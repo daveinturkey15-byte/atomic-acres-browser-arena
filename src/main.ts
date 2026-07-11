@@ -52,6 +52,11 @@ const WEAPONS: Record<WeaponId, WeaponSpec> = {
 };
 const WEAPON_ORDER: WeaponId[] = ['carbine', 'smg', 'scattergun'];
 
+function createPlayerId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
+  return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 app.innerHTML = `
@@ -150,7 +155,7 @@ buildSky();
 const arena: ArenaMap = buildArena(scene);
 
 const player = {
-  id: crypto.randomUUID(),
+  id: createPlayerId(),
   name: 'Player',
   team: 0 as Team,
   position: new THREE.Vector3(),
@@ -187,6 +192,32 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.textContent = text;
   statusEl.dataset.kind = kind;
 }
+
+function showFatalError(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  triggerHeld = false;
+  setStatus(`Game paused: ${message}`, 'error');
+  menu.classList.remove('hidden');
+  const banner = element<HTMLElement>('#banner');
+  banner.innerHTML = '<strong>SYSTEM PAUSED</strong><span>Reload the page to re-enter the test block.</span>';
+  banner.hidden = false;
+  console.error('[Atomic Acres fatal]', error);
+}
+
+const webRtcSupported = typeof window.RTCPeerConnection === 'function';
+if (!webRtcSupported) {
+  element<HTMLButtonElement>('#host').disabled = true;
+  element<HTMLButtonElement>('#join').disabled = true;
+  setStatus('This browser lacks WebRTC; solo training is still available.', 'warn');
+} else if (typeof canvas.requestPointerLock !== 'function') {
+  setStatus('Pointer lock is unavailable; keyboard movement works but mouse aim may not.', 'warn');
+}
+
+canvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  showFatalError(new Error('Graphics context was lost'));
+});
+canvas.addEventListener('webglcontextrestored', () => window.location.reload());
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
@@ -795,23 +826,27 @@ window.addEventListener('beforeunload', () => {
 });
 
 function frame(now: number): void {
-  const frameDt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
-  lastFrame = now;
-  accumulator += frameDt;
-  const step = 1 / 120;
-  let iterations = 0;
-  while (accumulator >= step && iterations < 6) {
-    updatePhysics(step);
-    accumulator -= step;
-    iterations += 1;
+  try {
+    const frameDt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
+    lastFrame = now;
+    accumulator += frameDt;
+    const step = 1 / 120;
+    let iterations = 0;
+    while (accumulator >= step && iterations < 6) {
+      updatePhysics(step);
+      accumulator -= step;
+      iterations += 1;
+    }
+    if (triggerHeld && WEAPONS[player.weapon].automatic) tryFire(now);
+    completeReload(now);
+    updateTargets(now);
+    updateRemotes(frameDt, now);
+    updateHud(now);
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  } catch (error) {
+    showFatalError(error);
   }
-  if (triggerHeld && WEAPONS[player.weapon].automatic) tryFire(now);
-  completeReload(now);
-  updateTargets(now);
-  updateRemotes(frameDt, now);
-  updateHud(now);
-  renderer.render(scene, camera);
-  requestAnimationFrame(frame);
 }
 respawn();
 requestAnimationFrame(frame);
