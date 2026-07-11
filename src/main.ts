@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import './style.css';
 import { ArenaAudio } from './audio';
-import { damp, resolveHorizontalMove, shortestAngleDelta } from './collision';
+import { damp, shortestAngleDelta } from './collision';
 import { ArenaMap, buildArena } from './map';
+import { loadArenaArt } from './environment-assets';
 import { ArenaNetwork } from './network';
+import { CharacterPhysics } from './physics';
+import { WeaponPresentation } from './weapon-presentation';
 import {
   DeathMessage,
   GameMessage,
@@ -78,7 +81,7 @@ app.innerHTML = `
     <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
     <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
     <div id="network-status" data-kind="ok">Ready for deployment.</div>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>SPACE</b> jump · <b>MOUSE</b> aim/fire · <b>R</b> reload · <b>1–3</b> weapons · <b>TAB</b> roster · <b>ESC</b> menu</div>
+    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>SPACE</b> jump · <b>RMB</b> aim · <b>LMB</b> fire · <b>R</b> reload · <b>1–3</b> weapons · <b>TAB</b> roster · <b>ESC</b> menu</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Desktop keyboard and mouse recommended.</p>
   </section>
   <div id="hud" hidden>
@@ -187,6 +190,9 @@ let recoilVisual = 0;
 let weaponBob = 0;
 let lastFrame = performance.now();
 let matchFinished = false;
+let adsHeld = false;
+let playerGrounded = false;
+let characterPhysics: CharacterPhysics | null = null;
 
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.textContent = text;
@@ -221,27 +227,7 @@ canvas.addEventListener('webglcontextrestored', () => window.location.reload());
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
-function createWeaponView(): THREE.Group {
-  const root = new THREE.Group();
-  root.name = 'weapon-view';
-  const dark = new THREE.MeshStandardMaterial({ color: 0x1d2228, roughness: 0.48, metalness: 0.55 });
-  const accent = new THREE.MeshStandardMaterial({ color: 0xb77d3c, roughness: 0.75 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.18, 0.72), dark);
-  body.position.z = -0.35;
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.46, 10), dark);
-  barrel.rotation.x = Math.PI / 2;
-  barrel.position.set(0, 0.02, -0.92);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.15), accent);
-  grip.rotation.x = -0.25;
-  grip.position.set(0, -0.17, -0.25);
-  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.1), dark);
-  sight.position.set(0, 0.13, -0.55);
-  root.add(body, barrel, grip, sight);
-  root.position.set(0.34, -0.27, -0.48);
-  camera.add(root);
-  return root;
-}
-const weaponView = createWeaponView();
+const weaponView = new WeaponPresentation(camera);
 const viewFill = new THREE.PointLight(0xd8ecff, 0.9, 5);
 viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
@@ -412,6 +398,7 @@ function requestGamePointerLock(): void {
 
 function respawn(): void {
   player.position.copy(spawnPoint());
+  characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
   player.hp = 100;
   player.alive = true;
@@ -448,7 +435,7 @@ function switchWeapon(index: number): void {
   if (!id || id === player.weapon) return;
   player.weapon = id;
   player.reloadingUntil = 0;
-  weaponView.rotation.set(0, 0, 0);
+  weaponView.setWeapon(id);
 }
 
 function reload(): void {
@@ -458,6 +445,7 @@ function reload(): void {
   if (player.reloadingUntil || ammo >= spec.mag || player.reserve[player.weapon] <= 0) return;
   player.reloadingUntil = performance.now() + spec.reload * 1000;
   audio.reload();
+  weaponView.reload(spec.reload);
   addFeed(`Reloading ${spec.name}`);
 }
 
@@ -487,6 +475,7 @@ function tryFire(now: number): void {
   player.ammo[player.weapon] -= 1;
   recoilVisual = Math.min(0.22, recoilVisual + spec.recoil * 3.8);
   player.pitch = Math.max(-1.42, player.pitch - spec.recoil);
+  weaponView.fire(spec.recoil);
   audio.shot(player.weapon);
 
   const origin = camera.getWorldPosition(new THREE.Vector3());
@@ -590,7 +579,7 @@ function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
 }
 
 function updatePhysics(dt: number): void {
-  if (!gameStarted || !player.alive || matchFinished) return;
+  if (!gameStarted || !player.alive || matchFinished || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const input = new THREE.Vector3();
@@ -599,9 +588,9 @@ function updatePhysics(dt: number): void {
   if (keys.has('KeyD')) input.add(right);
   if (keys.has('KeyA')) input.sub(right);
   if (input.lengthSq() > 0) input.normalize();
-  const sprinting = keys.has('ShiftLeft') && input.lengthSq() > 0;
+  const sprinting = keys.has('ShiftLeft') && input.lengthSq() > 0 && !adsHeld;
   const acceleration = sprinting ? 43 : 34;
-  const maxSpeed = sprinting ? 10.6 : 7.2;
+  const maxSpeed = sprinting ? 10.6 : adsHeld ? 4.2 : 7.2;
   player.velocity.x += input.x * acceleration * dt;
   player.velocity.z += input.z * acceleration * dt;
   const friction = Math.exp(-8.5 * dt);
@@ -613,26 +602,29 @@ function updatePhysics(dt: number): void {
     player.velocity.z *= maxSpeed / horizontal;
   }
   player.velocity.y -= 22 * dt;
-  const grounded = player.position.y <= 1.705;
-  if (grounded) {
-    player.position.y = 1.7;
+  if (playerGrounded) {
     player.velocity.y = Math.max(0, player.velocity.y);
-    if (keys.has('Space')) player.velocity.y = 7.1;
+    if (keys.has('Space') && !adsHeld) {
+      player.velocity.y = 7.1;
+      playerGrounded = false;
+    }
   }
-  const desired = player.position.clone().addScaledVector(player.velocity, dt);
-  if (desired.y < 1.7) desired.y = 1.7;
-  const resolved = resolveHorizontalMove(player.position, desired, arena.colliders, arena.bounds);
-  if (Math.abs(resolved.x - desired.x) > 0.001) player.velocity.x = 0;
-  if (Math.abs(resolved.z - desired.z) > 0.001) player.velocity.z = 0;
-  player.position.set(resolved.x, resolved.y, resolved.z);
+  const movement = characterPhysics.move({
+    x: player.velocity.x * dt,
+    y: player.velocity.y * dt,
+    z: player.velocity.z * dt,
+  }, dt);
+  player.position.set(movement.position.x, movement.position.y, movement.position.z);
+  playerGrounded = movement.grounded;
+  if (movement.blockedX) player.velocity.x = 0;
+  if (movement.blockedY && player.velocity.y < 0) player.velocity.y = 0;
+  if (movement.blockedZ) player.velocity.z = 0;
 
-  const moving = input.lengthSq() > 0 && grounded;
+  const moving = input.lengthSq() > 0 && playerGrounded;
   weaponBob += dt * (sprinting ? 15 : 10) * (moving ? 1 : 0.25);
-  const bob = moving ? Math.sin(weaponBob) * 0.018 : 0;
   recoilVisual = damp(recoilVisual, 0, 15, dt);
-  weaponView.position.set(0.34 + Math.cos(weaponBob * 0.5) * (moving ? 0.012 : 0), -0.27 + bob - recoilVisual * 0.45, -0.48 + recoilVisual);
-  weaponView.rotation.x = recoilVisual * 0.9;
-  camera.fov = damp(camera.fov, sprinting ? 81 : 76, 7, dt);
+  weaponView.update({ dt, moving, sprinting, ads: adsHeld, phase: weaponBob });
+  camera.fov = damp(camera.fov, adsHeld ? 62 : sprinting ? 81 : 76, 9, dt);
   camera.updateProjectionMatrix();
   camera.position.copy(player.position);
   camera.rotation.y = player.yaw;
@@ -741,25 +733,36 @@ window.addEventListener('keyup', (event) => {
 window.addEventListener('blur', () => {
   keys.clear();
   triggerHeld = false;
+  adsHeld = false;
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
   player.yaw -= event.movementX * 0.00215;
   player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019));
+  weaponView.addMouseDelta(event.movementX, event.movementY);
 });
+canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 canvas.addEventListener('mousedown', (event) => {
-  if (event.button !== 0) return;
   if (document.pointerLockElement !== canvas) {
     requestGamePointerLock();
     return;
   }
+  if (event.button === 2) {
+    adsHeld = true;
+    return;
+  }
+  if (event.button !== 0) return;
   triggerHeld = true;
   tryFire(performance.now());
 });
-window.addEventListener('mouseup', (event) => { if (event.button === 0) triggerHeld = false; });
+window.addEventListener('mouseup', (event) => {
+  if (event.button === 0) triggerHeld = false;
+  if (event.button === 2) adsHeld = false;
+});
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
     triggerHeld = false;
+    adsHeld = false;
     if (gameStarted && player.alive) {
       element<HTMLButtonElement>('#resume').hidden = matchFinished;
       menu.classList.remove('hidden');
@@ -848,5 +851,32 @@ function frame(now: number): void {
     showFatalError(error);
   }
 }
-respawn();
-requestAnimationFrame(frame);
+async function bootstrap(): Promise<void> {
+  const soloButton = element<HTMLButtonElement>('#solo');
+  const hostButton = element<HTMLButtonElement>('#host');
+  const joinButton = element<HTMLButtonElement>('#join');
+  soloButton.disabled = true;
+  hostButton.disabled = true;
+  joinButton.disabled = true;
+  setStatus('Loading authored arena art, weapons and advanced collision…');
+
+  const physicsPromise = CharacterPhysics.create(arena.colliders, arena.bounds);
+  const weaponPromise = weaponView.load((loaded, total) => {
+    setStatus(`Loading authored weapons ${loaded}/${total}…`);
+  });
+  const artPromise = loadArenaArt(scene, (loaded, total) => {
+    setStatus(`Loading authored arena models ${loaded}/${total}…`);
+  });
+  const [physics] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
+  characterPhysics = physics;
+  weaponView.setWeapon(player.weapon, true);
+  respawn();
+
+  soloButton.disabled = false;
+  hostButton.disabled = !webRtcSupported;
+  joinButton.disabled = !webRtcSupported;
+  setStatus('V2 foundation ready — authored arena art and weapons, ADS, and Rapier controller active.', 'ok');
+  requestAnimationFrame(frame);
+}
+
+void bootstrap().catch(showFatalError);
