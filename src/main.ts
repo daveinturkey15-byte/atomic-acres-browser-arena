@@ -1,8 +1,28 @@
 import * as THREE from 'three';
 import './style.css';
+import { batchStaticMeshes, buildOperator } from './art-kit';
+import { chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
-import { damp, shortestAngleDelta } from './collision';
+import { damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta } from './collision';
+import {
+  WEAPONS,
+  advanceMatch,
+  beginReload,
+  cancelReload,
+  completeReload as completeReloadState,
+  computeDamage,
+  computeSpread,
+  createMatch,
+  grenadeDamage,
+  meleeStrike,
+  movementProfile,
+  recoverRecoil,
+  type HitZone,
+  type MatchState,
+  type ReloadState,
+} from './gameplay';
 import { ArenaMap, buildArena } from './map';
+import { shouldRevealEnemy, worldToMinimap } from './minimap';
 import { loadArenaArt } from './environment-assets';
 import { ArenaNetwork } from './network';
 import { CharacterPhysics } from './physics';
@@ -25,21 +45,6 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('[Atomic Acres unhandled rejection]', reason);
 });
 
-type WeaponSpec = {
-  id: WeaponId;
-  name: string;
-  damage: number;
-  rpm: number;
-  mag: number;
-  reserve: number;
-  reload: number;
-  spread: number;
-  pellets: number;
-  recoil: number;
-  automatic: boolean;
-  color: number;
-};
-
 type RemotePlayer = {
   root: THREE.Group;
   snapshot: PlayerSnapshot;
@@ -48,11 +53,31 @@ type RemotePlayer = {
   lastSeen: number;
 };
 
-const WEAPONS: Record<WeaponId, WeaponSpec> = {
-  carbine: { id: 'carbine', name: 'M86 Carbine', damage: 31, rpm: 540, mag: 24, reserve: 96, reload: 1.75, spread: 0.008, pellets: 1, recoil: 0.018, automatic: false, color: 0xffd166 },
-  smg: { id: 'smg', name: 'Vectorline SMG', damage: 18, rpm: 820, mag: 32, reserve: 128, reload: 1.45, spread: 0.019, pellets: 1, recoil: 0.011, automatic: true, color: 0x65e7ff },
-  scattergun: { id: 'scattergun', name: 'Model 12 Scattergun', damage: 13, rpm: 90, mag: 8, reserve: 40, reload: 2.3, spread: 0.072, pellets: 9, recoil: 0.05, automatic: false, color: 0xff8a5b },
+type BotPlayer = {
+  id: string;
+  name: string;
+  team: Team;
+  root: THREE.Group;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  hp: number;
+  alive: boolean;
+  kills: number;
+  deaths: number;
+  lastShotAt: number;
+  lastSightAt: number;
+  hasLineOfSight: boolean;
+  invulnerableUntil: number;
+  respawnAt: number;
+  waypoint: number;
 };
+
+type GrenadeEntity = {
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  explodeAt: number;
+};
+
 const WEAPON_ORDER: WeaponId[] = ['carbine', 'smg', 'scattergun'];
 
 function createPlayerId(): string {
@@ -66,22 +91,26 @@ app.innerHTML = `
   <canvas id="game" aria-label="Atomic Acres multiplayer arena"></canvas>
   <div id="vignette"></div><div id="damage-flash"></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · BUILD 86</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · STRUCTURED PASS 01</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A fast retro-future two-house arena: tiny sightlines, frantic flanks, coach-versus-truck chaos and peer-to-peer multiplayer.</p>
+    <p class="lede">A fast retro-future test-town skirmish with responsive movement, full weapon handling, bot combat and peer-to-peer multiplayer.</p>
     <div class="setup-grid">
       <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
       <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
     </div>
     <div class="menu-actions">
       <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
-      <button id="solo" class="primary">TRAIN SOLO</button>
+      <button id="solo" class="primary">BOT SKIRMISH</button>
       <button id="host">HOST LOBBY</button>
     </div>
     <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
     <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
     <div id="network-status" data-kind="ok">Ready for deployment.</div>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>SPACE</b> jump · <b>RMB</b> aim · <b>LMB</b> fire · <b>R</b> reload · <b>1–3</b> weapons · <b>TAB</b> roster · <b>ESC</b> menu</div>
+    <div class="settings-grid">
+      <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
+      <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
+    </div>
+    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Desktop keyboard and mouse recommended.</p>
   </section>
   <div id="hud" hidden>
@@ -89,8 +118,10 @@ app.innerHTML = `
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="killfeed"></div>
     <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
+    <canvas id="minimap" width="180" height="180" aria-label="Tactical minimap"></canvas>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
-    <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">24</b><i>/</i><em id="reserve">96</em></div><small id="reload-state"></small></div>
+    <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
+    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V MELEE · G THROW</small></div>
     <div id="room-hud"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span>Reconstituting mannequin operator…</span></div>
     <div id="banner" hidden></div>
@@ -110,15 +141,20 @@ const hudRoot = element<HTMLElement>('#hud');
 const roomCard = element<HTMLElement>('#room-card');
 const roomCodeEl = element<HTMLElement>('#room-code');
 const statusEl = element<HTMLElement>('#network-status');
+const minimapCanvas = element<HTMLCanvasElement>('#minimap');
+const minimapContextValue = minimapCanvas.getContext('2d');
+if (!minimapContextValue) throw new Error('Canvas2D minimap is unavailable');
+const minimapContext: CanvasRenderingContext2D = minimapContextValue;
 const audio = new ArenaAudio();
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const reducedRenderMode = new URLSearchParams(window.location.search).get('render') === 'compat';
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !reducedRenderMode, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !reducedRenderMode;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+renderer.setPixelRatio(reducedRenderMode ? 0.25 : Math.min(window.devicePixelRatio, 1.75));
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xe8b781, 55, 118);
@@ -169,10 +205,15 @@ const player = {
   kills: 0,
   deaths: 0,
   weapon: 'carbine' as WeaponId,
-  ammo: { carbine: 24, smg: 32, scattergun: 8 } as Record<WeaponId, number>,
-  reserve: { carbine: 96, smg: 128, scattergun: 40 } as Record<WeaponId, number>,
-  reloadingUntil: 0,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve } as Record<WeaponId, number>,
+  reloadState: null as ReloadState | null,
+  switchingUntil: 0,
   lastShotAt: 0,
+  sustainedShots: 0,
+  crouched: false,
+  grenades: 1,
+  lastMeleeAt: -10_000,
   alive: true,
   invulnerableUntil: 0,
   seq: 0,
@@ -180,18 +221,30 @@ const player = {
 
 const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
+const bots = new Map<string, BotPlayer>();
+const grenades: GrenadeEntity[] = [];
 const processedNonces = new Set<number>();
 let gameStarted = false;
+let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let triggerHeld = false;
-let startTime = 0;
 let targetHits = 0;
 let accumulator = 0;
 let recoilVisual = 0;
+let landingImpulse = 0;
 let weaponBob = 0;
+let lastFootstepAt = 0;
 let lastFrame = performance.now();
+let lastHudAt = 0;
+let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
+let matchState: MatchState = createMatch(performance.now());
 let matchFinished = false;
 let adsHeld = false;
 let playerGrounded = false;
+let wasGrounded = false;
+let sensitivity = 1;
+let preferredFov = 82;
+let botsFrozen = false;
+let debugInputUnlocked = false;
 let characterPhysics: CharacterPhysics | null = null;
 
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
@@ -227,27 +280,18 @@ canvas.addEventListener('webglcontextrestored', () => window.location.reload());
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
-const weaponView = new WeaponPresentation(camera);
+const weaponView = new WeaponPresentation(camera, reducedRenderMode);
 const viewFill = new THREE.PointLight(0xd8ecff, 0.9, 5);
 viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
 
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
-  const root = new THREE.Group();
-  root.name = 'remote-player';
+  const root = buildOperator(snapshot.team, 'remote-player', reducedRenderMode);
   root.userData.playerId = snapshot.id;
-  const teamMaterial = new THREE.MeshStandardMaterial({ color: snapshot.team === 0 ? 0x52d5d2 : 0xff765f, roughness: 0.62 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x202a31, roughness: 0.8 });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.05, 5, 10), teamMaterial);
-  body.position.y = 0.96;
-  body.castShadow = true;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 10), dark);
-  head.position.y = 1.85;
-  head.castShadow = true;
-  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.7), dark);
-  gun.position.set(0.28, 1.25, -0.35);
-  root.add(body, head, gun);
-  root.traverse((child) => { child.userData.playerId = snapshot.id; });
+  root.traverse((child) => {
+    child.userData.playerId = snapshot.id;
+    child.userData.targetRoot = root;
+  });
 
   const labelCanvas = document.createElement('canvas');
   labelCanvas.width = 256;
@@ -359,12 +403,14 @@ function applyDamage(damage: number, attacker: string): void {
 }
 
 function processDeath(message: DeathMessage): void {
-  const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? 'Unknown';
-  const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? 'Unknown';
+  const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
+  const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   if (message.killer === player.id && message.victim !== player.id) player.kills += 1;
   addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
   const remote = remotes.get(message.victim);
   if (remote) remote.root.visible = false;
+  const bot = bots.get(message.victim);
+  if (bot) bot.root.visible = false;
   checkMatchEnd();
 }
 
@@ -396,31 +442,37 @@ function requestGamePointerLock(): void {
   }
 }
 
-function respawn(): void {
+function respawn(requestLock = true): void {
   player.position.copy(spawnPoint());
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
   player.hp = 100;
+  player.grenades = 1;
+  player.reloadState = null;
+  player.crouched = false;
   player.alive = true;
   player.invulnerableUntil = performance.now() + 1350;
   player.yaw = player.team === 0 ? Math.PI : 0;
   player.pitch = 0;
   element<HTMLElement>('#respawn').hidden = true;
-  if (gameStarted) requestGamePointerLock();
+  if (gameStarted && requestLock) requestGamePointerLock();
   network.send({ type: 'state', player: snapshot() });
 }
 
-function startGame(mode: 'solo' | 'host' | 'client'): void {
+function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   player.name = sanitizeName(element<HTMLInputElement>('#player-name').value);
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  gameMode = mode;
+  botsFrozen = false;
+  matchState = createMatch(performance.now());
   matchFinished = false;
-  startTime = performance.now();
   menu.classList.add('hidden');
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = mode === 'solo' ? 'SOLO DRILL' : mode === 'host' ? 'HOST' : 'PEER';
+  element<HTMLElement>('#connection-pill').textContent = mode === 'solo' ? 'BOT SKIRMISH' : mode === 'host' ? 'HOST' : 'PEER';
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
-  respawn();
+  respawn(requestLock);
+  if (mode === 'solo') spawnBots();
   audio.unlock();
   addFeed('Welcome to Atomic Acres', 'gold');
   if (mode !== 'solo') network.send({ type: 'join', player: snapshot() });
@@ -432,38 +484,49 @@ function randomNonce(): number {
 
 function switchWeapon(index: number): void {
   const id = WEAPON_ORDER[index];
-  if (!id || id === player.weapon) return;
+  if (!id || id === player.weapon || !player.alive) return;
+  if (player.reloadState) {
+    if (!cancelReload(player.reloadState, performance.now())) return;
+    player.reloadState = null;
+    weaponView.cancelReload();
+  }
   player.weapon = id;
-  player.reloadingUntil = 0;
+  player.switchingUntil = performance.now() + 360;
+  player.sustainedShots = 0;
   weaponView.setWeapon(id);
 }
 
 function reload(): void {
-  if (!player.alive) return;
+  if (!player.alive || matchState.phase !== 'active') return;
   const spec = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
-  if (player.reloadingUntil || ammo >= spec.mag || player.reserve[player.weapon] <= 0) return;
-  player.reloadingUntil = performance.now() + spec.reload * 1000;
+  if (player.reloadState || ammo >= spec.mag || player.reserve[player.weapon] <= 0) return;
+  player.reloadState = beginReload(spec, ammo, player.reserve[player.weapon], performance.now());
   audio.reload();
   weaponView.reload(spec.reload);
   addFeed(`Reloading ${spec.name}`);
 }
 
-function completeReload(now: number): void {
-  if (!player.reloadingUntil || now < player.reloadingUntil) return;
-  const spec = WEAPONS[player.weapon];
-  const needed = spec.mag - player.ammo[player.weapon];
-  const amount = Math.min(needed, player.reserve[player.weapon]);
-  player.ammo[player.weapon] += amount;
-  player.reserve[player.weapon] -= amount;
-  player.reloadingUntil = 0;
+function finishReload(now: number): void {
+  if (!player.reloadState) return;
+  const state = completeReloadState(player.reloadState, now, player.ammo[player.weapon], player.reserve[player.weapon]);
+  if (state.completed) {
+    player.ammo[player.weapon] = state.ammo;
+    player.reserve[player.weapon] = state.reserve;
+    player.reloadState = null;
+  }
 }
 
 function tryFire(now: number): void {
-  if (!player.alive || !gameStarted || document.pointerLockElement !== canvas || matchFinished) return;
+  if (!player.alive || !gameStarted || (!debugInputUnlocked && document.pointerLockElement !== canvas) || matchState.phase !== 'active') return;
   const spec = WEAPONS[player.weapon];
   if (!triggerHeld && spec.automatic) return;
-  if (player.reloadingUntil) return;
+  if (now < player.switchingUntil) return;
+  if (player.reloadState) {
+    if (!cancelReload(player.reloadState, now)) return;
+    player.reloadState = null;
+    weaponView.cancelReload();
+  }
   if (now - player.lastShotAt < 60_000 / spec.rpm) return;
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
@@ -471,32 +534,52 @@ function tryFire(now: number): void {
     player.lastShotAt = now;
     return;
   }
+  player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
   player.ammo[player.weapon] -= 1;
-  recoilVisual = Math.min(0.22, recoilVisual + spec.recoil * 3.8);
-  player.pitch = Math.max(-1.42, player.pitch - spec.recoil);
-  weaponView.fire(spec.recoil);
+  recoilVisual = Math.min(0.24, recoilVisual + spec.recoilPitch * 4.2);
+  player.pitch = Math.max(-1.42, player.pitch - spec.recoilPitch);
+  weaponView.fire(spec.recoilPitch);
   audio.shot(player.weapon);
 
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const baseDirection = camera.getWorldDirection(new THREE.Vector3());
-  const hitDamage = new Map<string, number>();
+  const moving = Math.hypot(player.velocity.x, player.velocity.z) > 1.2;
+  const spread = computeSpread(spec, {
+    ads: adsHeld,
+    moving,
+    crouched: player.crouched,
+    sustainedShots: player.sustainedShots,
+  });
+  const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
     const direction = baseDirection.clone();
-    direction.x += (Math.random() - 0.5) * spec.spread;
-    direction.y += (Math.random() - 0.5) * spec.spread;
-    direction.z += (Math.random() - 0.5) * spec.spread;
+    direction.x += (Math.random() - 0.5) * spread;
+    direction.y += (Math.random() - 0.5) * spread;
+    direction.z += (Math.random() - 0.5) * spread;
     direction.normalize();
     const result = castShot(origin, direction);
     spawnTracer(origin, direction, result.distance, spec.color);
-    if (result.playerId) hitDamage.set(result.playerId, (hitDamage.get(result.playerId) ?? 0) + spec.damage);
+    if (result.playerId) {
+      const zone = result.hitZone ?? 'body';
+      const damage = computeDamage(spec, result.distance, zone);
+      const prior = hitDamage.get(result.playerId);
+      hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
+    }
     if (result.targetId) hitPracticeTarget(result.targetId);
   }
-  for (const [target, damage] of hitDamage) {
-    const nonce = randomNonce();
-    network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, damage), nonce });
-    showHitmarker();
-    audio.hit();
+  for (const [target, hit] of hitDamage) {
+    const bot = bots.get(target);
+    if (bot) applyBotDamage(bot, Math.min(100, hit.damage), hit.zone);
+    else {
+      const remote = remotes.get(target);
+      if (remote && remote.snapshot.team !== player.team) {
+        const nonce = randomNonce();
+        network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), nonce });
+        showHitmarker(hit.zone === 'head');
+        audio.hit();
+      }
+    }
   }
   const shot: ShotMessage = {
     type: 'shot',
@@ -510,23 +593,244 @@ function tryFire(now: number): void {
   if (player.ammo[player.weapon] === 0) setTimeout(reload, 120);
 }
 
-function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: number; playerId?: string; targetId?: string } {
+function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: number; playerId?: string; targetId?: string; hitZone?: HitZone } {
   const ray = new THREE.Raycaster(origin, direction, 0.1, 110);
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
+  const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
   const activeTargets = arena.targets.filter((target) => target.active).map((target) => target.root);
-  const intersections = ray.intersectObjects([...arena.raycastMeshes, ...remoteObjects, ...activeTargets], true);
+  const intersections = ray.intersectObjects([...arena.raycastMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
   const first = intersections[0];
   if (!first) return { distance: 90 };
   let node: THREE.Object3D | null = first.object;
-  while (node && node.parent && node.parent !== scene) {
-    if (node.userData.playerId || node.userData.targetId) break;
-    if (node.userData.targetRoot) node = node.userData.targetRoot as THREE.Object3D;
-    else node = node.parent;
+  let playerId: string | undefined;
+  let targetId: string | undefined;
+  let hitZone: HitZone | undefined;
+  while (node) {
+    playerId ??= node.userData.playerId as string | undefined;
+    targetId ??= node.userData.targetId as string | undefined;
+    hitZone ??= node.userData.hitZone as HitZone | undefined;
+    node = node.parent;
   }
-  const playerId = first.object.userData.playerId as string | undefined;
   const targetRoot = first.object.userData.targetRoot as THREE.Group | undefined;
-  const targetId = (targetRoot?.userData.targetId ?? node?.userData.targetId) as string | undefined;
-  return { distance: Math.min(first.distance, 110), playerId, targetId };
+  targetId ??= targetRoot?.userData.targetId as string | undefined;
+  return { distance: Math.min(first.distance, 110), playerId, targetId, hitZone };
+}
+
+function spawnBots(): void {
+  clearBots();
+  const botTeam: Team = player.team === 0 ? 1 : 0;
+  const names = ['RIVET', 'MABEL', 'BOLT', 'TANGO'];
+  const spawnOptions = arena.spawns[botTeam];
+  names.forEach((name, index) => {
+    const id = `bot-${index}`;
+    const root = buildOperator(botTeam, 'bot-operator', reducedRenderMode);
+    root.userData.playerId = id;
+    root.traverse((node) => {
+      node.userData.playerId = id;
+      node.userData.targetRoot = root;
+    });
+    const spawn = spawnOptions[index % spawnOptions.length];
+    const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
+    root.position.copy(position);
+    scene.add(root);
+    bots.set(id, {
+      id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
+      kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
+      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index,
+    });
+  });
+  addFeed('Four hostile operators entered the block', 'coral');
+}
+
+function clearBots(): void {
+  for (const bot of bots.values()) scene.remove(bot.root);
+  bots.clear();
+}
+
+function botHasLineOfSight(bot: BotPlayer): boolean {
+  const origin = { x: bot.position.x, y: bot.position.y + 1.65, z: bot.position.z };
+  const target = { x: player.position.x, y: player.position.y, z: player.position.z };
+  return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
+}
+
+function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
+  const now = performance.now();
+  if (!bot.alive || now < bot.invulnerableUntil) return;
+  bot.hp = Math.max(0, bot.hp - damage);
+  showHitmarker(zone === 'head');
+  audio.hit();
+  if (bot.hp > 0) return;
+  bot.alive = false;
+  bot.deaths += 1;
+  bot.respawnAt = now + 2_200;
+  bot.root.visible = false;
+  player.kills += 1;
+  addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
+  checkMatchEnd();
+}
+
+function respawnBot(bot: BotPlayer, now: number): void {
+  const state = respawnBotState(now);
+  const spawns = arena.spawns[bot.team];
+  const spawn = spawns[(bot.deaths + bot.waypoint) % spawns.length];
+  bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
+  bot.root.position.copy(bot.position);
+  bot.hp = state.health;
+  bot.alive = state.alive;
+  bot.invulnerableUntil = state.invulnerableUntil;
+  bot.lastShotAt = state.lastShotAt;
+  bot.lastSightAt = 0;
+  bot.hasLineOfSight = false;
+  bot.root.visible = true;
+}
+
+function updateBots(dt: number, now: number): void {
+  if (gameMode !== 'solo' || matchState.phase !== 'active' || botsFrozen) return;
+  let botIndex = 0;
+  for (const bot of bots.values()) {
+    botIndex += 1;
+    if (!bot.alive) {
+      if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
+      continue;
+    }
+    const toPlayer = player.position.clone().setY(0).sub(bot.position.clone().setY(0));
+    const distance = toPlayer.length();
+    const sightInterval = 130 + botIndex * 17;
+    if (now - bot.lastSightAt >= sightInterval) {
+      bot.lastSightAt = now;
+      bot.hasLineOfSight = player.alive && botHasLineOfSight(bot);
+    }
+    const lineOfSight = bot.hasLineOfSight;
+    const intent = chooseBotIntent({
+      alive: bot.alive,
+      distanceToPlayer: distance,
+      hasLineOfSight: lineOfSight,
+      health: bot.hp,
+      now,
+      lastShotAt: bot.lastShotAt,
+      waypointReached: false,
+      random: Math.random(),
+    });
+    const forward = distance > 0.01 ? toPlayer.normalize() : new THREE.Vector3(0, 0, -1);
+    const side = new THREE.Vector3(-forward.z, 0, forward.x);
+    const desiredDirection = intent.movement === 'advance' ? forward
+      : intent.movement === 'retreat' ? forward.clone().multiplyScalar(-1)
+        : intent.movement === 'strafe-left' ? side.clone().multiplyScalar(-1)
+          : intent.movement === 'strafe-right' ? side : new THREE.Vector3();
+    const speed = intent.movement.startsWith('strafe') ? 3.2 : 3.8;
+    const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
+    let resolved = resolveHorizontalMove(bot.position, desired, arena.colliders, arena.bounds, 0.44);
+    if (Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002 && desiredDirection.lengthSq() > 0) {
+      const detour = bot.position.clone().addScaledVector(side, (bot.waypoint % 2 === 0 ? 1 : -1) * speed * dt * 1.4);
+      resolved = resolveHorizontalMove(bot.position, detour, arena.colliders, arena.bounds, 0.44);
+      bot.waypoint += 1;
+    }
+    bot.position.set(resolved.x, bot.position.y, resolved.z);
+    bot.root.position.copy(bot.position);
+    bot.root.lookAt(player.position.x, bot.position.y + 1.1, player.position.z);
+
+    if (intent.fire && player.alive) {
+      bot.lastShotAt = now;
+      const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
+      const direction = player.position.clone().sub(origin).normalize();
+      const jitter = THREE.MathUtils.lerp(0.055, 0.012, Math.min(1, (now - matchState.phaseStartedAt) / 120_000));
+      direction.x += (Math.random() - 0.5) * jitter;
+      direction.y += (Math.random() - 0.5) * jitter;
+      direction.z += (Math.random() - 0.5) * jitter;
+      direction.normalize();
+      spawnTracer(origin, direction, Math.min(distance, 75), WEAPONS.carbine.color);
+      audio.shot('carbine', true);
+      const rayToPlayer = new THREE.Ray(origin, direction);
+      const closest = rayToPlayer.closestPointToPoint(player.position, new THREE.Vector3());
+      if (closest.distanceTo(player.position) < 0.55 && lineOfSight) {
+        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * 0.72;
+        applyDamage(damage, bot.id);
+        if (!player.alive) {
+          bot.kills += 1;
+          checkMatchEnd();
+        }
+      }
+    }
+  }
+}
+
+function melee(): void {
+  const now = performance.now();
+  if (!meleeStrike(2, now, player.lastMeleeAt).hit || !player.alive || matchState.phase !== 'active') return;
+  player.lastMeleeAt = now;
+  weaponView.melee();
+  audio.melee();
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  const hit = castShot(origin, direction);
+  if (!hit.playerId || hit.distance > 2.25) return;
+  const bot = bots.get(hit.playerId);
+  if (bot) applyBotDamage(bot, 70, hit.hitZone ?? 'body');
+  else if (remotes.has(hit.playerId)) network.send({ type: 'hit', by: player.id, target: hit.playerId, damage: 70, nonce: randomNonce() });
+}
+
+function throwGrenade(): void {
+  if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
+  player.grenades -= 1;
+  weaponView.throwGrenade();
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 14, 10),
+    new THREE.MeshStandardMaterial({ color: 0x34413a, roughness: 0.55, metalness: 0.48 }),
+  );
+  mesh.position.copy(origin);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  grenades.push({ mesh, velocity: direction.multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0)), explodeAt: performance.now() + 2_300 });
+}
+
+function explodeGrenade(entity: GrenadeEntity): void {
+  const point = entity.mesh.position.clone();
+  scene.remove(entity.mesh);
+  audio.explosion();
+  const flash = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 20, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffb24c, transparent: true, opacity: 0.72 }),
+  );
+  flash.position.copy(point); flash.scale.setScalar(0.2); scene.add(flash);
+  const light = new THREE.PointLight(0xff7b2e, 12, 18, 2); light.position.copy(point); scene.add(light);
+  const started = performance.now();
+  const animate = () => {
+    const t = (performance.now() - started) / 420;
+    if (t >= 1) { scene.remove(flash, light); return; }
+    flash.scale.setScalar(0.2 + t * 5.5);
+    (flash.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - t);
+    light.intensity = 12 * (1 - t);
+    requestAnimationFrame(animate);
+  };
+  animate();
+  for (const bot of bots.values()) {
+    const damage = grenadeDamage(bot.position.distanceTo(point));
+    if (damage > 0) applyBotDamage(bot, damage, 'body');
+  }
+  const selfDamage = grenadeDamage(player.position.distanceTo(point)) * 0.35;
+  if (selfDamage > 0) applyDamage(selfDamage, player.id);
+}
+
+function updateGrenades(dt: number, now: number): void {
+  for (let index = grenades.length - 1; index >= 0; index -= 1) {
+    const grenade = grenades[index];
+    grenade.velocity.y -= 18 * dt;
+    grenade.mesh.position.addScaledVector(grenade.velocity, dt);
+    grenade.mesh.rotation.x += dt * 8;
+    grenade.mesh.rotation.z += dt * 11;
+    if (grenade.mesh.position.y < 0.18) {
+      grenade.mesh.position.y = 0.18;
+      grenade.velocity.y = Math.abs(grenade.velocity.y) * 0.42;
+      grenade.velocity.x *= 0.72;
+      grenade.velocity.z *= 0.72;
+    }
+    if (now >= grenade.explodeAt) {
+      grenades.splice(index, 1);
+      explodeGrenade(grenade);
+    }
+  }
 }
 
 function hitPracticeTarget(id: string): void {
@@ -543,6 +847,10 @@ function hitPracticeTarget(id: string): void {
 
 function updateTargets(now: number): void {
   for (const target of arena.targets) {
+    if (gameMode === 'solo') {
+      target.root.visible = false;
+      continue;
+    }
     if (!target.active && now >= target.respawnAt) {
       target.active = true;
       target.root.visible = true;
@@ -561,9 +869,10 @@ function spawnTracer(origin: THREE.Vector3, direction: THREE.Vector3, distance: 
   }, 55);
 }
 
-function showHitmarker(): void {
+function showHitmarker(headshot = false): void {
   const marker = element<HTMLElement>('#hitmarker');
-  marker.classList.remove('show');
+  marker.classList.remove('show', 'headshot');
+  if (headshot) marker.classList.add('headshot');
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
@@ -579,7 +888,7 @@ function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
 }
 
 function updatePhysics(dt: number): void {
-  if (!gameStarted || !player.alive || matchFinished || !characterPhysics) return;
+  if (!gameStarted || !player.alive || matchState.phase === 'ended' || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const input = new THREE.Vector3();
@@ -588,27 +897,28 @@ function updatePhysics(dt: number): void {
   if (keys.has('KeyD')) input.add(right);
   if (keys.has('KeyA')) input.sub(right);
   if (input.lengthSq() > 0) input.normalize();
-  const sprinting = keys.has('ShiftLeft') && input.lengthSq() > 0 && !adsHeld;
-  const acceleration = sprinting ? 43 : 34;
-  const maxSpeed = sprinting ? 10.6 : adsHeld ? 4.2 : 7.2;
-  player.velocity.x += input.x * acceleration * dt;
-  player.velocity.z += input.z * acceleration * dt;
-  const friction = Math.exp(-8.5 * dt);
+  player.crouched = keys.has('KeyC') && playerGrounded;
+  const sprinting = keys.has('ShiftLeft') && input.lengthSq() > 0 && !adsHeld && !player.crouched;
+  const profile = movementProfile({ crouched: player.crouched, ads: adsHeld, sprinting, grounded: playerGrounded });
+  player.velocity.x += input.x * profile.acceleration * dt;
+  player.velocity.z += input.z * profile.acceleration * dt;
+  const friction = Math.exp(-profile.friction * dt);
   player.velocity.x *= friction;
   player.velocity.z *= friction;
   const horizontal = Math.hypot(player.velocity.x, player.velocity.z);
-  if (horizontal > maxSpeed) {
-    player.velocity.x *= maxSpeed / horizontal;
-    player.velocity.z *= maxSpeed / horizontal;
+  if (horizontal > profile.maxSpeed) {
+    player.velocity.x *= profile.maxSpeed / horizontal;
+    player.velocity.z *= profile.maxSpeed / horizontal;
   }
   player.velocity.y -= 22 * dt;
   if (playerGrounded) {
     player.velocity.y = Math.max(0, player.velocity.y);
-    if (keys.has('Space') && !adsHeld) {
-      player.velocity.y = 7.1;
+    if (keys.has('Space') && !adsHeld && !player.crouched && matchState.phase === 'active') {
+      player.velocity.y = profile.jumpVelocity;
       playerGrounded = false;
     }
   }
+  const impactVelocity = player.velocity.y;
   const movement = characterPhysics.move({
     x: player.velocity.x * dt,
     y: player.velocity.y * dt,
@@ -616,17 +926,26 @@ function updatePhysics(dt: number): void {
   }, dt);
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
+  if (playerGrounded && !wasGrounded && impactVelocity < -5) landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
+  wasGrounded = playerGrounded;
   if (movement.blockedX) player.velocity.x = 0;
   if (movement.blockedY && player.velocity.y < 0) player.velocity.y = 0;
   if (movement.blockedZ) player.velocity.z = 0;
 
   const moving = input.lengthSq() > 0 && playerGrounded;
-  weaponBob += dt * (sprinting ? 15 : 10) * (moving ? 1 : 0.25);
-  recoilVisual = damp(recoilVisual, 0, 15, dt);
-  weaponView.update({ dt, moving, sprinting, ads: adsHeld, phase: weaponBob });
-  camera.fov = damp(camera.fov, adsHeld ? 62 : sprinting ? 81 : 76, 9, dt);
+  const now = performance.now();
+  if (moving && now - lastFootstepAt >= (sprinting ? 330 : player.crouched ? 610 : 440)) {
+    lastFootstepAt = now;
+    audio.footstep(sprinting);
+  }
+  weaponBob += dt * (sprinting ? 15 : player.crouched ? 7 : 10) * (moving ? 1 : 0.25);
+  recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
+  landingImpulse = damp(landingImpulse, 0, 10, dt);
+  weaponView.update({ dt, moving, sprinting, crouched: player.crouched, ads: adsHeld, phase: weaponBob, landingImpulse });
+  camera.fov = damp(camera.fov, adsHeld ? Math.max(55, preferredFov - 20) : sprinting ? preferredFov + 4 : preferredFov, 9, dt);
   camera.updateProjectionMatrix();
   camera.position.copy(player.position);
+  if (player.crouched) camera.position.y -= 0.54;
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
 }
@@ -650,21 +969,92 @@ function teamScores(): [number, number] {
     if (remote.snapshot.team === 0) aqua += remote.snapshot.kills;
     else coral += remote.snapshot.kills;
   }
+  for (const bot of bots.values()) {
+    if (bot.team === 0) aqua += bot.kills;
+    else coral += bot.kills;
+  }
   return [aqua, coral];
 }
 
-function checkMatchEnd(): void {
-  const [aqua, coral] = teamScores();
-  if (matchFinished || (aqua < 25 && coral < 25)) return;
-  matchFinished = true;
-  const won = (player.team === 0 ? aqua : coral) >= 25;
+function updateMatchState(now: number): void {
+  const previous = matchState.phase;
+  const scores = teamScores();
+  matchState = advanceMatch(matchState, now, scores);
+  if (previous === matchState.phase) return;
   const banner = element<HTMLElement>('#banner');
-  banner.innerHTML = `<strong>${won ? 'VICTORY' : 'DEFEAT'}</strong><span>${aqua} — ${coral}</span>`;
-  banner.hidden = false;
-  document.exitPointerLock();
+  if (matchState.phase === 'active') {
+    banner.innerHTML = '<strong>ENGAGE</strong><span>First squad to 25</span>';
+    banner.hidden = false;
+    window.setTimeout(() => { if (matchState.phase === 'active') banner.hidden = true; }, 900);
+    return;
+  }
+  if (matchState.phase === 'ended') {
+    matchFinished = true;
+    const won = matchState.winner === player.team;
+    const draw = matchState.winner === 'draw';
+    banner.innerHTML = `<strong>${draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT'}</strong><span>${scores[0]} — ${scores[1]} · CLICK BOT SKIRMISH FOR REMATCH</span>`;
+    banner.hidden = false;
+    document.exitPointerLock();
+  }
+}
+
+function checkMatchEnd(): void {
+  updateMatchState(performance.now());
+}
+
+function updateMinimap(now: number): void {
+  const context = minimapContext;
+  const width = minimapCanvas.width;
+  const height = minimapCanvas.height;
+  const bounds = arena.bounds;
+  const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = 'rgba(7, 15, 18, .78)';
+  context.fillRect(0, 0, width, height);
+  context.strokeStyle = 'rgba(244, 196, 79, .5)';
+  context.lineWidth = 2;
+  context.strokeRect(2, 2, width - 4, height - 4);
+
+  const [roadLeft] = point(-10.25, 0);
+  const [roadRight] = point(10.25, 0);
+  context.fillStyle = 'rgba(126, 137, 132, .18)';
+  context.fillRect(roadLeft, 2, roadRight - roadLeft, height - 4);
+  for (const [x, z, team] of [[-11, -34, 0], [11, 34, 1]] as Array<[number, number, Team]>) {
+    const [cx, cy] = point(x, z);
+    const houseWidth = (16.4 / (bounds.maxX - bounds.minX)) * width;
+    const houseHeight = (15 / (bounds.maxZ - bounds.minZ)) * height;
+    context.fillStyle = team === 0 ? 'rgba(88, 227, 220, .2)' : 'rgba(255, 118, 95, .2)';
+    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+  }
+  for (const remote of remotes.values()) {
+    const friendly = remote.snapshot.team === player.team;
+    if (!friendly && remote.target.distanceTo(player.position) > 15) continue;
+    const [x, y] = point(remote.target.x, remote.target.z);
+    context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
+    context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive || !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    const [x, y] = point(bot.position.x, bot.position.z);
+    context.fillStyle = '#ff765f';
+    context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
+  }
+  const [px, py] = point(player.position.x, player.position.z);
+  context.save();
+  context.translate(px, py);
+  context.rotate(-player.yaw);
+  context.fillStyle = player.team === 0 ? '#58e3dc' : '#ff765f';
+  context.beginPath(); context.moveTo(0, -7); context.lineTo(5, 6); context.lineTo(-5, 6); context.closePath(); context.fill();
+  context.restore();
 }
 
 function updateHud(now: number): void {
+  // DOM reconstruction and 2D minimap drawing do not need to run at render rate.
+  // Keeping them at 10 Hz removes main-thread pressure without reducing simulation
+  // or WebGL frame cadence.
+  if (now - lastHudAt < 100) return;
+  lastHudAt = now;
+  if (gameStarted) updateMatchState(now);
   const spec = WEAPONS[player.weapon];
   const [aqua, coral] = teamScores();
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
@@ -674,24 +1064,32 @@ function updateHud(now: number): void {
   element<HTMLElement>('#reserve').textContent = String(player.reserve[player.weapon]);
   element<HTMLElement>('#aqua-score').textContent = String(aqua);
   element<HTMLElement>('#coral-score').textContent = String(coral);
-  const remaining = Math.max(0, 300 - Math.floor((now - startTime) / 1000));
-  element<HTMLElement>('#timer').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
-  element<HTMLElement>('#reload-state').textContent = player.reloadingUntil ? `RELOADING ${Math.max(0, (player.reloadingUntil - now) / 1000).toFixed(1)}s` : network.role === 'offline' ? `${targetHits} TARGETS HIT` : `${player.kills} K / ${player.deaths} D`;
+  const remainingMs = Math.max(0, matchState.endsAt - now);
+  const remaining = matchState.phase === 'warmup' ? Math.ceil(remainingMs / 1000) : Math.floor(remainingMs / 1000);
+  element<HTMLElement>('#timer').textContent = matchState.phase === 'warmup'
+    ? `00:0${Math.min(9, remaining)}`
+    : `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+  element<HTMLElement>('#objective').textContent = matchState.phase === 'warmup' ? `MATCH STARTS IN ${remaining}` : 'ATOMIC ACRES · FIRST TO 25';
+  element<HTMLElement>('#reload-state').textContent = player.reloadState
+    ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
+    : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
+  element<HTMLElement>('#stance').textContent = player.crouched ? 'CROUCHED' : 'STANDING';
+  element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
   element<HTMLElement>('#health-block').classList.toggle('critical', player.hp <= 30);
-  if (remaining === 0 && !matchFinished) {
-    matchFinished = true;
-    const won = (player.team === 0 ? aqua : coral) >= (player.team === 0 ? coral : aqua);
-    const banner = element<HTMLElement>('#banner');
-    banner.innerHTML = `<strong>${won ? 'TIME — VICTORY' : 'TIME — DEFEAT'}</strong><span>${aqua} — ${coral}</span>`;
-    banner.hidden = false;
-    document.exitPointerLock();
-  }
-  updateRoster();
+  updateMinimap(now);
+  if (!element<HTMLElement>('#roster').hidden) updateRoster();
 }
 
 function updateRoster(): void {
-  const entries = [snapshot(), ...[...remotes.values()].map((remote) => remote.snapshot)].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-  element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => `<div><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><em>${entry.hp > 0 ? entry.hp + ' HP' : 'DOWN'}</em></div>`).join('');
+  const entries = [
+    snapshot(),
+    ...[...remotes.values()].map((remote) => remote.snapshot),
+    ...[...bots.values()].map((bot) => ({
+      id: bot.id, name: bot.name, team: bot.team, x: bot.position.x, y: bot.position.y, z: bot.position.z,
+      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, weapon: 'carbine' as WeaponId, seq: 0,
+    })),
+  ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => `<div><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`).join('');
 }
 
 function escapeHtml(value: string): string {
@@ -715,14 +1113,32 @@ const invitedName = launchParams.get('name');
 if (invitedName) element<HTMLInputElement>('#player-name').value = sanitizeName(invitedName);
 if (launchParams.get('team') === '1') element<HTMLSelectElement>('#team').value = '1';
 
+const sensitivityInput = element<HTMLInputElement>('#sensitivity');
+const fovInput = element<HTMLInputElement>('#field-of-view');
+sensitivity = Number(localStorage.getItem('atomic-acres-sensitivity') ?? sensitivityInput.value) || 1;
+preferredFov = Number(localStorage.getItem('atomic-acres-fov') ?? fovInput.value) || 82;
+sensitivityInput.value = String(sensitivity);
+fovInput.value = String(preferredFov);
+sensitivityInput.addEventListener('input', () => {
+  sensitivity = Number(sensitivityInput.value);
+  localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
+});
+fovInput.addEventListener('input', () => {
+  preferredFov = Number(fovInput.value);
+  localStorage.setItem('atomic-acres-fov', String(preferredFov));
+});
+
 window.addEventListener('keydown', (event) => {
   keys.add(event.code);
   if (event.code === 'Digit1') switchWeapon(0);
   if (event.code === 'Digit2') switchWeapon(1);
   if (event.code === 'Digit3') switchWeapon(2);
   if (event.code === 'KeyR') reload();
+  if (event.code === 'KeyV' && !event.repeat) melee();
+  if (event.code === 'KeyG' && !event.repeat) throwGrenade();
   if (event.code === 'Tab') {
     event.preventDefault();
+    updateRoster();
     element<HTMLElement>('#roster').hidden = false;
   }
 });
@@ -737,8 +1153,8 @@ window.addEventListener('blur', () => {
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
-  player.yaw -= event.movementX * 0.00215;
-  player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019));
+  player.yaw -= event.movementX * 0.00215 * sensitivity;
+  player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019 * sensitivity));
   weaponView.addMouseDelta(event.movementX, event.movementY);
 });
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -777,11 +1193,18 @@ function resetForMode(): void {
   player.kills = 0;
   player.deaths = 0;
   player.hp = 100;
+  player.grenades = 1;
+  player.reloadState = null;
+  player.sustainedShots = 0;
+  player.crouched = false;
   targetHits = 0;
+  clearBots();
+  for (const grenade of grenades) scene.remove(grenade.mesh);
+  grenades.length = 0;
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   element<HTMLElement>('#banner').hidden = true;
-  player.ammo = { carbine: 24, smg: 32, scattergun: 8 };
-  player.reserve = { carbine: 96, smg: 128, scattergun: 40 };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve };
 }
 
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
@@ -841,16 +1264,76 @@ function frame(now: number): void {
       iterations += 1;
     }
     if (triggerHeld && WEAPONS[player.weapon].automatic) tryFire(now);
-    completeReload(now);
+    finishReload(now);
     updateTargets(now);
+    updateBots(frameDt, now);
+    updateGrenades(frameDt, now);
     updateRemotes(frameDt, now);
     updateHud(now);
-    renderer.render(scene, camera);
+    if (!debugRenderPaused) renderer.render(scene, camera);
     requestAnimationFrame(frame);
   } catch (error) {
     showFatalError(error);
   }
 }
+const debugWindow = window as Window & {
+  __ATOMIC_ACRES_DEBUG__?: {
+    snapshot: () => Record<string, unknown>;
+    startSolo: () => void;
+    setBotsFrozen: (frozen: boolean) => void;
+    setRenderPaused: (paused: boolean) => void;
+    fireOnce: () => void;
+    throwGrenade: () => void;
+  };
+};
+debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  snapshot: () => ({
+    gameStarted,
+    gameMode,
+    matchPhase: matchState.phase,
+    player: {
+      hp: player.hp,
+      kills: player.kills,
+      deaths: player.deaths,
+      weapon: player.weapon,
+      ammo: player.ammo[player.weapon],
+      reserve: player.reserve[player.weapon],
+      crouched: player.crouched,
+      grenades: player.grenades,
+      position: player.position.toArray(),
+    },
+    bots: [...bots.values()].map((bot) => ({ id: bot.id, hp: bot.hp, alive: bot.alive, kills: bot.kills, position: bot.position.toArray() })),
+    remotes: remotes.size,
+    grenades: grenades.length,
+    originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
+    weaponReady: weaponView.isReady(),
+    menuVisible: !menu.classList.contains('hidden'),
+    render: {
+      calls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+      points: renderer.info.render.points,
+      lines: renderer.info.render.lines,
+      sceneObjects: scene.children.length,
+      reducedMode: reducedRenderMode,
+    },
+  }),
+  startSolo: () => {
+    network.close();
+    resetForMode();
+    startGame('solo', false);
+  },
+  setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
+  fireOnce: () => {
+    debugInputUnlocked = true;
+    triggerHeld = true;
+    tryFire(performance.now());
+    triggerHeld = false;
+    debugInputUnlocked = false;
+  },
+  throwGrenade: () => throwGrenade(),
+};
+
 async function bootstrap(): Promise<void> {
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
@@ -867,8 +1350,16 @@ async function bootstrap(): Promise<void> {
   const artPromise = loadArenaArt(scene, (loaded, total) => {
     setStatus(`Loading authored arena models ${loaded}/${total}…`);
   });
-  const [physics] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
+  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
   characterPhysics = physics;
+  const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible);
+  arena.raycastMeshes.splice(0, arena.raycastMeshes.length, ...visibleMapMeshes);
+  art.root.traverse((node) => {
+    if (node instanceof THREE.Mesh) arena.raycastMeshes.push(node);
+  });
+  const arenaRoot = scene.getObjectByName('Atomic Acres arena');
+  if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', reducedRenderMode);
+  batchStaticMeshes(art.root, scene, () => '', reducedRenderMode);
   weaponView.setWeapon(player.weapon, true);
   respawn();
 

@@ -1,41 +1,23 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "assets": [
     {
-      "id": "kenney-city-kit-suburban-2.0",
-      "kind": "environment-model-pack",
-      "creator": "Kenney",
-      "source": "https://kenney.nl/assets/city-kit-suburban",
-      "downloadedAsOf": "2026-07-11",
-      "license": "CC0-1.0",
-      "licenseFile": "public/assets/kenney/suburban/LICENSE.txt",
-      "files": "public/assets/kenney/suburban/*.glb",
-      "modifications": "None at import; individual models may be transformed, combined, recolored, or optimized in the game runtime/build pipeline.",
+      "id": "atomic-acres-original-texture-set-2026-07-11",
+      "kind": "project-generated-surface-textures",
+      "creator": "Atomic Acres project",
+      "source": "scripts/generate-art-textures.py",
+      "generatedAsOf": "2026-07-11",
+      "license": "Original project work",
+      "files": "public/assets/original/textures/*.png",
+      "contactSheet": "public/assets/original/texture-contact-sheet.jpg",
+      "modifications": "Generated procedurally, tiled and colour-graded in the game runtime.",
       "attributionRequired": false
-    },
+    }
+  ],
+  "excludedLegacyAssets": [
     {
-      "id": "kenney-blaster-kit-2.1",
-      "kind": "weapon-and-target-model-pack",
-      "creator": "Kenney",
-      "source": "https://kenney.nl/assets/blaster-kit",
-      "downloadedAsOf": "2026-07-11",
-      "license": "CC0-1.0",
-      "licenseFile": "public/assets/kenney/blaster/LICENSE.txt",
-      "files": "public/assets/kenney/blaster/*.glb",
-      "modifications": "Models are selected, transformed, recolored, and animated procedurally for first-person presentation.",
-      "attributionRequired": false
-    },
-    {
-      "id": "kenney-car-kit-3.1",
-      "kind": "vehicle-and-street-prop-model-pack",
-      "creator": "Kenney",
-      "source": "https://kenney.nl/assets/car-kit",
-      "downloadedAsOf": "2026-07-11",
-      "license": "CC0-1.0",
-      "licenseFile": "public/assets/kenney/car/LICENSE.txt",
-      "files": "public/assets/kenney/car/*.glb",
-      "modifications": "Selected models are transformed, recolored, combined, and used as static authored arena cover.",
-      "attributionRequired": false
+      "id": "kenney-v2-foundation-models",
+      "reason": "Removed from the structured release because the owner rejected their low-poly art direction; no Kenney runtime asset ships in this build."
     }
   ]
 }

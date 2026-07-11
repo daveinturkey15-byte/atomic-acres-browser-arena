@@ -1,135 +1,110 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {
+  buildRetroCoach,
+  buildRetroDeliveryTruck,
+  roundedBox,
+  texturedMaterial,
+} from './art-kit';
 
 export type ArenaArtResult = {
   root: THREE.Group;
   loadedModels: number;
 };
 
-type Placement = {
-  path: string;
-  name: string;
-  position: [number, number, number];
-  longestAxis: number;
-  rotationY?: number;
-};
-
-const PLACEMENTS: Placement[] = [
-  {
-    path: './assets/kenney/car/firetruck.glb',
-    name: 'authored-central-rescue-truck',
-    position: [-3.8, 0, 7],
-    longestAxis: 13.2,
-  },
-  {
-    path: './assets/kenney/car/delivery.glb',
-    name: 'authored-central-delivery-truck',
-    position: [4.2, 0, -9],
-    longestAxis: 8.4,
-    rotationY: Math.PI,
-  },
-  {
-    path: './assets/kenney/suburban/tree-large.glb',
-    name: 'authored-tree-west',
-    position: [-33, 0, -26],
-    longestAxis: 7.2,
-  },
-  {
-    path: './assets/kenney/suburban/tree-large.glb',
-    name: 'authored-tree-east',
-    position: [33, 0, 27],
-    longestAxis: 7.2,
-  },
-  {
-    path: './assets/kenney/suburban/tree-small.glb',
-    name: 'authored-tree-south',
-    position: [-32, 0, 34],
-    longestAxis: 5.3,
-  },
-  {
-    path: './assets/kenney/suburban/tree-small.glb',
-    name: 'authored-tree-north',
-    position: [31, 0, -36],
-    longestAxis: 5.3,
-  },
-  {
-    path: './assets/kenney/suburban/planter.glb',
-    name: 'authored-planter-a',
-    position: [-18, 0, -18],
-    longestAxis: 2.4,
-  },
-  {
-    path: './assets/kenney/suburban/planter.glb',
-    name: 'authored-planter-b',
-    position: [18, 0, 18],
-    longestAxis: 2.4,
-    rotationY: Math.PI,
-  },
-];
-
 const LEGACY_VEHICLE_NAMES = new Set([
-  'tour coach',
-  'coach roof',
-  'coach window',
-  'delivery truck',
-  'truck cab',
-  'truck windshield',
+  'tour coach', 'coach roof', 'coach window', 'delivery truck', 'truck cab', 'truck windshield',
 ]);
 
-/** Loads authored CC0 dressing while preserving the separately-tested collision blockout. */
+function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
+  const bark = texturedMaterial('./assets/original/textures/wood-deck.png', { color: 0x72503b, roughness: 1, repeatY: 3 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.38 * scale, 0.55 * scale, 4.2 * scale, 12), bark);
+  trunk.position.set(x, 2.1 * scale, z);
+  trunk.castShadow = true;
+  root.add(trunk);
+  const leafMaterials = [0x496f47, 0x5f8249, 0x77934f].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
+  const clusters: Array<[number, number, number, number]> = [
+    [0, 5.1, 0, 2.3], [-1.25, 4.75, 0.3, 1.55], [1.2, 4.9, -0.25, 1.65], [0.15, 6.2, 0.1, 1.7],
+  ];
+  clusters.forEach(([ox, oy, oz, radius], index) => {
+    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(radius * scale, 2), leafMaterials[index % leafMaterials.length]);
+    crown.position.set(x + ox * scale, oy * scale, z + oz * scale);
+    crown.castShadow = true;
+    root.add(crown);
+  });
+}
+
+function addStreetProps(root: THREE.Group): void {
+  const metal = texturedMaterial('./assets/original/textures/painted-metal-teal.png', { roughness: 0.58, metalness: 0.3 });
+  const concrete = texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.95, repeatX: 2 });
+  for (const [x, z, rotation] of [
+    [-15, -20, 0.2], [17, 22, Math.PI], [-31, 10, Math.PI / 2], [30, -13, -Math.PI / 2],
+  ] as Array<[number, number, number]>) {
+    const mailbox = new THREE.Group();
+    mailbox.position.set(x, 0, z); mailbox.rotation.y = rotation;
+    const post = roundedBox('mailbox-post', [0.16, 1.35, 0.16], concrete, 0.035); post.position.y = 0.67;
+    const box = roundedBox('mailbox', [0.7, 0.48, 0.95], metal, 0.12, 4); box.position.set(0, 1.35, 0);
+    mailbox.add(post, box); root.add(mailbox);
+  }
+  for (const [x, z] of [[-9, 18], [10, -22], [-34, -2], [34, 4]] as Array<[number, number]>) {
+    const hydrant = new THREE.Group(); hydrant.position.set(x, 0, z);
+    const red = new THREE.MeshStandardMaterial({ color: 0xb94d38, roughness: 0.55, metalness: 0.35 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 16), red); body.position.y = 0.45; body.castShadow = true;
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), red); cap.position.y = 0.9;
+    hydrant.add(body, cap); root.add(hydrant);
+  }
+  for (const [x, z] of [[-20, 12], [22, -14], [-26, -29], [25, 30]] as Array<[number, number]>) {
+    const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
+    for (const offset of [-0.6, 0, 0.6]) {
+      const shrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.54, 2), new THREE.MeshStandardMaterial({ color: 0x547747, roughness: 0.96 }));
+      shrub.position.set(x + offset, 0.88, z); shrub.castShadow = true; root.add(shrub);
+    }
+  }
+}
+
+/** Builds original Atomic Acres hero vehicles and environmental props. */
 export async function loadArenaArt(
   scene: THREE.Scene,
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<ArenaArtResult> {
-  const loader = new GLTFLoader();
-  const templates = new Map<string, THREE.Object3D>();
-  const uniquePaths = [...new Set(PLACEMENTS.map((entry) => entry.path))];
-  let loaded = 0;
-  await Promise.all(uniquePaths.map(async (path) => {
-    const gltf = await loader.loadAsync(path);
-    templates.set(path, gltf.scene);
-    loaded += 1;
-    onProgress?.(loaded, uniquePaths.length);
-  }));
-
   scene.traverse((node) => {
-    if (LEGACY_VEHICLE_NAMES.has(node.name)) node.visible = false;
-    if (node.name === 'fence post' || node.name === 'lamp pole') {
-      // Keep these authored-looking silhouettes until the full modular environment kit lands.
-      node.castShadow = true;
-    }
+    if (LEGACY_VEHICLE_NAMES.has(node.name) || node.name === 'primitive-tree') node.visible = false;
   });
 
   const root = new THREE.Group();
-  root.name = 'authored-arena-art';
+  root.name = 'original-arena-art';
   scene.add(root);
-  for (const placement of PLACEMENTS) {
-    const template = templates.get(placement.path);
-    if (!template) throw new Error(`Missing loaded template ${placement.path}`);
-    const model = template.clone(true);
-    model.name = placement.name;
-    model.rotation.y = placement.rotationY ?? 0;
-    model.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      child.castShadow = true;
-      child.receiveShadow = true;
-    });
-    fitAndGround(model, placement.longestAxis);
-    model.position.add(new THREE.Vector3(...placement.position));
-    root.add(model);
-  }
-  return { root, loadedModels: uniquePaths.length };
-}
 
-function fitAndGround(model: THREE.Object3D, longestAxis: number): void {
-  const initial = new THREE.Box3().setFromObject(model);
-  const size = initial.getSize(new THREE.Vector3());
-  const scale = longestAxis / Math.max(size.x, size.y, size.z, 0.001);
-  model.scale.multiplyScalar(scale);
-  model.updateMatrixWorld(true);
-  const fitted = new THREE.Box3().setFromObject(model);
-  const center = fitted.getCenter(new THREE.Vector3());
-  model.position.x -= center.x;
-  model.position.z -= center.z;
-  model.position.y -= fitted.min.y;
+  const coach = buildRetroCoach();
+  coach.position.set(-3.8, 0, 7);
+  coach.rotation.y = 0.03;
+  root.add(coach);
+  onProgress?.(1, 8);
+
+  const truck = buildRetroDeliveryTruck();
+  truck.position.set(4.2, 0, -8.8);
+  truck.rotation.y = Math.PI;
+  root.add(truck);
+  onProgress?.(2, 8);
+
+  addTree(root, -33, -26, 1.05); onProgress?.(3, 8);
+  addTree(root, 33, 27, 1.1); onProgress?.(4, 8);
+  addTree(root, -32, 34, 0.82); onProgress?.(5, 8);
+  addTree(root, 31, -36, 0.9); onProgress?.(6, 8);
+  addStreetProps(root); onProgress?.(7, 8);
+
+  const tower = new THREE.Group();
+  tower.position.set(35, 0, -42);
+  const steel = new THREE.MeshStandardMaterial({ color: 0x4c5960, roughness: 0.48, metalness: 0.55 });
+  for (const x of [-1.4, 1.4]) for (const z of [-1.4, 1.4]) {
+    const leg = roundedBox('test-tower-leg', [0.22, 9, 0.22], steel, 0.04); leg.position.set(x, 4.5, z); tower.add(leg);
+  }
+  for (let y = 1; y < 9; y += 1.6) {
+    for (const rotation of [0, Math.PI / 2]) {
+      const brace = roundedBox('test-tower-brace', [3.2, 0.12, 0.12], steel, 0.025); brace.position.y = y; brace.rotation.y = rotation; tower.add(brace);
+    }
+  }
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), new THREE.MeshStandardMaterial({ color: 0xff6b4f, emissive: 0xff2a16, emissiveIntensity: 3 }));
+  beacon.position.y = 9.2; tower.add(beacon); root.add(tower); onProgress?.(8, 8);
+
+  return { root, loadedModels: 8 };
 }

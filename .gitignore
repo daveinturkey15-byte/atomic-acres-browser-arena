@@ -8,3 +8,6 @@ qwen_swarm.py
 .DS_Store
 .env
 .env.*
+.hermes/
+playwright-report/
+test-results/

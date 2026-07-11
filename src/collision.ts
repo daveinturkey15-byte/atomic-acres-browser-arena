@@ -9,6 +9,30 @@ export function circleIntersectsBox(x: number, z: number, radius: number, box: B
   return dx * dx + dz * dz < radius * radius;
 }
 
+/** Fast horizontal line-of-sight check against a solid AABB. */
+export function segmentIntersectsBox(start: Point3, end: Point3, box: Box2, padding = 0.02): boolean {
+  const eyeY = (start.y + end.y) / 2;
+  if (box.minY !== undefined && eyeY < box.minY) return false;
+  if (box.maxY !== undefined && eyeY > box.maxY) return false;
+  let near = 0;
+  let far = 1;
+  for (const [origin, delta, min, max] of [
+    [start.x, end.x - start.x, box.minX - padding, box.maxX + padding],
+    [start.z, end.z - start.z, box.minZ - padding, box.maxZ + padding],
+  ] as const) {
+    if (Math.abs(delta) < 1e-8) {
+      if (origin < min || origin > max) return false;
+      continue;
+    }
+    const first = (min - origin) / delta;
+    const second = (max - origin) / delta;
+    near = Math.max(near, Math.min(first, second));
+    far = Math.min(far, Math.max(first, second));
+    if (near > far) return false;
+  }
+  return far > 0.01 && near < 0.99;
+}
+
 export function isBlocked(point: Point3, colliders: readonly Box2[], radius = 0.42): boolean {
   return colliders.some((box) => {
     if (box.minY !== undefined && point.y < box.minY) return false;

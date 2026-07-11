@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { circleIntersectsBox, damp, resolveHorizontalMove, shortestAngleDelta } from './collision';
+import { circleIntersectsBox, damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta } from './collision';
 
 const wall = { minX: 1, maxX: 3, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
 const bounds = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
@@ -31,6 +31,12 @@ describe('arena collision', () => {
     );
     expect(result.x).toBe(9.5);
     expect(result.z).toBe(-9.5);
+  });
+
+  it('checks line of sight against solid boxes without mesh raycasts', () => {
+    expect(segmentIntersectsBox({ x: 0, y: 1.7, z: 0 }, { x: 4, y: 1.7, z: 0 }, wall)).toBe(true);
+    expect(segmentIntersectsBox({ x: 0, y: 1.7, z: 3 }, { x: 4, y: 1.7, z: 3 }, wall)).toBe(false);
+    expect(segmentIntersectsBox({ x: 0, y: 5, z: 0 }, { x: 4, y: 5, z: 0 }, wall)).toBe(false);
   });
 });
 

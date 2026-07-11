@@ -4,7 +4,11 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
+    "test:e2e": "playwright test --project=chromium",
+    "qa:release": "node scripts/qa/capture-release.mjs",
+    "qa:multiplayer": "node scripts/qa/verify-multiplayer.mjs",
     "lint": "tsc --noEmit",
+    "verify": "npm run lint && npm test && npm run build && npm run test:e2e",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
@@ -15,6 +19,8 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
     "@types/three": "^0.185.0",
     "gh-pages": "^6.3.0",
     "vitest": "latest"
