@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vite/
+.swarm/
+__pycache__/
+qwen_swarm.py
+*.log
+.DS_Store
+.env
+.env.*
