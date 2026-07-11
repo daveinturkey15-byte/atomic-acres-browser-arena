@@ -14,6 +14,14 @@ import {
   sanitizeName,
 } from './protocol';
 
+window.addEventListener('error', (event) => {
+  console.error('[Atomic Acres runtime error]', event.message || 'unknown error', event.error?.stack || '');
+});
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason instanceof Error ? `${event.reason.message}\n${event.reason.stack ?? ''}` : String(event.reason);
+  console.error('[Atomic Acres unhandled rejection]', reason);
+});
+
 type WeaponSpec = {
   id: WeaponId;
   name: string;
