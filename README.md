@@ -69,11 +69,13 @@ The test suite covers collision sliding/bounds, framerate-independent interpolat
 
 ### GitHub Pages
 
-The included `.github/workflows/pages.yml` builds and publishes `dist/` on pushes to `main`.
+This repository publishes the built `dist/` folder to a dedicated `gh-pages` branch, which avoids requiring GitHub Actions workflow-token permissions.
 
-1. Create/push a GitHub repository.
-2. In **Settings → Pages**, set **Source** to **GitHub Actions**.
-3. Push `main` and verify the Pages deployment.
+```bash
+npm run deploy
+```
+
+The first deployment enables **Settings → Pages → Deploy from a branch → `gh-pages` / root**. Later deployments only need the command above.
 
 ## Design notes
 
