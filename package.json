@@ -15,5 +15,9 @@
   "devDependencies": {
     "@types/three": "^0.185.0",
     "vitest": "latest"
-  }
+  },
+  "name": "atomic-acres-browser-arena",
+  "version": "1.0.0",
+  "description": "Original retro-future browser arena FPS with peer-to-peer multiplayer",
+  "private": "true"
 }
