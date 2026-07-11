@@ -362,6 +362,15 @@ function spawnPoint(): THREE.Vector3 {
   return scored[0].point.clone();
 }
 
+function requestGamePointerLock(): void {
+  try {
+    const request = canvas.requestPointerLock();
+    if (request instanceof Promise) void request.catch(() => undefined);
+  } catch {
+    // Browsers can reject pointer lock outside a user gesture (for example, auto-join smoke tests).
+  }
+}
+
 function respawn(): void {
   player.position.copy(spawnPoint());
   player.velocity.set(0, 0, 0);
@@ -371,7 +380,7 @@ function respawn(): void {
   player.yaw = player.team === 0 ? Math.PI : 0;
   player.pitch = 0;
   element<HTMLElement>('#respawn').hidden = true;
-  if (gameStarted) void canvas.requestPointerLock();
+  if (gameStarted) requestGamePointerLock();
   network.send({ type: 'state', player: snapshot() });
 }
 
@@ -702,7 +711,7 @@ window.addEventListener('mousemove', (event) => {
 canvas.addEventListener('mousedown', (event) => {
   if (event.button !== 0) return;
   if (document.pointerLockElement !== canvas) {
-    void canvas.requestPointerLock();
+    requestGamePointerLock();
     return;
   }
   triggerHeld = true;
@@ -734,7 +743,7 @@ function resetForMode(): void {
 }
 
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
-  if (gameStarted && player.alive && !matchFinished) void canvas.requestPointerLock();
+  if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   network.close();
