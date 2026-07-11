@@ -34,7 +34,20 @@ export class CharacterPhysics {
 
   static async create(colliders: readonly Box2[], bounds: Box2): Promise<CharacterPhysics> {
     const { default: RAPIER } = await import('@dimforge/rapier3d-compat');
-    await RAPIER.init();
+    // Rapier 0.19.3's compatibility bundle calls its own wasm-bindgen loader with
+    // the legacy positional form and emits a warning even though the public
+    // RAPIER.init() API takes no arguments. Suppress only that upstream message
+    // during initialization; preserve every other warning and restore immediately.
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      if (args.length === 1 && args[0] === 'using deprecated parameters for the initialization function; pass a single object instead') return;
+      originalWarn(...args);
+    };
+    try {
+      await RAPIER.init();
+    } finally {
+      console.warn = originalWarn;
+    }
     const world = new RAPIER.World({ x: 0, y: -22, z: 0 });
     world.timestep = 1 / 120;
 
