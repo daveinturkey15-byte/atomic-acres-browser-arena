@@ -99,16 +99,25 @@ Art budgets:
 
 ## Layer 04D — original loadout workflow
 
-Original information architecture: `DEPLOY | FIELD KIT | OPTIONS`.
+Original information architecture implemented: `DEPLOY | FIELD KIT | OPTIONS`.
 
-- Four locally saved Field Kits.
-- Primary tool, implemented utility, one modest suit module, and a team-neutral identity finish.
-- Controller-friendly kit cards, slot row, rotating procedural preview and plain-language comparative stat bars.
-- Mid-match changes are queued for the next deployment rather than granting immediate inventory swaps.
-- Remove unconditional possession of all three primaries once the kit system is active.
-- Store a versioned, allowlisted selection in `localStorage`; malformed values fall back safely.
-- Preserve keyboard/gamepad focus, visible selected/focused/queued states, short-height usability and the existing original Atomic Acres visual language.
-- Do not copy commercial class names, point systems, icons, fonts, sounds, menu layout or branding.
+- Three original Field Kits map only to implemented primaries: Linekeeper/M86 Carbine, Circuit Runner/Vectorline SMG, and Doorbreaker/Model 12 Scattergun.
+- Each kit communicates role, plain-language purpose and comparative range/control/mobility traits without fake numerical precision.
+- Selection uses native focusable buttons with visible selected and `aria-pressed` states.
+- The selected kit is summarized on Deploy and becomes the starting weapon.
+- Mid-life changes are labelled `QUEUED NEXT DEPLOYMENT` and apply on respawn/new match rather than mutating the current weapon immediately.
+- Selection is stored as versioned JSON under `atomic-acres.field-kit.v1`; malformed, stale-version and unknown IDs safely fall back to Linekeeper.
+- Options and the complete keyboard/gamepad legend live in a dedicated tab while host/join controls remain under Deploy.
+- The 1280×580 visual review shows all tabs, the three-card kit grid, options sliders and full control path without clipping.
+- The design uses original Atomic Acres typography, colours, kit names and card hierarchy; no commercial class names, points systems, icons or copied layout.
+
+Verification:
+
+- `loadout.test.ts`: 3/3 parsing, allowlist and round-trip tests.
+- Full units: 47/47.
+- Functional Chromium: 9/9 including tab navigation, selection, reload persistence and SMG deployment.
+- Isolated compatibility FPS/call/triangle gate passed unchanged.
+- Local release QA had zero console errors; local compatibility multiplayer and prone replication passed.
 
 ## Deployment rule
 

@@ -69,12 +69,40 @@ test.describe('boot and authored presentation', () => {
   test('menu exposes controls and accessibility settings', async ({ page }) => {
     await pageReady(page);
     await expect(page.locator('#solo')).toHaveText('BOT SKIRMISH');
+    await page.getByRole('button', { name: 'OPTIONS' }).click();
     await expect(page.locator('#sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
     await expect(page.locator('.controls')).toContainText('melee');
     await expect(page.locator('.controls')).toContainText('frag');
+  });
+
+  test('selects and persists an allowlisted field kit for deployment', async ({ page }) => {
+    await pageReady(page);
+    await page.getByRole('button', { name: 'FIELD KIT' }).click();
+    const runner = page.locator('[data-kit-id="runner"]');
+    await runner.click();
+    await expect(runner).toHaveClass(/selected/);
+    await page.getByRole('button', { name: 'DEPLOY' }).click();
+    await expect(page.locator('#selected-kit-summary')).toContainText('Circuit Runner');
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
+    await expect(page.locator('#selected-kit-summary')).toContainText('Vectorline SMG');
+    await page.locator('#solo').click();
+    await expect.poll(async () => (await debug(page)).player.weapon).toBe('smg');
+    await page.evaluate(() => {
+      document.exitPointerLock();
+      document.querySelector('#menu')?.classList.remove('hidden');
+    });
+    await expect(page.locator('#menu')).toBeVisible();
+    await page.getByRole('button', { name: 'FIELD KIT' }).click();
+    await page.locator('[data-kit-id="breacher"]').click();
+    await expect.poll(async () => (await debug(page)).player.weapon).toBe('smg');
+    await page.getByRole('button', { name: 'DEPLOY' }).click();
+    await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(999));
+    await expect.poll(async () => (await debug(page)).player.weapon, { timeout: 6_000 }).toBe('scattergun');
   });
 });
 

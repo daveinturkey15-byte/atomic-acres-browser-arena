@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, setOperatorWeapon } from './art-kit';
 import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
+import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
@@ -116,24 +117,44 @@ app.innerHTML = `
     <div class="eyebrow">ORIGINAL WEB ARENA · LAYERED BUILD PASS 04</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">A compact retro-future skirmish with one bounded close-range rival, articulated operators, distinct procedural weapons, physical sights and authoritative hard cover.</p>
-    <div class="setup-grid">
-      <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
-      <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
+    <nav class="menu-tabs" aria-label="Deployment menu">
+      <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
+      <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
+      <button type="button" data-menu-tab="options" aria-selected="false">OPTIONS</button>
+    </nav>
+    <div class="menu-panel active" data-menu-panel="deploy">
+      <div class="setup-grid">
+        <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
+        <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
+      </div>
+      <div id="selected-kit-summary" class="selected-kit-summary"></div>
+      <div class="menu-actions">
+        <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
+        <button id="solo" class="primary">BOT SKIRMISH</button>
+        <button id="host">HOST LOBBY</button>
+      </div>
+      <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
+      <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
+      <div id="network-status" data-kind="ok">Ready for deployment.</div>
     </div>
-    <div class="menu-actions">
-      <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
-      <button id="solo" class="primary">BOT SKIRMISH</button>
-      <button id="host">HOST LOBBY</button>
+    <div class="menu-panel" data-menu-panel="kit" hidden>
+      <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary issued on deployment.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
+      <div class="kit-grid">
+        ${FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}">
+          <span>${kit.role}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name}</b><p>${kit.summary}</p>
+          <i>${kit.traits.join(' · ')}</i><em>SELECTED</em>
+        </button>`).join('')}
+      </div>
     </div>
-    <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
-    <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
-    <div id="network-status" data-kind="ok">Ready for deployment.</div>
-    <div class="settings-grid">
-      <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
-      <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
+    <div class="menu-panel" data-menu-panel="options" hidden>
+      <div class="options-heading"><b>OPTIONS</b><span>Input and view settings apply immediately.</span></div>
+      <div class="settings-grid">
+        <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
+        <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
+      </div>
+      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
+      <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
-    <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </section>
   <div id="hud" hidden>
     <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
@@ -324,6 +345,51 @@ canvas.addEventListener('webglcontextrestored', () => window.location.reload());
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
 const weaponView = new WeaponPresentation(camera, reducedRenderMode);
+let selectedFieldKit: FieldKitId = parseFieldKitSelection(localStorage.getItem(FIELD_KIT_STORAGE_KEY));
+
+function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
+    const active = button.dataset.menuTab === tab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll<HTMLElement>('[data-menu-panel]').forEach((panel) => {
+    const active = panel.dataset.menuPanel === tab;
+    panel.classList.toggle('active', active);
+    panel.hidden = !active;
+  });
+}
+
+function renderFieldKitSelection(): void {
+  const kit = fieldKitById(selectedFieldKit);
+  const queued = gameStarted && player.weapon !== kit.weapon;
+  element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name}</b>`;
+  document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
+    const selected = card.dataset.kitId === selectedFieldKit;
+    card.classList.toggle('selected', selected);
+    card.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function chooseFieldKit(id: string): void {
+  selectedFieldKit = fieldKitById(id).id;
+  localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
+  if (!gameStarted) {
+    player.weapon = fieldKitById(selectedFieldKit).weapon;
+    weaponView.setWeapon(player.weapon, true);
+  }
+  renderFieldKitSelection();
+}
+
+document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
+  button.addEventListener('click', () => setMenuTab(button.dataset.menuTab as 'deploy' | 'kit' | 'options'));
+});
+document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) => {
+  button.addEventListener('click', () => chooseFieldKit(button.dataset.kitId ?? 'balanced'));
+});
+player.weapon = fieldKitById(selectedFieldKit).weapon;
+renderFieldKitSelection();
+
 const viewFill = new THREE.PointLight(0xd8ecff, 0.9, 5);
 viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
@@ -586,6 +652,13 @@ function respawn(requestLock = true): void {
   cameraHeightOffset = 0;
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
+  const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
+  if (player.weapon !== deploymentWeapon) {
+    player.weapon = deploymentWeapon;
+    player.switchingUntil = 0;
+    weaponView.setWeapon(deploymentWeapon, true);
+  }
+  renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
   if (gameStarted && requestLock) requestGamePointerLock();
   network.send({ type: 'state', player: snapshot() });
@@ -1582,6 +1655,10 @@ function resetForMode(): void {
   grenades.length = 0;
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   element<HTMLElement>('#banner').hidden = true;
+  player.weapon = fieldKitById(selectedFieldKit).weapon;
+  player.switchingUntil = 0;
+  weaponView.setWeapon(player.weapon, true);
+  renderFieldKitSelection();
   player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag };
   player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve };
 }
