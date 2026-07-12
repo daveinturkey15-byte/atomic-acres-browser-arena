@@ -4,6 +4,7 @@ import {
   BOT_REACTION_DELAY,
   SOLO_BOT_COUNT,
   botAimJitter,
+  botCanFireWhileProtected,
   chooseBotIntent,
   chooseTacticalWaypoint,
   respawnBotState,
@@ -48,6 +49,7 @@ describe('chooseBotIntent', () => {
 
   it('advances at long range, strafes in combat and retreats when crowded', () => {
     expect(chooseBotIntent({ ...base, distanceToPlayer: 40 }).movement).toBe('advance');
+    expect(chooseBotIntent({ ...base, distanceToPlayer: 22 }).movement).toBe('advance');
     expect(chooseBotIntent(base).movement).toBe('strafe-right');
     expect(chooseBotIntent({ ...base, random: 0.8 }).movement).toBe('strafe-left');
     expect(chooseBotIntent({ ...base, distanceToPlayer: 3 }).movement).toBe('retreat');
@@ -66,6 +68,8 @@ describe('tactical bot scoring', () => {
     const occupied = scoreBotSpawn({ nearestThreatDistanceSq: 2_000, visibleThreats: 0, occupied: true, preferred: true });
     expect(safe).toBeGreaterThan(exposed);
     expect(safe).toBeGreaterThan(occupied);
+    const extremelyFarExposed = scoreBotSpawn({ nearestThreatDistanceSq: 999_999_999, visibleThreats: 1, occupied: false, preferred: true });
+    expect(safe).toBeGreaterThan(extremelyFarExposed);
   });
 
   it('chooses a nearby reacquisition point in the intended engagement band', () => {
@@ -82,5 +86,11 @@ describe('tactical bot scoring', () => {
 describe('respawnBotState', () => {
   it('resets combat values and grants bounded protection', () => {
     expect(respawnBotState(5_000)).toEqual({ health: 100, alive: true, invulnerableUntil: 6_000, lastShotAt: 0 });
+  });
+
+  it('prevents a respawned bot from firing while its protection is active', () => {
+    expect(botCanFireWhileProtected(true, 5_999, 6_000)).toBe(false);
+    expect(botCanFireWhileProtected(true, 6_000, 6_000)).toBe(true);
+    expect(botCanFireWhileProtected(false, 7_000, 6_000)).toBe(false);
   });
 });

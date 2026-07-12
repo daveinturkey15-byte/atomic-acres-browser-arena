@@ -31,15 +31,19 @@ export type BotSpawnScore = {
   preferred: boolean;
 };
 
-/** Larger scores are safer; line-of-sight exposure dominates a modest authored preference. */
+/** Larger scores are safer; occupation and exposure are hard tiers ahead of distance/preference. */
 export function scoreBotSpawn(candidate: BotSpawnScore): number {
   const distance = Number.isFinite(candidate.nearestThreatDistanceSq)
-    ? Math.max(0, candidate.nearestThreatDistanceSq)
+    ? Math.min(1_000_000, Math.max(0, candidate.nearestThreatDistanceSq))
     : 0;
   return distance
-    - Math.max(0, candidate.visibleThreats) * 5_000
-    - (candidate.occupied ? 10_000 : 0)
+    - Math.max(0, candidate.visibleThreats) * 1_000_000_000
+    - (candidate.occupied ? 1_000_000_000_000 : 0)
     + (candidate.preferred ? 1 : 0);
+}
+
+export function botCanFireWhileProtected(intentFire: boolean, now: number, invulnerableUntil: number): boolean {
+  return intentFire && now >= invulnerableUntil;
 }
 
 export type TacticalWaypointCandidate = {
@@ -86,7 +90,7 @@ export function chooseBotIntent(sense: BotSense): BotIntent {
   let movement: BotMovement;
   if (sense.health < 35 && sense.hasLineOfSight && sense.distanceToPlayer < 18) movement = 'retreat';
   else if (sense.distanceToPlayer < 5.5) movement = 'retreat';
-  else if (!sense.hasLineOfSight || sense.distanceToPlayer > 28) movement = 'advance';
+  else if (!sense.hasLineOfSight || sense.distanceToPlayer > 18) movement = 'advance';
   else movement = sense.random < 0.5 ? 'strafe-right' : 'strafe-left';
   return { movement, fire, changeWaypoint: sense.waypointReached || (!sense.hasLineOfSight && sense.random > 0.88) };
 }

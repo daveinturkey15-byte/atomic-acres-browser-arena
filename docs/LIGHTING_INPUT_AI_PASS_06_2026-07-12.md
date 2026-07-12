@@ -70,6 +70,10 @@ Continue the original early-2010s compact arena-FPS quality roadmap without copy
 - Added a persisted, bounded `CONTROLLER LOOK` slider (`0.5–1.8`) separate from mouse sensitivity.
 - Stored mouse/FOV/controller values are now range-validated before use.
 - Gamepad movement/look are zeroed behind menus and look velocity resets on disconnect, preventing menu drift and stale rotational tails.
+- Radial shaping now normalizes against the raw stick magnitude, so diagonal full deflection cannot exceed unit length; invalid numeric input returns neutral.
+- Horizontal acceleration now spends one vector acceleration budget, eliminating the previous `sqrt(2)` diagonal advantage.
+- Keyboard movement and queued actions are cleared with the menu; held pad ADS/fire must be released before rearming after a menu transition.
+- Backward or strafe-only sprint input no longer forces a crouched/prone player to stand.
 
 ### Tactical one-bot behavior
 
@@ -78,14 +82,18 @@ Continue the original early-2010s compact arena-FPS quality roadmap without copy
 - Added deterministic tactical waypoint scoring for travel cost, 13 m engagement band, sight reacquisition and route changes.
 - The bot selects a tactical waypoint on sight loss and at hidden-route waypoint arrival; collision detours and all bounds guards remain intact.
 - A bot below 35 HP disengages inside 18 m instead of receiving extra health, damage or accuracy.
+- The east patrol turn was moved clear of the service-wall collider, and radius-aware regression coverage now protects that node/edge.
+- Spawn selection now uses hard safety tiers: occupied points lose before free points, and exposed points lose before screened points regardless of distance.
+- The bot closes through the former 22–28 m no-fire orbit, consumes waypoint-change intent, and replans only after 400 ms of sustained blockage rather than thrashing every frame.
+- Respawn protection now blocks bot offense until invulnerability expires.
 - Solo policy remains one bot, 22 m fire range, 650 ms reaction delay and 50% damage.
 
 ## Local verification evidence
 
 - TypeScript and production build passed.
-- Unit tests: `63/63` across 11 files.
-- Functional Chromium: `9/9`, including controller-slider persistence.
-- Clean isolated performance scenario passed unchanged (`>=40 FPS`).
+- Unit tests: `66/66` across 11 files.
+- Functional Chromium: `10/10`, including controller-slider persistence, menu-input suppression, exact radius-aware bot bounds and sprint/stance ordering.
+- Clean isolated performance scenario passed unchanged (`>=40 FPS`); a separate 2.5-second compatibility measurement reported `43.65 FPS` in the constrained headless environment.
 - Full-quality release QA: zero console errors, `302` calls / `302,706` triangles.
 - Compatibility release QA: zero console errors, `59` calls / `72,406` triangles.
 - Two-browser PeerJS QA passed room creation/join, reciprocal remote presence and prone replication with `24.19 m` observed spawn separation.

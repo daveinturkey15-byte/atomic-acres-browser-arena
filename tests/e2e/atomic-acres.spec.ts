@@ -18,7 +18,16 @@ type DebugState = {
     grenades: number;
     position: number[];
   };
-  bots: Array<{ id: string; hp: number; alive: boolean; kills: number; position: number[] }>;
+  bots: Array<{
+    id: string;
+    hp: number;
+    alive: boolean;
+    kills: number;
+    position: number[];
+    waypoint: number;
+    blockedSince: number;
+    hasLineOfSight: boolean;
+  }>;
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
@@ -137,8 +146,24 @@ test.describe('solo mechanics', () => {
       return Math.hypot(bot.position[0] - previous[0], bot.position[2] - previous[2]) > 0.05;
     });
     expect(moved).toBe(true);
-    expect(after.bots.every((bot) => bot.position[0] >= -40.56 && bot.position[0] <= 40.56
-      && bot.position[2] >= -50.56 && bot.position[2] <= 50.56)).toBe(true);
+    expect(after.bots.every((bot) => bot.position[0] >= -33.56 && bot.position[0] <= 33.56
+      && bot.position[2] >= -42.56 && bot.position[2] <= 42.56)).toBe(true);
+    expect(after.bots.every((bot) => Number.isInteger(bot.waypoint) && bot.waypoint >= 0 && bot.waypoint < 8)).toBe(true);
+    expect(after.bots.every((bot) => Number.isFinite(bot.blockedSince))).toBe(true);
+  });
+
+  test('opening the deployment menu neutralizes movement input', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { openMenu: () => void } }).__ATOMIC_ACRES_DEBUG__.openMenu());
+    await expect(page.locator('#menu')).toBeVisible();
+    const before = await debug(page);
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(450);
+    await page.keyboard.up('KeyW');
+    const after = await debug(page);
+    expect(Math.hypot(
+      after.player.position[0] - before.player.position[0],
+      after.player.position[2] - before.player.position[2],
+    )).toBeLessThan(0.02);
   });
 
   test('walk, sprint, crouch and prone alter the real player stance', async ({ page }) => {
@@ -162,6 +187,15 @@ test.describe('solo mechanics', () => {
     const crouched = await debug(page);
     expect(crouched.player.crouched).toBe(true);
     await page.keyboard.up('KeyC');
+
+    await page.keyboard.down('KeyS');
+    await page.keyboard.down('ShiftLeft');
+    await page.waitForTimeout(180);
+    const backwardSprintAttempt = await debug(page);
+    expect(backwardSprintAttempt.player.stance).toBe('crouch');
+    expect(backwardSprintAttempt.player.sprinting).toBe(false);
+    await page.keyboard.up('ShiftLeft');
+    await page.keyboard.up('KeyS');
 
     await page.keyboard.press('KeyZ');
     await page.waitForTimeout(180);

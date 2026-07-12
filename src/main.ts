@@ -6,6 +6,7 @@ import {
   BOT_REACTION_DELAY,
   SOLO_BOT_COUNT,
   botAimJitter,
+  botCanFireWhileProtected,
   chooseBotIntent,
   chooseTacticalWaypoint,
   respawnBotState,
@@ -97,6 +98,7 @@ type BotPlayer = {
   invulnerableUntil: number;
   respawnAt: number;
   waypoint: number;
+  blockedSince: number;
 };
 
 type GrenadeEntity = {
@@ -272,6 +274,7 @@ function buildSky(): void {
   const sky = new THREE.Mesh(geometry, material);
   sky.name = 'procedural-atmosphere-sky';
   sky.frustumCulled = false;
+  sky.onBeforeRender = () => sky.position.copy(camera.position);
   scene.add(sky);
   scene.add(new THREE.HemisphereLight(0xdcefff, 0x4d6046, 1.48));
   scene.add(new THREE.AmbientLight(0xc7d3d4, 0.38));
@@ -356,6 +359,8 @@ let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
 let gamepadLookRate = { yaw: 0, pitch: 0 };
 let gamepadSprint = false;
+let gamepadTriggerArmed = true;
+let gamepadAdsArmed = true;
 
 let previousGamepadButtons: boolean[] = [];
 let playerGrounded = false;
@@ -367,6 +372,29 @@ let botsFrozen = false;
 let debugInputUnlocked = false;
 let debugAdsOverride: boolean | null = null;
 let characterPhysics: CharacterPhysics | null = null;
+
+function gameplayInputEnabled(): boolean {
+  return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden');
+}
+
+function playerSimulationEnabled(): boolean {
+  return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden');
+}
+
+function clearGameplayInput(): void {
+  keys.clear();
+  gamepadMove = { x: 0, y: 0 };
+  gamepadLookRate = { yaw: 0, pitch: 0 };
+  gamepadSprint = false;
+  mouseTriggerHeld = false;
+  mouseAdsHeld = false;
+  triggerHeld = false;
+  adsHeld = false;
+  currentSprinting = false;
+  jumpQueuedAt = -10_000;
+  player.velocity.x = 0;
+  player.velocity.z = 0;
+}
 
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.textContent = text;
@@ -641,7 +669,10 @@ function removeRemote(id: string, reason: string): void {
 function spawnPoint(): THREE.Vector3 {
   const options = arena.spawns[player.team];
   const preferredIndex = gameMode === 'client' ? Math.min(1, options.length - 1) : gameMode === 'host' ? 0 : player.deaths % options.length;
-  const occupied = [...remotes.values()].map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z));
+  const occupied = [
+    ...[...remotes.values()].map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
+    ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
+  ];
   const threats = [
     ...[...remotes.values()]
       .filter((remote) => remote.snapshot.team !== player.team && remote.snapshot.hp > 0)
@@ -650,14 +681,28 @@ function spawnPoint(): THREE.Vector3 {
       .filter((bot) => bot.team !== player.team && bot.alive)
       .map((bot) => bot.position.clone().add(new THREE.Vector3(0, 1.42, 0))),
   ];
-  const scored = options.map((point, index) => {
-    const nearestDistance = threats.length === 0 ? 0 : Math.min(...threats.map((threat) => threat.distanceToSquared(point)));
-    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length;
-    const occupiedPenalty = occupied.some((position) => position.distanceToSquared(point) < 20) ? 10_000 : 0;
-    const rolePreference = index === preferredIndex ? 1 : 0;
-    return { point, score: nearestDistance - visibleThreats * 900 - occupiedPenalty + rolePreference };
+  const valid = options.map((point, index) => ({ point, index })).filter(({ point }) => {
+    const bodyPoint = { x: point.x, y: 0, z: point.z };
+    return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
+      && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
+      && !isBlocked(bodyPoint, arena.colliders, 0.44);
   });
-  scored.sort((a, b) => b.score - a.score);
+  if (valid.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  const scored = valid.map(({ point, index }) => {
+    const nearestThreatDistanceSq = threats.length === 0 ? 0 : Math.min(...threats.map((threat) => threat.distanceToSquared(point)));
+    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length;
+    return {
+      point,
+      index,
+      score: scoreBotSpawn({
+        nearestThreatDistanceSq,
+        visibleThreats,
+        occupied: occupied.some((position) => position.distanceToSquared(point) < 20),
+        preferred: index === preferredIndex,
+      }),
+    };
+  });
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
   return scored[0].point.clone();
 }
 
@@ -974,6 +1019,7 @@ function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
     const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length;
     return {
       candidate,
+      index,
       score: scoreBotSpawn({
         nearestThreatDistanceSq,
         visibleThreats,
@@ -982,7 +1028,7 @@ function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
       }),
     };
   });
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
   return scored[0].candidate;
 }
 
@@ -1006,7 +1052,7 @@ function spawnBots(): void {
       id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
       kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
       sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
-      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index,
+      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index, blockedSince: 0,
     });
   });
   addFeed('One hostile operator entered the block', 'coral');
@@ -1067,6 +1113,7 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.sightStartedAt = 0;
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
+  bot.blockedSince = 0;
   bot.root.visible = true;
 }
 
@@ -1087,6 +1134,7 @@ function updateBots(dt: number, now: number): void {
       bot.hasLineOfSight = false;
       bot.sightStartedAt = 0;
       bot.burstShots = 0;
+      bot.blockedSince = 0;
       bot.lastSightAt = now;
       continue;
     }
@@ -1111,8 +1159,8 @@ function updateBots(dt: number, now: number): void {
       bot.nextDecisionAt = now + 850 + botIndex * 95;
     }
 
-    const patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
-    const toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
+    let patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
+    let toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
     const waypointReached = toPatrol.lengthSq() < 5.2;
     if (waypointReached) {
       bot.waypoint = lineOfSight
@@ -1132,6 +1180,9 @@ function updateBots(dt: number, now: number): void {
       reactionDelay: BOT_REACTION_DELAY,
       burstShotsRemaining: bot.burstShots,
     });
+    if (intent.changeWaypoint && !waypointReached) bot.waypoint = selectBotTacticalWaypoint(bot);
+    patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
+    toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
     const pursuit = lineOfSight ? toPlayer : toPatrol;
     const forward = pursuit.lengthSq() > 0.01 ? pursuit.normalize() : new THREE.Vector3(0, 0, -1);
@@ -1143,10 +1194,23 @@ function updateBots(dt: number, now: number): void {
     const speed = intent.movement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     let resolved = resolveHorizontalMove(bot.position, desired, arena.colliders, arena.bounds, 0.44);
-    if (Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002 && desiredDirection.lengthSq() > 0) {
+    const stalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002
+      && desiredDirection.lengthSq() > 0;
+    if (stalled) {
       const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
       resolved = resolveHorizontalMove(bot.position, detour, arena.colliders, arena.bounds, 0.44);
-      bot.waypoint = (bot.waypoint + 1) % BOT_PATROL_POINTS.length;
+      const detourStalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002;
+      if (detourStalled) {
+        if (bot.blockedSince === 0) bot.blockedSince = now;
+        else if (now - bot.blockedSince >= 400) {
+          bot.waypoint = selectBotTacticalWaypoint(bot);
+          bot.blockedSince = 0;
+        }
+      } else {
+        bot.blockedSince = 0;
+      }
+    } else {
+      bot.blockedSince = 0;
     }
     bot.position.set(resolved.x, bot.position.y, resolved.z);
     bot.root.position.copy(bot.position);
@@ -1154,7 +1218,7 @@ function updateBots(dt: number, now: number): void {
     bot.root.lookAt(lookTarget.x, bot.position.y + 1.1, lookTarget.z);
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
-    if (intent.fire && player.alive) {
+    if (botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
       if (bot.burstShots <= 0) bot.burstShots = 2 + (botIndex % 2);
       bot.burstShots -= 1;
       bot.lastShotAt = now;
@@ -1377,7 +1441,7 @@ function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
 }
 
 function updatePhysics(dt: number): void {
-  if (!gameStarted || !player.alive || matchState.phase === 'ended' || !characterPhysics) return;
+  if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
@@ -1385,10 +1449,11 @@ function updatePhysics(dt: number): void {
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
-  const wantsSprint = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
-  if (wantsSprint && player.stance !== 'stand') requestStance('stand');
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
+  const wantsSprint = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
+  const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
+  if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
@@ -1692,12 +1757,18 @@ function pollGamepad(dt: number): void {
   const look = applyRadialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.1, 1.6);
   const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
   const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
-  gamepadSprint = Boolean(buttons[10]);
   const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
   const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
-  adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAds);
-  triggerHeld = mouseTriggerHeld || padTrigger;
-  const canControlPlayer = gameStarted && player.alive && menu.classList.contains('hidden');
+  const canControlPlayer = gameplayInputEnabled();
+  if (!padTrigger) gamepadTriggerArmed = true;
+  else if (!canControlPlayer) gamepadTriggerArmed = false;
+  if (!padAds) gamepadAdsArmed = true;
+  else if (!canControlPlayer) gamepadAdsArmed = false;
+  const padTriggerActive = canControlPlayer && padTrigger && gamepadTriggerArmed;
+  const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
+  gamepadSprint = canControlPlayer && Boolean(buttons[10]);
+  adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAdsActive);
+  triggerHeld = mouseTriggerHeld || padTriggerActive;
   gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
   gamepadLookRate = integrateGamepadLookRate(
     gamepadLookRate,
@@ -1724,7 +1795,8 @@ function pollGamepad(dt: number): void {
 }
 
 window.addEventListener('keydown', (event) => {
-  keys.add(event.code);
+  if (gameplayInputEnabled()) keys.add(event.code);
+  else if (event.code !== 'Tab') return;
   if (event.code === 'Space' && !event.repeat) {
     if (player.stance !== 'stand') requestStance('stand');
     jumpQueuedAt = performance.now();
@@ -1748,11 +1820,7 @@ window.addEventListener('keyup', (event) => {
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
-  keys.clear();
-  mouseTriggerHeld = false;
-  mouseAdsHeld = false;
-  triggerHeld = false;
-  adsHeld = false;
+  clearGameplayInput();
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
@@ -1785,10 +1853,7 @@ window.addEventListener('mouseup', (event) => {
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
-    mouseTriggerHeld = false;
-    mouseAdsHeld = false;
-    triggerHeld = false;
-    adsHeld = false;
+    clearGameplayInput();
     if (gameStarted && player.alive) {
       element<HTMLButtonElement>('#resume').hidden = matchFinished;
       menu.classList.remove('hidden');
@@ -1899,6 +1964,7 @@ const debugWindow = window as Window & {
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     setRenderPaused: (paused: boolean) => void;
+    openMenu: () => void;
     fireOnce: () => void;
     throwGrenade: () => void;
     switchWeapon: (index: number) => void;
@@ -1929,7 +1995,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       grenades: player.grenades,
       position: player.position.toArray(),
     },
-    bots: [...bots.values()].map((bot) => ({ id: bot.id, hp: bot.hp, alive: bot.alive, kills: bot.kills, position: bot.position.toArray() })),
+    bots: [...bots.values()].map((bot) => ({
+      id: bot.id,
+      hp: bot.hp,
+      alive: bot.alive,
+      kills: bot.kills,
+      position: bot.position.toArray(),
+      waypoint: bot.waypoint,
+      blockedSince: bot.blockedSince,
+      hasLineOfSight: bot.hasLineOfSight,
+    })),
     remotes: remotes.size,
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
@@ -1958,6 +2033,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
+  openMenu: () => {
+    clearGameplayInput();
+    menu.classList.remove('hidden');
+  },
   fireOnce: () => {
     debugInputUnlocked = true;
     triggerHeld = true;

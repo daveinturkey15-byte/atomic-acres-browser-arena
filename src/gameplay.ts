@@ -115,10 +115,11 @@ export function integrateHorizontalVelocity(
   const target = { x: normalized.x * profile.maxSpeed, z: normalized.z * profile.maxSpeed };
   const rate = inputLength > 0.001 ? profile.acceleration : profile.deceleration;
   const maxDelta = Math.max(0, rate * Math.max(0, dt));
-  return {
-    x: approach(velocity.x, target.x, maxDelta),
-    z: approach(velocity.z, target.z, maxDelta),
-  };
+  const delta = { x: target.x - velocity.x, z: target.z - velocity.z };
+  const deltaLength = Math.hypot(delta.x, delta.z);
+  if (deltaLength <= maxDelta || deltaLength < 1e-8) return target;
+  const scale = maxDelta / deltaLength;
+  return { x: velocity.x + delta.x * scale, z: velocity.z + delta.z * scale };
 }
 
 export function sprintEligible(forwardInput: number, strafeInput: number, ads: boolean, crouched: boolean, prone = false): boolean {
@@ -141,10 +142,14 @@ export function mouseSensitivityMultiplier(ads: boolean, sprinting: boolean): nu
 }
 
 export function applyRadialDeadzone(x: number, y: number, deadzone = 0.14, exponent = 1.6): { x: number; y: number } {
-  const magnitude = Math.min(1, Math.hypot(x, y));
-  if (magnitude <= deadzone) return { x: 0, y: 0 };
-  const scaled = Math.pow((magnitude - deadzone) / Math.max(0.001, 1 - deadzone), exponent);
-  return { x: (x / magnitude) * scaled, y: (y / magnitude) * scaled };
+  if (![x, y, deadzone, exponent].every(Number.isFinite)) return { x: 0, y: 0 };
+  const safeDeadzone = Math.max(0, Math.min(0.99, deadzone));
+  const safeExponent = Math.max(0.01, exponent);
+  const rawMagnitude = Math.hypot(x, y);
+  if (rawMagnitude <= safeDeadzone || rawMagnitude < 1e-8) return { x: 0, y: 0 };
+  const clampedMagnitude = Math.min(1, rawMagnitude);
+  const scaled = Math.pow((clampedMagnitude - safeDeadzone) / Math.max(0.001, 1 - safeDeadzone), safeExponent);
+  return { x: (x / rawMagnitude) * scaled, y: (y / rawMagnitude) * scaled };
 }
 
 export type GamepadLookRate = { yaw: number; pitch: number };

@@ -26,5 +26,5 @@ export const SPAWN_LAYOUT = Object.freeze({
 
 export const PATROL_LAYOUT: ReadonlyArray<readonly [number, number]> = Object.freeze([
   [-22, -10], [-16, 13], [-4, 20], [7, 13],
-  [22, 7], [17, -15], [2, -20], [-11, -15],
+  [19, 7], [17, -15], [2, -20], [-11, -15],
 ]);

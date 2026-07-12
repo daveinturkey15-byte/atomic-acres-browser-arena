@@ -88,9 +88,20 @@ describe('console-style movement integration', () => {
     expect(applyRadialDeadzone(0.05, -0.04)).toEqual({ x: 0, y: 0 });
     const full = applyRadialDeadzone(0.6, 0.8);
     expect(Math.hypot(full.x, full.y)).toBeCloseTo(1, 6);
+    const diagonal = applyRadialDeadzone(1, 1);
+    expect(Math.hypot(diagonal.x, diagonal.y)).toBeCloseTo(1, 6);
+    expect(diagonal.x).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(applyRadialDeadzone(Number.NaN, 0)).toEqual({ x: 0, y: 0 });
     const shaped = applyRadialDeadzone(0.4, 0);
     expect(shaped.x).toBeGreaterThan(0);
     expect(shaped.x).toBeLessThan(0.4);
+  });
+
+  it('applies the same acceleration budget to cardinal and diagonal movement', () => {
+    const profile = movementProfile({ crouched: false, ads: false, sprinting: false, grounded: true });
+    const cardinal = integrateHorizontalVelocity({ x: 0, z: 0 }, { x: 0, z: -1 }, profile, 1 / 60);
+    const diagonal = integrateHorizontalVelocity({ x: 0, z: 0 }, { x: 1, z: -1 }, profile, 1 / 60);
+    expect(Math.hypot(diagonal.x, diagonal.z)).toBeCloseTo(Math.hypot(cardinal.x, cardinal.z), 8);
   });
 
   it('accelerates gamepad look predictably, slows ADS, and releases without a long tail', () => {
