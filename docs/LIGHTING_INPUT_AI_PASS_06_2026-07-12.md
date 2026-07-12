@@ -108,11 +108,11 @@ Continue the original early-2010s compact arena-FPS quality roadmap without copy
 
 ## Public review deployment
 
-- Source build: `b0cf59c`.
-- Pages revision: `373f549`.
-- Review URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass06/?release=b0cf59c`.
-- Pages diff from Pass 05 contained 15 files, all under `review/pass06/`; canonical root, `review/pass04/` and `review/pass05/` remained unchanged.
+- Hardened source build: `86bf2be` (supersedes initial Pass 06 candidate `b0cf59c`).
+- Pages revision: `7dbfbc6`.
+- Review URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass06/?release=86bf2be`.
+- The hardening deployment changed only two files under `review/pass06/`; canonical root, `review/pass04/` and `review/pass05/` remained unchanged.
 - Public full and compatibility release QA matched local telemetry with zero console errors.
 - Public two-browser multiplayer QA passed room/join, reciprocal remote presence and prone replication.
-- Public menu and first-person visual smoke checks found no missing assets, clipping, darkness, glare, fog or release blocker.
+- Public menu visual smoke check confirmed the camera-relative sky and scene render without missing assets, clipping, black geometry or atmosphere artifacts.
 
