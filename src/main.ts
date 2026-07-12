@@ -174,7 +174,8 @@ renderer.shadowMap.enabled = !reducedRenderMode;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.22;
-renderer.setPixelRatio(reducedRenderMode ? 0.25 : Math.min(window.devicePixelRatio, 1.75));
+// Compatibility mode targets constrained/software-rendered Chromium; full-quality play keeps the normal ratio.
+renderer.setPixelRatio(reducedRenderMode ? 0.2 : Math.min(window.devicePixelRatio, 1.75));
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xaec2c7, 62, 128);
