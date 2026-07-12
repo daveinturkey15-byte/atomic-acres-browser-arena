@@ -135,6 +135,15 @@ Verification:
 - Visual inspection covered aerial menu composition, compact flank traversal, carbine hip/ADS arm placement, scattergun hand placement and sight obstruction.
 - Known limitations: no mobile controls; multiplayer remains peer/victim-validated rather than server authoritative; world death/reload action replication remains future work; subjective pacing requires Dave's review.
 
+## Review deployment
+
+- Source build revision: `5ac4b7c` (`overhaul/arena-scale-ai-art-pass-04`).
+- Pages revision: `c5e60c9`.
+- Review URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass04/?release=5ac4b7c`
+- Exact public release QA: zero console errors; one bounded bot; full-quality `302` calls / `311,410` triangles.
+- Exact public two-browser PeerJS QA: room creation/join, one remote on each page and prone replication passed.
+- A tree diff from Pages `303f3c6` to `c5e60c9`, excluding `review/pass04`, is empty. The canonical root files were not modified and the canonical URL still returns HTTP 200.
+
 ## Deployment rule
 
-Do not overwrite the canonical Pass 03 deployment during Layer 04 development. Publish only a separate review candidate after complete functional, performance, visual, console and multiplayer verification.
+The Pass 04 build is published only at the separate review path. Do not overwrite the canonical Pass 03 deployment until Dave explicitly approves promotion.
