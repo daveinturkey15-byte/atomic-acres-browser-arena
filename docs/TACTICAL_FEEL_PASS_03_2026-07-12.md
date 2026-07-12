@@ -124,3 +124,15 @@ This is still an original browser/procedural arena, not a native AAA engine or a
 - Public full-quality release QA passed with zero console errors.
 - Public two-page QA passed with prone replication, one remote per peer, and 29.1548 m spawn separation.
 - A 1280×580 public-menu inspection exposed hidden below-fold controls; a short-height desktop layout was added, locally rechecked, and included in the final review revision. The final menu visibly includes `Z/CTRL prone` without hidden scrolling.
+
+## Canonical promotion — half-damage bots (2026-07-12)
+
+Dave approved Pass 03 for the canonical site and requested bots deal 50% weapon damage.
+
+- Bot damage is now the explicit tested constant `BOT_DAMAGE_MULTIPLIER = 0.5`, replacing the previous `0.62` multiplier.
+- Source revision: `e9e1c7f01ff1900c7a756d7ca382cfbc58211776`; `origin/main` was fast-forwarded to it.
+- Pages revision: `303f3c6f61226d249583b822b68acca4ae451371`; Pages API status `built`.
+- Canonical URL: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?release=303f3c6>
+- Canonical bundle `assets/index-BGc3FxlB.js` matched the local production bundle exactly: SHA-256 `9461ecf9fb12ff16885870caf7f2f7821aa23233f0e4d91d5555a7c379253217`.
+- TypeScript, 42/42 unit tests, production build, eight functional Chromium scenarios, the isolated unchanged `>=40 FPS` scenario, dependency audit, public release QA, and public two-page multiplayer QA passed. Public console errors were empty.
+- The combined sequential browser suite remained benchmark-sensitive: its final FPS case reported 38.38–39.67 FPS after eight prior browser scenarios, while a clean isolated run passed. The threshold was not lowered. Five stale Atomic Acres Vite listeners on ports 4181–4184/5173 were discovered and stopped before the clean performance measurement.
