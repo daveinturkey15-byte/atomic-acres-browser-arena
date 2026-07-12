@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import './style.css';
 import { batchStaticMeshes, buildOperator } from './art-kit';
-import { chooseBotIntent, respawnBotState } from './bot-ai';
+import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
-import { damp, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { damp, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
   BOT_DAMAGE_MULTIPLIER,
   WEAPONS,
@@ -393,7 +393,7 @@ function snapshot(): PlayerSnapshot {
 function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'join' || message.type === 'state') {
     const incoming = message.player;
-    if (incoming.id === player.id) return;
+    if (incoming.id === player.id || !pointInsideBounds(incoming, arena.bounds, 0.44)) return;
     let remote = remotes.get(incoming.id);
     if (!remote) {
       remote = createRemote(incoming);
@@ -416,7 +416,7 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'hit' && message.target === player.id && !processedNonces.has(message.nonce)) {
     const attacker = remotes.get(message.by);
-    if (!attacker) return;
+    if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
     const attackerEye = {
       x: attacker.snapshot.x,
       y: attacker.snapshot.y,
@@ -443,6 +443,7 @@ function trimNonceSet(): void {
 
 function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
+  if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
   const direction = new THREE.Vector3(...message.direction).normalize();
   const end = origin.clone().addScaledVector(direction, 50);
   const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
@@ -780,7 +781,7 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: 
 function spawnBots(): void {
   clearBots();
   const botTeam: Team = player.team === 0 ? 1 : 0;
-  const names = ['RIVET', 'MABEL', 'BOLT', 'TANGO'];
+  const names = ['RIVET'].slice(0, SOLO_BOT_COUNT);
   const spawnOptions = arena.spawns[botTeam];
   names.forEach((name, index) => {
     const id = `bot-${index}`;
@@ -801,7 +802,7 @@ function spawnBots(): void {
       invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index,
     });
   });
-  addFeed('Four hostile operators entered the block', 'coral');
+  addFeed('One hostile operator entered the block', 'coral');
 }
 
 function clearBots(): void {
@@ -859,6 +860,17 @@ function updateBots(dt: number, now: number): void {
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
       continue;
     }
+    // A corrupted position can never become an out-of-arena damage source.
+    if (!pointInsideBounds(bot.position, arena.bounds, 0.44)) {
+      const safeSpawn = arena.spawns[bot.team][0];
+      bot.position.set(safeSpawn.x, safeSpawn.y - 1.7, safeSpawn.z);
+      bot.root.position.copy(bot.position);
+      bot.hasLineOfSight = false;
+      bot.sightStartedAt = 0;
+      bot.burstShots = 0;
+      bot.lastSightAt = now;
+      continue;
+    }
 
     const toPlayer = player.position.clone().setY(0).sub(bot.position.clone().setY(0));
     const distance = toPlayer.length();
@@ -893,7 +905,7 @@ function updateBots(dt: number, now: number): void {
       waypointReached,
       random: bot.strafeSign === 1 ? 0.25 : 0.75,
       lineOfSightSince: bot.sightStartedAt,
-      reactionDelay: 210 + botIndex * 45,
+      reactionDelay: BOT_REACTION_DELAY,
       burstShotsRemaining: bot.burstShots,
     });
 
@@ -923,8 +935,7 @@ function updateBots(dt: number, now: number): void {
       bot.lastShotAt = now;
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
       const direction = player.position.clone().sub(origin).normalize();
-      const matchAccuracy = THREE.MathUtils.lerp(0.038, 0.014, Math.min(1, (now - matchState.phaseStartedAt) / 120_000));
-      const jitter = matchAccuracy + bot.burstShots * 0.004;
+      const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
       direction.x += (Math.random() - 0.5) * jitter;
       direction.y += (Math.random() - 0.5) * jitter;
       direction.z += (Math.random() - 0.5) * jitter;

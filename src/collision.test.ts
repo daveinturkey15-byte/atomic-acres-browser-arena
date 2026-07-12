@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { circleIntersectsBox, damp, firstSegmentBoxHit, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { circleIntersectsBox, damp, firstSegmentBoxHit, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 
 const wall = { minX: 1, maxX: 3, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
 const bounds = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
@@ -31,6 +31,13 @@ describe('arena collision', () => {
     );
     expect(result.x).toBe(9.5);
     expect(result.z).toBe(-9.5);
+  });
+
+  it('rejects out-of-bounds combat origins with the actor radius margin', () => {
+    expect(pointInsideBounds({ x: 0, y: 1.7, z: 0 }, bounds, 0.5)).toBe(true);
+    expect(pointInsideBounds({ x: 9.5, y: 1.7, z: -9.5 }, bounds, 0.5)).toBe(true);
+    expect(pointInsideBounds({ x: 9.51, y: 1.7, z: 0 }, bounds, 0.5)).toBe(false);
+    expect(pointInsideBounds({ x: 0, y: 1.7, z: -9.51 }, bounds, 0.5)).toBe(false);
   });
 
   it('checks line of sight against solid boxes in all three dimensions', () => {

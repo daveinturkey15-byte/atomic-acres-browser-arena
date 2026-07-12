@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseBotIntent, respawnBotState, type BotSense } from './bot-ai';
+import { BOT_FIRE_RANGE, BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState, type BotSense } from './bot-ai';
 
 const base: BotSense = {
   alive: true,
@@ -16,8 +16,17 @@ describe('chooseBotIntent', () => {
   it('fires only with line of sight, range and cadence', () => {
     expect(chooseBotIntent(base).fire).toBe(true);
     expect(chooseBotIntent({ ...base, hasLineOfSight: false }).fire).toBe(false);
-    expect(chooseBotIntent({ ...base, distanceToPlayer: 80 }).fire).toBe(false);
+    expect(chooseBotIntent({ ...base, distanceToPlayer: BOT_FIRE_RANGE + 0.01 }).fire).toBe(false);
     expect(chooseBotIntent({ ...base, lastShotAt: 1_800 }).fire).toBe(false);
+  });
+
+  it('uses one deliberately close-to-medium-range solo opponent', () => {
+    expect(SOLO_BOT_COUNT).toBe(1);
+    expect(BOT_FIRE_RANGE).toBe(22);
+    expect(BOT_REACTION_DELAY).toBeGreaterThanOrEqual(600);
+    expect(botAimJitter(8)).toBeLessThan(botAimJitter(16));
+    expect(botAimJitter(16)).toBeLessThan(botAimJitter(BOT_FIRE_RANGE));
+    expect(botAimJitter(BOT_FIRE_RANGE)).toBe(0.1);
   });
 
   it('honours reaction delay and accelerates follow-up shots inside a burst', () => {

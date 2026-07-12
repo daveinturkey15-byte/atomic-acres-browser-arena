@@ -161,6 +161,13 @@ export function resolveHorizontalMove(
   return next;
 }
 
+export function pointInsideBounds(point: Point3, bounds: Box2, margin = 0): boolean {
+  return point.x >= bounds.minX + margin
+    && point.x <= bounds.maxX - margin
+    && point.z >= bounds.minZ + margin
+    && point.z <= bounds.maxZ - margin;
+}
+
 export function shortestAngleDelta(from: number, to: number): number {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }

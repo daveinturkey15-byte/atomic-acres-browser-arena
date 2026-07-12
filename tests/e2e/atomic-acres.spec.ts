@@ -85,10 +85,10 @@ test.describe('solo mechanics', () => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
   });
 
-  test('spawns four combat bots and they navigate', async ({ page }) => {
+  test('spawns one bounded close-range combat bot and it navigates', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
     const before = await debug(page);
-    expect(before.bots).toHaveLength(4);
+    expect(before.bots).toHaveLength(1);
     expect(before.bots.every((bot) => bot.alive)).toBe(true);
     await page.waitForTimeout(1_200);
     const after = await debug(page);
@@ -97,6 +97,8 @@ test.describe('solo mechanics', () => {
       return Math.hypot(bot.position[0] - previous[0], bot.position[2] - previous[2]) > 0.05;
     });
     expect(moved).toBe(true);
+    expect(after.bots.every((bot) => bot.position[0] >= -40.56 && bot.position[0] <= 40.56
+      && bot.position[2] >= -50.56 && bot.position[2] <= 50.56)).toBe(true);
   });
 
   test('walk, sprint, crouch and prone alter the real player stance', async ({ page }) => {
@@ -175,7 +177,7 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#grenades')).toHaveText('FRAG ×1');
     await expect(page.locator('#minimap')).toBeVisible();
     await page.keyboard.down('Tab');
-    await expect(page.locator('#roster-list > div')).toHaveCount(5);
+    await expect(page.locator('#roster-list > div')).toHaveCount(2);
     await page.keyboard.up('Tab');
     await page.screenshot({ path: 'test-results/gameplay-structured-pass.png', fullPage: true });
   });

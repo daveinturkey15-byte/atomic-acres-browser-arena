@@ -20,13 +20,23 @@ export type BotIntent = {
   changeWaypoint: boolean;
 };
 
+export const SOLO_BOT_COUNT = 1;
+export const BOT_FIRE_RANGE = 22;
+export const BOT_REACTION_DELAY = 650;
+
+/** Close-range bots remain readable; their aim becomes deliberately poor toward medium range. */
+export function botAimJitter(distance: number): number {
+  const rangeFraction = Math.max(0, Math.min(1, (distance - 6) / (BOT_FIRE_RANGE - 6)));
+  return 0.024 + rangeFraction * rangeFraction * 0.076;
+}
+
 export function chooseBotIntent(sense: BotSense): BotIntent {
   if (!sense.alive) return { movement: 'idle', fire: false, changeWaypoint: false };
   const reacted = sense.hasLineOfSight
     && sense.now - (sense.lineOfSightSince ?? sense.now) >= (sense.reactionDelay ?? 0);
   const shotInterval = (sense.burstShotsRemaining ?? 0) > 0 ? 135 : 620;
   const fire = reacted
-    && sense.distanceToPlayer <= 55
+    && sense.distanceToPlayer <= BOT_FIRE_RANGE
     && sense.distanceToPlayer >= 2.5
     && sense.now - sense.lastShotAt >= shotInterval;
   let movement: BotMovement;
