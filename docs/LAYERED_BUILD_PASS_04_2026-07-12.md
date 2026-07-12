@@ -72,6 +72,24 @@ Implementation specification:
 - Replace per-shot casing allocation with a 12–16 object pool and shared geometries/materials.
 - Use named events (`shot`, `eject`, `boltRear`, `boltForward`, `magSeated`, `pumpRear`, `pumpForward`, `roundInsert`) so audio, hands, weapon parts and gameplay commits align.
 
+Implementation checkpoint completed:
+
+- Replaced the statically merged mannequin with a rigid procedural pelvis/spine/head, upper-arm/forearm/hand and thigh/shin/foot hierarchy.
+- Stand/crouch/prone now target articulated joints rather than scaling or tipping the whole remote body.
+- Team identity uses both band orientation and shoulder-beacon shape.
+- Replicated remote weapon IDs now swap the visible world weapon.
+- Bot and remote firing drive world weapon recoil, bolt/pump travel and a shared-material emissive flash.
+- Rebuilt the three weapon models into distinct silhouettes. The scattergun now uses a barrel/tube pair and pump with no box magazine.
+- Added first-person upper-arm/elbow/forearm/hand groups, per-weapon muzzle/eject/grip/support sockets, staged bolt/pump movement and visible magazine travel.
+- Replaced per-shot casing geometry/material allocation with a fixed 16-object pool and separate shared brass/shell forms.
+- Re-centered the physical sight after reducing viewmodel scale and moving ADS farther from the camera.
+
+Remaining art refinement:
+
+- The first-person arms are articulated but not yet full two-bone IK; weapon-authored sockets currently inform layout rather than solving every joint each frame.
+- World death collapse, reload and aim-pitch replication still need dedicated network action events.
+- Full-quality renderer telemetry is above the compatibility budget (`320` calls / `385,120` triangles in the local capture); the compatibility run remains inside the asserted `<=180` / `<=350k` gates and passed `>=40 FPS`. Normal-quality optimization remains required before release acceptance.
+
 Art budgets:
 
 - First-person weapon plus arms: target `6k–8k`, hard cap `10k` triangles.

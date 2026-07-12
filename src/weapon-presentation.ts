@@ -14,7 +14,7 @@ export type WeaponPose = {
   lateralSpeed: number;
 };
 
-type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number };
+type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; active: boolean };
 
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
@@ -32,29 +32,45 @@ export class WeaponPresentation {
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
   private readonly casings: ViewCasing[] = [];
+  private readonly brassGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7);
+  private readonly shellGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.105, 8);
+  private readonly brassMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
+  private readonly shellMaterial = new THREE.MeshStandardMaterial({ color: 0xb43f32, roughness: 0.58, metalness: 0.18 });
+  private shotStarted = -10_000;
+  private casingCursor = 0;
   private adsBlend = 0;
   private sprintBlend = 0;
 
   constructor(camera: THREE.Camera, private readonly flattenMaterials = false) {
     this.root.name = 'original-weapon-view';
     this.root.position.set(0.36, -0.38, -0.78);
-    this.root.scale.setScalar(0.64);
+    this.root.scale.setScalar(0.6);
     camera.add(this.root);
 
     const sleeve = new THREE.MeshStandardMaterial({ color: 0x263c38, roughness: 0.9 });
     const glove = new THREE.MeshStandardMaterial({ color: 0x12181b, roughness: 0.94 });
     const arms = new THREE.Group(); arms.name = 'first-person-arms';
-    const rightForearm = roundedBox('right-forearm', [0.18, 0.18, 0.68], sleeve, 0.08, 4);
-    rightForearm.position.set(0.18, -0.2, 0.3); rightForearm.rotation.set(-0.2, -0.12, -0.12);
-    const rightGlove = roundedBox('right-glove', [0.2, 0.19, 0.25], glove, 0.075, 4);
-    rightGlove.position.set(0.1, -0.15, -0.02); rightGlove.rotation.x = -0.12;
-    const leftForearm = roundedBox('left-forearm', [0.19, 0.19, 0.75], sleeve, 0.08, 4);
-    leftForearm.position.set(-0.24, -0.23, 0.12); leftForearm.rotation.set(-0.42, 0.28, 0.08);
-    const leftGlove = roundedBox('left-glove', [0.21, 0.2, 0.27], glove, 0.075, 4);
-    leftGlove.position.set(-0.08, -0.07, -0.43); leftGlove.rotation.set(-0.18, 0.15, 0);
-    arms.add(rightForearm, rightGlove, leftForearm, leftGlove);
+    const makeArm = (side: 'left' | 'right') => {
+      const sign = side === 'left' ? -1 : 1;
+      const shoulder = new THREE.Group(); shoulder.name = `${side}-shoulder-joint`;
+      shoulder.position.set(sign * 0.25, side === 'right' ? -0.17 : -0.12, side === 'right' ? 0.52 : 0.45);
+      shoulder.rotation.set(side === 'left' ? -0.48 : -0.28, sign * -0.16, sign * -0.12);
+      const upper = roundedBox(`${side}-upper-arm`, [0.19, 0.19, 0.46], sleeve, 0.075, 4);
+      upper.position.z = -0.2; shoulder.add(upper);
+      const elbow = new THREE.Group(); elbow.name = `${side}-elbow-joint`; elbow.position.z = side === 'right' ? -0.28 : -0.42; shoulder.add(elbow);
+      elbow.rotation.set(side === 'left' ? -0.18 : -0.08, sign * 0.12, 0);
+      const forearm = roundedBox(`${side}-forearm`, [0.18, 0.18, 0.5], sleeve, 0.075, 4);
+      forearm.position.z = side === 'right' ? -0.1 : -0.22; elbow.add(forearm);
+      const handZ = side === 'right' ? -0.2 : -0.55;
+      const hand = roundedBox(`${side}-glove`, [0.17, 0.15, 0.22], glove, 0.06, 4);
+      hand.position.set(sign * -0.015, -0.01, handZ); hand.rotation.x = -0.12; elbow.add(hand);
+      const thumb = roundedBox(`${side}-thumb`, [0.07, 0.1, 0.16], glove, 0.028, 3);
+      thumb.position.set(sign * -0.1, -0.04, handZ + 0.02); thumb.rotation.z = sign * 0.32; elbow.add(thumb);
+      return shoulder;
+    };
+    arms.add(makeArm('right'), makeArm('left'));
     arms.scale.setScalar(0.74);
-    arms.position.set(0, -0.1, -0.04);
+    arms.position.set(0, -0.08, 0.02);
     this.root.add(arms);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
     this.muzzleLight.position.set(0, 0.08, -1.15);
@@ -76,6 +92,15 @@ export class WeaponPresentation {
     this.muzzleFlash.add(core, flare);
     this.muzzleFlash.visible = false;
     this.root.add(this.muzzleFlash);
+
+    for (let index = 0; index < 16; index += 1) {
+      const mesh = new THREE.Mesh(this.brassGeometry, this.brassMaterial);
+      mesh.name = `pooled-casing-${index}`;
+      mesh.visible = false;
+      mesh.rotation.z = Math.PI / 2;
+      this.root.add(mesh);
+      this.casings.push({ mesh, velocity: new THREE.Vector3(), life: 0, active: false });
+    }
   }
 
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
@@ -99,25 +124,37 @@ export class WeaponPresentation {
     this.switchBlend = immediate ? 1 : 0;
     this.reloadDuration = 0;
     for (const [weaponId, model] of this.models) model.visible = weaponId === id;
+    const activeModel = this.models.get(id);
+    const muzzleSocket = activeModel?.getObjectByName('muzzle-socket');
+    if (muzzleSocket) {
+      this.muzzleLight.position.copy(muzzleSocket.position);
+      this.muzzleFlash.position.copy(muzzleSocket.position);
+    }
   }
 
   fire(amount: number): void {
     this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
+    this.shotStarted = performance.now();
     this.muzzleLight.intensity = this.active === 'scattergun' ? 7.2 : 4.8;
     this.muzzleFlash.visible = true;
     this.muzzleFlash.scale.setScalar(this.active === 'scattergun' ? 1.45 : this.active === 'smg' ? 0.78 : 1);
     this.muzzleFlash.rotation.z = Math.random() * Math.PI;
 
-    const casingMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
-    const casing = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7), casingMaterial);
-    casing.rotation.z = Math.PI / 2;
-    casing.position.set(0.12, 0.04, -0.48);
-    this.root.add(casing);
-    this.casings.push({
-      mesh: casing,
-      velocity: new THREE.Vector3(0.95 + Math.random() * 0.25, 0.75 + Math.random() * 0.2, 0.1),
-      life: 0.42,
-    });
+    const casing = this.casings[this.casingCursor++ % this.casings.length];
+    const shell = this.active === 'scattergun';
+    casing.mesh.geometry = shell ? this.shellGeometry : this.brassGeometry;
+    casing.mesh.material = shell ? this.shellMaterial : this.brassMaterial;
+    const ejectSocket = this.models.get(this.active)?.getObjectByName('eject-socket');
+    casing.mesh.position.copy(ejectSocket?.position ?? new THREE.Vector3(0.12, 0.04, -0.48));
+    casing.mesh.rotation.set(Math.random() * 0.4, 0, Math.PI / 2);
+    casing.mesh.visible = true;
+    casing.velocity.set(
+      shell ? 0.72 : 0.95 + Math.random() * 0.25,
+      shell ? 0.55 : 0.75 + Math.random() * 0.2,
+      shell ? 0.16 : 0.1,
+    );
+    casing.life = shell ? 0.62 : 0.42;
+    casing.active = true;
   }
 
   reload(durationSeconds: number): void {
@@ -152,20 +189,38 @@ export class WeaponPresentation {
     this.adsBlend = THREE.MathUtils.lerp(this.adsBlend, pose.ads ? 1 : 0, smoothing(pose.ads ? 18 : 15));
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
+    const arms = this.root.getObjectByName('first-person-arms');
+    if (arms) arms.position.y = THREE.MathUtils.lerp(-0.08, -0.3, this.adsBlend);
 
-    for (let index = this.casings.length - 1; index >= 0; index -= 1) {
-      const casing = this.casings[index];
+    for (const casing of this.casings) {
+      if (!casing.active) continue;
       casing.life -= pose.dt;
       casing.velocity.y -= 4.5 * pose.dt;
       casing.mesh.position.addScaledVector(casing.velocity, pose.dt);
       casing.mesh.rotation.x += pose.dt * 18;
       casing.mesh.rotation.z += pose.dt * 11;
       if (casing.life <= 0) {
-        this.root.remove(casing.mesh);
-        casing.mesh.geometry.dispose();
-        (casing.mesh.material as THREE.Material).dispose();
-        this.casings.splice(index, 1);
+        casing.active = false;
+        casing.mesh.visible = false;
       }
+    }
+
+    const activeModel = this.models.get(this.active);
+    const shotAge = performance.now() - this.shotStarted;
+    const bolt = activeModel?.getObjectByName('bolt-or-slide');
+    if (bolt) {
+      const restZ = Number(bolt.userData.restZ ?? 0);
+      const cycleMs = this.active === 'smg' ? 44 : 62;
+      const cycle = THREE.MathUtils.clamp(shotAge / cycleMs, 0, 1);
+      bolt.position.z = restZ + Math.sin(cycle * Math.PI) * (this.active === 'smg' ? 0.09 : 0.075);
+    }
+    const pump = activeModel?.getObjectByName('pump');
+    if (pump) {
+      const restZ = Number(pump.userData.restZ ?? -0.48);
+      const pumpProgress = THREE.MathUtils.clamp((shotAge - 180) / 440, 0, 1);
+      pump.position.z = restZ + Math.sin(pumpProgress * Math.PI) * 0.22;
+      const leftElbow = this.root.getObjectByName('left-elbow-joint');
+      if (leftElbow) leftElbow.rotation.x = -0.18 - Math.sin(pumpProgress * Math.PI) * 0.24;
     }
 
     const bobWeight = pose.moving ? (pose.sprinting ? 1.22 : pose.ads ? 0.12 : pose.prone ? 0.12 : pose.crouched ? 0.32 : 0.56) : 0.05;
@@ -173,10 +228,10 @@ export class WeaponPresentation {
     const bobY = Math.sin(pose.phase) * 0.019 * bobWeight;
     const breath = Math.sin(performance.now() * 0.0017) * (pose.ads ? 0.0015 : 0.0045);
     const adsX = this.adsBlend * -0.36;
-    // The procedural optic axis is y=.215 before the 0.64 view scale. This delta
-    // puts that physical sight axis on the camera centre instead of above it.
-    const adsY = this.adsBlend * 0.242;
-    const adsZ = this.adsBlend * 0.06;
+    // The authored sight axes are y=.215. This offsets the 0.6 view scale so
+    // the physical sight—not a HUD approximation—lands on camera centre.
+    const adsY = this.adsBlend * 0.251;
+    const adsZ = this.adsBlend * -0.04;
     const sprintDrop = this.sprintBlend * -0.16;
     const stanceHipBlend = 1 - this.adsBlend;
     const crouchLift = pose.crouched ? 0.035 * stanceHipBlend : 0;
@@ -185,16 +240,25 @@ export class WeaponPresentation {
 
     let reloadRoll = 0;
     let reloadDrop = 0;
+    let reloadProgress = 0;
     if (this.reloadDuration > 0) {
       const progress = (performance.now() - this.reloadStart) / this.reloadDuration;
       if (progress >= 1) this.reloadDuration = 0;
       else {
         const p = THREE.MathUtils.clamp(progress, 0, 1);
+        reloadProgress = p;
         const lower = Math.sin(Math.PI * p);
         const seatSnap = p > 0.65 ? Math.sin((p - 0.65) / 0.35 * Math.PI) : 0;
         reloadRoll = lower * 0.78 - seatSnap * 0.12;
         reloadDrop = lower * -0.22 + seatSnap * 0.035;
       }
+    }
+    const magazine = activeModel?.getObjectByName(this.active === 'carbine' ? 'curved-magazine' : 'straight-magazine');
+    if (magazine) {
+      const restY = this.active === 'carbine' ? -0.24 : -0.26;
+      const exchange = reloadProgress > 0 ? Math.sin(reloadProgress * Math.PI) : 0;
+      magazine.position.y = restY - exchange * 0.38;
+      magazine.rotation.z = exchange * 0.18;
     }
 
     const meleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / 430, 0, 1);

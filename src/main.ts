@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import { batchStaticMeshes, buildOperator } from './art-kit';
+import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, setOperatorWeapon } from './art-kit';
 import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -113,9 +113,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · TACTICAL FEEL PASS 03</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · LAYERED BUILD PASS 04</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A close-quarters retro-future skirmish with real stand/crouch/prone physics, centred physical sights, authoritative hard cover and peer-to-peer multiplayer.</p>
+    <p class="lede">A compact retro-future skirmish with one bounded close-range rival, articulated operators, distinct procedural weapons, physical sights and authoritative hard cover.</p>
     <div class="setup-grid">
       <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
       <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
@@ -338,7 +338,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
 
-  const operator = buildOperator(snapshot.team, 'remote-player-model', reducedRenderMode);
+  const operator = buildOperator(snapshot.team, 'remote-player-model', reducedRenderMode, snapshot.weapon);
   operator.userData.playerId = snapshot.id;
   operator.traverse((child) => {
     child.userData.playerId = snapshot.id;
@@ -448,6 +448,8 @@ function renderRemoteShot(message: ShotMessage): void {
   const end = origin.clone().addScaledVector(direction, 50);
   const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
   spawnTracer(origin, direction, trace.tracerDistance, WEAPONS[message.weapon].color);
+  const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
+  if (remoteOperator) fireOperator(remoteOperator);
   if (trace.blockedByCover) {
     const impact = origin.clone().addScaledVector(direction, trace.tracerDistance);
     spawnImpactFlash(impact);
@@ -938,11 +940,13 @@ function updateBots(dt: number, now: number): void {
     bot.root.position.copy(bot.position);
     const lookTarget = lineOfSight ? player.position : patrolTarget;
     bot.root.lookAt(lookTarget.x, bot.position.y + 1.1, lookTarget.z);
+    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
     if (intent.fire && player.alive) {
       if (bot.burstShots <= 0) bot.burstShots = 2 + (botIndex % 2);
       bot.burstShots -= 1;
       bot.lastShotAt = now;
+      fireOperator(bot.root);
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
       const direction = player.position.clone().sub(origin).normalize();
       const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
@@ -1260,14 +1264,13 @@ function updateRemotes(dt: number, now: number): void {
       continue;
     }
     const alpha = 1 - Math.exp(-13 * dt);
+    const remainingDistance = remote.root.position.distanceTo(remote.target);
     remote.root.position.lerp(remote.target, alpha);
     remote.root.rotation.y += shortestAngleDelta(remote.root.rotation.y, remote.targetYaw) * alpha;
     const stance = remote.snapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
-    operator.rotation.x = THREE.MathUtils.lerp(operator.rotation.x, stance === 'prone' ? -1.38 : 0, alpha);
-    const targetScaleY = stance === 'crouch' ? 0.76 : stance === 'prone' ? 0.9 : 1;
-    operator.scale.y = THREE.MathUtils.lerp(operator.scale.y, targetScaleY, alpha);
-    operator.position.y = THREE.MathUtils.lerp(operator.position.y, stance === 'prone' ? 0.28 : 0, alpha);
+    setOperatorWeapon(operator, remote.snapshot.weapon, reducedRenderMode);
+    poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, alpha, remote.snapshot.pitch);
   }
 }
 
@@ -1793,7 +1796,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Tactical Feel Pass 03 ready — prone physics, rebuilt ADS and authoritative cover active.', 'ok');
+  setStatus('Layered Build Pass 04 ready — bounded solo rival and articulated procedural weapon rigs active.');
   requestAnimationFrame(frame);
 }
 

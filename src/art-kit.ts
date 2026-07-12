@@ -167,7 +167,7 @@ function part(root: THREE.Group, mesh: THREE.Mesh, position: [number, number, nu
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.Group {
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
-  const metal = MAT.gunmetal();
+  const metal = flattenMaterials ? MAT.dark() : MAT.gunmetal();
   const dark = MAT.dark();
   const rubber = MAT.rubber();
   const accent = new THREE.MeshStandardMaterial({
@@ -176,61 +176,102 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     metalness: 0.35,
   });
 
-  const long = id === 'scattergun';
-  const compact = id === 'smg';
-  const bodyLength = long ? 0.72 : compact ? 0.43 : 0.58;
-  part(root, roundedBox('receiver', [0.18, 0.18, bodyLength], metal, 0.035), [0, 0, -0.15]);
-  part(root, roundedBox('receiver-accent', [0.19, 0.055, bodyLength * 0.72], accent, 0.025), [0, 0.075, -0.13]);
-  part(root, roundedBox('stock', [0.15, 0.18, compact ? 0.22 : 0.34], rubber, 0.045), [0, -0.015, bodyLength * 0.48]);
-  part(root, roundedBox('grip', [0.105, 0.25, 0.13], rubber, 0.025), [0, -0.18, 0.02], [-0.18, 0, 0]);
-  part(root, roundedBox('magazine', [compact ? 0.13 : 0.11, compact ? 0.28 : 0.33, 0.14], dark, 0.025), [0, -0.22, -0.18], [compact ? -0.08 : 0.12, 0, 0]);
+  const addSocket = (name: string, position: [number, number, number]) => {
+    const socket = new THREE.Object3D();
+    socket.name = name;
+    socket.position.set(...position);
+    root.add(socket);
+  };
+  const addBarrel = (length: number, z: number, radius: number) => {
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.82, radius, length, 12), dark);
+    part(root, barrel, [0, 0.005, z], [Math.PI / 2, 0, 0]);
+  };
 
-  const barrelLength = long ? 0.65 : compact ? 0.31 : 0.48;
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(long ? 0.035 : 0.026, long ? 0.04 : 0.032, barrelLength, 18), dark);
-  part(root, barrel, [0, 0.005, -bodyLength * 0.5 - barrelLength * 0.48], [Math.PI / 2, 0, 0]);
-  const shroud = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, barrelLength * 0.64, 12), metal);
-  part(root, shroud, [0, 0.005, -bodyLength * 0.5 - barrelLength * 0.25], [Math.PI / 2, 0, 0]);
-  const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.11, 16), dark);
-  part(root, muzzle, [0, 0.005, -bodyLength * 0.5 - barrelLength - 0.02], [Math.PI / 2, 0, 0]);
-  muzzle.userData.muzzle = true;
-
-  // Sight, rails, charging handle and visible hardware keep the silhouette authored rather than toy-like.
-  part(root, roundedBox('top-rail', [0.13, 0.028, bodyLength * 0.78], dark, 0.008), [0, 0.12, -0.14]);
-  for (const z of [-0.31, -0.22, -0.13, -0.04, 0.05]) {
-    part(root, roundedBox('rail-notch', [0.16, 0.018, 0.018], MAT.brass(), 0.004, 2), [0, 0.142, z]);
+  if (id === 'carbine') {
+    part(root, roundedBox('receiver', [0.19, 0.2, 0.58], metal, 0.035), [0, 0, -0.12]);
+    part(root, roundedBox('receiver-accent', [0.2, 0.045, 0.42], accent, 0.018), [0, 0.09, -0.17]);
+    part(root, roundedBox('angled-stock', [0.15, 0.19, 0.36], rubber, 0.045), [0, -0.015, 0.33], [-0.08, 0, 0]);
+    part(root, roundedBox('grip', [0.105, 0.25, 0.13], rubber, 0.025), [0, -0.18, 0.06], [-0.18, 0, 0]);
+    part(root, roundedBox('curved-magazine', [0.115, 0.34, 0.15], dark, 0.035), [0, -0.24, -0.17], [0.16, 0, 0]);
+    part(root, roundedBox('triangular-fore-end', [0.17, 0.14, 0.38], metal, 0.03), [0, -0.01, -0.56]);
+    for (const z of [-0.68, -0.58, -0.48]) part(root, roundedBox('fore-end-vent', [0.19, 0.035, 0.045], accent, 0.01), [0, 0.055, z]);
+    addBarrel(0.46, -0.93, 0.032);
+    part(root, roundedBox('optic-bridge', [0.15, 0.04, 0.34], dark, 0.01), [0, 0.145, -0.01]);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.011, 8, 20), dark);
+    ring.position.set(0, 0.215, -0.02); root.add(ring);
+    const bolt = part(root, roundedBox('bolt-or-slide', [0.045, 0.055, 0.16], MAT.brass(), 0.01), [0.105, 0.035, -0.05]);
+    bolt.userData.restZ = bolt.position.z;
+    addSocket('muzzle-socket', [0, 0.005, -1.18]);
+    addSocket('eject-socket', [0.13, 0.05, -0.08]);
+    addSocket('grip-socket-r', [0.03, -0.13, 0.04]);
+    addSocket('support-socket-l', [-0.03, -0.08, -0.55]);
+  } else if (id === 'smg') {
+    part(root, roundedBox('receiver', [0.21, 0.22, 0.42], metal, 0.04), [0, 0, -0.12]);
+    part(root, roundedBox('tall-rear-housing', [0.2, 0.25, 0.18], dark, 0.035), [0, 0.08, 0.08]);
+    part(root, roundedBox('heat-shield', [0.22, 0.14, 0.3], accent, 0.025), [0, 0.005, -0.43]);
+    for (const z of [-0.52, -0.43, -0.34]) {
+      const vent = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 6, 12), dark);
+      vent.rotation.y = Math.PI / 2; vent.position.set(0.116, 0.01, z); root.add(vent);
+    }
+    part(root, roundedBox('raked-grip', [0.11, 0.25, 0.13], rubber, 0.025), [0, -0.18, 0.01], [-0.24, 0, 0]);
+    part(root, roundedBox('straight-magazine', [0.13, 0.3, 0.14], dark, 0.025), [0, -0.26, -0.1], [-0.08, 0, 0]);
+    for (const x of [-0.065, 0.065]) {
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 8), dark);
+      part(root, rod, [x, 0.015, 0.35], [Math.PI / 2, 0, 0]);
+    }
+    part(root, roundedBox('wire-stock-pad', [0.18, 0.19, 0.08], rubber, 0.025), [0, 0.015, 0.54]);
+    addBarrel(0.25, -0.68, 0.035);
+    const block = part(root, roundedBox('bolt-or-slide', [0.22, 0.055, 0.1], accent, 0.012), [0, 0.135, -0.04]);
+    block.userData.restZ = block.position.z;
+    part(root, roundedBox('rear-sight', [0.13, 0.08, 0.05], dark, 0.012), [0, 0.19, 0.08]);
+    part(root, roundedBox('front-sight', [0.04, 0.1, 0.04], dark, 0.008), [0, 0.18, -0.52]);
+    addSocket('muzzle-socket', [0, 0.005, -0.83]);
+    addSocket('eject-socket', [0.14, 0.06, -0.04]);
+    addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
+    addSocket('support-socket-l', [-0.03, -0.08, -0.4]);
+  } else {
+    const wood = new THREE.MeshStandardMaterial({ color: 0xb98a57, roughness: 0.78, metalness: 0.04 });
+    part(root, roundedBox('rounded-receiver', [0.21, 0.22, 0.48], metal, 0.055), [0, 0, -0.05]);
+    part(root, roundedBox('stock', [0.17, 0.2, 0.48], wood, 0.06), [0, -0.015, 0.4], [-0.05, 0, 0]);
+    part(root, roundedBox('grip', [0.115, 0.25, 0.14], rubber, 0.03), [0, -0.19, 0.13], [-0.2, 0, 0]);
+    addBarrel(0.88, -0.75, 0.042);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.039, 0.72, 12), metal);
+    part(root, tube, [0, -0.075, -0.69], [Math.PI / 2, 0, 0]);
+    const pump = part(root, roundedBox('pump', [0.2, 0.17, 0.34], wood, 0.05), [0, -0.055, -0.48]);
+    pump.userData.restZ = pump.position.z;
+    for (const z of [-0.59, -0.52, -0.45, -0.38]) part(pump as unknown as THREE.Group, roundedBox('pump-rib', [0.21, 0.02, 0.018], dark, 0.004), [0, 0.03, z + 0.48]);
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), accent);
+    bead.position.set(0, 0.215, -1.11); root.add(bead);
+    part(root, roundedBox('rear-ring', [0.09, 0.055, 0.025], dark, 0.01), [0, 0.2, 0.11]);
+    addSocket('muzzle-socket', [0, 0.005, -1.2]);
+    addSocket('eject-socket', [0.14, 0.045, -0.03]);
+    addSocket('grip-socket-r', [0.03, -0.14, 0.12]);
+    addSocket('support-socket-l', [-0.03, -0.08, -0.48]);
   }
-  part(root, roundedBox('optic-base', [0.12, 0.045, 0.13], dark, 0.014), [0, 0.145, 0.02]);
-  const opticRing = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.011, 8, 20), dark);
-  opticRing.position.set(0, 0.215, -0.025); root.add(opticRing);
-  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.038, 20), new THREE.MeshBasicMaterial({ color: 0x9af6ff, transparent: true, opacity: 0.32, depthWrite: false }));
-  lens.position.set(0, 0.215, -0.026);
-  root.add(lens);
-  const reticle = new THREE.Mesh(
-    new THREE.CircleGeometry(0.0065, 16),
-    new THREE.MeshBasicMaterial({ color: 0xff5b3e, transparent: true, opacity: 0.96, depthWrite: false }),
-  );
-  reticle.name = 'optic-reticle';
-  reticle.position.set(0, 0.215, -0.023);
-  reticle.renderOrder = 6;
-  root.add(reticle);
-  part(root, roundedBox('front-sight-post', [0.035, 0.105, 0.035], dark, 0.008), [0, 0.16, -bodyLength * 0.52]);
-  part(root, roundedBox('charging-handle', [0.24, 0.035, 0.065], dark, 0.012), [0, 0.06, 0.05]);
 
-  if (long) {
-    part(root, roundedBox('pump', [0.19, 0.16, 0.3], new THREE.MeshStandardMaterial({ color: 0x704528, roughness: 0.82 }), 0.045), [0, -0.035, -0.48]);
-    for (const z of [-0.59, -0.52, -0.45, -0.38]) part(root, roundedBox('pump-rib', [0.2, 0.018, 0.018], dark, 0.004), [0, -0.01, z]);
+  const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.1, 12), dark);
+  const muzzleSocket = root.getObjectByName('muzzle-socket');
+  if (muzzleSocket) {
+    muzzle.rotation.x = Math.PI / 2;
+    muzzle.position.copy(muzzleSocket.position);
+    muzzle.userData.muzzle = true;
+    root.add(muzzle);
+    const flash = new THREE.Mesh(
+      new THREE.ConeGeometry(id === 'scattergun' ? 0.12 : 0.075, id === 'scattergun' ? 0.42 : 0.28, 7),
+      new THREE.MeshBasicMaterial({ color: 0xffc66d, transparent: true, opacity: 0.88, depthWrite: false }),
+    );
+    flash.name = 'world-muzzle-flash';
+    flash.rotation.x = -Math.PI / 2;
+    flash.position.copy(muzzleSocket.position).add(new THREE.Vector3(0, 0, -0.18));
+    flash.visible = false;
+    root.add(flash);
   }
-  if (compact) {
-    part(root, roundedBox('foregrip', [0.09, 0.22, 0.09], rubber, 0.022), [0, -0.13, -0.33], [-0.08, 0, 0]);
-  }
-
   root.traverse((node) => {
     if (node instanceof THREE.Mesh) {
       node.castShadow = true;
       node.receiveShadow = false;
     }
   });
-  batchStaticMeshes(root, root, () => '', flattenMaterials);
   return root;
 }
 
@@ -291,43 +332,165 @@ export function buildRetroDeliveryTruck(): THREE.Group {
   return root;
 }
 
-export function buildOperator(team: Team, name = 'operator', flattenMaterials = false): THREE.Group {
+type OperatorStance = 'stand' | 'crouch' | 'prone';
+
+type OperatorRig = {
+  pelvis: THREE.Group;
+  spine: THREE.Group;
+  leftUpperArm: THREE.Group;
+  rightUpperArm: THREE.Group;
+  leftForearm: THREE.Group;
+  rightForearm: THREE.Group;
+  leftThigh: THREE.Group;
+  rightThigh: THREE.Group;
+  leftShin: THREE.Group;
+  rightShin: THREE.Group;
+  weaponSocket: THREE.Group;
+  weapon?: THREE.Group;
+  weaponId: WeaponId;
+};
+
+function operatorRig(root: THREE.Group): OperatorRig | undefined {
+  return root.userData.operatorRig as OperatorRig | undefined;
+}
+
+export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flattenMaterials = false): void {
+  const rig = operatorRig(root);
+  if (!rig || rig.weaponId === weaponId && rig.weapon) return;
+  if (rig.weapon) rig.weaponSocket.remove(rig.weapon);
+  const weapon = buildWeaponModel(weaponId, flattenMaterials);
+  weapon.name = `operator-${weaponId}`;
+  weapon.scale.setScalar(weaponId === 'smg' ? 0.72 : 0.68);
+  weapon.rotation.y = Math.PI;
+  rig.weaponSocket.add(weapon);
+  rig.weapon = weapon;
+  rig.weaponId = weaponId;
+}
+
+export function fireOperator(root: THREE.Group): void {
+  root.userData.operatorShotAt = performance.now();
+  const rig = operatorRig(root);
+  if (rig?.weapon) {
+    const flash = rig.weapon.getObjectByName('world-muzzle-flash');
+    if (flash) flash.visible = true;
+  }
+}
+
+export function poseOperator(
+  root: THREE.Group,
+  stance: OperatorStance,
+  speed: number,
+  phase: number,
+  blend = 1,
+  aimPitch = 0,
+): void {
+  const rig = operatorRig(root);
+  if (!rig) return;
+  const shotAge = performance.now() - Number(root.userData.operatorShotAt ?? -10_000);
+  const shotKick = shotAge < 180 ? Math.sin((shotAge / 180) * Math.PI) : 0;
+  rig.weaponSocket.position.z = -0.36 + shotKick * 0.11;
+  rig.weaponSocket.rotation.x = -shotKick * 0.12;
+  const actionPart = rig.weapon?.getObjectByName(rig.weaponId === 'scattergun' ? 'pump' : 'bolt-or-slide');
+  if (actionPart) {
+    const restZ = Number(actionPart.userData.restZ ?? actionPart.position.z);
+    const actionDelay = rig.weaponId === 'scattergun' ? 180 : 0;
+    const actionDuration = rig.weaponId === 'scattergun' ? 440 : rig.weaponId === 'smg' ? 44 : 62;
+    const progress = THREE.MathUtils.clamp((shotAge - actionDelay) / actionDuration, 0, 1);
+    actionPart.position.z = restZ + Math.sin(progress * Math.PI) * (rig.weaponId === 'scattergun' ? 0.22 : 0.08);
+  }
+  const flash = rig.weapon?.getObjectByName('world-muzzle-flash');
+  if (flash) flash.visible = shotAge >= 0 && shotAge < 55;
+  const gait = Math.sin(phase) * Math.min(1, speed / 4.8);
+  const crouched = stance === 'crouch';
+  const prone = stance === 'prone';
+  const lerp = (from: number, to: number) => THREE.MathUtils.lerp(from, to, blend);
+  rig.pelvis.position.y = lerp(rig.pelvis.position.y, prone ? 0.38 : crouched ? 0.67 : 0.9);
+  rig.pelvis.rotation.x = lerp(rig.pelvis.rotation.x, prone ? -1.08 : 0);
+  rig.spine.rotation.x = lerp(rig.spine.rotation.x, prone ? -0.24 : crouched ? 0.13 : aimPitch * 0.28);
+  rig.leftThigh.rotation.x = lerp(rig.leftThigh.rotation.x, prone ? -1.22 + gait * 0.12 : crouched ? -0.7 + gait * 0.18 : gait * 0.48);
+  rig.rightThigh.rotation.x = lerp(rig.rightThigh.rotation.x, prone ? -1.22 - gait * 0.12 : crouched ? -0.7 - gait * 0.18 : -gait * 0.48);
+  rig.leftShin.rotation.x = lerp(rig.leftShin.rotation.x, prone ? 1.32 : crouched ? 1.15 : Math.max(0, -gait) * 0.32);
+  rig.rightShin.rotation.x = lerp(rig.rightShin.rotation.x, prone ? 1.32 : crouched ? 1.15 : Math.max(0, gait) * 0.32);
+  const shoulderPitch = prone ? -1.05 : -0.72 + aimPitch * 0.45;
+  rig.leftUpperArm.rotation.x = lerp(rig.leftUpperArm.rotation.x, shoulderPitch - gait * 0.08);
+  rig.rightUpperArm.rotation.x = lerp(rig.rightUpperArm.rotation.x, shoulderPitch + gait * 0.08);
+  rig.leftUpperArm.rotation.z = lerp(rig.leftUpperArm.rotation.z, -0.54);
+  rig.rightUpperArm.rotation.z = lerp(rig.rightUpperArm.rotation.z, 0.45);
+  rig.leftForearm.rotation.x = lerp(rig.leftForearm.rotation.x, -1.08);
+  rig.rightForearm.rotation.x = lerp(rig.rightForearm.rotation.x, -1.22);
+}
+
+export function buildOperator(team: Team, name = 'operator', flattenMaterials = false, weaponId: WeaponId = 'carbine'): THREE.Group {
   const root = new THREE.Group(); root.name = name;
+  root.userData.dynamic = true;
   const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;
   const uniform = new THREE.MeshStandardMaterial({
     color: teamColor,
     emissive: team === 0 ? 0x0b4c4b : 0x5a160f,
-    emissiveIntensity: 0.32,
-    roughness: 0.63,
+    emissiveIntensity: 0.24,
+    roughness: 0.68,
   });
-  const identifier = new THREE.MeshStandardMaterial({ color: teamColor, emissive: teamColor, emissiveIntensity: 0.62, roughness: 0.48 });
+  const identifier = new THREE.MeshStandardMaterial({ color: teamColor, emissive: teamColor, emissiveIntensity: 0.72, roughness: 0.46 });
   const armour = MAT.dark();
   const skin = new THREE.MeshStandardMaterial({ color: 0xc99b78, roughness: 0.82 });
-  const torso = roundedBox('torso', [0.64, 0.86, 0.34], uniform, 0.14, 4); torso.position.y = 1.28; torso.userData.hitZone = 'body';
-  const vest = roundedBox('vest', [0.7, 0.58, 0.4], armour, 0.08); vest.position.set(0, 1.32, -0.04); vest.userData.hitZone = 'body';
-  const teamBand = roundedBox('team-identifier', [0.74, 0.09, 0.42], identifier, 0.025, 2); teamBand.position.set(0, 1.54, -0.055); teamBand.userData.hitZone = 'body';
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 20, 14), skin); head.position.y = 1.98; head.userData.hitZone = 'head'; head.castShadow = true;
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.255, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.58), armour); helmet.position.y = 2.04; helmet.userData.hitZone = 'head';
-  root.add(torso, vest, teamBand, head, helmet);
-  for (const side of [-1, 1]) {
-    const arm = roundedBox('arm', [0.18, 0.72, 0.2], uniform, 0.07); arm.position.set(side * 0.43, 1.32, -0.05); arm.rotation.x = -0.35; arm.userData.hitZone = 'limb';
-    const leg = roundedBox('leg', [0.24, 0.82, 0.27], armour, 0.08); leg.position.set(side * 0.18, 0.5, 0); leg.userData.hitZone = 'limb';
-    root.add(arm, leg);
+  const joint = (parent: THREE.Object3D, jointName: string, position: [number, number, number]) => {
+    const group = new THREE.Group(); group.name = jointName; group.position.set(...position); parent.add(group); return group;
+  };
+  const limb = (parent: THREE.Group, meshName: string, size: [number, number, number], y: number, material: THREE.Material) => {
+    const mesh = roundedBox(meshName, size, material, Math.min(...size) * 0.3, 3);
+    mesh.position.y = y; mesh.userData.hitZone = 'limb'; parent.add(mesh); return mesh;
+  };
+
+  const pelvis = joint(root, 'pelvis-joint', [0, 0.9, 0]);
+  const pelvisArmour = roundedBox('pelvis-armour', [0.5, 0.28, 0.32], armour, 0.08, 3);
+  pelvisArmour.userData.hitZone = 'body'; pelvis.add(pelvisArmour);
+  const spine = joint(pelvis, 'spine-joint', [0, 0.18, 0]);
+  const torso = roundedBox('torso', [0.66, 0.72, 0.35], uniform, 0.13, 4);
+  torso.position.y = 0.38; torso.userData.hitZone = 'body'; spine.add(torso);
+  const vest = roundedBox('chest-armour', [0.71, 0.48, 0.41], armour, 0.08, 3);
+  vest.position.set(0, 0.4, -0.04); vest.userData.hitZone = 'body'; spine.add(vest);
+  const band = roundedBox('team-identifier', [0.74, 0.085, 0.43], identifier, 0.02, 2);
+  band.position.set(0, team === 0 ? 0.55 : 0.42, -0.06); band.rotation.z = team === 0 ? 0 : -0.28; band.userData.hitZone = 'body'; spine.add(band);
+  const neck = joint(spine, 'neck-joint', [0, 0.81, 0]);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.225, 16, 12), skin); head.position.y = 0.18; head.userData.hitZone = 'head'; head.castShadow = true; neck.add(head);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.255, 16, 9, 0, Math.PI * 2, 0, Math.PI * 0.58), armour);
+  helmet.position.y = 0.24; helmet.userData.hitZone = 'head'; neck.add(helmet);
+  const visor = roundedBox('visor', [0.36, 0.1, 0.06], identifier, 0.025, 2); visor.position.set(0, 0.2, -0.2); visor.userData.hitZone = 'head'; neck.add(visor);
+
+  const upperArms: THREE.Group[] = [];
+  const forearms: THREE.Group[] = [];
+  const thighs: THREE.Group[] = [];
+  const shins: THREE.Group[] = [];
+  for (const side of [-1, 1] as const) {
+    const upperArm = joint(spine, side < 0 ? 'left-upper-arm-joint' : 'right-upper-arm-joint', [side * 0.42, 0.66, 0]);
+    limb(upperArm, 'upper-arm', [0.19, 0.42, 0.21], -0.2, uniform);
+    const forearm = joint(upperArm, side < 0 ? 'left-elbow-joint' : 'right-elbow-joint', [0, -0.4, 0]);
+    limb(forearm, 'forearm', [0.17, 0.38, 0.19], -0.18, armour);
+    const hand = roundedBox('hand', [0.18, 0.2, 0.18], armour, 0.065, 3); hand.position.y = -0.4; hand.userData.hitZone = 'limb'; forearm.add(hand);
+    const thigh = joint(pelvis, side < 0 ? 'left-thigh-joint' : 'right-thigh-joint', [side * 0.17, -0.12, 0]);
+    limb(thigh, 'thigh', [0.24, 0.49, 0.28], -0.23, uniform);
+    const shin = joint(thigh, side < 0 ? 'left-knee-joint' : 'right-knee-joint', [0, -0.47, 0]);
+    limb(shin, 'shin', [0.22, 0.48, 0.25], -0.22, armour);
+    const foot = roundedBox('foot', [0.23, 0.16, 0.38], armour, 0.055, 3); foot.position.set(0, -0.49, -0.08); foot.userData.hitZone = 'limb'; shin.add(foot);
+    upperArms.push(upperArm); forearms.push(forearm); thighs.push(thigh); shins.push(shin);
   }
-  const weapon = new THREE.Group();
-  weapon.name = 'operator-carbine-silhouette';
-  const receiver = roundedBox('operator-receiver', [0.15, 0.14, 0.72], MAT.gunmetal(), 0.025, 2);
-  receiver.position.z = -0.26;
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.48, 10), MAT.dark());
-  barrel.rotation.x = Math.PI / 2; barrel.position.z = -0.82;
-  const grip = roundedBox('operator-grip', [0.09, 0.22, 0.11], MAT.rubber(), 0.018, 2);
-  grip.position.set(0, -0.15, -0.08); grip.rotation.x = -0.18;
-  const magazine = roundedBox('operator-magazine', [0.1, 0.27, 0.13], armour, 0.018, 2);
-  magazine.position.set(0, -0.18, -0.34); magazine.rotation.x = 0.16;
-  weapon.add(receiver, barrel, grip, magazine);
-  weapon.scale.setScalar(0.78); weapon.position.set(0.28, 1.38, -0.4); weapon.rotation.y = Math.PI;
-  root.add(weapon);
-  batchStaticMeshes(root, root, (mesh) => String(mesh.userData.hitZone ?? 'visual'), flattenMaterials);
+
+  const beacon = team === 0
+    ? new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 14), identifier)
+    : new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.2, 3), identifier);
+  beacon.name = 'team-shoulder-beacon'; beacon.position.set(team === 0 ? -0.44 : 0.44, 0.7, 0); beacon.rotation.z = Math.PI / 2; beacon.userData.hitZone = 'body'; spine.add(beacon);
+  const weaponSocket = joint(spine, 'weapon-socket', [0.22, 0.43, -0.36]);
+  const rig: OperatorRig = {
+    pelvis, spine,
+    leftUpperArm: upperArms[0], rightUpperArm: upperArms[1],
+    leftForearm: forearms[0], rightForearm: forearms[1],
+    leftThigh: thighs[0], rightThigh: thighs[1],
+    leftShin: shins[0], rightShin: shins[1],
+    weaponSocket, weaponId,
+  };
+  root.userData.operatorRig = rig;
+  setOperatorWeapon(root, weaponId, flattenMaterials);
+  poseOperator(root, 'stand', 0, 0, 1);
   root.traverse((node) => { node.userData.targetRoot = root; });
   return root;
 }
