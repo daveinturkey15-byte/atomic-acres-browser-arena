@@ -11,6 +11,7 @@ export type CharacterMoveResult = {
   blockedX: boolean;
   blockedY: boolean;
   blockedZ: boolean;
+  appliedDelta: Point3;
 };
 
 /** Rapier-backed kinematic FPS character with stairs, slopes, sliding and ground snap. */
@@ -124,6 +125,7 @@ export class CharacterPhysics {
       blockedX: Math.abs(allowed.x - desiredDelta.x) > epsilon,
       blockedY: Math.abs(allowed.y - desiredDelta.y) > epsilon,
       blockedZ: Math.abs(allowed.z - desiredDelta.z) > epsilon,
+      appliedDelta: { x: allowed.x, y: allowed.y, z: allowed.z },
     };
   }
 

@@ -199,10 +199,13 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
   for (const z of [-0.31, -0.22, -0.13, -0.04, 0.05]) {
     part(root, roundedBox('rail-notch', [0.16, 0.018, 0.018], MAT.brass(), 0.004, 2), [0, 0.142, z]);
   }
-  part(root, roundedBox('rear-sight', [0.12, 0.12, 0.08], dark, 0.018), [0, 0.19, 0.02]);
-  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.037, 20), new THREE.MeshBasicMaterial({ color: 0x9af6ff, transparent: true, opacity: 0.74 }));
-  lens.position.set(0, 0.195, -0.023);
+  part(root, roundedBox('optic-base', [0.12, 0.045, 0.13], dark, 0.014), [0, 0.145, 0.02]);
+  const opticRing = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.011, 8, 20), dark);
+  opticRing.position.set(0, 0.215, -0.025); root.add(opticRing);
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.038, 20), new THREE.MeshBasicMaterial({ color: 0x9af6ff, transparent: true, opacity: 0.58, depthWrite: false }));
+  lens.position.set(0, 0.215, -0.026);
   root.add(lens);
+  part(root, roundedBox('front-sight-post', [0.035, 0.105, 0.035], dark, 0.008), [0, 0.16, -bodyLength * 0.52]);
   part(root, roundedBox('charging-handle', [0.24, 0.035, 0.065], dark, 0.012), [0, 0.06, 0.05]);
 
   if (long) {

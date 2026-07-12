@@ -1,5 +1,47 @@
 export type Box2 = { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
 export type Point3 = { x: number; y: number; z: number };
+export type SweptSphereHit = { time: number; normal: Point3 };
+
+/** Earliest swept-sphere hit against authored AABBs; prevents fast grenades tunnelling through thin cover. */
+export function sweepSphereAgainstBoxes(
+  start: Point3,
+  delta: Point3,
+  boxes: readonly Box2[],
+  radius = 0.17,
+): SweptSphereHit | null {
+  let best: SweptSphereHit | null = null;
+  for (const box of boxes) {
+    const mins = [box.minX - radius, (box.minY ?? 0) - radius, box.minZ - radius];
+    const maxs = [box.maxX + radius, (box.maxY ?? 8) + radius, box.maxZ + radius];
+    const starts = [start.x, start.y, start.z];
+    const deltas = [delta.x, delta.y, delta.z];
+    let near = 0;
+    let far = 1;
+    let nearAxis = -1;
+    let nearSign = 0;
+    let valid = true;
+    for (let axis = 0; axis < 3; axis += 1) {
+      if (Math.abs(deltas[axis]) < 1e-7) {
+        if (starts[axis] < mins[axis] || starts[axis] > maxs[axis]) valid = false;
+        continue;
+      }
+      let first = (mins[axis] - starts[axis]) / deltas[axis];
+      let second = (maxs[axis] - starts[axis]) / deltas[axis];
+      let sign = -Math.sign(deltas[axis]);
+      if (first > second) { [first, second] = [second, first]; sign *= -1; }
+      if (first > near) { near = first; nearAxis = axis; nearSign = sign; }
+      far = Math.min(far, second);
+      if (near > far) { valid = false; break; }
+    }
+    if (!valid || nearAxis < 0 || near < 0 || near > 1 || (best && near >= best.time)) continue;
+    const normal = { x: 0, y: 0, z: 0 };
+    if (nearAxis === 0) normal.x = nearSign;
+    else if (nearAxis === 1) normal.y = nearSign;
+    else normal.z = nearSign;
+    best = { time: near, normal };
+  }
+  return best;
+}
 
 export function circleIntersectsBox(x: number, z: number, radius: number, box: Box2): boolean {
   const nearestX = Math.max(box.minX, Math.min(x, box.maxX));

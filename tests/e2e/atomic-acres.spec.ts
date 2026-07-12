@@ -12,6 +12,7 @@ type DebugState = {
     ammo: number;
     reserve: number;
     crouched: boolean;
+    sprinting: boolean;
     grenades: number;
     position: number[];
   };
@@ -101,6 +102,14 @@ test.describe('solo mechanics', () => {
     const walked = await debug(page);
     expect(Math.hypot(walked.player.position[0] - before.player.position[0], walked.player.position[2] - before.player.position[2])).toBeGreaterThan(0.4);
 
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('ShiftLeft');
+    await page.waitForTimeout(160);
+    expect((await debug(page)).player.sprinting).toBe(true);
+    await page.waitForTimeout(490);
+    await page.keyboard.up('ShiftLeft');
+    await page.keyboard.up('KeyW');
+
     await page.keyboard.down('KeyC');
     await page.waitForTimeout(120);
     expect((await debug(page)).player.crouched).toBe(true);
@@ -147,6 +156,20 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#roster-list > div')).toHaveCount(5);
     await page.keyboard.up('Tab');
     await page.screenshot({ path: 'test-results/gameplay-structured-pass.png', fullPage: true });
+  });
+
+  test('shows directional damage, ADS telemetry and delayed health recovery', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(true));
+    await page.waitForTimeout(150);
+    await expect(page.locator('#crosshair')).toHaveClass(/ads/);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(false));
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(40));
+    const damaged = await debug(page);
+    expect(damaged.player.hp).toBeLessThanOrEqual(60);
+    await expect(page.locator('#damage-direction')).toHaveClass(/pulse/);
+    await page.waitForTimeout(5_700);
+    expect((await debug(page)).player.hp).toBeGreaterThan(damaged.player.hp);
   });
 });
 

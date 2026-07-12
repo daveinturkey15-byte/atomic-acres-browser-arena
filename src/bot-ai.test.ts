@@ -20,6 +20,13 @@ describe('chooseBotIntent', () => {
     expect(chooseBotIntent({ ...base, lastShotAt: 1_800 }).fire).toBe(false);
   });
 
+  it('honours reaction delay and accelerates follow-up shots inside a burst', () => {
+    const reacting = { ...base, lineOfSightSince: 1_900, reactionDelay: 260, lastShotAt: 0 };
+    expect(chooseBotIntent(reacting).fire).toBe(false);
+    expect(chooseBotIntent({ ...reacting, now: 2_300 }).fire).toBe(true);
+    expect(chooseBotIntent({ ...reacting, now: 2_100, lineOfSightSince: 1_000, lastShotAt: 1_940, burstShotsRemaining: 2 }).fire).toBe(true);
+  });
+
   it('advances at long range, strafes in combat and retreats when crowded', () => {
     expect(chooseBotIntent({ ...base, distanceToPlayer: 40 }).movement).toBe('advance');
     expect(chooseBotIntent(base).movement).toBe('strafe-right');

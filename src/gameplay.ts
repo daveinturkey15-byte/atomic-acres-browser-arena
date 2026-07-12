@@ -70,21 +70,64 @@ export type MovementContext = {
 export type MovementProfile = {
   maxSpeed: number;
   acceleration: number;
+  deceleration: number;
   friction: number;
   eyeHeight: number;
   jumpVelocity: number;
 };
 
 export function movementProfile(context: MovementContext): MovementProfile {
-  const maxSpeed = context.crouched ? 3.45 : context.ads ? 4.35 : context.sprinting ? 10.25 : 7.15;
-  const groundAcceleration = context.crouched ? 26 : context.sprinting ? 40 : 34;
+  const maxSpeed = context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15;
+  const groundAcceleration = context.crouched ? 36 : context.sprinting ? 54 : context.ads ? 40 : 48;
   return {
     maxSpeed,
-    acceleration: context.grounded ? groundAcceleration : groundAcceleration * 0.28,
-    friction: context.grounded ? 9.4 : 0.9,
+    acceleration: context.grounded ? groundAcceleration : 10.5,
+    deceleration: context.grounded ? (context.crouched ? 42 : 62) : 2.4,
+    friction: context.grounded ? 0 : 0.25,
     eyeHeight: context.crouched ? 1.16 : 1.7,
-    jumpVelocity: 6.8,
+    jumpVelocity: 6.35,
   };
+}
+
+export type HorizontalVelocity = { x: number; z: number };
+
+function approach(current: number, target: number, maxDelta: number): number {
+  if (current < target) return Math.min(target, current + maxDelta);
+  if (current > target) return Math.max(target, current - maxDelta);
+  return target;
+}
+
+/** Converges on authored speed without creating a hidden low terminal speed through friction. */
+export function integrateHorizontalVelocity(
+  velocity: HorizontalVelocity,
+  input: HorizontalVelocity,
+  profile: MovementProfile,
+  dt: number,
+): HorizontalVelocity {
+  const inputLength = Math.hypot(input.x, input.z);
+  const normalized = inputLength > 1 ? { x: input.x / inputLength, z: input.z / inputLength } : input;
+  const target = { x: normalized.x * profile.maxSpeed, z: normalized.z * profile.maxSpeed };
+  const rate = inputLength > 0.001 ? profile.acceleration : profile.deceleration;
+  const maxDelta = Math.max(0, rate * Math.max(0, dt));
+  return {
+    x: approach(velocity.x, target.x, maxDelta),
+    z: approach(velocity.z, target.z, maxDelta),
+  };
+}
+
+export function sprintEligible(forwardInput: number, strafeInput: number, ads: boolean, crouched: boolean): boolean {
+  return !ads && !crouched && forwardInput > 0.45 && Math.abs(strafeInput) < 0.92;
+}
+
+export function mouseSensitivityMultiplier(ads: boolean, sprinting: boolean): number {
+  return ads ? 0.68 : sprinting ? 0.94 : 1;
+}
+
+export function applyRadialDeadzone(x: number, y: number, deadzone = 0.14, exponent = 1.6): { x: number; y: number } {
+  const magnitude = Math.min(1, Math.hypot(x, y));
+  if (magnitude <= deadzone) return { x: 0, y: 0 };
+  const scaled = Math.pow((magnitude - deadzone) / Math.max(0.001, 1 - deadzone), exponent);
+  return { x: (x / magnitude) * scaled, y: (y / magnitude) * scaled };
 }
 
 export type SpreadContext = {
@@ -101,6 +144,13 @@ export function computeSpread(weapon: WeaponSpec, context: SpreadContext): numbe
   if (context.crouched) spread *= weapon.crouchSpreadMultiplier;
   spread += Math.max(0, context.sustainedShots) * weapon.sustainedSpreadPerShot;
   return Math.min(weapon.maximumSpread, spread);
+}
+
+/** Uniformly samples a circular cone instead of biasing shots through a random XYZ cube. */
+export function sampleSpreadDisk(angle: number, radialRandom: number, angularRandom: number): { x: number; y: number } {
+  const radius = Math.tan(Math.max(0, angle)) * Math.sqrt(Math.min(1, Math.max(0, radialRandom)));
+  const theta = Math.min(1, Math.max(0, angularRandom)) * Math.PI * 2;
+  return { x: Math.cos(theta) * radius, y: Math.sin(theta) * radius };
 }
 
 export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZone): number {
@@ -151,6 +201,22 @@ export function completeReload(
 
 export function recoverRecoil(value: number, weapon: WeaponSpec, dt: number): number {
   return Math.max(0, value * Math.exp(-weapon.recoilRecovery * Math.max(0, dt)));
+}
+
+export type RecoilImpulse = { pitch: number; yaw: number };
+
+export function computeRecoilImpulse(weapon: WeaponSpec, sustainedShots: number, random: number): RecoilImpulse {
+  const buildup = 1 + Math.min(0.48, Math.max(0, sustainedShots) * 0.045);
+  const centeredRandom = Math.max(-1, Math.min(1, random * 2 - 1));
+  return {
+    pitch: weapon.recoilPitch * buildup,
+    yaw: weapon.recoilYaw * centeredRandom * (0.8 + buildup * 0.28),
+  };
+}
+
+export function recoverRecoilImpulse(recoil: RecoilImpulse, weapon: WeaponSpec, dt: number): RecoilImpulse {
+  const damping = Math.exp(-weapon.recoilRecovery * Math.max(0, dt));
+  return { pitch: recoil.pitch * damping, yaw: recoil.yaw * damping };
 }
 
 export function grenadeDamage(distance: number): number {

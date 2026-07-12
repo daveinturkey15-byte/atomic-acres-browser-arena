@@ -2,14 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
   WEAPONS,
   advanceMatch,
+  applyRadialDeadzone,
   beginReload,
   cancelReload,
   completeReload,
   computeDamage,
+  computeRecoilImpulse,
   computeSpread,
   grenadeDamage,
+  integrateHorizontalVelocity,
   meleeStrike,
+  mouseSensitivityMultiplier,
   movementProfile,
+  recoverRecoilImpulse,
+  sampleSpreadDisk,
+  sprintEligible,
   type MatchState,
 } from './gameplay';
 
@@ -23,6 +30,7 @@ describe('movementProfile', () => {
     expect(ads.maxSpeed).toBeLessThan(run.maxSpeed);
     expect(run.maxSpeed).toBeLessThan(sprint.maxSpeed);
     expect(crouch.eyeHeight).toBeLessThan(run.eyeHeight);
+    expect(run.deceleration).toBeGreaterThan(run.acceleration);
   });
 
   it('reduces air acceleration without changing the requested stance', () => {
@@ -30,6 +38,37 @@ describe('movementProfile', () => {
     const air = movementProfile({ crouched: false, ads: false, sprinting: false, grounded: false });
     expect(air.acceleration).toBeLessThan(ground.acceleration);
     expect(air.eyeHeight).toBe(ground.eyeHeight);
+  });
+});
+
+describe('console-style movement integration', () => {
+  it('reaches authored run speed and brakes without a hidden friction terminal', () => {
+    const profile = movementProfile({ crouched: false, ads: false, sprinting: false, grounded: true });
+    let velocity = { x: 0, z: 0 };
+    for (let step = 0; step < 120; step += 1) {
+      velocity = integrateHorizontalVelocity(velocity, { x: 0, z: -1 }, profile, 1 / 120);
+    }
+    expect(velocity.z).toBeCloseTo(-profile.maxSpeed, 4);
+    for (let step = 0; step < 20; step += 1) {
+      velocity = integrateHorizontalVelocity(velocity, { x: 0, z: 0 }, profile, 1 / 120);
+    }
+    expect(Math.abs(velocity.z)).toBeLessThan(0.01);
+  });
+
+  it('requires forward intent to sprint and scales mouse input down during ADS', () => {
+    expect(sprintEligible(1, 0.4, false, false)).toBe(true);
+    expect(sprintEligible(0, 1, false, false)).toBe(false);
+    expect(sprintEligible(1, 0, true, false)).toBe(false);
+    expect(mouseSensitivityMultiplier(true, false)).toBeLessThan(mouseSensitivityMultiplier(false, false));
+  });
+
+  it('removes controller stick drift and preserves full-scale radial intent', () => {
+    expect(applyRadialDeadzone(0.05, -0.04)).toEqual({ x: 0, y: 0 });
+    const full = applyRadialDeadzone(0.6, 0.8);
+    expect(Math.hypot(full.x, full.y)).toBeCloseTo(1, 6);
+    const shaped = applyRadialDeadzone(0.4, 0);
+    expect(shaped.x).toBeGreaterThan(0);
+    expect(shaped.x).toBeLessThan(0.4);
   });
 });
 
@@ -45,6 +84,14 @@ describe('weapon tuning', () => {
     expect(movingBurst).toBeGreaterThan(stillHip);
   });
 
+  it('samples spread inside a circular cone with deterministic radial scaling', () => {
+    expect(sampleSpreadDisk(0.05, 0, 0)).toEqual({ x: 0, y: 0 });
+    const edge = sampleSpreadDisk(0.05, 1, 0.25);
+    expect(Math.hypot(edge.x, edge.y)).toBeCloseTo(Math.tan(0.05), 8);
+    expect(Math.abs(edge.x)).toBeLessThan(1e-8);
+    expect(edge.y).toBeGreaterThan(0);
+  });
+
   it('applies range falloff and head/body multipliers with a non-zero floor', () => {
     const weapon = WEAPONS.carbine;
     const closeBody = computeDamage(weapon, 5, 'body');
@@ -53,6 +100,15 @@ describe('weapon tuning', () => {
     expect(closeHead).toBeGreaterThan(closeBody);
     expect(farBody).toBeLessThan(closeBody);
     expect(farBody).toBeGreaterThanOrEqual(weapon.minimumDamage);
+  });
+
+  it('builds bounded directional recoil and recovers it toward rest', () => {
+    const impulse = computeRecoilImpulse(WEAPONS.carbine, 8, 1);
+    expect(impulse.pitch).toBeGreaterThan(WEAPONS.carbine.recoilPitch);
+    expect(impulse.yaw).toBeGreaterThan(0);
+    const recovered = recoverRecoilImpulse(impulse, WEAPONS.carbine, 0.2);
+    expect(recovered.pitch).toBeLessThan(impulse.pitch);
+    expect(recovered.yaw).toBeLessThan(impulse.yaw);
   });
 });
 

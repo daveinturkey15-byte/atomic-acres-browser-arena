@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { circleIntersectsBox, damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta } from './collision';
+import { circleIntersectsBox, damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 
 const wall = { minX: 1, maxX: 3, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
 const bounds = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
@@ -37,6 +37,20 @@ describe('arena collision', () => {
     expect(segmentIntersectsBox({ x: 0, y: 1.7, z: 0 }, { x: 4, y: 1.7, z: 0 }, wall)).toBe(true);
     expect(segmentIntersectsBox({ x: 0, y: 1.7, z: 3 }, { x: 4, y: 1.7, z: 3 }, wall)).toBe(false);
     expect(segmentIntersectsBox({ x: 0, y: 5, z: 0 }, { x: 4, y: 5, z: 0 }, wall)).toBe(false);
+  });
+
+  it('sweeps fast grenades into thin walls instead of tunnelling through', () => {
+    const hit = sweepSphereAgainstBoxes(
+      { x: 0, y: 1, z: 0 },
+      { x: 4, y: 0, z: 0 },
+      [wall],
+      0.17,
+    );
+    expect(hit).not.toBeNull();
+    expect(hit!.time).toBeGreaterThan(0.15);
+    expect(hit!.time).toBeLessThan(0.3);
+    expect(hit!.normal).toEqual({ x: -1, y: 0, z: 0 });
+    expect(sweepSphereAgainstBoxes({ x: 0, y: 4, z: 0 }, { x: 4, y: 0, z: 0 }, [wall])).toBeNull();
   });
 });
 

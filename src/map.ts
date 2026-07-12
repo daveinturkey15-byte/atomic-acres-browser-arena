@@ -24,8 +24,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   scene.add(world);
 
   const palette = {
-    grass: material(0x5f7f49, 1),
-    grassDark: material(0x3f6138, 1),
+    grass: texturedMaterial('./assets/original/textures/grass-turf.png', { roughness: 1, repeatX: 12, repeatY: 16 }),
+    grassDark: texturedMaterial('./assets/original/textures/grass-turf.png', { color: 0x7e916a, roughness: 1, repeatX: 8, repeatY: 8 }),
     road: texturedMaterial('./assets/original/textures/asphalt-aged.png', { roughness: 0.98, repeatX: 5, repeatY: 20 }),
     concrete: texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.94, repeatX: 3, repeatY: 3 }),
     cream: texturedMaterial('./assets/original/textures/brick-warm.png', { color: 0xf0ddbd, roughness: 0.86, repeatX: 4, repeatY: 2 }),
@@ -38,6 +38,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     white: material(0xf0e4c9, 0.68),
     chrome: material(0xaebdc1, 0.23, 0.76),
     brick: texturedMaterial('./assets/original/textures/brick-warm.png', { roughness: 0.9, repeatX: 5, repeatY: 3 }),
+    roof: texturedMaterial('./assets/original/textures/roof-shingles.png', { roughness: 0.86, repeatX: 5, repeatY: 6 }),
   };
 
   function box(
@@ -69,6 +70,12 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     return mesh;
   }
 
+  function collisionProxy(name: string, position: [number, number, number], size: [number, number, number]): void {
+    const proxy = box(name, position, size, palette.dark, true, true);
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  }
+
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 120), palette.grass);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -80,7 +87,11 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   road.receiveShadow = true;
   world.add(road);
   for (const x of [-10.25, 10.25]) box('curb', [x, 0.12, 0], [1.4, 0.24, 104], palette.concrete, false, false);
+  for (const x of [-12.6, 12.6]) box('sidewalk', [x, 0.07, 0], [3.2, 0.14, 104], palette.concrete, false, false);
   for (let z = -46; z <= 46; z += 8) box('lane marker', [0, 0.055, z], [0.18, 0.03, 3.6], palette.mustard, false, false);
+  for (const z of [-22, 22]) {
+    for (let x = -7.5; x <= 7.5; x += 2.5) box('crosswalk stripe', [x, 0.062, z], [1.4, 0.025, 3.2], palette.white, false, false);
+  }
 
   function addHouse(team: Team, x: number, z: number, facing: 1 | -1): void {
     const accent = team === 0 ? palette.aqua : palette.coral;
@@ -133,9 +144,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     }
 
     // Twin pitched roof slabs, gutters, porch columns and exterior dressing.
-    const roofLeft = box('pitched-roof', [x - 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.dark, false);
+    const roofLeft = box('pitched-roof', [x - 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.roof, false);
     roofLeft.rotation.z = -0.24;
-    const roofRight = box('pitched-roof', [x + 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.dark, false);
+    const roofRight = box('pitched-roof', [x + 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.roof, false);
     roofRight.rotation.z = 0.24;
     box('front-porch', [x, 0.22, frontZ + facing * 1.4], [8.2, 0.44, 2.5], palette.concrete, false);
     box('rear-deck', [x, 0.36, backZ - facing * 2], [10, 0.72, 3.5], palette.timber, true);
@@ -177,12 +188,26 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   box('garage door', [14, 1.55, -40.2], [9, 2.7, 0.18], palette.chrome, false, false);
   box('garage door', [-14, 1.55, 40.2], [9, 2.7, 0.18], palette.chrome, false, false);
 
+  // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
+  box('atomic landmark plinth', [29.5, 0.38, -1.5], [5.8, 0.76, 5.8], palette.concrete);
+
   // Lane cover creates short sightlines and quick flanks.
   const cover: Array<[number, number, number, number]> = [
     [-15, -13, 3.5, 2], [15, 13, 3.5, 2], [-17, 5, 3, 3], [17, -5, 3, 3],
     [-24, 20, 4, 2], [24, -20, 4, 2], [-27, -5, 3, 5], [27, 5, 3, 5],
   ];
   cover.forEach(([x, z, w, d], index) => box(`cover ${index}`, [x, 0.8, z], [w, 1.6, d], index % 2 ? palette.coral : palette.aqua));
+
+  // Route-shaping collision proxies for three distinct lanes. Rounded visual shells live in environment-assets.ts.
+  for (const x of [-34, -25]) for (const z of [-17, -5]) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55]);
+  collisionProxy('greenhouse west wall', [-33.3, 1.5, 18], [0.45, 3, 8]);
+  collisionProxy('greenhouse east wall', [-25.7, 1.5, 18], [0.45, 3, 8]);
+  collisionProxy('greenhouse north wall', [-29.5, 1.5, 21.8], [8, 3, 0.45]);
+  collisionProxy('greenhouse south left', [-32.2, 1.5, 14.2], [2.6, 3, 0.45]);
+  collisionProxy('greenhouse south right', [-26.8, 1.5, 14.2], [2.6, 3, 0.45]);
+  collisionProxy('service wall west', [25.8, 0.75, 11], [0.7, 1.5, 11]);
+  collisionProxy('service wall east', [32.2, 0.75, 11], [0.7, 1.5, 11]);
+  for (const x of [25.5, 33.5]) for (const z of [-22, -14]) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);
 
   // Boundary fencing, with substantial visual posts rather than invisible walls.
   box('west fence', [-41.3, 1.5, 0], [0.6, 3, 104], palette.timber);

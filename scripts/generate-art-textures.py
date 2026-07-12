@@ -120,6 +120,34 @@ def weapon_finish() -> None:
     image.save(OUT / "weapon-gunmetal.png", optimize=True)
 
 
+def lawn() -> None:
+    image = noise_layer((79, 111, 58), 22)
+    draw = ImageDraw.Draw(image)
+    for _ in range(3600):
+        x, y = random.randrange(SIZE), random.randrange(SIZE)
+        length = random.randint(2, 7)
+        tone = random.choice(((52, 88, 47), (102, 133, 69), (65, 103, 52), (124, 132, 67)))
+        draw.line((x, y, x + random.choice((-1, 0, 1)), max(0, y - length)), fill=tone, width=1)
+    for _ in range(14):
+        x, y = random.randrange(SIZE), random.randrange(SIZE)
+        r = random.randint(10, 28)
+        draw.ellipse((x-r, y-r, x+r, y+r), outline=(58, 89, 48), width=2)
+    image.save(OUT / "grass-turf.png", optimize=True)
+
+
+def roof_shingles() -> None:
+    image = noise_layer((72, 79, 80), 12)
+    draw = ImageDraw.Draw(image)
+    width, height = 64, 34
+    for row, y in enumerate(range(0, SIZE, height)):
+        offset = -(width // 2) if row % 2 else 0
+        draw.line((0, y, SIZE, y), fill=(24, 34, 38), width=3)
+        for x in range(offset, SIZE + width, width):
+            draw.line((x, y, x, min(SIZE, y + height)), fill=(31, 42, 46), width=2)
+            draw.line((x + 3, y + 4, x + width - 4, y + 4), fill=(70, 80, 80), width=1)
+    image.save(OUT / "roof-shingles.png", optimize=True)
+
+
 def make_contact_sheet() -> None:
     paths = sorted(OUT.glob("*.png"))
     thumbs = []
@@ -139,7 +167,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     siding("siding-aqua.png", (71, 139, 137), (37, 82, 84))
     siding("siding-coral.png", (178, 89, 70), (111, 54, 47))
-    brick(); asphalt(); concrete(); wood(); painted_metal(); weapon_finish(); make_contact_sheet()
+    brick(); asphalt(); concrete(); wood(); painted_metal(); weapon_finish(); lawn(); roof_shingles(); make_contact_sheet()
     print(f"generated {len(list(OUT.glob('*.png')))} textures in {OUT}")
 
 

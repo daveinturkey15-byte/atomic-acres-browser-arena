@@ -3,20 +3,27 @@ import './style.css';
 import { batchStaticMeshes, buildOperator } from './art-kit';
 import { chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
-import { damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta } from './collision';
+import { damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
   WEAPONS,
   advanceMatch,
+  applyRadialDeadzone,
   beginReload,
   cancelReload,
   completeReload as completeReloadState,
   computeDamage,
+  computeRecoilImpulse,
   computeSpread,
   createMatch,
   grenadeDamage,
+  integrateHorizontalVelocity,
   meleeStrike,
+  mouseSensitivityMultiplier,
   movementProfile,
   recoverRecoil,
+  recoverRecoilImpulse,
+  sampleSpreadDisk,
+  sprintEligible,
   type HitZone,
   type MatchState,
   type ReloadState,
@@ -67,6 +74,10 @@ type BotPlayer = {
   lastShotAt: number;
   lastSightAt: number;
   hasLineOfSight: boolean;
+  sightStartedAt: number;
+  burstShots: number;
+  nextDecisionAt: number;
+  strafeSign: -1 | 1;
   invulnerableUntil: number;
   respawnAt: number;
   waypoint: number;
@@ -76,9 +87,16 @@ type GrenadeEntity = {
   mesh: THREE.Mesh;
   velocity: THREE.Vector3;
   explodeAt: number;
+  lastBounceAt: number;
 };
 
 const WEAPON_ORDER: WeaponId[] = ['carbine', 'smg', 'scattergun'];
+const BOT_PATROL_POINTS = [
+  new THREE.Vector3(-25, 0, -12), new THREE.Vector3(-18, 0, 15),
+  new THREE.Vector3(-4, 0, 24), new THREE.Vector3(8, 0, 15),
+  new THREE.Vector3(24, 0, 8), new THREE.Vector3(19, 0, -18),
+  new THREE.Vector3(2, 0, -24), new THREE.Vector3(-12, 0, -17),
+];
 
 function createPlayerId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
@@ -89,11 +107,12 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 app.innerHTML = `
   <canvas id="game" aria-label="Atomic Acres multiplayer arena"></canvas>
-  <div id="vignette"></div><div id="damage-flash"></div>
+  <div id="color-grade"></div><div id="film-grain"></div>
+  <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · STRUCTURED PASS 01</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT FEEL PASS 02</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A fast retro-future test-town skirmish with responsive movement, full weapon handling, bot combat and peer-to-peer multiplayer.</p>
+    <p class="lede">A close-quarters retro-future skirmish with spring-tuned movement, layered weapon handling, tactical bots and peer-to-peer multiplayer.</p>
     <div class="setup-grid">
       <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
       <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
@@ -110,8 +129,8 @@ app.innerHTML = `
       <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
       <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
     </div>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster</div>
-    <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Desktop keyboard and mouse recommended.</p>
+    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>X</b> reload · <b>Y</b> switch</div>
+    <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </section>
   <div id="hud" hidden>
     <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
@@ -148,16 +167,17 @@ const minimapContext: CanvasRenderingContext2D = minimapContextValue;
 const audio = new ArenaAudio();
 
 const reducedRenderMode = new URLSearchParams(window.location.search).get('render') === 'compat';
+document.documentElement.classList.toggle('compat-render', reducedRenderMode);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !reducedRenderMode, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = !reducedRenderMode;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.22;
 renderer.setPixelRatio(reducedRenderMode ? 0.25 : Math.min(window.devicePixelRatio, 1.75));
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xe8b781, 55, 118);
+scene.fog = new THREE.Fog(0xaec2c7, 62, 128);
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -168,23 +188,24 @@ function buildSky(): void {
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      top: { value: new THREE.Color(0x3d7fb0) },
-      horizon: { value: new THREE.Color(0xf5c27f) },
-      bottom: { value: new THREE.Color(0xeee0b9) },
+      top: { value: new THREE.Color(0x2c668d) },
+      horizon: { value: new THREE.Color(0xabcbd1) },
+      bottom: { value: new THREE.Color(0xd8d3b6) },
     },
     vertexShader: 'varying vec3 worldPos; void main(){ worldPos=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader: 'varying vec3 worldPos; uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; void main(){ float h=normalize(worldPos).y; vec3 c=h>0.0?mix(horizon,top,smoothstep(0.0,.75,h)):mix(horizon,bottom,smoothstep(0.0,-.35,h)); gl_FragColor=vec4(c,1.0); }',
   });
   scene.add(new THREE.Mesh(geometry, material));
-  scene.add(new THREE.HemisphereLight(0xd9efff, 0x435833, 1.45));
-  const sun = new THREE.DirectionalLight(0xffdfb2, 2.3);
-  sun.position.set(-38, 74, 22);
+  scene.add(new THREE.HemisphereLight(0xd9efff, 0x52664b, 1.7));
+  scene.add(new THREE.AmbientLight(0xc8d5d9, 0.62));
+  const sun = new THREE.DirectionalLight(0xffe1b5, 2.55);
+  sun.position.set(-32, 68, 34);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -60;
-  sun.shadow.camera.right = 60;
-  sun.shadow.camera.top = 65;
-  sun.shadow.camera.bottom = -65;
+  sun.shadow.camera.left = -48;
+  sun.shadow.camera.right = 48;
+  sun.shadow.camera.top = 54;
+  sun.shadow.camera.bottom = -54;
   sun.shadow.camera.near = 10;
   sun.shadow.camera.far = 150;
   sun.shadow.bias = -0.0004;
@@ -210,6 +231,7 @@ const player = {
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
+  nextShotAt: 0,
   sustainedShots: 0,
   crouched: false,
   grenades: 1,
@@ -230,8 +252,15 @@ let triggerHeld = false;
 let targetHits = 0;
 let accumulator = 0;
 let recoilVisual = 0;
+let recoilCamera = { pitch: 0, yaw: 0 };
 let landingImpulse = 0;
 let weaponBob = 0;
+let cameraHeightOffset = 0;
+let cameraRoll = 0;
+let currentSprinting = false;
+let lastGroundedAt = 0;
+let jumpQueuedAt = -10_000;
+let lastDamageAt = -10_000;
 let lastFootstepAt = 0;
 let lastFrame = performance.now();
 let lastHudAt = 0;
@@ -239,12 +268,19 @@ let debugRenderPaused = new URLSearchParams(window.location.search).get('renderP
 let matchState: MatchState = createMatch(performance.now());
 let matchFinished = false;
 let adsHeld = false;
+let mouseTriggerHeld = false;
+let mouseAdsHeld = false;
+let gamepadMove = { x: 0, y: 0 };
+let gamepadSprint = false;
+let gamepadCrouch = false;
+let previousGamepadButtons: boolean[] = [];
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
 let preferredFov = 82;
 let botsFrozen = false;
 let debugInputUnlocked = false;
+let debugAdsOverride: boolean | null = null;
 let characterPhysics: CharacterPhysics | null = null;
 
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
@@ -306,7 +342,8 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   context.fillText(snapshot.name, 128, 32);
   const texture = new THREE.CanvasTexture(labelCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false }));
+  sprite.visible = snapshot.team === player.team;
   sprite.position.y = 2.5;
   sprite.scale.set(2.4, 0.6, 1);
   root.add(sprite);
@@ -381,13 +418,28 @@ function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   const direction = new THREE.Vector3(...message.direction).normalize();
   spawnTracer(origin, direction, 50, WEAPONS[message.weapon].color);
-  audio.shot(message.weapon, true);
+  audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+}
+
+function showDamageDirection(attacker: string): void {
+  const attackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
+  if (!attackerPosition || attacker === player.id) return;
+  const dx = attackerPosition.x - player.position.x;
+  const dz = attackerPosition.z - player.position.z;
+  const attackerYaw = Math.atan2(-dx, -dz);
+  const indicator = element<HTMLElement>('#damage-direction');
+  indicator.style.setProperty('--damage-angle', `${shortestAngleDelta(player.yaw, attackerYaw)}rad`);
+  indicator.classList.remove('pulse');
+  requestAnimationFrame(() => indicator.classList.add('pulse'));
 }
 
 function applyDamage(damage: number, attacker: string): void {
   const now = performance.now();
   if (!player.alive || now < player.invulnerableUntil) return;
   player.hp = Math.max(0, player.hp - Math.min(100, Math.max(1, damage)));
+  lastDamageAt = now;
+  audio.damage();
+  showDamageDirection(attacker);
   element<HTMLElement>('#damage-flash').classList.remove('pulse');
   requestAnimationFrame(() => element<HTMLElement>('#damage-flash').classList.add('pulse'));
   if (player.hp <= 0) {
@@ -405,7 +457,10 @@ function applyDamage(damage: number, attacker: string): void {
 function processDeath(message: DeathMessage): void {
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
-  if (message.killer === player.id && message.victim !== player.id) player.kills += 1;
+  if (message.killer === player.id && message.victim !== player.id) {
+    player.kills += 1;
+    audio.kill();
+  }
   addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
   const remote = remotes.get(message.victim);
   if (remote) remote.root.visible = false;
@@ -447,6 +502,7 @@ function respawn(requestLock = true): void {
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
   player.hp = 100;
+  lastDamageAt = -10_000;
   player.grenades = 1;
   player.reloadState = null;
   player.crouched = false;
@@ -454,6 +510,10 @@ function respawn(requestLock = true): void {
   player.invulnerableUntil = performance.now() + 1350;
   player.yaw = player.team === 0 ? Math.PI : 0;
   player.pitch = 0;
+  recoilCamera = { pitch: 0, yaw: 0 };
+  cameraHeightOffset = 0;
+  cameraRoll = 0;
+  jumpQueuedAt = -10_000;
   element<HTMLElement>('#respawn').hidden = true;
   if (gameStarted && requestLock) requestGamePointerLock();
   network.send({ type: 'state', player: snapshot() });
@@ -463,6 +523,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   player.name = sanitizeName(element<HTMLInputElement>('#player-name').value);
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  weaponView.root.visible = true;
   gameMode = mode;
   botsFrozen = false;
   matchState = createMatch(performance.now());
@@ -494,6 +555,7 @@ function switchWeapon(index: number): void {
   player.switchingUntil = performance.now() + 360;
   player.sustainedShots = 0;
   weaponView.setWeapon(id);
+  audio.weaponSwitch();
 }
 
 function reload(): void {
@@ -527,7 +589,10 @@ function tryFire(now: number): void {
     player.reloadState = null;
     weaponView.cancelReload();
   }
-  if (now - player.lastShotAt < 60_000 / spec.rpm) return;
+  const shotInterval = 60_000 / spec.rpm;
+  if (now < player.nextShotAt) return;
+  if (player.nextShotAt === 0 || now - player.nextShotAt > shotInterval * 2) player.nextShotAt = now;
+  player.nextShotAt += shotInterval;
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
     reload();
@@ -537,9 +602,14 @@ function tryFire(now: number): void {
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
   player.ammo[player.weapon] -= 1;
-  recoilVisual = Math.min(0.24, recoilVisual + spec.recoilPitch * 4.2);
-  player.pitch = Math.max(-1.42, player.pitch - spec.recoilPitch);
-  weaponView.fire(spec.recoilPitch);
+  const ammoDisplay = element<HTMLElement>('#ammo');
+  ammoDisplay.classList.remove('fired');
+  requestAnimationFrame(() => ammoDisplay.classList.add('fired'));
+  const recoil = computeRecoilImpulse(spec, player.sustainedShots, Math.random());
+  recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
+  recoilCamera.yaw = THREE.MathUtils.clamp(recoilCamera.yaw + recoil.yaw, -0.075, 0.075);
+  recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
+  weaponView.fire(recoil.pitch);
   audio.shot(player.weapon);
 
   const origin = camera.getWorldPosition(new THREE.Vector3());
@@ -552,14 +622,19 @@ function tryFire(now: number): void {
     sustainedShots: player.sustainedShots,
   });
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
+  const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
-    const direction = baseDirection.clone();
-    direction.x += (Math.random() - 0.5) * spread;
-    direction.y += (Math.random() - 0.5) * spread;
-    direction.z += (Math.random() - 0.5) * spread;
-    direction.normalize();
+    const sample = sampleSpreadDisk(spread, Math.random(), Math.random());
+    const direction = baseDirection.clone()
+      .addScaledVector(cameraRight, sample.x)
+      .addScaledVector(cameraUp, sample.y)
+      .normalize();
     const result = castShot(origin, direction);
     spawnTracer(origin, direction, result.distance, spec.color);
+    if (!result.playerId && !result.targetId && result.distance < 89) {
+      spawnImpactFlash(origin.clone().addScaledVector(direction, result.distance));
+    }
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
       const damage = computeDamage(spec, result.distance, zone);
@@ -577,7 +652,7 @@ function tryFire(now: number): void {
         const nonce = randomNonce();
         network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), nonce });
         showHitmarker(hit.zone === 'head');
-        audio.hit();
+        audio.hit(hit.zone === 'head');
       }
     }
   }
@@ -636,6 +711,7 @@ function spawnBots(): void {
     bots.set(id, {
       id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
       kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
+      sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
       invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index,
     });
   });
@@ -658,13 +734,14 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   if (!bot.alive || now < bot.invulnerableUntil) return;
   bot.hp = Math.max(0, bot.hp - damage);
   showHitmarker(zone === 'head');
-  audio.hit();
+  audio.hit(zone === 'head');
   if (bot.hp > 0) return;
   bot.alive = false;
   bot.deaths += 1;
   bot.respawnAt = now + 2_200;
   bot.root.visible = false;
   player.kills += 1;
+  audio.kill();
   addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
   checkMatchEnd();
 }
@@ -681,6 +758,9 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.lastShotAt = state.lastShotAt;
   bot.lastSightAt = 0;
   bot.hasLineOfSight = false;
+  bot.sightStartedAt = 0;
+  bot.burstShots = 0;
+  bot.nextDecisionAt = 0;
   bot.root.visible = true;
 }
 
@@ -693,14 +773,30 @@ function updateBots(dt: number, now: number): void {
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
       continue;
     }
+
     const toPlayer = player.position.clone().setY(0).sub(bot.position.clone().setY(0));
     const distance = toPlayer.length();
-    const sightInterval = 130 + botIndex * 17;
+    const sightInterval = 120 + botIndex * 19;
     if (now - bot.lastSightAt >= sightInterval) {
       bot.lastSightAt = now;
+      const previousSight = bot.hasLineOfSight;
       bot.hasLineOfSight = player.alive && botHasLineOfSight(bot);
+      if (bot.hasLineOfSight && !previousSight) bot.sightStartedAt = now;
+      if (!bot.hasLineOfSight) {
+        bot.sightStartedAt = 0;
+        bot.burstShots = 0;
+      }
     }
     const lineOfSight = bot.hasLineOfSight;
+    if (now >= bot.nextDecisionAt) {
+      bot.strafeSign = bot.strafeSign === 1 ? -1 : 1;
+      bot.nextDecisionAt = now + 850 + botIndex * 95;
+    }
+
+    const patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
+    const toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
+    const waypointReached = toPatrol.lengthSq() < 5.2;
+    if (waypointReached) bot.waypoint = (bot.waypoint + 1 + botIndex) % BOT_PATROL_POINTS.length;
     const intent = chooseBotIntent({
       alive: bot.alive,
       distanceToPlayer: distance,
@@ -708,32 +804,41 @@ function updateBots(dt: number, now: number): void {
       health: bot.hp,
       now,
       lastShotAt: bot.lastShotAt,
-      waypointReached: false,
-      random: Math.random(),
+      waypointReached,
+      random: bot.strafeSign === 1 ? 0.25 : 0.75,
+      lineOfSightSince: bot.sightStartedAt,
+      reactionDelay: 210 + botIndex * 45,
+      burstShotsRemaining: bot.burstShots,
     });
-    const forward = distance > 0.01 ? toPlayer.normalize() : new THREE.Vector3(0, 0, -1);
+
+    const pursuit = lineOfSight ? toPlayer : toPatrol;
+    const forward = pursuit.lengthSq() > 0.01 ? pursuit.normalize() : new THREE.Vector3(0, 0, -1);
     const side = new THREE.Vector3(-forward.z, 0, forward.x);
     const desiredDirection = intent.movement === 'advance' ? forward
       : intent.movement === 'retreat' ? forward.clone().multiplyScalar(-1)
         : intent.movement === 'strafe-left' ? side.clone().multiplyScalar(-1)
           : intent.movement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = intent.movement.startsWith('strafe') ? 3.2 : 3.8;
+    const speed = intent.movement.startsWith('strafe') ? 3.5 : lineOfSight ? 4.05 : 4.45;
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     let resolved = resolveHorizontalMove(bot.position, desired, arena.colliders, arena.bounds, 0.44);
     if (Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002 && desiredDirection.lengthSq() > 0) {
-      const detour = bot.position.clone().addScaledVector(side, (bot.waypoint % 2 === 0 ? 1 : -1) * speed * dt * 1.4);
+      const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
       resolved = resolveHorizontalMove(bot.position, detour, arena.colliders, arena.bounds, 0.44);
-      bot.waypoint += 1;
+      bot.waypoint = (bot.waypoint + 1) % BOT_PATROL_POINTS.length;
     }
     bot.position.set(resolved.x, bot.position.y, resolved.z);
     bot.root.position.copy(bot.position);
-    bot.root.lookAt(player.position.x, bot.position.y + 1.1, player.position.z);
+    const lookTarget = lineOfSight ? player.position : patrolTarget;
+    bot.root.lookAt(lookTarget.x, bot.position.y + 1.1, lookTarget.z);
 
     if (intent.fire && player.alive) {
+      if (bot.burstShots <= 0) bot.burstShots = 2 + (botIndex % 2);
+      bot.burstShots -= 1;
       bot.lastShotAt = now;
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
       const direction = player.position.clone().sub(origin).normalize();
-      const jitter = THREE.MathUtils.lerp(0.055, 0.012, Math.min(1, (now - matchState.phaseStartedAt) / 120_000));
+      const matchAccuracy = THREE.MathUtils.lerp(0.038, 0.014, Math.min(1, (now - matchState.phaseStartedAt) / 120_000));
+      const jitter = matchAccuracy + bot.burstShots * 0.004;
       direction.x += (Math.random() - 0.5) * jitter;
       direction.y += (Math.random() - 0.5) * jitter;
       direction.z += (Math.random() - 0.5) * jitter;
@@ -743,7 +848,7 @@ function updateBots(dt: number, now: number): void {
       const rayToPlayer = new THREE.Ray(origin, direction);
       const closest = rayToPlayer.closestPointToPoint(player.position, new THREE.Vector3());
       if (closest.distanceTo(player.position) < 0.55 && lineOfSight) {
-        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * 0.72;
+        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * 0.62;
         applyDamage(damage, bot.id);
         if (!player.alive) {
           bot.kills += 1;
@@ -782,7 +887,12 @@ function throwGrenade(): void {
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
-  grenades.push({ mesh, velocity: direction.multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0)), explodeAt: performance.now() + 2_300 });
+  grenades.push({
+    mesh,
+    velocity: direction.multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0)),
+    explodeAt: performance.now() + 2_300,
+    lastBounceAt: 0,
+  });
 }
 
 function explodeGrenade(entity: GrenadeEntity): void {
@@ -806,10 +916,19 @@ function explodeGrenade(entity: GrenadeEntity): void {
   };
   animate();
   for (const bot of bots.values()) {
-    const damage = grenadeDamage(bot.position.distanceTo(point));
+    const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
+    const damage = blocked ? 0 : grenadeDamage(bot.position.distanceTo(point));
     if (damage > 0) applyBotDamage(bot, damage, 'body');
   }
-  const selfDamage = grenadeDamage(player.position.distanceTo(point)) * 0.35;
+  for (const remote of remotes.values()) {
+    const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    const damage = grenadeDamage(target.distanceTo(point));
+    if (damage > 0) network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage, nonce: randomNonce() });
+  }
+  const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
+  const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
   if (selfDamage > 0) applyDamage(selfDamage, player.id);
 }
 
@@ -817,10 +936,30 @@ function updateGrenades(dt: number, now: number): void {
   for (let index = grenades.length - 1; index >= 0; index -= 1) {
     const grenade = grenades[index];
     grenade.velocity.y -= 18 * dt;
-    grenade.mesh.position.addScaledVector(grenade.velocity, dt);
+    const start = grenade.mesh.position.clone();
+    const delta = grenade.velocity.clone().multiplyScalar(dt);
+    const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
+    if (collision) {
+      const collisionNormal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+      grenade.mesh.position.copy(start).addScaledVector(delta, collision.time).addScaledVector(collisionNormal, 0.025);
+      const incoming = grenade.velocity.dot(collisionNormal);
+      grenade.velocity.addScaledVector(collisionNormal, -(1.38 * incoming));
+      grenade.velocity.multiplyScalar(0.76);
+      if (Math.abs(incoming) > 1.8 && now - grenade.lastBounceAt > 90) {
+        grenade.lastBounceAt = now;
+        audio.grenadeBounce(Math.abs(incoming));
+      }
+    } else {
+      grenade.mesh.position.add(delta);
+    }
     grenade.mesh.rotation.x += dt * 8;
     grenade.mesh.rotation.z += dt * 11;
     if (grenade.mesh.position.y < 0.18) {
+      const impactSpeed = Math.abs(grenade.velocity.y);
+      if (impactSpeed > 1.8 && now - grenade.lastBounceAt > 90) {
+        grenade.lastBounceAt = now;
+        audio.grenadeBounce(impactSpeed);
+      }
       grenade.mesh.position.y = 0.18;
       grenade.velocity.y = Math.abs(grenade.velocity.y) * 0.42;
       grenade.velocity.x *= 0.72;
@@ -858,6 +997,19 @@ function updateTargets(now: number): void {
   }
 }
 
+function spawnImpactFlash(point: THREE.Vector3): void {
+  const material = new THREE.MeshBasicMaterial({ color: 0xffdda0, transparent: true, opacity: 0.9, depthWrite: false });
+  const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), material);
+  flash.position.copy(point);
+  flash.scale.set(1, 0.55, 1);
+  scene.add(flash);
+  window.setTimeout(() => {
+    scene.remove(flash);
+    flash.geometry.dispose();
+    material.dispose();
+  }, 72);
+}
+
 function spawnTracer(origin: THREE.Vector3, direction: THREE.Vector3, distance: number, color: number): void {
   const geometry = new THREE.BufferGeometry().setFromPoints([origin.clone(), origin.clone().addScaledVector(direction, distance)]);
   const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.72 }));
@@ -891,33 +1043,38 @@ function updatePhysics(dt: number): void {
   if (!gameStarted || !player.alive || matchState.phase === 'ended' || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
-  const input = new THREE.Vector3();
-  if (keys.has('KeyW')) input.add(forward);
-  if (keys.has('KeyS')) input.sub(forward);
-  if (keys.has('KeyD')) input.add(right);
-  if (keys.has('KeyA')) input.sub(right);
-  if (input.lengthSq() > 0) input.normalize();
-  player.crouched = keys.has('KeyC') && playerGrounded;
-  const sprinting = keys.has('ShiftLeft') && input.lengthSq() > 0 && !adsHeld && !player.crouched;
-  const profile = movementProfile({ crouched: player.crouched, ads: adsHeld, sprinting, grounded: playerGrounded });
-  player.velocity.x += input.x * profile.acceleration * dt;
-  player.velocity.z += input.z * profile.acceleration * dt;
-  const friction = Math.exp(-profile.friction * dt);
-  player.velocity.x *= friction;
-  player.velocity.z *= friction;
-  const horizontal = Math.hypot(player.velocity.x, player.velocity.z);
-  if (horizontal > profile.maxSpeed) {
-    player.velocity.x *= profile.maxSpeed / horizontal;
-    player.velocity.z *= profile.maxSpeed / horizontal;
+  const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
+  const strafeInput = THREE.MathUtils.clamp(Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + gamepadMove.x, -1, 1);
+  const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
+  if (input.lengthSq() > 1) input.normalize();
+  const now = performance.now();
+  player.crouched = (keys.has('KeyC') || gamepadCrouch) && playerGrounded;
+  currentSprinting = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded
+    && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
+    && sprintEligible(forwardInput, strafeInput, adsHeld, player.crouched);
+  const profile = movementProfile({ crouched: player.crouched, ads: adsHeld, sprinting: currentSprinting, grounded: playerGrounded });
+  const integrated = integrateHorizontalVelocity(
+    { x: player.velocity.x, z: player.velocity.z },
+    { x: input.x, z: input.z },
+    profile,
+    dt,
+  );
+  player.velocity.x = integrated.x;
+  player.velocity.z = integrated.z;
+
+  if (player.hp < 100 && now - lastDamageAt >= 5_000) player.hp = Math.min(100, player.hp + 18 * dt);
+  if (playerGrounded) lastGroundedAt = now;
+  const jumpBuffered = now - jumpQueuedAt <= 125;
+  const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
+  if (jumpBuffered && coyoteGrounded && !adsHeld && !player.crouched && matchState.phase === 'active') {
+    player.velocity.y = profile.jumpVelocity;
+    playerGrounded = false;
+    jumpQueuedAt = -10_000;
+  } else {
+    player.velocity.y -= 24.5 * dt;
+    if (playerGrounded) player.velocity.y = Math.max(0, player.velocity.y);
   }
-  player.velocity.y -= 22 * dt;
-  if (playerGrounded) {
-    player.velocity.y = Math.max(0, player.velocity.y);
-    if (keys.has('Space') && !adsHeld && !player.crouched && matchState.phase === 'active') {
-      player.velocity.y = profile.jumpVelocity;
-      playerGrounded = false;
-    }
-  }
+
   const impactVelocity = player.velocity.y;
   const movement = characterPhysics.move({
     x: player.velocity.x * dt,
@@ -926,28 +1083,45 @@ function updatePhysics(dt: number): void {
   }, dt);
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
-  if (playerGrounded && !wasGrounded && impactVelocity < -5) landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
+  if (playerGrounded) lastGroundedAt = now;
+  if (playerGrounded && !wasGrounded && impactVelocity < -5) {
+    landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
+    audio.land(Math.abs(impactVelocity));
+  }
   wasGrounded = playerGrounded;
-  if (movement.blockedX) player.velocity.x = 0;
+  if (movement.blockedX) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
   if (movement.blockedY && player.velocity.y < 0) player.velocity.y = 0;
-  if (movement.blockedZ) player.velocity.z = 0;
+  if (movement.blockedZ) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
 
   const moving = input.lengthSq() > 0 && playerGrounded;
-  const now = performance.now();
-  if (moving && now - lastFootstepAt >= (sprinting ? 330 : player.crouched ? 610 : 440)) {
+  if (moving && now - lastFootstepAt >= (currentSprinting ? 300 : player.crouched ? 575 : 405)) {
     lastFootstepAt = now;
-    audio.footstep(sprinting);
+    audio.footstep(currentSprinting, player.crouched);
   }
-  weaponBob += dt * (sprinting ? 15 : player.crouched ? 7 : 10) * (moving ? 1 : 0.25);
+  weaponBob += dt * (currentSprinting ? 15 : player.crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
+  recoilCamera = recoverRecoilImpulse(recoilCamera, WEAPONS[player.weapon], dt);
   landingImpulse = damp(landingImpulse, 0, 10, dt);
-  weaponView.update({ dt, moving, sprinting, crouched: player.crouched, ads: adsHeld, phase: weaponBob, landingImpulse });
-  camera.fov = damp(camera.fov, adsHeld ? Math.max(55, preferredFov - 20) : sprinting ? preferredFov + 4 : preferredFov, 9, dt);
+  cameraHeightOffset = damp(cameraHeightOffset, player.crouched ? -0.54 : 0, 15, dt);
+  const lateralSpeed = player.velocity.dot(right) / Math.max(1, profile.maxSpeed);
+  cameraRoll = damp(cameraRoll, -lateralSpeed * (adsHeld ? 0.006 : 0.016), 11, dt);
+  weaponView.update({
+    dt,
+    moving,
+    sprinting: currentSprinting,
+    crouched: player.crouched,
+    ads: adsHeld,
+    phase: weaponBob,
+    landingImpulse,
+    lateralSpeed,
+  });
+  camera.fov = damp(camera.fov, adsHeld ? Math.max(55, preferredFov - 20) : currentSprinting ? preferredFov + 4.5 : preferredFov, 10, dt);
   camera.updateProjectionMatrix();
   camera.position.copy(player.position);
-  if (player.crouched) camera.position.y -= 0.54;
-  camera.rotation.y = player.yaw;
-  camera.rotation.x = player.pitch;
+  camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
+  camera.rotation.y = player.yaw + recoilCamera.yaw;
+  camera.rotation.x = THREE.MathUtils.clamp(player.pitch - recoilCamera.pitch, -1.42, 1.42);
+  camera.rotation.z = cameraRoll;
 }
 
 function updateRemotes(dt: number, now: number): void {
@@ -1056,6 +1230,17 @@ function updateHud(now: number): void {
   lastHudAt = now;
   if (gameStarted) updateMatchState(now);
   const spec = WEAPONS[player.weapon];
+  const speed = Math.hypot(player.velocity.x, player.velocity.z);
+  const spread = computeSpread(spec, {
+    ads: adsHeld,
+    moving: speed > 1.2,
+    crouched: player.crouched,
+    sustainedShots: player.sustainedShots,
+  });
+  const crosshairGap = THREE.MathUtils.clamp(5 + spread * 320, 5, 23);
+  const crosshair = element<HTMLElement>('#crosshair');
+  crosshair.style.setProperty('--spread', `${crosshairGap}px`);
+  crosshair.classList.toggle('ads', adsHeld);
   const [aqua, coral] = teamScores();
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
@@ -1128,8 +1313,45 @@ fovInput.addEventListener('input', () => {
   localStorage.setItem('atomic-acres-fov', String(preferredFov));
 });
 
+function pollGamepad(dt: number): void {
+  const pad = navigator.getGamepads?.().find((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected));
+  if (!pad) {
+    gamepadMove = { x: 0, y: 0 };
+    gamepadSprint = false;
+    gamepadCrouch = false;
+    previousGamepadButtons = [];
+    triggerHeld = mouseTriggerHeld;
+    adsHeld = debugAdsOverride ?? mouseAdsHeld;
+    return;
+  }
+  gamepadMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
+  const look = applyRadialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.1, 1.6);
+  const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
+  const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
+  gamepadSprint = Boolean(buttons[10]);
+  gamepadCrouch = Boolean(buttons[1]);
+  const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
+  const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
+  adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAds);
+  triggerHeld = mouseTriggerHeld || padTrigger;
+  if (gameStarted && player.alive && !menu.classList.contains('hidden')) {
+    // Do not steer the game behind a pause/menu overlay.
+  } else if (gameStarted && player.alive) {
+    const turnRate = adsHeld ? 1.92 : 3.66;
+    player.yaw -= look.x * turnRate * dt;
+    player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * turnRate * 0.82 * dt, -1.42, 1.42);
+    if (pressed(0)) jumpQueuedAt = performance.now();
+    if (pressed(2)) reload();
+    if (pressed(3)) switchWeapon((WEAPON_ORDER.indexOf(player.weapon) + 1) % WEAPON_ORDER.length);
+    if (pressed(4)) throwGrenade();
+    if (pressed(5)) melee();
+  }
+  previousGamepadButtons = buttons;
+}
+
 window.addEventListener('keydown', (event) => {
   keys.add(event.code);
+  if (event.code === 'Space' && !event.repeat) jumpQueuedAt = performance.now();
   if (event.code === 'Digit1') switchWeapon(0);
   if (event.code === 'Digit2') switchWeapon(1);
   if (event.code === 'Digit3') switchWeapon(2);
@@ -1148,13 +1370,16 @@ window.addEventListener('keyup', (event) => {
 });
 window.addEventListener('blur', () => {
   keys.clear();
+  mouseTriggerHeld = false;
+  mouseAdsHeld = false;
   triggerHeld = false;
   adsHeld = false;
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
-  player.yaw -= event.movementX * 0.00215 * sensitivity;
-  player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019 * sensitivity));
+  const aimScale = mouseSensitivityMultiplier(adsHeld, currentSprinting);
+  player.yaw -= event.movementX * 0.00215 * sensitivity * aimScale;
+  player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019 * sensitivity * aimScale));
   weaponView.addMouseDelta(event.movementX, event.movementY);
 });
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -1164,19 +1389,25 @@ canvas.addEventListener('mousedown', (event) => {
     return;
   }
   if (event.button === 2) {
+    mouseAdsHeld = true;
     adsHeld = true;
     return;
   }
   if (event.button !== 0) return;
+  mouseTriggerHeld = true;
   triggerHeld = true;
   tryFire(performance.now());
 });
 window.addEventListener('mouseup', (event) => {
-  if (event.button === 0) triggerHeld = false;
-  if (event.button === 2) adsHeld = false;
+  if (event.button === 0) mouseTriggerHeld = false;
+  if (event.button === 2) mouseAdsHeld = false;
+  triggerHeld = mouseTriggerHeld;
+  adsHeld = mouseAdsHeld;
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
+    mouseTriggerHeld = false;
+    mouseAdsHeld = false;
     triggerHeld = false;
     adsHeld = false;
     if (gameStarted && player.alive) {
@@ -1255,6 +1486,7 @@ function frame(now: number): void {
   try {
     const frameDt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
     lastFrame = now;
+    pollGamepad(frameDt);
     accumulator += frameDt;
     const step = 1 / 120;
     let iterations = 0;
@@ -1284,6 +1516,12 @@ const debugWindow = window as Window & {
     setRenderPaused: (paused: boolean) => void;
     fireOnce: () => void;
     throwGrenade: () => void;
+    switchWeapon: (index: number) => void;
+    reload: () => void;
+    melee: () => void;
+    setAds: (held: boolean) => void;
+    damage: (amount: number) => void;
+
   };
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
@@ -1299,6 +1537,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
       crouched: player.crouched,
+      sprinting: currentSprinting,
       grenades: player.grenades,
       position: player.position.toArray(),
     },
@@ -1332,7 +1571,30 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugInputUnlocked = false;
   },
   throwGrenade: () => throwGrenade(),
+  switchWeapon: (index: number) => switchWeapon(index),
+  reload: () => reload(),
+  melee: () => melee(),
+  setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = held; },
+  damage: (amount: number) => {
+    player.invulnerableUntil = 0;
+    applyDamage(amount, bots.keys().next().value ?? player.id);
+  },
+
 };
+
+function liftCrushedEnvironmentBlacks(root: THREE.Object3D, excluded: THREE.Object3D): void {
+  const adjusted = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || excluded.getObjectById(node.id)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (adjusted.has(material) || !(material instanceof THREE.MeshStandardMaterial)) continue;
+      adjusted.add(material);
+      const { r, g, b } = material.color;
+      if (Math.max(r, g, b) < 0.16) material.color.lerp(new THREE.Color(0x5b6664), 0.24);
+    }
+  });
+}
 
 async function bootstrap(): Promise<void> {
   const soloButton = element<HTMLButtonElement>('#solo');
@@ -1349,24 +1611,30 @@ async function bootstrap(): Promise<void> {
   });
   const artPromise = loadArenaArt(scene, (loaded, total) => {
     setStatus(`Loading authored arena models ${loaded}/${total}…`);
-  });
+  }, reducedRenderMode);
   const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
   characterPhysics = physics;
-  const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible);
+  const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
   arena.raycastMeshes.splice(0, arena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {
-    if (node instanceof THREE.Mesh) arena.raycastMeshes.push(node);
+    if (node instanceof THREE.Mesh && node.userData.blocksShots === true) arena.raycastMeshes.push(node);
   });
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', reducedRenderMode);
   batchStaticMeshes(art.root, scene, () => '', reducedRenderMode);
+  liftCrushedEnvironmentBlacks(scene, weaponView.root);
   weaponView.setWeapon(player.weapon, true);
   respawn();
+  weaponView.root.visible = false;
+  camera.position.set(-32, 10.5, -17);
+  camera.lookAt(0, 2.8, 4);
+  camera.fov = 72;
+  camera.updateProjectionMatrix();
 
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('V2 foundation ready — authored arena art and weapons, ADS, and Rapier controller active.', 'ok');
+  setStatus('Combat Feel Pass 02 ready — tuned locomotion, layered audio, expanded arena art and recoil systems active.', 'ok');
   requestAnimationFrame(frame);
 }
 

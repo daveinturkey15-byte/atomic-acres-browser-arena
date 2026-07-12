@@ -2,15 +2,15 @@
   "schemaVersion": 2,
   "assets": [
     {
-      "id": "atomic-acres-original-texture-set-2026-07-11",
+      "id": "atomic-acres-original-texture-set-2026-07-12",
       "kind": "project-generated-surface-textures",
       "creator": "Atomic Acres project",
       "source": "scripts/generate-art-textures.py",
-      "generatedAsOf": "2026-07-11",
+      "generatedAsOf": "2026-07-12",
       "license": "Original project work",
       "files": "public/assets/original/textures/*.png",
       "contactSheet": "public/assets/original/texture-contact-sheet.jpg",
-      "modifications": "Generated procedurally, tiled and colour-graded in the game runtime.",
+      "modifications": "Ten deterministic project-generated textures, including grass turf and roof shingles; tiled and colour-graded in the game runtime.",
       "attributionRequired": false
     }
   ],
