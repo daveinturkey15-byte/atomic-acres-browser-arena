@@ -97,3 +97,14 @@ The quality reference is the clarity, cadence, audiovisual layering, and grounde
 - Impact particles classify authored visual/raycast materials, but analytic bot/remote cover collisions conservatively use concrete feedback.
 - Multiplayer remains peer/victim validated rather than server authoritative.
 - No mobile controls, new mode, killcam, or additional weapon was added in this pass.
+
+## Public review deployment
+
+- Source revision: `239a1da`.
+- Pages revision: `e97b9fb`.
+- Review URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass05/?release=239a1da`.
+- The Pages diff from Pass 04 contained 15 files, all under `review/pass05/`; canonical root and `review/pass04/` were unchanged.
+- Public full-quality release QA: zero console errors, `302` calls / `302,706` triangles.
+- Public compatibility release QA: zero console errors, `59` calls / `73,054` triangles.
+- Public two-browser PeerJS QA passed room creation/join, reciprocal remote presence and prone replication with `24.19 m` observed spawn separation.
+- Public menu and first-person gameplay smoke checks found no missing assets, catastrophic clipping or release blocker.
