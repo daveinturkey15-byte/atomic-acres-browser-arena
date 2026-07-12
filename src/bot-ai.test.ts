@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { BOT_FIRE_RANGE, BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState, type BotSense } from './bot-ai';
+import {
+  BOT_FIRE_RANGE,
+  BOT_REACTION_DELAY,
+  SOLO_BOT_COUNT,
+  botAimJitter,
+  chooseBotIntent,
+  chooseTacticalWaypoint,
+  respawnBotState,
+  scoreBotSpawn,
+  type BotSense,
+} from './bot-ai';
 
 const base: BotSense = {
   alive: true,
@@ -41,10 +51,31 @@ describe('chooseBotIntent', () => {
     expect(chooseBotIntent(base).movement).toBe('strafe-right');
     expect(chooseBotIntent({ ...base, random: 0.8 }).movement).toBe('strafe-left');
     expect(chooseBotIntent({ ...base, distanceToPlayer: 3 }).movement).toBe('retreat');
+    expect(chooseBotIntent({ ...base, health: 25, distanceToPlayer: 14 }).movement).toBe('retreat');
   });
 
   it('keeps dead bots inert', () => {
     expect(chooseBotIntent({ ...base, alive: false })).toEqual({ movement: 'idle', fire: false, changeWaypoint: false });
+  });
+});
+
+describe('tactical bot scoring', () => {
+  it('prefers distance and cover while strongly rejecting occupied spawns', () => {
+    const safe = scoreBotSpawn({ nearestThreatDistanceSq: 500, visibleThreats: 0, occupied: false, preferred: false });
+    const exposed = scoreBotSpawn({ nearestThreatDistanceSq: 600, visibleThreats: 1, occupied: false, preferred: true });
+    const occupied = scoreBotSpawn({ nearestThreatDistanceSq: 2_000, visibleThreats: 0, occupied: true, preferred: true });
+    expect(safe).toBeGreaterThan(exposed);
+    expect(safe).toBeGreaterThan(occupied);
+  });
+
+  it('chooses a nearby reacquisition point in the intended engagement band', () => {
+    const choice = chooseTacticalWaypoint([
+      { index: 0, distanceFromBot: 2, distanceFromPlayer: 31, seesPlayer: false },
+      { index: 1, distanceFromBot: 7, distanceFromPlayer: 14, seesPlayer: true },
+      { index: 2, distanceFromBot: 19, distanceFromPlayer: 13, seesPlayer: true },
+    ], 0, 3);
+    expect(choice).toBe(1);
+    expect(chooseTacticalWaypoint([], 4, 0)).toBe(4);
   });
 });
 

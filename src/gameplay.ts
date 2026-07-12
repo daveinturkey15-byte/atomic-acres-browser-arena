@@ -147,6 +147,38 @@ export function applyRadialDeadzone(x: number, y: number, deadzone = 0.14, expon
   return { x: (x / magnitude) * scaled, y: (y / magnitude) * scaled };
 }
 
+export type GamepadLookRate = { yaw: number; pitch: number };
+
+/**
+ * Converts shaped right-stick input into a bounded angular velocity. Acceleration is quick enough
+ * for target acquisition while the faster release rate prevents stick drift from leaving a tail.
+ */
+export function integrateGamepadLookRate(
+  current: GamepadLookRate,
+  input: { x: number; y: number },
+  dt: number,
+  ads: boolean,
+  sensitivity = 1,
+): GamepadLookRate {
+  const safeDt = Math.max(0, Math.min(0.05, dt));
+  const safeSensitivity = Math.max(0.5, Math.min(1.8, Number.isFinite(sensitivity) ? sensitivity : 1));
+  const magnitude = Math.min(1, Math.hypot(input.x, input.y));
+  const flickBoost = magnitude > 0.92 ? 1.08 : 1;
+  const maximumRate = (ads ? 2.02 : 3.78) * safeSensitivity * flickBoost;
+  const targetYaw = input.x * maximumRate;
+  const targetPitch = input.y * maximumRate * 0.8;
+  const acceleration = ads ? 16.5 : 22;
+  const release = 29;
+  const integrateAxis = (value: number, target: number): number => {
+    const building = (value === 0 || Math.sign(value) === Math.sign(target)) && Math.abs(target) > Math.abs(value);
+    return approach(value, target, (building ? acceleration : release) * safeDt);
+  };
+  return {
+    yaw: integrateAxis(current.yaw, targetYaw),
+    pitch: integrateAxis(current.pitch, targetPitch),
+  };
+}
+
 export type SpreadContext = {
   ads: boolean;
   moving: boolean;

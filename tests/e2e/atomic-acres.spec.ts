@@ -73,7 +73,17 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#solo')).toHaveText('BOT SKIRMISH');
     await page.getByRole('button', { name: 'OPTIONS' }).click();
     await expect(page.locator('#sensitivity')).toBeVisible();
+    await expect(page.locator('#controller-sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
+    await page.locator('#controller-sensitivity').evaluate((input) => {
+      const slider = input as HTMLInputElement;
+      slider.value = '1.45';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.reload();
+    await pageReady(page);
+    await page.getByRole('button', { name: 'OPTIONS' }).click();
+    await expect(page.locator('#controller-sensitivity')).toHaveValue('1.45');
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
     await expect(page.locator('.controls')).toContainText('melee');

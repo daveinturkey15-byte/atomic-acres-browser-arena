@@ -11,6 +11,7 @@ import {
   computeRecoilImpulse,
   computeSpread,
   grenadeDamage,
+  integrateGamepadLookRate,
   integrateHorizontalVelocity,
   meleeStrike,
   mouseSensitivityMultiplier,
@@ -90,6 +91,27 @@ describe('console-style movement integration', () => {
     const shaped = applyRadialDeadzone(0.4, 0);
     expect(shaped.x).toBeGreaterThan(0);
     expect(shaped.x).toBeLessThan(0.4);
+  });
+
+  it('accelerates gamepad look predictably, slows ADS, and releases without a long tail', () => {
+    const hip = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: -0.5 }, 1 / 60, false, 1);
+    const ads = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: -0.5 }, 1 / 60, true, 1);
+    expect(hip.yaw).toBeGreaterThan(0);
+    expect(hip.pitch).toBeLessThan(0);
+    expect(Math.abs(ads.yaw)).toBeLessThan(Math.abs(hip.yaw));
+    let released = hip;
+    for (let frame = 0; frame < 20; frame += 1) {
+      released = integrateGamepadLookRate(released, { x: 0, y: 0 }, 1 / 60, false, 1);
+    }
+    expect(released.yaw).toBe(0);
+    expect(released.pitch).toBe(0);
+  });
+
+  it('clamps unsafe gamepad sensitivity inputs', () => {
+    const normal = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: 0 }, 0.05, false, 1.8);
+    const excessive = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: 0 }, 0.5, false, 99);
+    expect(excessive.yaw).toBeCloseTo(normal.yaw, 6);
+    expect(Number.isFinite(excessive.yaw)).toBe(true);
   });
 });
 

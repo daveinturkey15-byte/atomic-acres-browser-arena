@@ -2,7 +2,15 @@ import * as THREE from 'three';
 import './style.css';
 import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
-import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
+import {
+  BOT_REACTION_DELAY,
+  SOLO_BOT_COUNT,
+  botAimJitter,
+  chooseBotIntent,
+  chooseTacticalWaypoint,
+  respawnBotState,
+  scoreBotSpawn,
+} from './bot-ai';
 import { classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
@@ -20,6 +28,7 @@ import {
   computeSpread,
   createMatch,
   grenadeDamage,
+  integrateGamepadLookRate,
   integrateHorizontalVelocity,
   meleeStrike,
   mouseSensitivityMultiplier,
@@ -112,9 +121,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT & WORLD ART PASS 05</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · LIGHTING, INPUT & TACTICAL AI PASS 06</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A compact retro-future skirmish with synchronized weapon actions, socket-driven hands, material-readable impacts and one bounded close-range rival.</p>
+    <p class="lede">A compact retro-future skirmish with a warmer procedural sky, tuned controller response, tactical spawn scoring and one readable close-range rival.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -147,7 +156,8 @@ app.innerHTML = `
     <div class="menu-panel" data-menu-panel="options" hidden>
       <div class="options-heading"><b>OPTIONS</b><span>Input and view settings apply immediately.</span></div>
       <div class="settings-grid">
-        <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
+        <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
+        <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
       </div>
       <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
@@ -195,33 +205,77 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = !reducedRenderMode;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.22;
+renderer.toneMappingExposure = 1.14;
 // Compatibility mode targets constrained/software-rendered Chromium; full-quality play keeps the normal ratio.
 renderer.setPixelRatio(reducedRenderMode ? 0.2 : Math.min(window.devicePixelRatio, 1.75));
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xaec2c7, 62, 128);
+scene.fog = new THREE.Fog(0xb6c5c1, 70, 142);
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
 function buildSky(): void {
-  const geometry = new THREE.SphereGeometry(150, 32, 18);
+  const geometry = new THREE.SphereGeometry(150, reducedRenderMode ? 20 : 32, reducedRenderMode ? 12 : 18);
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
+    fog: false,
     uniforms: {
-      top: { value: new THREE.Color(0x2c668d) },
-      horizon: { value: new THREE.Color(0xabcbd1) },
-      bottom: { value: new THREE.Color(0xd8d3b6) },
+      top: { value: new THREE.Color(0x245b82) },
+      horizon: { value: new THREE.Color(0xb9d1cd) },
+      bottom: { value: new THREE.Color(0xe2c99e) },
+      sunColor: { value: new THREE.Color(0xffd39a) },
+      cloudColor: { value: new THREE.Color(0xe8eee7) },
+      sunDirection: { value: new THREE.Vector3(-0.39, 0.83, 0.42).normalize() },
+      cloudStrength: { value: reducedRenderMode ? 0 : 0.035 },
     },
-    vertexShader: 'varying vec3 worldPos; void main(){ worldPos=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: 'varying vec3 worldPos; uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; void main(){ float h=normalize(worldPos).y; vec3 c=h>0.0?mix(horizon,top,smoothstep(0.0,.75,h)):mix(horizon,bottom,smoothstep(0.0,-.35,h)); gl_FragColor=vec4(c,1.0); }',
+    vertexShader: `
+      varying vec3 skyDirection;
+      void main(){
+        skyDirection = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 skyDirection;
+      uniform vec3 top;
+      uniform vec3 horizon;
+      uniform vec3 bottom;
+      uniform vec3 sunColor;
+      uniform vec3 cloudColor;
+      uniform vec3 sunDirection;
+      uniform float cloudStrength;
+      void main(){
+        vec3 direction = normalize(skyDirection);
+        float h = direction.y;
+        vec3 color = h > 0.0
+          ? mix(horizon, top, smoothstep(0.0, 0.78, h))
+          : mix(horizon, bottom, smoothstep(0.0, -0.38, h));
+        float sunDot = max(dot(direction, sunDirection), 0.0);
+        float sunDisc = pow(sunDot, 420.0);
+        float sunHalo = pow(sunDot, 18.0) * 0.28;
+        ${reducedRenderMode ? '' : `
+        float azimuth = atan(direction.z, direction.x);
+        float highBand = 1.0 - smoothstep(0.0, 0.075, abs(h - 0.48));
+        float lowBand = 1.0 - smoothstep(0.0, 0.06, abs(h - 0.3));
+        float waveA = 0.5 + 0.5 * sin(azimuth * 8.0 + sin(azimuth * 3.0) * 1.8);
+        float waveB = 0.5 + 0.5 * sin(azimuth * 17.0 - h * 12.0);
+        float cloudMask = smoothstep(0.62, 0.9, waveA * 0.72 + waveB * 0.28) * max(highBand, lowBand * 0.72);
+        color = mix(color, cloudColor, cloudMask * cloudStrength);
+        `}
+        color += sunColor * (sunDisc * 1.4 + sunHalo);
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
   });
-  scene.add(new THREE.Mesh(geometry, material));
-  scene.add(new THREE.HemisphereLight(0xd9efff, 0x52664b, 1.7));
-  scene.add(new THREE.AmbientLight(0xc8d5d9, 0.62));
-  const sun = new THREE.DirectionalLight(0xffe1b5, 2.55);
+  const sky = new THREE.Mesh(geometry, material);
+  sky.name = 'procedural-atmosphere-sky';
+  sky.frustumCulled = false;
+  scene.add(sky);
+  scene.add(new THREE.HemisphereLight(0xdcefff, 0x4d6046, 1.48));
+  scene.add(new THREE.AmbientLight(0xc7d3d4, 0.38));
+  const sun = new THREE.DirectionalLight(0xffd9a5, 2.8);
   sun.position.set(-32, 68, 34);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -231,7 +285,8 @@ function buildSky(): void {
   sun.shadow.camera.bottom = -54;
   sun.shadow.camera.near = 10;
   sun.shadow.camera.far = 150;
-  sun.shadow.bias = -0.0004;
+  sun.shadow.bias = -0.00028;
+  sun.shadow.normalBias = 0.025;
   scene.add(sun);
 }
 buildSky();
@@ -299,12 +354,14 @@ let adsHeld = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
+let gamepadLookRate = { yaw: 0, pitch: 0 };
 let gamepadSprint = false;
 
 let previousGamepadButtons: boolean[] = [];
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
+let controllerSensitivity = 1;
 let preferredFov = 82;
 let botsFrozen = false;
 let debugInputUnlocked = false;
@@ -893,14 +950,40 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
 
 function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
   const options = arena.spawns[team];
-  for (let offset = 0; offset < options.length; offset += 1) {
-    const candidate = options[(preferredIndex + offset) % options.length];
+  const threats = [
+    ...(player.alive && player.team !== team ? [player.position.clone()] : []),
+    ...[...remotes.values()]
+      .filter((remote) => remote.snapshot.team !== team && remote.snapshot.hp > 0)
+      .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
+  ];
+  const occupied = [
+    ...[...remotes.values()].map((remote) => remote.target.clone()),
+    ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
+  ];
+  const valid = options.map((candidate, index) => ({ candidate, index })).filter(({ candidate }) => {
     const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
-    if (Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
+    return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
       && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-      && !isBlocked(bodyPoint, arena.colliders, 0.44)) return candidate;
-  }
-  throw new Error(`No valid authored spawn for team ${team}`);
+      && !isBlocked(bodyPoint, arena.colliders, 0.44);
+  });
+  if (valid.length === 0) throw new Error(`No valid authored spawn for team ${team}`);
+  const scored = valid.map(({ candidate, index }) => {
+    const nearestThreatDistanceSq = threats.length === 0
+      ? 0
+      : Math.min(...threats.map((threat) => threat.distanceToSquared(candidate)));
+    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length;
+    return {
+      candidate,
+      score: scoreBotSpawn({
+        nearestThreatDistanceSq,
+        visibleThreats,
+        occupied: occupied.some((position) => position.distanceToSquared(candidate) < 20),
+        preferred: index === ((preferredIndex % options.length) + options.length) % options.length,
+      }),
+    };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].candidate;
 }
 
 function spawnBots(): void {
@@ -938,6 +1021,19 @@ function botHasLineOfSight(bot: BotPlayer): boolean {
   const origin = { x: bot.position.x, y: bot.position.y + 1.42, z: bot.position.z };
   const target = { x: player.position.x, y: player.position.y, z: player.position.z };
   return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
+}
+
+function selectBotTacticalWaypoint(bot: BotPlayer): number {
+  const target = { x: player.position.x, y: player.position.y, z: player.position.z };
+  return chooseTacticalWaypoint(BOT_PATROL_POINTS.map((point, index) => {
+    const eye = { x: point.x, y: 1.42, z: point.z };
+    return {
+      index,
+      distanceFromBot: point.distanceTo(bot.position),
+      distanceFromPlayer: point.distanceTo(player.position),
+      seesPlayer: player.alive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
+    };
+  }), bot.waypoint, bot.deaths + bot.kills);
 }
 
 function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
@@ -1004,6 +1100,7 @@ function updateBots(dt: number, now: number): void {
       bot.hasLineOfSight = player.alive && botHasLineOfSight(bot);
       if (bot.hasLineOfSight && !previousSight) bot.sightStartedAt = now;
       if (!bot.hasLineOfSight) {
+        if (previousSight) bot.waypoint = selectBotTacticalWaypoint(bot);
         bot.sightStartedAt = 0;
         bot.burstShots = 0;
       }
@@ -1017,7 +1114,11 @@ function updateBots(dt: number, now: number): void {
     const patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
     const toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
     const waypointReached = toPatrol.lengthSq() < 5.2;
-    if (waypointReached) bot.waypoint = (bot.waypoint + 1 + botIndex) % BOT_PATROL_POINTS.length;
+    if (waypointReached) {
+      bot.waypoint = lineOfSight
+        ? (bot.waypoint + 1 + botIndex) % BOT_PATROL_POINTS.length
+        : selectBotTacticalWaypoint(bot);
+    }
     const intent = chooseBotIntent({
       alive: bot.alive,
       distanceToPlayer: distance,
@@ -1551,14 +1652,25 @@ if (invitedName) element<HTMLInputElement>('#player-name').value = sanitizeName(
 if (launchParams.get('team') === '1') element<HTMLSelectElement>('#team').value = '1';
 
 const sensitivityInput = element<HTMLInputElement>('#sensitivity');
+const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
 const fovInput = element<HTMLInputElement>('#field-of-view');
-sensitivity = Number(localStorage.getItem('atomic-acres-sensitivity') ?? sensitivityInput.value) || 1;
-preferredFov = Number(localStorage.getItem('atomic-acres-fov') ?? fovInput.value) || 82;
+const storedRange = (key: string, fallback: number, minimum: number, maximum: number): number => {
+  const parsed = Number(localStorage.getItem(key));
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
+};
+sensitivity = storedRange('atomic-acres-sensitivity', Number(sensitivityInput.value), 0.6, 2);
+controllerSensitivity = storedRange('atomic-acres-controller-sensitivity', Number(controllerSensitivityInput.value), 0.5, 1.8);
+preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
 sensitivityInput.value = String(sensitivity);
+controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
+});
+controllerSensitivityInput.addEventListener('input', () => {
+  controllerSensitivity = Number(controllerSensitivityInput.value);
+  localStorage.setItem('atomic-acres-controller-sensitivity', String(controllerSensitivity));
 });
 fovInput.addEventListener('input', () => {
   preferredFov = Number(fovInput.value);
@@ -1569,13 +1681,14 @@ function pollGamepad(dt: number): void {
   const pad = navigator.getGamepads?.().find((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected));
   if (!pad) {
     gamepadMove = { x: 0, y: 0 };
+    gamepadLookRate = { yaw: 0, pitch: 0 };
     gamepadSprint = false;
     previousGamepadButtons = [];
     triggerHeld = mouseTriggerHeld;
     adsHeld = debugAdsOverride ?? mouseAdsHeld;
     return;
   }
-  gamepadMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
+  const shapedMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
   const look = applyRadialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.1, 1.6);
   const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
   const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
@@ -1584,12 +1697,18 @@ function pollGamepad(dt: number): void {
   const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
   adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAds);
   triggerHeld = mouseTriggerHeld || padTrigger;
-  if (gameStarted && player.alive && !menu.classList.contains('hidden')) {
-    // Do not steer the game behind a pause/menu overlay.
-  } else if (gameStarted && player.alive) {
-    const turnRate = adsHeld ? 1.92 : 3.66;
-    player.yaw -= look.x * turnRate * dt;
-    player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * turnRate * 0.82 * dt, -1.42, 1.42);
+  const canControlPlayer = gameStarted && player.alive && menu.classList.contains('hidden');
+  gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
+  gamepadLookRate = integrateGamepadLookRate(
+    gamepadLookRate,
+    canControlPlayer ? look : { x: 0, y: 0 },
+    dt,
+    adsHeld,
+    controllerSensitivity,
+  );
+  if (canControlPlayer) {
+    player.yaw -= gamepadLookRate.yaw * dt;
+    player.pitch = THREE.MathUtils.clamp(player.pitch - gamepadLookRate.pitch * dt, -1.42, 1.42);
     if (pressed(0)) {
       if (player.stance !== 'stand') requestStance('stand');
       jumpQueuedAt = performance.now();
@@ -1916,7 +2035,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Combat & World Art Pass 05 ready — synchronized reload actions, surface impacts and compact arena dressing active.');
+  setStatus('Pass 06 ready — procedural atmosphere, tuned controller look and tactical one-bot routing active.');
   requestAnimationFrame(frame);
 }
 
