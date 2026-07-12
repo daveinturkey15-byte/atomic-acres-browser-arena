@@ -5,6 +5,7 @@ import {
   roundedBox,
   texturedMaterial,
 } from './art-kit';
+import { COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT } from './arena-layout';
 
 export type ArenaArtResult = {
   root: THREE.Group;
@@ -46,7 +47,7 @@ function addStreetProps(root: THREE.Group): void {
   const metal = texturedMaterial('./assets/original/textures/painted-metal-teal.png', { roughness: 0.58, metalness: 0.3 });
   const concrete = texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.95, repeatX: 2 });
   for (const [x, z, rotation] of [
-    [-15, -20, 0.2], [17, 22, Math.PI], [-31, 10, Math.PI / 2], [30, -13, -Math.PI / 2],
+    [-13, -17, 0.2], [15, 19, Math.PI], [-28, 9, Math.PI / 2], [27, -11, -Math.PI / 2],
   ] as Array<[number, number, number]>) {
     const mailbox = new THREE.Group();
     mailbox.position.set(x, 0, z); mailbox.rotation.y = rotation;
@@ -54,14 +55,14 @@ function addStreetProps(root: THREE.Group): void {
     const box = roundedBox('mailbox', [0.7, 0.48, 0.95], metal, 0.12, 4); box.position.set(0, 1.35, 0);
     mailbox.add(post, box); root.add(mailbox);
   }
-  for (const [x, z] of [[-9, 18], [10, -22], [-34, -2], [34, 4]] as Array<[number, number]>) {
+  for (const [x, z] of [[-9, 15], [10, -18], [-29, -2], [29, 4]] as Array<[number, number]>) {
     const hydrant = new THREE.Group(); hydrant.position.set(x, 0, z);
     const red = new THREE.MeshStandardMaterial({ color: 0xb94d38, roughness: 0.55, metalness: 0.35 });
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 16), red); body.position.y = 0.45; body.castShadow = true;
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), red); cap.position.y = 0.9;
     hydrant.add(body, cap); root.add(hydrant);
   }
-  for (const [x, z] of [[-20, 12], [22, -14], [-26, -29], [25, 30]] as Array<[number, number]>) {
+  for (const [x, z] of [[-18, 10], [20, -12], [-22, -24], [22, 25]] as Array<[number, number]>) {
     const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
     for (const offset of [-0.6, 0, 0.6]) {
       const shrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.54, 2), new THREE.MeshStandardMaterial({ color: 0x547747, roughness: 0.96 }));
@@ -71,7 +72,15 @@ function addStreetProps(root: THREE.Group): void {
 }
 
 function decorative(mesh: THREE.Object3D): THREE.Object3D {
-  mesh.traverse((node) => { node.userData.blocksShots = false; });
+  mesh.traverse((node) => {
+    node.userData.blocksShots = false;
+    if (node instanceof THREE.Mesh) {
+      // Decorative facade/route dressing receives the authored world shadow but
+      // does not render a second shadow-map pass of hundreds of tiny pieces.
+      node.castShadow = false;
+      node.receiveShadow = true;
+    }
+  });
   return mesh;
 }
 
@@ -102,10 +111,12 @@ function addFacadeAndInteriorDressing(root: THREE.Group): void {
     roughness: 0.92,
   });
 
-  for (const house of [
-    { x: -11, z: -34, facing: 1, fabric: fabricAqua, shell: shellAqua },
-    { x: 11, z: 34, facing: -1, fabric: fabricCoral, shell: shellCoral },
-  ]) {
+  for (const layout of HOUSE_LAYOUT) {
+    const house = {
+      ...layout,
+      fabric: layout.team === 0 ? fabricAqua : fabricCoral,
+      shell: layout.team === 0 ? shellAqua : shellCoral,
+    };
     const frontZ = house.z + house.facing * 7.48;
     const backZ = house.z - house.facing * 7.55;
 
@@ -191,10 +202,10 @@ function addFacadeAndInteriorDressing(root: THREE.Group): void {
   }
 
   // The end garages are major lane anchors; give them bright readable gables instead of dark blockout silhouettes.
-  const garageRoofs = [
-    { x: 14, z: -43.5, accent: fabricAqua },
-    { x: -14, z: 43.5, accent: fabricCoral },
-  ];
+  const garageRoofs = GARAGE_LAYOUT.map((garage, index) => ({
+    ...garage,
+    accent: index === 0 ? fabricAqua : fabricCoral,
+  }));
   for (const garage of garageRoofs) {
     const garageShell = new THREE.MeshBasicMaterial({ color: garage.z < 0 ? 0x4f9fa1 : 0xb96755 });
     const facade = roundedBox('garage-facade-finish', [16, 7, 0.14], garageShell, 0.04, 2);
@@ -244,7 +255,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
   const steel = new THREE.MeshStandardMaterial({ color: 0x39484d, roughness: 0.56, metalness: 0.56 });
   const porcelain = new THREE.MeshStandardMaterial({ color: 0xd7d0bd, roughness: 0.42 });
   const cable = new THREE.LineBasicMaterial({ color: 0x20292c, transparent: true, opacity: 0.72 });
-  const polePositions: Array<[number, number]> = [[-34, -42], [-34, 0], [-34, 42], [34, -42], [34, 0], [34, 42]];
+  const polePositions: Array<[number, number]> = [[-29, -35], [-29, 0], [-29, 35], [29, -35], [29, 0], [29, 35]];
   for (const [x, z] of polePositions) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 9.6, 10), steel);
     pole.position.set(x, 4.8, z); decorative(pole); root.add(pole);
@@ -256,9 +267,9 @@ function addStreetInfrastructure(root: THREE.Group): void {
     }
   }
   const wireSegments: THREE.Vector3[] = [];
-  for (const x of [-34, 34]) {
+  for (const x of [-29, 29]) {
     for (const offset of [-1, 0, 1]) {
-      for (const [fromZ, toZ] of [[-42, 0], [0, 42]] as Array<[number, number]>) {
+      for (const [fromZ, toZ] of [[-35, 0], [0, 35]] as Array<[number, number]>) {
         let previous = new THREE.Vector3(x + offset, 9.02, fromZ);
         for (let segment = 1; segment <= 12; segment += 1) {
           const t = segment / 12;
@@ -285,7 +296,7 @@ function addStreetInfrastructure(root: THREE.Group): void {
 function addAtomicLandmark(root: THREE.Group): void {
   const landmark = new THREE.Group();
   landmark.name = 'original-atomic-landmark';
-  landmark.position.set(29.5, 0, -1.5);
+  landmark.position.set(27, 0, -1.5);
   const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x54c8c7, emissive: 0x123b42, emissiveIntensity: 1.2, roughness: 0.36, metalness: 0.64 });
   for (const rotation of [0, Math.PI / 3, -Math.PI / 3]) {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(2.25, 0.13, 10, 42), ringMaterial);
@@ -305,65 +316,61 @@ function addRouteArchitecture(root: THREE.Group): void {
   const routeBox = (name: string, size: [number, number, number], material: THREE.Material, radius: number) => roundedBox(name, size, material, radius, 2);
 
   // West "skyline garden" route: a folded trellis reveal leading into a framed greenhouse.
-  for (const x of [-34, -25]) for (const z of [-17, -5]) {
+  for (const x of [-29, -22]) for (const z of [-15, -5]) {
     const column = routeBox('trellis-column', [0.55, 3.8, 0.55], frame, 0.08);
     column.position.set(x, 1.9, z); decorative(column); root.add(column);
   }
-  for (const z of [-17, -13, -9, -5]) {
-    const rib = routeBox('trellis-rib', [10.1, 0.22, 0.36], frame, 0.05);
-    rib.position.set(-29.5, 4.0, z); decorative(rib); root.add(rib);
+  for (const z of [-15, -11.7, -8.3, -5]) {
+    const rib = routeBox('trellis-rib', [8.1, 0.22, 0.36], frame, 0.05);
+    rib.position.set(-25.5, 4.0, z); decorative(rib); root.add(rib);
   }
-  for (const x of [-33.2, -31.35, -29.5, -27.65, -25.8]) {
-    const slat = routeBox('trellis-slat', [0.18, 0.16, 12.8], trim, 0.04);
-    slat.position.set(x, 4.08, -11); decorative(slat); root.add(slat);
+  for (const x of [-28.5, -27, -25.5, -24, -22.5]) {
+    const slat = routeBox('trellis-slat', [0.18, 0.16, 10.8], trim, 0.04);
+    slat.position.set(x, 4.08, -10); decorative(slat); root.add(slat);
   }
 
   for (const [x, z, sx, sz] of [
-    [-33.3, 18, 0.45, 8], [-25.7, 18, 0.45, 8], [-29.5, 21.8, 8, 0.45],
-    [-32.2, 14.2, 2.6, 0.45], [-26.8, 14.2, 2.6, 0.45],
+    [-29, 16, 0.45, 8], [-22, 16, 0.45, 8], [-25.5, 19.8, 7.5, 0.45],
+    [-28, 12.2, 2.2, 0.45], [-23, 12.2, 2.2, 0.45],
   ] as Array<[number, number, number, number]>) {
     const sill = routeBox('greenhouse-frame-wall', [sx, 3, sz], frame, 0.08);
     sill.position.set(x, 1.5, z); decorative(sill); root.add(sill);
   }
-  for (const x of [-31.9, -29.5, -27.1]) {
+  for (const x of [-27.7, -25.5, -23.3]) {
     const roof = routeBox('greenhouse-roof-rib', [0.18, 0.18, 8.4], trim, 0.04);
-    roof.position.set(x, 3.45, 18); roof.rotation.z = x < -29.5 ? -0.22 : x > -29.5 ? 0.22 : 0; decorative(roof); root.add(roof);
+    roof.position.set(x, 3.45, 16); roof.rotation.z = x < -25.5 ? -0.22 : x > -25.5 ? 0.22 : 0; decorative(roof); root.add(roof);
   }
-  for (const x of [-31.4, -27.6]) {
-    const pane = routeBox('greenhouse-glass', [3.15, 0.08, 8], glass, 0.02);
-    pane.position.set(x, 3.5, 18); pane.rotation.z = x < -29.5 ? -0.22 : 0.22; decorative(pane); root.add(pane);
+  for (const x of [-27.2, -23.8]) {
+    const pane = routeBox('greenhouse-glass', [2.8, 0.08, 8], glass, 0.02);
+    pane.position.set(x, 3.5, 16); pane.rotation.z = x < -25.5 ? -0.22 : 0.22; decorative(pane); root.add(pane);
   }
-  for (const [x, z] of [[-32.5, 16], [-29.5, 20], [-26.5, 16]] as Array<[number, number]>) {
+  for (const [x, z] of [[-28, 14], [-25.5, 18], [-23, 14]] as Array<[number, number]>) {
     const planter = routeBox('greenhouse-planter', [1.5, 0.55, 0.8], concrete, 0.12);
     planter.position.set(x, 0.28, z); decorative(planter); root.add(planter);
   }
 
   // East "service lane": waist-high channel walls and a folded solar maintenance canopy.
-  for (const x of [25.8, 32.2]) {
-    const wall = routeBox('service-channel-wall', [0.7, 1.5, 11], concrete, 0.12);
-    wall.position.set(x, 0.75, 11); decorative(wall); root.add(wall);
-    for (const z of [7.5, 11, 14.5]) {
-      const marker = routeBox('service-marker', [0.78, 0.16, 1.5], trim, 0.03);
+  for (const x of [22.5, 28.5]) {
+    const wall = routeBox('service-channel-wall', [0.7, 1.5, 10], concrete, 0.12);
+    wall.position.set(x, 0.75, 9); decorative(wall); root.add(wall);
+    for (const z of [6, 9, 12]) {
+      const marker = routeBox('service-marker', [0.78, 0.16, 1.35], trim, 0.03);
       marker.position.set(x, 1.18, z); decorative(marker); root.add(marker);
     }
   }
-  for (const x of [25.5, 33.5]) for (const z of [-22, -14]) {
+  for (const x of [22.5, 29.5]) for (const z of [-20, -12]) {
     const column = routeBox('solar-column', [0.6, 4.2, 0.6], frame, 0.08);
     column.position.set(x, 2.1, z); decorative(column); root.add(column);
   }
-  const canopy = routeBox('solar-canopy', [9.3, 0.34, 9.2], solar, 0.12);
-  canopy.position.set(29.5, 4.45, -18); canopy.rotation.z = -0.08; decorative(canopy); root.add(canopy);
-  for (const x of [26.4, 28.45, 30.5, 32.55]) {
+  const canopy = routeBox('solar-canopy', [8.2, 0.34, 9.2], solar, 0.12);
+  canopy.position.set(26, 4.45, -16); canopy.rotation.z = -0.08; decorative(canopy); root.add(canopy);
+  for (const x of [23.3, 25.1, 26.9, 28.7]) {
     const seam = routeBox('solar-seam', [0.06, 0.04, 8.5], trim, 0.01);
-    seam.position.set(x, 4.66 + (29.5 - x) * 0.08, -18); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
+    seam.position.set(x, 4.66 + (26 - x) * 0.08, -16); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
   }
 
   // Turn anonymous cover cubes into authored modular test barriers.
-  const cover: Array<[number, number, number, number]> = [
-    [-15, -13, 3.5, 2], [15, 13, 3.5, 2], [-17, 5, 3, 3], [17, -5, 3, 3],
-    [-24, 20, 4, 2], [24, -20, 4, 2], [-27, -5, 3, 5], [27, 5, 3, 5],
-  ];
-  cover.forEach(([x, z, width, depth], index) => {
+  COVER_LAYOUT.forEach(([x, z, width, depth], index) => {
     const cap = routeBox('barrier-cap', [width + 0.18, 0.16, depth + 0.18], index % 2 ? trim : frame, 0.05);
     cap.position.set(x, 1.58, z); decorative(cap); root.add(cap);
     for (const side of [-1, 1]) {
@@ -380,7 +387,7 @@ function addHouseInteriorLighting(root: THREE.Group): void {
     emissiveIntensity: 2.4,
     roughness: 0.45,
   });
-  for (const [x, z] of [[-11, -34], [11, 34]] as Array<[number, number]>) {
+  for (const { x, z } of HOUSE_LAYOUT) {
     const light = new THREE.PointLight(0xffd7a0, 4.8, 21, 1.7);
     light.position.set(x, 4.8, z);
     root.add(light);
@@ -421,14 +428,14 @@ export async function loadArenaArt(
   root.add(truck);
   onProgress?.(2, 12);
 
-  addTree(root, -33, -26, 1.05); onProgress?.(3, 12);
-  addTree(root, 33, 27, 1.1); onProgress?.(4, 12);
-  addTree(root, -32, 34, 0.82); onProgress?.(5, 12);
-  addTree(root, 31, -36, 0.9); onProgress?.(6, 12);
+  addTree(root, -29, -23, 1.05); onProgress?.(3, 12);
+  addTree(root, 29, 24, 1.1); onProgress?.(4, 12);
+  addTree(root, -28, 29, 0.82); onProgress?.(5, 12);
+  addTree(root, 27, -31, 0.9); onProgress?.(6, 12);
   addStreetProps(root); onProgress?.(7, 12);
 
   const tower = new THREE.Group();
-  tower.position.set(35, 0, -42);
+  tower.position.set(29, 0, -36);
   const steel = new THREE.MeshStandardMaterial({ color: 0x4c5960, roughness: 0.48, metalness: 0.55 });
   for (const x of [-1.4, 1.4]) for (const z of [-1.4, 1.4]) {
     const leg = roundedBox('test-tower-leg', [0.22, 9, 0.22], steel, 0.04); leg.position.set(x, 4.5, z); tower.add(leg);

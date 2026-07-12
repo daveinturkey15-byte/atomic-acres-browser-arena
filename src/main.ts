@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, setOperatorWeapon } from './art-kit';
+import { PATROL_LAYOUT } from './arena-layout';
 import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
@@ -95,12 +96,7 @@ type GrenadeEntity = {
 };
 
 const WEAPON_ORDER: WeaponId[] = ['carbine', 'smg', 'scattergun'];
-const BOT_PATROL_POINTS = [
-  new THREE.Vector3(-25, 0, -12), new THREE.Vector3(-18, 0, 15),
-  new THREE.Vector3(-4, 0, 24), new THREE.Vector3(8, 0, 15),
-  new THREE.Vector3(24, 0, 8), new THREE.Vector3(19, 0, -18),
-  new THREE.Vector3(2, 0, -24), new THREE.Vector3(-12, 0, -17),
-];
+const BOT_PATROL_POINTS = PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z));
 
 function createPlayerId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
@@ -1865,9 +1861,9 @@ async function bootstrap(): Promise<void> {
   weaponView.setWeapon(player.weapon, true);
   respawn();
   weaponView.root.visible = false;
-  camera.position.set(-32, 10.5, -17);
-  camera.lookAt(0, 2.8, 4);
-  camera.fov = 72;
+  camera.position.set(0, 30, -22);
+  camera.lookAt(0, 0.8, 4);
+  camera.fov = 65;
   camera.updateProjectionMatrix();
 
   soloButton.disabled = false;

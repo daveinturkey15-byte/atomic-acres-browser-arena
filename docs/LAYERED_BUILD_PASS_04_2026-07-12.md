@@ -47,16 +47,16 @@ Measured current state:
 - Mean spawn-to-centre lower bound: `36.20 m`, about `4.24 s` at authored sprint speed before collision detours.
 - One forward spawn pair has an immediate unblocked `64.03 m` sightline, creating zero-second visual contact despite otherwise 4–5 second traversal.
 
-Original target—not copied commercial coordinates:
+Implemented original target—not copied commercial coordinates:
 
-- Bounds approximately `68 × 86 m`, about 30% less area.
-- Retain current house/interior dimensions but relocate centres near `(-9,-28)` and `(9,28)`.
-- Spawn-to-centre target `26.6–31.6 m` / `3.1–3.7 s` ideal sprint.
-- No direct spawn-to-spawn line of sight.
-- First aggressive reveal `2.2–3.0 s`; median first engagement `3.0–3.8 s`.
-- Primary routes `6–9 m`; side routes `4.5–7 m`; effective cover pinches never below `2.4 m`.
-- Break sightlines every `12–18 m` and avoid unbroken combat rays above roughly `30–34 m`.
-- Reposition macro anchors individually instead of uniformly scaling the world, preserving original architecture and readable player-scale interiors.
+- Bounds are now exactly `68 × 86 m` (`5,848 m²`), a 30.1% area reduction from the prior authored map.
+- House/interior dimensions remain player-scale while the centres moved individually to `(-9,-28)` and `(9,28)`, `58.82 m` apart.
+- Garages, boundaries, sidewalks, route architecture, trees, utilities, practice targets, cover, spawns and patrol points were individually repositioned; interiors and collider thicknesses were not uniformly scaled.
+- Eight shared cover anchors interrupt the main/side lanes every roughly `12–18 m`.
+- All authored spawn and patrol centres pass the `0.44 m` radius-aware bounds test.
+- The primary opposing-spawn ray is analytically verified to intersect the original central coach rather than providing direct spawn visibility.
+- The cinematic menu now uses a high aerial review angle so the compact macro layout is visible without clipping through the moved roofs/trellises.
+- Local gameplay inspection confirmed the first flank is materially shorter and denser while remaining traversable; subjective engagement-time tuning remains a user-review item rather than a fabricated measurement.
 
 ## Layer 04C — operator and first-person art
 
@@ -83,12 +83,16 @@ Implementation checkpoint completed:
 - Added first-person upper-arm/elbow/forearm/hand groups, per-weapon muzzle/eject/grip/support sockets, staged bolt/pump movement and visible magazine travel.
 - Replaced per-shot casing geometry/material allocation with a fixed 16-object pool and separate shared brass/shell forms.
 - Re-centered the physical sight after reducing viewmodel scale and moving ADS farther from the camera.
+- Added a tested finite two-bone elbow solver. Both first-person arms now solve from authored shoulder positions to the active weapon's right-grip and left-support sockets every frame.
+- Parent the scattergun support socket to its moving pump, so the left hand follows the pump cycle rather than animating independently.
+- Reduced rounded limb segment density and disabled shadow-map casting for non-gameplay facade/route dressing while preserving received world shadows.
 
 Remaining art refinement:
 
-- The first-person arms are articulated but not yet full two-bone IK; weapon-authored sockets currently inform layout rather than solving every joint each frame.
 - World death collapse, reload and aim-pitch replication still need dedicated network action events.
-- Full-quality renderer telemetry is above the compatibility budget (`320` calls / `385,120` triangles in the local capture); the compatibility run remains inside the asserted `<=180` / `<=350k` gates and passed `>=40 FPS`. Normal-quality optimization remains required before release acceptance.
+- Full-quality renderer telemetry improved from `320` calls / `385,120` triangles to `302` calls / `311,410` triangles: 73,710 fewer triangles (19.1%) and 18 fewer calls. It remains intentionally richer than compatibility mode.
+- Compatibility telemetry is `59` calls / `76,894` triangles, and the unchanged clean-process `>=40 FPS`, `<=180` calls and `<=350k` triangle gate passed.
+- Further LOD/static-subassembly work is desirable, but no release threshold was weakened and the normal-quality triangle count is now below the compatibility triangle ceiling.
 
 Art budgets:
 
@@ -118,6 +122,18 @@ Verification:
 - Functional Chromium: 9/9 including tab navigation, selection, reload persistence and SMG deployment.
 - Isolated compatibility FPS/call/triangle gate passed unchanged.
 - Local release QA had zero console errors; local compatibility multiplayer and prone replication passed.
+
+## Final local review-candidate evidence
+
+- TypeScript and production build: passed.
+- Unit tests: `53/53` across nine files, including compact-layout metrics/direct-spawn-ray containment and finite/reachable/hinted IK cases.
+- Functional Chromium: `9/9` passed.
+- Clean isolated compatibility performance: passed the unchanged `>=40 FPS`, `<=180` calls and `<=350k` triangle assertions after removing exact stale tracked QA processes.
+- Normal release QA: zero console errors; `302` calls / `311,410` triangles.
+- Compatibility release QA: zero console errors; `59` calls / `76,894` triangles.
+- Two-browser PeerJS QA: room creation/join, remote presence and prone stance replication passed; observed spawn separation `24.19 m`.
+- Visual inspection covered aerial menu composition, compact flank traversal, carbine hip/ADS arm placement, scattergun hand placement and sight obstruction.
+- Known limitations: no mobile controls; multiplayer remains peer/victim-validated rather than server authoritative; world death/reload action replication remains future work; subjective pacing requires Dave's review.
 
 ## Deployment rule
 

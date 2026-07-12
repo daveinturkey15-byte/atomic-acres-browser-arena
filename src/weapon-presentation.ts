@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildWeaponModel, roundedBox } from './art-kit';
+import { solveTwoBoneElbow } from './ik';
 import type { WeaponId } from './protocol';
 
 export type WeaponPose = {
@@ -15,6 +16,13 @@ export type WeaponPose = {
 };
 
 type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; active: boolean };
+type ViewArmRig = {
+  side: 'left' | 'right';
+  shoulder: THREE.Group;
+  elbow: THREE.Group;
+  upperLength: number;
+  lowerLength: number;
+};
 
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
@@ -32,6 +40,7 @@ export class WeaponPresentation {
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
   private readonly casings: ViewCasing[] = [];
+  private readonly armRigs: ViewArmRig[] = [];
   private readonly brassGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7);
   private readonly shellGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.105, 8);
   private readonly brassMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
@@ -52,20 +61,20 @@ export class WeaponPresentation {
     const arms = new THREE.Group(); arms.name = 'first-person-arms';
     const makeArm = (side: 'left' | 'right') => {
       const sign = side === 'left' ? -1 : 1;
+      const upperLength = 0.56;
+      const lowerLength = 0.58;
       const shoulder = new THREE.Group(); shoulder.name = `${side}-shoulder-joint`;
       shoulder.position.set(sign * 0.25, side === 'right' ? -0.17 : -0.12, side === 'right' ? 0.52 : 0.45);
-      shoulder.rotation.set(side === 'left' ? -0.48 : -0.28, sign * -0.16, sign * -0.12);
-      const upper = roundedBox(`${side}-upper-arm`, [0.19, 0.19, 0.46], sleeve, 0.075, 4);
-      upper.position.z = -0.2; shoulder.add(upper);
-      const elbow = new THREE.Group(); elbow.name = `${side}-elbow-joint`; elbow.position.z = side === 'right' ? -0.28 : -0.42; shoulder.add(elbow);
-      elbow.rotation.set(side === 'left' ? -0.18 : -0.08, sign * 0.12, 0);
-      const forearm = roundedBox(`${side}-forearm`, [0.18, 0.18, 0.5], sleeve, 0.075, 4);
-      forearm.position.z = side === 'right' ? -0.1 : -0.22; elbow.add(forearm);
-      const handZ = side === 'right' ? -0.2 : -0.55;
-      const hand = roundedBox(`${side}-glove`, [0.17, 0.15, 0.22], glove, 0.06, 4);
-      hand.position.set(sign * -0.015, -0.01, handZ); hand.rotation.x = -0.12; elbow.add(hand);
-      const thumb = roundedBox(`${side}-thumb`, [0.07, 0.1, 0.16], glove, 0.028, 3);
-      thumb.position.set(sign * -0.1, -0.04, handZ + 0.02); thumb.rotation.z = sign * 0.32; elbow.add(thumb);
+      const upper = roundedBox(`${side}-upper-arm`, [0.19, 0.19, upperLength], sleeve, 0.075, 3);
+      upper.position.z = -upperLength / 2; shoulder.add(upper);
+      const elbow = new THREE.Group(); elbow.name = `${side}-elbow-joint`; elbow.position.z = -upperLength; shoulder.add(elbow);
+      const forearm = roundedBox(`${side}-forearm`, [0.18, 0.18, lowerLength], sleeve, 0.075, 3);
+      forearm.position.z = -lowerLength / 2; elbow.add(forearm);
+      const hand = roundedBox(`${side}-glove`, [0.17, 0.15, 0.22], glove, 0.06, 3);
+      hand.position.set(sign * -0.015, -0.01, -lowerLength); hand.rotation.x = -0.12; elbow.add(hand);
+      const thumb = roundedBox(`${side}-thumb`, [0.07, 0.1, 0.16], glove, 0.028, 2);
+      thumb.position.set(sign * -0.1, -0.04, -lowerLength + 0.02); thumb.rotation.z = sign * 0.32; elbow.add(thumb);
+      this.armRigs.push({ side, shoulder, elbow, upperLength, lowerLength });
       return shoulder;
     };
     arms.add(makeArm('right'), makeArm('left'));
@@ -179,6 +188,27 @@ export class WeaponPresentation {
     this.swayY = THREE.MathUtils.clamp(this.swayY + y * 0.00006, -0.02, 0.02);
   }
 
+  private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined): void {
+    if (!activeModel) return;
+    this.root.updateMatrixWorld(true);
+    for (const rig of this.armRigs) {
+      const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
+      const socket = activeModel.getObjectByName(socketName);
+      if (!socket) continue;
+      const targetWorld = socket.getWorldPosition(new THREE.Vector3());
+      const targetInArms = arms.worldToLocal(targetWorld.clone());
+      const hint = new THREE.Vector3(rig.side === 'left' ? -0.48 : 0.48, -1, 0.22);
+      const elbowPoint = solveTwoBoneElbow(rig.shoulder.position, targetInArms, rig.upperLength, rig.lowerLength, hint);
+      const upperDirection = elbowPoint.sub(rig.shoulder.position).normalize();
+      rig.shoulder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), upperDirection);
+      rig.elbow.position.set(0, 0, -rig.upperLength);
+      rig.shoulder.updateWorldMatrix(true, true);
+      const targetInShoulder = rig.shoulder.worldToLocal(targetWorld.clone());
+      const lowerDirection = targetInShoulder.sub(rig.elbow.position).normalize();
+      rig.elbow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), lowerDirection);
+    }
+  }
+
   update(pose: WeaponPose): void {
     const smoothing = (rate: number) => 1 - Math.exp(-rate * pose.dt);
     this.recoil = THREE.MathUtils.lerp(this.recoil, 0, smoothing(16));
@@ -219,8 +249,6 @@ export class WeaponPresentation {
       const restZ = Number(pump.userData.restZ ?? -0.48);
       const pumpProgress = THREE.MathUtils.clamp((shotAge - 180) / 440, 0, 1);
       pump.position.z = restZ + Math.sin(pumpProgress * Math.PI) * 0.22;
-      const leftElbow = this.root.getObjectByName('left-elbow-joint');
-      if (leftElbow) leftElbow.rotation.x = -0.18 - Math.sin(pumpProgress * Math.PI) * 0.24;
     }
 
     const bobWeight = pose.moving ? (pose.sprinting ? 1.22 : pose.ads ? 0.12 : pose.prone ? 0.12 : pose.crouched ? 0.32 : 0.56) : 0.05;
@@ -275,5 +303,6 @@ export class WeaponPresentation {
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * 0.18 - this.swayY - grenadeArc * 0.42, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(this.root.rotation.y, -this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65, smoothing(13));
     this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
+    if (arms) this.solveArms(arms, activeModel);
   }
 }

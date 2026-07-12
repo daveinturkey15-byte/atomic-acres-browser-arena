@@ -176,11 +176,11 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     metalness: 0.35,
   });
 
-  const addSocket = (name: string, position: [number, number, number]) => {
+  const addSocket = (name: string, position: [number, number, number], parent: THREE.Object3D = root) => {
     const socket = new THREE.Object3D();
     socket.name = name;
     socket.position.set(...position);
-    root.add(socket);
+    parent.add(socket);
   };
   const addBarrel = (length: number, z: number, radius: number) => {
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.82, radius, length, 12), dark);
@@ -246,7 +246,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     addSocket('muzzle-socket', [0, 0.005, -1.2]);
     addSocket('eject-socket', [0.14, 0.045, -0.03]);
     addSocket('grip-socket-r', [0.03, -0.14, 0.12]);
-    addSocket('support-socket-l', [-0.03, -0.08, -0.48]);
+    addSocket('support-socket-l', [-0.03, -0.025, 0], pump);
   }
 
   const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.1, 12), dark);
