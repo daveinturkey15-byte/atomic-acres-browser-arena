@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildWeaponModel, roundedBox } from './art-kit';
 import { solveTwoBoneElbow } from './ik';
+import { reloadActionEvents, reloadPoseAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 
 export type WeaponPose = {
@@ -16,6 +17,7 @@ export type WeaponPose = {
 };
 
 type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; active: boolean };
+type ViewSmoke = { velocity: THREE.Vector3; life: number; maxLife: number; active: boolean };
 type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
@@ -32,6 +34,7 @@ export class WeaponPresentation {
   private recoil = 0;
   private reloadStart = 0;
   private reloadDuration = 0;
+  private reloadLastProgress = 0;
   private switchBlend = 1;
   private swayX = 0;
   private swayY = 0;
@@ -40,6 +43,10 @@ export class WeaponPresentation {
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
   private readonly casings: ViewCasing[] = [];
+  private readonly smokes: ViewSmoke[] = [];
+  private readonly smokePositions = new Float32Array(24);
+  private readonly smokeColors = new Float32Array(24);
+  private readonly smokePoints: THREE.Points;
   private readonly armRigs: ViewArmRig[] = [];
   private readonly brassGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7);
   private readonly shellGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.105, 8);
@@ -47,6 +54,8 @@ export class WeaponPresentation {
   private readonly shellMaterial = new THREE.MeshStandardMaterial({ color: 0xb43f32, roughness: 0.58, metalness: 0.18 });
   private shotStarted = -10_000;
   private casingCursor = 0;
+  private smokeCursor = 0;
+  private pendingScattergunShell = false;
   private adsBlend = 0;
   private sprintBlend = 0;
 
@@ -102,6 +111,27 @@ export class WeaponPresentation {
     this.muzzleFlash.visible = false;
     this.root.add(this.muzzleFlash);
 
+    const smokeGeometry = new THREE.BufferGeometry();
+    this.smokePositions.fill(0);
+    for (let index = 0; index < 8; index += 1) this.smokePositions[index * 3 + 1] = -10_000;
+    smokeGeometry.setAttribute('position', new THREE.BufferAttribute(this.smokePositions, 3));
+    smokeGeometry.setAttribute('color', new THREE.BufferAttribute(this.smokeColors, 3));
+    this.smokePoints = new THREE.Points(smokeGeometry, new THREE.PointsMaterial({
+      size: flattenMaterials ? 0.045 : 0.075,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.58,
+      depthWrite: false,
+      sizeAttenuation: true,
+    }));
+    this.smokePoints.name = 'pooled-muzzle-smoke';
+    this.smokePoints.visible = false;
+    this.smokePoints.frustumCulled = false;
+    this.root.add(this.smokePoints);
+    for (let index = 0; index < 8; index += 1) {
+      this.smokes.push({ velocity: new THREE.Vector3(), life: 0, maxLife: 0, active: false });
+    }
+
     for (let index = 0; index < 16; index += 1) {
       const mesh = new THREE.Mesh(this.brassGeometry, this.brassMaterial);
       mesh.name = `pooled-casing-${index}`;
@@ -132,6 +162,8 @@ export class WeaponPresentation {
     this.active = id;
     this.switchBlend = immediate ? 1 : 0;
     this.reloadDuration = 0;
+    this.reloadLastProgress = 0;
+    this.pendingScattergunShell = false;
     for (const [weaponId, model] of this.models) model.visible = weaponId === id;
     const activeModel = this.models.get(id);
     const muzzleSocket = activeModel?.getObjectByName('muzzle-socket');
@@ -141,16 +173,8 @@ export class WeaponPresentation {
     }
   }
 
-  fire(amount: number): void {
-    this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
-    this.shotStarted = performance.now();
-    this.muzzleLight.intensity = this.active === 'scattergun' ? 7.2 : 4.8;
-    this.muzzleFlash.visible = true;
-    this.muzzleFlash.scale.setScalar(this.active === 'scattergun' ? 1.45 : this.active === 'smg' ? 0.78 : 1);
-    this.muzzleFlash.rotation.z = Math.random() * Math.PI;
-
+  private ejectCasing(shell: boolean): void {
     const casing = this.casings[this.casingCursor++ % this.casings.length];
-    const shell = this.active === 'scattergun';
     casing.mesh.geometry = shell ? this.shellGeometry : this.brassGeometry;
     casing.mesh.material = shell ? this.shellMaterial : this.brassMaterial;
     const ejectSocket = this.models.get(this.active)?.getObjectByName('eject-socket');
@@ -166,13 +190,47 @@ export class WeaponPresentation {
     casing.active = true;
   }
 
+  fire(amount: number): void {
+    this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
+    this.shotStarted = performance.now();
+    this.muzzleLight.intensity = this.active === 'scattergun' ? 7.2 : 4.8;
+    this.muzzleFlash.visible = true;
+    this.muzzleFlash.scale.setScalar(this.active === 'scattergun' ? 1.45 : this.active === 'smg' ? 0.78 : 1);
+    this.muzzleFlash.rotation.z = Math.random() * Math.PI;
+
+    const muzzleSocket = this.models.get(this.active)?.getObjectByName('muzzle-socket');
+    const smokeCount = this.active === 'scattergun' ? 2 : 1;
+    for (let index = 0; index < smokeCount; index += 1) {
+      const slot = this.smokeCursor++ % this.smokes.length;
+      const smoke = this.smokes[slot];
+      const offset = slot * 3;
+      const muzzle = muzzleSocket?.position ?? new THREE.Vector3(0, 0.08, -1.15);
+      this.smokePositions[offset] = muzzle.x + (Math.random() - 0.5) * 0.025;
+      this.smokePositions[offset + 1] = muzzle.y + (Math.random() - 0.5) * 0.02;
+      this.smokePositions[offset + 2] = muzzle.z - 0.05 - index * 0.035;
+      smoke.velocity.set((Math.random() - 0.5) * 0.055, 0.1 + Math.random() * 0.06, -0.11 - Math.random() * 0.08);
+      smoke.maxLife = this.active === 'scattergun' ? 0.34 : 0.22;
+      smoke.life = smoke.maxLife;
+      smoke.active = true;
+      this.smokeColors[offset] = this.smokeColors[offset + 1] = this.smokeColors[offset + 2] = 0.62;
+    }
+    this.smokePoints.visible = true;
+    (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+
+    if (this.active === 'scattergun') this.pendingScattergunShell = true;
+    else this.ejectCasing(false);
+  }
+
   reload(durationSeconds: number): void {
     this.reloadStart = performance.now();
     this.reloadDuration = durationSeconds * 1000;
+    this.reloadLastProgress = 0;
   }
 
   cancelReload(): void {
     this.reloadDuration = 0;
+    this.reloadLastProgress = 0;
   }
 
   melee(): void {
@@ -188,7 +246,7 @@ export class WeaponPresentation {
     this.swayY = THREE.MathUtils.clamp(this.swayY + y * 0.00006, -0.02, 0.02);
   }
 
-  private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined): void {
+  private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
     if (!activeModel) return;
     this.root.updateMatrixWorld(true);
     for (const rig of this.armRigs) {
@@ -196,6 +254,10 @@ export class WeaponPresentation {
       const socket = activeModel.getObjectByName(socketName);
       if (!socket) continue;
       const targetWorld = socket.getWorldPosition(new THREE.Vector3());
+      if (rig.side === 'left' && reloadPose.handToReload > 0) {
+        const reloadSocket = activeModel.getObjectByName('reload-socket-l');
+        if (reloadSocket) targetWorld.lerp(reloadSocket.getWorldPosition(new THREE.Vector3()), reloadPose.handToReload);
+      }
       const targetInArms = arms.worldToLocal(targetWorld.clone());
       const hint = new THREE.Vector3(rig.side === 'left' ? -0.48 : 0.48, -1, 0.22);
       const elbowPoint = solveTwoBoneElbow(rig.shoulder.position, targetInArms, rig.upperLength, rig.lowerLength, hint);
@@ -209,7 +271,8 @@ export class WeaponPresentation {
     }
   }
 
-  update(pose: WeaponPose): void {
+  update(pose: WeaponPose): WeaponActionEvent[] {
+    const actionEvents: WeaponActionEvent[] = [];
     const smoothing = (rate: number) => 1 - Math.exp(-rate * pose.dt);
     this.recoil = THREE.MathUtils.lerp(this.recoil, 0, smoothing(16));
     this.muzzleLight.intensity = THREE.MathUtils.lerp(this.muzzleLight.intensity, 0, smoothing(30));
@@ -234,9 +297,37 @@ export class WeaponPresentation {
         casing.mesh.visible = false;
       }
     }
+    let activeSmoke = 0;
+    for (let slot = 0; slot < this.smokes.length; slot += 1) {
+      const smoke = this.smokes[slot];
+      if (!smoke.active) continue;
+      const offset = slot * 3;
+      smoke.life -= pose.dt;
+      if (smoke.life <= 0) {
+        smoke.active = false;
+        this.smokePositions[offset + 1] = -10_000;
+        this.smokeColors[offset] = this.smokeColors[offset + 1] = this.smokeColors[offset + 2] = 0;
+        continue;
+      }
+      activeSmoke += 1;
+      this.smokePositions[offset] += smoke.velocity.x * pose.dt;
+      this.smokePositions[offset + 1] += smoke.velocity.y * pose.dt;
+      this.smokePositions[offset + 2] += smoke.velocity.z * pose.dt;
+      const fade = Math.min(1, smoke.life / Math.max(0.001, smoke.maxLife) * 1.7) * 0.62;
+      this.smokeColors[offset] = this.smokeColors[offset + 1] = this.smokeColors[offset + 2] = fade;
+    }
+    this.smokePoints.visible = activeSmoke > 0;
+    if (activeSmoke > 0) {
+      (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+    }
 
     const activeModel = this.models.get(this.active);
     const shotAge = performance.now() - this.shotStarted;
+    if (this.active === 'scattergun' && this.pendingScattergunShell && shotAge >= 230) {
+      this.ejectCasing(true);
+      this.pendingScattergunShell = false;
+    }
     const bolt = activeModel?.getObjectByName('bolt-or-slide');
     if (bolt) {
       const restZ = Number(bolt.userData.restZ ?? 0);
@@ -270,23 +361,36 @@ export class WeaponPresentation {
     let reloadDrop = 0;
     let reloadProgress = 0;
     if (this.reloadDuration > 0) {
-      const progress = (performance.now() - this.reloadStart) / this.reloadDuration;
-      if (progress >= 1) this.reloadDuration = 0;
-      else {
-        const p = THREE.MathUtils.clamp(progress, 0, 1);
-        reloadProgress = p;
-        const lower = Math.sin(Math.PI * p);
-        const seatSnap = p > 0.65 ? Math.sin((p - 0.65) / 0.35 * Math.PI) : 0;
-        reloadRoll = lower * 0.78 - seatSnap * 0.12;
-        reloadDrop = lower * -0.22 + seatSnap * 0.035;
+      reloadProgress = THREE.MathUtils.clamp((performance.now() - this.reloadStart) / this.reloadDuration, 0, 1);
+      actionEvents.push(...reloadActionEvents(this.active, this.reloadLastProgress, reloadProgress));
+      this.reloadLastProgress = reloadProgress;
+      const lower = Math.sin(Math.PI * reloadProgress);
+      const seatSnap = reloadProgress > 0.65 ? Math.sin((reloadProgress - 0.65) / 0.35 * Math.PI) : 0;
+      reloadRoll = lower * 0.78 - seatSnap * 0.12;
+      reloadDrop = lower * -0.22 + seatSnap * 0.035;
+      if (reloadProgress >= 1) {
+        this.reloadDuration = 0;
+        this.reloadLastProgress = 0;
       }
     }
+    const reloadPose = reloadPoseAt(this.active, reloadProgress);
     const magazine = activeModel?.getObjectByName(this.active === 'carbine' ? 'curved-magazine' : 'straight-magazine');
     if (magazine) {
-      const restY = this.active === 'carbine' ? -0.24 : -0.26;
-      const exchange = reloadProgress > 0 ? Math.sin(reloadProgress * Math.PI) : 0;
-      magazine.position.y = restY - exchange * 0.38;
-      magazine.rotation.z = exchange * 0.18;
+      if (magazine.userData.restY === undefined) {
+        magazine.userData.restY = magazine.position.y;
+        magazine.userData.restRotationZ = magazine.rotation.z;
+      }
+      magazine.position.y = Number(magazine.userData.restY) - reloadPose.magazineDrop;
+      magazine.rotation.z = Number(magazine.userData.restRotationZ) + reloadPose.magazineTwist;
+    }
+    const reloadShell = activeModel?.getObjectByName('reload-shell');
+    if (reloadShell) {
+      reloadShell.visible = reloadPose.shellVisible;
+      reloadShell.position.set(-0.16 + reloadPose.shellTravel * 0.13, -0.13 + reloadPose.shellTravel * 0.035, -0.02);
+    }
+    if (pump && reloadPose.actionPull > 0) {
+      const restZ = Number(pump.userData.restZ ?? -0.48);
+      pump.position.z = restZ + reloadPose.actionPull * 0.16;
     }
 
     const meleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / 430, 0, 1);
@@ -303,6 +407,7 @@ export class WeaponPresentation {
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * 0.18 - this.swayY - grenadeArc * 0.42, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(this.root.rotation.y, -this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65, smoothing(13));
     this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
-    if (arms) this.solveArms(arms, activeModel);
+    if (arms) this.solveArms(arms, activeModel, reloadPose);
+    return actionEvents;
   }
 }

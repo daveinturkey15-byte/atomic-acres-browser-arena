@@ -3,6 +3,7 @@ import './style.css';
 import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
 import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
+import { classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -36,6 +37,7 @@ import {
 import { ArenaMap, buildArena } from './map';
 import { shouldRevealEnemy, worldToMinimap } from './minimap';
 import { loadArenaArt } from './environment-assets';
+import { ImpactPresentation } from './impact-presentation';
 import { ArenaNetwork } from './network';
 import { CharacterPhysics } from './physics';
 import { WeaponPresentation } from './weapon-presentation';
@@ -110,9 +112,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · LAYERED BUILD PASS 04</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT & WORLD ART PASS 05</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A compact retro-future skirmish with one bounded close-range rival, articulated operators, distinct procedural weapons, physical sights and authoritative hard cover.</p>
+    <p class="lede">A compact retro-future skirmish with synchronized weapon actions, socket-driven hands, material-readable impacts and one bounded close-range rival.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -234,6 +236,7 @@ function buildSky(): void {
 }
 buildSky();
 const arena: ArenaMap = buildArena(scene);
+const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 
 const player = {
   id: createPlayerId(),
@@ -267,6 +270,7 @@ const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
 const grenades: GrenadeEntity[] = [];
 const processedNonces = new Set<number>();
+const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let triggerHeld = false;
@@ -509,14 +513,15 @@ function renderRemoteShot(message: ShotMessage): void {
   const direction = new THREE.Vector3(...message.direction).normalize();
   const end = origin.clone().addScaledVector(direction, 50);
   const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
+  const visibleEnd = origin.clone().addScaledVector(direction, trace.tracerDistance);
   spawnTracer(origin, direction, trace.tracerDistance, WEAPONS[message.weapon].color);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   if (remoteOperator) fireOperator(remoteOperator);
   if (trace.blockedByCover) {
-    const impact = origin.clone().addScaledVector(direction, trace.tracerDistance);
-    spawnImpactFlash(impact);
-    audio.coverImpact(impact.distanceTo(camera.position));
+    spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
+    audio.impact('concrete', visibleEnd.distanceTo(camera.position));
   }
+  if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
 }
 
@@ -705,6 +710,7 @@ function reload(): void {
   const ammo = player.ammo[player.weapon];
   if (player.reloadState || ammo >= spec.mag || player.reserve[player.weapon] <= 0) return;
   player.reloadState = beginReload(spec, ammo, player.reserve[player.weapon], performance.now());
+  weaponActionHistory.length = 0;
   audio.reload();
   weaponView.reload(spec.reload);
   addFeed(`Reloading ${spec.name}`);
@@ -780,6 +786,7 @@ function tryFire(now: number): void {
     sustainedShots: player.sustainedShots,
   });
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
+  let impactAudioPlayed = false;
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
@@ -791,7 +798,14 @@ function tryFire(now: number): void {
     const result = castShot(origin, direction);
     spawnTracer(origin, direction, result.distance, spec.color);
     if (!result.playerId && !result.targetId && result.distance < 89) {
-      spawnImpactFlash(origin.clone().addScaledVector(direction, result.distance));
+      const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
+      const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
+      const surface = result.impactSurface ?? 'concrete';
+      spawnImpactFlash(point, surface, normal);
+      if (!impactAudioPlayed) {
+        impactAudioPlayed = true;
+        audio.impact(surface, point.distanceTo(camera.position));
+      }
     }
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
@@ -826,7 +840,17 @@ function tryFire(now: number): void {
   if (player.ammo[player.weapon] === 0) setTimeout(reload, 120);
 }
 
-function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: number; playerId?: string; targetId?: string; hitZone?: HitZone } {
+type ShotCastResult = {
+  distance: number;
+  playerId?: string;
+  targetId?: string;
+  hitZone?: HitZone;
+  impactPoint?: THREE.Vector3;
+  impactNormal?: THREE.Vector3;
+  impactSurface?: ImpactSurface;
+};
+
+function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResult {
   const ray = new THREE.Raycaster(origin, direction, 0.1, 110);
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
   const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
@@ -838,15 +862,33 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: 
   let playerId: string | undefined;
   let targetId: string | undefined;
   let hitZone: HitZone | undefined;
+  let surfaceHint: unknown;
+  const names: string[] = [];
   while (node) {
     playerId ??= node.userData.playerId as string | undefined;
     targetId ??= node.userData.targetId as string | undefined;
     hitZone ??= node.userData.hitZone as HitZone | undefined;
+    surfaceHint ??= node.userData.impactSurface;
+    if (node.name) names.push(node.name);
     node = node.parent;
   }
   const targetRoot = first.object.userData.targetRoot as THREE.Group | undefined;
   targetId ??= targetRoot?.userData.targetId as string | undefined;
-  return { distance: Math.min(first.distance, 110), playerId, targetId, hitZone };
+  const objectMaterial = first.object instanceof THREE.Mesh
+    ? (Array.isArray(first.object.material) ? first.object.material[0] : first.object.material)
+    : undefined;
+  const metalness = objectMaterial instanceof THREE.MeshStandardMaterial ? objectMaterial.metalness : undefined;
+  const impactNormal = first.face?.normal.clone().transformDirection(first.object.matrixWorld)
+    ?? direction.clone().multiplyScalar(-1);
+  return {
+    distance: Math.min(first.distance, 110),
+    playerId,
+    targetId,
+    hitZone,
+    impactPoint: first.point.clone(),
+    impactNormal,
+    impactSurface: classifyImpactSurface({ hint: surfaceHint, name: names.join(' '), metalness }),
+  };
 }
 
 function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
@@ -1026,11 +1068,13 @@ function updateBots(dt: number, now: number): void {
       const shotLength = Math.min(distance + 2, 75);
       const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
       const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
+      const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
       spawnTracer(origin, direction, resolution.tracerDistance, WEAPONS.carbine.color);
       if (resolution.blockedByCover) {
-        const impact = origin.clone().addScaledVector(direction, resolution.tracerDistance);
-        spawnImpactFlash(impact);
-        audio.coverImpact(impact.distanceTo(player.position));
+        spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
+        audio.impact('concrete', visibleEnd.distanceTo(player.position));
+      } else if (!resolution.hitTarget) {
+        audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
       audio.shot('carbine', true);
       if (resolution.hitTarget) {
@@ -1194,17 +1238,12 @@ function updateTargets(now: number): void {
   }
 }
 
-function spawnImpactFlash(point: THREE.Vector3): void {
-  const material = new THREE.MeshBasicMaterial({ color: 0xffdda0, transparent: true, opacity: 0.9, depthWrite: false });
-  const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), material);
-  flash.position.copy(point);
-  flash.scale.set(1, 0.55, 1);
-  scene.add(flash);
-  window.setTimeout(() => {
-    scene.remove(flash);
-    flash.geometry.dispose();
-    material.dispose();
-  }, 72);
+function spawnImpactFlash(
+  point: THREE.Vector3,
+  surface: ImpactSurface = 'concrete',
+  normal = new THREE.Vector3(0, 1, 0),
+): void {
+  impactPresentation.impact(point, normal.normalize(), surface);
 }
 
 function spawnTracer(origin: THREE.Vector3, direction: THREE.Vector3, distance: number, color: number): void {
@@ -1306,7 +1345,7 @@ function updatePhysics(dt: number): void {
   cameraHeightOffset = damp(cameraHeightOffset, 0, prone ? 9 : 15, dt);
   const lateralSpeed = player.velocity.dot(right) / Math.max(1, profile.maxSpeed);
   cameraRoll = damp(cameraRoll, -lateralSpeed * (adsHeld ? 0.006 : 0.016), 11, dt);
-  weaponView.update({
+  const weaponActionEvents = weaponView.update({
     dt,
     moving,
     sprinting: currentSprinting,
@@ -1317,6 +1356,11 @@ function updatePhysics(dt: number): void {
     landingImpulse,
     lateralSpeed,
   });
+  for (const event of weaponActionEvents) {
+    audio.weaponAction(player.weapon, event);
+    weaponActionHistory.push(event);
+  }
+  if (weaponActionHistory.length > 16) weaponActionHistory.splice(0, weaponActionHistory.length - 16);
   camera.fov = damp(camera.fov, adsHeld ? Math.max(55, preferredFov - 20) : currentSprinting ? preferredFov + 4.5 : preferredFov, 10, dt);
   camera.updateProjectionMatrix();
   camera.position.copy(player.position);
@@ -1721,6 +1765,7 @@ function frame(now: number): void {
     updateTargets(now);
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
+    impactPresentation.update(frameDt);
     updateRemotes(frameDt, now);
     updateHud(now);
     if (!debugRenderPaused) renderer.render(scene, camera);
@@ -1773,8 +1818,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       position: remote.target.toArray(),
     })),
     grenades: grenades.length,
+    activeImpactParticles: impactPresentation.activeParticles(),
     originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
     weaponReady: weaponView.isReady(),
+    weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
     render: {
       calls: renderer.info.render.calls,
@@ -1869,7 +1916,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Layered Build Pass 04 ready — bounded solo rival and articulated procedural weapon rigs active.');
+  setStatus('Combat & World Art Pass 05 ready — synchronized reload actions, surface impacts and compact arena dressing active.');
   requestAnimationFrame(frame);
 }
 

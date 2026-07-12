@@ -1,3 +1,5 @@
+import type { ImpactSurface } from './combat-feedback';
+import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 
 type NoiseOptions = {
@@ -20,6 +22,7 @@ export class ArenaAudio {
   private noiseBuffer: AudioBuffer | null = null;
   private stepVariant = 0;
   private ambienceStarted = false;
+  private lastNearMissAt = -10_000;
 
   unlock(): void {
     if (!this.context) {
@@ -73,10 +76,10 @@ export class ArenaAudio {
     if (!this.context || !this.weapons) return;
     const attenuation = remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
     const profile = weapon === 'scattergun'
-      ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900 }
+      ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
       : weapon === 'smg'
-        ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600 }
-        : { body: 116, bodyEnd: 46, duration: 0.13, crack: 1750, noise: 0.23, lowpass: 2900 };
+        ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
+        : { body: 116, bodyEnd: 46, duration: 0.13, crack: 1750, noise: 0.23, lowpass: 2900, tail: 560, tailDuration: 0.19 };
 
     this.sweep(profile.body, profile.bodyEnd, profile.duration, 0.22 * attenuation, 'sawtooth', this.weapons);
     this.sweep(profile.crack, profile.crack * 0.38, 0.035, 0.075 * attenuation, 'square', this.weapons);
@@ -94,6 +97,14 @@ export class ArenaAudio {
       frequency: weapon === 'scattergun' ? 1400 : 2400,
       q: 0.4,
     }, this.weapons);
+    this.noise({
+      duration: profile.tailDuration,
+      volume: (remote ? 0.055 : 0.082) * attenuation,
+      filter: 'bandpass',
+      frequency: profile.tail,
+      q: 0.48,
+      delay: 0.025,
+    }, this.ambience);
 
     if (!remote) {
       const mechanismDelay = weapon === 'scattergun' ? 0.21 : 0.055;
@@ -118,10 +129,47 @@ export class ArenaAudio {
     this.sweep(110, 72, 0.14, 0.055, 'sine', this.feedback);
   }
 
-  coverImpact(distance = 0): void {
+  impact(surface: ImpactSurface, distance = 0): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
-    this.noise({ duration: 0.045, volume: 0.075 * attenuation, filter: 'bandpass', frequency: 1850, q: 1.5 }, this.feedback);
-    this.tone(420, 0.024, 0.028 * attenuation, 'triangle', this.feedback, 0.006);
+    const profile = surface === 'metal'
+      ? { frequency: 3150, tone: 960, duration: 0.065, volume: 0.09 }
+      : surface === 'wood'
+        ? { frequency: 980, tone: 240, duration: 0.075, volume: 0.07 }
+        : surface === 'soil'
+          ? { frequency: 460, tone: 120, duration: 0.09, volume: 0.062 }
+          : { frequency: 1780, tone: 410, duration: 0.07, volume: 0.076 };
+    this.noise({ duration: profile.duration, volume: profile.volume * attenuation, filter: 'bandpass', frequency: profile.frequency, q: 1.25 }, this.feedback);
+    this.tone(profile.tone, 0.028, 0.03 * attenuation, surface === 'metal' ? 'square' : 'triangle', this.feedback, 0.006);
+  }
+
+  coverImpact(distance = 0): void {
+    this.impact('concrete', distance);
+  }
+
+  nearMiss(strength: number): void {
+    const now = performance.now();
+    if (strength <= 0 || now - this.lastNearMissAt < 85) return;
+    this.lastNearMissAt = now;
+    const level = Math.min(1, Math.max(0.1, strength));
+    this.sweep(5200, 1350, 0.085, 0.055 * level, 'sawtooth', this.feedback);
+    this.noise({ duration: 0.11, volume: 0.045 * level, filter: 'highpass', frequency: 2600, q: 0.85, delay: 0.008 }, this.feedback);
+  }
+
+  weaponAction(weapon: WeaponId, event: WeaponActionEvent): void {
+    const scattergun = weapon === 'scattergun';
+    if (event === 'mag-release') this.tone(620, 0.018, 0.028, 'square', this.feedback);
+    else if (event === 'mag-out') this.noise({ duration: 0.055, volume: 0.032, filter: 'bandpass', frequency: 1050, q: 0.9 }, this.feedback);
+    else if (event === 'mag-in') this.noise({ duration: 0.06, volume: 0.038, filter: 'bandpass', frequency: 1320, q: 1.1 }, this.feedback);
+    else if (event === 'mag-seat') {
+      this.tone(weapon === 'smg' ? 470 : 390, 0.035, 0.052, 'square', this.feedback);
+      this.noise({ duration: 0.025, volume: 0.028, filter: 'highpass', frequency: 2400, q: 0.8 }, this.feedback);
+    } else if (event === 'shell-insert') {
+      this.tone(740, 0.02, 0.034, 'triangle', this.feedback);
+      this.tone(260, 0.028, 0.03, 'square', this.feedback, 0.015);
+    } else if (event === 'bolt-release') {
+      this.tone(scattergun ? 310 : 520, 0.034, 0.055, 'square', this.feedback);
+      this.noise({ duration: 0.032, volume: 0.036, filter: 'highpass', frequency: scattergun ? 1200 : 1900, q: 0.75 }, this.feedback);
+    }
   }
 
   empty(): void {
@@ -130,10 +178,9 @@ export class ArenaAudio {
   }
 
   reload(): void {
-    this.noise({ duration: 0.045, volume: 0.032, filter: 'highpass', frequency: 2200 }, this.feedback);
-    this.tone(250, 0.035, 0.04, 'square', this.feedback, 0.015);
-    this.tone(390, 0.05, 0.045, 'triangle', this.feedback, 0.19);
-    this.noise({ duration: 0.028, volume: 0.025, filter: 'bandpass', frequency: 3100, delay: 0.24 }, this.feedback);
+    // Only the initial handling sound lives here; mechanical events are emitted
+    // from the same normalized timeline that drives hands and weapon parts.
+    this.noise({ duration: 0.07, volume: 0.026, filter: 'bandpass', frequency: 720, q: 0.7 }, this.feedback);
   }
 
   weaponSwitch(): void {

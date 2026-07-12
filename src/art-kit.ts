@@ -192,7 +192,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     part(root, roundedBox('receiver-accent', [0.2, 0.045, 0.42], accent, 0.018), [0, 0.09, -0.17]);
     part(root, roundedBox('angled-stock', [0.15, 0.19, 0.36], rubber, 0.045), [0, -0.015, 0.33], [-0.08, 0, 0]);
     part(root, roundedBox('grip', [0.105, 0.25, 0.13], rubber, 0.025), [0, -0.18, 0.06], [-0.18, 0, 0]);
-    part(root, roundedBox('curved-magazine', [0.115, 0.34, 0.15], dark, 0.035), [0, -0.24, -0.17], [0.16, 0, 0]);
+    const magazine = part(root, roundedBox('curved-magazine', [0.115, 0.34, 0.15], dark, 0.035), [0, -0.24, -0.17], [0.16, 0, 0]);
+    addSocket('reload-socket-l', [-0.13, -0.08, 0.02], magazine);
     part(root, roundedBox('triangular-fore-end', [0.17, 0.14, 0.38], metal, 0.03), [0, -0.01, -0.56]);
     for (const z of [-0.68, -0.58, -0.48]) part(root, roundedBox('fore-end-vent', [0.19, 0.035, 0.045], accent, 0.01), [0, 0.055, z]);
     addBarrel(0.46, -0.93, 0.032);
@@ -214,7 +215,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
       vent.rotation.y = Math.PI / 2; vent.position.set(0.116, 0.01, z); root.add(vent);
     }
     part(root, roundedBox('raked-grip', [0.11, 0.25, 0.13], rubber, 0.025), [0, -0.18, 0.01], [-0.24, 0, 0]);
-    part(root, roundedBox('straight-magazine', [0.13, 0.3, 0.14], dark, 0.025), [0, -0.26, -0.1], [-0.08, 0, 0]);
+    const magazine = part(root, roundedBox('straight-magazine', [0.13, 0.3, 0.14], dark, 0.025), [0, -0.26, -0.1], [-0.08, 0, 0]);
+    addSocket('reload-socket-l', [-0.14, -0.08, 0.02], magazine);
     for (const x of [-0.065, 0.065]) {
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 8), dark);
       part(root, rod, [x, 0.015, 0.35], [Math.PI / 2, 0, 0]);
@@ -243,6 +245,13 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     const bead = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), accent);
     bead.position.set(0, 0.215, -1.11); root.add(bead);
     part(root, roundedBox('rear-ring', [0.09, 0.055, 0.025], dark, 0.01), [0, 0.2, 0.11]);
+    const reloadShell = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.105, 8), new THREE.MeshStandardMaterial({ color: 0xb43f32, roughness: 0.58, metalness: 0.18 }));
+    reloadShell.name = 'reload-shell';
+    reloadShell.rotation.z = Math.PI / 2;
+    reloadShell.position.set(-0.16, -0.13, -0.02);
+    reloadShell.visible = false;
+    root.add(reloadShell);
+    addSocket('reload-socket-l', [-0.18, -0.14, 0.02]);
     addSocket('muzzle-socket', [0, 0.005, -1.2]);
     addSocket('eject-socket', [0.14, 0.045, -0.03]);
     addSocket('grip-socket-r', [0.03, -0.14, 0.12]);

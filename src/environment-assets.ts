@@ -34,7 +34,7 @@ function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
     [1.45, 5.8, 0.65, 1.0, 0.82, 0.95], [0.05, 6.95, 0, 1.1, 0.95, 1.0], [0, 4.7, 1.05, 1.25, 0.9, 1.0],
   ];
   clusters.forEach(([ox, oy, oz, rx, ry, rz], index) => {
-    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(scale, 2), leafMaterials[index % leafMaterials.length]);
+    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(scale, 1), leafMaterials[index % leafMaterials.length]);
     crown.position.set(x + ox * scale, oy * scale, z + oz * scale);
     crown.scale.set(rx, ry, rz);
     crown.rotation.set(index * 0.17, index * 0.43, index * 0.11);
@@ -46,6 +46,10 @@ function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
 function addStreetProps(root: THREE.Group): void {
   const metal = texturedMaterial('./assets/original/textures/painted-metal-teal.png', { roughness: 0.58, metalness: 0.3 });
   const concrete = texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.95, repeatX: 2 });
+  const hydrantRed = new THREE.MeshStandardMaterial({ color: 0xb94d38, roughness: 0.55, metalness: 0.35 });
+  const shrubMaterial = new THREE.MeshStandardMaterial({ color: 0x547747, roughness: 0.96 });
+  const shrubGeometry = new THREE.IcosahedronGeometry(0.54, 1);
+  const lampGlow = new THREE.MeshStandardMaterial({ color: 0xffe5b5, emissive: 0xffb45b, emissiveIntensity: 2.4, roughness: 0.45 });
   for (const [x, z, rotation] of [
     [-13, -17, 0.2], [15, 19, Math.PI], [-28, 9, Math.PI / 2], [27, -11, -Math.PI / 2],
   ] as Array<[number, number, number]>) {
@@ -57,17 +61,28 @@ function addStreetProps(root: THREE.Group): void {
   }
   for (const [x, z] of [[-9, 15], [10, -18], [-29, -2], [29, 4]] as Array<[number, number]>) {
     const hydrant = new THREE.Group(); hydrant.position.set(x, 0, z);
-    const red = new THREE.MeshStandardMaterial({ color: 0xb94d38, roughness: 0.55, metalness: 0.35 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 16), red); body.position.y = 0.45; body.castShadow = true;
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), red); cap.position.y = 0.9;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 12), hydrantRed); body.position.y = 0.45; body.castShadow = true;
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hydrantRed); cap.position.y = 0.9;
     hydrant.add(body, cap); root.add(hydrant);
   }
   for (const [x, z] of [[-18, 10], [20, -12], [-22, -24], [22, 25]] as Array<[number, number]>) {
     const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
     for (const offset of [-0.6, 0, 0.6]) {
-      const shrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.54, 2), new THREE.MeshStandardMaterial({ color: 0x547747, roughness: 0.96 }));
-      shrub.position.set(x + offset, 0.88, z); shrub.castShadow = true; root.add(shrub);
+      const shrub = new THREE.Mesh(shrubGeometry, shrubMaterial);
+      shrub.position.set(x + offset, 0.92 + (offset === 0 ? 0.08 : 0), z);
+      shrub.scale.set(1, offset === 0 ? 1.15 : 0.86, 0.82);
+      shrub.rotation.y = offset * 1.7;
+      shrub.castShadow = true; root.add(shrub);
     }
+  }
+  for (const [x, z] of [[-13, -16], [13, 16], [-13, 22], [13, -22]] as Array<[number, number]>) {
+    const direction = x < 0 ? 1 : -1;
+    const arm = roundedBox('streetlamp-arm', [1.15, 0.14, 0.14], metal, 0.035, 2);
+    arm.position.set(x + direction * 0.5, 5.45, z); decorative(arm); root.add(arm);
+    const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.19, 0.2, 10), metal);
+    hood.position.set(x + direction, 5.3, z); decorative(hood); root.add(hood);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.08, 10), lampGlow);
+    lens.position.set(x + direction, 5.18, z); decorative(lens); root.add(lens);
   }
 }
 
@@ -313,7 +328,14 @@ function addRouteArchitecture(root: THREE.Group): void {
   const concrete = texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.9, repeatX: 2, repeatY: 4 });
   const glass = new THREE.MeshPhysicalMaterial({ color: 0x7fc6c3, transparent: true, opacity: 0.32, roughness: 0.18, metalness: 0.08, depthWrite: false });
   const solar = new THREE.MeshStandardMaterial({ color: 0x173d58, emissive: 0x071d2c, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.72 });
+  const vineMaterial = new THREE.MeshStandardMaterial({ color: 0x496f47, roughness: 0.96 });
+  const vineGeometry = new THREE.IcosahedronGeometry(0.46, 1);
   const routeBox = (name: string, size: [number, number, number], material: THREE.Material, radius: number) => roundedBox(name, size, material, radius, 2);
+  const routePanel = (name: string, size: [number, number, number], material: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.name = name;
+    return mesh;
+  };
 
   // West "skyline garden" route: a folded trellis reveal leading into a framed greenhouse.
   for (const x of [-29, -22]) for (const z of [-15, -5]) {
@@ -327,6 +349,17 @@ function addRouteArchitecture(root: THREE.Group): void {
   for (const x of [-28.5, -27, -25.5, -24, -22.5]) {
     const slat = routeBox('trellis-slat', [0.18, 0.16, 10.8], trim, 0.04);
     slat.position.set(x, 4.08, -10); decorative(slat); root.add(slat);
+  }
+  for (const [x, y, z, scale] of [
+    [-28.7, 4.08, -14.2, 1.05], [-27.1, 4.16, -12.1, 0.82], [-25.5, 4.1, -9.5, 1.1],
+    [-23.7, 4.05, -6.4, 0.9], [-22.35, 3.92, -13.7, 0.78], [-27.8, 3.98, -6.1, 0.84],
+  ] as Array<[number, number, number, number]>) {
+    const vine = new THREE.Mesh(vineGeometry, vineMaterial);
+    vine.name = 'trellis-vine-cluster';
+    vine.position.set(x, y, z);
+    vine.scale.set(scale * 1.3, scale * 0.52, scale * 1.45);
+    vine.rotation.set(x * 0.07, z * 0.11, y * 0.09);
+    decorative(vine); root.add(vine);
   }
 
   for (const [x, z, sx, sz] of [
@@ -369,13 +402,26 @@ function addRouteArchitecture(root: THREE.Group): void {
     seam.position.set(x, 4.66 + (26 - x) * 0.08, -16); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
   }
 
-  // Turn anonymous cover cubes into authored modular test barriers.
+  // Layered modular lane barriers retain the exact invisible gameplay box while losing the blockout-cube silhouette.
   COVER_LAYOUT.forEach(([x, z, width, depth], index) => {
     const cap = routeBox('barrier-cap', [width + 0.18, 0.16, depth + 0.18], index % 2 ? trim : frame, 0.05);
     cap.position.set(x, 1.58, z); decorative(cap); root.add(cap);
     for (const side of [-1, 1]) {
       const rib = routeBox('barrier-rib', [0.12, 1.18, depth + 0.1], frame, 0.03);
       rib.position.set(x + side * (width / 2 - 0.18), 0.78, z); decorative(rib); root.add(rib);
+      const foot = routePanel('barrier-foot', [0.48, 0.14, depth + 0.34], frame);
+      foot.position.set(x + side * (width / 2 - 0.34), 0.08, z); decorative(foot); root.add(foot);
+    }
+    for (const face of [-1, 1]) {
+      const faceZ = z + face * (depth / 2 + 0.035);
+      const panel = routePanel('barrier-recessed-panel', [Math.max(0.7, width - 0.48), 0.92, 0.07], frame);
+      panel.position.set(x, 0.78, faceZ); decorative(panel); root.add(panel);
+      for (const side of [-1, 1]) {
+        const warning = routePanel('barrier-warning-stripe', [Math.max(0.42, width * 0.29), 0.13, 0.075], trim);
+        warning.position.set(x + side * width * 0.21, 0.8, faceZ + face * 0.006);
+        warning.rotation.z = side * 0.48;
+        decorative(warning); root.add(warning);
+      }
     }
   });
 }

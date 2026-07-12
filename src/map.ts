@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { texturedMaterial } from './art-kit';
 import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
+import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
 import { Team } from './protocol';
 
@@ -53,6 +54,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   ): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
     mesh.name = name;
+    mesh.userData.impactSurface = classifyImpactSurface({
+      name,
+      metalness: mat instanceof THREE.MeshStandardMaterial ? mat.metalness : undefined,
+    });
     mesh.position.set(...position);
     mesh.castShadow = cast;
     mesh.receiveShadow = true;
@@ -80,13 +85,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(86, 98), palette.grass);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
+  ground.userData.impactSurface = 'soil';
   world.add(ground);
+  raycastMeshes.push(ground);
 
   const road = new THREE.Mesh(new THREE.PlaneGeometry(19, 88), palette.road);
+  road.name = 'aged asphalt road';
   road.rotation.x = -Math.PI / 2;
   road.position.y = 0.025;
   road.receiveShadow = true;
+  road.userData.impactSurface = 'concrete';
   world.add(road);
+  raycastMeshes.push(road);
   for (const x of [-10.25, 10.25]) box('curb', [x, 0.12, 0], [1.4, 0.24, 88], palette.concrete, false, false);
   for (const x of [-12.6, 12.6]) box('sidewalk', [x, 0.07, 0], [3.2, 0.14, 88], palette.concrete, false, false);
   for (let z = -38; z <= 38; z += 8) box('lane marker', [0, 0.055, z], [0.18, 0.03, 3.6], palette.mustard, false, false);

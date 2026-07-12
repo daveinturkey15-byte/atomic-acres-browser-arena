@@ -22,8 +22,10 @@ type DebugState = {
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
+  activeImpactParticles: number;
   originalArtLoaded: boolean;
   weaponReady: boolean;
+  weaponActionHistory: string[];
   menuVisible: boolean;
   render: { calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean };
 };
@@ -174,6 +176,7 @@ test.describe('solo mechanics', () => {
     await page.waitForTimeout(120);
     const fired = await debug(page);
     expect(fired.player.ammo).toBeLessThan(before.player.ammo);
+    expect(fired.activeImpactParticles).toBeGreaterThan(0);
 
     await page.keyboard.press('Digit2');
     await page.waitForTimeout(450);
@@ -187,6 +190,7 @@ test.describe('solo mechanics', () => {
     const afterReload = await debug(page);
     expect(afterReload.player.ammo).toBeGreaterThan(beforeReload.player.ammo);
     expect(afterReload.player.reserve).toBeLessThan(beforeReload.player.reserve);
+    expect(afterReload.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
   });
 
   test('throws one frag, consumes inventory and resolves the fuse', async ({ page }) => {
