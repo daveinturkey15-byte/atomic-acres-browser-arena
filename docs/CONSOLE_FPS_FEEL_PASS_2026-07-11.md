@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-11  
 **Branch:** `overhaul/console-fps-feel-pass`  
-**Status:** implementation candidate; the existing public preview remains unchanged until Dave approves a verified replacement.
+**Status:** deployed to the canonical GitHub Pages site on 2026-07-12 after Dave approved publication.
 
 ## Product target
 
@@ -114,7 +114,11 @@ A green verifier proves only these checks. It is not a claim of feature parity w
 - Local release capture: passed with no console errors and fresh full-quality menu/gameplay screenshots.
 - Two-page PeerJS smoke: host and guest each reported one remote; no errors.
 - Full-quality diagnostic capture: 287 draw calls / 392,560 triangles. This is above the compatibility budget but is an intentional richer desktop presentation; compatibility mode remains the performance-gated path.
-- The live GitHub Pages preview remains on the earlier stable revision and was not changed.
+- Canonical source revision: `c74551d4b5cbd69b0725ee9499d969959b125427` on `overhaul/console-fps-feel-pass`.
+- Canonical Pages revision: `33305ec4747cf1657a0e6caed4c66061402598d8`; GitHub Pages reported `built`.
+- Live URL: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/
+- Cache-busted public release capture passed with zero console errors. Public two-page PeerJS QA passed with one remote on host and guest.
+- The constrained compatibility path uses a `0.2` internal pixel ratio to retain margin above the unchanged 40-FPS gate; normal public play keeps the full-quality device-pixel-ratio path.
 
 ### Honest limitations
 
