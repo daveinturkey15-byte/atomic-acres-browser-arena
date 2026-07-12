@@ -3,6 +3,9 @@ import type { WeaponId } from './protocol';
 export type HitZone = 'head' | 'body' | 'limb';
 export type Stance = 'stand' | 'crouch' | 'prone';
 
+/** Solo bots deal half of the equivalent player-weapon damage. */
+export const BOT_DAMAGE_MULTIPLIER = 0.5;
+
 export type WeaponSpec = {
   id: WeaponId;
   name: string;

@@ -5,6 +5,7 @@ import { chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
 import { damp, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
+  BOT_DAMAGE_MULTIPLIER,
   WEAPONS,
   advanceMatch,
   applyRadialDeadzone,
@@ -939,7 +940,7 @@ function updateBots(dt: number, now: number): void {
       }
       audio.shot('carbine', true);
       if (resolution.hitTarget) {
-        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * 0.62;
+        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * BOT_DAMAGE_MULTIPLIER;
         applyDamage(damage, bot.id);
         if (!player.alive) {
           bot.kills += 1;
