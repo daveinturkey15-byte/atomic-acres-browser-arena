@@ -113,3 +113,14 @@ A green result is evidence for these gates only. It is not a claim of AAA parity
 ## Honest remaining limitations
 
 This is still an original browser/procedural arena, not a native AAA engine or a literal recreation of another game. It does not copy maps, assets, audio, UI, code, animation data, or branding. Remaining limits include stylised procedural environment geometry, no skeletal prone animation, no killcam, no mobile/touch support, and synthesized Web Audio rather than recorded weapon libraries. Those limits are not represented as bugs fixed by automated tests.
+
+## Isolated HTTPS review deployment
+
+- Review URL: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass03/?release=0b4d662>
+- Source branch/revision: `overhaul/tactical-feel-pass-03` at `6d192e2d890321206904d336a1b1161df70f9d23`.
+- Pages revision: `0b4d66297292feccd109f3569ab2a05504bc3ee6`; GitHub Pages API status `built`.
+- Review bundle: `assets/index-DZUrMLdw.js`; review stylesheet: `assets/index-CMzxS9np.css`.
+- Canonical root remained on the prior `assets/index-OlmsQh-U.js` Pass 02 bundle and returned HTTP 200.
+- Public full-quality release QA passed with zero console errors.
+- Public two-page QA passed with prone replication, one remote per peer, and 29.1548 m spawn separation.
+- A 1280×580 public-menu inspection exposed hidden below-fold controls; a short-height desktop layout was added, locally rechecked, and included in the final review revision. The final menu visibly includes `Z/CTRL prone` without hidden scrolling.
