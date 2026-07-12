@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { circleIntersectsBox, damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { circleIntersectsBox, damp, firstSegmentBoxHit, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 
 const wall = { minX: 1, maxX: 3, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
 const bounds = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
@@ -33,10 +33,46 @@ describe('arena collision', () => {
     expect(result.z).toBe(-9.5);
   });
 
-  it('checks line of sight against solid boxes without mesh raycasts', () => {
+  it('checks line of sight against solid boxes in all three dimensions', () => {
     expect(segmentIntersectsBox({ x: 0, y: 1.7, z: 0 }, { x: 4, y: 1.7, z: 0 }, wall)).toBe(true);
     expect(segmentIntersectsBox({ x: 0, y: 1.7, z: 3 }, { x: 4, y: 1.7, z: 3 }, wall)).toBe(false);
     expect(segmentIntersectsBox({ x: 0, y: 5, z: 0 }, { x: 4, y: 5, z: 0 }, wall)).toBe(false);
+    expect(segmentIntersectsBox({ x: 0, y: 8, z: 0 }, { x: 4, y: 0, z: 0 }, wall)).toBe(true);
+    expect(segmentIntersectsBox({ x: 0, y: 8, z: 0 }, { x: 4, y: 4, z: 0 }, wall)).toBe(false);
+  });
+
+  it('returns the nearest authoritative cover hit for tracer clipping', () => {
+    const nearWall = { minX: 1, maxX: 1.4, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
+    const farWall = { minX: 3, maxX: 3.4, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
+    const hit = firstSegmentBoxHit({ x: 0, y: 1.5, z: 0 }, { x: 5, y: 1.5, z: 0 }, [farWall, nearWall]);
+    expect(hit?.box).toBe(nearWall);
+    expect(hit?.time).toBeCloseTo(0.196, 3);
+  });
+
+  it('stops a bot hitscan at cover and never authorizes damage through it', () => {
+    const fence = { minX: 2, maxX: 2.4, minZ: -1, maxZ: 1, minY: 0, maxY: 3 };
+    const blocked = resolveHitscanAgainstTarget(
+      { x: 0, y: 1.4, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      8,
+      { x: 4, y: 1.4, z: 0 },
+      0.55,
+      [fence],
+    );
+    expect(blocked.blockedByCover).toBe(true);
+    expect(blocked.hitTarget).toBe(false);
+    expect(blocked.tracerDistance).toBeCloseTo(1.98, 2);
+
+    const clear = resolveHitscanAgainstTarget(
+      { x: 0, y: 1.4, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      8,
+      { x: 4, y: 1.4, z: 0 },
+      0.55,
+      [],
+    );
+    expect(clear.blockedByCover).toBe(false);
+    expect(clear.hitTarget).toBe(true);
   });
 
   it('sweeps fast grenades into thin walls instead of tunnelling through', () => {

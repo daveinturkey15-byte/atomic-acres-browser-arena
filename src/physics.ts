@@ -1,9 +1,14 @@
 import type * as RapierTypes from '@dimforge/rapier3d-compat';
 import type { Box2, Point3 } from './collision';
+import type { Stance } from './gameplay';
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_HALF_HEIGHT = 0.53;
-const EYE_FROM_CENTER = 0.72;
+const STANCE_SHAPES: Record<Stance, { halfHeight: number; radius: number; eyeFromCenter: number }> = {
+  stand: { halfHeight: PLAYER_HALF_HEIGHT, radius: PLAYER_RADIUS, eyeFromCenter: 0.79 },
+  crouch: { halfHeight: 0.22, radius: 0.36, eyeFromCenter: 0.58 },
+  prone: { halfHeight: 0.04, radius: 0.31, eyeFromCenter: 0.15 },
+};
 
 export type CharacterMoveResult = {
   position: Point3;
@@ -20,8 +25,14 @@ export class CharacterPhysics {
   private readonly body: RapierTypes.RigidBody;
   private readonly collider: RapierTypes.Collider;
   private readonly controller: RapierTypes.KinematicCharacterController;
+  private stance: Stance = 'stand';
 
-  private constructor(world: RapierTypes.World, body: RapierTypes.RigidBody, collider: RapierTypes.Collider) {
+  private constructor(
+    world: RapierTypes.World,
+    body: RapierTypes.RigidBody,
+    collider: RapierTypes.Collider,
+    private readonly makeCapsule: (halfHeight: number, radius: number) => RapierTypes.Shape,
+  ) {
     this.world = world;
     this.body = body;
     this.collider = collider;
@@ -88,14 +99,15 @@ export class CharacterPhysics {
         .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL),
       body,
     );
-    const physics = new CharacterPhysics(world, body, collider);
+    const physics = new CharacterPhysics(world, body, collider, (halfHeight, radius) => new RAPIER.Capsule(halfHeight, radius));
     physics.teleportEye({ x: 0, y: 1.7, z: 0 });
     return physics;
   }
 
   teleportEye(position: Point3): void {
+    const eyeFromCenter = STANCE_SHAPES[this.stance].eyeFromCenter;
     this.body.setTranslation(
-      { x: position.x, y: position.y - EYE_FROM_CENTER, z: position.z },
+      { x: position.x, y: position.y - eyeFromCenter, z: position.z },
       true,
     );
     this.world.propagateModifiedBodyPositionsToColliders();
@@ -103,7 +115,46 @@ export class CharacterPhysics {
 
   eyePosition(): Point3 {
     const position = this.body.translation();
-    return { x: position.x, y: position.y + EYE_FROM_CENTER, z: position.z };
+    return { x: position.x, y: position.y + STANCE_SHAPES[this.stance].eyeFromCenter, z: position.z };
+  }
+
+  /** Changes the real player collider while preserving foot position. Raising fails under hard cover. */
+  setStance(next: Stance): boolean {
+    if (next === this.stance) return true;
+    const currentShape = STANCE_SHAPES[this.stance];
+    const nextShape = STANCE_SHAPES[next];
+    const current = this.body.translation();
+    const currentExtent = currentShape.halfHeight + currentShape.radius;
+    const nextExtent = nextShape.halfHeight + nextShape.radius;
+    const footY = current.y - currentExtent;
+    const candidate = { x: current.x, y: footY + nextExtent, z: current.z };
+    const shape = this.makeCapsule(nextShape.halfHeight, nextShape.radius);
+
+    if (nextExtent > currentExtent) {
+      let blocked = false;
+      this.world.intersectionsWithShape(
+        candidate,
+        { x: 0, y: 0, z: 0, w: 1 },
+        shape,
+        () => { blocked = true; return false; },
+        undefined,
+        undefined,
+        this.collider,
+      );
+      if (blocked) return false;
+    }
+
+    this.collider.setShape(shape);
+    this.body.setTranslation(candidate, true);
+    this.world.propagateModifiedBodyPositionsToColliders();
+    this.stance = next;
+    if (next === 'prone') this.controller.disableAutostep();
+    else this.controller.enableAutostep(0.42, 0.22, false);
+    return true;
+  }
+
+  currentStance(): Stance {
+    return this.stance;
   }
 
   move(desiredDelta: Point3, dt: number): CharacterMoveResult {

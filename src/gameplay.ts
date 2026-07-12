@@ -1,6 +1,7 @@
 import type { WeaponId } from './protocol';
 
 export type HitZone = 'head' | 'body' | 'limb';
+export type Stance = 'stand' | 'crouch' | 'prone';
 
 export type WeaponSpec = {
   id: WeaponId;
@@ -62,6 +63,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
 
 export type MovementContext = {
   crouched: boolean;
+  prone?: boolean;
   ads: boolean;
   sprinting: boolean;
   grounded: boolean;
@@ -77,14 +79,15 @@ export type MovementProfile = {
 };
 
 export function movementProfile(context: MovementContext): MovementProfile {
-  const maxSpeed = context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15;
-  const groundAcceleration = context.crouched ? 36 : context.sprinting ? 54 : context.ads ? 40 : 48;
+  const prone = context.prone === true;
+  const maxSpeed = prone ? 1.55 : context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15;
+  const groundAcceleration = prone ? 17 : context.crouched ? 36 : context.sprinting ? 54 : context.ads ? 40 : 48;
   return {
     maxSpeed,
     acceleration: context.grounded ? groundAcceleration : 10.5,
-    deceleration: context.grounded ? (context.crouched ? 42 : 62) : 2.4,
+    deceleration: context.grounded ? (prone ? 25 : context.crouched ? 42 : 62) : 2.4,
     friction: context.grounded ? 0 : 0.25,
-    eyeHeight: context.crouched ? 1.16 : 1.7,
+    eyeHeight: prone ? 0.5 : context.crouched ? 1.16 : 1.7,
     jumpVelocity: 6.35,
   };
 }
@@ -115,8 +118,19 @@ export function integrateHorizontalVelocity(
   };
 }
 
-export function sprintEligible(forwardInput: number, strafeInput: number, ads: boolean, crouched: boolean): boolean {
-  return !ads && !crouched && forwardInput > 0.45 && Math.abs(strafeInput) < 0.92;
+export function sprintEligible(forwardInput: number, strafeInput: number, ads: boolean, crouched: boolean, prone = false): boolean {
+  return !ads && !crouched && !prone && forwardInput > 0.45 && Math.abs(strafeInput) < 0.92;
+}
+
+export type StanceAction = 'toggle-crouch' | 'toggle-prone' | 'stand';
+
+/** Pure stance intent reducer; physical clearance is verified by CharacterPhysics before the change is accepted. */
+export function nextStance(current: Stance, action: StanceAction): Stance {
+  if (action === 'stand') return 'stand';
+  if (action === 'toggle-prone') return current === 'prone' ? 'stand' : 'prone';
+  if (current === 'stand') return 'crouch';
+  if (current === 'crouch') return 'stand';
+  return 'crouch';
 }
 
 export function mouseSensitivityMultiplier(ads: boolean, sprinting: boolean): number {
@@ -134,6 +148,7 @@ export type SpreadContext = {
   ads: boolean;
   moving: boolean;
   crouched: boolean;
+  prone?: boolean;
   sustainedShots: number;
 };
 
@@ -142,6 +157,7 @@ export function computeSpread(weapon: WeaponSpec, context: SpreadContext): numbe
   if (context.ads) spread *= weapon.adsSpreadMultiplier;
   if (context.moving) spread *= weapon.movementSpreadMultiplier;
   if (context.crouched) spread *= weapon.crouchSpreadMultiplier;
+  if (context.prone) spread *= 0.62;
   spread += Math.max(0, context.sustainedShots) * weapon.sustainedSpreadPerShot;
   return Math.min(weapon.maximumSpread, spread);
 }

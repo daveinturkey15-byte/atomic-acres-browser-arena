@@ -118,6 +118,12 @@ export class ArenaAudio {
     this.sweep(110, 72, 0.14, 0.055, 'sine', this.feedback);
   }
 
+  coverImpact(distance = 0): void {
+    const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
+    this.noise({ duration: 0.045, volume: 0.075 * attenuation, filter: 'bandpass', frequency: 1850, q: 1.5 }, this.feedback);
+    this.tone(420, 0.024, 0.028 * attenuation, 'triangle', this.feedback, 0.006);
+  }
+
   empty(): void {
     this.tone(170, 0.025, 0.055, 'square', this.feedback);
     this.tone(112, 0.035, 0.04, 'triangle', this.feedback, 0.03);

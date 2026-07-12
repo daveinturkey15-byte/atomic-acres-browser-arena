@@ -11,12 +11,16 @@ type DebugState = {
     weapon: string;
     ammo: number;
     reserve: number;
+    stance: 'stand' | 'crouch' | 'prone';
     crouched: boolean;
+    prone: boolean;
     sprinting: boolean;
     grenades: number;
     position: number[];
   };
   bots: Array<{ id: string; hp: number; alive: boolean; kills: number; position: number[] }>;
+  remotes: number;
+  remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
   originalArtLoaded: boolean;
   weaponReady: boolean;
@@ -68,6 +72,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('.controls')).toContainText('crouch');
+    await expect(page.locator('.controls')).toContainText('prone');
     await expect(page.locator('.controls')).toContainText('melee');
     await expect(page.locator('.controls')).toContainText('frag');
   });
@@ -94,7 +99,7 @@ test.describe('solo mechanics', () => {
     expect(moved).toBe(true);
   });
 
-  test('walk, sprint and crouch alter live player state', async ({ page }) => {
+  test('walk, sprint, crouch and prone alter the real player stance', async ({ page }) => {
     const before = await debug(page);
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(650);
@@ -112,8 +117,25 @@ test.describe('solo mechanics', () => {
 
     await page.keyboard.down('KeyC');
     await page.waitForTimeout(120);
-    expect((await debug(page)).player.crouched).toBe(true);
+    const crouched = await debug(page);
+    expect(crouched.player.crouched).toBe(true);
     await page.keyboard.up('KeyC');
+
+    await page.keyboard.press('KeyZ');
+    await page.waitForTimeout(180);
+    const prone = await debug(page);
+    expect(prone.player.stance).toBe('prone');
+    expect(prone.player.prone).toBe(true);
+    expect(prone.player.position[1]).toBeLessThan(crouched.player.position[1] - 0.45);
+
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('ShiftLeft');
+    await page.waitForTimeout(180);
+    const recovered = await debug(page);
+    expect(recovered.player.stance).toBe('stand');
+    expect(recovered.player.sprinting).toBe(true);
+    await page.keyboard.up('ShiftLeft');
+    await page.keyboard.up('KeyW');
   });
 
   test('fires, switches weapon and completes a staged reload', async ({ page }) => {
@@ -162,6 +184,7 @@ test.describe('solo mechanics', () => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(true));
     await page.waitForTimeout(150);
     await expect(page.locator('#crosshair')).toHaveClass(/ads/);
+    await expect(page.locator('#crosshair i').first()).toHaveCSS('opacity', '0');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(false));
 
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(40));

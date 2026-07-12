@@ -49,4 +49,18 @@ describe('CharacterPhysics', () => {
     expect(position.z).toBeGreaterThan(0.1);
     expect(position.y).toBeGreaterThan(1.82);
   });
+
+  it('uses a real low prone collider and refuses to stand through a ceiling', async () => {
+    const ceiling: Box2 = { minX: -1, maxX: 1, minZ: -1, maxZ: 1, minY: 0.82, maxY: 1.05 };
+    active = await CharacterPhysics.create([ceiling], bounds);
+    active.teleportEye({ x: 2, y: 1.7, z: 0 });
+    expect(active.setStance('prone')).toBe(true);
+    expect(active.eyePosition().y).toBeCloseTo(0.5, 2);
+    for (let frame = 0; frame < 70; frame += 1) {
+      active.move({ x: -0.035, y: -0.01, z: 0 }, 1 / 120);
+    }
+    expect(active.eyePosition().x).toBeLessThan(0.5);
+    expect(active.setStance('stand')).toBe(false);
+    expect(active.currentStance()).toBe('prone');
+  });
 });

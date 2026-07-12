@@ -14,6 +14,7 @@ export type PlayerSnapshot = {
   kills: number;
   deaths: number;
   weapon: WeaponId;
+  stance?: 'stand' | 'crouch' | 'prone';
   seq: number;
 };
 
@@ -48,6 +49,7 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && typeof p.name === 'string' && p.name.length > 0 && p.name.length <= 20
     && (p.team === 0 || p.team === 1)
     && ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'kills', 'deaths', 'seq'].every((key) => Number.isFinite(p[key]))
+    && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
     && weapons.has(p.weapon as WeaponId);
 }
 

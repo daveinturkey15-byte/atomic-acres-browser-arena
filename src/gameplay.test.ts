@@ -14,6 +14,7 @@ import {
   meleeStrike,
   mouseSensitivityMultiplier,
   movementProfile,
+  nextStance,
   recoverRecoilImpulse,
   sampleSpreadDisk,
   sprintEligible,
@@ -21,14 +22,17 @@ import {
 } from './gameplay';
 
 describe('movementProfile', () => {
-  it('orders crouch, ADS, run and sprint speeds coherently', () => {
+  it('orders prone, crouch, ADS, run and sprint speeds coherently', () => {
+    const prone = movementProfile({ crouched: false, prone: true, ads: false, sprinting: false, grounded: true });
     const crouch = movementProfile({ crouched: true, ads: false, sprinting: false, grounded: true });
     const ads = movementProfile({ crouched: false, ads: true, sprinting: false, grounded: true });
     const run = movementProfile({ crouched: false, ads: false, sprinting: false, grounded: true });
     const sprint = movementProfile({ crouched: false, ads: false, sprinting: true, grounded: true });
+    expect(prone.maxSpeed).toBeLessThan(crouch.maxSpeed);
     expect(crouch.maxSpeed).toBeLessThan(ads.maxSpeed);
     expect(ads.maxSpeed).toBeLessThan(run.maxSpeed);
     expect(run.maxSpeed).toBeLessThan(sprint.maxSpeed);
+    expect(prone.eyeHeight).toBeLessThan(crouch.eyeHeight);
     expect(crouch.eyeHeight).toBeLessThan(run.eyeHeight);
     expect(run.deceleration).toBeGreaterThan(run.acceleration);
   });
@@ -59,7 +63,16 @@ describe('console-style movement integration', () => {
     expect(sprintEligible(1, 0.4, false, false)).toBe(true);
     expect(sprintEligible(0, 1, false, false)).toBe(false);
     expect(sprintEligible(1, 0, true, false)).toBe(false);
+    expect(sprintEligible(1, 0, false, false, true)).toBe(false);
     expect(mouseSensitivityMultiplier(true, false)).toBeLessThan(mouseSensitivityMultiplier(false, false));
+  });
+
+  it('reduces stance intents predictably without skipping prone-to-crouch recovery', () => {
+    expect(nextStance('stand', 'toggle-crouch')).toBe('crouch');
+    expect(nextStance('crouch', 'toggle-crouch')).toBe('stand');
+    expect(nextStance('stand', 'toggle-prone')).toBe('prone');
+    expect(nextStance('prone', 'toggle-crouch')).toBe('crouch');
+    expect(nextStance('prone', 'stand')).toBe('stand');
   });
 
   it('removes controller stick drift and preserves full-scale radial intent', () => {
@@ -78,9 +91,11 @@ describe('weapon tuning', () => {
     const stillHip = computeSpread(weapon, { ads: false, moving: false, crouched: false, sustainedShots: 0 });
     const ads = computeSpread(weapon, { ads: true, moving: false, crouched: false, sustainedShots: 0 });
     const crouchedAds = computeSpread(weapon, { ads: true, moving: false, crouched: true, sustainedShots: 0 });
+    const proneAds = computeSpread(weapon, { ads: true, moving: false, crouched: false, prone: true, sustainedShots: 0 });
     const movingBurst = computeSpread(weapon, { ads: false, moving: true, crouched: false, sustainedShots: 7 });
     expect(ads).toBeLessThan(stillHip);
     expect(crouchedAds).toBeLessThan(ads);
+    expect(proneAds).toBeLessThan(ads);
     expect(movingBurst).toBeGreaterThan(stillHip);
   });
 

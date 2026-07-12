@@ -202,9 +202,17 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
   part(root, roundedBox('optic-base', [0.12, 0.045, 0.13], dark, 0.014), [0, 0.145, 0.02]);
   const opticRing = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.011, 8, 20), dark);
   opticRing.position.set(0, 0.215, -0.025); root.add(opticRing);
-  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.038, 20), new THREE.MeshBasicMaterial({ color: 0x9af6ff, transparent: true, opacity: 0.58, depthWrite: false }));
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.038, 20), new THREE.MeshBasicMaterial({ color: 0x9af6ff, transparent: true, opacity: 0.32, depthWrite: false }));
   lens.position.set(0, 0.215, -0.026);
   root.add(lens);
+  const reticle = new THREE.Mesh(
+    new THREE.CircleGeometry(0.0065, 16),
+    new THREE.MeshBasicMaterial({ color: 0xff5b3e, transparent: true, opacity: 0.96, depthWrite: false }),
+  );
+  reticle.name = 'optic-reticle';
+  reticle.position.set(0, 0.215, -0.023);
+  reticle.renderOrder = 6;
+  root.add(reticle);
   part(root, roundedBox('front-sight-post', [0.035, 0.105, 0.035], dark, 0.008), [0, 0.16, -bodyLength * 0.52]);
   part(root, roundedBox('charging-handle', [0.24, 0.035, 0.065], dark, 0.012), [0, 0.06, 0.05]);
 
@@ -285,14 +293,22 @@ export function buildRetroDeliveryTruck(): THREE.Group {
 
 export function buildOperator(team: Team, name = 'operator', flattenMaterials = false): THREE.Group {
   const root = new THREE.Group(); root.name = name;
-  const uniform = new THREE.MeshStandardMaterial({ color: team === 0 ? 0x4dbab6 : 0xd96a55, roughness: 0.68 });
+  const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;
+  const uniform = new THREE.MeshStandardMaterial({
+    color: teamColor,
+    emissive: team === 0 ? 0x0b4c4b : 0x5a160f,
+    emissiveIntensity: 0.32,
+    roughness: 0.63,
+  });
+  const identifier = new THREE.MeshStandardMaterial({ color: teamColor, emissive: teamColor, emissiveIntensity: 0.62, roughness: 0.48 });
   const armour = MAT.dark();
   const skin = new THREE.MeshStandardMaterial({ color: 0xc99b78, roughness: 0.82 });
   const torso = roundedBox('torso', [0.64, 0.86, 0.34], uniform, 0.14, 4); torso.position.y = 1.28; torso.userData.hitZone = 'body';
   const vest = roundedBox('vest', [0.7, 0.58, 0.4], armour, 0.08); vest.position.set(0, 1.32, -0.04); vest.userData.hitZone = 'body';
+  const teamBand = roundedBox('team-identifier', [0.74, 0.09, 0.42], identifier, 0.025, 2); teamBand.position.set(0, 1.54, -0.055); teamBand.userData.hitZone = 'body';
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 20, 14), skin); head.position.y = 1.98; head.userData.hitZone = 'head'; head.castShadow = true;
   const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.255, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.58), armour); helmet.position.y = 2.04; helmet.userData.hitZone = 'head';
-  root.add(torso, vest, head, helmet);
+  root.add(torso, vest, teamBand, head, helmet);
   for (const side of [-1, 1]) {
     const arm = roundedBox('arm', [0.18, 0.72, 0.2], uniform, 0.07); arm.position.set(side * 0.43, 1.32, -0.05); arm.rotation.x = -0.35; arm.userData.hitZone = 'limb';
     const leg = roundedBox('leg', [0.24, 0.82, 0.27], armour, 0.08); leg.position.set(side * 0.18, 0.5, 0); leg.userData.hitZone = 'limb';

@@ -7,6 +7,7 @@ export type WeaponPose = {
   moving: boolean;
   sprinting: boolean;
   crouched: boolean;
+  prone: boolean;
   ads: boolean;
   phase: number;
   landingImpulse: number;
@@ -36,8 +37,8 @@ export class WeaponPresentation {
 
   constructor(camera: THREE.Camera, private readonly flattenMaterials = false) {
     this.root.name = 'original-weapon-view';
-    this.root.position.set(0.31, -0.31, -0.7);
-    this.root.scale.setScalar(0.78);
+    this.root.position.set(0.36, -0.38, -0.78);
+    this.root.scale.setScalar(0.64);
     camera.add(this.root);
 
     const sleeve = new THREE.MeshStandardMaterial({ color: 0x263c38, roughness: 0.9 });
@@ -52,6 +53,8 @@ export class WeaponPresentation {
     const leftGlove = roundedBox('left-glove', [0.21, 0.2, 0.27], glove, 0.075, 4);
     leftGlove.position.set(-0.08, -0.07, -0.43); leftGlove.rotation.set(-0.18, 0.15, 0);
     arms.add(rightForearm, rightGlove, leftForearm, leftGlove);
+    arms.scale.setScalar(0.74);
+    arms.position.set(0, -0.1, -0.04);
     this.root.add(arms);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
     this.muzzleLight.position.set(0, 0.08, -1.15);
@@ -165,15 +168,19 @@ export class WeaponPresentation {
       }
     }
 
-    const bobWeight = pose.moving ? (pose.sprinting ? 1.22 : pose.ads ? 0.18 : pose.crouched ? 0.32 : 0.56) : 0.05;
+    const bobWeight = pose.moving ? (pose.sprinting ? 1.22 : pose.ads ? 0.12 : pose.prone ? 0.12 : pose.crouched ? 0.32 : 0.56) : 0.05;
     const bobX = Math.cos(pose.phase * 0.5) * 0.017 * bobWeight;
     const bobY = Math.sin(pose.phase) * 0.019 * bobWeight;
     const breath = Math.sin(performance.now() * 0.0017) * (pose.ads ? 0.0015 : 0.0045);
-    const adsX = this.adsBlend * -0.305;
-    const adsY = this.adsBlend * 0.255;
-    const adsZ = this.adsBlend * 0.22;
+    const adsX = this.adsBlend * -0.36;
+    // The procedural optic axis is y=.215 before the 0.64 view scale. This delta
+    // puts that physical sight axis on the camera centre instead of above it.
+    const adsY = this.adsBlend * 0.242;
+    const adsZ = this.adsBlend * 0.06;
     const sprintDrop = this.sprintBlend * -0.16;
-    const crouchLift = pose.crouched ? 0.035 : 0;
+    const stanceHipBlend = 1 - this.adsBlend;
+    const crouchLift = pose.crouched ? 0.035 * stanceHipBlend : 0;
+    const proneLift = pose.prone ? 0.018 * stanceHipBlend : 0;
     const switchDrop = (1 - this.switchBlend) * -0.34;
 
     let reloadRoll = 0;
@@ -196,13 +203,13 @@ export class WeaponPresentation {
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 
     const targetPosition = new THREE.Vector3(
-      0.31 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18,
-      -0.31 + adsY + bobY + breath + sprintDrop + crouchLift + switchDrop + reloadDrop - this.recoil * 0.08 - pose.landingImpulse * 0.075,
-      -0.7 + adsZ + this.recoil * 0.13 - meleeArc * 0.32 + grenadeArc * 0.24,
+      0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18,
+      -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadDrop - this.recoil * 0.08 - pose.landingImpulse * 0.075,
+      -0.78 + adsZ + this.recoil * 0.13 - meleeArc * 0.32 + grenadeArc * 0.24,
     );
     this.root.position.lerp(targetPosition, smoothing(18));
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * 0.18 - this.swayY - grenadeArc * 0.42, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(this.root.rotation.y, -this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65, smoothing(13));
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * 0.025 + meleeArc * 0.42, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
   }
 }

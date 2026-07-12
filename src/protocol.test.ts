@@ -8,13 +8,14 @@ const player = {
 };
 
 describe('network protocol guards', () => {
-  it('accepts a bounded valid player snapshot', () => {
+  it('accepts a bounded valid player snapshot and known stance', () => {
     expect(isPlayerSnapshot(player)).toBe(true);
-    expect(isGameMessage({ type: 'state', player })).toBe(true);
+    expect(isGameMessage({ type: 'state', player: { ...player, stance: 'prone' } })).toBe(true);
   });
 
   it('rejects malformed or unbounded messages', () => {
     expect(isGameMessage({ type: 'state', player: { ...player, x: Infinity } })).toBe(false);
+    expect(isGameMessage({ type: 'state', player: { ...player, stance: 'burrowed' } })).toBe(false);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 999, nonce: 1 })).toBe(false);
     expect(isGameMessage({ type: 'chat', by: 'a', text: 'x'.repeat(161) })).toBe(false);
     expect(isGameMessage({ type: 'script', body: 'alert(1)' })).toBe(false);

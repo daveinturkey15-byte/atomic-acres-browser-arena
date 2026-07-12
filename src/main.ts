@@ -3,7 +3,7 @@ import './style.css';
 import { batchStaticMeshes, buildOperator } from './art-kit';
 import { chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
-import { damp, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { damp, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
   WEAPONS,
   advanceMatch,
@@ -20,6 +20,7 @@ import {
   meleeStrike,
   mouseSensitivityMultiplier,
   movementProfile,
+  nextStance,
   recoverRecoil,
   recoverRecoilImpulse,
   sampleSpreadDisk,
@@ -27,6 +28,7 @@ import {
   type HitZone,
   type MatchState,
   type ReloadState,
+  type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
 import { shouldRevealEnemy, worldToMinimap } from './minimap';
@@ -110,9 +112,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT FEEL PASS 02</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · TACTICAL FEEL PASS 03</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A close-quarters retro-future skirmish with spring-tuned movement, layered weapon handling, tactical bots and peer-to-peer multiplayer.</p>
+    <p class="lede">A close-quarters retro-future skirmish with real stand/crouch/prone physics, centred physical sights, authoritative hard cover and peer-to-peer multiplayer.</p>
     <div class="setup-grid">
       <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
       <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
@@ -129,7 +131,7 @@ app.innerHTML = `
       <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
       <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
     </div>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>X</b> reload · <b>Y</b> switch</div>
+    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </section>
   <div id="hud" hidden>
@@ -234,7 +236,7 @@ const player = {
   lastShotAt: 0,
   nextShotAt: 0,
   sustainedShots: 0,
-  crouched: false,
+  stance: 'stand' as Stance,
   grenades: 1,
   lastMeleeAt: -10_000,
   alive: true,
@@ -259,6 +261,9 @@ let weaponBob = 0;
 let cameraHeightOffset = 0;
 let cameraRoll = 0;
 let currentSprinting = false;
+let stanceRecoveryUntil = 0;
+let sprintRecoveryUntil = 0;
+let deferredFireAt = 0;
 let lastGroundedAt = 0;
 let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
@@ -273,7 +278,7 @@ let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
 let gamepadSprint = false;
-let gamepadCrouch = false;
+
 let previousGamepadButtons: boolean[] = [];
 let playerGrounded = false;
 let wasGrounded = false;
@@ -322,13 +327,24 @@ const viewFill = new THREE.PointLight(0xd8ecff, 0.9, 5);
 viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
 
+function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
+  return stance === 'prone' ? 0.5 : stance === 'crouch' ? 1.16 : 1.7;
+}
+
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
-  const root = buildOperator(snapshot.team, 'remote-player', reducedRenderMode);
+  const root = new THREE.Group();
+  root.name = 'remote-player-world';
+  root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
-  root.traverse((child) => {
+
+  const operator = buildOperator(snapshot.team, 'remote-player-model', reducedRenderMode);
+  operator.userData.playerId = snapshot.id;
+  operator.traverse((child) => {
     child.userData.playerId = snapshot.id;
     child.userData.targetRoot = root;
   });
+  root.userData.operator = operator;
+  root.add(operator);
 
   const labelCanvas = document.createElement('canvas');
   labelCanvas.width = 256;
@@ -349,9 +365,9 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   sprite.scale.set(2.4, 0.6, 1);
   root.add(sprite);
 
-  root.position.set(snapshot.x, snapshot.y - 1.7, snapshot.z);
+  root.position.set(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z);
   scene.add(root);
-  return { root, snapshot, target: new THREE.Vector3(snapshot.x, snapshot.y - 1.7, snapshot.z), targetYaw: snapshot.yaw, lastSeen: performance.now() };
+  return { root, snapshot, target: new THREE.Vector3(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z), targetYaw: snapshot.yaw, lastSeen: performance.now() };
 }
 
 function snapshot(): PlayerSnapshot {
@@ -368,6 +384,7 @@ function snapshot(): PlayerSnapshot {
     kills: player.kills,
     deaths: player.deaths,
     weapon: player.weapon,
+    stance: player.stance,
     seq: ++player.seq,
   };
 }
@@ -385,7 +402,7 @@ function onNetworkMessage(message: GameMessage): void {
     }
     if (incoming.seq >= remote.snapshot.seq) {
       remote.snapshot = incoming;
-      remote.target.set(incoming.x, incoming.y - 1.7, incoming.z);
+      remote.target.set(incoming.x, incoming.y - stanceEyeHeight(incoming.stance), incoming.z);
       remote.targetYaw = incoming.yaw;
       remote.lastSeen = performance.now();
       remote.root.visible = incoming.hp > 0;
@@ -397,6 +414,14 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'hit' && message.target === player.id && !processedNonces.has(message.nonce)) {
+    const attacker = remotes.get(message.by);
+    if (!attacker) return;
+    const attackerEye = {
+      x: attacker.snapshot.x,
+      y: attacker.snapshot.y,
+      z: attacker.snapshot.z,
+    };
+    if (arena.colliders.some((box) => segmentIntersectsBox(attackerEye, player.position, box))) return;
     processedNonces.add(message.nonce);
     applyDamage(message.damage, message.by);
     trimNonceSet();
@@ -418,7 +443,14 @@ function trimNonceSet(): void {
 function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   const direction = new THREE.Vector3(...message.direction).normalize();
-  spawnTracer(origin, direction, 50, WEAPONS[message.weapon].color);
+  const end = origin.clone().addScaledVector(direction, 50);
+  const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
+  spawnTracer(origin, direction, trace.tracerDistance, WEAPONS[message.weapon].color);
+  if (trace.blockedByCover) {
+    const impact = origin.clone().addScaledVector(direction, trace.tracerDistance);
+    spawnImpactFlash(impact);
+    audio.coverImpact(impact.distanceTo(camera.position));
+  }
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
 }
 
@@ -480,12 +512,24 @@ function removeRemote(id: string, reason: string): void {
 
 function spawnPoint(): THREE.Vector3 {
   const options = arena.spawns[player.team];
-  const remotePositions = [...remotes.values()].map((remote) => remote.target);
-  const scored = options.map((point) => ({
-    point,
-    distance: remotePositions.length ? Math.min(...remotePositions.map((remote) => remote.distanceToSquared(point))) : Infinity,
-  }));
-  scored.sort((a, b) => b.distance - a.distance);
+  const preferredIndex = gameMode === 'client' ? Math.min(1, options.length - 1) : gameMode === 'host' ? 0 : player.deaths % options.length;
+  const occupied = [...remotes.values()].map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z));
+  const threats = [
+    ...[...remotes.values()]
+      .filter((remote) => remote.snapshot.team !== player.team && remote.snapshot.hp > 0)
+      .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
+    ...[...bots.values()]
+      .filter((bot) => bot.team !== player.team && bot.alive)
+      .map((bot) => bot.position.clone().add(new THREE.Vector3(0, 1.42, 0))),
+  ];
+  const scored = options.map((point, index) => {
+    const nearestDistance = threats.length === 0 ? 0 : Math.min(...threats.map((threat) => threat.distanceToSquared(point)));
+    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length;
+    const occupiedPenalty = occupied.some((position) => position.distanceToSquared(point) < 20) ? 10_000 : 0;
+    const rolePreference = index === preferredIndex ? 1 : 0;
+    return { point, score: nearestDistance - visibleThreats * 900 - occupiedPenalty + rolePreference };
+  });
+  scored.sort((a, b) => b.score - a.score);
   return scored[0].point.clone();
 }
 
@@ -498,7 +542,28 @@ function requestGamePointerLock(): void {
   }
 }
 
+function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): boolean {
+  if (!characterPhysics || !player.alive || !playerGrounded) return false;
+  const target = nextStance(player.stance, action);
+  if (target === player.stance) return true;
+  const previous = player.stance;
+  const before = characterPhysics.eyePosition();
+  if (!characterPhysics.setStance(target)) {
+    setStatus('Low clearance — stance change blocked.', 'warn');
+    return false;
+  }
+  const after = characterPhysics.eyePosition();
+  cameraHeightOffset += before.y - after.y;
+  player.position.set(after.x, after.y, after.z);
+  player.stance = target;
+  stanceRecoveryUntil = performance.now() + (target === 'prone' ? 260 : previous === 'prone' ? 290 : 135);
+  currentSprinting = false;
+  return true;
+}
+
 function respawn(requestLock = true): void {
+  player.stance = 'stand';
+  characterPhysics?.setStance('stand');
   player.position.copy(spawnPoint());
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
@@ -506,12 +571,14 @@ function respawn(requestLock = true): void {
   lastDamageAt = -10_000;
   player.grenades = 1;
   player.reloadState = null;
-  player.crouched = false;
   player.alive = true;
   player.invulnerableUntil = performance.now() + 1350;
   player.yaw = player.team === 0 ? Math.PI : 0;
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
+  stanceRecoveryUntil = 0;
+  sprintRecoveryUntil = 0;
+  deferredFireAt = 0;
   cameraHeightOffset = 0;
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
@@ -582,6 +649,22 @@ function finishReload(now: number): void {
 
 function tryFire(now: number): void {
   if (!player.alive || !gameStarted || (!debugInputUnlocked && document.pointerLockElement !== canvas) || matchState.phase !== 'active') return;
+  if (currentSprinting) {
+    currentSprinting = false;
+    sprintRecoveryUntil = Math.max(sprintRecoveryUntil, now + 150);
+  }
+  const readyAt = Math.max(stanceRecoveryUntil, sprintRecoveryUntil);
+  if (now < readyAt) {
+    if (deferredFireAt < readyAt) {
+      deferredFireAt = readyAt;
+      window.setTimeout(() => {
+        deferredFireAt = 0;
+        if (triggerHeld) tryFire(performance.now());
+      }, Math.max(1, readyAt - now + 2));
+    }
+    return;
+  }
+  deferredFireAt = 0;
   const spec = WEAPONS[player.weapon];
   if (!triggerHeld && spec.automatic) return;
   if (now < player.switchingUntil) return;
@@ -619,7 +702,8 @@ function tryFire(now: number): void {
   const spread = computeSpread(spec, {
     ads: adsHeld,
     moving,
-    crouched: player.crouched,
+    crouched: player.stance === 'crouch',
+    prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
@@ -725,7 +809,7 @@ function clearBots(): void {
 }
 
 function botHasLineOfSight(bot: BotPlayer): boolean {
-  const origin = { x: bot.position.x, y: bot.position.y + 1.65, z: bot.position.z };
+  const origin = { x: bot.position.x, y: bot.position.y + 1.42, z: bot.position.z };
   const target = { x: player.position.x, y: player.position.y, z: player.position.z };
   return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
 }
@@ -819,7 +903,7 @@ function updateBots(dt: number, now: number): void {
       : intent.movement === 'retreat' ? forward.clone().multiplyScalar(-1)
         : intent.movement === 'strafe-left' ? side.clone().multiplyScalar(-1)
           : intent.movement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = intent.movement.startsWith('strafe') ? 3.5 : lineOfSight ? 4.05 : 4.45;
+    const speed = intent.movement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     let resolved = resolveHorizontalMove(bot.position, desired, arena.colliders, arena.bounds, 0.44);
     if (Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002 && desiredDirection.lengthSq() > 0) {
@@ -844,11 +928,17 @@ function updateBots(dt: number, now: number): void {
       direction.y += (Math.random() - 0.5) * jitter;
       direction.z += (Math.random() - 0.5) * jitter;
       direction.normalize();
-      spawnTracer(origin, direction, Math.min(distance, 75), WEAPONS.carbine.color);
+      const shotLength = Math.min(distance + 2, 75);
+      const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
+      const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
+      spawnTracer(origin, direction, resolution.tracerDistance, WEAPONS.carbine.color);
+      if (resolution.blockedByCover) {
+        const impact = origin.clone().addScaledVector(direction, resolution.tracerDistance);
+        spawnImpactFlash(impact);
+        audio.coverImpact(impact.distanceTo(player.position));
+      }
       audio.shot('carbine', true);
-      const rayToPlayer = new THREE.Ray(origin, direction);
-      const closest = rayToPlayer.closestPointToPoint(player.position, new THREE.Vector3());
-      if (closest.distanceTo(player.position) < 0.55 && lineOfSight) {
+      if (resolution.hitTarget) {
         const damage = computeDamage(WEAPONS.carbine, distance, 'body') * 0.62;
         applyDamage(damage, bot.id);
         if (!player.alive) {
@@ -1049,11 +1139,14 @@ function updatePhysics(dt: number): void {
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
-  player.crouched = (keys.has('KeyC') || gamepadCrouch) && playerGrounded;
-  currentSprinting = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded
+  const wantsSprint = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
+  if (wantsSprint && player.stance !== 'stand') requestStance('stand');
+  const crouched = player.stance === 'crouch';
+  const prone = player.stance === 'prone';
+  currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
-    && sprintEligible(forwardInput, strafeInput, adsHeld, player.crouched);
-  const profile = movementProfile({ crouched: player.crouched, ads: adsHeld, sprinting: currentSprinting, grounded: playerGrounded });
+    && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
+  const profile = movementProfile({ crouched, prone, ads: adsHeld, sprinting: currentSprinting, grounded: playerGrounded });
   const integrated = integrateHorizontalVelocity(
     { x: player.velocity.x, z: player.velocity.z },
     { x: input.x, z: input.z },
@@ -1067,7 +1160,7 @@ function updatePhysics(dt: number): void {
   if (playerGrounded) lastGroundedAt = now;
   const jumpBuffered = now - jumpQueuedAt <= 125;
   const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
-  if (jumpBuffered && coyoteGrounded && !adsHeld && !player.crouched && matchState.phase === 'active') {
+  if (jumpBuffered && coyoteGrounded && !adsHeld && player.stance === 'stand' && matchState.phase === 'active') {
     player.velocity.y = profile.jumpVelocity;
     playerGrounded = false;
     jumpQueuedAt = -10_000;
@@ -1095,22 +1188,24 @@ function updatePhysics(dt: number): void {
   if (movement.blockedZ) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
 
   const moving = input.lengthSq() > 0 && playerGrounded;
-  if (moving && now - lastFootstepAt >= (currentSprinting ? 300 : player.crouched ? 575 : 405)) {
+  const footstepInterval = currentSprinting ? 300 : prone ? 760 : crouched ? 575 : 405;
+  if (moving && now - lastFootstepAt >= footstepInterval) {
     lastFootstepAt = now;
-    audio.footstep(currentSprinting, player.crouched);
+    audio.footstep(currentSprinting, crouched || prone);
   }
-  weaponBob += dt * (currentSprinting ? 15 : player.crouched ? 7 : 10) * (moving ? 1 : 0.25);
+  weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
   recoilCamera = recoverRecoilImpulse(recoilCamera, WEAPONS[player.weapon], dt);
   landingImpulse = damp(landingImpulse, 0, 10, dt);
-  cameraHeightOffset = damp(cameraHeightOffset, player.crouched ? -0.54 : 0, 15, dt);
+  cameraHeightOffset = damp(cameraHeightOffset, 0, prone ? 9 : 15, dt);
   const lateralSpeed = player.velocity.dot(right) / Math.max(1, profile.maxSpeed);
   cameraRoll = damp(cameraRoll, -lateralSpeed * (adsHeld ? 0.006 : 0.016), 11, dt);
   weaponView.update({
     dt,
     moving,
     sprinting: currentSprinting,
-    crouched: player.crouched,
+    crouched,
+    prone,
     ads: adsHeld,
     phase: weaponBob,
     landingImpulse,
@@ -1134,6 +1229,12 @@ function updateRemotes(dt: number, now: number): void {
     const alpha = 1 - Math.exp(-13 * dt);
     remote.root.position.lerp(remote.target, alpha);
     remote.root.rotation.y += shortestAngleDelta(remote.root.rotation.y, remote.targetYaw) * alpha;
+    const stance = remote.snapshot.stance ?? 'stand';
+    const operator = remote.root.userData.operator as THREE.Group;
+    operator.rotation.x = THREE.MathUtils.lerp(operator.rotation.x, stance === 'prone' ? -1.38 : 0, alpha);
+    const targetScaleY = stance === 'crouch' ? 0.76 : stance === 'prone' ? 0.9 : 1;
+    operator.scale.y = THREE.MathUtils.lerp(operator.scale.y, targetScaleY, alpha);
+    operator.position.y = THREE.MathUtils.lerp(operator.position.y, stance === 'prone' ? 0.28 : 0, alpha);
   }
 }
 
@@ -1235,7 +1336,8 @@ function updateHud(now: number): void {
   const spread = computeSpread(spec, {
     ads: adsHeld,
     moving: speed > 1.2,
-    crouched: player.crouched,
+    crouched: player.stance === 'crouch',
+    prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
   const crosshairGap = THREE.MathUtils.clamp(5 + spread * 320, 5, 23);
@@ -1259,7 +1361,7 @@ function updateHud(now: number): void {
   element<HTMLElement>('#reload-state').textContent = player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
     : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
-  element<HTMLElement>('#stance').textContent = player.crouched ? 'CROUCHED' : 'STANDING';
+  element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
   element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
   element<HTMLElement>('#health-block').classList.toggle('critical', player.hp <= 30);
   updateMinimap(now);
@@ -1319,7 +1421,6 @@ function pollGamepad(dt: number): void {
   if (!pad) {
     gamepadMove = { x: 0, y: 0 };
     gamepadSprint = false;
-    gamepadCrouch = false;
     previousGamepadButtons = [];
     triggerHeld = mouseTriggerHeld;
     adsHeld = debugAdsOverride ?? mouseAdsHeld;
@@ -1330,7 +1431,6 @@ function pollGamepad(dt: number): void {
   const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
   const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
   gamepadSprint = Boolean(buttons[10]);
-  gamepadCrouch = Boolean(buttons[1]);
   const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
   const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
   adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAds);
@@ -1341,7 +1441,12 @@ function pollGamepad(dt: number): void {
     const turnRate = adsHeld ? 1.92 : 3.66;
     player.yaw -= look.x * turnRate * dt;
     player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * turnRate * 0.82 * dt, -1.42, 1.42);
-    if (pressed(0)) jumpQueuedAt = performance.now();
+    if (pressed(0)) {
+      if (player.stance !== 'stand') requestStance('stand');
+      jumpQueuedAt = performance.now();
+    }
+    if (pressed(1)) requestStance('toggle-crouch');
+    if (pressed(13)) requestStance('toggle-prone');
     if (pressed(2)) reload();
     if (pressed(3)) switchWeapon((WEAPON_ORDER.indexOf(player.weapon) + 1) % WEAPON_ORDER.length);
     if (pressed(4)) throwGrenade();
@@ -1352,7 +1457,12 @@ function pollGamepad(dt: number): void {
 
 window.addEventListener('keydown', (event) => {
   keys.add(event.code);
-  if (event.code === 'Space' && !event.repeat) jumpQueuedAt = performance.now();
+  if (event.code === 'Space' && !event.repeat) {
+    if (player.stance !== 'stand') requestStance('stand');
+    jumpQueuedAt = performance.now();
+  }
+  if (event.code === 'KeyC' && !event.repeat) requestStance('toggle-crouch');
+  if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
   if (event.code === 'Digit1') switchWeapon(0);
   if (event.code === 'Digit2') switchWeapon(1);
   if (event.code === 'Digit3') switchWeapon(2);
@@ -1428,7 +1538,8 @@ function resetForMode(): void {
   player.grenades = 1;
   player.reloadState = null;
   player.sustainedShots = 0;
-  player.crouched = false;
+  player.stance = 'stand';
+  characterPhysics?.setStance('stand');
   targetHits = 0;
   clearBots();
   for (const grenade of grenades) scene.remove(grenade.mesh);
@@ -1521,6 +1632,7 @@ const debugWindow = window as Window & {
     reload: () => void;
     melee: () => void;
     setAds: (held: boolean) => void;
+    setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
 
   };
@@ -1537,13 +1649,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       weapon: player.weapon,
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
-      crouched: player.crouched,
+      stance: player.stance,
+      crouched: player.stance === 'crouch',
+      prone: player.stance === 'prone',
       sprinting: currentSprinting,
       grenades: player.grenades,
       position: player.position.toArray(),
     },
     bots: [...bots.values()].map((bot) => ({ id: bot.id, hp: bot.hp, alive: bot.alive, kills: bot.kills, position: bot.position.toArray() })),
     remotes: remotes.size,
+    remotePlayers: [...remotes.values()].map((remote) => ({
+      id: remote.snapshot.id,
+      stance: remote.snapshot.stance ?? 'stand',
+      position: remote.target.toArray(),
+    })),
     grenades: grenades.length,
     originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
     weaponReady: weaponView.isReady(),
@@ -1576,6 +1695,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   reload: () => reload(),
   melee: () => melee(),
   setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = held; },
+  setStance: (stance: Stance) => {
+    if (stance === player.stance) return;
+    if (stance === 'stand') requestStance('stand');
+    else if (stance === 'prone') requestStance('toggle-prone');
+    else requestStance('toggle-crouch');
+  },
   damage: (amount: number) => {
     player.invulnerableUntil = 0;
     applyDamage(amount, bots.keys().next().value ?? player.id);
@@ -1635,7 +1760,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Combat Feel Pass 02 ready — tuned locomotion, layered audio, expanded arena art and recoil systems active.', 'ok');
+  setStatus('Tactical Feel Pass 03 ready — prone physics, rebuilt ADS and authoritative cover active.', 'ok');
   requestAnimationFrame(frame);
 }
 
