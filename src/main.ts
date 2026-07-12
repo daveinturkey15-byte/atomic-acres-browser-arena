@@ -3,7 +3,7 @@ import './style.css';
 import { batchStaticMeshes, buildOperator } from './art-kit';
 import { BOT_REACTION_DELAY, SOLO_BOT_COUNT, botAimJitter, chooseBotIntent, respawnBotState } from './bot-ai';
 import { ArenaAudio } from './audio';
-import { damp, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
   BOT_DAMAGE_MULTIPLIER,
   WEAPONS,
@@ -778,11 +778,22 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: 
   return { distance: Math.min(first.distance, 110), playerId, targetId, hitZone };
 }
 
+function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
+  const options = arena.spawns[team];
+  for (let offset = 0; offset < options.length; offset += 1) {
+    const candidate = options[(preferredIndex + offset) % options.length];
+    const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+    if (Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
+      && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
+      && !isBlocked(bodyPoint, arena.colliders, 0.44)) return candidate;
+  }
+  throw new Error(`No valid authored spawn for team ${team}`);
+}
+
 function spawnBots(): void {
   clearBots();
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const names = ['RIVET'].slice(0, SOLO_BOT_COUNT);
-  const spawnOptions = arena.spawns[botTeam];
   names.forEach((name, index) => {
     const id = `bot-${index}`;
     const root = buildOperator(botTeam, 'bot-operator', reducedRenderMode);
@@ -791,7 +802,7 @@ function spawnBots(): void {
       node.userData.playerId = id;
       node.userData.targetRoot = root;
     });
-    const spawn = spawnOptions[index % spawnOptions.length];
+    const spawn = selectSafeBotSpawn(botTeam, index);
     const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
     root.position.copy(position);
     scene.add(root);
@@ -835,8 +846,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
 
 function respawnBot(bot: BotPlayer, now: number): void {
   const state = respawnBotState(now);
-  const spawns = arena.spawns[bot.team];
-  const spawn = spawns[(bot.deaths + bot.waypoint) % spawns.length];
+  const spawn = selectSafeBotSpawn(bot.team, bot.deaths + bot.waypoint);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.hp = state.health;
@@ -862,7 +872,7 @@ function updateBots(dt: number, now: number): void {
     }
     // A corrupted position can never become an out-of-arena damage source.
     if (!pointInsideBounds(bot.position, arena.bounds, 0.44)) {
-      const safeSpawn = arena.spawns[bot.team][0];
+      const safeSpawn = selectSafeBotSpawn(bot.team, bot.waypoint);
       bot.position.set(safeSpawn.x, safeSpawn.y - 1.7, safeSpawn.z);
       bot.root.position.copy(bot.position);
       bot.hasLineOfSight = false;
@@ -1054,6 +1064,17 @@ function updateGrenades(dt: number, now: number): void {
       }
     } else {
       grenade.mesh.position.add(delta);
+    }
+    if (!pointInsideBounds(grenade.mesh.position, arena.bounds, 0.16)) {
+      const impact = clampPointToBounds(grenade.mesh.position, arena.bounds, 0.16);
+      grenade.mesh.position.set(impact.x, impact.y, impact.z);
+      spawnImpactFlash(grenade.mesh.position.clone());
+      audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
+      scene.remove(grenade.mesh);
+      grenade.mesh.geometry.dispose();
+      (grenade.mesh.material as THREE.Material).dispose();
+      grenades.splice(index, 1);
+      continue;
     }
     grenade.mesh.rotation.x += dt * 8;
     grenade.mesh.rotation.z += dt * 11;

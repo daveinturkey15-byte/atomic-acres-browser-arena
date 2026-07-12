@@ -168,6 +168,14 @@ export function pointInsideBounds(point: Point3, bounds: Box2, margin = 0): bool
     && point.z <= bounds.maxZ - margin;
 }
 
+export function clampPointToBounds(point: Point3, bounds: Box2, margin = 0): Point3 {
+  return {
+    x: Math.max(bounds.minX + margin, Math.min(point.x, bounds.maxX - margin)),
+    y: point.y,
+    z: Math.max(bounds.minZ + margin, Math.min(point.z, bounds.maxZ - margin)),
+  };
+}
+
 export function shortestAngleDelta(from: number, to: number): number {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
