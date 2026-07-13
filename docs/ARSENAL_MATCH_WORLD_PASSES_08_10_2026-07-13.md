@@ -34,6 +34,44 @@ Baseline: Pass 07 documentation `d4936f8`; game source `cbd3c17`
 - Compatibility uses semantic placeholders or omits micro-detail while retaining route identity.
 - Acceptance: normal quality gains clear west/center/east route identities and ambient state telemetry while compatibility remains within existing budgets.
 
+## Release evidence
+
+### Source checkpoints
+
+- Pass 08 — `584b1f4` (`Build Pass 08 arsenal and operator parity`)
+- Pass 09 — `c3c46e3` (`Build Pass 09 match flow and rematch loop`)
+- Pass 10 — `69977d5` (`Build Pass 10 arena storytelling and route identity`)
+- Pages deployment — `d5e2a57` (`Publish Atomic Acres review passes 08 through 10`)
+
+### Local verification
+
+- TypeScript lint: passed.
+- Vitest: `87/87` tests across `19/19` files.
+- Production builds: passed independently at all three source checkpoints.
+- Chromium functional matrix: `12/12` scenarios.
+- Isolated performance scenario: passed the unchanged `>=40 FPS` gate.
+- Scripted two-browser multiplayer: host/client each observed one remote; zero errors.
+- Full-quality Pass 10 capture: `569` calls / `341,078` triangles; zero console errors.
+- Compatibility Pass 10 active capture: `75` calls / `71,934` triangles, below the `180` / `350,000` limits.
+- Fixed pools, one weak bot policy, camera-ray authority, identity binding, remote-shot admission, and fixed authoritative hit proxies remained covered by deterministic/browser checks.
+- Final visual review covered menu, hip view, SMG ADS, and scattergun ADS. The SMG front-post tip and Model 12 bead were corrected to align physically through their rear apertures at screen centre.
+
+### Public verification
+
+The deployment diff was mechanically confined to `review/pass08/`, `review/pass09/`, and `review/pass10/`; Pass 07 and earlier paths were unchanged. All expected hashed bundles became available on GitHub Pages.
+
+- Pass 08: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass08/?release=584b1f4>
+- Pass 09: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass09/?release=c3c46e3>
+- Pass 10: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass10/?release=69977d5>
+
+Public smoke verification confirmed the correct Pass 08/09/10 identity at each path, original-art and weapon readiness, zero page/console errors, Pass 10 story readiness, and two-browser Pass 10 host/client replication. The public compatibility smoke measured `43` calls / `62,542` triangles; the more demanding local active compatibility capture above remains the release-budget reference.
+
+## Known limits
+
+- Automated tests cannot prove subjective controller feel, synthesized audio quality, or perceived weapon weight; those remain manual play/listening checks.
+- Existing multiplayer architecture still uses victim validation rather than a fully authoritative dedicated server, and grenades are not fully replicated.
+- Full quality intentionally exceeds the compatibility draw-call target; the target applies to the explicit reduced compatibility renderer.
+
 ## Release plan
 
-Commit after each pass, retain each source revision, and publish immutable `review/pass08/`, `review/pass09/`, and `review/pass10/` builds. The canonical root and Pass 04–07 paths remain untouched.
+Completed: each pass remains an independent source revision and is published under its immutable review path. The canonical root and Pass 04–07 paths remain untouched.
