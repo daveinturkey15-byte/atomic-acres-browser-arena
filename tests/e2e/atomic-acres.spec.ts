@@ -11,6 +11,7 @@ type DebugState = {
     weapon: string;
     ammo: number;
     reserve: number;
+    reloading: boolean;
     stance: 'stand' | 'crouch' | 'prone';
     crouched: boolean;
     prone: boolean;
@@ -27,13 +28,26 @@ type DebugState = {
     waypoint: number;
     blockedSince: number;
     hasLineOfSight: boolean;
+    presentationReady: boolean;
+    presentationWeaponSafe: boolean;
   }>;
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
   activeImpactParticles: number;
+  activeImpactMarks: number;
+  activeTracers: number;
   originalArtLoaded: boolean;
   weaponReady: boolean;
+  weaponPresentation: {
+    weapon: 'carbine' | 'smg' | 'scattergun';
+    heat: number;
+    shotsPresented: number;
+    activeCasings: number;
+    activeSmoke: number;
+    detailsReady: boolean;
+    adsProgress: number;
+  };
   weaponActionHistory: string[];
   menuVisible: boolean;
   render: { calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean };
@@ -72,7 +86,9 @@ test.describe('boot and authored presentation', () => {
     const state = await debug(page);
     expect(state.originalArtLoaded).toBe(true);
     expect(state.weaponReady).toBe(true);
+    expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
+    await expect(page.locator('.eyebrow')).toContainText('COMBAT PRESENTATION PASS 07');
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -148,8 +164,9 @@ test.describe('solo mechanics', () => {
     expect(moved).toBe(true);
     expect(after.bots.every((bot) => bot.position[0] >= -33.56 && bot.position[0] <= 33.56
       && bot.position[2] >= -42.56 && bot.position[2] <= 42.56)).toBe(true);
-    expect(after.bots.every((bot) => Number.isInteger(bot.waypoint) && bot.waypoint >= 0 && bot.waypoint < 8)).toBe(true);
-    expect(after.bots.every((bot) => Number.isFinite(bot.blockedSince))).toBe(true);
+    expect(after.bots.every((bot) => Number.isInteger(bot.waypoint) && bot.waypoint >= 0 && bot.waypoint < 8
+      && Number.isFinite(bot.blockedSince))).toBe(true);
+    expect(after.bots.every((bot) => bot.presentationReady && bot.presentationWeaponSafe)).toBe(true);
   });
 
   test('opening the deployment menu neutralizes movement input', async ({ page }) => {
@@ -164,6 +181,22 @@ test.describe('solo mechanics', () => {
       after.player.position[0] - before.player.position[0],
       after.player.position[2] - before.player.position[2],
     )).toBeLessThan(0.02);
+  });
+
+  test('menu interruption cancels a pre-seat reload without stale action events', async ({ page }) => {
+    await page.evaluate(() => {
+      const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void; reload: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      debug.fireOnce();
+      debug.reload();
+    });
+    await page.waitForTimeout(110);
+    expect((await debug(page)).player.reloading).toBe(true);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { openMenu: () => void } }).__ATOMIC_ACRES_DEBUG__.openMenu());
+    const interrupted = await debug(page);
+    expect(interrupted.player.reloading).toBe(false);
+    const eventCount = interrupted.weaponActionHistory.length;
+    await page.waitForTimeout(900);
+    expect((await debug(page)).weaponActionHistory).toHaveLength(eventCount);
   });
 
   test('walk, sprint, crouch and prone alter the real player stance', async ({ page }) => {
@@ -221,6 +254,17 @@ test.describe('solo mechanics', () => {
     const fired = await debug(page);
     expect(fired.player.ammo).toBeLessThan(before.player.ammo);
     expect(fired.activeImpactParticles).toBeGreaterThan(0);
+    expect(fired.activeImpactMarks).toBeGreaterThan(0);
+    expect(fired.activeImpactMarks).toBeLessThanOrEqual(32);
+    expect(fired.activeTracers).toBeLessThanOrEqual(18);
+    expect(fired.weaponPresentation.weapon).toBe('carbine');
+    expect(fired.weaponPresentation.detailsReady).toBe(true);
+    expect(fired.weaponPresentation.shotsPresented).toBe(before.weaponPresentation.shotsPresented + 1);
+    expect(fired.weaponPresentation.heat).toBeGreaterThan(0);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.activeCasings, { timeout: 800 }).toBeGreaterThan(0);
+    expect((await debug(page)).weaponPresentation.activeCasings).toBeLessThanOrEqual(16);
+    expect(fired.weaponPresentation.activeSmoke).toBeGreaterThan(0);
+    expect(fired.weaponPresentation.activeSmoke).toBeLessThanOrEqual(8);
 
     await page.keyboard.press('Digit2');
     await page.waitForTimeout(450);
@@ -260,7 +304,10 @@ test.describe('solo mechanics', () => {
 
   test('shows directional damage, ADS telemetry and delayed health recovery', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(true));
+    expect((await debug(page)).weaponPresentation.adsProgress).toBeLessThan(0.9);
+    await expect(page.locator('#crosshair')).not.toHaveClass(/ads/);
     await page.waitForTimeout(150);
+    expect((await debug(page)).weaponPresentation.adsProgress).toBeGreaterThanOrEqual(0.9);
     await expect(page.locator('#crosshair')).toHaveClass(/ads/);
     await expect(page.locator('#crosshair i').first()).toHaveCSS('opacity', '0');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(false));

@@ -1,4 +1,7 @@
+import { HOUSE_LAYOUT } from './arena-layout';
+
 export type ImpactSurface = 'metal' | 'concrete' | 'wood' | 'soil';
+export type FootstepSurface = 'asphalt' | 'concrete' | 'wood' | 'soil';
 
 export type SurfaceEvidence = {
   hint?: unknown;
@@ -39,4 +42,20 @@ export function nearMissStrength(point: Point3, start: Point3, end: Point3): num
   const distance = distancePointToSegment(point, start, end);
   if (distance < 0.6 || distance > 2.6) return 0;
   return Math.min(1, Math.max(0, 1 - (distance - 0.6) / 2));
+}
+
+/** Authored walkable-surface classifier for synthesized first-person footsteps. */
+export function classifyFootstepSurface(point: Point3): FootstepSurface {
+  if (![point.x, point.y, point.z].every(Number.isFinite)) return 'soil';
+  for (const house of HOUSE_LAYOUT) {
+    const localX = Math.abs(point.x - house.x);
+    const localZ = Math.abs(point.z - house.z);
+    if (point.y > 3.05 && localX <= 8.1 && localZ <= 7.1) return 'wood';
+    const deckZ = house.z - house.facing * 9.2;
+    if (localX <= 5 && Math.abs(point.z - deckZ) <= 1.8 && point.y < 1.4) return 'wood';
+  }
+  const roadDistance = Math.abs(point.x);
+  if (roadDistance <= 9.5) return 'asphalt';
+  if (roadDistance <= 14.2) return 'concrete';
+  return 'soil';
 }

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Team, WeaponId } from './protocol';
+import { hitReactionAt } from './weapon-presentation-state';
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
@@ -148,9 +149,9 @@ export function roundedBox(
 }
 
 const MAT = {
-  gunmetal: () => texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { roughness: 0.38, metalness: 0.62, repeatX: 2 }),
-  dark: () => new THREE.MeshStandardMaterial({ color: 0x151b20, roughness: 0.42, metalness: 0.5 }),
-  rubber: () => new THREE.MeshStandardMaterial({ color: 0x111315, roughness: 0.9 }),
+  gunmetal: () => texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { color: 0xb8bfbd, roughness: 0.38, metalness: 0.62, repeatX: 2 }),
+  dark: () => new THREE.MeshStandardMaterial({ color: 0x252c31, roughness: 0.42, metalness: 0.5 }),
+  rubber: () => new THREE.MeshStandardMaterial({ color: 0x202628, roughness: 0.9 }),
   brass: () => new THREE.MeshStandardMaterial({ color: 0xb8883c, roughness: 0.3, metalness: 0.76 }),
   glass: () => new THREE.MeshPhysicalMaterial({ color: 0x84cfe3, roughness: 0.12, metalness: 0.08, transparent: true, opacity: 0.7 }),
   cream: () => new THREE.MeshStandardMaterial({ color: 0xe7dbc1, roughness: 0.68 }),
@@ -188,24 +189,95 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
   };
 
   if (id === 'carbine') {
-    part(root, roundedBox('receiver', [0.19, 0.2, 0.58], metal, 0.035), [0, 0, -0.12]);
-    part(root, roundedBox('receiver-accent', [0.2, 0.045, 0.42], accent, 0.018), [0, 0.09, -0.17]);
-    part(root, roundedBox('angled-stock', [0.15, 0.19, 0.36], rubber, 0.045), [0, -0.015, 0.33], [-0.08, 0, 0]);
-    part(root, roundedBox('grip', [0.105, 0.25, 0.13], rubber, 0.025), [0, -0.18, 0.06], [-0.18, 0, 0]);
-    const magazine = part(root, roundedBox('curved-magazine', [0.115, 0.34, 0.15], dark, 0.035), [0, -0.24, -0.17], [0.16, 0, 0]);
-    addSocket('reload-socket-l', [-0.13, -0.08, 0.02], magazine);
-    part(root, roundedBox('triangular-fore-end', [0.17, 0.14, 0.38], metal, 0.03), [0, -0.01, -0.56]);
-    for (const z of [-0.68, -0.58, -0.48]) part(root, roundedBox('fore-end-vent', [0.19, 0.035, 0.045], accent, 0.01), [0, 0.055, z]);
-    addBarrel(0.46, -0.93, 0.032);
-    part(root, roundedBox('optic-bridge', [0.15, 0.04, 0.34], dark, 0.01), [0, 0.145, -0.01]);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.011, 8, 20), dark);
-    ring.position.set(0, 0.215, -0.02); root.add(ring);
-    const bolt = part(root, roundedBox('bolt-or-slide', [0.045, 0.055, 0.16], MAT.brass(), 0.01), [0.105, 0.035, -0.05]);
+    // Original M86 vertical-slice silhouette: compact receiver, ventilated fore-end,
+    // skeleton stock and a physically aligned low reflex optic.
+    part(root, roundedBox('receiver', [0.235, 0.22, 0.62], metal, 0.035), [0, 0, -0.12]);
+    part(root, roundedBox('upper-receiver', [0.205, 0.095, 0.57], dark, 0.025), [0, 0.115, -0.13]);
+    for (const side of [-1, 1]) {
+      part(root, roundedBox('receiver-side-panel', [0.022, 0.135, 0.43], dark, 0.006, 2), [side * 0.128, 0.015, -0.16]);
+      if (side < 0) {
+        const accentPositions = flattenMaterials ? [-0.15] : [-0.29, -0.15, -0.01];
+        for (const z of accentPositions) {
+          part(root, roundedBox('receiver-accent-stripe', [0.025, 0.045, 0.085], accent, 0.006, 1), [side * 0.141, 0.045, z], [0, 0, -0.18]);
+        }
+      }
+      const stockRod = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 7), dark);
+      stockRod.name = 'stock-support-rod';
+      part(root, stockRod, [side * 0.055, 0.035, 0.38], [Math.PI / 2, side * 0.08, 0]);
+    }
+    part(root, roundedBox('stock-cheek-rest', [0.18, 0.105, 0.3], rubber, 0.035), [0, 0.095, 0.36], [-0.05, 0, 0]);
+    part(root, roundedBox('stock-shoulder-pad', [0.185, 0.23, 0.09], rubber, 0.035), [0, -0.005, 0.56], [-0.08, 0, 0]);
+    part(root, roundedBox('pistol-grip', [0.11, 0.255, 0.135], rubber, 0.025), [0, -0.18, 0.055], [-0.2, 0, 0]);
+    part(root, roundedBox('trigger-guard-front', [0.026, 0.125, 0.025], dark, 0.006, 1), [0, -0.12, -0.045], [0.18, 0, 0]);
+    part(root, roundedBox('trigger-guard-bottom', [0.026, 0.025, 0.13], dark, 0.006, 1), [0, -0.18, 0.01]);
+    part(root, roundedBox('trigger', [0.022, 0.09, 0.022], accent, 0.005, 1), [0, -0.12, 0.01], [0.25, 0, 0]);
+
+    const magazine = new THREE.Group();
+    magazine.name = 'curved-magazine';
+    magazine.position.set(0, -0.24, -0.17);
+    magazine.rotation.x = 0.16;
+    root.add(magazine);
+    part(magazine, roundedBox('magazine-body', [0.12, 0.35, 0.16], dark, 0.032), [0, 0, 0]);
+    const magazineRibs = flattenMaterials ? [0.04] : [-0.11, -0.035, 0.04, 0.115];
+    for (const y of magazineRibs) {
+      part(magazine, roundedBox('magazine-rib', [0.126, 0.018, 0.168], accent, 0.005, 1), [0, y, 0]);
+    }
+    part(magazine, roundedBox('magazine-base', [0.14, 0.045, 0.18], rubber, 0.012, 2), [0, -0.185, 0.01]);
+    addSocket('reload-socket-l', [-0.14, -0.05, 0.04], magazine);
+
+    part(root, roundedBox('triangular-fore-end', [0.215, 0.16, 0.46], metal, 0.032), [0, -0.005, -0.59]);
+    part(root, roundedBox('fore-end-top-rail', [0.19, 0.035, 0.52], dark, 0.008, 1), [0, 0.105, -0.55]);
+    for (const side of [-1, 1]) {
+      part(root, roundedBox('fore-end-side-rail', [0.028, 0.085, 0.34], dark, 0.006, 1), [side * 0.116, 0, -0.58]);
+      const ventPositions = flattenMaterials ? [-0.61] : [-0.72, -0.61, -0.5];
+      for (const z of ventPositions) {
+        part(root, roundedBox('fore-end-vent', [0.024, 0.052, 0.062], accent, 0.006, 1), [side * 0.123, 0.035, z]);
+      }
+    }
+    const railTeeth = flattenMaterials ? [-0.64, -0.46] : [-0.73, -0.64, -0.55, -0.46, -0.37];
+    for (const z of railTeeth) {
+      part(root, roundedBox('rail-tooth', [0.18, 0.024, 0.035], dark, 0.004, 1), [0, 0.135, z]);
+    }
+    addBarrel(0.5, -0.96, 0.031);
+    const gasBlock = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.095, 10), dark);
+    gasBlock.name = 'gas-block';
+    part(root, gasBlock, [0, 0.002, -0.8], [Math.PI / 2, 0, 0]);
+
+    part(root, roundedBox('optic-bridge', [0.155, 0.045, 0.34], dark, 0.01), [0, 0.145, -0.015]);
+    for (const side of [-1, 1]) {
+      part(root, roundedBox('optic-side-post', [0.026, 0.13, 0.11], dark, 0.007, 2), [side * 0.062, 0.202, -0.025]);
+    }
+    part(root, roundedBox('optic-top-frame', [0.148, 0.026, 0.11], dark, 0.007, 2), [0, 0.268, -0.025]);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.01, 8, 20), dark);
+    ring.name = 'optic-ring';
+    ring.position.set(0, 0.215, -0.096); root.add(ring);
+    const lens = new THREE.Mesh(
+      new THREE.CircleGeometry(0.049, 18),
+      new THREE.MeshBasicMaterial({
+        color: flattenMaterials ? 0x6fc3d7 : 0x8bdbe4,
+        transparent: true,
+        opacity: flattenMaterials ? 0.16 : 0.22,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    lens.name = 'optic-lens';
+    lens.position.set(0, 0.215, -0.098); root.add(lens);
+    const reticle = new THREE.Mesh(
+      new THREE.CircleGeometry(0.009, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffd35a, depthWrite: false, toneMapped: false }),
+    );
+    reticle.name = 'optic-reticle';
+    reticle.position.set(0, 0.215, 0.033); root.add(reticle);
+    part(root, roundedBox('rear-sight', [0.105, 0.07, 0.045], dark, 0.01), [0, 0.19, 0.18]);
+    part(root, roundedBox('front-sight', [0.035, 0.105, 0.035], dark, 0.006), [0, 0.17, -0.78]);
+    part(root, roundedBox('charging-handle', [0.19, 0.035, 0.07], accent, 0.008), [0, 0.13, 0.1]);
+    const bolt = part(root, roundedBox('bolt-or-slide', [0.052, 0.06, 0.18], MAT.brass(), 0.01), [0.112, 0.035, -0.045]);
     bolt.userData.restZ = bolt.position.z;
-    addSocket('muzzle-socket', [0, 0.005, -1.18]);
-    addSocket('eject-socket', [0.13, 0.05, -0.08]);
-    addSocket('grip-socket-r', [0.03, -0.13, 0.04]);
-    addSocket('support-socket-l', [-0.03, -0.08, -0.55]);
+    addSocket('muzzle-socket', [0, 0.005, -1.24]);
+    addSocket('eject-socket', [0.145, 0.055, -0.07]);
+    addSocket('grip-socket-r', [0.035, -0.135, 0.045]);
+    addSocket('support-socket-l', [-0.035, -0.085, -0.58]);
   } else if (id === 'smg') {
     part(root, roundedBox('receiver', [0.21, 0.22, 0.42], metal, 0.04), [0, 0, -0.12]);
     part(root, roundedBox('tall-rear-housing', [0.2, 0.25, 0.18], dark, 0.035), [0, 0.08, 0.08]);
@@ -274,6 +346,17 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     flash.position.copy(muzzleSocket.position).add(new THREE.Vector3(0, 0, -0.18));
     flash.visible = false;
     root.add(flash);
+  }
+  if (flattenMaterials && id === 'carbine') {
+    const compatibilityHidden = new Set([
+      'receiver-side-panel', 'receiver-accent-stripe', 'stock-support-rod',
+      'trigger-guard-front', 'trigger-guard-bottom', 'trigger',
+      'fore-end-side-rail', 'fore-end-vent', 'rail-tooth', 'gas-block',
+      'rear-sight', 'front-sight', 'charging-handle', 'bolt-or-slide',
+    ]);
+    root.traverse((node) => {
+      if (compatibilityHidden.has(node.name)) node.visible = false;
+    });
   }
   root.traverse((node) => {
     if (node instanceof THREE.Mesh) {
@@ -355,6 +438,7 @@ type OperatorRig = {
   leftShin: THREE.Group;
   rightShin: THREE.Group;
   weaponSocket: THREE.Group;
+  reactionRoot: THREE.Group;
   weapon?: THREE.Group;
   weaponId: WeaponId;
 };
@@ -371,6 +455,13 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   weapon.name = `operator-${weaponId}`;
   weapon.scale.setScalar(weaponId === 'smg' ? 0.72 : 0.68);
   weapon.rotation.y = Math.PI;
+  // World weapons are presentation only: visual recoil must never move an authoritative hit proxy.
+  weapon.traverse((node) => {
+    if (node instanceof THREE.Mesh) {
+      node.userData.presentationOnly = true;
+      node.raycast = () => undefined;
+    }
+  });
   rig.weaponSocket.add(weapon);
   rig.weapon = weapon;
   rig.weaponId = weaponId;
@@ -385,6 +476,12 @@ export function fireOperator(root: THREE.Group): void {
   }
 }
 
+export function reactOperator(root: THREE.Group, zone: 'head' | 'body' | 'limb'): void {
+  root.userData.operatorHitAt = performance.now();
+  root.userData.operatorHitZone = zone;
+  root.userData.operatorHitSign = Number(root.userData.operatorHitSign ?? -1) * -1;
+}
+
 export function poseOperator(
   root: THREE.Group,
   stance: OperatorStance,
@@ -397,8 +494,17 @@ export function poseOperator(
   if (!rig) return;
   const shotAge = performance.now() - Number(root.userData.operatorShotAt ?? -10_000);
   const shotKick = shotAge < 180 ? Math.sin((shotAge / 180) * Math.PI) : 0;
-  rig.weaponSocket.position.z = -0.36 + shotKick * 0.11;
-  rig.weaponSocket.rotation.x = -shotKick * 0.12;
+  const hitAge = performance.now() - Number(root.userData.operatorHitAt ?? -10_000);
+  const rawHitZone = root.userData.operatorHitZone;
+  const hitZone = rawHitZone === 'head' || rawHitZone === 'limb' ? rawHitZone : 'body';
+  const hitReaction = hitReactionAt(hitAge, hitZone);
+  const hitSign = Number(root.userData.operatorHitSign ?? 1);
+  rig.weaponSocket.position.x = hitReaction.roll * hitSign * 0.18;
+  rig.weaponSocket.position.z = -0.36 + shotKick * 0.11 + hitReaction.envelope * 0.055;
+  rig.weaponSocket.rotation.x = -shotKick * 0.12 + hitReaction.pitch;
+  rig.weaponSocket.rotation.z = hitReaction.roll * hitSign;
+  rig.reactionRoot.rotation.x = hitReaction.pitch * 0.72;
+  rig.reactionRoot.rotation.z = hitReaction.roll * hitSign * 0.85;
   const actionPart = rig.weapon?.getObjectByName(rig.weaponId === 'scattergun' ? 'pump' : 'bolt-or-slide');
   if (actionPart) {
     const restZ = Number(actionPart.userData.restZ ?? actionPart.position.z);
@@ -449,6 +555,11 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     const mesh = roundedBox(meshName, size, material, Math.min(...size) * 0.3, 3);
     mesh.position.y = y; mesh.userData.hitZone = 'limb'; parent.add(mesh); return mesh;
   };
+  const presentationOnly = (mesh: THREE.Mesh): THREE.Mesh => {
+    mesh.userData.presentationOnly = true;
+    mesh.raycast = () => undefined;
+    return mesh;
+  };
 
   const pelvis = joint(root, 'pelvis-joint', [0, 0.9, 0]);
   const pelvisArmour = roundedBox('pelvis-armour', [0.5, 0.28, 0.32], armour, 0.08, 3);
@@ -460,6 +571,27 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
   vest.position.set(0, 0.4, -0.04); vest.userData.hitZone = 'body'; spine.add(vest);
   const band = roundedBox('team-identifier', [0.74, 0.085, 0.43], identifier, 0.02, 2);
   band.position.set(0, team === 0 ? 0.55 : 0.42, -0.06); band.rotation.z = team === 0 ? 0 : -0.28; band.userData.hitZone = 'body'; spine.add(band);
+
+  // Asymmetric presentation-only field gear improves team silhouettes and can
+  // react to hits without moving the authoritative body/head/limb meshes.
+  const reactionRoot = joint(spine, 'presentation-reaction-gear', [0, 0, 0]);
+  if (flattenMaterials) {
+    for (const name of ['field-radio-pack', 'asymmetric-shoulder-plate', 'utility-pouch', 'team-radio-antenna']) {
+      const placeholder = new THREE.Group();
+      placeholder.name = name;
+      reactionRoot.add(placeholder);
+    }
+  } else {
+    const backpack = presentationOnly(roundedBox('field-radio-pack', [0.42, 0.48, 0.18], armour, 0.06, 2));
+    backpack.position.set(team === 0 ? -0.07 : 0.07, 0.38, 0.25); reactionRoot.add(backpack);
+    const shoulderPlate = presentationOnly(roundedBox('asymmetric-shoulder-plate', [0.3, 0.13, 0.34], identifier, 0.035, 2));
+    shoulderPlate.position.set(team === 0 ? -0.44 : 0.44, 0.67, 0); shoulderPlate.rotation.z = team === 0 ? -0.12 : 0.12; reactionRoot.add(shoulderPlate);
+    const utilityPouch = presentationOnly(roundedBox('utility-pouch', [0.2, 0.22, 0.13], uniform, 0.035, 2));
+    utilityPouch.position.set(team === 0 ? 0.24 : -0.24, 0.05, -0.21); reactionRoot.add(utilityPouch);
+    const antenna = presentationOnly(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), identifier));
+    antenna.name = 'team-radio-antenna'; antenna.position.set(team === 0 ? -0.16 : 0.16, 0.78, 0.22); antenna.rotation.z = team === 0 ? -0.12 : 0.12; reactionRoot.add(antenna);
+  }
+
   const neck = joint(spine, 'neck-joint', [0, 0.81, 0]);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.225, 16, 12), skin); head.position.y = 0.18; head.userData.hitZone = 'head'; head.castShadow = true; neck.add(head);
   const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.255, 16, 9, 0, Math.PI * 2, 0, Math.PI * 0.58), armour);
@@ -495,7 +627,7 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     leftForearm: forearms[0], rightForearm: forearms[1],
     leftThigh: thighs[0], rightThigh: thighs[1],
     leftShin: shins[0], rightShin: shins[1],
-    weaponSocket, weaponId,
+    weaponSocket, reactionRoot, weaponId,
   };
   root.userData.operatorRig = rig;
   setOperatorWeapon(root, weaponId, flattenMaterials);

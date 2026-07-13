@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, setOperatorWeapon } from './art-kit';
+import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, reactOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
 import {
   BOT_REACTION_DELAY,
@@ -12,7 +12,7 @@ import {
   respawnBotState,
   scoreBotSpawn,
 } from './bot-ai';
-import { classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
+import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -48,8 +48,11 @@ import { ArenaMap, buildArena } from './map';
 import { shouldRevealEnemy, worldToMinimap } from './minimap';
 import { loadArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
+import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { ArenaNetwork } from './network';
+import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
 import { CharacterPhysics } from './physics';
+import { TracerPool } from './tracer-pool';
 import { WeaponPresentation } from './weapon-presentation';
 import {
   DeathMessage,
@@ -123,9 +126,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · LIGHTING, INPUT & TACTICAL AI PASS 06</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT PRESENTATION PASS 07</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A compact retro-future skirmish with a warmer procedural sky, tuned controller response, tactical spawn scoring and one readable close-range rival.</p>
+    <p class="lede">A compact retro-future skirmish with a rebuilt M86 carbine, articulated operator kit, layered original weapon audio and tactical close-range pressure.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -295,6 +298,7 @@ function buildSky(): void {
 buildSky();
 const arena: ArenaMap = buildArena(scene);
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
+const tracerPool = new TracerPool(scene);
 
 const player = {
   id: createPlayerId(),
@@ -328,6 +332,7 @@ const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
 const grenades: GrenadeEntity[] = [];
 const processedNonces = new Set<number>();
+const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
@@ -347,7 +352,7 @@ let deferredFireAt = 0;
 let lastGroundedAt = 0;
 let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
-let lastFootstepAt = 0;
+let footstepAccumulator: FootstepAccumulator = { distance: 0, side: 0 };
 let lastFrame = performance.now();
 let lastHudAt = 0;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
@@ -381,7 +386,19 @@ function playerSimulationEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden');
 }
 
+function interruptReload(force = false, now = performance.now()): void {
+  if (!player.reloadState) {
+    weaponView.cancelReload();
+    return;
+  }
+  if (force || cancelReload(player.reloadState, now)) {
+    player.reloadState = null;
+    weaponView.cancelReload();
+  }
+}
+
 function clearGameplayInput(): void {
+  interruptReload(false);
   keys.clear();
   gamepadMove = { x: 0, y: 0 };
   gamepadLookRate = { yaw: 0, pitch: 0 };
@@ -475,7 +492,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) =
 player.weapon = fieldKitById(selectedFieldKit).weapon;
 renderFieldKitSelection();
 
-const viewFill = new THREE.PointLight(0xd8ecff, 0.9, 5);
+const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
 viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
 
@@ -562,7 +579,13 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'shot') {
-    if (message.by !== player.id) renderRemoteShot(message);
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    const prior = remoteShotAdmissions.get(message.by) ?? createRemoteShotAdmissionState();
+    const admission = admitRemoteShot(message, sender?.snapshot, performance.now(), prior);
+    if (!admission.accepted) return;
+    remoteShotAdmissions.set(message.by, admission.nextState);
+    renderRemoteShot(message);
     return;
   }
   if (message.type === 'hit' && message.target === player.id && !processedNonces.has(message.nonce)) {
@@ -599,8 +622,9 @@ function renderRemoteShot(message: ShotMessage): void {
   const end = origin.clone().addScaledVector(direction, 50);
   const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.tracerDistance);
-  spawnTracer(origin, direction, trace.tracerDistance, WEAPONS[message.weapon].color);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
+  const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
+  spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   if (remoteOperator) fireOperator(remoteOperator);
   if (trace.blockedByCover) {
     spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
@@ -632,6 +656,7 @@ function applyDamage(damage: number, attacker: string): void {
   element<HTMLElement>('#damage-flash').classList.remove('pulse');
   requestAnimationFrame(() => element<HTMLElement>('#damage-flash').classList.add('pulse'));
   if (player.hp <= 0) {
+    interruptReload(true, now);
     player.alive = false;
     player.deaths += 1;
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, nonce: randomNonce() };
@@ -663,6 +688,7 @@ function removeRemote(id: string, reason: string): void {
   if (!remote) return;
   scene.remove(remote.root);
   remotes.delete(id);
+  remoteShotAdmissions.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -735,6 +761,7 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
 }
 
 function respawn(requestLock = true): void {
+  interruptReload(true);
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
   player.position.copy(spawnPoint());
@@ -755,6 +782,7 @@ function respawn(requestLock = true): void {
   cameraHeightOffset = 0;
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
+  footstepAccumulator = { distance: 0, side: 0 };
   const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
   if (player.weapon !== deploymentWeapon) {
     player.weapon = deploymentWeapon;
@@ -825,6 +853,7 @@ function finishReload(now: number): void {
     player.ammo[player.weapon] = state.ammo;
     player.reserve[player.weapon] = state.reserve;
     player.reloadState = null;
+    weaponView.cancelReload();
   }
 }
 
@@ -880,8 +909,9 @@ function tryFire(now: number): void {
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const baseDirection = camera.getWorldDirection(new THREE.Vector3());
   const moving = Math.hypot(player.velocity.x, player.velocity.z) > 1.2;
+  const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
   const spread = computeSpread(spec, {
-    ads: adsHeld,
+    ads: adsSettled,
     moving,
     crouched: player.stance === 'crouch',
     prone: player.stance === 'prone',
@@ -898,7 +928,9 @@ function tryFire(now: number): void {
       .addScaledVector(cameraUp, sample.y)
       .normalize();
     const result = castShot(origin, direction);
-    spawnTracer(origin, direction, result.distance, spec.color);
+    const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
+    const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
+    spawnTracer(visualStart, authoritativeEnd, spec.color);
     if (!result.playerId && !result.targetId && result.distance < 89) {
       const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
@@ -923,6 +955,8 @@ function tryFire(now: number): void {
     else {
       const remote = remotes.get(target);
       if (remote && remote.snapshot.team !== player.team) {
+        const remoteOperator = remote.root.userData.operator as THREE.Group | undefined;
+        if (remoteOperator) reactOperator(remoteOperator, hit.zone);
         const nonce = randomNonce();
         network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), nonce });
         showHitmarker(hit.zone === 'head');
@@ -1085,6 +1119,7 @@ function selectBotTacticalWaypoint(bot: BotPlayer): number {
 function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return;
+  reactOperator(bot.root, zone);
   bot.hp = Math.max(0, bot.hp - damage);
   showHitmarker(zone === 'head');
   audio.hit(zone === 'head');
@@ -1234,7 +1269,8 @@ function updateBots(dt: number, now: number): void {
       const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
       const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
       const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
-      spawnTracer(origin, direction, resolution.tracerDistance, WEAPONS.carbine.color);
+      const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
+      spawnTracer(botMuzzle ?? origin, visibleEnd, WEAPONS.carbine.color);
       if (resolution.blockedByCover) {
         spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
         audio.impact('concrete', visibleEnd.distanceTo(player.position));
@@ -1411,15 +1447,8 @@ function spawnImpactFlash(
   impactPresentation.impact(point, normal.normalize(), surface);
 }
 
-function spawnTracer(origin: THREE.Vector3, direction: THREE.Vector3, distance: number, color: number): void {
-  const geometry = new THREE.BufferGeometry().setFromPoints([origin.clone(), origin.clone().addScaledVector(direction, distance)]);
-  const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.72 }));
-  scene.add(line);
-  setTimeout(() => {
-    scene.remove(line);
-    geometry.dispose();
-    (line.material as THREE.Material).dispose();
-  }, 55);
+function spawnTracer(start: THREE.Vector3, end: THREE.Vector3, color: number): void {
+  tracerPool.emit(start, end, color);
 }
 
 function showHitmarker(headshot = false): void {
@@ -1499,10 +1528,15 @@ function updatePhysics(dt: number): void {
   if (movement.blockedZ) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
 
   const moving = input.lengthSq() > 0 && playerGrounded;
-  const footstepInterval = currentSprinting ? 300 : prone ? 760 : crouched ? 575 : 405;
-  if (moving && now - lastFootstepAt >= footstepInterval) {
-    lastFootstepAt = now;
-    audio.footstep(currentSprinting, crouched || prone);
+  const appliedHorizontalDistance = playerGrounded ? Math.hypot(movement.appliedDelta.x, movement.appliedDelta.z) : 0;
+  const footsteps = advanceFootsteps(
+    footstepAccumulator,
+    appliedHorizontalDistance,
+    strideLength(player.stance, currentSprinting),
+  );
+  footstepAccumulator = footsteps.state;
+  for (let index = 0; index < footsteps.emitted; index += 1) {
+    audio.footstep(classifyFootstepSurface(player.position), currentSprinting, crouched || prone);
   }
   weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
@@ -1648,8 +1682,9 @@ function updateHud(now: number): void {
   if (gameStarted) updateMatchState(now);
   const spec = WEAPONS[player.weapon];
   const speed = Math.hypot(player.velocity.x, player.velocity.z);
+  const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
   const spread = computeSpread(spec, {
-    ads: adsHeld,
+    ads: adsSettled,
     moving: speed > 1.2,
     crouched: player.stance === 'crouch',
     prone: player.stance === 'prone',
@@ -1658,7 +1693,7 @@ function updateHud(now: number): void {
   const crosshairGap = THREE.MathUtils.clamp(5 + spread * 320, 5, 23);
   const crosshair = element<HTMLElement>('#crosshair');
   crosshair.style.setProperty('--spread', `${crosshairGap}px`);
-  crosshair.classList.toggle('ads', adsHeld);
+  crosshair.classList.toggle('ads', adsSettled);
   const [aqua, coral] = teamScores();
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
@@ -1865,6 +1900,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 function resetForMode(): void {
+  interruptReload(true);
   player.kills = 0;
   player.deaths = 0;
   player.hp = 100;
@@ -1950,6 +1986,7 @@ function frame(now: number): void {
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
     impactPresentation.update(frameDt);
+    tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
     updateHud(now);
     if (!debugRenderPaused) renderer.render(scene, camera);
@@ -1988,6 +2025,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       weapon: player.weapon,
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
+      reloading: player.reloadState !== null,
       stance: player.stance,
       crouched: player.stance === 'crouch',
       prone: player.stance === 'prone',
@@ -2004,6 +2042,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       waypoint: bot.waypoint,
       blockedSince: bot.blockedSince,
       hasLineOfSight: bot.hasLineOfSight,
+      presentationReady: ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
+        .every((name) => bot.root.getObjectByName(name) !== undefined),
+      presentationWeaponSafe: (() => {
+        const weapon = bot.root.getObjectByName(`operator-${bot.root.userData.operatorRig?.weaponId ?? 'carbine'}`);
+        if (!weapon) return false;
+        let safe = true;
+        weapon.traverse((node) => {
+          if (node instanceof THREE.Mesh && node.userData.presentationOnly !== true) safe = false;
+        });
+        return safe;
+      })(),
     })),
     remotes: remotes.size,
     remotePlayers: [...remotes.values()].map((remote) => ({
@@ -2013,8 +2062,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     })),
     grenades: grenades.length,
     activeImpactParticles: impactPresentation.activeParticles(),
+    activeImpactMarks: impactPresentation.activeMarks(),
+    activeTracers: tracerPool.activeCount(),
     originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
     weaponReady: weaponView.isReady(),
+    weaponPresentation: weaponView.presentationState(),
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
     render: {

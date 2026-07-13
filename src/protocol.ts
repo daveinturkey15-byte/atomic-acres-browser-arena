@@ -80,6 +80,23 @@ export function isGameMessage(value: unknown): value is GameMessage {
   }
 }
 
+export function messageBelongsToPlayer(message: GameMessage, playerId: string): boolean {
+  if (!playerId) return false;
+  switch (message.type) {
+    case 'join':
+    case 'state':
+      return message.player.id === playerId;
+    case 'shot':
+    case 'hit':
+    case 'chat':
+      return message.by === playerId;
+    case 'death':
+      return message.victim === playerId;
+    case 'leave':
+      return message.playerId === playerId;
+  }
+}
+
 export function sanitizeName(value: string): string {
   const clean = value.replace(/[^a-zA-Z0-9 _-]/g, '').trim().slice(0, 16);
   return clean || `Player${Math.floor(Math.random() * 900 + 100)}`;

@@ -1,5 +1,5 @@
 import { DataConnection, Peer } from 'peerjs';
-import { GameMessage, isGameMessage } from './protocol';
+import { GameMessage, isGameMessage, messageBelongsToPlayer } from './protocol';
 
 export type NetworkRole = 'offline' | 'host' | 'client';
 
@@ -92,7 +92,11 @@ export class ArenaNetwork {
     connection.on('open', () => this.onStatus(`${this.guests.size} guest connection${this.guests.size === 1 ? '' : 's'}`, 'ok'));
     connection.on('data', (payload) => {
       if (!isGameMessage(payload)) return;
-      if (payload.type === 'join') playerId = payload.player.id;
+      if (!playerId) {
+        if (payload.type !== 'join') return;
+        playerId = payload.player.id;
+      }
+      if (!messageBelongsToPlayer(payload, playerId)) return;
       this.onMessage(payload);
       this.broadcast(payload, connection);
     });

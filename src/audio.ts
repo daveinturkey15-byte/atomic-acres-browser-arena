@@ -1,4 +1,4 @@
-import type { ImpactSurface } from './combat-feedback';
+import type { FootstepSurface, ImpactSurface } from './combat-feedback';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 
@@ -105,6 +105,12 @@ export class ArenaAudio {
       q: 0.48,
       delay: 0.025,
     }, this.ambience);
+    if (weapon === 'carbine') {
+      // Original M86 pressure and yard-reflection layers; short enough to stay readable at full RPM.
+      this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', this.weapons, 0.008);
+      this.noise({ duration: 0.14, volume: 0.046 * attenuation, filter: 'bandpass', frequency: 830, q: 0.62, delay: 0.058 }, this.ambience);
+      if (!remote) this.noise({ duration: 0.022, volume: 0.046, filter: 'highpass', frequency: 4200, q: 0.55, delay: 0.043 }, this.feedback);
+    }
 
     if (!remote) {
       const mechanismDelay = weapon === 'scattergun' ? 0.21 : 0.055;
@@ -193,18 +199,29 @@ export class ArenaAudio {
     this.sweep(135, 62, 0.11, 0.075, 'sawtooth', this.feedback);
   }
 
-  footstep(sprinting = false, crouched = false): void {
+  footstep(surface: FootstepSurface, sprinting = false, crouched = false): void {
     this.stepVariant = (this.stepVariant + 1) % 4;
     const variation = [0.94, 1.04, 0.98, 1.08][this.stepVariant];
     const base = (sprinting ? 82 : crouched ? 54 : 68) * variation;
+    const profile = surface === 'asphalt'
+      ? { frequency: 1_050, tone: 72, volume: 1 }
+      : surface === 'concrete'
+        ? { frequency: 1_420, tone: 86, volume: 0.94 }
+        : surface === 'wood'
+          ? { frequency: 720, tone: 118, volume: 0.9 }
+          : { frequency: 430, tone: 48, volume: 0.78 };
     this.noise({
-      duration: sprinting ? 0.07 : 0.052,
-      volume: crouched ? 0.022 : sprinting ? 0.052 : 0.034,
-      filter: 'lowpass',
-      frequency: sprinting ? 620 : 480,
-      q: 0.7,
+      duration: sprinting ? 0.075 : 0.055,
+      volume: (crouched ? 0.022 : sprinting ? 0.052 : 0.034) * profile.volume,
+      filter: surface === 'soil' ? 'lowpass' : 'bandpass',
+      frequency: profile.frequency,
+      q: surface === 'concrete' ? 1.15 : 0.72,
     }, this.movement);
-    this.sweep(base, 38, sprinting ? 0.075 : 0.06, crouched ? 0.018 : 0.034, 'triangle', this.movement);
+    this.sweep(base + profile.tone * 0.2, Math.max(32, profile.tone * 0.48), sprinting ? 0.075 : 0.06, crouched ? 0.018 : 0.034, 'triangle', this.movement);
+    if (surface === 'wood') this.tone(profile.tone, 0.035, crouched ? 0.012 : 0.022, 'square', this.movement, 0.018);
+    else if (surface === 'asphalt' || surface === 'concrete') {
+      this.noise({ duration: 0.022, volume: crouched ? 0.008 : 0.014, filter: 'highpass', frequency: 2_800, q: 0.6, delay: 0.012 }, this.movement);
+    }
   }
 
   land(impactSpeed: number): void {

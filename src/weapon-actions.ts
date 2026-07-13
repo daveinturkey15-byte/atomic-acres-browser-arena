@@ -11,6 +11,8 @@ export type WeaponActionEvent =
 export type ReloadPose = {
   magazineDrop: number;
   magazineTwist: number;
+  magazineForward: number;
+  magazineLateral: number;
   handToReload: number;
   shellVisible: boolean;
   shellTravel: number;
@@ -57,6 +59,8 @@ export function reloadPoseAt(weapon: WeaponId, rawProgress: number): ReloadPose 
     return {
       magazineDrop: 0,
       magazineTwist: 0,
+      magazineForward: 0,
+      magazineLateral: 0,
       handToReload: smoothstep(0.05, 0.16, progress) * (1 - smoothstep(0.82, 0.94, progress)),
       shellVisible: activeInsert && insertionPhase > 0.12 && insertionPhase < 0.78,
       shellTravel: activeInsert ? smoothstep(0.15, 0.72, insertionPhase) : 0,
@@ -70,6 +74,8 @@ export function reloadPoseAt(weapon: WeaponId, rawProgress: number): ReloadPose 
   return {
     magazineDrop: holdOut * 0.52 + insertion * (1 - smoothstep(0.78, 0.84, progress)) * 0.04,
     magazineTwist: holdOut * 0.24,
+    magazineForward: holdOut * (weapon === 'carbine' ? 0.17 : 0.1),
+    magazineLateral: holdOut * (weapon === 'carbine' ? -0.075 : -0.045),
     handToReload: smoothstep(0.06, 0.2, progress) * (1 - smoothstep(0.82, 0.94, progress)),
     shellVisible: false,
     shellTravel: 0,

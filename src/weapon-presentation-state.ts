@@ -1,0 +1,61 @@
+import type { HitZone } from './gameplay';
+import type { WeaponId } from './protocol';
+
+export type FireCycleState = {
+  flash: number;
+  boltTravel: number;
+  smokeScale: number;
+  casingReady: boolean;
+};
+
+export type HitReactionState = {
+  envelope: number;
+  pitch: number;
+  roll: number;
+};
+
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
+
+/** Bounded heat accumulator used only for original presentation smoke/flash layering. */
+export function advanceWeaponHeat(current: number, fired: boolean, dt: number, weapon: WeaponId): number {
+  const safeCurrent = clamp01(finite(current));
+  const safeDt = Math.max(0, finite(dt));
+  const perShot = weapon === 'scattergun' ? 0.32 : weapon === 'smg' ? 0.1 : 0.17;
+  const cooled = Math.max(0, safeCurrent - safeDt * 0.24);
+  return clamp01(cooled + (fired ? perShot : 0));
+}
+
+/** Deterministic visual fire-cycle envelope. Gameplay recoil and hit rays remain authoritative elsewhere. */
+export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): FireCycleState {
+  const ageMs = Math.max(0, finite(rawAgeMs));
+  const cycleMs = weapon === 'smg' ? 44 : weapon === 'scattergun' ? 620 : 62;
+  const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'smg' ? 36 : 52;
+  const flashProgress = clamp01(ageMs / flashDuration);
+  const flash = (1 - flashProgress) ** 2;
+  const actionAge = weapon === 'scattergun' ? Math.max(0, ageMs - 180) : ageMs;
+  const actionDuration = weapon === 'scattergun' ? 440 : cycleMs;
+  const actionProgress = clamp01(actionAge / actionDuration);
+  const boltTravel = actionProgress >= 1 ? 0 : Math.sin(actionProgress * Math.PI);
+  return {
+    flash,
+    boltTravel,
+    smokeScale: 0.72 + clamp01(finite(heat)) * 1.28,
+    casingReady: ageMs >= (weapon === 'scattergun' ? 230 : weapon === 'smg' ? 24 : 34),
+  };
+}
+
+/** Presentation-only reaction envelope; authoritative operator hit meshes do not consume these rotations. */
+export function hitReactionAt(rawAgeMs: number, zone: HitZone): HitReactionState {
+  const ageMs = Math.max(0, finite(rawAgeMs));
+  const duration = zone === 'head' ? 260 : 320;
+  const progress = clamp01(ageMs / duration);
+  if (progress >= 1) return { envelope: 0, pitch: 0, roll: 0 };
+  const envelope = Math.sin(progress * Math.PI) * (1 - progress * 0.32);
+  const strength = zone === 'head' ? 1 : zone === 'limb' ? 0.62 : 0.78;
+  return {
+    envelope: progress >= 1 ? 0 : envelope * strength,
+    pitch: (zone === 'head' ? -0.2 : 0.12) * envelope * strength,
+    roll: (zone === 'limb' ? 0.18 : 0.1) * envelope * strength,
+  };
+}

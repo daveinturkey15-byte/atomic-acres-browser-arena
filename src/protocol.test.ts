@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isGameMessage, isPlayerSnapshot, sanitizeName } from './protocol';
+import { isGameMessage, isPlayerSnapshot, messageBelongsToPlayer, sanitizeName } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -25,6 +25,14 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'laser', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 3 })).toBe(false);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1], direction: [0, 0, -1], nonce: 3 })).toBe(false);
+  });
+
+  it('binds relayed guest claims to the established player id', () => {
+    expect(messageBelongsToPlayer({ type: 'state', player }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ type: 'shot', by: 'abc', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], nonce: 1 }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ type: 'shot', by: 'spoof', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], nonce: 1 }, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', nonce: 2 }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', nonce: 2 }, 'abc')).toBe(false);
   });
 });
 

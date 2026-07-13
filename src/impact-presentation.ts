@@ -9,6 +9,7 @@ type Particle = {
 };
 
 const MAX_PARTICLES = 72;
+const MAX_MARKS = 32;
 const HIDDEN_Y = -10_000;
 
 const SURFACE_COLORS: Record<ImpactSurface, [number, number]> = {
@@ -21,10 +22,13 @@ const SURFACE_COLORS: Record<ImpactSurface, [number, number]> = {
 /** One-draw-call pooled impact debris for every combat surface. */
 export class ImpactPresentation {
   readonly points: THREE.Points;
+  readonly marks: THREE.InstancedMesh;
   private readonly positions = new Float32Array(MAX_PARTICLES * 3);
   private readonly colors = new Float32Array(MAX_PARTICLES * 3);
   private readonly particles: Particle[] = [];
+  private readonly markLife = new Float32Array(MAX_MARKS);
   private cursor = 0;
+  private markCursor = 0;
 
   constructor(scene: THREE.Scene, reducedDetail = false) {
     const geometry = new THREE.BufferGeometry();
@@ -46,6 +50,25 @@ export class ImpactPresentation {
     this.points.frustumCulled = false;
     this.points.visible = false;
     scene.add(this.points);
+    this.marks = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: reducedDetail ? 0.24 : 0.4,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -3,
+      }),
+      MAX_MARKS,
+    );
+    this.marks.name = 'pooled-surface-impact-marks';
+    this.marks.frustumCulled = false;
+    this.marks.visible = false;
+    const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let index = 0; index < MAX_MARKS; index += 1) this.marks.setMatrixAt(index, hiddenMatrix);
+    this.marks.instanceMatrix.needsUpdate = true;
+    scene.add(this.marks);
     for (let index = 0; index < MAX_PARTICLES; index += 1) {
       this.particles.push({ velocity: new THREE.Vector3(), life: 0, maxLife: 0, color: new THREE.Color() });
     }
@@ -77,6 +100,24 @@ export class ImpactPresentation {
       this.colors[positionIndex + 1] = particle.color.g;
       this.colors[positionIndex + 2] = particle.color.b;
     }
+    const markSlot = this.markCursor++ % MAX_MARKS;
+    const markNormal = normal.clone().normalize();
+    const markPosition = point.clone().addScaledVector(markNormal, 0.018);
+    const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
+    markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, Math.random() * Math.PI));
+    const markScale = surface === 'metal' ? 0.085 : surface === 'soil' ? 0.15 : 0.12;
+    this.marks.setMatrixAt(markSlot, new THREE.Matrix4().compose(
+      markPosition,
+      markRotation,
+      new THREE.Vector3(markScale, markScale, 1),
+    ));
+    this.marks.setColorAt(markSlot, new THREE.Color(
+      surface === 'metal' ? 0x5c482f : surface === 'wood' ? 0x4d3322 : surface === 'soil' ? 0x4a452f : 0x4a4b49,
+    ));
+    this.markLife[markSlot] = surface === 'metal' ? 5.5 : 8;
+    this.marks.visible = true;
+    this.marks.instanceMatrix.needsUpdate = true;
+    if (this.marks.instanceColor) this.marks.instanceColor.needsUpdate = true;
     this.points.visible = true;
     this.markDirty();
   }
@@ -106,11 +147,26 @@ export class ImpactPresentation {
       this.colors[index + 2] = particle.color.b * fade;
     }
     this.points.visible = activeCount > 0;
+    let marksChanged = false;
+    for (let slot = 0; slot < MAX_MARKS; slot += 1) {
+      if (this.markLife[slot] <= 0) continue;
+      this.markLife[slot] -= dt;
+      if (this.markLife[slot] <= 0) {
+        this.marks.setMatrixAt(slot, new THREE.Matrix4().makeScale(0, 0, 0));
+        marksChanged = true;
+      }
+    }
+    if (marksChanged) this.marks.instanceMatrix.needsUpdate = true;
+    this.marks.visible = this.activeMarks() > 0;
     if (changed) this.markDirty();
   }
 
   activeParticles(): number {
     return this.particles.reduce((count, particle) => count + Number(particle.life > 0), 0);
+  }
+
+  activeMarks(): number {
+    return this.markLife.reduce((count, life) => count + Number(life > 0), 0);
   }
 
   private markDirty(): void {
