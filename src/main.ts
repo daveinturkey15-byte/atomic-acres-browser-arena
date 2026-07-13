@@ -51,7 +51,9 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
+import { FramePacingSampler } from './frame-pacing';
 import { ArenaNetwork } from './network';
+import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
 import { CharacterPhysics } from './physics';
 import { TracerPool } from './tracer-pool';
@@ -129,7 +131,7 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · PERFORMANCE PASS 11</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · RESPONSIVE SYNC PASS 12</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -167,12 +169,13 @@ app.innerHTML = `
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
         <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
-        <label>GRAPHICS<select id="graphics-profile"><option value="balanced">PERFORMANCE 60</option><option value="quality">QUALITY</option><option value="compat">COMPATIBILITY</option></select></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="balanced">RESPONSIVE</option><option value="quality">QUALITY</option><option value="compat">COMPATIBILITY</option></select></label>
       </div>
       <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
   </section>
+  <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
   <div id="hud" hidden>
     <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
@@ -214,10 +217,16 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
 );
 const activeRenderConfig = renderProfileConfig(renderProfile);
-const reducedRenderMode = activeRenderConfig.reducedRepresentation;
-document.documentElement.classList.toggle('compat-render', reducedRenderMode);
+const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
+const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
+const staticMaterialMode = activeRenderConfig.staticMaterialMode;
+document.documentElement.classList.toggle('compat-render', renderProfile === 'compat');
 document.documentElement.dataset.renderProfile = renderProfile;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: activeRenderConfig.antialias, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: activeRenderConfig.antialias,
+  powerPreference: 'high-performance',
+});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = activeRenderConfig.shadows;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -225,8 +234,8 @@ renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.14;
-// Balanced is the default play path: full authored art at one physical pixel per CSS pixel,
-// without a second shadow-map draw of the whole arena. Quality remains an explicit option.
+// Responsive is the default play path: original authored art with reduced micro-detail,
+// cached shadows and bounded fill rate. Quality retains the complete presentation.
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
@@ -370,6 +379,7 @@ let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
 let footstepAccumulator: FootstepAccumulator = { distance: 0, side: 0 };
 let lastFrame = performance.now();
+const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let matchState: MatchState = createMatch(performance.now());
@@ -1598,7 +1608,7 @@ function updateRemotes(dt: number, now: number): void {
       removeRemote(id, 'timed out');
       continue;
     }
-    const alpha = 1 - Math.exp(-13 * dt);
+    const alpha = remoteInterpolationAlpha(dt);
     const remainingDistance = remote.root.position.distanceTo(remote.target);
     remote.root.position.lerp(remote.target, alpha);
     remote.root.rotation.y += shortestAngleDelta(remote.root.rotation.y, remote.targetYaw) * alpha;
@@ -2022,7 +2032,7 @@ if (invitedRoom && launchParams.get('autojoin') === '1') {
 
 setInterval(() => {
   if (gameStarted && network.role !== 'offline' && player.alive) network.send({ type: 'state', player: snapshot() });
-}, 60);
+}, STATE_BROADCAST_INTERVAL_MS);
 window.addEventListener('beforeunload', () => {
   if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id });
   network.close();
@@ -2030,7 +2040,15 @@ window.addEventListener('beforeunload', () => {
 
 function frame(now: number): void {
   try {
-    const frameDt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
+    const rawFrameMs = Math.max(0, now - lastFrame);
+    framePacing.record(rawFrameMs);
+    const pacing = framePacing.summary();
+    const refreshWarning = element<HTMLElement>('#refresh-warning');
+    refreshWarning.hidden = !pacing.displayLimited;
+    if (pacing.displayLimited) {
+      refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
+    }
+    const frameDt = Math.min(0.05, rawFrameMs / 1000);
     lastFrame = now;
     pollGamepad(frameDt);
     accumulator += frameDt;
@@ -2121,10 +2139,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       })(),
     })),
     remotes: remotes.size,
+    networkSync: {
+      stateIntervalMs: STATE_BROADCAST_INTERVAL_MS,
+      interpolationRate: REMOTE_INTERPOLATION_RATE,
+    },
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
       stance: remote.snapshot.stance ?? 'stand',
       position: remote.target.toArray(),
+      visualPosition: remote.root.position.toArray(),
+      snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
+      interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
     activeImpactParticles: impactPresentation.activeParticles(),
@@ -2140,6 +2165,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     menuVisible: !menu.classList.contains('hidden'),
     render: {
       profile: renderProfile,
+      representation: activeRenderConfig.representation,
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       points: renderer.info.render.points,
@@ -2149,6 +2175,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       shadows: activeRenderConfig.shadows,
       shadowMode: activeRenderConfig.shadowMode,
       pixelRatio: renderer.getPixelRatio(),
+      framePacing: framePacing.summary(),
+      staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
+        const material = node instanceof THREE.Mesh ? node.material : null;
+        return !Array.isArray(material) && material && 'color' in material
+          ? (material as THREE.MeshBasicMaterial).color.getHexString()
+          : null;
+      }) ?? [],
     },
   }),
   startSolo: () => {
@@ -2225,7 +2258,7 @@ async function bootstrap(): Promise<void> {
   });
   const artPromise = loadArenaArt(scene, (loaded, total) => {
     setStatus(`Loading authored arena models ${loaded}/${total}…`);
-  }, reducedRenderMode);
+  }, reducedWorldDetail);
   const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
   characterPhysics = physics;
   arenaArtRoot = art.root;
@@ -2235,8 +2268,8 @@ async function bootstrap(): Promise<void> {
     if (node instanceof THREE.Mesh && node.userData.blocksShots === true) arena.raycastMeshes.push(node);
   });
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
-  if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', reducedRenderMode);
-  batchStaticMeshes(art.root, scene, () => '', reducedRenderMode);
+  if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', staticMaterialMode);
+  batchStaticMeshes(art.root, scene, () => '', staticMaterialMode);
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   liftCrushedEnvironmentBlacks(scene, weaponView.root);
   weaponView.setWeapon(player.weapon, true);
@@ -2250,7 +2283,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 11 ready — balanced 60 FPS rendering, full arsenal, match flow and route storytelling active.');
+  setStatus('Pass 12 ready — responsive presentation, synchronized peers and full Quality mode available.');
   requestAnimationFrame(frame);
 }
 

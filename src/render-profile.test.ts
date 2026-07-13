@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { renderProfileConfig, resolveRenderProfile } from './render-profile';
 
 describe('render profiles', () => {
-  it('defaults to balanced full-art rendering', () => {
+  it('defaults to the responsive original-art profile', () => {
     expect(resolveRenderProfile('', null)).toBe('balanced');
     expect(renderProfileConfig('balanced')).toMatchObject({
-      reducedRepresentation: false,
-      shadows: true,
-      shadowMode: 'static',
-      pixelRatioCap: 1,
+      representation: 'responsive',
+      reducedRepresentation: true,
+      reducedWorldDetail: true,
+      reducedPresentationDetail: true,
+      staticMaterialMode: 'palette-basic',
+      shadows: false,
+      shadowMode: 'off',
+      pixelRatioCap: 0.85,
     });
   });
 

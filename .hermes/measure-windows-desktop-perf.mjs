@@ -86,8 +86,11 @@ try {
   console.log(JSON.stringify(results, null, 2));
   const balanced = results[0];
   if (!String(balanced.gpu.renderer).includes('AMD')) throw new Error(`Expected AMD renderer, got ${balanced.gpu.renderer}`);
-  if (balanced.timing.fps < 60) throw new Error(`Balanced profile missed 60 FPS: ${balanced.timing.fps.toFixed(2)}`);
-  if (balanced.timing.long50ms > 0) throw new Error(`Balanced profile had ${balanced.timing.long50ms} >50ms frames`);
+  if (balanced.timing.fps < 90) throw new Error(`Responsive profile missed 90 FPS headroom: ${balanced.timing.fps.toFixed(2)}`);
+  if (balanced.timing.p95ms > 20) throw new Error(`Responsive p95 exceeded 20ms: ${balanced.timing.p95ms.toFixed(2)}`);
+  if (balanced.timing.maxms > 50) throw new Error(`Responsive max frame exceeded 50ms: ${balanced.timing.maxms.toFixed(2)}`);
+  if (balanced.render.calls > 120) throw new Error(`Responsive draw calls exceeded 120: ${balanced.render.calls}`);
+  if (balanced.render.triangles > 150_000) throw new Error(`Responsive triangles exceeded 150000: ${balanced.render.triangles}`);
 } finally {
   ws.close();
 }

@@ -6,11 +6,35 @@ import { hitReactionAt } from './weapon-presentation-state';
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
+const textureBatchColors: Record<string, number> = {
+  'grass-turf.png': 0x789d55,
+  'asphalt-aged.png': 0x4b5557,
+  'concrete-poured.png': 0xa6a49a,
+  'brick-warm.png': 0xb57b5e,
+  'siding-aqua.png': 0x4eaaa7,
+  'siding-coral.png': 0xc66d5a,
+  'weapon-gunmetal.png': 0x4b555a,
+  'wood-deck.png': 0x78513b,
+  'roof-shingles.png': 0x595e63,
+};
 
 export type StaticBatchStats = {
   sourceMeshes: number;
   batches: number;
 };
+export type StaticBatchMaterialMode = 'preserve' | 'palette-basic';
+
+function batchDisplayColor(material: THREE.Material): THREE.Color {
+  const candidate = material as THREE.MeshStandardMaterial;
+  const stored = material.userData.batchColor;
+  const color = typeof stored === 'number'
+    ? new THREE.Color(stored)
+    : candidate.color?.clone() ?? new THREE.Color(0xffffff);
+  if (candidate.emissive && Math.max(candidate.emissive.r, candidate.emissive.g, candidate.emissive.b) > 0) {
+    color.lerp(candidate.emissive, Math.min(0.5, (candidate.emissiveIntensity ?? 0) * 0.35));
+  }
+  return color;
+}
 
 function materialBatchKey(material: THREE.Material): string {
   const candidate = material as THREE.MeshStandardMaterial & { transmission?: number };
@@ -41,8 +65,9 @@ export function batchStaticMeshes(
   root: THREE.Object3D,
   destination: THREE.Object3D,
   classify: (mesh: THREE.Mesh) => string = () => '',
-  flattenMaterials = false,
+  materialMode: StaticBatchMaterialMode = 'preserve',
 ): StaticBatchStats {
+  const simplifyMaterials = materialMode !== 'preserve';
   root.updateWorldMatrix(true, true);
   const groups = new Map<string, { material: THREE.Material; classification: string; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[] }>();
   root.traverse((node) => {
@@ -55,12 +80,26 @@ export function batchStaticMeshes(
       return false;
     })();
     if (!(node instanceof THREE.Mesh) || !node.visible || hasDynamicAncestor || node.userData.targetRoot || Array.isArray(node.material)) return;
+    const sourceMaterial = node.material as THREE.MeshBasicMaterial;
+    const canvasMap = typeof HTMLCanvasElement !== 'undefined' && sourceMaterial.map?.image instanceof HTMLCanvasElement;
+    if (simplifyMaterials && canvasMap) return;
     const classification = classify(node);
-    const key = flattenMaterials ? classification : `${materialBatchKey(node.material)}:${classification}`;
+    const displayColor = batchDisplayColor(node.material);
+    const opacityKey = node.material.transparent ? `t${node.material.opacity.toFixed(2)}` : 'opaque';
+    const key = simplifyMaterials ? `${displayColor.getHexString()}:${opacityKey}:${classification}` : `${materialBatchKey(node.material)}:${classification}`;
     let entry = groups.get(key);
     if (!entry) {
+      const material = materialMode === 'palette-basic'
+        ? new THREE.MeshBasicMaterial({
+            color: displayColor,
+            toneMapped: false,
+            transparent: node.material.transparent,
+            opacity: node.material.opacity,
+            depthWrite: !node.material.transparent,
+          })
+        : node.material;
       entry = {
-        material: flattenMaterials ? new THREE.MeshBasicMaterial({ vertexColors: true }) : node.material,
+        material,
         classification,
         meshes: [],
         geometries: [],
@@ -74,20 +113,10 @@ export function batchStaticMeshes(
       indexed.dispose();
     }
     geometry.applyMatrix4(node.matrixWorld);
-    if (flattenMaterials) {
+    if (simplifyMaterials) {
       for (const attribute of Object.keys(geometry.attributes)) {
         if (attribute !== 'position') geometry.deleteAttribute(attribute);
       }
-      const source = node.material as THREE.MeshStandardMaterial;
-      const color = source.color?.clone() ?? new THREE.Color(0xffffff);
-      if (source.emissive) color.lerp(source.emissive, Math.min(1, source.emissiveIntensity ?? 0));
-      const colors = new Float32Array(geometry.getAttribute('position').count * 3);
-      for (let index = 0; index < colors.length; index += 3) {
-        colors[index] = color.r;
-        colors[index + 1] = color.g;
-        colors[index + 2] = color.b;
-      }
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     }
     entry.meshes.push(node);
     entry.geometries.push(geometry);
@@ -105,8 +134,8 @@ export function batchStaticMeshes(
     }
     const mesh = new THREE.Mesh(geometry, entry.material);
     if (entry.classification) mesh.userData.hitZone = entry.classification;
-    mesh.castShadow = !flattenMaterials && entry.meshes.some((item) => item.castShadow);
-    mesh.receiveShadow = !flattenMaterials && entry.meshes.some((item) => item.receiveShadow);
+    mesh.castShadow = materialMode === 'preserve' && entry.meshes.some((item) => item.castShadow);
+    mesh.receiveShadow = materialMode === 'preserve' && entry.meshes.some((item) => item.receiveShadow);
     mesh.frustumCulled = true;
     batches.add(mesh);
     for (const source of entry.meshes) source.visible = false;
@@ -134,12 +163,15 @@ export function texturedMaterial(
   path: string,
   options: { color?: number; roughness?: number; metalness?: number; repeatX?: number; repeatY?: number } = {},
 ): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     map: texture(path, options.repeatX ?? 1, options.repeatY ?? 1),
     color: options.color ?? 0xffffff,
     roughness: options.roughness ?? 0.78,
     metalness: options.metalness ?? 0.03,
   });
+  const base = Object.entries(textureBatchColors).find(([suffix]) => path.endsWith(suffix))?.[1] ?? 0xffffff;
+  material.userData.batchColor = new THREE.Color(base).multiply(new THREE.Color(options.color ?? 0xffffff)).getHex();
+  return material;
 }
 
 export function roundedBox(
@@ -176,7 +208,7 @@ function part(root: THREE.Group, mesh: THREE.Mesh, position: [number, number, nu
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.Group {
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
-  const metal = flattenMaterials ? MAT.dark() : MAT.gunmetal();
+  const metal = MAT.gunmetal();
   const dark = MAT.dark();
   const rubber = MAT.rubber();
   const accent = new THREE.MeshStandardMaterial({

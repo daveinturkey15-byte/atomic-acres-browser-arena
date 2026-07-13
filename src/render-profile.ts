@@ -4,7 +4,11 @@ export const RENDER_PROFILE_STORAGE_KEY = 'atomic-acres-render-profile';
 
 export type RenderProfileConfig = {
   profile: RenderProfile;
+  representation: 'responsive' | 'full' | 'compat';
   reducedRepresentation: boolean;
+  reducedWorldDetail: boolean;
+  reducedPresentationDetail: boolean;
+  staticMaterialMode: 'preserve' | 'palette-basic';
   antialias: boolean;
   shadows: boolean;
   shadowMode: 'off' | 'static' | 'dynamic';
@@ -26,7 +30,11 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
   if (profile === 'compat') {
     return {
       profile,
+      representation: 'compat',
       reducedRepresentation: true,
+      reducedWorldDetail: true,
+      reducedPresentationDetail: true,
+      staticMaterialMode: 'palette-basic',
       antialias: false,
       shadows: false,
       shadowMode: 'off',
@@ -37,7 +45,11 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
   if (profile === 'quality') {
     return {
       profile,
+      representation: 'full',
       reducedRepresentation: false,
+      reducedWorldDetail: false,
+      reducedPresentationDetail: false,
+      staticMaterialMode: 'preserve',
       antialias: true,
       shadows: true,
       shadowMode: 'dynamic',
@@ -47,11 +59,15 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
   }
   return {
     profile,
-    reducedRepresentation: false,
+    representation: 'responsive',
+    reducedRepresentation: true,
+    reducedWorldDetail: true,
+    reducedPresentationDetail: true,
+    staticMaterialMode: 'palette-basic',
     antialias: true,
-    shadows: true,
-    shadowMode: 'static',
-    pixelRatioCap: 1,
-    shadowMapSize: 1024,
+    shadows: false,
+    shadowMode: 'off',
+    pixelRatioCap: 0.85,
+    shadowMapSize: 0,
   };
 }

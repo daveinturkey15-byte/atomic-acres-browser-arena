@@ -54,7 +54,8 @@ type DebugState = {
   };
   weaponActionHistory: string[];
   menuVisible: boolean;
-  render: { profile: 'balanced' | 'quality' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number };
+  networkSync: { stateIntervalMs: number; interpolationRate: number };
+  render: { profile: 'balanced' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
 };
 
 async function debug(page: Page): Promise<DebugState> {
@@ -97,7 +98,8 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('PERFORMANCE PASS 11');
+    await expect(page.locator('.eyebrow')).toContainText('RESPONSIVE SYNC PASS 12');
+    expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -358,7 +360,7 @@ test.describe('solo mechanics', () => {
 });
 
 test.describe('performance and stability', () => {
-  test('default full-art profile stays within the balanced GPU work budget', async ({ page }) => {
+  test('default responsive profile stays within the stable 60 Hz work budget', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=balanced');
@@ -366,12 +368,14 @@ test.describe('performance and stability', () => {
     await page.waitForTimeout(500);
     const state = await debug(page);
     expect(state.render.profile).toBe('balanced');
-    expect(state.render.reducedMode).toBe(false);
-    expect(state.render.shadows).toBe(true);
-    expect(state.render.shadowMode).toBe('static');
-    expect(state.render.pixelRatio).toBe(1);
-    expect(state.render.calls).toBeLessThanOrEqual(450);
-    expect(state.render.triangles).toBeLessThanOrEqual(300_000);
+    expect(state.render.representation).toBe('responsive');
+    expect(state.render.reducedMode).toBe(true);
+    expect(state.render.shadows).toBe(false);
+    expect(state.render.shadowMode).toBe('off');
+    expect(state.render.pixelRatio).toBeCloseTo(0.85, 5);
+    expect(state.render.calls).toBeLessThanOrEqual(120);
+    expect(state.render.triangles).toBeLessThanOrEqual(150_000);
+    expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
     expect(errors).toEqual([]);
   });
 
