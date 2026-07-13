@@ -1,7 +1,7 @@
 # Atomic Acres — Classes, Melee and Field Support Pass 14
 
 Date: 2026-07-13
-Status: release candidate — local gates passed; awaiting immutable public deployment
+Status: immutable Pass 14 review published and publicly verified
 
 ## Overview
 
@@ -113,4 +113,8 @@ Without copying commercial names or presentation:
   - Performance: `28.82 Hz`, median `34.7 ms`, p95 `35.4 ms`, max `35.9 ms`.
   - Quality: `28.99 Hz`, median `34.5 ms`, p95 `35.3 ms`, max `35.9 ms`.
 - Visual inspection: first-person arms and enemy operator are perceptually visible in both modes; Performance and Quality interiors retain open entrances, partitions, stairs and furniture; collision proxy telemetry is zero.
-- Remaining C9/C10 work: immutable public `review/pass14/` deployment, deployed console/asset verification and deployed two-peer WebRTC verification. Canonical root remains unchanged until owner acceptance.
+- Public review: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass14/?release=8e85fc4`
+- Pages revision: `3ad3740`; deployment diff contained only `review/pass14/`. The pre-existing review tree hash remained unchanged.
+- Public Performance and Quality booted with the expected hashed bundle and zero console/page errors.
+- Public WebRTC: reciprocal host/client, zero errors, snapshot age `5.1 ms`, interpolation error `0.126 m`, pistol replication passed and victim-side melee recorded one death.
+- Canonical root remains unchanged pending owner playtest/acceptance.
