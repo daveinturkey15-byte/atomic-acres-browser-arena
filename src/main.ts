@@ -56,6 +56,7 @@ import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissi
 import { CharacterPhysics } from './physics';
 import { TracerPool } from './tracer-pool';
 import { WeaponPresentation } from './weapon-presentation';
+import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import {
   DeathMessage,
   GameMessage,
@@ -128,7 +129,7 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · WORLD STORY PASS 10</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · PERFORMANCE PASS 11</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -166,6 +167,7 @@ app.innerHTML = `
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
         <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="balanced">PERFORMANCE 60</option><option value="quality">QUALITY</option><option value="compat">COMPATIBILITY</option></select></label>
       </div>
       <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
@@ -207,16 +209,25 @@ if (!minimapContextValue) throw new Error('Canvas2D minimap is unavailable');
 const minimapContext: CanvasRenderingContext2D = minimapContextValue;
 const audio = new ArenaAudio();
 
-const reducedRenderMode = new URLSearchParams(window.location.search).get('render') === 'compat';
+const renderProfile: RenderProfile = resolveRenderProfile(
+  window.location.search,
+  localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
+);
+const activeRenderConfig = renderProfileConfig(renderProfile);
+const reducedRenderMode = activeRenderConfig.reducedRepresentation;
 document.documentElement.classList.toggle('compat-render', reducedRenderMode);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !reducedRenderMode, powerPreference: 'high-performance' });
+document.documentElement.dataset.renderProfile = renderProfile;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: activeRenderConfig.antialias, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = !reducedRenderMode;
+renderer.shadowMap.enabled = activeRenderConfig.shadows;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
+renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.14;
-// Compatibility mode targets constrained/software-rendered Chromium; full-quality play keeps the normal ratio.
-renderer.setPixelRatio(reducedRenderMode ? 0.2 : Math.min(window.devicePixelRatio, 1.75));
+// Balanced is the default play path: full authored art at one physical pixel per CSS pixel,
+// without a second shadow-map draw of the whole arena. Quality remains an explicit option.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xb6c5c1, 70, 142);
@@ -287,8 +298,8 @@ function buildSky(): void {
   scene.add(new THREE.AmbientLight(0xc7d3d4, 0.38));
   const sun = new THREE.DirectionalLight(0xffd9a5, 2.8);
   sun.position.set(-32, 68, 34);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.castShadow = activeRenderConfig.shadows;
+  if (activeRenderConfig.shadows) sun.shadow.mapSize.set(activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize);
   sun.shadow.camera.left = -48;
   sun.shadow.camera.right = 48;
   sun.shadow.camera.top = 54;
@@ -1790,6 +1801,7 @@ if (launchParams.get('team') === '1') element<HTMLSelectElement>('#team').value 
 const sensitivityInput = element<HTMLInputElement>('#sensitivity');
 const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
 const fovInput = element<HTMLInputElement>('#field-of-view');
+const graphicsProfileInput = element<HTMLSelectElement>('#graphics-profile');
 const storedRange = (key: string, fallback: number, minimum: number, maximum: number): number => {
   const parsed = Number(localStorage.getItem(key));
   return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
@@ -1800,6 +1812,7 @@ preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
 sensitivityInput.value = String(sensitivity);
 controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
+graphicsProfileInput.value = renderProfile;
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
@@ -1811,6 +1824,14 @@ controllerSensitivityInput.addEventListener('input', () => {
 fovInput.addEventListener('input', () => {
   preferredFov = Number(fovInput.value);
   localStorage.setItem('atomic-acres-fov', String(preferredFov));
+});
+graphicsProfileInput.addEventListener('change', () => {
+  const selected = graphicsProfileInput.value as RenderProfile;
+  localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, selected);
+  const next = new URL(window.location.href);
+  if (selected === 'balanced') next.searchParams.delete('render');
+  else next.searchParams.set('render', selected);
+  window.location.assign(next);
 });
 
 function pollGamepad(dt: number): void {
@@ -2118,12 +2139,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
     render: {
+      profile: renderProfile,
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       points: renderer.info.render.points,
       lines: renderer.info.render.lines,
       sceneObjects: scene.children.length,
       reducedMode: reducedRenderMode,
+      shadows: activeRenderConfig.shadows,
+      shadowMode: activeRenderConfig.shadowMode,
+      pixelRatio: renderer.getPixelRatio(),
     },
   }),
   startSolo: () => {
@@ -2212,6 +2237,7 @@ async function bootstrap(): Promise<void> {
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', reducedRenderMode);
   batchStaticMeshes(art.root, scene, () => '', reducedRenderMode);
+  if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   liftCrushedEnvironmentBlacks(scene, weaponView.root);
   weaponView.setWeapon(player.weapon, true);
   respawn();
@@ -2224,7 +2250,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 10 ready — full arsenal, match flow, route storytelling and bounded ambient presentation active.');
+  setStatus('Pass 11 ready — balanced 60 FPS rendering, full arsenal, match flow and route storytelling active.');
   requestAnimationFrame(frame);
 }
 

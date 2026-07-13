@@ -54,15 +54,15 @@ type DebugState = {
   };
   weaponActionHistory: string[];
   menuVisible: boolean;
-  render: { calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean };
+  render: { profile: 'balanced' | 'quality' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number };
 };
 
 async function debug(page: Page): Promise<DebugState> {
   return page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot());
 }
 
-async function pageReady(page: Page): Promise<void> {
-  await page.goto('/?render=compat');
+async function pageReadyAt(page: Page, path: string): Promise<void> {
+  await page.goto(path);
   await page.waitForFunction(() => {
     const status = document.querySelector<HTMLElement>('#network-status');
     const solo = document.querySelector<HTMLButtonElement>('#solo');
@@ -70,6 +70,10 @@ async function pageReady(page: Page): Promise<void> {
     const snapshot = debugApi?.snapshot();
     return status?.dataset.kind === 'ok' && solo?.disabled === false && snapshot?.weaponReady === true && snapshot.originalArtLoaded === true;
   }, undefined, { timeout: 30_000 });
+}
+
+async function pageReady(page: Page): Promise<void> {
+  await pageReadyAt(page, '/?render=compat');
 }
 
 async function startSolo(page: Page): Promise<void> {
@@ -93,7 +97,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('WORLD STORY PASS 10');
+    await expect(page.locator('.eyebrow')).toContainText('PERFORMANCE PASS 11');
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -105,6 +109,8 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#sensitivity')).toBeVisible();
     await expect(page.locator('#controller-sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
+    await expect(page.locator('#graphics-profile')).toBeVisible();
+    await expect(page.locator('#graphics-profile')).toHaveValue('compat');
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';
@@ -352,7 +358,24 @@ test.describe('solo mechanics', () => {
 });
 
 test.describe('performance and stability', () => {
-  test('maintains interactive frame rate with bots active', async ({ page }) => {
+  test('default full-art profile stays within the balanced GPU work budget', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=balanced');
+    await startSolo(page);
+    await page.waitForTimeout(500);
+    const state = await debug(page);
+    expect(state.render.profile).toBe('balanced');
+    expect(state.render.reducedMode).toBe(false);
+    expect(state.render.shadows).toBe(true);
+    expect(state.render.shadowMode).toBe('static');
+    expect(state.render.pixelRatio).toBe(1);
+    expect(state.render.calls).toBeLessThanOrEqual(450);
+    expect(state.render.triangles).toBeLessThanOrEqual(300_000);
+    expect(errors).toEqual([]);
+  });
+
+  test('compatibility profile maintains the constrained browser budget', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReady(page);
@@ -370,6 +393,7 @@ test.describe('performance and stability', () => {
     }));
     const state = await debug(page);
     expect(fps).toBeGreaterThanOrEqual(40);
+    expect(state.render.profile).toBe('compat');
     expect(state.render.calls).toBeLessThanOrEqual(180);
     expect(state.render.triangles).toBeLessThanOrEqual(350_000);
     expect(errors).toEqual([]);
