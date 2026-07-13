@@ -100,3 +100,15 @@ The public Pass 06 first-person capture shows the carbine as a long dark rectang
 ## Audit reconciliation
 
 Two independent read-only audits completed and one operator audit timed out. Confirmed high-priority findings were corrected: ADS/physical-sight synchronization, reload lifecycle interruption, carbine silhouette/material hierarchy, bolt/magazine timing, distance/surface footsteps, pooled tracers, remote-shot admission, compatibility construction, operator presentation safety and bounded debug telemetry. The timeout produced no evidence; operator behavior was instead covered by local source review plus deterministic browser assertions for gear presence and non-raycast weapon presentation.
+
+## Published review candidate
+
+- Source build: `cbd3c172bc9264e117b5c359ca0c762d4d04342a`.
+- Pages build: `5dbe754f2cd4e2718d5c812adb7345171c3b86dc`.
+- URL: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass07/?release=cbd3c17>
+- Pages isolation: 15 changed files, all under `review/pass07/`; `outside_pass07: []`. Canonical root and Pass 04–06 review paths remain untouched.
+- GitHub Pages API reported the exact Pages commit with status `built`.
+- Public normal QA reproduced zero console errors and **547 calls / 333,258 triangles**.
+- Public compatibility QA reproduced zero console errors and **75 calls / 70,486 triangles**.
+- Public two-browser QA reproduced one remote each, prone stance replication and `24.19 m` spawn separation with zero errors.
+- Public menu/gameplay visual smoke confirmed Pass 07 identity, the deployed hashed bundle, centered visible gold reticle, readable arena/HUD, and no missing assets or release-blocking clipping. Browser console and JavaScript error buffers were empty.
