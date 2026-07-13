@@ -58,4 +58,13 @@ The game now clears 60 FPS render throughput on Dave's AMD desktop, but the acti
 
 ## Preserved authority and scope
 
-No damage, weapon tuning, bot lethality, movement authority, collision, camera-ray firing, networking, hit proxies, arena geometry, match rules, or bounded presentation capacities changed. Pass 10 remains immutable under `review/pass10/`; Pass 11 will publish separately under `review/pass11/` before canonical promotion.
+No damage, weapon tuning, bot lethality, movement authority, collision, camera-ray firing, networking, hit proxies, arena geometry, match rules, or bounded presentation capacities changed. Pass 10 remains immutable under `review/pass10/`; Pass 11 is published separately and promoted to the canonical root.
+
+## Release evidence
+
+- Source: `45351f7` (`Build Pass 11 desktop performance profiles`)
+- Pages: `2f44037981049f0d5e65b45360660e1c5ec4a6b4`
+- Review: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass11/?release=45351f7>
+- Canonical: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?release=2f44037>
+
+The deployment changed only canonical root assets/index and the new `review/pass11/` subtree; Pass 03–10 tree object IDs were unchanged. Public balanced solo smoke reported full art, one safe operator bot, static shadows, 412 calls / 269,514 triangles and zero page/console errors. The isolated public Windows AMD CDP gate measured **63.64 FPS**, p50 14.4 ms, p95 31.7 ms and zero >50 ms frames. Public two-browser PeerJS QA passed host/client reciprocal remote presence with zero errors.
