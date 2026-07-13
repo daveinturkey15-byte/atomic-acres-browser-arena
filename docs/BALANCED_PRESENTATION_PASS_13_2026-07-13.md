@@ -1,7 +1,7 @@
 # Atomic Acres — Balanced Presentation Pass 13
 
 Date: 2026-07-13
-Status: implementation and real-path QA in progress
+Status: immutable review published; owner-path acceptance pending
 
 ## Owner report
 
@@ -81,3 +81,16 @@ Balanced reaches `97.9%` of Compatibility's unlocked throughput in this sample w
 ## Remaining acceptance
 
 Pass 13 should first be published only to immutable `review/pass13/`. Canonical must remain Pass 12 until Dave confirms that the review build feels materially better in his normal play path.
+
+## Review release
+
+- Source revision: `9dd2b55`.
+- Pages revision: `d38a3eec1543e0681284048ae9cc529f4d5a51c7`.
+- Review URL: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass13/?release=9dd2b55
+- Pages isolation: `15` added files, all under `review/pass13/`; `outside_pass13: []`.
+- Canonical Pass 12 still serves `index-DQ9-GZeB.js` and was not changed.
+- Public review serves `index-DYZm5_gU.js`; Balanced reports `0.50` DPR, no AA, overlays hidden, `110` calls and `63,700` triangles in the public visual session.
+- Public visual/console smoke: passed, zero console and JavaScript errors.
+- Public WebRTC: a first moving-peer sample had reciprocal peers/errors `[]` but transient interpolation error `2.62 m`, above the unchanged `2 m` gate. An immediate rerun passed with reciprocal peers, errors `[]`, snapshot age `0.60 ms` and interpolation error `0.000482 m`. The verifier threshold was not weakened.
+
+The release is deliberately not canonical. Dave's direct normal-stream/controller assessment remains the final acceptance gate.
