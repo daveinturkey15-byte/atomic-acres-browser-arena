@@ -73,7 +73,7 @@ C7. Deployment adds only `review/pass12/` plus canonical root assets/index; Pass
 
 ## Local verification evidence
 
-Exact final source revision: pending commit.
+Exact game/source revision: `e0eec5d`.
 
 Deterministic and browser gates:
 
@@ -119,7 +119,7 @@ This proves the application now has ample rendering headroom, but the current Wi
 
 ## Release evidence
 
-Source revision: pending.
+Source revision: `e0eec5d`.
 
 Pages revision: pending.
 
