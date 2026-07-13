@@ -41,7 +41,8 @@ Baseline: Pass 07 documentation `d4936f8`; game source `cbd3c17`
 - Pass 08 — `584b1f4` (`Build Pass 08 arsenal and operator parity`)
 - Pass 09 — `c3c46e3` (`Build Pass 09 match flow and rematch loop`)
 - Pass 10 — `69977d5` (`Build Pass 10 arena storytelling and route identity`)
-- Pages deployment — `d5e2a57` (`Publish Atomic Acres review passes 08 through 10`)
+- Review Pages deployment — `d5e2a57` (`Publish Atomic Acres review passes 08 through 10`)
+- Canonical live promotion — `31b638f` (`Promote Atomic Acres Pass 10 to live root`)
 
 ### Local verification
 
@@ -66,6 +67,19 @@ The deployment diff was mechanically confined to `review/pass08/`, `review/pass0
 
 Public smoke verification confirmed the correct Pass 08/09/10 identity at each path, original-art and weapon readiness, zero page/console errors, Pass 10 story readiness, and two-browser Pass 10 host/client replication. The public compatibility smoke measured `43` calls / `62,542` triangles; the more demanding local active compatibility capture above remains the release-budget reference.
 
+### Canonical audit and promotion
+
+The final pre-promotion audit distinguished source milestones from public review snapshots rather than inventing missing releases:
+
+- Passes 01 and 02 are retained source milestones (`b345392`, `3d70e62`) but were never published as `review/pass01/` or `review/pass02/`.
+- Passes 03–10 retain public review snapshots and all returned HTTP 200 after promotion.
+- The corrected Pass 03 source milestone `e9e1c7f` and every later Pass 04–09 source milestone are ancestors of Pass 10 `69977d5`; Pass 10 therefore contains the complete source progression.
+- A fresh gate before promotion passed `87/87` units, `12/12` functional Chromium scenarios, production build, isolated performance, and `git diff --check`.
+- The canonical deployment changed only root `index.html` and hashed root assets; the `review/` tree hash was unchanged.
+- Public canonical full-quality solo smoke loaded Pass 10 with original art, weapon, operator and arena-story readiness and zero page/console errors. Compatibility active smoke measured `77` calls / `71,998` triangles.
+
+Canonical URL: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?release=31b638f>
+
 ## Known limits
 
 - Automated tests cannot prove subjective controller feel, synthesized audio quality, or perceived weapon weight; those remain manual play/listening checks.
@@ -74,4 +88,4 @@ Public smoke verification confirmed the correct Pass 08/09/10 identity at each p
 
 ## Release plan
 
-Completed: each pass remains an independent source revision and is published under its immutable review path. The canonical root and Pass 04–07 paths remain untouched.
+Completed: each pass from 08–10 remains an independent source revision and immutable review path. Pass 10 is also the canonical live root at Pages revision `31b638f`; the review tree and Pass 03–09 checkpoints remain unchanged.
