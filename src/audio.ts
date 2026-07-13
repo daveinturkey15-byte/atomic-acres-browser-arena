@@ -1,4 +1,5 @@
 import type { FootstepSurface, ImpactSurface } from './combat-feedback';
+import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 
@@ -23,6 +24,8 @@ export class ArenaAudio {
   private stepVariant = 0;
   private ambienceStarted = false;
   private lastNearMissAt = -10_000;
+  private arenaZone: ArenaZone | null = null;
+  private lastZoneCueAt = -10_000;
 
   unlock(): void {
     if (!this.context) {
@@ -69,6 +72,24 @@ export class ArenaAudio {
     electricalGain.gain.value = 0.012;
     electrical.connect(electricalGain).connect(this.ambience);
     electrical.start();
+  }
+
+  setArenaZone(zone: ArenaZone): void {
+    if (!this.context || !this.ambience) {
+      this.arenaZone = null;
+      return;
+    }
+    if (zone === this.arenaZone) return;
+    this.arenaZone = zone;
+    const level = zone === 'central-transit' ? 0.2 : zone === 'east-service' ? 0.18 : zone === 'west-garden' ? 0.145 : 0.16;
+    this.ambience.gain.cancelScheduledValues(this.context.currentTime);
+    this.ambience.gain.linearRampToValueAtTime(level, this.context.currentTime + 0.45);
+    const now = performance.now();
+    if (now - this.lastZoneCueAt < 1_200) return;
+    this.lastZoneCueAt = now;
+    const frequency = zone === 'east-service' ? 720 : zone === 'west-garden' ? 330 : zone === 'central-transit' ? 510 : 420;
+    this.tone(frequency, 0.12, 0.018, 'sine', this.ambience);
+    this.tone(frequency * 1.5, 0.08, 0.012, 'triangle', this.ambience, 0.09);
   }
 
   shot(weapon: WeaponId, remote = false, distance = 0): void {

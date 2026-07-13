@@ -46,8 +46,9 @@ import {
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
 import { shouldRevealEnemy, worldToMinimap } from './minimap';
+import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
-import { loadArenaArt } from './environment-assets';
+import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { ArenaNetwork } from './network';
@@ -127,9 +128,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · MATCH FLOW PASS 09</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · WORLD STORY PASS 10</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Three original weapon families meet a clearer countdown, score race, redeployment loop and rematch flow in a compact retro-future skirmish.</p>
+    <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -176,6 +177,7 @@ app.innerHTML = `
     <div id="killfeed"></div>
     <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
     <canvas id="minimap" width="180" height="180" aria-label="Tactical minimap"></canvas>
+    <div id="location-label">ATOM-LINER CROSSING</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
     <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
     <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V MELEE · G THROW</small></div>
@@ -301,6 +303,7 @@ buildSky();
 const arena: ArenaMap = buildArena(scene);
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 const tracerPool = new TracerPool(scene);
+let arenaArtRoot: THREE.Group | null = null;
 
 const player = {
   id: createPlayerId(),
@@ -1637,7 +1640,7 @@ function updateMatchState(now: number): void {
     rematch.addEventListener('click', () => {
       network.close();
       resetForMode();
-      startGame('solo');
+      startGame('solo', false);
     }, { once: true });
     document.exitPointerLock();
   }
@@ -1717,6 +1720,9 @@ function updateHud(now: number): void {
   const [aqua, coral] = teamScores();
   const scores: [number, number] = [aqua, coral];
   const presentation = matchPresentationAt(matchState, now, scores, player.team);
+  const arenaZone = classifyArenaZone(player.position.x, player.position.z);
+  element<HTMLElement>('#location-label').textContent = arenaZoneLabel(arenaZone);
+  audio.setArenaZone(arenaZone);
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
@@ -2022,6 +2028,7 @@ function frame(now: number): void {
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
+    if (arenaArtRoot) updateArenaArt(arenaArtRoot, now);
     updateHud(now);
     if (!debugRenderPaused) renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -2103,6 +2110,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     activeImpactMarks: impactPresentation.activeMarks(),
     activeTracers: tracerPool.activeCount(),
     originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
+    arenaZone: classifyArenaZone(player.position.x, player.position.z),
+    arenaStoryReady: ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
+      .every((name) => scene.getObjectByName(name) !== undefined),
     weaponReady: weaponView.isReady(),
     weaponPresentation: weaponView.presentationState(),
     weaponActionHistory: [...weaponActionHistory],
@@ -2193,6 +2203,7 @@ async function bootstrap(): Promise<void> {
   }, reducedRenderMode);
   const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
   characterPhysics = physics;
+  arenaArtRoot = art.root;
   const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
   arena.raycastMeshes.splice(0, arena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {
@@ -2213,7 +2224,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 06 ready — procedural atmosphere, tuned controller look and tactical one-bot routing active.');
+  setStatus('Pass 10 ready — full arsenal, match flow, route storytelling and bounded ambient presentation active.');
   requestAnimationFrame(frame);
 }
 

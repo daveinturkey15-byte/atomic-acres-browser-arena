@@ -6,6 +6,7 @@ import {
   texturedMaterial,
 } from './art-kit';
 import { COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT } from './arena-layout';
+import { arenaAnimationAt } from './arena-storytelling';
 
 export type ArenaArtResult = {
   root: THREE.Group;
@@ -313,12 +314,20 @@ function addAtomicLandmark(root: THREE.Group): void {
   landmark.name = 'original-atomic-landmark';
   landmark.position.set(27, 0, -1.5);
   const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x54c8c7, emissive: 0x123b42, emissiveIntensity: 1.2, roughness: 0.36, metalness: 0.64 });
-  for (const rotation of [0, Math.PI / 3, -Math.PI / 3]) {
+  const animationRings: THREE.Mesh[] = [];
+  for (const [index, rotation] of [0, Math.PI / 3, -Math.PI / 3].entries()) {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(2.25, 0.13, 10, 42), ringMaterial);
+    ring.name = `animated-atomic-ring-${index}`;
+    ring.userData.dynamic = true;
     ring.position.y = 3.25; ring.rotation.set(Math.PI / 2, rotation, rotation * 0.45); landmark.add(ring);
+    animationRings.push(ring);
   }
   const nucleus = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 2), new THREE.MeshStandardMaterial({ color: 0xffc851, emissive: 0xb85b13, emissiveIntensity: 1.6, roughness: 0.32 }));
+  nucleus.name = 'animated-atomic-nucleus';
+  nucleus.userData.dynamic = true;
   nucleus.position.y = 3.25; landmark.add(nucleus);
+  root.userData.animationRings = animationRings;
+  root.userData.animationNucleus = nucleus;
   decorative(landmark); root.add(landmark);
 }
 
@@ -426,6 +435,71 @@ function addRouteArchitecture(root: THREE.Group): void {
   });
 }
 
+function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
+  const dark = new THREE.MeshStandardMaterial({ color: 0x25343a, roughness: 0.62, metalness: 0.28 });
+  const gold = new THREE.MeshStandardMaterial({ color: 0xe5b842, emissive: 0x6b4210, emissiveIntensity: 0.5, roughness: 0.52, metalness: 0.2 });
+  const domestic = new THREE.MeshStandardMaterial({ color: 0xd8c7a5, roughness: 0.88 });
+  const screen = new THREE.MeshStandardMaterial({ color: 0x78cfca, emissive: 0x1b6c70, emissiveIntensity: 1.4, roughness: 0.28 });
+  const routeMarkers: Array<[string, number, number, number, number]> = [
+    ['SKYLINE GARDEN', -19.2, 2.7, -8, Math.PI / 2],
+    ['ATOM-LINER CROSSING', 7.4, 2.7, 0, -Math.PI / 2],
+    ['SOLAR SERVICE', 19.2, 2.7, 8, -Math.PI / 2],
+  ];
+  for (const [label, x, y, z, rotation] of routeMarkers) {
+    const marker = new THREE.Group(); marker.name = `route-marker-${label.toLowerCase().replaceAll(' ', '-')}`;
+    marker.position.set(x, 0, z); marker.rotation.y = rotation;
+    const post = roundedBox('route-story-post', [0.16, y * 2, 0.16], dark, 0.03, 2); post.position.y = y;
+    marker.add(post);
+    if (reduced) {
+      const plate = roundedBox('route-story-plate', [2.7, 0.68, 0.12], gold, 0.06, 2); plate.position.y = y * 1.72; marker.add(plate);
+    } else {
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 1.05), new THREE.MeshBasicMaterial({ map: createSignTexture(label), side: THREE.DoubleSide }));
+      sign.name = 'route-story-sign'; sign.position.y = y * 1.72; marker.add(sign);
+    }
+    decorative(marker); root.add(marker);
+  }
+
+  if (reduced) return;
+  for (const house of HOUSE_LAYOUT) {
+    const facing = house.facing;
+    const table = roundedBox('interior-dining-table', [2.5, 0.16, 1.15], domestic, 0.06, 2);
+    table.position.set(house.x - 2.7, 0.92, house.z - facing * 2.4); decorative(table); root.add(table);
+    for (const side of [-1, 1]) {
+      const chair = roundedBox('interior-dining-chair', [0.58, 1.05, 0.58], house.team === 0 ? screen : gold, 0.08, 2);
+      chair.position.set(house.x - 2.7 + side * 1.65, 0.53, house.z - facing * 2.4); decorative(chair); root.add(chair);
+    }
+    const consoleBody = roundedBox('interior-atom-console', [2.2, 1.15, 0.65], dark, 0.08, 2);
+    consoleBody.position.set(house.x + 3.4, 0.58, house.z + facing * 2.45); decorative(consoleBody); root.add(consoleBody);
+    const consoleScreen = roundedBox('interior-console-screen', [1.5, 0.52, 0.05], screen, 0.04, 2);
+    consoleScreen.position.set(house.x + 3.4, 0.83, house.z + facing * (2.8)); decorative(consoleScreen); root.add(consoleScreen);
+    const plaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.7, 0.85),
+      new THREE.MeshBasicMaterial({ map: createSignTexture(house.team === 0 ? 'AQUA MODEL HOME' : 'CORAL MODEL HOME'), side: THREE.DoubleSide }),
+    );
+    plaque.name = 'model-home-plaque';
+    plaque.position.set(house.x, 3.2, house.z + facing * 7.72);
+    if (facing < 0) plaque.rotation.y = Math.PI;
+    decorative(plaque); root.add(plaque);
+  }
+}
+
+/** Updates only explicitly presentation-only arena nodes. */
+export function updateArenaArt(root: THREE.Group, now: number): void {
+  const state = arenaAnimationAt(now);
+  const rings = (root.userData.animationRings as THREE.Mesh[] | undefined) ?? [];
+  rings.forEach((ring, index) => {
+    ring.rotation.y = state.landmarkYaw * (index % 2 === 0 ? 1 : -1) + index * Math.PI / 3;
+  });
+  const nucleus = root.userData.animationNucleus as THREE.Object3D | undefined;
+  if (nucleus) nucleus.scale.setScalar(0.96 + state.beaconPulse * 0.08);
+  const beacon = root.userData.animationBeacon as THREE.Mesh | undefined;
+  if (beacon) {
+    beacon.scale.setScalar(0.86 + state.beaconPulse * 0.22);
+    const material = beacon.material;
+    if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = 1.7 + state.beaconPulse * 2;
+  }
+}
+
 function addHouseInteriorLighting(root: THREE.Group): void {
   const fixtureMaterial = new THREE.MeshStandardMaterial({
     color: 0xffe5b5,
@@ -460,6 +534,7 @@ export async function loadArenaArt(
   addHouseInteriorLighting(root);
 
   const reduced = reducedDetail || new URLSearchParams(window.location.search).get('render') === 'compat';
+  addNarrativeDressing(root, reduced);
   const coach = buildRetroCoach();
   coach.position.set(-3.8, 0, 7);
   coach.rotation.y = 0.03;
@@ -492,9 +567,12 @@ export async function loadArenaArt(
     }
   }
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), new THREE.MeshStandardMaterial({ color: 0xff6b4f, emissive: 0xff2a16, emissiveIntensity: 3 }));
+  beacon.name = 'animated-test-beacon';
+  beacon.userData.dynamic = true;
+  root.userData.animationBeacon = beacon;
   beacon.position.y = 9.2; tower.add(beacon); decorative(tower); root.add(tower); onProgress?.(8, 12);
 
-  if (!reducedDetail) {
+  if (!reduced) {
     addFacadeAndInteriorDressing(root); onProgress?.(9, 12);
     addStreetInfrastructure(root); onProgress?.(10, 12);
     addRouteArchitecture(root);

@@ -64,7 +64,7 @@ export class WeaponPresentation {
   private weaponHeat = 0;
   private shotsPresented = 0;
 
-  constructor(camera: THREE.Camera, private readonly flattenMaterials = false) {
+  constructor(private readonly camera: THREE.Camera, private readonly flattenMaterials = false) {
     this.root.name = 'original-weapon-view';
     this.root.position.set(0.36, -0.38, -0.78);
     this.root.scale.setScalar(0.6);
@@ -310,9 +310,14 @@ export class WeaponPresentation {
     return this.adsBlend;
   }
 
-  presentationState(): { weapon: WeaponId; heat: number; shotsPresented: number; activeCasings: number; activeSmoke: number; detailsReady: boolean; adsProgress: number } {
+  presentationState(): { weapon: WeaponId; heat: number; shotsPresented: number; activeCasings: number; activeSmoke: number; detailsReady: boolean; adsProgress: number; sightOffset: [number, number] | null } {
     const model = this.models.get(this.active);
     const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
+    const sightName = this.active === 'carbine' ? 'optic-reticle' : this.active === 'smg' ? 'smg-aperture' : 'ghost-ring';
+    const sight = model?.getObjectByName(sightName);
+    this.camera.updateMatrixWorld(true);
+    sight?.updateWorldMatrix(true, false);
+    const projected = sight?.getWorldPosition(new THREE.Vector3()).project(this.camera);
     return {
       weapon: this.active,
       heat: this.weaponHeat,
@@ -321,6 +326,7 @@ export class WeaponPresentation {
       activeSmoke: this.smokes.reduce((count, smoke) => count + Number(smoke.active), 0),
       detailsReady: requiredDetails.every((name) => model?.getObjectByName(name) !== undefined),
       adsProgress: this.adsBlend,
+      sightOffset: projected ? [projected.x, projected.y] : null,
     };
   }
 

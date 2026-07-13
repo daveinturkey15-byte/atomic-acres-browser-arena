@@ -40,6 +40,8 @@ type DebugState = {
   activeImpactMarks: number;
   activeTracers: number;
   originalArtLoaded: boolean;
+  arenaZone: string;
+  arenaStoryReady: boolean;
   weaponReady: boolean;
   weaponPresentation: {
     weapon: 'carbine' | 'smg' | 'scattergun';
@@ -90,7 +92,8 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponReady).toBe(true);
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('MATCH FLOW PASS 09');
+    expect(state.arenaStoryReady).toBe(true);
+    await expect(page.locator('.eyebrow')).toContainText('WORLD STORY PASS 10');
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -308,6 +311,7 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#objective')).toContainText('FIRST TO 25');
     await expect(page.locator('#grenades')).toHaveText('FRAG ×1');
     await expect(page.locator('#minimap')).toBeVisible();
+    await expect(page.locator('#location-label')).toHaveText(/AQUA HOUSE|CORAL HOUSE|SKYLINE GARDEN|SOLAR SERVICE|ATOM-LINER CROSSING/);
     await page.keyboard.down('Tab');
     await expect(page.locator('#roster-list > div')).toHaveCount(2);
     await page.keyboard.up('Tab');

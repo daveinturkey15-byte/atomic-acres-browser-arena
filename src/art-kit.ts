@@ -46,7 +46,15 @@ export function batchStaticMeshes(
   root.updateWorldMatrix(true, true);
   const groups = new Map<string, { material: THREE.Material; classification: string; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[] }>();
   root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh) || !node.visible || node.userData.targetRoot || Array.isArray(node.material)) return;
+    const hasDynamicAncestor = (() => {
+      let current: THREE.Object3D | null = node;
+      while (current && current !== root.parent) {
+        if (current.userData.dynamic === true) return true;
+        current = current.parent;
+      }
+      return false;
+    })();
+    if (!(node instanceof THREE.Mesh) || !node.visible || hasDynamicAncestor || node.userData.targetRoot || Array.isArray(node.material)) return;
     const classification = classify(node);
     const key = flattenMaterials ? classification : `${materialBatchKey(node.material)}:${classification}`;
     let entry = groups.get(key);
@@ -316,9 +324,10 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     const block = part(root, roundedBox('bolt-or-slide', [0.22, 0.055, 0.11], accent, 0.012), [0, 0.135, -0.035]);
     block.userData.restZ = block.position.z;
     part(root, roundedBox('charging-tab', [0.07, 0.035, 0.09], accent, 0.008, 2), [0.145, 0.105, -0.035]);
-    const aperture = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.009, 7, 18), dark);
-    aperture.name = 'smg-aperture'; aperture.position.set(0, 0.19, 0.09); root.add(aperture);
-    part(root, roundedBox('smg-front-post', [0.028, 0.1, 0.028], dark, 0.006), [0, 0.18, -0.57]);
+    const aperture = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.009, 7, 18), dark);
+    aperture.name = 'smg-aperture'; aperture.position.set(0, 0.24, 0.09); root.add(aperture);
+    // The front-post tip, not its centre, is collinear with the aperture.
+    part(root, roundedBox('smg-front-post', [0.028, 0.12, 0.028], dark, 0.006), [0, 0.11, -0.57]);
     addSocket('muzzle-socket', [0, 0.005, -0.96]);
     addSocket('eject-socket', [0.14, 0.06, -0.04]);
     addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
@@ -353,7 +362,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     const ghostRing = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.009, 7, 18), dark);
     ghostRing.name = 'ghost-ring'; ghostRing.position.set(0, 0.2, 0.11); root.add(ghostRing);
     const bead = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), accent);
-    bead.name = 'front-bead'; bead.position.set(0, 0.2, -1.12); root.add(bead);
+    bead.name = 'front-bead'; bead.position.set(0, 0.06, -1.12); root.add(bead);
     const loadingPort = roundedBox('loading-port', [0.12, 0.025, 0.18], dark, 0.006, 1);
     loadingPort.position.set(0, -0.125, -0.02); root.add(loadingPort);
     const saddle = new THREE.Group(); saddle.name = 'shell-saddle'; saddle.position.set(-0.135, 0.02, -0.04); root.add(saddle);
