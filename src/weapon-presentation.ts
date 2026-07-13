@@ -3,6 +3,7 @@ import { buildWeaponModel, roundedBox } from './art-kit';
 import { solveTwoBoneElbow } from './ik';
 import { reloadActionEvents, reloadPoseAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import { advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
+import { weaponFamilyPresentation } from './weapon-family-presentation';
 import type { WeaponId } from './protocol';
 
 export type WeaponPose = {
@@ -237,17 +238,18 @@ export class WeaponPresentation {
   }
 
   fire(amount: number): void {
+    const profile = weaponFamilyPresentation(this.active);
     this.weaponHeat = advanceWeaponHeat(this.weaponHeat, true, 0, this.active);
     this.shotsPresented += 1;
     this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
     this.shotStarted = performance.now();
     this.muzzleLight.intensity = this.flattenMaterials ? 0 : this.active === 'scattergun' ? 7.2 : 4.8;
     this.muzzleFlash.visible = true;
-    this.muzzleFlash.scale.setScalar(this.active === 'scattergun' ? 1.45 : this.active === 'smg' ? 0.78 : 1);
+    this.muzzleFlash.scale.setScalar(profile.flashScale);
     this.muzzleFlash.rotation.z = Math.random() * Math.PI;
 
     const muzzleSocket = this.models.get(this.active)?.getObjectByName('muzzle-socket');
-    const smokeCount = this.active === 'scattergun' ? 3 : this.weaponHeat > 0.56 ? 2 : 1;
+    const smokeCount = Math.min(this.smokes.length, profile.smokeBase + (this.weaponHeat > 0.56 ? 1 : 0));
     const cycle = fireCycleAt(this.active, 0, this.weaponHeat);
     for (let index = 0; index < smokeCount; index += 1) {
       const slot = this.smokeCursor++ % this.smokes.length;
@@ -310,9 +312,7 @@ export class WeaponPresentation {
 
   presentationState(): { weapon: WeaponId; heat: number; shotsPresented: number; activeCasings: number; activeSmoke: number; detailsReady: boolean; adsProgress: number } {
     const model = this.models.get(this.active);
-    const requiredDetails = this.active === 'carbine'
-      ? ['optic-lens', 'stock-cheek-rest', 'charging-handle', 'magazine-rib']
-      : ['muzzle-socket', 'grip-socket-r', 'support-socket-l'];
+    const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
     return {
       weapon: this.active,
       heat: this.weaponHeat,
@@ -402,12 +402,12 @@ export class WeaponPresentation {
     }
 
     const activeModel = this.models.get(this.active);
+    const profile = weaponFamilyPresentation(this.active);
     const shotAge = performance.now() - this.shotStarted;
     const fireCycle = fireCycleAt(this.active, shotAge, this.weaponHeat);
     this.muzzleFlash.visible = fireCycle.flash > 0.015;
     if (this.muzzleFlash.visible) {
-      const baseScale = this.active === 'scattergun' ? 1.45 : this.active === 'smg' ? 0.78 : 1;
-      this.muzzleFlash.scale.setScalar(baseScale * (0.72 + fireCycle.flash * 0.38));
+      this.muzzleFlash.scale.setScalar(profile.flashScale * (0.72 + fireCycle.flash * 0.38));
     }
     if (this.active === 'scattergun' && this.pendingScattergunShell && fireCycle.casingReady) {
       this.ejectCasing(true);
@@ -419,23 +419,23 @@ export class WeaponPresentation {
     const bolt = activeModel?.getObjectByName('bolt-or-slide');
     if (bolt) {
       const restZ = Number(bolt.userData.restZ ?? 0);
-      bolt.position.z = restZ + fireCycle.boltTravel * (this.active === 'smg' ? 0.09 : 0.075);
+      bolt.position.z = restZ + fireCycle.boltTravel * profile.actionTravel;
     }
     const pump = activeModel?.getObjectByName('pump');
     if (pump) {
       const restZ = Number(pump.userData.restZ ?? -0.48);
-      pump.position.z = restZ + fireCycle.boltTravel * 0.22;
+      pump.position.z = restZ + fireCycle.boltTravel * profile.actionTravel;
     }
 
     const bobWeight = pose.moving ? (pose.sprinting ? 1.22 : pose.ads ? 0.12 : pose.prone ? 0.12 : pose.crouched ? 0.32 : 0.56) : 0.05;
     const bobX = Math.cos(pose.phase * 0.5) * 0.017 * bobWeight;
     const bobY = Math.sin(pose.phase) * 0.019 * bobWeight;
     const breath = Math.sin(performance.now() * 0.0017) * (pose.ads ? 0.0015 : 0.0045);
-    const adsX = this.adsBlend * -0.36;
-    // The authored sight axes are y=.215. This offsets the 0.6 view scale so
-    // the physical sight—not a HUD approximation—lands on camera centre.
-    const adsY = this.adsBlend * 0.251;
-    const adsZ = this.adsBlend * -0.04;
+    const adsX = this.adsBlend * profile.adsX;
+    // Each original weapon family declares its physical sight axis. The 0.6
+    // view scale is included in the profile so no HUD approximation is used.
+    const adsY = this.adsBlend * profile.adsY;
+    const adsZ = this.adsBlend * profile.adsZ;
     const sprintDrop = this.sprintBlend * -0.16;
     const stanceHipBlend = 1 - this.adsBlend;
     const crouchLift = pose.crouched ? 0.035 * stanceHipBlend : 0;
@@ -494,10 +494,10 @@ export class WeaponPresentation {
     const targetPosition = new THREE.Vector3(
       0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18,
       -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadDrop - this.recoil * 0.08 - pose.landingImpulse * 0.075,
-      -0.78 + adsZ + this.recoil * 0.13 - meleeArc * 0.32 + grenadeArc * 0.24,
+      -0.78 + adsZ + this.recoil * profile.recoilTranslation - meleeArc * 0.32 + grenadeArc * 0.24,
     );
     this.root.position.lerp(targetPosition, smoothing(18));
-    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * 0.18 - this.swayY - grenadeArc * 0.42, smoothing(22));
+    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * profile.recoilRotation - this.swayY - grenadeArc * 0.42, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(this.root.rotation.y, -this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65, smoothing(13));
     this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
     if (arms) this.solveArms(arms, activeModel, reloadPose);

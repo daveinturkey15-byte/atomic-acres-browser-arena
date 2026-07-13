@@ -126,9 +126,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT PRESENTATION PASS 07</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · ARSENAL PARITY PASS 08</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A compact retro-future skirmish with a rebuilt M86 carbine, articulated operator kit, layered original weapon audio and tactical close-range pressure.</p>
+    <p class="lede">Three original weapon families, physically aligned sights, articulated operator kit and layered procedural combat audio in a compact retro-future skirmish.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>

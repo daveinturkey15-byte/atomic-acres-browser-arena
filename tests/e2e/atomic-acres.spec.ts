@@ -88,7 +88,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponReady).toBe(true);
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('COMBAT PRESENTATION PASS 07');
+    await expect(page.locator('.eyebrow')).toContainText('ARSENAL PARITY PASS 08');
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -269,6 +269,7 @@ test.describe('solo mechanics', () => {
     await page.keyboard.press('Digit2');
     await page.waitForTimeout(450);
     expect((await debug(page)).player.weapon).toBe('smg');
+    expect((await debug(page)).weaponPresentation.detailsReady).toBe(true);
 
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
     await page.waitForTimeout(120);
@@ -279,6 +280,15 @@ test.describe('solo mechanics', () => {
     expect(afterReload.player.ammo).toBeGreaterThan(beforeReload.player.ammo);
     expect(afterReload.player.reserve).toBeLessThan(beforeReload.player.reserve);
     expect(afterReload.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
+
+    await page.keyboard.press('Digit3');
+    await page.waitForTimeout(650);
+    const scattergun = await debug(page);
+    expect(scattergun.player.weapon).toBe('scattergun');
+    expect(scattergun.weaponPresentation.detailsReady).toBe(true);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await page.waitForTimeout(250);
+    expect((await debug(page)).weaponPresentation.activeSmoke).toBeGreaterThan(0);
   });
 
   test('throws one frag, consumes inventory and resolves the fuse', async ({ page }) => {
