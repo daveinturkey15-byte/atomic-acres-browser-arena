@@ -4,6 +4,8 @@ type DebugState = {
   gameStarted: boolean;
   gameMode: string;
   matchPhase: 'warmup' | 'active' | 'ended';
+  matchEndReason: 'score' | 'time' | null;
+  scores: [number, number];
   player: {
     hp: number;
     kills: number;
@@ -88,7 +90,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponReady).toBe(true);
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('ARSENAL PARITY PASS 08');
+    await expect(page.locator('.eyebrow')).toContainText('MATCH FLOW PASS 09');
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -310,6 +312,20 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#roster-list > div')).toHaveCount(2);
     await page.keyboard.up('Tab');
     await page.screenshot({ path: 'test-results/gameplay-structured-pass.png', fullPage: true });
+  });
+
+  test('ends on the score limit and performs a complete rematch reset', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__.endMatch());
+    const ended = await debug(page);
+    expect(ended.matchPhase).toBe('ended');
+    expect(ended.matchEndReason).toBe('score');
+    expect(ended.scores[0] + ended.scores[1]).toBeGreaterThanOrEqual(25);
+    await expect(page.locator('#banner')).toContainText('VICTORY');
+    await expect(page.locator('#rematch')).toBeVisible();
+    await page.locator('#rematch').click();
+    await expect.poll(async () => (await debug(page)).matchPhase, { timeout: 6_000 }).toBe('active');
+    expect((await debug(page)).scores).toEqual([0, 0]);
+    await expect(page.locator('#banner')).toBeHidden();
   });
 
   test('shows directional damage, ADS telemetry and delayed health recovery', async ({ page }) => {

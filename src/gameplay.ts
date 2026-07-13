@@ -294,6 +294,7 @@ export type MatchState = {
   phaseStartedAt: number;
   endsAt: number;
   winner: 0 | 1 | 'draw' | null;
+  endReason?: 'score' | 'time';
   rematchRequested?: boolean;
 };
 
@@ -308,7 +309,10 @@ export function advanceMatch(state: MatchState, now: number, scores: [number, nu
   }
   if (state.phase === 'active' && (scores[0] >= 25 || scores[1] >= 25 || now >= state.endsAt)) {
     const winner = scores[0] === scores[1] ? 'draw' : scores[0] > scores[1] ? 0 : 1;
-    return { phase: 'ended', phaseStartedAt: now, endsAt: now, winner };
+    return {
+      phase: 'ended', phaseStartedAt: now, endsAt: now, winner,
+      endReason: scores[0] >= 25 || scores[1] >= 25 ? 'score' : 'time',
+    };
   }
   return state;
 }

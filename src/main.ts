@@ -46,6 +46,7 @@ import {
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
 import { shouldRevealEnemy, worldToMinimap } from './minimap';
+import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
@@ -126,9 +127,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · ARSENAL PARITY PASS 08</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · MATCH FLOW PASS 09</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Three original weapon families, physically aligned sights, articulated operator kit and layered procedural combat audio in a compact retro-future skirmish.</p>
+    <p class="lede">Three original weapon families meet a clearer countdown, score race, redeployment loop and rematch flow in a compact retro-future skirmish.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -179,7 +180,8 @@ app.innerHTML = `
     <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
     <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V MELEE · G THROW</small></div>
     <div id="room-hud"></div>
-    <div id="respawn" hidden><strong>ELIMINATED</strong><span>Reconstituting mannequin operator…</span></div>
+    <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
+    <div id="countdown" hidden></div>
     <div id="banner" hidden></div>
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>
   </div>
@@ -358,6 +360,8 @@ let lastHudAt = 0;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let matchState: MatchState = createMatch(performance.now());
 let matchFinished = false;
+let respawnEndsAt = 0;
+let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
@@ -663,6 +667,7 @@ function applyDamage(damage: number, attacker: string): void {
     network.send(death);
     processDeath(death);
     element<HTMLElement>('#respawn').hidden = false;
+    respawnEndsAt = now + 1_900;
     document.exitPointerLock();
     setTimeout(respawn, 1900);
   }
@@ -772,6 +777,7 @@ function respawn(requestLock = true): void {
   player.grenades = 1;
   player.reloadState = null;
   player.alive = true;
+  respawnEndsAt = 0;
   player.invulnerableUntil = performance.now() + 1350;
   player.yaw = player.team === 0 ? Math.PI : 0;
   player.pitch = 0;
@@ -804,6 +810,8 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   botsFrozen = false;
   matchState = createMatch(performance.now());
   matchFinished = false;
+  previousHudScores = [0, 0];
+  respawnEndsAt = 0;
   menu.classList.add('hidden');
   hudRoot.hidden = false;
   element<HTMLElement>('#connection-pill').textContent = mode === 'solo' ? 'BOT SKIRMISH' : mode === 'host' ? 'HOST' : 'PEER';
@@ -1605,6 +1613,14 @@ function updateMatchState(now: number): void {
   const previous = matchState.phase;
   const scores = teamScores();
   matchState = advanceMatch(matchState, now, scores);
+  const presentation = matchPresentationAt(matchState, now, scores, player.team);
+  const countdown = element<HTMLElement>('#countdown');
+  if (matchState.phase === 'warmup') {
+    countdown.textContent = presentation.headline ?? '';
+    countdown.hidden = false;
+  } else {
+    countdown.hidden = true;
+  }
   if (previous === matchState.phase) return;
   const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
@@ -1615,10 +1631,14 @@ function updateMatchState(now: number): void {
   }
   if (matchState.phase === 'ended') {
     matchFinished = true;
-    const won = matchState.winner === player.team;
-    const draw = matchState.winner === 'draw';
-    banner.innerHTML = `<strong>${draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT'}</strong><span>${scores[0]} — ${scores[1]} · CLICK BOT SKIRMISH FOR REMATCH</span>`;
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><button id="rematch" type="button">REMATCH</button>`;
     banner.hidden = false;
+    const rematch = element<HTMLButtonElement>('#rematch');
+    rematch.addEventListener('click', () => {
+      network.close();
+      resetForMode();
+      startGame('solo');
+    }, { once: true });
     document.exitPointerLock();
   }
 }
@@ -1695,19 +1715,29 @@ function updateHud(now: number): void {
   crosshair.style.setProperty('--spread', `${crosshairGap}px`);
   crosshair.classList.toggle('ads', adsSettled);
   const [aqua, coral] = teamScores();
+  const scores: [number, number] = [aqua, coral];
+  const presentation = matchPresentationAt(matchState, now, scores, player.team);
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
   element<HTMLElement>('#reserve').textContent = String(player.reserve[player.weapon]);
-  element<HTMLElement>('#aqua-score').textContent = String(aqua);
-  element<HTMLElement>('#coral-score').textContent = String(coral);
-  const remainingMs = Math.max(0, matchState.endsAt - now);
-  const remaining = matchState.phase === 'warmup' ? Math.ceil(remainingMs / 1000) : Math.floor(remainingMs / 1000);
-  element<HTMLElement>('#timer').textContent = matchState.phase === 'warmup'
-    ? `00:0${Math.min(9, remaining)}`
-    : `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
-  element<HTMLElement>('#objective').textContent = matchState.phase === 'warmup' ? `MATCH STARTS IN ${remaining}` : 'ATOMIC ACRES · FIRST TO 25';
+  const aquaScore = element<HTMLElement>('#aqua-score');
+  const coralScore = element<HTMLElement>('#coral-score');
+  aquaScore.textContent = String(aqua);
+  coralScore.textContent = String(coral);
+  scores.forEach((score, team) => {
+    if (score === previousHudScores[team]) return;
+    const scoreElement = team === 0 ? aquaScore : coralScore;
+    scoreElement.classList.remove('score-pulse');
+    requestAnimationFrame(() => scoreElement.classList.add('score-pulse'));
+  });
+  previousHudScores = scores;
+  element<HTMLElement>('#timer').textContent = presentation.timer;
+  element<HTMLElement>('#objective').textContent = presentation.objective;
+  if (!player.alive && respawnEndsAt > 0) {
+    element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
+  }
   element<HTMLElement>('#reload-state').textContent = player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
     : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
@@ -1889,7 +1919,7 @@ window.addEventListener('mouseup', (event) => {
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
     clearGameplayInput();
-    if (gameStarted && player.alive) {
+    if (gameStarted && player.alive && !matchFinished) {
       element<HTMLButtonElement>('#resume').hidden = matchFinished;
       menu.classList.remove('hidden');
     }
@@ -1910,11 +1940,15 @@ function resetForMode(): void {
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
   targetHits = 0;
+  previousHudScores = [0, 0];
+  respawnEndsAt = 0;
   clearBots();
   for (const grenade of grenades) scene.remove(grenade.mesh);
   grenades.length = 0;
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   element<HTMLElement>('#banner').hidden = true;
+  element<HTMLElement>('#countdown').hidden = true;
+  element<HTMLElement>('#respawn').hidden = true;
   player.weapon = fieldKitById(selectedFieldKit).weapon;
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
@@ -2010,6 +2044,8 @@ const debugWindow = window as Window & {
     setAds: (held: boolean) => void;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
+    endMatch: () => void;
+    rematch: () => void;
 
   };
 };
@@ -2018,6 +2054,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     gameStarted,
     gameMode,
     matchPhase: matchState.phase,
+    matchEndReason: matchState.endReason ?? null,
+    scores: teamScores(),
     player: {
       hp: player.hp,
       kills: player.kills,
@@ -2110,6 +2148,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   damage: (amount: number) => {
     player.invulnerableUntil = 0;
     applyDamage(amount, bots.keys().next().value ?? player.id);
+  },
+  endMatch: () => {
+    player.kills = 25;
+    updateMatchState(performance.now());
+  },
+  rematch: () => {
+    network.close();
+    resetForMode();
+    startGame('solo', false);
   },
 
 };
