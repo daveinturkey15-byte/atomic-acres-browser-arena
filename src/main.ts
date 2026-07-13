@@ -131,7 +131,7 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · RESPONSIVE SYNC PASS 12</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · BALANCED PRESENTATION PASS 13</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -169,7 +169,7 @@ app.innerHTML = `
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
         <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
-        <label>GRAPHICS<select id="graphics-profile"><option value="balanced">RESPONSIVE</option><option value="quality">QUALITY</option><option value="compat">COMPATIBILITY</option></select></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="balanced">BALANCED</option><option value="quality">QUALITY</option><option value="compat">COMPATIBILITY</option></select></label>
       </div>
       <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
@@ -221,6 +221,7 @@ const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
 const staticMaterialMode = activeRenderConfig.staticMaterialMode;
 document.documentElement.classList.toggle('compat-render', renderProfile === 'compat');
+document.documentElement.classList.toggle('balanced-render', renderProfile === 'balanced');
 document.documentElement.dataset.renderProfile = renderProfile;
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -234,8 +235,8 @@ renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.14;
-// Responsive is the default play path: original authored art with reduced micro-detail,
-// cached shadows and bounded fill rate. Quality retains the complete presentation.
+// Balanced is the default play path: the readable palette/geometry of Responsive at a
+// 0.35-scale framebuffer without multisample AA. Quality retains the complete presentation.
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
@@ -2166,6 +2167,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     render: {
       profile: renderProfile,
       representation: activeRenderConfig.representation,
+      pixelRatio: renderer.getPixelRatio(),
+      drawingBuffer: renderer.getDrawingBufferSize(new THREE.Vector2()).toArray(),
+      antialias: renderer.getContext().getContextAttributes()?.antialias ?? false,
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       points: renderer.info.render.points,
@@ -2174,7 +2178,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       reducedMode: reducedRenderMode,
       shadows: activeRenderConfig.shadows,
       shadowMode: activeRenderConfig.shadowMode,
-      pixelRatio: renderer.getPixelRatio(),
       framePacing: framePacing.summary(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
         const material = node instanceof THREE.Mesh ? node.material : null;

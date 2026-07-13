@@ -64,10 +64,10 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
     reducedWorldDetail: true,
     reducedPresentationDetail: true,
     staticMaterialMode: 'palette-basic',
-    antialias: true,
+    antialias: false,
     shadows: false,
     shadowMode: 'off',
-    pixelRatioCap: 0.85,
+    pixelRatioCap: 0.5,
     shadowMapSize: 0,
   };
 }

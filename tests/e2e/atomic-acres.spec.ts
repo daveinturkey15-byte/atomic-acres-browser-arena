@@ -55,7 +55,7 @@ type DebugState = {
   weaponActionHistory: string[];
   menuVisible: boolean;
   networkSync: { stateIntervalMs: number; interpolationRate: number };
-  render: { profile: 'balanced' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
+  render: { profile: 'balanced' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; drawingBuffer: number[]; antialias: boolean; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
 };
 
 async function debug(page: Page): Promise<DebugState> {
@@ -98,7 +98,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('RESPONSIVE SYNC PASS 12');
+    await expect(page.locator('.eyebrow')).toContainText('BALANCED PRESENTATION PASS 13');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -360,7 +360,7 @@ test.describe('solo mechanics', () => {
 });
 
 test.describe('performance and stability', () => {
-  test('default responsive profile stays within the stable 60 Hz work budget', async ({ page }) => {
+  test('default balanced profile keeps readable art at a half-resolution framebuffer', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=balanced');
@@ -372,7 +372,16 @@ test.describe('performance and stability', () => {
     expect(state.render.reducedMode).toBe(true);
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
-    expect(state.render.pixelRatio).toBeCloseTo(0.85, 5);
+    expect(state.render.pixelRatio).toBeCloseTo(0.5, 5);
+    expect(state.render.antialias).toBe(false);
+    const overlays = await page.evaluate(() => ({
+      grade: getComputedStyle(document.querySelector('#color-grade')!).display,
+      grain: getComputedStyle(document.querySelector('#film-grain')!).display,
+    }));
+    expect(overlays).toEqual({ grade: 'none', grain: 'none' });
+    const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
+    expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.5));
+    expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.5));
     expect(state.render.calls).toBeLessThanOrEqual(120);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));

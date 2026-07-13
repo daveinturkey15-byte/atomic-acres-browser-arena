@@ -10,9 +10,10 @@ describe('render profiles', () => {
       reducedWorldDetail: true,
       reducedPresentationDetail: true,
       staticMaterialMode: 'palette-basic',
+      antialias: false,
       shadows: false,
       shadowMode: 'off',
-      pixelRatioCap: 0.85,
+      pixelRatioCap: 0.5,
     });
   });
 
