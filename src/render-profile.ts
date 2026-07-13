@@ -1,4 +1,4 @@
-export type RenderProfile = 'balanced' | 'quality' | 'compat';
+export type RenderProfile = 'performance' | 'quality' | 'compat';
 
 export const RENDER_PROFILE_STORAGE_KEY = 'atomic-acres-render-profile';
 
@@ -16,14 +16,15 @@ export type RenderProfileConfig = {
   shadowMapSize: number;
 };
 
-const VALID_PROFILES = new Set<RenderProfile>(['balanced', 'quality', 'compat']);
+const VALID_PROFILES = new Set<RenderProfile>(['performance', 'quality', 'compat']);
 
 export function resolveRenderProfile(search: string, stored: string | null): RenderProfile {
   const requested = new URLSearchParams(search).get('render');
-  if (requested === 'performance') return 'balanced';
+  if (requested === 'balanced') return 'performance';
   if (requested && VALID_PROFILES.has(requested as RenderProfile)) return requested as RenderProfile;
+  if (stored === 'balanced') return 'performance';
   if (stored && VALID_PROFILES.has(stored as RenderProfile)) return stored as RenderProfile;
-  return 'balanced';
+  return 'performance';
 }
 
 export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig {
@@ -52,9 +53,9 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
       staticMaterialMode: 'preserve',
       antialias: true,
       shadows: true,
-      shadowMode: 'dynamic',
-      pixelRatioCap: 1.5,
-      shadowMapSize: 1024,
+      shadowMode: 'static',
+      pixelRatioCap: 1,
+      shadowMapSize: 768,
     };
   }
   return {
@@ -67,7 +68,7 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
     antialias: false,
     shadows: false,
     shadowMode: 'off',
-    pixelRatioCap: 0.5,
+    pixelRatioCap: 0.6,
     shadowMapSize: 0,
   };
 }

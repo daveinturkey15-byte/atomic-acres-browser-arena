@@ -11,6 +11,8 @@ type DebugState = {
     kills: number;
     deaths: number;
     weapon: string;
+    primaryWeapon: string;
+    equippedWeapons: string[];
     ammo: number;
     reserve: number;
     reloading: boolean;
@@ -30,32 +32,46 @@ type DebugState = {
     waypoint: number;
     blockedSince: number;
     hasLineOfSight: boolean;
+    rootVisible: boolean;
+    visibleMeshCount: number;
+    screenPosition: number[];
     presentationReady: boolean;
     presentationWeaponSafe: boolean;
   }>;
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
+  fieldSupport: {
+    streak: number;
+    available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass', boolean>;
+    scoutActive: boolean;
+    yardhawkActive: boolean;
+    strikePasses: number;
+  };
   activeImpactParticles: number;
   activeImpactMarks: number;
   activeTracers: number;
   originalArtLoaded: boolean;
   arenaZone: string;
   arenaStoryReady: boolean;
+  interiorTelemetry: { stairs: number; beds: number; workbenches: number; lights: number; visibleCollisionProxies: number };
   weaponReady: boolean;
   weaponPresentation: {
-    weapon: 'carbine' | 'smg' | 'scattergun';
+    weapon: 'carbine' | 'smg' | 'scattergun' | 'pistol';
     heat: number;
     shotsPresented: number;
     activeCasings: number;
     activeSmoke: number;
     detailsReady: boolean;
     adsProgress: number;
+    armsVisible: boolean;
+    armMeshCount: number;
+    knifeVisible: boolean;
   };
   weaponActionHistory: string[];
   menuVisible: boolean;
   networkSync: { stateIntervalMs: number; interpolationRate: number };
-  render: { profile: 'balanced' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; drawingBuffer: number[]; antialias: boolean; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
+  render: { profile: 'performance' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; drawingBuffer: number[]; antialias: boolean; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
 };
 
 async function debug(page: Page): Promise<DebugState> {
@@ -74,7 +90,7 @@ async function pageReadyAt(page: Page, path: string): Promise<void> {
 }
 
 async function pageReady(page: Page): Promise<void> {
-  await pageReadyAt(page, '/?render=compat');
+  await pageReadyAt(page, '/?render=performance');
 }
 
 async function startSolo(page: Page): Promise<void> {
@@ -98,7 +114,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('BALANCED PRESENTATION PASS 13');
+    await expect(page.locator('.eyebrow')).toContainText('COMBAT SYSTEMS PASS 14');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -112,7 +128,9 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#controller-sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toBeVisible();
-    await expect(page.locator('#graphics-profile')).toHaveValue('compat');
+    await expect(page.locator('#graphics-profile')).toHaveValue('performance');
+    await expect(page.locator('#graphics-profile option')).toHaveCount(2);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY']);
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';
@@ -124,7 +142,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#controller-sensitivity')).toHaveValue('1.45');
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
-    await expect(page.locator('.controls')).toContainText('melee');
+    await expect(page.locator('.controls')).toContainText('knife');
     await expect(page.locator('.controls')).toContainText('frag');
   });
 
@@ -141,6 +159,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#selected-kit-summary')).toContainText('Vectorline SMG');
     await page.locator('#solo').click();
     await expect.poll(async () => (await debug(page)).player.weapon).toBe('smg');
+    expect((await debug(page)).player.equippedWeapons).toEqual(['smg', 'pistol']);
     await page.evaluate(() => {
       document.exitPointerLock();
       document.querySelector('#menu')?.classList.remove('hidden');
@@ -153,6 +172,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(999));
     await expect.poll(async () => (await debug(page)).player.weapon, { timeout: 6_000 }).toBe('scattergun');
+    expect((await debug(page)).player.equippedWeapons).toEqual(['scattergun', 'pistol']);
   });
 });
 
@@ -180,6 +200,54 @@ test.describe('solo mechanics', () => {
     expect(after.bots.every((bot) => Number.isInteger(bot.waypoint) && bot.waypoint >= 0 && bot.waypoint < 8
       && Number.isFinite(bot.blockedSince))).toBe(true);
     expect(after.bots.every((bot) => bot.presentationReady && bot.presentationWeaponSafe)).toBe(true);
+  });
+
+  test('renders first-person arms and a readable hostile operator', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotAhead: (distance: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(5);
+    });
+    await page.waitForTimeout(150);
+    const state = await debug(page);
+    expect(state.weaponPresentation.armsVisible).toBe(true);
+    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(8);
+    expect(state.bots[0].rootVisible).toBe(true);
+    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(20);
+    expect(Math.abs(state.bots[0].screenPosition[0])).toBeLessThan(0.5);
+    expect(Math.abs(state.bots[0].screenPosition[1])).toBeLessThan(0.8);
+    await page.screenshot({ path: 'test-results/performance-arms-operator.png' });
+  });
+
+  test('animates the knife on misses while keeping first-person arms visible', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { melee: () => void } }).__ATOMIC_ACRES_DEBUG__.melee());
+    await expect.poll(async () => (await debug(page)).weaponPresentation.knifeVisible, { timeout: 350 }).toBe(true);
+    const active = await debug(page);
+    expect(active.weaponPresentation.armsVisible).toBe(true);
+    expect(active.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(2);
+    await page.waitForTimeout(650);
+    expect((await debug(page)).weaponPresentation.knifeVisible).toBe(false);
+  });
+
+  test('earns and activates all three bounded field supports', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(7);
+    });
+    expect((await debug(page)).fieldSupport.available).toEqual({
+      'scout-sweep': true,
+      yardhawk: true,
+      'tri-pass': true,
+    });
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.activateSupport('scout-sweep');
+      api.activateSupport('yardhawk');
+      api.activateSupport('tri-pass');
+    });
+    await expect.poll(async () => (await debug(page)).fieldSupport.scoutActive).toBe(true);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkActive).toBe(true);
+    await expect.poll(async () => (await debug(page)).fieldSupport.strikePasses, { timeout: 2_000 }).toBeGreaterThan(0);
+    expect(Object.values((await debug(page)).fieldSupport.available)).toEqual([false, false, false]);
   });
 
   test('opening the deployment menu neutralizes movement input', async ({ page }) => {
@@ -260,8 +328,10 @@ test.describe('solo mechanics', () => {
     await page.keyboard.up('KeyW');
   });
 
-  test('fires, switches weapon and completes a staged reload', async ({ page }) => {
+  test('fires, switches only between the class primary and service pistol, then reloads', async ({ page }) => {
     const before = await debug(page);
+    expect(before.player.primaryWeapon).toBe('carbine');
+    expect(before.player.equippedWeapons).toEqual(['carbine', 'pistol']);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
     await page.waitForTimeout(120);
     const fired = await debug(page);
@@ -281,7 +351,7 @@ test.describe('solo mechanics', () => {
 
     await page.keyboard.press('Digit2');
     await page.waitForTimeout(450);
-    expect((await debug(page)).player.weapon).toBe('smg');
+    expect((await debug(page)).player.weapon).toBe('pistol');
     expect((await debug(page)).weaponPresentation.detailsReady).toBe(true);
 
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
@@ -295,13 +365,10 @@ test.describe('solo mechanics', () => {
     expect(afterReload.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
 
     await page.keyboard.press('Digit3');
-    await page.waitForTimeout(650);
-    const scattergun = await debug(page);
-    expect(scattergun.player.weapon).toBe('scattergun');
-    expect(scattergun.weaponPresentation.detailsReady).toBe(true);
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
     await page.waitForTimeout(250);
-    expect((await debug(page)).weaponPresentation.activeSmoke).toBeGreaterThan(0);
+    expect((await debug(page)).player.weapon).toBe('pistol');
+    await page.keyboard.press('Digit1');
+    await expect.poll(async () => (await debug(page)).player.weapon).toBe('carbine');
   });
 
   test('throws one frag, consumes inventory and resolves the fuse', async ({ page }) => {
@@ -360,19 +427,19 @@ test.describe('solo mechanics', () => {
 });
 
 test.describe('performance and stability', () => {
-  test('default balanced profile keeps readable art at a half-resolution framebuffer', async ({ page }) => {
+  test('Performance keeps readable art within its smooth rendering budget', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=balanced');
+    await pageReadyAt(page, '/?render=performance');
     await startSolo(page);
     await page.waitForTimeout(500);
     const state = await debug(page);
-    expect(state.render.profile).toBe('balanced');
+    expect(state.render.profile).toBe('performance');
     expect(state.render.representation).toBe('responsive');
     expect(state.render.reducedMode).toBe(true);
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
-    expect(state.render.pixelRatio).toBeCloseTo(0.5, 5);
+    expect(state.render.pixelRatio).toBeCloseTo(0.6, 5);
     expect(state.render.antialias).toBe(false);
     const overlays = await page.evaluate(() => ({
       grade: getComputedStyle(document.querySelector('#color-grade')!).display,
@@ -380,18 +447,43 @@ test.describe('performance and stability', () => {
     }));
     expect(overlays).toEqual({ grade: 'none', grain: 'none' });
     const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
-    expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.5));
-    expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.5));
-    expect(state.render.calls).toBeLessThanOrEqual(120);
+    expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.6));
+    expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.6));
+    expect(state.render.calls).toBeLessThanOrEqual(140);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
+    expect(state.interiorTelemetry).toMatchObject({ stairs: 20, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
     expect(errors).toEqual([]);
   });
 
-  test('compatibility profile maintains the constrained browser budget', async ({ page }) => {
+  test('Quality keeps full art, static shadows and visible combat presentation', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReady(page);
+    await pageReadyAt(page, '/?render=quality');
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void; placeBotAhead: (distance: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.placeBotAhead(5);
+    });
+    await page.waitForTimeout(350);
+    const state = await debug(page);
+    expect(state.render.profile).toBe('quality');
+    expect(state.render.representation).toBe('full');
+    expect(state.render.shadowMode).toBe('static');
+    expect(state.render.pixelRatio).toBeLessThanOrEqual(1);
+    expect(state.weaponPresentation.armsVisible).toBe(true);
+    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(8);
+    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(20);
+    expect(state.interiorTelemetry).toMatchObject({ stairs: 20, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: 'test-results/quality-arms-operator.png' });
+  });
+
+  test('hidden compatibility diagnostic maintains the constrained browser budget', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=compat');
     await startSolo(page);
     const fps = await page.evaluate(() => new Promise<number>((resolve) => {
       let frames = 0;

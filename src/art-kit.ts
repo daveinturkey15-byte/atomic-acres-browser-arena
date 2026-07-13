@@ -212,7 +212,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
   const dark = MAT.dark();
   const rubber = MAT.rubber();
   const accent = new THREE.MeshStandardMaterial({
-    color: id === 'carbine' ? 0xd6a944 : id === 'smg' ? 0x48b9b7 : 0xb75d45,
+    color: id === 'carbine' ? 0xd6a944 : id === 'smg' ? 0x48b9b7 : id === 'pistol' ? 0xe0bd68 : 0xb75d45,
     roughness: 0.45,
     metalness: 0.35,
   });
@@ -364,6 +364,42 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.
     addSocket('eject-socket', [0.14, 0.06, -0.04]);
     addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
     addSocket('support-socket-l', [-0.03, -0.08, -0.43]);
+  } else if (id === 'pistol') {
+    // Original Aster 9 service pistol: compact stepped slide, open-frame
+    // trigger guard and a high-contrast sight channel. It is not based on a
+    // commercial weapon mesh or proprietary animation.
+    const frame = roundedBox('pistol-frame', [0.21, 0.16, 0.5], metal, 0.035, 3);
+    part(root, frame, [0, -0.025, -0.08]);
+    const slide = new THREE.Group();
+    slide.name = 'bolt-or-slide';
+    slide.position.set(0, 0.105, -0.12);
+    slide.userData.restZ = slide.position.z;
+    root.add(slide);
+    part(slide, roundedBox('pistol-slide', [0.205, 0.145, 0.58], dark, 0.025, 3), [0, 0, 0]);
+    part(slide, roundedBox('pistol-slide-accent', [0.215, 0.035, 0.24], accent, 0.008, 1), [0, 0.06, 0.04]);
+    const serrations = flattenMaterials ? [0.08] : [0.02, 0.08, 0.14];
+    for (const z of serrations) {
+      part(slide, roundedBox('pistol-slide-serration', [0.218, 0.055, 0.022], accent, 0.004, 1), [0, 0, z]);
+    }
+    part(root, roundedBox('pistol-grip', [0.17, 0.34, 0.2], rubber, 0.045, 3), [0, -0.23, 0.08], [-0.18, 0, 0]);
+    part(root, roundedBox('pistol-grip-panel', [0.178, 0.23, 0.12], accent, 0.025, 2), [0, -0.245, 0.055], [-0.18, 0, 0]);
+    const magazine = new THREE.Group();
+    magazine.name = 'pistol-magazine';
+    magazine.position.set(0, -0.31, 0.08);
+    magazine.rotation.x = -0.18;
+    root.add(magazine);
+    part(magazine, roundedBox('pistol-magazine-body', [0.13, 0.28, 0.14], dark, 0.025, 2), [0, 0, 0]);
+    part(magazine, roundedBox('pistol-magazine-base', [0.16, 0.045, 0.17], accent, 0.012, 2), [0, -0.155, 0]);
+    addSocket('reload-socket-l', [-0.12, -0.06, 0], magazine);
+    part(root, roundedBox('pistol-trigger-guard', [0.19, 0.04, 0.2], dark, 0.012, 2), [0, -0.13, -0.1]);
+    part(root, roundedBox('pistol-trigger', [0.028, 0.095, 0.028], accent, 0.007, 1), [0, -0.1, -0.08], [0.24, 0, 0]);
+    addBarrel(0.43, -0.35, 0.028);
+    part(root, roundedBox('pistol-rear-sight', [0.19, 0.07, 0.045], accent, 0.01, 2), [0, 0.205, 0.09]);
+    part(root, roundedBox('pistol-front-sight', [0.04, 0.085, 0.04], accent, 0.008, 2), [0, 0.205, -0.39]);
+    addSocket('muzzle-socket', [0, 0.105, -0.58]);
+    addSocket('eject-socket', [0.125, 0.13, -0.08]);
+    addSocket('grip-socket-r', [0.03, -0.2, 0.08]);
+    addSocket('support-socket-l', [-0.09, -0.1, -0.12]);
   } else {
     // Original Model 12: warm laminated furniture, perforated heat shield,
     // shell saddle and a physically aligned ghost-ring sight.
@@ -526,6 +562,7 @@ type OperatorRig = {
   weaponSocket: THREE.Group;
   reactionRoot: THREE.Group;
   hitProxyRoot: THREE.Group;
+  meleeKnife: THREE.Group;
   weapon?: THREE.Group;
   weaponId: WeaponId;
 };
@@ -569,6 +606,10 @@ export function reactOperator(root: THREE.Group, zone: 'head' | 'body' | 'limb')
   root.userData.operatorHitSign = Number(root.userData.operatorHitSign ?? -1) * -1;
 }
 
+export function meleeOperator(root: THREE.Group): void {
+  root.userData.operatorMeleeAt = performance.now();
+}
+
 export function poseOperator(
   root: THREE.Group,
   stance: OperatorStance,
@@ -585,6 +626,9 @@ export function poseOperator(
   const rawHitZone = root.userData.operatorHitZone;
   const hitZone = rawHitZone === 'head' || rawHitZone === 'limb' ? rawHitZone : 'body';
   const hitReaction = hitReactionAt(hitAge, hitZone);
+  const meleeAge = performance.now() - Number(root.userData.operatorMeleeAt ?? -10_000);
+  const meleeActive = meleeAge >= 0 && meleeAge < 520;
+  const meleeEnvelope = meleeActive ? Math.sin(THREE.MathUtils.clamp(meleeAge / 520, 0, 1) * Math.PI) : 0;
   const hitSign = Number(root.userData.operatorHitSign ?? 1);
   rig.weaponSocket.position.x = hitReaction.roll * hitSign * 0.18;
   rig.weaponSocket.position.z = -0.36 + shotKick * 0.11 + hitReaction.envelope * 0.055;
@@ -602,6 +646,8 @@ export function poseOperator(
   }
   const flash = rig.weapon?.getObjectByName('world-muzzle-flash');
   if (flash) flash.visible = shotAge >= 0 && shotAge < 55;
+  if (rig.weapon) rig.weapon.visible = !meleeActive;
+  rig.meleeKnife.visible = meleeActive;
   const gait = Math.sin(phase) * Math.min(1, speed / 4.8);
   const crouched = stance === 'crouch';
   const prone = stance === 'prone';
@@ -624,21 +670,40 @@ export function poseOperator(
   rig.rightUpperArm.rotation.z = lerp(rig.rightUpperArm.rotation.z, 0.45);
   rig.leftForearm.rotation.x = lerp(rig.leftForearm.rotation.x, -1.08);
   rig.rightForearm.rotation.x = lerp(rig.rightForearm.rotation.x, -1.22);
+  if (meleeActive) {
+    rig.rightUpperArm.rotation.x = lerp(rig.rightUpperArm.rotation.x, -1.6 + meleeEnvelope * 1.15);
+    rig.rightUpperArm.rotation.z = lerp(rig.rightUpperArm.rotation.z, 0.12 - meleeEnvelope * 0.42);
+    rig.rightForearm.rotation.x = lerp(rig.rightForearm.rotation.x, -0.35 - meleeEnvelope * 0.75);
+    rig.spine.rotation.y = lerp(rig.spine.rotation.y, -meleeEnvelope * 0.16);
+  } else {
+    rig.spine.rotation.y = lerp(rig.spine.rotation.y, 0);
+  }
 }
 
 export function buildOperator(team: Team, name = 'operator', flattenMaterials = false, weaponId: WeaponId = 'carbine'): THREE.Group {
   const root = new THREE.Group(); root.name = name;
   root.userData.dynamic = true;
   const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;
-  const uniform = new THREE.MeshStandardMaterial({
-    color: teamColor,
-    emissive: team === 0 ? 0x0b4c4b : 0x5a160f,
-    emissiveIntensity: 0.24,
-    roughness: 0.68,
-  });
-  const identifier = new THREE.MeshStandardMaterial({ color: teamColor, emissive: teamColor, emissiveIntensity: 0.72, roughness: 0.46 });
-  const armour = MAT.dark();
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc99b78, roughness: 0.82 });
+  // Performance must simplify shading, not erase combatants. Unlit semantic
+  // team/skin/armour blocks stay readable through low-DPR and remote-display
+  // paths; Quality retains the authored physically shaded materials.
+  const uniform: THREE.Material = flattenMaterials
+    ? new THREE.MeshBasicMaterial({ color: teamColor })
+    : new THREE.MeshStandardMaterial({
+      color: teamColor,
+      emissive: team === 0 ? 0x0b4c4b : 0x5a160f,
+      emissiveIntensity: 0.24,
+      roughness: 0.68,
+    });
+  const identifier: THREE.Material = flattenMaterials
+    ? new THREE.MeshBasicMaterial({ color: team === 0 ? 0x8ffff7 : 0xffb09d })
+    : new THREE.MeshStandardMaterial({ color: teamColor, emissive: teamColor, emissiveIntensity: 0.72, roughness: 0.46 });
+  const armour: THREE.Material = flattenMaterials
+    ? new THREE.MeshBasicMaterial({ color: 0x29393d })
+    : MAT.dark();
+  const skin: THREE.Material = flattenMaterials
+    ? new THREE.MeshBasicMaterial({ color: 0xd8a781 })
+    : new THREE.MeshStandardMaterial({ color: 0xc99b78, roughness: 0.82 });
   const joint = (parent: THREE.Object3D, jointName: string, position: [number, number, number]) => {
     const group = new THREE.Group(); group.name = jointName; group.position.set(...position); parent.add(group); return group;
   };
@@ -711,6 +776,16 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     ? new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 14), identifier)
     : new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.2, 3), identifier);
   beacon.name = 'team-shoulder-beacon'; beacon.position.set(team === 0 ? -0.44 : 0.44, 0.7, 0); beacon.rotation.z = Math.PI / 2; beacon.userData.hitZone = 'body'; spine.add(beacon);
+  const meleeKnife = new THREE.Group();
+  meleeKnife.name = 'operator-melee-knife';
+  const knifeHandle = presentationOnly(roundedBox('operator-knife-handle', [0.13, 0.13, 0.3], armour, 0.035, 2));
+  const knifeBlade = presentationOnly(roundedBox('operator-knife-blade', [0.075, 0.035, 0.54], new THREE.MeshBasicMaterial({ color: 0xdce8e5 }), 0.012, 1));
+  knifeBlade.position.z = -0.4;
+  meleeKnife.add(knifeHandle, knifeBlade);
+  meleeKnife.position.set(0, -0.47, -0.16);
+  meleeKnife.rotation.x = -0.24;
+  meleeKnife.visible = false;
+  forearms[1].add(meleeKnife);
   const weaponSocket = joint(spine, 'weapon-socket', [0.22, 0.43, -0.36]);
   const hitProxyRoot = new THREE.Group();
   hitProxyRoot.name = 'authoritative-hit-proxies';
@@ -738,7 +813,7 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     leftForearm: forearms[0], rightForearm: forearms[1],
     leftThigh: thighs[0], rightThigh: thighs[1],
     leftShin: shins[0], rightShin: shins[1],
-    weaponSocket, reactionRoot, hitProxyRoot, weaponId,
+    weaponSocket, reactionRoot, hitProxyRoot, meleeKnife, weaponId,
   };
   root.userData.operatorRig = rig;
   setOperatorWeapon(root, weaponId, flattenMaterials);

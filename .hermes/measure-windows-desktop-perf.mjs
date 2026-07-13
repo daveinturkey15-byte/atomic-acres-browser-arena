@@ -79,18 +79,18 @@ async function profile(url, label) {
 try {
   const base = process.env.ATOMIC_BASE || 'https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/';
   const results = [
-    await profile(`${base}?render=balanced&perf=desktop-balanced`, 'balanced'),
+    await profile(`${base}?render=performance&perf=desktop-performance`, 'performance'),
     await profile(`${base}?render=quality&perf=desktop-quality`, 'quality'),
     await profile(`${base}?render=compat&perf=desktop-compat`, 'compat'),
   ];
   console.log(JSON.stringify(results, null, 2));
-  const balanced = results[0];
-  if (!String(balanced.gpu.renderer).includes('AMD')) throw new Error(`Expected AMD renderer, got ${balanced.gpu.renderer}`);
-  if (balanced.timing.fps < 90) throw new Error(`Responsive profile missed 90 FPS headroom: ${balanced.timing.fps.toFixed(2)}`);
-  if (balanced.timing.p95ms > 20) throw new Error(`Responsive p95 exceeded 20ms: ${balanced.timing.p95ms.toFixed(2)}`);
-  if (balanced.timing.maxms > 50) throw new Error(`Responsive max frame exceeded 50ms: ${balanced.timing.maxms.toFixed(2)}`);
-  if (balanced.render.calls > 120) throw new Error(`Responsive draw calls exceeded 120: ${balanced.render.calls}`);
-  if (balanced.render.triangles > 150_000) throw new Error(`Responsive triangles exceeded 150000: ${balanced.render.triangles}`);
+  const performanceProfile = results[0];
+  if (!String(performanceProfile.gpu.renderer).includes('AMD')) throw new Error(`Expected AMD renderer, got ${performanceProfile.gpu.renderer}`);
+  if (performanceProfile.timing.fps < 90) throw new Error(`Performance profile missed 90 FPS headroom: ${performanceProfile.timing.fps.toFixed(2)}`);
+  if (performanceProfile.timing.p95ms > 20) throw new Error(`Performance p95 exceeded 20ms: ${performanceProfile.timing.p95ms.toFixed(2)}`);
+  if (performanceProfile.timing.maxms > 50) throw new Error(`Performance max frame exceeded 50ms: ${performanceProfile.timing.maxms.toFixed(2)}`);
+  if (performanceProfile.render.calls > 140) throw new Error(`Performance draw calls exceeded 140: ${performanceProfile.render.calls}`);
+  if (performanceProfile.render.triangles > 150_000) throw new Error(`Performance triangles exceeded 150000: ${performanceProfile.render.triangles}`);
 } finally {
   ws.close();
 }

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FIELD_KIT, FIELD_KITS, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection } from './loadout';
+import { DEFAULT_FIELD_KIT, FIELD_KITS, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection } from './loadout';
 
 describe('field-kit selection', () => {
   it('offers one original kit for each implemented primary weapon', () => {
     expect(FIELD_KITS.map((kit) => kit.weapon)).toEqual(['carbine', 'smg', 'scattergun']);
     expect(new Set(FIELD_KITS.map((kit) => kit.id)).size).toBe(FIELD_KITS.length);
+  });
+
+  it('issues exactly the selected primary and shared service pistol', () => {
+    for (const kit of FIELD_KITS) expect(deployedWeapons(kit.weapon)).toEqual([kit.weapon, 'pistol']);
   });
 
   it('falls back safely for missing malformed stale or unknown storage values', () => {

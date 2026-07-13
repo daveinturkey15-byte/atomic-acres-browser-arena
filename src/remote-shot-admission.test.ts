@@ -4,7 +4,7 @@ import { admitRemoteShot, createRemoteShotAdmissionState } from './remote-shot-a
 
 const sender: PlayerSnapshot = {
   id: 'remote-a', name: 'Remote', team: 1, x: 2, y: 1.7, z: 3,
-  yaw: 0, pitch: 0, hp: 100, kills: 0, deaths: 0, weapon: 'carbine', seq: 2,
+  yaw: 0, pitch: 0, hp: 100, kills: 0, deaths: 0, primary: 'carbine', weapon: 'carbine', seq: 2,
 };
 const shot = (overrides: Partial<ShotMessage> = {}): ShotMessage => ({
   type: 'shot', by: sender.id, weapon: 'carbine', origin: [2, 1.7, 3], direction: [0, 0, -1], nonce: 10,

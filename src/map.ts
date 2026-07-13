@@ -77,8 +77,11 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
 
   function collisionProxy(name: string, position: [number, number, number], size: [number, number, number]): void {
-    const proxy = box(name, position, size, palette.dark, true, true);
-    proxy.visible = false;
+    const proxy = box(name, position, size, palette.dark, true, false);
+    // This simple shell is intentionally visible in Performance so every
+    // authoritative route collider has a readable visual counterpart. Quality
+    // replaces it with the rounded authored route art in environment-assets.
+    proxy.visible = true;
     proxy.userData.collisionProxy = true;
   }
 

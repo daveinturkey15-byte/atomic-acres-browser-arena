@@ -1,11 +1,11 @@
-import type { WeaponId } from './protocol';
+import type { PrimaryWeaponId } from './protocol';
 
 export type FieldKitId = 'balanced' | 'breacher' | 'runner';
 
 export type FieldKit = {
   id: FieldKitId;
   title: string;
-  weapon: WeaponId;
+  weapon: PrimaryWeaponId;
   role: string;
   summary: string;
   traits: [string, string, string];
@@ -40,6 +40,11 @@ export const FIELD_KITS: readonly FieldKit[] = [
 
 export const DEFAULT_FIELD_KIT: FieldKitId = 'balanced';
 export const FIELD_KIT_STORAGE_KEY = 'atomic-acres.field-kit.v1';
+export const SERVICE_PISTOL = 'pistol' as const;
+
+export function deployedWeapons(primary: PrimaryWeaponId): readonly [PrimaryWeaponId, 'pistol'] {
+  return [primary, SERVICE_PISTOL];
+}
 
 export function fieldKitById(value: unknown): FieldKit {
   return FIELD_KITS.find((kit) => kit.id === value) ?? FIELD_KITS.find((kit) => kit.id === DEFAULT_FIELD_KIT)!;

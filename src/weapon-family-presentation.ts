@@ -33,6 +33,12 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     actionTravel: 0.22, smokeBase: 3,
     requiredDetails: ['ghost-ring', 'front-bead', 'loading-port', 'shell-saddle', 'pump-rib'],
   },
+  pistol: {
+    sightHeight: 0.17, adsX: -0.36, adsY: 0.278, adsZ: 0.12, projectionCorrection: 0,
+    flashScale: 0.7, recoilTranslation: 0.11, recoilRotation: 0.2,
+    actionTravel: 0.1, smokeBase: 1,
+    requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard'],
+  },
 };
 
 export function weaponFamilyPresentation(weapon: WeaponId): WeaponFamilyPresentation {

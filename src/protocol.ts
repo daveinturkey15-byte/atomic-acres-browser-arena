@@ -1,5 +1,6 @@
 export type Team = 0 | 1;
-export type WeaponId = 'carbine' | 'smg' | 'scattergun';
+export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun';
+export type WeaponId = PrimaryWeaponId | 'pistol';
 
 export type PlayerSnapshot = {
   id: string;
@@ -13,6 +14,7 @@ export type PlayerSnapshot = {
   hp: number;
   kills: number;
   deaths: number;
+  primary: PrimaryWeaponId;
   weapon: WeaponId;
   stance?: 'stand' | 'crouch' | 'prone';
   seq: number;
@@ -28,19 +30,29 @@ export type ShotMessage = {
   direction: [number, number, number];
   nonce: number;
 };
+export type MeleeMessage = {
+  type: 'melee';
+  by: string;
+  origin: [number, number, number];
+  direction: [number, number, number];
+  nonce: number;
+};
 export type HitMessage = {
   type: 'hit';
   by: string;
   target: string;
   damage: number;
+  kind: 'shot' | 'explosive';
+  origin?: [number, number, number];
   nonce: number;
 };
 export type DeathMessage = { type: 'death'; killer: string; victim: string; nonce: number };
 export type LeaveMessage = { type: 'leave'; playerId: string };
 export type ChatMessage = { type: 'chat'; by: string; text: string };
-export type GameMessage = JoinMessage | StateMessage | ShotMessage | HitMessage | DeathMessage | LeaveMessage | ChatMessage;
+export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | LeaveMessage | ChatMessage;
 
-const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun']);
+const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'pistol']);
+const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun']);
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
   if (!value || typeof value !== 'object') return false;
@@ -50,7 +62,9 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && (p.team === 0 || p.team === 1)
     && ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'kills', 'deaths', 'seq'].every((key) => Number.isFinite(p[key]))
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
-    && weapons.has(p.weapon as WeaponId);
+    && primaryWeapons.has(p.primary as PrimaryWeaponId)
+    && weapons.has(p.weapon as WeaponId)
+    && (p.weapon === p.primary || p.weapon === 'pistol');
 }
 
 export function isGameMessage(value: unknown): value is GameMessage {
@@ -65,9 +79,16 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
+    case 'melee':
+      return typeof msg.by === 'string'
+        && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
+        && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
+        && Number.isFinite(msg.nonce);
     case 'hit':
       return typeof msg.by === 'string' && typeof msg.target === 'string'
         && Number.isFinite(msg.damage) && Number(msg.damage) > 0 && Number(msg.damage) <= 100
+        && (msg.kind === 'shot' || msg.kind === 'explosive')
+        && (msg.kind !== 'explosive' || Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite))
         && Number.isFinite(msg.nonce);
     case 'death':
       return typeof msg.killer === 'string' && typeof msg.victim === 'string' && Number.isFinite(msg.nonce);
@@ -87,6 +108,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'state':
       return message.player.id === playerId;
     case 'shot':
+    case 'melee':
     case 'hit':
     case 'chat':
       return message.by === playerId;

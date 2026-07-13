@@ -62,6 +62,15 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     pellets: 9, recoilPitch: 0.052, recoilYaw: 0.012, recoilRecovery: 8,
     switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
   },
+  pistol: {
+    id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
+    falloffStart: 20, falloffEnd: 58, headMultiplier: 1.5, limbMultiplier: 0.84,
+    rpm: 420, mag: 15, reserve: 60, reload: 1.35,
+    hipSpread: 0.02, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.42,
+    crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.0024, maximumSpread: 0.052,
+    pellets: 1, recoilPitch: 0.021, recoilYaw: 0.008, recoilRecovery: 14,
+    switchSeconds: 0.28, automatic: false, color: 0xe8c77b,
+  },
 };
 
 export type MovementContext = {

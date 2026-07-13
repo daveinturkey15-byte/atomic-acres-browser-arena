@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import { batchStaticMeshes, buildOperator, fireOperator, poseOperator, reactOperator, setOperatorWeapon } from './art-kit';
+import { batchStaticMeshes, buildOperator, fireOperator, meleeOperator, poseOperator, reactOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
 import {
   BOT_REACTION_DELAY,
@@ -13,7 +13,7 @@ import {
   scoreBotSpawn,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
-import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
+import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
@@ -52,9 +52,11 @@ import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
+import { consumeFieldSupport, createFieldSupportState, recordSupportDeath, recordSupportElimination, triPassSchedule, type FieldSupportId } from './field-support';
 import { ArenaNetwork } from './network';
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
+import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint, type RemoteMeleeAdmissionState } from './remote-melee-admission';
 import { CharacterPhysics } from './physics';
 import { TracerPool } from './tracer-pool';
 import { WeaponPresentation } from './weapon-presentation';
@@ -63,6 +65,7 @@ import {
   DeathMessage,
   GameMessage,
   PlayerSnapshot,
+  PrimaryWeaponId,
   ShotMessage,
   Team,
   WeaponId,
@@ -116,7 +119,21 @@ type GrenadeEntity = {
   lastBounceAt: number;
 };
 
-const WEAPON_ORDER: WeaponId[] = ['carbine', 'smg', 'scattergun'];
+type YardhawkEntity = {
+  root: THREE.Group;
+  targetId: string;
+  expiresAt: number;
+};
+
+type StrikePassEntity = {
+  plane: THREE.Group;
+  marker: THREE.Mesh;
+  target: THREE.Vector3;
+  startedAt: number;
+  impactAt: number;
+  resolved: boolean;
+};
+
 const BOT_PATROL_POINTS = PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z));
 
 function createPlayerId(): string {
@@ -131,7 +148,7 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · BALANCED PRESENTATION PASS 13</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT SYSTEMS PASS 14</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -169,9 +186,9 @@ app.innerHTML = `
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
         <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
-        <label>GRAPHICS<select id="graphics-profile"><option value="balanced">BALANCED</option><option value="quality">QUALITY</option><option value="compat">COMPATIBILITY</option></select></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="quality">QUALITY</option></select></label>
       </div>
-      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
+      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>1/2</b> primary/pistol · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
   </section>
@@ -185,7 +202,8 @@ app.innerHTML = `
     <div id="location-label">ATOM-LINER CROSSING</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
     <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
-    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V MELEE · G THROW</small></div>
+    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V KNIFE · G THROW</small></div>
+    <div id="support-block"><span id="support-streak">STREAK 0</span><b data-support="scout-sweep">3 · SCOUT</b><b data-support="yardhawk">5 · YARDHAWK</b><b data-support="tri-pass">7 · TRI-PASS</b><small>3 / 4 / 5 ACTIVATE</small></div>
     <div id="room-hud"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
     <div id="countdown" hidden></div>
@@ -221,7 +239,8 @@ const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
 const staticMaterialMode = activeRenderConfig.staticMaterialMode;
 document.documentElement.classList.toggle('compat-render', renderProfile === 'compat');
-document.documentElement.classList.toggle('balanced-render', renderProfile === 'balanced');
+document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
+document.documentElement.classList.toggle('quality-render', renderProfile === 'quality');
 document.documentElement.dataset.renderProfile = renderProfile;
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -338,8 +357,9 @@ const player = {
   kills: 0,
   deaths: 0,
   weapon: 'carbine' as WeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve } as Record<WeaponId, number>,
+  primaryWeapon: 'carbine' as PrimaryWeaponId,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, pistol: WEAPONS.pistol.mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, pistol: WEAPONS.pistol.reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -357,8 +377,13 @@ const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
 const grenades: GrenadeEntity[] = [];
+let fieldSupport = createFieldSupportState();
+let scoutSweepUntil = 0;
+let yardhawk: YardhawkEntity | null = null;
+const strikePasses: StrikePassEntity[] = [];
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
+const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
@@ -493,7 +518,7 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
 
 function renderFieldKitSelection(): void {
   const kit = fieldKitById(selectedFieldKit);
-  const queued = gameStarted && player.weapon !== kit.weapon;
+  const queued = gameStarted && player.primaryWeapon !== kit.weapon;
   element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name}</b>`;
   document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
     const selected = card.dataset.kitId === selectedFieldKit;
@@ -506,7 +531,8 @@ function chooseFieldKit(id: string): void {
   selectedFieldKit = fieldKitById(id).id;
   localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
   if (!gameStarted) {
-    player.weapon = fieldKitById(selectedFieldKit).weapon;
+    player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+    player.weapon = player.primaryWeapon;
     weaponView.setWeapon(player.weapon, true);
   }
   renderFieldKitSelection();
@@ -518,7 +544,8 @@ document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button)
 document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) => {
   button.addEventListener('click', () => chooseFieldKit(button.dataset.kitId ?? 'balanced'));
 });
-player.weapon = fieldKitById(selectedFieldKit).weapon;
+player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+player.weapon = player.primaryWeapon;
 renderFieldKitSelection();
 
 const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
@@ -558,6 +585,8 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const texture = new THREE.CanvasTexture(labelCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false }));
+  sprite.userData.presentationOnly = true;
+  sprite.raycast = () => {};
   sprite.visible = snapshot.team === player.team;
   sprite.position.y = 2.5;
   sprite.scale.set(2.4, 0.6, 1);
@@ -581,6 +610,7 @@ function snapshot(): PlayerSnapshot {
     hp: player.hp,
     kills: player.kills,
     deaths: player.deaths,
+    primary: player.primaryWeapon,
     weapon: player.weapon,
     stance: player.stance,
     seq: ++player.seq,
@@ -617,15 +647,36 @@ function onNetworkMessage(message: GameMessage): void {
     renderRemoteShot(message);
     return;
   }
+  if (message.type === 'melee') {
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    const prior = remoteMeleeAdmissions.get(message.by) ?? createRemoteMeleeAdmissionState();
+    const admission = admitRemoteMelee(message, sender?.snapshot, performance.now(), prior);
+    if (!admission.accepted || !sender) return;
+    remoteMeleeAdmissions.set(message.by, admission.nextState);
+    const operator = sender.root.userData.operator as THREE.Group | undefined;
+    if (operator) meleeOperator(operator);
+    audio.melee();
+    const origin = new THREE.Vector3(...message.origin);
+    if (player.alive && sender.snapshot.team !== player.team
+      && meleeActionHitsPoint(message, player.position)
+      && !arena.colliders.some((box) => segmentIntersectsBox(origin, player.position, box))) {
+      applyDamage(100, message.by);
+    }
+    return;
+  }
   if (message.type === 'hit' && message.target === player.id && !processedNonces.has(message.nonce)) {
     const attacker = remotes.get(message.by);
     if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
-    const attackerEye = {
-      x: attacker.snapshot.x,
-      y: attacker.snapshot.y,
-      z: attacker.snapshot.z,
-    };
-    if (arena.colliders.some((box) => segmentIntersectsBox(attackerEye, player.position, box))) return;
+    let validationOrigin: THREE.Vector3;
+    if (message.kind === 'explosive') {
+      if (!message.origin) return;
+      validationOrigin = new THREE.Vector3(...message.origin);
+      if (!pointInsideBounds(validationOrigin, arena.bounds, 0) || validationOrigin.distanceTo(player.position) > 6.2) return;
+    } else {
+      validationOrigin = new THREE.Vector3(attacker.snapshot.x, attacker.snapshot.y, attacker.snapshot.z);
+    }
+    if (arena.colliders.some((box) => segmentIntersectsBox(validationOrigin, player.position, box))) return;
     processedNonces.add(message.nonce);
     applyDamage(message.damage, message.by);
     trimNonceSet();
@@ -688,6 +739,8 @@ function applyDamage(damage: number, attacker: string): void {
     interruptReload(true, now);
     player.alive = false;
     player.deaths += 1;
+    fieldSupport = recordSupportDeath(fieldSupport);
+    updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, nonce: randomNonce() };
     network.send(death);
     processDeath(death);
@@ -703,6 +756,7 @@ function processDeath(message: DeathMessage): void {
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   if (message.killer === player.id && message.victim !== player.id) {
     player.kills += 1;
+    awardSupportElimination();
     audio.kill();
   }
   addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
@@ -719,6 +773,7 @@ function removeRemote(id: string, reason: string): void {
   scene.remove(remote.root);
   remotes.delete(id);
   remoteShotAdmissions.delete(id);
+  remoteMeleeAdmissions.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -815,10 +870,11 @@ function respawn(requestLock = true): void {
   jumpQueuedAt = -10_000;
   footstepAccumulator = { distance: 0, side: 0 };
   const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
-  if (player.weapon !== deploymentWeapon) {
-    player.weapon = deploymentWeapon;
+  player.primaryWeapon = deploymentWeapon;
+  if (player.weapon !== player.primaryWeapon) {
+    player.weapon = player.primaryWeapon;
     player.switchingUntil = 0;
-    weaponView.setWeapon(deploymentWeapon, true);
+    weaponView.setWeapon(player.primaryWeapon, true);
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
@@ -853,7 +909,8 @@ function randomNonce(): number {
 }
 
 function switchWeapon(index: number): void {
-  const id = WEAPON_ORDER[index];
+  const equippedWeapons = deployedWeapons(player.primaryWeapon);
+  const id = equippedWeapons[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -991,7 +1048,7 @@ function tryFire(now: number): void {
         const remoteOperator = remote.root.userData.operator as THREE.Group | undefined;
         if (remoteOperator) reactOperator(remoteOperator, hit.zone);
         const nonce = randomNonce();
-        network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), nonce });
+        network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), kind: 'shot', nonce });
         showHitmarker(hit.zone === 'head');
         audio.hit(hit.zone === 'head');
       }
@@ -1021,6 +1078,7 @@ type ShotCastResult = {
 
 function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResult {
   const ray = new THREE.Raycaster(origin, direction, 0.1, 110);
+  ray.camera = camera;
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
   const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
   const activeTargets = arena.targets.filter((target) => target.active).map((target) => target.root);
@@ -1162,6 +1220,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   bot.respawnAt = now + 2_200;
   bot.root.visible = false;
   player.kills += 1;
+  awardSupportElimination();
   audio.kill();
   addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
   checkMatchEnd();
@@ -1325,17 +1384,23 @@ function updateBots(dt: number, now: number): void {
 
 function melee(): void {
   const now = performance.now();
-  if (!meleeStrike(2, now, player.lastMeleeAt).hit || !player.alive || matchState.phase !== 'active') return;
+  const previousMeleeAt = player.lastMeleeAt;
+  // A melee action must animate and play even when it misses. The old code
+  // checked a fake distance of 2 m against a 1.75 m strike range, so it could
+  // never enter the action at all.
+  if (!meleeStrike(0, now, previousMeleeAt).hit || !player.alive || matchState.phase !== 'active') return;
   player.lastMeleeAt = now;
   weaponView.melee();
   audio.melee();
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const direction = camera.getWorldDirection(new THREE.Vector3());
+  network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: randomNonce() });
   const hit = castShot(origin, direction);
-  if (!hit.playerId || hit.distance > 2.25) return;
+  if (!hit.playerId) return;
+  const strike = meleeStrike(hit.distance, now, previousMeleeAt);
+  if (!strike.hit) return;
   const bot = bots.get(hit.playerId);
-  if (bot) applyBotDamage(bot, 70, hit.hitZone ?? 'body');
-  else if (remotes.has(hit.playerId)) network.send({ type: 'hit', by: player.id, target: hit.playerId, damage: 70, nonce: randomNonce() });
+  if (bot) applyBotDamage(bot, strike.damage, hit.hitZone ?? 'body');
 }
 
 function throwGrenade(): void {
@@ -1389,7 +1454,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
     const damage = grenadeDamage(target.distanceTo(point));
-    if (damage > 0) network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage, nonce: randomNonce() });
+    if (damage > 0) network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage, kind: 'explosive', origin: point.toArray(), nonce: randomNonce() });
   }
   const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
   const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
@@ -1500,6 +1565,172 @@ function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
   while (feed.children.length > 6) feed.lastElementChild?.remove();
   setTimeout(() => row.classList.add('fade'), 4200);
   setTimeout(() => row.remove(), 5000);
+}
+
+function updateFieldSupportHud(): void {
+  element<HTMLElement>('#support-streak').textContent = `STREAK ${fieldSupport.streak}`;
+  document.querySelectorAll<HTMLElement>('[data-support]').forEach((item) => {
+    item.classList.toggle('ready', fieldSupport.available[item.dataset.support as FieldSupportId] === true);
+  });
+}
+
+function awardSupportElimination(): void {
+  const before = fieldSupport.available;
+  fieldSupport = recordSupportElimination(fieldSupport);
+  for (const [id, label] of [['scout-sweep', 'SCOUT SWEEP'], ['yardhawk', 'YARDHAWK'], ['tri-pass', 'TRI-PASS STRIKE']] as const) {
+    if (!before[id] && fieldSupport.available[id]) addFeed(`${label} READY`, 'gold');
+  }
+  updateFieldSupportHud();
+}
+
+function supportTargetPosition(id: string): THREE.Vector3 | null {
+  const bot = bots.get(id);
+  if (bot?.alive) return bot.position.clone().add(new THREE.Vector3(0, 1.15, 0));
+  const remote = remotes.get(id);
+  if (remote && remote.snapshot.team !== player.team && remote.snapshot.hp > 0) return remote.target.clone().add(new THREE.Vector3(0, 1.15, 0));
+  return null;
+}
+
+function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
+  const candidates: { id: string; point: THREE.Vector3 }[] = [];
+  for (const bot of bots.values()) if (bot.alive && bot.team !== player.team) candidates.push({ id: bot.id, point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)) });
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.team !== player.team && remote.snapshot.hp > 0) candidates.push({ id: remote.snapshot.id, point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)) });
+  }
+  candidates.sort((a, b) => a.point.distanceToSquared(player.position) - b.point.distanceToSquared(player.position));
+  return candidates[0] ?? null;
+}
+
+function makeSupportPlane(): THREE.Group {
+  const root = new THREE.Group();
+  root.name = 'tri-pass-plane';
+  const material = new THREE.MeshBasicMaterial({ color: 0xd5bf76 });
+  const dark = new THREE.MeshBasicMaterial({ color: 0x29393d });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 2.8), dark);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 0.62), material);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 0.42), material); tail.position.z = 1.05;
+  root.add(body, wing, tail);
+  root.scale.setScalar(0.8);
+  return root;
+}
+
+function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: number): void {
+  audio.explosion();
+  const flash = new THREE.Mesh(
+    new THREE.SphereGeometry(1, reducedRenderMode ? 10 : 18, reducedRenderMode ? 7 : 12),
+    new THREE.MeshBasicMaterial({ color: 0xffb24c, transparent: true, opacity: 0.76, depthWrite: false }),
+  );
+  flash.position.copy(point); scene.add(flash);
+  const started = performance.now();
+  const animate = () => {
+    const t = (performance.now() - started) / 460;
+    if (t >= 1) { scene.remove(flash); flash.geometry.dispose(); (flash.material as THREE.Material).dispose(); return; }
+    flash.scale.setScalar(0.25 + t * radius);
+    (flash.material as THREE.MeshBasicMaterial).opacity = 0.76 * (1 - t);
+    requestAnimationFrame(animate);
+  };
+  animate();
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    applyBotDamage(bot, Math.max(1, Math.round(maximumDamage * (1 - distance / radius))), 'body');
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.team === player.team || remote.snapshot.hp <= 0) continue;
+    const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, Math.max(1, Math.round(maximumDamage * (1 - distance / radius)))), kind: 'explosive', origin: point.toArray(), nonce: randomNonce() });
+  }
+}
+
+function activateFieldSupport(id: FieldSupportId): void {
+  if (!player.alive || matchState.phase !== 'active') return;
+  const consumed = consumeFieldSupport(fieldSupport, id);
+  if (!consumed.activated) return;
+  fieldSupport = consumed.state;
+  const now = performance.now();
+  if (id === 'scout-sweep') {
+    scoutSweepUntil = now + 12_000;
+    addFeed('SCOUT SWEEP ACTIVE · 12 SEC', 'gold');
+  } else if (id === 'yardhawk') {
+    const target = nearestSupportTarget();
+    if (!target) {
+      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, yardhawk: true } };
+      updateFieldSupportHud();
+      return;
+    }
+    if (yardhawk) scene.remove(yardhawk.root);
+    const root = new THREE.Group(); root.name = 'yardhawk-pursuit-drone';
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, 0.9), new THREE.MeshBasicMaterial({ color: 0x29393d }));
+    const wings = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.08, 0.32), new THREE.MeshBasicMaterial({ color: 0xe0bd68 }));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff765f })); eye.position.z = -0.48;
+    root.add(body, wings, eye);
+    root.position.copy(player.position).add(new THREE.Vector3(0, 2.3, 0));
+    scene.add(root);
+    yardhawk = { root, targetId: target.id, expiresAt: now + 5_000 };
+    addFeed('YARDHAWK LAUNCHED', 'gold');
+  } else {
+    const target = nearestSupportTarget();
+    const base = target?.point ?? new THREE.Vector3(0, 0, 0);
+    const schedule = triPassSchedule(now);
+    for (let index = 0; index < schedule.length; index += 1) {
+      const clamped = clampPointToBounds(new THREE.Vector3(base.x + (index - 1) * 2.4, 0.2, base.z + (index % 2 === 0 ? -1.5 : 1.5)), arena.bounds, 1);
+      const targetPoint = new THREE.Vector3(clamped.x, 0.2, clamped.z);
+      const plane = makeSupportPlane();
+      plane.position.set(-42, 18 + index * 1.2, targetPoint.z); scene.add(plane);
+      const marker = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.65, 24), new THREE.MeshBasicMaterial({ color: 0xff765f, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false }));
+      marker.rotation.x = -Math.PI / 2; marker.position.copy(targetPoint); scene.add(marker);
+      strikePasses.push({ plane, marker, target: targetPoint, startedAt: now, impactAt: schedule[index], resolved: false });
+    }
+    addFeed('TRI-PASS STRIKE INBOUND', 'gold');
+  }
+  updateFieldSupportHud();
+}
+
+function updateFieldSupport(dt: number, now: number): void {
+  if (yardhawk) {
+    const target = supportTargetPosition(yardhawk.targetId);
+    if (!target || now >= yardhawk.expiresAt) {
+      scene.remove(yardhawk.root); yardhawk = null;
+    } else {
+      const direction = target.clone().sub(yardhawk.root.position);
+      const distance = direction.length();
+      if (distance <= 1.1) {
+        supportBlast(target, 2.6, 200);
+        scene.remove(yardhawk.root); yardhawk = null;
+      } else {
+        yardhawk.root.position.addScaledVector(direction.normalize(), Math.min(distance, dt * 14));
+        yardhawk.root.lookAt(target);
+      }
+    }
+  }
+  for (let index = strikePasses.length - 1; index >= 0; index -= 1) {
+    const pass = strikePasses[index];
+    const progress = THREE.MathUtils.clamp((now - pass.startedAt) / Math.max(1, pass.impactAt - pass.startedAt), 0, 1);
+    pass.plane.position.x = THREE.MathUtils.lerp(-42, 42, progress);
+    (pass.marker.material as THREE.MeshBasicMaterial).opacity = 0.32 + Math.sin(now * 0.018) * 0.18;
+    if (!pass.resolved && now >= pass.impactAt) {
+      pass.resolved = true;
+      supportBlast(pass.target, 5.2, 120);
+      scene.remove(pass.plane, pass.marker);
+      pass.plane.traverse((node) => { if (node instanceof THREE.Mesh) { node.geometry.dispose(); (node.material as THREE.Material).dispose(); } });
+      pass.marker.geometry.dispose(); (pass.marker.material as THREE.Material).dispose();
+      strikePasses.splice(index, 1);
+    }
+  }
+}
+
+function clearFieldSupport(): void {
+  if (yardhawk) scene.remove(yardhawk.root);
+  yardhawk = null;
+  for (const pass of strikePasses) scene.remove(pass.plane, pass.marker);
+  strikePasses.length = 0;
+  scoutSweepUntil = 0;
+  fieldSupport = createFieldSupportState();
+  updateFieldSupportHud();
 }
 
 function updatePhysics(dt: number): void {
@@ -1698,13 +1929,14 @@ function updateMinimap(now: number): void {
   }
   for (const remote of remotes.values()) {
     const friendly = remote.snapshot.team === player.team;
-    if (!friendly && remote.target.distanceTo(player.position) > 15) continue;
+    const scoutActive = now < scoutSweepUntil;
+    if (!friendly && !scoutActive && remote.target.distanceTo(player.position) > 15) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
     context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    if (!bot.alive || now >= scoutSweepUntil && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
@@ -1771,6 +2003,7 @@ function updateHud(now: number): void {
     : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
   element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
   element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
+  updateFieldSupportHud();
   element<HTMLElement>('#health-block').classList.toggle('critical', player.hp <= 30);
   updateMinimap(now);
   if (!element<HTMLElement>('#roster').hidden) updateRoster();
@@ -1782,7 +2015,7 @@ function updateRoster(): void {
     ...[...remotes.values()].map((remote) => remote.snapshot),
     ...[...bots.values()].map((bot) => ({
       id: bot.id, name: bot.name, team: bot.team, x: bot.position.x, y: bot.position.y, z: bot.position.z,
-      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, weapon: 'carbine' as WeaponId, seq: 0,
+      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: 'carbine' as PrimaryWeaponId, weapon: 'carbine' as WeaponId, seq: 0,
     })),
   ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => `<div><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`).join('');
@@ -1823,7 +2056,9 @@ preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
 sensitivityInput.value = String(sensitivity);
 controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
-graphicsProfileInput.value = renderProfile;
+// Compatibility remains query-only for diagnostic QA; players choose between
+// the readable Performance path and the complete Quality presentation.
+graphicsProfileInput.value = renderProfile === 'quality' ? 'quality' : 'performance';
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
@@ -1837,10 +2072,10 @@ fovInput.addEventListener('input', () => {
   localStorage.setItem('atomic-acres-fov', String(preferredFov));
 });
 graphicsProfileInput.addEventListener('change', () => {
-  const selected = graphicsProfileInput.value as RenderProfile;
+  const selected: RenderProfile = graphicsProfileInput.value === 'quality' ? 'quality' : 'performance';
   localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, selected);
   const next = new URL(window.location.href);
-  if (selected === 'balanced') next.searchParams.delete('render');
+  if (selected === 'performance') next.searchParams.delete('render');
   else next.searchParams.set('render', selected);
   window.location.assign(next);
 });
@@ -1890,9 +2125,12 @@ function pollGamepad(dt: number): void {
     if (pressed(1)) requestStance('toggle-crouch');
     if (pressed(13)) requestStance('toggle-prone');
     if (pressed(2)) reload();
-    if (pressed(3)) switchWeapon((WEAPON_ORDER.indexOf(player.weapon) + 1) % WEAPON_ORDER.length);
+    if (pressed(3)) switchWeapon(player.weapon === 'pistol' ? 0 : 1);
     if (pressed(4)) throwGrenade();
     if (pressed(5)) melee();
+    if (pressed(12)) activateFieldSupport('scout-sweep');
+    if (pressed(14)) activateFieldSupport('yardhawk');
+    if (pressed(15)) activateFieldSupport('tri-pass');
   }
   previousGamepadButtons = buttons;
 }
@@ -1908,7 +2146,9 @@ window.addEventListener('keydown', (event) => {
   if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
   if (event.code === 'Digit1') switchWeapon(0);
   if (event.code === 'Digit2') switchWeapon(1);
-  if (event.code === 'Digit3') switchWeapon(2);
+  if (event.code === 'Digit3' && !event.repeat) activateFieldSupport('scout-sweep');
+  if (event.code === 'Digit4' && !event.repeat) activateFieldSupport('yardhawk');
+  if (event.code === 'Digit5' && !event.repeat) activateFieldSupport('tri-pass');
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
@@ -1983,16 +2223,18 @@ function resetForMode(): void {
   clearBots();
   for (const grenade of grenades) scene.remove(grenade.mesh);
   grenades.length = 0;
+  clearFieldSupport();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
-  player.weapon = fieldKitById(selectedFieldKit).weapon;
+  player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+  player.weapon = player.primaryWeapon;
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, pistol: WEAPONS.pistol.mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, pistol: WEAPONS.pistol.reserve };
 }
 
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
@@ -2065,6 +2307,7 @@ function frame(now: number): void {
     updateTargets(now);
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
+    updateFieldSupport(frameDt, now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
@@ -2081,6 +2324,8 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown>;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
+    placeBotAhead: (distance?: number) => void;
+    teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
     fireOnce: () => void;
@@ -2091,6 +2336,8 @@ const debugWindow = window as Window & {
     setAds: (held: boolean) => void;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
+    earnSupport: (eliminations: number) => void;
+    activateSupport: (id: FieldSupportId) => void;
     endMatch: () => void;
     rematch: () => void;
 
@@ -2108,6 +2355,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       kills: player.kills,
       deaths: player.deaths,
       weapon: player.weapon,
+      primaryWeapon: player.primaryWeapon,
+      equippedWeapons: deployedWeapons(player.primaryWeapon),
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
       reloading: player.reloadState !== null,
@@ -2127,6 +2376,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       waypoint: bot.waypoint,
       blockedSince: bot.blockedSince,
       hasLineOfSight: bot.hasLineOfSight,
+      rootVisible: bot.root.visible,
+      screenPosition: bot.root.localToWorld(new THREE.Vector3(0, 1.35, 0)).project(camera).toArray(),
+      visibleMeshCount: (() => {
+        let count = 0;
+        bot.root.traverse((node) => {
+          if (node instanceof THREE.Mesh && node.visible && node.userData.authoritativeProxy !== true) count += 1;
+        });
+        return count;
+      })(),
       presentationReady: ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
         .every((name) => bot.root.getObjectByName(name) !== undefined),
       presentationWeaponSafe: (() => {
@@ -2146,6 +2404,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
+      hp: remote.snapshot.hp,
+      primary: remote.snapshot.primary,
+      weapon: remote.snapshot.weapon,
       stance: remote.snapshot.stance ?? 'stand',
       position: remote.target.toArray(),
       visualPosition: remote.root.position.toArray(),
@@ -2153,6 +2414,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
+    fieldSupport: {
+      streak: fieldSupport.streak,
+      available: { ...fieldSupport.available },
+      scoutActive: performance.now() < scoutSweepUntil,
+      yardhawkActive: yardhawk !== null,
+      strikePasses: strikePasses.length,
+    },
     activeImpactParticles: impactPresentation.activeParticles(),
     activeImpactMarks: impactPresentation.activeMarks(),
     activeTracers: tracerPool.activeCount(),
@@ -2160,6 +2428,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     arenaZone: classifyArenaZone(player.position.x, player.position.z),
     arenaStoryReady: ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
+    interiorTelemetry: (() => {
+      const counts = { stairs: 0, beds: 0, workbenches: 0, lights: 0, visibleCollisionProxies: 0 };
+      scene.traverse((node) => {
+        if (node.name === 'interior-stair') counts.stairs += 1;
+        if (node.name === 'upper-room-bed-base') counts.beds += 1;
+        if (node.name === 'upper-room-workbench') counts.workbenches += 1;
+        if (node.name === 'interior-ceiling-light') counts.lights += 1;
+        if (node.userData.collisionProxy === true && node.visible) counts.visibleCollisionProxies += 1;
+      });
+      return counts;
+    })(),
     weaponReady: weaponView.isReady(),
     weaponPresentation: weaponView.presentationState(),
     weaponActionHistory: [...weaponActionHistory],
@@ -2193,6 +2472,24 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  placeBotAhead: (distance = 5) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    const forward = new THREE.Vector3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    bot.position.set(player.position.x, 0, player.position.z).addScaledVector(forward, THREE.MathUtils.clamp(distance, 2.5, 9));
+    bot.root.position.copy(bot.position);
+    bot.velocity.set(0, 0, 0);
+    bot.root.rotation.y = player.yaw + Math.PI;
+  },
+  teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
+    if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
+    player.position.set(x, y, z);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    player.yaw = yaw;
+    player.pitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
+    player.invulnerableUntil = 0;
+  },
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
   openMenu: () => {
     clearGameplayInput();
@@ -2220,6 +2517,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.invulnerableUntil = 0;
     applyDamage(amount, bots.keys().next().value ?? player.id);
   },
+  earnSupport: (eliminations: number) => {
+    for (let index = 0; index < Math.max(0, Math.min(7, Math.floor(eliminations))); index += 1) awardSupportElimination();
+  },
+  activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   endMatch: () => {
     player.kills = 25;
     updateMatchState(performance.now());

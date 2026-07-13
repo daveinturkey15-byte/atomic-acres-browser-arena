@@ -50,6 +50,8 @@ export class WeaponPresentation {
   private readonly smokeColors = new Float32Array(24);
   private readonly smokePoints: THREE.Points;
   private readonly armRigs: ViewArmRig[] = [];
+  private readonly meleeKnife = new THREE.Group();
+  private readonly meleeRig = new THREE.Group();
   private readonly brassGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7);
   private readonly shellGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.105, 8);
   private readonly brassMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
@@ -70,9 +72,15 @@ export class WeaponPresentation {
     this.root.scale.setScalar(0.6);
     camera.add(this.root);
 
-    const sleeve = new THREE.MeshStandardMaterial({ color: 0x31544f, roughness: 0.84 });
-    const sleeveTrim = new THREE.MeshStandardMaterial({ color: 0xb9963f, roughness: 0.62, metalness: 0.12 });
-    const glove = new THREE.MeshStandardMaterial({ color: 0x252d2e, roughness: 0.88 });
+    const sleeve: THREE.Material = flattenMaterials
+      ? new THREE.MeshBasicMaterial({ color: 0x3f7771 })
+      : new THREE.MeshStandardMaterial({ color: 0x31544f, roughness: 0.84 });
+    const sleeveTrim: THREE.Material = flattenMaterials
+      ? new THREE.MeshBasicMaterial({ color: 0xd4ad48 })
+      : new THREE.MeshStandardMaterial({ color: 0xb9963f, roughness: 0.62, metalness: 0.12 });
+    const glove: THREE.Material = flattenMaterials
+      ? new THREE.MeshBasicMaterial({ color: 0x3c4b4c })
+      : new THREE.MeshStandardMaterial({ color: 0x252d2e, roughness: 0.88 });
     const arms = new THREE.Group(); arms.name = 'first-person-arms';
     const makeArm = (side: 'left' | 'right') => {
       const sign = side === 'left' ? -1 : 1;
@@ -116,6 +124,47 @@ export class WeaponPresentation {
     arms.scale.setScalar(0.74);
     arms.position.set(0, -0.08, 0.02);
     this.root.add(arms);
+
+    // Original compact field knife. It is a camera-space presentation prop;
+    // authoritative melee range and occlusion remain in gameplay/main.
+    this.meleeKnife.name = 'field-knife-presentation';
+    const knifeHandle = roundedBox('field-knife-handle', [0.15, 0.42, 0.14], glove, 0.035, 2);
+    knifeHandle.position.set(0, -0.24, 0);
+    const knifeGuard = roundedBox('field-knife-guard', [0.36, 0.075, 0.11], sleeveTrim, 0.018, 2);
+    knifeGuard.position.set(0, 0, 0);
+    const bladeShape = new THREE.Shape();
+    bladeShape.moveTo(-0.095, 0);
+    bladeShape.lineTo(0.095, 0);
+    bladeShape.lineTo(0.072, 0.82);
+    bladeShape.lineTo(0, 1.04);
+    bladeShape.lineTo(-0.072, 0.82);
+    bladeShape.closePath();
+    const blade = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(bladeShape, { depth: 0.045, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 1 }),
+      flattenMaterials
+        ? new THREE.MeshBasicMaterial({ color: 0xe4eeee })
+        : new THREE.MeshStandardMaterial({ color: 0xd5e0e0, roughness: 0.24, metalness: 0.8 }),
+    );
+    blade.name = 'field-knife-blade';
+    blade.position.set(0, 0.02, -0.03);
+    this.meleeKnife.add(knifeHandle, knifeGuard, blade);
+    this.meleeRig.name = 'field-knife-arm-rig';
+    const meleeForearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.46, 5, 9), sleeve);
+    meleeForearm.name = 'knife-forearm';
+    meleeForearm.position.set(0.38, -0.42, 0.08);
+    meleeForearm.rotation.z = 0.42;
+    const meleeCuff = roundedBox('knife-glove-cuff', [0.21, 0.18, 0.15], sleeveTrim, 0.04, 2);
+    meleeCuff.position.set(0.24, -0.13, -0.04);
+    meleeCuff.rotation.z = 0.3;
+    const meleeHand = roundedBox('knife-glove', [0.19, 0.21, 0.24], glove, 0.055, 3);
+    meleeHand.position.set(0.19, -0.02, -0.14);
+    meleeHand.rotation.set(-0.18, 0.08, -0.42);
+    this.meleeKnife.position.set(0.19, 0.1, -0.2);
+    this.meleeKnife.rotation.set(0.04, -0.06, -0.48);
+    this.meleeKnife.visible = true;
+    this.meleeRig.add(meleeForearm, meleeCuff, meleeHand, this.meleeKnife);
+    this.meleeRig.visible = false;
+    this.root.add(this.meleeRig);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
@@ -177,7 +226,7 @@ export class WeaponPresentation {
   }
 
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
-    const ids: WeaponId[] = ['carbine', 'smg', 'scattergun'];
+    const ids: WeaponId[] = ['carbine', 'smg', 'scattergun', 'pistol'];
     ids.forEach((id, index) => {
       const model = buildWeaponModel(id, this.flattenMaterials);
       if (id === 'carbine') {
@@ -201,7 +250,7 @@ export class WeaponPresentation {
   }
 
   isReady(): boolean {
-    return this.models.size === 3;
+    return this.models.size === 4;
   }
 
   setWeapon(id: WeaponId, immediate = false): void {
@@ -310,14 +359,26 @@ export class WeaponPresentation {
     return this.adsBlend;
   }
 
-  presentationState(): { weapon: WeaponId; heat: number; shotsPresented: number; activeCasings: number; activeSmoke: number; detailsReady: boolean; adsProgress: number; sightOffset: [number, number] | null } {
+  presentationState(): { weapon: WeaponId; heat: number; shotsPresented: number; activeCasings: number; activeSmoke: number; detailsReady: boolean; adsProgress: number; sightOffset: [number, number] | null; armsVisible: boolean; armMeshCount: number; knifeVisible: boolean } {
     const model = this.models.get(this.active);
     const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
-    const sightName = this.active === 'carbine' ? 'optic-reticle' : this.active === 'smg' ? 'smg-aperture' : 'ghost-ring';
+    const sightName = this.active === 'carbine'
+      ? 'optic-reticle'
+      : this.active === 'smg'
+        ? 'smg-aperture'
+        : this.active === 'pistol'
+          ? 'pistol-rear-sight'
+          : 'ghost-ring';
     const sight = model?.getObjectByName(sightName);
     this.camera.updateMatrixWorld(true);
     sight?.updateWorldMatrix(true, false);
     const projected = sight?.getWorldPosition(new THREE.Vector3()).project(this.camera);
+    const arms = this.root.getObjectByName('first-person-arms');
+    let armMeshCount = 0;
+    if (arms?.visible) arms.traverse((child) => { if (child.visible && child instanceof THREE.Mesh) armMeshCount += 1; });
+    if (this.meleeRig.visible) this.meleeRig.traverse((child) => {
+      if (child.visible && child instanceof THREE.Mesh && (child.name.includes('forearm') || child.name.includes('glove'))) armMeshCount += 1;
+    });
     return {
       weapon: this.active,
       heat: this.weaponHeat,
@@ -327,6 +388,9 @@ export class WeaponPresentation {
       detailsReady: requiredDetails.every((name) => model?.getObjectByName(name) !== undefined),
       adsProgress: this.adsBlend,
       sightOffset: projected ? [projected.x, projected.y] : null,
+      armsVisible: arms?.visible === true || this.meleeRig.visible,
+      armMeshCount,
+      knifeVisible: this.meleeRig.visible,
     };
   }
 
@@ -465,7 +529,12 @@ export class WeaponPresentation {
       }
     }
     const reloadPose = reloadPoseAt(this.active, reloadProgress);
-    const magazine = activeModel?.getObjectByName(this.active === 'carbine' ? 'curved-magazine' : 'straight-magazine');
+    const magazineName = this.active === 'carbine'
+      ? 'curved-magazine'
+      : this.active === 'pistol'
+        ? 'pistol-magazine'
+        : 'straight-magazine';
+    const magazine = activeModel?.getObjectByName(magazineName);
     if (magazine) {
       if (magazine.userData.restY === undefined) {
         magazine.userData.restX = magazine.position.x;
@@ -494,6 +563,16 @@ export class WeaponPresentation {
 
     const meleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / 430, 0, 1);
     const meleeArc = this.meleeStart > 0 && meleeProgress < 1 ? Math.sin(meleeProgress * Math.PI) : 0;
+    const meleeActive = this.meleeStart > 0 && meleeProgress < 1;
+    this.meleeRig.visible = meleeActive;
+    if (arms) arms.visible = !meleeActive;
+    if (activeModel) activeModel.visible = !meleeActive;
+    if (meleeActive) {
+      const contact = THREE.MathUtils.smoothstep(meleeProgress, 0.12, 0.48);
+      const recover = 1 - THREE.MathUtils.smoothstep(meleeProgress, 0.55, 1);
+      this.meleeRig.position.set(0.28 - contact * 0.34, -0.12 + contact * 0.22, -0.2 - contact * 0.46);
+      this.meleeRig.rotation.set(-contact * 0.25, -contact * 0.42, contact * 0.52 * recover);
+    }
     const grenadeProgress = THREE.MathUtils.clamp((performance.now() - this.grenadeStart) / 620, 0, 1);
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 

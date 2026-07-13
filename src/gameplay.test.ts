@@ -158,6 +158,16 @@ describe('weapon tuning', () => {
     expect(farBody).toBeGreaterThanOrEqual(weapon.minimumDamage);
   });
 
+  it('keeps the service pistol useful without replacing a primary weapon', () => {
+    const pistol = WEAPONS.pistol;
+    expect(pistol.automatic).toBe(false);
+    expect(pistol.mag).toBe(15);
+    expect(computeDamage(pistol, 10, 'body')).toBe(36);
+    expect(computeDamage(pistol, 10, 'head')).toBe(54);
+    expect(pistol.rpm).toBeLessThan(WEAPONS.carbine.rpm);
+    expect(pistol.switchSeconds).toBeLessThan(WEAPONS.smg.switchSeconds);
+  });
+
   it('builds bounded directional recoil and recovers it toward rest', () => {
     const impulse = computeRecoilImpulse(WEAPONS.carbine, 8, 1);
     expect(impulse.pitch).toBeGreaterThan(WEAPONS.carbine.recoilPitch);
