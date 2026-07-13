@@ -1,7 +1,9 @@
 import { chromium } from '@playwright/test';
 
 const base = process.env.ATOMIC_BASE ?? 'http://127.0.0.1:4180/';
-const target = new URL('/?render=compat&multiplayerQa=1', base).toString();
+const targetUrl = new URL(base);
+targetUrl.search = 'render=compat&multiplayerQa=1';
+const target = targetUrl.toString();
 const browser = await chromium.launch({ headless: true });
 try {
   const host = await browser.newPage({ viewport: { width: 960, height: 540 } });

@@ -121,6 +121,20 @@ This proves the application now has ample rendering headroom, but the current Wi
 
 Source revision: `e0eec5d`.
 
-Pages revision: pending.
+Pages revision: `dd3e594`.
 
-Canonical and immutable Pass 12 URLs: pending public deployment and verification.
+Canonical:
+
+`https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?release=dd3e594`
+
+Immutable Pass 12:
+
+`https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass12/?release=e0eec5d`
+
+Public verification:
+
+- canonical and immutable HTML both served the expected `index-DQ9-GZeB.js` bundle;
+- public responsive solo telemetry: `110` calls / `63,700` triangles, correct 15-colour palette, `33 ms` state cadence, `24 s^-1` interpolation and zero console/page errors;
+- public visual smoke: passed with no black-world, missing-asset, HUD or weapon regression;
+- public two-browser WebRTC: host/client each saw one remote, errors `[]`, sampled snapshot age `0.60 ms`, interpolation error `0.000013 m`;
+- all Pass 03-11 review files were hash-verified unchanged before publication (`135` preserved files).
