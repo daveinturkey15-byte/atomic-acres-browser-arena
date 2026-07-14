@@ -57,10 +57,10 @@ export function viewmodelReloadStageAt(weapon: WeaponId, rawProgress: number): V
   const insert = smoothstep(0.48, 0.68, progress) * (1 - smoothstep(0.84, 0.96, progress));
   const pistolScale = weapon === 'pistol' ? 0.82 : 1;
   return {
-    lateral: -0.18 * out * (weapon === 'pistol' ? 1.15 : 1) + 0.03 * insert,
-    lift: 0.14 * out + 0.2 * insert,
-    pitch: (0.06 * out - 0.1 * insert) * pistolScale,
-    roll: (0.34 * out - 0.1 * insert) * pistolScale,
+    lateral: -0.22 * out * (weapon === 'pistol' ? 1.15 : 1),
+    lift: 0.14 * out + 0.12 * insert,
+    pitch: (0.07 * out - 0.045 * insert) * pistolScale,
+    roll: 0.46 * out * pistolScale,
   };
 }
 

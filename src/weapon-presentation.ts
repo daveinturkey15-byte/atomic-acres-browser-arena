@@ -215,15 +215,20 @@ export class WeaponPresentation {
       hand.position.set(sign * -0.012, -0.005, -0.012); wrist.add(hand);
       const knucklePad = roundedBox(`${side}-knuckle-pad`, [0.148, 0.035, 0.082], glove, 0.014, 2);
       knucklePad.position.set(sign * -0.012, -0.058, -0.072); wrist.add(knucklePad);
-      const thumb = roundedBox(`${side}-thumb`, [0.052, 0.064, 0.14], glove, 0.02, 2);
-      thumb.position.set(sign * -0.084, -0.024, -0.035);
-      thumb.rotation.set(-0.28, sign * 0.18, sign * 0.44);
+      const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.027, 0.09, 4, flattenMaterials ? 6 : 8), glove);
+      thumb.name = `${side}-thumb`;
+      thumb.position.set(sign * -0.082, -0.026, -0.036);
+      thumb.rotation.set(-Math.PI / 2 - 0.24, sign * 0.16, sign * 0.48);
       wrist.add(thumb);
       const fingers: THREE.Mesh[] = [];
       for (let finger = 0; finger < 4; finger += 1) {
-        const ridge = roundedBox(`${side}-finger-${finger}`, [0.03, 0.038, 0.112 - finger * 0.006], glove, 0.01, 2);
-        ridge.position.set(sign * (0.052 - finger * 0.035), -0.065, -0.108 + finger * 0.004);
-        ridge.rotation.set(-0.42 - finger * 0.025, 0, sign * (finger - 1.5) * 0.035);
+        const ridge = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.017, 0.066 - finger * 0.004, 4, flattenMaterials ? 6 : 8),
+          glove,
+        );
+        ridge.name = `${side}-finger-${finger}`;
+        ridge.position.set(sign * (0.052 - finger * 0.035), -0.065, -0.105 + finger * 0.004);
+        ridge.rotation.set(-Math.PI / 2 - 0.3 - finger * 0.02, 0, sign * (finger - 1.5) * 0.04);
         wrist.add(ridge);
         fingers.push(ridge);
       }
@@ -296,18 +301,32 @@ export class WeaponPresentation {
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     });
-    const core = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.46, 7), flashMaterial);
-    core.name = 'muzzle-flash-core';
-    core.rotation.x = -Math.PI / 2;
-    core.position.z = -0.22;
-    const crown = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.24, 6), flashMaterial.clone());
-    crown.name = 'muzzle-flash-crown';
-    crown.rotation.x = -Math.PI / 2;
-    crown.position.z = -0.1;
-    const flare = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.38), flashMaterial.clone());
-    flare.name = 'muzzle-flash-flare';
-    flare.rotation.z = Math.PI / 4;
-    this.muzzleFlash.add(core, crown, flare);
+    const coreGeometry = new THREE.ConeGeometry(0.052, 0.5, 7, 1, true);
+    coreGeometry.rotateX(-Math.PI / 2);
+    coreGeometry.translate(0, 0, -0.25);
+    const crownGeometry = new THREE.CircleGeometry(0.052, 10);
+    crownGeometry.translate(0, 0, -0.006);
+    const flareShape = new THREE.Shape();
+    const flarePoints = 16;
+    for (let index = 0; index < flarePoints; index += 1) {
+      const angle = (index / flarePoints) * Math.PI * 2 + Math.PI / 16;
+      const spoke = index % 2 === 0;
+      const radius = spoke ? (index % 4 === 0 ? 0.2 : 0.14) : 0.044;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (index === 0) flareShape.moveTo(x, y);
+      else flareShape.lineTo(x, y);
+    }
+    flareShape.closePath();
+    const flareGeometry = new THREE.ShapeGeometry(flareShape);
+    const burstGeometry = mergeGeometries([coreGeometry, crownGeometry, flareGeometry], false);
+    coreGeometry.dispose();
+    crownGeometry.dispose();
+    flareGeometry.dispose();
+    if (!burstGeometry) throw new Error('Unable to merge muzzle flash burst');
+    const burst = new THREE.Mesh(burstGeometry, flashMaterial);
+    burst.name = 'muzzle-flash-burst';
+    this.muzzleFlash.add(burst);
     this.muzzleFlash.visible = false;
     this.root.add(this.muzzleFlash);
 
@@ -424,7 +443,7 @@ export class WeaponPresentation {
     this.muzzleLight.intensity = this.flattenMaterials ? 0 : this.active === 'scattergun' ? 7.2 : 4.8;
     this.muzzleFlash.visible = true;
     this.muzzleFlash.scale.setScalar(profile.flashScale);
-    this.muzzleFlash.rotation.z = Math.random() * Math.PI;
+    this.muzzleFlash.rotation.z = (this.shotsPresented * 2.399963229728653) % Math.PI;
 
     const muzzleSocket = this.models.get(this.active)?.getObjectByName('muzzle-socket');
     const smokeCount = Math.min(this.smokes.length, profile.smokeBase + (this.weaponHeat > 0.56 ? 1 : 0));
@@ -544,6 +563,11 @@ export class WeaponPresentation {
       heat: this.weaponHeat,
       shotsPresented: this.shotsPresented,
       fireCycle: this.presentedFireCycle,
+      muzzleFlashMeshCount: (() => {
+        let count = 0;
+        this.muzzleFlash.traverse((node) => { if (node instanceof THREE.Mesh) count += 1; });
+        return count;
+      })(),
       activeCasings: this.casings.filter((casing) => casing.active).length,
       activeSmoke: this.smokes.reduce((count, smoke) => count + Number(smoke.active), 0),
       detailsReady,

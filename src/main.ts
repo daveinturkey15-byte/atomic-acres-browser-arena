@@ -2574,6 +2574,7 @@ const debugWindow = window as Window & {
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
     setReloadCaptureProgress: (progress: number | null) => void;
+    renderAudit: () => Array<{ name: string; material: string; triangles: number }>;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
     earnSupport: (eliminations: number) => void;
@@ -2788,6 +2789,31 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setFireCaptureAgeMs: (ageMs: number | null) => weaponView.setFireCaptureAgeMs(ageMs),
   setReloadCaptureProgress: (progress: number | null) => {
     debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
+  },
+  renderAudit: () => {
+    scene.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    const projection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(projection);
+    const visible: Array<{ name: string; material: string; triangles: number }> = [];
+    scene.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.layers.test(camera.layers)) return;
+      let ancestor: THREE.Object3D | null = node;
+      while (ancestor) {
+        if (!ancestor.visible) return;
+        ancestor = ancestor.parent;
+      }
+      if (node.frustumCulled && !frustum.intersectsObject(node)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      const positionCount = node.geometry.getAttribute('position')?.count ?? 0;
+      const triangles = Math.floor((node.geometry.index?.count ?? positionCount) / 3);
+      visible.push({
+        name: node.name || node.parent?.name || '(unnamed)',
+        material: materials.map((material) => `${material.type}:${material.name || material.uuid.slice(0, 8)}`).join(','),
+        triangles,
+      });
+    });
+    return visible.sort((a, b) => a.name.localeCompare(b.name));
   },
   setStance: (stance: Stance) => {
     if (stance === player.stance) return;

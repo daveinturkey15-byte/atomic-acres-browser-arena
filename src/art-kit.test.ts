@@ -101,6 +101,31 @@ describe('palette static batching', () => {
 });
 
 describe('attached weapon draw-call batching', () => {
+  it('keeps compound magazines dynamic while batching their visible parts', () => {
+    const weapon = new THREE.Group();
+    weapon.name = 'compound-magazine-weapon';
+    const magazine = new THREE.Group();
+    magazine.name = 'curved-magazine';
+    for (let index = 0; index < 6; index += 1) {
+      const material = new THREE.MeshStandardMaterial({ color: index % 2 ? 0xd6a944 : 0x343b40 });
+      const part = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), material);
+      part.position.y = index * -0.08;
+      magazine.add(part);
+    }
+    weapon.add(magazine);
+    for (let index = 0; index < 10; index += 1) {
+      weapon.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial({ color: 0x454b50 })));
+    }
+
+    optimizeAttachedWeapon(weapon, 'vertex-lit');
+    const magazineBatch = magazine.getObjectByName('curved-magazine-render-batches');
+
+    expect(magazine.userData.dynamic).toBe(true);
+    expect(magazineBatch?.children).toHaveLength(1);
+    expect(magazine.children.filter((node) => node instanceof THREE.Mesh && node.visible)).toHaveLength(0);
+    expect(magazine.position.y).toBe(0);
+  });
+
   it('collapses immutable pieces while preserving animated mechanics and sockets', () => {
     const weapon = new THREE.Group();
     weapon.name = 'synthetic-weapon';

@@ -105,3 +105,41 @@ Pass 18 begins with R1/R2 because the first-person weapon occupies the largest p
 4. make reload-out and reload-in visibly distinct for all weapon families;
 5. correct the framing verifier so off-screen shoulder roots do not mark every valid FPS pose as cropped;
 6. regenerate the focused Quality/Performance action matrix and inspect it before touching architecture.
+
+## 7. Verified implementation status — tranche 2
+
+Implemented on `overhaul/visual-reconstruction-pass-18`:
+
+- curved capsule thumb/finger masses retained inside the six-draw articulated arm contract;
+- neutral magazine-in staging and a more explicit magazine-out silhouette;
+- deterministic one-draw asymmetric muzzle burst with manifest-level flash/bolt telemetry;
+- internal batching for articulated magazine components before the magazine group is marked dynamic;
+- declaration-driven tread nosings, balusters, continuous diagonal rails, landing guards, and finished upper ceilings;
+- distinct Aqua open-side rails and Coral inner-well dogleg rails;
+- darker semantic Performance chrome so rails preserve structure without becoming near-white;
+- on-demand frustum-visible render audit for benchmark diagnosis;
+- bounded `CAPTURE_MODES` support in the architecture evidence harness.
+
+Current verified gates:
+
+```text
+31/31 unit-test files
+142/142 deterministic tests
+lint / TypeScript PASS
+production build PASS
+git diff --check PASS
+Chromium profile-budget scenarios 2/2 PASS
+architecture matrix 20/20, zero errors
+action matrix 28/28, zero errors
+```
+
+Renderer maxima after magazine and flash batching:
+
+```text
+Quality architecture:     152 calls / 148,060 triangles
+Quality balanced actions: 151 calls / 147,382 triangles
+Performance architecture:  81 calls /  71,924 triangles
+Performance actions:       80 calls /  71,616 triangles
+```
+
+Pass 17's Coral stair-foot evidence already contained `162` calls even though the prior summary quoted the `158` action-matrix ceiling. Pass 18 reduces that exact architecture camera to `152` without removing its operator, weapon, stairs, or environmental detail. Upper landings remain sparse and third-person operators remain an open high-impact tranche; no interim tribunal is justified yet.

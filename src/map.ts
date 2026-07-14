@@ -43,6 +43,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     brick: texturedMaterial('./assets/original/textures/brick-warm.png', { roughness: 0.9, repeatX: 5, repeatY: 3 }),
     roof: texturedMaterial('./assets/original/textures/roof-shingles.png', { roughness: 0.86, repeatX: 5, repeatY: 6 }),
   };
+  // Performance batching otherwise lifts reflective chrome to near-white and lets
+  // stair rails overpower route geometry. Quality preserves the authored material.
+  palette.chrome.userData.batchColor = 0x5f6d72;
 
   function box(
     name: string,
@@ -156,7 +159,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
           true,
         );
       } else {
-        box(solid.name, solid.position, solid.size, mat, solid.collidable, solid.kind !== 'glass');
+        const rendered = box(solid.name, solid.position, solid.size, mat, solid.collidable, solid.kind !== 'glass');
+        if (solid.rotation) rendered.rotation.set(...solid.rotation);
       }
     }
 

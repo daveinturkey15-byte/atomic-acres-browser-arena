@@ -26,8 +26,8 @@ describe('weapon action timelines', () => {
         out.pitch - insert.pitch,
         out.roll - insert.roll,
       );
-      expect(out.roll).toBeGreaterThan(0.2);
-      expect(insert.roll).toBeLessThan(-0.07);
+      expect(out.roll).toBeGreaterThan(0.3);
+      expect(Math.abs(insert.roll)).toBeLessThan(0.01);
       expect(separation).toBeGreaterThan(0.45);
     }
   });

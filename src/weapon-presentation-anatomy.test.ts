@@ -43,6 +43,7 @@ describe('first-person anatomical presentation', () => {
     });
     expect(presentation.presentationState().fireCycle.flash).toBeGreaterThan(0.1);
     expect(presentation.presentationState().fireCycle.boltTravel).toBeGreaterThan(0.5);
+    expect(presentation.presentationState().muzzleFlashMeshCount).toBe(1);
     presentation.setFireCaptureAgeMs(null);
   });
 

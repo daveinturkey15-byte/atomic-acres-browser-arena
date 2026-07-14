@@ -8,6 +8,7 @@ export type HouseSolid = {
   surface: HouseSurface;
   collidable: boolean;
   kind: 'wall' | 'floor' | 'stair' | 'landing' | 'frame' | 'fixture' | 'glass';
+  rotation?: [number, number, number];
 };
 export type HouseOpening = {
   id: string;
@@ -51,7 +52,8 @@ const solid = (
   surface: HouseSurface,
   collidable = true,
   kind: HouseSolid['kind'] = 'wall',
-): LocalSolid => ({ name, position, size, surface, collidable, kind });
+  rotation?: [number, number, number],
+): LocalSolid => ({ name, position, size, surface, collidable, kind, rotation });
 
 /** Add a wall along local X, splitting it around a declared opening. */
 function xWall(
@@ -154,6 +156,62 @@ function stairFlight(
   });
 }
 
+/** Non-authoritative stair finish: nosings, continuous rails and balusters follow the exact flight contract. */
+function stairFinish(
+  id: string,
+  x: number,
+  startV: number,
+  direction: 1 | -1,
+  steps: number,
+  startHeight: number,
+  width: number,
+  railSides: readonly (-1 | 1)[] = [-1, 1],
+): LocalSolid[] {
+  const rise = 0.3;
+  const run = 0.58;
+  const result: LocalSolid[] = [];
+  for (let index = 0; index < steps; index += 1) {
+    const height = startHeight + rise * (index + 1);
+    const v = startV + direction * run * index;
+    result.push(solid(
+      `${id}-nosing-${index + 1}`,
+      [x, height + 0.025, v + direction * (run / 2 + 0.015)],
+      [width + 0.1, 0.055, 0.11],
+      'trim',
+      false,
+      'fixture',
+    ));
+    for (const side of railSides) {
+      if (index % 2 === 0 || index === steps - 1) {
+        result.push(solid(
+          `${id}-${side < 0 ? 'west' : 'east'}-baluster-${index + 1}`,
+          [x + side * (width / 2 + 0.065), height + 0.47, v],
+          [0.065, 0.9, 0.065],
+          'metal',
+          false,
+          'fixture',
+        ));
+      }
+    }
+  }
+  const railLength = steps * Math.hypot(run, rise);
+  const railY = startHeight + 0.91 + rise * (steps + 1) / 2;
+  const railV = startV + direction * run * (steps - 1) / 2;
+  const railPitch = -direction * Math.atan2(rise, run);
+  for (const side of railSides) {
+    result.push(solid(
+      `${id}-${side < 0 ? 'west' : 'east'}-continuous-rail`,
+      [x + side * (width / 2 + 0.065), railY, railV],
+      [0.075, 0.075, railLength],
+      'metal',
+      false,
+      'fixture',
+      [railPitch, 0, 0],
+    ));
+  }
+  return result;
+}
+
 function aquaPlan(): { solids: LocalSolid[]; openings: LocalOpening[]; anchors: LocalAnchor[]; routes: HouseArchitecture['routes'] } {
   const frontDoorX = -4.8;
   const rearDoorX = 4.75;
@@ -179,9 +237,14 @@ function aquaPlan(): { solids: LocalSolid[]; openings: LocalOpening[]; anchors: 
     solid('workshop-west-ceiling', [-3.25, 3.29, 0], [9.1, 0.05, 13.5], 'ceiling', false, 'fixture'),
     solid('workshop-east-front-ceiling', [5.75, 3.29, 4.8], [4.1, 0.05, 4.0], 'ceiling', false, 'fixture'),
     solid('workshop-east-rear-ceiling', [5.75, 3.29, -5.25], [4.1, 0.05, 3.1], 'ceiling', false, 'fixture'),
+    solid('workshop-upper-ceiling', [0, 7.02, 0], [15.65, 0.08, 13.55], 'ceiling', false, 'fixture'),
     solid('workshop-service-landing', [5.2, FLOOR_Y, 2.35], [3.5, 0.3, 1.6], 'timber', true, 'landing'),
     solid('workshop-rear-deck', [rearDoorX, 0.18, -8.65], [5.0, 0.36, 2.5], 'concrete', true, 'landing'),
     ...stairFlight('workshop-service-stair', 5.2, -4.7, 1, 12, 0, 'timber', 1.55),
+    ...stairFinish('workshop-service-stair-finish', 5.2, -4.7, 1, 12, 0, 1.55),
+    solid('workshop-landing-guard-rail', [6.91, 4.42, 2.35], [0.075, 0.075, 1.52], 'metal', false, 'fixture'),
+    solid('workshop-landing-guard-post-front', [6.91, 3.97, 3.05], [0.075, 0.9, 0.075], 'metal', false, 'fixture'),
+    solid('workshop-landing-guard-post-rear', [6.91, 3.97, 1.65], [0.075, 0.9, 0.075], 'metal', false, 'fixture'),
     // A finished representative lane: workbench, receiving rail and mudroom lockers share the plan contract.
     solid('receiving-counter-base', [-5.85, 0.42, 3.1], [0.82, 0.84, 3.8], 'aqua', true, 'fixture'),
     solid('receiving-counter-top', [-5.85, 0.92, 3.1], [1.18, 0.16, 4.15], 'timber', false, 'fixture'),
@@ -248,15 +311,21 @@ function coralPlan(): { solids: LocalSolid[]; openings: LocalOpening[]; anchors:
 
     // Dogleg stair: two 1.5 m flights, a full 1.8 m cross landing, then upper convergence.
     ...stairFlight('conservatory-dogleg-lower', 5.35, -3.5, 1, 6, 0, 'timber', 1.5),
+    ...stairFinish('conservatory-dogleg-lower-finish', 5.35, -3.5, 1, 6, 0, 1.5, [-1]),
     solid('conservatory-dogleg-mid-landing', [4.15, 1.65, -0.25], [3.9, 0.3, 1.8], 'timber', true, 'landing'),
     ...stairFlight('conservatory-dogleg-upper', 2.95, -0.55, -1, 6, 1.8, 'timber', 1.5),
+    ...stairFinish('conservatory-dogleg-upper-finish', 2.95, -0.55, -1, 6, 1.8, 1.5, [1]),
     solid('conservatory-upper-landing', [2.95, FLOOR_Y, -3.85], [2.4, 0.3, 1.8], 'timber', true, 'landing'),
+    solid('conservatory-upper-landing-guard-rail', [4.12, 4.42, -3.85], [0.075, 0.075, 1.72], 'metal', false, 'fixture'),
+    solid('conservatory-upper-landing-guard-post-front', [4.12, 3.97, -3.08], [0.075, 0.9, 0.075], 'metal', false, 'fixture'),
+    solid('conservatory-upper-landing-guard-post-rear', [4.12, 3.97, -4.62], [0.075, 0.9, 0.075], 'metal', false, 'fixture'),
     solid('conservatory-upper-west-floor', [-2.75, FLOOR_Y, 0], [10.1, 0.3, 13.7], 'timber', true, 'floor'),
     solid('conservatory-upper-east-front-floor', [5.85, FLOOR_Y, 3.45], [4.1, 0.3, 6.8], 'timber', true, 'floor'),
     solid('conservatory-upper-east-rear-floor', [5.85, FLOOR_Y, -6.0], [4.1, 0.3, 1.7], 'timber', true, 'floor'),
     solid('conservatory-west-ceiling', [-2.75, 3.29, 0], [9.9, 0.05, 13.5], 'ceiling', false, 'fixture'),
     solid('conservatory-east-front-ceiling', [5.85, 3.29, 3.45], [4.0, 0.05, 6.65], 'ceiling', false, 'fixture'),
     solid('conservatory-east-rear-ceiling', [5.85, 3.29, -6.0], [4.0, 0.05, 1.6], 'ceiling', false, 'fixture'),
+    solid('conservatory-upper-ceiling', [0, 7.02, 0], [15.65, 0.08, 13.55], 'ceiling', false, 'fixture'),
     solid('conservatory-rear-deck', [rearDoorX, 0.18, -8.65], [5.2, 0.36, 2.5], 'concrete', true, 'landing'),
     solid('planter-island', [-4.8, 0.48, -5.9], [3.2, 0.96, 0.9], 'brick', true, 'fixture'),
     solid('planter-island-cap', [-4.8, 1.0, -5.9], [3.45, 0.12, 1.12], 'trim', false, 'fixture'),

@@ -61,6 +61,25 @@ describe('authored house architecture', () => {
     }
   });
 
+  it('defines substantial non-authoritative stair finish and landing guards', () => {
+    for (const team of [0, 1] as Team[]) {
+      const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+      const finish = architecture.solids.filter((entry) => entry.name.includes('-finish-'));
+      const nosings = finish.filter((entry) => /nosing/.test(entry.name));
+      const rails = finish.filter((entry) => /rail/.test(entry.name));
+      const balusters = finish.filter((entry) => /baluster/.test(entry.name));
+      expect(nosings.length).toBe(12);
+      expect(rails.length).toBe(2);
+      expect(balusters.length).toBeGreaterThanOrEqual(team === 0 ? 12 : 8);
+      expect(finish.every((entry) => !entry.collidable && entry.kind === 'fixture')).toBe(true);
+      expect(rails.every((entry) => entry.rotation && Math.abs(entry.rotation[0]) > 0.4)).toBe(true);
+      expect(architecture.solids.filter((entry) => /landing-guard/.test(entry.name)).length).toBeGreaterThanOrEqual(3);
+      const upperCeiling = architecture.solids.find((entry) => /upper-ceiling/.test(entry.name));
+      expect(upperCeiling).toMatchObject({ surface: 'ceiling', collidable: false, kind: 'fixture' });
+      expect(upperCeiling?.size[0]).toBeGreaterThan(15);
+    }
+  });
+
   it.each([0, 1] as Team[])('traverses every declared ground route forward and backward for team %s', async (team) => {
     const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
     const groundRoutes = Object.entries(architecture.routes).filter(([id]) => !/stair/i.test(id));

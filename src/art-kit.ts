@@ -199,6 +199,11 @@ export function optimizeAttachedWeapon(
 ): StaticBatchStats {
   if (weapon.userData.attachedWeaponBatchStats) return weapon.userData.attachedWeaponBatchStats as StaticBatchStats;
   const articulatedNames = new Set(['bolt-or-slide', 'pump', 'curved-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle']);
+  const compoundArticulatedNames = ['curved-magazine', 'straight-magazine', 'pistol-magazine'];
+  for (const name of compoundArticulatedNames) {
+    const articulated = weapon.getObjectByName(name);
+    if (articulated) batchStaticMeshes(articulated, articulated, () => '', materialMode);
+  }
   for (const name of articulatedNames) {
     const articulated = weapon.getObjectByName(name);
     if (articulated) articulated.userData.dynamic = true;
