@@ -248,6 +248,12 @@ export function beginReload(weapon: WeaponSpec, ammo: number, reserve: number, n
   };
 }
 
+export function reloadProgress(state: ReloadState | null, now: number): number | null {
+  if (!state) return null;
+  const duration = Math.max(1, state.endsAt - state.startedAt);
+  return Math.min(1, Math.max(0, (now - state.startedAt) / duration));
+}
+
 export function cancelReload(state: ReloadState, now: number): boolean {
   return now < state.seatAt;
 }

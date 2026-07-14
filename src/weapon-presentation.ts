@@ -18,6 +18,8 @@ export type WeaponPose = {
   phase: number;
   landingImpulse: number;
   lateralSpeed: number;
+  /** Authoritative gameplay reload progress. Null means no active reload. */
+  reloadProgress: number | null;
 };
 
 type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; active: boolean };
@@ -42,8 +44,6 @@ export class WeaponPresentation {
   private readonly models = new Map<WeaponId, THREE.Object3D>();
   private active: WeaponId = 'carbine';
   private recoil = 0;
-  private reloadStart = 0;
-  private reloadDuration = 0;
   private reloadLastProgress = 0;
   private switchBlend = 1;
   private swayX = 0;
@@ -244,7 +244,7 @@ export class WeaponPresentation {
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     const ids: WeaponId[] = ['carbine', 'smg', 'scattergun', 'pistol'];
     ids.forEach((id, index) => {
-      const model = buildWeaponModel(id, this.flattenMaterials, false);
+      const model = buildWeaponModel(id, this.flattenMaterials);
       if (id === 'carbine') {
         model.traverse((node) => {
           if (node.name === 'stock-shoulder-pad' || node.name === 'stock-cheek-rest' || node.name === 'stock-support-rod') node.visible = false;
@@ -272,7 +272,6 @@ export class WeaponPresentation {
   setWeapon(id: WeaponId, immediate = false): void {
     this.active = id;
     this.switchBlend = immediate ? 1 : 0;
-    this.reloadDuration = 0;
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
     this.pendingCasing = false;
@@ -344,16 +343,13 @@ export class WeaponPresentation {
     else this.pendingCasing = true;
   }
 
-  reload(durationSeconds: number): void {
+  reload(): void {
     const activeModel = this.models.get(this.active);
     if (activeModel) reloadImportedWeapon(activeModel);
-    this.reloadStart = performance.now();
-    this.reloadDuration = durationSeconds * 1000;
     this.reloadLastProgress = 0;
   }
 
   cancelReload(): void {
-    this.reloadDuration = 0;
     this.reloadLastProgress = 0;
   }
 
@@ -615,19 +611,16 @@ export class WeaponPresentation {
 
     let reloadRoll = 0;
     let reloadDrop = 0;
-    let reloadProgress = 0;
-    if (this.reloadDuration > 0) {
-      reloadProgress = THREE.MathUtils.clamp((performance.now() - this.reloadStart) / this.reloadDuration, 0, 1);
+    const reloadProgress = pose.reloadProgress ?? 0;
+    if (pose.reloadProgress !== null) {
       actionEvents.push(...reloadActionEvents(this.active, this.reloadLastProgress, reloadProgress));
       this.reloadLastProgress = reloadProgress;
       const lower = Math.sin(Math.PI * reloadProgress);
       const seatSnap = reloadProgress > 0.65 ? Math.sin((reloadProgress - 0.65) / 0.35 * Math.PI) : 0;
       reloadRoll = lower * 0.78 - seatSnap * 0.12;
       reloadDrop = lower * -0.22 + seatSnap * 0.035;
-      if (reloadProgress >= 1) {
-        this.reloadDuration = 0;
-        this.reloadLastProgress = 0;
-      }
+    } else if (this.reloadLastProgress > 0) {
+      this.reloadLastProgress = 0;
     }
     const reloadPose = reloadPoseAt(this.active, reloadProgress);
     const magazineName = this.active === 'carbine'

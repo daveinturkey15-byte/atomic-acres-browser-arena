@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator } from './operator-model';
 import { createImportedWeaponModel } from './weapon-model';
+import { solveTwoBoneElbow } from './ik';
 import type { Team, WeaponId } from './protocol';
 import { hitReactionAt } from './weapon-presentation-state';
 
@@ -576,6 +577,10 @@ type OperatorRig = {
   hitProxyRoot: THREE.Group;
   weapon?: THREE.Group;
   weaponId: WeaponId;
+  /** Rigged operator skeletal bones for two-hand weapon grip IK. */
+  leftShoulderBone?: THREE.Bone;
+  leftElbowBone?: THREE.Bone;
+  leftWristBone?: THREE.Bone;
 };
 
 function operatorRig(root: THREE.Group): OperatorRig | undefined {
@@ -591,6 +596,32 @@ const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number
   scattergun: [-0.631, 0.653868, 0.351994, 0.224491],
   pistol: [0.142442, -0.014047, 0.708358, 0.691189],
 };
+
+/** Solve the rigged operator's left arm to grip the weapon's support-socket-l. */
+function applyRiggedLeftGrip(
+  shoulder: THREE.Bone, elbow: THREE.Bone, wrist: THREE.Bone, weapon: THREE.Group,
+): void {
+  weapon.updateMatrixWorld(true);
+  const support = weapon.getObjectByName('support-socket-l');
+  if (!support) return;
+  const target = support.getWorldPosition(new THREE.Vector3());
+  // The weapon socket is parented to WristR. We need the left arm to reach
+  // the support point from shoulder space.
+  shoulder.updateMatrixWorld(true);
+  const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3());
+  const upperLength = shoulderPos.distanceTo(elbow.getWorldPosition(new THREE.Vector3())) || 0.38;
+  const lowerLength = elbow.getWorldPosition(new THREE.Vector3()).distanceTo(wrist.getWorldPosition(new THREE.Vector3())) || 0.35;
+  const targetLocal = shoulder.worldToLocal(target.clone());
+  const hint = new THREE.Vector3(-0.48, -1, 0.22);
+  const elbowPoint = solveTwoBoneElbow(new THREE.Vector3(0, 0, 0), targetLocal, upperLength, lowerLength, hint);
+  const upperDirection = elbowPoint.clone().normalize();
+  shoulder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), upperDirection);
+  elbow.position.set(0, 0, -upperLength);
+  shoulder.updateMatrixWorld();
+  const lowerTarget = shoulder.worldToLocal(target.clone());
+  const lowerDirection = lowerTarget.sub(elbow.position).normalize();
+  elbow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), lowerDirection);
+}
 
 export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flattenMaterials = false): void {
   const rig = operatorRig(root);
@@ -615,6 +646,14 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   rig.weaponSocket.add(weapon);
   rig.weapon = weapon;
   rig.weaponId = weaponId;
+
+  // Left-hand grip: solve the rigged skeleton arm to reach the support-socket-l
+  // on the weapon. The right wrist already drives the weapon-socket; this anchors
+  // the off-hand so the operator reads as gripping the forend or magazine well.
+  if (rig.rigged && (rig as OperatorRig & { rigged: true }).leftShoulderBone) {
+    const r = rig as OperatorRig & { rigged: true };
+    applyRiggedLeftGrip(r.leftShoulderBone!, r.leftElbowBone!, r.leftWristBone!, weapon);
+  }
 }
 
 export function fireOperator(root: THREE.Group): void {
@@ -747,6 +786,14 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
     proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
     root.userData.operatorRig = { rigged: true, weaponSocket, hitProxyRoot, weaponId } satisfies OperatorRig;
+    const shoulderL = root.getObjectByName('UpperArmL');
+    const elbowL = root.getObjectByName('LowerArmL');
+    const wristL = root.getObjectByName('WristL');
+    if (shoulderL instanceof THREE.Bone && elbowL instanceof THREE.Bone && wristL instanceof THREE.Bone) {
+      (root.userData.operatorRig as OperatorRig & { rigged: true }).leftShoulderBone = shoulderL;
+      (root.userData.operatorRig as OperatorRig & { rigged: true }).leftElbowBone = elbowL;
+      (root.userData.operatorRig as OperatorRig & { rigged: true }).leftWristBone = wristL;
+    }
     setOperatorWeapon(root, weaponId, flattenMaterials);
     root.traverse((node) => { node.userData.targetRoot = root; });
     return root;

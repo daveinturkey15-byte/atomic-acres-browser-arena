@@ -214,8 +214,10 @@ test.describe('solo mechanics', () => {
     const state = await debug(page);
     expect(state.weaponPresentation.armsVisible).toBe(true);
     expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(3);
-    expect(state.weaponPresentation.modelKind).toBe('original-authored');
-    expect(state.weaponPresentation.importedModel).toBeNull();
+    expect(state.weaponPresentation.modelKind).toBe('licensed-imported');
+    expect(state.weaponPresentation.importedModel).toMatchObject({ weapon: 'carbine', socketContractReady: true });
+    expect(state.weaponPresentation.importedModel?.sightForwardDot).toBeGreaterThanOrEqual(0.995);
+    expect(state.weaponPresentation.importedModel?.muzzleForwardDot).toBeGreaterThan(0.85);
     expect(state.bots[0].rootVisible).toBe(true);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
     expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
@@ -499,8 +501,10 @@ test.describe('performance and stability', () => {
     expect(state.render.triangles).toBeLessThanOrEqual(350_000);
     expect(state.weaponPresentation.armsVisible).toBe(true);
     expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(3);
-    expect(state.weaponPresentation.modelKind).toBe('original-authored');
-    expect(state.weaponPresentation.importedModel).toBeNull();
+    expect(state.weaponPresentation.modelKind).toBe('licensed-imported');
+    expect(state.weaponPresentation.importedModel).toMatchObject({ weapon: 'carbine', socketContractReady: true });
+    expect(state.weaponPresentation.importedModel?.sightForwardDot).toBeGreaterThanOrEqual(0.995);
+    expect(state.weaponPresentation.importedModel?.muzzleForwardDot).toBeGreaterThan(0.85);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
     expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
     expect(state.bots[0].operatorModel).toMatchObject({ skinnedMeshes: 5, clips: 24, weaponChildren: 1 });

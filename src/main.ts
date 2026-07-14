@@ -38,6 +38,7 @@ import {
   nextStance,
   recoverRecoil,
   recoverRecoilImpulse,
+  reloadProgress as gameplayReloadProgress,
   sampleSpreadDisk,
   sprintEligible,
   type HitZone,
@@ -1001,7 +1002,7 @@ function reload(): void {
   player.reloadState = beginReload(spec, ammo, player.reserve[player.weapon], performance.now());
   weaponActionHistory.length = 0;
   audio.reload();
-  weaponView.reload(spec.reload);
+  weaponView.reload();
   addFeed(`Reloading ${spec.name}`);
 }
 
@@ -1910,6 +1911,7 @@ function updatePhysics(dt: number): void {
     phase: weaponBob,
     landingImpulse,
     lateralSpeed,
+    reloadProgress: gameplayReloadProgress(player.reloadState, performance.now()),
   });
   for (const event of weaponActionEvents) {
     audio.weaponAction(player.weapon, event);

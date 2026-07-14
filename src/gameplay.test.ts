@@ -18,6 +18,7 @@ import {
   movementProfile,
   nextStance,
   recoverRecoilImpulse,
+  reloadProgress,
   sampleSpreadDisk,
   sprintEligible,
   type MatchState,
@@ -184,6 +185,15 @@ describe('reload state', () => {
     expect(state?.phase).toBe('eject');
     expect(completeReload(state!, 1_400, 7, 20)).toEqual({ ammo: 7, reserve: 20, completed: false });
     expect(completeReload(state!, state!.endsAt, 7, 20)).toEqual({ ammo: 27, reserve: 0, completed: true });
+  });
+
+  it('derives clamped presentation progress from the authoritative reload timeline', () => {
+    const state = beginReload(WEAPONS.pistol, 2, 15, 1_000)!;
+    expect(reloadProgress(null, 1_000)).toBeNull();
+    expect(reloadProgress(state, 900)).toBe(0);
+    expect(reloadProgress(state, 1_000)).toBe(0);
+    expect(reloadProgress(state, (state.startedAt + state.endsAt) / 2)).toBeCloseTo(0.5, 6);
+    expect(reloadProgress(state, state.endsAt + 1_000)).toBe(1);
   });
 
   it('allows a reload to be cancelled before the magazine is seated', () => {
