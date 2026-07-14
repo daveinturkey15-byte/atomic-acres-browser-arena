@@ -159,11 +159,33 @@ Pass 17 is not an MVP gate. It must feel like a deliberately authored place wher
 
 This checkpoint records engineering evidence only. It does not replace the independent `5.9/10` perceptual baseline or satisfy the release gate.
 
-- Source gate: `30/30` unit-test files and `132/132` deterministic tests pass; TypeScript/lint and production build pass.
-- Architecture: both original house declarations pass forward/reverse ground-route simulation, bidirectional stair traversal, opening/collision consistency, human-scale dimensions, and team transforms. Aqua uses one 12-tread service stair; Coral uses a two-flight 12-tread dogleg.
-- Presentation: the active authored carbine reports approximately `0.8 cm` first-person contact error at both hands with bind offsets preserved. The final settled third-person sample reports effectively zero support error, `0.958` reach ratio, an unclamped `146.5°` elbow, and a target inside weapon bounds. Weapon-specific third-person scaling reduces the carbine from a torso-obscuring approximately `1.78 m` visible bound toward a plausible operator-relative silhouette. Other weapons and moving/stance states still need equivalent visual capture.
-- Renderer: a live isolated browser sample reported Quality at `159` calls / `121,142` triangles and Performance at `99` calls / `61,970` triangles. Both satisfy the tightened renderer-margin contract in that benchmark.
-- Bounded social loop: arbitrary chat was removed from the accepted protocol. Enemy, Regroup, Push, and Nice are identity-bound fixed-enum messages; guest team claims are bound to the validated join; host relay is filtered by team; admission is one ping per second with a bounded 32-nonce replay window; presentation is capped at eight markers with five-second expiry.
-- Browser evidence: the complete suite passes `20/20`, including invalid-room timeout/retry, fixed social cooldown/expiry, authored arm/operator contracts, Performance and Quality renderer budgets, loadouts, knife, support, movement, reload, grenades, match/rematch, damage recovery, and bounded effects. The final weapon scale/contact change also passed its three affected browser gates.
-- Multiplayer evidence: the exact final tree passes reciprocal host/client WebRTC with zero page errors, one remote each, `33 ms` state cadence, `24 s^-1` interpolation, `183.1 ms` sampled snapshot age, `0.252 m` interpolation error, pistol replication, and admitted melee at `0 HP / 1 death`.
-- Remaining blockers: first-person anatomy remains visibly procedural; house finish and interior lighting still require perceptual refinement; other third-person weapons and moving/stance states need equivalent contact capture; ten-cycle soak and Windows 30 Hz capture remain outstanding.
+- Source gate: `31/31` unit-test files and `137/137` deterministic tests pass; `git diff --check`, TypeScript/lint, and production build pass.
+- Architecture: both original house declarations pass forward/reverse ground-route simulation, bidirectional stair traversal, opening/collision consistency, human-scale dimensions, and team transforms. The fresh matched architecture harness completed `20/20` Quality/Performance captures with zero runtime/page errors. Aqua uses one 12-tread service stair; Coral uses a two-flight 12-tread dogleg.
+- Presentation: first-person arms are merged into six render meshes while preserving named shoulder/elbow/wrist structures. Accepted melee now shows the knife immediately and remains visible for `620 ms`. QA-only capture controls pin reload at `0.34`/`0.68` and melee at `0.42` after real gameplay admission; normal gameplay remains clock-driven. The durable `artifacts/pass17-refinement` matrix completed `56/56` Quality/Performance frames across all three class primaries plus the pistol with zero errors. Across those actions, Performance peaks at `80` calls / `69,940` triangles and Quality at `158` calls / `143,200` triangles, inside the `120/160` call limits. Pistol reload remains a perceptual polish blocker because magazine separation is still too subtle.
+- Renderer and normal display: foreground Windows Chrome 150 with normal vsync sustained Performance at `28.6946 FPS` (64 calls / 53,872 triangles / DPR 0.75) and Quality at `28.8619 FPS` (125 calls / 100,070 triangles / DPR 1.0) on the active 30 Hz display. Both were visible/focused, exceeded the `28.5 FPS` gate, and did not adaptively downshift. The isolated Chrome profile and CDP listener were fully cleaned afterward.
+- Bounded social loop: arbitrary chat remains absent from the accepted protocol. Enemy, Regroup, Push, and Nice are identity-bound fixed-enum messages; guest team claims are bound to the validated join; host relay is filtered by team; admission is one ping per second with a bounded 32-nonce replay window; presentation is capped at eight markers with five-second expiry.
+- Browser evidence: the complete suite passes `20/20` in 3.2 minutes, including invalid-room timeout/retry, fixed social cooldown/expiry, visible arms/operators, Performance and Quality renderer budgets, class-primary plus service-pistol restriction, knife misses, all three supports, movement, reload interruption cleanup, grenades, match/rematch, damage recovery, and bounded effects.
+- Multiplayer evidence: the current tree passes reciprocal host/client WebRTC with zero page errors, one remote each, `33 ms` state cadence, `24 s^-1` interpolation, `189.5 ms` sampled snapshot age, `0.1764401384 m` interpolation error, carbine-primary/pistol-active replication, and authoritative melee admitted at `0 HP / 1 death` before respawn.
+- Remaining blockers: the official perceptual score remains `5.9/10` until the fresh three-reviewer tribunal reports; first-person anatomy and pistol reload still look procedural; architecture captures remain sparse/blockout-like despite mapped surfaces; audio/combat motion evidence is incomplete; ten-cycle multiplayer soak and 20-minute latency/loss evidence remain outstanding; Dave's controlled Pass 16/17 preference is still mandatory.
+
+## 8. Corrected independent tribunal — 2026-07-14
+
+The first attempted tribunal was invalid because the full Playwright suite had cleaned a weapon/action matrix stored under its disposable `test-results/` directory. Durable evidence was regenerated under `artifacts/`: `56/56` refinement frames and `20/20` architecture frames, all with zero capture errors. Three fresh GPT-5.6 Sol reviewers confirmed they could inspect all requested evidence.
+
+### Verdict
+
+- Character/action specialist: **5.8/10**, high confidence (`0.86`).
+- Architecture specialist: **5.3/10**, high confidence (`0.88`); Quality alone approximately `6.3`, Performance approximately `4.4`.
+- Release-quality director: **5.3/10**, medium-high confidence (`0.82`).
+- **Decision:** retain the official `5.9/10` baseline; do not raise or formally lower it without matched Pass 16/17 evidence.
+- **Release gate:** failed. The required `8.5` overall and `8.0` per category are not met. Only technically evidenced Performance (`8.0`) and Reliability (`8.6`) reached 8 in the release director's rubric.
+
+The tribunal separates a strong technical foundation from mid-prototype visual/product polish. Highest-impact blockers are:
+
+1. Tube-like first-person anatomy, disconnected-looking wrists/hands, and weak pose-specific contact.
+2. Reload/fire states with insufficient physical distinction, recoil, muzzle flash, moving magazines/shells, and support-hand interaction.
+3. Sparse, wall-dominated interiors and structurally unresolved stairs/landings.
+4. Flat lighting and repetitive materials, especially the conspicuous Performance-mode downgrade.
+5. Rigid third-person operators and insufficient motion evidence for locomotion, fire, reload, melee, hit, death, and respawn.
+
+Static screenshots cannot validly score audio, temporal animation smoothness, replayability, or complete multiplayer lifecycle reliability. Pass 17 remains unpublished and non-canonical.

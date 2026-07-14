@@ -495,6 +495,7 @@ let preferredFov = 82;
 let botsFrozen = false;
 let debugInputUnlocked = false;
 let debugAdsOverride: boolean | null = null;
+let debugReloadProgress: number | null = null;
 let characterPhysics: CharacterPhysics | null = null;
 
 function gameplayInputEnabled(): boolean {
@@ -2025,7 +2026,7 @@ function updatePhysics(dt: number): void {
     phase: weaponBob,
     landingImpulse,
     lateralSpeed,
-    reloadProgress: gameplayReloadProgress(player.reloadState, performance.now()),
+    reloadProgress: debugReloadProgress ?? gameplayReloadProgress(player.reloadState, performance.now()),
   });
   for (const event of weaponActionEvents) {
     audio.weaponAction(player.weapon, event);
@@ -2569,6 +2570,9 @@ const debugWindow = window as Window & {
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
+    setMovement: (forward: boolean, sprint?: boolean) => void;
+    setMeleeCaptureProgress: (progress: number | null) => void;
+    setReloadCaptureProgress: (progress: number | null) => void;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
     earnSupport: (eliminations: number) => void;
@@ -2772,6 +2776,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return { accepted: player.lastMeleeAt !== before, alive: player.alive, phase: matchState.phase, lastMeleeAt: player.lastMeleeAt };
   },
   setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = held; },
+  setMovement: (forward: boolean, sprint = false) => {
+    keys.delete('KeyW');
+    keys.delete('ShiftLeft');
+    keys.delete('ShiftRight');
+    if (forward) keys.add('KeyW');
+    if (forward && sprint) keys.add('ShiftLeft');
+  },
+  setMeleeCaptureProgress: (progress: number | null) => weaponView.setMeleeCaptureProgress(progress),
+  setReloadCaptureProgress: (progress: number | null) => {
+    debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
+  },
   setStance: (stance: Stance) => {
     if (stance === player.stance) return;
     if (stance === 'stand') requestStance('stand');

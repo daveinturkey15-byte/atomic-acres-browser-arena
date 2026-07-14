@@ -41,6 +41,8 @@ type ViewArmRig = {
   lowerLength: number;
 };
 
+const MELEE_PRESENTATION_MS = 620;
+
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
   readonly root = new THREE.Group();
@@ -52,6 +54,7 @@ export class WeaponPresentation {
   private swayX = 0;
   private swayY = 0;
   private meleeStart = 0;
+  private debugMeleeProgress: number | null = null;
   private grenadeStart = 0;
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
@@ -443,6 +446,22 @@ export class WeaponPresentation {
 
   melee(): void {
     this.meleeStart = performance.now();
+    this.meleeRig.visible = true;
+    const arms = this.root.getObjectByName('first-person-arms');
+    if (arms) arms.visible = false;
+    const activeModel = this.models.get(this.active);
+    if (activeModel) activeModel.visible = false;
+    this.actionContract = characterActionContract({
+      weapon: this.active,
+      aimBlend: this.adsBlend,
+      sprintBlend: this.sprintBlend,
+      reloadProgress: null,
+      meleeProgress: 0,
+    });
+  }
+
+  setMeleeCaptureProgress(progress: number | null): void {
+    this.debugMeleeProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 0.999);
   }
 
   throwGrenade(): void {
@@ -727,14 +746,16 @@ export class WeaponPresentation {
 
     let reloadRoll = 0;
     let reloadDrop = 0;
+    let reloadLower = 0;
     const reloadProgress = pose.reloadProgress ?? 0;
     if (pose.reloadProgress !== null) {
       actionEvents.push(...reloadActionEvents(this.active, this.reloadLastProgress, reloadProgress));
       this.reloadLastProgress = reloadProgress;
       const lower = Math.sin(Math.PI * reloadProgress);
+      reloadLower = lower;
       const seatSnap = reloadProgress > 0.65 ? Math.sin((reloadProgress - 0.65) / 0.35 * Math.PI) : 0;
-      reloadRoll = lower * 0.78 - seatSnap * 0.12;
-      reloadDrop = lower * -0.22 + seatSnap * 0.035;
+      reloadRoll = lower * (this.active === 'pistol' ? 0.24 : 0.78) - seatSnap * 0.12;
+      reloadDrop = lower * (this.active === 'pistol' ? 0.025 : -0.22) + seatSnap * 0.035;
     } else if (this.reloadLastProgress > 0) {
       this.reloadLastProgress = 0;
     }
@@ -771,9 +792,10 @@ export class WeaponPresentation {
       bolt.position.z = restZ + reloadPose.actionPull * (this.active === 'smg' ? 0.1 : 0.12);
     }
 
-    const meleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / 430, 0, 1);
+    const timedMeleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / MELEE_PRESENTATION_MS, 0, 1);
+    const meleeProgress = this.debugMeleeProgress ?? timedMeleeProgress;
     const meleeArc = this.meleeStart > 0 && meleeProgress < 1 ? Math.sin(meleeProgress * Math.PI) : 0;
-    const meleeActive = this.meleeStart > 0 && meleeProgress < 1;
+    const meleeActive = this.debugMeleeProgress !== null || (this.meleeStart > 0 && meleeProgress < 1);
     this.actionContract = characterActionContract({
       weapon: this.active,
       aimBlend: this.adsBlend,
@@ -794,7 +816,7 @@ export class WeaponPresentation {
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 
     const targetPosition = new THREE.Vector3(
-      0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18,
+      0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 - (this.active === 'pistol' ? reloadLower * 0.1 : 0),
       -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadDrop - this.recoil * 0.08 - pose.landingImpulse * 0.075,
       -0.78 + adsZ + this.recoil * profile.recoilTranslation - meleeArc * 0.32 + grenadeArc * 0.24,
     );

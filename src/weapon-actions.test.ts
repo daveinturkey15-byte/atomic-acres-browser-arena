@@ -17,7 +17,7 @@ describe('weapon action timelines', () => {
   });
 
   it('keeps magazine and shell poses finite across clamped progress', () => {
-    for (const weapon of ['carbine', 'smg', 'scattergun'] as const) {
+    for (const weapon of ['carbine', 'smg', 'scattergun', 'pistol'] as const) {
       for (const progress of [-2, 0, 0.25, 0.5, 0.75, 1, 4]) {
         const pose = reloadPoseAt(weapon, progress);
         for (const value of Object.values(pose)) {
@@ -26,6 +26,10 @@ describe('weapon action timelines', () => {
       }
     }
     expect(reloadPoseAt('carbine', 0.45).magazineDrop).toBeGreaterThan(0.45);
+    expect(reloadPoseAt('pistol', 0.34).magazineDrop).toBeGreaterThan(0.15);
+    expect(reloadPoseAt('pistol', 0.34).magazineDrop).toBeLessThan(0.25);
+    expect(reloadPoseAt('pistol', 0.34).magazineLateral).toBeLessThan(-0.25);
+    expect(reloadPoseAt('pistol', 0.68).magazineDrop).toBeLessThan(reloadPoseAt('pistol', 0.34).magazineDrop);
     expect(reloadPoseAt('scattergun', 0.4).handToReload).toBeGreaterThan(0.9);
   });
 });

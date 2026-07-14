@@ -21,12 +21,22 @@ describe('first-person anatomical presentation', () => {
       expect(arms!.getObjectByName(`${side}-wrist-joint`)).toBeInstanceOf(THREE.Group);
     }
 
-    let meshes = 0;
-    arms!.traverse((node) => { if (node instanceof THREE.Mesh) meshes += 1; });
-    expect(meshes).toBe(6);
+    expect(presentation.presentationState().armMeshCount).toBe(6);
   });
 
-  it('keeps the reduced representation at the same bounded assembly count', () => {
+  it('shows the knife immediately when melee is accepted', () => {
+    const camera = new THREE.PerspectiveCamera();
+    const presentation = new WeaponPresentation(camera, false);
+
+    presentation.melee();
+    const state = presentation.presentationState();
+
+    expect(state.knifeVisible).toBe(true);
+    expect(state.actionContract.meleeProgress).toBe(0);
+    expect(state.armsVisible).toBe(true);
+  });
+
+  it('keeps the reduced presentation coherent with fewer finger details', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, true);
     const arms = presentation.root.getObjectByName('first-person-arms');

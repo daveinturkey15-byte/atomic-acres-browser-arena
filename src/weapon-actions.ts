@@ -71,11 +71,12 @@ export function reloadPoseAt(weapon: WeaponId, rawProgress: number): ReloadPose 
   const removal = smoothstep(0.1, 0.34, progress);
   const insertion = smoothstep(0.56, 0.81, progress);
   const holdOut = removal * (1 - insertion);
+  const pistol = weapon === 'pistol';
   return {
-    magazineDrop: holdOut * 0.52 + insertion * (1 - smoothstep(0.78, 0.84, progress)) * 0.04,
-    magazineTwist: holdOut * 0.24,
+    magazineDrop: holdOut * (pistol ? 0.18 : 0.52) + insertion * (1 - smoothstep(0.78, 0.84, progress)) * (pistol ? 0.018 : 0.04),
+    magazineTwist: holdOut * (pistol ? 0.12 : 0.24),
     magazineForward: holdOut * (weapon === 'carbine' ? 0.17 : 0.1),
-    magazineLateral: holdOut * (weapon === 'carbine' ? -0.075 : -0.045),
+    magazineLateral: holdOut * (weapon === 'carbine' ? -0.075 : pistol ? -0.3 : -0.045),
     handToReload: smoothstep(0.06, 0.2, progress) * (1 - smoothstep(0.82, 0.94, progress)),
     shellVisible: false,
     shellTravel: 0,

@@ -11,3 +11,4 @@ qwen_swarm.py
 .hermes/
 playwright-report/
 test-results/
+artifacts/
