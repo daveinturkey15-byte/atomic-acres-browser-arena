@@ -3,7 +3,7 @@ import { texturedMaterial } from './art-kit';
 import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
-import { houseCollisionSolids } from './house-navigation';
+import { createHouseArchitecture, HouseSurface } from './house-navigation';
 import { Team } from './protocol';
 
 export type PracticeTarget = { id: string; root: THREE.Group; active: boolean; respawnAt: number };
@@ -31,7 +31,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     grassDark: texturedMaterial('./assets/original/textures/grass-turf.png', { color: 0x7e916a, roughness: 1, repeatX: 8, repeatY: 8 }),
     road: texturedMaterial('./assets/original/textures/asphalt-aged.png', { roughness: 0.98, repeatX: 5, repeatY: 20 }),
     concrete: texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.94, repeatX: 3, repeatY: 3 }),
-    cream: texturedMaterial('./assets/original/textures/brick-warm.png', { color: 0xf0ddbd, roughness: 0.86, repeatX: 4, repeatY: 2 }),
+    cream: texturedMaterial('./assets/original/textures/plaster-warm.png', { roughness: 0.92, repeatX: 3, repeatY: 3 }),
     aqua: texturedMaterial('./assets/original/textures/siding-aqua.png', { roughness: 0.76, repeatX: 4, repeatY: 4 }),
     coral: texturedMaterial('./assets/original/textures/siding-coral.png', { roughness: 0.76, repeatX: 4, repeatY: 4 }),
     mustard: material(0xd9a43b, 0.58, 0.18),
@@ -86,6 +86,17 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     proxy.userData.collisionProxy = true;
   }
 
+  function colliderOnly(position: [number, number, number], size: [number, number, number]): void {
+    colliders.push({
+      minX: position[0] - size[0] / 2,
+      maxX: position[0] + size[0] / 2,
+      minZ: position[2] - size[2] / 2,
+      maxZ: position[2] + size[2] / 2,
+      minY: position[1] - size[1] / 2,
+      maxY: position[1] + size[1] / 2,
+    });
+  }
+
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(86, 98), palette.grass);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -109,33 +120,50 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
 
   function addHouse(team: Team, x: number, z: number, facing: 1 | -1): void {
-    const accent = team === 0 ? palette.aqua : palette.coral;
     const frontZ = z + facing * 7.2;
     const backZ = z - facing * 7.2;
     const trim = palette.white;
+    const architecture = createHouseArchitecture(team, x, z, facing);
+    const surfaceMaterial: Record<HouseSurface, THREE.Material> = {
+      aqua: palette.aqua,
+      coral: palette.coral,
+      plaster: palette.cream,
+      brick: palette.brick,
+      timber: palette.timber,
+      concrete: palette.concrete,
+      trim,
+      glass: palette.glass,
+      metal: palette.chrome,
+      ceiling: texturedMaterial('./assets/original/textures/ceiling-acoustic.png', { roughness: 0.96, repeatX: 3, repeatY: 3 }),
+      light: new THREE.MeshBasicMaterial({ color: 0xffe2a3, toneMapped: false }),
+    };
 
-    // Ground floor: real door openings, two-room interior and readable exterior trim.
-    for (const wallZ of [frontZ, backZ]) {
-      box('door-trim-left', [x - 2.28, 1.35, wallZ + facing * 0.08], [0.15, 2.7, 0.12], trim, false);
-      box('door-trim-right', [x + 2.28, 1.35, wallZ + facing * 0.08], [0.15, 2.7, 0.12], trim, false);
-    }
-    for (const solid of houseCollisionSolids(x, z, facing)) {
-      const mat = solid.name === 'interior-divider'
-        ? palette.brick
-        : solid.name === 'door-lintel'
-          ? trim
-          : solid.name === 'rear-deck' || solid.name === 'upper-floor' || solid.name === 'interior-stair'
-            ? palette.timber
-            : accent;
-      box(solid.name, solid.position, solid.size, mat);
+    for (const solid of architecture.solids) {
+      const mat = surfaceMaterial[solid.surface];
+      if (solid.kind === 'stair') {
+        // Keep full-step controller collision while presenting credible thin
+        // treads and risers. Both derive from the same authored declaration.
+        colliderOnly(solid.position, solid.size);
+        const top = solid.position[1] + solid.size[1] / 2;
+        box('interior-stair-tread', [solid.position[0], top - 0.055, solid.position[2]], [solid.size[0], 0.11, solid.size[2]], mat, false, true, true);
+        box(
+          'interior-stair-riser',
+          [solid.position[0], top - 0.17, solid.position[2] - facing * (solid.size[2] / 2 - 0.04)],
+          [solid.size[0], 0.34, 0.08],
+          mat,
+          false,
+          true,
+          true,
+        );
+      } else {
+        box(solid.name, solid.position, solid.size, mat, solid.collidable, solid.kind !== 'glass');
+      }
     }
 
-    // Upper-storey window dressing follows the collision-shell openings.
+    // Glass occupies the authored upper openings but remains non-authoritative.
     for (const wallZ of [frontZ, backZ]) {
-      for (const wx of [x - 3.1, x + 3.1]) {
-        box('window-glass', [wx, 5.55, wallZ + facing * 0.08], [2.2, 1.55, 0.1], palette.glass, false, false);
-        box('window-top-trim', [wx, 6.43, wallZ + facing * 0.14], [2.5, 0.13, 0.13], trim, false);
-        box('window-bottom-trim', [wx, 4.67, wallZ + facing * 0.14], [2.5, 0.13, 0.13], trim, false);
+      for (const wx of [x - 4.7, x + 4.7]) {
+        box('window-glass', [wx, 5.35, wallZ + facing * 0.08], [2.1, 1.65, 0.08], palette.glass, false, false);
       }
     }
 

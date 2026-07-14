@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator } from './operator-model';
 import { createImportedWeaponModel } from './weapon-model';
 import { solveTwoBoneElbow } from './ik';
+import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
 import type { Team, WeaponId } from './protocol';
 import { hitReactionAt } from './weapon-presentation-state';
 
@@ -19,13 +20,15 @@ const textureBatchColors: Record<string, number> = {
   'weapon-gunmetal.png': 0x4b555a,
   'wood-deck.png': 0x78513b,
   'roof-shingles.png': 0x595e63,
+  'plaster-warm.png': 0xdcd2bb,
+  'ceiling-acoustic.png': 0xc6c2b1,
 };
 
 export type StaticBatchStats = {
   sourceMeshes: number;
   batches: number;
 };
-export type StaticBatchMaterialMode = 'preserve' | 'palette-basic';
+export type StaticBatchMaterialMode = 'preserve' | 'texture-lit' | 'vertex-lit' | 'palette-lit' | 'palette-basic';
 
 function batchDisplayColor(material: THREE.Material): THREE.Color {
   const candidate = material as THREE.MeshStandardMaterial;
@@ -86,13 +89,29 @@ export function batchStaticMeshes(
     const sourceMaterial = node.material as THREE.MeshBasicMaterial;
     const canvasMap = typeof HTMLCanvasElement !== 'undefined' && sourceMaterial.map?.image instanceof HTMLCanvasElement;
     if (simplifyMaterials && canvasMap) return;
+    const preserveMappedMaterial = materialMode === 'texture-lit' && Boolean(sourceMaterial.map);
+    const vertexPalette = materialMode === 'vertex-lit';
     const classification = classify(node);
     const displayColor = batchDisplayColor(node.material);
     const opacityKey = node.material.transparent ? `t${node.material.opacity.toFixed(2)}` : 'opaque';
-    const key = simplifyMaterials ? `${displayColor.getHexString()}:${opacityKey}:${classification}` : `${materialBatchKey(node.material)}:${classification}`;
+    const key = vertexPalette
+      ? `vertex:${opacityKey}:${classification}`
+      : simplifyMaterials && !preserveMappedMaterial
+      ? `${displayColor.getHexString()}:${opacityKey}:${classification}`
+      : `${materialBatchKey(node.material)}:${classification}`;
     let entry = groups.get(key);
     if (!entry) {
-      const material = materialMode === 'palette-basic'
+      const material = preserveMappedMaterial
+        ? node.material
+        : vertexPalette
+          ? new THREE.MeshLambertMaterial({
+              color: 0xffffff,
+              vertexColors: true,
+              transparent: node.material.transparent,
+              opacity: node.material.opacity,
+              depthWrite: !node.material.transparent,
+            })
+        : materialMode === 'palette-basic'
         ? new THREE.MeshBasicMaterial({
             color: displayColor,
             toneMapped: false,
@@ -100,7 +119,14 @@ export function batchStaticMeshes(
             opacity: node.material.opacity,
             depthWrite: !node.material.transparent,
           })
-        : node.material;
+        : materialMode === 'palette-lit'
+          ? new THREE.MeshLambertMaterial({
+              color: displayColor,
+              transparent: node.material.transparent,
+              opacity: node.material.opacity,
+              depthWrite: !node.material.transparent,
+            })
+          : node.material;
       entry = {
         material,
         classification,
@@ -116,9 +142,25 @@ export function batchStaticMeshes(
       indexed.dispose();
     }
     geometry.applyMatrix4(node.matrixWorld);
+    if (vertexPalette) {
+      const colors = new Float32Array(geometry.getAttribute('position').count * 3);
+      for (let index = 0; index < colors.length; index += 3) {
+        colors[index] = displayColor.r;
+        colors[index + 1] = displayColor.g;
+        colors[index + 2] = displayColor.b;
+      }
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
     if (simplifyMaterials) {
+      const retainedAttributes = preserveMappedMaterial
+        ? new Set(['position', 'normal', 'uv'])
+        : materialMode === 'palette-basic'
+          ? new Set(['position'])
+          : vertexPalette
+            ? new Set(['position', 'normal', 'color'])
+            : new Set(['position', 'normal']);
       for (const attribute of Object.keys(geometry.attributes)) {
-        if (attribute !== 'position') geometry.deleteAttribute(attribute);
+        if (!retainedAttributes.has(attribute)) geometry.deleteAttribute(attribute);
       }
     }
     entry.meshes.push(node);
@@ -137,8 +179,9 @@ export function batchStaticMeshes(
     }
     const mesh = new THREE.Mesh(geometry, entry.material);
     if (entry.classification) mesh.userData.hitZone = entry.classification;
+    const preserveShadowResponse = materialMode === 'preserve' || materialMode === 'texture-lit';
     mesh.castShadow = materialMode === 'preserve' && entry.meshes.some((item) => item.castShadow);
-    mesh.receiveShadow = materialMode === 'preserve' && entry.meshes.some((item) => item.receiveShadow);
+    mesh.receiveShadow = preserveShadowResponse && entry.meshes.some((item) => item.receiveShadow);
     mesh.frustumCulled = true;
     batches.add(mesh);
     for (const source of entry.meshes) source.visible = false;
@@ -147,6 +190,22 @@ export function batchStaticMeshes(
   }
   destination.add(batches);
   return { sourceMeshes, batches: batchCount };
+}
+
+/** Batch immutable pieces of a socket-attached third-person weapon. */
+export function optimizeAttachedWeapon(
+  weapon: THREE.Group,
+  materialMode: StaticBatchMaterialMode,
+): StaticBatchStats {
+  if (weapon.userData.attachedWeaponBatchStats) return weapon.userData.attachedWeaponBatchStats as StaticBatchStats;
+  const articulatedNames = new Set(['bolt-or-slide', 'pump', 'curved-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle']);
+  for (const name of articulatedNames) {
+    const articulated = weapon.getObjectByName(name);
+    if (articulated) articulated.userData.dynamic = true;
+  }
+  const stats = batchStaticMeshes(weapon, weapon, () => '', materialMode);
+  weapon.userData.attachedWeaponBatchStats = stats;
+  return stats;
 }
 
 function texture(path: string, repeatX = 1, repeatY = 1): THREE.Texture {
@@ -322,7 +381,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('muzzle-socket', [0, 0.005, -1.24]);
     addSocket('eject-socket', [0.145, 0.055, -0.07]);
     addSocket('grip-socket-r', [0.035, -0.135, 0.045]);
-    addSocket('support-socket-l', [-0.035, -0.085, -0.58]);
+    addSocket('support-socket-l', [-0.035, -0.085, -0.32]);
   } else if (id === 'smg') {
     // Original Vectorline SMG: vertically layered receiver, forward heat cage,
     // compact aperture sights and an exposed side charging tab.
@@ -597,39 +656,91 @@ const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number
   pistol: [0.142442, -0.014047, 0.708358, 0.691189],
 };
 
+/** Rotate one animated bone toward a world-space target without rewriting bind offsets. */
+function orientBoneToward(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
+  bone.updateWorldMatrix(true, true);
+  const origin = bone.getWorldPosition(new THREE.Vector3());
+  const currentDirection = child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
+  const desiredDirection = targetWorld.clone().sub(origin).normalize();
+  if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
+  const currentWorld = bone.getWorldQuaternion(new THREE.Quaternion());
+  const desiredWorld = new THREE.Quaternion().setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
+  const parentWorld = bone.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+  bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
+  bone.updateWorldMatrix(false, true);
+}
+
 /** Solve the rigged operator's left arm to grip the weapon's support-socket-l. */
 function applyRiggedLeftGrip(
   shoulder: THREE.Bone, elbow: THREE.Bone, wrist: THREE.Bone, weapon: THREE.Group,
-): void {
-  weapon.updateMatrixWorld(true);
+): Record<string, unknown> | null {
   const support = weapon.getObjectByName('support-socket-l');
-  if (!support) return;
-  const target = support.getWorldPosition(new THREE.Vector3());
-  // The weapon socket is parented to WristR. We need the left arm to reach
-  // the support point from shoulder space.
-  shoulder.updateMatrixWorld(true);
+  if (!support) return null;
+  // The scattergun grip is parented to its animated pump. Resolve the complete
+  // current hierarchy after the mixer/action part moved it; treating every
+  // socket as a direct weapon child was the stale/far-target Pass 17 bug.
+  const target = resolveSocketWorld(support);
+  shoulder.updateWorldMatrix(true, true);
   const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3());
-  const upperLength = shoulderPos.distanceTo(elbow.getWorldPosition(new THREE.Vector3())) || 0.38;
-  const lowerLength = elbow.getWorldPosition(new THREE.Vector3()).distanceTo(wrist.getWorldPosition(new THREE.Vector3())) || 0.35;
-  const targetLocal = shoulder.worldToLocal(target.clone());
-  const hint = new THREE.Vector3(-0.48, -1, 0.22);
-  const elbowPoint = solveTwoBoneElbow(new THREE.Vector3(0, 0, 0), targetLocal, upperLength, lowerLength, hint);
-  const upperDirection = elbowPoint.clone().normalize();
-  shoulder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), upperDirection);
-  elbow.position.set(0, 0, -upperLength);
-  shoulder.updateMatrixWorld();
-  const lowerTarget = shoulder.worldToLocal(target.clone());
-  const lowerDirection = lowerTarget.sub(elbow.position).normalize();
-  elbow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), lowerDirection);
+  const elbowPos = elbow.getWorldPosition(new THREE.Vector3());
+  const wristPos = wrist.getWorldPosition(new THREE.Vector3());
+  const shoulderOffset = elbow.position.clone();
+  const elbowOffset = wrist.position.clone();
+  const upperLength = shoulderPos.distanceTo(elbowPos) || 0.38;
+  const lowerLength = elbowPos.distanceTo(wristPos) || 0.35;
+  const elbowTarget = solveTwoBoneElbow(
+    shoulderPos,
+    target,
+    upperLength,
+    lowerLength,
+    new THREE.Vector3(-0.48, -1, 0.22),
+  );
+  orientBoneToward(shoulder, elbow, elbowTarget);
+  orientBoneToward(elbow, wrist, target);
+  wrist.updateWorldMatrix(true, true);
+  const solvedElbow = elbow.getWorldPosition(new THREE.Vector3());
+  const solvedWrist = wrist.getWorldPosition(new THREE.Vector3());
+  const bounds = objectLocalGeometryBounds(weapon);
+  const targetInWeapon = weapon.worldToLocal(target.clone());
+  const elbowAngle = shoulderPos.clone().sub(solvedElbow).angleTo(solvedWrist.clone().sub(solvedElbow));
+  return {
+    supportError: solvedWrist.distanceTo(target),
+    reachRatio: shoulderPos.distanceTo(target) / Math.max(0.001, upperLength + lowerLength),
+    clamped: shoulderPos.distanceTo(target) >= upperLength + lowerLength - 1e-4,
+    target: target.toArray(),
+    targetInWeapon: targetInWeapon.toArray(),
+    wrist: solvedWrist.toArray(),
+    socketParent: support.parent?.name ?? null,
+    nestedSocket: support.parent !== weapon,
+    elbowAngle,
+    bindOffsetsPreserved: shoulderOffset.equals(elbow.position) && elbowOffset.equals(wrist.position),
+    weaponLocalBounds: bounds ? {
+      center: bounds.getCenter(new THREE.Vector3()).toArray(),
+      size: bounds.getSize(new THREE.Vector3()).toArray(),
+      containsTarget: bounds.containsPoint(targetInWeapon),
+      distanceToTarget: bounds.distanceToPoint(targetInWeapon),
+    } : null,
+    finite: [...target.toArray(), ...solvedWrist.toArray()].every(Number.isFinite),
+  };
 }
 
 export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flattenMaterials = false): void {
   const rig = operatorRig(root);
   if (!rig || rig.weaponId === weaponId && rig.weapon) return;
   if (rig.weapon) rig.weaponSocket.remove(rig.weapon);
-  const weapon = buildWeaponModel(weaponId, flattenMaterials);
+  // Third-person mounting must use the socket-native authored model. Pass 16's
+  // imported scene could place visible bounds metres away from WristR even
+  // while the root socket itself was correct.
+  const weapon = buildWeaponModel(weaponId, flattenMaterials, false);
+  optimizeAttachedWeapon(weapon, flattenMaterials ? 'palette-basic' : 'vertex-lit');
   weapon.name = `operator-${weaponId}`;
-  weapon.scale.setScalar(rig.rigged ? (weaponId === 'pistol' ? 0.78 : 0.82) : weaponId === 'smg' ? 0.72 : 0.68);
+  const riggedScale: Record<WeaponId, number> = {
+    carbine: 0.58,
+    smg: 0.62,
+    scattergun: 0.56,
+    pistol: 0.66,
+  };
+  weapon.scale.setScalar(rig.rigged ? riggedScale[weaponId] : weaponId === 'smg' ? 0.72 : 0.68);
   if (rig.rigged) {
     weapon.position.set(0.04, -0.03, -0.12);
     weapon.quaternion.set(...RIGGED_WEAPON_QUATERNION[weaponId]);
@@ -652,7 +763,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   // the off-hand so the operator reads as gripping the forend or magazine well.
   if (rig.rigged && (rig as OperatorRig & { rigged: true }).leftShoulderBone) {
     const r = rig as OperatorRig & { rigged: true };
-    applyRiggedLeftGrip(r.leftShoulderBone!, r.leftElbowBone!, r.leftWristBone!, weapon);
+    root.userData.operatorGripTelemetry = applyRiggedLeftGrip(r.leftShoulderBone!, r.leftElbowBone!, r.leftWristBone!, weapon);
   }
 }
 
@@ -700,6 +811,12 @@ export function poseOperator(
   if (!rig) return;
   if (rig.rigged) {
     updateRiggedOperator(root, speed, stance);
+    root.updateWorldMatrix(true, true);
+    if (rig.weapon && rig.leftShoulderBone && rig.leftElbowBone && rig.leftWristBone) {
+      // The mixer writes animated bones first; support-hand IK is the final
+      // presentation layer so walk/fire/hit clips cannot erase the grip.
+      root.userData.operatorGripTelemetry = applyRiggedLeftGrip(rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone, rig.weapon);
+    }
     return;
   }
   const shotAge = performance.now() - Number(root.userData.operatorShotAt ?? -10_000);

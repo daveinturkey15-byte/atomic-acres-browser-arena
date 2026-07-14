@@ -48,8 +48,16 @@ export type HitMessage = {
 };
 export type DeathMessage = { type: 'death'; killer: string; victim: string; nonce: number };
 export type LeaveMessage = { type: 'leave'; playerId: string };
-export type ChatMessage = { type: 'chat'; by: string; text: string };
-export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | LeaveMessage | ChatMessage;
+export type TeamPingKind = 'enemy' | 'regroup' | 'push' | 'nice';
+export type TeamPingMessage = {
+  type: 'ping';
+  by: string;
+  team: Team;
+  kind: TeamPingKind;
+  position: [number, number, number];
+  nonce: number;
+};
+export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | LeaveMessage | TeamPingMessage;
 
 const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'pistol']);
 const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun']);
@@ -97,8 +105,12 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return typeof msg.killer === 'string' && typeof msg.victim === 'string' && Number.isFinite(msg.nonce);
     case 'leave':
       return typeof msg.playerId === 'string';
-    case 'chat':
-      return typeof msg.by === 'string' && typeof msg.text === 'string' && msg.text.length <= 160;
+    case 'ping':
+      return typeof msg.by === 'string'
+        && (msg.team === 0 || msg.team === 1)
+        && (msg.kind === 'enemy' || msg.kind === 'regroup' || msg.kind === 'push' || msg.kind === 'nice')
+        && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
+        && Number.isFinite(msg.nonce);
     default:
       return false;
   }
@@ -113,7 +125,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'shot':
     case 'melee':
     case 'hit':
-    case 'chat':
+    case 'ping':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;

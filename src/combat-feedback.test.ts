@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyFootstepSurface, classifyImpactSurface, distancePointToSegment, nearMissStrength } from './combat-feedback';
+import { classifyFootstepSurface, classifyImpactSurface, combatConfirmEnvelope, distancePointToSegment, nearMissStrength } from './combat-feedback';
 
 describe('combat feedback helpers', () => {
   it('prefers explicit surface metadata and deterministic material evidence', () => {
@@ -32,5 +32,17 @@ describe('combat feedback helpers', () => {
     expect(classifyFootstepSurface({ x: -9, y: 0.6, z: -37.2 })).toBe('wood');
     expect(classifyFootstepSurface({ x: 24, y: 1.7, z: 0 })).toBe('soil');
     expect(classifyFootstepSurface({ x: Number.NaN, y: 0, z: 0 })).toBe('soil');
+  });
+
+  it('keeps escalating hit and kill confirms strong but temporally bounded', () => {
+    const body = combatConfirmEnvelope('body');
+    const head = combatConfirmEnvelope('head');
+    const kill = combatConfirmEnvelope('kill');
+    expect(body.durationMs).toBeLessThanOrEqual(220);
+    expect(kill.durationMs).toBeLessThanOrEqual(360);
+    expect(body.visualScale).toBeLessThan(head.visualScale);
+    expect(head.visualScale).toBeLessThan(kill.visualScale);
+    expect(kill.audioLayers).toBeLessThanOrEqual(3);
+    expect(kill.frequencyHz.every((frequency) => frequency >= 80 && frequency <= 3_200)).toBe(true);
   });
 });

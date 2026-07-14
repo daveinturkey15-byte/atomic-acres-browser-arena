@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import type { Team } from './protocol';
+import { objectLocalGeometryBounds } from './character-presentation-contract';
 
 const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
 const FIRST_PERSON_ARMS_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb';
@@ -18,6 +19,8 @@ type RiggedOperatorRuntime = {
   lastUpdatedAt: number;
   visual: THREE.Group;
   weaponSocket: THREE.Group;
+  stance: 'stand' | 'crouch' | 'prone';
+  speed: number;
 };
 
 export type RiggedOperatorInstance = {
@@ -34,15 +37,15 @@ function materialForTeam(material: THREE.Material, team: Team, flattenMaterials:
   const result = material.clone();
   const name = material.name.toLowerCase();
   if (name === 'swat') {
-    result.color.setHex(team === 0 ? 0x2f6f75 : 0x8d433b);
-    result.emissive.setHex(team === 0 ? 0x071b1c : 0x230b08);
+    result.color.setHex(team === 0 ? 0x2d7882 : 0xb34d3f);
+    result.emissive.setHex(team === 0 ? 0x061a1d : 0x240906);
     result.emissiveIntensity = flattenMaterials ? 0.34 : 0.14;
   } else if (name.includes('swat_black')) {
     result.color.setHex(team === 0 ? 0x1d292d : 0x302326);
     result.emissive.setHex(team === 0 ? 0x061113 : 0x130708);
     result.emissiveIntensity = flattenMaterials ? 0.22 : 0.08;
   } else if (name.includes('grey')) {
-    result.color.setHex(team === 0 ? 0x5e8586 : 0x966961);
+    result.color.setHex(team === 0 ? 0x6d9b9e : 0xb98276);
   }
   if (flattenMaterials) {
     result.roughness = 1;
@@ -194,8 +197,18 @@ export function createRiggedOperator(team: Team, name: string, flattenMaterials:
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
     node.raycast = () => undefined;
-    if (Array.isArray(node.material)) node.material = node.material.map((material) => materialForTeam(material, team, flattenMaterials));
-    else node.material = materialForTeam(node.material, team, flattenMaterials);
+    if (Array.isArray(node.material)) {
+      const materials = node.material.map((material) => materialForTeam(material, team, flattenMaterials));
+      if (flattenMaterials) {
+        node.material = materials[0];
+        node.geometry = node.geometry.clone();
+        const drawCount = node.geometry.index?.count ?? node.geometry.getAttribute('position')?.count ?? 0;
+        node.geometry.clearGroups();
+        if (drawCount > 0) node.geometry.addGroup(0, drawCount, 0);
+      } else {
+        node.material = materials;
+      }
+    } else node.material = materialForTeam(node.material, team, flattenMaterials);
     if (node.name === 'Pistol') node.visible = false;
   });
   root.add(visual);
@@ -218,6 +231,8 @@ export function createRiggedOperator(team: Team, name: string, flattenMaterials:
     lastUpdatedAt: performance.now(),
     visual,
     weaponSocket,
+    stance: 'stand',
+    speed: 0,
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
     source: 'Quaternius Ultimate Modular Males / Swat.gltf',
@@ -234,6 +249,8 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
   const now = performance.now();
   const dt = Math.min(0.05, Math.max(0, (now - runtimeState.lastUpdatedAt) / 1_000));
   runtimeState.lastUpdatedAt = now;
+  runtimeState.stance = stance;
+  runtimeState.speed = Math.max(0, Number.isFinite(speed) ? speed : 0);
   if (runtimeState.currentBase === 'Death') {
     runtimeState.mixer.update(dt);
     return true;
@@ -294,22 +311,57 @@ export function meleeRiggedOperator(root: THREE.Object3D): boolean {
 export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, unknown> | null {
   const runtimeState = runtime(root);
   if (!runtimeState) return null;
-  const weaponBounds = runtimeState.weaponSocket.children.length > 0
-    ? new THREE.Box3().setFromObject(runtimeState.weaponSocket)
-    : null;
+  const weaponRoot = runtimeState.weaponSocket.children[0];
+  let weaponBounds: { center: number[]; size: number[]; distanceFromSocket: number } | null = null;
+  if (weaponRoot) {
+    weaponRoot.updateWorldMatrix(true, true);
+    const rootInverse = weaponRoot.matrixWorld.clone().invert();
+    const localBounds = new THREE.Box3().makeEmpty();
+    weaponRoot.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || !child.geometry) return;
+      child.geometry.computeBoundingBox();
+      if (!child.geometry.boundingBox) return;
+      const meshToWeapon = rootInverse.clone().multiply(child.matrixWorld);
+      localBounds.union(child.geometry.boundingBox.clone().applyMatrix4(meshToWeapon));
+    });
+    if (!localBounds.isEmpty()) {
+      const center = localBounds.getCenter(new THREE.Vector3()).applyMatrix4(weaponRoot.matrixWorld);
+      const size = localBounds.getSize(new THREE.Vector3());
+      const worldScale = weaponRoot.getWorldScale(new THREE.Vector3());
+      size.multiply(new THREE.Vector3(Math.abs(worldScale.x), Math.abs(worldScale.y), Math.abs(worldScale.z)));
+      const socketPosition = runtimeState.weaponSocket.getWorldPosition(new THREE.Vector3());
+      weaponBounds = { center: center.toArray(), size: size.toArray(), distanceFromSocket: center.distanceTo(socketPosition) };
+    }
+  }
+  const localMountBounds = weaponRoot ? objectLocalGeometryBounds(weaponRoot) : null;
   return {
     source: root.userData.operatorAsset?.source,
     license: root.userData.operatorAsset?.license,
     skinnedMeshes: root.userData.operatorAsset?.skinnedMeshes,
     clips: root.userData.operatorAsset?.clips,
     activeClip: runtimeState.currentBase,
+    animationContract: {
+      base: runtimeState.currentBase,
+      stance: runtimeState.stance,
+      speed: runtimeState.speed,
+      mixerBeforeSupportIk: true,
+    },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
     weaponChildren: runtimeState.weaponSocket.children.length,
     weaponSocketWorld: runtimeState.weaponSocket.getWorldPosition(new THREE.Vector3()).toArray(),
     weaponSocketQuaternion: runtimeState.weaponSocket.getWorldQuaternion(new THREE.Quaternion()).toArray(),
-    weaponBounds: weaponBounds ? {
-      center: weaponBounds.getCenter(new THREE.Vector3()).toArray(),
-      size: weaponBounds.getSize(new THREE.Vector3()).toArray(),
+    weaponBounds,
+    weaponMount: weaponRoot ? {
+      directChild: weaponRoot.parent === runtimeState.weaponSocket,
+      localPosition: weaponRoot.position.toArray(),
+      localQuaternion: weaponRoot.quaternion.toArray(),
+      localScale: weaponRoot.scale.toArray(),
+      finite: [...weaponRoot.position.toArray(), ...weaponRoot.quaternion.toArray(), ...weaponRoot.scale.toArray()].every(Number.isFinite),
+      localBounds: localMountBounds ? {
+        center: localMountBounds.getCenter(new THREE.Vector3()).toArray(),
+        size: localMountBounds.getSize(new THREE.Vector3()).toArray(),
+      } : null,
     } : null,
+    supportGrip: root.userData.operatorGripTelemetry ?? null,
   };
 }

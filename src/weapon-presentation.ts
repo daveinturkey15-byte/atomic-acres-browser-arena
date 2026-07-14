@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { buildWeaponModel, roundedBox } from './art-kit';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildWeaponModel, optimizeAttachedWeapon, roundedBox } from './art-kit';
 import type { FirstPersonArmChain } from './operator-model';
 import { solveTwoBoneElbow } from './ik';
 import { reloadActionEvents, reloadPoseAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
@@ -7,6 +8,7 @@ import { advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import { fireImportedWeapon, importedWeaponTelemetry, reloadImportedWeapon, updateImportedWeapon } from './weapon-model';
 import type { WeaponId } from './protocol';
+import { characterActionContract, measureCameraFraming, resolveSocketWorld, type CharacterActionContract } from './character-presentation-contract';
 
 export type WeaponPose = {
   dt: number;
@@ -34,6 +36,7 @@ type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
   elbow: THREE.Group;
+  hand: THREE.Object3D;
   upperLength: number;
   lowerLength: number;
 };
@@ -75,6 +78,9 @@ export class WeaponPresentation {
   private sprintBlend = 0;
   private weaponHeat = 0;
   private shotsPresented = 0;
+  private actionContract: CharacterActionContract = characterActionContract({
+    weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
+  });
 
   constructor(private readonly camera: THREE.Camera, private readonly flattenMaterials = false) {
     this.root.name = 'original-weapon-view';
@@ -83,60 +89,131 @@ export class WeaponPresentation {
     camera.add(this.root);
 
     const sleeve: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x3f7771 })
-      : new THREE.MeshStandardMaterial({ color: 0x31544f, roughness: 0.84 });
+      ? new THREE.MeshBasicMaterial({ color: 0x365e68 })
+      : new THREE.MeshStandardMaterial({ color: 0x355761, emissive: 0x071519, emissiveIntensity: 0.12, roughness: 0.88 });
     const sleeveTrim: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0xd4ad48 })
-      : new THREE.MeshStandardMaterial({ color: 0xb9963f, roughness: 0.62, metalness: 0.12 });
+      ? new THREE.MeshBasicMaterial({ color: 0xa69a61 })
+      : new THREE.MeshStandardMaterial({ color: 0x918653, emissive: 0x171306, emissiveIntensity: 0.08, roughness: 0.76, metalness: 0.04 });
     const glove: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x3c4b4c })
-      : new THREE.MeshStandardMaterial({ color: 0x252d2e, roughness: 0.88 });
+      ? new THREE.MeshBasicMaterial({ color: 0x46585b })
+      : new THREE.MeshStandardMaterial({ color: 0x354345, emissive: 0x05090a, emissiveIntensity: 0.08, roughness: 0.88 });
+    const glovePalm: THREE.Material = flattenMaterials
+      ? new THREE.MeshBasicMaterial({ color: 0x52666a })
+      : new THREE.MeshStandardMaterial({ color: 0x46565a, roughness: 0.82 });
     // The licensed full-body derivative remains available for future authored
     // grip poses, but its current bind/IK calibration fails the viewmodel
     // acceptance gate (detached hands and sleeves outside the viewport). Keep
     // the readable original two-bone arms as the public presentation rather
     // than shipping a technically rigged but visibly broken pose.
     const arms = new THREE.Group(); arms.name = 'first-person-arms';
+    const anatomicalLimb = (
+      name: string,
+      length: number,
+      profile: Array<[position: number, radius: number]>,
+    ): THREE.Mesh => {
+      const points = profile.map(([position, radius]) => new THREE.Vector2(radius, position * length - length / 2));
+      const geometry = new THREE.LatheGeometry(points, flattenMaterials ? 8 : 12);
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, sleeve);
+      mesh.name = name;
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.z = -length / 2;
+      mesh.castShadow = true;
+      return mesh;
+    };
+    const mergeArmAssembly = (parent: THREE.Object3D, sources: THREE.Mesh[], name: string): THREE.Mesh => {
+      const geometries = sources.map((source) => {
+        source.updateMatrix();
+        const clone = source.geometry.clone();
+        const geometry = clone.index ? clone.toNonIndexed() : clone;
+        if (geometry !== clone) clone.dispose();
+        geometry.applyMatrix4(source.matrix);
+        for (const attribute of Object.keys(geometry.attributes)) {
+          if (attribute !== 'position' && attribute !== 'normal') geometry.deleteAttribute(attribute);
+        }
+        const sourceMaterial = Array.isArray(source.material) ? source.material[0] : source.material;
+        const color = 'color' in sourceMaterial && sourceMaterial.color instanceof THREE.Color
+          ? sourceMaterial.color
+          : new THREE.Color(0xffffff);
+        const colors = new Float32Array(geometry.getAttribute('position').count * 3);
+        for (let index = 0; index < colors.length; index += 3) {
+          colors[index] = color.r;
+          colors[index + 1] = color.g;
+          colors[index + 2] = color.b;
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        return geometry;
+      });
+      const geometry = mergeGeometries(geometries, false);
+      geometries.forEach((item) => item.dispose());
+      if (!geometry) throw new Error(`Unable to merge ${name}`);
+      const material = this.flattenMaterials
+        ? new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+        : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.02 });
+      const merged = new THREE.Mesh(geometry, material);
+      merged.name = name;
+      sources.forEach((source) => parent.remove(source));
+      parent.add(merged);
+      return merged;
+    };
     const makeArm = (side: 'left' | 'right') => {
       const sign = side === 'left' ? -1 : 1;
-      const upperLength = 0.56;
-      const lowerLength = 0.58;
+      // Preserve the total reach while restoring human upper/forearm proportion.
+      // Profile bulges create a deltoid/biceps and brachioradialis silhouette
+      // without adding meshes or draw calls.
+      const upperLength = 0.66;
+      const lowerLength = 0.63;
       const shoulder = new THREE.Group(); shoulder.name = `${side}-shoulder-joint`;
-      shoulder.position.set(sign * 0.25, side === 'right' ? -0.17 : -0.12, side === 'right' ? 0.52 : 0.45);
-      const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, upperLength - 0.19, 5, 9), sleeve);
-      upper.name = `${side}-upper-arm`;
-      upper.rotation.x = -Math.PI / 2;
-      upper.position.z = -upperLength / 2;
-      upper.castShadow = true;
+      shoulder.position.set(side === 'right' ? 0.48 : -0.36, side === 'right' ? -0.08 : -0.04, side === 'right' ? 0.58 : 0.52);
+      const radialSegments = flattenMaterials ? 8 : 12;
+      const upper = anatomicalLimb(`${side}-upper-arm`, upperLength, [
+        [0, 0.1], [0.26, 0.112], [0.63, 0.091], [1, 0.071],
+      ]);
+      upper.scale.set(1.04, 0.9, 1);
       shoulder.add(upper);
       const elbow = new THREE.Group(); elbow.name = `${side}-elbow-joint`; elbow.position.z = -upperLength; shoulder.add(elbow);
-      const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, lowerLength - 0.18, 5, 9), sleeve);
-      forearm.name = `${side}-forearm`;
-      forearm.rotation.x = -Math.PI / 2;
-      forearm.position.z = -lowerLength / 2;
-      forearm.castShadow = true;
+      const forearm = anatomicalLimb(`${side}-forearm`, lowerLength, [
+        [0, 0.082], [0.28, 0.097], [0.68, 0.073], [1, 0.055],
+      ]);
+      forearm.scale.set(1, 0.84, 1);
       elbow.add(forearm);
-      const cuff = roundedBox(`${side}-glove-cuff`, [0.205, 0.195, 0.14], sleeveTrim, 0.045, 2);
-      cuff.position.z = -lowerLength + 0.075; elbow.add(cuff);
-      const hand = roundedBox(`${side}-glove`, [0.18, 0.155, 0.235], glove, 0.055, 3);
-      hand.position.set(sign * -0.015, -0.01, -lowerLength - 0.055); hand.rotation.x = -0.12; elbow.add(hand);
-      const thumb = roundedBox(`${side}-thumb`, [0.075, 0.1, 0.17], glove, 0.028, 2);
-      thumb.position.set(sign * -0.105, -0.04, -lowerLength - 0.035); thumb.rotation.z = sign * 0.32; elbow.add(thumb);
+      const elbowCap = new THREE.Mesh(new THREE.SphereGeometry(0.086, radialSegments, 7), sleeve);
+      elbowCap.name = `${side}-elbow-cap`;
+      elbowCap.scale.set(1, 0.92, 1.04);
+      elbow.add(elbowCap);
+      const wrist = new THREE.Group();
+      wrist.name = `${side}-wrist-joint`;
+      wrist.position.z = -lowerLength;
+      wrist.rotation.set(-0.12, 0, sign * 0.08);
+      elbow.add(wrist);
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.074, 0.088, 0.12, radialSegments), sleeveTrim);
+      cuff.name = `${side}-glove-cuff`;
+      cuff.rotation.x = -Math.PI / 2;
+      cuff.position.z = 0.06; wrist.add(cuff);
+      const hand = roundedBox(`${side}-glove`, [0.138, 0.11, 0.19], glovePalm, 0.04, 3);
+      hand.position.set(sign * -0.015, -0.01, 0); wrist.add(hand);
+      const thumb = roundedBox(`${side}-thumb`, [0.052, 0.072, 0.13], glove, 0.022, 2);
+      thumb.position.set(sign * -0.075, -0.03, -0.025); thumb.rotation.z = sign * 0.32; wrist.add(thumb);
       const fingerCount = flattenMaterials ? 1 : 3;
+      const fingers: THREE.Mesh[] = [];
       for (let finger = 0; finger < fingerCount; finger += 1) {
-        const ridge = roundedBox(`${side}-finger-${finger}`, [0.036, 0.025, 0.14], glove, 0.01, 1);
-        ridge.position.set(sign * (0.052 - finger * 0.052), -0.09, -lowerLength - 0.1);
+        const ridge = roundedBox(`${side}-finger-${finger}`, [0.026, 0.018, 0.105], glove, 0.008, 1);
+        ridge.position.set(sign * (0.038 - finger * 0.038), -0.064, -0.078);
         ridge.rotation.x = -0.18;
-        elbow.add(ridge);
+        wrist.add(ridge);
+        fingers.push(ridge);
       }
-      const sleeveBand = roundedBox(`${side}-sleeve-band`, [0.202, 0.202, 0.055], sleeveTrim, 0.016, 2);
+      const sleeveBand = roundedBox(`${side}-sleeve-band`, [0.166, 0.166, 0.048], sleeveTrim, 0.014, 2);
       sleeveBand.position.z = -upperLength * 0.72;
       shoulder.add(sleeveBand);
-      this.armRigs.push({ side, shoulder, elbow, upperLength, lowerLength });
+      mergeArmAssembly(shoulder, [upper, sleeveBand], `${side}-upper-arm`);
+      mergeArmAssembly(elbow, [forearm, elbowCap], `${side}-forearm`);
+      mergeArmAssembly(wrist, [cuff, hand, thumb, ...fingers], `${side}-glove`);
+      this.armRigs.push({ side, shoulder, elbow, hand: wrist, upperLength, lowerLength });
       return shoulder;
     };
     arms.add(makeArm('right'), makeArm('left'));
-    arms.scale.setScalar(0.74);
+    arms.scale.setScalar(this.flattenMaterials ? 0.76 : 0.74);
     arms.position.set(0, -0.08, 0.02);
     arms.visible = true;
     this.root.add(arms);
@@ -244,11 +321,21 @@ export class WeaponPresentation {
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     const ids: WeaponId[] = ['carbine', 'smg', 'scattergun', 'pistol'];
     ids.forEach((id, index) => {
-      const model = buildWeaponModel(id, this.flattenMaterials);
+      // The imported gun scenes remain licensed source assets, but their
+      // visual transforms do not share the explicit grip/muzzle contract and
+      // produced detached hands plus edge-on receivers in Pass 16. The authored
+      // models are built around these sockets and are the refined view path.
+      const model = buildWeaponModel(id, this.flattenMaterials, false);
+      const firstPersonHidden: Record<WeaponId, Set<string>> = {
+        carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
+        smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
+        scattergun: new Set(['stock', 'stock-cheek-panel']),
+        pistol: new Set(),
+      };
+      model.traverse((node) => {
+        if (firstPersonHidden[id].has(node.name)) node.visible = false;
+      });
       if (id === 'carbine') {
-        model.traverse((node) => {
-          if (node.name === 'stock-shoulder-pad' || node.name === 'stock-cheek-rest' || node.name === 'stock-support-rod') node.visible = false;
-        });
         const reticle = model.getObjectByName('optic-reticle');
         if (reticle instanceof THREE.Mesh && reticle.material instanceof THREE.MeshBasicMaterial) {
           reticle.material = reticle.material.clone();
@@ -257,6 +344,7 @@ export class WeaponPresentation {
           reticle.renderOrder = 1_000;
         }
       }
+      optimizeAttachedWeapon(model, this.flattenMaterials ? 'palette-basic' : 'vertex-lit');
       model.visible = false;
       this.models.set(id, model);
       this.root.add(model);
@@ -375,7 +463,7 @@ export class WeaponPresentation {
     return this.adsBlend;
   }
 
-  presentationState(): { weapon: WeaponId; heat: number; shotsPresented: number; activeCasings: number; activeSmoke: number; detailsReady: boolean; modelKind: 'licensed-imported' | 'original-authored'; adsProgress: number; sightOffset: [number, number] | null; armsVisible: boolean; armMeshCount: number; armBounds: { center: [number, number, number]; size: [number, number, number]; projected: [number, number, number] } | null; riggedArms: Array<Record<string, unknown>>; knifeVisible: boolean; importedModel: ReturnType<typeof importedWeaponTelemetry> } {
+  presentationState() {
     const model = this.models.get(this.active);
     const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
     const sightName = this.active === 'carbine'
@@ -390,6 +478,8 @@ export class WeaponPresentation {
     sight?.updateWorldMatrix(true, false);
     const projected = sight?.getWorldPosition(new THREE.Vector3()).project(this.camera);
     const arms = this.root.getObjectByName('first-person-arms');
+    let modelVisibleMeshCount = 0;
+    model?.traverse((child) => { if (child.visible && child instanceof THREE.Mesh) modelVisibleMeshCount += 1; });
     let armMeshCount = 0;
     if (arms?.visible) arms.traverse((child) => { if (child.visible && child instanceof THREE.Mesh) armMeshCount += 1; });
     if (this.meleeRig.visible) this.meleeRig.traverse((child) => {
@@ -413,6 +503,8 @@ export class WeaponPresentation {
       activeSmoke: this.smokes.reduce((count, smoke) => count + Number(smoke.active), 0),
       detailsReady,
       modelKind: importedModel ? 'licensed-imported' : 'original-authored',
+      modelVisibleMeshCount,
+      attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
       sightOffset: projected ? [projected.x, projected.y] : null,
       armsVisible: arms?.visible === true || this.meleeRig.visible,
@@ -422,6 +514,8 @@ export class WeaponPresentation {
         size: armSize.toArray(),
         projected: armProjected.toArray(),
       } : null,
+      armFraming: arms?.visible ? measureCameraFraming(arms, this.camera) : null,
+      actionContract: this.actionContract,
       riggedArms: this.riggedArmDiagnostics,
       knifeVisible: this.meleeRig.visible,
       importedModel,
@@ -431,14 +525,15 @@ export class WeaponPresentation {
   private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
     if (!activeModel) return;
     this.root.updateMatrixWorld(true);
+    const diagnostics: Array<Record<string, unknown>> = [];
     for (const rig of this.armRigs) {
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
       const socket = activeModel.getObjectByName(socketName);
       if (!socket) continue;
-      const targetWorld = socket.getWorldPosition(new THREE.Vector3());
+      const targetWorld = resolveSocketWorld(socket);
       if (rig.side === 'left' && reloadPose.handToReload > 0) {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
-        if (reloadSocket) targetWorld.lerp(reloadSocket.getWorldPosition(new THREE.Vector3()), reloadPose.handToReload);
+        if (reloadSocket) targetWorld.lerp(resolveSocketWorld(reloadSocket), reloadPose.handToReload);
       }
       const targetInArms = arms.worldToLocal(targetWorld.clone());
       const hint = new THREE.Vector3(rig.side === 'left' ? -0.48 : 0.48, -1, 0.22);
@@ -450,7 +545,21 @@ export class WeaponPresentation {
       const targetInShoulder = rig.shoulder.worldToLocal(targetWorld.clone());
       const lowerDirection = targetInShoulder.sub(rig.elbow.position).normalize();
       rig.elbow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), lowerDirection);
+      rig.elbow.updateWorldMatrix(true, true);
+      const handWorld = rig.hand.getWorldPosition(new THREE.Vector3());
+      diagnostics.push({
+        side: rig.side,
+        socket: socketName,
+        socketParent: socket.parent?.name ?? null,
+        target: targetWorld.toArray(),
+        hand: handWorld.toArray(),
+        contactError: handWorld.distanceTo(targetWorld),
+        reachRatio: rig.shoulder.position.distanceTo(targetInArms) / (rig.upperLength + rig.lowerLength),
+        bindOffsetsPreserved: rig.elbow.position.equals(new THREE.Vector3(0, 0, -rig.upperLength)),
+        finite: [...targetWorld.toArray(), ...handWorld.toArray()].every(Number.isFinite),
+      });
     }
+    this.riggedArmDiagnostics = diagnostics;
   }
 
   private orientRiggedBone(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
@@ -528,7 +637,7 @@ export class WeaponPresentation {
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
-    if (arms) arms.position.y = THREE.MathUtils.lerp(0.12, -0.08, this.adsBlend);
+    if (arms) arms.position.y = THREE.MathUtils.lerp(0.05, -0.1, this.adsBlend);
 
     for (const casing of this.casings) {
       if (!casing.active) continue;
@@ -570,6 +679,13 @@ export class WeaponPresentation {
     const activeModel = this.models.get(this.active);
     if (activeModel) updateImportedWeapon(activeModel, pose.dt);
     const profile = weaponFamilyPresentation(this.active);
+    const hipYaw = this.active === 'carbine'
+      ? 0.18
+      : this.active === 'scattergun'
+        ? 0.16
+        : this.active === 'smg'
+          ? 0.14
+          : 0.1;
     const shotAge = performance.now() - this.shotStarted;
     const fireCycle = fireCycleAt(this.active, shotAge, this.weaponHeat);
     this.muzzleFlash.visible = fireCycle.flash > 0.015;
@@ -658,6 +774,13 @@ export class WeaponPresentation {
     const meleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / 430, 0, 1);
     const meleeArc = this.meleeStart > 0 && meleeProgress < 1 ? Math.sin(meleeProgress * Math.PI) : 0;
     const meleeActive = this.meleeStart > 0 && meleeProgress < 1;
+    this.actionContract = characterActionContract({
+      weapon: this.active,
+      aimBlend: this.adsBlend,
+      sprintBlend: this.sprintBlend,
+      reloadProgress: pose.reloadProgress,
+      meleeProgress: meleeActive ? meleeProgress : null,
+    });
     this.meleeRig.visible = meleeActive;
     if (arms) arms.visible = !meleeActive;
     if (activeModel) activeModel.visible = !meleeActive;
@@ -677,7 +800,11 @@ export class WeaponPresentation {
     );
     this.root.position.lerp(targetPosition, smoothing(18));
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * profile.recoilRotation - this.swayY - grenadeArc * 0.42, smoothing(22));
-    this.root.rotation.y = THREE.MathUtils.lerp(this.root.rotation.y, -this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65, smoothing(13));
+    this.root.rotation.y = THREE.MathUtils.lerp(
+      this.root.rotation.y,
+      hipYaw * (1 - this.adsBlend) - this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65,
+      smoothing(13),
+    );
     this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
     if (arms) this.solveArms(arms, activeModel, reloadPose);
     this.solveRiggedArms(activeModel, reloadPose);

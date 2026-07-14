@@ -8,7 +8,7 @@ export type RenderProfileConfig = {
   reducedRepresentation: boolean;
   reducedWorldDetail: boolean;
   reducedPresentationDetail: boolean;
-  staticMaterialMode: 'preserve' | 'palette-basic';
+  staticMaterialMode: 'preserve' | 'texture-lit' | 'palette-lit' | 'palette-basic';
   antialias: boolean;
   shadows: boolean;
   shadowMode: 'off' | 'static' | 'dynamic';
@@ -48,17 +48,17 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
       profile,
       representation: 'full',
       reducedRepresentation: false,
-      reducedWorldDetail: false,
+      reducedWorldDetail: true,
       reducedPresentationDetail: false,
-      // Preserve full world geometry and combat presentation, but batch static
-      // architecture through the same semantic palette as Performance. This
-      // removes the previous 4.8x draw-call cliff without deleting Quality art.
-      staticMaterialMode: 'palette-basic',
+      // Preserve authored texture maps, UVs and normals while still collapsing
+      // meshes by texture/material class. Unmapped props remain palette-batched;
+      // direct lighting supplies depth without the duplicate shadow-map pass.
+      staticMaterialMode: 'texture-lit',
       antialias: true,
-      shadows: true,
-      shadowMode: 'static',
+      shadows: false,
+      shadowMode: 'off',
       pixelRatioCap: 1,
-      shadowMapSize: 768,
+      shadowMapSize: 0,
     };
   }
   return {

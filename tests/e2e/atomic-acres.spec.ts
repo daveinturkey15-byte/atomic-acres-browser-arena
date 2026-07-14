@@ -49,6 +49,7 @@ type DebugState = {
     yardhawkActive: boolean;
     strikePasses: number;
   };
+  teamPings: Array<{ kind: string; expiresInMs: number; position: number[] }>;
   activeImpactParticles: number;
   activeImpactMarks: number;
   activeTracers: number;
@@ -69,11 +70,13 @@ type DebugState = {
     armsVisible: boolean;
     armMeshCount: number;
     knifeVisible: boolean;
+    riggedArms: Array<{ finite: boolean; bindOffsetsPreserved: boolean; contactError: number }>;
     importedModel: { source: string; weapon: string; clips: number; meshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
   };
   weaponActionHistory: string[];
   menuVisible: boolean;
   networkSync: { stateIntervalMs: number; interpolationRate: number };
+  networkLifecycle: { role: string; joinDeadlineActive: boolean; peerPresent: boolean; hostConnectionPresent: boolean };
   render: { profile: 'performance' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; drawingBuffer: number[]; antialias: boolean; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
 };
 
@@ -117,7 +120,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('COMBAT SYSTEMS PASS 14');
+    await expect(page.locator('.eyebrow')).toContainText('HIGH REFINEMENT PASS 17');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -147,6 +150,18 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('.controls')).toContainText('prone');
     await expect(page.locator('.controls')).toContainText('knife');
     await expect(page.locator('.controls')).toContainText('frag');
+  });
+
+  test('times out an invalid room and leaves a clean retryable state', async ({ page }) => {
+    await pageReady(page);
+    await page.locator('#room-input').fill('missing-room-pass17');
+    await page.locator('#join').click();
+    await expect(page.locator('#network-status')).toContainText('Connection timed out', { timeout: 15_000 });
+    await expect(page.locator('#network-status')).toHaveAttribute('data-kind', 'error');
+    await expect(page.locator('#join')).toBeEnabled();
+    expect((await debug(page)).networkLifecycle).toMatchObject({
+      role: 'offline', joinDeadlineActive: false, peerPresent: false, hostConnectionPresent: false,
+    });
   });
 
   test('selects and persists an allowlisted field kit for deployment', async ({ page }) => {
@@ -214,10 +229,11 @@ test.describe('solo mechanics', () => {
     const state = await debug(page);
     expect(state.weaponPresentation.armsVisible).toBe(true);
     expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(3);
-    expect(state.weaponPresentation.modelKind).toBe('licensed-imported');
-    expect(state.weaponPresentation.importedModel).toMatchObject({ weapon: 'carbine', socketContractReady: true });
-    expect(state.weaponPresentation.importedModel?.sightForwardDot).toBeGreaterThanOrEqual(0.995);
-    expect(state.weaponPresentation.importedModel?.muzzleForwardDot).toBeGreaterThan(0.85);
+    expect(state.weaponPresentation.modelKind).toBe('original-authored');
+    expect(state.weaponPresentation.importedModel).toBeNull();
+    expect(state.weaponPresentation.detailsReady).toBe(true);
+    expect(state.weaponPresentation.riggedArms).toHaveLength(2);
+    expect(state.weaponPresentation.riggedArms.every((arm: { finite: boolean; bindOffsetsPreserved: boolean; contactError: number }) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02)).toBe(true);
     expect(state.bots[0].rootVisible).toBe(true);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
     expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
@@ -273,6 +289,21 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkActive).toBe(true);
     await expect.poll(async () => (await debug(page)).fieldSupport.strikePasses, { timeout: 2_000 }).toBeGreaterThan(0);
     expect(Object.values((await debug(page)).fieldSupport.available)).toEqual([false, false, false]);
+  });
+
+  test('rate-limits fixed team pings and cleans their markers', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { sendPing: (kind: 'enemy' | 'push') => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.sendPing('enemy');
+      api.sendPing('push');
+    });
+    expect((await debug(page)).teamPings.map((ping) => ping.kind)).toEqual(['enemy']);
+    await page.waitForTimeout(1_050);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { sendPing: (kind: 'push') => void } }).__ATOMIC_ACRES_DEBUG__.sendPing('push'));
+    expect((await debug(page)).teamPings.map((ping) => ping.kind)).toEqual(['enemy', 'push']);
+    await expect(page.locator('#killfeed')).toContainText('ENEMY');
+    await expect(page.locator('#killfeed')).toContainText('PUSH');
+    await expect.poll(async () => (await debug(page)).teamPings.length, { timeout: 7_000 }).toBe(0);
   });
 
   test('opening the deployment menu neutralizes movement input', async ({ page }) => {
@@ -477,11 +508,11 @@ test.describe('performance and stability', () => {
     expect(state.render.calls).toBeLessThanOrEqual(140);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
-    expect(state.interiorTelemetry).toMatchObject({ stairs: 20, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
+    expect(state.interiorTelemetry).toMatchObject({ stairs: 24, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
     expect(errors).toEqual([]);
   });
 
-  test('Quality keeps full art, static shadows and visible combat presentation', async ({ page }) => {
+  test('Quality keeps textured architecture and full combat presentation within budget', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=quality');
@@ -495,20 +526,23 @@ test.describe('performance and stability', () => {
     const state = await debug(page);
     expect(state.render.profile).toBe('quality');
     expect(state.render.representation).toBe('full');
-    expect(state.render.shadowMode).toBe('static');
+    expect(state.render.shadowMode).toBe('off');
+    expect(state.render.shadows).toBe(false);
     expect(state.render.pixelRatio).toBeLessThanOrEqual(1);
-    expect(state.render.calls).toBeLessThanOrEqual(180);
-    expect(state.render.triangles).toBeLessThanOrEqual(350_000);
+    expect(state.render.calls).toBeLessThanOrEqual(160);
+    expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.weaponPresentation.armsVisible).toBe(true);
-    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(3);
-    expect(state.weaponPresentation.modelKind).toBe('licensed-imported');
-    expect(state.weaponPresentation.importedModel).toMatchObject({ weapon: 'carbine', socketContractReady: true });
-    expect(state.weaponPresentation.importedModel?.sightForwardDot).toBeGreaterThanOrEqual(0.995);
-    expect(state.weaponPresentation.importedModel?.muzzleForwardDot).toBeGreaterThan(0.85);
+    expect(state.weaponPresentation.armMeshCount).toBe(6);
+    expect(state.weaponPresentation.attachedWeaponBatchStats).toEqual({ sourceMeshes: 38, batches: 2 });
+    expect(state.weaponPresentation.modelKind).toBe('original-authored');
+    expect(state.weaponPresentation.importedModel).toBeNull();
+    expect(state.weaponPresentation.detailsReady).toBe(true);
+    expect(state.weaponPresentation.riggedArms).toHaveLength(2);
+    expect(state.weaponPresentation.riggedArms.every((arm: { finite: boolean; bindOffsetsPreserved: boolean; contactError: number }) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02)).toBe(true);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
     expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
     expect(state.bots[0].operatorModel).toMatchObject({ skinnedMeshes: 5, clips: 24, weaponChildren: 1 });
-    expect(state.interiorTelemetry).toMatchObject({ stairs: 20, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
+    expect(state.interiorTelemetry).toMatchObject({ stairs: 24, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/quality-arms-operator.png' });
   });

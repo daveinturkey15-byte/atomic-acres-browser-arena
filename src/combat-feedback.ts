@@ -10,6 +10,24 @@ export type SurfaceEvidence = {
 };
 
 export type Point3 = { x: number; y: number; z: number };
+export type CombatConfirmKind = 'body' | 'head' | 'kill';
+export type CombatConfirmEnvelope = {
+  durationMs: number;
+  visualScale: number;
+  audioLayers: number;
+  frequencyHz: readonly number[];
+};
+
+const CONFIRM_ENVELOPES: Record<CombatConfirmKind, CombatConfirmEnvelope> = {
+  body: { durationMs: 180, visualScale: 1, audioLayers: 2, frequencyHz: [910, 1320] },
+  head: { durationMs: 210, visualScale: 1.18, audioLayers: 2, frequencyHz: [1260, 1840] },
+  kill: { durationMs: 330, visualScale: 1.42, audioLayers: 3, frequencyHz: [510, 790, 1120] },
+};
+
+/** Shared deterministic timing/intensity contract for visual and synthesized confirms. */
+export function combatConfirmEnvelope(kind: CombatConfirmKind): CombatConfirmEnvelope {
+  return CONFIRM_ENVELOPES[kind];
+}
 
 const SURFACES = new Set<ImpactSurface>(['metal', 'concrete', 'wood', 'soil']);
 

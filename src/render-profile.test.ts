@@ -23,7 +23,7 @@ describe('render profiles', () => {
     expect(resolveRenderProfile('?render=performance', 'quality')).toBe('performance');
     expect(resolveRenderProfile('?render=balanced', null)).toBe('performance');
     expect(renderProfileConfig('quality')).toMatchObject({
-      staticMaterialMode: 'palette-basic', shadows: true, shadowMode: 'static', pixelRatioCap: 1,
+      staticMaterialMode: 'texture-lit', shadows: false, shadowMode: 'off', pixelRatioCap: 1,
     });
     expect(renderProfileConfig('compat').reducedRepresentation).toBe(true);
   });

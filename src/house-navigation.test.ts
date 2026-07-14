@@ -1,103 +1,80 @@
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
-import { houseCollisionSolids, solidBounds } from './house-navigation';
+import { createHouseArchitecture, solidBounds, type HouseArchitecture } from './house-navigation';
 import { CharacterPhysics } from './physics';
+import type { Team } from './protocol';
 
-function overlapsXZ(a: ReturnType<typeof solidBounds>, b: ReturnType<typeof solidBounds>): boolean {
-  return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
-}
-
-async function walkToward(physics: CharacterPhysics, target: Point3, maxSteps = 1_000): Promise<Point3> {
+async function walkToward(physics: CharacterPhysics, target: Point3, maxSteps = 1_800): Promise<Point3> {
   for (let step = 0; step < maxSteps; step += 1) {
     const current = physics.eyePosition();
     const dx = target.x - current.x;
     const dz = target.z - current.z;
     const distance = Math.hypot(dx, dz);
-    if (distance < 0.16 && Math.abs(target.y - current.y) < 0.18) return current;
-    const amount = Math.min(0.036, distance);
-    physics.move({
-      x: distance > 0 ? dx / distance * amount : 0,
-      y: -0.002,
-      z: distance > 0 ? dz / distance * amount : 0,
-    }, 1 / 120);
+    if (distance < 0.14 && Math.abs(target.y - current.y) < 0.24) return current;
+    const amount = Math.min(0.032, distance);
+    physics.move({ x: distance > 0 ? dx / distance * amount : 0, y: -0.002, z: distance > 0 ? dz / distance * amount : 0 }, 1 / 120);
   }
   return physics.eyePosition();
 }
 
-describe('house navigation solids', () => {
-  it.each([1, -1] as const)('keeps the stair hall clear for facing %s', (facing) => {
-    const solids = houseCollisionSolids(0, 0, facing);
-    const divider = solidBounds(solids.find((solid) => solid.name === 'interior-divider')!);
-    const stairs = solids.filter((solid) => solid.name === 'interior-stair').map(solidBounds);
-    expect(stairs.some((stair) => overlapsXZ(divider, stair))).toBe(false);
-    const deck = solids.find((solid) => solid.name === 'rear-deck')!;
-    expect(deck.position[1] + deck.size[1] / 2).toBeLessThanOrEqual(0.42);
-  });
+function anchor(architecture: HouseArchitecture, id: string): Point3 {
+  const value = architecture.anchors.find((entry) => entry.id === id);
+  if (!value) throw new Error(`Missing route anchor ${id}`);
+  return { x: value.position[0], y: value.position[1], z: value.position[2] };
+}
 
-  it.each([1, -1] as const)('walks through the lower-room hall and across the rear threshold for facing %s', async (facing) => {
-    const solids = houseCollisionSolids(0, 0, facing);
-    const physics = await CharacterPhysics.create(
-      solids.map(solidBounds),
-      { minX: -12, maxX: 12, minZ: -13, maxZ: 13 },
-    );
-    try {
-      physics.teleportEye({ x: 0, y: 1.7, z: facing * 5 });
-      const throughRooms = await walkToward(physics, { x: 0, y: 1.7, z: -facing * 7.8 });
-      expect(throughRooms.z * facing).toBeLessThan(-7.3);
-      const acrossDeck = await walkToward(physics, { x: 0, y: 2.05, z: -facing * 10.5 });
-      expect(acrossDeck.z * facing).toBeLessThan(-10);
-      expect(acrossDeck.y).toBeGreaterThan(1.9);
-    } finally {
-      physics.dispose();
+async function traverse(architecture: HouseArchitecture, route: readonly string[], reverse = false): Promise<void> {
+  const ordered = reverse ? [...route].reverse() : [...route];
+  const physics = await CharacterPhysics.create(
+    architecture.solids.filter((entry) => entry.collidable).map(solidBounds),
+    { minX: -13, maxX: 13, minZ: -14, maxZ: 14 },
+  );
+  try {
+    physics.teleportEye(anchor(architecture, ordered[0]));
+    for (const id of ordered.slice(1)) {
+      const target = anchor(architecture, id);
+      const result = await walkToward(physics, target);
+      const horizontalError = Math.hypot(result.x - target.x, result.z - target.z);
+      expect(horizontalError, `${architecture.id}:${id}:horizontal result=${JSON.stringify(result)} target=${JSON.stringify(target)}`).toBeLessThan(0.42);
+      expect(Math.abs(result.y - target.y), `${architecture.id}:${id}:vertical`).toBeLessThan(0.48);
+    }
+  } finally {
+    physics.dispose();
+  }
+}
+
+describe('authored house architecture', () => {
+  it('defines distinct original identities with human-scale openings', () => {
+    const aqua = createHouseArchitecture(0, 0, 0, 1);
+    const coral = createHouseArchitecture(1, 0, 0, -1);
+    expect(aqua.id).not.toBe(coral.id);
+    expect(aqua.dimensions).toEqual({ width: 16.2, depth: 14.4, wallThickness: 0.42 });
+    expect(coral.dimensions).toEqual(aqua.dimensions);
+    for (const architecture of [aqua, coral]) {
+      const exterior = architecture.openings.filter((entry) => entry.kind === 'exterior-door');
+      const interior = architecture.openings.filter((entry) => entry.kind === 'interior-opening');
+      expect(exterior.length).toBeGreaterThanOrEqual(2);
+      expect(interior.length).toBeGreaterThanOrEqual(2);
+      expect(exterior.every((entry) => entry.width >= 1.5 && entry.width <= 1.8)).toBe(true);
+      expect(interior.every((entry) => entry.width >= 1.2 && entry.width <= 1.5)).toBe(true);
+      expect(new Set(architecture.anchors.map((entry) => entry.id)).size).toBe(architecture.anchors.length);
     }
   });
 
-  it.each([1, -1] as const)('walks the real character controller from stair foot to upstairs for facing %s', async (facing) => {
-    const solids = houseCollisionSolids(0, 0, facing);
-    const physics = await CharacterPhysics.create(
-      solids.map(solidBounds),
-      { minX: -12, maxX: 12, minZ: -12, maxZ: 12 },
-    );
-    try {
-      physics.teleportEye({ x: 4.85, y: 1.7, z: -facing * 4.2 });
-      const result = await walkToward(physics, { x: 4.85, y: 5.25, z: facing * 3.0 });
-      expect(result.z * facing).toBeGreaterThan(2.5);
-      expect(result.y).toBeGreaterThan(4.75);
-    } finally {
-      physics.dispose();
+  it.each([0, 1] as Team[])('traverses every declared ground route forward and backward for team %s', async (team) => {
+    const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+    const groundRoutes = Object.entries(architecture.routes).filter(([id]) => !/stair/i.test(id));
+    for (const [, route] of groundRoutes) {
+      await traverse(architecture, route);
+      await traverse(architecture, route, true);
     }
   });
 
-  it.each([1, -1] as const)('supports reverse traversal from rear deck through the front door for facing %s', async (facing) => {
-    const solids = houseCollisionSolids(0, 0, facing);
-    const physics = await CharacterPhysics.create(solids.map(solidBounds), { minX: -12, maxX: 12, minZ: -13, maxZ: 13 });
-    try {
-      physics.teleportEye({ x: 0, y: 2.05, z: -facing * 10.5 });
-      const inside = await walkToward(physics, { x: 0, y: 1.7, z: facing * 5 });
-      expect(inside.z * facing).toBeGreaterThan(4.5);
-      const outsideFront = await walkToward(physics, { x: 0, y: 1.7, z: facing * 9.5 });
-      expect(outsideFront.z * facing).toBeGreaterThan(9);
-    } finally {
-      physics.dispose();
-    }
-  });
-
-  it.each([1, -1] as const)('reaches both upstairs firing positions and returns down the stairs for facing %s', async (facing) => {
-    const solids = houseCollisionSolids(0, 0, facing);
-    const physics = await CharacterPhysics.create(solids.map(solidBounds), { minX: -12, maxX: 12, minZ: -12, maxZ: 12 });
-    try {
-      physics.teleportEye({ x: 4.85, y: 1.7, z: -facing * 4.2 });
-      const rightWindow = await walkToward(physics, { x: 3.75, y: 5.25, z: facing * 5.6 });
-      expect(rightWindow.y).toBeGreaterThan(4.75);
-      expect(rightWindow.x).toBeLessThan(4.1);
-      const leftWindow = await walkToward(physics, { x: -3.75, y: 5.25, z: facing * 5.6 });
-      expect(leftWindow.y).toBeGreaterThan(4.75);
-      expect(leftWindow.x).toBeLessThan(-3.35);
-      const stairFoot = await walkToward(physics, { x: 4.85, y: 1.7, z: -facing * 4.2 }, 1_600);
-      expect(stairFoot.y).toBeLessThan(2.15);
-      expect(stairFoot.z * facing).toBeLessThan(-3.7);
-    } finally {
-      physics.dispose();
-    }
+  it.each([0, 1] as Team[])('climbs and descends the declared stair route for team %s', async (team) => {
+    const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+    const stairRoute = Object.entries(architecture.routes).find(([id]) => /stair/i.test(id));
+    expect(stairRoute).toBeDefined();
+    await traverse(architecture, stairRoute![1]);
+    await traverse(architecture, stairRoute![1], true);
   });
 });

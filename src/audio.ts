@@ -1,4 +1,4 @@
-import type { FootstepSurface, ImpactSurface } from './combat-feedback';
+import { combatConfirmEnvelope, type FootstepSurface, type ImpactSurface } from './combat-feedback';
 import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
@@ -143,14 +143,16 @@ export class ArenaAudio {
   }
 
   hit(headshot = false): void {
-    this.tone(headshot ? 1260 : 910, 0.045, headshot ? 0.11 : 0.075, 'sine', this.feedback);
-    this.tone(headshot ? 1840 : 1320, 0.028, headshot ? 0.07 : 0.035, 'triangle', this.feedback, 0.018);
+    const cue = combatConfirmEnvelope(headshot ? 'head' : 'body');
+    this.tone(cue.frequencyHz[0], 0.045, headshot ? 0.11 : 0.075, 'sine', this.feedback);
+    this.tone(cue.frequencyHz[1], 0.028, headshot ? 0.07 : 0.035, 'triangle', this.feedback, 0.018);
   }
 
   kill(): void {
-    this.tone(510, 0.06, 0.055, 'triangle', this.feedback);
-    this.tone(760, 0.075, 0.07, 'sine', this.feedback, 0.045);
-    this.tone(1040, 0.09, 0.075, 'sine', this.feedback, 0.095);
+    const cue = combatConfirmEnvelope('kill');
+    this.tone(cue.frequencyHz[0], 0.06, 0.055, 'triangle', this.feedback);
+    this.tone(cue.frequencyHz[1], 0.075, 0.07, 'sine', this.feedback, 0.045);
+    this.tone(cue.frequencyHz[2], 0.09, 0.075, 'sine', this.feedback, 0.095);
   }
 
   damage(): void {

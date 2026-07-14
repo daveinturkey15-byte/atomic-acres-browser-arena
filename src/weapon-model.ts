@@ -21,10 +21,10 @@ const PRESENTATION_YAW: Record<WeaponId, number> = {
   pistol: Math.PI / 2,
 };
 const PRESENTATION_ROLL: Record<WeaponId, number> = {
-  carbine: -0.58,
-  smg: -0.5,
-  scattergun: -0.5,
-  pistol: -0.18,
+  carbine: -0.12,
+  smg: -0.1,
+  scattergun: -0.08,
+  pistol: -0.06,
 };
 const assets = new Map<WeaponId, WeaponAsset>();
 let loadPromise: Promise<void> | null = null;
@@ -89,9 +89,9 @@ export function createImportedWeaponModel(id: WeaponId, flattenMaterials: boolea
   const presentation = new THREE.Group();
   presentation.name = `${id}-licensed-orientation`;
   presentation.scale.setScalar(LENGTHS[id] / Math.max(0.001, maxDimension));
-  // Normalize scale on one parent. Long-gun authored forward already follows
-  // the game -Z axis; rotating it merely to expose a side silhouette makes
-  // the visible barrel disagree with camera-ray fire and every socket.
+  // Normalize scale on one parent. Keep roll subtle: the explicit gameplay
+  // sockets below live in root space, so a dramatic visual-only roll makes
+  // hands solve toward invisible grips and turns the receiver edge-on.
   presentation.rotation.y = PRESENTATION_YAW[id];
   presentation.rotation.z = PRESENTATION_ROLL[id];
   visual.traverse((node) => {

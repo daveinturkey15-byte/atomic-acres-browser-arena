@@ -136,23 +136,9 @@ function addFacadeAndInteriorDressing(root: THREE.Group): void {
     const frontZ = house.z + house.facing * 7.48;
     const backZ = house.z - house.facing * 7.55;
 
-    // Slightly offset exterior finish guarantees the hero houses keep their team colour at long range.
-    for (const [offset, width] of [[-5.2, 5.8], [5.2, 5.8], [-6.3, 3.6], [0, 3.4], [6.3, 3.6]] as Array<[number, number]>) {
-      const upper = Math.abs(offset) < 7 && width <= 3.6;
-      const panel = roundedBox('house-colour-finish', [width, upper ? 3.5 : 3.15, 0.12], house.shell, 0.025, 2);
-      panel.position.set(house.x + offset, upper ? 5.45 : 1.65, frontZ + house.facing * 0.26);
-      decorative(panel); root.add(panel);
-    }
-    for (const side of [-1, 1]) {
-      const roofFinish = roundedBox('house-roof-finish', [9.2, 0.26, 15.7], house.shell, 0.045, 2);
-      roofFinish.position.set(house.x + side * 4.15, 8.2, house.z);
-      roofFinish.rotation.z = side * 0.24;
-      decorative(roofFinish); root.add(roofFinish);
-    }
-    // Never place an opaque decorative slab across authored window openings.
-    // Pass 13's full-width facade could hide a combatant while the authoritative
-    // ray/AI path still considered the window open. The structural wall segments
-    // above already carry the team finish and preserve the two genuine sightlines.
+    // Structural walls, doors, windows, roof finish and interior fixtures now
+    // come exclusively from createHouseArchitecture()/map.ts. Never overlay an
+    // opaque legacy facade: it can visually seal a valid collision opening.
     const gableShape = new THREE.Shape();
     gableShape.moveTo(-8, 0); gableShape.lineTo(8, 0); gableShape.lineTo(0, 3.25); gableShape.closePath();
     const houseGable = new THREE.Mesh(new THREE.ShapeGeometry(gableShape), house.shell);
@@ -161,27 +147,6 @@ function addFacadeAndInteriorDressing(root: THREE.Group): void {
     if (house.facing === 1) houseGable.rotation.y = Math.PI;
     decorative(houseGable); root.add(houseGable);
 
-    for (const side of [-1, 1]) {
-      const door = roundedBox('recessed-entry-door', [0.82, 2.5, 0.12], dark, 0.04);
-      door.position.set(house.x + side * 1.62, 1.28, frontZ + house.facing * 0.34);
-      door.rotation.y = side * house.facing * 0.72;
-      decorative(door); root.add(door);
-    }
-    const awning = roundedBox('entry-awning', [4.8, 0.18, 1.35], trim, 0.08);
-    awning.position.set(house.x, 3.35, frontZ + house.facing * 0.62);
-    awning.rotation.x = house.facing * -0.11;
-    decorative(awning); root.add(awning);
-
-    // Warm segmented rear finish: preserve the real central entry instead of
-    // visually sealing it with a non-colliding backdrop.
-    for (const offset of [-5.2, 5.2]) {
-      const panel = roundedBox('interior-back-wall-finish', [5.8, 3.05, 0.12], interiorWall, 0.025, 2);
-      panel.position.set(house.x + offset, 1.55, backZ + house.facing * 0.22);
-      decorative(panel); root.add(panel);
-    }
-    const rearLintel = roundedBox('interior-back-lintel-finish', [4.55, 0.56, 0.12], interiorWall, 0.025, 2);
-    rearLintel.position.set(house.x, 3.02, backZ + house.facing * 0.22);
-    decorative(rearLintel); root.add(rearLintel);
 
     for (const levelY of [2.9, 6.95]) {
       for (const sideX of [house.x - 8.38, house.x + 8.38]) {
@@ -200,17 +165,6 @@ function addFacadeAndInteriorDressing(root: THREE.Group): void {
     railTop.position.set(house.x, 5.2, backZ - house.facing * 1.2);
     decorative(railTop); root.add(railTop);
 
-    const sofa = new THREE.Group();
-    sofa.position.set(house.x - 3.8, 0, house.z + house.facing * 1.8);
-    const seat = roundedBox('interior-sofa-seat', [3.2, 0.58, 1.15], house.fabric, 0.16, 4);
-    seat.position.y = 0.55;
-    const back = roundedBox('interior-sofa-back', [3.2, 1.05, 0.38], house.fabric, 0.14, 4);
-    back.position.set(0, 1.12, -house.facing * 0.42);
-    sofa.add(seat, back); decorative(sofa); root.add(sofa);
-
-    const counter = roundedBox('interior-counter', [3.7, 1.05, 0.8], timber, 0.06);
-    counter.position.set(house.x + 3.2, 0.53, house.z - house.facing * 2.8);
-    decorative(counter); root.add(counter);
 
     for (const xOffset of [-5.6, -2.8, 2.8, 5.6]) {
       const gardenWall = roundedBox('garden-wall', [2.2, 0.64, 0.48], trim, 0.1);

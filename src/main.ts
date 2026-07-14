@@ -56,6 +56,7 @@ import { advanceFootsteps, strideLength, type FootstepAccumulator } from './foot
 import { FramePacingSampler } from './frame-pacing';
 import { consumeFieldSupport, createFieldSupportState, recordSupportDeath, recordSupportElimination, triPassSchedule, type FieldSupportId } from './field-support';
 import { ArenaNetwork } from './network';
+import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
 import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint, type RemoteMeleeAdmissionState } from './remote-melee-admission';
@@ -72,6 +73,8 @@ import {
   PrimaryWeaponId,
   ShotMessage,
   Team,
+  TeamPingKind,
+  TeamPingMessage,
   WeaponId,
   sanitizeName,
 } from './protocol';
@@ -139,6 +142,11 @@ type StrikePassEntity = {
   resolved: boolean;
 };
 
+type ActiveTeamPing = {
+  root: THREE.Group;
+  expiresAt: number;
+};
+
 const BOT_PATROL_POINTS = PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z));
 
 function createPlayerId(): string {
@@ -153,7 +161,7 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · COMBAT SYSTEMS PASS 14</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · HIGH REFINEMENT PASS 17</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -209,6 +217,7 @@ app.innerHTML = `
     <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
     <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V KNIFE · G THROW</small></div>
     <div id="support-block"><span id="support-streak">STREAK 0</span><b data-support="scout-sweep">3 · SCOUT</b><b data-support="yardhawk">5 · YARDHAWK</b><b data-support="tri-pass">7 · TRI-PASS</b><small>3 / 4 / 5 ACTIVATE</small></div>
+    <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
     <div id="countdown" hidden></div>
@@ -243,6 +252,7 @@ const activeRenderConfig = renderProfileConfig(renderProfile);
 const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
 const staticMaterialMode = activeRenderConfig.staticMaterialMode;
+const flattenOperatorMaterials = reducedRenderMode || renderProfile === 'quality';
 document.documentElement.classList.toggle('compat-render', renderProfile === 'compat');
 document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
 document.documentElement.classList.toggle('quality-render', renderProfile === 'quality');
@@ -434,6 +444,9 @@ const strikePasses: StrikePassEntity[] = [];
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
+const remotePingAdmissions = new Map<string, TeamPingAdmissionState>();
+let localPingAdmission = createTeamPingAdmissionState();
+const activeTeamPings: ActiveTeamPing[] = [];
 const verifiedRemoteKills = new Map<string, number>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
@@ -614,7 +627,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
 
-  const operator = buildOperator(snapshot.team, 'remote-player-model', reducedRenderMode, snapshot.weapon);
+  const operator = buildOperator(snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon);
   operator.userData.playerId = snapshot.id;
   operator.traverse((child) => {
     child.userData.playerId = snapshot.id;
@@ -669,6 +682,88 @@ function snapshot(): PlayerSnapshot {
   };
 }
 
+const TEAM_PING_LABELS: Record<TeamPingKind, string> = {
+  enemy: 'ENEMY',
+  regroup: 'REGROUP',
+  push: 'PUSH',
+  nice: 'NICE',
+};
+
+function removeTeamPing(ping: ActiveTeamPing): void {
+  scene.remove(ping.root);
+  ping.root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) material.dispose();
+  });
+}
+
+function presentTeamPing(message: TeamPingMessage, senderName: string, now = performance.now()): void {
+  while (activeTeamPings.length >= MAX_ACTIVE_TEAM_PINGS) removeTeamPing(activeTeamPings.shift()!);
+  const color = message.kind === 'enemy' ? 0xff6b54
+    : message.kind === 'regroup' ? 0x67e6ff
+      : message.kind === 'push' ? 0xffd166 : 0x7df29a;
+  const root = new THREE.Group();
+  root.name = `team-ping-${message.kind}`;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.6, 20),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, depthTest: false, toneMapped: false }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.09, 1.5, 8),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.68, depthWrite: false, depthTest: false, toneMapped: false }),
+  );
+  beacon.position.y = 0.75;
+  const diamond = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.18, 0),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, toneMapped: false }),
+  );
+  diamond.position.y = 1.52;
+  root.add(ring, beacon, diamond);
+  root.position.set(...message.position);
+  root.renderOrder = 999;
+  root.userData.presentationOnly = true;
+  root.traverse((node) => { node.raycast = () => {}; });
+  scene.add(root);
+  activeTeamPings.push({ root, expiresAt: now + TEAM_PING_LIFETIME_MS });
+  addFeed(`${senderName}: ${TEAM_PING_LABELS[message.kind]}`, message.team === 0 ? 'aqua' : 'coral');
+}
+
+function sendTeamPing(kind: TeamPingKind): void {
+  if (!gameStarted || !player.alive) return;
+  const now = performance.now();
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  const projected = player.position.clone().addScaledVector(direction, 18);
+  const bounded = clampPointToBounds(projected, arena.bounds, 0.6);
+  const message: TeamPingMessage = {
+    type: 'ping', by: player.id, team: player.team, kind,
+    position: [bounded.x, 0.1, bounded.z],
+    nonce: randomNonce(),
+  };
+  const admission = admitTeamPing(message, snapshot(), now, localPingAdmission);
+  if (!admission.accepted) return;
+  localPingAdmission = admission.nextState;
+  presentTeamPing(message, player.name, now);
+  network.send(message);
+}
+
+function updateTeamPings(now: number): void {
+  for (let index = activeTeamPings.length - 1; index >= 0; index -= 1) {
+    const ping = activeTeamPings[index];
+    if (now >= ping.expiresAt) {
+      removeTeamPing(ping);
+      activeTeamPings.splice(index, 1);
+      continue;
+    }
+    const remaining = (ping.expiresAt - now) / TEAM_PING_LIFETIME_MS;
+    const distanceScale = THREE.MathUtils.clamp(camera.position.distanceTo(ping.root.position) / 8, 1, 2.5);
+    ping.root.scale.setScalar(distanceScale * (0.92 + Math.sin(now * 0.008) * 0.08));
+    ping.root.visible = remaining > 0;
+  }
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'join' || message.type === 'state') {
     const incoming = message.player;
@@ -690,6 +785,17 @@ function onNetworkMessage(message: GameMessage): void {
       remote.lastSeen = performance.now();
       remote.root.visible = incoming.hp > 0;
     }
+    return;
+  }
+  if (message.type === 'ping') {
+    const pingPoint = { x: message.position[0], y: message.position[1], z: message.position[2] };
+    if (message.by === player.id || message.team !== player.team || !pointInsideBounds(pingPoint, arena.bounds, 0)) return;
+    const sender = remotes.get(message.by);
+    const prior = remotePingAdmissions.get(message.by) ?? createTeamPingAdmissionState();
+    const admission = admitTeamPing(message, sender?.snapshot, performance.now(), prior);
+    if (!admission.accepted || !sender) return;
+    remotePingAdmissions.set(message.by, admission.nextState);
+    presentTeamPing(message, sender.snapshot.name);
     return;
   }
   if (message.type === 'shot') {
@@ -835,6 +941,7 @@ function removeRemote(id: string, reason: string): void {
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   remoteMeleeAdmissions.delete(id);
+  remotePingAdmissions.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -1234,7 +1341,7 @@ function spawnBots(): void {
   const names = ['RIVET'].slice(0, SOLO_BOT_COUNT);
   names.forEach((name, index) => {
     const id = `bot-${index}`;
-    const root = buildOperator(botTeam, 'bot-operator', reducedRenderMode);
+    const root = buildOperator(botTeam, 'bot-operator', flattenOperatorMaterials);
     root.userData.playerId = id;
     root.traverse((node) => {
       node.userData.playerId = id;
@@ -1825,6 +1932,13 @@ function clearFieldSupport(): void {
   updateFieldSupportHud();
 }
 
+function clearTeamPings(): void {
+  for (const ping of activeTeamPings) removeTeamPing(ping);
+  activeTeamPings.length = 0;
+  remotePingAdmissions.clear();
+  localPingAdmission = createTeamPingAdmissionState();
+}
+
 function updatePhysics(dt: number): void {
   if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -1939,7 +2053,7 @@ function updateRemotes(dt: number, now: number): void {
     remote.root.rotation.y += shortestAngleDelta(remote.root.rotation.y, remote.targetYaw) * alpha;
     const stance = remote.snapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
-    setOperatorWeapon(operator, remote.snapshot.weapon, reducedRenderMode);
+    setOperatorWeapon(operator, remote.snapshot.weapon, flattenOperatorMaterials);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, alpha, remote.snapshot.pitch);
   }
 }
@@ -2252,6 +2366,10 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
+  if (event.code === 'KeyT' && !event.repeat) sendTeamPing('enemy');
+  if (event.code === 'KeyY' && !event.repeat) sendTeamPing('regroup');
+  if (event.code === 'KeyU' && !event.repeat) sendTeamPing('push');
+  if (event.code === 'KeyI' && !event.repeat) sendTeamPing('nice');
   if (event.code === 'Tab') {
     event.preventDefault();
     updateRoster();
@@ -2324,6 +2442,7 @@ function resetForMode(): void {
   for (const grenade of grenades) scene.remove(grenade.mesh);
   grenades.length = 0;
   clearFieldSupport();
+  clearTeamPings();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   verifiedRemoteKills.clear();
   element<HTMLElement>('#banner').hidden = true;
@@ -2419,12 +2538,16 @@ function frame(now: number): void {
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
     updateFieldSupport(frameDt, now);
+    updateTeamPings(now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
     if (arenaArtRoot) updateArenaArt(arenaArtRoot, now);
     updateHud(now);
-    if (!debugRenderPaused) renderer.render(scene, camera);
+    if (!debugRenderPaused) {
+      renderer.render(scene, camera);
+      if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
+    }
     requestAnimationFrame(frame);
   } catch (error) {
     showFatalError(error);
@@ -2444,12 +2567,14 @@ const debugWindow = window as Window & {
     throwGrenade: () => void;
     switchWeapon: (index: number) => void;
     reload: () => void;
-    melee: () => void;
+    melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
     earnSupport: (eliminations: number) => void;
     activateSupport: (id: FieldSupportId) => void;
+    sendPing: (kind: TeamPingKind) => void;
+    holdPings: (durationMs?: number) => void;
     endMatch: () => void;
     rematch: () => void;
 
@@ -2469,6 +2594,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     player: {
       hp: player.hp,
+      alive: player.alive,
+      lastMeleeAt: player.lastMeleeAt,
       kills: player.kills,
       deaths: player.deaths,
       weapon: player.weapon,
@@ -2520,6 +2647,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       stateIntervalMs: STATE_BROADCAST_INTERVAL_MS,
       interpolationRate: REMOTE_INTERPOLATION_RATE,
     },
+    networkLifecycle: network.diagnostics(),
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
       hp: remote.snapshot.hp,
@@ -2539,6 +2667,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       yardhawkActive: yardhawk !== null,
       strikePasses: strikePasses.length,
     },
+    teamPings: activeTeamPings.map((ping) => ({
+      kind: ping.root.name.replace('team-ping-', ''),
+      expiresInMs: Math.max(0, ping.expiresAt - performance.now()),
+      position: ping.root.position.toArray(),
+    })),
     activeImpactParticles: impactPresentation.activeParticles(),
     activeImpactMarks: impactPresentation.activeMarks(),
     activeTracers: tracerPool.activeCount(),
@@ -2549,7 +2682,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     interiorTelemetry: (() => {
       const counts = { stairs: 0, beds: 0, workbenches: 0, lights: 0, visibleCollisionProxies: 0 };
       scene.traverse((node) => {
-        if (node.name === 'interior-stair') counts.stairs += 1;
+        if (node.name === 'interior-stair-tread') counts.stairs += 1;
         if (node.name === 'upper-room-bed-base') counts.beds += 1;
         if (node.name === 'upper-room-workbench') counts.workbenches += 1;
         if (node.name === 'interior-ceiling-light') counts.lights += 1;
@@ -2574,6 +2707,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       sceneObjects: scene.children.length,
       reducedMode: reducedRenderMode,
       shadows: renderer.shadowMap.enabled,
+      shadowAutoUpdate: renderer.shadowMap.autoUpdate,
+      shadowNeedsUpdate: renderer.shadowMap.needsUpdate,
       authoredShadows: activeRenderConfig.shadows,
       shadowMode: activeRenderConfig.shadowMode,
       framePacing: framePacing.summary(),
@@ -2599,7 +2734,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.position.set(player.position.x, 0, player.position.z).addScaledVector(forward, THREE.MathUtils.clamp(distance, 2.5, 9));
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
-    bot.root.rotation.y = player.yaw + Math.PI;
+    bot.root.rotation.y = player.yaw;
   },
   damageBot: (amount, zone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
@@ -2631,7 +2766,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),
   reload: () => reload(),
-  melee: () => melee(),
+  melee: () => {
+    const before = player.lastMeleeAt;
+    melee();
+    return { accepted: player.lastMeleeAt !== before, alive: player.alive, phase: matchState.phase, lastMeleeAt: player.lastMeleeAt };
+  },
   setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = held; },
   setStance: (stance: Stance) => {
     if (stance === player.stance) return;
@@ -2647,6 +2786,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     for (let index = 0; index < Math.max(0, Math.min(7, Math.floor(eliminations))); index += 1) awardSupportElimination();
   },
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
+  sendPing: (kind: TeamPingKind) => sendTeamPing(kind),
+  holdPings: (durationMs = 30_000) => {
+    const expiresAt = performance.now() + Math.max(0, Math.min(60_000, durationMs));
+    for (const ping of activeTeamPings) ping.expiresAt = expiresAt;
+  },
   endMatch: () => {
     player.kills = 25;
     updateMatchState(performance.now());
@@ -2699,7 +2843,8 @@ async function bootstrap(): Promise<void> {
   });
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', staticMaterialMode);
-  batchStaticMeshes(art.root, scene, () => '', staticMaterialMode);
+  const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+  batchStaticMeshes(art.root, scene, () => '', decorativeMaterialMode);
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   liftCrushedEnvironmentBlacks(scene, weaponView.root);
   weaponView.setWeapon(player.weapon, true);
@@ -2713,7 +2858,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 12 ready — responsive presentation, synchronized peers and full Quality mode available.');
+  setStatus('Pass 17 refinement candidate — cohesive presentation, authored architecture and synchronized combat.');
   requestAnimationFrame(frame);
 }
 

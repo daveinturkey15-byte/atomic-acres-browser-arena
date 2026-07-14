@@ -27,7 +27,25 @@ try {
   await guest.selectOption('#team', '1');
   await guest.fill('#room-input', roomCode);
   await guest.click('#join');
-  await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: 30_000 });
+  try {
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: 30_000 });
+  } catch (error) {
+    const diagnostics = await Promise.all([host, guest].map(async (page, index) => page.evaluate((label) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const status = document.querySelector('#network-status');
+      return {
+        label,
+        gameStarted: state?.gameStarted,
+        gameMode: state?.gameMode,
+        matchPhase: state?.matchPhase,
+        remotes: state?.remotes,
+        networkText: status?.textContent,
+        networkKind: status instanceof HTMLElement ? status.dataset.kind : undefined,
+      };
+    }, index === 0 ? 'host' : 'guest')));
+    console.error(JSON.stringify({ stage: 'guest-start', roomCodeLength: roomCode.length, diagnostics, errors }, null, 2));
+    throw error;
+  }
   await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: 30_000 });
   await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: 30_000 });
   await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 20_000 });
@@ -57,6 +75,10 @@ try {
   }, undefined, { timeout: 5_000 });
   await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.melee());
   await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.hp <= 0, undefined, { timeout: 5_000 });
+  const admittedMelee = await host.evaluate(() => {
+    const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+    return { hostHp: player.hp, hostDeaths: player.deaths };
+  });
 
   await guest.keyboard.down('KeyW');
   await guest.waitForTimeout(450);
@@ -76,7 +98,7 @@ try {
     networkSync: hostState.networkSync,
     remote: remote ? { snapshotAgeMs: remote.snapshotAgeMs, interpolationError: remote.interpolationError } : null,
     replicatedLoadout: pistolReplication,
-    melee: { hostHp: hostState.player.hp, hostDeaths: hostState.player.deaths },
+    melee: { admitted: admittedMelee, final: { hostHp: hostState.player.hp, hostDeaths: hostState.player.deaths } },
   };
   console.log(JSON.stringify(result, null, 2));
   if (
@@ -92,8 +114,9 @@ try {
     || remote.interpolationError > 2
     || pistolReplication?.primary !== 'carbine'
     || pistolReplication?.weapon !== 'pistol'
-    || hostState.player.hp > 0
-    || hostState.player.deaths < 1
+    || admittedMelee.hostHp > 0
+    || admittedMelee.hostDeaths < 1
+    || hostState.player.deaths < admittedMelee.hostDeaths
   ) process.exitCode = 1;
 } finally {
   await browser.close();

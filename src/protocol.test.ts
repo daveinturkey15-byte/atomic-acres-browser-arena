@@ -22,7 +22,8 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'state', player: { ...player, kills: -1 } })).toBe(false);
     expect(isGameMessage({ type: 'state', player: { ...player, seq: 4.5 } })).toBe(false);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 999, nonce: 1 })).toBe(false);
-    expect(isGameMessage({ type: 'chat', by: 'a', text: 'x'.repeat(161) })).toBe(false);
+    expect(isGameMessage({ type: 'chat', by: 'a', text: 'unbounded text transport' })).toBe(false);
+    expect(isGameMessage({ type: 'ping', by: 'a', team: 0, kind: 'link', position: [0, 1, 0], nonce: 1 })).toBe(false);
     expect(isGameMessage({ type: 'script', body: 'alert(1)' })).toBe(false);
   });
 
@@ -45,6 +46,8 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ type: 'shot', by: 'spoof', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], nonce: 1 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'melee', by: 'abc', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'melee', by: 'spoof', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer({ type: 'ping', by: 'abc', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ type: 'ping', by: 'spoof', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', nonce: 2 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', nonce: 2 }, 'abc')).toBe(false);
   });
