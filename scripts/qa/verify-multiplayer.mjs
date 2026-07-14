@@ -23,6 +23,10 @@ for (const [label, page] of [['host', host], ['guest', guest]]) {
 await host.click('#host');
 await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim().length > 0, undefined, { timeout: 30_000 });
 const roomCode = (await host.textContent('#room-code')).trim();
+// The transport verifier chooses explicit opposing squads before deployment;
+// untouched invite-default assignment is covered by browser/UI tests.
+await guest.selectOption('#team', '1');
+const teams = { host: 0, guest: Number(await guest.inputValue('#team')) };
 await guest.fill('#room-input', roomCode);
 await guest.click('#join');
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: 30_000 });
@@ -44,7 +48,6 @@ const spawnSeparation = Math.hypot(
   hostState.player.position[0] - guestState.player.position[0],
   hostState.player.position[2] - guestState.player.position[2],
 );
-const teams = { host: hostState.player.team, guest: guestState.player.team };
 const hostShot = (() => {
   const remote = hostState.remotePlayers[0];
   if (!remote) return false;
