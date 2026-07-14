@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator } from './operator-model';
+import { createImportedWeaponModel } from './weapon-model';
 import type { Team, WeaponId } from './protocol';
 import { hitReactionAt } from './weapon-presentation-state';
 
@@ -205,7 +207,9 @@ function part(root: THREE.Group, mesh: THREE.Mesh, position: [number, number, nu
   return mesh;
 }
 
-export function buildWeaponModel(id: WeaponId, flattenMaterials = false): THREE.Group {
+export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
+  const imported = preferImported ? createImportedWeaponModel(id, flattenMaterials) : null;
+  if (imported) return imported;
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
   const metal = MAT.gunmetal();
@@ -549,6 +553,7 @@ export function buildRetroDeliveryTruck(): THREE.Group {
 type OperatorStance = 'stand' | 'crouch' | 'prone';
 
 type OperatorRig = {
+  rigged: false;
   pelvis: THREE.Group;
   spine: THREE.Group;
   leftUpperArm: THREE.Group;
@@ -565,11 +570,27 @@ type OperatorRig = {
   meleeKnife: THREE.Group;
   weapon?: THREE.Group;
   weaponId: WeaponId;
+} | {
+  rigged: true;
+  weaponSocket: THREE.Group;
+  hitProxyRoot: THREE.Group;
+  weapon?: THREE.Group;
+  weaponId: WeaponId;
 };
 
 function operatorRig(root: THREE.Group): OperatorRig | undefined {
   return root.userData.operatorRig as OperatorRig | undefined;
 }
+
+// Calibrated against the SWAT Idle_Gun_Shoot wrist basis. These offsets keep
+// each imported asset's authored forward axis on the operator's aim line while
+// still inheriting wrist motion from walk, fire and hit-reaction clips.
+const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number]> = {
+  carbine: [-0.571313, 0.612978, 0.442337, 0.319683],
+  smg: [-0.631, 0.653868, 0.351994, 0.224491],
+  scattergun: [-0.631, 0.653868, 0.351994, 0.224491],
+  pistol: [0.142442, -0.014047, 0.708358, 0.691189],
+};
 
 export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flattenMaterials = false): void {
   const rig = operatorRig(root);
@@ -577,8 +598,13 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   if (rig.weapon) rig.weaponSocket.remove(rig.weapon);
   const weapon = buildWeaponModel(weaponId, flattenMaterials);
   weapon.name = `operator-${weaponId}`;
-  weapon.scale.setScalar(weaponId === 'smg' ? 0.72 : 0.68);
-  weapon.rotation.y = Math.PI;
+  weapon.scale.setScalar(rig.rigged ? (weaponId === 'pistol' ? 0.78 : 0.82) : weaponId === 'smg' ? 0.72 : 0.68);
+  if (rig.rigged) {
+    weapon.position.set(0.04, -0.03, -0.12);
+    weapon.quaternion.set(...RIGGED_WEAPON_QUATERNION[weaponId]);
+  } else {
+    weapon.rotation.y = Math.PI;
+  }
   // World weapons are presentation only: visual recoil must never move an authoritative hit proxy.
   weapon.traverse((node) => {
     if (node instanceof THREE.Mesh) {
@@ -593,6 +619,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
 
 export function fireOperator(root: THREE.Group): void {
   root.userData.operatorShotAt = performance.now();
+  fireRiggedOperator(root);
   const rig = operatorRig(root);
   if (rig?.weapon) {
     const flash = rig.weapon.getObjectByName('world-muzzle-flash');
@@ -604,10 +631,22 @@ export function reactOperator(root: THREE.Group, zone: 'head' | 'body' | 'limb')
   root.userData.operatorHitAt = performance.now();
   root.userData.operatorHitZone = zone;
   root.userData.operatorHitSign = Number(root.userData.operatorHitSign ?? -1) * -1;
+  reactRiggedOperator(root, zone === 'limb');
+}
+
+export function deathOperator(root: THREE.Group): void {
+  root.userData.operatorDeathAt = performance.now();
+  deathRiggedOperator(root);
+}
+
+export function resetOperator(root: THREE.Group): void {
+  root.userData.operatorDeathAt = 0;
+  resetRiggedOperator(root);
 }
 
 export function meleeOperator(root: THREE.Group): void {
   root.userData.operatorMeleeAt = performance.now();
+  meleeRiggedOperator(root);
 }
 
 export function poseOperator(
@@ -620,6 +659,10 @@ export function poseOperator(
 ): void {
   const rig = operatorRig(root);
   if (!rig) return;
+  if (rig.rigged) {
+    updateRiggedOperator(root, speed, stance);
+    return;
+  }
   const shotAge = performance.now() - Number(root.userData.operatorShotAt ?? -10_000);
   const shotKick = shotAge < 180 ? Math.sin((shotAge / 180) * Math.PI) : 0;
   const hitAge = performance.now() - Number(root.userData.operatorHitAt ?? -10_000);
@@ -681,6 +724,33 @@ export function poseOperator(
 }
 
 export function buildOperator(team: Team, name = 'operator', flattenMaterials = false, weaponId: WeaponId = 'carbine'): THREE.Group {
+  const rigged = createRiggedOperator(team, name, flattenMaterials);
+  if (rigged) {
+    const { root, weaponSocket } = rigged;
+    const hitProxyRoot = new THREE.Group();
+    hitProxyRoot.name = 'authoritative-hit-proxies';
+    root.add(hitProxyRoot);
+    const proxyMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, colorWrite: false, depthWrite: false });
+    const proxy = (proxyName: string, zone: 'head' | 'body' | 'limb', size: [number, number, number], position: [number, number, number]) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), proxyMaterial);
+      mesh.name = proxyName;
+      mesh.position.set(...position);
+      mesh.visible = false;
+      mesh.userData.hitZone = zone;
+      mesh.userData.authoritativeProxy = true;
+      hitProxyRoot.add(mesh);
+    };
+    proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
+    proxy('hit-proxy-head', 'head', [0.52, 0.52, 0.52], [0, 2.13, 0]);
+    proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
+    proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
+    proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
+    proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
+    root.userData.operatorRig = { rigged: true, weaponSocket, hitProxyRoot, weaponId } satisfies OperatorRig;
+    setOperatorWeapon(root, weaponId, flattenMaterials);
+    root.traverse((node) => { node.userData.targetRoot = root; });
+    return root;
+  }
   const root = new THREE.Group(); root.name = name;
   root.userData.dynamic = true;
   const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;
@@ -808,6 +878,7 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
   proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
   proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
   const rig: OperatorRig = {
+    rigged: false,
     pelvis, spine,
     leftUpperArm: upperArms[0], rightUpperArm: upperArms[1],
     leftForearm: forearms[0], rightForearm: forearms[1],

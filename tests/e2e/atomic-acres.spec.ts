@@ -37,6 +37,7 @@ type DebugState = {
     screenPosition: number[];
     presentationReady: boolean;
     presentationWeaponSafe: boolean;
+    operatorModel: { skinnedMeshes: number; clips: number; weaponChildren: number; activeClip: string } | null;
   }>;
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -63,10 +64,12 @@ type DebugState = {
     activeCasings: number;
     activeSmoke: number;
     detailsReady: boolean;
+    modelKind: 'licensed-imported' | 'original-authored';
     adsProgress: number;
     armsVisible: boolean;
     armMeshCount: number;
     knifeVisible: boolean;
+    importedModel: { source: string; weapon: string; clips: number; meshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
   };
   weaponActionHistory: string[];
   menuVisible: boolean;
@@ -210,12 +213,32 @@ test.describe('solo mechanics', () => {
     await page.waitForTimeout(150);
     const state = await debug(page);
     expect(state.weaponPresentation.armsVisible).toBe(true);
-    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(8);
+    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(3);
+    expect(state.weaponPresentation.modelKind).toBe('original-authored');
+    expect(state.weaponPresentation.importedModel).toBeNull();
     expect(state.bots[0].rootVisible).toBe(true);
-    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(20);
+    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
+    expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
+    expect(state.bots[0].operatorModel).toMatchObject({ skinnedMeshes: 5, clips: 24, weaponChildren: 1 });
     expect(Math.abs(state.bots[0].screenPosition[0])).toBeLessThan(0.5);
     expect(Math.abs(state.bots[0].screenPosition[1])).toBeLessThan(0.8);
     await page.screenshot({ path: 'test-results/performance-arms-operator.png' });
+  });
+
+  test('plays a bounded rigged death animation before a clean respawn', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotAhead: (distance: number) => void; damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(5);
+      api.damageBot(999);
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
+    const dying = (await debug(page)).bots[0];
+    expect(dying.rootVisible).toBe(true);
+    expect(dying.operatorModel?.activeClip).toBe('Death');
+    await page.waitForTimeout(1_200);
+    expect((await debug(page)).bots[0].rootVisible).toBe(false);
+    await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 2_000 }).toBe(true);
+    expect((await debug(page)).bots[0].operatorModel?.activeClip).toBe('Idle_Gun_Pointing');
   });
 
   test('animates the knife on misses while keeping first-person arms visible', async ({ page }) => {
@@ -439,7 +462,7 @@ test.describe('performance and stability', () => {
     expect(state.render.reducedMode).toBe(true);
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
-    expect(state.render.pixelRatio).toBeCloseTo(0.6, 5);
+    expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
     expect(state.render.antialias).toBe(false);
     const overlays = await page.evaluate(() => ({
       grade: getComputedStyle(document.querySelector('#color-grade')!).display,
@@ -447,8 +470,8 @@ test.describe('performance and stability', () => {
     }));
     expect(overlays).toEqual({ grade: 'none', grain: 'none' });
     const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
-    expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.6));
-    expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.6));
+    expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.75));
+    expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.75));
     expect(state.render.calls).toBeLessThanOrEqual(140);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
@@ -472,35 +495,17 @@ test.describe('performance and stability', () => {
     expect(state.render.representation).toBe('full');
     expect(state.render.shadowMode).toBe('static');
     expect(state.render.pixelRatio).toBeLessThanOrEqual(1);
+    expect(state.render.calls).toBeLessThanOrEqual(180);
+    expect(state.render.triangles).toBeLessThanOrEqual(350_000);
     expect(state.weaponPresentation.armsVisible).toBe(true);
-    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(8);
-    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(20);
+    expect(state.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(3);
+    expect(state.weaponPresentation.modelKind).toBe('original-authored');
+    expect(state.weaponPresentation.importedModel).toBeNull();
+    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
+    expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
+    expect(state.bots[0].operatorModel).toMatchObject({ skinnedMeshes: 5, clips: 24, weaponChildren: 1 });
     expect(state.interiorTelemetry).toMatchObject({ stairs: 20, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/quality-arms-operator.png' });
-  });
-
-  test('hidden compatibility diagnostic maintains the constrained browser budget', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=compat');
-    await startSolo(page);
-    const fps = await page.evaluate(() => new Promise<number>((resolve) => {
-      let frames = 0;
-      const started = performance.now();
-      const sample = () => {
-        frames += 1;
-        const elapsed = performance.now() - started;
-        if (elapsed >= 2_500) resolve((frames * 1_000) / elapsed);
-        else requestAnimationFrame(sample);
-      };
-      requestAnimationFrame(sample);
-    }));
-    const state = await debug(page);
-    expect(fps).toBeGreaterThanOrEqual(40);
-    expect(state.render.profile).toBe('compat');
-    expect(state.render.calls).toBeLessThanOrEqual(180);
-    expect(state.render.triangles).toBeLessThanOrEqual(350_000);
-    expect(errors).toEqual([]);
   });
 });

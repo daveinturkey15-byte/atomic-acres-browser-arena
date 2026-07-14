@@ -60,7 +60,10 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
   return typeof p.id === 'string' && p.id.length > 0 && p.id.length <= 80
     && typeof p.name === 'string' && p.name.length > 0 && p.name.length <= 20
     && (p.team === 0 || p.team === 1)
-    && ['x', 'y', 'z', 'yaw', 'pitch', 'hp', 'kills', 'deaths', 'seq'].every((key) => Number.isFinite(p[key]))
+    && ['x', 'y', 'z', 'yaw'].every((key) => Number.isFinite(p[key]))
+    && typeof p.pitch === 'number' && Number.isFinite(p.pitch) && p.pitch >= -1.5 && p.pitch <= 1.5
+    && typeof p.hp === 'number' && Number.isFinite(p.hp) && p.hp >= 0 && p.hp <= 100
+    && ['kills', 'deaths', 'seq'].every((key) => Number.isSafeInteger(p[key]) && Number(p[key]) >= 0)
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
     && weapons.has(p.weapon as WeaponId)

@@ -16,6 +16,11 @@ describe('network protocol guards', () => {
   it('rejects malformed or unbounded messages', () => {
     expect(isGameMessage({ type: 'state', player: { ...player, x: Infinity } })).toBe(false);
     expect(isGameMessage({ type: 'state', player: { ...player, stance: 'burrowed' } })).toBe(false);
+    expect(isGameMessage({ type: 'state', player: { ...player, hp: 101 } })).toBe(false);
+    expect(isGameMessage({ type: 'state', player: { ...player, hp: -1 } })).toBe(false);
+    expect(isGameMessage({ type: 'state', player: { ...player, pitch: 2 } })).toBe(false);
+    expect(isGameMessage({ type: 'state', player: { ...player, kills: -1 } })).toBe(false);
+    expect(isGameMessage({ type: 'state', player: { ...player, seq: 4.5 } })).toBe(false);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 999, nonce: 1 })).toBe(false);
     expect(isGameMessage({ type: 'chat', by: 'a', text: 'x'.repeat(161) })).toBe(false);
     expect(isGameMessage({ type: 'script', body: 'alert(1)' })).toBe(false);

@@ -13,7 +13,7 @@ describe('render profiles', () => {
       antialias: false,
       shadows: false,
       shadowMode: 'off',
-      pixelRatioCap: 0.6,
+      pixelRatioCap: 0.75,
     });
   });
 
@@ -22,7 +22,9 @@ describe('render profiles', () => {
     expect(resolveRenderProfile('?render=compat', 'quality')).toBe('compat');
     expect(resolveRenderProfile('?render=performance', 'quality')).toBe('performance');
     expect(resolveRenderProfile('?render=balanced', null)).toBe('performance');
-    expect(renderProfileConfig('quality')).toMatchObject({ shadows: true, shadowMode: 'static', pixelRatioCap: 1 });
+    expect(renderProfileConfig('quality')).toMatchObject({
+      staticMaterialMode: 'palette-basic', shadows: true, shadowMode: 'static', pixelRatioCap: 1,
+    });
     expect(renderProfileConfig('compat').reducedRepresentation).toBe(true);
   });
 

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "assets": [
     {
       "id": "atomic-acres-original-texture-set-2026-07-12",
@@ -12,6 +12,47 @@
       "contactSheet": "public/assets/original/texture-contact-sheet.jpg",
       "modifications": "Ten deterministic project-generated textures, including grass turf and roof shingles; tiled and colour-graded in the game runtime.",
       "attributionRequired": false
+    },
+    {
+      "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
+      "kind": "third-party-rigged-operator-and-derived-first-person-arms",
+      "creator": "Quaternius (@Quaternius)",
+      "source": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceFolder": "https://drive.google.com/drive/folders/1USAAquX2JJWuA2m6zol0KUkFe3UkZ8zX",
+      "sourcePath": "Individual Characters/glTF/Swat.gltf",
+      "retrieved": "2026-07-13",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "licenseFile": "public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/quaternius/ultimate-modular-males/README.md",
+      "modifications": "Swat.gltf is preserved as the reference source. Swat_FirstPersonArms.glb is a Blender 5.1.1 derivative retaining the original arm, hand, finger skin weights and skeleton while removing torso geometry at the authored shoulder seam. The derivative is bundled for continued calibration but is not selected by the current public first-person presentation because it failed the visual grip/framing gate.",
+      "attributionRequired": false,
+      "files": [
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt", "sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/README.md", "sha256": "ad892fe9f10736999e164eb2d477180b7c704e690928ecf079eb61e6c41b3c4f" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf", "sha256": "622b3f36fcac90539ef8f7121ec1f11b5e1ae603a085019b3fa96eba20dddfd3" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb", "sha256": "f5ea36848878cc3d94a661716879f1cc56d04cdeaf00ca826eacacca9f5332a8" }
+      ]
+    },
+    {
+      "id": "quaternius-animated-guns-runtime-derivatives-2026-07-13",
+      "kind": "third-party-rigged-weapon-runtime-derivatives",
+      "creator": "Quaternius (@Quaternius)",
+      "source": "https://quaternius.com/packs/animatedguns.html",
+      "sourceFolder": "https://drive.google.com/drive/folders/1ICYTdMXQqhkhrh8Fzjx9D0ozJuONwtC4",
+      "retrieved": "2026-07-13",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "licenseFile": "public/assets/third-party/quaternius/animated-guns/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/quaternius/animated-guns/README.md",
+      "modifications": "Rifle, P90, Shotgun and Pistol source FBX files were converted with Blender 5.1.1 to glTF 2.0 binary with Y-up coordinates and authored animations retained. Runtime materials and presentation transforms are adapted in-engine; weapon balance and authoritative hitscan remain original Atomic Acres code.",
+      "attributionRequired": false,
+      "files": [
+        { "path": "public/assets/third-party/quaternius/animated-guns/LICENSE.txt", "sha256": "2b239ddcf1d40297e9b95d42ec98808a210494cf79f163770107abab50c8c43a" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/README.md", "sha256": "2642ce0942a83ce7c26d2be5c40c1dc39de4fd8d597d784d023a6eef610baa6b" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/Rifle.glb", "sha256": "fdc22ccbb4b6dd167538a45d13e06effd8bd8556533e68850ad4b05f6da5343d" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/P90.glb", "sha256": "8085a36074803026ec2b8bc58b1fc938c5c5c76c909ac5ce9a0703c69cdaf7b0" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/Shotgun.glb", "sha256": "116f8e4e124f67e539e5e7784cfa373f0c886d04a17c99835a7a8e3827aa6844" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/Pistol.glb", "sha256": "2263a601a95e584bd9069f74f90b6418ee0f319f6b2800949dcc2e94902e5d4a" }
+      ]
     }
   ],
   "excludedLegacyAssets": [

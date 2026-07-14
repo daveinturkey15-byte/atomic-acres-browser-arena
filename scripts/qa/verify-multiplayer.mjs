@@ -10,7 +10,11 @@ for (const [label, page] of [['host', host], ['guest', guest]]) {
   page.on('console', (message) => { if (message.type() === 'error') errors.push(`${label}: ${message.text()}`); });
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`));
   const url = new URL(baseUrl);
-  if (renderMode === 'compat' || (renderMode === 'host-full' && label === 'guest')) url.searchParams.set('render', 'compat');
+  if (renderMode === 'host-full') {
+    url.searchParams.set('render', label === 'host' ? 'quality' : 'performance');
+  } else if (['performance', 'quality', 'compat'].includes(renderMode)) {
+    url.searchParams.set('render', renderMode);
+  }
   url.searchParams.set('multiplayerQa', '1');
   await page.goto(url.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
@@ -40,8 +44,19 @@ const spawnSeparation = Math.hypot(
   hostState.player.position[0] - guestState.player.position[0],
   hostState.player.position[2] - guestState.player.position[2],
 );
+const teams = { host: hostState.player.team, guest: guestState.player.team };
+const hostShot = (() => {
+  const remote = hostState.remotePlayers[0];
+  if (!remote) return false;
+  const delta = [
+    remote.position[0] - guestState.player.position[0],
+    remote.position[1] - guestState.player.position[1],
+    remote.position[2] - guestState.player.position[2],
+  ];
+  return Math.hypot(...delta) < 0.5;
+})();
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
-console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, spawnSeparation, host: { mode: hostState.gameMode, remotes: hostState.remotes }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance } }, null, 2));
-if (errors.length || !stanceReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1) process.exitCode = 1;
+console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, spawnSeparation, teams, hostShot, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team } }, null, 2));
+if (errors.length || !stanceReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
 await browser.close();

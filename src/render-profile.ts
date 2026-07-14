@@ -50,7 +50,10 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
       reducedRepresentation: false,
       reducedWorldDetail: false,
       reducedPresentationDetail: false,
-      staticMaterialMode: 'preserve',
+      // Preserve full world geometry and combat presentation, but batch static
+      // architecture through the same semantic palette as Performance. This
+      // removes the previous 4.8x draw-call cliff without deleting Quality art.
+      staticMaterialMode: 'palette-basic',
       antialias: true,
       shadows: true,
       shadowMode: 'static',
@@ -68,7 +71,7 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
     antialias: false,
     shadows: false,
     shadowMode: 'off',
-    pixelRatioCap: 0.6,
+    pixelRatioCap: 0.75,
     shadowMapSize: 0,
   };
 }

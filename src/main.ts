@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
-import { batchStaticMeshes, buildOperator, fireOperator, meleeOperator, poseOperator, reactOperator, setOperatorWeapon } from './art-kit';
+import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
 import {
   BOT_REACTION_DELAY,
@@ -59,6 +60,8 @@ import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissi
 import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint, type RemoteMeleeAdmissionState } from './remote-melee-admission';
 import { CharacterPhysics } from './physics';
 import { TracerPool } from './tracer-pool';
+import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
+import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import {
@@ -108,6 +111,7 @@ type BotPlayer = {
   strafeSign: -1 | 1;
   invulnerableUntil: number;
   respawnAt: number;
+  deathVisibleUntil: number;
   waypoint: number;
   blockedSince: number;
 };
@@ -254,8 +258,9 @@ renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.14;
-// Balanced is the default play path: the readable palette/geometry of Responsive at a
-// 0.35-scale framebuffer without multisample AA. Quality retains the complete presentation.
+// Both public profiles can reduce their internal framebuffer when sustained
+// frame time exceeds the detected display budget. Shadows disable
+// automatically below a moderate DPR threshold.
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
@@ -263,6 +268,50 @@ scene.fog = new THREE.Fog(0xb6c5c1, 70, 142);
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
+
+let riggedOperatorLoadError: string | null = null;
+let importedWeaponLoadError: string | null = null;
+const displayCadencePromise = new Promise<number>((resolve) => {
+  const samples: number[] = [];
+  let previous = performance.now();
+  const sample = (now: number) => {
+    if (samples.length > 0 || now - previous < 100) samples.push(now - previous);
+    previous = now;
+    if (samples.length >= 36) resolve(classifyDisplayFrameMs(samples));
+    else requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);
+});
+const [operatorLoad, weaponLoad] = await Promise.allSettled([
+  loadRiggedOperatorAsset(),
+  loadImportedWeaponAssets(),
+]);
+if (operatorLoad.status === 'rejected') {
+  riggedOperatorLoadError = operatorLoad.reason instanceof Error ? operatorLoad.reason.message : String(operatorLoad.reason);
+  console.error('[Atomic Acres operator asset load failed]', riggedOperatorLoadError);
+}
+if (weaponLoad.status === 'rejected') {
+  importedWeaponLoadError = weaponLoad.reason instanceof Error ? weaponLoad.reason.message : String(weaponLoad.reason);
+  console.error('[Atomic Acres weapon asset load failed]', importedWeaponLoadError);
+}
+const detectedDisplayFrameMs = await displayCadencePromise;
+const adaptiveQuality = new AdaptiveQualityController({
+  profile: renderProfile,
+  targetFrameMs: detectedDisplayFrameMs,
+  initialPixelRatioCap: activeRenderConfig.pixelRatioCap,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
+
+function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap);
+  if (renderer.shadowMap.enabled !== shadowsEnabled) {
+    renderer.shadowMap.enabled = shadowsEnabled;
+    renderer.shadowMap.needsUpdate = shadowsEnabled;
+  }
+  document.documentElement.dataset.adaptiveShadows = shadowsEnabled ? 'on' : 'off';
+}
+applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 
 function buildSky(): void {
   const geometry = new THREE.SphereGeometry(150, reducedRenderMode ? 20 : 32, reducedRenderMode ? 12 : 18);
@@ -384,8 +433,10 @@ const strikePasses: StrikePassEntity[] = [];
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
+const verifiedRemoteKills = new Map<string, number>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
+let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let triggerHeld = false;
 let targetHits = 0;
@@ -628,7 +679,10 @@ function onNetworkMessage(message: GameMessage): void {
       addFeed(`${incoming.name} entered the test block`, incoming.team === 0 ? 'aqua' : 'coral');
       if (message.type === 'join') network.send({ type: 'state', player: snapshot() });
     }
-    if (incoming.seq >= remote.snapshot.seq) {
+    if (incoming.seq > remote.snapshot.seq) {
+      const respawned = remote.snapshot.hp <= 0 && incoming.hp > 0;
+      if (incoming.team !== remote.snapshot.team) return;
+      if (incoming.primary !== remote.snapshot.primary && !respawned) return;
       remote.snapshot = incoming;
       remote.target.set(incoming.x, incoming.y - stanceEyeHeight(incoming.stance), incoming.z);
       remote.targetYaw = incoming.yaw;
@@ -758,6 +812,11 @@ function processDeath(message: DeathMessage): void {
     player.kills += 1;
     awardSupportElimination();
     audio.kill();
+  } else if (message.victim === player.id && message.killer !== player.id) {
+    const remoteKiller = remotes.get(message.killer);
+    if (remoteKiller && remoteKiller.snapshot.team !== player.team) {
+      verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
+    }
   }
   addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
   const remote = remotes.get(message.victim);
@@ -772,6 +831,7 @@ function removeRemote(id: string, reason: string): void {
   if (!remote) return;
   scene.remove(remote.root);
   remotes.delete(id);
+  verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   remoteMeleeAdmissions.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
@@ -871,6 +931,10 @@ function respawn(requestLock = true): void {
   footstepAccumulator = { distance: 0, side: 0 };
   const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
   player.primaryWeapon = deploymentWeapon;
+  for (const weapon of deployedWeapons(deploymentWeapon)) {
+    player.ammo[weapon] = WEAPONS[weapon].mag;
+    player.reserve[weapon] = WEAPONS[weapon].reserve;
+  }
   if (player.weapon !== player.primaryWeapon) {
     player.weapon = player.primaryWeapon;
     player.switchingUntil = 0;
@@ -886,6 +950,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   player.name = sanitizeName(element<HTMLInputElement>('#player-name').value);
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  refreshWarningUntil = performance.now() + 6_000;
   weaponView.root.visible = true;
   gameMode = mode;
   botsFrozen = false;
@@ -906,6 +971,10 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
 
 function randomNonce(): number {
   return Math.floor(performance.now() * 1000 + Math.random() * 1_000_000);
+}
+
+function endSpawnProtectionOnOffense(now: number): void {
+  if (now < player.invulnerableUntil) player.invulnerableUntil = 0;
 }
 
 function switchWeapon(index: number): void {
@@ -977,6 +1046,7 @@ function tryFire(now: number): void {
   if (now < player.nextShotAt) return;
   if (player.nextShotAt === 0 || now - player.nextShotAt > shotInterval * 2) player.nextShotAt = now;
   player.nextShotAt += shotInterval;
+  endSpawnProtectionOnOffense(now);
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
     reload();
@@ -1177,7 +1247,7 @@ function spawnBots(): void {
       id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
       kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
       sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
-      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index, blockedSince: 0,
+      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
     });
   });
   addFeed('One hostile operator entered the block', 'coral');
@@ -1218,7 +1288,8 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   bot.alive = false;
   bot.deaths += 1;
   bot.respawnAt = now + 2_200;
-  bot.root.visible = false;
+  bot.deathVisibleUntil = now + 1_050;
+  deathOperator(bot.root);
   player.kills += 1;
   awardSupportElimination();
   audio.kill();
@@ -1241,16 +1312,24 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
   bot.blockedSince = 0;
+  bot.deathVisibleUntil = 0;
+  resetOperator(bot.root);
   bot.root.visible = true;
 }
 
 function updateBots(dt: number, now: number): void {
-  if (gameMode !== 'solo' || matchState.phase !== 'active' || botsFrozen) return;
+  if (gameMode !== 'solo' || matchState.phase !== 'active') return;
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
     if (!bot.alive) {
+      bot.root.visible = now < bot.deathVisibleUntil;
+      if (bot.root.visible) poseOperator(bot.root, 'stand', 0, now * 0.001);
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
+      continue;
+    }
+    if (botsFrozen) {
+      poseOperator(bot.root, 'stand', 0, now * 0.001);
       continue;
     }
     // A corrupted position can never become an out-of-arena damage source.
@@ -1389,6 +1468,7 @@ function melee(): void {
   // checked a fake distance of 2 m against a 1.75 m strike range, so it could
   // never enter the action at all.
   if (!meleeStrike(0, now, previousMeleeAt).hit || !player.alive || matchState.phase !== 'active') return;
+  endSpawnProtectionOnOffense(now);
   player.lastMeleeAt = now;
   weaponView.melee();
   audio.melee();
@@ -1405,6 +1485,7 @@ function melee(): void {
 
 function throwGrenade(): void {
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
+  endSpawnProtectionOnOffense(performance.now());
   player.grenades -= 1;
   weaponView.throwGrenade();
   const direction = camera.getWorldDirection(new THREE.Vector3());
@@ -1650,6 +1731,7 @@ function activateFieldSupport(id: FieldSupportId): void {
   if (!player.alive || matchState.phase !== 'active') return;
   const consumed = consumeFieldSupport(fieldSupport, id);
   if (!consumed.activated) return;
+  endSpawnProtectionOnOffense(performance.now());
   fieldSupport = consumed.state;
   const now = performance.now();
   if (id === 'scout-sweep') {
@@ -1721,6 +1803,15 @@ function updateFieldSupport(dt: number, now: number): void {
       strikePasses.splice(index, 1);
     }
   }
+}
+
+function clearGrenades(): void {
+  for (const grenade of grenades) {
+    scene.remove(grenade.mesh);
+    grenade.mesh.geometry.dispose();
+    (grenade.mesh.material as THREE.Material).dispose();
+  }
+  grenades.length = 0;
 }
 
 function clearFieldSupport(): void {
@@ -1855,8 +1946,9 @@ function teamScores(): [number, number] {
   let aqua = player.team === 0 ? player.kills : 0;
   let coral = player.team === 1 ? player.kills : 0;
   for (const remote of remotes.values()) {
-    if (remote.snapshot.team === 0) aqua += remote.snapshot.kills;
-    else coral += remote.snapshot.kills;
+    const admittedKills = verifiedRemoteKills.get(remote.snapshot.id) ?? 0;
+    if (remote.snapshot.team === 0) aqua += admittedKills;
+    else coral += admittedKills;
   }
   for (const bot of bots.values()) {
     if (bot.team === 0) aqua += bot.kills;
@@ -1887,6 +1979,8 @@ function updateMatchState(now: number): void {
   }
   if (matchState.phase === 'ended') {
     matchFinished = true;
+    clearGrenades();
+    clearFieldSupport();
     banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><button id="rematch" type="button">REMATCH</button>`;
     banner.hidden = false;
     const rematch = element<HTMLButtonElement>('#rematch');
@@ -2040,7 +2134,11 @@ const invitedRoom = launchParams.get('room')?.trim() ?? '';
 if (invitedRoom) element<HTMLInputElement>('#room-input').value = invitedRoom;
 const invitedName = launchParams.get('name');
 if (invitedName) element<HTMLInputElement>('#player-name').value = sanitizeName(invitedName);
-if (launchParams.get('team') === '1') element<HTMLSelectElement>('#team').value = '1';
+const teamSelect = element<HTMLSelectElement>('#team');
+const invitedTeam = launchParams.get('team');
+let teamSelectionTouched = invitedTeam === '0' || invitedTeam === '1';
+if (teamSelectionTouched) teamSelect.value = invitedTeam!;
+teamSelect.addEventListener('change', () => { teamSelectionTouched = true; });
 
 const sensitivityInput = element<HTMLInputElement>('#sensitivity');
 const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
@@ -2225,6 +2323,7 @@ function resetForMode(): void {
   grenades.length = 0;
   clearFieldSupport();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
+  verifiedRemoteKills.clear();
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
@@ -2254,12 +2353,14 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   });
 });
 element<HTMLButtonElement>('#join').addEventListener('click', () => {
+  if (!teamSelectionTouched) teamSelect.value = '1';
   resetForMode();
   const code = element<HTMLInputElement>('#room-input').value.trim();
   network.join(code, () => startGame('client'));
 });
 element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
-  const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(network.roomCode)}`;
+  const invitedTeam = player.team === 0 ? 1 : 0;
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(network.roomCode)}&team=${invitedTeam}&autojoin=1`;
   try {
     await navigator.clipboard.writeText(inviteUrl);
     setStatus('Invite link copied', 'ok');
@@ -2285,9 +2386,17 @@ function frame(now: number): void {
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
     framePacing.record(rawFrameMs);
+    const adaptivePixelRatio = adaptiveQuality.record(
+      rawFrameMs,
+      gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
+    );
+    if (adaptivePixelRatio !== null) {
+      applyAdaptiveRenderBudget(adaptivePixelRatio);
+      resize();
+    }
     const pacing = framePacing.summary();
     const refreshWarning = element<HTMLElement>('#refresh-warning');
-    refreshWarning.hidden = !pacing.displayLimited;
+    refreshWarning.hidden = !(pacing.displayLimited && now < refreshWarningUntil);
     if (pacing.displayLimited) {
       refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
     }
@@ -2325,6 +2434,7 @@ const debugWindow = window as Window & {
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     placeBotAhead: (distance?: number) => void;
+    damageBot: (amount: number, zone?: HitZone) => void;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
@@ -2350,6 +2460,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
     scores: teamScores(),
+    operatorAsset: {
+      ready: riggedOperatorAssetReady(),
+      error: riggedOperatorLoadError,
+      weaponError: importedWeaponLoadError,
+    },
     player: {
       hp: player.hp,
       kills: player.kills,
@@ -2385,7 +2500,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         });
         return count;
       })(),
-      presentationReady: ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
+      operatorModel: riggedOperatorTelemetry(bot.root),
+      presentationReady: riggedOperatorTelemetry(bot.root) !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
         .every((name) => bot.root.getObjectByName(name) !== undefined),
       presentationWeaponSafe: (() => {
         const weapon = bot.root.getObjectByName(`operator-${bot.root.userData.operatorRig?.weaponId ?? 'carbine'}`);
@@ -2455,9 +2571,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lines: renderer.info.render.lines,
       sceneObjects: scene.children.length,
       reducedMode: reducedRenderMode,
-      shadows: activeRenderConfig.shadows,
+      shadows: renderer.shadowMap.enabled,
+      authoredShadows: activeRenderConfig.shadows,
       shadowMode: activeRenderConfig.shadowMode,
       framePacing: framePacing.summary(),
+      adaptive: adaptiveQuality.telemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
         const material = node instanceof THREE.Mesh ? node.material : null;
         return !Array.isArray(material) && material && 'color' in material
@@ -2480,6 +2598,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
     bot.root.rotation.y = player.yaw + Math.PI;
+  },
+  damageBot: (amount, zone = 'body') => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot || !Number.isFinite(amount) || amount <= 0) return;
+    bot.invulnerableUntil = 0;
+    applyBotDamage(bot, amount, zone);
   },
   teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;

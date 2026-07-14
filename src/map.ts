@@ -3,6 +3,7 @@ import { texturedMaterial } from './art-kit';
 import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
+import { houseCollisionSolids } from './house-navigation';
 import { Team } from './protocol';
 
 export type PracticeTarget = { id: string; root: THREE.Group; active: boolean; respawnAt: number };
@@ -114,43 +115,24 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     const trim = palette.white;
 
     // Ground floor: real door openings, two-room interior and readable exterior trim.
-    box('house-ground-side', [x - 8.1, 1.65, z], [0.45, 3.3, 14.8], accent);
-    box('house-ground-side', [x + 8.1, 1.65, z], [0.45, 3.3, 14.8], accent);
     for (const wallZ of [frontZ, backZ]) {
-      box('house-ground-wall', [x - 5.2, 1.65, wallZ], [5.8, 3.3, 0.45], accent);
-      box('house-ground-wall', [x + 5.2, 1.65, wallZ], [5.8, 3.3, 0.45], accent);
-      box('door-lintel', [x, 3.02, wallZ], [4.55, 0.56, 0.45], trim);
       box('door-trim-left', [x - 2.28, 1.35, wallZ + facing * 0.08], [0.15, 2.7, 0.12], trim, false);
       box('door-trim-right', [x + 2.28, 1.35, wallZ + facing * 0.08], [0.15, 2.7, 0.12], trim, false);
     }
-    box('interior-divider-left', [x - 4.9, 1.55, z], [5.6, 3.1, 0.25], palette.brick);
-    box('interior-divider-right', [x + 5.9, 1.55, z], [4.2, 3.1, 0.25], palette.brick);
-
-    // Split second-floor slab leaves a genuine stairwell opening.
-    box('upper-floor-left', [x - 4.9, 3.48, z], [6.2, 0.3, 13.7], palette.timber);
-    box('upper-floor-right-front', [x + 4.9, 3.48, z + facing * 4.25], [6.2, 0.3, 5.2], palette.timber);
-    box('upper-floor-right-rear', [x + 4.9, 3.48, z - facing * 4.25], [6.2, 0.3, 5.2], palette.timber);
-
-    // Ten solid steps connect the lower room to the upper combat route.
-    for (let step = 0; step < 10; step += 1) {
-      const height = 0.34 * (step + 1);
-      const depth = 0.62;
-      box(
-        'interior-stair',
-        [x + 4.85, height / 2, z - facing * 3.45 + facing * step * depth],
-        [2.5, height, depth + 0.04],
-        palette.timber,
-      );
+    for (const solid of houseCollisionSolids(x, z, facing)) {
+      const mat = solid.name === 'interior-divider'
+        ? palette.brick
+        : solid.name === 'door-lintel'
+          ? trim
+          : solid.name === 'rear-deck' || solid.name === 'upper-floor' || solid.name === 'interior-stair'
+            ? palette.timber
+            : accent;
+      box(solid.name, solid.position, solid.size, mat);
     }
 
-    // Upper-storey shell uses actual walls and window gaps, not a decorative cube.
-    box('house-upper-side', [x - 8.1, 5.45, z], [0.45, 3.65, 14.8], accent);
-    box('house-upper-side', [x + 8.1, 5.45, z], [0.45, 3.65, 14.8], accent);
+    // Upper-storey window dressing follows the collision-shell openings.
     for (const wallZ of [frontZ, backZ]) {
-      box('upper-wall-left', [x - 6.3, 5.45, wallZ], [3.6, 3.65, 0.45], accent);
-      box('upper-wall-centre', [x, 5.45, wallZ], [3.4, 3.65, 0.45], accent);
-      box('upper-wall-right', [x + 6.3, 5.45, wallZ], [3.6, 3.65, 0.45], accent);
-      for (const wx of [x - 3.75, x + 3.75]) {
+      for (const wx of [x - 3.1, x + 3.1]) {
         box('window-glass', [wx, 5.55, wallZ + facing * 0.08], [2.2, 1.55, 0.1], palette.glass, false, false);
         box('window-top-trim', [wx, 6.43, wallZ + facing * 0.14], [2.5, 0.13, 0.13], trim, false);
         box('window-bottom-trim', [wx, 4.67, wallZ + facing * 0.14], [2.5, 0.13, 0.13], trim, false);
@@ -163,7 +145,6 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     const roofRight = box('pitched-roof', [x + 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.roof, false);
     roofRight.rotation.z = 0.24;
     box('front-porch', [x, 0.22, frontZ + facing * 1.4], [8.2, 0.44, 2.5], palette.concrete, false);
-    box('rear-deck', [x, 0.36, backZ - facing * 2], [10, 0.72, 3.5], palette.timber, true);
     for (const px of [x - 3.5, x + 3.5]) {
       box('porch-column', [px, 1.8, frontZ + facing * 1.65], [0.28, 3.6, 0.28], trim, false);
     }
