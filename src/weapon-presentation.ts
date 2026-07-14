@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox } from './art-kit';
 import type { FirstPersonArmChain } from './operator-model';
 import { solveTwoBoneElbow } from './ik';
-import { reloadActionEvents, reloadPoseAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
+import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import { advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import { fireImportedWeapon, importedWeaponTelemetry, reloadImportedWeapon, updateImportedWeapon } from './weapon-model';
@@ -36,9 +36,25 @@ type ViewArmRig = {
   side: 'left' | 'right';
   shoulder: THREE.Group;
   elbow: THREE.Group;
-  hand: THREE.Object3D;
+  hand: THREE.Group;
   upperLength: number;
   lowerLength: number;
+};
+
+type HandRotationSet = { left: [number, number, number]; right: [number, number, number] };
+
+const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
+  carbine: { left: [-0.3, 0.1, -0.18], right: [-0.16, -0.04, 0.14] },
+  smg: { left: [-0.36, 0.14, -0.22], right: [-0.18, -0.02, 0.16] },
+  scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
+  pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+};
+
+const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
+  carbine: [-0.72, 0.32, -0.5],
+  smg: [-0.82, 0.38, -0.58],
+  scattergun: [-0.58, 0.18, -0.42],
+  pistol: [-0.92, 0.42, -0.68],
 };
 
 const MELEE_PRESENTATION_MS = 620;
@@ -73,6 +89,8 @@ export class WeaponPresentation {
   private readonly brassMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
   private readonly shellMaterial = new THREE.MeshStandardMaterial({ color: 0xb43f32, roughness: 0.58, metalness: 0.18 });
   private shotStarted = -10_000;
+  private debugFireAgeMs: number | null = null;
+  private presentedFireCycle = fireCycleAt('carbine', 10_000, 0);
   private casingCursor = 0;
   private smokeCursor = 0;
   private pendingScattergunShell = false;
@@ -193,16 +211,19 @@ export class WeaponPresentation {
       cuff.name = `${side}-glove-cuff`;
       cuff.rotation.x = -Math.PI / 2;
       cuff.position.z = 0.06; wrist.add(cuff);
-      const hand = roundedBox(`${side}-glove`, [0.138, 0.11, 0.19], glovePalm, 0.04, 3);
-      hand.position.set(sign * -0.015, -0.01, 0); wrist.add(hand);
-      const thumb = roundedBox(`${side}-thumb`, [0.052, 0.072, 0.13], glove, 0.022, 2);
-      thumb.position.set(sign * -0.075, -0.03, -0.025); thumb.rotation.z = sign * 0.32; wrist.add(thumb);
-      const fingerCount = flattenMaterials ? 1 : 3;
+      const hand = roundedBox(`${side}-palm`, [0.15, 0.105, 0.185], glovePalm, 0.038, 3);
+      hand.position.set(sign * -0.012, -0.005, -0.012); wrist.add(hand);
+      const knucklePad = roundedBox(`${side}-knuckle-pad`, [0.148, 0.035, 0.082], glove, 0.014, 2);
+      knucklePad.position.set(sign * -0.012, -0.058, -0.072); wrist.add(knucklePad);
+      const thumb = roundedBox(`${side}-thumb`, [0.052, 0.064, 0.14], glove, 0.02, 2);
+      thumb.position.set(sign * -0.084, -0.024, -0.035);
+      thumb.rotation.set(-0.28, sign * 0.18, sign * 0.44);
+      wrist.add(thumb);
       const fingers: THREE.Mesh[] = [];
-      for (let finger = 0; finger < fingerCount; finger += 1) {
-        const ridge = roundedBox(`${side}-finger-${finger}`, [0.026, 0.018, 0.105], glove, 0.008, 1);
-        ridge.position.set(sign * (0.038 - finger * 0.038), -0.064, -0.078);
-        ridge.rotation.x = -0.18;
+      for (let finger = 0; finger < 4; finger += 1) {
+        const ridge = roundedBox(`${side}-finger-${finger}`, [0.03, 0.038, 0.112 - finger * 0.006], glove, 0.01, 2);
+        ridge.position.set(sign * (0.052 - finger * 0.035), -0.065, -0.108 + finger * 0.004);
+        ridge.rotation.set(-0.42 - finger * 0.025, 0, sign * (finger - 1.5) * 0.035);
         wrist.add(ridge);
         fingers.push(ridge);
       }
@@ -211,7 +232,7 @@ export class WeaponPresentation {
       shoulder.add(sleeveBand);
       mergeArmAssembly(shoulder, [upper, sleeveBand], `${side}-upper-arm`);
       mergeArmAssembly(elbow, [forearm, elbowCap], `${side}-forearm`);
-      mergeArmAssembly(wrist, [cuff, hand, thumb, ...fingers], `${side}-glove`);
+      mergeArmAssembly(wrist, [cuff, hand, knucklePad, thumb, ...fingers], `${side}-glove`);
       this.armRigs.push({ side, shoulder, elbow, hand: wrist, upperLength, lowerLength });
       return shoulder;
     };
@@ -464,6 +485,10 @@ export class WeaponPresentation {
     this.debugMeleeProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 0.999);
   }
 
+  setFireCaptureAgeMs(ageMs: number | null): void {
+    this.debugFireAgeMs = ageMs === null ? null : THREE.MathUtils.clamp(ageMs, 0, 1_000);
+  }
+
   throwGrenade(): void {
     this.grenadeStart = performance.now();
   }
@@ -518,6 +543,7 @@ export class WeaponPresentation {
       weapon: this.active,
       heat: this.weaponHeat,
       shotsPresented: this.shotsPresented,
+      fireCycle: this.presentedFireCycle,
       activeCasings: this.casings.filter((casing) => casing.active).length,
       activeSmoke: this.smokes.reduce((count, smoke) => count + Number(smoke.active), 0),
       detailsReady,
@@ -533,7 +559,10 @@ export class WeaponPresentation {
         size: armSize.toArray(),
         projected: armProjected.toArray(),
       } : null,
-      armFraming: arms?.visible ? measureCameraFraming(arms, this.camera) : null,
+      armFraming: arms?.visible
+        ? measureCameraFraming(arms, this.camera, (mesh) => mesh.name.endsWith('-glove'))
+        : null,
+      weaponFraming: model?.visible ? measureCameraFraming(model, this.camera) : null,
       actionContract: this.actionContract,
       riggedArms: this.riggedArmDiagnostics,
       knifeVisible: this.meleeRig.visible,
@@ -564,6 +593,14 @@ export class WeaponPresentation {
       const targetInShoulder = rig.shoulder.worldToLocal(targetWorld.clone());
       const lowerDirection = targetInShoulder.sub(rig.elbow.position).normalize();
       rig.elbow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), lowerDirection);
+      const gripRotation = WEAPON_HAND_ROTATIONS[this.active][rig.side];
+      const gripQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(...gripRotation, 'XYZ'));
+      if (rig.side === 'left' && reloadPose.handToReload > 0) {
+        const reloadQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(...RELOAD_HAND_ROTATIONS[this.active], 'XYZ'));
+        rig.hand.quaternion.copy(gripQuaternion).slerp(reloadQuaternion, reloadPose.handToReload);
+      } else {
+        rig.hand.quaternion.copy(gripQuaternion);
+      }
       rig.elbow.updateWorldMatrix(true, true);
       const handWorld = rig.hand.getWorldPosition(new THREE.Vector3());
       diagnostics.push({
@@ -705,8 +742,12 @@ export class WeaponPresentation {
         : this.active === 'smg'
           ? 0.14
           : 0.1;
-    const shotAge = performance.now() - this.shotStarted;
+    const shotAge = this.debugFireAgeMs ?? performance.now() - this.shotStarted;
     const fireCycle = fireCycleAt(this.active, shotAge, this.weaponHeat);
+    this.presentedFireCycle = fireCycle;
+    const presentedRecoil = this.debugFireAgeMs === null
+      ? this.recoil
+      : Math.max(this.recoil, fireCycle.flash * 0.35 + fireCycle.boltTravel * 0.65);
     this.muzzleFlash.visible = fireCycle.flash > 0.015;
     if (this.muzzleFlash.visible) {
       this.muzzleFlash.scale.setScalar(profile.flashScale * (0.72 + fireCycle.flash * 0.38));
@@ -744,21 +785,14 @@ export class WeaponPresentation {
     const proneLift = pose.prone ? 0.018 * stanceHipBlend : 0;
     const switchDrop = (1 - this.switchBlend) * -0.34;
 
-    let reloadRoll = 0;
-    let reloadDrop = 0;
-    let reloadLower = 0;
     const reloadProgress = pose.reloadProgress ?? 0;
     if (pose.reloadProgress !== null) {
       actionEvents.push(...reloadActionEvents(this.active, this.reloadLastProgress, reloadProgress));
       this.reloadLastProgress = reloadProgress;
-      const lower = Math.sin(Math.PI * reloadProgress);
-      reloadLower = lower;
-      const seatSnap = reloadProgress > 0.65 ? Math.sin((reloadProgress - 0.65) / 0.35 * Math.PI) : 0;
-      reloadRoll = lower * (this.active === 'pistol' ? 0.24 : 0.78) - seatSnap * 0.12;
-      reloadDrop = lower * (this.active === 'pistol' ? 0.025 : -0.22) + seatSnap * 0.035;
     } else if (this.reloadLastProgress > 0) {
       this.reloadLastProgress = 0;
     }
+    const reloadStage = viewmodelReloadStageAt(this.active, reloadProgress);
     const reloadPose = reloadPoseAt(this.active, reloadProgress);
     const magazineName = this.active === 'carbine'
       ? 'curved-magazine'
@@ -816,18 +850,18 @@ export class WeaponPresentation {
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 
     const targetPosition = new THREE.Vector3(
-      0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 - (this.active === 'pistol' ? reloadLower * 0.1 : 0),
-      -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadDrop - this.recoil * 0.08 - pose.landingImpulse * 0.075,
-      -0.78 + adsZ + this.recoil * profile.recoilTranslation - meleeArc * 0.32 + grenadeArc * 0.24,
+      0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
+      -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentedRecoil * 0.08 - pose.landingImpulse * 0.075,
+      -0.78 + adsZ + presentedRecoil * profile.recoilTranslation - meleeArc * 0.32 + grenadeArc * 0.24,
     );
     this.root.position.lerp(targetPosition, smoothing(18));
-    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, this.recoil * profile.recoilRotation - this.swayY - grenadeArc * 0.42, smoothing(22));
+    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentedRecoil * profile.recoilRotation - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
       hipYaw * (1 - this.adsBlend) - this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65,
       smoothing(13),
     );
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadRoll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
     if (arms) this.solveArms(arms, activeModel, reloadPose);
     this.solveRiggedArms(activeModel, reloadPose);
     return actionEvents;

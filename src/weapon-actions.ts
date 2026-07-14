@@ -19,6 +19,13 @@ export type ReloadPose = {
   actionPull: number;
 };
 
+export type ViewmodelReloadStage = {
+  lateral: number;
+  lift: number;
+  pitch: number;
+  roll: number;
+};
+
 type Marker = { at: number; event: WeaponActionEvent };
 
 const MAGAZINE_MARKERS: Marker[] = [
@@ -42,6 +49,20 @@ const smoothstep = (edge0: number, edge1: number, value: number): number => {
   const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
   return t * t * (3 - 2 * t);
 };
+
+/** Distinct camera-space staging for magazine-out and magazine-in beats. */
+export function viewmodelReloadStageAt(weapon: WeaponId, rawProgress: number): ViewmodelReloadStage {
+  const progress = clamp01(rawProgress);
+  const out = smoothstep(0.08, 0.28, progress) * (1 - smoothstep(0.44, 0.58, progress));
+  const insert = smoothstep(0.48, 0.68, progress) * (1 - smoothstep(0.84, 0.96, progress));
+  const pistolScale = weapon === 'pistol' ? 0.82 : 1;
+  return {
+    lateral: -0.18 * out * (weapon === 'pistol' ? 1.15 : 1) + 0.03 * insert,
+    lift: 0.14 * out + 0.2 * insert,
+    pitch: (0.06 * out - 0.1 * insert) * pistolScale,
+    roll: (0.34 * out - 0.1 * insert) * pistolScale,
+  };
+}
 
 export function reloadActionEvents(weapon: WeaponId, previousProgress: number, progress: number): WeaponActionEvent[] {
   const from = clamp01(previousProgress);
@@ -73,7 +94,7 @@ export function reloadPoseAt(weapon: WeaponId, rawProgress: number): ReloadPose 
   const holdOut = removal * (1 - insertion);
   const pistol = weapon === 'pistol';
   return {
-    magazineDrop: holdOut * (pistol ? 0.18 : 0.52) + insertion * (1 - smoothstep(0.78, 0.84, progress)) * (pistol ? 0.018 : 0.04),
+    magazineDrop: holdOut * (pistol ? 0.2 : 0.36) + insertion * (1 - smoothstep(0.78, 0.84, progress)) * (pistol ? 0.018 : 0.035),
     magazineTwist: holdOut * (pistol ? 0.12 : 0.24),
     magazineForward: holdOut * (weapon === 'carbine' ? 0.17 : 0.1),
     magazineLateral: holdOut * (weapon === 'carbine' ? -0.075 : pistol ? -0.3 : -0.045),

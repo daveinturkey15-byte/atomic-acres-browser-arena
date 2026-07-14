@@ -61,4 +61,24 @@ describe('character presentation contracts', () => {
     arm.position.z = -0.04;
     expect(measureCameraFraming(arm, camera)?.nearPlaneClear).toBe(false);
   });
+
+  it('can exclude intentionally off-screen roots from critical action framing', () => {
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.1, 100);
+    const assembly = new THREE.Group();
+    const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5));
+    shoulder.name = 'right-upper-arm';
+    shoulder.position.set(4, -2, -1);
+    const glove = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.24));
+    glove.name = 'right-glove';
+    glove.position.set(0.3, -0.25, -1);
+    assembly.add(shoulder, glove);
+
+    expect(measureCameraFraming(assembly, camera)?.fullyInsideViewport).toBe(false);
+    expect(measureCameraFraming(assembly, camera, (mesh) => mesh.name.endsWith('-glove'))).toMatchObject({
+      finite: true,
+      nearPlaneClear: true,
+      intersectsViewport: true,
+      fullyInsideViewport: true,
+    });
+  });
 });

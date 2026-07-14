@@ -88,10 +88,19 @@ export type CameraFramingTelemetry = {
 };
 
 /** Deterministic near-plane and viewport framing for a visible object bounds. */
-export function measureCameraFraming(object: THREE.Object3D, camera: THREE.Camera): CameraFramingTelemetry | null {
+export function measureCameraFraming(
+  object: THREE.Object3D,
+  camera: THREE.Camera,
+  includeMesh: (mesh: THREE.Mesh) => boolean = () => true,
+): CameraFramingTelemetry | null {
   object.updateWorldMatrix(true, true);
   camera.updateWorldMatrix(true, false);
-  const bounds = new THREE.Box3().setFromObject(object);
+  const bounds = new THREE.Box3().makeEmpty();
+  object.traverse((child) => {
+    if (!(child instanceof THREE.Mesh) || !child.visible || !includeMesh(child)) return;
+    child.geometry.computeBoundingBox();
+    if (child.geometry.boundingBox) bounds.union(child.geometry.boundingBox.clone().applyMatrix4(child.matrixWorld));
+  });
   if (bounds.isEmpty()) return null;
   const corners: THREE.Vector3[] = [];
   for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {

@@ -458,8 +458,13 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     part(root, roundedBox('pistol-trigger-guard', [0.19, 0.04, 0.2], dark, 0.012, 2), [0, -0.13, -0.1]);
     part(root, roundedBox('pistol-trigger', [0.028, 0.095, 0.028], accent, 0.007, 1), [0, -0.1, -0.08], [0.24, 0, 0]);
     addBarrel(0.43, -0.35, 0.028);
-    part(root, roundedBox('pistol-rear-sight', [0.19, 0.07, 0.045], accent, 0.01, 2), [0, 0.205, 0.09]);
-    part(root, roundedBox('pistol-front-sight', [0.04, 0.085, 0.04], accent, 0.008, 2), [0, 0.205, -0.39]);
+    const rearSight = new THREE.Group();
+    rearSight.name = 'pistol-rear-sight';
+    rearSight.position.set(0, 0.205, 0.09);
+    root.add(rearSight);
+    part(rearSight, roundedBox('pistol-rear-sight-left', [0.045, 0.06, 0.04], accent, 0.008, 2), [-0.062, 0, 0]);
+    part(rearSight, roundedBox('pistol-rear-sight-right', [0.045, 0.06, 0.04], accent, 0.008, 2), [0.062, 0, 0]);
+    part(root, roundedBox('pistol-front-sight', [0.032, 0.07, 0.032], accent, 0.007, 2), [0, 0.205, -0.39]);
     addSocket('muzzle-socket', [0, 0.105, -0.58]);
     addSocket('eject-socket', [0.125, 0.13, -0.08]);
     addSocket('grip-socket-r', [0.03, -0.2, 0.08]);

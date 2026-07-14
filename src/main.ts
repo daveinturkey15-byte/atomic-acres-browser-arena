@@ -2572,6 +2572,7 @@ const debugWindow = window as Window & {
     setAds: (held: boolean) => void;
     setMovement: (forward: boolean, sprint?: boolean) => void;
     setMeleeCaptureProgress: (progress: number | null) => void;
+    setFireCaptureAgeMs: (ageMs: number | null) => void;
     setReloadCaptureProgress: (progress: number | null) => void;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
@@ -2784,6 +2785,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (forward && sprint) keys.add('ShiftLeft');
   },
   setMeleeCaptureProgress: (progress: number | null) => weaponView.setMeleeCaptureProgress(progress),
+  setFireCaptureAgeMs: (ageMs: number | null) => weaponView.setFireCaptureAgeMs(ageMs),
   setReloadCaptureProgress: (progress: number | null) => {
     debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
   },

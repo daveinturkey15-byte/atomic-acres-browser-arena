@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reloadActionEvents, reloadPoseAt } from './weapon-actions';
+import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt } from './weapon-actions';
 
 describe('weapon action timelines', () => {
   it('emits each crossed magazine event exactly once', () => {
@@ -16,6 +16,22 @@ describe('weapon action timelines', () => {
     expect(reloadActionEvents('scattergun', 0.8, 1)).toEqual(['bolt-release']);
   });
 
+  it('authors visibly distinct magazine-out and magazine-in viewmodel stages', () => {
+    for (const weapon of ['carbine', 'smg', 'scattergun', 'pistol'] as const) {
+      const out = viewmodelReloadStageAt(weapon, 0.34);
+      const insert = viewmodelReloadStageAt(weapon, 0.68);
+      const separation = Math.hypot(
+        out.lateral - insert.lateral,
+        out.lift - insert.lift,
+        out.pitch - insert.pitch,
+        out.roll - insert.roll,
+      );
+      expect(out.roll).toBeGreaterThan(0.2);
+      expect(insert.roll).toBeLessThan(-0.07);
+      expect(separation).toBeGreaterThan(0.45);
+    }
+  });
+
   it('keeps magazine and shell poses finite across clamped progress', () => {
     for (const weapon of ['carbine', 'smg', 'scattergun', 'pistol'] as const) {
       for (const progress of [-2, 0, 0.25, 0.5, 0.75, 1, 4]) {
@@ -25,7 +41,7 @@ describe('weapon action timelines', () => {
         }
       }
     }
-    expect(reloadPoseAt('carbine', 0.45).magazineDrop).toBeGreaterThan(0.45);
+    expect(reloadPoseAt('carbine', 0.45).magazineDrop).toBeGreaterThan(0.3);
     expect(reloadPoseAt('pistol', 0.34).magazineDrop).toBeGreaterThan(0.15);
     expect(reloadPoseAt('pistol', 0.34).magazineDrop).toBeLessThan(0.25);
     expect(reloadPoseAt('pistol', 0.34).magazineLateral).toBeLessThan(-0.25);
