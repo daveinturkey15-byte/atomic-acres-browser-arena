@@ -152,4 +152,18 @@ Observed evidence:
 - `npm audit --omit=dev`: zero known vulnerabilities.
 - `git diff --check`: clean.
 
-The canonical Pass 20 root remains untouched. Only an isolated Pass 21 review may be published from this exact tested build before any later promotion decision.
+## Isolated public review release
+
+Dave approved publishing the tested candidate for live review. The exact locally verified artifact was published without changing the canonical Pass 20 root.
+
+- Source implementation commit: `221c0ed2f3279aaf9d54665e1793fa603777519e`
+- Pages review commit: `fd0e16b1806d04b010d29b99be0d6e83267038b5`
+- Exact `dist/` tree SHA-256: `61d3469b60a360dcb0a1d9b32646977223527bc2ab28b888dae863cdea4041cc`
+- Review URL: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass21/?source=221c0ed&pages=fd0e16b
+- GitHub Pages status: `built`
+- Public asset hashes matched the tested local `index-ByevM9Pk.js` and `index-DRJOKkTa.css` byte-for-byte.
+- Public release QA reported an active solo match and zero console/page errors.
+- Public runtime telemetry confirmed the 3 px permanent reticle point, sniper ADS sight offset `[0, 0]`, 360 px minimap backing, two 18.2×16.4 houses, 2.6-wide ramps, six breakable windows, and ready original weapon/operator assets.
+- Public pixel review found no HUD overlap, missing assets, or obvious striped/coplanar house surfaces.
+
+The canonical Pass 20 root remains untouched and still references `index-DyABOUpe.js` and `index-DPQZawgN.css`. Pass 21 promotion to the root requires a separate decision.
