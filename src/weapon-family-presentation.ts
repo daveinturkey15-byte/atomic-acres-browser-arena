@@ -33,6 +33,12 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     actionTravel: 0.22, smokeBase: 3,
     requiredDetails: ['ghost-ring', 'front-bead', 'loading-port', 'shell-saddle', 'pump-rib'],
   },
+  sniper: {
+    sightHeight: 0.3, adsX: -0.36, adsY: 0.166, adsZ: 0.045, projectionCorrection: 0,
+    flashScale: 1.22, recoilTranslation: 0.22, recoilRotation: 0.3,
+    actionTravel: 0.13, smokeBase: 2,
+    requiredDetails: ['sniper-scope', 'sniper-scope-lens', 'optic-reticle', 'stock-cheek-rest', 'bolt-or-slide'],
+  },
   pistol: {
     sightHeight: 0.17, adsX: -0.36, adsY: 0.278, adsZ: -0.08, projectionCorrection: 0,
     flashScale: 0.7, recoilTranslation: 0.11, recoilRotation: 0.2,

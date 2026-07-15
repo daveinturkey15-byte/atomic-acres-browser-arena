@@ -7,8 +7,9 @@
     "test:e2e": "playwright test --project=chromium",
     "qa:release": "node scripts/qa/capture-release.mjs",
     "qa:multiplayer": "node scripts/qa/verify-multiplayer.mjs",
+    "verify:release-tree": "node scripts/qa/verify-release-tree.mjs",
     "lint": "tsc --noEmit",
-    "verify": "npm run lint && npm test && npm run build && npm run test:e2e",
+    "verify": "npm run lint && npm test && npm run build && npm run verify:release-tree && npm run test:e2e",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {

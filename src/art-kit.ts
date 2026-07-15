@@ -275,6 +275,46 @@ function part(root: THREE.Group, mesh: THREE.Mesh, position: [number, number, nu
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
   const imported = preferImported ? createImportedWeaponModel(id, flattenMaterials) : null;
   if (imported) return imported;
+  if (id === 'sniper') {
+    const root = buildWeaponModel('carbine', flattenMaterials, false);
+    root.name = 'sniper-original-weapon';
+    const muzzleSocket = root.getObjectByName('muzzle-socket');
+    if (muzzleSocket) muzzleSocket.position.z = -1.52;
+    const muzzle = root.children.find((node) => node.userData.muzzle === true);
+    if (muzzle) muzzle.position.z = -1.52;
+    const flash = root.getObjectByName('world-muzzle-flash');
+    if (flash) flash.position.z = -1.7;
+    const longBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.032, 0.72, 12), MAT.dark());
+    longBarrel.name = 'sniper-long-barrel';
+    part(root, longBarrel, [0, 0.005, -1.18], [Math.PI / 2, 0, 0]);
+    const scope = new THREE.Group();
+    scope.name = 'sniper-scope';
+    scope.position.set(0, 0.3, -0.08);
+    const scopeBody = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.48, 16), MAT.dark());
+    scopeBody.name = 'sniper-scope-body';
+    scopeBody.rotation.x = Math.PI / 2;
+    scope.add(scopeBody);
+    for (const z of [-0.25, 0.25]) {
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.074, 0.09, 16), MAT.dark());
+      bell.name = 'sniper-scope-bell';
+      bell.rotation.x = Math.PI / 2;
+      bell.position.z = z;
+      scope.add(bell);
+    }
+    const lens = new THREE.Mesh(
+      new THREE.CircleGeometry(0.066, 20),
+      new THREE.MeshBasicMaterial({ color: 0x8fe9ff, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    lens.name = 'sniper-scope-lens';
+    lens.position.z = -0.298;
+    scope.add(lens);
+    root.add(scope);
+    for (const name of ['optic-ring', 'optic-lens', 'optic-reticle']) {
+      const opticPart = root.getObjectByName(name);
+      if (opticPart) opticPart.position.y = 0.3;
+    }
+    return root;
+  }
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
   const metal = MAT.gunmetal();
@@ -661,6 +701,7 @@ function operatorRig(root: THREE.Group): OperatorRig | undefined {
 // still inheriting wrist motion from walk, fire and hit-reaction clips.
 const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number]> = {
   carbine: [-0.571313, 0.612978, 0.442337, 0.319683],
+  sniper: [-0.571313, 0.612978, 0.442337, 0.319683],
   smg: [-0.631, 0.653868, 0.351994, 0.224491],
   scattergun: [-0.631, 0.653868, 0.351994, 0.224491],
   pistol: [0.142442, -0.014047, 0.708358, 0.691189],
@@ -746,6 +787,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   weapon.name = `operator-${weaponId}`;
   const riggedScale: Record<WeaponId, number> = {
     carbine: 0.58,
+    sniper: 0.55,
     smg: 0.62,
     scattergun: 0.56,
     pistol: 0.66,

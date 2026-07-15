@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   consumeFieldSupport,
   createFieldSupportState,
+  createTriPassTargeting,
+  registerTriPassTarget,
   recordSupportDeath,
   recordSupportElimination,
   triPassSchedule,
@@ -35,7 +37,25 @@ describe('field support rewards', () => {
     expect(second.activated).toBe(false);
   });
 
-  it('schedules exactly three ordered bounded strike passes', () => {
-    expect(triPassSchedule(1_000)).toEqual([1_650, 2_550, 3_450]);
+  it('accepts exactly three in-bounds tactical-map points and refuses a fourth', () => {
+    const bounds = { minX: -34, maxX: 34, minZ: -43, maxZ: 43 };
+    let targeting = createTriPassTargeting();
+    targeting = registerTriPassTarget(targeting, { x: -20, z: -30 }, bounds);
+    targeting = registerTriPassTarget(targeting, { x: 0, z: 0 }, bounds);
+    targeting = registerTriPassTarget(targeting, { x: 20, z: 30 }, bounds);
+    const unchanged = registerTriPassTarget(targeting, { x: 10, z: 10 }, bounds);
+    expect(targeting.points).toHaveLength(3);
+    expect(targeting.complete).toBe(true);
+    expect(unchanged).toEqual(targeting);
+  });
+
+  it('rejects out-of-bounds tactical-map points', () => {
+    const targeting = registerTriPassTarget(createTriPassTargeting(), { x: 99, z: 0 }, { minX: -34, maxX: 34, minZ: -43, maxZ: 43 });
+    expect(targeting.points).toHaveLength(0);
+    expect(targeting.complete).toBe(false);
+  });
+
+  it('schedules exactly three simultaneous missile impacts one second after confirmation', () => {
+    expect(triPassSchedule(1_000)).toEqual([2_000, 2_000, 2_000]);
   });
 });

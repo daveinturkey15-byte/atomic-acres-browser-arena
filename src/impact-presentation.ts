@@ -16,6 +16,7 @@ const SURFACE_COLORS: Record<ImpactSurface, [number, number]> = {
   metal: [0xffd06a, 0xff7b3a],
   concrete: [0xd8d0bc, 0x8c918d],
   wood: [0xd3a167, 0x6d4a32],
+  glass: [0xbbeeff, 0x5ca8c4],
   soil: [0x8ca56e, 0x5c4731],
 };
 
@@ -76,7 +77,7 @@ export class ImpactPresentation {
 
   impact(point: THREE.Vector3, normal: THREE.Vector3, surface: ImpactSurface): void {
     const [primary, secondary] = SURFACE_COLORS[surface];
-    const count = surface === 'metal' ? 8 : surface === 'concrete' ? 6 : 5;
+    const count = surface === 'glass' ? 10 : surface === 'metal' ? 8 : surface === 'concrete' ? 6 : 5;
     const tangent = new THREE.Vector3(normal.z, 0.35, -normal.x).normalize();
     const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
     for (let index = 0; index < count; index += 1) {

@@ -47,6 +47,7 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   carbine: { left: [-0.32, 0.12, -0.22], right: [-0.22, -0.06, 0.26] },
   smg: { left: [-0.36, 0.14, -0.22], right: [-0.18, -0.02, 0.16] },
   scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
+  sniper: { left: [-0.3, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
 };
 
@@ -54,6 +55,7 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   carbine: { left: [-0.085, -0.02, 0.015], right: [0.1, -0.03, 0.015] },
   smg: { left: [0, 0, 0], right: [0, 0, 0] },
   scattergun: { left: [0, 0, 0], right: [0, 0, 0] },
+  sniper: { left: [-0.075, -0.015, 0.012], right: [0.09, -0.03, 0.015] },
   pistol: { left: [0, 0, 0], right: [0, 0, 0] },
 };
 
@@ -61,6 +63,7 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   carbine: [-0.72, 0.32, -0.5],
   smg: [-0.82, 0.38, -0.58],
   scattergun: [-0.58, 0.18, -0.42],
+  sniper: [-0.76, 0.34, -0.52],
   pistol: [-0.92, 0.42, -0.68],
 };
 
@@ -385,7 +388,7 @@ export class WeaponPresentation {
   }
 
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
-    const ids: WeaponId[] = ['carbine', 'smg', 'scattergun', 'pistol'];
+    const ids: WeaponId[] = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol'];
     ids.forEach((id, index) => {
       // The imported gun scenes remain licensed source assets, but their
       // visual transforms do not share the explicit grip/muzzle contract and
@@ -396,6 +399,7 @@ export class WeaponPresentation {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
         scattergun: new Set(['stock', 'stock-cheek-panel']),
+        sniper: new Set(['stock-shoulder-pad', 'stock-support-rod']),
         pistol: new Set(),
       };
       model.traverse((node) => {
@@ -420,7 +424,7 @@ export class WeaponPresentation {
   }
 
   isReady(): boolean {
-    return this.models.size === 4;
+    return this.models.size === 5;
   }
 
   setWeapon(id: WeaponId, immediate = false): void {
@@ -549,17 +553,34 @@ export class WeaponPresentation {
     return this.adsBlend;
   }
 
-  presentationState() {
-    const model = this.models.get(this.active);
-    const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
-    const sightName = this.active === 'carbine'
+  private sightReference(model: THREE.Object3D | undefined): THREE.Object3D | undefined {
+    const sightName = this.active === 'carbine' || this.active === 'sniper'
       ? 'optic-reticle'
       : this.active === 'smg'
         ? 'smg-aperture'
         : this.active === 'pistol'
           ? 'pistol-rear-sight'
           : 'ghost-ring';
-    const sight = model?.getObjectByName(sightName);
+    return model?.getObjectByName(sightName);
+  }
+
+  private centerSightReference(model: THREE.Object3D | undefined): void {
+    const lock = THREE.MathUtils.smoothstep(this.adsBlend, 0.72, 0.98);
+    if (lock <= 0) return;
+    const sight = this.sightReference(model);
+    if (!sight) return;
+    this.camera.updateMatrixWorld(true);
+    this.root.updateWorldMatrix(true, true);
+    const cameraLocal = this.camera.worldToLocal(sight.getWorldPosition(new THREE.Vector3()));
+    this.root.position.x -= cameraLocal.x * lock;
+    this.root.position.y -= cameraLocal.y * lock;
+    this.root.updateWorldMatrix(true, true);
+  }
+
+  presentationState() {
+    const model = this.models.get(this.active);
+    const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
+    const sight = this.sightReference(model);
     this.camera.updateMatrixWorld(true);
     sight?.updateWorldMatrix(true, false);
     const projected = sight?.getWorldPosition(new THREE.Vector3()).project(this.camera);
@@ -931,6 +952,7 @@ export class WeaponPresentation {
       smoothing(13),
     );
     this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42 + shotRoll, smoothing(13));
+    this.centerSightReference(activeModel);
     if (arms) this.solveArms(arms, activeModel, reloadPose);
     this.solveRiggedArms(activeModel, reloadPose);
     return actionEvents;

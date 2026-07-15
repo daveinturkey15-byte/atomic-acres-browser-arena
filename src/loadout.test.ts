@@ -3,8 +3,15 @@ import { DEFAULT_FIELD_KIT, FIELD_KITS, deployedWeapons, fieldKitById, parseFiel
 
 describe('field-kit selection', () => {
   it('offers one original kit for each implemented primary weapon', () => {
-    expect(FIELD_KITS.map((kit) => kit.weapon)).toEqual(['carbine', 'smg', 'scattergun']);
+    expect(FIELD_KITS.map((kit) => kit.weapon)).toEqual(['carbine', 'smg', 'scattergun', 'sniper']);
     expect(new Set(FIELD_KITS.map((kit) => kit.id)).size).toBe(FIELD_KITS.length);
+  });
+
+  it('round-trips the marksman kit and deploys its Longline sniper with the service pistol', () => {
+    const encoded = serializeFieldKitSelection('marksman');
+    expect(parseFieldKitSelection(encoded)).toBe('marksman');
+    expect(fieldKitById('marksman').weapon).toBe('sniper');
+    expect(deployedWeapons('sniper')).toEqual(['sniper', 'pistol']);
   });
 
   it('issues exactly the selected primary and shared service pistol', () => {

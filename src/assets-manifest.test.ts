@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 type ManifestFile = { path: string; sha256: string };
 type ManifestAsset = { files: string | ManifestFile[]; license?: string; licenseFile?: string; provenanceFile?: string };
-type Manifest = { schemaVersion: number; assets: ManifestAsset[] };
+type Manifest = { schemaVersion: number; assets: ManifestAsset[]; rejectedCandidates?: ManifestAsset[] };
 
 function filesBelow(root: string): string[] {
   const result: string[] = [];
@@ -41,5 +41,19 @@ describe('third-party asset provenance', () => {
       expect(record.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect(sha256(record.path)).toBe(record.sha256);
     }
+  });
+
+  it('preserves rejected candidate provenance outside the deployable public tree', () => {
+    const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
+    const candidates = manifest.rejectedCandidates ?? [];
+    const records = candidates.flatMap((asset) => Array.isArray(asset.files) ? asset.files : []);
+    expect(records.map((record) => record.path).sort()).toEqual(filesBelow('third-party-candidates'));
+    for (const asset of candidates) {
+      expect(asset.license).toMatch(/CC0/);
+      expect(asset.licenseFile).toMatch(/^third-party-candidates\//);
+      expect(asset.provenanceFile).toMatch(/^third-party-candidates\//);
+    }
+    for (const record of records) expect(sha256(record.path)).toBe(record.sha256);
+    expect(filesBelow('public/assets/third-party').some((path) => path.includes('/opengameart/fps-arms/'))).toBe(false);
   });
 });

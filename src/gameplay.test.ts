@@ -20,6 +20,7 @@ import {
   recoverRecoilImpulse,
   reloadProgress,
   sampleSpreadDisk,
+  sampleWeaponPellet,
   sprintEligible,
   type MatchState,
 } from './gameplay';
@@ -149,6 +150,17 @@ describe('weapon tuning', () => {
     expect(edge.y).toBeGreaterThan(0);
   });
 
+  it('keeps every weapon principal projectile exactly on the reticle ray', () => {
+    for (const weapon of Object.values(WEAPONS)) {
+      const principal = sampleWeaponPellet(weapon, 0, weapon.maximumSpread, 1, 0.37);
+      expect(principal, weapon.id).toEqual({ x: 0, y: 0 });
+      if (weapon.pellets === 1) {
+        expect(sampleWeaponPellet(weapon, 7, weapon.maximumSpread, 1, 0.37), weapon.id).toEqual({ x: 0, y: 0 });
+      }
+    }
+    expect(sampleWeaponPellet(WEAPONS.scattergun, 1, WEAPONS.scattergun.hipSpread, 1, 0.25).y).toBeGreaterThan(0);
+  });
+
   it('applies range falloff and head/body multipliers with a non-zero floor', () => {
     const weapon = WEAPONS.carbine;
     const closeBody = computeDamage(weapon, 5, 'body');
@@ -167,6 +179,24 @@ describe('weapon tuning', () => {
     expect(computeDamage(pistol, 10, 'head')).toBe(54);
     expect(pistol.rpm).toBeLessThan(WEAPONS.carbine.rpm);
     expect(pistol.switchSeconds).toBeLessThan(WEAPONS.smg.switchSeconds);
+  });
+
+  it('gives the Longline sniper an exact one-headshot two-body-shot lethality contract', () => {
+    const sniper = WEAPONS.sniper;
+    const body = computeDamage(sniper, 90, 'body');
+    const head = computeDamage(sniper, 90, 'head');
+    expect(sniper.automatic).toBe(false);
+    expect(sniper.mag).toBe(5);
+    expect(sniper.reserve).toBe(25);
+    expect(body).toBe(55);
+    expect(body).toBeLessThan(100);
+    expect(body * 2).toBeGreaterThanOrEqual(100);
+    expect(head).toBeGreaterThanOrEqual(100);
+    expect(sniper.rpm).toBeLessThan(WEAPONS.scattergun.rpm);
+    expect(sniper.hipSpread).toBeGreaterThan(WEAPONS.carbine.hipSpread);
+    expect(sniper.hipSpread * sniper.adsSpreadMultiplier).toBeLessThan(
+      WEAPONS.carbine.hipSpread * WEAPONS.carbine.adsSpreadMultiplier,
+    );
   });
 
   it('builds bounded directional recoil and recovers it toward rest', () => {

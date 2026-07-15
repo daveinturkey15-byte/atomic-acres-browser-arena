@@ -11,19 +11,22 @@ const URLS: Record<WeaponId, string> = {
   carbine: './assets/third-party/quaternius/animated-guns/Rifle.glb',
   smg: './assets/third-party/quaternius/animated-guns/P90.glb',
   scattergun: './assets/third-party/quaternius/animated-guns/Shotgun.glb',
+  sniper: './assets/third-party/quaternius/animated-guns/Rifle.glb',
   pistol: './assets/third-party/quaternius/animated-guns/Pistol.glb',
 };
-const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, smg: 0.92, scattergun: 1.3, pistol: 0.48 };
+const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, smg: 0.92, scattergun: 1.3, sniper: 1.55, pistol: 0.48 };
 const PRESENTATION_YAW: Record<WeaponId, number> = {
   carbine: 0,
   smg: 0,
   scattergun: 0,
+  sniper: 0,
   pistol: Math.PI / 2,
 };
 const PRESENTATION_ROLL: Record<WeaponId, number> = {
   carbine: -0.12,
   smg: -0.1,
   scattergun: -0.08,
+  sniper: -0.1,
   pistol: -0.06,
 };
 const assets = new Map<WeaponId, WeaponAsset>();
@@ -69,6 +72,7 @@ const SOCKETS: Record<WeaponId, {
   carbine: { muzzle: [0, 0.005, -1.24], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
   smg: { muzzle: [0, 0.005, -0.96], eject: [0.14, 0.06, -0.04], right: [0.03, -0.13, 0.02], left: [-0.03, -0.08, -0.43], reload: [-0.14, -0.16, -0.08], sight: 'smg-aperture' },
   scattergun: { muzzle: [0, 0.005, -1.24], eject: [0.14, 0.045, -0.03], right: [0.03, -0.14, 0.12], left: [-0.03, -0.025, -0.55], reload: [-0.18, -0.14, 0.02], sight: 'ghost-ring' },
+  sniper: { muzzle: [0, 0.005, -1.52], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
   pistol: { muzzle: [0, 0.105, -0.58], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
 };
 

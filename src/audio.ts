@@ -98,6 +98,8 @@ export class ArenaAudio {
     const attenuation = remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
     const profile = weapon === 'scattergun'
       ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
+      : weapon === 'sniper'
+        ? { body: 62, bodyEnd: 24, duration: 0.26, crack: 2920, noise: 0.3, lowpass: 2400, tail: 330, tailDuration: 0.42 }
       : weapon === 'smg'
         ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
         : weapon === 'pistol'
@@ -117,7 +119,7 @@ export class ArenaAudio {
       duration: 0.028,
       volume: 0.17 * attenuation,
       filter: 'highpass',
-      frequency: weapon === 'scattergun' ? 1400 : 2400,
+      frequency: weapon === 'scattergun' ? 1400 : weapon === 'sniper' ? 1250 : 2400,
       q: 0.4,
     }, this.weapons);
     this.noise({
@@ -136,8 +138,8 @@ export class ArenaAudio {
     }
 
     if (!remote) {
-      const mechanismDelay = weapon === 'scattergun' ? 0.21 : 0.055;
-      this.tone(weapon === 'scattergun' ? 340 : 520, 0.028, 0.038, 'square', this.feedback, mechanismDelay);
+      const mechanismDelay = weapon === 'scattergun' ? 0.21 : weapon === 'sniper' ? 0.62 : 0.055;
+      this.tone(weapon === 'scattergun' ? 340 : weapon === 'sniper' ? 290 : 520, 0.028, 0.038, 'square', this.feedback, mechanismDelay);
       this.tone(weapon === 'smg' ? 680 : 430, 0.018, 0.022, 'triangle', this.feedback, mechanismDelay + 0.025);
     }
   }
@@ -162,7 +164,9 @@ export class ArenaAudio {
 
   impact(surface: ImpactSurface, distance = 0): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
-    const profile = surface === 'metal'
+    const profile = surface === 'glass'
+      ? { frequency: 5200, tone: 1460, duration: 0.095, volume: 0.105 }
+      : surface === 'metal'
       ? { frequency: 3150, tone: 960, duration: 0.065, volume: 0.09 }
       : surface === 'wood'
         ? { frequency: 980, tone: 240, duration: 0.075, volume: 0.07 }

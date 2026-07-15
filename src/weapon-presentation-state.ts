@@ -22,7 +22,7 @@ const finite = (value: number, fallback = 0): number => Number.isFinite(value) ?
 export function advanceWeaponHeat(current: number, fired: boolean, dt: number, weapon: WeaponId): number {
   const safeCurrent = clamp01(finite(current));
   const safeDt = Math.max(0, finite(dt));
-  const perShot = weapon === 'scattergun' ? 0.32 : weapon === 'smg' ? 0.1 : 0.17;
+  const perShot = weapon === 'scattergun' ? 0.32 : weapon === 'sniper' ? 0.26 : weapon === 'smg' ? 0.1 : 0.17;
   const cooled = Math.max(0, safeCurrent - safeDt * 0.24);
   return clamp01(cooled + (fired ? perShot : 0));
 }
@@ -30,15 +30,15 @@ export function advanceWeaponHeat(current: number, fired: boolean, dt: number, w
 /** Deterministic visual fire-cycle envelope. Gameplay recoil and hit rays remain authoritative elsewhere. */
 export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): FireCycleState {
   const ageMs = Math.max(0, finite(rawAgeMs));
-  const cycleMs = weapon === 'smg' ? 44 : weapon === 'scattergun' ? 620 : 62;
-  const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'smg' ? 36 : 52;
+  const cycleMs = weapon === 'smg' ? 44 : weapon === 'scattergun' ? 620 : weapon === 'sniper' ? 920 : 62;
+  const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'sniper' ? 78 : weapon === 'smg' ? 36 : 52;
   const flashProgress = clamp01(ageMs / flashDuration);
   const flash = (1 - flashProgress) ** 2;
-  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'smg' ? 50 : weapon === 'pistol' ? 58 : 62;
+  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'sniper' ? 310 : weapon === 'smg' ? 50 : weapon === 'pistol' ? 58 : 62;
   const kickProgress = clamp01(ageMs / kickDuration);
   const kick = kickProgress >= 1 ? 0 : (1 - kickProgress) ** 1.35;
-  const actionAge = weapon === 'scattergun' ? Math.max(0, ageMs - 180) : ageMs;
-  const actionDuration = weapon === 'scattergun' ? 440 : cycleMs;
+  const actionAge = weapon === 'scattergun' ? Math.max(0, ageMs - 180) : weapon === 'sniper' ? Math.max(0, ageMs - 130) : ageMs;
+  const actionDuration = weapon === 'scattergun' ? 440 : weapon === 'sniper' ? 700 : cycleMs;
   const actionProgress = clamp01(actionAge / actionDuration);
   const boltTravel = actionProgress >= 1 ? 0 : Math.sin(actionProgress * Math.PI);
   return {
@@ -46,7 +46,7 @@ export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): F
     kick,
     boltTravel,
     smokeScale: 0.72 + clamp01(finite(heat)) * 1.28,
-    casingReady: ageMs >= (weapon === 'scattergun' ? 230 : weapon === 'smg' ? 24 : 34),
+    casingReady: ageMs >= (weapon === 'scattergun' ? 230 : weapon === 'sniper' ? 150 : weapon === 'smg' ? 24 : 34),
   };
 }
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
-import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
+import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
 import {
   BOT_REACTION_DELAY,
@@ -39,7 +39,7 @@ import {
   recoverRecoil,
   recoverRecoilImpulse,
   reloadProgress as gameplayReloadProgress,
-  sampleSpreadDisk,
+  sampleWeaponPellet,
   sprintEligible,
   type HitZone,
   type MatchState,
@@ -47,14 +47,23 @@ import {
   type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
-import { shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapToWorld, playerFacingGeometry, shouldRevealEnemy, worldToMinimap } from './minimap';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
-import { consumeFieldSupport, createFieldSupportState, recordSupportDeath, recordSupportElimination, triPassSchedule, type FieldSupportId } from './field-support';
+import { consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
+import {
+  DEATH_DROP_INTERACTION_RANGE,
+  MAX_DEATH_DROPS,
+  consumeDeathDrop,
+  createDeathDrop,
+  nearestDeathDrop,
+  pruneDeathDrops,
+  type DeathDrop,
+} from './death-drops';
 import { ArenaNetwork } from './network';
 import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
@@ -70,12 +79,14 @@ import {
   DeathMessage,
   GameMessage,
   PlayerSnapshot,
+  PickupMessage,
   PrimaryWeaponId,
   ShotMessage,
   Team,
   TeamPingKind,
   TeamPingMessage,
   WeaponId,
+  WindowBreakMessage,
   sanitizeName,
 } from './protocol';
 
@@ -130,11 +141,15 @@ type GrenadeEntity = {
 type YardhawkEntity = {
   root: THREE.Group;
   targetId: string;
+  phase: 'thrown' | 'homing';
+  velocity: THREE.Vector3;
+  spawnedAt: number;
+  armedAt: number;
   expiresAt: number;
 };
 
-type StrikePassEntity = {
-  plane: THREE.Group;
+type StrikeMissileEntity = {
+  missile: THREE.Group;
   marker: THREE.Mesh;
   target: THREE.Vector3;
   startedAt: number;
@@ -145,6 +160,11 @@ type StrikePassEntity = {
 type ActiveTeamPing = {
   root: THREE.Group;
   expiresAt: number;
+};
+
+type DeathDropEntity = {
+  drop: DeathDrop;
+  root: THREE.Group;
 };
 
 const BOT_PATROL_POINTS = PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z));
@@ -161,9 +181,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · HIGH REFINEMENT PASS 17</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · GAMEPLAY SYSTEMS PASS 21</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Three original weapon families meet readable garden, transit, service and model-home routes with a complete score race and rematch flow.</p>
+    <p class="lede">Four class weapons, recoverable battlefield gear, tactical supports and breakable model-home routes in a complete score race and rematch flow.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -201,17 +221,23 @@ app.innerHTML = `
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
         <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="quality">QUALITY</option></select></label>
       </div>
-      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>1/2</b> primary/pistol · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
+      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> pickup/replenish · <b>1/2</b> primary/pistol · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
   </section>
   <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
+  <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
+    <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
+    <canvas id="strike-map" width="480" height="480"></canvas>
+    <footer>CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</footer>
+  </section>
   <div id="hud" hidden>
     <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="killfeed"></div>
     <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
-    <canvas id="minimap" width="180" height="180" aria-label="Tactical minimap"></canvas>
+    <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
+    <div id="map-heading">N · 000°</div>
     <div id="location-label">ATOM-LINER CROSSING</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
     <div id="weapon-block">
@@ -231,6 +257,7 @@ app.innerHTML = `
     </div>
     <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
+    <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
     <div id="countdown" hidden></div>
     <div id="banner" hidden></div>
@@ -254,6 +281,10 @@ const minimapCanvas = element<HTMLCanvasElement>('#minimap');
 const minimapContextValue = minimapCanvas.getContext('2d');
 if (!minimapContextValue) throw new Error('Canvas2D minimap is unavailable');
 const minimapContext: CanvasRenderingContext2D = minimapContextValue;
+const strikeMapCanvas = element<HTMLCanvasElement>('#strike-map');
+const strikeMapContextValue = strikeMapCanvas.getContext('2d');
+if (!strikeMapContextValue) throw new Error('Canvas2D tactical map is unavailable');
+const strikeMapContext: CanvasRenderingContext2D = strikeMapContextValue;
 const audio = new ArenaAudio();
 
 const renderProfile: RenderProfile = resolveRenderProfile(
@@ -430,8 +461,8 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, pistol: WEAPONS.pistol.mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, pistol: WEAPONS.pistol.reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -452,13 +483,21 @@ const grenades: GrenadeEntity[] = [];
 let fieldSupport = createFieldSupportState();
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
-const strikePasses: StrikePassEntity[] = [];
+const strikeMissiles: StrikeMissileEntity[] = [];
+let triPassTargeting: TriPassTargeting | null = null;
+let tacticalMapOpen = false;
+let yardhawkExplosions = 0;
+let triPassLaunches = 0;
+let triPassImpacts = 0;
+let triPassLastImpactDelayMs: number | null = null;
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
 const remotePingAdmissions = new Map<string, TeamPingAdmissionState>();
 let localPingAdmission = createTeamPingAdmissionState();
 const activeTeamPings: ActiveTeamPing[] = [];
+const deathDrops: DeathDropEntity[] = [];
+const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expiresAt: number }>();
 const verifiedRemoteKills = new Map<string, number>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
@@ -789,9 +828,13 @@ function onNetworkMessage(message: GameMessage): void {
       if (message.type === 'join') network.send({ type: 'state', player: snapshot() });
     }
     if (incoming.seq > remote.snapshot.seq) {
+      const now = performance.now();
       const respawned = remote.snapshot.hp <= 0 && incoming.hp > 0;
+      const pickup = authorizedRemotePickups.get(incoming.id);
+      const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === incoming.primary;
       if (incoming.team !== remote.snapshot.team) return;
-      if (incoming.primary !== remote.snapshot.primary && !respawned) return;
+      if (incoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+      if (pickupAllowed) authorizedRemotePickups.delete(incoming.id);
       remote.snapshot = incoming;
       remote.target.set(incoming.x, incoming.y - stanceEyeHeight(incoming.stance), incoming.z);
       remote.targetYaw = incoming.yaw;
@@ -809,6 +852,14 @@ function onNetworkMessage(message: GameMessage): void {
     if (!admission.accepted || !sender) return;
     remotePingAdmissions.set(message.by, admission.nextState);
     presentTeamPing(message, sender.snapshot.name);
+    return;
+  }
+  if (message.type === 'window-break') {
+    acceptRemoteWindowBreak(message);
+    return;
+  }
+  if (message.type === 'pickup') {
+    acceptRemotePickup(message);
     return;
   }
   if (message.type === 'shot') {
@@ -925,9 +976,265 @@ function applyDamage(damage: number, attacker: string): void {
   }
 }
 
+function disposeDeathDrop(entity: DeathDropEntity): void {
+  scene.remove(entity.root);
+  entity.root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    materials.forEach((material) => material.dispose());
+  });
+}
+
+function clearDeathDrops(): void {
+  for (const entity of deathDrops) disposeDeathDrop(entity);
+  deathDrops.length = 0;
+  authorizedRemotePickups.clear();
+  element<HTMLElement>('#pickup-prompt').hidden = true;
+}
+
+function deathDropVictim(message: DeathMessage): { weapon: PrimaryWeaponId; position: THREE.Vector3 } | null {
+  if (message.victim === player.id) {
+    const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
+    return { weapon: player.primaryWeapon, position: new THREE.Vector3(player.position.x, floorY, player.position.z) };
+  }
+  const remote = remotes.get(message.victim);
+  if (remote) {
+    const floorY = remote.snapshot.y - stanceEyeHeight(remote.snapshot.stance ?? 'stand') + 0.18;
+    return { weapon: remote.snapshot.primary, position: new THREE.Vector3(remote.snapshot.x, floorY, remote.snapshot.z) };
+  }
+  const bot = bots.get(message.victim);
+  if (bot) return { weapon: 'carbine', position: bot.position.clone().add(new THREE.Vector3(0, 0.18, 0)) };
+  return null;
+}
+
+function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDropEntity | null {
+  const id = `death-${message.nonce}`;
+  const existing = deathDrops.find((entity) => entity.drop.id === id);
+  if (existing) return existing;
+  const victim = deathDropVictim(message);
+  if (!victim) return null;
+  const bounded = clampPointToBounds(victim.position, arena.bounds, 0.5);
+  victim.position.set(bounded.x, bounded.y, bounded.z);
+  const spec = WEAPONS[victim.weapon];
+  const drop = createDeathDrop(
+    id,
+    victim.weapon,
+    victim.position,
+    Math.max(1, Math.ceil(spec.mag * 0.5)),
+    Math.max(1, Math.ceil(spec.reserve * 0.25)),
+    now,
+  );
+  const root = new THREE.Group();
+  root.name = `death-drop-${victim.weapon}`;
+  root.position.copy(victim.position);
+  root.userData.deathDropId = id;
+  const model = buildWeaponModel(victim.weapon, true, false);
+  model.name = 'death-drop-weapon';
+  model.scale.setScalar(victim.weapon === 'sniper' ? 0.27 : 0.3);
+  model.rotation.set(0.12, 0, Math.PI / 2);
+  optimizeAttachedWeapon(model, 'palette-basic');
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.52, 0.72, 24),
+    new THREE.MeshBasicMaterial({ color: spec.color, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
+  );
+  ring.name = 'death-drop-ring';
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = -0.08;
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.07, 1.1, 8),
+    new THREE.MeshBasicMaterial({ color: spec.color, transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false }),
+  );
+  beacon.name = 'death-drop-beacon';
+  beacon.position.y = 0.55;
+  root.add(model, ring, beacon);
+  root.traverse((node) => { node.userData.presentationOnly = true; node.raycast = () => undefined; });
+  scene.add(root);
+  const entity = { drop, root };
+  deathDrops.unshift(entity);
+  while (deathDrops.length > MAX_DEATH_DROPS) disposeDeathDrop(deathDrops.pop()!);
+  return entity;
+}
+
+function removeDeathDrop(entity: DeathDropEntity): void {
+  const index = deathDrops.indexOf(entity);
+  if (index >= 0) deathDrops.splice(index, 1);
+  disposeDeathDrop(entity);
+}
+
+function interactWithDeathDrop(now = performance.now()): boolean {
+  if (!player.alive || matchState.phase !== 'active') return false;
+  const drop = nearestDeathDrop(deathDrops.map((entity) => entity.drop), player.position, DEATH_DROP_INTERACTION_RANGE, now);
+  if (!drop) return false;
+  const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
+  if (!entity) return false;
+  const result = consumeDeathDrop(
+    drop,
+    { primary: player.primaryWeapon, ammo: player.ammo[player.primaryWeapon], reserve: player.reserve[player.primaryWeapon] },
+    WEAPONS[drop.weapon].reserve,
+    now,
+  );
+  if (!result.consumed) return false;
+  interruptReload(true, now);
+  entity.drop = result.drop;
+  player.primaryWeapon = result.inventory.primary;
+  player.ammo[result.inventory.primary] = result.inventory.ammo;
+  player.reserve[result.inventory.primary] = result.inventory.reserve;
+  player.weapon = result.inventory.primary;
+  player.switchingUntil = now + 360;
+  weaponView.setWeapon(player.weapon);
+  audio.weaponSwitch();
+  const pickup: PickupMessage = {
+    type: 'pickup',
+    by: player.id,
+    dropId: drop.id,
+    weapon: drop.weapon,
+    position: player.position.toArray(),
+    nonce: randomNonce(),
+  };
+  network.send(pickup);
+  addFeed(result.mode === 'replenish' ? `${WEAPONS[drop.weapon].name.toUpperCase()} AMMO REPLENISHED` : `${WEAPONS[drop.weapon].name.toUpperCase()} PICKED UP`, 'gold');
+  removeDeathDrop(entity);
+  renderFieldKitSelection();
+  return true;
+}
+
+function updateDeathDrops(now: number): void {
+  const retained = new Set(pruneDeathDrops(deathDrops.map((entity) => entity.drop), now, MAX_DEATH_DROPS).map((drop) => drop.id));
+  for (let index = deathDrops.length - 1; index >= 0; index -= 1) {
+    const entity = deathDrops[index];
+    if (!retained.has(entity.drop.id)) {
+      deathDrops.splice(index, 1);
+      disposeDeathDrop(entity);
+      continue;
+    }
+    const age = Math.max(0, now - entity.drop.createdAt);
+    entity.root.rotation.y = age * 0.00065;
+    entity.root.position.y = entity.drop.position.y + Math.sin(age * 0.004) * 0.08;
+  }
+  const nearby = player.alive
+    ? nearestDeathDrop(deathDrops.map((entity) => entity.drop), player.position, DEATH_DROP_INTERACTION_RANGE, now)
+    : null;
+  const prompt = element<HTMLElement>('#pickup-prompt');
+  prompt.hidden = !nearby;
+  if (nearby) {
+    const replenish = nearby.weapon === player.primaryWeapon;
+    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REPLENISH' : 'PICK UP';
+    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearby.weapon].name.toUpperCase();
+  }
+}
+
+function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
+  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const remote = remotes.get(message.by);
+  const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
+  if (!remote || !entity || entity.drop.weapon !== message.weapon) return;
+  const position = new THREE.Vector3(...message.position);
+  const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
+  if (!pointInsideBounds(position, arena.bounds, 0.44)
+    || position.distanceTo(senderPosition) > 2.8
+    || position.distanceTo(dropPosition) > DEATH_DROP_INTERACTION_RANGE + 0.5) return;
+  processedNonces.add(message.nonce);
+  authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
+  setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials);
+  removeDeathDrop(entity);
+  trimNonceSet();
+}
+
+function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
+  const root = new THREE.Group();
+  root.name = 'breaking-window-shards';
+  root.position.copy(point);
+  const shards: Array<{ mesh: THREE.Mesh; velocity: THREE.Vector3; spin: THREE.Vector3 }> = [];
+  const material = new THREE.MeshBasicMaterial({ color: 0xa9e8f5, transparent: true, opacity: 0.74, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
+  for (let index = 0; index < 10; index += 1) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.14 + Math.random() * 0.16, 0.18 + Math.random() * 0.22), material);
+    mesh.position.set((Math.random() - 0.5) * 0.55, (Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.08);
+    root.add(mesh);
+    shards.push({
+      mesh,
+      velocity: normal.clone().multiplyScalar(1.1 + Math.random() * 1.5).add(new THREE.Vector3((Math.random() - 0.5) * 1.7, 0.8 + Math.random() * 1.3, (Math.random() - 0.5) * 1.7)),
+      spin: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8),
+    });
+  }
+  scene.add(root);
+  const startedAt = performance.now();
+  const animate = (now: number) => {
+    const age = (now - startedAt) / 1000;
+    if (age >= 0.9) {
+      disposeSupportRoot(root);
+      return;
+    }
+    for (const shard of shards) {
+      shard.velocity.y -= 7.5 / 60;
+      shard.mesh.position.addScaledVector(shard.velocity, 1 / 60);
+      shard.mesh.rotation.x += shard.spin.x / 60;
+      shard.mesh.rotation.y += shard.spin.y / 60;
+      shard.mesh.rotation.z += shard.spin.z / 60;
+      (shard.mesh.material as THREE.MeshBasicMaterial).opacity = 0.74 * (1 - age / 0.9);
+    }
+    requestAnimationFrame(animate);
+  };
+  requestAnimationFrame(animate);
+}
+
+function breakHouseWindow(
+  windowId: string,
+  point: THREE.Vector3,
+  normal: THREE.Vector3,
+  replicate: boolean,
+  origin = camera.getWorldPosition(new THREE.Vector3()),
+): boolean {
+  const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
+  if (!window || window.broken) return false;
+  window.broken = true;
+  window.mesh.visible = false;
+  spawnImpactFlash(point, 'glass', normal);
+  spawnGlassShards(point, normal);
+  audio.impact('glass', point.distanceTo(camera.position));
+  if (replicate) {
+    const message: WindowBreakMessage = {
+      type: 'window-break',
+      by: player.id,
+      windowId,
+      origin: origin.toArray(),
+      nonce: randomNonce(),
+    };
+    network.send(message);
+  }
+  return true;
+}
+
+function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
+  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const remote = remotes.get(message.by);
+  const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
+  if (!remote || !window || window.broken) return;
+  const origin = new THREE.Vector3(...message.origin);
+  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  if (!pointInsideBounds(origin, arena.bounds, 0.44)
+    || origin.distanceTo(sender) > 2.8
+    || origin.distanceTo(centre) > 110
+    || arena.colliders.some((box) => segmentIntersectsBox(origin, centre, box))) return;
+  processedNonces.add(message.nonce);
+  const normal = centre.clone().sub(origin).normalize().multiplyScalar(-1);
+  breakHouseWindow(message.windowId, centre, normal, false, origin);
+  trimNonceSet();
+}
+
+function resetBreakableWindows(): void {
+  for (const window of arena.breakableWindows) {
+    window.broken = false;
+    window.mesh.visible = true;
+  }
+}
+
 function processDeath(message: DeathMessage): void {
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
+  spawnDeathDrop(message);
   if (message.killer === player.id && message.victim !== player.id) {
     player.kills += 1;
     awardSupportElimination();
@@ -955,6 +1262,7 @@ function removeRemote(id: string, reason: string): void {
   remoteShotAdmissions.delete(id);
   remoteMeleeAdmissions.delete(id);
   remotePingAdmissions.delete(id);
+  authorizedRemotePickups.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -1203,7 +1511,7 @@ function tryFire(now: number): void {
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
-    const sample = sampleSpreadDisk(spread, Math.random(), Math.random());
+    const sample = sampleWeaponPellet(spec, pellet, spread, Math.random(), Math.random());
     const direction = baseDirection.clone()
       .addScaledVector(cameraRight, sample.x)
       .addScaledVector(cameraUp, sample.y)
@@ -1212,7 +1520,12 @@ function tryFire(now: number): void {
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     spawnTracer(visualStart, authoritativeEnd, spec.color);
-    if (!result.playerId && !result.targetId && result.distance < 89) {
+    if (result.windowId) {
+      const point = result.impactPoint ?? authoritativeEnd;
+      const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
+      if (breakHouseWindow(result.windowId, point, normal, true, origin)) impactAudioPlayed = true;
+    }
+    if (!result.playerId && !result.targetId && !result.windowId && result.distance < 89) {
       const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
       const surface = result.impactSurface ?? 'concrete';
@@ -1261,6 +1574,7 @@ type ShotCastResult = {
   distance: number;
   playerId?: string;
   targetId?: string;
+  windowId?: string;
   hitZone?: HitZone;
   impactPoint?: THREE.Vector3;
   impactNormal?: THREE.Vector3;
@@ -1279,12 +1593,14 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
   let node: THREE.Object3D | null = first.object;
   let playerId: string | undefined;
   let targetId: string | undefined;
+  let windowId: string | undefined;
   let hitZone: HitZone | undefined;
   let surfaceHint: unknown;
   const names: string[] = [];
   while (node) {
     playerId ??= node.userData.playerId as string | undefined;
     targetId ??= node.userData.targetId as string | undefined;
+    windowId ??= node.userData.breakableWindowId as string | undefined;
     hitZone ??= node.userData.hitZone as HitZone | undefined;
     surfaceHint ??= node.userData.impactSurface;
     if (node.name) names.push(node.name);
@@ -1302,6 +1618,7 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
     distance: Math.min(first.distance, 110),
     playerId,
     targetId,
+    windowId,
     hitZone,
     impactPoint: first.point.clone(),
     impactNormal,
@@ -1408,6 +1725,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   if (bot.hp > 0) return;
   bot.alive = false;
   bot.deaths += 1;
+  spawnDeathDrop({ type: 'death', killer: player.id, victim: bot.id, nonce: randomNonce() }, now);
   bot.respawnAt = now + 2_200;
   bot.deathVisibleUntil = now + 1_050;
   deathOperator(bot.root);
@@ -1597,6 +1915,19 @@ function melee(): void {
   const direction = camera.getWorldDirection(new THREE.Vector3());
   network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: randomNonce() });
   const hit = castShot(origin, direction);
+  if (hit.windowId) {
+    const strike = meleeStrike(hit.distance, now, previousMeleeAt);
+    if (strike.hit) {
+      breakHouseWindow(
+        hit.windowId,
+        hit.impactPoint ?? origin.clone().addScaledVector(direction, hit.distance),
+        hit.impactNormal ?? direction.clone().multiplyScalar(-1),
+        true,
+        origin,
+      );
+    }
+    return;
+  }
   if (!hit.playerId) return;
   const strike = meleeStrike(hit.distance, now, previousMeleeAt);
   if (!strike.hit) return;
@@ -1803,17 +2134,38 @@ function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
   return candidates[0] ?? null;
 }
 
-function makeSupportPlane(): THREE.Group {
+function makeSkyMissile(): THREE.Group {
   const root = new THREE.Group();
-  root.name = 'tri-pass-plane';
-  const material = new THREE.MeshBasicMaterial({ color: 0xd5bf76 });
-  const dark = new THREE.MeshBasicMaterial({ color: 0x29393d });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 2.8), dark);
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 0.62), material);
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 0.42), material); tail.position.z = 1.05;
-  root.add(body, wing, tail);
-  root.scale.setScalar(0.8);
+  root.name = 'tri-pass-sky-missile';
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.18, 2.4, 10),
+    new THREE.MeshBasicMaterial({ color: 0xd5bf76 }),
+  );
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(0.18, 0.55, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff765f }),
+  );
+  nose.position.y = -1.45;
+  nose.rotation.z = Math.PI;
+  const fins = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.08, 0.28),
+    new THREE.MeshBasicMaterial({ color: 0x29393d }),
+  );
+  fins.position.y = 0.92;
+  const glow = new THREE.PointLight(0xff7a45, reducedRenderMode ? 0 : 3.5, 6);
+  glow.position.y = 1.2;
+  root.add(body, nose, fins, glow);
   return root;
+}
+
+function disposeSupportRoot(root: THREE.Object3D): void {
+  scene.remove(root);
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    materials.forEach((material) => material.dispose());
+  });
 }
 
 function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: number): void {
@@ -1848,13 +2200,128 @@ function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: numbe
   }
 }
 
+function drawStrikeMap(): void {
+  const context = strikeMapContext;
+  const width = strikeMapCanvas.width;
+  const height = strikeMapCanvas.height;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = '#10232a';
+  context.fillRect(0, 0, width, height);
+  context.strokeStyle = 'rgba(181, 224, 222, 0.12)';
+  context.lineWidth = 1;
+  for (let line = 1; line < 8; line += 1) {
+    context.beginPath(); context.moveTo(line * width / 8, 0); context.lineTo(line * width / 8, height); context.stroke();
+    context.beginPath(); context.moveTo(0, line * height / 8); context.lineTo(width, line * height / 8); context.stroke();
+  }
+  const [roadLeft] = worldToMinimap(-9.5, 0, arena.bounds, width, height);
+  const [roadRight] = worldToMinimap(9.5, 0, arena.bounds, width, height);
+  context.fillStyle = 'rgba(88, 102, 105, 0.78)';
+  context.fillRect(roadLeft, 0, roadRight - roadLeft, height);
+  context.strokeStyle = '#e3bd5f';
+  context.setLineDash([10, 10]);
+  context.beginPath(); context.moveTo(width / 2, 0); context.lineTo(width / 2, height); context.stroke();
+  context.setLineDash([]);
+  for (const house of arena.houses) {
+    const [cx, cy] = worldToMinimap(house.origin.x, house.origin.z, arena.bounds, width, height);
+    const [minX] = worldToMinimap(house.origin.x - house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, minY] = worldToMinimap(house.origin.x, house.origin.z + house.dimensions.depth / 2, arena.bounds, width, height);
+    const [maxX] = worldToMinimap(house.origin.x + house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, maxY] = worldToMinimap(house.origin.x, house.origin.z - house.dimensions.depth / 2, arena.bounds, width, height);
+    context.fillStyle = house.team === 0 ? 'rgba(72, 185, 183, 0.58)' : 'rgba(214, 113, 91, 0.58)';
+    context.strokeStyle = house.team === 0 ? '#80f5f0' : '#ff9a7f';
+    context.lineWidth = 3;
+    context.fillRect(minX, minY, maxX - minX, maxY - minY);
+    context.strokeRect(minX, minY, maxX - minX, maxY - minY);
+    context.fillStyle = '#f6ead6'; context.font = '700 14px sans-serif'; context.textAlign = 'center';
+    context.fillText(house.label.toUpperCase(), cx, cy + 5);
+  }
+  const points = triPassTargeting?.points ?? [];
+  points.forEach((point, index) => {
+    const [x, y] = worldToMinimap(point.x, point.z, arena.bounds, width, height);
+    context.fillStyle = '#ff684f';
+    context.beginPath(); context.arc(x, y, 16, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
+    context.fillStyle = '#10232a'; context.font = '900 18px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText(String(index + 1), x, y + 1);
+  });
+  context.textBaseline = 'alphabetic';
+  context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
+  context.fillText('N', width / 2, 28);
+  element<HTMLElement>('#strike-target-count').textContent = `${points.length} / 3`;
+}
+
+function beginTriPassTargeting(): void {
+  triPassTargeting = createTriPassTargeting();
+  tacticalMapOpen = true;
+  const overlay = element<HTMLElement>('#strike-map-overlay');
+  overlay.hidden = false;
+  menu.classList.add('hidden');
+  clearGameplayInput();
+  drawStrikeMap();
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+}
+
+function cancelTriPassTargeting(refund: boolean, reacquirePointer = true): void {
+  const wasIncomplete = triPassTargeting !== null && !triPassTargeting.complete;
+  if (refund && wasIncomplete) {
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'tri-pass': true } };
+    addFeed('TRI-PASS TARGETING CANCELLED · REFUNDED', 'gold');
+  }
+  triPassTargeting = null;
+  tacticalMapOpen = false;
+  element<HTMLElement>('#strike-map-overlay').hidden = true;
+  updateFieldSupportHud();
+  if (reacquirePointer && gameStarted && player.alive && !matchFinished) requestGamePointerLock();
+}
+
+function scheduleTriPassMissiles(points: readonly { x: number; z: number }[], confirmedAt: number): void {
+  const schedule = triPassSchedule(confirmedAt);
+  triPassLaunches += Math.min(3, points.length);
+  points.slice(0, 3).forEach((point, index) => {
+    const target = new THREE.Vector3(point.x, 0.2, point.z);
+    const missile = makeSkyMissile();
+    missile.position.set(target.x, 30 + index * 1.5, target.z);
+    scene.add(missile);
+    const marker = new THREE.Mesh(
+      new THREE.RingGeometry(1.35, 1.75, 28),
+      new THREE.MeshBasicMaterial({ color: 0xff765f, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
+    );
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.copy(target);
+    scene.add(marker);
+    strikeMissiles.push({ missile, marker, target, startedAt: confirmedAt, impactAt: schedule[index], resolved: false });
+  });
+  addFeed('TRI-PASS · THREE MISSILES INBOUND · 1.0 SEC', 'gold');
+}
+
+function registerTriPassClick(clientX: number, clientY: number, confirmedAt = performance.now()): boolean {
+  if (!tacticalMapOpen || !triPassTargeting || triPassTargeting.complete) return false;
+  const rect = strikeMapCanvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
+  const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
+  const point = minimapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  const next = registerTriPassTarget(triPassTargeting, point, arena.bounds);
+  if (next === triPassTargeting) return false;
+  triPassTargeting = next;
+  drawStrikeMap();
+  if (next.complete) {
+    scheduleTriPassMissiles(next.points, confirmedAt);
+    cancelTriPassTargeting(false);
+  }
+  return true;
+}
+
+strikeMapCanvas.addEventListener('click', (event) => {
+  registerTriPassClick(event.clientX, event.clientY);
+});
+
 function activateFieldSupport(id: FieldSupportId): void {
-  if (!player.alive || matchState.phase !== 'active') return;
+  if (!player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
   const consumed = consumeFieldSupport(fieldSupport, id);
   if (!consumed.activated) return;
-  endSpawnProtectionOnOffense(performance.now());
-  fieldSupport = consumed.state;
   const now = performance.now();
+  endSpawnProtectionOnOffense(now);
+  fieldSupport = consumed.state;
   if (id === 'scout-sweep') {
     scoutSweepUntil = now + 12_000;
     addFeed('SCOUT SWEEP ACTIVE · 12 SEC', 'gold');
@@ -1865,63 +2332,100 @@ function activateFieldSupport(id: FieldSupportId): void {
       updateFieldSupportHud();
       return;
     }
-    if (yardhawk) scene.remove(yardhawk.root);
-    const root = new THREE.Group(); root.name = 'yardhawk-pursuit-drone';
+    if (yardhawk) disposeSupportRoot(yardhawk.root);
+    const root = new THREE.Group(); root.name = 'yardhawk-hunter-killer';
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, 0.9), new THREE.MeshBasicMaterial({ color: 0x29393d }));
     const wings = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.08, 0.32), new THREE.MeshBasicMaterial({ color: 0xe0bd68 }));
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff765f })); eye.position.z = -0.48;
     root.add(body, wings, eye);
-    root.position.copy(player.position).add(new THREE.Vector3(0, 2.3, 0));
+    const forward = camera.getWorldDirection(new THREE.Vector3()).normalize();
+    root.position.copy(camera.position).addScaledVector(forward, 0.85).add(new THREE.Vector3(0, -0.32, 0));
     scene.add(root);
-    yardhawk = { root, targetId: target.id, expiresAt: now + 5_000 };
-    addFeed('YARDHAWK LAUNCHED', 'gold');
+    yardhawk = {
+      root,
+      targetId: target.id,
+      phase: 'thrown',
+      velocity: forward.multiplyScalar(10).add(new THREE.Vector3(0, 4.2, 0)),
+      spawnedAt: now,
+      armedAt: now + 450,
+      expiresAt: now + 6_500,
+    };
+    addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
   } else {
-    const target = nearestSupportTarget();
-    const base = target?.point ?? new THREE.Vector3(0, 0, 0);
-    const schedule = triPassSchedule(now);
-    for (let index = 0; index < schedule.length; index += 1) {
-      const clamped = clampPointToBounds(new THREE.Vector3(base.x + (index - 1) * 2.4, 0.2, base.z + (index % 2 === 0 ? -1.5 : 1.5)), arena.bounds, 1);
-      const targetPoint = new THREE.Vector3(clamped.x, 0.2, clamped.z);
-      const plane = makeSupportPlane();
-      plane.position.set(-42, 18 + index * 1.2, targetPoint.z); scene.add(plane);
-      const marker = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.65, 24), new THREE.MeshBasicMaterial({ color: 0xff765f, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false }));
-      marker.rotation.x = -Math.PI / 2; marker.position.copy(targetPoint); scene.add(marker);
-      strikePasses.push({ plane, marker, target: targetPoint, startedAt: now, impactAt: schedule[index], resolved: false });
-    }
-    addFeed('TRI-PASS STRIKE INBOUND', 'gold');
+    beginTriPassTargeting();
   }
   updateFieldSupportHud();
 }
 
 function updateFieldSupport(dt: number, now: number): void {
   if (yardhawk) {
-    const target = supportTargetPosition(yardhawk.targetId);
-    if (!target || now >= yardhawk.expiresAt) {
-      scene.remove(yardhawk.root); yardhawk = null;
-    } else {
-      const direction = target.clone().sub(yardhawk.root.position);
-      const distance = direction.length();
-      if (distance <= 1.1) {
-        supportBlast(target, 2.6, 200);
-        scene.remove(yardhawk.root); yardhawk = null;
+    if (now >= yardhawk.expiresAt) {
+      supportBlast(yardhawk.root.position.clone(), 2.8, 150);
+      yardhawkExplosions += 1;
+      disposeSupportRoot(yardhawk.root);
+      yardhawk = null;
+    } else if (yardhawk.phase === 'thrown') {
+      yardhawk.velocity.y -= 9.5 * dt;
+      const start = yardhawk.root.position.clone();
+      const delta = yardhawk.velocity.clone().multiplyScalar(dt);
+      const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
+      if (collision) {
+        yardhawk.root.position.copy(start).addScaledVector(delta, collision.time);
+        yardhawk.phase = 'homing';
+        yardhawk.velocity.set(0, 0, 0);
+        yardhawk.armedAt = now;
       } else {
-        yardhawk.root.position.addScaledVector(direction.normalize(), Math.min(distance, dt * 14));
-        yardhawk.root.lookAt(target);
+        yardhawk.root.position.add(delta);
+      }
+      yardhawk.root.rotation.x += dt * 8;
+      yardhawk.root.rotation.z += dt * 11;
+      if (yardhawk && now >= yardhawk.armedAt) {
+        yardhawk.phase = 'homing';
+        yardhawk.velocity.set(0, 0, 0);
+        addFeed('YARDHAWK ARMED · TARGET LOCK', 'gold');
+      }
+    } else {
+      let target = supportTargetPosition(yardhawk.targetId);
+      if (!target) {
+        const replacement = nearestSupportTarget();
+        if (replacement) {
+          yardhawk.targetId = replacement.id;
+          target = replacement.point;
+        }
+      }
+      if (target) {
+        const direction = target.clone().sub(yardhawk.root.position);
+        const distance = direction.length();
+        if (distance <= 1.15) {
+          supportBlast(target, 3.2, 200);
+          yardhawkExplosions += 1;
+          disposeSupportRoot(yardhawk.root);
+          yardhawk = null;
+        } else {
+          yardhawk.root.position.addScaledVector(direction.normalize(), Math.min(distance, dt * 16));
+          yardhawk.root.lookAt(target);
+        }
+      } else {
+        yardhawk.root.position.y += Math.sin(now * 0.009) * dt * 0.16;
+        yardhawk.root.rotation.y += dt * 2;
       }
     }
   }
-  for (let index = strikePasses.length - 1; index >= 0; index -= 1) {
-    const pass = strikePasses[index];
-    const progress = THREE.MathUtils.clamp((now - pass.startedAt) / Math.max(1, pass.impactAt - pass.startedAt), 0, 1);
-    pass.plane.position.x = THREE.MathUtils.lerp(-42, 42, progress);
-    (pass.marker.material as THREE.MeshBasicMaterial).opacity = 0.32 + Math.sin(now * 0.018) * 0.18;
-    if (!pass.resolved && now >= pass.impactAt) {
-      pass.resolved = true;
-      supportBlast(pass.target, 5.2, 120);
-      scene.remove(pass.plane, pass.marker);
-      pass.plane.traverse((node) => { if (node instanceof THREE.Mesh) { node.geometry.dispose(); (node.material as THREE.Material).dispose(); } });
-      pass.marker.geometry.dispose(); (pass.marker.material as THREE.Material).dispose();
-      strikePasses.splice(index, 1);
+  for (let index = strikeMissiles.length - 1; index >= 0; index -= 1) {
+    const strike = strikeMissiles[index];
+    const progress = THREE.MathUtils.clamp((now - strike.startedAt) / Math.max(1, strike.impactAt - strike.startedAt), 0, 1);
+    strike.missile.position.y = THREE.MathUtils.lerp(30, 0.65, progress ** 1.35);
+    strike.missile.rotation.y += dt * 7;
+    (strike.marker.material as THREE.MeshBasicMaterial).opacity = 0.38 + Math.sin(now * 0.022) * 0.22;
+    strike.marker.scale.setScalar(0.88 + progress * 0.22);
+    if (!strike.resolved && now >= strike.impactAt) {
+      strike.resolved = true;
+      supportBlast(strike.target, 4.8, 130);
+      triPassImpacts += 1;
+      triPassLastImpactDelayMs = now - strike.startedAt;
+      disposeSupportRoot(strike.missile);
+      disposeSupportRoot(strike.marker);
+      strikeMissiles.splice(index, 1);
     }
   }
 }
@@ -1936,11 +2440,19 @@ function clearGrenades(): void {
 }
 
 function clearFieldSupport(): void {
-  if (yardhawk) scene.remove(yardhawk.root);
+  if (yardhawk) disposeSupportRoot(yardhawk.root);
   yardhawk = null;
-  for (const pass of strikePasses) scene.remove(pass.plane, pass.marker);
-  strikePasses.length = 0;
+  for (const strike of strikeMissiles) {
+    disposeSupportRoot(strike.missile);
+    disposeSupportRoot(strike.marker);
+  }
+  strikeMissiles.length = 0;
+  cancelTriPassTargeting(false, false);
   scoutSweepUntil = 0;
+  yardhawkExplosions = 0;
+  triPassLaunches = 0;
+  triPassImpacts = 0;
+  triPassLastImpactDelayMs = null;
   fieldSupport = createFieldSupportState();
   updateFieldSupportHud();
 }
@@ -2045,7 +2557,8 @@ function updatePhysics(dt: number): void {
     weaponActionHistory.push(event);
   }
   if (weaponActionHistory.length > 16) weaponActionHistory.splice(0, weaponActionHistory.length - 16);
-  camera.fov = damp(camera.fov, adsHeld ? Math.max(55, preferredFov - 20) : currentSprinting ? preferredFov + 4.5 : preferredFov, 10, dt);
+  const aimingFov = player.weapon === 'sniper' ? Math.min(38, preferredFov - 20) : Math.max(55, preferredFov - 20);
+  camera.fov = damp(camera.fov, adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov, 10, dt);
   camera.updateProjectionMatrix();
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
@@ -2133,22 +2646,30 @@ function updateMinimap(now: number): void {
   const bounds = arena.bounds;
   const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = 'rgba(7, 15, 18, .78)';
+  context.fillStyle = 'rgba(7, 15, 18, .86)';
   context.fillRect(0, 0, width, height);
-  context.strokeStyle = 'rgba(244, 196, 79, .5)';
-  context.lineWidth = 2;
-  context.strokeRect(2, 2, width - 4, height - 4);
+  context.strokeStyle = 'rgba(244, 196, 79, .62)';
+  context.lineWidth = 4;
+  context.strokeRect(4, 4, width - 8, height - 8);
 
   const [roadLeft] = point(-10.25, 0);
   const [roadRight] = point(10.25, 0);
-  context.fillStyle = 'rgba(126, 137, 132, .18)';
-  context.fillRect(roadLeft, 2, roadRight - roadLeft, height - 4);
-  for (const [x, z, team] of [[-11, -34, 0], [11, 34, 1]] as Array<[number, number, Team]>) {
-    const [cx, cy] = point(x, z);
-    const houseWidth = (16.4 / (bounds.maxX - bounds.minX)) * width;
-    const houseHeight = (15 / (bounds.maxZ - bounds.minZ)) * height;
-    context.fillStyle = team === 0 ? 'rgba(88, 227, 220, .2)' : 'rgba(255, 118, 95, .2)';
+  context.fillStyle = 'rgba(126, 137, 132, .23)';
+  context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
+  context.strokeStyle = 'rgba(244, 196, 79, .42)';
+  context.lineWidth = 2;
+  context.setLineDash([10, 10]);
+  context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
+  context.setLineDash([]);
+  for (const house of arena.houses) {
+    const [cx, cy] = point(house.origin.x, house.origin.z);
+    const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
+    const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
+    context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
+    context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
+    context.lineWidth = 2;
     context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
   }
   for (const remote of remotes.values()) {
     const friendly = remote.snapshot.team === player.team;
@@ -2156,21 +2677,44 @@ function updateMinimap(now: number): void {
     if (!friendly && !scoutActive && remote.target.distanceTo(player.position) > 15) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
-    context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
     if (!bot.alive || now >= scoutSweepUntil && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
-    context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   const [px, py] = point(player.position.x, player.position.z);
-  context.save();
-  context.translate(px, py);
-  context.rotate(-player.yaw);
+  const facing = playerFacingGeometry(px, py, player.yaw);
+  context.fillStyle = player.team === 0 ? 'rgba(88, 227, 220, .18)' : 'rgba(255, 118, 95, .18)';
+  context.beginPath();
+  context.moveTo(px, py);
+  context.lineTo(...facing.coneLeft);
+  context.lineTo(...facing.coneRight);
+  context.closePath();
+  context.fill();
   context.fillStyle = player.team === 0 ? '#58e3dc' : '#ff765f';
-  context.beginPath(); context.moveTo(0, -7); context.lineTo(5, 6); context.lineTo(-5, 6); context.closePath(); context.fill();
-  context.restore();
+  context.strokeStyle = '#fff7df';
+  context.lineWidth = 4;
+  context.beginPath();
+  context.moveTo(...facing.nose);
+  context.lineTo(...facing.right);
+  context.lineTo(...facing.tail);
+  context.lineTo(...facing.left);
+  context.closePath();
+  context.fill();
+  context.stroke();
+  context.strokeStyle = '#10232a';
+  context.lineWidth = 3;
+  context.beginPath(); context.moveTo(...facing.tail); context.lineTo(...facing.nose); context.stroke();
+  context.fillStyle = '#fff7df';
+  context.beginPath(); context.arc(px, py, 4.5, 0, Math.PI * 2); context.fill();
+  context.fillStyle = '#fff7df';
+  context.font = '900 22px sans-serif';
+  context.textAlign = 'center';
+  context.fillText('N', width / 2, 28);
+  element<HTMLElement>('#map-heading').textContent = `N · ${String(headingDegrees(player.yaw)).padStart(3, '0')}°`;
 }
 
 function updateHud(now: number): void {
@@ -2365,6 +2909,11 @@ function pollGamepad(dt: number): void {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
+    event.preventDefault();
+    cancelTriPassTargeting(true);
+    return;
+  }
   if (gameplayInputEnabled()) keys.add(event.code);
   else if (event.code !== 'Tab') return;
   if (event.code === 'Space' && !event.repeat) {
@@ -2381,6 +2930,7 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
+  if (event.code === 'KeyF' && !event.repeat) interactWithDeathDrop();
   if (event.code === 'KeyT' && !event.repeat) sendTeamPing('enemy');
   if (event.code === 'KeyY' && !event.repeat) sendTeamPing('regroup');
   if (event.code === 'KeyU' && !event.repeat) sendTeamPing('push');
@@ -2430,6 +2980,10 @@ window.addEventListener('mouseup', (event) => {
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
     clearGameplayInput();
+    if (tacticalMapOpen) {
+      menu.classList.add('hidden');
+      return;
+    }
     if (gameStarted && player.alive && !matchFinished) {
       element<HTMLButtonElement>('#resume').hidden = matchFinished;
       menu.classList.remove('hidden');
@@ -2458,6 +3012,8 @@ function resetForMode(): void {
   grenades.length = 0;
   clearFieldSupport();
   clearTeamPings();
+  clearDeathDrops();
+  resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   verifiedRemoteKills.clear();
   element<HTMLElement>('#banner').hidden = true;
@@ -2468,8 +3024,8 @@ function resetForMode(): void {
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, pistol: WEAPONS.pistol.mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, pistol: WEAPONS.pistol.reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve };
 }
 
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
@@ -2554,6 +3110,7 @@ function frame(now: number): void {
     updateGrenades(frameDt, now);
     updateFieldSupport(frameDt, now);
     updateTeamPings(now);
+    updateDeathDrops(now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
@@ -2574,6 +3131,9 @@ const debugWindow = window as Window & {
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     placeBotAhead: (distance?: number) => void;
+    aimAtBot: (zone?: HitZone) => void;
+    aimAtRemote: (zone?: HitZone) => void;
+    stageWindow: (index: number, distance?: number) => void;
     damageBot: (amount: number, zone?: HitZone) => void;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setRenderPaused: (paused: boolean) => void;
@@ -2581,6 +3141,10 @@ const debugWindow = window as Window & {
     fireOnce: () => void;
     throwGrenade: () => void;
     switchWeapon: (index: number) => void;
+    equipKit: (id: FieldKitId) => void;
+    equipWeapon: (weapon: WeaponId) => void;
+    interactDrop: () => void;
+    setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
@@ -2684,9 +3248,48 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       streak: fieldSupport.streak,
       available: { ...fieldSupport.available },
       scoutActive: performance.now() < scoutSweepUntil,
-      yardhawkActive: yardhawk !== null,
-      strikePasses: strikePasses.length,
+      yardhawk: yardhawk ? {
+        active: true,
+        phase: yardhawk.phase,
+        targetId: yardhawk.targetId,
+        position: yardhawk.root.position.toArray(),
+        armedInMs: Math.max(0, yardhawk.armedAt - performance.now()),
+      } : { active: false, phase: null },
+      yardhawkExplosions,
+      tacticalMapOpen,
+      tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
+      strikeMissiles: strikeMissiles.map((strike) => ({
+        target: strike.target.toArray(),
+        impactInMs: Math.max(0, strike.impactAt - performance.now()),
+        position: strike.missile.position.toArray(),
+      })),
+      triPassLaunches,
+      triPassImpacts,
+      triPassLastImpactDelayMs,
     },
+    deathDrops: deathDrops.map((entity) => ({
+      id: entity.drop.id,
+      weapon: entity.drop.weapon,
+      position: [entity.drop.position.x, entity.drop.position.y, entity.drop.position.z],
+      expiresInMs: Math.max(0, entity.drop.expiresAt - performance.now()),
+    })),
+    breakableWindows: arena.breakableWindows.map((window) => ({
+      id: window.id,
+      broken: window.broken,
+      visible: window.mesh.visible,
+      position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
+    })),
+    minimap: {
+      backingWidth: minimapCanvas.width,
+      cssWidth: minimapCanvas.getBoundingClientRect().width,
+      headingDegrees: headingDegrees(player.yaw),
+    },
+    houseNavigation: arena.houses.map((house) => ({
+      id: house.id,
+      dimensions: { ...house.dimensions },
+      rampWidth: house.solids.find((solid) => solid.kind === 'ramp')?.size[2] ?? 0,
+      routeAnchors: house.routes['ramp-room-flow'].length,
+    })),
     teamPings: activeTeamPings.map((ping) => ({
       kind: ping.root.name.replace('team-ping-', ''),
       expiresInMs: Math.max(0, ping.expiresAt - performance.now()),
@@ -2748,11 +3351,61 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;
-    const forward = new THREE.Vector3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     bot.position.set(player.position.x, 0, player.position.z).addScaledVector(forward, THREE.MathUtils.clamp(distance, 2.5, 9));
     bot.root.position.copy(bot.position);
+    bot.root.updateMatrixWorld(true);
     bot.velocity.set(0, 0, 0);
     bot.root.rotation.y = player.yaw;
+    bot.invulnerableUntil = 0;
+  },
+  aimAtBot: (zone: HitZone = 'body') => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    const targetHeight = zone === 'head' ? 2.13 : zone === 'limb' ? 0.58 : 1.06;
+    const target = bot.position.clone().add(new THREE.Vector3(0, targetHeight, 0));
+    const delta = target.sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+  },
+  aimAtRemote: (zone: HitZone = 'body') => {
+    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    if (!remote) return;
+    const targetHeight = zone === 'head' ? 2.13 : zone === 'limb' ? 0.58 : 1.06;
+    const target = remote.target.clone().add(new THREE.Vector3(0, targetHeight, 0));
+    const delta = target.sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    remote.root.position.copy(remote.target);
+    remote.root.updateMatrixWorld(true);
+  },
+  stageWindow: (index: number, distance = 3) => {
+    const window = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
+    if (!window) return;
+    const target = window.mesh.getWorldPosition(new THREE.Vector3());
+    const house = arena.houses.reduce((nearest, candidate) => {
+      const currentDistance = Math.hypot(target.x - candidate.origin.x, target.z - candidate.origin.z);
+      const nearestDistance = Math.hypot(target.x - nearest.origin.x, target.z - nearest.origin.z);
+      return currentDistance < nearestDistance ? candidate : nearest;
+    }, arena.houses[0]);
+    const outward = Math.sign(target.z - house.origin.z) || house.origin.facing;
+    const eye = new THREE.Vector3(target.x, target.y, target.z + outward * THREE.MathUtils.clamp(distance, 1.1, 8));
+    player.position.copy(eye);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    const delta = target.clone().sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    player.invulnerableUntil = 0;
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
   },
   damageBot: (amount, zone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
@@ -2783,6 +3436,31 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),
+  equipKit: (id: FieldKitId) => {
+    const kit = fieldKitById(id);
+    selectedFieldKit = kit.id;
+    localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
+    player.primaryWeapon = kit.weapon;
+    player.weapon = kit.weapon;
+    player.ammo[kit.weapon] = WEAPONS[kit.weapon].mag;
+    player.reserve[kit.weapon] = WEAPONS[kit.weapon].reserve;
+    player.nextShotAt = 0;
+    weaponView.setWeapon(player.weapon, true);
+    renderFieldKitSelection();
+  },
+  equipWeapon: (weapon: WeaponId) => {
+    if (weapon !== 'pistol') player.primaryWeapon = weapon;
+    player.weapon = weapon;
+    player.ammo[weapon] = WEAPONS[weapon].mag;
+    player.reserve[weapon] = WEAPONS[weapon].reserve;
+    player.nextShotAt = 0;
+    weaponView.setWeapon(weapon, true);
+  },
+  interactDrop: () => interactWithDeathDrop(),
+  setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
+    player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
+    player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
+  },
   reload: () => reload(),
   melee: () => {
     const before = player.lastMeleeAt;
@@ -2913,7 +3591,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 17 refinement candidate — cohesive presentation, authored architecture and synchronized combat.');
+  setStatus('Pass 21 candidate — precision class, battlefield pickups, tactical supports, breakable glass and wider house routes.');
   requestAnimationFrame(frame);
 }
 

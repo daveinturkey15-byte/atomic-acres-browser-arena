@@ -3,16 +3,19 @@ import { texturedMaterial } from './art-kit';
 import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
-import { createHouseArchitecture, HouseSurface, solidBounds } from './house-navigation';
+import { createHouseArchitecture, HouseSurface, solidBounds, type HouseArchitecture } from './house-navigation';
 import { Team } from './protocol';
 
 export type PracticeTarget = { id: string; root: THREE.Group; active: boolean; respawnAt: number };
+export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
 export type ArenaMap = {
   colliders: Box2[];
   physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
   spawns: Record<Team, THREE.Vector3[]>;
   targets: PracticeTarget[];
+  houses: readonly HouseArchitecture[];
+  breakableWindows: BreakableWindow[];
   bounds: Box2;
   houseTelemetry: {
     houses: number;
@@ -32,6 +35,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const physicsColliders: Box2[] = [];
   const raycastMeshes: THREE.Object3D[] = [];
   const targets: PracticeTarget[] = [];
+  const houses: HouseArchitecture[] = [];
+  const breakableWindows: BreakableWindow[] = [];
   const houseTelemetry = { houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0 };
   const world = new THREE.Group();
   world.name = 'Atomic Acres arena';
@@ -127,6 +132,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   function addHouse(team: Team, x: number, z: number, facing: 1 | -1): void {
     const architecture = createHouseArchitecture(team, x, z, facing);
+    houses.push(architecture);
     houseTelemetry.houses += 1;
     houseTelemetry.groundRooms += architecture.rooms.filter((room) => room.level === 'ground').length;
     houseTelemetry.upperRooms += architecture.rooms.filter((room) => room.level === 'upper').length;
@@ -154,6 +160,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         physicsColliders.push(solidBounds(solid));
         continue;
       }
+      const isBreakableGlass = solid.kind === 'glass' && solid.breakable;
       const rendered = box(
         solid.name,
         solid.position,
@@ -161,13 +168,19 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         surfaceMaterial[solid.surface],
         solid.collidable,
         solid.kind !== 'glass',
+        isBreakableGlass || solid.collidable,
       );
       if (solid.rotation) rendered.rotation.set(...solid.rotation);
+      if (isBreakableGlass) {
+        rendered.userData.breakableWindowId = solid.id;
+        rendered.userData.dynamic = true;
+        breakableWindows.push({ id: solid.id, mesh: rendered, broken: false });
+      }
     }
 
     // One quiet roof cap is the only exterior dressing. Both ground doors and
     // all three windows come directly from the shared architecture declaration.
-    box('simple-house-roof', [x, 7.35, z], [16.8, 0.42, 15], palette.roof, false);
+    box('simple-house-roof', [x, 7.35, z], [architecture.dimensions.width + 0.6, 0.42, architecture.dimensions.depth + 0.6], palette.roof, false);
   }
 
   for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
@@ -289,6 +302,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     physicsColliders,
     raycastMeshes,
     targets,
+    houses,
+    breakableWindows,
     houseTelemetry,
     bounds: { ...ARENA_BOUNDS },
     spawns: {

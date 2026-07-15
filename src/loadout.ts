@@ -1,6 +1,6 @@
 import type { PrimaryWeaponId } from './protocol';
 
-export type FieldKitId = 'balanced' | 'breacher' | 'runner';
+export type FieldKitId = 'balanced' | 'runner' | 'breacher' | 'marksman';
 
 export type FieldKit = {
   id: FieldKitId;
@@ -35,6 +35,14 @@ export const FIELD_KITS: readonly FieldKit[] = [
     role: 'BURST / VERY CLOSE',
     summary: 'Heavy short-range impact with a deliberate pump cycle.',
     traits: ['Range 1', 'Control 2', 'Mobility 3'],
+  },
+  {
+    id: 'marksman',
+    title: 'Longline Marksman',
+    weapon: 'sniper',
+    role: 'PRECISION / LONG RANGE',
+    summary: 'One headshot or two body hits, balanced by a deliberate bolt cadence.',
+    traits: ['Range 5', 'Control 2', 'Mobility 2'],
   },
 ] as const;
 

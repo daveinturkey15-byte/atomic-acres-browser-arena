@@ -46,9 +46,19 @@ type DebugState = {
     streak: number;
     available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass', boolean>;
     scoutActive: boolean;
-    yardhawkActive: boolean;
-    strikePasses: number;
+    yardhawk: { active: boolean; phase: 'thrown' | 'homing' | null; targetId?: string; position?: number[]; armedInMs?: number };
+    yardhawkExplosions: number;
+    tacticalMapOpen: boolean;
+    tacticalTargets: Array<{ x: number; z: number }>;
+    strikeMissiles: Array<{ target: number[]; impactInMs: number; position: number[] }>;
+    triPassLaunches: number;
+    triPassImpacts: number;
+    triPassLastImpactDelayMs: number | null;
   };
+  deathDrops: Array<{ id: string; weapon: string; position: number[]; expiresInMs: number }>;
+  breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
+  minimap: { backingWidth: number; cssWidth: number; headingDegrees: number };
+  houseNavigation: Array<{ id: string; dimensions: { width: number; depth: number; wallThickness: number }; rampWidth: number; routeAnchors: number }>;
   teamPings: Array<{ kind: string; expiresInMs: number; position: number[] }>;
   activeImpactParticles: number;
   activeImpactMarks: number;
@@ -69,7 +79,7 @@ type DebugState = {
   };
   weaponReady: boolean;
   weaponPresentation: {
-    weapon: 'carbine' | 'smg' | 'scattergun' | 'pistol';
+    weapon: 'carbine' | 'smg' | 'scattergun' | 'sniper' | 'pistol';
     heat: number;
     shotsPresented: number;
     activeCasings: number;
@@ -77,8 +87,10 @@ type DebugState = {
     detailsReady: boolean;
     modelKind: 'licensed-imported' | 'original-authored';
     adsProgress: number;
+    sightOffset: [number, number] | null;
     armsVisible: boolean;
     armMeshCount: number;
+    attachedWeaponBatchStats: { sourceMeshes: number; batches: number };
     knifeVisible: boolean;
     riggedArms: Array<{ finite: boolean; bindOffsetsPreserved: boolean; contactError: number }>;
     importedModel: { source: string; weapon: string; clips: number; meshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
@@ -130,7 +142,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('HIGH REFINEMENT PASS 17');
+    await expect(page.locator('.eyebrow')).toContainText('GAMEPLAY SYSTEMS PASS 21');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -279,10 +291,15 @@ test.describe('solo mechanics', () => {
     expect((await debug(page)).weaponPresentation.knifeVisible).toBe(false);
   });
 
-  test('earns and activates all three bounded field supports', async ({ page }) => {
+  test('throws a homing Yardhawk and resolves three player-selected sky missiles after one second', async ({ page }) => {
     await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        placeBotAhead: (distance: number) => void;
+        activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
       api.earnSupport(7);
+      api.placeBotAhead(4);
     });
     expect((await debug(page)).fieldSupport.available).toEqual({
       'scout-sweep': true,
@@ -293,12 +310,172 @@ test.describe('solo mechanics', () => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void } }).__ATOMIC_ACRES_DEBUG__;
       api.activateSupport('scout-sweep');
       api.activateSupport('yardhawk');
-      api.activateSupport('tri-pass');
     });
     await expect.poll(async () => (await debug(page)).fieldSupport.scoutActive).toBe(true);
-    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkActive).toBe(true);
-    await expect.poll(async () => (await debug(page)).fieldSupport.strikePasses, { timeout: 2_000 }).toBeGreaterThan(0);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawk.active).toBe(true);
+    expect(['thrown', 'homing']).toContain((await debug(page)).fieldSupport.yardhawk.phase);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 4_000 }).toBe(1);
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { activateSupport: (id: 'tri-pass') => void } }).__ATOMIC_ACRES_DEBUG__.activateSupport('tri-pass'));
+    await expect(page.locator('#strike-map-overlay')).toBeVisible();
+    await page.locator('#strike-map').click({ position: { x: 95, y: 100 } });
+    await page.locator('#strike-map').click({ position: { x: 240, y: 250 } });
+    await page.locator('#strike-map').click({ position: { x: 385, y: 360 } });
+    const scheduled = (await debug(page)).fieldSupport;
+    expect(scheduled.triPassLaunches).toBe(3);
+    await expect(page.locator('#strike-map-overlay')).toBeHidden();
+    await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 6_000 }).toBe(3);
+    const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
+    expect(impactDelay).not.toBeNull();
+    expect(impactDelay!).toBeGreaterThanOrEqual(950);
     expect(Object.values((await debug(page)).fieldSupport.available)).toEqual([false, false, false]);
+  });
+
+  test('sniper kills with one headshot or two body shots and F-style interaction consumes death drops', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        equipKit: (id: 'marksman') => void;
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'body' | 'head') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipKit('marksman');
+      api.placeBotAhead(5);
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].hp).toBe(45);
+    let state = await debug(page);
+    expect(state.player.primaryWeapon).toBe('sniper');
+    expect(state.player.ammo).toBe(4);
+    expect(state.weaponPresentation.weapon).toBe('sniper');
+
+    await page.waitForTimeout(1_120);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { aimAtBot: (zone: 'body') => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
+    await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(1);
+
+    await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 4_000 }).toBe(true);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'head') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(5);
+      api.aimAtBot('head');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
+    await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(2);
+
+    state = await debug(page);
+    const [x, y, z] = state.deathDrops[0].position;
+    await page.evaluate(([dropX, dropY, dropZ]) => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        teleportPlayer: (x: number, y: number, z: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(dropX, dropY + 1.5, dropZ);
+    }, [x, y, z]);
+    await page.keyboard.press('KeyF');
+    await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe('carbine');
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setAmmo: (weapon: 'carbine', ammo: number, reserve: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAmmo('carbine', 1, 0);
+    });
+    await page.keyboard.press('KeyF');
+    await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(0);
+    state = await debug(page);
+    expect(state.player.primaryWeapon).toBe('carbine');
+    expect(state.player.ammo).toBe(1);
+    expect(state.player.reserve).toBeGreaterThan(0);
+  });
+
+  test('keeps the permanent reticle and every physical ADS sight on the authoritative centre ray', async ({ page }) => {
+    const reticle = await page.evaluate(() => {
+      const crosshair = document.querySelector<HTMLElement>('#crosshair')!;
+      const rect = crosshair.getBoundingClientRect();
+      const dot = getComputedStyle(crosshair, '::after');
+      return {
+        offsetX: rect.left + rect.width / 2 - innerWidth / 2,
+        offsetY: rect.top + rect.height / 2 - innerHeight / 2,
+        dotVisible: dot.content !== 'none' && Number.parseFloat(dot.width) >= 3 && Number.parseFloat(dot.height) >= 3,
+      };
+    });
+    expect(reticle).toEqual({ offsetX: 0, offsetY: 0, dotVisible: true });
+
+    for (const weapon of ['carbine', 'smg', 'scattergun', 'sniper', 'pistol'] as const) {
+      await page.evaluate((weaponId) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          equipWeapon: (id: typeof weaponId) => void;
+          setAds: (held: boolean) => void;
+          setMovement: (forward: boolean) => void;
+          fireOnce: () => void;
+        } }).__ATOMIC_ACRES_DEBUG__;
+        api.setAds(false);
+        api.setMovement(false);
+        api.equipWeapon(weaponId);
+        api.setAds(true);
+      }, weapon);
+      await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+      await expect.poll(async () => {
+        const offset = (await debug(page)).weaponPresentation.sightOffset;
+        return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
+      }).toBeLessThan(0.006);
+
+      await page.evaluate(() => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setMovement: (forward: boolean) => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
+        api.setMovement(true);
+        api.fireOnce();
+      });
+      await page.waitForTimeout(90);
+      const firingOffset = (await debug(page)).weaponPresentation.sightOffset;
+      expect(firingOffset, `${weapon} sight telemetry`).not.toBeNull();
+      expect(Math.hypot(...firingOffset!), `${weapon} sight moved off the bullet ray during recoil`).toBeLessThan(0.012);
+    }
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void; setMovement: (forward: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setMovement(false);
+    });
+  });
+
+  test('doubles the minimap, exposes heading, enlarges house flow, and breaks glass with gun and knife', async ({ page }) => {
+    let state = await debug(page);
+    expect(state.minimap.backingWidth).toBe(360);
+    expect(state.minimap.cssWidth).toBeGreaterThanOrEqual(299);
+    expect(state.houseNavigation).toHaveLength(2);
+    expect(state.houseNavigation.every((house) => house.dimensions.width === 18.2 && house.dimensions.depth === 16.4)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.rampWidth >= 2.6 && house.routeAnchors >= 9)).toBe(true);
+    expect(state.breakableWindows).toHaveLength(6);
+
+    const [px, py, pz] = state.player.position;
+    await page.evaluate(([x, y, z]) => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw?: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(x, y, z, -Math.PI / 2);
+    }, [px, py, pz]);
+    await expect.poll(async () => (await debug(page)).minimap.headingDegrees).toBe(90);
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.stageWindow(0, 4);
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[0].broken).toBe(true);
+    expect((await debug(page)).breakableWindows[0].visible).toBe(false);
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void; melee: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.stageWindow(1, 1.25);
+      api.melee();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[1].broken).toBe(true);
   });
 
   test('keeps ammo and Field Support cards large, clear, and non-overlapping', async ({ page }) => {
@@ -322,6 +499,24 @@ test.describe('solo mechanics', () => {
     expect(metrics.cardCount).toBe(3);
     expect(metrics.supportWidth).toBeGreaterThanOrEqual(390);
     expect(metrics.verticalGap).toBeGreaterThanOrEqual(6);
+  });
+
+  test('keeps the doubled map responsive and bottom-left HUD cards separated at 960x540', async ({ page }) => {
+    await page.setViewportSize({ width: 960, height: 540 });
+    const metrics = await page.evaluate(() => {
+      const minimap = document.querySelector<HTMLElement>('#minimap')!.getBoundingClientRect();
+      const location = document.querySelector<HTMLElement>('#location-label')!.getBoundingClientRect();
+      const equipment = document.querySelector<HTMLElement>('#equipment-block')!.getBoundingClientRect();
+      const health = document.querySelector<HTMLElement>('#health-block')!.getBoundingClientRect();
+      return {
+        minimapWidth: minimap.width,
+        locationEquipmentGap: equipment.top - location.bottom,
+        equipmentHealthGap: health.top - equipment.bottom,
+      };
+    });
+    expect(metrics.minimapWidth).toBe(240);
+    expect(metrics.locationEquipmentGap).toBeGreaterThanOrEqual(6);
+    expect(metrics.equipmentHealthGap).toBeGreaterThanOrEqual(6);
   });
 
   test('rate-limits fixed team pings and cleans their markers', async ({ page }) => {

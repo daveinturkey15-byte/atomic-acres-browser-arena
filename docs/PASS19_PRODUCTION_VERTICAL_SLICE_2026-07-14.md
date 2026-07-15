@@ -130,7 +130,7 @@ Do not rebuild the second house, all weapons, all operators, or the whole map un
 
 ### Intake and static audit
 
-- Candidate: `public/assets/third-party/opengameart/fps-arms/FPS_ARMS_RIG_1.fbx`.
+- Rejected candidate retained outside the deploy tree for provenance: `third-party-candidates/opengameart/fps-arms/FPS_ARMS_RIG_1.fbx`.
 - Licence/source records are preserved beside the unchanged FBX; the intake commit is `64a3ad0` (`chore: preserve pass 19 CC0 FPS arms candidate`).
 - Binary FBX 7.4; one skinned mesh; 4,103 vertices; 16,304 polygon indices; 4,076 polygons.
 - Bilateral upper-arm, forearm, hand, palm, thumb, and three-joint finger chains are present.

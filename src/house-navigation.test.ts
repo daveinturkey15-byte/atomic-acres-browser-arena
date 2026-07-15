@@ -48,7 +48,7 @@ describe('simplified two-floor house architecture', () => {
     const aqua = createHouseArchitecture(0, 0, 0, 1);
     const coral = createHouseArchitecture(1, 0, 0, -1);
     expect(aqua.id).not.toBe(coral.id);
-    expect(aqua.dimensions).toEqual({ width: 16.2, depth: 14.4, wallThickness: 0.42 });
+    expect(aqua.dimensions).toEqual({ width: 18.2, depth: 16.4, wallThickness: 0.42 });
     expect(coral.dimensions).toEqual(aqua.dimensions);
     for (const architecture of [aqua, coral]) {
       expect(architecture.rooms.filter((room) => room.level === 'ground')).toHaveLength(2);
@@ -83,6 +83,27 @@ describe('simplified two-floor house architecture', () => {
     expect(front.position[2] + front.size[2] / 2).toBeGreaterThanOrEqual(landing.position[2] - landing.size[2] / 2);
   });
 
+  it('keeps exterior door frames and floor seams wholly in front of wall faces', () => {
+    const architecture = createHouseArchitecture(0, 0, 0, 1);
+    const byName = (name: string) => {
+      const entry = architecture.solids.find((solid) => solid.name === name);
+      if (!entry) throw new Error(`Missing ${name}`);
+      return solidBounds(entry);
+    };
+    const frontWall = byName('front-ground-far-left');
+    const rearWall = byName('rear-ground-far-right');
+    const westWall = byName('ground-west-wall');
+    const eastWall = byName('ground-east-wall');
+    for (const name of ['front-entry-frame-left', 'front-entry-frame-right', 'front-entry-frame-head', 'floor-seam-front']) {
+      expect(byName(name).minZ, name).toBeGreaterThan(frontWall.maxZ);
+    }
+    for (const name of ['rear-entry-frame-left', 'rear-entry-frame-right', 'rear-entry-frame-head', 'floor-seam-rear']) {
+      expect(byName(name).maxZ, name).toBeLessThan(rearWall.minZ);
+    }
+    expect(byName('floor-seam-west').maxX).toBeLessThan(westWall.minX);
+    expect(byName('floor-seam-east').minX).toBeGreaterThan(eastWall.maxX);
+  });
+
   it('uses one continuous rendered-and-physical ramp with no stair proxies or clutter fixtures', () => {
     for (const team of [0, 1] as Team[]) {
       const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
@@ -90,11 +111,22 @@ describe('simplified two-floor house architecture', () => {
       const proxies = architecture.solids.filter((entry) => (entry.kind as string) === 'ramp-proxy');
       expect(ramps).toHaveLength(1);
       expect(ramps[0]).toMatchObject({ collidable: true, surface: 'timber' });
+      expect(ramps[0].size[2]).toBeGreaterThanOrEqual(2.6);
       expect(ramps[0].rotation && Math.abs(ramps[0].rotation[2])).toBeGreaterThan(0.2);
       expect(proxies).toHaveLength(0);
       expect(architecture.solids.some((entry) => (entry.kind as string) === 'stair')).toBe(false);
       expect(architecture.solids.some((entry) => (entry.kind as string) === 'fixture')).toBe(false);
       expect(architecture.solids.length).toBeLessThanOrEqual(48);
+    }
+  });
+
+  it('declares stable breakable IDs for every house glass pane', () => {
+    for (const team of [0, 1] as Team[]) {
+      const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+      const glass = architecture.solids.filter((entry) => entry.kind === 'glass');
+      expect(glass).toHaveLength(3);
+      expect(new Set(glass.map((entry) => entry.id)).size).toBe(3);
+      expect(glass.every((entry) => entry.breakable === true)).toBe(true);
     }
   });
 

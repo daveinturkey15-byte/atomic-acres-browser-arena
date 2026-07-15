@@ -1,6 +1,6 @@
 import { HOUSE_LAYOUT } from './arena-layout';
 
-export type ImpactSurface = 'metal' | 'concrete' | 'wood' | 'soil';
+export type ImpactSurface = 'metal' | 'concrete' | 'wood' | 'soil' | 'glass';
 export type FootstepSurface = 'asphalt' | 'concrete' | 'wood' | 'soil';
 
 export type SurfaceEvidence = {
@@ -29,11 +29,12 @@ export function combatConfirmEnvelope(kind: CombatConfirmKind): CombatConfirmEnv
   return CONFIRM_ENVELOPES[kind];
 }
 
-const SURFACES = new Set<ImpactSurface>(['metal', 'concrete', 'wood', 'soil']);
+const SURFACES = new Set<ImpactSurface>(['metal', 'concrete', 'wood', 'soil', 'glass']);
 
 export function classifyImpactSurface(evidence: SurfaceEvidence): ImpactSurface {
   if (typeof evidence.hint === 'string' && SURFACES.has(evidence.hint as ImpactSurface)) return evidence.hint as ImpactSurface;
   const name = (evidence.name ?? '').toLowerCase();
+  if (/(glass|window|pane)/.test(name)) return 'glass';
   if (/(metal|steel|chrome|vehicle|coach|truck|hydrant|mailbox|barrier|fence post|utility|tower)/.test(name)) return 'metal';
   if (/(wood|timber|deck|tree|trunk|branch|fence)/.test(name)) return 'wood';
   if (/(grass|ground|soil|garden|planter|shrub|hedge)/.test(name)) return 'soil';
@@ -68,8 +69,8 @@ export function classifyFootstepSurface(point: Point3): FootstepSurface {
   for (const house of HOUSE_LAYOUT) {
     const localX = Math.abs(point.x - house.x);
     const localZ = Math.abs(point.z - house.z);
-    if (point.y > 3.05 && localX <= 8.1 && localZ <= 7.1) return 'wood';
-    const deckZ = house.z - house.facing * 9.2;
+    if (point.y > 3.05 && localX <= 9.1 && localZ <= 8.2) return 'wood';
+    const deckZ = house.z - house.facing * 10.2;
     if (localX <= 5 && Math.abs(point.z - deckZ) <= 1.8 && point.y < 1.4) return 'wood';
   }
   const roadDistance = Math.abs(point.x);

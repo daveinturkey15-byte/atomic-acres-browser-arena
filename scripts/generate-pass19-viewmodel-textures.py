@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSET_DIR = ROOT / "public/assets/third-party/opengameart/fps-arms"
+ASSET_DIR = ROOT / "third-party-candidates/opengameart/fps-arms"
 SOURCE = ASSET_DIR / "source_diffuse.png"
 ALBEDO = ASSET_DIR / "new_diff.png"
 ROUGHNESS = ASSET_DIR / "atomic_arms_roughness.png"

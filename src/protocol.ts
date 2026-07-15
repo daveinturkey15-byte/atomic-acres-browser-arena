@@ -1,5 +1,5 @@
 export type Team = 0 | 1;
-export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun';
+export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun' | 'sniper';
 export type WeaponId = PrimaryWeaponId | 'pistol';
 
 export type PlayerSnapshot = {
@@ -47,6 +47,21 @@ export type HitMessage = {
   nonce: number;
 };
 export type DeathMessage = { type: 'death'; killer: string; victim: string; nonce: number };
+export type PickupMessage = {
+  type: 'pickup';
+  by: string;
+  dropId: string;
+  weapon: PrimaryWeaponId;
+  position: [number, number, number];
+  nonce: number;
+};
+export type WindowBreakMessage = {
+  type: 'window-break';
+  by: string;
+  windowId: string;
+  origin: [number, number, number];
+  nonce: number;
+};
 export type LeaveMessage = { type: 'leave'; playerId: string };
 export type TeamPingKind = 'enemy' | 'regroup' | 'push' | 'nice';
 export type TeamPingMessage = {
@@ -57,10 +72,10 @@ export type TeamPingMessage = {
   position: [number, number, number];
   nonce: number;
 };
-export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | LeaveMessage | TeamPingMessage;
+export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage;
 
-const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'pistol']);
-const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun']);
+const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'sniper', 'pistol']);
+const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun', 'sniper']);
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
   if (!value || typeof value !== 'object') return false;
@@ -103,6 +118,17 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.nonce);
     case 'death':
       return typeof msg.killer === 'string' && typeof msg.victim === 'string' && Number.isFinite(msg.nonce);
+    case 'pickup':
+      return typeof msg.by === 'string'
+        && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
+        && primaryWeapons.has(msg.weapon as PrimaryWeaponId)
+        && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
+        && Number.isFinite(msg.nonce);
+    case 'window-break':
+      return typeof msg.by === 'string'
+        && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
+        && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
+        && Number.isFinite(msg.nonce);
     case 'leave':
       return typeof msg.playerId === 'string';
     case 'ping':
@@ -126,6 +152,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'melee':
     case 'hit':
     case 'ping':
+    case 'pickup':
+    case 'window-break':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;

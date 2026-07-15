@@ -62,6 +62,15 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     pellets: 9, recoilPitch: 0.052, recoilYaw: 0.012, recoilRecovery: 8,
     switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
   },
+  sniper: {
+    id: 'sniper', name: 'Longline 86', damage: 55, minimumDamage: 55,
+    falloffStart: 96, falloffEnd: 120, headMultiplier: 2, limbMultiplier: 0.9,
+    rpm: 55, mag: 5, reserve: 25, reload: 2.6,
+    hipSpread: 0.052, adsSpreadMultiplier: 0.05, movementSpreadMultiplier: 1.8,
+    crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,
+    pellets: 1, recoilPitch: 0.072, recoilYaw: 0.016, recoilRecovery: 6.5,
+    switchSeconds: 0.68, automatic: false, color: 0xa9e7ff,
+  },
   pistol: {
     id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
     falloffStart: 20, falloffEnd: 58, headMultiplier: 1.5, limbMultiplier: 0.84,
@@ -216,6 +225,22 @@ export function sampleSpreadDisk(angle: number, radialRandom: number, angularRan
   const radius = Math.tan(Math.max(0, angle)) * Math.sqrt(Math.min(1, Math.max(0, radialRandom)));
   const theta = Math.min(1, Math.max(0, angularRandom)) * Math.PI * 2;
   return { x: Math.cos(theta) * radius, y: Math.sin(theta) * radius };
+}
+
+/**
+ * The reticle is the authoritative principal ray. Single-projectile weapons
+ * always fire through it; multi-pellet weapons reserve pellet zero for it and
+ * distribute only their remaining pellets around that centre ray.
+ */
+export function sampleWeaponPellet(
+  weapon: WeaponSpec,
+  pelletIndex: number,
+  angle: number,
+  radialRandom: number,
+  angularRandom: number,
+): { x: number; y: number } {
+  if (weapon.pellets <= 1 || pelletIndex <= 0) return { x: 0, y: 0 };
+  return sampleSpreadDisk(angle, radialRandom, angularRandom);
 }
 
 export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZone): number {
