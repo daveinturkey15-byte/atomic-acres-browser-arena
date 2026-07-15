@@ -1,7 +1,7 @@
 # Atomic Acres Pass 22 — Traversable Houses, Scavenging, Stable Grenades, and Marksman Auto Sidearm
 
 Date: 2026-07-15
-Status: locally implemented and verified; isolated review publication pending
+Status: published to isolated review; canonical root preserved
 Branch: `overhaul/house-loot-grenade-pass-22`
 Baseline: Pass 21 source `67ca0c2`
 
@@ -122,3 +122,25 @@ Pass 22 converts Dave's Pass 21 playtest feedback into shared architecture, inve
 - Chromium: `26/26` passed in four bounded serial groups (`9 + 6 + 7 + 4`) because the gateway's 600-second outer command cap is shorter than this one-file software-WebGL suite. Assertions and per-test timeouts were unchanged. Coverage includes all six weapons' physical sight/reticle ray, sniper+G18 loadout, independent walk-over/F drop consumption, two-frag non-freezing explosion with frame heartbeat, real jump→airborne-crouch window crossing, houses/ramps/floors, match reset, and Quality/Performance budgets.
 - Two-peer QA: passed with zero errors, opposite teams, 46.96-unit spawn separation, stance/window/scavenge/weapon-pickup replication, and authoritative ammo/grenade scavenging before the later independent weapon swap.
 - Visual inspection: exterior side ramp is connected to the upper side landing and leaves the front/rear ground doors clear; the widened interior has continuous floor/ceiling surfaces with no visible hole or Z-fighting seam; G18 ADS telemetry reports `sightOffset [0, 0]`.
+
+## Isolated review release
+
+- Gameplay implementation: `a5ffa28d58f6ef3967cf20efec7eb2e947da6ea3`.
+- Public-QA bounded-staging hardening: `f45b97e0c8a41a58dd3771c8e91d1c6e7e79cb6f` (QA script only; runtime artifacts unchanged).
+- Pages deployment: `922070af4d3cec2e7c083474e9f866b5bf2db9ce` (`built`).
+- URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass22/?source=a5ffa28&pages=922070a`.
+- Public HTML, app JS, and CSS hashes match the exact tested local artifacts.
+- Public solo smoke reached an active match with two houses, six windows, two grenades, marksman `sniper + machine-pistol`, and G18 `sightOffset [0, 0]`.
+- Public two-peer QA exited `0` with `errors: []`, opposing teams, one remote per peer, 46.96-unit spawn separation, and stance/window/scavenge/weapon replication.
+- Canonical root was preserved: root index blob `430899c6324a128ed99a4344c7de058be7eeb163`, root assets tree `e328066cf30bdbfef9a4f08d5933d877d17ff113`.
+- Pass 21 was preserved: `review/pass21` tree `d3dfa8a6ceb60825c0be92f43c430467dedb0a78` and public index blob `47a8c6f28670481bac1f6867fc888eed0c396635`.
+
+### Public-QA staging gotcha
+
+**Symptom:** Local multiplayer QA passed, but the first public run timed out waiting for the guest to observe the host's post-death-drop staging position.
+
+**Cause:** A debug teleport exceeded remote movement-admission velocity, and the verifier had not proved bidirectional convergence before emitting the next authority transition. Local latency happened to hide the rejected snapshot.
+
+**Correction:** Wait for both peers to observe initial combat staging, then move later staging positions in bounded `0.2`-unit increments every `120ms` before entering the `1.05` scavenging radius. Production admission limits remain unchanged.
+
+**Verify:** Both local and public `qa:multiplayer` now exit `0` with zero errors and independent `scavengeReplicated` plus `pickupReplicated` assertions true.
