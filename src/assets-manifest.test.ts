@@ -4,7 +4,16 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 type ManifestFile = { path: string; sha256: string };
-type ManifestAsset = { files: string | ManifestFile[]; license?: string; licenseFile?: string; provenanceFile?: string };
+type ManifestAsset = {
+  id?: string;
+  files: string | ManifestFile[];
+  license?: string;
+  licenseFile?: string;
+  provenanceFile?: string;
+  sha256?: string;
+  sourceBlend?: string;
+  sourceBlendSha256?: string;
+};
 type Manifest = { schemaVersion: number; assets: ManifestAsset[]; rejectedCandidates?: ManifestAsset[] };
 
 function filesBelow(root: string): string[] {
@@ -41,6 +50,18 @@ describe('third-party asset provenance', () => {
       expect(record.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect(sha256(record.path)).toBe(record.sha256);
     }
+  });
+
+  it('records exact checksums for the original Sanctified Frag GLB and editable Blender source', () => {
+    const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
+    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-sanctified-frag-2026-07-15');
+    expect(asset).toBeTruthy();
+    expect(asset?.files).toBe('public/assets/original/models/holy-hand-frag.glb');
+    expect(asset?.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(sha256(asset?.files as string)).toBe(asset?.sha256);
+    expect(asset?.sourceBlend).toBe('source-assets/blender/holy-hand-frag.blend');
+    expect(asset?.sourceBlendSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(sha256(asset?.sourceBlend as string)).toBe(asset?.sourceBlendSha256);
   });
 
   it('preserves rejected candidate provenance outside the deployable public tree', () => {

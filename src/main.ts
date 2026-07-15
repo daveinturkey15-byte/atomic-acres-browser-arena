@@ -55,6 +55,7 @@ import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
 import { consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
+import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   DEATH_DROP_INTERACTION_RANGE,
   DEATH_DROP_SCAVENGE_RANGE,
@@ -139,8 +140,9 @@ type BotPlayer = {
 };
 
 type GrenadeEntity = {
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D;
   velocity: THREE.Vector3;
+  angularVelocity: THREE.Vector3;
   explodeAt: number;
   lastBounceAt: number;
 };
@@ -2039,16 +2041,14 @@ function throwGrenade(): void {
   weaponView.throwGrenade();
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 14, 10),
-    new THREE.MeshStandardMaterial({ color: 0x34413a, roughness: 0.55, metalness: 0.48 }),
-  );
+  const mesh = createGrenadePresentation();
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
   grenades.push({
     mesh,
     velocity: direction.multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0)),
+    angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
     explodeAt: performance.now() + 2_300,
     lastBounceAt: 0,
   });
@@ -2113,9 +2113,7 @@ function clearGrenadeExplosionVisuals(): void {
 
 function explodeGrenade(entity: GrenadeEntity): void {
   const point = entity.mesh.position.clone();
-  scene.remove(entity.mesh);
-  entity.mesh.geometry.dispose();
-  (entity.mesh.material as THREE.Material).dispose();
+  disposeGrenadePresentation(entity.mesh);
   audio.explosion();
   const now = performance.now();
   spawnGrenadeExplosionVisual(point, now);
@@ -2140,6 +2138,9 @@ function updateGrenades(dt: number, now: number): void {
   for (let index = grenades.length - 1; index >= 0; index -= 1) {
     const grenade = grenades[index];
     grenade.velocity.y -= 18 * dt;
+    grenade.mesh.rotation.x += grenade.angularVelocity.x * dt;
+    grenade.mesh.rotation.y += grenade.angularVelocity.y * dt;
+    grenade.mesh.rotation.z += grenade.angularVelocity.z * dt;
     const start = grenade.mesh.position.clone();
     const delta = grenade.velocity.clone().multiplyScalar(dt);
     const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
@@ -2161,9 +2162,7 @@ function updateGrenades(dt: number, now: number): void {
       grenade.mesh.position.set(impact.x, impact.y, impact.z);
       spawnImpactFlash(grenade.mesh.position.clone());
       audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
-      scene.remove(grenade.mesh);
-      grenade.mesh.geometry.dispose();
-      (grenade.mesh.material as THREE.Material).dispose();
+      disposeGrenadePresentation(grenade.mesh);
       grenades.splice(index, 1);
       continue;
     }
@@ -2573,11 +2572,7 @@ function updateFieldSupport(dt: number, now: number): void {
 }
 
 function clearGrenades(): void {
-  for (const grenade of grenades) {
-    scene.remove(grenade.mesh);
-    grenade.mesh.geometry.dispose();
-    (grenade.mesh.material as THREE.Material).dispose();
-  }
+  for (const grenade of grenades) disposeGrenadePresentation(grenade.mesh);
   grenades.length = 0;
 }
 
@@ -3160,12 +3155,7 @@ function resetForMode(): void {
   previousHudScores = [0, 0];
   respawnEndsAt = 0;
   clearBots();
-  for (const grenade of grenades) {
-    scene.remove(grenade.mesh);
-    grenade.mesh.geometry.dispose();
-    (grenade.mesh.material as THREE.Material).dispose();
-  }
-  grenades.length = 0;
+  clearGrenades();
   clearGrenadeExplosionVisuals();
   clearFieldSupport();
   clearTeamPings();
@@ -3405,6 +3395,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
+    grenadeVisual: {
+      ...grenadePresentationTelemetry(),
+      active: grenades.map((grenade) => ({
+        name: grenade.mesh.name,
+        authored: grenade.mesh.userData.authoredGrenade === true,
+        meshes: (() => {
+          let count = 0;
+          grenade.mesh.traverse((node) => { if (node instanceof THREE.Mesh) count += 1; });
+          return count;
+        })(),
+      })),
+    },
     grenadeExplosion: {
       total: grenadeExplosions,
       activeVisuals: grenadeExplosionVisuals.length,
@@ -3756,7 +3758,8 @@ async function bootstrap(): Promise<void> {
   const artPromise = loadArenaArt(scene, (loaded, total) => {
     setStatus(`Loading authored arena models ${loaded}/${total}…`);
   }, reducedWorldDetail);
-  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
+  const grenadePromise = loadGrenadePresentation();
+  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise, grenadePromise]);
   characterPhysics = physics;
   arenaArtRoot = art.root;
   const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);

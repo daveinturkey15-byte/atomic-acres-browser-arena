@@ -43,6 +43,14 @@ type DebugState = {
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
+  grenadeVisual: {
+    status: 'idle' | 'loading' | 'ready' | 'fallback';
+    asset: string;
+    sourceMeshCount: number;
+    sourceMaxDimension: number;
+    targetMaxDimension: number;
+    active: Array<{ name: string; authored: boolean; meshes: number }>;
+  };
   grenadeExplosion: { total: number; activeVisuals: number; lastExplosionAgeMs: number | null };
   fieldSupport: {
     streak: number;
@@ -738,11 +746,17 @@ test.describe('solo mechanics', () => {
   test('starts with two frags and resolves explosions without freezing the game loop', async ({ page }) => {
     const before = await debug(page);
     expect(before.player.grenades).toBe(2);
+    expect(before.grenadeVisual.status).toBe('ready');
+    expect(before.grenadeVisual.asset).toBe('./assets/original/models/holy-hand-frag.glb');
+    expect(before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { throwGrenade: () => void } }).__ATOMIC_ACRES_DEBUG__.throwGrenade());
     await page.waitForTimeout(100);
     const thrown = await debug(page);
     expect(thrown.player.grenades).toBe(1);
     expect(thrown.grenades).toBe(1);
+    expect(thrown.grenadeVisual.active).toHaveLength(1);
+    expect(thrown.grenadeVisual.active[0]).toMatchObject({ name: 'sanctified-frag-authored-glb', authored: true });
+    expect(thrown.grenadeVisual.active[0].meshes).toBeGreaterThanOrEqual(12);
     await expect.poll(async () => (await debug(page)).grenadeExplosion.total, { timeout: 3_500 }).toBe(1);
     await expect.poll(async () => (await debug(page)).grenades).toBe(0);
     await expect.poll(async () => (await debug(page)).grenadeExplosion.activeVisuals).toBe(0);

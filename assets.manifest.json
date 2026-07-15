@@ -14,6 +14,21 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-sanctified-frag-2026-07-15",
+      "kind": "original-project-3d-model",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "scripts/blender/create-holy-hand-frag.py",
+      "generatedAsOf": "2026-07-15",
+      "license": "Original project work",
+      "files": "public/assets/original/models/holy-hand-frag.glb",
+      "sha256": "892a7e0fe08d24e3d743843b3642c2453715f69875af1bcad6a098c59fdba80c",
+      "sourceBlend": "source-assets/blender/holy-hand-frag.blend",
+      "sourceBlendSha256": "2312c8a20e7f9ec5227127dc3775f727bed263c157bc13e2bc48a8f592023e48",
+      "preview": "artifacts/holy-hand-frag/holy-hand-frag-preview.png",
+      "modifications": "Original ceremonial grenade authored from Blender primitives through the local Blender MCP socket. No commercial model, texture, or extracted game asset is used. Runtime loading preserves the existing gameplay collider, fuse, damage, networking, and explosion behavior.",
+      "attributionRequired": false
+    },
+    {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
       "kind": "third-party-rigged-operator-and-derived-first-person-arms",
       "creator": "Quaternius (@Quaternius)",
