@@ -1,7 +1,7 @@
 # Atomic Acres Pass 22 — Traversable Houses, Scavenging, Stable Grenades, and Marksman Auto Sidearm
 
 Date: 2026-07-15
-Status: published to isolated review; canonical root preserved
+Status: ramp/scope hotfix verified locally; corrected isolated review publication pending
 Branch: `overhaul/house-loot-grenade-pass-22`
 Baseline: Pass 21 source `67ca0c2`
 
@@ -22,7 +22,7 @@ Pass 22 converts Dave's Pass 21 playtest feedback into shared architecture, inve
 
 - Move each continuous ramp away from exterior/interior door circulation.
 - Slightly widen the usable rooms while retaining exactly two ground rooms and two upper rooms per house.
-- Preserve one rendered and Rapier-physical continuous incline per house; no hidden step substitution.
+- Preserve the rendered and Rapier-physical exterior incline, then add a smaller rendered and physical interior incline per house; no hidden step substitution.
 - Front-to-rear ground route and ramp route must pass in both directions with the real capsule.
 
 ### R3 — Floor continuity
@@ -86,8 +86,9 @@ Pass 22 converts Dave's Pass 21 playtest feedback into shared architecture, inve
 - Window sill top: `0.58`, above the controller's `0.42` auto-step but low enough for the real jump arc.
 - Ground window opening height: `1.97`; width: `2.6`.
 - The stance controller permits airborne shrinking from standing to crouch; airborne stand/prone transitions remain rejected.
-- The `2.8`-wide continuous incline is fully exterior on the house's west side and joins an upper side landing. It no longer crosses either ground-door route.
-- Ground and upper floors are single continuous slabs (`ground-floor-slab`, `upper-floor-slab`) with positive wall overlap rather than per-room pieces that can reveal a seam.
+- The original `2.8`-wide continuous incline remains fully exterior and joins its upper side landing without crossing either ground-door route.
+- A separate `2.2`-wide interior incline rises through a deliberate framed floor well to a positively overlapping upper landing. Slim non-colliding rails/posts keep the route readable without becoming invisible barriers.
+- The ground floor remains one overlapping slab. The upper floor uses `upper-floor-main`, `upper-floor-ramp-front`, and `upper-floor-ramp-rear` around the intentional ramp well, eliminating accidental seams while retaining real vertical circulation.
 
 ### Death-drop scavenging
 
@@ -122,6 +123,18 @@ Pass 22 converts Dave's Pass 21 playtest feedback into shared architecture, inve
 - Chromium: `26/26` passed in four bounded serial groups (`9 + 6 + 7 + 4`) because the gateway's 600-second outer command cap is shorter than this one-file software-WebGL suite. Assertions and per-test timeouts were unchanged. Coverage includes all six weapons' physical sight/reticle ray, sniper+G18 loadout, independent walk-over/F drop consumption, two-frag non-freezing explosion with frame heartbeat, real jump→airborne-crouch window crossing, houses/ramps/floors, match reset, and Quality/Performance budgets.
 - Two-peer QA: passed with zero errors, opposite teams, 46.96-unit spawn separation, stance/window/scavenge/weapon-pickup replication, and authoritative ammo/grenade scavenging before the later independent weapon swap.
 - Visual inspection: exterior side ramp is connected to the upper side landing and leaves the front/rear ground doors clear; the widened interior has continuous floor/ceiling surfaces with no visible hole or Z-fighting seam; G18 ADS telemetry reports `sightOffset [0, 0]`.
+
+## Indoor-ramp and Longline-scope hotfix
+
+- Runtime source commit: `199d5f1` (`fix: add indoor ramps and true sniper scope`).
+- Each mirrored house now declares both `exterior-access-ramp` (`2.8` wide) and `interior-access-ramp` (`2.2` wide), each with a nine-anchor bidirectional route.
+- Rapier controller tests ascend and descend both inclines in both house orientations. Door/window corridors remain clear and the floor-well sections positively overlap their landing.
+- Static-batch sources now carry `staticBatchRendered: true`, allowing debug/QA telemetry to distinguish a deliberately hidden source mesh that is present in a render batch from geometry that genuinely disappeared. Performance remains within the existing `140`-call budget.
+- Longline ADS uses a true angular 3× camera FOV: `2 × atan(tan(baseFov / 2) / 3)`. At the verified `82°` base FOV this settles at approximately `32.319°`.
+- Once ADS/FOV convergence is reached, the opaque physical scope body is replaced by a centered circular scope picture and reticle. Ordinary HUD elements are suppressed during the scoped view; the authoritative camera-center shot ray is unchanged.
+- Hotfix verification: TypeScript/lint passed; `167/167` deterministic tests passed across 32 files; all `26/26` Chromium scenarios passed in bounded serial groups; local two-peer compatibility QA passed with `errors: []`; Performance and Quality budgets passed; dependency audit found zero vulnerabilities.
+- Exact hotfix artifact: 27 files; release-tree verifier clean; checksum-manifest SHA-256 `ab1d39a58aff11339b300f1b4f37da3a113e5fc591af37fa0d42254a7d47770b`.
+- Final local visual checks confirmed the batched indoor deck, slim rails/posts, framed upper landing, retained outdoor ramp, clear 3× sight picture, centered reticle, no black optic occlusion, and no ordinary HUD bleed-through.
 
 ## Isolated review release
 
