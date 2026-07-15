@@ -2686,12 +2686,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     arenaStoryReady: ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
     interiorTelemetry: (() => {
-      const counts = { stairs: 0, beds: 0, workbenches: 0, lights: 0, visibleCollisionProxies: 0 };
+      const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0 };
       scene.traverse((node) => {
-        if (node.name === 'interior-stair-tread') counts.stairs += 1;
-        if (node.name === 'upper-room-bed-base') counts.beds += 1;
-        if (node.name === 'upper-room-workbench') counts.workbenches += 1;
-        if (node.name === 'interior-ceiling-light') counts.lights += 1;
+        if (/^(upper-room-(bed|headboard|workbench|console)|performance-interior)/.test(node.name)) counts.furnishings += 1;
+        if (/interior-ceiling-light|balcony-rail|house-gable-finish|house-gutter|house-chimney/.test(node.name)) counts.fixtures += 1;
         if (node.userData.collisionProxy === true && node.visible) counts.visibleCollisionProxies += 1;
       });
       return counts;
@@ -2869,7 +2867,7 @@ async function bootstrap(): Promise<void> {
   joinButton.disabled = true;
   setStatus('Loading authored arena art, weapons and advanced collision…');
 
-  const physicsPromise = CharacterPhysics.create(arena.colliders, arena.bounds);
+  const physicsPromise = CharacterPhysics.create(arena.physicsColliders, arena.bounds);
   const weaponPromise = weaponView.load((loaded, total) => {
     setStatus(`Loading authored weapons ${loaded}/${total}…`);
   });

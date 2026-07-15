@@ -3,16 +3,25 @@ import { texturedMaterial } from './art-kit';
 import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
-import { createHouseArchitecture, HouseSurface } from './house-navigation';
+import { createHouseArchitecture, HouseSurface, solidBounds } from './house-navigation';
 import { Team } from './protocol';
 
 export type PracticeTarget = { id: string; root: THREE.Group; active: boolean; respawnAt: number };
 export type ArenaMap = {
   colliders: Box2[];
+  physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
   spawns: Record<Team, THREE.Vector3[]>;
   targets: PracticeTarget[];
   bounds: Box2;
+  houseTelemetry: {
+    houses: number;
+    groundRooms: number;
+    upperRooms: number;
+    doors: number;
+    windows: number;
+    ramps: number;
+  };
 };
 
 const material = (color: number, roughness = 0.78, metalness = 0.03) =>
@@ -20,8 +29,10 @@ const material = (color: number, roughness = 0.78, metalness = 0.03) =>
 
 export function buildArena(scene: THREE.Scene): ArenaMap {
   const colliders: Box2[] = [];
+  const physicsColliders: Box2[] = [];
   const raycastMeshes: THREE.Object3D[] = [];
   const targets: PracticeTarget[] = [];
+  const houseTelemetry = { houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0 };
   const world = new THREE.Group();
   world.name = 'Atomic Acres arena';
   scene.add(world);
@@ -68,14 +79,16 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     world.add(mesh);
     if (blocksShots) raycastMeshes.push(mesh);
     if (solid) {
-      colliders.push({
+      const bounds = {
         minX: position[0] - size[0] / 2,
         maxX: position[0] + size[0] / 2,
         minZ: position[2] - size[2] / 2,
         maxZ: position[2] + size[2] / 2,
         minY: position[1] - size[1] / 2,
         maxY: position[1] + size[1] / 2,
-      });
+      };
+      colliders.push(bounds);
+      physicsColliders.push(bounds);
     }
     return mesh;
   }
@@ -89,16 +102,6 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     proxy.userData.collisionProxy = true;
   }
 
-  function colliderOnly(position: [number, number, number], size: [number, number, number]): void {
-    colliders.push({
-      minX: position[0] - size[0] / 2,
-      maxX: position[0] + size[0] / 2,
-      minZ: position[2] - size[2] / 2,
-      maxZ: position[2] + size[2] / 2,
-      minY: position[1] - size[1] / 2,
-      maxY: position[1] + size[1] / 2,
-    });
-  }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(86, 98), palette.grass);
   ground.rotation.x = -Math.PI / 2;
@@ -123,10 +126,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
 
   function addHouse(team: Team, x: number, z: number, facing: 1 | -1): void {
-    const frontZ = z + facing * 7.2;
-    const backZ = z - facing * 7.2;
-    const trim = palette.white;
     const architecture = createHouseArchitecture(team, x, z, facing);
+    houseTelemetry.houses += 1;
+    houseTelemetry.groundRooms += architecture.rooms.filter((room) => room.level === 'ground').length;
+    houseTelemetry.upperRooms += architecture.rooms.filter((room) => room.level === 'upper').length;
+    houseTelemetry.doors += architecture.openings.filter((opening) => opening.kind === 'exterior-door').length;
+    houseTelemetry.windows += architecture.openings.filter((opening) => opening.kind === 'window').length;
+    houseTelemetry.ramps += architecture.solids.filter((solid) => solid.kind === 'ramp').length;
     const surfaceMaterial: Record<HouseSurface, THREE.Material> = {
       aqua: palette.aqua,
       coral: palette.coral,
@@ -134,68 +140,34 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       brick: palette.brick,
       timber: palette.timber,
       concrete: palette.concrete,
-      trim,
+      trim: palette.white,
       glass: palette.glass,
       metal: palette.chrome,
-      ceiling: texturedMaterial('./assets/original/textures/ceiling-acoustic.png', { roughness: 0.96, repeatX: 3, repeatY: 3 }),
+      ceiling: palette.cream,
       light: new THREE.MeshBasicMaterial({ color: 0xffe2a3, toneMapped: false }),
     };
 
     for (const solid of architecture.solids) {
-      const mat = surfaceMaterial[solid.surface];
-      if (solid.kind === 'stair') {
-        // Keep full-step controller collision while presenting credible thin
-        // treads and risers. Both derive from the same authored declaration.
-        colliderOnly(solid.position, solid.size);
-        const top = solid.position[1] + solid.size[1] / 2;
-        box('interior-stair-tread', [solid.position[0], top - 0.055, solid.position[2]], [solid.size[0], 0.11, solid.size[2]], mat, false, true, true);
-        box(
-          'interior-stair-riser',
-          [solid.position[0], top - 0.17, solid.position[2] - facing * (solid.size[2] / 2 - 0.04)],
-          [solid.size[0], 0.34, 0.08],
-          mat,
-          false,
-          true,
-          true,
-        );
-      } else {
-        const rendered = box(solid.name, solid.position, solid.size, mat, solid.collidable, solid.kind !== 'glass');
+      if (solid.kind === 'ramp') {
+        const rendered = box(solid.name, solid.position, solid.size, surfaceMaterial[solid.surface], false, true, false);
         if (solid.rotation) rendered.rotation.set(...solid.rotation);
+        physicsColliders.push(solidBounds(solid));
+        continue;
       }
+      const rendered = box(
+        solid.name,
+        solid.position,
+        solid.size,
+        surfaceMaterial[solid.surface],
+        solid.collidable,
+        solid.kind !== 'glass',
+      );
+      if (solid.rotation) rendered.rotation.set(...solid.rotation);
     }
 
-    // Glass occupies the authored upper openings but remains non-authoritative.
-    for (const wallZ of [frontZ, backZ]) {
-      for (const wx of [x - 4.7, x + 4.7]) {
-        box('window-glass', [wx, 5.35, wallZ + facing * 0.08], [2.1, 1.65, 0.08], palette.glass, false, false);
-      }
-    }
-
-    // Twin pitched roof slabs, gutters, porch columns and exterior dressing.
-    const roofLeft = box('pitched-roof', [x - 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.roof, false);
-    roofLeft.rotation.z = -0.24;
-    const roofRight = box('pitched-roof', [x + 4.15, 8.15, z], [9.2, 0.48, 15.7], palette.roof, false);
-    roofRight.rotation.z = 0.24;
-    box('front-porch', [x, 0.22, frontZ + facing * 1.4], [8.2, 0.44, 2.5], palette.concrete, false);
-    for (const px of [x - 3.5, x + 3.5]) {
-      box('porch-column', [px, 1.8, frontZ + facing * 1.65], [0.28, 3.6, 0.28], trim, false);
-    }
-    box('balcony', [x, 4.1, backZ - facing * 1.1], [10, 0.4, 2.2], palette.concrete, false);
-    box('chimney', [x + 5.4, 8.6, z - facing * 3], [1.45, 3.4, 1.45], palette.brick, false);
-    box('gutter', [x - 8.25, 7.68, z], [0.18, 0.18, 15.5], palette.chrome, false, false);
-    box('gutter', [x + 8.25, 7.68, z], [0.18, 0.18, 15.5], palette.chrome, false, false);
-
-    if (team === 0) {
-      // The Aqua west spawn looks directly at this broad side wall. A single
-      // graphic service bay breaks the empty siding without changing collision,
-      // cover or route readability.
-      const sideX = x - 8.28;
-      box('aqua-side-foundation-band', [sideX, 0.28, z - 0.4], [0.12, 0.42, 7.4], palette.dark, false, false);
-      box('aqua-side-service-panel', [sideX - 0.07, 2.85, z - 1], [0.08, 1.05, 2.15], trim, false, false);
-      box('aqua-side-service-stripe', [sideX - 0.12, 2.85, z - 1], [0.035, 0.13, 1.72], palette.mustard, false, false);
-      box('aqua-side-service-marker', [sideX - 0.13, 3.12, z - 1], [0.03, 0.3, 0.3], surfaceMaterial.light, false, false);
-      box('aqua-side-lamp', [sideX - 0.12, 4.35, z + 3.8], [0.04, 0.26, 0.38], surfaceMaterial.light, false, false);
-    }
+    // One quiet roof cap is the only exterior dressing. Door and the two windows
+    // come directly from the same simplified architecture declaration.
+    box('simple-house-roof', [x, 7.35, z], [16.8, 0.42, 15], palette.roof, false);
   }
 
   for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
@@ -314,8 +286,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   return {
     colliders,
+    physicsColliders,
     raycastMeshes,
     targets,
+    houseTelemetry,
     bounds: { ...ARENA_BOUNDS },
     spawns: {
       0: SPAWN_LAYOUT[0].map(([x, z]) => new THREE.Vector3(x, 1.7, z)),

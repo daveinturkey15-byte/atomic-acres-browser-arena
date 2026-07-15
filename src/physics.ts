@@ -83,13 +83,24 @@ export class CharacterPhysics {
       const halfX = Math.max(0.01, (box.maxX - box.minX) / 2);
       const halfY = Math.max(0.01, (maxY - minY) / 2);
       const halfZ = Math.max(0.01, (box.maxZ - box.minZ) / 2);
-      world.createCollider(
-        RAPIER.ColliderDesc.cuboid(halfX, halfY, halfZ).setTranslation(
-          (box.minX + box.maxX) / 2,
-          (minY + maxY) / 2,
-          (box.minZ + box.maxZ) / 2,
-        ),
+      const descriptor = RAPIER.ColliderDesc.cuboid(halfX, halfY, halfZ).setTranslation(
+        (box.minX + box.maxX) / 2,
+        (minY + maxY) / 2,
+        (box.minZ + box.maxZ) / 2,
       );
+      if (box.rotation) {
+        const [x, y, z] = box.rotation;
+        const [sx, cx] = [Math.sin(x / 2), Math.cos(x / 2)];
+        const [sy, cy] = [Math.sin(y / 2), Math.cos(y / 2)];
+        const [sz, cz] = [Math.sin(z / 2), Math.cos(z / 2)];
+        descriptor.setRotation({
+          x: sx * cy * cz + cx * sy * sz,
+          y: cx * sy * cz - sx * cy * sz,
+          z: cx * cy * sz + sx * sy * cz,
+          w: cx * cy * cz - sx * sy * sz,
+        });
+      }
+      world.createCollider(descriptor);
     }
 
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());

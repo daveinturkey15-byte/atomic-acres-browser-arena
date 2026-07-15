@@ -114,66 +114,14 @@ function createSignTexture(label: string): THREE.CanvasTexture {
 
 function addFacadeAndInteriorDressing(root: THREE.Group): void {
   const trim = new THREE.MeshStandardMaterial({ color: 0xf1e5cc, roughness: 0.68 });
-  const dark = texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { roughness: 0.62, metalness: 0.22 });
-  const timber = texturedMaterial('./assets/original/textures/wood-deck.png', { roughness: 0.9, repeatX: 3 });
   const fabricAqua = new THREE.MeshStandardMaterial({ color: 0x347a80, roughness: 0.96 });
   const fabricCoral = new THREE.MeshStandardMaterial({ color: 0x9d4f43, roughness: 0.96 });
-  const shellAqua = new THREE.MeshBasicMaterial({ color: 0x4f9fa1 });
-  const shellCoral = new THREE.MeshBasicMaterial({ color: 0xb96755 });
-  const interiorWall = new THREE.MeshStandardMaterial({
-    color: 0xcbbf9f,
-    emissive: 0x3b3020,
-    emissiveIntensity: 0.32,
-    roughness: 0.92,
-  });
 
-  for (const layout of HOUSE_LAYOUT) {
-    const house = {
-      ...layout,
-      fabric: layout.team === 0 ? fabricAqua : fabricCoral,
-      shell: layout.team === 0 ? shellAqua : shellCoral,
-    };
-    const frontZ = house.z + house.facing * 7.48;
-    const backZ = house.z - house.facing * 7.55;
+  // House geometry is intentionally complete in createHouseArchitecture()/map.ts.
+  // Keep this layer off the houses so ramps, four-room plans, door and windows
+  // cannot be obscured by legacy gables, balconies, downpipes or garden walls.
 
-    // Structural walls, doors, windows, roof finish and interior fixtures now
-    // come exclusively from createHouseArchitecture()/map.ts. Never overlay an
-    // opaque legacy facade: it can visually seal a valid collision opening.
-    const gableShape = new THREE.Shape();
-    gableShape.moveTo(-8, 0); gableShape.lineTo(8, 0); gableShape.lineTo(0, 3.25); gableShape.closePath();
-    const houseGable = new THREE.Mesh(new THREE.ShapeGeometry(gableShape), house.shell);
-    houseGable.name = 'house-gable-finish';
-    houseGable.position.set(house.x, 7.18, frontZ + house.facing * 0.37);
-    if (house.facing === 1) houseGable.rotation.y = Math.PI;
-    decorative(houseGable); root.add(houseGable);
-
-
-    for (const levelY of [2.9, 6.95]) {
-      for (const sideX of [house.x - 8.38, house.x + 8.38]) {
-        const downpipe = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, levelY - 0.2, 8), dark);
-        downpipe.position.set(sideX, levelY / 2, house.z + 5.8);
-        decorative(downpipe); root.add(downpipe);
-      }
-    }
-
-    for (const xOffset of [-4.2, -1.4, 1.4, 4.2]) {
-      const rail = roundedBox('balcony-rail', [0.12, 1.05, 0.12], trim, 0.025);
-      rail.position.set(house.x + xOffset, 4.72, backZ - house.facing * 1.2);
-      decorative(rail); root.add(rail);
-    }
-    const railTop = roundedBox('balcony-rail-top', [9.2, 0.12, 0.14], trim, 0.025);
-    railTop.position.set(house.x, 5.2, backZ - house.facing * 1.2);
-    decorative(railTop); root.add(railTop);
-
-
-    for (const xOffset of [-5.6, -2.8, 2.8, 5.6]) {
-      const gardenWall = roundedBox('garden-wall', [2.2, 0.64, 0.48], trim, 0.1);
-      gardenWall.position.set(house.x + xOffset, 0.32, frontZ + house.facing * 3.6);
-      decorative(gardenWall); root.add(gardenWall);
-    }
-  }
-
-  // The end garages are major lane anchors; give them bright readable gables instead of dark blockout silhouettes.
+  // The end garages remain separate lane anchors rather than house clutter.
   const garageRoofs = GARAGE_LAYOUT.map((garage, index) => ({
     ...garage,
     accent: index === 0 ? fabricAqua : fabricCoral,
@@ -439,46 +387,6 @@ function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   }
 }
 
-function addSemanticHomeInteriors(root: THREE.Group, reduced: boolean): void {
-  const cream: THREE.Material = reduced
-    ? new THREE.MeshBasicMaterial({ color: 0xd8c7a5 })
-    : new THREE.MeshStandardMaterial({ color: 0xd8c7a5, roughness: 0.88 });
-  const dark: THREE.Material = reduced
-    ? new THREE.MeshBasicMaterial({ color: 0x35464a })
-    : new THREE.MeshStandardMaterial({ color: 0x35464a, roughness: 0.68, metalness: 0.18 });
-  const aqua: THREE.Material = reduced
-    ? new THREE.MeshBasicMaterial({ color: 0x3f8588 })
-    : new THREE.MeshStandardMaterial({ color: 0x3f8588, roughness: 0.92 });
-  const coral: THREE.Material = reduced
-    ? new THREE.MeshBasicMaterial({ color: 0xa65749 })
-    : new THREE.MeshStandardMaterial({ color: 0xa65749, roughness: 0.92 });
-  const gold = new THREE.MeshBasicMaterial({ color: 0xd5ad42 });
-  const simpleBox = (name: string, size: [number, number, number], material: THREE.Material, x: number, y: number, z: number) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-    mesh.name = name;
-    mesh.position.set(x, y, z);
-    decorative(mesh);
-    root.add(mesh);
-  };
-
-  for (const house of HOUSE_LAYOUT) {
-    const fabric = house.team === 0 ? aqua : coral;
-    if (reduced) {
-      simpleBox('performance-interior-sofa-seat', [3.2, 0.58, 1.15], fabric, house.x - 3.8, 0.55, house.z + house.facing * 1.8);
-      simpleBox('performance-interior-sofa-back', [3.2, 1.05, 0.34], fabric, house.x - 3.8, 1.12, house.z + house.facing * 1.38);
-      simpleBox('performance-interior-counter', [3.7, 1.05, 0.8], dark, house.x + 3.2, 0.53, house.z - house.facing * 2.8);
-      simpleBox('performance-interior-rug', [4.4, 0.035, 3.1], cream, house.x - 3.8, 0.045, house.z + house.facing * 1.5);
-    }
-    // Original upstairs room identities: a sleeping nook on the broad slab and
-    // an Atomic Acres hobby desk beside the landing.
-    simpleBox('upper-room-bed-base', [3.4, 0.42, 2.05], fabric, house.x - 4.6, 3.82, house.z - house.facing * 2.4);
-    simpleBox('upper-room-headboard', [3.4, 1.1, 0.24], dark, house.x - 4.6, 4.25, house.z - house.facing * 3.38);
-    simpleBox('upper-room-workbench', [2.8, 0.18, 1.1], cream, house.x + 4.8, 4.25, house.z + house.facing * 4.25);
-    simpleBox('upper-room-console', [1.65, 0.68, 0.25], dark, house.x + 4.8, 4.65, house.z + house.facing * 4.2);
-    simpleBox('upper-room-console-screen', [1.05, 0.38, 0.04], gold, house.x + 4.8, 4.66, house.z + house.facing * 4.35);
-  }
-}
-
 /** Updates only explicitly presentation-only arena nodes. */
 export function updateArenaArt(root: THREE.Group, now: number): void {
   const state = arenaAnimationAt(now);
@@ -493,23 +401,6 @@ export function updateArenaArt(root: THREE.Group, now: number): void {
     beacon.scale.setScalar(0.86 + state.beaconPulse * 0.22);
     const material = beacon.material;
     if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = 1.7 + state.beaconPulse * 2;
-  }
-}
-
-function addHouseInteriorLighting(root: THREE.Group, reduced: boolean): void {
-  const fixtureMaterial: THREE.Material = reduced
-    ? new THREE.MeshBasicMaterial({ color: 0xffd78a })
-    : new THREE.MeshStandardMaterial({ color: 0xffe5b5, emissive: 0xffb45b, emissiveIntensity: 2.4, roughness: 0.45 });
-  for (const { x, z } of HOUSE_LAYOUT) {
-    if (!reduced) {
-      const light = new THREE.PointLight(0xffd7a0, 4.8, 21, 1.7);
-      light.position.set(x, 4.8, z);
-      root.add(light);
-    }
-    const fixture = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 16), fixtureMaterial);
-    fixture.name = 'interior-ceiling-light';
-    fixture.position.set(x, 6.9, z);
-    root.add(fixture);
   }
 }
 
@@ -528,10 +419,8 @@ export async function loadArenaArt(
   const root = new THREE.Group();
   root.name = 'original-arena-art';
   scene.add(root);
-  addHouseInteriorLighting(root, reduced);
 
   addNarrativeDressing(root, reduced);
-  addSemanticHomeInteriors(root, reduced);
   const coach = buildRetroCoach();
   coach.position.set(-3.8, 0, 7);
   coach.rotation.y = 0.03;

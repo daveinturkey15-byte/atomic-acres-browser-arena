@@ -43,57 +43,52 @@ async function traverse(architecture: HouseArchitecture, route: readonly string[
   }
 }
 
-describe('authored house architecture', () => {
-  it('defines distinct original identities with human-scale openings', () => {
+describe('simplified two-floor house architecture', () => {
+  it('defines exactly two rooms per floor, one exterior door, and one window per floor', () => {
     const aqua = createHouseArchitecture(0, 0, 0, 1);
     const coral = createHouseArchitecture(1, 0, 0, -1);
     expect(aqua.id).not.toBe(coral.id);
     expect(aqua.dimensions).toEqual({ width: 16.2, depth: 14.4, wallThickness: 0.42 });
     expect(coral.dimensions).toEqual(aqua.dimensions);
     for (const architecture of [aqua, coral]) {
-      const exterior = architecture.openings.filter((entry) => entry.kind === 'exterior-door');
-      const interior = architecture.openings.filter((entry) => entry.kind === 'interior-opening');
-      expect(exterior.length).toBeGreaterThanOrEqual(2);
-      expect(interior.length).toBeGreaterThanOrEqual(2);
-      expect(exterior.every((entry) => entry.width >= 1.5 && entry.width <= 1.8)).toBe(true);
-      expect(interior.every((entry) => entry.width >= 1.2 && entry.width <= 1.5)).toBe(true);
+      expect(architecture.rooms.filter((room) => room.level === 'ground')).toHaveLength(2);
+      expect(architecture.rooms.filter((room) => room.level === 'upper')).toHaveLength(2);
+      expect(new Set(architecture.rooms.map((room) => room.id)).size).toBe(4);
+      expect(architecture.openings.filter((entry) => entry.kind === 'exterior-door')).toHaveLength(1);
+      expect(architecture.openings.filter((entry) => entry.kind === 'window')).toHaveLength(2);
+      expect(architecture.openings.filter((entry) => entry.kind === 'interior-opening')).toHaveLength(2);
       expect(new Set(architecture.anchors.map((entry) => entry.id)).size).toBe(architecture.anchors.length);
     }
   });
 
-  it('defines substantial non-authoritative stair finish and landing guards', () => {
+  it('uses one continuous rendered-and-physical ramp with no stair proxies or clutter fixtures', () => {
     for (const team of [0, 1] as Team[]) {
       const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
-      const finish = architecture.solids.filter((entry) => entry.name.includes('-finish-'));
-      const nosings = finish.filter((entry) => /nosing/.test(entry.name));
-      const rails = finish.filter((entry) => /rail/.test(entry.name));
-      const balusters = finish.filter((entry) => /baluster/.test(entry.name));
-      expect(nosings.length).toBe(12);
-      expect(rails.length).toBe(2);
-      expect(balusters.length).toBeGreaterThanOrEqual(team === 0 ? 12 : 8);
-      expect(finish.every((entry) => !entry.collidable && entry.kind === 'fixture')).toBe(true);
-      expect(rails.every((entry) => entry.rotation && Math.abs(entry.rotation[0]) > 0.4)).toBe(true);
-      expect(architecture.solids.filter((entry) => /landing-guard/.test(entry.name)).length).toBeGreaterThanOrEqual(3);
-      const upperCeiling = architecture.solids.find((entry) => /upper-ceiling/.test(entry.name));
-      expect(upperCeiling).toMatchObject({ surface: 'ceiling', collidable: false, kind: 'fixture' });
-      expect(upperCeiling?.size[0]).toBeGreaterThan(15);
+      const ramps = architecture.solids.filter((entry) => entry.kind === 'ramp');
+      const proxies = architecture.solids.filter((entry) => (entry.kind as string) === 'ramp-proxy');
+      expect(ramps).toHaveLength(1);
+      expect(ramps[0]).toMatchObject({ collidable: true, surface: 'timber' });
+      expect(ramps[0].rotation && Math.abs(ramps[0].rotation[2])).toBeGreaterThan(0.2);
+      expect(proxies).toHaveLength(0);
+      expect(architecture.solids.some((entry) => (entry.kind as string) === 'stair')).toBe(false);
+      expect(architecture.solids.some((entry) => (entry.kind as string) === 'fixture')).toBe(false);
+      expect(architecture.solids.length).toBeLessThanOrEqual(48);
     }
   });
 
-  it.each([0, 1] as Team[])('traverses every declared ground route forward and backward for team %s', async (team) => {
+  it.each([0, 1] as Team[])('traverses the two downstairs rooms in both directions for team %s', async (team) => {
     const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
-    const groundRoutes = Object.entries(architecture.routes).filter(([id]) => !/stair/i.test(id));
-    for (const [, route] of groundRoutes) {
-      await traverse(architecture, route);
-      await traverse(architecture, route, true);
-    }
+    const groundRoute = architecture.routes['ground-room-flow'];
+    expect(groundRoute).toBeDefined();
+    await traverse(architecture, groundRoute);
+    await traverse(architecture, groundRoute, true);
   });
 
-  it.each([0, 1] as Team[])('climbs and descends the declared stair route for team %s', async (team) => {
+  it.each([0, 1] as Team[])('climbs and descends the ramp between both upstairs rooms for team %s', async (team) => {
     const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
-    const stairRoute = Object.entries(architecture.routes).find(([id]) => /stair/i.test(id));
-    expect(stairRoute).toBeDefined();
-    await traverse(architecture, stairRoute![1]);
-    await traverse(architecture, stairRoute![1], true);
+    const rampRoute = architecture.routes['ramp-room-flow'];
+    expect(rampRoute).toBeDefined();
+    await traverse(architecture, rampRoute);
+    await traverse(architecture, rampRoute, true);
   });
 });

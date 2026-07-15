@@ -1,4 +1,13 @@
-export type Box2 = { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+export type Box2 = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  minY?: number;
+  maxY?: number;
+  /** Optional visual-space Euler rotation consumed only by the Rapier physics adapter. */
+  rotation?: [number, number, number];
+};
 export type Point3 = { x: number; y: number; z: number };
 export type SweptSphereHit = { time: number; normal: Point3 };
 

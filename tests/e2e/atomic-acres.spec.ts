@@ -56,7 +56,17 @@ type DebugState = {
   originalArtLoaded: boolean;
   arenaZone: string;
   arenaStoryReady: boolean;
-  interiorTelemetry: { stairs: number; beds: number; workbenches: number; lights: number; visibleCollisionProxies: number };
+  interiorTelemetry: {
+    houses: number;
+    groundRooms: number;
+    upperRooms: number;
+    doors: number;
+    windows: number;
+    ramps: number;
+    furnishings: number;
+    fixtures: number;
+    visibleCollisionProxies: number;
+  };
   weaponReady: boolean;
   weaponPresentation: {
     weapon: 'carbine' | 'smg' | 'scattergun' | 'pistol';
@@ -508,7 +518,17 @@ test.describe('performance and stability', () => {
     expect(state.render.calls).toBeLessThanOrEqual(140);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
-    expect(state.interiorTelemetry).toMatchObject({ stairs: 24, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
+    expect(state.interiorTelemetry).toEqual({
+      houses: 2,
+      groundRooms: 4,
+      upperRooms: 4,
+      doors: 2,
+      windows: 4,
+      ramps: 2,
+      furnishings: 0,
+      fixtures: 0,
+      visibleCollisionProxies: 0,
+    });
     expect(errors).toEqual([]);
   });
 
@@ -542,7 +562,17 @@ test.describe('performance and stability', () => {
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
     expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
     expect(state.bots[0].operatorModel).toMatchObject({ skinnedMeshes: 5, clips: 24, weaponChildren: 1 });
-    expect(state.interiorTelemetry).toMatchObject({ stairs: 24, beds: 2, workbenches: 2, lights: 2, visibleCollisionProxies: 0 });
+    expect(state.interiorTelemetry).toEqual({
+      houses: 2,
+      groundRooms: 4,
+      upperRooms: 4,
+      doors: 2,
+      windows: 4,
+      ramps: 2,
+      furnishings: 0,
+      fixtures: 0,
+      visibleCollisionProxies: 0,
+    });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/quality-arms-operator.png' });
   });
