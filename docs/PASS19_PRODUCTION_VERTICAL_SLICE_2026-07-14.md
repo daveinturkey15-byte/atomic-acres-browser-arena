@@ -125,3 +125,48 @@ Do not rebuild the second house, all weapons, all operators, or the whole map un
 5. Capture temporal and still evidence in both profiles.
 6. Run owner A/B and independent gate.
 7. Scale only after the gate passes.
+
+## 8. Pass 19 FPS arms candidate evaluation — 2026-07-15
+
+### Intake and static audit
+
+- Candidate: `public/assets/third-party/opengameart/fps-arms/FPS_ARMS_RIG_1.fbx`.
+- Licence/source records are preserved beside the unchanged FBX; the intake commit is `64a3ad0` (`chore: preserve pass 19 CC0 FPS arms candidate`).
+- Binary FBX 7.4; one skinned mesh; 4,103 vertices; 16,304 polygon indices; 4,076 polygons.
+- Bilateral upper-arm, forearm, hand, palm, thumb, and three-joint finger chains are present.
+- The FBX contains no embedded `Texture`/`Video` object and no external texture filename reference. Runtime experiments therefore assigned `new_diff.png` and `atomic_arms_roughness.png` explicitly.
+- Three.js `FBXLoader` removes periods from source node names. The experimental resolver required narrowly scoped aliases for both source names such as `upper_arm.R` and normalized runtime names such as `upper_armR`.
+
+### Isolated A/B experiment
+
+The candidate was tested only through an uncommitted opt-in path; the stable/default release was never changed.
+
+| View | Local query | Finding |
+|---|---|---|
+| Stable Pass 18 | `?render=quality` | Existing procedural arms remained the control. |
+| Raw imported bind | `?render=quality&pass19Arms=1&pass19ArmsIk=0` | Recognisable bilateral source anatomy, but hands were far apart, one arm crossed the weapon, the other floated to screen right, grip contact failed, and sleeve cuts were exposed. |
+| Bone IK | `?render=quality&pass19Arms=1` | Hand controls reached the grip sockets, but the original shoulder placement overextended the chains (`1.12×` right, `1.46×` left), producing hose-like sleeves and implausible silhouettes. |
+| Reachable shoulder IK | same opt-in query, tuned shoulder anchors | Contact error was effectively zero and final reach ratios were `0.452` right / `0.553` left, but the visible result still had angular tube-like forearms, hidden/tiny hands, exposed sleeve cuts, and no convincing grip silhouette. |
+| Glove-only hybrid | candidate alpha-masked to gloves over Pass 18 forearms | Rejected: authored hands remained occluded and undersized; removing the procedural gloves exposed triangular cuff cuts. It did not beat the control. |
+
+The candidate failed the hip-fire hero frame before action-sequence review. Reload, sprint, melee, ADS, and weapon-swap promotion tests were therefore intentionally not used to rationalize a baseline failure.
+
+### Decision
+
+**Rejected for production viewmodel integration.** The FBX remains preserved as an audited CC0 source candidate, but all uncommitted runtime loader, mapping, IK, query-flag, glove-mask, and hybrid-overlay changes were reverted. Pass 18 remains the selected stable viewmodel.
+
+This is a visual-contract failure rather than a technical loader failure: the asset can be loaded, textured, cloned with `SkeletonUtils.clone`, and addressed by its normalized skeleton names, but its source hand spacing, independent hand controls, lost authoring-tool IK semantics, sleeve cuts, and bind proportions do not fit Atomic Acres' compact two-grip first-person contract without destructive re-rigging.
+
+### Post-rejection verification
+
+- `npm run lint` — passed.
+- `npm test -- --run` — 31 files / 142 tests passed.
+- `npm run build` — passed.
+- `npm run test:e2e` — 20 Chromium scenarios passed in 3.3 minutes.
+- `git diff --check` — passed.
+- Working tree was clean before this evidence note was added.
+- Stable release capture completed with zero console/page errors. Local ignored evidence:
+  - `artifacts/pass19-fbx-evaluation/stable-menu.png`
+  - `artifacts/pass19-fbx-evaluation/stable-gameplay.png`
+  - `artifacts/pass19-fbx-evaluation/stable-qa-output.txt`
+- Stable telemetry showed 6 procedural arm meshes, finite framing, right/left grip contact errors below `5e-15`, and reach ratios `0.556` / `0.805`.
