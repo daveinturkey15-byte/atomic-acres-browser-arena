@@ -170,3 +170,58 @@ This is a visual-contract failure rather than a technical loader failure: the as
   - `artifacts/pass19-fbx-evaluation/stable-gameplay.png`
   - `artifacts/pass19-fbx-evaluation/stable-qa-output.txt`
 - Stable telemetry showed 6 procedural arm meshes, finite framing, right/left grip contact errors below `5e-15`, and reach ratios `0.556` / `0.805`.
+
+## 9. Simple stylized recovery pass — 2026-07-15
+
+After the FBX rejection, the next implementation deliberately avoided another imported rig. Commit `ed78155` (`feat: add simple stylized combat polish`) retains the Pass 18 procedural arm solver and adds one bounded carbine/Aqua polish slice.
+
+### Changes
+
+- Rebuilt the merged glove source geometry as a rounded tactical silhouette: dark palm/cuff body, padded palm/knuckle elements, short rounded grip fingers, a clearer thumb, and a narrow gold cuff accent.
+- Kept glove geometry centred on its wrist. Small carbine-only presentation offsets move the wrist targets outward only at hip so both gloves overlap the weapon grips visibly; offsets fade during ADS and the support offset yields to authoritative reload presentation.
+- Added a deterministic bounded `kick` envelope to the existing fire-cycle state. The viewmodel uses it for slightly stronger recoil translation, rotation, alternating micro-roll, and flash scale without changing damage, cadence, or camera-ray authority.
+- Added a late-ADS arm opacity fade. At settled precision aim the procedural sleeves are hidden, producing a clean centred sight picture instead of a crossed-tube silhouette; hip, fire, reload, sprint, and melee presentation remain available.
+- Added a compact cream/gold Aqua side-service motif and foundation accent at the spawn-side wall without changing collision, cover, or routes.
+- Added an explicit gold headshot hitmarker treatment; normal hit timing and admission are unchanged.
+
+### Visual and telemetry gate
+
+Durable ignored evidence is in `artifacts/pass19-simple-polish/`:
+
+- `hip.png`
+- `fire-18ms.png`
+- `reload-48.png`
+- `ads.png`
+- `public-https.png`
+- `contact-sheet.jpg`
+- `qa.json`
+
+Observed final local Quality capture:
+
+- hip reach ratios `0.497` right / `0.681` left;
+- settled ADS reach ratios `0.549` / `0.772`;
+- maximum settled ADS hand-target error below `4e-15`;
+- pinned `18 ms` fire state: flash `0.428`, kick `0.629`, bolt travel `0.791`;
+- settled sight offset approximately `[0.00029, -0.00009]`;
+- final Quality frame used 138 calls / 123,156 triangles;
+- zero browser console/page errors.
+
+The final matched contact sheet passed hip, fire, reload, and settled ADS review. The reload remains intentionally stylized and procedural rather than a claim of authored human animation; the duplicate internal glove offset was removed after it visibly detached the support cuff during reload.
+
+### Verification and isolated review deployment
+
+- `npm run lint` — passed.
+- Vitest — 31 files / 142 tests passed.
+- `npm run build` — passed.
+- Chromium E2E — 20/20 passed after the final geometry correction.
+- `git diff --check` — passed.
+- Preview-only `gh-pages` commit: `2afe576ccb50b693e3ef3f15050749c1082feaee`.
+- GitHub Pages reported `built` and served the exact final JavaScript asset `assets/index-fqm5fPah.js`.
+- Public HTTPS review: `https://daveinturkey15-byte.github.io/atomic-acres-v2-preview/?review=pass19-simple-polish&v=ed78155`.
+- Live public verification reached active solo play with zero console/page errors. Browser automation selected Performance and adaptively reduced to 80 calls / 69,200 triangles on its display-limited 30 Hz path; this is diagnostic, not a substitute for the Windows owner gate.
+
+### Claim state
+
+- **Observed:** the small pass is a visible improvement over the unchanged Pass 18 hip frame in glove readability, fire impulse, clean settled ADS, and Aqua spawn identity while retaining all automated safety gates.
+- **Not claimed:** Pass 19 C8 owner approval, C9 independent `>=7.0/10`, C10 normal Windows Chrome pacing, or a replacement-quality authored human viewmodel. Those gates remain open.
+- **Next falsifier:** Dave's live HTTPS playtest. If the gloves still read as awkward or the combat does not feel better in motion, do not scale the technique to other weapons; revert or retune this bounded slice.
