@@ -14,6 +14,30 @@
       "attributionRequired": false
     },
     {
+      "id": "opengameart-para-cc0-fps-arms-pass19-2026-07-14",
+      "kind": "third-party-rigged-first-person-arms-with-project-generated-materials",
+      "creator": "para",
+      "source": "https://opengameart.org/content/fps-arms-rigged-only",
+      "sourceArchive": "https://opengameart.org/sites/default/files/fps%20arms.7z",
+      "retrieved": "2026-07-14",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "licenseFile": "public/assets/third-party/opengameart/fps-arms/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/opengameart/fps-arms/README.md",
+      "generator": "scripts/generate-pass19-viewmodel-textures.py",
+      "modifications": "The original FBX rig is preserved unchanged. Static inspection found no embedded Texture/Video object or external texture filename reference, so the runtime must explicitly assign the generated maps. The source photographic skin diffuse is retained for audit but not selected at runtime. A deterministic project script labels the source UV components and generates Atomic Acres navy textile sleeves, dark tactical gloves, a roughness map and an audit contact sheet. This remains a gated Pass 19 candidate until it passes in-engine framing, deformation, grip-contact, action-pose and owner A/B checks.",
+      "attributionRequired": false,
+      "originalArchiveSha256": "31f6c7bd5caea8856c4aafca8461f38a3c8bfdd3d8f05c898e403b9475e54562",
+      "files": [
+        { "path": "public/assets/third-party/opengameart/fps-arms/LICENSE.txt", "sha256": "7bd2521fd3fff35f7ef316c9e08e1a48117833c923a9a58c531344cfc981c001" },
+        { "path": "public/assets/third-party/opengameart/fps-arms/README.md", "sha256": "497b691fb15de88804dc75e0f9ad2079dfbcd58b7d56522d899f91cc85397f26" },
+        { "path": "public/assets/third-party/opengameart/fps-arms/FPS_ARMS_RIG_1.fbx", "sha256": "8aeb5a2e5ee6277ecc40e99a6dc5034b0fff321ef6d86f53e10b3461fdbae35b" },
+        { "path": "public/assets/third-party/opengameart/fps-arms/source_diffuse.png", "sha256": "f7a67f1c8f72294dc54ddea96253522dabdee99838746d6fb695eeef46120b63" },
+        { "path": "public/assets/third-party/opengameart/fps-arms/new_diff.png", "sha256": "1d566532cde531c7f4ef73e730ce74ae7e45fce524120a86b8a63dcae2dae88b" },
+        { "path": "public/assets/third-party/opengameart/fps-arms/atomic_arms_roughness.png", "sha256": "2faf15e6271fd38de30d2211d62e707a328b1c9cb2b61337556fa9ad7900326e" },
+        { "path": "public/assets/third-party/opengameart/fps-arms/atomic_arms_texture_contact_sheet.jpg", "sha256": "e993f221a8b5e5736123373153543e6c55f03437fa682430e1a304bdefa866f3" }
+      ]
+    },
+    {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
       "kind": "third-party-rigged-operator-and-derived-first-person-arms",
       "creator": "Quaternius (@Quaternius)",
