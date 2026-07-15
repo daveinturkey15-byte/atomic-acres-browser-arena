@@ -49,3 +49,17 @@
 @media(min-width:701px){.kit-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.panel:has([data-menu-panel=kit].active){width:min(920px,calc(100vw - 36px))}}
 @media(max-width:700px){#minimap{left:12px;top:82px;width:240px;height:240px}#map-heading{left:12px;top:91px;width:240px}#location-label{left:12px;top:328px;width:240px}#pickup-prompt{bottom:82px;min-width:220px}#strike-map-overlay{padding:11px}#strike-map-overlay header strong{font-size:20px}}
 @media(max-height:600px) and (min-width:701px){#minimap{width:240px;height:240px}#map-heading{width:240px}#location-label{top:338px;width:240px}}
+
+/* Pass 22 scope correction: true camera magnification with a clear circular sight picture. */
+#sniper-scope{position:absolute;inset:0;z-index:12;pointer-events:none;background:radial-gradient(circle at 50% 50%,rgba(20,70,72,.035) 0 min(37vh,28vw),rgba(2,6,8,.96) calc(min(37vh,28vw) + 5px),#010304 100%)}
+#sniper-scope[hidden]{display:none}
+#hud.sniper-scope-active>:not(#sniper-scope):not(#hitmarker){opacity:0!important}
+#sniper-scope .scope-ring{position:absolute;left:50%;top:50%;width:min(74vh,56vw);aspect-ratio:1;transform:translate(-50%,-50%);border:6px solid #11191b;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(142,232,238,.2),inset 0 0 38px rgba(4,15,18,.34),0 0 0 2px #000}
+#sniper-scope .scope-reticle{position:absolute;left:50%;top:50%;width:min(70vh,53vw);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;overflow:hidden;filter:drop-shadow(0 0 1px rgba(255,255,255,.55))}
+#sniper-scope .scope-reticle::before,#sniper-scope .scope-reticle::after{content:'';position:absolute;left:50%;top:50%;background:rgba(9,20,20,.9);transform:translate(-50%,-50%)}
+#sniper-scope .scope-reticle::before{width:1px;height:100%}#sniper-scope .scope-reticle::after{width:100%;height:1px}
+#sniper-scope .scope-reticle i{position:absolute;left:50%;top:50%;width:5px;height:5px;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.95);border-radius:50%;background:#0c1718;box-shadow:0 0 4px rgba(255,255,255,.8)}
+#sniper-scope .scope-reticle b{position:absolute;left:50%;top:52%;width:2px;height:24%;transform:translateX(-50%);background:linear-gradient(#0a1516 0 38%,transparent 38% 48%,#0a1516 48% 52%,transparent 52% 62%,#0a1516 62%)}
+#sniper-scope .scope-reticle span,#sniper-scope .scope-reticle em{position:absolute;top:50%;width:9%;height:4px;border-top:1px solid rgba(9,20,20,.9);border-bottom:1px solid rgba(9,20,20,.72);transform:translateY(-50%)}
+#sniper-scope .scope-reticle span{left:24%}#sniper-scope .scope-reticle em{right:24%}
+#sniper-scope>small{position:absolute;left:50%;top:calc(50% - min(37vh,28vw) + 16px);transform:translateX(-50%);font:900 11px/1 Inter;letter-spacing:.22em;color:rgba(221,247,241,.8);text-shadow:0 1px 3px #000}

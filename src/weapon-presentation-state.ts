@@ -18,6 +18,14 @@ export type HitReactionState = {
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
 
+/** Converts a base vertical field of view into a true angular magnification. */
+export function magnifiedFovDegrees(baseFovDegrees: number, magnification: number): number {
+  const safeBase = Math.min(120, Math.max(10, finite(baseFovDegrees, 76)));
+  const safeMagnification = Math.min(12, Math.max(1, finite(magnification, 1)));
+  const baseRadians = safeBase * Math.PI / 180;
+  return 2 * Math.atan(Math.tan(baseRadians / 2) / safeMagnification) * 180 / Math.PI;
+}
+
 /** Bounded heat accumulator used only for original presentation smoke/flash layering. */
 export function advanceWeaponHeat(current: number, fired: boolean, dt: number, weapon: WeaponId): number {
   const safeCurrent = clamp01(finite(current));

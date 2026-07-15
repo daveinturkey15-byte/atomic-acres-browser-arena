@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceWeaponHeat, fireCycleAt, hitReactionAt } from './weapon-presentation-state';
+import { advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees } from './weapon-presentation-state';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -24,6 +24,15 @@ describe('weapon presentation state', () => {
     expect(end.boltTravel).toBe(0);
     expect(end.casingReady).toBe(true);
     expect(start.smokeScale).toBeGreaterThan(1);
+  });
+
+  it('converts the player FOV into a true 3x angular scope FOV', () => {
+    const baseFov = 76;
+    const scopedFov = magnifiedFovDegrees(baseFov, 3);
+    const angularRatio = Math.tan(baseFov * Math.PI / 360) / Math.tan(scopedFov * Math.PI / 360);
+    expect(scopedFov).toBeCloseTo(29.15, 1);
+    expect(angularRatio).toBeCloseTo(3, 8);
+    expect(magnifiedFovDegrees(Number.NaN, Number.NaN)).toBeCloseTo(76, 8);
   });
 
   it('returns bounded presentation-only hit reactions', () => {

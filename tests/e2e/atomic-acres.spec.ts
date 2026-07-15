@@ -60,7 +60,16 @@ type DebugState = {
   deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
   breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
   minimap: { backingWidth: number; cssWidth: number; headingDegrees: number };
-  houseNavigation: Array<{ id: string; dimensions: { width: number; depth: number; wallThickness: number }; rampWidth: number; floorSections: string[]; routeAnchors: number }>;
+  houseNavigation: Array<{
+    id: string;
+    dimensions: { width: number; depth: number; wallThickness: number };
+    rampWidth: number;
+    indoorRampWidth: number;
+    rampNames: string[];
+    floorSections: string[];
+    routeAnchors: number;
+    indoorRouteAnchors: number;
+  }>;
   teamPings: Array<{ kind: string; expiresInMs: number; position: number[] }>;
   activeImpactParticles: number;
   activeImpactMarks: number;
@@ -78,6 +87,7 @@ type DebugState = {
     furnishings: number;
     fixtures: number;
     visibleCollisionProxies: number;
+    visibleRamps: number;
   };
   weaponReady: boolean;
   weaponPresentation: {
@@ -97,6 +107,7 @@ type DebugState = {
     riggedArms: Array<{ finite: boolean; bindOffsetsPreserved: boolean; contactError: number }>;
     importedModel: { source: string; weapon: string; clips: number; meshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
   };
+  sniperScope: { active: boolean; magnification: number; baseFov: number; cameraFov: number; viewmodelVisible: boolean };
   weaponActionHistory: string[];
   menuVisible: boolean;
   networkSync: { stateIntervalMs: number; interpolationRate: number };
@@ -334,7 +345,9 @@ test.describe('solo mechanics', () => {
     const scheduled = (await debug(page)).fieldSupport;
     expect(scheduled.triPassLaunches).toBe(3);
     await expect(page.locator('#strike-map-overlay')).toBeHidden();
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
     await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
     const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
     expect(impactDelay).not.toBeNull();
     expect(impactDelay!).toBeGreaterThanOrEqual(950);
@@ -444,6 +457,32 @@ test.describe('solo mechanics', () => {
         const offset = (await debug(page)).weaponPresentation.sightOffset;
         return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
       }).toBeLessThan(0.006);
+      if (weapon === 'sniper') await expect.poll(async () => (await debug(page)).sniperScope.active).toBe(true);
+      const settledState = await debug(page);
+      if (weapon === 'sniper') {
+        expect(settledState.sniperScope).toMatchObject({ active: true, magnification: 3, viewmodelVisible: false });
+        const angularRatio = Math.tan(settledState.sniperScope.baseFov * Math.PI / 360)
+          / Math.tan(settledState.sniperScope.cameraFov * Math.PI / 360);
+        expect(angularRatio).toBeCloseTo(3, 1);
+        const scopePicture = await page.evaluate(() => {
+          const scope = document.querySelector<HTMLElement>('#sniper-scope')!;
+          const reticle = scope.querySelector<HTMLElement>('.scope-reticle')!;
+          const rect = reticle.getBoundingClientRect();
+          return {
+            hidden: scope.hidden,
+            centreX: rect.left + rect.width / 2 - innerWidth / 2,
+            centreY: rect.top + rect.height / 2 - innerHeight / 2,
+            diameter: rect.width,
+          };
+        });
+        expect(scopePicture.hidden).toBe(false);
+        expect(Math.abs(scopePicture.centreX)).toBeLessThan(0.01);
+        expect(Math.abs(scopePicture.centreY)).toBeLessThan(0.01);
+        expect(scopePicture.diameter).toBeGreaterThan(300);
+      } else {
+        expect(settledState.sniperScope.active).toBe(false);
+        expect(settledState.sniperScope.viewmodelVisible).toBe(true);
+      }
 
       await page.evaluate(() => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setMovement: (forward: boolean) => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -469,8 +508,10 @@ test.describe('solo mechanics', () => {
     expect(state.houseNavigation).toHaveLength(2);
     expect(state.houseNavigation.every((house) => house.dimensions.width === 20.2 && house.dimensions.depth === 16.4)).toBe(true);
     expect(state.houseNavigation.every((house) => house.rampWidth >= 2.8 && house.routeAnchors >= 9)).toBe(true);
-    expect(state.houseNavigation.every((house) => house.floorSections.includes('upper-floor-slab'))).toBe(true);
-    expect(state.houseNavigation.every((house) => !house.floorSections.some((name) => name === 'upper-floor-rear' || name === 'upper-floor-front'))).toBe(true);
+    expect(state.houseNavigation.every((house) => house.indoorRampWidth >= 2.2 && house.indoorRampWidth < house.rampWidth && house.indoorRouteAnchors >= 9)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.rampNames.includes('exterior-access-ramp') && house.rampNames.includes('interior-access-ramp'))).toBe(true);
+    expect(state.houseNavigation.every((house) => ['upper-floor-main', 'upper-floor-ramp-front', 'upper-floor-ramp-rear'].every((name) => house.floorSections.includes(name)))).toBe(true);
+    expect(state.houseNavigation.every((house) => !house.floorSections.includes('upper-floor-slab'))).toBe(true);
     expect(state.breakableWindows).toHaveLength(6);
 
     const [px, py, pz] = state.player.position;
@@ -791,10 +832,11 @@ test.describe('performance and stability', () => {
       upperRooms: 4,
       doors: 4,
       windows: 6,
-      ramps: 2,
+      ramps: 4,
       furnishings: 0,
       fixtures: 0,
       visibleCollisionProxies: 0,
+      visibleRamps: 4,
     });
     expect(errors).toEqual([]);
   });
@@ -835,10 +877,11 @@ test.describe('performance and stability', () => {
       upperRooms: 4,
       doors: 4,
       windows: 6,
-      ramps: 2,
+      ramps: 4,
       furnishings: 0,
       fixtures: 0,
       visibleCollisionProxies: 0,
+      visibleRamps: 4,
     });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/quality-arms-operator.png' });

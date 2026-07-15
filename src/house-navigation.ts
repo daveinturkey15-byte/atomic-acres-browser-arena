@@ -68,6 +68,17 @@ const RAMP_RISE = FLOOR_Y;
 const RAMP_RUN = RAMP_BOTTOM_Z - RAMP_TOP_Z;
 const RAMP_WIDTH = 2.8;
 const RAMP_SIDE_OUTSET = 1.85;
+const INDOOR_RAMP_BOTTOM_Z = 7;
+const INDOOR_RAMP_TOP_Z = 0.8;
+const INDOOR_RAMP_RISE = FLOOR_Y;
+const INDOOR_RAMP_RUN = INDOOR_RAMP_BOTTOM_Z - INDOOR_RAMP_TOP_Z;
+const INDOOR_RAMP_WIDTH = 2.2;
+const INDOOR_RAMP_X = HALF_WIDTH - 1.75;
+const INDOOR_OPENING_FRONT_Z = 6.1;
+const INDOOR_OPENING_REAR_Z = 0.1;
+const FLOOR_OUTER_X = HALF_WIDTH - 0.1;
+const FLOOR_OUTER_Z = HALF_DEPTH - 0.1;
+const INDOOR_OPENING_INNER_X = HALF_WIDTH - 3.4;
 const DOOR_FRAME_OUTSET = WALL / 2 + 0.09;
 const SEAM_OUTSET = WALL / 2 + 0.08;
 
@@ -208,6 +219,49 @@ function rampSolids(side: 1 | -1): LocalSolid[] {
   ];
 }
 
+function indoorRampSolids(side: 1 | -1): LocalSolid[] {
+  const slopeLength = Math.hypot(INDOOR_RAMP_RUN, INDOOR_RAMP_RISE);
+  const angle = Math.atan2(INDOOR_RAMP_RISE, INDOOR_RAMP_RUN);
+  const x = side * INDOOR_RAMP_X;
+  const y = INDOOR_RAMP_RISE / 2 + 0.04;
+  const z = (INDOOR_RAMP_BOTTOM_Z + INDOOR_RAMP_TOP_Z) / 2;
+  const railXs = [x - side * (INDOOR_RAMP_WIDTH / 2 - 0.05), x + side * (INDOOR_RAMP_WIDTH / 2 - 0.05)];
+  const posts = [0.18, 0.82].flatMap((progress, index) => {
+    const postZ = INDOOR_RAMP_BOTTOM_Z - INDOOR_RAMP_RUN * progress;
+    const postBaseY = INDOOR_RAMP_RISE * progress;
+    return railXs.map((railX, sideIndex) => solid(
+      `interior-ramp-post-${index}-${sideIndex}`,
+      [railX, postBaseY + 0.38, postZ],
+      [0.08, 0.76, 0.08],
+      'metal',
+      false,
+      'frame',
+    ));
+  });
+  return [
+    solid('interior-access-ramp', [x, y, z], [INDOOR_RAMP_WIDTH, 0.18, slopeLength], 'timber', true, 'ramp', [angle, 0, 0]),
+    solid('interior-ramp-rail-inner', [railXs[0], y + 0.62, z], [0.08, 0.08, slopeLength], 'metal', false, 'frame', [angle, 0, 0]),
+    solid('interior-ramp-rail-outer', [railXs[1], y + 0.62, z], [0.08, 0.08, slopeLength], 'metal', false, 'frame', [angle, 0, 0]),
+    ...posts,
+  ];
+}
+
+function upperFloorSolids(indoorSide: 1 | -1): LocalSolid[] {
+  const mainInnerEdge = indoorSide * INDOOR_OPENING_INNER_X;
+  const mainMinX = indoorSide === 1 ? -FLOOR_OUTER_X : mainInnerEdge;
+  const mainMaxX = indoorSide === 1 ? mainInnerEdge : FLOOR_OUTER_X;
+  const stripMinX = indoorSide === 1 ? INDOOR_OPENING_INNER_X - 0.08 : -FLOOR_OUTER_X;
+  const stripMaxX = indoorSide === 1 ? FLOOR_OUTER_X : -INDOOR_OPENING_INNER_X + 0.08;
+  const floorDepth = FLOOR_OUTER_Z * 2;
+  const frontDepth = FLOOR_OUTER_Z - INDOOR_OPENING_FRONT_Z;
+  const rearDepth = INDOOR_OPENING_REAR_Z + FLOOR_OUTER_Z;
+  return [
+    solid('upper-floor-main', [(mainMinX + mainMaxX) / 2, FLOOR_Y, 0], [mainMaxX - mainMinX, 0.32, floorDepth], 'timber', true, 'floor'),
+    solid('upper-floor-ramp-front', [(stripMinX + stripMaxX) / 2, FLOOR_Y, (INDOOR_OPENING_FRONT_Z + FLOOR_OUTER_Z) / 2], [stripMaxX - stripMinX, 0.32, frontDepth], 'timber', true, 'floor'),
+    solid('upper-floor-ramp-rear', [(stripMinX + stripMaxX) / 2, FLOOR_Y, (-FLOOR_OUTER_Z + INDOOR_OPENING_REAR_Z) / 2], [stripMaxX - stripMinX, 0.32, rearDepth], 'timber', true, 'floor'),
+  ];
+}
+
 function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
   rooms: LocalRoom[];
   solids: LocalSolid[];
@@ -219,6 +273,7 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
   const rearDoorX = 3.8;
   const partitionOpeningX = 2;
   const rampWallX = rampSide * HALF_WIDTH;
+  const indoorRampSide = -rampSide as 1 | -1;
   const westUpperWall = rampSide === -1
     ? splitSideWallAroundDoor('upper-ramp-side-wall', -HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
     : [solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface)];
@@ -233,7 +288,7 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     ...doorFrame('front-entry', doorX, HALF_DEPTH + DOOR_FRAME_OUTSET),
     ...doorFrame('rear-entry', rearDoorX, -HALF_DEPTH - DOOR_FRAME_OUTSET),
     ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.6, 'plaster'),
-    solid('ground-floor-slab', [0, 0.06, 0], [WIDTH - WALL * 2, 0.12, DEPTH - WALL * 2], 'concrete', false, 'floor'),
+    solid('ground-floor-slab', [0, 0.06, 0], [WIDTH - 0.2, 0.12, DEPTH - 0.2], 'concrete', false, 'floor'),
 
     ...westUpperWall,
     ...eastUpperWall,
@@ -246,9 +301,11 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     solid('floor-seam-west', [-HALF_WIDTH - SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
     solid('floor-seam-east', [HALF_WIDTH + SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
 
-    solid('upper-floor-slab', [0, FLOOR_Y, 0], [WIDTH - WALL * 2, 0.32, DEPTH - WALL * 2], 'timber', true, 'floor'),
+    ...upperFloorSolids(indoorRampSide),
     solid('ramp-top-landing', [rampSide * (HALF_WIDTH + 0.85), FLOOR_Y, (RAMP_TOP_Z + RAMP_ENTRY_Z) / 2], [3.8, 0.32, 2.2], 'timber', true, 'landing'),
+    solid('interior-ramp-top-landing', [indoorRampSide * (INDOOR_OPENING_INNER_X + 0.2), FLOOR_Y, INDOOR_RAMP_TOP_Z], [3.5, 0.32, 0.8], 'timber', true, 'landing'),
     ...rampSolids(rampSide),
+    ...indoorRampSolids(indoorRampSide),
   ];
 
   const rooms: LocalRoom[] = [
@@ -268,6 +325,7 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     { id: 'upper-window', kind: 'window', centre: [0, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH], width: 3.2, height: WINDOW_OPENING_HEIGHT, route: true },
   ];
   const rampX = rampSide * (HALF_WIDTH + RAMP_SIDE_OUTSET);
+  const indoorRampX = indoorRampSide * INDOOR_RAMP_X;
   const anchors: LocalAnchor[] = [
     { id: 'front-yard', position: [doorX, 1.7, 9.9], level: 'ground' },
     { id: 'front-door-inside', position: [doorX, 1.7, 7], level: 'ground' },
@@ -281,6 +339,10 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     { id: 'ramp-mid', position: [rampX, 3.44, (RAMP_BOTTOM_Z + RAMP_TOP_Z) / 2], level: 'upper' },
     { id: 'ramp-top', position: [rampX, 5.18, RAMP_TOP_Z], level: 'upper' },
     { id: 'landing-exit', position: [rampSide * (HALF_WIDTH - 1), 5.18, RAMP_ENTRY_Z], level: 'upper' },
+    { id: 'indoor-ramp-foot', position: [indoorRampX, 1.7, INDOOR_RAMP_BOTTOM_Z], level: 'ground' },
+    { id: 'indoor-ramp-mid', position: [indoorRampX, 3.44, (INDOOR_RAMP_BOTTOM_Z + INDOOR_RAMP_TOP_Z) / 2], level: 'upper' },
+    { id: 'indoor-ramp-top', position: [indoorRampX, 5.18, INDOOR_RAMP_TOP_Z], level: 'upper' },
+    { id: 'indoor-landing-exit', position: [indoorRampSide * (INDOOR_OPENING_INNER_X - 0.4), 5.18, INDOOR_RAMP_TOP_Z], level: 'upper' },
     { id: 'upper-rear', position: [rampSide * 4, 5.18, -3.5], level: 'upper' },
     { id: 'upper-opening', position: [partitionOpeningX, 5.18, 0], level: 'upper' },
     { id: 'upper-front', position: [partitionOpeningX, 5.18, 3.5], level: 'upper' },
@@ -293,6 +355,7 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     routes: {
       'ground-room-flow': ['front-yard', 'front-door-inside', 'ground-front', 'ground-opening', 'ground-rear', 'rear-door-inside', 'rear-yard'],
       'ramp-room-flow': ['front-yard', 'ramp-approach', 'ramp-foot', 'ramp-mid', 'ramp-top', 'landing-exit', 'upper-rear', 'upper-opening', 'upper-front'],
+      'indoor-ramp-room-flow': ['front-door-inside', 'ground-front', 'indoor-ramp-foot', 'indoor-ramp-mid', 'indoor-ramp-top', 'indoor-landing-exit', 'upper-front', 'upper-opening', 'upper-rear'],
     },
   };
 }

@@ -39,6 +39,7 @@ describe('palette static batching', () => {
 
     expect(stats).toEqual({ sourceMeshes: 1, batches: 1 });
     expect(glass.visible).toBe(false);
+    expect(glass.userData.staticBatchRendered).toBe(true);
     expect(material.transparent).toBe(true);
     expect(material.opacity).toBe(0.5);
     expect(material.depthWrite).toBe(false);

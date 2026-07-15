@@ -117,25 +117,38 @@ describe('simplified two-floor house architecture', () => {
     }
   });
 
-  it('covers the interior footprint with one upper slab and a positively overlapping exterior landing', () => {
-    const architecture = createHouseArchitecture(0, 0, 0, 1);
-    const ground = architecture.solids.find((entry) => entry.name === 'ground-floor-slab');
-    const upper = architecture.solids.find((entry) => entry.name === 'upper-floor-slab');
-    const landing = architecture.solids.find((entry) => entry.name === 'ramp-top-landing');
-    expect(ground).toBeDefined();
-    expect(upper).toBeDefined();
-    expect(landing).toBeDefined();
-    if (!ground || !upper || !landing) throw new Error('Missing declared floor solid');
-    expect(ground.size[0]).toBeGreaterThanOrEqual(architecture.dimensions.width - architecture.dimensions.wallThickness * 2);
-    expect(ground.size[2]).toBeGreaterThanOrEqual(architecture.dimensions.depth - architecture.dimensions.wallThickness * 2);
-    expect(upper.size[0]).toBeGreaterThanOrEqual(architecture.dimensions.width - architecture.dimensions.wallThickness * 2);
-    expect(upper.size[2]).toBeGreaterThanOrEqual(architecture.dimensions.depth - architecture.dimensions.wallThickness * 2);
-    const upperBounds = solidBounds(upper);
-    const landingBounds = solidBounds(landing);
-    const overlapX = Math.min(upperBounds.maxX, landingBounds.maxX) - Math.max(upperBounds.minX, landingBounds.minX);
-    const overlapZ = Math.min(upperBounds.maxZ, landingBounds.maxZ) - Math.max(upperBounds.minZ, landingBounds.minZ);
-    expect(overlapX).toBeGreaterThan(0.3);
-    expect(overlapZ).toBeGreaterThan(2);
+  it('keeps sealed floor sections around one framed indoor-ramp opening and overlaps both landings', () => {
+    for (const team of [0, 1] as Team[]) {
+      const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+      const ground = architecture.solids.find((entry) => entry.name === 'ground-floor-slab');
+      const floorSections = architecture.solids.filter((entry) => entry.kind === 'floor' && entry.name.startsWith('upper-floor-'));
+      const exteriorLanding = architecture.solids.find((entry) => entry.name === 'ramp-top-landing');
+      const interiorLanding = architecture.solids.find((entry) => entry.name === 'interior-ramp-top-landing');
+      expect(ground).toBeDefined();
+      expect(floorSections.map((entry) => entry.name).sort()).toEqual(['upper-floor-main', 'upper-floor-ramp-front', 'upper-floor-ramp-rear']);
+      expect(exteriorLanding).toBeDefined();
+      expect(interiorLanding).toBeDefined();
+      if (!ground || !exteriorLanding || !interiorLanding) throw new Error('Missing declared floor or landing solid');
+      expect(ground.size[0]).toBeGreaterThanOrEqual(architecture.dimensions.width - 0.2);
+      expect(ground.size[2]).toBeGreaterThanOrEqual(architecture.dimensions.depth - 0.2);
+      const main = floorSections.find((entry) => entry.name === 'upper-floor-main')!;
+      expect(main.size[2]).toBeGreaterThanOrEqual(architecture.dimensions.depth - 0.2);
+      for (const landing of [exteriorLanding, interiorLanding]) {
+        const mainBounds = solidBounds(main);
+        const landingBounds = solidBounds(landing);
+        const overlapX = Math.min(mainBounds.maxX, landingBounds.maxX) - Math.max(mainBounds.minX, landingBounds.minX);
+        const overlapZ = Math.min(mainBounds.maxZ, landingBounds.maxZ) - Math.max(mainBounds.minZ, landingBounds.minZ);
+        expect(overlapX, `${architecture.id}:${landing.name}:x`).toBeGreaterThan(0.5);
+        expect(overlapZ, `${architecture.id}:${landing.name}:z`).toBeGreaterThan(0.5);
+      }
+      for (const stripName of ['upper-floor-ramp-front', 'upper-floor-ramp-rear']) {
+        const strip = floorSections.find((entry) => entry.name === stripName)!;
+        const mainBounds = solidBounds(main);
+        const stripBounds = solidBounds(strip);
+        const overlapX = Math.min(mainBounds.maxX, stripBounds.maxX) - Math.max(mainBounds.minX, stripBounds.minX);
+        expect(overlapX, `${architecture.id}:${stripName}:sealed-edge`).toBeGreaterThan(0.05);
+      }
+    }
   });
 
   it('keeps exterior door frames and floor seams wholly in front of wall faces', () => {
@@ -159,25 +172,35 @@ describe('simplified two-floor house architecture', () => {
     expect(byName('floor-seam-east').minX).toBeGreaterThan(eastWall.maxX);
   });
 
-  it('uses one exterior continuous rendered-and-physical ramp clear of both ground doors', () => {
+  it('uses distinct continuous exterior and smaller indoor rendered-and-physical ramps', () => {
     for (const team of [0, 1] as Team[]) {
       const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
       const ramps = architecture.solids.filter((entry) => entry.kind === 'ramp');
+      const exterior = ramps.find((entry) => entry.name === 'exterior-access-ramp');
+      const interior = ramps.find((entry) => entry.name === 'interior-access-ramp');
       const proxies = architecture.solids.filter((entry) => (entry.kind as string) === 'ramp-proxy');
-      expect(ramps).toHaveLength(1);
-      expect(ramps[0]).toMatchObject({ collidable: true, surface: 'timber' });
-      expect(ramps[0].size[0]).toBeGreaterThanOrEqual(2.8);
-      expect(ramps[0].rotation && Math.abs(ramps[0].rotation[0])).toBeGreaterThan(0.2);
-      const rampBounds = solidBounds(ramps[0]);
+      expect(ramps).toHaveLength(2);
+      expect(exterior).toMatchObject({ collidable: true, surface: 'timber' });
+      expect(interior).toMatchObject({ collidable: true, surface: 'timber' });
+      if (!exterior || !interior) throw new Error('Missing exterior or indoor ramp');
+      expect(exterior.size[0]).toBeGreaterThanOrEqual(2.8);
+      expect(interior.size[0]).toBeGreaterThanOrEqual(2.2);
+      expect(interior.size[0]).toBeLessThan(exterior.size[0]);
+      expect(exterior.rotation && Math.abs(exterior.rotation[0])).toBeGreaterThan(0.2);
+      expect(interior.rotation && Math.abs(interior.rotation[0])).toBeGreaterThan(0.3);
+      const exteriorBounds = solidBounds(exterior);
+      const interiorBounds = solidBounds(interior);
       const halfWidth = architecture.dimensions.width / 2;
-      expect(rampBounds.maxX < architecture.origin.x - halfWidth || rampBounds.minX > architecture.origin.x + halfWidth).toBe(true);
+      expect(exteriorBounds.maxX < architecture.origin.x - halfWidth || exteriorBounds.minX > architecture.origin.x + halfWidth).toBe(true);
+      expect(interiorBounds.minX).toBeGreaterThan(architecture.origin.x - halfWidth);
+      expect(interiorBounds.maxX).toBeLessThan(architecture.origin.x + halfWidth);
       for (const door of architecture.openings.filter((entry) => entry.kind === 'exterior-door')) {
-        expect(Math.abs(ramps[0].position[0] - door.centre[0])).toBeGreaterThan(5);
+        expect(Math.abs(exterior.position[0] - door.centre[0])).toBeGreaterThan(5);
       }
       expect(proxies).toHaveLength(0);
       expect(architecture.solids.some((entry) => (entry.kind as string) === 'stair')).toBe(false);
       expect(architecture.solids.some((entry) => (entry.kind as string) === 'fixture')).toBe(false);
-      expect(architecture.solids.length).toBeLessThanOrEqual(52);
+      expect(architecture.solids.length).toBeLessThanOrEqual(60);
     }
   });
 
@@ -204,6 +227,14 @@ describe('simplified two-floor house architecture', () => {
   it.each([0, 1] as Team[])('climbs and descends the exterior ramp between both upstairs rooms for team %s', async (team) => {
     const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
     const rampRoute = architecture.routes['ramp-room-flow'];
+    expect(rampRoute).toBeDefined();
+    await traverse(architecture, rampRoute);
+    await traverse(architecture, rampRoute, true);
+  });
+
+  it.each([0, 1] as Team[])('climbs and descends the smaller indoor ramp for team %s', async (team) => {
+    const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+    const rampRoute = architecture.routes['indoor-ramp-room-flow'];
     expect(rampRoute).toBeDefined();
     await traverse(architecture, rampRoute);
     await traverse(architecture, rampRoute, true);

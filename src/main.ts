@@ -80,6 +80,7 @@ import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
+import { magnifiedFovDegrees } from './weapon-presentation-state';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import {
   DeathMessage,
@@ -248,6 +249,11 @@ app.innerHTML = `
   <div id="hud" hidden>
     <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
+    <div id="sniper-scope" hidden aria-label="3x sniper scope">
+      <div class="scope-ring"></div>
+      <div class="scope-reticle"><i></i><b></b><span></span><em></em></div>
+      <small>3×</small>
+    </div>
     <div id="killfeed"></div>
     <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
     <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
@@ -288,6 +294,7 @@ function element<T extends HTMLElement>(selector: string): T {
 const canvas = element<HTMLCanvasElement>('#game');
 const menu = element<HTMLElement>('#menu');
 const hudRoot = element<HTMLElement>('#hud');
+const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
 const roomCard = element<HTMLElement>('#room-card');
 const roomCodeEl = element<HTMLElement>('#room-code');
 const statusEl = element<HTMLElement>('#network-status');
@@ -2692,9 +2699,19 @@ function updatePhysics(dt: number): void {
     weaponActionHistory.push(event);
   }
   if (weaponActionHistory.length > 16) weaponActionHistory.splice(0, weaponActionHistory.length - 16);
-  const aimingFov = player.weapon === 'sniper' ? Math.min(38, preferredFov - 20) : Math.max(55, preferredFov - 20);
-  camera.fov = damp(camera.fov, adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov, 10, dt);
+  const aimingFov = player.weapon === 'sniper'
+    ? magnifiedFovDegrees(preferredFov, 3)
+    : Math.max(55, preferredFov - 20);
+  camera.fov = damp(camera.fov, adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov, player.weapon === 'sniper' ? 18 : 10, dt);
   camera.updateProjectionMatrix();
+  const sniperScopeActive = player.alive
+    && player.weapon === 'sniper'
+    && adsHeld
+    && weaponView.adsProgress() >= 0.9
+    && Math.abs(camera.fov - aimingFov) < 0.35;
+  sniperScopeOverlay.hidden = !sniperScopeActive;
+  hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
+  weaponView.root.visible = gameStarted && !sniperScopeActive;
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -3439,11 +3456,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       id: house.id,
       dimensions: { ...house.dimensions },
       rampWidth: (() => {
-        const ramp = house.solids.find((solid) => solid.kind === 'ramp');
+        const ramp = house.solids.find((solid) => solid.name === 'exterior-access-ramp');
         return ramp ? Math.min(ramp.size[0], ramp.size[2]) : 0;
       })(),
+      indoorRampWidth: (() => {
+        const ramp = house.solids.find((solid) => solid.name === 'interior-access-ramp');
+        return ramp ? Math.min(ramp.size[0], ramp.size[2]) : 0;
+      })(),
+      rampNames: house.solids.filter((solid) => solid.kind === 'ramp').map((solid) => solid.name),
       floorSections: house.solids.filter((solid) => solid.kind === 'floor').map((solid) => solid.name),
       routeAnchors: house.routes['ramp-room-flow'].length,
+      indoorRouteAnchors: house.routes['indoor-ramp-room-flow'].length,
     })),
     teamPings: activeTeamPings.map((ping) => ({
       kind: ping.root.name.replace('team-ping-', ''),
@@ -3458,16 +3481,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     arenaStoryReady: ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
     interiorTelemetry: (() => {
-      const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0 };
+      const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0, visibleRamps: 0 };
       scene.traverse((node) => {
         if (/^(upper-room-(bed|headboard|workbench|console)|performance-interior)/.test(node.name)) counts.furnishings += 1;
         if (/interior-ceiling-light|balcony-rail|house-gable-finish|house-gutter|house-chimney/.test(node.name)) counts.fixtures += 1;
         if (node.userData.collisionProxy === true && node.visible) counts.visibleCollisionProxies += 1;
+        if (/^(exterior|interior)-access-ramp$/.test(node.name)
+          && (node.visible || node.userData.staticBatchRendered === true)) counts.visibleRamps += 1;
       });
       return counts;
     })(),
     weaponReady: weaponView.isReady(),
     weaponPresentation: weaponView.presentationState(),
+    sniperScope: {
+      active: !sniperScopeOverlay.hidden,
+      magnification: 3,
+      baseFov: preferredFov,
+      cameraFov: camera.fov,
+      viewmodelVisible: weaponView.root.visible,
+    },
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
     render: {

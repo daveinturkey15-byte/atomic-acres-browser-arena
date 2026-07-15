@@ -184,7 +184,10 @@ export function batchStaticMeshes(
     mesh.receiveShadow = preserveShadowResponse && entry.meshes.some((item) => item.receiveShadow);
     mesh.frustumCulled = true;
     batches.add(mesh);
-    for (const source of entry.meshes) source.visible = false;
+    for (const source of entry.meshes) {
+      source.visible = false;
+      source.userData.staticBatchRendered = true;
+    }
     sourceMeshes += entry.meshes.length;
     batchCount += 1;
   }
