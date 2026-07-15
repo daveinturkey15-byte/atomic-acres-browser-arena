@@ -73,7 +73,24 @@ await host.evaluate(() => {
 await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: 10_000 });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops.length > 0, undefined, { timeout: 10_000 });
 const remoteDeathDrop = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]);
-await host.evaluate(([x, y, z]) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y + 1.55, z), remoteDeathDrop.position);
+await host.evaluate(([x, y, z]) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y + 1.55, z + 2.2), remoteDeathDrop.position);
+await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
+  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 2.2)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: 10_000 });
+await host.evaluate(([x, y, z]) => {
+  const api = window.__ATOMIC_ACRES_DEBUG__;
+  const state = api.snapshot();
+  api.setAmmo('sniper', state.player.ammo, 0);
+  api.setGrenades(1);
+  api.teleportPlayer(x, y + 1.55, z);
+}, remoteDeathDrop.position);
+await host.waitForFunction(() => {
+  const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+  return state?.player.primaryWeapon === 'sniper' && state.player.reserve > 0 && state.player.grenades === 2;
+}, undefined, { timeout: 10_000 });
+await guest.waitForFunction((dropId) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops
+  .some((drop) => drop.id === dropId && drop.ammoAvailable === false && drop.weaponAvailable === true), remoteDeathDrop.id, { timeout: 10_000 });
+const scavengeReplicated = await guest.evaluate((dropId) => window.__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops
+  .some((drop) => drop.id === dropId && drop.ammoAvailable === false && drop.weaponAvailable === true), remoteDeathDrop.id);
 await host.waitForFunction(() => document.querySelector('#pickup-prompt')?.classList.contains('hidden') === false, undefined, { timeout: 10_000 });
 await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop());
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.primaryWeapon === 'carbine', undefined, { timeout: 10_000 });
@@ -88,6 +105,6 @@ const spawnSeparation = Math.hypot(
 );
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
-console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, windowReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
-if (errors.length || !stanceReplicated || !windowReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
+console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, windowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
+if (errors.length || !stanceReplicated || !windowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
 await browser.close();

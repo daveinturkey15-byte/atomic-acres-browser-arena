@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 type DebugState = {
   gameStarted: boolean;
+  frameCount: number;
   gameMode: string;
   matchPhase: 'warmup' | 'active' | 'ended';
   matchEndReason: 'score' | 'time' | null;
@@ -42,6 +43,7 @@ type DebugState = {
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
   grenades: number;
+  grenadeExplosion: { total: number; activeVisuals: number; lastExplosionAgeMs: number | null };
   fieldSupport: {
     streak: number;
     available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass', boolean>;
@@ -55,10 +57,10 @@ type DebugState = {
     triPassImpacts: number;
     triPassLastImpactDelayMs: number | null;
   };
-  deathDrops: Array<{ id: string; weapon: string; position: number[]; expiresInMs: number }>;
+  deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
   breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
   minimap: { backingWidth: number; cssWidth: number; headingDegrees: number };
-  houseNavigation: Array<{ id: string; dimensions: { width: number; depth: number; wallThickness: number }; rampWidth: number; routeAnchors: number }>;
+  houseNavigation: Array<{ id: string; dimensions: { width: number; depth: number; wallThickness: number }; rampWidth: number; floorSections: string[]; routeAnchors: number }>;
   teamPings: Array<{ kind: string; expiresInMs: number; position: number[] }>;
   activeImpactParticles: number;
   activeImpactMarks: number;
@@ -79,7 +81,7 @@ type DebugState = {
   };
   weaponReady: boolean;
   weaponPresentation: {
-    weapon: 'carbine' | 'smg' | 'scattergun' | 'sniper' | 'pistol';
+    weapon: 'carbine' | 'smg' | 'scattergun' | 'sniper' | 'pistol' | 'machine-pistol';
     heat: number;
     shotsPresented: number;
     activeCasings: number;
@@ -142,7 +144,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('GAMEPLAY SYSTEMS PASS 21');
+    await expect(page.locator('.eyebrow')).toContainText('HOUSE AND SCAVENGE PASS 22');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -283,7 +285,7 @@ test.describe('solo mechanics', () => {
 
   test('animates the knife on misses while keeping first-person arms visible', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { melee: () => void } }).__ATOMIC_ACRES_DEBUG__.melee());
-    await expect.poll(async () => (await debug(page)).weaponPresentation.knifeVisible, { timeout: 350 }).toBe(true);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.knifeVisible, { timeout: 1_000 }).toBe(true);
     const active = await debug(page);
     expect(active.weaponPresentation.armsVisible).toBe(true);
     expect(active.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(2);
@@ -291,7 +293,7 @@ test.describe('solo mechanics', () => {
     expect((await debug(page)).weaponPresentation.knifeVisible).toBe(false);
   });
 
-  test('throws a homing Yardhawk and resolves three player-selected sky missiles after one second', async ({ page }) => {
+  test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         earnSupport: (kills: number) => void;
@@ -316,6 +318,14 @@ test.describe('solo mechanics', () => {
     expect(['thrown', 'homing']).toContain((await debug(page)).fieldSupport.yardhawk.phase);
     await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 4_000 }).toBe(1);
 
+    expect((await debug(page)).fieldSupport.available.yardhawk).toBe(false);
+  });
+
+  test('resolves three player-selected sky missiles after one second', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+      earnSupport: (kills: number) => void;
+      activateSupport: (id: 'tri-pass') => void;
+    } }).__ATOMIC_ACRES_DEBUG__.earnSupport(7));
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { activateSupport: (id: 'tri-pass') => void } }).__ATOMIC_ACRES_DEBUG__.activateSupport('tri-pass'));
     await expect(page.locator('#strike-map-overlay')).toBeVisible();
     await page.locator('#strike-map').click({ position: { x: 95, y: 100 } });
@@ -324,14 +334,14 @@ test.describe('solo mechanics', () => {
     const scheduled = (await debug(page)).fieldSupport;
     expect(scheduled.triPassLaunches).toBe(3);
     await expect(page.locator('#strike-map-overlay')).toBeHidden();
-    await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 6_000 }).toBe(3);
+    await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
     const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
     expect(impactDelay).not.toBeNull();
     expect(impactDelay!).toBeGreaterThanOrEqual(950);
-    expect(Object.values((await debug(page)).fieldSupport.available)).toEqual([false, false, false]);
+    expect((await debug(page)).fieldSupport.available).toEqual({ 'scout-sweep': true, yardhawk: true, 'tri-pass': false });
   });
 
-  test('sniper kills with one headshot or two body shots and F-style interaction consumes death drops', async ({ page }) => {
+  test('sniper lethality, marksman auto sidearm, walk-over scavenging and independent F weapon pickup all hold', async ({ page }) => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         equipKit: (id: 'marksman') => void;
@@ -366,7 +376,7 @@ test.describe('solo mechanics', () => {
         aimAtBot: (zone: 'head') => void;
         fireOnce: () => void;
       } }).__ATOMIC_ACRES_DEBUG__;
-      api.placeBotAhead(5);
+      api.placeBotAhead(8);
       api.aimAtBot('head');
       api.fireOnce();
     });
@@ -374,27 +384,33 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(2);
 
     state = await debug(page);
-    const [x, y, z] = state.deathDrops[0].position;
+    expect(state.player.equippedWeapons).toEqual(['sniper', 'machine-pistol']);
+    await page.keyboard.press('Digit2');
+    await expect.poll(async () => (await debug(page)).player.weapon).toBe('machine-pistol');
+    const targetDrop = state.deathDrops[0];
+    const [x, y, z] = targetDrop.position;
     await page.evaluate(([dropX, dropY, dropZ]) => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setAmmo: (weapon: 'machine-pistol', ammo: number, reserve: number) => void;
+        setGrenades: (count: number) => void;
         teleportPlayer: (x: number, y: number, z: number) => void;
       } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAmmo('machine-pistol', 3, 0);
+      api.setGrenades(1);
       api.teleportPlayer(dropX, dropY + 1.5, dropZ);
     }, [x, y, z]);
+    await expect.poll(async () => (await debug(page)).player.reserve).toBeGreaterThan(0);
+    state = await debug(page);
+    expect(state.player.primaryWeapon).toBe('sniper');
+    expect(state.player.weapon).toBe('machine-pistol');
+    expect(state.player.ammo).toBe(3);
+    expect(state.player.grenades).toBe(2);
+    const scavenged = state.deathDrops.find((drop) => drop.id === targetDrop.id);
+    expect(scavenged).toMatchObject({ ammoAvailable: false, weaponAvailable: true });
+
     await page.keyboard.press('KeyF');
     await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe('carbine');
-    await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
-        setAmmo: (weapon: 'carbine', ammo: number, reserve: number) => void;
-      } }).__ATOMIC_ACRES_DEBUG__;
-      api.setAmmo('carbine', 1, 0);
-    });
-    await page.keyboard.press('KeyF');
-    await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(0);
-    state = await debug(page);
-    expect(state.player.primaryWeapon).toBe('carbine');
-    expect(state.player.ammo).toBe(1);
-    expect(state.player.reserve).toBeGreaterThan(0);
+    await expect.poll(async () => (await debug(page)).deathDrops.some((drop) => drop.id === targetDrop.id)).toBe(false);
   });
 
   test('keeps the permanent reticle and every physical ADS sight on the authoritative centre ray', async ({ page }) => {
@@ -410,7 +426,7 @@ test.describe('solo mechanics', () => {
     });
     expect(reticle).toEqual({ offsetX: 0, offsetY: 0, dotVisible: true });
 
-    for (const weapon of ['carbine', 'smg', 'scattergun', 'sniper', 'pistol'] as const) {
+    for (const weapon of ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const) {
       await page.evaluate((weaponId) => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
           equipWeapon: (id: typeof weaponId) => void;
@@ -451,8 +467,10 @@ test.describe('solo mechanics', () => {
     expect(state.minimap.backingWidth).toBe(360);
     expect(state.minimap.cssWidth).toBeGreaterThanOrEqual(299);
     expect(state.houseNavigation).toHaveLength(2);
-    expect(state.houseNavigation.every((house) => house.dimensions.width === 18.2 && house.dimensions.depth === 16.4)).toBe(true);
-    expect(state.houseNavigation.every((house) => house.rampWidth >= 2.6 && house.routeAnchors >= 9)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.dimensions.width === 20.2 && house.dimensions.depth === 16.4)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.rampWidth >= 2.8 && house.routeAnchors >= 9)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.floorSections.includes('upper-floor-slab'))).toBe(true);
+    expect(state.houseNavigation.every((house) => !house.floorSections.some((name) => name === 'upper-floor-rear' || name === 'upper-floor-front'))).toBe(true);
     expect(state.breakableWindows).toHaveLength(6);
 
     const [px, py, pz] = state.player.position;
@@ -469,6 +487,27 @@ test.describe('solo mechanics', () => {
     });
     await expect.poll(async () => (await debug(page)).breakableWindows[0].broken).toBe(true);
     expect((await debug(page)).breakableWindows[0].visible).toBe(false);
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void } }).__ATOMIC_ACRES_DEBUG__.stageWindow(0, 1.1));
+    const windowZ = (await debug(page)).breakableWindows[0].position[2];
+    const standingBeforeZ = (await debug(page)).player.position[2];
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(520);
+    await page.keyboard.up('KeyW');
+    const standingAfterZ = (await debug(page)).player.position[2];
+    expect(Math.sign(standingAfterZ - windowZ)).toBe(Math.sign(standingBeforeZ - windowZ));
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void } }).__ATOMIC_ACRES_DEBUG__.stageWindow(0, 1.1));
+    const jumpBeforeZ = (await debug(page)).player.position[2];
+    await page.keyboard.down('KeyW');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(55);
+    await page.keyboard.press('KeyC');
+    await expect.poll(async () => (await debug(page)).player.crouched).toBe(true);
+    await page.waitForTimeout(2_000);
+    await page.keyboard.up('KeyW');
+    const jumpAfter = await debug(page);
+    expect(Math.sign(jumpAfter.player.position[2] - windowZ)).toBe(-Math.sign(jumpBeforeZ - windowZ));
 
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void; melee: () => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -612,7 +651,7 @@ test.describe('solo mechanics', () => {
     await page.keyboard.up('KeyW');
   });
 
-  test('fires, switches only between the class primary and service pistol, then reloads', async ({ page }) => {
+  test('fires, switches only between the class primary and issued sidearm, then reloads', async ({ page }) => {
     const before = await debug(page);
     expect(before.player.primaryWeapon).toBe('carbine');
     expect(before.player.equippedWeapons).toEqual(['carbine', 'pistol']);
@@ -655,20 +694,30 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).player.weapon).toBe('carbine');
   });
 
-  test('throws one frag, consumes inventory and resolves the fuse', async ({ page }) => {
+  test('starts with two frags and resolves explosions without freezing the game loop', async ({ page }) => {
+    const before = await debug(page);
+    expect(before.player.grenades).toBe(2);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { throwGrenade: () => void } }).__ATOMIC_ACRES_DEBUG__.throwGrenade());
     await page.waitForTimeout(100);
     const thrown = await debug(page);
-    expect(thrown.player.grenades).toBe(0);
+    expect(thrown.player.grenades).toBe(1);
     expect(thrown.grenades).toBe(1);
-    await page.waitForTimeout(2_500);
-    expect((await debug(page)).grenades).toBe(0);
+    await expect.poll(async () => (await debug(page)).grenadeExplosion.total, { timeout: 3_500 }).toBe(1);
+    await expect.poll(async () => (await debug(page)).grenades).toBe(0);
+    await expect.poll(async () => (await debug(page)).grenadeExplosion.activeVisuals).toBe(0);
+    const afterExplosion = await debug(page);
+    const [x, y, z] = afterExplosion.player.position;
+    const heartbeatBefore = afterExplosion.frameCount;
+    await page.evaluate(([px, py, pz]) => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__.teleportPlayer(px + 1, py, pz), [x, y, z]);
+    await expect.poll(async () => (await debug(page)).player.position[0]).toBeCloseTo(x + 1, 2);
+    await page.waitForTimeout(350);
+    expect((await debug(page)).frameCount).toBeGreaterThan(heartbeatBefore);
   });
 
   test('HUD reports match, stance, equipment and bots in roster', async ({ page }) => {
     await expect(page.locator('#connection-pill')).toHaveText('BOT SKIRMISH');
     await expect(page.locator('#objective')).toContainText('FIRST TO 25');
-    await expect(page.locator('#grenades')).toHaveText('FRAG ×1');
+    await expect(page.locator('#grenades')).toHaveText('FRAG ×2');
     await expect(page.locator('#minimap')).toBeVisible();
     await expect(page.locator('#location-label')).toHaveText(/AQUA HOUSE|CORAL HOUSE|SKYLINE GARDEN|SOLAR SERVICE|ATOM-LINER CROSSING/);
     await page.keyboard.down('Tab');

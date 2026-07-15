@@ -7,6 +7,7 @@ import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPo
 import { advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import { fireImportedWeapon, importedWeaponTelemetry, reloadImportedWeapon, updateImportedWeapon } from './weapon-model';
+import { WEAPONS } from './gameplay';
 import type { WeaponId } from './protocol';
 import { characterActionContract, measureCameraFraming, resolveSocketWorld, type CharacterActionContract } from './character-presentation-contract';
 
@@ -49,6 +50,7 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
   sniper: { left: [-0.3, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+  'machine-pistol': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
 };
 
 const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
@@ -57,6 +59,7 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   scattergun: { left: [0, 0, 0], right: [0, 0, 0] },
   sniper: { left: [-0.075, -0.015, 0.012], right: [0.09, -0.03, 0.015] },
   pistol: { left: [0, 0, 0], right: [0, 0, 0] },
+  'machine-pistol': { left: [0, 0, 0], right: [0, 0, 0] },
 };
 
 const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
@@ -65,6 +68,7 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   scattergun: [-0.58, 0.18, -0.42],
   sniper: [-0.76, 0.34, -0.52],
   pistol: [-0.92, 0.42, -0.68],
+  'machine-pistol': [-0.92, 0.42, -0.68],
 };
 
 const MELEE_PRESENTATION_MS = 620;
@@ -388,7 +392,7 @@ export class WeaponPresentation {
   }
 
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
-    const ids: WeaponId[] = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol'];
+    const ids = Object.keys(WEAPONS) as WeaponId[];
     ids.forEach((id, index) => {
       // The imported gun scenes remain licensed source assets, but their
       // visual transforms do not share the explicit grip/muzzle contract and
@@ -401,6 +405,7 @@ export class WeaponPresentation {
         scattergun: new Set(['stock', 'stock-cheek-panel']),
         sniper: new Set(['stock-shoulder-pad', 'stock-support-rod']),
         pistol: new Set(),
+        'machine-pistol': new Set(),
       };
       model.traverse((node) => {
         if (firstPersonHidden[id].has(node.name)) node.visible = false;
@@ -424,7 +429,7 @@ export class WeaponPresentation {
   }
 
   isReady(): boolean {
-    return this.models.size === 5;
+    return this.models.size === Object.keys(WEAPONS).length;
   }
 
   setWeapon(id: WeaponId, immediate = false): void {
@@ -558,7 +563,7 @@ export class WeaponPresentation {
       ? 'optic-reticle'
       : this.active === 'smg'
         ? 'smg-aperture'
-        : this.active === 'pistol'
+        : this.active === 'pistol' || this.active === 'machine-pistol'
           ? 'pistol-rear-sight'
           : 'ghost-ring';
     return model?.getObjectByName(sightName);
@@ -886,7 +891,7 @@ export class WeaponPresentation {
     const reloadPose = reloadPoseAt(this.active, reloadProgress);
     const magazineName = this.active === 'carbine'
       ? 'curved-magazine'
-      : this.active === 'pistol'
+      : this.active === 'pistol' || this.active === 'machine-pistol'
         ? 'pistol-magazine'
         : 'straight-magazine';
     const magazine = activeModel?.getObjectByName(magazineName);

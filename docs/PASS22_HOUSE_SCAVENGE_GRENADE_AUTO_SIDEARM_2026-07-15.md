@@ -1,0 +1,124 @@
+# Atomic Acres Pass 22 — Traversable Houses, Scavenging, Stable Grenades, and Marksman Auto Sidearm
+
+Date: 2026-07-15
+Status: locally implemented and verified; isolated review publication pending
+Branch: `overhaul/house-loot-grenade-pass-22`
+Baseline: Pass 21 source `67ca0c2`
+
+## Overview
+
+Pass 22 converts Dave's Pass 21 playtest feedback into shared architecture, inventory, grenade, and weapon contracts. It remains an additive isolated review candidate; canonical Pass 20 and review/pass21 remain unchanged.
+
+## Requirements
+
+### R1 — Broken-window traversal
+
+- Every breakable house pane must reveal a real character opening.
+- A standing capsule must not walk directly through the sill/opening.
+- A player who jumps and crouches must be able to pass through the opening in either direction using the real controller.
+- Glass continues to block shots until broken but never becomes a hidden movement collider.
+
+### R2 — Ramp, door, and room clearance
+
+- Move each continuous ramp away from exterior/interior door circulation.
+- Slightly widen the usable rooms while retaining exactly two ground rooms and two upper rooms per house.
+- Preserve one rendered and Rapier-physical continuous incline per house; no hidden step substitution.
+- Front-to-rear ground route and ramp route must pass in both directions with the real capsule.
+
+### R3 — Floor continuity
+
+- Ground, upper floor, landing, and ramp-top pieces must positively overlap at traversal joins.
+- No terrain slit, dark floor gap, raw slab seam, or collision lip may remain in ordinary interior or oblique exterior views.
+- Finish geometry remains non-colliding and derives from the shared architecture declaration.
+
+### R4 — Walk-over scavenging without forced swap
+
+- Moving directly over an available death drop automatically scavenges ammunition for the player's currently carried weapon, regardless of the dropped weapon identity.
+- Scavenging never changes the equipped or primary weapon.
+- The drop's weapon remains independently available for explicit `F` swapping after its ammo payload is scavenged.
+- Ammo payload and weapon payload are independently consume-once, expiring, stably identified, replicated, and non-duplicating.
+- Full ammo plus full grenades must not consume the ammo payload.
+
+### R5 — Two-grenade inventory and drop refill
+
+- Fresh deployment, respawn, and rematch provide two grenades.
+- Grenade cap is two.
+- Successful walk-over scavenging restores exactly one grenade up to the cap.
+- Throwing and exploding grenades must not stall/freeze the game loop.
+- Explosion work, particles, audio, collision queries, and cleanup must remain bounded.
+
+### R6 — Marksman full-auto machine pistol
+
+- The marksman/sniper kit receives a Glock-style full-auto machine pistol labelled `G18 AUTO` in-game.
+- Existing kits retain the service pistol.
+- The machine pistol is automatic, compact, close-range, lower damage per shot, and balanced by recoil/cadence/ammunition.
+- It reuses/adapts the approved pistol asset rather than adding an unaudited external asset.
+- Its principal projectile, permanent reticle, and physical ADS sight inherit the same authoritative centre-ray invariant as every other gun.
+- Its local and replicated shot cadence is validated through the canonical weapon registry.
+
+## Acceptance criteria
+
+- C1: Shared architecture tests prove every window has stable dimensions/IDs and a crouched airborne capsule route; standing direct traversal remains blocked by sill/lintel geometry.
+- C2: Door/ramp clearance tests prove positive separation and bidirectional front/rear/ramp traversal for both mirrored houses.
+- C3: Floor/landing/ramp-top declarations have positive overlap; browser pixels show no visible floor gap.
+- C4: Pure drop tests prove independent ammo and weapon payload consumption, no forced swap, caps, expiry, and idempotence.
+- C5: Browser input proves walk-over scavenging restores carried-weapon reserve plus one grenade and leaves the dropped weapon available for `F`.
+- C6: Protocol/multiplayer QA proves one replicated scavenging transition and one later weapon-swap transition cannot replay or manufacture ammo/grenades.
+- C7: Initial/respawn/rematch grenade count is exactly two; each drop restores at most one up to two.
+- C8: A real grenade throw reaches explosion/cleanup without long task, page error, frame stall, unbounded transient count, or frozen simulation; repeated bounded throws remain healthy.
+- C9: Marksman deploys sniper + `G18 AUTO`; other kits deploy their existing primary + service pistol. G18 hold-fire cadence is automatic and bounded.
+- C10: Registry-wide deterministic and Chromium tests include the new machine pistol in reticle/principal-ray/physical-sight coverage.
+- C11: TypeScript, all deterministic tests, full serial Chromium, two-peer QA, visual/performance checks, build, release-tree scan, dependency audit, exact-artifact checksum, and public HTTPS checks pass before publication.
+- C12: Publish only to a new additive `review/pass22/` subtree; canonical root and all earlier review subtrees remain unchanged.
+
+## Decisions
+
+- Dave's phrase “five two grebades” is interpreted as “give two grenades,” consistent with the following refill request.
+- Walk-over scavenging uses a tighter radius than `F` weapon interaction so merely seeing a prompt does not consume supplies.
+- Ammo and weapon availability are separate state transitions; this avoids auto-loot deleting a gun before the player can choose it.
+- The sidearm is described as Glock-style/G18 AUTO without implying affiliation or importing proprietary assets.
+
+## Implemented contract
+
+### Shared house architecture
+
+- House width: `20.2`; depth: `16.4`; wall thickness: `0.42`.
+- Window sill top: `0.58`, above the controller's `0.42` auto-step but low enough for the real jump arc.
+- Ground window opening height: `1.97`; width: `2.6`.
+- The stance controller permits airborne shrinking from standing to crouch; airborne stand/prone transitions remain rejected.
+- The `2.8`-wide continuous incline is fully exterior on the house's west side and joins an upper side landing. It no longer crosses either ground-door route.
+- Ground and upper floors are single continuous slabs (`ground-floor-slab`, `upper-floor-slab`) with positive wall overlap rather than per-room pieces that can reveal a seam.
+
+### Death-drop scavenging
+
+- Manual weapon range remains `2.35`; automatic horizontal scavenging range is `1.05`.
+- A drop now owns independent `weaponConsumedAt` and `ammoConsumedAt` transitions.
+- Walking over a useful drop fills reserve for the currently selected carried weapon and restores one grenade up to two, without changing either selected or primary weapon.
+- Explicit `F` consumes only the weapon payload. A depleted drop is removed only after both payloads are unavailable.
+- Pickup replication includes `mode: 'scavenge' | 'weapon'`; distance, stable ID, nonce, payload availability, source weapon, and remote state admission remain validated.
+
+### Grenades
+
+- Spawn/reset/rematch inventory and cap: `2`.
+- The old per-explosion expanding sphere plus independent `requestAnimationFrame` animation was removed.
+- Explosion presentation is now a bounded ground ring/light in the main game frame loop: `280ms` lifetime and at most four active visuals.
+- Grenade mesh, ring, material, geometry, and light cleanup are explicit; explosion telemetry includes total count, active visuals, age, and a frame heartbeat.
+
+### Marksman sidearm
+
+- Protocol ID: `machine-pistol`; display name: `G18 AUTO`.
+- Entitlement is derived from primary: sniper deploys `['sniper', 'machine-pistol']`; every standard kit retains `pistol`.
+- Values: `20` close damage, `11` minimum damage, `900 RPM`, `20/80` magazine/reserve, `1.65s` reload, automatic fire, close-range falloff, sustained spread, and faster recoil presentation.
+- It reuses the original authored pistol family with an extended magazine and `auto-selector`; no external asset or trademarked logo was added.
+- Registry-derived model readiness, protocol admission, audio, hand sockets, recoil, physical sight, authoritative center ray, HUD, and multiplayer snapshots include the machine pistol.
+
+## Local verification evidence
+
+- TypeScript/lint: passed.
+- Deterministic: `164/164` across 32 files.
+- Production build: passed; output CSS `index-DRJOKkTa.css`, app JS `index-BgPEm9Ns.js`, Rapier `rapier-B45baom8.js`.
+- Exact `dist/` checksum manifest: 27 files; manifest SHA-256 `4ff055c42fdaa9b912214412d3f3bad310e364aa8ff3983514e2315dbf362caf`.
+- Release-tree verifier: `27` files, `0` rejected-candidate files, `0` oversized policy violations.
+- Chromium: `26/26` passed in four bounded serial groups (`9 + 6 + 7 + 4`) because the gateway's 600-second outer command cap is shorter than this one-file software-WebGL suite. Assertions and per-test timeouts were unchanged. Coverage includes all six weapons' physical sight/reticle ray, sniper+G18 loadout, independent walk-over/F drop consumption, two-frag non-freezing explosion with frame heartbeat, real jump→airborne-crouch window crossing, houses/ramps/floors, match reset, and Quality/Performance budgets.
+- Two-peer QA: passed with zero errors, opposite teams, 46.96-unit spawn separation, stance/window/scavenge/weapon-pickup replication, and authoritative ammo/grenade scavenging before the later independent weapon swap.
+- Visual inspection: exterior side ramp is connected to the upper side landing and leaves the front/rear ground doors clear; the widened interior has continuous floor/ceiling surfaces with no visible hole or Z-fighting seam; G18 ADS telemetry reports `sightOffset [0, 0]`.

@@ -317,11 +317,12 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   }
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
+  const pistolFamily = id === 'pistol' || id === 'machine-pistol';
   const metal = MAT.gunmetal();
   const dark = MAT.dark();
   const rubber = MAT.rubber();
   const accent = new THREE.MeshStandardMaterial({
-    color: id === 'carbine' ? 0xd6a944 : id === 'smg' ? 0x48b9b7 : id === 'pistol' ? 0xe0bd68 : 0xb75d45,
+    color: id === 'carbine' ? 0xd6a944 : id === 'smg' ? 0x48b9b7 : id === 'machine-pistol' ? 0xff8f3d : id === 'pistol' ? 0xe0bd68 : 0xb75d45,
     roughness: 0.45,
     metalness: 0.35,
   });
@@ -473,10 +474,10 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('eject-socket', [0.14, 0.06, -0.04]);
     addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
     addSocket('support-socket-l', [-0.03, -0.08, -0.43]);
-  } else if (id === 'pistol') {
-    // Original Aster 9 service pistol: compact stepped slide, open-frame
-    // trigger guard and a high-contrast sight channel. It is not based on a
-    // commercial weapon mesh or proprietary animation.
+  } else if (pistolFamily) {
+    // Original Aster/G18-style pistol family: compact stepped slide, open-frame
+    // trigger guard and a high-contrast sight channel. The full-auto marksman
+    // derivative uses an extended magazine and selector without a new asset.
     const frame = roundedBox('pistol-frame', [0.21, 0.16, 0.5], metal, 0.035, 3);
     part(root, frame, [0, -0.025, -0.08]);
     const slide = new THREE.Group();
@@ -486,6 +487,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     root.add(slide);
     part(slide, roundedBox('pistol-slide', [0.205, 0.145, 0.58], dark, 0.025, 3), [0, 0, 0]);
     part(slide, roundedBox('pistol-slide-accent', [0.215, 0.035, 0.24], accent, 0.008, 1), [0, 0.06, 0.04]);
+    if (id === 'machine-pistol') part(root, roundedBox('auto-selector', [0.035, 0.055, 0.07], accent, 0.008, 2), [0.12, 0.055, 0.02]);
     const serrations = flattenMaterials ? [0.08] : [0.02, 0.08, 0.14];
     for (const z of serrations) {
       part(slide, roundedBox('pistol-slide-serration', [0.218, 0.055, 0.022], accent, 0.004, 1), [0, 0, z]);
@@ -494,11 +496,12 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     part(root, roundedBox('pistol-grip-panel', [0.178, 0.23, 0.12], accent, 0.025, 2), [0, -0.245, 0.055], [-0.18, 0, 0]);
     const magazine = new THREE.Group();
     magazine.name = 'pistol-magazine';
-    magazine.position.set(0, -0.31, 0.08);
+    magazine.position.set(0, id === 'machine-pistol' ? -0.36 : -0.31, 0.08);
     magazine.rotation.x = -0.18;
     root.add(magazine);
-    part(magazine, roundedBox('pistol-magazine-body', [0.13, 0.28, 0.14], dark, 0.025, 2), [0, 0, 0]);
-    part(magazine, roundedBox('pistol-magazine-base', [0.16, 0.045, 0.17], accent, 0.012, 2), [0, -0.155, 0]);
+    const pistolMagazineHeight = id === 'machine-pistol' ? 0.38 : 0.28;
+    part(magazine, roundedBox('pistol-magazine-body', [0.13, pistolMagazineHeight, 0.14], dark, 0.025, 2), [0, 0, 0]);
+    part(magazine, roundedBox('pistol-magazine-base', [0.16, 0.045, 0.17], accent, 0.012, 2), [0, -pistolMagazineHeight / 2 - 0.015, 0]);
     addSocket('reload-socket-l', [-0.12, -0.06, 0], magazine);
     part(root, roundedBox('pistol-trigger-guard', [0.19, 0.04, 0.2], dark, 0.012, 2), [0, -0.13, -0.1]);
     part(root, roundedBox('pistol-trigger', [0.028, 0.095, 0.028], accent, 0.007, 1), [0, -0.1, -0.08], [0.24, 0, 0]);
@@ -705,6 +708,7 @@ const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number
   smg: [-0.631, 0.653868, 0.351994, 0.224491],
   scattergun: [-0.631, 0.653868, 0.351994, 0.224491],
   pistol: [0.142442, -0.014047, 0.708358, 0.691189],
+  'machine-pistol': [0.142442, -0.014047, 0.708358, 0.691189],
 };
 
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */
@@ -791,6 +795,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
     smg: 0.62,
     scattergun: 0.56,
     pistol: 0.66,
+    'machine-pistol': 0.66,
   };
   weapon.scale.setScalar(rig.rigged ? riggedScale[weaponId] : weaponId === 'smg' ? 0.72 : 0.68);
   if (rig.rigged) {

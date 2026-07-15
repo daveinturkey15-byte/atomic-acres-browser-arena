@@ -1,6 +1,7 @@
 export type Team = 0 | 1;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun' | 'sniper';
-export type WeaponId = PrimaryWeaponId | 'pistol';
+export type SidearmWeaponId = 'pistol' | 'machine-pistol';
+export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
 
 export type PlayerSnapshot = {
   id: string;
@@ -52,6 +53,7 @@ export type PickupMessage = {
   by: string;
   dropId: string;
   weapon: PrimaryWeaponId;
+  mode: 'scavenge' | 'weapon';
   position: [number, number, number];
   nonce: number;
 };
@@ -74,7 +76,7 @@ export type TeamPingMessage = {
 };
 export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage;
 
-const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'sniper', 'pistol']);
+const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol']);
 const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun', 'sniper']);
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
@@ -90,7 +92,7 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
     && weapons.has(p.weapon as WeaponId)
-    && (p.weapon === p.primary || p.weapon === 'pistol');
+    && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol'));
 }
 
 export function isGameMessage(value: unknown): value is GameMessage {
@@ -122,6 +124,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return typeof msg.by === 'string'
         && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
         && primaryWeapons.has(msg.weapon as PrimaryWeaponId)
+        && (msg.mode === 'scavenge' || msg.mode === 'weapon')
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'window-break':

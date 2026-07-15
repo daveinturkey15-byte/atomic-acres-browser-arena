@@ -14,7 +14,7 @@ export type HouseSolid = {
 };
 export type HouseOpening = {
   id: string;
-  kind: 'exterior-door' | 'interior-opening' | 'window';
+  kind: 'exterior-door' | 'interior-opening' | 'ramp-entry' | 'window';
   centre: [number, number, number];
   width: number;
   height: number;
@@ -49,7 +49,7 @@ type LocalOpening = Omit<HouseOpening, 'centre'> & { centre: [number, number, nu
 type LocalAnchor = Omit<HouseRouteAnchor, 'position'> & { position: [number, number, number] };
 type LocalRoom = Omit<HouseRoom, 'centre'> & { centre: [number, number, number] };
 
-const WIDTH = 18.2;
+const WIDTH = 20.2;
 const DEPTH = 16.4;
 const WALL = 0.42;
 const GROUND_HEIGHT = 3.35;
@@ -57,14 +57,19 @@ const UPPER_HEIGHT = 3.45;
 const FLOOR_Y = 3.48;
 const HALF_WIDTH = WIDTH / 2;
 const HALF_DEPTH = DEPTH / 2;
-const RAMP_START_X = -7.1;
-const RAMP_END_X = 4.7;
-const RAMP_Z = 5.5;
+const WINDOW_SILL_TOP = 0.58;
+const WINDOW_OPENING_TOP = 2.55;
+const WINDOW_OPENING_HEIGHT = WINDOW_OPENING_TOP - WINDOW_SILL_TOP;
+const WINDOW_CENTRE_Y = (WINDOW_OPENING_TOP + WINDOW_SILL_TOP) / 2;
+const RAMP_BOTTOM_Z = 6;
+const RAMP_TOP_Z = -3.4;
+const RAMP_ENTRY_Z = -4.8;
 const RAMP_RISE = FLOOR_Y;
-const RAMP_RUN = RAMP_END_X - RAMP_START_X;
+const RAMP_RUN = RAMP_BOTTOM_Z - RAMP_TOP_Z;
+const RAMP_WIDTH = 2.8;
+const RAMP_SIDE_OUTSET = 1.85;
 const DOOR_FRAME_OUTSET = WALL / 2 + 0.09;
 const SEAM_OUTSET = WALL / 2 + 0.08;
-
 
 const solid = (
   name: string,
@@ -94,11 +99,29 @@ function splitWallAroundDoor(
   ];
 }
 
+function splitSideWallAroundDoor(
+  name: string,
+  x: number,
+  centreZ: number,
+  width: number,
+  surface: 'aqua' | 'coral',
+  baseY: number,
+): LocalSolid[] {
+  const rearEdge = centreZ - width / 2;
+  const frontEdge = centreZ + width / 2;
+  const height = baseY === 0 ? GROUND_HEIGHT : UPPER_HEIGHT;
+  return [
+    solid(`${name}-rear`, [x, baseY + height / 2, (-HALF_DEPTH + rearEdge) / 2], [WALL, height, rearEdge + HALF_DEPTH], surface),
+    solid(`${name}-front`, [x, baseY + height / 2, (frontEdge + HALF_DEPTH) / 2], [WALL, height, HALF_DEPTH - frontEdge], surface),
+    solid(`${name}-lintel`, [x, baseY + height - 0.28, centreZ], [WALL, 0.56, width], 'trim'),
+  ];
+}
+
 function groundFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
-  const doorX = -3.4;
+  const doorX = -3.8;
   const doorWidth = 2.2;
-  const windowX = 4.4;
-  const windowWidth = 2.6;
+  const windowX = 4.8;
+  const windowWidth = 2.8;
   const doorLeft = doorX - doorWidth / 2;
   const doorRight = doorX + doorWidth / 2;
   const windowLeft = windowX - windowWidth / 2;
@@ -108,17 +131,17 @@ function groundFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
     solid('front-ground-centre', [(doorRight + windowLeft) / 2, GROUND_HEIGHT / 2, HALF_DEPTH], [windowLeft - doorRight, GROUND_HEIGHT, WALL], surface),
     solid('front-ground-far-right', [(windowRight + HALF_WIDTH) / 2, GROUND_HEIGHT / 2, HALF_DEPTH], [HALF_WIDTH - windowRight, GROUND_HEIGHT, WALL], surface),
     solid('front-door-lintel', [doorX, 3.05, HALF_DEPTH], [doorWidth, 0.6, WALL], 'trim'),
-    solid('ground-window-sill-wall', [windowX, 0.52, HALF_DEPTH], [windowWidth, 1.04, WALL], surface),
-    solid('ground-window-lintel-wall', [windowX, 2.88, HALF_DEPTH], [windowWidth, 0.94, WALL], surface),
-    solid('ground-window-glass', [windowX, 1.7, HALF_DEPTH + 0.02], [windowWidth, 1.32, 0.08], 'glass', false, 'glass'),
+    solid('ground-window-sill-wall', [windowX, WINDOW_SILL_TOP / 2, HALF_DEPTH], [windowWidth, WINDOW_SILL_TOP, WALL], surface),
+    solid('ground-window-lintel-wall', [windowX, (WINDOW_OPENING_TOP + GROUND_HEIGHT) / 2, HALF_DEPTH], [windowWidth, GROUND_HEIGHT - WINDOW_OPENING_TOP, WALL], surface),
+    solid('ground-window-glass', [windowX, WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.08], 'glass', false, 'glass'),
   ];
 }
 
 function groundRearWall(surface: 'aqua' | 'coral'): LocalSolid[] {
-  const doorX = 3.4;
+  const doorX = 3.8;
   const doorWidth = 2.2;
-  const windowX = -4.4;
-  const windowWidth = 2.6;
+  const windowX = -4.8;
+  const windowWidth = 2.8;
   const windowLeft = windowX - windowWidth / 2;
   const windowRight = windowX + windowWidth / 2;
   const doorLeft = doorX - doorWidth / 2;
@@ -128,23 +151,25 @@ function groundRearWall(surface: 'aqua' | 'coral'): LocalSolid[] {
     solid('rear-ground-centre', [(windowRight + doorLeft) / 2, GROUND_HEIGHT / 2, -HALF_DEPTH], [doorLeft - windowRight, GROUND_HEIGHT, WALL], surface),
     solid('rear-ground-far-right', [(doorRight + HALF_WIDTH) / 2, GROUND_HEIGHT / 2, -HALF_DEPTH], [HALF_WIDTH - doorRight, GROUND_HEIGHT, WALL], surface),
     solid('rear-door-lintel', [doorX, 3.05, -HALF_DEPTH], [doorWidth, 0.6, WALL], 'trim'),
-    solid('rear-ground-window-sill-wall', [windowX, 0.52, -HALF_DEPTH], [windowWidth, 1.04, WALL], surface),
-    solid('rear-ground-window-lintel-wall', [windowX, 2.88, -HALF_DEPTH], [windowWidth, 0.94, WALL], surface),
-    solid('rear-ground-window-glass', [windowX, 1.7, -HALF_DEPTH - 0.02], [windowWidth, 1.32, 0.08], 'glass', false, 'glass'),
+    solid('rear-ground-window-sill-wall', [windowX, WINDOW_SILL_TOP / 2, -HALF_DEPTH], [windowWidth, WINDOW_SILL_TOP, WALL], surface),
+    solid('rear-ground-window-lintel-wall', [windowX, (WINDOW_OPENING_TOP + GROUND_HEIGHT) / 2, -HALF_DEPTH], [windowWidth, GROUND_HEIGHT - WINDOW_OPENING_TOP, WALL], surface),
+    solid('rear-ground-window-glass', [windowX, WINDOW_CENTRE_Y, -HALF_DEPTH - 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.08], 'glass', false, 'glass'),
   ];
 }
 
 function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   const windowX = 0;
-  const windowWidth = 3;
+  const windowWidth = 3.2;
   const left = windowX - windowWidth / 2;
   const right = windowX + windowWidth / 2;
+  const sillTop = FLOOR_Y + WINDOW_SILL_TOP;
+  const openingTop = FLOOR_Y + WINDOW_OPENING_TOP;
   return [
     solid('front-upper-left', [(-HALF_WIDTH + left) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [left + HALF_WIDTH, UPPER_HEIGHT, WALL], surface),
     solid('front-upper-right', [(right + HALF_WIDTH) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [HALF_WIDTH - right, UPPER_HEIGHT, WALL], surface),
-    solid('upper-window-sill-wall', [windowX, 4.15, HALF_DEPTH], [windowWidth, 1.04, WALL], surface),
-    solid('upper-window-lintel-wall', [windowX, 6.5, HALF_DEPTH], [windowWidth, 0.86, WALL], surface),
-    solid('upper-window-glass', [windowX, 5.32, HALF_DEPTH + 0.02], [windowWidth, 1.3, 0.08], 'glass', false, 'glass'),
+    solid('upper-window-sill-wall', [windowX, FLOOR_Y + WINDOW_SILL_TOP / 2, HALF_DEPTH], [windowWidth, WINDOW_SILL_TOP, WALL], surface),
+    solid('upper-window-lintel-wall', [windowX, (openingTop + FLOOR_Y + UPPER_HEIGHT) / 2, HALF_DEPTH], [windowWidth, FLOOR_Y + UPPER_HEIGHT - openingTop, WALL], surface),
+    solid('upper-window-glass', [windowX, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.08], 'glass', false, 'glass'),
   ];
 }
 
@@ -157,32 +182,49 @@ function doorFrame(id: string, x: number, z: number, baseY = 0): LocalSolid[] {
   ];
 }
 
-function rampSolids(): LocalSolid[] {
+function sideDoorFrame(id: string, side: 1 | -1, z: number, baseY: number): LocalSolid[] {
+  const width = 2.6;
+  const x = side * (HALF_WIDTH + DOOR_FRAME_OUTSET);
+  return [
+    solid(`${id}-frame-rear`, [x, baseY + 1.42, z - width / 2 - 0.09], [0.16, 2.84, 0.18], 'trim', false, 'frame'),
+    solid(`${id}-frame-front`, [x, baseY + 1.42, z + width / 2 + 0.09], [0.16, 2.84, 0.18], 'trim', false, 'frame'),
+    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [0.16, 0.18, width + 0.36], 'trim', false, 'frame'),
+  ];
+}
+
+function rampSolids(side: 1 | -1): LocalSolid[] {
   const slopeLength = Math.hypot(RAMP_RUN, RAMP_RISE);
   const angle = Math.atan2(RAMP_RISE, RAMP_RUN);
   return [
     solid(
-      'interior-access-ramp',
-      [(RAMP_START_X + RAMP_END_X) / 2, RAMP_RISE / 2 + 0.04, RAMP_Z],
-      [slopeLength, 0.18, 2.6],
+      'exterior-access-ramp',
+      [side * (HALF_WIDTH + RAMP_SIDE_OUTSET), RAMP_RISE / 2 + 0.04, (RAMP_BOTTOM_Z + RAMP_TOP_Z) / 2],
+      [RAMP_WIDTH, 0.18, slopeLength],
       'timber',
       true,
       'ramp',
-      [0, 0, angle],
+      [angle, 0, 0],
     ),
   ];
 }
 
-function simplePlan(surface: 'aqua' | 'coral'): {
+function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
   rooms: LocalRoom[];
   solids: LocalSolid[];
   openings: LocalOpening[];
   anchors: LocalAnchor[];
   routes: HouseArchitecture['routes'];
 } {
-  const doorX = -3.4;
-  const rearDoorX = 3.4;
-  const partitionOpeningX = 1.7;
+  const doorX = -3.8;
+  const rearDoorX = 3.8;
+  const partitionOpeningX = 2;
+  const rampWallX = rampSide * HALF_WIDTH;
+  const westUpperWall = rampSide === -1
+    ? splitSideWallAroundDoor('upper-ramp-side-wall', -HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
+    : [solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface)];
+  const eastUpperWall = rampSide === 1
+    ? splitSideWallAroundDoor('upper-ramp-side-wall', HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
+    : [solid('upper-east-wall', [HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface)];
   const solids: LocalSolid[] = [
     solid('ground-west-wall', [-HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, DEPTH + WALL], surface),
     solid('ground-east-wall', [HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, DEPTH + WALL], surface),
@@ -190,57 +232,58 @@ function simplePlan(surface: 'aqua' | 'coral'): {
     ...groundFrontWall(surface),
     ...doorFrame('front-entry', doorX, HALF_DEPTH + DOOR_FRAME_OUTSET),
     ...doorFrame('rear-entry', rearDoorX, -HALF_DEPTH - DOOR_FRAME_OUTSET),
-    ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.4, 'plaster'),
-    solid('ground-floor-slab', [0, 0.04, 0], [WIDTH - WALL * 2, 0.08, DEPTH - WALL * 2], 'concrete', false, 'floor'),
+    ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.6, 'plaster'),
+    solid('ground-floor-slab', [0, 0.06, 0], [WIDTH - WALL * 2, 0.12, DEPTH - WALL * 2], 'concrete', false, 'floor'),
 
-    solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface),
-    solid('upper-east-wall', [HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface),
+    ...westUpperWall,
+    ...eastUpperWall,
     solid('upper-rear-wall', [0, FLOOR_Y + UPPER_HEIGHT / 2, -HALF_DEPTH], [WIDTH + WALL, UPPER_HEIGHT, WALL], surface),
     ...upperFrontWall(surface),
-    ...splitWallAroundDoor('upper-room-partition', 0, partitionOpeningX, 2.4, 'plaster', FLOOR_Y),
+    ...splitWallAroundDoor('upper-room-partition', 0, partitionOpeningX, 2.6, 'plaster', FLOOR_Y),
+    ...sideDoorFrame('upper-ramp-entry', rampSide, RAMP_ENTRY_Z, FLOOR_Y),
     solid('floor-seam-front', [0, FLOOR_Y - 0.05, HALF_DEPTH + SEAM_OUTSET], [WIDTH + 0.24, 0.18, 0.14], 'trim', false, 'frame'),
     solid('floor-seam-rear', [0, FLOOR_Y - 0.05, -HALF_DEPTH - SEAM_OUTSET], [WIDTH + 0.24, 0.18, 0.14], 'trim', false, 'frame'),
     solid('floor-seam-west', [-HALF_WIDTH - SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
     solid('floor-seam-east', [HALF_WIDTH + SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
 
-    solid('upper-rear-floor', [0, FLOOR_Y, -4.05], [WIDTH - WALL * 2, 0.32, 8.3], 'timber', true, 'floor'),
-    solid('upper-front-floor', [0, FLOOR_Y, 1.9], [WIDTH - WALL * 2, 0.32, 3.8], 'timber', true, 'floor'),
-    solid('ramp-top-landing', [5.85, FLOOR_Y, 5.5], [3.4, 0.32, 4], 'timber', true, 'landing'),
-    ...rampSolids(),
+    solid('upper-floor-slab', [0, FLOOR_Y, 0], [WIDTH - WALL * 2, 0.32, DEPTH - WALL * 2], 'timber', true, 'floor'),
+    solid('ramp-top-landing', [rampSide * (HALF_WIDTH + 0.85), FLOOR_Y, (RAMP_TOP_Z + RAMP_ENTRY_Z) / 2], [3.8, 0.32, 2.2], 'timber', true, 'landing'),
+    ...rampSolids(rampSide),
   ];
 
   const rooms: LocalRoom[] = [
-    { id: 'ground-front-room', level: 'ground', centre: [0, 0, 4], size: [17.6, 7.6] },
-    { id: 'ground-rear-room', level: 'ground', centre: [0, 0, -4], size: [17.6, 7.6] },
-    { id: 'upper-front-room', level: 'upper', centre: [0, FLOOR_Y, 2], size: [17.6, 3.7] },
-    { id: 'upper-rear-room', level: 'upper', centre: [0, FLOOR_Y, -4], size: [17.6, 7.8] },
+    { id: 'ground-front-room', level: 'ground', centre: [0, 0, 4], size: [19.4, 7.6] },
+    { id: 'ground-rear-room', level: 'ground', centre: [0, 0, -4], size: [19.4, 7.6] },
+    { id: 'upper-front-room', level: 'upper', centre: [0, FLOOR_Y, 4], size: [19.4, 7.6] },
+    { id: 'upper-rear-room', level: 'upper', centre: [0, FLOOR_Y, -4], size: [19.4, 7.6] },
   ];
   const openings: LocalOpening[] = [
     { id: 'front-door', kind: 'exterior-door', centre: [doorX, 1.4, HALF_DEPTH], width: 2.2, height: 2.8, route: true },
     { id: 'rear-door', kind: 'exterior-door', centre: [rearDoorX, 1.4, -HALF_DEPTH], width: 2.2, height: 2.8, route: true },
-    { id: 'ground-room-opening', kind: 'interior-opening', centre: [partitionOpeningX, 1.4, 0], width: 2.4, height: 2.8, route: true },
-    { id: 'upper-room-opening', kind: 'interior-opening', centre: [partitionOpeningX, FLOOR_Y + 1.4, 0], width: 2.4, height: 2.8, route: true },
-    { id: 'front-ground-window', kind: 'window', centre: [4.4, 1.7, HALF_DEPTH], width: 2.6, height: 1.32, route: false },
-    { id: 'rear-ground-window', kind: 'window', centre: [-4.4, 1.7, -HALF_DEPTH], width: 2.6, height: 1.32, route: false },
-    { id: 'upper-window', kind: 'window', centre: [0, 5.32, HALF_DEPTH], width: 3, height: 1.3, route: false },
+    { id: 'ground-room-opening', kind: 'interior-opening', centre: [partitionOpeningX, 1.4, 0], width: 2.6, height: 2.8, route: true },
+    { id: 'upper-room-opening', kind: 'interior-opening', centre: [partitionOpeningX, FLOOR_Y + 1.4, 0], width: 2.6, height: 2.8, route: true },
+    { id: 'upper-ramp-entry', kind: 'ramp-entry', centre: [rampWallX, FLOOR_Y + 1.4, RAMP_ENTRY_Z], width: 2.6, height: 2.8, route: true },
+    { id: 'front-ground-window', kind: 'window', centre: [4.8, WINDOW_CENTRE_Y, HALF_DEPTH], width: 2.8, height: WINDOW_OPENING_HEIGHT, route: true },
+    { id: 'rear-ground-window', kind: 'window', centre: [-4.8, WINDOW_CENTRE_Y, -HALF_DEPTH], width: 2.8, height: WINDOW_OPENING_HEIGHT, route: true },
+    { id: 'upper-window', kind: 'window', centre: [0, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH], width: 3.2, height: WINDOW_OPENING_HEIGHT, route: true },
   ];
+  const rampX = rampSide * (HALF_WIDTH + RAMP_SIDE_OUTSET);
   const anchors: LocalAnchor[] = [
-    { id: 'front-yard', position: [doorX, 1.7, 9.8], level: 'ground' },
-    { id: 'front-door-inside', position: [doorX, 1.7, 7.1], level: 'ground' },
-    { id: 'ground-front-bypass', position: [6.2, 1.7, 7], level: 'ground' },
-    { id: 'ground-front', position: [6.1, 1.7, 3.2], level: 'ground' },
-    { id: 'ground-opening', position: [1.7, 1.7, 0], level: 'ground' },
-    { id: 'ground-rear', position: [1.7, 1.7, -4], level: 'ground' },
-    { id: 'rear-door-inside', position: [rearDoorX, 1.7, -7.1], level: 'ground' },
-    { id: 'rear-yard', position: [rearDoorX, 1.7, -9.8], level: 'ground' },
-    { id: 'ramp-approach', position: [-7.65, 1.7, 6.9], level: 'ground' },
-    { id: 'ramp-foot', position: [-7.1, 1.7, RAMP_Z], level: 'ground' },
-    { id: 'ramp-mid', position: [-1.2, 3.45, RAMP_Z], level: 'upper' },
-    { id: 'ramp-top', position: [4.7, 5.18, RAMP_Z], level: 'upper' },
-    { id: 'landing-exit', position: [5.2, 5.18, 3.72], level: 'upper' },
-    { id: 'upper-front', position: [1.7, 5.18, 2.5], level: 'upper' },
-    { id: 'upper-opening', position: [1.7, 5.18, 0], level: 'upper' },
-    { id: 'upper-rear', position: [1.7, 5.18, -4], level: 'upper' },
+    { id: 'front-yard', position: [doorX, 1.7, 9.9], level: 'ground' },
+    { id: 'front-door-inside', position: [doorX, 1.7, 7], level: 'ground' },
+    { id: 'ground-front', position: [doorX, 1.7, 3.2], level: 'ground' },
+    { id: 'ground-opening', position: [partitionOpeningX, 1.7, 0], level: 'ground' },
+    { id: 'ground-rear', position: [rearDoorX, 1.7, -3.2], level: 'ground' },
+    { id: 'rear-door-inside', position: [rearDoorX, 1.7, -7], level: 'ground' },
+    { id: 'rear-yard', position: [rearDoorX, 1.7, -9.9], level: 'ground' },
+    { id: 'ramp-approach', position: [rampX, 1.7, 8], level: 'ground' },
+    { id: 'ramp-foot', position: [rampX, 1.7, RAMP_BOTTOM_Z], level: 'ground' },
+    { id: 'ramp-mid', position: [rampX, 3.44, (RAMP_BOTTOM_Z + RAMP_TOP_Z) / 2], level: 'upper' },
+    { id: 'ramp-top', position: [rampX, 5.18, RAMP_TOP_Z], level: 'upper' },
+    { id: 'landing-exit', position: [rampSide * (HALF_WIDTH - 1), 5.18, RAMP_ENTRY_Z], level: 'upper' },
+    { id: 'upper-rear', position: [rampSide * 4, 5.18, -3.5], level: 'upper' },
+    { id: 'upper-opening', position: [partitionOpeningX, 5.18, 0], level: 'upper' },
+    { id: 'upper-front', position: [partitionOpeningX, 5.18, 3.5], level: 'upper' },
   ];
   return {
     rooms,
@@ -248,8 +291,8 @@ function simplePlan(surface: 'aqua' | 'coral'): {
     openings,
     anchors,
     routes: {
-      'ground-room-flow': ['front-yard', 'front-door-inside', 'ground-front-bypass', 'ground-front', 'ground-opening', 'ground-rear', 'rear-door-inside', 'rear-yard'],
-      'ramp-room-flow': ['front-door-inside', 'ramp-approach', 'ramp-foot', 'ramp-mid', 'ramp-top', 'landing-exit', 'upper-front', 'upper-opening', 'upper-rear'],
+      'ground-room-flow': ['front-yard', 'front-door-inside', 'ground-front', 'ground-opening', 'ground-rear', 'rear-door-inside', 'rear-yard'],
+      'ramp-room-flow': ['front-yard', 'ramp-approach', 'ramp-foot', 'ramp-mid', 'ramp-top', 'landing-exit', 'upper-rear', 'upper-opening', 'upper-front'],
     },
   };
 }
@@ -258,9 +301,14 @@ function worldPosition(position: [number, number, number], x: number, z: number,
   return [x + position[0], position[1], z + facing * position[2]];
 }
 
+function worldRotation(rotation: [number, number, number] | undefined, facing: 1 | -1): [number, number, number] | undefined {
+  return rotation ? [rotation[0] * facing, rotation[1], rotation[2]] : undefined;
+}
+
 /** Shared simplified declaration used by rendering, collision and traversal tests. */
 export function createHouseArchitecture(team: Team, x: number, z: number, facing: 1 | -1): HouseArchitecture {
-  const local = simplePlan(team === 0 ? 'aqua' : 'coral');
+  const rampSide: 1 | -1 = team === 0 ? -1 : 1;
+  const local = simplePlan(team === 0 ? 'aqua' : 'coral', rampSide);
   const id = team === 0 ? 'aqua-irrigation-workshop' : 'coral-orchard-conservatory';
   return {
     id,
@@ -269,7 +317,12 @@ export function createHouseArchitecture(team: Team, x: number, z: number, facing
     origin: { x, z, facing },
     dimensions: { width: WIDTH, depth: DEPTH, wallThickness: WALL },
     rooms: local.rooms.map((entry) => ({ ...entry, centre: worldPosition(entry.centre, x, z, facing) })),
-    solids: local.solids.map((entry) => ({ ...entry, id: `${id}:${entry.id}`, position: worldPosition(entry.position, x, z, facing) })),
+    solids: local.solids.map((entry) => ({
+      ...entry,
+      id: `${id}:${entry.id}`,
+      position: worldPosition(entry.position, x, z, facing),
+      rotation: worldRotation(entry.rotation, facing),
+    })),
     openings: local.openings.map((entry) => ({ ...entry, centre: worldPosition(entry.centre, x, z, facing) })),
     anchors: local.anchors.map((entry) => ({ ...entry, position: worldPosition(entry.position, x, z, facing) })),
     routes: local.routes,

@@ -45,6 +45,12 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     actionTravel: 0.1, smokeBase: 1,
     requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard'],
   },
+  'machine-pistol': {
+    sightHeight: 0.17, adsX: -0.36, adsY: 0.278, adsZ: -0.08, projectionCorrection: 0,
+    flashScale: 0.76, recoilTranslation: 0.12, recoilRotation: 0.22,
+    actionTravel: 0.11, smokeBase: 1,
+    requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard', 'auto-selector'],
+  },
 };
 
 export function weaponFamilyPresentation(weapon: WeaponId): WeaponFamilyPresentation {

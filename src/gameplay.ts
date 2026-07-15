@@ -80,6 +80,15 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     pellets: 1, recoilPitch: 0.021, recoilYaw: 0.008, recoilRecovery: 14,
     switchSeconds: 0.28, automatic: false, color: 0xe8c77b,
   },
+  'machine-pistol': {
+    id: 'machine-pistol', name: 'G18 AUTO', damage: 18, minimumDamage: 11,
+    falloffStart: 11, falloffEnd: 34, headMultiplier: 1.35, limbMultiplier: 0.8,
+    rpm: 900, mag: 20, reserve: 80, reload: 1.55,
+    hipSpread: 0.026, adsSpreadMultiplier: 0.46, movementSpreadMultiplier: 1.55,
+    crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0032, maximumSpread: 0.072,
+    pellets: 1, recoilPitch: 0.014, recoilYaw: 0.012, recoilRecovery: 13,
+    switchSeconds: 0.3, automatic: true, color: 0xff9f43,
+  },
 };
 
 export type MovementContext = {

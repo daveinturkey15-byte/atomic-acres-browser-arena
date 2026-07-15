@@ -30,6 +30,7 @@ describe('network protocol guards', () => {
   it('validates shot vectors and known weapon ids', () => {
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'sniper', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 4 })).toBe(true);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'machine-pistol', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 5 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'laser', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 3 })).toBe(false);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1], direction: [0, 0, -1], nonce: 3 })).toBe(false);
   });
@@ -42,16 +43,24 @@ describe('network protocol guards', () => {
   });
 
   it('validates replicated pickup and breakable-window messages', () => {
-    const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
+    const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', mode: 'weapon', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;
     expect(isGameMessage(pickup)).toBe(true);
+    expect(isGameMessage({ ...pickup, mode: 'scavenge' })).toBe(true);
     expect(isGameMessage(brokenWindow)).toBe(true);
     expect(messageBelongsToPlayer(pickup, 'abc')).toBe(true);
     expect(messageBelongsToPlayer(brokenWindow, 'abc')).toBe(true);
     expect(isGameMessage({ ...pickup, dropId: '<script>'.repeat(30) })).toBe(false);
     expect(isGameMessage({ ...pickup, weapon: 'laser' })).toBe(false);
+    expect(isGameMessage({ ...pickup, mode: 'duplicate' })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, origin: [Infinity, 1.7, 2] })).toBe(false);
     expect(messageBelongsToPlayer({ ...brokenWindow, by: 'spoof' }, 'abc')).toBe(false);
+  });
+
+  it('admits the machine pistol only as the sniper sidearm in snapshots', () => {
+    expect(isPlayerSnapshot({ ...player, primary: 'sniper', weapon: 'machine-pistol' })).toBe(true);
+    expect(isPlayerSnapshot({ ...player, primary: 'carbine', weapon: 'machine-pistol' })).toBe(false);
+    expect(isPlayerSnapshot({ ...player, primary: 'sniper', weapon: 'pistol' })).toBe(false);
   });
 
   it('binds relayed guest claims to the established player id', () => {

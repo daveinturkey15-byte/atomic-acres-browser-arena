@@ -57,11 +57,17 @@ import { FramePacingSampler } from './frame-pacing';
 import { consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
 import {
   DEATH_DROP_INTERACTION_RANGE,
+  DEATH_DROP_SCAVENGE_RANGE,
   MAX_DEATH_DROPS,
-  consumeDeathDrop,
+  consumeDeathDropWeapon,
   createDeathDrop,
+  deathDropAmmoAvailable,
+  deathDropAvailable,
+  deathDropWeaponAvailable,
   nearestDeathDrop,
+  nearestScavengeDeathDrop,
   pruneDeathDrops,
+  scavengeDeathDrop,
   type DeathDrop,
 } from './death-drops';
 import { ArenaNetwork } from './network';
@@ -138,6 +144,14 @@ type GrenadeEntity = {
   lastBounceAt: number;
 };
 
+type GrenadeExplosionVisual = {
+  root: THREE.Group;
+  ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  light: THREE.PointLight;
+  startedAt: number;
+  expiresAt: number;
+};
+
 type YardhawkEntity = {
   root: THREE.Group;
   targetId: string;
@@ -181,9 +195,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · GAMEPLAY SYSTEMS PASS 21</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · HOUSE AND SCAVENGE PASS 22</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Four class weapons, recoverable battlefield gear, tactical supports and breakable model-home routes in a complete score race and rematch flow.</p>
+    <p class="lede">Traversable broken windows, exterior house ramps, walk-over scavenging, stable two-frag combat and a marksman-only full-auto sidearm.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -205,10 +219,10 @@ app.innerHTML = `
       <div id="network-status" data-kind="ok">Ready for deployment.</div>
     </div>
     <div class="menu-panel" data-menu-panel="kit" hidden>
-      <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary issued on deployment.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
+      <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary and issued sidearm.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
       <div class="kit-grid">
         ${FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}">
-          <span>${kit.role}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name}</b><p>${kit.summary}</p>
+          <span>${kit.role}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b><p>${kit.summary}</p>
           <i>${kit.traits.join(' · ')}</i><em>SELECTED</em>
         </button>`).join('')}
       </div>
@@ -221,7 +235,7 @@ app.innerHTML = `
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
         <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="quality">QUALITY</option></select></label>
       </div>
-      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> pickup/replenish · <b>1/2</b> primary/pistol · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
+      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
   </section>
@@ -245,7 +259,7 @@ app.innerHTML = `
       <div class="ammo-row"><b id="ammo">30</b><div class="reserve-stack"><small>RESERVE</small><span><i>/</i><em id="reserve">120</em></span></div></div>
       <small id="reload-state"></small>
     </div>
-    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V KNIFE · G THROW</small></div>
+    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×2</b><small>V KNIFE · G THROW</small></div>
     <div id="support-block">
       <div class="support-heading"><span>FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
       <div class="support-list">
@@ -461,15 +475,15 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
   nextShotAt: 0,
   sustainedShots: 0,
   stance: 'stand' as Stance,
-  grenades: 1,
+  grenades: 2,
   lastMeleeAt: -10_000,
   alive: true,
   invulnerableUntil: 0,
@@ -480,6 +494,9 @@ const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
 const grenades: GrenadeEntity[] = [];
+const grenadeExplosionVisuals: GrenadeExplosionVisual[] = [];
+let grenadeExplosions = 0;
+let lastGrenadeExplosionFrameAt = 0;
 let fieldSupport = createFieldSupportState();
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
@@ -506,6 +523,7 @@ let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let triggerHeld = false;
 let targetHits = 0;
 let accumulator = 0;
+let frameCount = 0;
 let recoilVisual = 0;
 let recoilCamera = { pitch: 0, yaw: 0 };
 let landingImpulse = 0;
@@ -636,7 +654,7 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
 function renderFieldKitSelection(): void {
   const kit = fieldKitById(selectedFieldKit);
   const queued = gameStarted && player.primaryWeapon !== kit.weapon;
-  element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name}</b>`;
+  element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>`;
   document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
     const selected = card.dataset.kitId === selectedFieldKit;
     card.classList.toggle('selected', selected);
@@ -1062,16 +1080,33 @@ function removeDeathDrop(entity: DeathDropEntity): void {
   disposeDeathDrop(entity);
 }
 
+function updateDeathDropPresentation(entity: DeathDropEntity, now = performance.now()): void {
+  const ammoAvailable = deathDropAmmoAvailable(entity.drop, now);
+  const weaponAvailable = deathDropWeaponAvailable(entity.drop, now);
+  const model = entity.root.getObjectByName('death-drop-weapon');
+  const beacon = entity.root.getObjectByName('death-drop-beacon');
+  const ring = entity.root.getObjectByName('death-drop-ring') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;
+  if (model) model.visible = weaponAvailable;
+  if (beacon) beacon.visible = ammoAvailable;
+  if (ring) {
+    ring.visible = ammoAvailable || weaponAvailable;
+    ring.material.color.setHex(ammoAvailable ? 0x7cf3a0 : WEAPONS[entity.drop.weapon].color);
+  }
+}
+
 function interactWithDeathDrop(now = performance.now()): boolean {
   if (!player.alive || matchState.phase !== 'active') return false;
-  const drop = nearestDeathDrop(deathDrops.map((entity) => entity.drop), player.position, DEATH_DROP_INTERACTION_RANGE, now);
+  const candidates = deathDrops
+    .map((entity) => entity.drop)
+    .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
+  const drop = nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon');
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
-  const result = consumeDeathDrop(
+  const result = consumeDeathDropWeapon(
     drop,
     { primary: player.primaryWeapon, ammo: player.ammo[player.primaryWeapon], reserve: player.reserve[player.primaryWeapon] },
-    WEAPONS[drop.weapon].reserve,
+    WEAPONS[player.primaryWeapon].reserve,
     now,
   );
   if (!result.consumed) return false;
@@ -1089,17 +1124,55 @@ function interactWithDeathDrop(now = performance.now()): boolean {
     by: player.id,
     dropId: drop.id,
     weapon: drop.weapon,
+    mode: 'weapon',
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
   network.send(pickup);
   addFeed(result.mode === 'replenish' ? `${WEAPONS[drop.weapon].name.toUpperCase()} AMMO REPLENISHED` : `${WEAPONS[drop.weapon].name.toUpperCase()} PICKED UP`, 'gold');
-  removeDeathDrop(entity);
+  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
+  else removeDeathDrop(entity);
   renderFieldKitSelection();
   return true;
 }
 
+function autoScavengeDeathDrop(now: number): boolean {
+  if (!player.alive || matchState.phase !== 'active') return false;
+  const drop = nearestScavengeDeathDrop(deathDrops.map((entity) => entity.drop), player.position, now);
+  if (!drop) return false;
+  const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
+  if (!entity) return false;
+  const activeWeapon = player.weapon;
+  const result = scavengeDeathDrop(
+    drop,
+    { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
+    WEAPONS[activeWeapon].reserve,
+    2,
+    now,
+  );
+  if (!result.scavenged) return false;
+  entity.drop = result.drop;
+  player.reserve[activeWeapon] = result.inventory.reserve;
+  player.grenades = result.inventory.grenades;
+  const pickup: PickupMessage = {
+    type: 'pickup',
+    by: player.id,
+    dropId: drop.id,
+    weapon: drop.weapon,
+    mode: 'scavenge',
+    position: player.position.toArray(),
+    nonce: randomNonce(),
+  };
+  network.send(pickup);
+  const gains = [result.ammoGranted > 0 ? `+${result.ammoGranted} ${WEAPONS[activeWeapon].name.toUpperCase()} AMMO` : '', result.grenadeGranted > 0 ? '+1 FRAG' : ''].filter(Boolean).join(' · ');
+  addFeed(`SCAVENGED ${gains}`, 'gold');
+  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
+  else removeDeathDrop(entity);
+  return true;
+}
+
 function updateDeathDrops(now: number): void {
+  autoScavengeDeathDrop(now);
   const retained = new Set(pruneDeathDrops(deathDrops.map((entity) => entity.drop), now, MAX_DEATH_DROPS).map((drop) => drop.id));
   for (let index = deathDrops.length - 1; index >= 0; index -= 1) {
     const entity = deathDrops[index];
@@ -1108,12 +1181,16 @@ function updateDeathDrops(now: number): void {
       disposeDeathDrop(entity);
       continue;
     }
+    updateDeathDropPresentation(entity);
     const age = Math.max(0, now - entity.drop.createdAt);
     entity.root.rotation.y = age * 0.00065;
     entity.root.position.y = entity.drop.position.y + Math.sin(age * 0.004) * 0.08;
   }
+  const candidates = deathDrops
+    .map((entity) => entity.drop)
+    .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
   const nearby = player.alive
-    ? nearestDeathDrop(deathDrops.map((entity) => entity.drop), player.position, DEATH_DROP_INTERACTION_RANGE, now)
+    ? nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon')
     : null;
   const prompt = element<HTMLElement>('#pickup-prompt');
   prompt.hidden = !nearby;
@@ -1132,13 +1209,25 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   const position = new THREE.Vector3(...message.position);
   const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
+  const horizontalDropDistance = Math.hypot(position.x - dropPosition.x, position.z - dropPosition.z);
+  const validDropDistance = message.mode === 'scavenge'
+    ? horizontalDropDistance <= DEATH_DROP_SCAVENGE_RANGE + 0.5 && Math.abs(position.y - dropPosition.y) <= 2.5
+    : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
   if (!pointInsideBounds(position, arena.bounds, 0.44)
     || position.distanceTo(senderPosition) > 2.8
-    || position.distanceTo(dropPosition) > DEATH_DROP_INTERACTION_RANGE + 0.5) return;
+    || !validDropDistance
+    || message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)
+    || message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)) return;
   processedNonces.add(message.nonce);
-  authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
-  setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials);
-  removeDeathDrop(entity);
+  if (message.mode === 'scavenge') {
+    entity.drop = { ...entity.drop, ammoConsumedAt: now };
+  } else {
+    entity.drop = { ...entity.drop, weaponConsumedAt: now };
+    authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
+    setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials);
+  }
+  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
+  else removeDeathDrop(entity);
   trimNonceSet();
 }
 
@@ -1316,8 +1405,9 @@ function requestGamePointerLock(): void {
 }
 
 function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): boolean {
-  if (!characterPhysics || !player.alive || !playerGrounded) return false;
+  if (!characterPhysics || !player.alive) return false;
   const target = nextStance(player.stance, action);
+  if (!playerGrounded && target !== 'crouch') return false;
   if (target === player.stance) return true;
   const previous = player.stance;
   const before = characterPhysics.eyePosition();
@@ -1343,7 +1433,7 @@ function respawn(requestLock = true): void {
   player.velocity.set(0, 0, 0);
   player.hp = 100;
   lastDamageAt = -10_000;
-  player.grenades = 1;
+  player.grenades = 2;
   player.reloadState = null;
   player.alive = true;
   respawnEndsAt = 0;
@@ -1957,26 +2047,71 @@ function throwGrenade(): void {
   });
 }
 
+function spawnGrenadeExplosionVisual(point: THREE.Vector3, now: number): void {
+  while (grenadeExplosionVisuals.length >= 4) {
+    const oldest = grenadeExplosionVisuals.shift()!;
+    disposeSupportRoot(oldest.root);
+  }
+  const root = new THREE.Group();
+  root.name = 'grenade-explosion-visual';
+  root.position.copy(point).add(new THREE.Vector3(0, 0.055, 0));
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffa13d,
+    transparent: true,
+    opacity: 0.68,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.24, 1.45, 28), material);
+  ring.name = 'grenade-blast-ring';
+  ring.rotation.x = -Math.PI / 2;
+  ring.scale.setScalar(0.18);
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffcf78, transparent: true, opacity: 0.82, depthWrite: false, toneMapped: false }),
+  );
+  core.name = 'grenade-blast-core';
+  core.position.y = 0.08;
+  const light = new THREE.PointLight(0xff7b2e, 7, 12, 2);
+  light.position.y = 0.55;
+  root.add(ring, core, light);
+  root.traverse((node) => { node.userData.presentationOnly = true; node.raycast = () => undefined; });
+  scene.add(root);
+  grenadeExplosionVisuals.push({ root, ring, light, startedAt: now, expiresAt: now + 280 });
+  grenadeExplosions += 1;
+  lastGrenadeExplosionFrameAt = now;
+  spawnImpactFlash(point.clone(), 'metal', new THREE.Vector3(0, 1, 0));
+}
+
+function updateGrenadeExplosionVisuals(now: number): void {
+  for (let index = grenadeExplosionVisuals.length - 1; index >= 0; index -= 1) {
+    const visual = grenadeExplosionVisuals[index];
+    if (now >= visual.expiresAt) {
+      grenadeExplosionVisuals.splice(index, 1);
+      disposeSupportRoot(visual.root);
+      continue;
+    }
+    const progress = THREE.MathUtils.clamp((now - visual.startedAt) / Math.max(1, visual.expiresAt - visual.startedAt), 0, 1);
+    visual.ring.scale.setScalar(0.18 + progress * 1.35);
+    visual.ring.material.opacity = 0.68 * (1 - progress);
+    visual.light.intensity = 7 * (1 - progress);
+  }
+}
+
+function clearGrenadeExplosionVisuals(): void {
+  for (const visual of grenadeExplosionVisuals) disposeSupportRoot(visual.root);
+  grenadeExplosionVisuals.length = 0;
+}
+
 function explodeGrenade(entity: GrenadeEntity): void {
   const point = entity.mesh.position.clone();
   scene.remove(entity.mesh);
+  entity.mesh.geometry.dispose();
+  (entity.mesh.material as THREE.Material).dispose();
   audio.explosion();
-  const flash = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 20, 14),
-    new THREE.MeshBasicMaterial({ color: 0xffb24c, transparent: true, opacity: 0.72 }),
-  );
-  flash.position.copy(point); flash.scale.setScalar(0.2); scene.add(flash);
-  const light = new THREE.PointLight(0xff7b2e, 12, 18, 2); light.position.copy(point); scene.add(light);
-  const started = performance.now();
-  const animate = () => {
-    const t = (performance.now() - started) / 420;
-    if (t >= 1) { scene.remove(flash, light); return; }
-    flash.scale.setScalar(0.2 + t * 5.5);
-    (flash.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - t);
-    light.intensity = 12 * (1 - t);
-    requestAnimationFrame(animate);
-  };
-  animate();
+  const now = performance.now();
+  spawnGrenadeExplosionVisual(point, now);
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
@@ -2999,7 +3134,7 @@ function resetForMode(): void {
   player.kills = 0;
   player.deaths = 0;
   player.hp = 100;
-  player.grenades = 1;
+  player.grenades = 2;
   player.reloadState = null;
   player.sustainedShots = 0;
   player.stance = 'stand';
@@ -3008,8 +3143,13 @@ function resetForMode(): void {
   previousHudScores = [0, 0];
   respawnEndsAt = 0;
   clearBots();
-  for (const grenade of grenades) scene.remove(grenade.mesh);
+  for (const grenade of grenades) {
+    scene.remove(grenade.mesh);
+    grenade.mesh.geometry.dispose();
+    (grenade.mesh.material as THREE.Material).dispose();
+  }
   grenades.length = 0;
+  clearGrenadeExplosionVisuals();
   clearFieldSupport();
   clearTeamPings();
   clearDeathDrops();
@@ -3024,8 +3164,8 @@ function resetForMode(): void {
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
 }
 
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
@@ -3075,6 +3215,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 function frame(now: number): void {
+  frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
     framePacing.record(rawFrameMs);
@@ -3108,6 +3249,7 @@ function frame(now: number): void {
     updateTargets(now);
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
+    updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
     updateTeamPings(now);
     updateDeathDrops(now);
@@ -3145,6 +3287,7 @@ const debugWindow = window as Window & {
     equipWeapon: (weapon: WeaponId) => void;
     interactDrop: () => void;
     setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
+    setGrenades: (count: number) => void;
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
@@ -3167,6 +3310,7 @@ const debugWindow = window as Window & {
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   snapshot: () => ({
     gameStarted,
+    frameCount,
     gameMode,
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
@@ -3244,6 +3388,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
+    grenadeExplosion: {
+      total: grenadeExplosions,
+      activeVisuals: grenadeExplosionVisuals.length,
+      lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
+    },
     fieldSupport: {
       streak: fieldSupport.streak,
       available: { ...fieldSupport.available },
@@ -3270,6 +3419,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     deathDrops: deathDrops.map((entity) => ({
       id: entity.drop.id,
       weapon: entity.drop.weapon,
+      ammoAvailable: deathDropAmmoAvailable(entity.drop, performance.now()),
+      weaponAvailable: deathDropWeaponAvailable(entity.drop, performance.now()),
       position: [entity.drop.position.x, entity.drop.position.y, entity.drop.position.z],
       expiresInMs: Math.max(0, entity.drop.expiresAt - performance.now()),
     })),
@@ -3287,7 +3438,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     houseNavigation: arena.houses.map((house) => ({
       id: house.id,
       dimensions: { ...house.dimensions },
-      rampWidth: house.solids.find((solid) => solid.kind === 'ramp')?.size[2] ?? 0,
+      rampWidth: (() => {
+        const ramp = house.solids.find((solid) => solid.kind === 'ramp');
+        return ramp ? Math.min(ramp.size[0], ramp.size[2]) : 0;
+      })(),
+      floorSections: house.solids.filter((solid) => solid.kind === 'floor').map((solid) => solid.name),
       routeAnchors: house.routes['ramp-room-flow'].length,
     })),
     teamPings: activeTeamPings.map((ping) => ({
@@ -3449,7 +3604,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     renderFieldKitSelection();
   },
   equipWeapon: (weapon: WeaponId) => {
-    if (weapon !== 'pistol') player.primaryWeapon = weapon;
+    if (weapon === 'carbine' || weapon === 'smg' || weapon === 'scattergun' || weapon === 'sniper') player.primaryWeapon = weapon;
     player.weapon = weapon;
     player.ammo[weapon] = WEAPONS[weapon].mag;
     player.reserve[weapon] = WEAPONS[weapon].reserve;
@@ -3460,6 +3615,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
     player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
+  },
+  setGrenades: (count: number) => {
+    if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(2, Math.floor(count)));
   },
   reload: () => reload(),
   melee: () => {
@@ -3591,7 +3749,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 21 candidate — precision class, battlefield pickups, tactical supports, breakable glass and wider house routes.');
+  setStatus('Pass 22 candidate — vaultable windows, exterior ramps, seam-free floors, walk-over scavenging, stable frags and G18 AUTO.');
   requestAnimationFrame(frame);
 }
 

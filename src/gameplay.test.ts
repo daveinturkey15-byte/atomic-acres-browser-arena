@@ -181,6 +181,17 @@ describe('weapon tuning', () => {
     expect(pistol.switchSeconds).toBeLessThan(WEAPONS.smg.switchSeconds);
   });
 
+  it('gives the marksman a bounded full-auto G18 sidearm', () => {
+    const auto = WEAPONS['machine-pistol'];
+    expect(auto.name).toBe('G18 AUTO');
+    expect(auto.automatic).toBe(true);
+    expect(auto.rpm).toBeGreaterThan(WEAPONS.smg.rpm);
+    expect(auto.damage).toBeLessThan(WEAPONS.pistol.damage);
+    expect(auto.mag).toBe(20);
+    expect(auto.reserve).toBe(80);
+    expect(sampleWeaponPellet(auto, 0, auto.maximumSpread, 1, 0.5)).toEqual({ x: 0, y: 0 });
+  });
+
   it('gives the Longline sniper an exact one-headshot two-body-shot lethality contract', () => {
     const sniper = WEAPONS.sniper;
     const body = computeDamage(sniper, 90, 'body');

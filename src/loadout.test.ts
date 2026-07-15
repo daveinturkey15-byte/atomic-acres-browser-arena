@@ -7,15 +7,17 @@ describe('field-kit selection', () => {
     expect(new Set(FIELD_KITS.map((kit) => kit.id)).size).toBe(FIELD_KITS.length);
   });
 
-  it('round-trips the marksman kit and deploys its Longline sniper with the service pistol', () => {
+  it('round-trips the marksman kit and deploys its Longline sniper with the full-auto machine pistol', () => {
     const encoded = serializeFieldKitSelection('marksman');
     expect(parseFieldKitSelection(encoded)).toBe('marksman');
     expect(fieldKitById('marksman').weapon).toBe('sniper');
-    expect(deployedWeapons('sniper')).toEqual(['sniper', 'pistol']);
+    expect(fieldKitById('marksman').sidearm).toBe('machine-pistol');
+    expect(deployedWeapons('sniper')).toEqual(['sniper', 'machine-pistol']);
   });
 
-  it('issues exactly the selected primary and shared service pistol', () => {
-    for (const kit of FIELD_KITS) expect(deployedWeapons(kit.weapon)).toEqual([kit.weapon, 'pistol']);
+  it('issues the service pistol to standard kits and the auto sidearm only to marksman', () => {
+    for (const kit of FIELD_KITS) expect(deployedWeapons(kit.weapon)).toEqual([kit.weapon, kit.sidearm]);
+    expect(FIELD_KITS.filter((kit) => kit.sidearm === 'machine-pistol').map((kit) => kit.id)).toEqual(['marksman']);
   });
 
   it('falls back safely for missing malformed stale or unknown storage values', () => {
