@@ -1,7 +1,7 @@
 # Atomic Acres Pass 22 — Traversable Houses, Scavenging, Stable Grenades, and Marksman Auto Sidearm
 
 Date: 2026-07-15
-Status: ramp/scope hotfix verified locally; corrected isolated review publication pending
+Status: ramp/scope hotfix published to isolated review; canonical root and Pass 21 preserved
 Branch: `overhaul/house-loot-grenade-pass-22`
 Baseline: Pass 21 source `67ca0c2`
 
@@ -135,6 +135,18 @@ Pass 22 converts Dave's Pass 21 playtest feedback into shared architecture, inve
 - Hotfix verification: TypeScript/lint passed; `167/167` deterministic tests passed across 32 files; all `26/26` Chromium scenarios passed in bounded serial groups; local two-peer compatibility QA passed with `errors: []`; Performance and Quality budgets passed; dependency audit found zero vulnerabilities.
 - Exact hotfix artifact: 27 files; release-tree verifier clean; checksum-manifest SHA-256 `ab1d39a58aff11339b300f1b4f37da3a113e5fc591af37fa0d42254a7d47770b`.
 - Final local visual checks confirmed the batched indoor deck, slim rails/posts, framed upper landing, retained outdoor ramp, clear 3× sight picture, centered reticle, no black optic occlusion, and no ordinary HUD bleed-through.
+
+### Hotfix replacement release
+
+- Runtime source: `199d5f1`; public-QA final-approach hardening: `66d1bba` (QA script only; runtime artifact unchanged).
+- Pages deployment: `9b9b9dcb0b17481742657776d7cec47ba30d5c50` (`built`).
+- Review URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass22/?source=199d5f1&pages=9b9b9dc`.
+- All 27 public files matched the exact tested artifact hashes.
+- Public telemetry reported four ramps/four visible rendered ramps, two `2.8` exterior ramps, two `2.2` interior ramps, and nine anchors for each exterior/interior route.
+- Public visual inspection confirmed the indoor ramp/landing and clear centered 3× scope. Browser console and JavaScript error buffers remained empty.
+- Local and public two-peer QA both exited `0` with `errors: []`, stance/window/scavenge/weapon replication true, one remote per peer, opposing teams, and 46.96-unit spawn separation.
+- The first public QA attempt exposed one remaining direct `2.2`-unit verifier teleport into the `1.05` pickup radius. The verifier now smooths that final approach over 12 bounded steps; production movement admission and pickup authority were not changed.
+- Canonical root remained `index.html` blob `430899c6324a128ed99a4344c7de058be7eeb163` and assets tree `e328066cf30bdbfef9a4f08d5933d877d17ff113`; `review/pass21` remained tree `d3dfa8a6ceb60825c0be92f43c430467dedb0a78`.
 
 ## Isolated review release
 
