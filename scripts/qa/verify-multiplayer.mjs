@@ -6,6 +6,16 @@ const browser = await chromium.launch({ headless: true });
 const host = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const guest = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const errors = [];
+
+async function movePlayerSmoothly(page, target, steps = 10) {
+  const start = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position);
+  for (let step = 1; step <= steps; step += 1) {
+    const progress = step / steps;
+    const position = start.map((value, index) => value + (target[index] - value) * progress);
+    await page.evaluate(([x, y, z]) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z), position);
+    await page.waitForTimeout(120);
+  }
+}
 for (const [label, page] of [['host', host], ['guest', guest]]) {
   page.on('console', (message) => { if (message.type() === 'error') errors.push(`${label}: ${message.text()}`); });
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`));
@@ -58,6 +68,8 @@ const windowReplicated = (await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG
 await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 6, 0, 0));
 await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 0, Math.PI, 0));
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers.some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2]) < 0.25), undefined, { timeout: 10_000 });
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
+  .some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2] - 6) < 0.25), undefined, { timeout: 10_000 });
 const guestDeathsBefore = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.deaths);
 await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -73,7 +85,10 @@ await host.evaluate(() => {
 await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: 10_000 });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops.length > 0, undefined, { timeout: 10_000 });
 const remoteDeathDrop = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]);
-await host.evaluate(([x, y, z]) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y + 1.55, z + 2.2), remoteDeathDrop.position);
+await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 4]);
+await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
+  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 4)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: 10_000 });
+await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 2.2]);
 await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
   .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 2.2)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: 10_000 });
 await host.evaluate(([x, y, z]) => {
