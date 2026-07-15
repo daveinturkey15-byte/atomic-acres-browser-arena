@@ -214,9 +214,21 @@ app.innerHTML = `
     <canvas id="minimap" width="180" height="180" aria-label="Tactical minimap"></canvas>
     <div id="location-label">ATOM-LINER CROSSING</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
-    <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
+    <div id="weapon-block">
+      <span id="weapon-name">M86 CARBINE</span>
+      <div class="ammo-row"><b id="ammo">30</b><div class="reserve-stack"><small>RESERVE</small><span><i>/</i><em id="reserve">120</em></span></div></div>
+      <small id="reload-state"></small>
+    </div>
     <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V KNIFE · G THROW</small></div>
-    <div id="support-block"><span id="support-streak">STREAK 0</span><b data-support="scout-sweep">3 · SCOUT</b><b data-support="yardhawk">5 · YARDHAWK</b><b data-support="tri-pass">7 · TRI-PASS</b><small>3 / 4 / 5 ACTIVATE</small></div>
+    <div id="support-block">
+      <div class="support-heading"><span>FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
+      <div class="support-list">
+        <b data-support="scout-sweep"><kbd>3</kbd><span><small>3 KILLS</small>SCOUT SWEEP</span></b>
+        <b data-support="yardhawk"><kbd>4</kbd><span><small>5 KILLS</small>YARDHAWK</span></b>
+        <b data-support="tri-pass"><kbd>5</kbd><span><small>7 KILLS</small>TRI-PASS</span></b>
+      </div>
+      <small class="support-help">PRESS 3 / 4 / 5 TO ACTIVATE</small>
+    </div>
     <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
@@ -2209,9 +2221,11 @@ function updateHud(now: number): void {
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
-  element<HTMLElement>('#reload-state').textContent = player.reloadState
+  const reloadStateElement = element<HTMLElement>('#reload-state');
+  reloadStateElement.textContent = player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
     : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
+  reloadStateElement.classList.toggle('active', player.reloadState !== null);
   element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
   element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
   updateFieldSupportHud();

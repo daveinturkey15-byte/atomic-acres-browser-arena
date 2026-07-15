@@ -44,7 +44,7 @@ async function traverse(architecture: HouseArchitecture, route: readonly string[
 }
 
 describe('simplified two-floor house architecture', () => {
-  it('defines exactly two rooms per floor, one exterior door, and one window per floor', () => {
+  it('defines two rooms per floor plus front/rear ground doors and windows', () => {
     const aqua = createHouseArchitecture(0, 0, 0, 1);
     const coral = createHouseArchitecture(1, 0, 0, -1);
     expect(aqua.id).not.toBe(coral.id);
@@ -54,11 +54,33 @@ describe('simplified two-floor house architecture', () => {
       expect(architecture.rooms.filter((room) => room.level === 'ground')).toHaveLength(2);
       expect(architecture.rooms.filter((room) => room.level === 'upper')).toHaveLength(2);
       expect(new Set(architecture.rooms.map((room) => room.id)).size).toBe(4);
-      expect(architecture.openings.filter((entry) => entry.kind === 'exterior-door')).toHaveLength(1);
-      expect(architecture.openings.filter((entry) => entry.kind === 'window')).toHaveLength(2);
+      expect(architecture.openings.filter((entry) => entry.kind === 'exterior-door')).toHaveLength(2);
+      expect(architecture.openings.filter((entry) => entry.kind === 'window')).toHaveLength(3);
       expect(architecture.openings.filter((entry) => entry.kind === 'interior-opening')).toHaveLength(2);
+      expect(architecture.openings.find((entry) => entry.id === 'front-door')?.route).toBe(true);
+      expect(architecture.openings.find((entry) => entry.id === 'rear-door')?.route).toBe(true);
+      expect(architecture.openings.find((entry) => entry.id === 'front-ground-window')?.centre[2]).not.toBe(
+        architecture.openings.find((entry) => entry.id === 'rear-ground-window')?.centre[2],
+      );
       expect(new Set(architecture.anchors.map((entry) => entry.id)).size).toBe(architecture.anchors.length);
     }
+  });
+
+  it('covers the interior footprint and overlaps floor joins instead of leaving sliver gaps', () => {
+    const architecture = createHouseArchitecture(0, 0, 0, 1);
+    const ground = architecture.solids.find((entry) => entry.name === 'ground-floor-slab');
+    const rear = architecture.solids.find((entry) => entry.name === 'upper-rear-floor');
+    const front = architecture.solids.find((entry) => entry.name === 'upper-front-floor');
+    const landing = architecture.solids.find((entry) => entry.name === 'ramp-top-landing');
+    expect(ground).toBeDefined();
+    expect(rear).toBeDefined();
+    expect(front).toBeDefined();
+    expect(landing).toBeDefined();
+    if (!ground || !rear || !front || !landing) throw new Error('Missing declared floor solid');
+    expect(ground.size[0]).toBeGreaterThanOrEqual(architecture.dimensions.width - architecture.dimensions.wallThickness * 2);
+    expect(ground.size[2]).toBeGreaterThanOrEqual(architecture.dimensions.depth - architecture.dimensions.wallThickness * 2);
+    expect(rear.position[2] + rear.size[2] / 2).toBeGreaterThanOrEqual(front.position[2] - front.size[2] / 2);
+    expect(front.position[2] + front.size[2] / 2).toBeGreaterThanOrEqual(landing.position[2] - landing.size[2] / 2);
   });
 
   it('uses one continuous rendered-and-physical ramp with no stair proxies or clutter fixtures', () => {
@@ -76,10 +98,12 @@ describe('simplified two-floor house architecture', () => {
     }
   });
 
-  it.each([0, 1] as Team[])('traverses the two downstairs rooms in both directions for team %s', async (team) => {
+  it.each([0, 1] as Team[])('traverses both downstairs rooms and exterior doors in both directions for team %s', async (team) => {
     const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
     const groundRoute = architecture.routes['ground-room-flow'];
     expect(groundRoute).toBeDefined();
+    expect(groundRoute[0]).toBe('front-yard');
+    expect(groundRoute.at(-1)).toBe('rear-yard');
     await traverse(architecture, groundRoute);
     await traverse(architecture, groundRoute, true);
   });

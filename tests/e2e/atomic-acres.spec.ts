@@ -301,6 +301,29 @@ test.describe('solo mechanics', () => {
     expect(Object.values((await debug(page)).fieldSupport.available)).toEqual([false, false, false]);
   });
 
+  test('keeps ammo and Field Support cards large, clear, and non-overlapping', async ({ page }) => {
+    const metrics = await page.evaluate(() => {
+      const ammo = document.querySelector<HTMLElement>('#ammo')!;
+      const weapon = document.querySelector<HTMLElement>('#weapon-block')!;
+      const support = document.querySelector<HTMLElement>('#support-block')!;
+      const cards = [...document.querySelectorAll<HTMLElement>('[data-support]')];
+      const supportBox = support.getBoundingClientRect();
+      const weaponBox = weapon.getBoundingClientRect();
+      return {
+        ammoFont: Number.parseFloat(getComputedStyle(ammo).fontSize),
+        cardFonts: cards.map((card) => Number.parseFloat(getComputedStyle(card).fontSize)),
+        cardCount: cards.length,
+        supportWidth: supportBox.width,
+        verticalGap: weaponBox.top - supportBox.bottom,
+      };
+    });
+    expect(metrics.ammoFont).toBeGreaterThanOrEqual(64);
+    expect(metrics.cardFonts.every((size) => size >= 15)).toBe(true);
+    expect(metrics.cardCount).toBe(3);
+    expect(metrics.supportWidth).toBeGreaterThanOrEqual(390);
+    expect(metrics.verticalGap).toBeGreaterThanOrEqual(6);
+  });
+
   test('rate-limits fixed team pings and cleans their markers', async ({ page }) => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { sendPing: (kind: 'enemy' | 'push') => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -522,8 +545,8 @@ test.describe('performance and stability', () => {
       houses: 2,
       groundRooms: 4,
       upperRooms: 4,
-      doors: 2,
-      windows: 4,
+      doors: 4,
+      windows: 6,
       ramps: 2,
       furnishings: 0,
       fixtures: 0,
@@ -566,8 +589,8 @@ test.describe('performance and stability', () => {
       houses: 2,
       groundRooms: 4,
       upperRooms: 4,
-      doors: 2,
-      windows: 4,
+      doors: 4,
+      windows: 6,
       ramps: 2,
       furnishings: 0,
       fixtures: 0,

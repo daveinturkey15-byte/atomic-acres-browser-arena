@@ -109,6 +109,26 @@ function groundFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   ];
 }
 
+function groundRearWall(surface: 'aqua' | 'coral'): LocalSolid[] {
+  const doorX = 3;
+  const doorWidth = 1.8;
+  const windowX = -3.8;
+  const windowWidth = 2.4;
+  const windowLeft = windowX - windowWidth / 2;
+  const windowRight = windowX + windowWidth / 2;
+  const doorLeft = doorX - doorWidth / 2;
+  const doorRight = doorX + doorWidth / 2;
+  return [
+    solid('rear-ground-far-left', [(-HALF_WIDTH + windowLeft) / 2, GROUND_HEIGHT / 2, -HALF_DEPTH], [windowLeft + HALF_WIDTH, GROUND_HEIGHT, WALL], surface),
+    solid('rear-ground-centre', [(windowRight + doorLeft) / 2, GROUND_HEIGHT / 2, -HALF_DEPTH], [doorLeft - windowRight, GROUND_HEIGHT, WALL], surface),
+    solid('rear-ground-far-right', [(doorRight + HALF_WIDTH) / 2, GROUND_HEIGHT / 2, -HALF_DEPTH], [HALF_WIDTH - doorRight, GROUND_HEIGHT, WALL], surface),
+    solid('rear-door-lintel', [doorX, 3.05, -HALF_DEPTH], [doorWidth, 0.6, WALL], 'trim'),
+    solid('rear-ground-window-sill-wall', [windowX, 0.52, -HALF_DEPTH], [windowWidth, 1.04, WALL], surface),
+    solid('rear-ground-window-lintel-wall', [windowX, 2.88, -HALF_DEPTH], [windowWidth, 0.94, WALL], surface),
+    solid('rear-ground-window-glass', [windowX, 1.7, -HALF_DEPTH - 0.02], [windowWidth, 1.32, 0.08], 'glass', false, 'glass'),
+  ];
+}
+
 function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   const windowX = 0;
   const windowWidth = 2.8;
@@ -156,24 +176,31 @@ function simplePlan(surface: 'aqua' | 'coral'): {
   routes: HouseArchitecture['routes'];
 } {
   const doorX = -3;
+  const rearDoorX = 3;
   const partitionOpeningX = 1.5;
   const solids: LocalSolid[] = [
     solid('ground-west-wall', [-HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, DEPTH + WALL], surface),
     solid('ground-east-wall', [HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, DEPTH + WALL], surface),
-    solid('ground-rear-wall', [0, GROUND_HEIGHT / 2, -HALF_DEPTH], [WIDTH + WALL, GROUND_HEIGHT, WALL], surface),
+    ...groundRearWall(surface),
     ...groundFrontWall(surface),
     ...doorFrame('front-entry', doorX, HALF_DEPTH + 0.04),
+    ...doorFrame('rear-entry', rearDoorX, -HALF_DEPTH - 0.04),
     ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 1.8, 'plaster'),
+    solid('ground-floor-slab', [0, 0.04, 0], [WIDTH - WALL * 2, 0.08, DEPTH - WALL * 2], 'concrete', false, 'floor'),
 
     solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface),
     solid('upper-east-wall', [HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface),
     solid('upper-rear-wall', [0, FLOOR_Y + UPPER_HEIGHT / 2, -HALF_DEPTH], [WIDTH + WALL, UPPER_HEIGHT, WALL], surface),
     ...upperFrontWall(surface),
     ...splitWallAroundDoor('upper-room-partition', 0, partitionOpeningX, 1.8, 'plaster', FLOOR_Y),
+    solid('floor-seam-front', [0, FLOOR_Y - 0.05, HALF_DEPTH + 0.07], [WIDTH + 0.24, 0.18, 0.14], 'trim', false, 'frame'),
+    solid('floor-seam-rear', [0, FLOOR_Y - 0.05, -HALF_DEPTH - 0.07], [WIDTH + 0.24, 0.18, 0.14], 'trim', false, 'frame'),
+    solid('floor-seam-west', [-HALF_WIDTH - 0.07, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
+    solid('floor-seam-east', [HALF_WIDTH + 0.07, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
 
-    solid('upper-rear-floor', [0, FLOOR_Y, -3.5], [15.6, 0.3, 6.7], 'timber', true, 'floor'),
-    solid('upper-front-floor', [0, FLOOR_Y, 1.8], [15.6, 0.3, 3.2], 'timber', true, 'floor'),
-    solid('ramp-top-landing', [4.75, FLOOR_Y, 4.8], [2.3, 0.3, 2.4], 'timber', true, 'landing'),
+    solid('upper-rear-floor', [0, FLOOR_Y, -3.47], [WIDTH - WALL * 2, 0.32, 7.04], 'timber', true, 'floor'),
+    solid('upper-front-floor', [0, FLOOR_Y, 1.75], [WIDTH - WALL * 2, 0.32, 3.5], 'timber', true, 'floor'),
+    solid('ramp-top-landing', [4.65, FLOOR_Y, 4.8], [2.5, 0.32, 2.9], 'timber', true, 'landing'),
     ...rampSolids(),
   ];
 
@@ -185,9 +212,11 @@ function simplePlan(surface: 'aqua' | 'coral'): {
   ];
   const openings: LocalOpening[] = [
     { id: 'front-door', kind: 'exterior-door', centre: [doorX, 1.4, HALF_DEPTH], width: 1.8, height: 2.8, route: true },
+    { id: 'rear-door', kind: 'exterior-door', centre: [rearDoorX, 1.4, -HALF_DEPTH], width: 1.8, height: 2.8, route: true },
     { id: 'ground-room-opening', kind: 'interior-opening', centre: [partitionOpeningX, 1.4, 0], width: 1.8, height: 2.8, route: true },
     { id: 'upper-room-opening', kind: 'interior-opening', centre: [partitionOpeningX, FLOOR_Y + 1.4, 0], width: 1.8, height: 2.8, route: true },
-    { id: 'ground-window', kind: 'window', centre: [3.8, 1.7, HALF_DEPTH], width: 2.4, height: 1.32, route: false },
+    { id: 'front-ground-window', kind: 'window', centre: [3.8, 1.7, HALF_DEPTH], width: 2.4, height: 1.32, route: false },
+    { id: 'rear-ground-window', kind: 'window', centre: [-3.8, 1.7, -HALF_DEPTH], width: 2.4, height: 1.32, route: false },
     { id: 'upper-window', kind: 'window', centre: [0, 5.32, HALF_DEPTH], width: 2.8, height: 1.3, route: false },
   ];
   const anchors: LocalAnchor[] = [
@@ -197,6 +226,8 @@ function simplePlan(surface: 'aqua' | 'coral'): {
     { id: 'ground-front', position: [5.2, 1.7, 2.7], level: 'ground' },
     { id: 'ground-opening', position: [1.5, 1.7, 0], level: 'ground' },
     { id: 'ground-rear', position: [1.5, 1.7, -3.5], level: 'ground' },
+    { id: 'rear-door-inside', position: [rearDoorX, 1.7, -6.15], level: 'ground' },
+    { id: 'rear-yard', position: [rearDoorX, 1.7, -8.8], level: 'ground' },
     { id: 'ramp-approach', position: [-6.85, 1.7, 6.0], level: 'ground' },
     { id: 'ramp-foot', position: [-6.1, 1.7, RAMP_Z], level: 'ground' },
     { id: 'ramp-mid', position: [-1.1, 3.45, RAMP_Z], level: 'upper' },
@@ -211,7 +242,7 @@ function simplePlan(surface: 'aqua' | 'coral'): {
     openings,
     anchors,
     routes: {
-      'ground-room-flow': ['front-yard', 'front-door-inside', 'ground-front-bypass', 'ground-front', 'ground-opening', 'ground-rear'],
+      'ground-room-flow': ['front-yard', 'front-door-inside', 'ground-front-bypass', 'ground-front', 'ground-opening', 'ground-rear', 'rear-door-inside', 'rear-yard'],
       'ramp-room-flow': ['front-door-inside', 'ramp-approach', 'ramp-foot', 'ramp-mid', 'ramp-top', 'upper-front', 'upper-opening', 'upper-rear'],
     },
   };

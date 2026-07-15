@@ -165,8 +165,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       if (solid.rotation) rendered.rotation.set(...solid.rotation);
     }
 
-    // One quiet roof cap is the only exterior dressing. Door and the two windows
-    // come directly from the same simplified architecture declaration.
+    // One quiet roof cap is the only exterior dressing. Both ground doors and
+    // all three windows come directly from the shared architecture declaration.
     box('simple-house-roof', [x, 7.35, z], [16.8, 0.42, 15], palette.roof, false);
   }
 
