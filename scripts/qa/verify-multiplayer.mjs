@@ -91,13 +91,13 @@ await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot(
 await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 2.2]);
 await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
   .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 2.2)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: 10_000 });
-await host.evaluate(([x, y, z]) => {
+await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
   const state = api.snapshot();
   api.setAmmo('sniper', state.player.ammo, 0);
   api.setGrenades(1);
-  api.teleportPlayer(x, y + 1.55, z);
-}, remoteDeathDrop.position);
+});
+await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2]], 12);
 await host.waitForFunction(() => {
   const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
   return state?.player.primaryWeapon === 'sniper' && state.player.reserve > 0 && state.player.grenades === 2;
