@@ -71,6 +71,18 @@ describe('first-person anatomical presentation', () => {
     for (const side of ['left', 'right'] as const) {
       const glove = arms?.getObjectByName(`${side}-glove`) as THREE.Mesh;
       expect(glove.geometry.getAttribute('position').count).toBeGreaterThan(300);
+      expect(glove.userData.style).toBe('atomic-tactical-v2');
+      expect(glove.userData.cuffConnected).toBe(true);
+      expect(glove.userData.sourcePartCount).toBeGreaterThanOrEqual(10);
+      const material = glove.material as THREE.MeshBasicMaterial;
+      expect(material.transparent).toBe(true);
+      expect(material.opacity).toBe(1);
+      const colors = glove.geometry.getAttribute('color') as THREE.BufferAttribute;
+      const uniqueColors = new Set<string>();
+      for (let index = 0; index < colors.count; index += 1) {
+        uniqueColors.add(`${colors.getX(index).toFixed(3)}:${colors.getY(index).toFixed(3)}:${colors.getZ(index).toFixed(3)}`);
+      }
+      expect(uniqueColors.size).toBeGreaterThanOrEqual(3);
     }
   });
 });

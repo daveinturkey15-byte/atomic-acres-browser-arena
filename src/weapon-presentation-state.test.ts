@@ -14,9 +14,13 @@ describe('weapon presentation state', () => {
     const middle = fireCycleAt('carbine', 31, 0.5);
     const end = fireCycleAt('carbine', 70, 0.5);
     expect(start.flash).toBe(1);
+    expect(start.kick).toBe(1);
+    expect(middle.kick).toBeGreaterThan(0.2);
+    expect(middle.kick).toBeLessThan(start.kick);
     expect(middle.boltTravel).toBeGreaterThan(0.95);
     expect(middle.casingReady).toBe(false);
     expect(end.flash).toBe(0);
+    expect(end.kick).toBe(0);
     expect(end.boltTravel).toBe(0);
     expect(end.casingReady).toBe(true);
     expect(start.smokeScale).toBeGreaterThan(1);

@@ -44,10 +44,17 @@ type ViewArmRig = {
 type HandRotationSet = { left: [number, number, number]; right: [number, number, number] };
 
 const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
-  carbine: { left: [-0.3, 0.1, -0.18], right: [-0.16, -0.04, 0.14] },
+  carbine: { left: [-0.32, 0.12, -0.22], right: [-0.22, -0.06, 0.26] },
   smg: { left: [-0.36, 0.14, -0.22], right: [-0.18, -0.02, 0.16] },
   scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+};
+
+const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
+  carbine: { left: [-0.085, -0.02, 0.015], right: [0.1, -0.03, 0.015] },
+  smg: { left: [0, 0, 0], right: [0, 0, 0] },
+  scattergun: { left: [0, 0, 0], right: [0, 0, 0] },
+  pistol: { left: [0, 0, 0], right: [0, 0, 0] },
 };
 
 const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
@@ -110,17 +117,17 @@ export class WeaponPresentation {
     camera.add(this.root);
 
     const sleeve: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x365e68 })
-      : new THREE.MeshStandardMaterial({ color: 0x355761, emissive: 0x071519, emissiveIntensity: 0.12, roughness: 0.88 });
+      ? new THREE.MeshBasicMaterial({ color: 0x2f6570 })
+      : new THREE.MeshStandardMaterial({ color: 0x285863, emissive: 0x061419, emissiveIntensity: 0.1, roughness: 0.9 });
     const sleeveTrim: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0xa69a61 })
-      : new THREE.MeshStandardMaterial({ color: 0x918653, emissive: 0x171306, emissiveIntensity: 0.08, roughness: 0.76, metalness: 0.04 });
+      ? new THREE.MeshBasicMaterial({ color: 0xd6b458 })
+      : new THREE.MeshStandardMaterial({ color: 0xb99a45, emissive: 0x1b1304, emissiveIntensity: 0.07, roughness: 0.7, metalness: 0.06 });
     const glove: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x46585b })
-      : new THREE.MeshStandardMaterial({ color: 0x354345, emissive: 0x05090a, emissiveIntensity: 0.08, roughness: 0.88 });
+      ? new THREE.MeshBasicMaterial({ color: 0x1c3034 })
+      : new THREE.MeshStandardMaterial({ color: 0x1a2a2e, emissive: 0x030708, emissiveIntensity: 0.06, roughness: 0.92 });
     const glovePalm: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x52666a })
-      : new THREE.MeshStandardMaterial({ color: 0x46565a, roughness: 0.82 });
+      ? new THREE.MeshBasicMaterial({ color: 0x38555a })
+      : new THREE.MeshStandardMaterial({ color: 0x314b50, roughness: 0.84 });
     // The licensed full-body derivative remains available for future authored
     // grip poses, but its current bind/IK calibration fails the viewmodel
     // acceptance gate (detached hands and sleeves outside the viewport). Keep
@@ -169,8 +176,8 @@ export class WeaponPresentation {
       geometries.forEach((item) => item.dispose());
       if (!geometry) throw new Error(`Unable to merge ${name}`);
       const material = this.flattenMaterials
-        ? new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
-        : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.02 });
+        ? new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, transparent: true, opacity: 1 })
+        : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.02, transparent: true, opacity: 1 });
       const merged = new THREE.Mesh(geometry, material);
       merged.name = name;
       sources.forEach((source) => parent.remove(source));
@@ -207,28 +214,38 @@ export class WeaponPresentation {
       wrist.position.z = -lowerLength;
       wrist.rotation.set(-0.12, 0, sign * 0.08);
       elbow.add(wrist);
-      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.074, 0.088, 0.12, radialSegments), sleeveTrim);
-      cuff.name = `${side}-glove-cuff`;
-      cuff.rotation.x = -Math.PI / 2;
-      cuff.position.z = 0.06; wrist.add(cuff);
-      const hand = roundedBox(`${side}-palm`, [0.15, 0.105, 0.185], glovePalm, 0.038, 3);
-      hand.position.set(sign * -0.012, -0.005, -0.012); wrist.add(hand);
-      const knucklePad = roundedBox(`${side}-knuckle-pad`, [0.148, 0.035, 0.082], glove, 0.014, 2);
-      knucklePad.position.set(sign * -0.012, -0.058, -0.072); wrist.add(knucklePad);
-      const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.027, 0.09, 4, flattenMaterials ? 6 : 8), glove);
+      const cuff = roundedBox(`${side}-glove-cuff`, [0.21, 0.15, 0.14], glove, 0.038, 3);
+      cuff.position.z = 0.045;
+      wrist.add(cuff);
+      const cuffAccent = roundedBox(`${side}-cuff-accent`, [0.178, 0.15, 0.032], sleeveTrim, 0.009, 2);
+      cuffAccent.position.z = 0.098;
+      wrist.add(cuffAccent);
+      const hand = roundedBox(`${side}-palm`, [0.2, 0.13, 0.21], glovePalm, 0.048, 4);
+      hand.position.set(sign * -0.014, -0.002, -0.035);
+      wrist.add(hand);
+      const palmHeel = roundedBox(`${side}-palm-heel`, [0.142, 0.032, 0.095], glove, 0.014, 2);
+      palmHeel.position.set(sign * -0.014, 0.058, -0.012);
+      palmHeel.rotation.x = -0.08;
+      wrist.add(palmHeel);
+      const knucklePad = roundedBox(`${side}-knuckle-pad`, [0.158, 0.038, 0.09], glove, 0.016, 3);
+      knucklePad.position.set(sign * -0.014, -0.062, -0.085);
+      wrist.add(knucklePad);
+      const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.029, 0.088, 5, flattenMaterials ? 6 : 9), glove);
       thumb.name = `${side}-thumb`;
-      thumb.position.set(sign * -0.082, -0.026, -0.036);
-      thumb.rotation.set(-Math.PI / 2 - 0.24, sign * 0.16, sign * 0.48);
+      thumb.position.set(sign * -0.094, -0.018, -0.052);
+      thumb.rotation.set(-Math.PI / 2 - 0.38, sign * 0.12, sign * 0.54);
       wrist.add(thumb);
       const fingers: THREE.Mesh[] = [];
       for (let finger = 0; finger < 4; finger += 1) {
-        const ridge = new THREE.Mesh(
-          new THREE.CapsuleGeometry(0.017, 0.066 - finger * 0.004, 4, flattenMaterials ? 6 : 8),
+        const ridge = roundedBox(
+          `${side}-finger-${finger}`,
+          [0.031, 0.05, 0.105 - finger * 0.004],
           glove,
+          0.012,
+          2,
         );
-        ridge.name = `${side}-finger-${finger}`;
-        ridge.position.set(sign * (0.052 - finger * 0.035), -0.065, -0.105 + finger * 0.004);
-        ridge.rotation.set(-Math.PI / 2 - 0.3 - finger * 0.02, 0, sign * (finger - 1.5) * 0.04);
+        ridge.position.set(sign * (0.055 - finger * 0.037), -0.064, -0.126 + finger * 0.004);
+        ridge.rotation.set(-0.4 - finger * 0.025, 0, sign * (finger - 1.5) * 0.045);
         wrist.add(ridge);
         fingers.push(ridge);
       }
@@ -237,7 +254,13 @@ export class WeaponPresentation {
       shoulder.add(sleeveBand);
       mergeArmAssembly(shoulder, [upper, sleeveBand], `${side}-upper-arm`);
       mergeArmAssembly(elbow, [forearm, elbowCap], `${side}-forearm`);
-      mergeArmAssembly(wrist, [cuff, hand, knucklePad, thumb, ...fingers], `${side}-glove`);
+      const gloveSources = [cuff, cuffAccent, hand, palmHeel, knucklePad, thumb, ...fingers];
+      const silhouetteOffset = new THREE.Vector3(sign * 0.02, -0.012, 0);
+      gloveSources.forEach((part) => part.position.add(silhouetteOffset));
+      const gloveAssembly = mergeArmAssembly(wrist, gloveSources, `${side}-glove`);
+      gloveAssembly.userData.style = 'atomic-tactical-v2';
+      gloveAssembly.userData.cuffConnected = true;
+      gloveAssembly.userData.sourcePartCount = gloveSources.length;
       this.armRigs.push({ side, shoulder, elbow, hand: wrist, upperLength, lowerLength });
       return shoulder;
     };
@@ -602,7 +625,16 @@ export class WeaponPresentation {
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
       const socket = activeModel.getObjectByName(socketName);
       if (!socket) continue;
-      const targetWorld = resolveSocketWorld(socket);
+      const socketTargetWorld = resolveSocketWorld(socket);
+      const targetWorld = socketTargetWorld.clone();
+      const gripOffset = new THREE.Vector3(...VIEWMODEL_GRIP_OFFSETS[this.active][rig.side])
+        .multiplyScalar(rig.side === 'left' ? 1 - reloadPose.handToReload : 1)
+        .multiplyScalar(1 - this.adsBlend * 0.9);
+      if (gripOffset.lengthSq() > 0) {
+        const modelOrigin = activeModel.localToWorld(new THREE.Vector3());
+        const modelOffset = activeModel.localToWorld(gripOffset).sub(modelOrigin);
+        targetWorld.add(modelOffset);
+      }
       if (rig.side === 'left' && reloadPose.handToReload > 0) {
         const reloadSocket = activeModel.getObjectByName('reload-socket-l');
         if (reloadSocket) targetWorld.lerp(resolveSocketWorld(reloadSocket), reloadPose.handToReload);
@@ -631,6 +663,7 @@ export class WeaponPresentation {
         side: rig.side,
         socket: socketName,
         socketParent: socket.parent?.name ?? null,
+        socketTarget: socketTargetWorld.toArray(),
         target: targetWorld.toArray(),
         hand: handWorld.toArray(),
         contactError: handWorld.distanceTo(targetWorld),
@@ -717,7 +750,17 @@ export class WeaponPresentation {
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
-    if (arms) arms.position.y = THREE.MathUtils.lerp(0.05, -0.1, this.adsBlend);
+    const armAdsOpacity = 1 - THREE.MathUtils.smoothstep(this.adsBlend, 0.72, 0.98);
+    if (arms) {
+      arms.position.y = THREE.MathUtils.lerp(-0.075, -0.19, this.adsBlend);
+      arms.scale.setScalar(THREE.MathUtils.lerp(1, 0.82, this.adsBlend));
+      arms.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        const material = node.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+        material.opacity = armAdsOpacity;
+        material.depthWrite = armAdsOpacity > 0.45;
+      });
+    }
 
     for (const casing of this.casings) {
       if (!casing.active) continue;
@@ -772,9 +815,11 @@ export class WeaponPresentation {
     const presentedRecoil = this.debugFireAgeMs === null
       ? this.recoil
       : Math.max(this.recoil, fireCycle.flash * 0.35 + fireCycle.boltTravel * 0.65);
+    const presentationKick = Math.max(presentedRecoil, fireCycle.kick * 0.9);
+    const shotRoll = fireCycle.kick * (this.shotsPresented % 2 === 0 ? -0.018 : 0.018);
     this.muzzleFlash.visible = fireCycle.flash > 0.015;
     if (this.muzzleFlash.visible) {
-      this.muzzleFlash.scale.setScalar(profile.flashScale * (0.72 + fireCycle.flash * 0.38));
+      this.muzzleFlash.scale.setScalar(profile.flashScale * (0.78 + fireCycle.flash * 0.42 + fireCycle.kick * 0.12));
     }
     if (this.active === 'scattergun' && this.pendingScattergunShell && fireCycle.casingReady) {
       this.ejectCasing(true);
@@ -862,7 +907,7 @@ export class WeaponPresentation {
       meleeProgress: meleeActive ? meleeProgress : null,
     });
     this.meleeRig.visible = meleeActive;
-    if (arms) arms.visible = !meleeActive;
+    if (arms) arms.visible = !meleeActive && armAdsOpacity > 0.02;
     if (activeModel) activeModel.visible = !meleeActive;
     if (meleeActive) {
       const contact = THREE.MathUtils.smoothstep(meleeProgress, 0.12, 0.48);
@@ -875,17 +920,17 @@ export class WeaponPresentation {
 
     const targetPosition = new THREE.Vector3(
       0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
-      -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentedRecoil * 0.08 - pose.landingImpulse * 0.075,
-      -0.78 + adsZ + presentedRecoil * profile.recoilTranslation - meleeArc * 0.32 + grenadeArc * 0.24,
+      -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
+      -0.78 + adsZ + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
     );
     this.root.position.lerp(targetPosition, smoothing(18));
-    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentedRecoil * profile.recoilRotation - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
+    this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(
       this.root.rotation.y,
       hipYaw * (1 - this.adsBlend) - this.swayX * 2 - this.sprintBlend * 0.38 - meleeArc * 0.65,
       smoothing(13),
     );
-    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42, smoothing(13));
+    this.root.rotation.z = THREE.MathUtils.lerp(this.root.rotation.z, reloadStage.roll - this.sprintBlend * 0.22 - pose.lateralSpeed * (pose.prone ? 0.01 : 0.025) + meleeArc * 0.42 + shotRoll, smoothing(13));
     if (arms) this.solveArms(arms, activeModel, reloadPose);
     this.solveRiggedArms(activeModel, reloadPose);
     return actionEvents;

@@ -3,6 +3,7 @@ import type { WeaponId } from './protocol';
 
 export type FireCycleState = {
   flash: number;
+  kick: number;
   boltTravel: number;
   smokeScale: number;
   casingReady: boolean;
@@ -33,12 +34,16 @@ export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): F
   const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'smg' ? 36 : 52;
   const flashProgress = clamp01(ageMs / flashDuration);
   const flash = (1 - flashProgress) ** 2;
+  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'smg' ? 50 : weapon === 'pistol' ? 58 : 62;
+  const kickProgress = clamp01(ageMs / kickDuration);
+  const kick = kickProgress >= 1 ? 0 : (1 - kickProgress) ** 1.35;
   const actionAge = weapon === 'scattergun' ? Math.max(0, ageMs - 180) : ageMs;
   const actionDuration = weapon === 'scattergun' ? 440 : cycleMs;
   const actionProgress = clamp01(actionAge / actionDuration);
   const boltTravel = actionProgress >= 1 ? 0 : Math.sin(actionProgress * Math.PI);
   return {
     flash,
+    kick,
     boltTravel,
     smokeScale: 0.72 + clamp01(finite(heat)) * 1.28,
     casingReady: ageMs >= (weapon === 'scattergun' ? 230 : weapon === 'smg' ? 24 : 34),

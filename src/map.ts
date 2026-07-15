@@ -184,6 +184,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     box('chimney', [x + 5.4, 8.6, z - facing * 3], [1.45, 3.4, 1.45], palette.brick, false);
     box('gutter', [x - 8.25, 7.68, z], [0.18, 0.18, 15.5], palette.chrome, false, false);
     box('gutter', [x + 8.25, 7.68, z], [0.18, 0.18, 15.5], palette.chrome, false, false);
+
+    if (team === 0) {
+      // The Aqua west spawn looks directly at this broad side wall. A single
+      // graphic service bay breaks the empty siding without changing collision,
+      // cover or route readability.
+      const sideX = x - 8.28;
+      box('aqua-side-foundation-band', [sideX, 0.28, z - 0.4], [0.12, 0.42, 7.4], palette.dark, false, false);
+      box('aqua-side-service-panel', [sideX - 0.07, 2.85, z - 1], [0.08, 1.05, 2.15], trim, false, false);
+      box('aqua-side-service-stripe', [sideX - 0.12, 2.85, z - 1], [0.035, 0.13, 1.72], palette.mustard, false, false);
+      box('aqua-side-service-marker', [sideX - 0.13, 3.12, z - 1], [0.03, 0.3, 0.3], surfaceMaterial.light, false, false);
+      box('aqua-side-lamp', [sideX - 0.12, 4.35, z + 3.8], [0.04, 0.26, 0.38], surfaceMaterial.light, false, false);
+    }
   }
 
   for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
