@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-16
 **Branch:** `overhaul/house-loot-grenade-pass-22`
-**Status:** Verified local checkpoint; canonical Pages remains unchanged pending owner deployment direction.
+**Status:** Published to canonical GitHub Pages from tested runtime source `498aca2` through Pages revision `017de8e`.
 
 ## Owner Report
 
@@ -90,6 +90,19 @@ Results:
 
 The first aggregate Chromium wrapper expired after ten green scenarios because software WebGL exceeded the ten-minute outer bound. No assertion failed. The remaining scenarios were completed in non-overlapping bounded shards rather than restarting the same aggregate run.
 
-## Release Boundary
+## Canonical Release
 
-This correction is verified locally. It does not modify the canonical GitHub Pages build until Dave explicitly asks to publish it.
+- Runtime source: `498aca255df7c055a233329dd46ec8c62bf657e4`
+- Pages revision: `017de8ea383065f90a00892b80af9de099959ac6`
+- Public URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?source=498aca2&pages=017de8e`
+- Historical `review/` tree preserved: `ffbb470817b20d9bcbb4f93d62e3d3b8f530f8c0`
+
+Public verification:
+
+- GitHub Pages reported the expected revision as `built`.
+- Public index, CSS, runtime JavaScript, Rapier chunk, choir WAV, and grenade GLB matched the tested `dist/` SHA-256 hashes exactly.
+- The public real-keyboard Chromium ascent regression passed for both interior and exterior ramps.
+- Direct public gameplay reached the active match with zero JavaScript errors.
+- The exact build passed local multiplayer with `errors=[]` before deployment.
+
+The first public two-page multiplayer run connected both peers and replicated stance, then timed out waiting for ADS progress under the approximately 6 Hz software-rendering environment. The one permitted fresh-room retry subsequently hit a PeerJS guest-join timeout before gameplay. No third retry was made and these transient public-harness outcomes are not represented as a green full public multiplayer run. They do not alter the verified local multiplayer result or the successful public ramp/browser/artifact evidence for this movement-only release.
