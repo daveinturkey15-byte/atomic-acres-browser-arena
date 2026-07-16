@@ -16,6 +16,7 @@ export type CharacterMoveResult = {
   blockedX: boolean;
   blockedY: boolean;
   blockedZ: boolean;
+  slopeAdjusted: boolean;
   appliedDelta: Point3;
 };
 
@@ -181,12 +182,17 @@ export class CharacterPhysics {
     this.world.step();
     const position = this.eyePosition();
     const epsilon = 0.0005;
+    const grounded = this.controller.computedGrounded();
+    const slopeAdjusted = grounded
+      && Math.abs(allowed.y - desiredDelta.y) > epsilon
+      && Math.hypot(allowed.x, allowed.z) > epsilon;
     return {
       position,
-      grounded: this.controller.computedGrounded(),
+      grounded,
       blockedX: Math.abs(allowed.x - desiredDelta.x) > epsilon,
       blockedY: Math.abs(allowed.y - desiredDelta.y) > epsilon,
       blockedZ: Math.abs(allowed.z - desiredDelta.z) > epsilon,
+      slopeAdjusted,
       appliedDelta: { x: allowed.x, y: allowed.y, z: allowed.z },
     };
   }

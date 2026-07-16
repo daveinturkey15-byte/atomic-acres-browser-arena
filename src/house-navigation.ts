@@ -81,6 +81,7 @@ const FLOOR_OUTER_Z = HALF_DEPTH - 0.1;
 const INDOOR_OPENING_INNER_X = HALF_WIDTH - 3.4;
 const DOOR_FRAME_OUTSET = WALL / 2 + 0.09;
 const SEAM_OUTSET = WALL / 2 + 0.08;
+const RAMP_LANDING_OVERLAP = 0.06;
 
 const solid = (
   name: string,
@@ -302,8 +303,22 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     solid('floor-seam-east', [HALF_WIDTH + SEAM_OUTSET, FLOOR_Y - 0.05, 0], [0.14, 0.18, DEPTH], 'trim', false, 'frame'),
 
     ...upperFloorSolids(indoorRampSide),
-    solid('ramp-top-landing', [rampSide * (HALF_WIDTH + 0.85), FLOOR_Y, (RAMP_TOP_Z + RAMP_ENTRY_Z) / 2], [3.8, 0.32, 2.2], 'timber', true, 'landing'),
-    solid('interior-ramp-top-landing', [indoorRampSide * (INDOOR_OPENING_INNER_X + 0.2), FLOOR_Y, INDOOR_RAMP_TOP_Z], [3.5, 0.32, 0.8], 'timber', true, 'landing'),
+    solid(
+      'ramp-top-landing',
+      [rampSide * (HALF_WIDTH + 0.85), FLOOR_Y, ((RAMP_TOP_Z + RAMP_LANDING_OVERLAP) + (RAMP_ENTRY_Z - 0.4)) / 2],
+      [3.8, 0.32, (RAMP_TOP_Z + RAMP_LANDING_OVERLAP) - (RAMP_ENTRY_Z - 0.4)],
+      'timber',
+      true,
+      'landing',
+    ),
+    solid(
+      'interior-ramp-top-landing',
+      [indoorRampSide * (INDOOR_OPENING_INNER_X + 0.2), FLOOR_Y, ((INDOOR_RAMP_TOP_Z + RAMP_LANDING_OVERLAP) + (INDOOR_OPENING_REAR_Z - 0.2)) / 2],
+      [3.5, 0.32, (INDOOR_RAMP_TOP_Z + RAMP_LANDING_OVERLAP) - (INDOOR_OPENING_REAR_Z - 0.2)],
+      'timber',
+      true,
+      'landing',
+    ),
     ...rampSolids(rampSide),
     ...indoorRampSolids(indoorRampSide),
   ];

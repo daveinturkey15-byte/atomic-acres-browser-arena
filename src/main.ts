@@ -2625,9 +2625,9 @@ function updatePhysics(dt: number): void {
     audio.land(Math.abs(impactVelocity));
   }
   wasGrounded = playerGrounded;
-  if (movement.blockedX) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
+  if (movement.blockedX && !movement.slopeAdjusted) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
   if (movement.blockedY && player.velocity.y < 0) player.velocity.y = 0;
-  if (movement.blockedZ) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
+  if (movement.blockedZ && !movement.slopeAdjusted) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
 
   const moving = input.lengthSq() > 0 && playerGrounded;
   const appliedHorizontalDistance = playerGrounded ? Math.hypot(movement.appliedDelta.x, movement.appliedDelta.z) : 0;
@@ -3254,6 +3254,14 @@ const debugWindow = window as Window & {
     aimAtRemote: (zone?: HitZone) => void;
     stageWindow: (index: number, distance?: number) => void;
     damageBot: (amount: number, zone?: HitZone) => void;
+    stageHouseRamp: (kind: 'interior' | 'exterior', team?: Team) => {
+      kind: 'interior' | 'exterior';
+      start: number[];
+      foot: number[];
+      top: number[];
+      uphill: number[];
+      run: number;
+    } | null;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
@@ -3576,6 +3584,42 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!bot || !Number.isFinite(amount) || amount <= 0) return;
     bot.invulnerableUntil = 0;
     applyBotDamage(bot, amount, zone);
+  },
+  stageHouseRamp: (kind: 'interior' | 'exterior', team: Team = 0) => {
+    const house = arena.houses.find((candidate) => candidate.team === team);
+    const footId = kind === 'interior' ? 'indoor-ramp-foot' : 'ramp-foot';
+    const topId = kind === 'interior' ? 'indoor-ramp-top' : 'ramp-top';
+    const foot = house?.anchors.find((entry) => entry.id === footId);
+    const top = house?.anchors.find((entry) => entry.id === topId);
+    if (!house || !foot || !top) return null;
+    const uphill = new THREE.Vector3(
+      top.position[0] - foot.position[0],
+      0,
+      top.position[2] - foot.position[2],
+    );
+    const run = uphill.length();
+    if (run < 0.01) return null;
+    uphill.multiplyScalar(1 / run);
+    const start = new THREE.Vector3(foot.position[0], 1.7, foot.position[2]).addScaledVector(uphill, -0.65);
+    player.position.copy(start);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    playerGrounded = false;
+    wasGrounded = false;
+    player.yaw = Math.atan2(-uphill.x, -uphill.z);
+    player.pitch = 0;
+    player.invulnerableUntil = 0;
+    camera.position.copy(player.position);
+    camera.rotation.set(0, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      kind,
+      start: start.toArray(),
+      foot: [...foot.position],
+      top: [...top.position],
+      uphill: uphill.toArray(),
+      run,
+    };
   },
   teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;

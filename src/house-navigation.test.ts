@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
-import { movementProfile } from './gameplay';
+import { integrateHorizontalVelocity, movementProfile } from './gameplay';
 import { createHouseArchitecture, solidBounds, type HouseArchitecture, type HouseOpening } from './house-navigation';
 import { CharacterPhysics } from './physics';
 import type { Team } from './protocol';
@@ -39,6 +39,62 @@ async function traverse(architecture: HouseArchitecture, route: readonly string[
       expect(horizontalError, `${architecture.id}:${id}:horizontal result=${JSON.stringify(result)} target=${JSON.stringify(target)}`).toBeLessThan(0.42);
       expect(Math.abs(result.y - target.y), `${architecture.id}:${id}:vertical`).toBeLessThan(0.48);
     }
+  } finally {
+    physics.dispose();
+  }
+}
+
+async function sprintUpRamp(
+  architecture: HouseArchitecture,
+  footId: 'ramp-foot' | 'indoor-ramp-foot',
+  topId: 'ramp-top' | 'indoor-ramp-top',
+): Promise<{ elapsedSeconds: number; horizontalSpeed: number; final: Point3 }> {
+  const foot = anchor(architecture, footId);
+  const top = anchor(architecture, topId);
+  const dx = top.x - foot.x;
+  const dz = top.z - foot.z;
+  const rampRun = Math.hypot(dx, dz);
+  const uphill = { x: dx / rampRun, z: dz / rampRun };
+  const approach = 0.65;
+  const start = { x: foot.x - uphill.x * approach, y: 1.7, z: foot.z - uphill.z * approach };
+  const physics = await CharacterPhysics.create(
+    architecture.solids.filter((entry) => entry.collidable).map(solidBounds),
+    { minX: -16, maxX: 16, minZ: -16, maxZ: 16 },
+  );
+  const dt = 1 / 120;
+  let grounded = false;
+  let velocity = { x: 0, y: 0, z: 0 };
+  try {
+    physics.teleportEye(start);
+    for (let step = 0; step < 30; step += 1) {
+      const settled = physics.move({ x: 0, y: -24.5 * dt * dt, z: 0 }, dt);
+      grounded = settled.grounded;
+    }
+    const settledStart = physics.eyePosition();
+    for (let step = 1; step <= 360; step += 1) {
+      const profile = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded });
+      const integrated = integrateHorizontalVelocity(
+        { x: velocity.x, z: velocity.z },
+        uphill,
+        profile,
+        dt,
+      );
+      velocity.x = integrated.x;
+      velocity.z = integrated.z;
+      velocity.y -= 24.5 * dt;
+      if (grounded) velocity.y = Math.max(0, velocity.y);
+      const moved = physics.move({ x: velocity.x * dt, y: velocity.y * dt, z: velocity.z * dt }, dt);
+      grounded = moved.grounded;
+      if (moved.blockedX && !moved.slopeAdjusted) velocity.x = moved.appliedDelta.x / dt;
+      if (moved.blockedY && velocity.y < 0) velocity.y = 0;
+      if (moved.blockedZ && !moved.slopeAdjusted) velocity.z = moved.appliedDelta.z / dt;
+      const progress = (moved.position.x - settledStart.x) * uphill.x + (moved.position.z - settledStart.z) * uphill.z;
+      if (progress >= rampRun + approach - 0.2 && moved.position.y >= top.y - 0.48) {
+        const elapsedSeconds = step * dt;
+        return { elapsedSeconds, horizontalSpeed: progress / elapsedSeconds, final: moved.position };
+      }
+    }
+    return { elapsedSeconds: 3, horizontalSpeed: 0, final: physics.eyePosition() };
   } finally {
     physics.dispose();
   }
@@ -190,6 +246,23 @@ describe('simplified two-floor house architecture', () => {
       expect(interior.rotation && Math.abs(interior.rotation[0])).toBeGreaterThan(0.3);
       const exteriorBounds = solidBounds(exterior);
       const interiorBounds = solidBounds(interior);
+      const exteriorLanding = architecture.solids.find((entry) => entry.name === 'ramp-top-landing');
+      const interiorLanding = architecture.solids.find((entry) => entry.name === 'interior-ramp-top-landing');
+      if (!exteriorLanding || !interiorLanding) throw new Error('Missing ramp landing');
+      for (const [ramp, landing] of [[exterior, exteriorLanding], [interior, interiorLanding]] as const) {
+        const angle = Math.abs(ramp.rotation?.[0] ?? 0);
+        const uphillZ = -Math.sign(ramp.rotation?.[0] ?? 1);
+        const horizontalHalfRun = Math.cos(angle) * ramp.size[2] / 2;
+        const rampTopZ = ramp.position[2] + uphillZ * horizontalHalfRun;
+        const landingBounds = solidBounds(landing);
+        const downhillEdge = uphillZ < 0 ? landingBounds.maxZ : landingBounds.minZ;
+        const overlap = Math.abs(downhillEdge - rampTopZ);
+        const rampTopSurface = ramp.position[1] + Math.sin(angle) * ramp.size[2] / 2 + Math.cos(angle) * ramp.size[1] / 2;
+        const landingTop = landing.position[1] + landing.size[1] / 2;
+        const transitionLip = landingTop - (rampTopSurface - Math.tan(angle) * overlap);
+        expect(overlap, `${architecture.id}:${ramp.name}:landing-overlap`).toBeLessThanOrEqual(0.08);
+        expect(transitionLip, `${architecture.id}:${ramp.name}:landing-lip`).toBeLessThan(0.1);
+      }
       const halfWidth = architecture.dimensions.width / 2;
       expect(exteriorBounds.maxX < architecture.origin.x - halfWidth || exteriorBounds.minX > architecture.origin.x + halfWidth).toBe(true);
       expect(interiorBounds.minX).toBeGreaterThan(architecture.origin.x - halfWidth);
@@ -238,6 +311,16 @@ describe('simplified two-floor house architecture', () => {
     expect(rampRoute).toBeDefined();
     await traverse(architecture, rampRoute);
     await traverse(architecture, rampRoute, true);
+  });
+
+  it.each([0, 1] as Team[])('preserves responsive sprint speed up both ramps for team %s', async (team) => {
+    const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
+    const exterior = await sprintUpRamp(architecture, 'ramp-foot', 'ramp-top');
+    const interior = await sprintUpRamp(architecture, 'indoor-ramp-foot', 'indoor-ramp-top');
+    expect(exterior.elapsedSeconds, `${architecture.id}:exterior:${JSON.stringify(exterior)}`).toBeLessThan(1.9);
+    expect(exterior.horizontalSpeed, `${architecture.id}:exterior`).toBeGreaterThan(6.5);
+    expect(interior.elapsedSeconds, `${architecture.id}:interior:${JSON.stringify(interior)}`).toBeLessThan(1.5);
+    expect(interior.horizontalSpeed, `${architecture.id}:interior`).toBeGreaterThan(5.6);
   });
 
   it.each([0, 1] as Team[])('jump-crouches through every broken ground window in both directions for team %s', async (team) => {

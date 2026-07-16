@@ -263,6 +263,42 @@ test.describe('solo mechanics', () => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
   });
 
+  test('sprints smoothly from the foot to the landing of both house ramps', async ({ page }) => {
+    type RampStage = { kind: 'interior' | 'exterior'; start: number[]; top: number[]; uphill: number[]; run: number };
+    for (const kind of ['interior', 'exterior'] as const) {
+      const stage = await page.evaluate((rampKind) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageHouseRamp: (value: 'interior' | 'exterior') => RampStage | null } }).__ATOMIC_ACRES_DEBUG__;
+        return api.stageHouseRamp(rampKind);
+      }, kind);
+      expect(stage, `${kind}:stage`).not.toBeNull();
+      if (!stage) throw new Error(`Unable to stage ${kind} ramp`);
+      await page.waitForTimeout(120);
+      const traversalStart = await page.evaluate(() => ({
+        frame: (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().frameCount,
+        now: performance.now(),
+      }));
+      await page.keyboard.down('ShiftLeft');
+      await page.keyboard.down('KeyW');
+      await page.waitForFunction(
+        (start) => {
+          const frame = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().frameCount;
+          return performance.now() - start.now >= 2_400 && frame - start.frame >= 36;
+        },
+        traversalStart,
+        { timeout: 15_000 },
+      );
+      await page.keyboard.up('KeyW');
+      await page.keyboard.up('ShiftLeft');
+      const state = await debug(page);
+      const completedFrames = state.frameCount - traversalStart.frame;
+      const dx = state.player.position[0] - stage.start[0];
+      const dz = state.player.position[2] - stage.start[2];
+      const progress = dx * stage.uphill[0] + dz * stage.uphill[2];
+      expect(progress, `${kind}:progress frames=${completedFrames} start=${JSON.stringify(stage.start)} end=${JSON.stringify(state.player.position)}`).toBeGreaterThanOrEqual(stage.run + 0.35);
+      expect(state.player.position[1], `${kind}:landing-height`).toBeGreaterThan(stage.top[1] - 0.5);
+    }
+  });
+
   test('spawns one bounded close-range combat bot and it navigates', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
     const before = await debug(page);
