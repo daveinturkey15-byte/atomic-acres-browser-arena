@@ -174,4 +174,17 @@ Controlled visual review confirmed the projectile is visible on the throw path a
 
 ## Release Boundary
 
-The owner approved the model visually and explicitly authorized canonical publication after the explosion hitch and Hallelujah cue were corrected. Canonical deployment must copy only the exact tested `dist/` root while proving historical review subtrees unchanged; final source/Pages revisions and public HTTPS evidence are recorded after propagation.
+The owner approved the model visually and explicitly authorized canonical publication after the explosion hitch and Hallelujah cue were corrected. Canonical deployment copied only the exact tested `dist/` root while preserving the complete historical review tree.
+
+## Canonical Release Evidence
+
+```text
+source_candidate=628eab0c63f72f781ce84f5f9d36753f44d4bf04
+pages_commit=d2f47b7df9cde99f5e1709db3eab3f99cd6eeb16
+review_tree=ffbb470817b20d9bcbb4f93d62e3d3b8f530f8c0
+canonical_url=https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?source=628eab0&pages=d2f47b7
+```
+
+GitHub Pages reported `built`. Public `index.html` referenced `index-CFdLO_Oe.js` and `index-AkhmQi48.css`; downloaded JS, choir WAV, and frag GLB matched the exact tested local hashes. The public focused detonation test passed. A live public throw reported choir `ready=true`, `prewarmed=true`, `plays=1`, four pooled blast slots, zero dynamic lights, no remaining grenade, and `totalSyncMs=2.5`, while the frame counter continued to advance and the browser recorded zero JavaScript errors.
+
+The first public PeerJS multiplayer attempt timed out at guest join before gameplay; no application assertion failed. One policy-permitted retry with a fresh query and newly generated room completed with `errors=[]` and all stance, window-break, scavenging, pickup, opposing-team, spawn-separation, and remote-presence assertions green.
