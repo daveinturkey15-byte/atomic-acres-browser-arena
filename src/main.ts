@@ -54,6 +54,7 @@ import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
+import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
 import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
@@ -145,14 +146,6 @@ type GrenadeEntity = {
   angularVelocity: THREE.Vector3;
   explodeAt: number;
   lastBounceAt: number;
-};
-
-type GrenadeExplosionVisual = {
-  root: THREE.Group;
-  ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
-  light: THREE.PointLight;
-  startedAt: number;
-  expiresAt: number;
 };
 
 type YardhawkEntity = {
@@ -469,6 +462,7 @@ buildSky();
 const arena: ArenaMap = buildArena(scene);
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 const tracerPool = new TracerPool(scene);
+const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 let arenaArtRoot: THREE.Group | null = null;
 
 const player = {
@@ -503,9 +497,16 @@ const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
 const grenades: GrenadeEntity[] = [];
-const grenadeExplosionVisuals: GrenadeExplosionVisual[] = [];
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
+let lastGrenadeExplosionProfile = {
+  disposeMs: 0,
+  audioMs: 0,
+  visualMs: 0,
+  targetDamageMs: 0,
+  selfDamageMs: 0,
+  totalSyncMs: 0,
+};
 let fieldSupport = createFieldSupportState();
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
@@ -2055,68 +2056,29 @@ function throwGrenade(): void {
 }
 
 function spawnGrenadeExplosionVisual(point: THREE.Vector3, now: number): void {
-  while (grenadeExplosionVisuals.length >= 4) {
-    const oldest = grenadeExplosionVisuals.shift()!;
-    disposeSupportRoot(oldest.root);
-  }
-  const root = new THREE.Group();
-  root.name = 'grenade-explosion-visual';
-  root.position.copy(point).add(new THREE.Vector3(0, 0.055, 0));
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffa13d,
-    transparent: true,
-    opacity: 0.68,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.24, 1.45, 28), material);
-  ring.name = 'grenade-blast-ring';
-  ring.rotation.x = -Math.PI / 2;
-  ring.scale.setScalar(0.18);
-  const core = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 10, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffcf78, transparent: true, opacity: 0.82, depthWrite: false, toneMapped: false }),
-  );
-  core.name = 'grenade-blast-core';
-  core.position.y = 0.08;
-  const light = new THREE.PointLight(0xff7b2e, 7, 12, 2);
-  light.position.y = 0.55;
-  root.add(ring, core, light);
-  root.traverse((node) => { node.userData.presentationOnly = true; node.raycast = () => undefined; });
-  scene.add(root);
-  grenadeExplosionVisuals.push({ root, ring, light, startedAt: now, expiresAt: now + 280 });
+  grenadeExplosionPresentation.emit(point, now);
   grenadeExplosions += 1;
   lastGrenadeExplosionFrameAt = now;
-  spawnImpactFlash(point.clone(), 'metal', new THREE.Vector3(0, 1, 0));
 }
 
 function updateGrenadeExplosionVisuals(now: number): void {
-  for (let index = grenadeExplosionVisuals.length - 1; index >= 0; index -= 1) {
-    const visual = grenadeExplosionVisuals[index];
-    if (now >= visual.expiresAt) {
-      grenadeExplosionVisuals.splice(index, 1);
-      disposeSupportRoot(visual.root);
-      continue;
-    }
-    const progress = THREE.MathUtils.clamp((now - visual.startedAt) / Math.max(1, visual.expiresAt - visual.startedAt), 0, 1);
-    visual.ring.scale.setScalar(0.18 + progress * 1.35);
-    visual.ring.material.opacity = 0.68 * (1 - progress);
-    visual.light.intensity = 7 * (1 - progress);
-  }
+  grenadeExplosionPresentation.update(now);
 }
 
 function clearGrenadeExplosionVisuals(): void {
-  for (const visual of grenadeExplosionVisuals) disposeSupportRoot(visual.root);
-  grenadeExplosionVisuals.length = 0;
+  grenadeExplosionPresentation.clear();
 }
 
 function explodeGrenade(entity: GrenadeEntity): void {
+  const started = performance.now();
   const point = entity.mesh.position.clone();
   disposeGrenadePresentation(entity.mesh);
-  audio.explosion();
+  const afterDispose = performance.now();
+  audio.sanctifiedFragExplosion();
+  const afterAudio = performance.now();
   const now = performance.now();
   spawnGrenadeExplosionVisual(point, now);
+  const afterVisual = performance.now();
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
@@ -2129,9 +2091,19 @@ function explodeGrenade(entity: GrenadeEntity): void {
     const damage = grenadeDamage(target.distanceTo(point));
     if (damage > 0) network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage, kind: 'explosive', origin: point.toArray(), nonce: randomNonce() });
   }
+  const afterTargets = performance.now();
   const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
   const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
   if (selfDamage > 0) applyDamage(selfDamage, player.id);
+  const finished = performance.now();
+  lastGrenadeExplosionProfile = {
+    disposeMs: afterDispose - started,
+    audioMs: afterAudio - afterDispose,
+    visualMs: afterVisual - afterAudio,
+    targetDamageMs: afterTargets - afterVisual,
+    selfDamageMs: finished - afterTargets,
+    totalSyncMs: finished - started,
+  };
 }
 
 function updateGrenades(dt: number, now: number): void {
@@ -2166,8 +2138,6 @@ function updateGrenades(dt: number, now: number): void {
       grenades.splice(index, 1);
       continue;
     }
-    grenade.mesh.rotation.x += dt * 8;
-    grenade.mesh.rotation.z += dt * 11;
     if (grenade.mesh.position.y < 0.18) {
       const impactSpeed = Math.abs(grenade.velocity.y);
       if (impactSpeed > 1.8 && now - grenade.lastBounceAt > 90) {
@@ -3409,9 +3379,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     grenadeExplosion: {
       total: grenadeExplosions,
-      activeVisuals: grenadeExplosionVisuals.length,
+      activeVisuals: grenadeExplosionPresentation.telemetry().active,
+      poolCapacity: grenadeExplosionPresentation.telemetry().capacity,
+      dynamicLights: grenadeExplosionPresentation.telemetry().dynamicLights,
+      prewarmed: grenadeExplosionPresentation.telemetry().prewarmed,
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
+      profile: { ...lastGrenadeExplosionProfile },
     },
+    audio: audio.telemetry(),
     fieldSupport: {
       streak: fieldSupport.streak,
       available: { ...fieldSupport.available },
@@ -3759,9 +3734,11 @@ async function bootstrap(): Promise<void> {
     setStatus(`Loading authored arena models ${loaded}/${total}…`);
   }, reducedWorldDetail);
   const grenadePromise = loadGrenadePresentation();
-  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise, grenadePromise]);
+  const choirPromise = audio.preloadSanctifiedFragChoir();
+  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise, grenadePromise, choirPromise]);
   characterPhysics = physics;
   arenaArtRoot = art.root;
+  await grenadeExplosionPresentation.prewarm(renderer, camera);
   const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
   arena.raycastMeshes.splice(0, arena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {

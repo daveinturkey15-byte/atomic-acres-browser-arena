@@ -51,7 +51,26 @@ type DebugState = {
     targetMaxDimension: number;
     active: Array<{ name: string; authored: boolean; meshes: number }>;
   };
-  grenadeExplosion: { total: number; activeVisuals: number; lastExplosionAgeMs: number | null };
+  grenadeExplosion: {
+    total: number;
+    activeVisuals: number;
+    poolCapacity: number;
+    dynamicLights: number;
+    prewarmed: boolean;
+    lastExplosionAgeMs: number | null;
+    profile: { disposeMs: number; audioMs: number; visualMs: number; targetDamageMs: number; selfDamageMs: number; totalSyncMs: number };
+  };
+  audio: {
+    sanctifiedFragChoir: {
+      asset: string;
+      status: 'idle' | 'loading' | 'fetched' | 'decoding' | 'ready' | 'error';
+      ready: boolean;
+      prewarmed: boolean;
+      byteLength: number;
+      durationSeconds: number;
+      plays: number;
+    };
+  };
   fieldSupport: {
     streak: number;
     available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass', boolean>;
@@ -743,26 +762,93 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).player.weapon).toBe('carbine');
   });
 
-  test('starts with two frags and resolves explosions without freezing the game loop', async ({ page }) => {
-    const before = await debug(page);
-    expect(before.player.grenades).toBe(2);
-    expect(before.grenadeVisual.status).toBe('ready');
-    expect(before.grenadeVisual.asset).toBe('./assets/original/models/holy-hand-frag.glb');
-    expect(before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { throwGrenade: () => void } }).__ATOMIC_ACRES_DEBUG__.throwGrenade());
-    await page.waitForTimeout(100);
-    const thrown = await debug(page);
-    expect(thrown.player.grenades).toBe(1);
-    expect(thrown.grenades).toBe(1);
-    expect(thrown.grenadeVisual.active).toHaveLength(1);
-    expect(thrown.grenadeVisual.active[0]).toMatchObject({ name: 'sanctified-frag-authored-glb', authored: true });
-    expect(thrown.grenadeVisual.active[0].meshes).toBeGreaterThanOrEqual(12);
-    await expect.poll(async () => (await debug(page)).grenadeExplosion.total, { timeout: 3_500 }).toBe(1);
-    await expect.poll(async () => (await debug(page)).grenades).toBe(0);
-    await expect.poll(async () => (await debug(page)).grenadeExplosion.activeVisuals).toBe(0);
-    const afterExplosion = await debug(page);
-    const [x, y, z] = afterExplosion.player.position;
-    const heartbeatBefore = afterExplosion.frameCount;
+  test('starts with two frags and resolves a prewarmed Hallelujah explosion without a detonation hitch', async ({ page }) => {
+    await page.waitForFunction(
+      () => {
+        const choir = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().audio.sanctifiedFragChoir;
+        return choir.ready === true && choir.prewarmed === true;
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
+    const result = await page.evaluate(async () => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState; throwGrenade: () => void; teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      const before = api.snapshot();
+      const frames: Array<{ end: number; duration: number }> = [];
+      const longTasks: Array<{ start: number; duration: number }> = [];
+      let last = performance.now();
+      let sampling = true;
+      const tick = (now: number) => {
+        frames.push({ end: now, duration: now - last });
+        last = now;
+        if (sampling) requestAnimationFrame(tick);
+      };
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) longTasks.push({ start: entry.startTime, duration: entry.duration });
+      });
+      try { observer.observe({ type: 'longtask', buffered: false }); } catch { /* unsupported browser */ }
+      requestAnimationFrame(tick);
+      const throwAt = performance.now();
+      api.throwGrenade();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const thrown = api.snapshot();
+      await new Promise((resolve) => setTimeout(resolve, 3_250));
+      sampling = false;
+      observer.disconnect();
+      const after = api.snapshot();
+      const explosionAt = performance.now() - (after.grenadeExplosion.lastExplosionAgeMs ?? 0);
+      const baselineFrames = frames.filter((sample) => sample.end >= throwAt + 350 && sample.end <= throwAt + 1_700);
+      const baselineLongTasks = longTasks.filter((task) => task.start >= throwAt + 350 && task.start <= throwAt + 1_700);
+      const detonationFrames = frames.filter((sample) => {
+        const start = sample.end - sample.duration;
+        return start <= explosionAt + 500 && sample.end >= explosionAt - 50;
+      });
+      const detonationLongTasks = longTasks.filter((task) => task.start <= explosionAt + 500 && task.start + task.duration >= explosionAt - 50);
+      const percentile95 = (values: number[]) => {
+        if (values.length === 0) return 0;
+        const ordered = [...values].sort((a, b) => a - b);
+        return ordered[Math.min(ordered.length - 1, Math.floor((ordered.length - 1) * 0.95))];
+      };
+      return {
+        before,
+        thrown,
+        after,
+        baselineP95FrameMs: percentile95(baselineFrames.map((sample) => sample.duration)),
+        baselineP95LongTaskMs: percentile95(baselineLongTasks.map((task) => task.duration)),
+        detonationMaxFrameMs: Math.max(0, ...detonationFrames.map((sample) => sample.duration)),
+        detonationMaxLongTaskMs: Math.max(0, ...detonationLongTasks.map((task) => task.duration)),
+      };
+    });
+
+    expect(result.before.player.grenades).toBe(2);
+    expect(result.before.grenadeVisual.status).toBe('ready');
+    expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/holy-hand-frag.glb');
+    expect(result.before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
+    expect(result.before.grenadeExplosion).toMatchObject({ poolCapacity: 4, dynamicLights: 0, prewarmed: true });
+    expect(result.before.audio.sanctifiedFragChoir).toMatchObject({
+      asset: './assets/original/audio/sanctified-frag-hallelujah.wav',
+      status: 'ready',
+      ready: true,
+      prewarmed: true,
+      byteLength: 313_152,
+      plays: 0,
+    });
+    expect(result.thrown.player.grenades).toBe(1);
+    expect(result.thrown.grenades).toBe(1);
+    expect(result.thrown.grenadeVisual.active).toHaveLength(1);
+    expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'sanctified-frag-authored-glb', authored: true });
+    expect(result.thrown.grenadeVisual.active[0].meshes).toBeGreaterThanOrEqual(12);
+    expect(result.after.grenadeExplosion.total).toBe(1);
+    expect(result.after.grenadeExplosion.activeVisuals).toBe(0);
+    expect(result.after.grenades).toBe(0);
+    expect(result.after.audio.sanctifiedFragChoir.plays).toBe(1);
+    const hitchEvidence = `baselineFrameP95=${result.baselineP95FrameMs.toFixed(1)}ms detonationFrame=${result.detonationMaxFrameMs.toFixed(1)}ms baselineLongTaskP95=${result.baselineP95LongTaskMs.toFixed(1)}ms detonationLongTask=${result.detonationMaxLongTaskMs.toFixed(1)}ms sync=${JSON.stringify(result.after.grenadeExplosion.profile)}`;
+    expect(result.after.grenadeExplosion.profile.totalSyncMs, hitchEvidence).toBeLessThan(12);
+    expect(result.detonationMaxFrameMs - result.baselineP95FrameMs, hitchEvidence).toBeLessThan(100);
+    expect(result.detonationMaxLongTaskMs - result.baselineP95LongTaskMs, hitchEvidence).toBeLessThan(100);
+
+    const [x, y, z] = result.after.player.position;
+    const heartbeatBefore = result.after.frameCount;
     await page.evaluate(([px, py, pz]) => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__.teleportPlayer(px + 1, py, pz), [x, y, z]);
     await expect.poll(async () => (await debug(page)).player.position[0]).toBeCloseTo(x + 1, 2);
     await page.waitForTimeout(350);

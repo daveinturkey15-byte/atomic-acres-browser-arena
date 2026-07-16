@@ -1,8 +1,8 @@
 # Atomic Acres — Sanctified Frag Blender/MCP Integration
 
-**Date:** 2026-07-15
+**Date:** 2026-07-16
 **Branch:** `overhaul/house-loot-grenade-pass-22`
-**Status:** locally integrated and verified; public deployment intentionally gated on visual approval
+**Status:** owner-approved release candidate; hitch fix and choir sting verified for canonical deployment
 
 ## Overview
 
@@ -20,6 +20,8 @@ The result is the **Sanctified Frag**: a gold orb with antique bands and crown, 
 - **R6:** Preserve the existing 13-unit forward impulse, 5.2-unit upward impulse, gravity, collision sweep, bounce response, 2,300 ms fuse, damage, and explosion path.
 - **R7:** Provide an original fallback when the GLB cannot load.
 - **R8:** Prove load, throw, authored-clone use, explosion cleanup, release-tree safety, browser stability, performance, and multiplayer regression safety.
+- **R9:** Detonation may not add a visible main-thread/render stall over the same browser's pre-fuse frame baseline.
+- **R10:** Play a recognizable original four-syllable choir sting on Sanctified Frag explosions without decoding or synthesizing audio at detonation time.
 
 ## Authored Asset
 
@@ -55,6 +57,39 @@ Named GLB parts include `HHG_Body`, `HHG_EquatorBand`, `HHG_CrownCollar`, `HHG_C
 7. The thrown model receives visual angular velocity only. Gameplay throw and explosion values remain unchanged.
 
 `src/main.ts` now uses that presentation object in the existing `GrenadeEntity`. The original physics and damage code remains authoritative.
+
+## Explosion Hitch Correction
+
+The first integrated build could freeze for roughly one second when the frag exploded. Instrumentation separated synchronous detonation work from the following render and found the authoritative explosion work itself was only a few milliseconds. The actual cause was transient presentation setup on the detonation frame:
+
+1. Adding a new `THREE.PointLight` changed the point-light count and forced lit arena shader variants to recompile.
+2. The redundant generic impact/debris call activated another first-use GPU path on the same frame.
+
+`src/grenade-explosion-presentation.ts` replaces that path with a fixed four-slot pool created at startup. It uses only additive unlit ring/core meshes, contains zero dynamic lights, reuses its geometry/materials, and is compiled plus rendered invisibly during bootstrap. Grenade detonation only repositions and reveals one existing slot. The redundant generic impact emission was removed because the dedicated blast pool already supplies the flash.
+
+QA telemetry records per-stage synchronous duration for disposal, audio scheduling, visual admission, target damage, self-damage, and total work. The browser regression compares the detonation window with a pre-fuse baseline from the same browser and fails when frame or long-task cost increases by 100 ms or more; synchronous detonation work has a separate 12 ms ceiling. This catches the original approximately 1.15-second freeze without inventing a 60 Hz absolute requirement on software-WebGL runners.
+
+## Original Hallelujah Choir Sting
+
+`scripts/audio/create-sanctified-frag-choir.py` deterministically generates:
+
+```text
+public/assets/original/audio/sanctified-frag-hallelujah.wav
+```
+
+The 3.55-second stereo PCM waveform uses additive/formant synthesis for four sung syllables—**Hal · le · lu · jah**—with four-part chord voicings, detuned singer layers, breath consonants, vibrato, and deterministic chapel reflections. It uses no voice sample, commercial recording, downloaded sound effect, or external model.
+
+| Audio property | Value |
+|---|---|
+| Format | PCM WAV, stereo, 16-bit |
+| Sample rate | 22,050 Hz |
+| Duration | 3.55 seconds |
+| Size | 313,152 bytes |
+| Peak / RMS | 0.8800 / 0.1801 |
+| SHA-256 | `cf8a0bcd12b56e43ac41fcaa28f3b737296fd88085a062fc15470e6c9fa0d3ee` |
+| External samples | 0 |
+
+The WAV is fetched during bootstrap, decoded after browser audio unlock, and genuinely prewarmed through a near-silent completed render quantum. Detonation creates one cached `AudioBufferSource`; it performs no fetch, decode, PCM generation, or convolution.
 
 ## Blender MCP Setup Used
 
@@ -108,11 +143,11 @@ A `get_scene_info` smoke test succeeded, followed by an MCP `execute_code` call 
 `npm run verify` completed successfully:
 
 - TypeScript: passed
-- Vitest: **170/170 passed** across 33 files
+- Vitest: **174/174 passed** across 35 files
 - Production build: passed
-- Release-tree verifier: `releaseTree=ok`, 28 files, 0 rejected-candidate files, 0 oversized files
+- Release-tree verifier: `releaseTree=ok`, 29 files, 0 rejected-candidate files, 0 oversized files
 - Chromium: **26/26 passed**
-- Authored frag E2E: GLB state `ready`, 18 source meshes, one authored clone after throw, explosion and cleanup complete, frame loop continues
+- Authored frag E2E: GLB state `ready`, 18 source meshes, four-slot prewarmed blast pool, zero detonation lights, choir state `ready` and `prewarmed`, exactly one choir play, synchronous work below 12 ms, no 100 ms baseline-relative hitch, explosion cleanup complete, frame loop continues
 - Existing reticle/ADS centre-ray E2E: passed
 - Performance and quality browser budgets: passed
 
@@ -139,4 +174,4 @@ Controlled visual review confirmed the projectile is visible on the throw path a
 
 ## Release Boundary
 
-No push or Pages deployment is included in this integration pass yet. The locally tested source and controlled gameplay screenshot are ready for owner visual approval first.
+The owner approved the model visually and explicitly authorized canonical publication after the explosion hitch and Hallelujah cue were corrected. Canonical deployment must copy only the exact tested `dist/` root while proving historical review subtrees unchanged; final source/Pages revisions and public HTTPS evidence are recorded after propagation.

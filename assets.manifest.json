@@ -29,6 +29,21 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-sanctified-frag-choir-2026-07-16",
+      "kind": "original-project-audio",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "scripts/audio/create-sanctified-frag-choir.py",
+      "generatedAsOf": "2026-07-16",
+      "license": "Original project work",
+      "files": "public/assets/original/audio/sanctified-frag-hallelujah.wav",
+      "sha256": "cf8a0bcd12b56e43ac41fcaa28f3b737296fd88085a062fc15470e6c9fa0d3ee",
+      "sourceScript": "scripts/audio/create-sanctified-frag-choir.py",
+      "format": "PCM WAV, stereo, 16-bit, 22050 Hz, 3.55 seconds",
+      "externalSamples": 0,
+      "description": "Original four-syllable formant-synthesized choir sting singing Hal-le-lu-jah for the Sanctified Frag explosion. No sampled or commercial recording is used.",
+      "attributionRequired": false
+    },
+    {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
       "kind": "third-party-rigged-operator-and-derived-first-person-arms",
       "creator": "Quaternius (@Quaternius)",

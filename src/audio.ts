@@ -3,6 +3,10 @@ import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 
+export const SANCTIFIED_FRAG_CHOIR_ASSET = './assets/original/audio/sanctified-frag-hallelujah.wav';
+
+type SanctifiedFragChoirStatus = 'idle' | 'loading' | 'fetched' | 'decoding' | 'ready' | 'error';
+
 type NoiseOptions = {
   duration: number;
   volume: number;
@@ -26,6 +30,67 @@ export class ArenaAudio {
   private lastNearMissAt = -10_000;
   private arenaZone: ArenaZone | null = null;
   private lastZoneCueAt = -10_000;
+  private sanctifiedChoirBytes: ArrayBuffer | null = null;
+  private sanctifiedChoirBuffer: AudioBuffer | null = null;
+  private sanctifiedChoirLoadPromise: Promise<void> | null = null;
+  private sanctifiedChoirDecodePromise: Promise<void> | null = null;
+  private sanctifiedChoirStatus: SanctifiedFragChoirStatus = 'idle';
+  private sanctifiedChoirPrewarming = false;
+  private sanctifiedChoirPrewarmed = false;
+  private sanctifiedChoirPlays = 0;
+
+  preloadSanctifiedFragChoir(): Promise<void> {
+    if (this.sanctifiedChoirLoadPromise) return this.sanctifiedChoirLoadPromise;
+    this.sanctifiedChoirStatus = 'loading';
+    this.sanctifiedChoirLoadPromise = fetch(SANCTIFIED_FRAG_CHOIR_ASSET)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Sanctified Frag choir HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((bytes) => {
+        this.sanctifiedChoirBytes = bytes;
+        this.sanctifiedChoirStatus = 'fetched';
+        if (this.context) void this.decodeSanctifiedFragChoir();
+      })
+      .catch((error: unknown) => {
+        this.sanctifiedChoirStatus = 'error';
+        console.warn('Sanctified Frag choir unavailable; explosion remains functional.', error);
+      });
+    return this.sanctifiedChoirLoadPromise;
+  }
+
+  private decodeSanctifiedFragChoir(): Promise<void> {
+    if (this.sanctifiedChoirBuffer || !this.context || !this.sanctifiedChoirBytes) return Promise.resolve();
+    if (this.sanctifiedChoirDecodePromise) return this.sanctifiedChoirDecodePromise;
+    this.sanctifiedChoirStatus = 'decoding';
+    this.sanctifiedChoirDecodePromise = this.context.decodeAudioData(this.sanctifiedChoirBytes.slice(0))
+      .then((buffer) => {
+        this.sanctifiedChoirBuffer = buffer;
+        this.sanctifiedChoirStatus = 'ready';
+        this.prewarmSanctifiedFragChoir();
+      })
+      .catch((error: unknown) => {
+        this.sanctifiedChoirStatus = 'error';
+        console.warn('Sanctified Frag choir could not be decoded; explosion remains functional.', error);
+      });
+    return this.sanctifiedChoirDecodePromise;
+  }
+
+  private prewarmSanctifiedFragChoir(): void {
+    if (this.sanctifiedChoirPrewarmed || this.sanctifiedChoirPrewarming || !this.context || !this.feedback || !this.sanctifiedChoirBuffer) return;
+    this.sanctifiedChoirPrewarming = true;
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    source.buffer = this.sanctifiedChoirBuffer;
+    gain.gain.value = 0.0001;
+    source.connect(gain).connect(this.feedback);
+    source.onended = () => {
+      this.sanctifiedChoirPrewarming = false;
+      this.sanctifiedChoirPrewarmed = true;
+    };
+    source.start(this.context.currentTime);
+    source.stop(this.context.currentTime + 0.08);
+  }
 
   unlock(): void {
     if (!this.context) {
@@ -47,6 +112,7 @@ export class ArenaAudio {
       this.startAmbience();
     }
     if (this.context.state === 'suspended') void this.context.resume();
+    void this.preloadSanctifiedFragChoir().then(() => this.decodeSanctifiedFragChoir());
   }
 
   private startAmbience(): void {
@@ -267,12 +333,57 @@ export class ArenaAudio {
     this.tone(185, 0.035, 0.026 * level, 'square', this.feedback, 0.012);
   }
 
+  sanctifiedFragExplosion(): void {
+    this.explosion();
+    const play = () => {
+      if (!this.context || !this.feedback || !this.sanctifiedChoirBuffer) return;
+      const now = this.context.currentTime + 0.045;
+      const source = this.context.createBufferSource();
+      const gain = this.context.createGain();
+      source.buffer = this.sanctifiedChoirBuffer;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.72, now + 0.065);
+      gain.gain.setValueAtTime(0.56, now + Math.min(0.55, source.buffer.duration * 0.25));
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + source.buffer.duration);
+      source.connect(gain).connect(this.feedback);
+      source.start(now);
+      source.stop(now + source.buffer.duration);
+      this.sanctifiedChoirPlays += 1;
+    };
+    if (this.sanctifiedChoirBuffer) play();
+    else void this.decodeSanctifiedFragChoir().then(play);
+  }
+
   explosion(): void {
     this.unlock();
     if (!this.weapons) return;
     this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons);
     this.noise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
     this.noise({ duration: 0.18, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035 }, this.weapons);
+  }
+
+  telemetry(): {
+    sanctifiedFragChoir: {
+      asset: string;
+      status: SanctifiedFragChoirStatus;
+      ready: boolean;
+      prewarmed: boolean;
+      byteLength: number;
+      durationSeconds: number;
+      plays: number;
+    };
+  } {
+    return {
+      sanctifiedFragChoir: {
+        asset: SANCTIFIED_FRAG_CHOIR_ASSET,
+        status: this.sanctifiedChoirStatus,
+        ready: this.sanctifiedChoirBuffer !== null,
+        prewarmed: this.sanctifiedChoirPrewarmed,
+        byteLength: this.sanctifiedChoirBytes?.byteLength ?? 0,
+        durationSeconds: this.sanctifiedChoirBuffer?.duration ?? 0,
+        plays: this.sanctifiedChoirPlays,
+      },
+    };
   }
 
   private createBus(gainValue: number): GainNode {
