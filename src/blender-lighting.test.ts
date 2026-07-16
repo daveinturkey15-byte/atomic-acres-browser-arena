@@ -14,7 +14,7 @@ describe('Blender Render lighting', () => {
       sunIntensity: 2.45,
       shadowBias: -0.00012,
       shadowNormalBias: 0.04,
-      softShadows: true,
+      softShadows: false,
     });
     expect(blender.exposure).toBeLessThan(quality.exposure);
     expect(blender.hemisphereIntensity).toBeLessThan(quality.hemisphereIntensity);

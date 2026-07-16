@@ -27,7 +27,7 @@ const BLENDER_LIGHTING: ArenaLightingProfile = {
   sunIntensity: 2.45,
   shadowBias: -0.00012,
   shadowNormalBias: 0.04,
-  softShadows: true,
+  softShadows: false,
 };
 
 export function arenaLightingProfile(profile: RenderProfile): ArenaLightingProfile {

@@ -71,7 +71,7 @@ Ambient intensity         0.18
 Sun intensity             2.45
 Shadow bias              -0.00012
 Shadow normal bias        0.04
-Shadow filter             PCF soft
+Shadow filter             PCF
 Shadow mode               static, 2048
 ```
 

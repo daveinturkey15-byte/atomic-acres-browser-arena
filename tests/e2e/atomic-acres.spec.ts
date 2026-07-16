@@ -236,7 +236,7 @@ test.describe('boot and authored presentation', () => {
       shadows: true, shadowMode: 'static',
       lighting: {
         exposure: 1.02, hemisphereIntensity: 1, ambientIntensity: 0.18,
-        sunIntensity: 2.45, shadowBias: -0.00012, shadowNormalBias: 0.04, softShadows: true,
+        sunIntensity: 2.45, shadowBias: -0.00012, shadowNormalBias: 0.04, softShadows: false,
       },
       blenderEnvironment: {
         status: 'ready', meshCount: 25, materialCount: 19, texturedMaterials: 12, textureCount: 9, triangleCount: 18_884,
