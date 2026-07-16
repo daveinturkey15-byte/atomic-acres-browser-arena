@@ -2,7 +2,7 @@
 
 Date: 2026-07-16
 Branch: `overhaul/blender-textures-lighting-pass-24`
-Status: tested local candidate; isolated review pending
+Status: source branch pushed; isolated review deployed; canonical root unchanged
 
 ## Owner feedback
 
@@ -148,4 +148,15 @@ The Tri-Pass browser case keeps rendering paused after its three authoritative i
 
 ## Release boundary
 
-Publish only to a new isolated Pass 24 review path. Do not replace the canonical root or the Pass 23 review snapshot without separate approval.
+Dave requested the Blender presentation be improved, authorizing a new isolated review build.
+
+- tested source artifact: `3a1ead06bfdede4b3d6c96f9ecde228520c04ccf`;
+- Pages review commit: `8ce7c7ef52e623f1b3b3448aaf61cd400d5c1581`;
+- URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/blender-pass24/?render=blender&source=3a1ead0&pages=8ce7c7e`;
+- public GLB SHA-256: `b65595d3f6f0967e0ddf2b18c002cd32691ec70b7ec4cca6c37488584408b9ad`;
+- public telemetry: `ready`, 25 meshes, 19 materials, 12 textured materials, 9 loaded textures, 18,884 triangles and 6/6 semantic windows;
+- public JavaScript errors: zero;
+- public console: only the browser capability warning that `KHR_parallel_shader_compile` is unavailable; no deprecated shadow-filter warning;
+- public visual probe: textured road, grass, sidewalk, buildings and props loaded without a blocking failure.
+
+Only `review/blender-pass24/**` changed on `gh-pages`. The canonical root and Pass 23 review snapshot remain untouched.
