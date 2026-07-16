@@ -17,7 +17,7 @@ export type AdaptiveQualityTelemetry = {
 };
 
 export function adaptiveShadowsEnabled(profile: RenderProfile, authoredShadows: boolean, pixelRatioCap: number): boolean {
-  return profile === 'quality' && authoredShadows && pixelRatioCap >= 0.85;
+  return (profile === 'quality' || profile === 'blender') && authoredShadows && pixelRatioCap >= 0.85;
 }
 
 type AdaptiveQualityOptions = {
@@ -32,6 +32,7 @@ type AdaptiveQualityOptions = {
 const LEVELS: Record<RenderProfile, readonly number[]> = {
   performance: [0.55, 0.65, 0.75],
   quality: [0.65, 0.75, 0.85, 1],
+  blender: [0.65, 0.75, 0.85, 1],
   compat: [0.2],
 };
 

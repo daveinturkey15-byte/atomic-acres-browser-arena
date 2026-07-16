@@ -3,6 +3,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "author:blender-arena": "npx vite-node scripts/blender/export-atomic-acres-arena-spec.ts source-assets/blender/atomic-acres-arena-spec.json && PYTHONHASHSEED=0 blender --background --factory-startup --python scripts/blender/create-atomic-acres-blender-arena.py",
     "test": "vitest run",
     "test:e2e": "playwright test --project=chromium",
     "qa:release": "node scripts/qa/capture-release.mjs",
@@ -24,6 +25,7 @@
     "@types/node": "^26.1.1",
     "@types/three": "^0.185.0",
     "gh-pages": "^6.3.0",
+    "peer": "^1.0.2",
     "vitest": "latest"
   },
   "name": "atomic-acres-browser-arena",

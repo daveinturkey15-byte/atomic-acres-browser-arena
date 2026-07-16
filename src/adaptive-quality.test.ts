@@ -2,11 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 
 describe('adaptive quality controller', () => {
-  it('drops authored shadows at low Quality tiers and never enables them in Performance', () => {
+  it('drops authored shadows at low Quality/Blender tiers and never enables them in Performance', () => {
     expect(adaptiveShadowsEnabled('quality', true, 1)).toBe(true);
     expect(adaptiveShadowsEnabled('quality', true, 0.85)).toBe(true);
     expect(adaptiveShadowsEnabled('quality', true, 0.75)).toBe(false);
+    expect(adaptiveShadowsEnabled('blender', true, 1)).toBe(true);
+    expect(adaptiveShadowsEnabled('blender', true, 0.75)).toBe(false);
     expect(adaptiveShadowsEnabled('performance', true, 0.75)).toBe(false);
+  });
+
+  it('keeps Blender Render within its authored resolution ladder', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,
+    });
+    expect(controller.telemetry()).toMatchObject({
+      profile: 'blender', levels: [0.65, 0.75, 0.85, 1], pixelRatioCap: 1,
+    });
   });
 
   it('classifies common uncapped display cadences before heavy rendering starts', () => {

@@ -51,6 +51,7 @@ import { headingDegrees, minimapToWorld, playerFacingGeometry, shouldRevealEnemy
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
+import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
@@ -191,9 +192,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · HOUSE AND SCAVENGE PASS 22</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · BLENDER RENDER PASS 23</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Traversable broken windows, exterior house ramps, walk-over scavenging, stable two-frag combat and a marksman-only full-auto sidearm.</p>
+    <p class="lede">Choose Blender Render for a complete original Blender-authored tactical suburb while Performance and Quality remain available.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -229,7 +230,7 @@ app.innerHTML = `
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
         <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
-        <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="quality">QUALITY</option></select></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="quality">QUALITY</option><option value="blender">BLENDER RENDER</option></select></label>
       </div>
       <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
@@ -315,6 +316,7 @@ const flattenOperatorMaterials = reducedRenderMode || renderProfile === 'quality
 document.documentElement.classList.toggle('compat-render', renderProfile === 'compat');
 document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
 document.documentElement.classList.toggle('quality-render', renderProfile === 'quality');
+document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -464,6 +466,7 @@ const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 let arenaArtRoot: THREE.Group | null = null;
+let blenderArenaActive = false;
 
 const player = {
   id: createPlayerId(),
@@ -2946,9 +2949,9 @@ preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
 sensitivityInput.value = String(sensitivity);
 controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
-// Compatibility remains query-only for diagnostic QA; players choose between
-// the readable Performance path and the complete Quality presentation.
-graphicsProfileInput.value = renderProfile === 'quality' ? 'quality' : 'performance';
+// Compatibility remains query-only for diagnostic QA; players choose Performance,
+// Quality, or the fully Blender-authored environment presentation.
+graphicsProfileInput.value = renderProfile === 'quality' || renderProfile === 'blender' ? renderProfile : 'performance';
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
@@ -2962,7 +2965,8 @@ fovInput.addEventListener('input', () => {
   localStorage.setItem('atomic-acres-fov', String(preferredFov));
 });
 graphicsProfileInput.addEventListener('change', () => {
-  const selected: RenderProfile = graphicsProfileInput.value === 'quality' ? 'quality' : 'performance';
+  const value = graphicsProfileInput.value;
+  const selected: RenderProfile = value === 'quality' || value === 'blender' ? value : 'performance';
   localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, selected);
   const next = new URL(window.location.href);
   if (selected === 'performance') next.searchParams.delete('render');
@@ -3233,7 +3237,7 @@ function frame(now: number): void {
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
-    if (arenaArtRoot) updateArenaArt(arenaArtRoot, now);
+    if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
     updateHud(now);
     if (!debugRenderPaused) {
       renderer.render(scene, camera);
@@ -3461,9 +3465,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     activeImpactParticles: impactPresentation.activeParticles(),
     activeImpactMarks: impactPresentation.activeMarks(),
     activeTracers: tracerPool.activeCount(),
-    originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
+    originalArtLoaded: blenderArenaActive || scene.getObjectByName('original-arena-art') !== undefined,
     arenaZone: classifyArenaZone(player.position.x, player.position.z),
-    arenaStoryReady: ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
+    arenaStoryReady: blenderArenaActive || ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
     interiorTelemetry: (() => {
       const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0, visibleRamps: 0 };
@@ -3506,6 +3510,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       shadowMode: activeRenderConfig.shadowMode,
       framePacing: framePacing.summary(),
       adaptive: adaptiveQuality.telemetry(),
+      blenderEnvironment: blenderArenaTelemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
         const material = node instanceof THREE.Mesh ? node.material : null;
         return !Array.isArray(material) && material && 'color' in material
@@ -3774,9 +3779,26 @@ async function bootstrap(): Promise<void> {
   const weaponPromise = weaponView.load((loaded, total) => {
     setStatus(`Loading authored weapons ${loaded}/${total}…`);
   });
-  const artPromise = loadArenaArt(scene, (loaded, total) => {
-    setStatus(`Loading authored arena models ${loaded}/${total}…`);
-  }, reducedWorldDetail);
+  const artPromise = renderProfile === 'blender'
+    ? (async () => {
+        try {
+          const art = await loadBlenderArena(scene, arena, (loaded, total) => {
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            setStatus(`Loading Blender Render arena ${percent}%…`);
+          });
+          blenderArenaActive = true;
+          return art;
+        } catch (error) {
+          markBlenderArenaFallback(error);
+          console.error('[Atomic Acres Blender Render asset load failed; using authored fallback]', error);
+          return loadArenaArt(scene, (loaded, total) => {
+            setStatus(`Blender Render fallback ${loaded}/${total}…`);
+          }, false);
+        }
+      })()
+    : loadArenaArt(scene, (loaded, total) => {
+        setStatus(`Loading authored arena models ${loaded}/${total}…`);
+      }, reducedWorldDetail);
   const grenadePromise = loadGrenadePresentation();
   const choirPromise = audio.preloadSanctifiedFragChoir();
   const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise, grenadePromise, choirPromise]);
@@ -3789,9 +3811,11 @@ async function bootstrap(): Promise<void> {
     if (node instanceof THREE.Mesh && node.userData.blocksShots === true) arena.raycastMeshes.push(node);
   });
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
-  if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', staticMaterialMode);
-  const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
-  batchStaticMeshes(art.root, scene, () => '', decorativeMaterialMode);
+  if (!blenderArenaActive) {
+    if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', staticMaterialMode);
+    const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+    batchStaticMeshes(art.root, scene, () => '', decorativeMaterialMode);
+  }
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   liftCrushedEnvironmentBlacks(scene, weaponView.root);
   weaponView.setWeapon(player.weapon, true);
@@ -3805,7 +3829,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 22 candidate — vaultable windows, exterior ramps, seam-free floors, walk-over scavenging, stable frags and G18 AUTO.');
+  setStatus('Pass 23 candidate — new Blender Render environment profile with authoritative ramps, breakable windows, scavenging and multiplayer preserved.');
   requestAnimationFrame(frame);
 }
 

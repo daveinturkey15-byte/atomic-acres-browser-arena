@@ -13,6 +13,8 @@ type ManifestAsset = {
   sha256?: string;
   sourceBlend?: string;
   sourceBlendSha256?: string;
+  sourceSpec?: string;
+  sourceSpecSha256?: string;
 };
 type Manifest = { schemaVersion: number; assets: ManifestAsset[]; rejectedCandidates?: ManifestAsset[] };
 
@@ -62,6 +64,18 @@ describe('third-party asset provenance', () => {
     expect(asset?.sourceBlend).toBe('source-assets/blender/holy-hand-frag.blend');
     expect(asset?.sourceBlendSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(sha256(asset?.sourceBlend as string)).toBe(asset?.sourceBlendSha256);
+  });
+
+  it('records exact checksums for the Blender Render GLB, editable source, and authoritative arena spec', () => {
+    const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
+    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-blender-render-arena-2026-07-16');
+    expect(asset).toBeTruthy();
+    expect(asset?.files).toBe('public/assets/original/models/atomic-acres-blender-arena.glb');
+    expect(sha256(asset?.files as string)).toBe(asset?.sha256);
+    expect(asset?.sourceBlend).toBe('source-assets/blender/atomic-acres-blender-arena.blend');
+    expect(sha256(asset?.sourceBlend as string)).toBe(asset?.sourceBlendSha256);
+    expect(asset?.sourceSpec).toBe('source-assets/blender/atomic-acres-arena-spec.json');
+    expect(sha256(asset?.sourceSpec as string)).toBe(asset?.sourceSpecSha256);
   });
 
   it('preserves rejected candidate provenance outside the deployable public tree', () => {

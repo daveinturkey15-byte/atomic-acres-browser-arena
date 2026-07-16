@@ -7,6 +7,22 @@ export type NetworkRole = 'offline' | 'host' | 'client';
 type MessageHandler = (message: GameMessage) => void;
 type StatusHandler = (text: string, kind?: 'ok' | 'warn' | 'error') => void;
 
+function createArenaPeer(): Peer {
+  const params = new URLSearchParams(window.location.search);
+  const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+  const port = Number(params.get('peerQaPort'));
+  if (localQa && Number.isInteger(port) && port >= 1_024 && port <= 65_535) {
+    return new Peer({
+      host: window.location.hostname,
+      port,
+      path: '/peerjs',
+      secure: false,
+      config: { iceServers: [] },
+    });
+  }
+  return new Peer();
+}
+
 export class ArenaNetwork {
   role: NetworkRole = 'offline';
   roomCode = '';
@@ -29,7 +45,7 @@ export class ArenaNetwork {
     this.role = 'host';
     this.onReady = onReady;
     this.onStatus('Opening a secure peer lobby…');
-    const peer = new Peer();
+    const peer = createArenaPeer();
     this.peer = peer;
     peer.on('open', (id) => {
       this.roomCode = id;
@@ -65,7 +81,7 @@ export class ArenaNetwork {
       try { stalePeer?.destroy(); } catch { /* no-op */ }
       this.onStatus('Connection timed out. Check the room code and retry.', 'error');
     }, 12_000);
-    const peer = new Peer();
+    const peer = createArenaPeer();
     this.peer = peer;
     peer.on('open', () => {
       const connection = peer.connect(this.roomCode, { reliable: true, serialization: 'json' });

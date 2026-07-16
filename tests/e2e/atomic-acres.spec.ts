@@ -139,7 +139,34 @@ type DebugState = {
   menuVisible: boolean;
   networkSync: { stateIntervalMs: number; interpolationRate: number };
   networkLifecycle: { role: string; joinDeadlineActive: boolean; peerPresent: boolean; hostConnectionPresent: boolean };
-  render: { profile: 'performance' | 'quality' | 'compat'; representation: 'responsive' | 'full' | 'compat'; calls: number; triangles: number; points: number; lines: number; sceneObjects: number; reducedMode: boolean; shadows: boolean; shadowMode: 'off' | 'static' | 'dynamic'; pixelRatio: number; drawingBuffer: number[]; antialias: boolean; framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean }; staticBatchPalette: Array<string | null> };
+  render: {
+    profile: 'performance' | 'quality' | 'blender' | 'compat';
+    representation: 'responsive' | 'full' | 'blender' | 'compat';
+    calls: number;
+    triangles: number;
+    points: number;
+    lines: number;
+    sceneObjects: number;
+    reducedMode: boolean;
+    shadows: boolean;
+    shadowMode: 'off' | 'static' | 'dynamic';
+    pixelRatio: number;
+    drawingBuffer: number[];
+    antialias: boolean;
+    framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
+    staticBatchPalette: Array<string | null>;
+    blenderEnvironment: {
+      status: 'idle' | 'loading' | 'ready' | 'fallback';
+      asset: string;
+      meshCount: number;
+      materialCount: number;
+      triangleCount: number;
+      semanticWindows: number;
+      boundWindows: number;
+      proceduralWorldHidden: boolean;
+      error: string | null;
+    };
+  };
 };
 
 async function debug(page: Page): Promise<DebugState> {
@@ -182,10 +209,50 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('HOUSE AND SCAVENGE PASS 22');
+    await expect(page.locator('.eyebrow')).toContainText('BLENDER RENDER PASS 23');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
+  });
+
+  test('loads the complete Blender Render arena and binds authored breakable windows', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=blender');
+    const menuState = await debug(page);
+    expect(menuState.render).toMatchObject({
+      profile: 'blender', representation: 'blender', antialias: true,
+      shadows: true, shadowMode: 'static',
+      blenderEnvironment: {
+        status: 'ready', meshCount: 24, materialCount: 18, triangleCount: 18_872,
+        semanticWindows: 6, boundWindows: 6, proceduralWorldHidden: true, error: null,
+      },
+    });
+    expect(menuState.render.calls).toBeLessThanOrEqual(70);
+    await expect(page.locator('#graphics-profile')).toHaveValue('blender');
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        stageWindow: (index: number, distance?: number) => void;
+        equipWeapon: (weapon: string) => void;
+        setAds: (held: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.stageWindow(0, 5);
+      api.equipWeapon('carbine');
+      api.setAds(true);
+    });
+    await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().weaponPresentation.adsProgress >= 0.98, undefined, { timeout: 15_000 });
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows[0]?.broken === true, undefined, { timeout: 10_000 });
+    const activeState = await debug(page);
+    expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
+    expect(activeState.render.blenderEnvironment.status).toBe('ready');
+    expect(activeState.render.calls).toBeLessThanOrEqual(90);
+    expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: 'test-results/blender-render-gameplay.png' });
   });
 
   test('menu exposes controls and accessibility settings', async ({ page }) => {
@@ -197,8 +264,8 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toHaveValue('performance');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(2);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(3);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY', 'BLENDER RENDER']);
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';

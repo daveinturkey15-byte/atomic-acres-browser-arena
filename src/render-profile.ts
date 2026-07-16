@@ -1,10 +1,10 @@
-export type RenderProfile = 'performance' | 'quality' | 'compat';
+export type RenderProfile = 'performance' | 'quality' | 'blender' | 'compat';
 
 export const RENDER_PROFILE_STORAGE_KEY = 'atomic-acres-render-profile';
 
 export type RenderProfileConfig = {
   profile: RenderProfile;
-  representation: 'responsive' | 'full' | 'compat';
+  representation: 'responsive' | 'full' | 'blender' | 'compat';
   reducedRepresentation: boolean;
   reducedWorldDetail: boolean;
   reducedPresentationDetail: boolean;
@@ -16,7 +16,7 @@ export type RenderProfileConfig = {
   shadowMapSize: number;
 };
 
-const VALID_PROFILES = new Set<RenderProfile>(['performance', 'quality', 'compat']);
+const VALID_PROFILES = new Set<RenderProfile>(['performance', 'quality', 'blender', 'compat']);
 
 export function resolveRenderProfile(search: string, stored: string | null): RenderProfile {
   const requested = new URLSearchParams(search).get('render');
@@ -41,6 +41,21 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
       shadowMode: 'off',
       pixelRatioCap: 0.2,
       shadowMapSize: 0,
+    };
+  }
+  if (profile === 'blender') {
+    return {
+      profile,
+      representation: 'blender',
+      reducedRepresentation: false,
+      reducedWorldDetail: false,
+      reducedPresentationDetail: false,
+      staticMaterialMode: 'preserve',
+      antialias: true,
+      shadows: true,
+      shadowMode: 'static',
+      pixelRatioCap: 1,
+      shadowMapSize: 2048,
     };
   }
   if (profile === 'quality') {
