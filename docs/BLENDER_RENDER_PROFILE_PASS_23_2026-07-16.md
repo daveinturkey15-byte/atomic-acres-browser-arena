@@ -2,7 +2,7 @@
 
 Date: 2026-07-16
 Branch: `overhaul/blender-render-profile-pass-23`
-Status: local candidate; not deployed
+Status: source branch pushed; isolated review deployed; canonical root unchanged
 
 ## Intent
 
@@ -151,7 +151,7 @@ Green retained gates:
 - Performance and Quality rendering budgets: pass;
 - production build: pass;
 - release-tree audit: pass, 30 files, zero rejected-candidate files, zero oversized files;
-- dependency audit: zero vulnerabilities before the local PeerServer development dependency; npm reported zero vulnerabilities while installing it;
+- dependency audit: zero vulnerabilities after the local PeerServer development dependency;
 - local deterministic Performance multiplayer control: pass with `errors: []`, stance/window/scavenge/pickup replication all true and opposing teams.
 
 ### Headless mixed-profile limitation
@@ -168,4 +168,14 @@ This candidate therefore does **not** claim a complete dual-Blender headless mul
 
 ## Release boundary
 
-No source branch or Pages artifact was pushed during this task. Canonical live remains the approved Pass 22/ramp release. Publish only to isolated review after explicit approval and a fresh exact-build public verification.
+Dave explicitly requested a URL, authorizing an isolated review deployment.
+
+- tested source artifact: `9fd44524c507ea736f761e333a847e53d5f0ba0e`;
+- Pages review commit: `28cb4b89502c2397d7192a96e0a93fe4115348c3`;
+- review URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/blender-pass23/?render=blender&source=9fd4452&pages=28cb4b8`;
+- public telemetry: Blender environment `ready`, 24 meshes, 18 materials, 18,872 triangles, six of six windows bound, procedural presentation hidden;
+- public GLB SHA-256: `e7a393a8e912ea2423c052e3734b70fbc9326190103927ecea4fe6a6fb8792b3`;
+- public JavaScript errors: zero;
+- visual probe: Pass 23 menu and Blender-authored tactical-suburb background rendered without a blocking failure.
+
+Only `review/blender-pass23/**` changed on `gh-pages`. Canonical live remains the approved Pass 22/ramp release, and pre-existing review snapshots were not modified.
