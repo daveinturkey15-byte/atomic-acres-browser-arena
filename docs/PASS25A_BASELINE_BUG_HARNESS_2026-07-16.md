@@ -3,7 +3,7 @@
 **Date:** 2026-07-16
 **Branch:** `overhaul/pass25a-baseline-bug-harness`
 **Behavioral reference:** Pass 24 source `3a1ead06bfdede4b3d6c96f9ecde228520c04ccf`
-**Public deployment:** unchanged
+**Public deployment:** canonical source `204f9b19f9bbef05861c839d6cdd6bab2d99eaf4`; Pages `86daf8fff1a1940bb9e8b99417766e487c8eb898`
 
 ## Purpose
 
@@ -161,6 +161,21 @@ QA_NETWORK_SOAK_MS=1800000 npm run qa:network-chaos:soak
 - **Correction:** wrap asynchronous TypeScript QA entry points in `async function main()`; keep `.mjs` scripts as native ESM.
 - **Verify:** the script exits zero under its package command.
 
+### Root Pages publish can delete archived review builds
+
+- **Symptom:** canonical `dist/` publishes successfully, but every historical `/review/*` path disappears from `gh-pages`.
+- **Cause:** `gh-pages -d dist` mirrors only `dist/` and removes destination files absent from that directory.
+- **Correction:** publish with `gh-pages -d dist --add`. If an earlier publish removed archives, restore only `review/` from the prior Pages revision while retaining the new canonical root.
+- **Verify:** the remote canonical `index.html` hash equals `dist/index.html`, the new Pages root returns HTTP 200, the restored `review/` tree hash equals its prior revision, and a representative archived review URL returns HTTP 200.
+
+## Canonical promotion
+
+Dave approved canonical promotion on 2026-07-16. Source `204f9b19f9bbef05861c839d6cdd6bab2d99eaf4` was built and published to Pages revision `86daf8fff1a1940bb9e8b99417766e487c8eb898`.
+
+- Canonical URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/`
+- Traceable URL: `https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/?source=204f9b1&pages=86daf8f`
+- Verification: canonical HTTP 200; remote/local `index.html` SHA-256 `80b0d68ec7b691275c871ede15123453ac2734e44951184d59246f3abbf777d3`; archived Pass 24 review HTTP 200.
+
 ## Promotion rule
 
-Pass 25A changes no public deployment. Pass 25B cannot begin until all Pass 25A evidence is green and Dave's owner review confirms the approved feel remains intact.
+Pass 25A was promoted only after all gates passed and Dave explicitly approved going live. Future gameplay-contract or presentation changes still require classification, verification, owner review, and a separate promotion decision.
