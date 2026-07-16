@@ -957,7 +957,7 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
       hitProxyRoot.add(mesh);
     };
     proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-    proxy('hit-proxy-head', 'head', [0.52, 0.52, 0.52], [0, 2.13, 0]);
+    proxy('hit-proxy-head', 'head', [0.62, 0.62, 0.62], [0, 2.13, 0]);
     proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
     proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
     proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
@@ -1096,7 +1096,7 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     hitProxyRoot.add(mesh);
   };
   proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-  proxy('hit-proxy-head', 'head', [0.52, 0.52, 0.52], [0, 2.13, 0]);
+  proxy('hit-proxy-head', 'head', [0.62, 0.62, 0.62], [0, 2.13, 0]);
   proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
   proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
   proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);

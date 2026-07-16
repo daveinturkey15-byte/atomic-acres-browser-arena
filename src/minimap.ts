@@ -62,3 +62,14 @@ export function playerFacingGeometry(x: number, y: number, yaw: number, length =
 export function headingDegrees(yaw: number): number {
   return Math.round(((((180 + (yaw * 180) / Math.PI) % 360) + 360) % 360));
 }
+
+/** Canvas rotation that keeps the player's camera-forward direction at the top of a player-centred minimap. */
+export function playerUpRotationRadians(yaw: number): number {
+  return -(headingDegrees(yaw) * Math.PI) / 180;
+}
+
+export function northMarkerPosition(yaw: number, width: number, height: number, inset = 24): [number, number] {
+  const radius = Math.max(0, Math.min(width, height) / 2 - Math.max(0, inset));
+  const angle = -Math.PI / 2 - (headingDegrees(yaw) * Math.PI) / 180;
+  return [width / 2 + Math.cos(angle) * radius, height / 2 + Math.sin(angle) * radius];
+}

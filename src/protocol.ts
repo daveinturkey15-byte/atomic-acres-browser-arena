@@ -1,3 +1,5 @@
+import { presentationRandom } from './runtime-random';
+
 export type Team = 0 | 1;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol';
@@ -62,6 +64,7 @@ export type WindowBreakMessage = {
   by: string;
   windowId: string;
   origin: [number, number, number];
+  kind?: 'shot' | 'explosive';
   nonce: number;
 };
 export type LeaveMessage = { type: 'leave'; playerId: string };
@@ -130,6 +133,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'window-break':
       return typeof msg.by === 'string'
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
+        && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'explosive')
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'leave':
@@ -167,5 +171,5 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
 
 export function sanitizeName(value: string): string {
   const clean = value.replace(/[^a-zA-Z0-9 _-]/g, '').trim().slice(0, 16);
-  return clean || `Player${Math.floor(Math.random() * 900 + 100)}`;
+  return clean || `Player${Math.floor(presentationRandom() * 900 + 100)}`;
 }

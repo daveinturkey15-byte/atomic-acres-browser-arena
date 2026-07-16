@@ -9,9 +9,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
+  outputDir: 'artifacts/pass25a/playwright-results',
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:4173',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     // Chromium screencasting caps requestAnimationFrame near 30 Hz and invalidates
     // the >=40 FPS budget. Failure screenshots and traces remain enabled.
@@ -26,6 +27,11 @@ export default defineConfig({
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'], viewport: { width: 1920, height: 1080 } },
+    },
+    {
+      name: 'webkit-smoke',
+      testMatch: /pass25a-capability\.spec\.ts/,
+      use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 },
     },
   ],
   webServer: {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { presentationRandom } from './runtime-random';
 import type { ImpactSurface } from './combat-feedback';
 
 type Particle = {
@@ -84,15 +85,15 @@ export class ImpactPresentation {
       const slot = this.cursor++ % MAX_PARTICLES;
       const particle = this.particles[slot];
       const positionIndex = slot * 3;
-      const spreadA = (Math.random() - 0.5) * (surface === 'metal' ? 4.2 : 2.6);
-      const spreadB = (Math.random() - 0.5) * 2.2;
-      const speed = surface === 'metal' ? 2.4 + Math.random() * 2.8 : 0.8 + Math.random() * 1.9;
+      const spreadA = (presentationRandom() - 0.5) * (surface === 'metal' ? 4.2 : 2.6);
+      const spreadB = (presentationRandom() - 0.5) * 2.2;
+      const speed = surface === 'metal' ? 2.4 + presentationRandom() * 2.8 : 0.8 + presentationRandom() * 1.9;
       particle.velocity.copy(normal).multiplyScalar(speed)
         .addScaledVector(tangent, spreadA)
         .addScaledVector(bitangent, spreadB)
         .add(new THREE.Vector3(0, surface === 'soil' ? 1.2 : 0.55, 0));
       particle.maxLife = surface === 'metal' ? 0.24 : 0.38;
-      particle.life = particle.maxLife * (0.72 + Math.random() * 0.28);
+      particle.life = particle.maxLife * (0.72 + presentationRandom() * 0.28);
       particle.color.set(index % 2 === 0 ? primary : secondary);
       this.positions[positionIndex] = point.x + normal.x * 0.035;
       this.positions[positionIndex + 1] = point.y + normal.y * 0.035;
@@ -105,7 +106,7 @@ export class ImpactPresentation {
     const markNormal = normal.clone().normalize();
     const markPosition = point.clone().addScaledVector(markNormal, 0.018);
     const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
-    markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, Math.random() * Math.PI));
+    markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, presentationRandom() * Math.PI));
     const markScale = surface === 'metal' ? 0.085 : surface === 'soil' ? 0.15 : 0.12;
     this.marks.setMatrixAt(markSlot, new THREE.Matrix4().compose(
       markPosition,

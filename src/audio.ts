@@ -2,6 +2,7 @@ import { combatConfirmEnvelope, type FootstepSurface, type ImpactSurface } from 
 import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
+import { presentationRandom } from './runtime-random';
 
 export const SANCTIFIED_FRAG_CHOIR_ASSET = './assets/original/audio/sanctified-frag-hallelujah.wav';
 
@@ -399,7 +400,7 @@ export class ArenaAudio {
     const data = buffer.getChannelData(0);
     let previous = 0;
     for (let index = 0; index < length; index += 1) {
-      const white = Math.random() * 2 - 1;
+      const white = presentationRandom() * 2 - 1;
       previous = previous * 0.16 + white * 0.84;
       data[index] = previous;
     }
@@ -420,7 +421,7 @@ export class ArenaAudio {
     gain.gain.setValueAtTime(Math.max(0.0001, options.volume), now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + options.duration);
     source.connect(filter).connect(gain).connect(destination);
-    source.start(now, Math.random() * Math.max(0.001, this.noiseBuffer.duration - options.duration), options.duration);
+    source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - options.duration), options.duration);
   }
 
   private sweep(

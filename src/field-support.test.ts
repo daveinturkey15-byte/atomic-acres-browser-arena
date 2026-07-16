@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  TRI_PASS_BLAST_RADIUS,
+  TRI_PASS_MAX_DAMAGE,
   consumeFieldSupport,
   createFieldSupportState,
   createTriPassTargeting,
@@ -13,8 +15,20 @@ describe('field support rewards', () => {
   it('unlocks the three original rewards at bounded elimination thresholds', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(7);
+    expect(state.streak).toBe(0);
     expect(state.available).toEqual({ 'scout-sweep': true, yardhawk: true, 'tri-pass': true });
+  });
+
+  it('starts a fresh reward cycle immediately after the final streak without requiring death', () => {
+    let state = createFieldSupportState();
+    for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
+    state = consumeFieldSupport(state, 'scout-sweep').state;
+    for (let index = 0; index < 4; index += 1) state = recordSupportElimination(state);
+    expect(state.streak).toBe(0);
+    expect(state.available['tri-pass']).toBe(true);
+    for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
+    expect(state.streak).toBe(3);
+    expect(state.available['scout-sweep']).toBe(true);
   });
 
   it('resets the live streak on death without deleting already earned support', () => {
@@ -35,6 +49,11 @@ describe('field support rewards', () => {
     expect(fourthElimination.available['scout-sweep']).toBe(false);
     const second = consumeFieldSupport(fourthElimination, 'scout-sweep');
     expect(second.activated).toBe(false);
+  });
+
+  it('gives the owner-approved Tri-Pass a decisive blast contract', () => {
+    expect(TRI_PASS_BLAST_RADIUS).toBe(7.5);
+    expect(TRI_PASS_MAX_DAMAGE).toBe(225);
   });
 
   it('accepts exactly three in-bounds tactical-map points and refuses a fourth', () => {

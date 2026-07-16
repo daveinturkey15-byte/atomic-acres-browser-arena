@@ -1,11 +1,21 @@
 import type * as RapierTypes from '@dimforge/rapier3d-compat';
 import type { Box2, Point3 } from './collision';
 import type { Stance } from './gameplay';
+import { SIMULATION_HZ } from './gameplay';
 
-const PLAYER_RADIUS = 0.38;
-const PLAYER_HALF_HEIGHT = 0.53;
-const STANCE_SHAPES: Record<Stance, { halfHeight: number; radius: number; eyeFromCenter: number }> = {
-  stand: { halfHeight: PLAYER_HALF_HEIGHT, radius: PLAYER_RADIUS, eyeFromCenter: 0.79 },
+export const CHARACTER_PHYSICS_CONFIG = Object.freeze({
+  controllerOffset: 0.025,
+  autostepHeight: 0.42,
+  autostepMinimumWidth: 0.22,
+  snapToGround: 0.24,
+  maximumSlopeClimbDegrees: 50,
+  minimumSlopeSlideDegrees: 55,
+  gravity: -22,
+  playerRadius: 0.38,
+  playerHalfHeight: 0.53,
+});
+export const STANCE_SHAPES: Readonly<Record<Stance, { halfHeight: number; radius: number; eyeFromCenter: number }>> = {
+  stand: { halfHeight: CHARACTER_PHYSICS_CONFIG.playerHalfHeight, radius: CHARACTER_PHYSICS_CONFIG.playerRadius, eyeFromCenter: 0.79 },
   crouch: { halfHeight: 0.22, radius: 0.36, eyeFromCenter: 0.58 },
   prone: { halfHeight: 0.04, radius: 0.31, eyeFromCenter: 0.15 },
 };
@@ -37,12 +47,12 @@ export class CharacterPhysics {
     this.world = world;
     this.body = body;
     this.collider = collider;
-    this.controller = world.createCharacterController(0.025);
+    this.controller = world.createCharacterController(CHARACTER_PHYSICS_CONFIG.controllerOffset);
     this.controller.setSlideEnabled(true);
-    this.controller.enableAutostep(0.42, 0.22, false);
-    this.controller.enableSnapToGround(0.24);
-    this.controller.setMaxSlopeClimbAngle(50 * Math.PI / 180);
-    this.controller.setMinSlopeSlideAngle(55 * Math.PI / 180);
+    this.controller.enableAutostep(CHARACTER_PHYSICS_CONFIG.autostepHeight, CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth, false);
+    this.controller.enableSnapToGround(CHARACTER_PHYSICS_CONFIG.snapToGround);
+    this.controller.setMaxSlopeClimbAngle(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180);
+    this.controller.setMinSlopeSlideAngle(CHARACTER_PHYSICS_CONFIG.minimumSlopeSlideDegrees * Math.PI / 180);
   }
 
   static async create(colliders: readonly Box2[], bounds: Box2): Promise<CharacterPhysics> {
@@ -61,8 +71,8 @@ export class CharacterPhysics {
     } finally {
       console.warn = originalWarn;
     }
-    const world = new RAPIER.World({ x: 0, y: -22, z: 0 });
-    world.timestep = 1 / 120;
+    const world = new RAPIER.World({ x: 0, y: CHARACTER_PHYSICS_CONFIG.gravity, z: 0 });
+    world.timestep = 1 / SIMULATION_HZ;
 
     // The world floor and four thin boundary walls make falling out impossible even if
     // an authored visual mesh is missing or still loading.
@@ -106,7 +116,7 @@ export class CharacterPhysics {
 
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
     const collider = world.createCollider(
-      RAPIER.ColliderDesc.capsule(PLAYER_HALF_HEIGHT, PLAYER_RADIUS)
+      RAPIER.ColliderDesc.capsule(CHARACTER_PHYSICS_CONFIG.playerHalfHeight, CHARACTER_PHYSICS_CONFIG.playerRadius)
         .setFriction(0)
         .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL),
       body,
@@ -161,7 +171,7 @@ export class CharacterPhysics {
     this.world.propagateModifiedBodyPositionsToColliders();
     this.stance = next;
     if (next === 'prone') this.controller.disableAutostep();
-    else this.controller.enableAutostep(0.42, 0.22, false);
+    else this.controller.enableAutostep(CHARACTER_PHYSICS_CONFIG.autostepHeight, CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth, false);
     return true;
   }
 

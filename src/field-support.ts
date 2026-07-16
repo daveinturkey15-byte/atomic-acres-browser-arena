@@ -12,6 +12,9 @@ export const FIELD_SUPPORT: readonly FieldSupportDefinition[] = [
   { id: 'tri-pass', name: 'Tri-Pass Strike', eliminations: 7 },
 ] as const;
 
+export const TRI_PASS_BLAST_RADIUS = 7.5;
+export const TRI_PASS_MAX_DAMAGE = 225;
+
 export type FieldSupportState = {
   streak: number;
   available: Record<FieldSupportId, boolean>;
@@ -27,16 +30,24 @@ export function createFieldSupportState(): FieldSupportState {
 }
 
 export function recordSupportElimination(state: FieldSupportState): FieldSupportState {
-  const streak = Math.max(0, Math.floor(state.streak)) + 1;
+  const finalThreshold = FIELD_SUPPORT[FIELD_SUPPORT.length - 1].eliminations;
+  const nextStreak = Math.max(0, Math.floor(state.streak)) % finalThreshold + 1;
   const available = { ...state.available };
   const earnedThisStreak = { ...state.earnedThisStreak };
   for (const reward of FIELD_SUPPORT) {
-    if (streak === reward.eliminations && !earnedThisStreak[reward.id]) {
+    if (nextStreak === reward.eliminations && !earnedThisStreak[reward.id]) {
       available[reward.id] = true;
       earnedThisStreak[reward.id] = true;
     }
   }
-  return { streak, available, earnedThisStreak };
+  if (nextStreak === finalThreshold) {
+    return {
+      streak: 0,
+      available,
+      earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
+    };
+  }
+  return { streak: nextStreak, available, earnedThisStreak };
 }
 
 export function recordSupportDeath(state: FieldSupportState): FieldSupportState {

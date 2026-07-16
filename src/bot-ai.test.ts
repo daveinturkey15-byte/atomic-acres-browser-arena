@@ -7,8 +7,10 @@ import {
   botCanFireWhileProtected,
   chooseBotIntent,
   chooseTacticalWaypoint,
+  operatorYawToward,
   respawnBotState,
   scoreBotSpawn,
+  selectFarthestSpawnCandidate,
   type BotSense,
 } from './bot-ai';
 
@@ -62,6 +64,28 @@ describe('chooseBotIntent', () => {
 });
 
 describe('tactical bot scoring', () => {
+  it('orients the operator negative-Z forward axis toward movement and fire targets', () => {
+    expect(operatorYawToward({ x: 0, z: 0 }, { x: 0, z: -5 })).toBeCloseTo(0);
+    expect(operatorYawToward({ x: 0, z: 0 }, { x: 5, z: 0 })).toBeCloseTo(-Math.PI / 2);
+    expect(Math.abs(operatorYawToward({ x: 0, z: 0 }, { x: 0, z: 5 }))).toBeCloseTo(Math.PI);
+  });
+
+  it('selects only from the ten candidates farthest from every living player', () => {
+    const candidates = Array.from({ length: 12 }, (_, index) => ({
+      index,
+      nearestPlayerDistanceSq: index * 100,
+      visibleThreats: index % 2,
+    }));
+    const selected = new Set([
+      selectFarthestSpawnCandidate(candidates, 0),
+      selectFarthestSpawnCandidate(candidates, 0.5),
+      selectFarthestSpawnCandidate(candidates, 0.999999),
+    ]);
+    expect([...selected].every((index) => index >= 2)).toBe(true);
+    expect(selectFarthestSpawnCandidate(candidates, 0)).toBe(11);
+    expect(selectFarthestSpawnCandidate([], 0.5)).toBe(-1);
+  });
+
   it('prefers distance and cover while strongly rejecting occupied spawns', () => {
     const safe = scoreBotSpawn({ nearestThreatDistanceSq: 500, visibleThreats: 0, occupied: false, preferred: false });
     const exposed = scoreBotSpawn({ nearestThreatDistanceSq: 600, visibleThreats: 1, occupied: false, preferred: true });

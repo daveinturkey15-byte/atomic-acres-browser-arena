@@ -220,11 +220,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   // Route-shaping collision proxies for three distinct lanes. Rounded visual shells live in environment-assets.ts.
   for (const x of [-29, -22]) for (const z of [-15, -5]) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55]);
-  collisionProxy('greenhouse west wall', [-29, 1.5, 16], [0.45, 3, 8]);
-  collisionProxy('greenhouse east wall', [-22, 1.5, 16], [0.45, 3, 8]);
-  collisionProxy('greenhouse north wall', [-25.5, 1.5, 19.8], [7.5, 3, 0.45]);
-  collisionProxy('greenhouse south left', [-28, 1.5, 12.2], [2.2, 3, 0.45]);
-  collisionProxy('greenhouse south right', [-23, 1.5, 12.2], [2.2, 3, 0.45]);
+  // The Blender hydroponics landmark is an open frame with beds rather than a full-height perimeter.
+  // Older west/east/north/south proxy walls created an unseen enclosure; keep those routes open.
   collisionProxy('service wall west', [22.5, 0.75, 9], [0.7, 1.5, 10]);
   collisionProxy('service wall east', [28.5, 0.75, 9], [0.7, 1.5, 10]);
   for (const x of [22.5, 29.5]) for (const z of [-20, -12]) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);

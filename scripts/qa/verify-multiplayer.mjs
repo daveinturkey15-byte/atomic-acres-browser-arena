@@ -5,9 +5,17 @@ const renderMode = process.env.QA_RENDER_MODE ?? 'compat';
 const connectionTimeoutMs = ['blender', 'host-blender', 'guest-blender'].includes(renderMode) ? 45_000 : 30_000;
 const interactionTimeoutMs = ['blender', 'host-blender', 'guest-blender'].includes(renderMode) ? 20_000 : 10_000;
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
-const browser = await chromium.launch({ headless: true });
+const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
+const headed = process.env.QA_HEADED === '1';
+const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 const host = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const guest = await browser.newPage({ viewport: { width: 960, height: 540 } });
+for (const page of [host, guest]) {
+  if (headed) continue;
+  const cdp = await page.context().newCDPSession(page);
+  cdp.on('Page.screencastFrame', ({ sessionId }) => cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => {}));
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 1, everyNthFrame: 5 });
+}
 const errors = [];
 const phase = (name) => console.error(`[multiplayer-qa] ${name}`);
 
@@ -21,7 +29,12 @@ async function movePlayerSmoothly(page, target, steps = 10) {
   }
 }
 for (const [label, page] of [['host', host], ['guest', guest]]) {
-  page.on('console', (message) => { if (message.type() === 'error') errors.push(`${label}: ${message.text()}`); });
+  page.on('console', (message) => {
+    if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(`${label}: ${message.text()}`);
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400) errors.push(`${label}: HTTP ${response.status()} ${response.url()}`);
+  });
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`));
   const url = new URL(baseUrl);
   if (renderMode === 'host-full') {
@@ -86,6 +99,11 @@ phase('host window broken');
 await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows.filter((pane) => pane.broken).length > before, windowBreaksBefore, { timeout: 10_000 });
 const windowReplicated = (await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows.filter((pane) => pane.broken).length)) > windowBreaksBefore;
 phase('window replicated');
+await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.detonateGrenadeAtWindow(1));
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows[1]?.broken === true, undefined, { timeout: 10_000 });
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows[1]?.broken === true, undefined, { timeout: 10_000 });
+const explosiveWindowReplicated = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows[1]?.broken === true);
+phase('explosive window replicated');
 
 await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 6, 0, 0));
 await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 0, Math.PI, 0));
@@ -145,6 +163,6 @@ const spawnSeparation = Math.hypot(
 );
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
-console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, windowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
-if (errors.length || !stanceReplicated || !windowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
+console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
+if (errors.length || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
 await browser.close();

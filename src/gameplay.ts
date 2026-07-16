@@ -5,6 +5,15 @@ export type Stance = 'stand' | 'crouch' | 'prone';
 
 /** Solo bots deal half of the equivalent player-weapon damage. */
 export const BOT_DAMAGE_MULTIPLIER = 0.5;
+export const SIMULATION_HZ = 120;
+export const MATCH_WARMUP_MS = 3_000;
+export const MATCH_DURATION_MS = 300_000;
+export const MATCH_SCORE_LIMIT = 25;
+export const GRENADE_RADIUS = 8;
+export const GRENADE_MAX_DAMAGE = 115;
+export const MELEE_COOLDOWN_MS = 650;
+export const MELEE_RANGE = 1.75;
+export const MELEE_DAMAGE = 100;
 
 export type WeaponSpec = {
   id: WeaponId;
@@ -54,7 +63,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     switchSeconds: 0.4, automatic: true, color: 0x65e7ff,
   },
   scattergun: {
-    id: 'scattergun', name: 'Model 12 Scattergun', damage: 14, minimumDamage: 5,
+    id: 'scattergun', name: 'Model 12 Scattergun', damage: 17, minimumDamage: 7,
     falloffStart: 8, falloffEnd: 30, headMultiplier: 1.15, limbMultiplier: 0.88,
     rpm: 82, mag: 8, reserve: 40, reload: 2.35,
     hipSpread: 0.068, adsSpreadMultiplier: 0.72, movementSpreadMultiplier: 1.22,
@@ -325,16 +334,15 @@ export function recoverRecoilImpulse(recoil: RecoilImpulse, weapon: WeaponSpec, 
 }
 
 export function grenadeDamage(distance: number): number {
-  const radius = 8;
-  if (distance >= radius) return 0;
-  const normalized = Math.max(0, 1 - Math.max(0, distance) / radius);
-  return Math.round(115 * normalized * normalized);
+  if (distance >= GRENADE_RADIUS) return 0;
+  const normalized = Math.max(0, 1 - Math.max(0, distance) / GRENADE_RADIUS);
+  return Math.round(GRENADE_MAX_DAMAGE * normalized * normalized);
 }
 
 export function meleeStrike(distance: number, now: number, lastMeleeAt: number): { hit: boolean; damage: number } {
-  const ready = now - lastMeleeAt >= 650;
-  const hit = ready && distance <= 1.75;
-  return { hit, damage: hit ? 100 : 0 };
+  const ready = now - lastMeleeAt >= MELEE_COOLDOWN_MS;
+  const hit = ready && distance <= MELEE_RANGE;
+  return { hit, damage: hit ? MELEE_DAMAGE : 0 };
 }
 
 export type MatchPhase = 'warmup' | 'active' | 'ended';
@@ -348,19 +356,19 @@ export type MatchState = {
 };
 
 export function createMatch(now: number): MatchState {
-  return { phase: 'warmup', phaseStartedAt: now, endsAt: now + 3_000, winner: null };
+  return { phase: 'warmup', phaseStartedAt: now, endsAt: now + MATCH_WARMUP_MS, winner: null };
 }
 
 export function advanceMatch(state: MatchState, now: number, scores: [number, number]): MatchState {
   if (state.phase === 'ended' && state.rematchRequested) return createMatch(now);
   if (state.phase === 'warmup' && now >= state.endsAt) {
-    return { phase: 'active', phaseStartedAt: now, endsAt: now + 300_000, winner: null };
+    return { phase: 'active', phaseStartedAt: now, endsAt: now + MATCH_DURATION_MS, winner: null };
   }
-  if (state.phase === 'active' && (scores[0] >= 25 || scores[1] >= 25 || now >= state.endsAt)) {
+  if (state.phase === 'active' && (scores[0] >= MATCH_SCORE_LIMIT || scores[1] >= MATCH_SCORE_LIMIT || now >= state.endsAt)) {
     const winner = scores[0] === scores[1] ? 'draw' : scores[0] > scores[1] ? 0 : 1;
     return {
       phase: 'ended', phaseStartedAt: now, endsAt: now, winner,
-      endReason: scores[0] >= 25 || scores[1] >= 25 ? 'score' : 'time',
+      endReason: scores[0] >= MATCH_SCORE_LIMIT || scores[1] >= MATCH_SCORE_LIMIT ? 'score' : 'time',
     };
   }
   return state;

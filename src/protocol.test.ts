@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { configureRuntimeRandom } from './runtime-random';
 import { isGameMessage, isPlayerSnapshot, messageBelongsToPlayer, sanitizeName } from './protocol';
 
 const player = {
@@ -48,6 +49,8 @@ describe('network protocol guards', () => {
     expect(isGameMessage(pickup)).toBe(true);
     expect(isGameMessage({ ...pickup, mode: 'scavenge' })).toBe(true);
     expect(isGameMessage(brokenWindow)).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'magic' })).toBe(false);
     expect(messageBelongsToPlayer(pickup, 'abc')).toBe(true);
     expect(messageBelongsToPlayer(brokenWindow, 'abc')).toBe(true);
     expect(isGameMessage({ ...pickup, dropId: '<script>'.repeat(30) })).toBe(false);
@@ -82,8 +85,10 @@ describe('callsign sanitizing', () => {
   });
 
   it('creates a safe fallback when nothing remains', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    expect(sanitizeName('🔥🔥')).toBe('Player100');
-    vi.restoreAllMocks();
+    configureRuntimeRandom('callsign-test');
+    const first = sanitizeName('🔥🔥');
+    configureRuntimeRandom('callsign-test');
+    expect(sanitizeName('🔥🔥')).toBe(first);
+    expect(first).toMatch(/^Player[1-9][0-9]{2}$/);
   });
 });

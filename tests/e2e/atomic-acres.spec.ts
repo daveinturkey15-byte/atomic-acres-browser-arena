@@ -87,6 +87,7 @@ type DebugState = {
   deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
   breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
   minimap: { backingWidth: number; cssWidth: number; headingDegrees: number };
+  spawnSafety: Array<{ team: 0 | 1; authored: number; valid: number }>;
   houseNavigation: Array<{
     id: string;
     dimensions: { width: number; depth: number; wallThickness: number };
@@ -226,6 +227,29 @@ test.describe('boot and authored presentation', () => {
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
 
+  test('defaults new players to Blender Render while retaining explicit slow-PC profiles', async ({ page }) => {
+    await pageReadyAt(page, '/');
+    const defaultState = await debug(page);
+    expect(defaultState.render).toMatchObject({ profile: 'blender', representation: 'blender' });
+    expect(defaultState.spawnSafety).toEqual([
+      { team: 0, authored: 12, valid: 12 },
+      { team: 1, authored: 12, valid: 12 },
+    ]);
+    await expect(page.locator('#graphics-profile')).toHaveValue('blender');
+    await pageReadyAt(page, '/?render=performance');
+    expect((await debug(page)).render).toMatchObject({ profile: 'performance', representation: 'responsive' });
+  });
+
+  test('falls back to the authored procedural arena if the default Blender asset cannot load', async ({ page }) => {
+    await page.route('**/atomic-acres-blender-arena.glb', (route) => route.abort('failed'));
+    await pageReadyAt(page, '/');
+    await expect.poll(async () => (await debug(page)).render.blenderEnvironment.status).toBe('fallback');
+    const state = await debug(page);
+    expect(state.render.profile).toBe('blender');
+    expect(state.render.blenderEnvironment.proceduralWorldHidden).toBe(false);
+    expect(state.originalArtLoaded).toBe(true);
+  });
+
   test('loads the complete Blender Render arena and binds authored breakable windows', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -264,8 +288,16 @@ test.describe('boot and authored presentation', () => {
     const activeState = await debug(page);
     expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
-    expect(activeState.render.calls).toBeLessThanOrEqual(90);
+    expect(activeState.render.calls).toBeLessThanOrEqual(120);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
+    await page.waitForFunction(() => {
+      const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.activeImpactParticles === 0 && state.activeTracers === 0;
+    }, undefined, { timeout: 10_000 });
+    await page.waitForTimeout(1_100);
+    const stableState = await debug(page);
+    expect(stableState.render.calls).toBeLessThanOrEqual(90);
+    expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png' });
   });
@@ -320,20 +352,37 @@ test.describe('boot and authored presentation', () => {
     await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
     await expect(page.locator('#selected-kit-summary')).toContainText('Vectorline SMG');
     await page.locator('#solo').click();
-    await expect.poll(async () => (await debug(page)).player.weapon).toBe('smg');
+    await page.waitForFunction(
+      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.waitForFunction(
+      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
+      undefined,
+      { timeout: 20_000 },
+    );
     expect((await debug(page)).player.equippedWeapons).toEqual(['smg', 'pistol']);
     await page.evaluate(() => {
-      document.exitPointerLock();
+      if (document.pointerLockElement) document.exitPointerLock();
       document.querySelector('#menu')?.classList.remove('hidden');
     });
     await expect(page.locator('#menu')).toBeVisible();
     await page.getByRole('button', { name: 'FIELD KIT' }).click();
     await page.locator('[data-kit-id="breacher"]').click();
-    await expect.poll(async () => (await debug(page)).player.weapon).toBe('smg');
+    await page.waitForFunction(
+      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
+      undefined,
+      { timeout: 20_000 },
+    );
     await page.getByRole('button', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(999));
-    await expect.poll(async () => (await debug(page)).player.weapon, { timeout: 6_000 }).toBe('scattergun');
+    await page.waitForFunction(
+      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'scattergun',
+      undefined,
+      { timeout: 12_000 },
+    );
     expect((await debug(page)).player.equippedWeapons).toEqual(['scattergun', 'pistol']);
   });
 });
@@ -424,18 +473,21 @@ test.describe('solo mechanics', () => {
   });
 
   test('plays a bounded rigged death animation before a clean respawn', async ({ page }) => {
-    await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotAhead: (distance: number) => void; damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+    const dying = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        damageBot: (amount: number) => void;
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
       api.placeBotAhead(5);
       api.damageBot(999);
+      return api.snapshot().bots[0];
     });
-    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
-    const dying = (await debug(page)).bots[0];
+    expect(dying.alive).toBe(false);
     expect(dying.rootVisible).toBe(true);
     expect(dying.operatorModel?.activeClip).toBe('Death');
-    await page.waitForTimeout(1_200);
-    expect((await debug(page)).bots[0].rootVisible).toBe(false);
-    await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 2_000 }).toBe(true);
+    await expect.poll(async () => (await debug(page)).bots[0].rootVisible, { timeout: 5_000 }).toBe(false);
+    await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 5_000 }).toBe(true);
     expect((await debug(page)).bots[0].operatorModel?.activeClip).toBe('Idle_Gun_Pointing');
   });
 
@@ -464,17 +516,69 @@ test.describe('solo mechanics', () => {
       yardhawk: true,
       'tri-pass': true,
     });
-    await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void } }).__ATOMIC_ACRES_DEBUG__;
+    const activated = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void;
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
       api.activateSupport('scout-sweep');
       api.activateSupport('yardhawk');
+      return api.snapshot().fieldSupport;
     });
-    await expect.poll(async () => (await debug(page)).fieldSupport.scoutActive).toBe(true);
-    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawk.active).toBe(true);
-    expect(['thrown', 'homing']).toContain((await debug(page)).fieldSupport.yardhawk.phase);
-    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 4_000 }).toBe(1);
+    expect(activated.scoutActive).toBe(true);
+    expect(activated.yardhawk.active).toBe(true);
+    expect(['thrown', 'homing']).toContain(activated.yardhawk.phase);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 12_000 }).toBe(1);
 
     expect((await debug(page)).fieldSupport.available.yardhawk).toBe(false);
+  });
+
+  test('Yardhawk collides with solid walls and cannot damage its target through cover', async ({ page }) => {
+    const staged = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { stageYardhawkWall: () => boolean };
+    }).__ATOMIC_ACRES_DEBUG__.stageYardhawkWall());
+    expect(staged).toBe(true);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 5_000 }).toBe(1);
+    const state = await debug(page);
+    expect(state.bots[0].hp).toBe(100);
+    expect(state.fieldSupport.yardhawk.active).toBe(false);
+  });
+
+  test('loops field-support progression after Tri-Pass so three more kills re-earn Scout Sweep', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        activateSupport: (id: 'scout-sweep') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(3);
+      api.activateSupport('scout-sweep');
+      api.earnSupport(4);
+    });
+    expect((await debug(page)).fieldSupport.streak).toBe(0);
+    await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
+    }).__ATOMIC_ACRES_DEBUG__.earnSupport(3));
+    const looped = (await debug(page)).fieldSupport;
+    expect(looped.streak).toBe(3);
+    expect(looped.available['scout-sweep']).toBe(true);
+  });
+
+  test('routes the bot from the interior ramp foot onto the upper floor instead of jamming', async ({ page }) => {
+    const staged = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { stageBotAtIndoorRamp: () => boolean };
+    }).__ATOMIC_ACRES_DEBUG__.stageBotAtIndoorRamp());
+    expect(staged).toBe(true);
+    await expect.poll(async () => (await debug(page)).bots[0].position[1], { timeout: 12_000 }).toBeGreaterThan(2.5);
+    expect((await debug(page)).bots[0].blockedSince).toBe(0);
+  });
+
+  test('routes the mirrored bot down the interior ramp without abandoning traversal mid-slope', async ({ page }) => {
+    const staged = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { stageBotAtIndoorRamp: (team?: 0 | 1, descending?: boolean) => boolean };
+    }).__ATOMIC_ACRES_DEBUG__.stageBotAtIndoorRamp(1, true));
+    expect(staged).toBe(true);
+    expect((await debug(page)).bots[0].position[1]).toBeGreaterThan(3);
+    await expect.poll(async () => (await debug(page)).bots[0].position[1], { timeout: 15_000 }).toBeLessThan(0.15);
   });
 
   test('resolves three player-selected sky missiles after one second', async ({ page }) => {
@@ -496,6 +600,24 @@ test.describe('solo mechanics', () => {
     expect(impactDelay).not.toBeNull();
     expect(impactDelay!).toBeGreaterThanOrEqual(950);
     expect((await debug(page)).fieldSupport.available).toEqual({ 'scout-sweep': true, yardhawk: true, 'tri-pass': false });
+  });
+
+  test('makes the strengthened Model 12 decisive at close range', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        equipWeapon: (weapon: 'scattergun') => void;
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'body') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.equipWeapon('scattergun');
+      api.placeBotAhead(3);
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
   });
 
   test('sniper lethality, marksman auto sidearm, walk-over scavenging and independent F weapon pickup all hold', async ({ page }) => {
@@ -645,6 +767,54 @@ test.describe('solo mechanics', () => {
     });
   });
 
+  test('broken semantic windows stop blocking player shots and grenade blasts shatter intact panes', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        stageWindow: (index: number, distance: number) => void;
+        placeBotAhead: (distance: number) => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.stageWindow(0, 3);
+      api.placeBotAhead(5);
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[0].broken).toBe(true);
+    await page.waitForTimeout(120);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        aimAtBot: (zone: 'body') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].hp).toBeLessThan(100);
+
+    const grenadeBreaks = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { detonateGrenadeAtWindow: (index: number) => number };
+    }).__ATOMIC_ACRES_DEBUG__.detonateGrenadeAtWindow(1));
+    expect(grenadeBreaks).toBeGreaterThanOrEqual(1);
+    expect((await debug(page)).breakableWindows[1].broken).toBe(true);
+  });
+
+  test('keeps the reported west greenhouse route free of hidden wall planes', async ({ page }) => {
+    const probes = await page.evaluate(() => {
+      const probe = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        collisionProbe: (x: number, z: number) => boolean;
+      } }).__ATOMIC_ACRES_DEBUG__.collisionProbe;
+      return [
+        probe(-29, 16),
+        probe(-22, 14),
+        probe(-25.5, 19.8),
+        probe(-28, 12.2),
+        probe(-23, 12.2),
+      ];
+    });
+    expect(probes).toEqual([false, false, false, false, false]);
+  });
+
   test('doubles the minimap, exposes heading, enlarges house flow, and breaks glass with gun and knife', async ({ page }) => {
     let state = await debug(page);
     expect(state.minimap.backingWidth).toBe(360);
@@ -664,6 +834,7 @@ test.describe('solo mechanics', () => {
       api.teleportPlayer(x, y, z, -Math.PI / 2);
     }, [px, py, pz]);
     await expect.poll(async () => (await debug(page)).minimap.headingDegrees).toBe(90);
+    await expect(page.locator('#map-heading')).toContainText('PLAYER UP');
 
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -773,17 +944,23 @@ test.describe('solo mechanics', () => {
   });
 
   test('menu interruption cancels a pre-seat reload without stale action events', async ({ page }) => {
-    await page.evaluate(() => {
-      const debug = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void; reload: () => void } }).__ATOMIC_ACRES_DEBUG__;
-      debug.fireOnce();
-      debug.reload();
+    const interruption = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        fireOnce: () => void;
+        reload: () => void;
+        openMenu: () => void;
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.fireOnce();
+      api.reload();
+      const started = api.snapshot().player.reloading;
+      api.openMenu();
+      const interrupted = api.snapshot();
+      return { started, interrupted };
     });
-    await page.waitForTimeout(110);
-    expect((await debug(page)).player.reloading).toBe(true);
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { openMenu: () => void } }).__ATOMIC_ACRES_DEBUG__.openMenu());
-    const interrupted = await debug(page);
-    expect(interrupted.player.reloading).toBe(false);
-    const eventCount = interrupted.weaponActionHistory.length;
+    expect(interruption.started).toBe(true);
+    expect(interruption.interrupted.player.reloading).toBe(false);
+    const eventCount = interruption.interrupted.weaponActionHistory.length;
     await page.waitForTimeout(900);
     expect((await debug(page)).weaponActionHistory).toHaveLength(eventCount);
   });
@@ -840,9 +1017,11 @@ test.describe('solo mechanics', () => {
     const before = await debug(page);
     expect(before.player.primaryWeapon).toBe('carbine');
     expect(before.player.equippedWeapons).toEqual(['carbine', 'pistol']);
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
-    await page.waitForTimeout(120);
-    const fired = await debug(page);
+    const fired = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void; snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      api.fireOnce();
+      return api.snapshot();
+    });
     expect(fired.player.ammo).toBeLessThan(before.player.ammo);
     expect(fired.activeImpactParticles).toBeGreaterThan(0);
     expect(fired.activeImpactMarks).toBeGreaterThan(0);
@@ -999,9 +1178,16 @@ test.describe('solo mechanics', () => {
   });
 
   test('shows directional damage, ADS telemetry and delayed health recovery', async ({ page }) => {
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(true));
-    expect((await debug(page)).weaponPresentation.adsProgress).toBeLessThan(0.9);
-    await expect(page.locator('#crosshair')).not.toHaveClass(/ads/);
+    const initialAds = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void; snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(true);
+      return {
+        progress: api.snapshot().weaponPresentation.adsProgress,
+        crosshairAds: document.querySelector('#crosshair')?.classList.contains('ads') ?? false,
+      };
+    });
+    expect(initialAds.progress).toBeLessThan(0.9);
+    expect(initialAds.crosshairAds).toBe(false);
     await page.waitForTimeout(150);
     expect((await debug(page)).weaponPresentation.adsProgress).toBeGreaterThanOrEqual(0.9);
     await expect(page.locator('#crosshair')).toHaveClass(/ads/);

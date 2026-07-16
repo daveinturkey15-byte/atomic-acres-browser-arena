@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingDegrees, minimapToWorld, playerFacingGeometry, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, shouldRevealEnemy, worldToMinimap } from './minimap';
 
 const bounds = { minX: -40, maxX: 40, minZ: -50, maxZ: 50 };
 
@@ -37,6 +37,17 @@ describe('player facing marker', () => {
     expect(headingDegrees(-Math.PI / 2)).toBe(90);
     expect(headingDegrees(Math.PI / 2)).toBe(270);
     expect(headingDegrees(0)).toBe(180);
+  });
+
+  it('rotates a player-centred minimap so camera-forward stays up and north moves around the rim', () => {
+    expect(playerUpRotationRadians(Math.PI)).toBeCloseTo(0);
+    expect(playerUpRotationRadians(-Math.PI / 2)).toBeCloseTo(-Math.PI / 2);
+    const northWhenFacingNorth = northMarkerPosition(Math.PI, 180, 180);
+    expect(northWhenFacingNorth[0]).toBeCloseTo(90);
+    expect(northWhenFacingNorth[1]).toBeLessThan(90);
+    const northWhenFacingEast = northMarkerPosition(-Math.PI / 2, 180, 180);
+    expect(northWhenFacingEast[0]).toBeLessThan(90);
+    expect(northWhenFacingEast[1]).toBeCloseTo(90);
   });
 });
 

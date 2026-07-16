@@ -24,6 +24,34 @@ export const SOLO_BOT_COUNT = 1;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
 
+/** Yaw that points Atomic Acres' authoritative -Z operator-forward axis toward a target. */
+export function operatorYawToward(from: { x: number; z: number }, target: { x: number; z: number }): number {
+  return Math.atan2(-(target.x - from.x), -(target.z - from.z));
+}
+
+export type SpawnCandidate = {
+  index: number;
+  nearestPlayerDistanceSq: number;
+  visibleThreats: number;
+};
+
+/** Selects deterministically-randomly from the ten candidates farthest from every living player. */
+export function selectFarthestSpawnCandidate(
+  candidates: readonly SpawnCandidate[],
+  random: number,
+  poolSize = 10,
+): number {
+  if (candidates.length === 0) return -1;
+  const ranked = [...candidates].sort((a, b) =>
+    b.nearestPlayerDistanceSq - a.nearestPlayerDistanceSq
+    || a.visibleThreats - b.visibleThreats
+    || a.index - b.index,
+  );
+  const pool = ranked.slice(0, Math.max(1, Math.min(Math.floor(poolSize), ranked.length)));
+  const boundedRandom = Number.isFinite(random) ? Math.max(0, Math.min(0.999999999, random)) : 0;
+  return pool[Math.floor(boundedRandom * pool.length)].index;
+}
+
 export type BotSpawnScore = {
   nearestThreatDistanceSq: number;
   visibleThreats: number;

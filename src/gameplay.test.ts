@@ -210,6 +210,15 @@ describe('weapon tuning', () => {
     );
   });
 
+  it('applies the owner-approved close-range Model 12 damage increase without changing cadence or pellet count', () => {
+    const shotgun = WEAPONS.scattergun;
+    expect(shotgun.damage).toBe(17);
+    expect(shotgun.minimumDamage).toBe(7);
+    expect(shotgun.pellets).toBe(9);
+    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(153);
+    expect(shotgun.rpm).toBe(82);
+  });
+
   it('builds bounded directional recoil and recovers it toward rest', () => {
     const impulse = computeRecoilImpulse(WEAPONS.carbine, 8, 1);
     expect(impulse.pitch).toBeGreaterThan(WEAPONS.carbine.recoilPitch);

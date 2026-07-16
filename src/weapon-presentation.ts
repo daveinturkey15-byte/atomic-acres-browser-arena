@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { presentationRandom } from './runtime-random';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox } from './art-kit';
 import type { FirstPersonArmChain } from './operator-model';
@@ -453,11 +454,11 @@ export class WeaponPresentation {
     casing.mesh.material = shell ? this.shellMaterial : this.brassMaterial;
     const ejectSocket = this.models.get(this.active)?.getObjectByName('eject-socket');
     casing.mesh.position.copy(ejectSocket?.position ?? new THREE.Vector3(0.12, 0.04, -0.48));
-    casing.mesh.rotation.set(Math.random() * 0.4, 0, Math.PI / 2);
+    casing.mesh.rotation.set(presentationRandom() * 0.4, 0, Math.PI / 2);
     casing.mesh.visible = true;
     casing.velocity.set(
-      shell ? 0.72 : 0.95 + Math.random() * 0.25,
-      shell ? 0.55 : 0.75 + Math.random() * 0.2,
+      shell ? 0.72 : 0.95 + presentationRandom() * 0.25,
+      shell ? 0.55 : 0.75 + presentationRandom() * 0.2,
       shell ? 0.16 : 0.1,
     );
     casing.life = shell ? 0.62 : 0.42;
@@ -485,13 +486,13 @@ export class WeaponPresentation {
       const smoke = this.smokes[slot];
       const offset = slot * 3;
       const muzzle = muzzleSocket?.position ?? new THREE.Vector3(0, 0.08, -1.15);
-      this.smokePositions[offset] = muzzle.x + (Math.random() - 0.5) * 0.025;
-      this.smokePositions[offset + 1] = muzzle.y + (Math.random() - 0.5) * 0.02;
+      this.smokePositions[offset] = muzzle.x + (presentationRandom() - 0.5) * 0.025;
+      this.smokePositions[offset + 1] = muzzle.y + (presentationRandom() - 0.5) * 0.02;
       this.smokePositions[offset + 2] = muzzle.z - 0.05 - index * 0.035;
       smoke.velocity.set(
-        (Math.random() - 0.5) * 0.055 * cycle.smokeScale,
-        (0.1 + Math.random() * 0.06) * cycle.smokeScale,
-        (-0.11 - Math.random() * 0.08) * cycle.smokeScale,
+        (presentationRandom() - 0.5) * 0.055 * cycle.smokeScale,
+        (0.1 + presentationRandom() * 0.06) * cycle.smokeScale,
+        (-0.11 - presentationRandom() * 0.08) * cycle.smokeScale,
       );
       smoke.maxLife = (this.active === 'scattergun' ? 0.38 : 0.2 + this.weaponHeat * 0.12);
       smoke.life = smoke.maxLife;

@@ -10,8 +10,9 @@ import {
   botCanFireWhileProtected,
   chooseBotIntent,
   chooseTacticalWaypoint,
+  operatorYawToward,
   respawnBotState,
-  scoreBotSpawn,
+  selectFarthestSpawnCandidate,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
@@ -19,6 +20,8 @@ import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
   BOT_DAMAGE_MULTIPLIER,
+  GRENADE_RADIUS,
+  SIMULATION_HZ,
   WEAPONS,
   advanceMatch,
   applyRadialDeadzone,
@@ -47,7 +50,7 @@ import {
   type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
-import { headingDegrees, minimapToWorld, playerFacingGeometry, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, shouldRevealEnemy, worldToMinimap } from './minimap';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
@@ -57,7 +60,7 @@ import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
-import { consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
+import { TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE, consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
 import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   DEATH_DROP_INTERACTION_RANGE,
@@ -86,6 +89,8 @@ import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
 import { magnifiedFovDegrees } from './weapon-presentation-state';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
+import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
+import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
 import {
   DeathMessage,
   GameMessage,
@@ -100,6 +105,8 @@ import {
   WindowBreakMessage,
   sanitizeName,
 } from './protocol';
+
+configureRuntimeRandom(runtimeSeed(window.location.search));
 
 window.addEventListener('error', (event) => {
   console.error('[Atomic Acres runtime error]', event.message || 'unknown error', event.error?.stack || '');
@@ -183,7 +190,7 @@ const BOT_PATROL_POINTS = PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, 
 
 function createPlayerId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
-  return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `player-${Date.now().toString(36)}-${Math.floor(presentationRandom() * 0x1_0000_0000).toString(36)}`;
 }
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -203,7 +210,7 @@ app.innerHTML = `
     </nav>
     <div class="menu-panel active" data-menu-panel="deploy">
       <div class="setup-grid">
-        <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
+        <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(presentationRandom() * 900 + 100)}"></label>
         <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
       </div>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
@@ -332,6 +339,25 @@ renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = activeLighting.exposure;
+let webglContextLost = false;
+let webglContextLosses = 0;
+let webglContextRestorations = 0;
+let staticShadowDynamicRefreshes = 0;
+let lastStaticShadowRefreshAt = -Infinity;
+renderer.domElement.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  webglContextLost = true;
+  webglContextLosses += 1;
+  document.documentElement.dataset.webglContext = 'lost';
+});
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  webglContextLost = false;
+  webglContextRestorations += 1;
+  document.documentElement.dataset.webglContext = 'ready';
+  renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
+  resize();
+});
+document.documentElement.dataset.webglContext = 'ready';
 // Both public profiles can reduce their internal framebuffer when sustained
 // frame time exceeds the detected display budget. Shadows disable
 // automatically below a moderate DPR threshold.
@@ -504,6 +530,7 @@ const bots = new Map<string, BotPlayer>();
 const grenades: GrenadeEntity[] = [];
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
+let lastPrincipalShotAlignment: { weapon: WeaponId; angularError: number; sample: [number, number]; direction: [number, number, number]; cameraDirection: [number, number, number] } | null = null;
 let lastGrenadeExplosionProfile = {
   disposeMs: 0,
   audioMs: 0,
@@ -557,6 +584,7 @@ let lastFrame = performance.now();
 const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
+let debugShadowProbe: THREE.Mesh | null = null;
 let matchState: MatchState = createMatch(performance.now());
 let matchFinished = false;
 let respawnEndsAt = 0;
@@ -641,12 +669,6 @@ if (!webRtcSupported) {
 } else if (typeof canvas.requestPointerLock !== 'function') {
   setStatus('Pointer lock is unavailable; keyboard movement works but mouse aim may not.', 'warn');
 }
-
-canvas.addEventListener('webglcontextlost', (event) => {
-  event.preventDefault();
-  showFatalError(new Error('Graphics context was lost'));
-});
-canvas.addEventListener('webglcontextrestored', () => window.location.reload());
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
@@ -1253,13 +1275,13 @@ function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
   const shards: Array<{ mesh: THREE.Mesh; velocity: THREE.Vector3; spin: THREE.Vector3 }> = [];
   const material = new THREE.MeshBasicMaterial({ color: 0xa9e8f5, transparent: true, opacity: 0.74, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
   for (let index = 0; index < 10; index += 1) {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.14 + Math.random() * 0.16, 0.18 + Math.random() * 0.22), material);
-    mesh.position.set((Math.random() - 0.5) * 0.55, (Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.08);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.14 + presentationRandom() * 0.16, 0.18 + presentationRandom() * 0.22), material);
+    mesh.position.set((presentationRandom() - 0.5) * 0.55, (presentationRandom() - 0.5) * 0.45, (presentationRandom() - 0.5) * 0.08);
     root.add(mesh);
     shards.push({
       mesh,
-      velocity: normal.clone().multiplyScalar(1.1 + Math.random() * 1.5).add(new THREE.Vector3((Math.random() - 0.5) * 1.7, 0.8 + Math.random() * 1.3, (Math.random() - 0.5) * 1.7)),
-      spin: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8),
+      velocity: normal.clone().multiplyScalar(1.1 + presentationRandom() * 1.5).add(new THREE.Vector3((presentationRandom() - 0.5) * 1.7, 0.8 + presentationRandom() * 1.3, (presentationRandom() - 0.5) * 1.7)),
+      spin: new THREE.Vector3(presentationRandom() * 8, presentationRandom() * 8, presentationRandom() * 8),
     });
   }
   scene.add(root);
@@ -1289,6 +1311,7 @@ function breakHouseWindow(
   normal: THREE.Vector3,
   replicate: boolean,
   origin = camera.getWorldPosition(new THREE.Vector3()),
+  kind: WindowBreakMessage['kind'] = 'shot',
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window || window.broken) return false;
@@ -1303,6 +1326,7 @@ function breakHouseWindow(
       by: player.id,
       windowId,
       origin: origin.toArray(),
+      kind,
       nonce: randomNonce(),
     };
     network.send(message);
@@ -1318,9 +1342,12 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  const explosive = message.kind === 'explosive';
+  const senderOriginLimit = explosive ? 42 : 2.8;
   if (!pointInsideBounds(origin, arena.bounds, 0.44)
-    || origin.distanceTo(sender) > 2.8
-    || origin.distanceTo(centre) > 110
+    || origin.distanceTo(sender) > senderOriginLimit
+    || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
+    || !explosive && origin.distanceTo(centre) > 110
     || arena.colliders.some((box) => segmentIntersectsBox(origin, centre, box))) return;
   processedNonces.add(message.nonce);
   const normal = centre.clone().sub(origin).normalize().multiplyScalar(-1);
@@ -1372,9 +1399,9 @@ function removeRemote(id: string, reason: string): void {
 
 function spawnPoint(): THREE.Vector3 {
   const options = arena.spawns[player.team];
-  const preferredIndex = gameMode === 'client' ? Math.min(1, options.length - 1) : gameMode === 'host' ? 0 : player.deaths % options.length;
-  const occupied = [
-    ...[...remotes.values()].map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
+  const otherPlayers = [
+    ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
+      .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
     ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
   ];
   const threats = [
@@ -1392,22 +1419,16 @@ function spawnPoint(): THREE.Vector3 {
       && !isBlocked(bodyPoint, arena.colliders, 0.44);
   });
   if (valid.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
-  const scored = valid.map(({ point, index }) => {
-    const nearestThreatDistanceSq = threats.length === 0 ? 0 : Math.min(...threats.map((threat) => threat.distanceToSquared(point)));
-    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length;
-    return {
-      point,
-      index,
-      score: scoreBotSpawn({
-        nearestThreatDistanceSq,
-        visibleThreats,
-        occupied: occupied.some((position) => position.distanceToSquared(point) < 20),
-        preferred: index === preferredIndex,
-      }),
-    };
-  });
-  scored.sort((a, b) => b.score - a.score || a.index - b.index);
-  return scored[0].point.clone();
+  const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < 20));
+  const selectable = unoccupied.length > 0 ? unoccupied : valid;
+  const selectedIndex = selectFarthestSpawnCandidate(selectable.map(({ point, index }) => ({
+    index,
+    nearestPlayerDistanceSq: otherPlayers.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...otherPlayers.map((other) => other.distanceToSquared(point))),
+    visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
+  })), gameplayRandom());
+  return valid.find(({ index }) => index === selectedIndex)!.point.clone();
 }
 
 function requestGamePointerLock(): void {
@@ -1504,7 +1525,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
 }
 
 function randomNonce(): number {
-  return Math.floor(performance.now() * 1000 + Math.random() * 1_000_000);
+  return Math.floor(performance.now() * 1000 + protocolRandom() * 1_000_000);
 }
 
 function endSpawnProtectionOnOffense(now: number): void {
@@ -1593,7 +1614,7 @@ function tryFire(now: number): void {
   const ammoDisplay = element<HTMLElement>('#ammo');
   ammoDisplay.classList.remove('fired');
   requestAnimationFrame(() => ammoDisplay.classList.add('fired'));
-  const recoil = computeRecoilImpulse(spec, player.sustainedShots, Math.random());
+  const recoil = computeRecoilImpulse(spec, player.sustainedShots, gameplayRandom());
   recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
   recoilCamera.yaw = THREE.MathUtils.clamp(recoilCamera.yaw + recoil.yaw, -0.075, 0.075);
   recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
@@ -1616,11 +1637,20 @@ function tryFire(now: number): void {
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
-    const sample = sampleWeaponPellet(spec, pellet, spread, Math.random(), Math.random());
+    const sample = sampleWeaponPellet(spec, pellet, spread, gameplayRandom(), gameplayRandom());
     const direction = baseDirection.clone()
       .addScaledVector(cameraRight, sample.x)
       .addScaledVector(cameraUp, sample.y)
       .normalize();
+    if (pellet === 0) {
+      lastPrincipalShotAlignment = {
+        weapon: player.weapon,
+        angularError: direction.angleTo(baseDirection),
+        sample: [sample.x, sample.y],
+        direction: direction.toArray(),
+        cameraDirection: baseDirection.toArray(),
+      };
+    }
     const result = castShot(origin, direction);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
@@ -1692,7 +1722,12 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
   const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
   const activeTargets = arena.targets.filter((target) => target.active).map((target) => target.root);
-  const intersections = ray.intersectObjects([...arena.raycastMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
+  const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+  const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
+    const windowId = object.userData.breakableWindowId;
+    return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
+  });
+  const intersections = ray.intersectObjects([...activeWorldMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
   const first = intersections[0];
   if (!first) return { distance: 90 };
   let node: THREE.Object3D | null = first.object;
@@ -1731,17 +1766,18 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
   };
 }
 
-function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
+function selectSafeBotSpawn(team: Team): THREE.Vector3 {
   const options = arena.spawns[team];
+  const otherPlayers = [
+    ...(player.alive ? [player.position.clone()] : []),
+    ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
+    ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
+  ];
   const threats = [
     ...(player.alive && player.team !== team ? [player.position.clone()] : []),
     ...[...remotes.values()]
       .filter((remote) => remote.snapshot.team !== team && remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
-  ];
-  const occupied = [
-    ...[...remotes.values()].map((remote) => remote.target.clone()),
-    ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
   ];
   const valid = options.map((candidate, index) => ({ candidate, index })).filter(({ candidate }) => {
     const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
@@ -1750,24 +1786,16 @@ function selectSafeBotSpawn(team: Team, preferredIndex: number): THREE.Vector3 {
       && !isBlocked(bodyPoint, arena.colliders, 0.44);
   });
   if (valid.length === 0) throw new Error(`No valid authored spawn for team ${team}`);
-  const scored = valid.map(({ candidate, index }) => {
-    const nearestThreatDistanceSq = threats.length === 0
-      ? 0
-      : Math.min(...threats.map((threat) => threat.distanceToSquared(candidate)));
-    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length;
-    return {
-      candidate,
-      index,
-      score: scoreBotSpawn({
-        nearestThreatDistanceSq,
-        visibleThreats,
-        occupied: occupied.some((position) => position.distanceToSquared(candidate) < 20),
-        preferred: index === ((preferredIndex % options.length) + options.length) % options.length,
-      }),
-    };
-  });
-  scored.sort((a, b) => b.score - a.score || a.index - b.index);
-  return scored[0].candidate;
+  const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < 20));
+  const selectable = unoccupied.length > 0 ? unoccupied : valid;
+  const selectedIndex = selectFarthestSpawnCandidate(selectable.map(({ candidate, index }) => ({
+    index,
+    nearestPlayerDistanceSq: otherPlayers.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...otherPlayers.map((other) => other.distanceToSquared(candidate))),
+    visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
+  })), gameplayRandom());
+  return valid.find(({ index }) => index === selectedIndex)!.candidate;
 }
 
 function spawnBots(): void {
@@ -1782,7 +1810,7 @@ function spawnBots(): void {
       node.userData.playerId = id;
       node.userData.targetRoot = root;
     });
-    const spawn = selectSafeBotSpawn(botTeam, index);
+    const spawn = selectSafeBotSpawn(botTeam);
     const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
     root.position.copy(position);
     scene.add(root);
@@ -1843,7 +1871,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
 
 function respawnBot(bot: BotPlayer, now: number): void {
   const state = respawnBotState(now);
-  const spawn = selectSafeBotSpawn(bot.team, bot.deaths + bot.waypoint);
+  const spawn = selectSafeBotSpawn(bot.team);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.hp = state.health;
@@ -1860,6 +1888,56 @@ function respawnBot(bot: BotPlayer, now: number): void {
   resetOperator(bot.root);
   bot.root.visible = true;
 }
+
+function houseContainsXZ(house: ArenaMap['houses'][number], point: THREE.Vector3, margin = 1): boolean {
+  return Math.abs(point.x - house.origin.x) <= house.dimensions.width / 2 + margin
+    && Math.abs(point.z - house.origin.z) <= house.dimensions.depth / 2 + margin;
+}
+
+function botVerticalRouteTarget(bot: BotPlayer): THREE.Vector3 | null {
+  const playerUpper = player.position.y > 3;
+  const botOnGround = bot.position.y <= 0.1;
+  const botOnUpper = bot.position.y >= 3.2;
+  if (playerUpper && botOnUpper || !playerUpper && botOnGround) return null;
+  const house = arena.houses.find((candidate) => houseContainsXZ(candidate, playerUpper ? player.position : bot.position, 2));
+  if (!house) return null;
+  const foot = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-foot');
+  const top = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-top');
+  if (!foot || !top) return null;
+  const footPoint = new THREE.Vector3(foot.position[0], 0, foot.position[2]);
+  const topPoint = new THREE.Vector3(top.position[0], 3.48, top.position[2]);
+  if (playerUpper) return botOnGround && bot.position.distanceToSquared(footPoint) > 1 ? footPoint : topPoint;
+  return botOnUpper && bot.position.distanceToSquared(topPoint) > 1 ? topPoint : footPoint;
+}
+
+function botElevationAt(position: THREE.Vector3, previousY: number): number {
+  for (const house of arena.houses) {
+    for (const prefix of ['indoor-ramp', 'ramp'] as const) {
+      const foot = house.anchors.find((anchor) => anchor.id === `${prefix}-foot`);
+      const top = house.anchors.find((anchor) => anchor.id === `${prefix}-top`);
+      if (!foot || !top) continue;
+      const fx = foot.position[0];
+      const fz = foot.position[2];
+      const dx = top.position[0] - fx;
+      const dz = top.position[2] - fz;
+      const lengthSq = dx * dx + dz * dz;
+      const progress = lengthSq > 0 ? ((position.x - fx) * dx + (position.z - fz) * dz) / lengthSq : 0;
+      if (progress < -0.04 || progress > 1.04) continue;
+      const nearestX = fx + dx * progress;
+      const nearestZ = fz + dz * progress;
+      const distance = Math.hypot(position.x - nearestX, position.z - nearestZ);
+      if (distance <= 1.05) return THREE.MathUtils.lerp(0, 3.48, THREE.MathUtils.clamp(progress, 0, 1));
+    }
+    if (previousY > 1.5 && houseContainsXZ(house, position, 0)) return 3.48;
+  }
+  return 0;
+}
+
+const botNavigationColliders = arena.colliders.filter((box) => {
+  const minY = box.minY ?? 0;
+  const maxY = box.maxY ?? 8;
+  return !(minY > 2 && maxY - minY <= 0.5);
+});
 
 function updateBots(dt: number, now: number): void {
   if (gameMode !== 'solo' || matchState.phase !== 'active') return;
@@ -1878,7 +1956,7 @@ function updateBots(dt: number, now: number): void {
     }
     // A corrupted position can never become an out-of-arena damage source.
     if (!pointInsideBounds(bot.position, arena.bounds, 0.44)) {
-      const safeSpawn = selectSafeBotSpawn(bot.team, bot.waypoint);
+      const safeSpawn = selectSafeBotSpawn(bot.team);
       bot.position.set(safeSpawn.x, safeSpawn.y - 1.7, safeSpawn.z);
       bot.root.position.copy(bot.position);
       bot.hasLineOfSight = false;
@@ -1934,21 +2012,25 @@ function updateBots(dt: number, now: number): void {
     patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
     toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
-    const pursuit = lineOfSight ? toPlayer : toPatrol;
+    const verticalRouteTarget = botVerticalRouteTarget(bot);
+    const pursuit = verticalRouteTarget
+      ? verticalRouteTarget.clone().sub(bot.position).setY(0)
+      : lineOfSight ? toPlayer : toPatrol;
     const forward = pursuit.lengthSq() > 0.01 ? pursuit.normalize() : new THREE.Vector3(0, 0, -1);
     const side = new THREE.Vector3(-forward.z, 0, forward.x);
-    const desiredDirection = intent.movement === 'advance' ? forward
-      : intent.movement === 'retreat' ? forward.clone().multiplyScalar(-1)
-        : intent.movement === 'strafe-left' ? side.clone().multiplyScalar(-1)
-          : intent.movement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = intent.movement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    const routeMovement = verticalRouteTarget ? 'advance' : intent.movement;
+    const desiredDirection = routeMovement === 'advance' ? forward
+      : routeMovement === 'retreat' ? forward.clone().multiplyScalar(-1)
+        : routeMovement === 'strafe-left' ? side.clone().multiplyScalar(-1)
+          : routeMovement === 'strafe-right' ? side : new THREE.Vector3();
+    const speed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
-    let resolved = resolveHorizontalMove(bot.position, desired, arena.colliders, arena.bounds, 0.44);
+    let resolved = resolveHorizontalMove(bot.position, desired, botNavigationColliders, arena.bounds, 0.44);
     const stalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002
       && desiredDirection.lengthSq() > 0;
     if (stalled) {
       const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
-      resolved = resolveHorizontalMove(bot.position, detour, arena.colliders, arena.bounds, 0.44);
+      resolved = resolveHorizontalMove(bot.position, detour, botNavigationColliders, arena.bounds, 0.44);
       const detourStalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002;
       if (detourStalled) {
         if (bot.blockedSince === 0) bot.blockedSince = now;
@@ -1962,10 +2044,11 @@ function updateBots(dt: number, now: number): void {
     } else {
       bot.blockedSince = 0;
     }
-    bot.position.set(resolved.x, bot.position.y, resolved.z);
+    const resolvedPosition = new THREE.Vector3(resolved.x, bot.position.y, resolved.z);
+    bot.position.set(resolved.x, botElevationAt(resolvedPosition, bot.position.y), resolved.z);
     bot.root.position.copy(bot.position);
-    const lookTarget = lineOfSight ? player.position : patrolTarget;
-    bot.root.lookAt(lookTarget.x, bot.position.y + 1.1, lookTarget.z);
+    const lookTarget = lineOfSight ? player.position : verticalRouteTarget ?? patrolTarget;
+    bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
     if (botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
@@ -1976,9 +2059,9 @@ function updateBots(dt: number, now: number): void {
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
       const direction = player.position.clone().sub(origin).normalize();
       const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
-      direction.x += (Math.random() - 0.5) * jitter;
-      direction.y += (Math.random() - 0.5) * jitter;
-      direction.z += (Math.random() - 0.5) * jitter;
+      direction.x += (gameplayRandom() - 0.5) * jitter;
+      direction.y += (gameplayRandom() - 0.5) * jitter;
+      direction.z += (gameplayRandom() - 0.5) * jitter;
       direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
       const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
@@ -2074,6 +2157,21 @@ function clearGrenadeExplosionVisuals(): void {
   grenadeExplosionPresentation.clear();
 }
 
+function breakWindowsInGrenadeBlast(point: THREE.Vector3): number {
+  let broken = 0;
+  for (const pane of arena.breakableWindows) {
+    if (pane.broken) continue;
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    if (centre.distanceTo(point) > GRENADE_RADIUS) continue;
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, centre, box))) continue;
+    const normal = centre.clone().sub(point);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    if (breakHouseWindow(pane.id, centre, normal, true, point, 'explosive')) broken += 1;
+  }
+  return broken;
+}
+
 function explodeGrenade(entity: GrenadeEntity): void {
   const started = performance.now();
   const point = entity.mesh.position.clone();
@@ -2083,6 +2181,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const afterAudio = performance.now();
   const now = performance.now();
   spawnGrenadeExplosionVisual(point, now);
+  breakWindowsInGrenadeBlast(point);
   const afterVisual = performance.now();
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
@@ -2473,32 +2572,38 @@ function activateFieldSupport(id: FieldSupportId): void {
   updateFieldSupportHud();
 }
 
+function detonateYardhawk(point: THREE.Vector3, radius: number, maxDamage: number): void {
+  if (!yardhawk) return;
+  supportBlast(point, radius, maxDamage);
+  yardhawkExplosions += 1;
+  disposeSupportRoot(yardhawk.root);
+  yardhawk = null;
+}
+
 function updateFieldSupport(dt: number, now: number): void {
   if (yardhawk) {
     if (now >= yardhawk.expiresAt) {
-      supportBlast(yardhawk.root.position.clone(), 2.8, 150);
-      yardhawkExplosions += 1;
-      disposeSupportRoot(yardhawk.root);
-      yardhawk = null;
+      detonateYardhawk(yardhawk.root.position.clone(), 2.8, 150);
     } else if (yardhawk.phase === 'thrown') {
       yardhawk.velocity.y -= 9.5 * dt;
       const start = yardhawk.root.position.clone();
       const delta = yardhawk.velocity.clone().multiplyScalar(dt);
-      const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
+      const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders, 0.24);
       if (collision) {
-        yardhawk.root.position.copy(start).addScaledVector(delta, collision.time);
-        yardhawk.phase = 'homing';
-        yardhawk.velocity.set(0, 0, 0);
-        yardhawk.armedAt = now;
+        const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+        const impact = start.clone().addScaledVector(delta, collision.time).addScaledVector(normal, 0.26);
+        detonateYardhawk(impact, 2.8, 150);
       } else {
         yardhawk.root.position.add(delta);
       }
-      yardhawk.root.rotation.x += dt * 8;
-      yardhawk.root.rotation.z += dt * 11;
-      if (yardhawk && now >= yardhawk.armedAt) {
-        yardhawk.phase = 'homing';
-        yardhawk.velocity.set(0, 0, 0);
-        addFeed('YARDHAWK ARMED · TARGET LOCK', 'gold');
+      if (yardhawk) {
+        yardhawk.root.rotation.x += dt * 8;
+        yardhawk.root.rotation.z += dt * 11;
+        if (now >= yardhawk.armedAt) {
+          yardhawk.phase = 'homing';
+          yardhawk.velocity.set(0, 0, 0);
+          addFeed('YARDHAWK ARMED · TARGET LOCK', 'gold');
+        }
       }
     } else {
       let target = supportTargetPosition(yardhawk.targetId);
@@ -2513,13 +2618,19 @@ function updateFieldSupport(dt: number, now: number): void {
         const direction = target.clone().sub(yardhawk.root.position);
         const distance = direction.length();
         if (distance <= 1.15) {
-          supportBlast(target, 3.2, 200);
-          yardhawkExplosions += 1;
-          disposeSupportRoot(yardhawk.root);
-          yardhawk = null;
+          detonateYardhawk(target, 3.2, 200);
         } else {
-          yardhawk.root.position.addScaledVector(direction.normalize(), Math.min(distance, dt * 16));
-          yardhawk.root.lookAt(target);
+          const step = direction.normalize().multiplyScalar(Math.min(distance, dt * 16));
+          const start = yardhawk.root.position.clone();
+          const collision = sweepSphereAgainstBoxes(start, step, arena.colliders, 0.24);
+          if (collision) {
+            const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+            const impact = start.clone().addScaledVector(step, collision.time).addScaledVector(normal, 0.26);
+            detonateYardhawk(impact, 2.8, 150);
+          } else {
+            yardhawk.root.position.add(step);
+            yardhawk.root.lookAt(target);
+          }
         }
       } else {
         yardhawk.root.position.y += Math.sin(now * 0.009) * dt * 0.16;
@@ -2536,7 +2647,7 @@ function updateFieldSupport(dt: number, now: number): void {
     strike.marker.scale.setScalar(0.88 + progress * 0.22);
     if (!strike.resolved && now >= strike.impactAt) {
       strike.resolved = true;
-      supportBlast(strike.target, 4.8, 130);
+      supportBlast(strike.target, TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE);
       triPassImpacts += 1;
       triPassLastImpactDelayMs = now - strike.startedAt;
       disposeSupportRoot(strike.missile);
@@ -2774,6 +2885,12 @@ function updateMinimap(now: number): void {
   context.lineWidth = 4;
   context.strokeRect(4, 4, width - 8, height - 8);
 
+  const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.rotate(playerUpRotationRadians(player.yaw));
+  context.translate(-worldPlayerX, -worldPlayerY);
+
   const [roadLeft] = point(-10.25, 0);
   const [roadRight] = point(10.25, 0);
   context.fillStyle = 'rgba(126, 137, 132, .23)';
@@ -2807,8 +2924,10 @@ function updateMinimap(now: number): void {
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
-  const [px, py] = point(player.position.x, player.position.z);
-  const facing = playerFacingGeometry(px, py, player.yaw);
+  context.restore();
+  const px = width / 2;
+  const py = height / 2;
+  const facing = playerFacingGeometry(px, py, Math.PI);
   context.fillStyle = player.team === 0 ? 'rgba(88, 227, 220, .18)' : 'rgba(255, 118, 95, .18)';
   context.beginPath();
   context.moveTo(px, py);
@@ -2835,8 +2954,9 @@ function updateMinimap(now: number): void {
   context.fillStyle = '#fff7df';
   context.font = '900 22px sans-serif';
   context.textAlign = 'center';
-  context.fillText('N', width / 2, 28);
-  element<HTMLElement>('#map-heading').textContent = `N · ${String(headingDegrees(player.yaw)).padStart(3, '0')}°`;
+  const [northX, northY] = northMarkerPosition(player.yaw, width, height);
+  context.fillText('N', northX, northY + 7);
+  element<HTMLElement>('#map-heading').textContent = `PLAYER UP · ${String(headingDegrees(player.yaw)).padStart(3, '0')}°`;
 }
 
 function updateHud(now: number): void {
@@ -3119,6 +3239,7 @@ document.addEventListener('pointerlockchange', () => {
 
 function resetForMode(): void {
   interruptReload(true);
+  lastPrincipalShotAlignment = null;
   player.kills = 0;
   player.deaths = 0;
   player.hp = 100;
@@ -3197,6 +3318,23 @@ window.addEventListener('beforeunload', () => {
   network.close();
 });
 
+function refreshStaticShadowsForDynamicCasters(now: number): void {
+  const hasDynamicCasters = [...bots.values()].some((bot) => bot.alive && bot.root.visible)
+    || remotes.size > 0 || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0;
+  const admittedAt = admitStaticShadowDynamicRefresh({
+    shadowMode: activeRenderConfig.shadowMode,
+    shadowsEnabled: renderer.shadowMap.enabled,
+    contextLost: webglContextLost,
+    hasDynamicCasters,
+    now,
+    lastRefreshAt: lastStaticShadowRefreshAt,
+  });
+  if (admittedAt === null) return;
+  renderer.shadowMap.needsUpdate = true;
+  lastStaticShadowRefreshAt = admittedAt;
+  staticShadowDynamicRefreshes += 1;
+}
+
 function frame(now: number): void {
   frameCount += 1;
   try {
@@ -3220,7 +3358,7 @@ function frame(now: number): void {
     lastFrame = now;
     pollGamepad(frameDt);
     accumulator += frameDt;
-    const step = 1 / 120;
+    const step = 1 / SIMULATION_HZ;
     let iterations = 0;
     while (accumulator >= step && iterations < 6) {
       updatePhysics(step);
@@ -3241,7 +3379,8 @@ function frame(now: number): void {
     updateRemotes(frameDt, now);
     if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
     updateHud(now);
-    if (!debugRenderPaused) {
+    refreshStaticShadowsForDynamicCasters(now);
+    if (!debugRenderPaused && !webglContextLost) {
       renderer.render(scene, camera);
       if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
     }
@@ -3259,6 +3398,9 @@ const debugWindow = window as Window & {
     aimAtBot: (zone?: HitZone) => void;
     aimAtRemote: (zone?: HitZone) => void;
     stageWindow: (index: number, distance?: number) => void;
+    detonateGrenadeAtWindow: (index: number) => number;
+    stageYardhawkWall: (team?: Team) => boolean;
+    stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
     stageHouseRamp: (kind: 'interior' | 'exterior', team?: Team) => {
       kind: 'interior' | 'exterior';
@@ -3269,6 +3411,8 @@ const debugWindow = window as Window & {
       run: number;
     } | null;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
+    collisionProbe: (x: number, z: number) => boolean;
+    captureShadowProbeFrame: (horizontalOffset: number) => string;
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
     fireOnce: () => void;
@@ -3306,6 +3450,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
     scores: teamScores(),
+    random: runtimeRandomTelemetry(),
+    aimAlignment: (() => {
+      const canvasBounds = canvas.getBoundingClientRect();
+      const activeReticle = sniperScopeOverlay.hidden
+        ? element<HTMLElement>('#crosshair')
+        : element<HTMLElement>('.scope-reticle');
+      const reticleBounds = activeReticle.getBoundingClientRect();
+      const direction = camera.getWorldDirection(new THREE.Vector3());
+      const rayNdc = camera.position.clone().addScaledVector(direction, 100).project(camera);
+      const canvasCentre = { x: canvasBounds.left + canvasBounds.width / 2, y: canvasBounds.top + canvasBounds.height / 2 };
+      const reticleCentre = { x: reticleBounds.left + reticleBounds.width / 2, y: reticleBounds.top + reticleBounds.height / 2 };
+      return {
+        canvas: { left: canvasBounds.left, top: canvasBounds.top, width: canvasBounds.width, height: canvasBounds.height },
+        reticleCentre,
+        rayNdc: [rayNdc.x, rayNdc.y],
+        errorCssPixels: Math.hypot(reticleCentre.x - canvasCentre.x, reticleCentre.y - canvasCentre.y),
+      };
+    })(),
+    lastPrincipalShotAlignment,
     operatorAsset: {
       ready: riggedOperatorAssetReady(),
       error: riggedOperatorLoadError,
@@ -3443,6 +3606,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       cssWidth: minimapCanvas.getBoundingClientRect().width,
       headingDegrees: headingDegrees(player.yaw),
     },
+    spawnSafety: ([0, 1] as Team[]).map((team) => ({
+      team,
+      authored: arena.spawns[team].length,
+      valid: arena.spawns[team].filter((point) => {
+        const bodyPoint = { x: point.x, y: 0, z: point.z };
+        return pointInsideBounds(bodyPoint, arena.bounds, 0.44) && !isBlocked(bodyPoint, arena.colliders, 0.44);
+      }).length,
+    })),
     houseNavigation: arena.houses.map((house) => ({
       id: house.id,
       dimensions: { ...house.dimensions },
@@ -3499,6 +3670,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       pixelRatio: renderer.getPixelRatio(),
       drawingBuffer: renderer.getDrawingBufferSize(new THREE.Vector2()).toArray(),
       antialias: renderer.getContext().getContextAttributes()?.antialias ?? false,
+      webglVersion: renderer.getContext().getParameter(renderer.getContext().VERSION),
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       points: renderer.info.render.points,
@@ -3508,6 +3680,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       shadows: renderer.shadowMap.enabled,
       shadowAutoUpdate: renderer.shadowMap.autoUpdate,
       shadowNeedsUpdate: renderer.shadowMap.needsUpdate,
+      staticShadowDynamicRefreshes,
+      contextLifecycle: {
+        lost: webglContextLost,
+        losses: webglContextLosses,
+        restorations: webglContextRestorations,
+      },
       authoredShadows: activeRenderConfig.shadows,
       shadowMode: activeRenderConfig.shadowMode,
       framePacing: framePacing.summary(),
@@ -3587,6 +3765,59 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
   },
+  detonateGrenadeAtWindow: (index: number) => {
+    const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
+    return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3())) : 0;
+  },
+  stageYardhawkWall: (team: Team = 0) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    const house = arena.houses.find((candidate) => candidate.team === team);
+    const wall = house?.solids.find((solid) => solid.name === 'front-ground-centre');
+    if (!bot || !house || !wall) return false;
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, yardhawk: true } };
+    activateFieldSupport('yardhawk');
+    if (!yardhawk) return false;
+    const outward = house.origin.facing;
+    const start = new THREE.Vector3(wall.position[0], 1.15, wall.position[2] + outward * 1.2);
+    const target = new THREE.Vector3(wall.position[0], 0, wall.position[2] - outward * 1.4);
+    bot.position.copy(target);
+    bot.root.position.copy(target);
+    bot.root.updateMatrixWorld(true);
+    bot.hp = 100;
+    bot.alive = true;
+    bot.invulnerableUntil = 0;
+    yardhawk.root.position.copy(start);
+    yardhawk.phase = 'homing';
+    yardhawk.targetId = bot.id;
+    yardhawk.armedAt = 0;
+    yardhawk.expiresAt = performance.now() + 5_000;
+    return true;
+  },
+  stageBotAtIndoorRamp: (team: Team = 0, descending = false) => {
+    const house = arena.houses.find((candidate) => candidate.team === team);
+    const foot = house?.anchors.find((anchor) => anchor.id === 'indoor-ramp-foot');
+    const top = house?.anchors.find((anchor) => anchor.id === 'indoor-ramp-top');
+    const bot = [...bots.values()][0];
+    if (!house || !foot || !top || !bot) return false;
+    const playerAnchor = descending ? foot : top;
+    const botAnchor = descending ? top : foot;
+    player.position.set(playerAnchor.position[0], descending ? 1.7 : top.position[1], playerAnchor.position[2]);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    player.hp = 100;
+    player.alive = true;
+    player.invulnerableUntil = performance.now() + 30_000;
+    bot.position.set(botAnchor.position[0], descending ? 3.48 : 0, botAnchor.position[2]);
+    bot.root.position.copy(bot.position);
+    bot.velocity.set(0, 0, 0);
+    bot.hp = 100;
+    bot.alive = true;
+    bot.blockedSince = 0;
+    bot.hasLineOfSight = false;
+    bot.sightStartedAt = 0;
+    botsFrozen = false;
+    return true;
+  },
   damageBot: (amount, zone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot || !Number.isFinite(amount) || amount <= 0) return;
@@ -3637,6 +3868,41 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.yaw = yaw;
     player.pitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
     player.invulnerableUntil = 0;
+  },
+  collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
+    ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
+    : true,
+  captureShadowProbeFrame: (horizontalOffset) => {
+    if (!debugShadowProbe) {
+      debugShadowProbe = new THREE.Mesh(
+        new THREE.BoxGeometry(0.9, 2, 0.9),
+        new THREE.MeshStandardMaterial({ colorWrite: false, depthWrite: false }),
+      );
+      debugShadowProbe.name = 'pass25a-shadow-output-probe';
+      debugShadowProbe.castShadow = true;
+      debugShadowProbe.frustumCulled = false;
+      scene.add(debugShadowProbe);
+    }
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
+    forward.normalize();
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
+    debugShadowProbe.position.copy(camera.position)
+      .addScaledVector(forward, 6)
+      .addScaledVector(right, THREE.MathUtils.clamp(horizontalOffset, -3, 3));
+    debugShadowProbe.position.y = 1;
+    renderer.shadowMap.needsUpdate = true;
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+    gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let hash = 0x811c9dc5;
+    for (const byte of pixels) {
+      hash ^= byte;
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
   },
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
   openMenu: () => {

@@ -14,6 +14,12 @@ describe('compact original arena layout', () => {
     expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeCloseTo(58.82, 1);
   });
 
+  it('provides at least twenty good authored spawns with ten or more choices per team', () => {
+    expect(SPAWN_LAYOUT[0].length).toBeGreaterThanOrEqual(10);
+    expect(SPAWN_LAYOUT[1].length).toBeGreaterThanOrEqual(10);
+    expect(SPAWN_LAYOUT[0].length + SPAWN_LAYOUT[1].length).toBeGreaterThanOrEqual(20);
+  });
+
   it('keeps every authored spawn and patrol centre inside radius-aware bounds', () => {
     expect([...SPAWN_LAYOUT[0], ...SPAWN_LAYOUT[1]].every((point) => inside(point, 0.44))).toBe(true);
     expect(PATROL_LAYOUT.every((point) => inside(point, 0.44))).toBe(true);

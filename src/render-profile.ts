@@ -23,8 +23,8 @@ export function resolveRenderProfile(search: string, stored: string | null): Ren
   if (requested === 'balanced') return 'performance';
   if (requested && VALID_PROFILES.has(requested as RenderProfile)) return requested as RenderProfile;
   if (stored === 'balanced') return 'performance';
-  if (stored && VALID_PROFILES.has(stored as RenderProfile)) return stored as RenderProfile;
-  return 'performance';
+  if (stored === 'performance' || stored === 'quality' || stored === 'blender') return stored;
+  return 'blender';
 }
 
 export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig {
