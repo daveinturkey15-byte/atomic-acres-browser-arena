@@ -153,6 +153,15 @@ type DebugState = {
     pixelRatio: number;
     drawingBuffer: number[];
     antialias: boolean;
+    lighting: {
+      exposure: number;
+      hemisphereIntensity: number;
+      ambientIntensity: number;
+      sunIntensity: number;
+      shadowBias: number;
+      shadowNormalBias: number;
+      softShadows: boolean;
+    };
     framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
     staticBatchPalette: Array<string | null>;
     blenderEnvironment: {
@@ -160,6 +169,8 @@ type DebugState = {
       asset: string;
       meshCount: number;
       materialCount: number;
+      texturedMaterials: number;
+      textureCount: number;
       triangleCount: number;
       semanticWindows: number;
       boundWindows: number;
@@ -209,7 +220,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('BLENDER RENDER PASS 23');
+    await expect(page.locator('.eyebrow')).toContainText('TEXTURED BLENDER PASS 24');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -223,8 +234,12 @@ test.describe('boot and authored presentation', () => {
     expect(menuState.render).toMatchObject({
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
+      lighting: {
+        exposure: 1.02, hemisphereIntensity: 1, ambientIntensity: 0.18,
+        sunIntensity: 2.45, shadowBias: -0.00012, shadowNormalBias: 0.04, softShadows: true,
+      },
       blenderEnvironment: {
-        status: 'ready', meshCount: 24, materialCount: 18, triangleCount: 18_872,
+        status: 'ready', meshCount: 25, materialCount: 19, texturedMaterials: 12, textureCount: 9, triangleCount: 18_884,
         semanticWindows: 6, boundWindows: 6, proceduralWorldHidden: true, error: null,
       },
     });
@@ -477,7 +492,6 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#strike-map-overlay')).toBeHidden();
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
     await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
     const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
     expect(impactDelay).not.toBeNull();
     expect(impactDelay!).toBeGreaterThanOrEqual(950);
@@ -1016,6 +1030,10 @@ test.describe('performance and stability', () => {
     expect(state.render.reducedMode).toBe(true);
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
+    expect(state.render.lighting).toEqual({
+      exposure: 1.14, hemisphereIntensity: 1.48, ambientIntensity: 0.38,
+      sunIntensity: 2.8, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
+    });
     expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
     expect(state.render.antialias).toBe(false);
     const overlays = await page.evaluate(() => ({
@@ -1060,6 +1078,10 @@ test.describe('performance and stability', () => {
     expect(state.render.representation).toBe('full');
     expect(state.render.shadowMode).toBe('off');
     expect(state.render.shadows).toBe(false);
+    expect(state.render.lighting).toEqual({
+      exposure: 1.14, hemisphereIntensity: 1.48, ambientIntensity: 0.38,
+      sunIntensity: 2.8, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
+    });
     expect(state.render.pixelRatio).toBeLessThanOrEqual(1);
     expect(state.render.calls).toBeLessThanOrEqual(160);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);

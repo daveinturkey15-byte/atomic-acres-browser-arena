@@ -9,6 +9,8 @@ export type BlenderArenaTelemetry = {
   asset: string;
   meshCount: number;
   materialCount: number;
+  texturedMaterials: number;
+  textureCount: number;
   triangleCount: number;
   semanticWindows: number;
   boundWindows: number;
@@ -21,6 +23,8 @@ const telemetry: BlenderArenaTelemetry = {
   asset: BLENDER_ARENA_ASSET,
   meshCount: 0,
   materialCount: 0,
+  texturedMaterials: 0,
+  textureCount: 0,
   triangleCount: 0,
   semanticWindows: 0,
   boundWindows: 0,
@@ -52,6 +56,8 @@ export async function loadBlenderArena(
   const root = gltf.scene;
   root.name = 'Atomic Acres Blender Render arena';
   const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  const texturedMaterials = new Set<THREE.Material>();
   const windows = new Map<string, THREE.Mesh>();
   let meshCount = 0;
   let triangleCount = 0;
@@ -65,7 +71,13 @@ export async function loadBlenderArena(
     const geometry = node.geometry;
     triangleCount += geometry.index ? geometry.index.count / 3 : (geometry.getAttribute('position')?.count ?? 0) / 3;
     const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
-    nodeMaterials.forEach((material) => materials.add(material));
+    nodeMaterials.forEach((material) => {
+      materials.add(material);
+      if (material instanceof THREE.MeshStandardMaterial && material.map) {
+        texturedMaterials.add(material);
+        textures.add(material.map);
+      }
+    });
     const windowId = typeof node.userData.atomic_window_id === 'string' ? node.userData.atomic_window_id : null;
     if (windowId) {
       node.userData.breakableWindowId = windowId;
@@ -94,6 +106,8 @@ export async function loadBlenderArena(
   telemetry.status = 'ready';
   telemetry.meshCount = meshCount;
   telemetry.materialCount = materials.size;
+  telemetry.texturedMaterials = texturedMaterials.size;
+  telemetry.textureCount = textures.size;
   telemetry.triangleCount = Math.round(triangleCount);
   telemetry.semanticWindows = windows.size;
   telemetry.boundWindows = arena.breakableWindows.length;

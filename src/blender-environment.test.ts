@@ -21,21 +21,28 @@ describe('Blender Render environment asset', () => {
       nodes?: Array<{ name?: string; extras?: Record<string, unknown> }>;
       meshes?: unknown[];
       materials?: Array<{ name?: string }>;
-      images?: unknown[];
+      images?: Array<{ name?: string; bufferView?: number; uri?: string }>;
+      textures?: unknown[];
       buffers?: Array<{ uri?: string }>;
     };
     const semanticWindows = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'breakable-window');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(5_000_000);
-    expect(gltf.meshes?.length).toBe(24);
-    expect(gltf.materials?.length).toBe(18);
-    expect(gltf.images ?? []).toHaveLength(0);
+    expect(gltf.meshes?.length).toBe(25);
+    expect(gltf.materials?.length).toBe(19);
+    expect(gltf.images).toHaveLength(9);
+    expect(gltf.textures).toHaveLength(12);
+    expect(gltf.images?.every((image) => typeof image.bufferView === 'number' && image.uri === undefined)).toBe(true);
     expect(gltf.buffers?.every((bufferInfo) => !bufferInfo.uri)).toBe(true);
     expect(semanticWindows).toHaveLength(6);
     expect(new Set(semanticWindows.map((node) => node.extras?.atomic_window_id)).size).toBe(6);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_asphalt_charcoal')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_ground_olive')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_gunmetal')).toBe(true);
+    const groundBatches = (gltf.nodes ?? []).filter((node) =>
+      node.name === 'BLD_BATCH_MAT_ground_olive' || node.name === 'BLD_BATCH_MAT_asphalt_charcoal');
+    expect(groundBatches).toHaveLength(2);
+    expect(groundBatches.every((node) => node.extras?.atomic_ground_layout === 'split-road-verges-v2')).toBe(true);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {

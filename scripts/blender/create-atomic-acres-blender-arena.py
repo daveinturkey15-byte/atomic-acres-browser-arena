@@ -19,6 +19,7 @@ SPEC_PATH = ROOT / "source-assets/blender/atomic-acres-arena-spec.json"
 BLEND_PATH = ROOT / "source-assets/blender/atomic-acres-blender-arena.blend"
 GLB_PATH = ROOT / "public/assets/original/models/atomic-acres-blender-arena.glb"
 PREVIEW_PATH = ROOT / "artifacts/blender-render/atomic-acres-blender-arena-preview.png"
+TEXTURE_ROOT = ROOT / "public/assets/original/textures"
 
 for path in (BLEND_PATH, GLB_PATH, PREVIEW_PATH):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,8 +44,27 @@ def rgba(hex_value: int, alpha: float = 1.0) -> tuple[float, float, float, float
     )
 
 
+LOADED_TEXTURES: dict[str, bpy.types.Image] = {}
+
+
+def load_authored_texture(filename: str) -> bpy.types.Image:
+    existing = LOADED_TEXTURES.get(filename)
+    if existing is not None:
+        return existing
+    path = TEXTURE_ROOT / filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Missing project-authored arena texture: {path}")
+    image = bpy.data.images.load(str(path), check_existing=True)
+    image.name = f"TEX_{path.stem}"
+    image.colorspace_settings.name = "sRGB"
+    image.pack()
+    LOADED_TEXTURES[filename] = image
+    return image
+
+
 def make_material(name: str, color: int, roughness: float, metallic: float = 0.0,
-                  alpha: float = 1.0, emission: int | None = None, emission_strength: float = 0.0):
+                  alpha: float = 1.0, emission: int | None = None, emission_strength: float = 0.0,
+                  texture: str | None = None, tile_metres: float = 2.5):
     material = bpy.data.materials.new(name)
     material.use_nodes = True
     bsdf = material.node_tree.nodes.get("Principled BSDF")
@@ -52,6 +72,16 @@ def make_material(name: str, color: int, roughness: float, metallic: float = 0.0
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Alpha"].default_value = alpha
+    if texture is not None:
+        image_node = material.node_tree.nodes.new("ShaderNodeTexImage")
+        image_node.name = f"Authored_{Path(texture).stem}"
+        image_node.label = "Project-authored embedded albedo"
+        image_node.image = load_authored_texture(texture)
+        image_node.interpolation = "Linear"
+        image_node.extension = "REPEAT"
+        material.node_tree.links.new(image_node.outputs["Color"], bsdf.inputs["Base Color"])
+        material["atomic_texture"] = texture
+        material["atomic_tile_metres"] = tile_metres
     if emission is not None:
         emission_input = bsdf.inputs.get("Emission Color") or bsdf.inputs.get("Emission")
         if emission_input is not None:
@@ -70,23 +100,24 @@ def make_material(name: str, color: int, roughness: float, metallic: float = 0.0
 
 
 M = {
-    "grass": make_material("MAT_ground_olive", 0x56644C, 0.98),
+    "grass": make_material("MAT_ground_olive", 0x56644C, 0.98, texture="grass-turf.png", tile_metres=3.2),
     "earth": make_material("MAT_earth_edge", 0x3A3329, 1.0),
-    "asphalt": make_material("MAT_asphalt_charcoal", 0x292F31, 0.96),
-    "concrete": make_material("MAT_concrete_weathered", 0x7B7D76, 0.9),
-    "concrete_dark": make_material("MAT_concrete_dark", 0x454B4D, 0.92),
-    "aqua": make_material("MAT_aqua_oxidized", 0x356E73, 0.73, 0.05),
-    "coral": make_material("MAT_coral_oxide", 0x8B4B40, 0.76, 0.04),
-    "plaster": make_material("MAT_plaster_sand", 0xB8AE95, 0.9),
-    "trim": make_material("MAT_trim_bone", 0xD4CBB7, 0.67),
-    "brick": make_material("MAT_brick_brown", 0x6F4436, 0.91),
-    "timber": make_material("MAT_timber_dark", 0x574334, 0.9),
-    "metal": make_material("MAT_gunmetal", 0x2F3B40, 0.48, 0.62),
+    "asphalt": make_material("MAT_asphalt_charcoal", 0x292F31, 0.96, texture="asphalt-aged.png", tile_metres=3.4),
+    "concrete": make_material("MAT_concrete_weathered", 0x7B7D76, 0.9, texture="concrete-poured.png", tile_metres=2.8),
+    "concrete_dark": make_material("MAT_concrete_dark", 0x454B4D, 0.92, texture="roof-shingles.png", tile_metres=2.4),
+    "aqua": make_material("MAT_aqua_oxidized", 0x356E73, 0.73, 0.05, texture="siding-aqua.png", tile_metres=2.6),
+    "coral": make_material("MAT_coral_oxide", 0x8B4B40, 0.76, 0.04, texture="siding-coral.png", tile_metres=2.6),
+    "plaster": make_material("MAT_plaster_sand", 0xB8AE95, 0.9, texture="plaster-warm.png", tile_metres=2.8),
+    "trim": make_material("MAT_trim_bone", 0xD4CBB7, 0.67, texture="plaster-warm.png", tile_metres=2.1),
+    "brick": make_material("MAT_brick_brown", 0x6F4436, 0.91, texture="brick-warm.png", tile_metres=2.4),
+    "timber": make_material("MAT_timber_dark", 0x574334, 0.9, texture="wood-deck.png", tile_metres=2.2),
+    "metal": make_material("MAT_gunmetal", 0x2F3B40, 0.48, 0.62, texture="weapon-gunmetal.png", tile_metres=2.4),
     "metal_light": make_material("MAT_brushed_alloy", 0x7E898B, 0.41, 0.68),
+    "roof": make_material("MAT_roof_shingles", 0x343B3D, 0.88, texture="roof-shingles.png", tile_metres=2.5),
     "yellow": make_material("MAT_hazard_amber", 0xC79A32, 0.54, 0.16),
     "rubber": make_material("MAT_rubber", 0x15191A, 0.84),
     "glass": make_material("MAT_glass_tactical", 0x5E9AA5, 0.18, 0.16, 0.42),
-    "foliage": make_material("MAT_foliage_military", 0x405D3D, 0.97),
+    "foliage": make_material("MAT_foliage_military", 0x405D3D, 0.97, texture="grass-turf.png", tile_metres=1.8),
     "emissive_aqua": make_material("MAT_emissive_aqua", 0x67D7D4, 0.32, 0.25, emission=0x3CCDCB, emission_strength=3.0),
     "emissive_amber": make_material("MAT_emissive_amber", 0xF0C36A, 0.35, 0.15, emission=0xE9A73E, emission_strength=2.5),
 }
@@ -108,6 +139,36 @@ def game_dimensions(size):
     return (x, z, y)
 
 
+def apply_box_uvs(obj, material):
+    """Project each box face in local metres so textures retain a stable world scale."""
+    tile_metres = float(material.get("atomic_tile_metres", 0.0))
+    if tile_metres <= 0:
+        return
+    mesh = obj.data
+    uv_layer = mesh.uv_layers.active or mesh.uv_layers.new(name="UVMap")
+    for polygon in mesh.polygons:
+        normal = polygon.normal
+        for loop_index in polygon.loop_indices:
+            vertex = mesh.vertices[mesh.loops[loop_index].vertex_index].co
+            if abs(normal.z) >= abs(normal.x) and abs(normal.z) >= abs(normal.y):
+                u, v = vertex.x, vertex.y
+            elif abs(normal.x) >= abs(normal.y):
+                u, v = vertex.y, vertex.z
+            else:
+                u, v = vertex.x, vertex.z
+            uv_layer.data[loop_index].uv = (u / tile_metres, v / tile_metres)
+
+
+def scale_existing_uvs(obj, material):
+    tile_metres = float(material.get("atomic_tile_metres", 0.0))
+    uv_layer = obj.data.uv_layers.active
+    if tile_metres <= 0 or uv_layer is None:
+        return
+    repeats = max(1.0, max(obj.dimensions) / tile_metres)
+    for loop in uv_layer.data:
+        loop.uv *= repeats
+
+
 def add_box(name: str, position, size, material, bevel: float = 0.04, rotation=(0.0, 0.0, 0.0), semantic: str | None = None):
     bpy.ops.mesh.primitive_cube_add(size=1, location=game_location(position), rotation=rotation)
     obj = bpy.context.object
@@ -121,6 +182,7 @@ def add_box(name: str, position, size, material, bevel: float = 0.04, rotation=(
         modifier.limit_method = "ANGLE"
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.modifier_apply(modifier=modifier.name)
+    apply_box_uvs(obj, material)
     obj.data.materials.append(material)
     obj["atomic_environment"] = True
     if semantic:
@@ -134,6 +196,7 @@ def add_cylinder(name: str, position, radius: float, depth: float, material, ver
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=game_location(position), rotation=rotation)
     obj = bpy.context.object
     obj.name = name
+    scale_existing_uvs(obj, material)
     obj.data.materials.append(material)
     obj["atomic_environment"] = True
     link_only_env(obj)
@@ -146,6 +209,7 @@ def add_uv_sphere(name: str, position, scale, material, segments=12, rings=8):
     obj.name = name
     obj.scale = game_dimensions(scale)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    scale_existing_uvs(obj, material)
     obj.data.materials.append(material)
     obj["atomic_environment"] = True
     link_only_env(obj)
@@ -157,6 +221,7 @@ def add_torus(name: str, position, major: float, minor: float, material, rotatio
                                     location=game_location(position), rotation=rotation)
     obj = bpy.context.object
     obj.name = name
+    scale_existing_uvs(obj, material)
     obj.data.materials.append(material)
     obj["atomic_environment"] = True
     link_only_env(obj)
@@ -166,7 +231,10 @@ def add_torus(name: str, position, major: float, minor: float, material, rotatio
 # Ground and road hierarchy.
 roadway = spec["roadway"]
 add_box("BLD_TERRAIN_foundation", roadway["ground"]["position"], roadway["ground"]["size"], M["earth"], 0)
-add_box("BLD_TERRAIN_grass_cap", [0, 0.0, 0], [86, 0.06, 98], M["grass"], 0)
+# Keep grass and road on disjoint footprints. Pass 23 layered both surfaces at
+# the same top elevation, creating broad coplanar z-fighting and unstable light.
+for side, x in (("west", -28.6), ("east", 28.6)):
+    add_box(f"BLD_TERRAIN_grass_{side}", [x, 0.015, 0], [28.8, 0.03, 98], M["grass"], 0)
 add_box("BLD_ROAD_asphalt", roadway["road"]["position"], roadway["road"]["size"], M["asphalt"], 0)
 for index, item in enumerate(roadway["curbs"]): add_box(f"BLD_ROAD_curb_{index}", item["position"], item["size"], M["concrete"], 0.03)
 for index, item in enumerate(roadway["sidewalks"]): add_box(f"BLD_ROAD_sidewalk_{index}", item["position"], item["size"], M["concrete"], 0.02)
@@ -193,7 +261,7 @@ for house_index, house in enumerate(spec["houses"]):
     facing = house["origin"]["facing"]
     width, depth = house["dimensions"]["width"], house["dimensions"]["depth"]
     accent = M["aqua"] if house["team"] == 0 else M["coral"]
-    add_box(f"BLD_HOUSE_{prefix}_roof", [x, 7.18, z], [width + 0.8, 0.48, depth + 0.8], M["metal"], 0.08)
+    add_box(f"BLD_HOUSE_{prefix}_roof", [x, 7.18, z], [width + 0.8, 0.48, depth + 0.8], M["roof"], 0.08)
     # Original tactical facade ribs, rooftop equipment and faction beacon strips.
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_corner_{side}", [x + side * (width / 2 + 0.06), 3.55, z], [0.18, 7.1, depth + 0.25], M["metal"], 0.02)
@@ -210,7 +278,7 @@ for index, garage in enumerate(spec["garages"]):
     facing = 1 if z < 0 else -1
     accent = M["aqua"] if index == 0 else M["coral"]
     add_box(f"BLD_GARAGE_{index}_shell", [x, 1.7, z], [12, 3.4, 6.5], M["concrete_dark"], 0.12)
-    add_box(f"BLD_GARAGE_{index}_roof", [x, 3.65, z], [12.6, 0.5, 7.1], M["metal"], 0.09)
+    add_box(f"BLD_GARAGE_{index}_roof", [x, 3.65, z], [12.6, 0.5, 7.1], M["roof"], 0.09)
     front_z = z + facing * 3.3
     add_box(f"BLD_GARAGE_{index}_door", [x, 1.55, front_z], [9, 2.7, 0.16], M["metal_light"], 0.05)
     for y in (0.75, 1.35, 1.95, 2.55):
@@ -294,6 +362,8 @@ for material in list(M.values()):
     bpy.ops.object.join()
     objects[0].name = f"BLD_BATCH_{material.name}"
     objects[0]["atomic_environment"] = True
+    if material in (M["grass"], M["asphalt"]):
+        objects[0]["atomic_ground_layout"] = "split-road-verges-v2"
 
 for obj in env.objects:
     if obj.type == "MESH":

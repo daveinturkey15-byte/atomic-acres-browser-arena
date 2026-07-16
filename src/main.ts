@@ -52,6 +52,7 @@ import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
+import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
@@ -192,9 +193,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · BLENDER RENDER PASS 23</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · TEXTURED BLENDER PASS 24</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Choose Blender Render for a complete original Blender-authored tactical suburb while Performance and Quality remain available.</p>
+    <p class="lede">Choose Blender Render for a textured, relit original tactical suburb while Performance and Quality remain available.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -309,6 +310,7 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
 );
 const activeRenderConfig = renderProfileConfig(renderProfile);
+const activeLighting = arenaLightingProfile(renderProfile);
 const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
 const staticMaterialMode = activeRenderConfig.staticMaterialMode;
@@ -325,11 +327,11 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = activeRenderConfig.shadows;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type = activeLighting.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.14;
+renderer.toneMappingExposure = activeLighting.exposure;
 // Both public profiles can reduce their internal framebuffer when sustained
 // frame time exceeds the detected display budget. Shadows disable
 // automatically below a moderate DPR threshold.
@@ -444,9 +446,9 @@ function buildSky(): void {
   sky.frustumCulled = false;
   sky.onBeforeRender = () => sky.position.copy(camera.position);
   scene.add(sky);
-  scene.add(new THREE.HemisphereLight(0xdcefff, 0x4d6046, 1.48));
-  scene.add(new THREE.AmbientLight(0xc7d3d4, 0.38));
-  const sun = new THREE.DirectionalLight(0xffd9a5, 2.8);
+  scene.add(new THREE.HemisphereLight(0xdcefff, 0x4d6046, activeLighting.hemisphereIntensity));
+  scene.add(new THREE.AmbientLight(0xc7d3d4, activeLighting.ambientIntensity));
+  const sun = new THREE.DirectionalLight(0xffd9a5, activeLighting.sunIntensity);
   sun.position.set(-32, 68, 34);
   sun.castShadow = activeRenderConfig.shadows;
   if (activeRenderConfig.shadows) sun.shadow.mapSize.set(activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize);
@@ -456,8 +458,8 @@ function buildSky(): void {
   sun.shadow.camera.bottom = -54;
   sun.shadow.camera.near = 10;
   sun.shadow.camera.far = 150;
-  sun.shadow.bias = -0.00028;
-  sun.shadow.normalBias = 0.025;
+  sun.shadow.bias = activeLighting.shadowBias;
+  sun.shadow.normalBias = activeLighting.shadowNormalBias;
   scene.add(sun);
 }
 buildSky();
@@ -3510,6 +3512,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       shadowMode: activeRenderConfig.shadowMode,
       framePacing: framePacing.summary(),
       adaptive: adaptiveQuality.telemetry(),
+      lighting: { ...activeLighting },
       blenderEnvironment: blenderArenaTelemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
         const material = node instanceof THREE.Mesh ? node.material : null;
@@ -3829,7 +3832,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 23 candidate — new Blender Render environment profile with authoritative ramps, breakable windows, scavenging and multiplayer preserved.');
+  setStatus('Pass 24 candidate — embedded authored textures, corrected floor layers and rebalanced Blender lighting with gameplay preserved.');
   requestAnimationFrame(frame);
 }
 
