@@ -1,6 +1,6 @@
 ---
 title: Pass 26 Modern Smooth Visual Refresh
-status: verified
+status: deployed
 owner: Dave / Jigglyclaw
 date: 2026-07-17
 baseline: 4eeedc23181871896b286e2b0645dbbba6db6d96
@@ -62,4 +62,6 @@ Modernize Atomic Acres' original compact tactical-suburb presentation toward a c
 
 ## Release boundary
 
-No public deployment or canonical Pages promotion is included in Pass 26; owner visual/feel approval is required first.
+Dave explicitly authorized canonical promotion on 2026-07-17. Source implementation `0034e53` was pushed on `overhaul/pass26-modern-smooth-visuals` and built to GitHub Pages revision `0818d40188900f457a1b03d0bfab67cc5759e882` with `gh-pages -d dist --add`, preserving all archived `review/` trees.
+
+Canonical verification passed against the public HTTPS origin: root HTML, hashed JavaScript, hashed CSS, and the 4,443,828-byte Blender GLB matched the local release bytes; the runtime reported Pass 26, exactly Performance and Blender Render, Blender environment `ready`, eight PBR materials, six semantic windows, a numeric FPS HUD, and frame-cadence minimap telemetry. The archived Pass 24 review returned HTTP 200 after promotion.
