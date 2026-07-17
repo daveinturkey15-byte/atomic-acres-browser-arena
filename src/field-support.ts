@@ -16,7 +16,10 @@ export const TRI_PASS_BLAST_RADIUS = 7.5;
 export const TRI_PASS_MAX_DAMAGE = 225;
 
 export type FieldSupportState = {
+  /** Continuous combat streak. Resets only on death or a new match. */
   streak: number;
+  /** Progress through the repeatable 3/5/7 field-support eligibility cycle. */
+  rewardCycle: number;
   available: Record<FieldSupportId, boolean>;
   earnedThisStreak: Record<FieldSupportId, boolean>;
 };
@@ -24,6 +27,7 @@ export type FieldSupportState = {
 export function createFieldSupportState(): FieldSupportState {
   return {
     streak: 0,
+    rewardCycle: 0,
     available: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
     earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
   };
@@ -31,28 +35,31 @@ export function createFieldSupportState(): FieldSupportState {
 
 export function recordSupportElimination(state: FieldSupportState): FieldSupportState {
   const finalThreshold = FIELD_SUPPORT[FIELD_SUPPORT.length - 1].eliminations;
-  const nextStreak = Math.max(0, Math.floor(state.streak)) % finalThreshold + 1;
+  const nextStreak = Math.max(0, Math.floor(state.streak)) + 1;
+  const nextRewardCycle = Math.max(0, Math.floor(state.rewardCycle)) % finalThreshold + 1;
   const available = { ...state.available };
   const earnedThisStreak = { ...state.earnedThisStreak };
   for (const reward of FIELD_SUPPORT) {
-    if (nextStreak === reward.eliminations && !earnedThisStreak[reward.id]) {
+    if (nextRewardCycle === reward.eliminations && !earnedThisStreak[reward.id]) {
       available[reward.id] = true;
       earnedThisStreak[reward.id] = true;
     }
   }
-  if (nextStreak === finalThreshold) {
+  if (nextRewardCycle === finalThreshold) {
     return {
-      streak: 0,
+      streak: nextStreak,
+      rewardCycle: 0,
       available,
       earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
     };
   }
-  return { streak: nextStreak, available, earnedThisStreak };
+  return { streak: nextStreak, rewardCycle: nextRewardCycle, available, earnedThisStreak };
 }
 
 export function recordSupportDeath(state: FieldSupportState): FieldSupportState {
   return {
     streak: 0,
+    rewardCycle: 0,
     available: { ...state.available },
     earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
   };

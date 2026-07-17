@@ -3040,13 +3040,31 @@
             "staticMaterialMode": "preserve"
           },
           "lighting": {
-            "ambientIntensity": 0.18,
-            "exposure": 1.02,
-            "hemisphereIntensity": 1,
+            "ambientColor": 9412506,
+            "ambientIntensity": 0.14,
+            "exposure": 1,
+            "fogColor": 10463904,
+            "fogFar": 128,
+            "fogNear": 58,
+            "hemisphereGround": 4737084,
+            "hemisphereIntensity": 0.9,
+            "hemisphereSky": 12177880,
+            "routeLightIntensity": 1,
             "shadowBias": -0.00012,
             "shadowNormalBias": 0.04,
+            "skyBottom": 13213032,
+            "skyCloud": 13949903,
+            "skyHorizon": 10399651,
+            "skySun": 16760176,
+            "skyTop": 1193555,
             "softShadows": false,
-            "sunIntensity": 2.45
+            "sunColor": 16762758,
+            "sunIntensity": 3.25,
+            "sunPosition": [
+              -40,
+              60,
+              24
+            ]
           }
         },
         "compat": {
@@ -3064,13 +3082,31 @@
             "staticMaterialMode": "palette-basic"
           },
           "lighting": {
-            "ambientIntensity": 0.38,
-            "exposure": 1.14,
-            "hemisphereIntensity": 1.48,
+            "ambientColor": 11056817,
+            "ambientIntensity": 0.24,
+            "exposure": 1.08,
+            "fogColor": 11122606,
+            "fogFar": 145,
+            "fogNear": 68,
+            "hemisphereGround": 5657412,
+            "hemisphereIntensity": 1.2,
+            "hemisphereSky": 13098210,
+            "routeLightIntensity": 0.38,
             "shadowBias": -0.00028,
             "shadowNormalBias": 0.025,
+            "skyBottom": 14202755,
+            "skyCloud": 14542041,
+            "skyHorizon": 11452340,
+            "skySun": 16762751,
+            "skyTop": 1919341,
             "softShadows": false,
-            "sunIntensity": 2.8
+            "sunColor": 16764819,
+            "sunIntensity": 2.95,
+            "sunPosition": [
+              -36,
+              64,
+              28
+            ]
           }
         },
         "performance": {
@@ -3088,13 +3124,31 @@
             "staticMaterialMode": "palette-basic"
           },
           "lighting": {
-            "ambientIntensity": 0.38,
-            "exposure": 1.14,
-            "hemisphereIntensity": 1.48,
+            "ambientColor": 11056817,
+            "ambientIntensity": 0.24,
+            "exposure": 1.08,
+            "fogColor": 11122606,
+            "fogFar": 145,
+            "fogNear": 68,
+            "hemisphereGround": 5657412,
+            "hemisphereIntensity": 1.2,
+            "hemisphereSky": 13098210,
+            "routeLightIntensity": 0.38,
             "shadowBias": -0.00028,
             "shadowNormalBias": 0.025,
+            "skyBottom": 14202755,
+            "skyCloud": 14542041,
+            "skyHorizon": 11452340,
+            "skySun": 16762751,
+            "skyTop": 1919341,
             "softShadows": false,
-            "sunIntensity": 2.8
+            "sunColor": 16764819,
+            "sunIntensity": 2.95,
+            "sunPosition": [
+              -36,
+              64,
+              28
+            ]
           }
         }
       }

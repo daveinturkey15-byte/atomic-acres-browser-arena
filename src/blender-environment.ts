@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { ArenaMap } from './map';
+import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
 export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb';
 
@@ -15,6 +16,8 @@ export type BlenderArenaTelemetry = {
   triangleCount: number;
   semanticWindows: number;
   boundWindows: number;
+  routeLandmarks: number;
+  worldIdentityPass: boolean;
   proceduralWorldHidden: boolean;
   error: string | null;
 };
@@ -30,6 +33,8 @@ const telemetry: BlenderArenaTelemetry = {
   triangleCount: 0,
   semanticWindows: 0,
   boundWindows: 0,
+  routeLandmarks: 0,
+  worldIdentityPass: false,
   proceduralWorldHidden: false,
   error: null,
 };
@@ -62,12 +67,15 @@ export async function loadBlenderArena(
   const texturedMaterials = new Set<THREE.Material>();
   const pbrMaterials = new Set<THREE.Material>();
   const windows = new Map<string, THREE.Mesh>();
+  const routeLandmarks = new Set<string>();
   let meshCount = 0;
   let triangleCount = 0;
   root.traverse((node) => {
     node.userData.blenderAuthoredEnvironment = true;
-    node.userData.blocksShots = false;
+    const routeId = typeof node.userData.atomic_route_id === 'string' ? node.userData.atomic_route_id : null;
+    if (node.userData.atomic_semantic === 'route-landmark' && routeId) routeLandmarks.add(routeId);
     if (!(node instanceof THREE.Mesh)) return;
+    node.userData.blocksShots = false;
     meshCount += 1;
     node.castShadow = node.material instanceof THREE.MeshStandardMaterial && !node.material.transparent;
     node.receiveShadow = true;
@@ -98,6 +106,10 @@ export async function loadBlenderArena(
   if (missing.length > 0) {
     throw new Error(`Blender arena is missing semantic windows: ${missing.map((pane) => pane.id).join(', ')}`);
   }
+  const missingRoutes = ARENA_ROUTE_IDENTITIES.filter((route) => !routeLandmarks.has(route.id));
+  if (missingRoutes.length > 0) {
+    throw new Error(`Blender arena is missing route landmarks: ${missingRoutes.map((route) => route.id).join(', ')}`);
+  }
 
   // Retain the original visual meshes underneath as invisible presentation and
   // authoritative ray targets. Raycast/collision authority never comes from GLB art.
@@ -120,6 +132,8 @@ export async function loadBlenderArena(
   telemetry.triangleCount = Math.round(triangleCount);
   telemetry.semanticWindows = windows.size;
   telemetry.boundWindows = arena.breakableWindows.length;
+  telemetry.routeLandmarks = routeLandmarks.size;
+  telemetry.worldIdentityPass = routeLandmarks.size === ARENA_ROUTE_IDENTITIES.length;
   telemetry.proceduralWorldHidden = true;
   onProgress?.(1, 1);
   return { root, loadedModels: 1 };

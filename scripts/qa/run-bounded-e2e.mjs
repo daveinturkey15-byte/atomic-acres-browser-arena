@@ -1,11 +1,13 @@
 import { spawnSync } from 'node:child_process';
 
 const groups = [
-  { name: 'pass25a-baseline', timeoutMs: 900_000, args: ['tests/e2e/pass25a-baseline.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass25a-baseline', timeoutMs: 900_000, args: ['tests/e2e/pass25a-baseline.spec.ts', '--project=chromium', '--workers=1', '--grep-invert', 'neutralizes input on focus loss'] },
+  { name: 'pointer-lock-headed', xvfb: true, args: ['tests/e2e/pass25a-baseline.spec.ts', '--project=chromium', '--workers=1', '--headed', '--grep', 'neutralizes input on focus loss'] },
   { name: 'pass25a-capability-chromium', args: ['tests/e2e/pass25a-capability.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'boot-and-authored', timeoutMs: 480_000, args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'boot and authored presentation', '--grep-invert', 'field kit for deployment'] },
   { name: 'field-kit-persistence', xvfb: true, args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--headed', '--grep', 'field kit for deployment'] },
-  { name: 'solo-mechanics', timeoutMs: 900_000, args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'solo mechanics'] },
+  { name: 'solo-mechanics', timeoutMs: 900_000, args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'solo mechanics', '--grep-invert', 'resolves three player-selected sky missiles'] },
+  { name: 'tri-pass-support', args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'resolves three player-selected sky missiles'] },
   { name: 'performance-and-stability', timeoutMs: 900_000, args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'performance and stability'] },
   { name: 'capability-firefox', xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },
   { name: 'capability-webkit', args: ['tests/e2e/pass25a-capability.spec.ts', '--project=webkit-smoke', '--workers=1'] },

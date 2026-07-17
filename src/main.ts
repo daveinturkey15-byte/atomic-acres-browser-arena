@@ -53,6 +53,8 @@ import { ArenaMap, buildArena } from './map';
 import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
 import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
+import { routeIdentityTelemetry } from './world-identity';
+import { createWorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
@@ -79,6 +81,16 @@ import {
   type DeathDrop,
 } from './death-drops';
 import { ArenaNetwork } from './network';
+import {
+  HIGH_SCORE_STORAGE_KEY,
+  MAX_MATCH_KILLS,
+  loadHighScores,
+  mergeHighScores,
+  normalizeRequiredPlayerName,
+  personalBest,
+  saveHighScores,
+  type HighScoreEntry,
+} from './high-scores';
 import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
@@ -104,7 +116,6 @@ import {
   TeamPingMessage,
   WeaponId,
   WindowBreakMessage,
-  sanitizeName,
 } from './protocol';
 
 configureRuntimeRandom(runtimeSeed(window.location.search));
@@ -196,14 +207,17 @@ function createPlayerId(): string {
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
+const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
+let storedPlayerName = '';
+try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
 app.innerHTML = `
   <canvas id="game" aria-label="Atomic Acres multiplayer arena"></canvas>
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · MODERN MATERIAL PASS 26</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · WORLD IDENTITY PASS 27</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Choose Blender Render for the full modern material pass, or Performance for maximum frame-rate headroom.</p>
+    <p class="lede">Deploy into a sun-bleached agritech test suburb with distinct cultivation, transit and solar-service routes.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -211,7 +225,7 @@ app.innerHTML = `
     </nav>
     <div class="menu-panel active" data-menu-panel="deploy">
       <div class="setup-grid">
-        <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(presentationRandom() * 900 + 100)}"></label>
+        <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" required aria-describedby="player-name-error" placeholder="Enter callsign" value="${storedPlayerName}"><small id="player-name-error" class="input-error" hidden>Enter a callsign before deployment.</small></label>
         <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
       </div>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
@@ -223,6 +237,11 @@ app.innerHTML = `
       <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
       <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
       <div id="network-status" data-kind="ok">Ready for deployment.</div>
+      <section id="high-score-card" aria-labelledby="high-score-title">
+        <div class="high-score-heading"><span><small>PERSISTENT RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
+        <ol id="high-score-list"><li class="empty">Complete a match to set the first record.</li></ol>
+        <p>Stored on this browser across builds · merged live with players in your current peer lobby.</p>
+      </section>
     </div>
     <div class="menu-panel" data-menu-panel="kit" hidden>
       <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary and issued sidearm.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
@@ -264,7 +283,7 @@ app.innerHTML = `
     <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
     <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
     <div id="map-heading">N · 000°</div>
-    <div id="location-label">ATOM-LINER CROSSING</div>
+    <div id="location-label">CIVIC TRANSIT</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
     <div id="weapon-block">
       <span id="weapon-name">M86 CARBINE</span>
@@ -367,7 +386,7 @@ document.documentElement.dataset.webglContext = 'ready';
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xb6c5c1, 70, 142);
+scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -423,13 +442,13 @@ function buildSky(): void {
     depthWrite: false,
     fog: false,
     uniforms: {
-      top: { value: new THREE.Color(0x245b82) },
-      horizon: { value: new THREE.Color(0xb9d1cd) },
-      bottom: { value: new THREE.Color(0xe2c99e) },
-      sunColor: { value: new THREE.Color(0xffd39a) },
-      cloudColor: { value: new THREE.Color(0xe8eee7) },
-      sunDirection: { value: new THREE.Vector3(-0.39, 0.83, 0.42).normalize() },
-      cloudStrength: { value: reducedRenderMode ? 0 : 0.035 },
+      top: { value: new THREE.Color(activeLighting.skyTop) },
+      horizon: { value: new THREE.Color(activeLighting.skyHorizon) },
+      bottom: { value: new THREE.Color(activeLighting.skyBottom) },
+      sunColor: { value: new THREE.Color(activeLighting.skySun) },
+      cloudColor: { value: new THREE.Color(activeLighting.skyCloud) },
+      sunDirection: { value: new THREE.Vector3(...activeLighting.sunPosition).normalize() },
+      cloudStrength: { value: reducedRenderMode ? 0 : renderProfile === 'blender' ? 0.08 : 0.045 },
     },
     vertexShader: `
       varying vec3 skyDirection;
@@ -475,10 +494,10 @@ function buildSky(): void {
   sky.frustumCulled = false;
   sky.onBeforeRender = () => sky.position.copy(camera.position);
   scene.add(sky);
-  scene.add(new THREE.HemisphereLight(0xdcefff, 0x4d6046, activeLighting.hemisphereIntensity));
-  scene.add(new THREE.AmbientLight(0xc7d3d4, activeLighting.ambientIntensity));
-  const sun = new THREE.DirectionalLight(0xffd9a5, activeLighting.sunIntensity);
-  sun.position.set(-32, 68, 34);
+  scene.add(new THREE.HemisphereLight(activeLighting.hemisphereSky, activeLighting.hemisphereGround, activeLighting.hemisphereIntensity));
+  scene.add(new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity));
+  const sun = new THREE.DirectionalLight(activeLighting.sunColor, activeLighting.sunIntensity);
+  sun.position.set(...activeLighting.sunPosition);
   sun.castShadow = activeRenderConfig.shadows;
   if (activeRenderConfig.shadows) sun.shadow.mapSize.set(activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize);
   sun.shadow.camera.left = -48;
@@ -492,6 +511,11 @@ function buildSky(): void {
   scene.add(sun);
 }
 buildSky();
+const worldIdentityPresentation = createWorldIdentityPresentation(
+  scene,
+  activeLighting.routeLightIntensity,
+  reducedWorldDetail,
+);
 const arena: ArenaMap = buildArena(scene);
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 const tracerPool = new TracerPool(scene);
@@ -543,6 +567,11 @@ let lastGrenadeExplosionProfile = {
   totalSyncMs: 0,
 };
 let fieldSupport = createFieldSupportState();
+let bestStreakThisMatch = 0;
+let matchScoreRecorded = false;
+let highScores: HighScoreEntry[] = [];
+try { highScores = loadHighScores(localStorage); } catch { /* Gameplay remains available when persistent storage is blocked. */ }
+const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v1') : null;
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
@@ -663,6 +692,73 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.dataset.kind = kind;
 }
 
+function renderHighScores(): void {
+  const list = element<HTMLOListElement>('#high-score-list');
+  if (highScores.length === 0) {
+    list.innerHTML = '<li class="empty">Complete a match to set the first record.</li>';
+  } else {
+    list.innerHTML = highScores.slice(0, 8).map((entry, index) => (
+      `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>${entry.kills} KILLS</span><small>BEST ×${entry.bestStreak} · ${entry.deaths}D${entry.won ? ' · WIN' : ''}</small></li>`
+    )).join('');
+  }
+  const currentName = normalizeRequiredPlayerName(element<HTMLInputElement>('#player-name').value) ?? storedPlayerName;
+  const best = personalBest(highScores, currentName);
+  element<HTMLElement>('#personal-best').textContent = best
+    ? `YOUR BEST ${best.kills} KILLS · ×${best.bestStreak}`
+    : 'NO PERSONAL BEST';
+}
+
+function persistMergedHighScores(incoming: readonly unknown[], notifyTabs = true): void {
+  highScores = mergeHighScores(highScores, incoming);
+  try {
+    saveHighScores(localStorage, highScores);
+  } catch {
+    setStatus('Records cannot persist in this browser context.', 'warn');
+  }
+  renderHighScores();
+  if (notifyTabs) highScoreChannel?.postMessage(highScores);
+}
+
+function sendLeaderboardSync(): void {
+  if (network.role !== 'offline') network.send({ type: 'leaderboard-sync', by: player.id, entries: highScores });
+}
+
+function recordCompletedMatch(): void {
+  if (matchScoreRecorded || matchState.phase !== 'ended') return;
+  matchScoreRecorded = true;
+  const recordedAt = Date.now();
+  const entry: HighScoreEntry = {
+    id: `score:${player.id}:${recordedAt.toString(36)}`,
+    name: player.name,
+    kills: Math.min(MAX_MATCH_KILLS, Math.max(0, Math.floor(player.kills))),
+    deaths: Math.min(200, Math.max(0, Math.floor(player.deaths))),
+    bestStreak: Math.min(MAX_MATCH_KILLS, Math.max(0, Math.floor(bestStreakThisMatch))),
+    won: matchState.winner === player.team,
+    recordedAt,
+  };
+  persistMergedHighScores([entry]);
+  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, entry });
+}
+
+function requirePlayerName(): string | null {
+  const input = element<HTMLInputElement>('#player-name');
+  const error = element<HTMLElement>('#player-name-error');
+  const name = normalizeRequiredPlayerName(input.value);
+  input.classList.toggle('invalid', !name);
+  error.hidden = Boolean(name);
+  if (!name) {
+    setStatus('Enter a callsign before deployment.', 'error');
+    input.focus();
+    return null;
+  }
+  input.value = name;
+  player.name = name;
+  storedPlayerName = name;
+  try { localStorage.setItem(PLAYER_NAME_STORAGE_KEY, name); } catch { /* Match start does not depend on storage access. */ }
+  renderHighScores();
+  return name;
+}
+
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   triggerHeld = false;
@@ -684,6 +780,25 @@ if (!webRtcSupported) {
 }
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
+renderHighScores();
+highScoreChannel?.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (Array.isArray(event.data)) persistMergedHighScores(event.data, false);
+});
+window.addEventListener('storage', (event) => {
+  if (event.key !== HIGH_SCORE_STORAGE_KEY) return;
+  try {
+    highScores = loadHighScores(localStorage);
+    renderHighScores();
+  } catch { /* Ignore inaccessible cross-tab storage updates. */ }
+});
+element<HTMLInputElement>('#player-name').addEventListener('input', () => {
+  const input = element<HTMLInputElement>('#player-name');
+  if (normalizeRequiredPlayerName(input.value)) {
+    input.classList.remove('invalid');
+    element<HTMLElement>('#player-name-error').hidden = true;
+  }
+  renderHighScores();
+});
 
 const weaponView = new WeaponPresentation(camera, reducedRenderMode);
 let selectedFieldKit: FieldKitId = parseFieldKitSelection(localStorage.getItem(FIELD_KIT_STORAGE_KEY));
@@ -885,6 +1000,18 @@ function updateTeamPings(now: number): void {
 }
 
 function onNetworkMessage(message: GameMessage): void {
+  if (message.type === 'high-score') {
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    if (!sender || sender.snapshot.name !== message.entry.name) return;
+    persistMergedHighScores([message.entry]);
+    return;
+  }
+  if (message.type === 'leaderboard-sync') {
+    if (message.by === player.id || !remotes.has(message.by)) return;
+    persistMergedHighScores(message.entries);
+    return;
+  }
   if (message.type === 'join' || message.type === 'state') {
     const incoming = message.player;
     if (incoming.id === player.id || !pointInsideBounds(incoming, arena.bounds, 0.44)) return;
@@ -893,7 +1020,10 @@ function onNetworkMessage(message: GameMessage): void {
       remote = createRemote(incoming);
       remotes.set(incoming.id, remote);
       addFeed(`${incoming.name} entered the test block`, incoming.team === 0 ? 'aqua' : 'coral');
-      if (message.type === 'join') network.send({ type: 'state', player: snapshot() });
+      if (message.type === 'join') {
+        network.send({ type: 'state', player: snapshot() });
+        sendLeaderboardSync();
+      }
     }
     if (incoming.seq > remote.snapshot.seq) {
       const now = performance.now();
@@ -1524,9 +1654,13 @@ function respawn(requestLock = true): void {
 }
 
 function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
-  player.name = sanitizeName(element<HTMLInputElement>('#player-name').value);
+  const requiredName = requirePlayerName();
+  if (!requiredName) return;
+  player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  bestStreakThisMatch = 0;
+  matchScoreRecorded = false;
   refreshWarningUntil = performance.now() + 6_000;
   weaponView.root.visible = true;
   gameMode = mode;
@@ -1545,7 +1679,10 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   if (mode === 'solo') spawnBots();
   audio.unlock();
   addFeed('Welcome to Atomic Acres', 'gold');
-  if (mode !== 'solo') network.send({ type: 'join', player: snapshot() });
+  if (mode !== 'solo') {
+    network.send({ type: 'join', player: snapshot() });
+    sendLeaderboardSync();
+  }
 }
 
 function randomNonce(): number {
@@ -2349,6 +2486,7 @@ function updateFieldSupportHud(): void {
 function awardSupportElimination(): void {
   const before = fieldSupport.available;
   fieldSupport = recordSupportElimination(fieldSupport);
+  bestStreakThisMatch = Math.max(bestStreakThisMatch, fieldSupport.streak);
   for (const [id, label] of [['scout-sweep', 'SCOUT SWEEP'], ['yardhawk', 'YARDHAWK'], ['tri-pass', 'TRI-PASS STRIKE']] as const) {
     if (!before[id] && fieldSupport.available[id]) addFeed(`${label} READY`, 'gold');
   }
@@ -2878,6 +3016,7 @@ function updateMatchState(now: number): void {
   }
   if (matchState.phase === 'ended') {
     matchFinished = true;
+    recordCompletedMatch();
     clearGrenades();
     clearFieldSupport();
     banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><button id="rematch" type="button">REMATCH</button>`;
@@ -3074,7 +3213,8 @@ const launchParams = new URLSearchParams(window.location.search);
 const invitedRoom = launchParams.get('room')?.trim() ?? '';
 if (invitedRoom) element<HTMLInputElement>('#room-input').value = invitedRoom;
 const invitedName = launchParams.get('name');
-if (invitedName) element<HTMLInputElement>('#player-name').value = sanitizeName(invitedName);
+const normalizedInvitedName = normalizeRequiredPlayerName(invitedName ?? '');
+if (normalizedInvitedName) element<HTMLInputElement>('#player-name').value = normalizedInvitedName;
 const teamSelect = element<HTMLSelectElement>('#team');
 const invitedTeam = launchParams.get('team');
 let teamSelectionTouched = invitedTeam === '0' || invitedTeam === '1';
@@ -3300,11 +3440,13 @@ element<HTMLButtonElement>('#resume').addEventListener('click', () => {
   if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
+  if (!requirePlayerName()) return;
   network.close();
   resetForMode();
   startGame('solo');
 });
 element<HTMLButtonElement>('#host').addEventListener('click', () => {
+  if (!requirePlayerName()) return;
   resetForMode();
   network.host(() => {
     roomCard.hidden = false;
@@ -3313,6 +3455,7 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   });
 });
 element<HTMLButtonElement>('#join').addEventListener('click', () => {
+  if (!requirePlayerName()) return;
   if (!teamSelectionTouched) teamSelect.value = '1';
   resetForMode();
   const code = element<HTMLInputElement>('#room-input').value.trim();
@@ -3604,6 +3747,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     audio: audio.telemetry(),
     fieldSupport: {
       streak: fieldSupport.streak,
+      rewardCycle: fieldSupport.rewardCycle,
+      bestStreakThisMatch,
       available: { ...fieldSupport.available },
       scoutActive: performance.now() < scoutSweepUntil,
       yardhawk: yardhawk ? {
@@ -3678,7 +3823,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     activeTracers: tracerPool.activeCount(),
     originalArtLoaded: blenderArenaActive || scene.getObjectByName('original-arena-art') !== undefined,
     arenaZone: classifyArenaZone(player.position.x, player.position.z),
-    arenaStoryReady: blenderArenaActive || ['route-marker-skyline-garden', 'route-marker-atom-liner-crossing', 'route-marker-solar-service']
+    worldIdentity: routeIdentityTelemetry(),
+    worldIdentityPresentation: {
+      routeLights: worldIdentityPresentation.routeLights,
+      routeSigns: worldIdentityPresentation.routeSigns,
+      cueInstances: worldIdentityPresentation.cueInstances,
+      atmosphericParticles: worldIdentityPresentation.atmosphericParticles,
+    },
+    arenaStoryReady: blenderArenaActive || ['route-marker-verdant-array', 'route-marker-civic-transit', 'route-marker-helio-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
     interiorTelemetry: (() => {
       const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0, visibleRamps: 0 };
@@ -3740,6 +3892,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
   }),
   startSolo: () => {
+    element<HTMLInputElement>('#player-name').value = 'QA Operator';
     network.close();
     resetForMode();
     startGame('solo', false);
@@ -4159,7 +4312,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 26 candidate — smoother rotating minimap, bounded PBR materials and simplified Performance / Blender Render profiles with gameplay preserved.');
+  setStatus('Pass 27 owner-review build — three distinct agritech routes, continuous streaks and persistent peer-synchronised records.');
   requestAnimationFrame(frame);
 }
 

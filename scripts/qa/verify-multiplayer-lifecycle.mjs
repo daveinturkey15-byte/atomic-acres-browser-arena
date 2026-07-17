@@ -33,6 +33,7 @@ try {
       });
       await page.goto(`${baseUrl}?render=performance&seed=pass25a-mp-${cycle}-${label}&multiplayerQa=1&peerQaPort=${peerPort}`);
       await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
+      await page.fill('#player-name', `${label} ${cycle}`);
     }
     await host.bringToFront();
     await host.click('#host');

@@ -74,14 +74,14 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     });
   });
 
-  test('keeps canvas reticle and principal shot on the authoritative ray for every weapon', async ({ page }) => {
-    test.setTimeout(180_000);
-    await ready(page);
-    await startSolo(page);
-    const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'];
-    const viewports = [{ width: 960, height: 540 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }];
-    for (const viewport of viewports) {
+  const aimViewports = [{ width: 960, height: 540 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }];
+  for (const viewport of aimViewports) {
+    test(`keeps canvas reticle and principal shot on the authoritative ray for every weapon at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      test.setTimeout(240_000);
+      await ready(page);
+      await startSolo(page);
       await page.setViewportSize(viewport);
+      const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'];
       for (const weapon of weapons) {
         await page.evaluate(({ selected }) => {
           const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -114,8 +114,8 @@ test.describe('Pass 25A baseline and lifecycle', () => {
         expect(state.lastPrincipalShotAlignment?.sample).toEqual([0, 0]);
         expect(state.lastPrincipalShotAlignment?.angularError).toBeLessThanOrEqual(1e-7);
       }
-    }
-  });
+    });
+  }
 
   test('restores a deliberately lost WebGL context without reloading the match', async ({ page }) => {
     await ready(page);
@@ -150,15 +150,17 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     await expect.poll(() => page.evaluate(() => document.pointerLockElement?.id ?? null)).toBe('game');
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(250);
-    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('blur'));
+      if (document.pointerLockElement) document.exitPointerLock();
+    });
+    await expect.poll(() => page.evaluate(() => document.pointerLockElement?.id ?? null)).toBeNull();
     const blurred = await snapshot(page);
     await page.waitForTimeout(350);
     const afterBlur = await snapshot(page);
     expect(Math.hypot(afterBlur.player.position[0] - blurred.player.position[0], afterBlur.player.position[2] - blurred.player.position[2])).toBeLessThan(0.05);
     await page.setViewportSize({ width: 1_111, height: 777 });
     await assertAimAlignment(page);
-    await page.evaluate(() => document.exitPointerLock());
-    await expect.poll(() => page.evaluate(() => document.pointerLockElement?.id ?? null)).toBeNull();
     await page.locator('#resume').click();
     await expect.poll(() => page.evaluate(() => document.pointerLockElement?.id ?? null)).toBe('game');
     await assertAimAlignment(page);

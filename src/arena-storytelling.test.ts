@@ -7,7 +7,9 @@ describe('arena storytelling', () => {
     expect(classifyArenaZone(0, 34)).toBe('coral-home');
     expect(classifyArenaZone(-24, 0)).toBe('west-garden');
     expect(classifyArenaZone(24, 0)).toBe('east-service');
-    expect(arenaZoneLabel(classifyArenaZone(0, 0))).toBe('ATOM-LINER CROSSING');
+    expect(arenaZoneLabel(classifyArenaZone(-24, 0))).toBe('VERDANT ARRAY');
+    expect(arenaZoneLabel(classifyArenaZone(0, 0))).toBe('CIVIC TRANSIT');
+    expect(arenaZoneLabel(classifyArenaZone(24, 0))).toBe('HELIO SERVICE');
   });
 
   it('keeps restrained animation outputs finite and bounded', () => {

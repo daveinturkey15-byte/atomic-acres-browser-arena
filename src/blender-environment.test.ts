@@ -30,10 +30,11 @@ describe('Blender Render environment asset', () => {
       buffers?: Array<{ uri?: string }>;
     };
     const semanticWindows = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'breakable-window');
+    const routeLandmarks = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'route-landmark');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(5_000_000);
-    expect(gltf.meshes?.length).toBe(25);
-    expect(gltf.materials?.length).toBe(19);
+    expect(gltf.meshes?.length).toBe(26);
+    expect(gltf.materials?.length).toBe(20);
     expect(gltf.images).toHaveLength(21);
     expect(gltf.textures).toHaveLength(28);
     expect((gltf.materials ?? []).filter((material) =>
@@ -42,6 +43,13 @@ describe('Blender Render environment asset', () => {
     expect(gltf.buffers?.every((bufferInfo) => !bufferInfo.uri)).toBe(true);
     expect(semanticWindows).toHaveLength(6);
     expect(new Set(semanticWindows.map((node) => node.extras?.atomic_window_id)).size).toBe(6);
+    expect(routeLandmarks).toHaveLength(3);
+    expect(new Set(routeLandmarks.map((node) => node.extras?.atomic_route_id))).toEqual(new Set([
+      'west-cultivation', 'central-transit', 'east-service',
+    ]));
+    expect(new Set(routeLandmarks.map((node) => node.name))).toEqual(new Set([
+      'P27_LANDMARK_verdant_array', 'P27_LANDMARK_civic_transit', 'P27_LANDMARK_helio_service',
+    ]));
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_asphalt_charcoal')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_ground_olive')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_gunmetal')).toBe(true);

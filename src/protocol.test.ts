@@ -66,6 +66,22 @@ describe('network protocol guards', () => {
     expect(isPlayerSnapshot({ ...player, primary: 'sniper', weapon: 'pistol' })).toBe(false);
   });
 
+  it('binds persistent-score replication to the established player id and bounded schema', () => {
+    const entry = {
+      id: 'score:abc:one', name: 'Tester', kills: 12, deaths: 3,
+      bestStreak: 8, won: true, recordedAt: Date.now(),
+    };
+    const score = { type: 'high-score', by: 'abc', entry } as const;
+    const sync = { type: 'leaderboard-sync' as const, by: 'abc', entries: [entry] };
+    expect(isGameMessage(score)).toBe(true);
+    expect(isGameMessage(sync)).toBe(true);
+    expect(messageBelongsToPlayer(score, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ ...score, by: 'spoof' }, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer(sync, 'abc')).toBe(true);
+    expect(isGameMessage({ ...score, entry: { ...entry, kills: 999 } })).toBe(false);
+    expect(isGameMessage({ ...sync, entries: Array.from({ length: 21 }, () => entry) })).toBe(false);
+  });
+
   it('binds relayed guest claims to the established player id', () => {
     expect(messageBelongsToPlayer({ type: 'state', player }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'shot', by: 'abc', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], nonce: 1 }, 'abc')).toBe(true);

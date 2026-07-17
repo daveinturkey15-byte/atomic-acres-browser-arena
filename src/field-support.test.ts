@@ -15,7 +15,8 @@ describe('field support rewards', () => {
   it('unlocks the three original rewards at bounded elimination thresholds', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(0);
+    expect(state.streak).toBe(7);
+    expect(state.rewardCycle).toBe(0);
     expect(state.available).toEqual({ 'scout-sweep': true, yardhawk: true, 'tri-pass': true });
   });
 
@@ -24,10 +25,12 @@ describe('field support rewards', () => {
     for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
     state = consumeFieldSupport(state, 'scout-sweep').state;
     for (let index = 0; index < 4; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(0);
+    expect(state.streak).toBe(7);
+    expect(state.rewardCycle).toBe(0);
     expect(state.available['tri-pass']).toBe(true);
     for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(3);
+    expect(state.streak).toBe(10);
+    expect(state.rewardCycle).toBe(3);
     expect(state.available['scout-sweep']).toBe(true);
   });
 
@@ -36,6 +39,7 @@ describe('field support rewards', () => {
     for (let index = 0; index < 5; index += 1) state = recordSupportElimination(state);
     state = recordSupportDeath(state);
     expect(state.streak).toBe(0);
+    expect(state.rewardCycle).toBe(0);
     expect(state.available['scout-sweep']).toBe(true);
     expect(state.available.yardhawk).toBe(true);
   });

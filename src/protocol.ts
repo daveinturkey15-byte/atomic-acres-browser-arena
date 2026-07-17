@@ -1,4 +1,5 @@
 import { presentationRandom } from './runtime-random';
+import { MAX_HIGH_SCORE_ENTRIES, isHighScoreEntry, type HighScoreEntry } from './high-scores';
 
 export type Team = 0 | 1;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun' | 'sniper';
@@ -77,7 +78,9 @@ export type TeamPingMessage = {
   position: [number, number, number];
   nonce: number;
 };
-export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage;
+export type HighScoreMessage = { type: 'high-score'; by: string; entry: HighScoreEntry };
+export type LeaderboardSyncMessage = { type: 'leaderboard-sync'; by: string; entries: HighScoreEntry[] };
+export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | HitMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage;
 
 const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol']);
 const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun', 'sniper']);
@@ -144,6 +147,13 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.kind === 'enemy' || msg.kind === 'regroup' || msg.kind === 'push' || msg.kind === 'nice')
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
+    case 'high-score':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isHighScoreEntry(msg.entry);
+    case 'leaderboard-sync':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Array.isArray(msg.entries) && msg.entries.length <= MAX_HIGH_SCORE_ENTRIES
+        && msg.entries.every((entry) => isHighScoreEntry(entry));
     default:
       return false;
   }
@@ -161,6 +171,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'ping':
     case 'pickup':
     case 'window-break':
+    case 'high-score':
+    case 'leaderboard-sync':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;

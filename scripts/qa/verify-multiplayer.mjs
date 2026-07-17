@@ -10,6 +10,12 @@ const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 const host = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const guest = await browser.newPage({ viewport: { width: 960, height: 540 } });
+await host.addInitScript(() => {
+  localStorage.setItem('atomic-acres:high-scores:v1', JSON.stringify({
+    version: 1,
+    entries: [{ id: 'score:legacy-ace:qa', name: 'Legacy Ace', kills: 14, deaths: 4, bestStreak: 9, won: true, recordedAt: Date.UTC(2026, 6, 17, 12) }],
+  }));
+});
 for (const page of [host, guest]) {
   if (headed) continue;
   const cdp = await page.context().newCDPSession(page);
@@ -50,6 +56,7 @@ for (const [label, page] of [['host', host], ['guest', guest]]) {
   if (Number.isInteger(peerQaPort) && peerQaPort >= 1_024 && peerQaPort <= 65_535) url.searchParams.set('peerQaPort', String(peerQaPort));
   await page.goto(url.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: connectionTimeoutMs });
+  await page.fill('#player-name', label === 'host' ? 'Host QA' : 'Guest QA');
 }
 phase('both pages ready');
 
@@ -67,6 +74,9 @@ await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().game
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
 phase('peer join complete');
+await guest.waitForFunction(() => document.querySelector('#high-score-list')?.textContent?.includes('Legacy Ace'), undefined, { timeout: 10_000 });
+const leaderboardReplicated = await guest.evaluate(() => document.querySelector('#high-score-list')?.textContent?.includes('14 KILLS') === true);
+phase('persistent leaderboard replicated');
 await guest.waitForTimeout(500);
 await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.stance === 'prone', undefined, { timeout: 5_000 });
@@ -163,6 +173,6 @@ const spawnSeparation = Math.hypot(
 );
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
-console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
-if (errors.length || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
+console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, leaderboardReplicated, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
+if (errors.length || !leaderboardReplicated || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
 await browser.close();

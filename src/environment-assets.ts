@@ -345,9 +345,9 @@ function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   const domestic = new THREE.MeshStandardMaterial({ color: 0xd8c7a5, roughness: 0.88 });
   const screen = new THREE.MeshStandardMaterial({ color: 0x78cfca, emissive: 0x1b6c70, emissiveIntensity: 1.4, roughness: 0.28 });
   const routeMarkers: Array<[string, number, number, number, number]> = [
-    ['SKYLINE GARDEN', -19.2, 2.7, -8, Math.PI / 2],
-    ['ATOM-LINER CROSSING', 7.4, 2.7, 0, -Math.PI / 2],
-    ['SOLAR SERVICE', 19.2, 2.7, 8, -Math.PI / 2],
+    ['VERDANT ARRAY', -19.2, 2.7, -8, Math.PI / 2],
+    ['CIVIC TRANSIT', 7.4, 2.7, 0, -Math.PI / 2],
+    ['HELIO SERVICE', 19.2, 2.7, 8, -Math.PI / 2],
   ];
   for (const [label, x, y, z, rotation] of routeMarkers) {
     const marker = new THREE.Group(); marker.name = `route-marker-${label.toLowerCase().replaceAll(' ', '-')}`;

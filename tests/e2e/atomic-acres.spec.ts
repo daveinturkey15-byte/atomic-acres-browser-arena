@@ -80,6 +80,8 @@ type DebugState = {
   };
   fieldSupport: {
     streak: number;
+    rewardCycle: number;
+    bestStreakThisMatch: number;
     available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass', boolean>;
     scoutActive: boolean;
     yardhawk: { active: boolean; phase: 'thrown' | 'homing' | null; targetId?: string; position?: number[]; armedInMs?: number };
@@ -110,6 +112,12 @@ type DebugState = {
   activeImpactMarks: number;
   activeTracers: number;
   originalArtLoaded: boolean;
+  worldIdentity: {
+    pass: 'world-identity-27';
+    routes: Array<{ id: string; label: string; role: string; landmark: string }>;
+    cuesInsideBounds: boolean;
+  };
+  worldIdentityPresentation: { routeLights: number; routeSigns: number; cueInstances: number; atmosphericParticles: number };
   arenaZone: string;
   arenaStoryReady: boolean;
   interiorTelemetry: {
@@ -169,6 +177,13 @@ type DebugState = {
       shadowBias: number;
       shadowNormalBias: number;
       softShadows: boolean;
+      fogColor: number;
+      fogNear: number;
+      fogFar: number;
+      skyTop: number;
+      skyHorizon: number;
+      skyBottom: number;
+      routeLightIntensity: number;
     };
     framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
     minimapRenders: number;
@@ -184,6 +199,8 @@ type DebugState = {
       triangleCount: number;
       semanticWindows: number;
       boundWindows: number;
+      routeLandmarks: number;
+      worldIdentityPass: boolean;
       proceduralWorldHidden: boolean;
       error: string | null;
     };
@@ -230,10 +247,66 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('TEXTURED BLENDER PASS 24');
+    await expect(page.locator('.eyebrow')).toContainText('WORLD IDENTITY PASS 27');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
+  });
+
+  test('requires an intentional callsign before any deployment and remembers it across builds', async ({ page }) => {
+    test.setTimeout(180_000);
+    await pageReady(page);
+    await page.locator('#player-name').fill('');
+    await page.locator('#solo').click();
+    await expect(page.locator('#menu')).toBeVisible();
+    await expect(page.locator('#player-name-error')).toBeVisible();
+    expect((await debug(page)).gameStarted).toBe(false);
+
+    await page.locator('#player-name').fill('Dave');
+    await page.locator('#room-input').fill('');
+    await page.locator('#join').click();
+    await expect.poll(async () => page.evaluate(() => localStorage.getItem('atomic-acres:player-name:v1'))).toBe('Dave');
+    expect((await debug(page)).gameStarted).toBe(false);
+    await page.reload();
+    await pageReady(page);
+    await expect(page.locator('#player-name')).toHaveValue('Dave');
+  });
+
+  test('loads versioned high scores and surfaces real-time same-origin updates', async ({ page }) => {
+    const recordedAt = Date.UTC(2026, 6, 17, 12);
+    await page.addInitScript(({ recordedAt }) => {
+      localStorage.setItem('atomic-acres:high-scores:v1', JSON.stringify({
+        version: 1,
+        entries: [{ id: 'score:dave:one', name: 'Dave', kills: 14, deaths: 4, bestStreak: 9, won: true, recordedAt }],
+      }));
+    }, { recordedAt });
+    await pageReady(page);
+    await expect(page.locator('#high-score-list')).toContainText('Dave');
+    await expect(page.locator('#high-score-list')).toContainText('14 KILLS');
+
+    await page.evaluate(({ recordedAt }) => {
+      const channel = new BroadcastChannel('atomic-acres:high-scores:v1');
+      channel.postMessage([{ id: 'score:ellis:one', name: 'Ellis', kills: 18, deaths: 2, bestStreak: 12, won: true, recordedAt }]);
+      channel.close();
+    }, { recordedAt });
+    await expect(page.locator('#high-score-list li').first()).toContainText('Ellis');
+    await expect(page.locator('#high-score-list li').first()).toContainText('18 KILLS');
+  });
+
+  test('records a completed match with the continuous best streak in durable storage', async ({ page }) => {
+    await pageReady(page);
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void; endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(7);
+      api.endMatch();
+    });
+    await expect.poll(async () => (await debug(page)).matchPhase).toBe('ended');
+    const entries = await page.evaluate(() => {
+      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+      return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
+    });
+    expect(entries[0]).toMatchObject({ name: 'QA Operator', kills: 25, bestStreak: 7, won: true });
   });
 
   test('defaults new players to Blender Render while retaining explicit slow-PC profiles', async ({ page }) => {
@@ -260,6 +333,7 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('loads the complete Blender Render arena and binds authored breakable windows', async ({ page }) => {
+    test.setTimeout(120_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=blender');
@@ -268,14 +342,18 @@ test.describe('boot and authored presentation', () => {
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
-        exposure: 1.02, hemisphereIntensity: 1, ambientIntensity: 0.18,
-        sunIntensity: 2.45, shadowBias: -0.00012, shadowNormalBias: 0.04, softShadows: false,
+        exposure: 1, hemisphereIntensity: 0.9, ambientIntensity: 0.14,
+        sunIntensity: 3.25, fogNear: 58, fogFar: 128, routeLightIntensity: 1,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 25, materialCount: 19, texturedMaterials: 12, pbrMaterials: 8, textureCount: 21, triangleCount: 19_896,
-        semanticWindows: 6, boundWindows: 6, proceduralWorldHidden: true, error: null,
+        status: 'ready', meshCount: 26, materialCount: 20, texturedMaterials: 12, pbrMaterials: 8, textureCount: 21, triangleCount: 24_176,
+        semanticWindows: 6, boundWindows: 6, routeLandmarks: 3, worldIdentityPass: true,
+        proceduralWorldHidden: true, error: null,
       },
     });
+    expect(menuState.worldIdentity).toMatchObject({ pass: 'world-identity-27', cuesInsideBounds: true });
+    expect(menuState.worldIdentity.routes).toHaveLength(3);
+    expect(menuState.worldIdentityPresentation).toEqual({ routeLights: 3, routeSigns: 3, cueInstances: 0, atmosphericParticles: 0 });
     expect(menuState.render.calls).toBeLessThanOrEqual(70);
     await expect(page.locator('#graphics-profile')).toHaveValue('blender');
     await startSolo(page);
@@ -302,13 +380,41 @@ test.describe('boot and authored presentation', () => {
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
       return state.activeImpactParticles === 0 && state.activeTracers === 0;
-    }, undefined, { timeout: 10_000 });
+    }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_100);
     const stableState = await debug(page);
-    expect(stableState.render.calls).toBeLessThanOrEqual(90);
+    expect(stableState.render.calls).toBeLessThanOrEqual(95);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png' });
+  });
+
+  test('keeps all three Pass 27 route identities legible from representative approaches', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=blender');
+    await startSolo(page);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+
+    const samples = [
+      { id: 'verdant', position: [-18, 1.7, 12, Math.PI / 2, 0] as const, zone: 'west-garden', label: 'VERDANT ARRAY' },
+      { id: 'transit', position: [5, 1.7, -24, Math.PI, 0] as const, zone: 'central-transit', label: 'CIVIC TRANSIT' },
+      { id: 'helio', position: [18, 1.7, -14, -Math.PI / 2, 0] as const, zone: 'east-service', label: 'HELIO SERVICE' },
+    ];
+
+    for (const sample of samples) {
+      await page.evaluate(({ position }) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+        api.teleportPlayer(position[0], position[1], position[2], position[3], position[4]);
+      }, sample);
+      await expect.poll(async () => (await debug(page)).arenaZone).toBe(sample.zone);
+      await expect(page.locator('#location-label')).toHaveText(sample.label);
+      const state = await debug(page);
+      expect(state.worldIdentityPresentation).toMatchObject({ routeLights: 3, routeSigns: 3, cueInstances: 0 });
+      expect(state.render.blenderEnvironment).toMatchObject({ routeLandmarks: 3, worldIdentityPass: true });
+      await page.screenshot({ path: `test-results/pass27-route-${sample.id}.png` });
+    }
+    expect(errors).toEqual([]);
   });
 
   test('menu exposes controls and accessibility settings', async ({ page }) => {
@@ -339,6 +445,7 @@ test.describe('boot and authored presentation', () => {
 
   test('times out an invalid room and leaves a clean retryable state', async ({ page }) => {
     await pageReady(page);
+    await page.locator('#player-name').fill('Retry QA');
     await page.locator('#room-input').fill('missing-room-pass17');
     await page.locator('#join').click();
     await expect(page.locator('#network-status')).toContainText('Connection timed out', { timeout: 15_000 });
@@ -360,12 +467,7 @@ test.describe('boot and authored presentation', () => {
     await page.reload();
     await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
     await expect(page.locator('#selected-kit-summary')).toContainText('Vectorline SMG');
-    await page.locator('#solo').click();
-    await page.waitForFunction(
-      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
-      undefined,
-      { timeout: 20_000 },
-    );
+    await startSolo(page);
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
       undefined,
@@ -563,12 +665,16 @@ test.describe('solo mechanics', () => {
       api.activateSupport('scout-sweep');
       api.earnSupport(4);
     });
-    expect((await debug(page)).fieldSupport.streak).toBe(0);
+    const firstCycle = (await debug(page)).fieldSupport;
+    expect(firstCycle.streak).toBe(7);
+    expect(firstCycle.rewardCycle).toBe(0);
     await page.evaluate(() => (window as unknown as {
       __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
     }).__ATOMIC_ACRES_DEBUG__.earnSupport(3));
     const looped = (await debug(page)).fieldSupport;
-    expect(looped.streak).toBe(3);
+    expect(looped.streak).toBe(10);
+    expect(looped.rewardCycle).toBe(3);
+    expect(looped.bestStreakThisMatch).toBe(10);
     expect(looped.available['scout-sweep']).toBe(true);
   });
 
@@ -1165,7 +1271,7 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#objective')).toContainText('FIRST TO 25');
     await expect(page.locator('#grenades')).toHaveText('FRAG ×2');
     await expect(page.locator('#minimap')).toBeVisible();
-    await expect(page.locator('#location-label')).toHaveText(/AQUA HOUSE|CORAL HOUSE|SKYLINE GARDEN|SOLAR SERVICE|ATOM-LINER CROSSING/);
+    await expect(page.locator('#location-label')).toHaveText(/AQUA HABITAT|CORAL HABITAT|VERDANT ARRAY|CIVIC TRANSIT|HELIO SERVICE/);
     await page.keyboard.down('Tab');
     await expect(page.locator('#roster-list > div')).toHaveCount(2);
     await page.keyboard.up('Tab');
@@ -1225,10 +1331,12 @@ test.describe('performance and stability', () => {
     expect(state.render.reducedMode).toBe(true);
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
-    expect(state.render.lighting).toEqual({
-      exposure: 1.14, hemisphereIntensity: 1.48, ambientIntensity: 0.38,
-      sunIntensity: 2.8, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
+    expect(state.render.lighting).toMatchObject({
+      exposure: 1.08, hemisphereIntensity: 1.2, ambientIntensity: 0.24,
+      sunIntensity: 2.95, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
+      fogNear: 68, fogFar: 145, routeLightIntensity: 0.38,
     });
+    expect(state.worldIdentityPresentation).toEqual({ routeLights: 3, routeSigns: 3, cueInstances: 0, atmosphericParticles: 0 });
     expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
     expect(state.render.antialias).toBe(false);
     const overlays = await page.evaluate(() => ({

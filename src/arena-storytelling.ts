@@ -9,11 +9,11 @@ export function classifyArenaZone(x: number, z: number): ArenaZone {
 }
 
 export function arenaZoneLabel(zone: ArenaZone): string {
-  if (zone === 'aqua-home') return 'AQUA HOUSE';
-  if (zone === 'coral-home') return 'CORAL HOUSE';
-  if (zone === 'west-garden') return 'SKYLINE GARDEN';
-  if (zone === 'east-service') return 'SOLAR SERVICE';
-  return 'ATOM-LINER CROSSING';
+  if (zone === 'aqua-home') return 'AQUA HABITAT';
+  if (zone === 'coral-home') return 'CORAL HABITAT';
+  if (zone === 'west-garden') return 'VERDANT ARRAY';
+  if (zone === 'east-service') return 'HELIO SERVICE';
+  return 'CIVIC TRANSIT';
 }
 
 export function arenaAnimationAt(now: number): { landmarkYaw: number; beaconPulse: number; signGlow: number } {
