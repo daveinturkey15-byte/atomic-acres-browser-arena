@@ -141,8 +141,8 @@ type DebugState = {
   networkSync: { stateIntervalMs: number; interpolationRate: number };
   networkLifecycle: { role: string; joinDeadlineActive: boolean; peerPresent: boolean; hostConnectionPresent: boolean };
   render: {
-    profile: 'performance' | 'quality' | 'blender' | 'compat';
-    representation: 'responsive' | 'full' | 'blender' | 'compat';
+    profile: 'performance' | 'blender' | 'compat';
+    representation: 'responsive' | 'blender' | 'compat';
     calls: number;
     triangles: number;
     points: number;
@@ -164,6 +164,7 @@ type DebugState = {
       softShadows: boolean;
     };
     framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
+    minimapRenders: number;
     staticBatchPalette: Array<string | null>;
     blenderEnvironment: {
       status: 'idle' | 'loading' | 'ready' | 'fallback';
@@ -171,6 +172,7 @@ type DebugState = {
       meshCount: number;
       materialCount: number;
       texturedMaterials: number;
+      pbrMaterials: number;
       textureCount: number;
       triangleCount: number;
       semanticWindows: number;
@@ -263,7 +265,7 @@ test.describe('boot and authored presentation', () => {
         sunIntensity: 2.45, shadowBias: -0.00012, shadowNormalBias: 0.04, softShadows: false,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 25, materialCount: 19, texturedMaterials: 12, textureCount: 9, triangleCount: 18_884,
+        status: 'ready', meshCount: 25, materialCount: 19, texturedMaterials: 12, pbrMaterials: 8, textureCount: 21, triangleCount: 19_896,
         semanticWindows: 6, boundWindows: 6, proceduralWorldHidden: true, error: null,
       },
     });
@@ -311,8 +313,8 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toHaveValue('performance');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(3);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY', 'BLENDER RENDER']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(2);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'BLENDER RENDER']);
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';
@@ -1248,53 +1250,46 @@ test.describe('performance and stability', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Quality keeps textured architecture and full combat presentation within budget', async ({ page }) => {
+  test('legacy Quality migrates to Blender Render', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=quality');
+    await expect(page.locator('#graphics-profile option')).toHaveCount(2);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'BLENDER RENDER']);
     await startSolo(page);
-    await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void; placeBotAhead: (distance: number) => void } }).__ATOMIC_ACRES_DEBUG__;
-      api.setBotsFrozen(true);
-      api.placeBotAhead(5);
-    });
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(1_000);
     const state = await debug(page);
-    expect(state.render.profile).toBe('quality');
-    expect(state.render.representation).toBe('full');
-    expect(state.render.shadowMode).toBe('off');
-    expect(state.render.shadows).toBe(false);
-    expect(state.render.lighting).toEqual({
-      exposure: 1.14, hemisphereIntensity: 1.48, ambientIntensity: 0.38,
-      sunIntensity: 2.8, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
-    });
+    expect(state.render.profile).toBe('blender');
+    expect(state.render.representation).toBe('blender');
+    expect(state.render.blenderEnvironment.status).toBe('ready');
     expect(state.render.pixelRatio).toBeLessThanOrEqual(1);
-    expect(state.render.calls).toBeLessThanOrEqual(160);
-    expect(state.render.triangles).toBeLessThanOrEqual(150_000);
-    expect(state.weaponPresentation.armsVisible).toBe(true);
-    expect(state.weaponPresentation.armMeshCount).toBe(6);
-    expect(state.weaponPresentation.attachedWeaponBatchStats).toEqual({ sourceMeshes: 38, batches: 2 });
-    expect(state.weaponPresentation.modelKind).toBe('original-authored');
-    expect(state.weaponPresentation.importedModel).toBeNull();
-    expect(state.weaponPresentation.detailsReady).toBe(true);
-    expect(state.weaponPresentation.riggedArms).toHaveLength(2);
-    expect(state.weaponPresentation.riggedArms.every((arm: { finite: boolean; bindOffsetsPreserved: boolean; contactError: number }) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02)).toBe(true);
-    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(19);
-    expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
-    expect(state.bots[0].operatorModel).toMatchObject({ skinnedMeshes: 5, clips: 24, weaponChildren: 1 });
-    expect(state.interiorTelemetry).toEqual({
-      houses: 2,
-      groundRooms: 4,
-      upperRooms: 4,
-      doors: 4,
-      windows: 6,
-      ramps: 4,
-      furnishings: 0,
-      fixtures: 0,
-      visibleCollisionProxies: 0,
-      visibleRamps: 4,
-    });
     expect(errors).toEqual([]);
-    await page.screenshot({ path: 'test-results/quality-arms-operator.png' });
+  });
+
+  test('Performance gameplay shows a live FPS counter in the top right', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance');
+    await startSolo(page);
+    const fpsCounter = page.locator('#fps-counter');
+    await expect(fpsCounter).toBeVisible();
+    await expect(fpsCounter.locator('b')).toHaveText(/^\d{1,3}$/);
+    const box = await fpsCounter.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(box!.x + box!.width).toBeGreaterThan(viewport!.width - 140);
+    expect(box!.y).toBeLessThan(80);
+    const cadenceStart = await debug(page);
+    await page.waitForFunction((targetFrame) => (
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } })
+        .__ATOMIC_ACRES_DEBUG__.snapshot().frameCount >= targetFrame
+    ), cadenceStart.frameCount + 3, { timeout: 15_000 });
+    const cadenceEnd = await debug(page);
+    const renderedFrames = cadenceEnd.frameCount - cadenceStart.frameCount;
+    const minimapFrames = cadenceEnd.render.minimapRenders - cadenceStart.render.minimapRenders;
+    expect(minimapFrames).toBeGreaterThanOrEqual(renderedFrames - 1);
+    expect(minimapFrames).toBeLessThanOrEqual(renderedFrames + 1);
+    expect(errors).toEqual([]);
   });
 });

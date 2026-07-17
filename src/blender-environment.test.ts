@@ -20,7 +20,11 @@ describe('Blender Render environment asset', () => {
     const gltf = glbJson(buffer) as {
       nodes?: Array<{ name?: string; extras?: Record<string, unknown> }>;
       meshes?: unknown[];
-      materials?: Array<{ name?: string }>;
+      materials?: Array<{
+        name?: string;
+        normalTexture?: { index: number };
+        pbrMetallicRoughness?: { metallicRoughnessTexture?: { index: number } };
+      }>;
       images?: Array<{ name?: string; bufferView?: number; uri?: string }>;
       textures?: unknown[];
       buffers?: Array<{ uri?: string }>;
@@ -30,8 +34,10 @@ describe('Blender Render environment asset', () => {
     expect(buffer.byteLength).toBeLessThan(5_000_000);
     expect(gltf.meshes?.length).toBe(25);
     expect(gltf.materials?.length).toBe(19);
-    expect(gltf.images).toHaveLength(9);
-    expect(gltf.textures).toHaveLength(12);
+    expect(gltf.images).toHaveLength(21);
+    expect(gltf.textures).toHaveLength(28);
+    expect((gltf.materials ?? []).filter((material) =>
+      material.normalTexture && material.pbrMetallicRoughness?.metallicRoughnessTexture)).toHaveLength(8);
     expect(gltf.images?.every((image) => typeof image.bufferView === 'number' && image.uri === undefined)).toBe(true);
     expect(gltf.buffers?.every((bufferInfo) => !bufferInfo.uri)).toBe(true);
     expect(semanticWindows).toHaveLength(6);

@@ -17,15 +17,12 @@ describe('render profiles', () => {
     });
   });
 
-  it('allows explicit quality, Blender Render and compatibility overrides', () => {
-    expect(resolveRenderProfile('?render=quality', 'compat')).toBe('quality');
+  it('allows Blender Render and compatibility overrides while migrating legacy Quality', () => {
+    expect(resolveRenderProfile('?render=quality', 'compat')).toBe('blender');
     expect(resolveRenderProfile('?render=blender', 'performance')).toBe('blender');
-    expect(resolveRenderProfile('?render=compat', 'quality')).toBe('compat');
-    expect(resolveRenderProfile('?render=performance', 'quality')).toBe('performance');
+    expect(resolveRenderProfile('?render=compat', 'blender')).toBe('compat');
+    expect(resolveRenderProfile('?render=performance', 'blender')).toBe('performance');
     expect(resolveRenderProfile('?render=balanced', null)).toBe('performance');
-    expect(renderProfileConfig('quality')).toMatchObject({
-      staticMaterialMode: 'texture-lit', shadows: false, shadowMode: 'off', pixelRatioCap: 1,
-    });
     expect(renderProfileConfig('blender')).toMatchObject({
       representation: 'blender', reducedRepresentation: false, reducedWorldDetail: false,
       reducedPresentationDetail: false, staticMaterialMode: 'preserve', antialias: true,
@@ -36,7 +33,7 @@ describe('render profiles', () => {
 
   it('uses valid stored preferences, keeps compat query-only, and rejects unknown labels', () => {
     expect(resolveRenderProfile('', 'performance')).toBe('performance');
-    expect(resolveRenderProfile('', 'quality')).toBe('quality');
+    expect(resolveRenderProfile('', 'quality')).toBe('blender');
     expect(resolveRenderProfile('', 'blender')).toBe('blender');
     expect(resolveRenderProfile('', 'balanced')).toBe('performance');
     expect(resolveRenderProfile('', 'compat')).toBe('blender');

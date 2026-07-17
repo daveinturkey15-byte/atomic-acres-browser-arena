@@ -12,7 +12,7 @@ export class FramePacingSampler {
   private readonly samples: number[] = [];
 
   record(frameMs: number): void {
-    if (!Number.isFinite(frameMs) || frameMs < 1 || frameMs > 250) return;
+    if (!Number.isFinite(frameMs) || frameMs < 1 || frameMs > 1_000) return;
     this.samples.push(frameMs);
     if (this.samples.length > 180) this.samples.splice(0, this.samples.length - 180);
   }

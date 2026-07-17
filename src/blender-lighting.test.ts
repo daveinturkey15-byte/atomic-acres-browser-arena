@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { arenaLightingProfile } from './blender-lighting';
 
 describe('Blender Render lighting', () => {
-  it('uses a lower-fill textured-material rig without changing the existing profiles', () => {
+  it('uses a lower-fill textured-material rig without changing Performance', () => {
     const blender = arenaLightingProfile('blender');
-    const quality = arenaLightingProfile('quality');
     const performance = arenaLightingProfile('performance');
 
     expect(blender).toEqual({
@@ -16,10 +15,9 @@ describe('Blender Render lighting', () => {
       shadowNormalBias: 0.04,
       softShadows: false,
     });
-    expect(blender.exposure).toBeLessThan(quality.exposure);
-    expect(blender.hemisphereIntensity).toBeLessThan(quality.hemisphereIntensity);
-    expect(blender.ambientIntensity).toBeLessThan(quality.ambientIntensity);
-    expect(quality).toEqual(performance);
-    expect(quality.softShadows).toBe(false);
+    expect(blender.exposure).toBeLessThan(performance.exposure);
+    expect(blender.hemisphereIntensity).toBeLessThan(performance.hemisphereIntensity);
+    expect(blender.ambientIntensity).toBeLessThan(performance.ambientIntensity);
+    expect(performance.softShadows).toBe(false);
   });
 });

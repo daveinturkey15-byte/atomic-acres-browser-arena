@@ -3096,30 +3096,6 @@
             "softShadows": false,
             "sunIntensity": 2.8
           }
-        },
-        "quality": {
-          "config": {
-            "antialias": true,
-            "pixelRatioCap": 1,
-            "profile": "quality",
-            "reducedPresentationDetail": false,
-            "reducedRepresentation": false,
-            "reducedWorldDetail": true,
-            "representation": "full",
-            "shadowMapSize": 0,
-            "shadowMode": "off",
-            "shadows": false,
-            "staticMaterialMode": "texture-lit"
-          },
-          "lighting": {
-            "ambientIntensity": 0.38,
-            "exposure": 1.14,
-            "hemisphereIntensity": 1.48,
-            "shadowBias": -0.00028,
-            "shadowNormalBias": 0.025,
-            "softShadows": false,
-            "sunIntensity": 2.8
-          }
         }
       }
     },

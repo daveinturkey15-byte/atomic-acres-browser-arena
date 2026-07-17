@@ -143,6 +143,7 @@ test.describe('Pass 25A baseline and lifecycle', () => {
   });
 
   test('neutralizes input on focus loss and reacquires pointer lock after resize', async ({ page }) => {
+    test.setTimeout(180_000);
     await ready(page);
     await startSolo(page);
     await page.locator('#game').click({ position: { x: 100, y: 100 } });

@@ -38,12 +38,12 @@ for (const [label, page] of [['host', host], ['guest', guest]]) {
   page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`));
   const url = new URL(baseUrl);
   if (renderMode === 'host-full') {
-    url.searchParams.set('render', label === 'host' ? 'quality' : 'performance');
+    url.searchParams.set('render', label === 'host' ? 'blender' : 'performance');
   } else if (renderMode === 'host-blender') {
     url.searchParams.set('render', label === 'host' ? 'blender' : 'performance');
   } else if (renderMode === 'guest-blender') {
     url.searchParams.set('render', label === 'guest' ? 'blender' : 'performance');
-  } else if (['performance', 'quality', 'blender', 'compat'].includes(renderMode)) {
+  } else if (['performance', 'blender', 'compat'].includes(renderMode)) {
     url.searchParams.set('render', renderMode);
   }
   url.searchParams.set('multiplayerQa', '1');

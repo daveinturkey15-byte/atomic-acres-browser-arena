@@ -47,7 +47,7 @@ def rgba(hex_value: int, alpha: float = 1.0) -> tuple[float, float, float, float
 LOADED_TEXTURES: dict[str, bpy.types.Image] = {}
 
 
-def load_authored_texture(filename: str) -> bpy.types.Image:
+def load_authored_texture(filename: str, color_space: str = "sRGB") -> bpy.types.Image:
     existing = LOADED_TEXTURES.get(filename)
     if existing is not None:
         return existing
@@ -56,7 +56,7 @@ def load_authored_texture(filename: str) -> bpy.types.Image:
         raise FileNotFoundError(f"Missing project-authored arena texture: {path}")
     image = bpy.data.images.load(str(path), check_existing=True)
     image.name = f"TEX_{path.stem}"
-    image.colorspace_settings.name = "sRGB"
+    image.colorspace_settings.name = color_space
     image.pack()
     LOADED_TEXTURES[filename] = image
     return image
@@ -82,6 +82,30 @@ def make_material(name: str, color: int, roughness: float, metallic: float = 0.0
         material.node_tree.links.new(image_node.outputs["Color"], bsdf.inputs["Base Color"])
         material["atomic_texture"] = texture
         material["atomic_tile_metres"] = tile_metres
+        stem = Path(texture).stem
+        normal_filename = f"{stem}-normal.png"
+        roughness_filename = f"{stem}-roughness.png"
+        if (TEXTURE_ROOT / normal_filename).is_file():
+            normal_image = material.node_tree.nodes.new("ShaderNodeTexImage")
+            normal_image.name = f"Authored_{stem}_normal"
+            normal_image.label = "Project-authored embedded tangent normal"
+            normal_image.image = load_authored_texture(normal_filename, "Non-Color")
+            normal_image.interpolation = "Linear"
+            normal_image.extension = "REPEAT"
+            normal_map = material.node_tree.nodes.new("ShaderNodeNormalMap")
+            normal_map.inputs["Strength"].default_value = 0.72
+            material.node_tree.links.new(normal_image.outputs["Color"], normal_map.inputs["Color"])
+            material.node_tree.links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
+            material["atomic_normal_texture"] = normal_filename
+        if (TEXTURE_ROOT / roughness_filename).is_file():
+            roughness_image = material.node_tree.nodes.new("ShaderNodeTexImage")
+            roughness_image.name = f"Authored_{stem}_roughness"
+            roughness_image.label = "Project-authored embedded roughness"
+            roughness_image.image = load_authored_texture(roughness_filename, "Non-Color")
+            roughness_image.interpolation = "Linear"
+            roughness_image.extension = "REPEAT"
+            material.node_tree.links.new(roughness_image.outputs["Color"], bsdf.inputs["Roughness"])
+            material["atomic_roughness_texture"] = roughness_filename
     if emission is not None:
         emission_input = bsdf.inputs.get("Emission Color") or bsdf.inputs.get("Emission")
         if emission_input is not None:
@@ -240,6 +264,13 @@ for index, item in enumerate(roadway["curbs"]): add_box(f"BLD_ROAD_curb_{index}"
 for index, item in enumerate(roadway["sidewalks"]): add_box(f"BLD_ROAD_sidewalk_{index}", item["position"], item["size"], M["concrete"], 0.02)
 for index, item in enumerate(roadway["laneMarkers"]): add_box(f"BLD_ROAD_lane_{index}", item["position"], item["size"], M["yellow"], 0)
 for index, item in enumerate(roadway["crosswalks"]): add_box(f"BLD_ROAD_crosswalk_{index}", item["position"], item["size"], M["trim"], 0)
+# Flush storm drains and utility access plates add modern street-scale material
+# response without creating visible cover or changing TypeScript collision.
+for side in (-1, 1):
+    for index, z in enumerate((-31, -15, 1, 17, 33)):
+        add_box(f"BLD_ROAD_drain_{side}_{index}", [side * 9.18, 0.056, z], [0.62, 0.032, 1.2], M["metal"], 0.015)
+for index, (x, z, width, depth) in enumerate(((-3.2, -21, 3.4, 5.2), (3.5, 24, 4.2, 4.6), (2.8, -2, 2.8, 3.5))):
+    add_box(f"BLD_ROAD_repair_{index}", [x, 0.047, z], [width, 0.012, depth], M["asphalt"], 0.02)
 
 # Full two-storey house shells, floors, frames, rails, ramps and semantic glass.
 surface_material = {
@@ -271,6 +302,13 @@ for house_index, house in enumerate(spec["houses"]):
     for offset in (-1.05, 0, 1.05):
         add_box(f"BLD_HOUSE_{prefix}_roof_vent_{offset}", [x + 4.8 + offset, 8.18, z - facing * 2.2], [0.12, 0.32, 1.6], M["metal_light"], 0.02)
     add_box(f"BLD_HOUSE_{prefix}_identity_strip", [x, 6.55, z + facing * (depth / 2 + 0.28)], [7.5, 0.2, 0.1], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
+    # Lightweight entrance canopy and recessed wayfinding light: presentation
+    # only, above the traversal envelope, batched into existing materials.
+    entrance_z = z + facing * (depth / 2 + 0.58)
+    add_box(f"BLD_HOUSE_{prefix}_entrance_canopy", [x, 3.05, entrance_z], [3.8, 0.16, 1.25], M["metal"], 0.04)
+    add_box(f"BLD_HOUSE_{prefix}_entrance_light", [x, 2.92, entrance_z - facing * 0.18], [2.4, 0.05, 0.12], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
+    for side in (-1, 1):
+        add_box(f"BLD_HOUSE_{prefix}_window_hood_{side}", [x + side * 5.7, 5.62, z + facing * (depth / 2 + 0.35)], [3.2, 0.1, 0.62], M["metal_light"], 0.025)
 
 # Garages with armored doors, roof stacks and side vents.
 for index, garage in enumerate(spec["garages"]):
@@ -291,6 +329,8 @@ add_box("BLD_VEHICLE_transit_upper", [-3.8, 2.65, 7], [5.05, 1.5, 12.8], M["conc
 add_box("BLD_VEHICLE_transit_roof", [-3.8, 3.58, 7], [4.8, 0.28, 12.2], M["metal"], 0.1)
 for side_x in (-6.34, -1.26):
     for z in (3.0, 6.0, 9.0, 12.0): add_box(f"BLD_VEHICLE_transit_window_{side_x}_{z}", [side_x, 2.65, z], [0.07, 0.88, 2.15], M["glass"], 0.02)
+for z in (0.02, 13.98):
+    add_box(f"BLD_VEHICLE_transit_marker_{z}", [-3.8, 1.45, z], [3.2, 0.22, 0.08], M["emissive_amber"], 0.01)
 for x in (-5.7, -1.9):
     for z in (2.0, 12.0): add_cylinder(f"BLD_VEHICLE_transit_wheel_{x}_{z}", [x, 0.7, z], 0.66, 0.42, M["rubber"], 16, rotation=(0, math.pi / 2, 0))
 

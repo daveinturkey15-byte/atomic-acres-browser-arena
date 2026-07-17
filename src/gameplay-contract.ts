@@ -28,7 +28,7 @@ import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS } from './networ
 import { CHARACTER_PHYSICS_CONFIG, STANCE_SHAPES } from './physics';
 import { renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 
-const renderProfiles: readonly RenderProfile[] = ['performance', 'quality', 'blender', 'compat'];
+const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'compat'];
 const movementContexts = {
   walk: { crouched: false, prone: false, ads: false, sprinting: false, grounded: true },
   sprint: { crouched: false, prone: false, ads: false, sprinting: true, grounded: true },

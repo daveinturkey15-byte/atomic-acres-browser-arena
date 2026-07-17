@@ -6,11 +6,11 @@
       "kind": "project-generated-surface-textures",
       "creator": "Atomic Acres project",
       "source": "scripts/generate-art-textures.py",
-      "generatedAsOf": "2026-07-12",
+      "generatedAsOf": "2026-07-17",
       "license": "Original project work",
       "files": "public/assets/original/textures/*.png",
       "contactSheet": "public/assets/original/texture-contact-sheet.jpg",
-      "modifications": "Ten deterministic project-generated textures, including grass turf and roof shingles; tiled and colour-graded in the game runtime.",
+      "modifications": "Twenty-six deterministic project-generated textures: twelve original albedo surfaces plus seven 256 px tangent-normal and seven roughness companions for the major arena surfaces. Generated locally from project-authored source pixels with no external imagery.",
       "attributionRequired": false
     },
     {
@@ -29,22 +29,22 @@
       "attributionRequired": false
     },
     {
-      "id": "atomic-acres-blender-render-arena-2026-07-16",
+      "id": "atomic-acres-blender-render-arena-2026-07-17",
       "kind": "original-project-complete-blender-environment",
       "creator": "Atomic Acres project / Jigglyclaw",
       "source": "scripts/blender/create-atomic-acres-blender-arena.py",
-      "generatedAsOf": "2026-07-16",
+      "generatedAsOf": "2026-07-17",
       "license": "Original project work",
       "files": "public/assets/original/models/atomic-acres-blender-arena.glb",
-      "sha256": "b65595d3f6f0967e0ddf2b18c002cd32691ec70b7ec4cca6c37488584408b9ad",
+      "sha256": "9448979394c8564c5aad326440eb6650273f49f4b0301664985b226346fa314a",
       "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
-      "sourceBlendSha256": "a592cd6cb572bd170a0f538f6a92228855a239a17862699e88b87c994e5450e2",
+      "sourceBlendSha256": "11651144cbf7feb9c995739e3cf2df0048d53160d7c603ddf7e84e80ab6232ac",
       "sourceSpec": "source-assets/blender/atomic-acres-arena-spec.json",
       "sourceSpecSha256": "239c91038d234f77b2678fab6513b4cf5eced563e6fcb3f3d62573f32d2218f1",
       "sourceProvenance": "source-assets/blender/atomic-acres-blender-arena.provenance.json",
       "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-      "format": "glTF 2.0 binary, 25 meshes, 19 exported materials, 18884 triangles, 6 semantic breakable windows, 9 embedded project-authored images and 12 texture bindings",
-      "modifications": "Complete original near-future agricultural test-suburb environment authored deterministically in Blender 4.0.2 from project primitives, project-authored surface textures and the authoritative TypeScript arena/house specification. Pass 24 adds world-scale UVs, embedded asphalt/concrete/grass/siding/plaster/timber/metal/roof textures and disjoint road/grass footprints to remove coplanar floor lighting artifacts. No Activision, Call of Duty, Black Ops, downloaded model, copied texture, logo, signage, map geometry, or extracted game asset is used. The GLB is presentation-only; TypeScript collision, raycasts, ramps, windows, networking, drops and bot navigation remain authoritative.",
+      "format": "glTF 2.0 binary, 25 meshes, 19 exported materials, 19896 triangles, 6 semantic breakable windows, 21 embedded project-authored images, 28 texture bindings and 8 exported PBR materials",
+      "modifications": "Complete original near-future agricultural test-suburb environment authored deterministically in Blender 4.0.2 from project primitives, project-authored surface textures and the authoritative TypeScript arena/house specification. Pass 26 adds bounded PBR normal/roughness response on major surfaces plus flush street drains, road repairs, entrance canopies, window hoods and transit markers, all batched into existing material classes. No Activision, Call of Duty, Black Ops, downloaded model, copied texture, logo, signage, map geometry, or extracted game asset is used. The GLB is presentation-only; TypeScript collision, raycasts, ramps, windows, networking, drops and bot navigation remain authoritative.",
       "attributionRequired": false
     },
     {

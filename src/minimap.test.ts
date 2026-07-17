@@ -49,6 +49,16 @@ describe('player facing marker', () => {
     expect(northWhenFacingEast[0]).toBeLessThan(90);
     expect(northWhenFacingEast[1]).toBeCloseTo(90);
   });
+
+  it('rotates continuously for sub-degree camera movement instead of snapping to integer headings', () => {
+    const start = playerUpRotationRadians(0);
+    const quarterDegree = playerUpRotationRadians(Math.PI / 720);
+    expect(quarterDegree).not.toBe(start);
+    expect(Math.abs(quarterDegree - start)).toBeCloseTo(Math.PI / 720, 8);
+    const northStart = northMarkerPosition(0, 180, 180);
+    const northQuarterDegree = northMarkerPosition(Math.PI / 720, 180, 180);
+    expect(northQuarterDegree[0]).not.toBe(northStart[0]);
+  });
 });
 
 describe('enemy reveal policy', () => {

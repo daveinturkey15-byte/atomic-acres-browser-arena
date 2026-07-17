@@ -24,8 +24,14 @@ describe('FramePacingSampler', () => {
     const sampler = new FramePacingSampler();
     sampler.record(Number.NaN);
     sampler.record(0);
-    sampler.record(500);
+    sampler.record(1_500);
     for (let index = 0; index < 240; index += 1) sampler.record(10 + (index % 2));
     expect(sampler.summary().sampleCount).toBe(180);
+  });
+
+  it('reports very slow rendered frames instead of leaving the FPS HUD in a warming state', () => {
+    const sampler = new FramePacingSampler();
+    for (let index = 0; index < 10; index += 1) sampler.record(500);
+    expect(sampler.summary()).toMatchObject({ sampleCount: 10, cadenceHz: 2 });
   });
 });

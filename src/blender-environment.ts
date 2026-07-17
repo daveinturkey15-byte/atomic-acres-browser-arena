@@ -10,6 +10,7 @@ export type BlenderArenaTelemetry = {
   meshCount: number;
   materialCount: number;
   texturedMaterials: number;
+  pbrMaterials: number;
   textureCount: number;
   triangleCount: number;
   semanticWindows: number;
@@ -24,6 +25,7 @@ const telemetry: BlenderArenaTelemetry = {
   meshCount: 0,
   materialCount: 0,
   texturedMaterials: 0,
+  pbrMaterials: 0,
   textureCount: 0,
   triangleCount: 0,
   semanticWindows: 0,
@@ -58,6 +60,7 @@ export async function loadBlenderArena(
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
   const texturedMaterials = new Set<THREE.Material>();
+  const pbrMaterials = new Set<THREE.Material>();
   const windows = new Map<string, THREE.Mesh>();
   let meshCount = 0;
   let triangleCount = 0;
@@ -76,6 +79,11 @@ export async function loadBlenderArena(
       if (material instanceof THREE.MeshStandardMaterial && material.map) {
         texturedMaterials.add(material);
         textures.add(material.map);
+      }
+      if (material instanceof THREE.MeshStandardMaterial) {
+        if (material.normalMap) textures.add(material.normalMap);
+        if (material.roughnessMap) textures.add(material.roughnessMap);
+        if (material.normalMap && material.roughnessMap) pbrMaterials.add(material);
       }
     });
     const windowId = typeof node.userData.atomic_window_id === 'string' ? node.userData.atomic_window_id : null;
@@ -107,6 +115,7 @@ export async function loadBlenderArena(
   telemetry.meshCount = meshCount;
   telemetry.materialCount = materials.size;
   telemetry.texturedMaterials = texturedMaterials.size;
+  telemetry.pbrMaterials = pbrMaterials.size;
   telemetry.textureCount = textures.size;
   telemetry.triangleCount = Math.round(triangleCount);
   telemetry.semanticWindows = windows.size;

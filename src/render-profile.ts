@@ -1,10 +1,10 @@
-export type RenderProfile = 'performance' | 'quality' | 'blender' | 'compat';
+export type RenderProfile = 'performance' | 'blender' | 'compat';
 
 export const RENDER_PROFILE_STORAGE_KEY = 'atomic-acres-render-profile';
 
 export type RenderProfileConfig = {
   profile: RenderProfile;
-  representation: 'responsive' | 'full' | 'blender' | 'compat';
+  representation: 'responsive' | 'blender' | 'compat';
   reducedRepresentation: boolean;
   reducedWorldDetail: boolean;
   reducedPresentationDetail: boolean;
@@ -16,14 +16,16 @@ export type RenderProfileConfig = {
   shadowMapSize: number;
 };
 
-const VALID_PROFILES = new Set<RenderProfile>(['performance', 'quality', 'blender', 'compat']);
+const VALID_PROFILES = new Set<RenderProfile>(['performance', 'blender', 'compat']);
 
 export function resolveRenderProfile(search: string, stored: string | null): RenderProfile {
   const requested = new URLSearchParams(search).get('render');
   if (requested === 'balanced') return 'performance';
+  if (requested === 'quality') return 'blender';
   if (requested && VALID_PROFILES.has(requested as RenderProfile)) return requested as RenderProfile;
   if (stored === 'balanced') return 'performance';
-  if (stored === 'performance' || stored === 'quality' || stored === 'blender') return stored;
+  if (stored === 'quality') return 'blender';
+  if (stored === 'performance' || stored === 'blender') return stored;
   return 'blender';
 }
 
@@ -56,24 +58,6 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
       shadowMode: 'static',
       pixelRatioCap: 1,
       shadowMapSize: 2048,
-    };
-  }
-  if (profile === 'quality') {
-    return {
-      profile,
-      representation: 'full',
-      reducedRepresentation: false,
-      reducedWorldDetail: true,
-      reducedPresentationDetail: false,
-      // Preserve authored texture maps, UVs and normals while still collapsing
-      // meshes by texture/material class. Unmapped props remain palette-batched;
-      // direct lighting supplies depth without the duplicate shadow-map pass.
-      staticMaterialMode: 'texture-lit',
-      antialias: true,
-      shadows: false,
-      shadowMode: 'off',
-      pixelRatioCap: 1,
-      shadowMapSize: 0,
     };
   }
   return {
