@@ -35,19 +35,29 @@ export type SpawnCandidate = {
   visibleThreats: number;
 };
 
-/** Selects deterministically-randomly from the ten candidates farthest from every living player. */
+/**
+ * Selects from the least-exposed spawn tier first, then the farthest bounded
+ * pool. A previous spawn is avoided when another equally covered option exists.
+ */
 export function selectFarthestSpawnCandidate(
   candidates: readonly SpawnCandidate[],
   random: number,
-  poolSize = 10,
+  poolSize = 3,
+  avoidIndex = -1,
 ): number {
   if (candidates.length === 0) return -1;
-  const ranked = [...candidates].sort((a, b) =>
+  const leastVisibleThreats = Math.min(...candidates.map((candidate) => Math.max(0, candidate.visibleThreats)));
+  const coveredTier = candidates.filter((candidate) => Math.max(0, candidate.visibleThreats) === leastVisibleThreats);
+  const freshTier = coveredTier.filter((candidate) => candidate.index !== avoidIndex);
+  const eligible = freshTier.length > 0 ? freshTier : coveredTier;
+  const ranked = [...eligible].sort((a, b) =>
     b.nearestPlayerDistanceSq - a.nearestPlayerDistanceSq
-    || a.visibleThreats - b.visibleThreats
     || a.index - b.index,
   );
-  const pool = ranked.slice(0, Math.max(1, Math.min(Math.floor(poolSize), ranked.length)));
+  const allUncontested = ranked.every((candidate) => !Number.isFinite(candidate.nearestPlayerDistanceSq));
+  const pool = allUncontested
+    ? ranked
+    : ranked.slice(0, Math.max(1, Math.min(Math.floor(poolSize), ranked.length)));
   const boundedRandom = Number.isFinite(random) ? Math.max(0, Math.min(0.999999999, random)) : 0;
   return pool[Math.floor(boundedRandom * pool.length)].index;
 }

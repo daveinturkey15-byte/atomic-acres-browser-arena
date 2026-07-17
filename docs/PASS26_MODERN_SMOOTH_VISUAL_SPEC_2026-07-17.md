@@ -26,7 +26,7 @@ Modernize Atomic Acres' original compact tactical-suburb presentation toward a c
 
 - **C1:** Golden gameplay replay SHA-256 remains unchanged and `npm run verify:gameplay-contract` passes after the approved rendering-only removal of the Quality profile.
 - **C2:** Render-profile and adaptive-quality tests prove only Performance/Blender are player profiles and legacy Quality migrates to Blender.
-- **C3:** Minimap unit tests prove sub-degree yaw changes alter player-up rotation continuously; browser telemetry proves minimap redraw count tracks rendered frames within one frame.
+- **C3:** Minimap unit tests prove sub-degree yaw changes alter player-up rotation continuously, preserve camera left/right under all cardinal yaws, and browser telemetry proves minimap redraw count tracks rendered frames within one frame.
 - **C4:** Browser test proves the top-right FPS counter is visible and numeric during a solo match.
 - **C5:** Blender asset audit proves PBR texture bindings, six semantic windows, no external URIs, and bounded triangles/materials/draw calls.
 - **C6:** `npm run lint`, `npm test`, `npm run build`, `npm run verify:release-tree`, and dependency audit pass.
@@ -49,7 +49,7 @@ Modernize Atomic Acres' original compact tactical-suburb presentation toward a c
 
 - `npm run lint`: pass.
 - `npm run verify:gameplay-contract`: pass; golden replay SHA-256 unchanged.
-- `npm test`: 205/205 pass across 43 files.
+- `npm test`: 211/211 pass across 44 files after the directional/spawn hotfix.
 - `npm run build`: pass.
 - `npm run verify:release-tree`: 44 files, zero rejected and zero oversized.
 - `npm audit --omit=dev`: zero vulnerabilities.
@@ -59,6 +59,16 @@ Modernize Atomic Acres' original compact tactical-suburb presentation toward a c
 - Deterministic PBR and GLB regeneration: byte-identical.
 - Exact runtime screenshot: corrected grass repetition, no PBR artifact, no HUD overlap.
 - Focused Performance browser verification proves minimap redraw cadence tracks render cadence while retaining the top-right FPS counter.
+
+## Directional HUD and spawn-safety hotfix
+
+Two owner screenshots exposed a shared camera/map handedness bug and a separate damage-angle sign bug. The north-up canvas maps world `+Z` to screen-up, but player-up rendering previously applied rotation without correcting the canvas/Three.js handedness change. That mirrored landmarks and enemy markers left/right. The runtime now applies an explicit horizontal reflection plus the correct player-yaw rotation; pure cardinal fixtures and exact canvas-pixel browser checks prove camera-right remains map-right. The north marker uses the same camera-relative basis.
+
+The damage arc no longer derives a yaw and subtracts it with the reversed CSS sign. `sourceScreenAngle()` now projects the attacker vector directly onto authoritative camera-forward/camera-right axes: `0` is forward, positive is clockwise/right, and negative is counter-clockwise/left. Unit and browser checks prove both sides at yaw `0` and `π`.
+
+The respawn selector previously randomized across a pool of ten even when each team had only twelve authored spawns; distance was sorted before line-of-sight exposure, so an exposed “far” deadzone could remain eligible and immediately repeat. Respawns now hard-tier candidates by minimum visible threats, choose only from the three farthest candidates in that safest tier, and avoid the immediately previous spawn whenever another equally covered option exists. Initial uncontested deployment retains all authored variety. Existing 1.35-second protection, bot damage, movement, map geometry, collision and weapon constants are unchanged.
+
+Focused browser QA places the bot exactly camera-right and camera-left, checks the actual red minimap pixels on each side, checks the CSS damage angle sign, and forces successive respawns while asserting minimum exposure and no immediate safe-tier repeat.
 
 ## Release boundary
 

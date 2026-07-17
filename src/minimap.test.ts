@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerRelativeMinimapOffset, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
 
 const bounds = { minX: -40, maxX: 40, minZ: -50, maxZ: 50 };
 
@@ -41,13 +41,26 @@ describe('player facing marker', () => {
 
   it('rotates a player-centred minimap so camera-forward stays up and north moves around the rim', () => {
     expect(playerUpRotationRadians(Math.PI)).toBeCloseTo(0);
-    expect(playerUpRotationRadians(-Math.PI / 2)).toBeCloseTo(-Math.PI / 2);
+    expect(playerUpRotationRadians(-Math.PI / 2)).toBeCloseTo(Math.PI / 2);
+    expect(playerUpScaleX()).toBe(-1);
     const northWhenFacingNorth = northMarkerPosition(Math.PI, 180, 180);
     expect(northWhenFacingNorth[0]).toBeCloseTo(90);
     expect(northWhenFacingNorth[1]).toBeLessThan(90);
     const northWhenFacingEast = northMarkerPosition(-Math.PI / 2, 180, 180);
-    expect(northWhenFacingEast[0]).toBeLessThan(90);
+    expect(northWhenFacingEast[0]).toBeGreaterThan(90);
     expect(northWhenFacingEast[1]).toBeCloseTo(90);
+  });
+
+  it('preserves camera left/right instead of horizontally mirroring world markers', () => {
+    // At yaw 0, camera-forward is -Z and camera-right is +X.
+    expect(playerRelativeMinimapOffset(0, -8, 0)).toEqual([0, -8]);
+    expect(playerRelativeMinimapOffset(8, 0, 0)[0]).toBeCloseTo(8);
+    expect(playerRelativeMinimapOffset(-8, 0, 0)[0]).toBeCloseTo(-8);
+    // At yaw PI, camera-forward is +Z and camera-right is -X.
+    const northFacingRight = playerRelativeMinimapOffset(-8, 0, Math.PI);
+    const northFacingLeft = playerRelativeMinimapOffset(8, 0, Math.PI);
+    expect(northFacingRight[0]).toBeCloseTo(8);
+    expect(northFacingLeft[0]).toBeCloseTo(-8);
   });
 
   it('rotates continuously for sub-degree camera movement instead of snapping to integer headings', () => {

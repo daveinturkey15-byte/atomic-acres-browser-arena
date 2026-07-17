@@ -70,20 +70,37 @@ describe('tactical bot scoring', () => {
     expect(Math.abs(operatorYawToward({ x: 0, z: 0 }, { x: 0, z: 5 }))).toBeCloseTo(Math.PI);
   });
 
-  it('selects only from the ten candidates farthest from every living player', () => {
+  it('chooses only from the least-exposed farthest pool and avoids the last spawn', () => {
     const candidates = Array.from({ length: 12 }, (_, index) => ({
       index,
       nearestPlayerDistanceSq: index * 100,
       visibleThreats: index % 2,
     }));
-    const selected = new Set([
-      selectFarthestSpawnCandidate(candidates, 0),
-      selectFarthestSpawnCandidate(candidates, 0.5),
-      selectFarthestSpawnCandidate(candidates, 0.999999),
-    ]);
-    expect([...selected].every((index) => index >= 2)).toBe(true);
-    expect(selectFarthestSpawnCandidate(candidates, 0)).toBe(11);
+    expect(selectFarthestSpawnCandidate(candidates, 0)).toBe(10);
+    expect(selectFarthestSpawnCandidate(candidates, 0.5)).toBe(8);
+    expect(selectFarthestSpawnCandidate(candidates, 0.999999)).toBe(6);
+    expect(selectFarthestSpawnCandidate(candidates, 0, 3, 10)).toBe(8);
     expect(selectFarthestSpawnCandidate([], 0.5)).toBe(-1);
+  });
+
+  it('rejects a much farther exposed spawn when covered choices exist', () => {
+    const candidates = [
+      { index: 0, nearestPlayerDistanceSq: 400, visibleThreats: 0 },
+      { index: 1, nearestPlayerDistanceSq: 999_999, visibleThreats: 1 },
+      { index: 2, nearestPlayerDistanceSq: 225, visibleThreats: 0 },
+    ];
+    expect(selectFarthestSpawnCandidate(candidates, 0)).toBe(0);
+    expect(selectFarthestSpawnCandidate(candidates, 0.999999)).toBe(2);
+  });
+
+  it('keeps full authored variety before any opponent contests the arena', () => {
+    const uncontested = Array.from({ length: 10 }, (_, index) => ({
+      index,
+      nearestPlayerDistanceSq: Number.POSITIVE_INFINITY,
+      visibleThreats: 0,
+    }));
+    expect(selectFarthestSpawnCandidate(uncontested, 0)).toBe(0);
+    expect(selectFarthestSpawnCandidate(uncontested, 0.999999)).toBe(9);
   });
 
   it('prefers distance and cover while strongly rejecting occupied spawns', () => {

@@ -65,12 +65,32 @@ export function headingDegrees(yaw: number): number {
 
 /** Canvas rotation that keeps the player's camera-forward direction at the top of a player-centred minimap. */
 export function playerUpRotationRadians(yaw: number): number {
-  const heading = ((Math.PI + yaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-  return -heading;
+  return ((Math.PI + yaw) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+}
+
+/**
+ * Canvas' north-up map uses +X right and -Z up, while Three.js camera-right uses
+ * the opposite handedness after yaw. A player-up map therefore needs this
+ * horizontal reflection as well as rotation; rotation alone mirrors left/right.
+ */
+export function playerUpScaleX(): -1 {
+  return -1;
+}
+
+/** Screen-space offset where camera-forward is up and camera-right is right. */
+export function playerRelativeMinimapOffset(dx: number, dz: number, yaw: number): [number, number] {
+  const forwardX = -Math.sin(yaw);
+  const forwardZ = -Math.cos(yaw);
+  const rightX = Math.cos(yaw);
+  const rightZ = -Math.sin(yaw);
+  return [
+    dx * rightX + dz * rightZ,
+    -(dx * forwardX + dz * forwardZ),
+  ];
 }
 
 export function northMarkerPosition(yaw: number, width: number, height: number, inset = 24): [number, number] {
   const radius = Math.max(0, Math.min(width, height) / 2 - Math.max(0, inset));
-  const angle = -Math.PI / 2 + playerUpRotationRadians(yaw);
-  return [width / 2 + Math.cos(angle) * radius, height / 2 + Math.sin(angle) * radius];
+  const [northX, northY] = playerRelativeMinimapOffset(0, 1, yaw);
+  return [width / 2 + northX * radius, height / 2 + northY * radius];
 }

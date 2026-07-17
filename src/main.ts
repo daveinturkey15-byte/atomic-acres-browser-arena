@@ -50,7 +50,8 @@ import {
   type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
-import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
@@ -587,6 +588,14 @@ const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
+let lastPlayerSpawnIndex = -1;
+let lastPlayerSpawnAudit: {
+  previousIndex: number;
+  selectedIndex: number;
+  selectedVisibleThreats: number;
+  minimumVisibleThreats: number;
+  safeTierCount: number;
+} | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let debugShadowProbe: THREE.Mesh | null = null;
 let matchState: MatchState = createMatch(performance.now());
@@ -1001,11 +1010,8 @@ function renderRemoteShot(message: ShotMessage): void {
 function showDamageDirection(attacker: string): void {
   const attackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
   if (!attackerPosition || attacker === player.id) return;
-  const dx = attackerPosition.x - player.position.x;
-  const dz = attackerPosition.z - player.position.z;
-  const attackerYaw = Math.atan2(-dx, -dz);
   const indicator = element<HTMLElement>('#damage-direction');
-  indicator.style.setProperty('--damage-angle', `${shortestAngleDelta(player.yaw, attackerYaw)}rad`);
+  indicator.style.setProperty('--damage-angle', `${sourceScreenAngle(player.position, player.yaw, attackerPosition)}rad`);
   indicator.classList.remove('pulse');
   requestAnimationFrame(() => indicator.classList.add('pulse'));
 }
@@ -1425,13 +1431,25 @@ function spawnPoint(): THREE.Vector3 {
   if (valid.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
   const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < 20));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
-  const selectedIndex = selectFarthestSpawnCandidate(selectable.map(({ point, index }) => ({
+  const candidates = selectable.map(({ point, index }) => ({
     index,
     nearestPlayerDistanceSq: otherPlayers.length === 0
       ? Number.POSITIVE_INFINITY
       : Math.min(...otherPlayers.map((other) => other.distanceToSquared(point))),
     visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
-  })), gameplayRandom());
+  }));
+  const previousIndex = lastPlayerSpawnIndex;
+  const selectedIndex = selectFarthestSpawnCandidate(candidates, gameplayRandom(), 3, previousIndex);
+  const minimumVisibleThreats = Math.min(...candidates.map((candidate) => candidate.visibleThreats));
+  const selected = candidates.find((candidate) => candidate.index === selectedIndex)!;
+  lastPlayerSpawnAudit = {
+    previousIndex,
+    selectedIndex,
+    selectedVisibleThreats: selected.visibleThreats,
+    minimumVisibleThreats,
+    safeTierCount: candidates.filter((candidate) => candidate.visibleThreats === minimumVisibleThreats).length,
+  };
+  lastPlayerSpawnIndex = selectedIndex;
   return valid.find(({ index }) => index === selectedIndex)!.point.clone();
 }
 
@@ -1512,6 +1530,8 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   refreshWarningUntil = performance.now() + 6_000;
   weaponView.root.visible = true;
   gameMode = mode;
+  lastPlayerSpawnIndex = -1;
+  lastPlayerSpawnAudit = null;
   botsFrozen = false;
   matchState = createMatch(performance.now());
   matchFinished = false;
@@ -2894,6 +2914,7 @@ function updateMinimap(now: number): void {
   context.save();
   context.translate(width / 2, height / 2);
   context.rotate(playerUpRotationRadians(player.yaw));
+  context.scale(playerUpScaleX(), 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
   const [roadLeft] = point(-10.25, 0);
@@ -2965,9 +2986,8 @@ function updateMinimap(now: number): void {
 }
 
 function updateHud(now: number): void {
-  // DOM reconstruction and 2D minimap drawing do not need to run at render rate.
-  // Keeping them at 10 Hz removes main-thread pressure without reducing simulation
-  // or WebGL frame cadence.
+  // DOM reconstruction can stay at 10 Hz. The rotating minimap is intentionally
+  // drawn from frame() so camera-relative direction remains smooth and accurate.
   if (now - lastHudAt < 100) return;
   lastHudAt = now;
   if (gameStarted) updateMatchState(now);
@@ -3409,6 +3429,9 @@ const debugWindow = window as Window & {
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     placeBotAhead: (distance?: number) => void;
+    placeBotRelative: (right: number, forward: number) => void;
+    showBotDamageDirection: () => number | null;
+    respawn: () => void;
     aimAtBot: (zone?: HitZone) => void;
     aimAtRemote: (zone?: HitZone) => void;
     stageWindow: (index: number, distance?: number) => void;
@@ -3507,6 +3530,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       grenades: player.grenades,
       position: player.position.toArray(),
     },
+    spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
     bots: [...bots.values()].map((bot) => ({
       id: bot.id,
       hp: bot.hp,
@@ -3732,6 +3756,28 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.rotation.y = player.yaw;
     bot.invulnerableUntil = 0;
   },
+  placeBotRelative: (right = 0, forward = 5) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    const cameraForward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    const cameraRight = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+    bot.position.set(player.position.x, 0, player.position.z)
+      .addScaledVector(cameraRight, THREE.MathUtils.clamp(right, -9, 9))
+      .addScaledVector(cameraForward, THREE.MathUtils.clamp(forward, -9, 9));
+    bot.root.position.copy(bot.position);
+    bot.root.updateMatrixWorld(true);
+    bot.velocity.set(0, 0, 0);
+    bot.root.rotation.y = player.yaw;
+    bot.invulnerableUntil = 0;
+    bot.lastShotAt = performance.now();
+  },
+  showBotDamageDirection: () => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return null;
+    showDamageDirection(bot.id);
+    return sourceScreenAngle(player.position, player.yaw, bot.position);
+  },
+  respawn: () => respawn(false),
   aimAtBot: (zone: HitZone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;

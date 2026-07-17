@@ -24,6 +24,13 @@ type DebugState = {
     grenades: number;
     position: number[];
   };
+  spawnSelection: {
+    previousIndex: number;
+    selectedIndex: number;
+    selectedVisibleThreats: number;
+    minimumVisibleThreats: number;
+    safeTierCount: number;
+  } | null;
   bots: Array<{
     id: string;
     hp: number;
@@ -1290,6 +1297,87 @@ test.describe('performance and stability', () => {
     const minimapFrames = cadenceEnd.render.minimapRenders - cadenceStart.render.minimapRenders;
     expect(minimapFrames).toBeGreaterThanOrEqual(renderedFrames - 1);
     expect(minimapFrames).toBeLessThanOrEqual(renderedFrames + 1);
+    expect(errors).toEqual([]);
+  });
+
+  test('camera-relative map, damage direction and respawn safety agree on left and right', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance');
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        placeBotRelative: (right: number, forward: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.placeBotRelative(7, 0);
+    });
+
+    const markerCentreX = async (): Promise<number> => page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('#minimap')!;
+      const context = canvas.getContext('2d')!;
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      let weightedX = 0;
+      let pixels = 0;
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const offset = (y * canvas.width + x) * 4;
+          const r = image.data[offset];
+          const g = image.data[offset + 1];
+          const b = image.data[offset + 2];
+          const a = image.data[offset + 3];
+          if (r >= 248 && g >= 112 && g <= 124 && b >= 89 && b <= 101 && a >= 245) {
+            weightedX += x;
+            pixels += 1;
+          }
+        }
+      }
+      if (pixels < 20) throw new Error(`Expected enemy minimap marker pixels, found ${pixels}`);
+      return weightedX / pixels;
+    });
+
+    const waitForTwoFrames = async (): Promise<void> => {
+      const state = await debug(page);
+      await page.waitForFunction((targetFrame) => (
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } })
+          .__ATOMIC_ACRES_DEBUG__.snapshot().frameCount >= targetFrame
+      ), state.frameCount + 2, { timeout: 15_000 });
+    };
+
+    await waitForTwoFrames();
+    expect(await markerCentreX()).toBeGreaterThan(180);
+    const rightDamage = await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { showBotDamageDirection: () => number | null } }
+    ).__ATOMIC_ACRES_DEBUG__.showBotDamageDirection());
+    expect(rightDamage).toBeCloseTo(Math.PI / 2);
+    const rightCssAngle = Number.parseFloat(await page.locator('#damage-direction').evaluate((node) => (
+      node as HTMLElement
+    ).style.getPropertyValue('--damage-angle')));
+    expect(rightCssAngle).toBeGreaterThan(1);
+
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotRelative: (right: number, forward: number) => void } }
+    ).__ATOMIC_ACRES_DEBUG__.placeBotRelative(-7, 0));
+    await waitForTwoFrames();
+    expect(await markerCentreX()).toBeLessThan(180);
+    const leftDamage = await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { showBotDamageDirection: () => number | null } }
+    ).__ATOMIC_ACRES_DEBUG__.showBotDamageDirection());
+    expect(leftDamage).toBeCloseTo(-Math.PI / 2);
+
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { respawn: () => void } }
+    ).__ATOMIC_ACRES_DEBUG__.respawn());
+    const firstRespawn = (await debug(page)).spawnSelection!;
+    expect(firstRespawn.selectedVisibleThreats).toBe(firstRespawn.minimumVisibleThreats);
+    if (firstRespawn.safeTierCount > 1) expect(firstRespawn.selectedIndex).not.toBe(firstRespawn.previousIndex);
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { respawn: () => void } }
+    ).__ATOMIC_ACRES_DEBUG__.respawn());
+    const secondRespawn = (await debug(page)).spawnSelection!;
+    expect(secondRespawn.selectedVisibleThreats).toBe(secondRespawn.minimumVisibleThreats);
+    if (secondRespawn.safeTierCount > 1) expect(secondRespawn.selectedIndex).not.toBe(secondRespawn.previousIndex);
     expect(errors).toEqual([]);
   });
 });
