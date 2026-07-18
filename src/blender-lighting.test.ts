@@ -1,20 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { arenaLightingProfile } from './blender-lighting';
 
-describe('Pass 29 early-morning arena lighting', () => {
-  it('uses bounded low-contrast early-morning balance in Blender Render', () => {
+describe('Pass 30 stormfront early-morning arena lighting', () => {
+  it('uses bounded purple-orange early-morning balance in Blender Render', () => {
     const blender = arenaLightingProfile('blender');
     expect(blender).toMatchObject({
       exposure: 1,
       hemisphereIntensity: 1.5,
       ambientIntensity: 0.52,
       sunIntensity: 2.7,
-      fogColor: 0xb8c1ba,
-      fogNear: 58,
-      fogFar: 136,
-      skyTop: 0x66879e,
-      skyHorizon: 0xb7c6cc,
-      skyBottom: 0xe1b27c,
+      fogColor: 0xb0a5b5,
+      fogNear: 50,
+      fogFar: 128,
+      skyTop: 0x46385f,
+      skyHorizon: 0xcf8a7c,
+      skyBottom: 0xf0a15f,
+      skyCloudShadow: 0x382149,
+      skyCloudLight: 0xff873f,
       routeLightIntensity: 5,
       routeLightCount: 3,
       streetLightCount: 4,

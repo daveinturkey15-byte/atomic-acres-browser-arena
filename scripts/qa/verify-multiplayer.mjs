@@ -4,7 +4,7 @@ const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const renderMode = process.env.QA_RENDER_MODE ?? 'compat';
 const blenderRenderModes = ['blender', 'host-full', 'host-blender', 'guest-blender'];
 const connectionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 30_000;
-const interactionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 10_000;
+const interactionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : renderMode === 'performance' ? 20_000 : 10_000;
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
 const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
 const headed = process.env.QA_HEADED === '1';

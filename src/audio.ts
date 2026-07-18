@@ -363,6 +363,32 @@ export class ArenaAudio {
     this.noise({ duration: 0.18, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035 }, this.weapons);
   }
 
+  hunterLaunch(index: number): void {
+    this.unlock();
+    const offset = Math.max(0, Math.min(4, Math.floor(index))) * 0.045;
+    this.sweep(1_180 + index * 45, 230, 0.42, 0.052, 'sawtooth', this.feedback, offset);
+    this.noise({ duration: 0.24, volume: 0.044, filter: 'bandpass', frequency: 1_600, q: 0.85, delay: offset }, this.ambience);
+  }
+
+  nukeWarning(): void {
+    this.unlock();
+    for (let pulse = 0; pulse < 5; pulse += 1) {
+      const delay = pulse;
+      this.sweep(210 + pulse * 18, 96, 0.64, 0.075 + pulse * 0.008, 'sawtooth', this.feedback, delay);
+      this.tone(680 + pulse * 90, 0.12, 0.045, 'square', this.feedback, delay + 0.68);
+    }
+    this.sweep(42, 148, 4.85, 0.055, 'triangle', this.ambience, 0.05);
+  }
+
+  nukeDetonation(): void {
+    this.unlock();
+    this.sweep(72, 14, 1.15, 0.36, 'sawtooth', this.weapons);
+    this.sweep(34, 9, 2.6, 0.27, 'triangle', this.ambience, 0.04);
+    this.noise({ duration: 1.05, volume: 0.46, filter: 'lowpass', frequency: 1_250, q: 0.45 }, this.weapons);
+    this.noise({ duration: 0.34, volume: 0.2, filter: 'highpass', frequency: 3_600, q: 0.35, delay: 0.028 }, this.feedback);
+    this.noise({ duration: 1.05, volume: 0.16, filter: 'bandpass', frequency: 280, q: 0.52, delay: 0.9 }, this.ambience);
+  }
+
   telemetry(): {
     sanctifiedFragChoir: {
       asset: string;

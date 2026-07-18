@@ -7,7 +7,7 @@ import { grassBypassReason, grassProfileConfig, GrassSystem } from './grass-syst
 const source = readFileSync(new URL('./grass-system.ts', import.meta.url), 'utf8');
 const signalSource = readFileSync(new URL('./atomic-signal.ts', import.meta.url), 'utf8');
 
-describe('Pass 29 living-grass system', () => {
+describe('Pass 30 living-grass system', () => {
   it('freezes explicit profile budgets and bypasses Compatibility, software renderers and query opt-out', () => {
     expect(grassProfileConfig('blender')).toMatchObject({
       enabled: true,
@@ -47,7 +47,7 @@ describe('Pass 29 living-grass system', () => {
     system.update(3.25, new THREE.Vector3(0, 1.7, 0), new THREE.Vector3(10_000, 1.7, 10_000), true);
     const telemetry = system.telemetry();
     expect(telemetry).toMatchObject({
-      pass: 29,
+      pass: 30,
       enabled: true,
       instances: 2_400,
       blades: 7_200,
@@ -76,13 +76,15 @@ describe('Pass 29 living-grass system', () => {
     system.update(3.25, new THREE.Vector3(10_000, 1.7, 10_000), new THREE.Vector3(remote.x, 1.7, remote.z), true);
     expect(system.telemetry().visibleChunks).toBe(0);
     system.dispose();
-    expect(scene.getObjectByName('pass29-living-grass')).toBeUndefined();
+    expect(scene.getObjectByName('pass30-living-grass')).toBeUndefined();
   });
 
   it('keeps output chunks renderer-conditional so Atomic Signal receives linear scene color and direct render receives one transform', () => {
     expect(source).toContain('toneMapped: true');
     expect(source).toContain('#include <tonemapping_fragment>');
     expect(source).toContain('#include <colorspace_fragment>');
+    expect(source).toContain('attribute vec3 instanceColor');
+    expect(source).toContain('mesh.setColorAt(index, tint)');
     expect(signalSource).toContain('renderer.toneMapping = THREE.NoToneMapping');
     expect(signalSource).toContain('this.renderer.toneMapping = this.screenToneMapping');
   });

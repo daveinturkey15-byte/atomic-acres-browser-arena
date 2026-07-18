@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HUNTER_SWARM_COUNT,
+  NUKE_DAMAGE,
   TRI_PASS_BLAST_RADIUS,
   TRI_PASS_MAX_DAMAGE,
+  assignHunterSwarmTargets,
   consumeFieldSupport,
   createFieldSupportState,
   createTriPassTargeting,
+  hunterSwarmDamage,
+  nukeDamageForTarget,
   registerTriPassTarget,
   recordSupportDeath,
   recordSupportElimination,
@@ -17,7 +22,13 @@ describe('field support rewards', () => {
     for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
     expect(state.streak).toBe(7);
     expect(state.rewardCycle).toBe(0);
-    expect(state.available).toEqual({ 'scout-sweep': true, yardhawk: true, 'tri-pass': true });
+    expect(state.available).toEqual({
+      'scout-sweep': true,
+      yardhawk: true,
+      'tri-pass': true,
+      'hunter-swarm': false,
+      nuke: false,
+    });
   });
 
   it('starts a fresh reward cycle immediately after the final streak without requiring death', () => {
@@ -56,8 +67,51 @@ describe('field support rewards', () => {
   });
 
   it('gives the owner-approved Tri-Pass a decisive blast contract', () => {
-    expect(TRI_PASS_BLAST_RADIUS).toBe(7.5);
-    expect(TRI_PASS_MAX_DAMAGE).toBe(225);
+    expect(TRI_PASS_BLAST_RADIUS).toBe(15);
+    expect(TRI_PASS_MAX_DAMAGE).toBe(450);
+  });
+
+  it('unlocks Hunter Swarm and Nuke once per uninterrupted life while keeping 3/5/7 repeatable', () => {
+    let state = createFieldSupportState();
+    for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
+    expect(state.streak).toBe(15);
+    expect(state.available['hunter-swarm']).toBe(true);
+    expect(state.available.nuke).toBe(true);
+    state = consumeFieldSupport(consumeFieldSupport(state, 'hunter-swarm').state, 'nuke').state;
+    for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
+    expect(state.available['hunter-swarm']).toBe(false);
+    expect(state.available.nuke).toBe(false);
+    expect(state.available['tri-pass']).toBe(true);
+    state = recordSupportDeath(state);
+    for (let index = 0; index < 8; index += 1) state = recordSupportElimination(state);
+    expect(state.available['hunter-swarm']).toBe(true);
+  });
+
+  it('assigns exactly five deterministic hostile Hunter Swarm targets and excludes friendlies/dead targets', () => {
+    const assignments = assignHunterSwarmTargets([
+      { id: 'friend', team: 0, alive: true, distanceFromCentreSq: 1 },
+      { id: 'dead', team: 1, alive: false, distanceFromCentreSq: 0 },
+      { id: 'far', team: 1, alive: true, distanceFromCentreSq: 25 },
+      { id: 'near', team: 1, alive: true, distanceFromCentreSq: 4 },
+    ], 0);
+    expect(assignments).toHaveLength(HUNTER_SWARM_COUNT);
+    expect(assignments).toEqual(['near', 'far', 'near', 'far', 'near']);
+  });
+
+  it('makes direct Hunter hits lethal unless prone and bounds splash damage', () => {
+    expect(hunterSwarmDamage(0.2, 'stand')).toBe(200);
+    expect(hunterSwarmDamage(0.2, 'crouch')).toBe(200);
+    expect(hunterSwarmDamage(0.2, 'prone')).toBe(18);
+    expect(hunterSwarmDamage(2, 'stand')).toBe(100);
+    expect(hunterSwarmDamage(2, 'prone')).toBe(9);
+    expect(hunterSwarmDamage(0.2, 'prone') * HUNTER_SWARM_COUNT).toBeLessThan(100);
+    expect(hunterSwarmDamage(5, 'stand')).toBe(0);
+  });
+
+  it('applies nuke damage once to living hostiles only', () => {
+    expect(nukeDamageForTarget(0, 1, true)).toBe(NUKE_DAMAGE);
+    expect(nukeDamageForTarget(0, 0, true)).toBe(0);
+    expect(nukeDamageForTarget(0, 1, false)).toBe(0);
   });
 
   it('accepts exactly three in-bounds tactical-map points and refuses a fourth', () => {

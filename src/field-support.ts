@@ -1,19 +1,44 @@
-export type FieldSupportId = 'scout-sweep' | 'yardhawk' | 'tri-pass';
+import type { Stance } from './gameplay';
+
+export type FieldSupportId = 'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
 
 export type FieldSupportDefinition = {
   id: FieldSupportId;
   name: string;
   eliminations: number;
+  repeatable: boolean;
 };
 
 export const FIELD_SUPPORT: readonly FieldSupportDefinition[] = [
-  { id: 'scout-sweep', name: 'Scout Sweep', eliminations: 3 },
-  { id: 'yardhawk', name: 'Yardhawk', eliminations: 5 },
-  { id: 'tri-pass', name: 'Tri-Pass Strike', eliminations: 7 },
+  { id: 'scout-sweep', name: 'Scout Sweep', eliminations: 3, repeatable: true },
+  { id: 'yardhawk', name: 'Yardhawk', eliminations: 5, repeatable: true },
+  { id: 'tri-pass', name: 'Tri-Pass Strike', eliminations: 7, repeatable: true },
+  { id: 'hunter-swarm', name: 'Hunter Swarm', eliminations: 8, repeatable: false },
+  { id: 'nuke', name: 'Nuke', eliminations: 15, repeatable: false },
 ] as const;
 
-export const TRI_PASS_BLAST_RADIUS = 7.5;
-export const TRI_PASS_MAX_DAMAGE = 225;
+export const TRI_PASS_BLAST_RADIUS = 15;
+export const TRI_PASS_MAX_DAMAGE = 450;
+export const HUNTER_SWARM_COUNT = 5;
+export const HUNTER_SWARM_DIRECT_RADIUS = 0.85;
+export const HUNTER_SWARM_BLAST_RADIUS = 4;
+export const HUNTER_SWARM_DIRECT_DAMAGE = 200;
+export const HUNTER_SWARM_SPLASH_DAMAGE = 100;
+export const HUNTER_SWARM_PRONE_MULTIPLIER = 0.09;
+export const NUKE_WARNING_MS = 5_000;
+export const NUKE_DAMAGE = 1_000;
+
+const REPEATABLE_REWARD_THRESHOLD = 7;
+
+function supportFlags(value = false): Record<FieldSupportId, boolean> {
+  return {
+    'scout-sweep': value,
+    yardhawk: value,
+    'tri-pass': value,
+    'hunter-swarm': value,
+    nuke: value,
+  };
+}
 
 export type FieldSupportState = {
   /** Continuous combat streak. Resets only on death or a new match. */
@@ -28,29 +53,36 @@ export function createFieldSupportState(): FieldSupportState {
   return {
     streak: 0,
     rewardCycle: 0,
-    available: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
-    earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
+    available: supportFlags(),
+    earnedThisStreak: supportFlags(),
   };
 }
 
 export function recordSupportElimination(state: FieldSupportState): FieldSupportState {
-  const finalThreshold = FIELD_SUPPORT[FIELD_SUPPORT.length - 1].eliminations;
   const nextStreak = Math.max(0, Math.floor(state.streak)) + 1;
-  const nextRewardCycle = Math.max(0, Math.floor(state.rewardCycle)) % finalThreshold + 1;
+  const nextRewardCycle = Math.max(0, Math.floor(state.rewardCycle)) % REPEATABLE_REWARD_THRESHOLD + 1;
   const available = { ...state.available };
   const earnedThisStreak = { ...state.earnedThisStreak };
   for (const reward of FIELD_SUPPORT) {
-    if (nextRewardCycle === reward.eliminations && !earnedThisStreak[reward.id]) {
+    const thresholdReached = reward.repeatable
+      ? nextRewardCycle === reward.eliminations
+      : nextStreak === reward.eliminations;
+    if (thresholdReached && !earnedThisStreak[reward.id]) {
       available[reward.id] = true;
       earnedThisStreak[reward.id] = true;
     }
   }
-  if (nextRewardCycle === finalThreshold) {
+  if (nextRewardCycle === REPEATABLE_REWARD_THRESHOLD) {
     return {
       streak: nextStreak,
       rewardCycle: 0,
       available,
-      earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
+      earnedThisStreak: {
+        ...earnedThisStreak,
+        'scout-sweep': false,
+        yardhawk: false,
+        'tri-pass': false,
+      },
     };
   }
   return { streak: nextStreak, rewardCycle: nextRewardCycle, available, earnedThisStreak };
@@ -61,7 +93,7 @@ export function recordSupportDeath(state: FieldSupportState): FieldSupportState 
     streak: 0,
     rewardCycle: 0,
     available: { ...state.available },
-    earnedThisStreak: { 'scout-sweep': false, yardhawk: false, 'tri-pass': false },
+    earnedThisStreak: supportFlags(),
   };
 }
 
@@ -98,4 +130,35 @@ export function triPassSchedule(confirmedAt: number): readonly [number, number, 
   const confirmation = Number.isFinite(confirmedAt) ? confirmedAt : 0;
   const impactAt = confirmation + 1_000;
   return [impactAt, impactAt, impactAt];
+}
+
+export type HunterTargetCandidate = Readonly<{
+  id: string;
+  team: 0 | 1;
+  alive: boolean;
+  distanceFromCentreSq: number;
+}>;
+
+export function assignHunterSwarmTargets(
+  candidates: readonly HunterTargetCandidate[],
+  ownerTeam: 0 | 1,
+  count = HUNTER_SWARM_COUNT,
+): string[] {
+  const hostile = candidates
+    .filter((candidate) => candidate.alive && candidate.team !== ownerTeam && candidate.id.length > 0)
+    .sort((a, b) => a.distanceFromCentreSq - b.distanceFromCentreSq || a.id.localeCompare(b.id));
+  if (hostile.length === 0 || count <= 0) return [];
+  return Array.from({ length: Math.min(HUNTER_SWARM_COUNT, Math.floor(count)) }, (_, index) => hostile[index % hostile.length].id);
+}
+
+export function hunterSwarmDamage(distance: number, stance: Stance): number {
+  if (!Number.isFinite(distance) || distance < 0 || distance > HUNTER_SWARM_BLAST_RADIUS) return 0;
+  const base = distance <= HUNTER_SWARM_DIRECT_RADIUS ? HUNTER_SWARM_DIRECT_DAMAGE : HUNTER_SWARM_SPLASH_DAMAGE;
+  // All five drones may converge on one hostile. Five prone direct impacts
+  // total 90 damage, preserving the explicit full-health survival response.
+  return stance === 'prone' ? Math.round(base * HUNTER_SWARM_PRONE_MULTIPLIER) : base;
+}
+
+export function nukeDamageForTarget(ownerTeam: 0 | 1, targetTeam: 0 | 1, alive: boolean): number {
+  return alive && targetTeam !== ownerTeam ? NUKE_DAMAGE : 0;
 }

@@ -15,7 +15,19 @@ import {
   movementProfile,
 } from './gameplay';
 import { createHouseArchitecture } from './house-navigation';
-import { FIELD_SUPPORT, TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE } from './field-support';
+import {
+  FIELD_SUPPORT,
+  HUNTER_SWARM_BLAST_RADIUS,
+  HUNTER_SWARM_COUNT,
+  HUNTER_SWARM_DIRECT_DAMAGE,
+  HUNTER_SWARM_DIRECT_RADIUS,
+  HUNTER_SWARM_PRONE_MULTIPLIER,
+  HUNTER_SWARM_SPLASH_DAMAGE,
+  NUKE_DAMAGE,
+  NUKE_WARNING_MS,
+  TRI_PASS_BLAST_RADIUS,
+  TRI_PASS_MAX_DAMAGE,
+} from './field-support';
 import {
   DEATH_DROP_INTERACTION_RANGE,
   DEATH_DROP_LIFETIME_MS,
@@ -41,8 +53,8 @@ const movementContexts = {
 export function buildGameplayContract(): Record<string, unknown> {
   const houses = HOUSE_LAYOUT.map((entry) => createHouseArchitecture(entry.team, entry.x, entry.z, entry.facing));
   return {
-    schemaVersion: 1,
-    authority: 'Pass 24 gameplay and presentation-feel baseline',
+    schemaVersion: 2,
+    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 30 deltas',
     simulation: {
       hz: SIMULATION_HZ,
       maximumFrameDtSeconds: 0.05,
@@ -72,6 +84,15 @@ export function buildGameplayContract(): Record<string, unknown> {
       fieldSupport: {
         rewards: FIELD_SUPPORT,
         triPass: { blastRadius: TRI_PASS_BLAST_RADIUS, maximumDamage: TRI_PASS_MAX_DAMAGE },
+        hunterSwarm: {
+          count: HUNTER_SWARM_COUNT,
+          directRadius: HUNTER_SWARM_DIRECT_RADIUS,
+          blastRadius: HUNTER_SWARM_BLAST_RADIUS,
+          directDamage: HUNTER_SWARM_DIRECT_DAMAGE,
+          splashDamage: HUNTER_SWARM_SPLASH_DAMAGE,
+          proneMultiplier: HUNTER_SWARM_PRONE_MULTIPLIER,
+        },
+        nuke: { warningMs: NUKE_WARNING_MS, damage: NUKE_DAMAGE, hostileOnly: true },
       },
     },
     networking: {

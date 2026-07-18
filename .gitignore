@@ -8,7 +8,10 @@ qwen_swarm.py
 .DS_Store
 .env
 .env.*
+!.env.production
 .hermes/
 playwright-report/
 test-results/
 artifacts/
+.wrangler/
+.dev.vars*

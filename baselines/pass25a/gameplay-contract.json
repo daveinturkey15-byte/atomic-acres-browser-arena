@@ -2670,7 +2670,7 @@
         ]
       }
     },
-    "authority": "Pass 24 gameplay and presentation-feel baseline",
+    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 30 deltas",
     "combat": {
       "botDamageMultiplier": 0.5,
       "grenade": {
@@ -2915,26 +2915,54 @@
         }
       ],
       "fieldSupport": {
+        "hunterSwarm": {
+          "blastRadius": 4,
+          "count": 5,
+          "directDamage": 200,
+          "directRadius": 0.85,
+          "proneMultiplier": 0.09,
+          "splashDamage": 100
+        },
+        "nuke": {
+          "damage": 1000,
+          "hostileOnly": true,
+          "warningMs": 5000
+        },
         "rewards": [
           {
             "eliminations": 3,
             "id": "scout-sweep",
-            "name": "Scout Sweep"
+            "name": "Scout Sweep",
+            "repeatable": true
           },
           {
             "eliminations": 5,
             "id": "yardhawk",
-            "name": "Yardhawk"
+            "name": "Yardhawk",
+            "repeatable": true
           },
           {
             "eliminations": 7,
             "id": "tri-pass",
-            "name": "Tri-Pass Strike"
+            "name": "Tri-Pass Strike",
+            "repeatable": true
+          },
+          {
+            "eliminations": 8,
+            "id": "hunter-swarm",
+            "name": "Hunter Swarm",
+            "repeatable": false
+          },
+          {
+            "eliminations": 15,
+            "id": "nuke",
+            "name": "Nuke",
+            "repeatable": false
           }
         ],
         "triPass": {
-          "blastRadius": 7.5,
-          "maximumDamage": 225
+          "blastRadius": 15,
+          "maximumDamage": 450
         }
       }
     },
@@ -3043,25 +3071,27 @@
             "ambientColor": 12569028,
             "ambientIntensity": 0.52,
             "exposure": 1,
-            "fogColor": 12108218,
-            "fogFar": 136,
-            "fogNear": 58,
+            "fogColor": 11576757,
+            "fogFar": 128,
+            "fogNear": 50,
             "godRayLobes": 4,
             "godRayStrength": 0.12,
             "hemisphereGround": 7236442,
             "hemisphereIntensity": 1.5,
-            "hemisphereSky": 13228765,
+            "hemisphereSky": 13350090,
             "interiorLightCount": 4,
             "interiorLightIntensity": 12,
             "routeLightCount": 3,
             "routeLightIntensity": 5,
             "shadowBias": -0.00012,
             "shadowNormalBias": 0.04,
-            "skyBottom": 14791292,
-            "skyCloud": 14869207,
-            "skyHorizon": 12043980,
-            "skySun": 16765339,
-            "skyTop": 6719390,
+            "skyBottom": 15769951,
+            "skyCloud": 14259072,
+            "skyCloudLight": 16746303,
+            "skyCloudShadow": 3678537,
+            "skyHorizon": 13601404,
+            "skySun": 16763015,
+            "skyTop": 4601951,
             "softShadows": false,
             "streetLightCount": 4,
             "streetLightIntensity": 6,
@@ -3092,25 +3122,27 @@
             "ambientColor": 13094858,
             "ambientIntensity": 0.62,
             "exposure": 1.02,
-            "fogColor": 12831170,
-            "fogFar": 148,
-            "fogNear": 64,
+            "fogColor": 12103096,
+            "fogFar": 140,
+            "fogNear": 56,
             "godRayLobes": 0,
             "godRayStrength": 0,
             "hemisphereGround": 7828321,
             "hemisphereIntensity": 1.55,
-            "hemisphereSky": 13885667,
+            "hemisphereSky": 13351627,
             "interiorLightCount": 0,
             "interiorLightIntensity": 0,
             "routeLightCount": 0,
             "routeLightIntensity": 0,
             "shadowBias": -0.00028,
             "shadowNormalBias": 0.025,
-            "skyBottom": 14858631,
-            "skyCloud": 15066588,
-            "skyHorizon": 12110287,
-            "skySun": 16765856,
-            "skyTop": 7311269,
+            "skyBottom": 15377255,
+            "skyCloud": 14064262,
+            "skyCloudLight": 16748876,
+            "skyCloudShadow": 4467027,
+            "skyHorizon": 13275014,
+            "skySun": 16764819,
+            "skyTop": 5785198,
             "softShadows": false,
             "streetLightCount": 0,
             "streetLightIntensity": 0,
@@ -3141,25 +3173,27 @@
             "ambientColor": 13094858,
             "ambientIntensity": 0.55,
             "exposure": 1.02,
-            "fogColor": 12831170,
-            "fogFar": 148,
-            "fogNear": 64,
+            "fogColor": 12103096,
+            "fogFar": 140,
+            "fogNear": 56,
             "godRayLobes": 2,
             "godRayStrength": 0.08,
             "hemisphereGround": 7828321,
             "hemisphereIntensity": 1.5,
-            "hemisphereSky": 13885667,
+            "hemisphereSky": 13351627,
             "interiorLightCount": 2,
             "interiorLightIntensity": 8,
             "routeLightCount": 3,
             "routeLightIntensity": 3,
             "shadowBias": -0.00028,
             "shadowNormalBias": 0.025,
-            "skyBottom": 14858631,
-            "skyCloud": 15066588,
-            "skyHorizon": 12110287,
-            "skySun": 16765856,
-            "skyTop": 7311269,
+            "skyBottom": 15377255,
+            "skyCloud": 14064262,
+            "skyCloudLight": 16748876,
+            "skyCloudShadow": 4467027,
+            "skyHorizon": 13275014,
+            "skySun": 16764819,
+            "skyTop": 5785198,
             "softShadows": false,
             "streetLightCount": 4,
             "streetLightIntensity": 4,
@@ -3174,7 +3208,7 @@
         }
       }
     },
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "simulation": {
       "hz": 120,
       "maximumCatchupSteps": 6,
@@ -3187,10 +3221,14 @@
       "tri-pass-strength",
       "spawn-safety",
       "streak-cycle",
-      "owner-defect-fixes"
+      "owner-defect-fixes",
+      "pass30-double-tri-pass-radius-and-damage",
+      "pass30-hunter-swarm-eight-streak",
+      "pass30-nuke-fifteen-streak",
+      "pass30-stormfront-lighting"
     ],
-    "baseSourceRevision": "3a1ead06bfdede4b3d6c96f9ecde228520c04ccf",
-    "baseline": "Pass 24 approved gameplay feel plus owner-approved Pass 25A deltas",
+    "baseSourceRevision": "72c313c494853ed1ee4673f06a8f064330ac9efc",
+    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 30",
     "dependencies": {
       "@dimforge/rapier3d-compat": "0.19.3",
       "peerjs": "1.5.5",
@@ -3199,6 +3237,6 @@
       "vite": "8.1.3"
     },
     "generatedBy": "scripts/qa/generate-pass25a-baselines.ts",
-    "schemaVersion": 2
+    "schemaVersion": 3
   }
 }

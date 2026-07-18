@@ -18,30 +18,77 @@ const LEGACY_VEHICLE_NAMES = new Set([
 ]);
 
 function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
-  const bark = texturedMaterial('./assets/original/textures/wood-deck.png', { color: 0x72503b, roughness: 1, repeatY: 3 });
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.38 * scale, 0.55 * scale, 4.2 * scale, 12), bark);
-  trunk.position.set(x, 2.1 * scale, z);
+  const bark = texturedMaterial('./assets/original/textures/wood-deck.png', { color: 0x80593d, roughness: 0.98, repeatY: 4 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * scale, 0.64 * scale, 4.75 * scale, 14, 4), bark);
+  trunk.position.set(x, 2.37 * scale, z);
   trunk.castShadow = true;
   root.add(trunk);
-  const leafMaterials = [0x35583d, 0x496f47, 0x5f8249, 0x789454].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.96 }));
-  for (const [rotation, length] of [[-0.7, 2.2], [0.55, 2.0], [1.7, 1.65]] as Array<[number, number]>) {
-    const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * scale, 0.18 * scale, length * scale, 8), bark);
-    branch.position.set(x + Math.sin(rotation) * 0.55 * scale, 3.9 * scale, z + Math.cos(rotation) * 0.55 * scale);
+  for (const rotation of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+    const rootFlare = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.2 * scale, 1.35 * scale, 8), bark);
+    rootFlare.position.set(x + Math.sin(rotation) * 0.47 * scale, 0.22 * scale, z + Math.cos(rotation) * 0.47 * scale);
+    rootFlare.rotation.z = Math.PI / 2.8;
+    rootFlare.rotation.y = rotation;
+    rootFlare.castShadow = true;
+    root.add(rootFlare);
+  }
+  const leafMaterials = [0x3a6842, 0x527b49, 0x6f8d50, 0x829c5c].map((color) => (
+    texturedMaterial('./assets/original/textures/grass-turf.png', { color, roughness: 0.92, repeatX: 1.5, repeatY: 1.5 })
+  ));
+  for (const [rotation, length, height] of [[-0.7, 2.3, 4.05], [0.55, 2.1, 4.25], [1.7, 1.8, 4.5], [2.65, 1.7, 4.65], [-2.4, 1.55, 4.8]] as Array<[number, number, number]>) {
+    const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.17 * scale, length * scale, 9), bark);
+    branch.position.set(x + Math.sin(rotation) * 0.62 * scale, height * scale, z + Math.cos(rotation) * 0.62 * scale);
     branch.rotation.z = Math.PI / 2.9; branch.rotation.y = rotation; branch.castShadow = true; root.add(branch);
   }
   const clusters: Array<[number, number, number, number, number, number]> = [
-    [0, 5.35, 0, 1.85, 1.35, 1.7], [-1.3, 4.85, 0.45, 1.35, 1.05, 1.2], [1.25, 4.95, -0.35, 1.45, 1.05, 1.25],
-    [-0.5, 6.15, -0.55, 1.25, 1.1, 1.15], [0.65, 6.2, 0.45, 1.35, 1.15, 1.2], [-1.35, 5.75, -0.45, 1.05, 0.85, 1.0],
-    [1.45, 5.8, 0.65, 1.0, 0.82, 0.95], [0.05, 6.95, 0, 1.1, 0.95, 1.0], [0, 4.7, 1.05, 1.25, 0.9, 1.0],
+    [0, 5.55, 0, 1.95, 1.42, 1.78], [-1.38, 5.05, 0.5, 1.42, 1.08, 1.25], [1.32, 5.08, -0.42, 1.5, 1.08, 1.3],
+    [-0.55, 6.3, -0.6, 1.3, 1.14, 1.2], [0.72, 6.35, 0.5, 1.4, 1.18, 1.25], [-1.42, 5.9, -0.48, 1.08, 0.88, 1.02],
+    [1.5, 5.95, 0.68, 1.04, 0.86, 1], [0.05, 7.12, 0, 1.16, 1, 1.05], [0, 4.88, 1.12, 1.3, 0.94, 1.05],
+    [0.98, 6.55, -0.72, 0.82, 0.72, 0.78], [-0.98, 6.6, 0.78, 0.84, 0.74, 0.8],
   ];
   clusters.forEach(([ox, oy, oz, rx, ry, rz], index) => {
-    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(scale, 1), leafMaterials[index % leafMaterials.length]);
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(scale, 12, 8), leafMaterials[index % leafMaterials.length]);
     crown.position.set(x + ox * scale, oy * scale, z + oz * scale);
     crown.scale.set(rx, ry, rz);
     crown.rotation.set(index * 0.17, index * 0.43, index * 0.11);
     crown.castShadow = index < 5;
     root.add(crown);
   });
+  root.userData.pass30ModernVegetation = true;
+}
+
+function addModernGroundDetails(root: THREE.Group, reduced: boolean): void {
+  const details = new THREE.Group();
+  details.name = 'pass30-modern-ground-details';
+  details.userData.presentationOnly = true;
+  details.userData.blocksShots = false;
+  const drainMaterial = texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { color: 0x718089, roughness: 0.5, metalness: 0.55, repeatX: 2 });
+  const drainLayout: Array<[number, number]> = reduced
+    ? [[-6.6, -26], [6.6, 26]]
+    : [[-6.6, -31], [6.6, -17], [-6.6, -3], [6.6, 11], [-6.6, 25], [6.6, 35]];
+  const drains = new THREE.InstancedMesh(new THREE.BoxGeometry(0.75, 0.055, 1.35), drainMaterial, drainLayout.length);
+  const matrix = new THREE.Matrix4();
+  drainLayout.forEach(([dx, dz], index) => {
+    matrix.identity().setPosition(dx, 0.07, dz);
+    drains.setMatrixAt(index, matrix);
+  });
+  drains.instanceMatrix.needsUpdate = true;
+  drains.receiveShadow = true;
+  drains.userData.presentationOnly = true;
+  drains.userData.blocksShots = false;
+  details.add(drains);
+
+  const reflectorMaterial = new THREE.MeshStandardMaterial({ color: 0xffa15d, emissive: 0x642008, emissiveIntensity: 0.48, roughness: 0.4, metalness: 0.2 });
+  const reflectorLayout: Array<[number, number]> = [[-7.15, -30], [7.15, -20], [-7.15, -10], [7.15, 0], [-7.15, 10], [7.15, 20], [-7.15, 30], [7.15, 36]];
+  const reflectors = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.16, 0.34), reflectorMaterial, reduced ? 4 : reflectorLayout.length);
+  reflectorLayout.slice(0, reflectors.count).forEach(([rx, rz], index) => {
+    matrix.makeRotationY(index % 2 === 0 ? 0 : Math.PI).setPosition(rx, 0.14, rz);
+    reflectors.setMatrixAt(index, matrix);
+  });
+  reflectors.instanceMatrix.needsUpdate = true;
+  reflectors.userData.presentationOnly = true;
+  reflectors.userData.blocksShots = false;
+  details.add(reflectors);
+  root.add(details);
 }
 
 function addStreetProps(root: THREE.Group): void {
@@ -440,6 +487,7 @@ export async function loadArenaArt(
   addTree(root, -28, 29, 0.82); onProgress?.(5, 12);
   addTree(root, 27, -31, 0.9); onProgress?.(6, 12);
   addStreetProps(root); onProgress?.(7, 12);
+  addModernGroundDetails(root, reduced);
 
   const tower = new THREE.Group();
   tower.position.set(29, 0, -36);

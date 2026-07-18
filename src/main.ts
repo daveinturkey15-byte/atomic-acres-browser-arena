@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import { AtmosphereSystem } from './atmosphere-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
 import {
@@ -66,7 +67,25 @@ import { advanceFootsteps, strideLength, type FootstepAccumulator } from './foot
 import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { GrassSystem } from './grass-system';
-import { TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE, consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
+import {
+  HUNTER_SWARM_BLAST_RADIUS,
+  HUNTER_SWARM_COUNT,
+  NUKE_WARNING_MS,
+  TRI_PASS_BLAST_RADIUS,
+  TRI_PASS_MAX_DAMAGE,
+  assignHunterSwarmTargets,
+  consumeFieldSupport,
+  createFieldSupportState,
+  createTriPassTargeting,
+  hunterSwarmDamage,
+  nukeDamageForTarget,
+  recordSupportDeath,
+  recordSupportElimination,
+  registerTriPassTarget,
+  triPassSchedule,
+  type FieldSupportId,
+  type TriPassTargeting,
+} from './field-support';
 import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   DEATH_DROP_INTERACTION_RANGE,
@@ -87,6 +106,7 @@ import { ArenaNetwork } from './network';
 import {
   HIGH_SCORE_STORAGE_KEY,
   MAX_MATCH_KILLS,
+  immediateStreakEntry,
   loadHighScores,
   mergeHighScores,
   normalizeRequiredPlayerName,
@@ -94,6 +114,12 @@ import {
   saveHighScores,
   type HighScoreEntry,
 } from './high-scores';
+import {
+  GLOBAL_LEADERBOARD_ENDPOINT,
+  fetchGlobalLeaderboard,
+  leaderboardInstallId,
+  submitGlobalStreak,
+} from './global-leaderboard';
 import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
@@ -191,6 +217,24 @@ type StrikeMissileEntity = {
   resolved: boolean;
 };
 
+type HunterDroneEntity = {
+  root: THREE.Group;
+  targetId: string;
+  index: number;
+  spawnedAt: number;
+  diveAt: number;
+  expiresAt: number;
+};
+
+type NukeSequence = {
+  startedAt: number;
+  detonateAt: number;
+  finishedAt: number;
+  detonated: boolean;
+  shockwave: THREE.Mesh;
+  light: THREE.PointLight;
+};
+
 type ActiveTeamPing = {
   root: THREE.Group;
   expiresAt: number;
@@ -217,10 +261,12 @@ app.innerHTML = `
   <canvas id="game" aria-label="Atomic Acres multiplayer arena"></canvas>
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
+  <div id="nuke-flash" hidden></div>
+  <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · DAWNFIELD PASS 29</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · STORMFRONT PASS 30</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Deploy into a shader-unified agritech test suburb with distinct cultivation, transit and solar-service routes.</p>
+    <p class="lede">Deploy beneath a purple-orange stormfront with global streak records, modernized living ground and escalating field support.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -241,9 +287,9 @@ app.innerHTML = `
       <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
       <div id="network-status" data-kind="ok">Ready for deployment.</div>
       <section id="high-score-card" aria-labelledby="high-score-title">
-        <div class="high-score-heading"><span><small>PERSISTENT RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
-        <ol id="high-score-list"><li class="empty">Complete a match to set the first record.</li></ol>
-        <p>Stored on this browser across builds · merged live with players in your current peer lobby.</p>
+        <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
+        <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
+        <p>Global streak records sync across builds and devices · local cache remains available offline.</p>
       </section>
     </div>
     <div class="menu-panel" data-menu-panel="kit" hidden>
@@ -300,8 +346,10 @@ app.innerHTML = `
         <b data-support="scout-sweep"><kbd>3</kbd><span><small>3 KILLS</small>SCOUT SWEEP</span></b>
         <b data-support="yardhawk"><kbd>4</kbd><span><small>5 KILLS</small>YARDHAWK</span></b>
         <b data-support="tri-pass"><kbd>5</kbd><span><small>7 KILLS</small>TRI-PASS</span></b>
+        <b data-support="hunter-swarm"><kbd>6</kbd><span><small>8 KILLS</small>HUNTER SWARM</span></b>
+        <b data-support="nuke"><kbd>7</kbd><span><small>15 KILLS</small>NUKE</span></b>
       </div>
-      <small class="support-help">PRESS 3 / 4 / 5 TO ACTIVATE</small>
+      <small class="support-help">PRESS 3–7 TO ACTIVATE</small>
     </div>
     <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
@@ -377,6 +425,9 @@ const atomicSignal = new AtomicSignalPass(renderer, renderProfile, (reason) => {
   console.warn('[Atomic Acres Atomic Signal fallback]', reason);
 }, atomicSignalBypass);
 const grassQuery = new URLSearchParams(window.location.search).get('grass');
+const mistQuery = new URLSearchParams(window.location.search).get('mist');
+const cloudsQuery = new URLSearchParams(window.location.search).get('clouds');
+const skyCloudsEnabled = !reducedRenderMode || cloudsQuery === 'on';
 const raysQuery = new URLSearchParams(window.location.search).get('rays');
 const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on')) ? 0 : activeLighting.godRayStrength;
 const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
@@ -404,6 +455,7 @@ scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activ
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
+let skyMaterial: THREE.ShaderMaterial | null = null;
 
 let riggedOperatorLoadError: string | null = null;
 let importedWeaponLoadError: string | null = null;
@@ -461,10 +513,13 @@ function buildSky(): void {
       bottom: { value: new THREE.Color(activeLighting.skyBottom) },
       sunColor: { value: new THREE.Color(activeLighting.skySun) },
       cloudColor: { value: new THREE.Color(activeLighting.skyCloud) },
+      cloudShadow: { value: new THREE.Color(activeLighting.skyCloudShadow) },
+      cloudLight: { value: new THREE.Color(activeLighting.skyCloudLight) },
       sunDirection: { value: new THREE.Vector3(...activeLighting.sunPosition).normalize() },
-      cloudStrength: { value: reducedRenderMode ? 0 : renderProfile === 'blender' ? 0.08 : 0.045 },
+      cloudStrength: { value: skyCloudsEnabled ? (renderProfile === 'blender' ? 0.68 : 0.45) : 0 },
       rayStrength: { value: actualGodRayStrength },
       rayLobes: { value: actualGodRayLobes },
+      nukeFlash: { value: 0 },
     },
     vertexShader: `
       varying vec3 skyDirection;
@@ -480,10 +535,13 @@ function buildSky(): void {
       uniform vec3 bottom;
       uniform vec3 sunColor;
       uniform vec3 cloudColor;
+      uniform vec3 cloudShadow;
+      uniform vec3 cloudLight;
       uniform vec3 sunDirection;
       uniform float cloudStrength;
       uniform float rayStrength;
       uniform float rayLobes;
+      uniform float nukeFlash;
       void main(){
         vec3 direction = normalize(skyDirection);
         float h = direction.y;
@@ -493,21 +551,27 @@ function buildSky(): void {
         float sunDot = max(dot(direction, sunDirection), 0.0);
         float sunDisc = pow(sunDot, 420.0);
         float sunHalo = pow(sunDot, 18.0) * 0.28;
-        ${reducedRenderMode ? '' : `
-        float azimuth = atan(direction.z, direction.x);
-        float highBand = 1.0 - smoothstep(0.0, 0.075, abs(h - 0.48));
-        float lowBand = 1.0 - smoothstep(0.0, 0.06, abs(h - 0.3));
-        float waveA = 0.5 + 0.5 * sin(azimuth * 8.0 + sin(azimuth * 3.0) * 1.8);
-        float waveB = 0.5 + 0.5 * sin(azimuth * 17.0 - h * 12.0);
-        float cloudMask = smoothstep(0.62, 0.9, waveA * 0.72 + waveB * 0.28) * max(highBand, lowBand * 0.72);
-        color = mix(color, cloudColor, cloudMask * cloudStrength);
-        `}
+        ${skyCloudsEnabled ? `
+        float horizonBand = smoothstep(0.035, 0.11, h) * (1.0 - smoothstep(0.3, 0.43, h));
+        float highBand = smoothstep(0.5, 0.65, h) * (1.0 - smoothstep(0.88, 0.98, h));
+        float lowBand = smoothstep(0.2, 0.35, h) * (1.0 - smoothstep(0.57, 0.72, h));
+        float waveA = 0.5 + 0.5 * sin(direction.x * 11.0 + direction.z * 4.0 + sin(direction.z * 9.0) * 1.7 + h * 2.0);
+        float waveB = 0.5 + 0.5 * sin(direction.z * 15.0 - direction.x * 7.0 + h * 8.0);
+        float cloudBand = max(horizonBand * 0.82, max(highBand, lowBand * 0.86));
+        float cloudDetail = smoothstep(0.46, 0.8, waveA * 0.64 + waveB * 0.36);
+        float cloudMask = cloudBand * (0.34 + cloudDetail * 0.66);
+        float cloudSun = smoothstep(0.02, 0.42, sunDot + waveB * 0.08);
+        vec3 stormCloud = mix(cloudShadow, cloudLight, cloudSun);
+        stormCloud = mix(stormCloud, cloudColor, 0.04);
+        color = mix(color, stormCloud, cloudMask * cloudStrength);
+        ` : 'float cloudMask = 0.0;'}
         float rayAzimuth = atan(direction.z, direction.x);
         float rayBands = 0.5 + 0.5 * sin(rayAzimuth * max(rayLobes, 1.0) + h * 13.0);
         float rayShape = smoothstep(0.54, 0.96, rayBands) * pow(sunDot, 3.2);
         float rayAltitude = smoothstep(-0.04, 0.24, h);
         color += sunColor * rayShape * rayAltitude * rayStrength;
         color += sunColor * (sunDisc * 1.4 + sunHalo);
+        color = mix(color, vec3(1.55, 0.78, 0.34), clamp(nukeFlash, 0.0, 1.0));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -516,6 +580,7 @@ function buildSky(): void {
   sky.name = 'procedural-atmosphere-sky';
   sky.frustumCulled = false;
   sky.onBeforeRender = () => sky.position.copy(camera.position);
+  skyMaterial = material;
   scene.add(sky);
   scene.add(new THREE.HemisphereLight(activeLighting.hemisphereSky, activeLighting.hemisphereGround, activeLighting.hemisphereIntensity));
   scene.add(new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity));
@@ -540,6 +605,7 @@ const worldIdentityPresentation = createWorldIdentityPresentation(
   softwareRenderer,
 );
 const arena: ArenaMap = buildArena(scene);
+const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery);
 const grassSystem = new GrassSystem(
   scene,
   renderProfile,
@@ -555,6 +621,7 @@ renderer.domElement.addEventListener('webglcontextrestored', () => {
   document.documentElement.dataset.webglContext = 'ready';
   renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
   atomicSignal.invalidateValidation();
+  atmosphereSystem.handleContextRestored();
   grassSystem.handleContextRestored();
   resize();
 });
@@ -621,16 +688,27 @@ let bestStreakThisMatch = 0;
 let matchScoreRecorded = false;
 let highScores: HighScoreEntry[] = [];
 try { highScores = loadHighScores(localStorage); } catch { /* Gameplay remains available when persistent storage is blocked. */ }
+const leaderboardInstallation = leaderboardInstallId(localStorage);
+const LEADERBOARD_BUILD_ID = 'stormfront-pass30';
+const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
+  && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
 const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v1') : null;
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
+const hunterDrones: HunterDroneEntity[] = [];
+let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
 let tacticalMapOpen = false;
 let yardhawkExplosions = 0;
 let triPassLaunches = 0;
 let triPassImpacts = 0;
 let triPassLastImpactDelayMs: number | null = null;
+let hunterSwarmLaunches = 0;
+let hunterSwarmImpacts = 0;
+let nukeLaunches = 0;
+let nukeDetonations = 0;
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
@@ -749,17 +827,24 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
 function renderHighScores(): void {
   const list = element<HTMLOListElement>('#high-score-list');
   if (highScores.length === 0) {
-    list.innerHTML = '<li class="empty">Complete a match to set the first record.</li>';
+    list.innerHTML = '<li class="empty">Set the first named streak record.</li>';
   } else {
     list.innerHTML = highScores.slice(0, 8).map((entry, index) => (
-      `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>${entry.kills} KILLS</span><small>BEST ×${entry.bestStreak} · ${entry.deaths}D${entry.won ? ' · WIN' : ''}</small></li>`
+      `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>×${entry.bestStreak} STREAK</span><small>${entry.kills} KILLS · ${entry.deaths}D${entry.won ? ' · WIN' : ''}</small></li>`
     )).join('');
   }
   const currentName = normalizeRequiredPlayerName(element<HTMLInputElement>('#player-name').value) ?? storedPlayerName;
   const best = personalBest(highScores, currentName);
   element<HTMLElement>('#personal-best').textContent = best
-    ? `YOUR BEST ${best.kills} KILLS · ×${best.bestStreak}`
+    ? `YOUR BEST ×${best.bestStreak} · ${best.kills} KILLS`
     : 'NO PERSONAL BEST';
+  element<HTMLElement>('#global-leaderboard-status').textContent = globalLeaderboardState === 'live'
+    ? 'GLOBAL STREAK RECORDS · LIVE'
+    : globalLeaderboardState === 'saved'
+      ? 'GLOBAL STREAK RECORDS · SAVED'
+      : globalLeaderboardState === 'pending'
+        ? 'GLOBAL STREAK RECORDS · CONNECTING'
+        : 'GLOBAL STREAK RECORDS · OFFLINE CACHE';
 }
 
 function persistMergedHighScores(incoming: readonly unknown[], notifyTabs = true): void {
@@ -775,6 +860,56 @@ function persistMergedHighScores(incoming: readonly unknown[], notifyTabs = true
 
 function sendLeaderboardSync(): void {
   if (network.role !== 'offline') network.send({ type: 'leaderboard-sync', by: player.id, entries: highScores });
+}
+
+async function refreshGlobalLeaderboard(): Promise<void> {
+  if (!GLOBAL_LEADERBOARD_ENDPOINT || localMultiplayerQa) {
+    globalLeaderboardState = 'cached';
+    renderHighScores();
+    return;
+  }
+  globalLeaderboardState = 'pending';
+  renderHighScores();
+  try {
+    const entries = await fetchGlobalLeaderboard();
+    persistMergedHighScores(entries);
+    globalLeaderboardState = 'live';
+  } catch {
+    globalLeaderboardState = 'cached';
+  }
+  renderHighScores();
+}
+
+function recordImmediateStreak(syncGlobal = true): void {
+  const existing = personalBest(highScores, player.name);
+  if (existing && existing.bestStreak >= fieldSupport.streak) return;
+  const entry = immediateStreakEntry(
+    leaderboardInstallation,
+    player.name,
+    fieldSupport.streak,
+    player.kills,
+    player.deaths,
+  );
+  if (!entry) return;
+  persistMergedHighScores([entry]);
+  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, entry });
+  if (!syncGlobal || localMultiplayerQa) return;
+  const nameKey = entry.id.replace(/^global:/, '');
+  void submitGlobalStreak({
+    name: entry.name,
+    streak: entry.bestStreak,
+    kills: entry.kills,
+    deaths: entry.deaths,
+    installId: leaderboardInstallation,
+    buildId: LEADERBOARD_BUILD_ID,
+    idempotencyKey: `${leaderboardInstallation}:${nameKey}:${entry.bestStreak}`.slice(0, 120),
+  }).then((accepted) => {
+    globalLeaderboardState = accepted ? 'saved' : 'cached';
+    renderHighScores();
+  }).catch(() => {
+    globalLeaderboardState = 'cached';
+    renderHighScores();
+  });
 }
 
 function recordCompletedMatch(): void {
@@ -835,6 +970,7 @@ if (!webRtcSupported) {
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 renderHighScores();
+void refreshGlobalLeaderboard();
 highScoreChannel?.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (Array.isArray(event.data)) persistMergedHighScores(event.data, false);
 });
@@ -2537,22 +2673,35 @@ function updateFieldSupportHud(): void {
   });
 }
 
-function awardSupportElimination(): void {
+function awardSupportElimination(syncGlobalLeaderboard = true): void {
   const before = fieldSupport.available;
   fieldSupport = recordSupportElimination(fieldSupport);
   bestStreakThisMatch = Math.max(bestStreakThisMatch, fieldSupport.streak);
-  for (const [id, label] of [['scout-sweep', 'SCOUT SWEEP'], ['yardhawk', 'YARDHAWK'], ['tri-pass', 'TRI-PASS STRIKE']] as const) {
+  for (const [id, label] of [
+    ['scout-sweep', 'SCOUT SWEEP'],
+    ['yardhawk', 'YARDHAWK'],
+    ['tri-pass', 'TRI-PASS STRIKE'],
+    ['hunter-swarm', 'HUNTER SWARM'],
+    ['nuke', 'NUKE'],
+  ] as const) {
     if (!before[id] && fieldSupport.available[id]) addFeed(`${label} READY`, 'gold');
   }
+  recordImmediateStreak(syncGlobalLeaderboard);
   updateFieldSupportHud();
 }
 
-function supportTargetPosition(id: string): THREE.Vector3 | null {
+function supportTargetState(id: string): { point: THREE.Vector3; stance: Stance } | null {
   const bot = bots.get(id);
-  if (bot?.alive) return bot.position.clone().add(new THREE.Vector3(0, 1.15, 0));
+  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: 'stand' };
   const remote = remotes.get(id);
-  if (remote && remote.snapshot.team !== player.team && remote.snapshot.hp > 0) return remote.target.clone().add(new THREE.Vector3(0, 1.15, 0));
+  if (remote && remote.snapshot.team !== player.team && remote.snapshot.hp > 0) {
+    return { point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: remote.snapshot.stance ?? 'stand' };
+  }
   return null;
+}
+
+function supportTargetPosition(id: string): THREE.Vector3 | null {
+  return supportTargetState(id)?.point ?? null;
 }
 
 function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
@@ -2563,6 +2712,213 @@ function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
   }
   candidates.sort((a, b) => a.point.distanceToSquared(player.position) - b.point.distanceToSquared(player.position));
   return candidates[0] ?? null;
+}
+
+function hunterTargetAssignments(): string[] {
+  const candidates = [
+    ...[...bots.values()].map((bot) => ({
+      id: bot.id,
+      team: bot.team,
+      alive: bot.alive,
+      distanceFromCentreSq: bot.position.x * bot.position.x + bot.position.z * bot.position.z,
+    })),
+    ...[...remotes.values()].map((remote) => ({
+      id: remote.snapshot.id,
+      team: remote.snapshot.team,
+      alive: remote.snapshot.hp > 0,
+      distanceFromCentreSq: remote.target.x * remote.target.x + remote.target.z * remote.target.z,
+    })),
+  ];
+  return assignHunterSwarmTargets(candidates, player.team);
+}
+
+function makeHunterDrone(index: number): THREE.Group {
+  const root = new THREE.Group();
+  root.name = `hunter-swarm-drone-${index}`;
+  const shell = new THREE.MeshStandardMaterial({ color: 0x263139, roughness: 0.34, metalness: 0.82 });
+  const edge = new THREE.MeshStandardMaterial({ color: 0xe0a54e, emissive: 0x8a3517, emissiveIntensity: 1.4, roughness: 0.4, metalness: 0.52 });
+  const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff563e, toneMapped: false });
+  const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), shell);
+  body.scale.set(1, 0.48, 1.55);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.075, 0.42), edge);
+  wing.position.z = 0.08;
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.72, 8), shell);
+  tail.rotation.x = Math.PI / 2;
+  tail.position.z = 0.9;
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 7), eyeMaterial);
+  eye.position.z = -0.58;
+  const trail = new THREE.Mesh(
+    new THREE.ConeGeometry(0.16, 1.35, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xff9d50, transparent: true, opacity: 0.54, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+  );
+  trail.rotation.x = -Math.PI / 2;
+  trail.position.z = 1.25;
+  root.add(body, wing, tail, eye, trail);
+  root.traverse((node) => {
+    node.userData.presentationOnly = true;
+    node.userData.blocksShots = false;
+    if (node instanceof THREE.Mesh) {
+      node.castShadow = !reducedRenderMode && index < 2;
+      node.receiveShadow = false;
+    }
+  });
+  return root;
+}
+
+function spawnHunterSwarm(now: number): boolean {
+  const assignments = hunterTargetAssignments();
+  if (assignments.length === 0) return false;
+  const centre = new THREE.Vector3(0, 13.5, 0);
+  assignments.forEach((targetId, index) => {
+    const angle = index / HUNTER_SWARM_COUNT * Math.PI * 2 - Math.PI / 2;
+    const root = makeHunterDrone(index);
+    root.position.set(centre.x + Math.cos(angle) * 4.2, centre.y + (index % 2) * 0.65, centre.z + Math.sin(angle) * 4.2);
+    root.rotation.y = -angle;
+    scene.add(root);
+    hunterDrones.push({
+      root,
+      targetId,
+      index,
+      spawnedAt: now,
+      diveAt: now + 850 + index * 120,
+      expiresAt: now + 8_000,
+    });
+    audio.hunterLaunch(index);
+  });
+  hunterSwarmLaunches += assignments.length;
+  addFeed('HUNTER SWARM · FIVE DRONES OVER MID-MAP', 'gold');
+  return true;
+}
+
+function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): void {
+  supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0);
+  for (const bot of bots.values()) {
+    if (!bot.alive || bot.team === player.team) continue;
+    const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    const damage = hunterSwarmDamage(distance, 'stand');
+    if (damage > 0) applyBotDamage(bot, damage, 'body');
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.team === player.team || remote.snapshot.hp <= 0) continue;
+    const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    const damage = hunterSwarmDamage(distance, remote.snapshot.stance ?? 'stand');
+    if (damage > 0) {
+      network.send({
+        type: 'hit',
+        by: player.id,
+        target: remote.snapshot.id,
+        damage: Math.min(100, damage),
+        kind: 'explosive',
+        origin: point.toArray(),
+        nonce: randomNonce(),
+      });
+    }
+  }
+  hunterSwarmImpacts += 1;
+  disposeSupportRoot(drone.root);
+  const index = hunterDrones.indexOf(drone);
+  if (index >= 0) hunterDrones.splice(index, 1);
+}
+
+function beginNuke(now: number): void {
+  const shockwave = new THREE.Mesh(
+    new THREE.SphereGeometry(1, reducedRenderMode ? 12 : 28, reducedRenderMode ? 8 : 18),
+    new THREE.MeshBasicMaterial({ color: 0xffb15c, transparent: true, opacity: 0, depthWrite: false, side: THREE.BackSide, toneMapped: false }),
+  );
+  shockwave.name = 'pass30-nuke-shockwave';
+  shockwave.position.set(0, 1.5, 0);
+  shockwave.visible = false;
+  const light = new THREE.PointLight(0xff9a52, 0, reducedRenderMode ? 45 : 90, 1.5);
+  light.position.set(0, 12, 0);
+  scene.add(shockwave, light);
+  nukeSequence = {
+    startedAt: now,
+    detonateAt: now + NUKE_WARNING_MS,
+    finishedAt: now + NUKE_WARNING_MS + 3_500,
+    detonated: false,
+    shockwave,
+    light,
+  };
+  const warning = element<HTMLElement>('#nuke-warning');
+  warning.hidden = false;
+  element<HTMLElement>('#nuke-warning b').textContent = '5';
+  audio.nukeWarning();
+  nukeLaunches += 1;
+  addFeed('NUKE ARMED · FIVE-SECOND ATOMIC WARNING', 'gold');
+}
+
+function detonateNuke(sequence: NukeSequence): void {
+  sequence.detonated = true;
+  audio.nukeDetonation();
+  sequence.shockwave.visible = true;
+  sequence.shockwave.scale.setScalar(0.1);
+  sequence.light.intensity = reducedRenderMode ? 12 : 34;
+  const flash = element<HTMLElement>('#nuke-flash');
+  flash.hidden = false;
+  flash.style.opacity = '1';
+  landingImpulse = Math.max(landingImpulse, 1);
+  nukeDetonations += 1;
+  for (const remote of remotes.values()) {
+    const damage = nukeDamageForTarget(player.team, remote.snapshot.team, remote.snapshot.hp > 0);
+    if (damage <= 0) continue;
+    network.send({
+      type: 'hit',
+      by: player.id,
+      target: remote.snapshot.id,
+      damage: 100,
+      kind: 'explosive',
+      // Nuke damage is field-wide, but the existing receiver deliberately
+      // admits explosive hits only when their validation origin is local to
+      // the target. Use the authoritative remote snapshot here so the hit
+      // crosses that bounded validation path without weakening it globally.
+      origin: [remote.snapshot.x, remote.snapshot.y, remote.snapshot.z],
+      nonce: randomNonce(),
+    });
+  }
+  for (const bot of [...bots.values()]) {
+    const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
+    if (damage > 0) applyBotDamage(bot, damage, 'body');
+  }
+  addFeed('ATOMIC DETONATION · HOSTILE FIELD PURGED', 'gold');
+}
+
+function updateNuke(now: number): void {
+  const sequence = nukeSequence;
+  if (!sequence) return;
+  const warning = element<HTMLElement>('#nuke-warning');
+  if (!sequence.detonated) {
+    const remaining = Math.max(0, sequence.detonateAt - now);
+    element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
+    const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
+    if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
+    if (scene.fog) scene.fog.color.set(activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    if (now >= sequence.detonateAt) detonateNuke(sequence);
+    return;
+  }
+  warning.hidden = true;
+  const elapsed = now - sequence.detonateAt;
+  const blastProgress = THREE.MathUtils.clamp(elapsed / 2_600, 0, 1);
+  const flashStrength = Math.exp(-elapsed / 620);
+  sequence.shockwave.scale.setScalar(0.1 + blastProgress * 125);
+  (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
+  sequence.light.intensity = (reducedRenderMode ? 12 : 34) * flashStrength;
+  if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
+  if (scene.fog) scene.fog.color.set(activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
+  const flash = element<HTMLElement>('#nuke-flash');
+  flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
+  if (now < sequence.finishedAt) return;
+  scene.remove(sequence.shockwave, sequence.light);
+  sequence.shockwave.geometry.dispose();
+  (sequence.shockwave.material as THREE.Material).dispose();
+  if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
+  if (scene.fog) scene.fog.color.set(activeLighting.fogColor);
+  flash.hidden = true;
+  flash.style.opacity = '0';
+  nukeSequence = null;
 }
 
 function makeSkyMissile(): THREE.Group {
@@ -2615,6 +2971,7 @@ function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: numbe
     requestAnimationFrame(animate);
   };
   animate();
+  if (maximumDamage <= 0) return;
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
@@ -2782,8 +3139,15 @@ function activateFieldSupport(id: FieldSupportId): void {
       expiresAt: now + 6_500,
     };
     addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
-  } else {
+  } else if (id === 'tri-pass') {
     beginTriPassTargeting();
+  } else if (id === 'hunter-swarm') {
+    if (!spawnHunterSwarm(now)) {
+      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'hunter-swarm': true } };
+      addFeed('HUNTER SWARM · NO HOSTILE TARGETS · REFUNDED', 'gold');
+    }
+  } else {
+    beginNuke(now);
   }
   updateFieldSupportHud();
 }
@@ -2794,6 +3158,48 @@ function detonateYardhawk(point: THREE.Vector3, radius: number, maxDamage: numbe
   yardhawkExplosions += 1;
   disposeSupportRoot(yardhawk.root);
   yardhawk = null;
+}
+
+function updateHunterDrones(dt: number, now: number): void {
+  for (let index = hunterDrones.length - 1; index >= 0; index -= 1) {
+    const drone = hunterDrones[index];
+    let target = supportTargetState(drone.targetId);
+    if (!target) {
+      const replacement = nearestSupportTarget();
+      if (replacement) {
+        drone.targetId = replacement.id;
+        target = supportTargetState(replacement.id);
+      }
+    }
+    if (now >= drone.expiresAt || !target) {
+      detonateHunterDrone(drone, drone.root.position.clone());
+      continue;
+    }
+    if (now < drone.diveAt) {
+      const angle = drone.index / HUNTER_SWARM_COUNT * Math.PI * 2 + (now - drone.spawnedAt) * 0.0014;
+      const formation = new THREE.Vector3(Math.cos(angle) * 4.2, 13.5 + Math.sin(now * 0.004 + drone.index) * 0.35, Math.sin(angle) * 4.2);
+      drone.root.position.lerp(formation, Math.min(1, dt * 4.5));
+      drone.root.lookAt(target.point);
+      continue;
+    }
+    const direction = target.point.clone().sub(drone.root.position);
+    const distance = direction.length();
+    if (distance <= 0.85) {
+      detonateHunterDrone(drone, target.point);
+      continue;
+    }
+    const step = direction.normalize().multiplyScalar(Math.min(distance, dt * (20 + drone.index * 0.85)));
+    const collision = sweepSphereAgainstBoxes(drone.root.position, step, arena.colliders, 0.24);
+    if (collision) {
+      const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+      const impact = drone.root.position.clone().addScaledVector(step, collision.time).addScaledVector(normal, 0.26);
+      detonateHunterDrone(drone, impact);
+      continue;
+    }
+    drone.root.position.add(step);
+    drone.root.lookAt(target.point);
+    drone.root.rotation.z = Math.sin(now * 0.012 + drone.index) * 0.2;
+  }
 }
 
 function updateFieldSupport(dt: number, now: number): void {
@@ -2854,6 +3260,7 @@ function updateFieldSupport(dt: number, now: number): void {
       }
     }
   }
+  updateHunterDrones(dt, now);
   for (let index = strikeMissiles.length - 1; index >= 0; index -= 1) {
     const strike = strikeMissiles[index];
     const progress = THREE.MathUtils.clamp((now - strike.startedAt) / Math.max(1, strike.impactAt - strike.startedAt), 0, 1);
@@ -2871,6 +3278,7 @@ function updateFieldSupport(dt: number, now: number): void {
       strikeMissiles.splice(index, 1);
     }
   }
+  updateNuke(now);
 }
 
 function clearGrenades(): void {
@@ -2886,12 +3294,31 @@ function clearFieldSupport(): void {
     disposeSupportRoot(strike.marker);
   }
   strikeMissiles.length = 0;
+  for (const drone of hunterDrones) disposeSupportRoot(drone.root);
+  hunterDrones.length = 0;
+  if (nukeSequence) {
+    scene.remove(nukeSequence.shockwave, nukeSequence.light);
+    nukeSequence.shockwave.geometry.dispose();
+    (nukeSequence.shockwave.material as THREE.Material).dispose();
+    nukeSequence = null;
+  }
+  if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
+  if (scene.fog) scene.fog.color.set(activeLighting.fogColor);
+  const nukeWarning = element<HTMLElement>('#nuke-warning');
+  const nukeFlash = element<HTMLElement>('#nuke-flash');
+  nukeWarning.hidden = true;
+  nukeFlash.hidden = true;
+  nukeFlash.style.opacity = '0';
   cancelTriPassTargeting(false, false);
   scoutSweepUntil = 0;
   yardhawkExplosions = 0;
   triPassLaunches = 0;
   triPassImpacts = 0;
   triPassLastImpactDelayMs = null;
+  hunterSwarmLaunches = 0;
+  hunterSwarmImpacts = 0;
+  nukeLaunches = 0;
+  nukeDetonations = 0;
   fieldSupport = createFieldSupportState();
   updateFieldSupportHud();
 }
@@ -3389,6 +3816,8 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Digit3' && !event.repeat) activateFieldSupport('scout-sweep');
   if (event.code === 'Digit4' && !event.repeat) activateFieldSupport('yardhawk');
   if (event.code === 'Digit5' && !event.repeat) activateFieldSupport('tri-pass');
+  if (event.code === 'Digit6' && !event.repeat) activateFieldSupport('hunter-swarm');
+  if (event.code === 'Digit7' && !event.repeat) activateFieldSupport('nuke');
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
@@ -3542,7 +3971,7 @@ window.addEventListener('beforeunload', () => {
 
 function refreshStaticShadowsForDynamicCasters(now: number): void {
   const hasDynamicCasters = [...bots.values()].some((bot) => bot.alive && bot.root.visible)
-    || remotes.size > 0 || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0;
+    || remotes.size > 0 || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0 || hunterDrones.length > 0;
   const admittedAt = admitStaticShadowDynamicRefresh({
     shadowMode: activeRenderConfig.shadowMode,
     shadowsEnabled: renderer.shadowMap.enabled,
@@ -3610,6 +4039,7 @@ function frame(now: number): void {
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
     if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
+    atmosphereSystem.update(now / 1_000);
     grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
     if (gameStarted) updateMinimap(now);
     updateHud(now);
@@ -3835,6 +4265,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       triPassLaunches,
       triPassImpacts,
       triPassLastImpactDelayMs,
+      hunterDrones: hunterDrones.map((drone) => ({
+        targetId: drone.targetId,
+        index: drone.index,
+        position: drone.root.position.toArray(),
+        diveInMs: Math.max(0, drone.diveAt - performance.now()),
+        expiresInMs: Math.max(0, drone.expiresAt - performance.now()),
+      })),
+      hunterSwarmLaunches,
+      hunterSwarmImpacts,
+      nuke: nukeSequence ? {
+        active: true,
+        detonated: nukeSequence.detonated,
+        detonateInMs: Math.max(0, nukeSequence.detonateAt - performance.now()),
+        finishInMs: Math.max(0, nukeSequence.finishedAt - performance.now()),
+      } : { active: false, detonated: false, detonateInMs: 0, finishInMs: 0 },
+      nukeActivations: nukeLaunches,
+      nukeDetonations,
     },
     deathDrops: deathDrops.map((entity) => ({
       id: entity.drop.id,
@@ -3962,7 +4409,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       adaptive: adaptiveQuality.telemetry(),
       lighting: { ...activeLighting },
       sky: {
-        pass: 29,
+        pass: 30,
+        top: `#${activeLighting.skyTop.toString(16).padStart(6, '0')}`,
+        horizon: `#${activeLighting.skyHorizon.toString(16).padStart(6, '0')}`,
+        bottom: `#${activeLighting.skyBottom.toString(16).padStart(6, '0')}`,
+        cloudShadow: `#${activeLighting.skyCloudShadow.toString(16).padStart(6, '0')}`,
+        cloudLight: `#${activeLighting.skyCloudLight.toString(16).padStart(6, '0')}`,
+        cloudBands: skyCloudsEnabled ? 2 : 0,
+        fogColor: `#${activeLighting.fogColor.toString(16).padStart(6, '0')}`,
+        fogNear: activeLighting.fogNear,
+        fogFar: activeLighting.fogFar,
         godRayStrength: actualGodRayStrength,
         godRayLobes: actualGodRayLobes,
         extraDraws: 0,
@@ -3970,6 +4426,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         linearHdr: true,
       },
       grass: grassSystem.telemetry(),
+      atmosphere: atmosphereSystem.telemetry(),
       blenderEnvironment: blenderArenaTelemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
         const material = node instanceof THREE.Mesh ? node.material : null;
@@ -4316,7 +4773,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     applyDamage(amount, bots.keys().next().value ?? player.id);
   },
   earnSupport: (eliminations: number) => {
-    for (let index = 0; index < Math.max(0, Math.min(7, Math.floor(eliminations))); index += 1) awardSupportElimination();
+    for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
   },
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   sendPing: (kind: TeamPingKind) => sendTeamPing(kind),

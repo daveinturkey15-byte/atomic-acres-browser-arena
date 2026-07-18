@@ -82,7 +82,7 @@ type DebugState = {
     streak: number;
     rewardCycle: number;
     bestStreakThisMatch: number;
-    available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass', boolean>;
+    available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke', boolean>;
     scoutActive: boolean;
     yardhawk: { active: boolean; phase: 'thrown' | 'homing' | null; targetId?: string; position?: number[]; armedInMs?: number };
     yardhawkExplosions: number;
@@ -92,6 +92,12 @@ type DebugState = {
     triPassLaunches: number;
     triPassImpacts: number;
     triPassLastImpactDelayMs: number | null;
+    hunterDrones: Array<{ index: number; targetId: string; position: number[]; diveInMs: number; expiresInMs: number }>;
+    hunterSwarmLaunches: number;
+    hunterSwarmImpacts: number;
+    nuke: { active: boolean; detonated: boolean; detonateInMs: number; finishInMs: number };
+    nukeActivations: number;
+    nukeDetonations: number;
   };
   deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
   breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
@@ -209,6 +215,38 @@ type DebugState = {
       skyBottom: number;
       routeLightIntensity: number;
     };
+    sky: {
+      pass: 30;
+      top: string;
+      horizon: string;
+      bottom: string;
+      cloudShadow: string;
+      cloudLight: string;
+      cloudBands: number;
+      fogColor: string;
+      fogNear: number;
+      fogFar: number;
+      godRayStrength: number;
+      godRayLobes: number;
+      extraDraws: number;
+    };
+    grass: {
+      pass: 30;
+      enabled: boolean;
+      bypassReason: string | null;
+      blades: number;
+      submissions: number;
+      authoritative: false;
+    };
+    atmosphere: {
+      pass: 30;
+      enabled: boolean;
+      bypassReason: string | null;
+      mistCards: number;
+      triangles: number;
+      submissions: number;
+      volumetricRayMarching: false;
+    };
     framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
     minimapRenders: number;
     staticBatchPalette: Array<string | null>;
@@ -271,7 +309,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('DAWNFIELD PASS 29');
+    await expect(page.locator('.eyebrow')).toContainText('STORMFRONT PASS 30');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -331,6 +369,24 @@ test.describe('boot and authored presentation', () => {
       return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
     });
     expect(entries[0]).toMatchObject({ name: 'QA Operator', kills: 25, bestStreak: 7, won: true });
+  });
+
+  test('persists a named streak immediately and keeps it when the player exits before round end', async ({ page }) => {
+    await pageReady(page);
+    await startSolo(page);
+    await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
+    }).__ATOMIC_ACRES_DEBUG__.earnSupport(8));
+    expect((await debug(page)).matchPhase).toBe('active');
+    const immediate = await page.evaluate(() => {
+      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+      return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
+    });
+    expect(immediate[0]).toMatchObject({ id: 'global:qa_operator', name: 'QA Operator', bestStreak: 8 });
+    await page.reload();
+    await pageReady(page);
+    await expect(page.locator('#high-score-list li').first()).toContainText('QA Operator');
+    await expect(page.locator('#high-score-list li').first()).toContainText('×8 STREAK');
   });
 
   test('defaults new players to Blender Render while retaining explicit slow-PC profiles', async ({ page }) => {
@@ -727,6 +783,8 @@ test.describe('solo mechanics', () => {
       'scout-sweep': true,
       yardhawk: true,
       'tri-pass': true,
+      'hunter-swarm': false,
+      nuke: false,
     });
     const activated = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -816,7 +874,53 @@ test.describe('solo mechanics', () => {
     const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
     expect(impactDelay).not.toBeNull();
     expect(impactDelay!).toBeGreaterThanOrEqual(950);
-    expect((await debug(page)).fieldSupport.available).toEqual({ 'scout-sweep': true, yardhawk: true, 'tri-pass': false });
+    expect((await debug(page)).fieldSupport.available).toEqual({
+      'scout-sweep': true,
+      yardhawk: true,
+      'tri-pass': false,
+      'hunter-swarm': false,
+      nuke: false,
+    });
+  });
+
+  test('launches exactly five deterministic Hunter Swarm drones at eight eliminations', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        activateSupport: (id: 'hunter-swarm') => void;
+        setBotsFrozen: (frozen: boolean) => void;
+        placeBotAhead: (distance: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.placeBotAhead(8);
+      api.earnSupport(8);
+      api.activateSupport('hunter-swarm');
+    });
+    const launched = (await debug(page)).fieldSupport;
+    expect(launched.hunterSwarmLaunches).toBe(5);
+    expect(launched.hunterDrones).toHaveLength(5);
+    expect(launched.available['hunter-swarm']).toBe(false);
+    await expect.poll(async () => (await debug(page)).fieldSupport.hunterSwarmImpacts, { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+  });
+
+  test('arms and detonates the 15-elimination Nuke with a bounded warning sequence', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        activateSupport: (id: 'nuke') => void;
+        setBotsFrozen: (frozen: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.earnSupport(15);
+      api.activateSupport('nuke');
+    });
+    await expect(page.locator('#nuke-warning')).toBeVisible();
+    expect((await debug(page)).fieldSupport.nukeActivations).toBe(1);
+    await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 8_000 }).toBe(1);
+    await expect(page.locator('#nuke-flash')).toBeVisible();
+    await expect(page.locator('#nuke-warning')).toBeHidden({ timeout: 8_000 });
   });
 
   test('makes the strengthened Model 12 decisive at close range', async ({ page }) => {
@@ -1436,7 +1540,7 @@ test.describe('performance and stability', () => {
     expect(state.render.lighting).toMatchObject({
       exposure: 1.02, hemisphereIntensity: 1.5, ambientIntensity: 0.55,
       sunIntensity: 2.7, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
-      fogNear: 64, fogFar: 148,
+      fogNear: 56, fogFar: 140,
       routeLightIntensity: 3, streetLightIntensity: 4, interiorLightIntensity: 8,
       routeLightCount: 3, streetLightCount: 4, interiorLightCount: 2,
       godRayStrength: 0.08, godRayLobes: 2,
@@ -1453,13 +1557,21 @@ test.describe('performance and stability', () => {
       ceilingInstances: 10,
     });
     expect(state.render.grass).toMatchObject({
+      pass: 30,
       enabled: false,
       bypassReason: 'software-renderer',
       blades: 0,
       submissions: 0,
       authoritative: false,
     });
-    expect(state.render.sky).toMatchObject({ godRayStrength: 0, godRayLobes: 0, extraDraws: 0 });
+    expect(state.render.atmosphere).toMatchObject({
+      pass: 30,
+      enabled: false,
+      bypassReason: 'performance-budget',
+      mistCards: 0,
+      volumetricRayMarching: false,
+    });
+    expect(state.render.sky).toMatchObject({ pass: 30, cloudBands: 0, godRayStrength: 0, godRayLobes: 0, extraDraws: 0 });
     expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
     expect(state.render.antialias).toBe(false);
     expect(state.render.atomicSignal).toMatchObject({
@@ -1477,9 +1589,9 @@ test.describe('performance and stability', () => {
     const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
     expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.75));
     expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.75));
-    // Retain the prior 141-call ceiling and account for exactly two Pass 29
-    // instanced submissions: practical fixture panels and structural ceilings.
-    expect(state.render.calls).toBeLessThanOrEqual(143);
+    // Retain the Pass 29 ceiling and account for exactly four bounded Pass 30
+    // tree/ground-detail material submissions without changing the triangle cap.
+    expect(state.render.calls).toBeLessThanOrEqual(147);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
     expect(state.interiorTelemetry).toEqual({

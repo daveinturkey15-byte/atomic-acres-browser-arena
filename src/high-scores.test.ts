@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   HIGH_SCORE_STORAGE_KEY,
+  immediateStreakEntry,
   isHighScoreEntry,
   loadHighScores,
   mergeHighScores,
@@ -35,14 +36,14 @@ describe('persistent high scores', () => {
     expect(normalizeRequiredPlayerName('')).toBeNull();
   });
 
-  it('orders match records by kills, streak, deaths and victory without duplicates', () => {
+  it('orders records by streak, kills, deaths and victory without duplicates', () => {
     const scores = mergeHighScores([], [
       entry({ id: 'a', kills: 8, bestStreak: 4, deaths: 2 }),
       entry({ id: 'b', kills: 8, bestStreak: 6, deaths: 5 }),
       entry({ id: 'c', kills: 9, bestStreak: 3, deaths: 7 }),
       entry({ id: 'b', kills: 8, bestStreak: 6, deaths: 5 }),
     ], now);
-    expect(scores.map((score) => score.id)).toEqual(['c', 'b', 'a']);
+    expect(scores.map((score) => score.id)).toEqual(['b', 'a', 'c']);
   });
 
   it('rejects impossible or future peer claims', () => {
@@ -62,5 +63,18 @@ describe('persistent high scores', () => {
   it('finds a case-insensitive personal best', () => {
     const scores = [entry({ id: 'one', name: 'Dave', kills: 8 }), entry({ id: 'two', name: 'dave', kills: 14 })];
     expect(personalBest(scores, 'DAVE')?.id).toBe('two');
+  });
+
+  it('creates one stable per-install/name entry as soon as a streak is reached', () => {
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 9, 2, now)).toEqual({
+      id: 'global:dave',
+      name: 'Dave',
+      kills: 9,
+      deaths: 2,
+      bestStreak: 8,
+      won: false,
+      recordedAt: now,
+    });
+    expect(immediateStreakEntry('bad', 'Dave', 8, 8, 0, now)).toBeNull();
   });
 });

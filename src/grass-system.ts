@@ -25,7 +25,7 @@ export type GrassProfileConfig = Readonly<{
 }>;
 
 export type GrassTelemetry = Readonly<{
-  pass: 29;
+  pass: 30;
   profile: RenderProfile;
   enabled: boolean;
   bypassReason: string | null;
@@ -139,7 +139,7 @@ function createBladeGeometry(): THREE.BufferGeometry {
 
 function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightingProfile): THREE.ShaderMaterial {
   const material = new THREE.ShaderMaterial({
-    name: 'pass29-living-grass-linear-hdr',
+    name: 'pass30-living-grass-linear-hdr',
     side: THREE.DoubleSide,
     fog: true,
     toneMapped: true,
@@ -151,8 +151,8 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
         uPlayerPosition: { value: new THREE.Vector2(10_000, 10_000) },
         uInteractionRadius: { value: profile.interactionRadius },
         uInteractionStrength: { value: 0 },
-        uBaseColor: { value: new THREE.Color(0x1f3d25) },
-        uTipColor: { value: new THREE.Color(0x4c6f39) },
+        uBaseColor: { value: new THREE.Color(0x183522) },
+        uTipColor: { value: new THREE.Color(0x6f8c49) },
         uSunColor: { value: new THREE.Color(lighting.sunColor) },
         uSunDirection: { value: new THREE.Vector3(...lighting.sunPosition).normalize() },
         uAmbient: { value: Math.min(0.58, 0.24 + lighting.hemisphereIntensity * 0.18 + lighting.ambientIntensity * 0.36) },
@@ -167,9 +167,11 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
       uniform vec2 uPlayerPosition;
       uniform float uInteractionRadius;
       uniform float uInteractionStrength;
+      attribute vec3 instanceColor;
       varying float vBladeHeight;
       varying vec3 vWorldNormal;
       varying vec3 vWorldPosition;
+      varying vec3 vInstanceColor;
       void main() {
         vec4 baseWorld = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
         vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
@@ -184,11 +186,13 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
         float playerDistance = length(away);
         float interaction = (1.0 - smoothstep(0.0, uInteractionRadius, playerDistance)) * uInteractionStrength;
         vec2 interactionDirection = playerDistance > 0.0001 ? away / playerDistance : vec2(0.0);
-        worldPosition.xz += (wind + interactionDirection * interaction * 0.26) * bendWeight;
+        vec2 naturalCurl = vec2(sin(baseWorld.x * 0.41 + baseWorld.z * 0.29), cos(baseWorld.z * 0.37)) * 0.024;
+        worldPosition.xz += (naturalCurl + wind + interactionDirection * interaction * 0.26) * bendWeight;
         worldPosition.y -= interaction * bladeHeight * 0.11;
         vBladeHeight = bladeHeight;
         vWorldPosition = worldPosition.xyz;
         vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
+        vInstanceColor = instanceColor;
         vec4 mvPosition = viewMatrix * worldPosition;
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
@@ -206,10 +210,11 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
       varying float vBladeHeight;
       varying vec3 vWorldNormal;
       varying vec3 vWorldPosition;
+      varying vec3 vInstanceColor;
       void main() {
         vec3 normal = normalize(gl_FrontFacing ? vWorldNormal : -vWorldNormal);
         float diffuse = max(dot(normal, normalize(uSunDirection)), 0.0);
-        vec3 base = mix(uBaseColor, uTipColor, smoothstep(0.08, 1.0, vBladeHeight));
+        vec3 base = mix(uBaseColor, uTipColor, smoothstep(0.08, 1.0, vBladeHeight)) * vInstanceColor;
         vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
         float grazing = pow(1.0 - abs(dot(normal, viewDirection)), 3.0);
         float dew = grazing * smoothstep(0.35, 1.0, vBladeHeight) * uDewStrength;
@@ -221,10 +226,10 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
       }
     `,
   });
-  material.customProgramCacheKey = () => `pass29-grass:${profile.bladeLimit}:${profile.dewStrength}`;
+  material.customProgramCacheKey = () => `pass30-grass:${profile.bladeLimit}:${profile.dewStrength}`;
   material.userData.presentationOnly = true;
   material.userData.blocksShots = false;
-  material.userData.pass29LivingGrass = true;
+  material.userData.pass30LivingGrass = true;
   return material;
 }
 
@@ -258,7 +263,7 @@ export class GrassSystem {
     colliders: readonly Box2[],
     lighting: ArenaLightingProfile,
   ) {
-    this.root.name = 'pass29-living-grass';
+    this.root.name = 'pass30-living-grass';
     this.root.userData.presentationOnly = true;
     this.root.userData.blocksShots = false;
     this.config = grassProfileConfig(profile);
@@ -283,19 +288,20 @@ export class GrassSystem {
     const rotation = new THREE.Quaternion();
     const scale = new THREE.Vector3();
     const euler = new THREE.Euler(0, 0, 0);
+    const tint = new THREE.Color();
 
     grouped.forEach((placements, chunkIndex) => {
       const admitted = placements;
       if (admitted.length === 0) return;
       const mesh = new THREE.InstancedMesh(this.geometry!, this.material!, admitted.length);
-      mesh.name = `pass29-grass-chunk-${chunkIndex}`;
+      mesh.name = `pass30-grass-chunk-${chunkIndex}`;
       mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       mesh.frustumCulled = true;
       mesh.userData.presentationOnly = true;
       mesh.userData.blocksShots = false;
-      mesh.userData.pass29GrassChunk = chunkIndex;
+      mesh.userData.pass30GrassChunk = chunkIndex;
       let centreX = 0;
       let centreZ = 0;
       let minX = Infinity;
@@ -309,6 +315,9 @@ export class GrassSystem {
         scale.set(placement.width, placement.height, placement.width);
         matrix.compose(position, rotation, scale);
         mesh.setMatrixAt(index, matrix);
+        const tintPhase = 0.5 + 0.5 * Math.sin(placement.x * 0.73 + placement.z * 0.51 + placement.yaw);
+        tint.setHSL(0.245 + tintPhase * 0.035, 0.24 + tintPhase * 0.08, 0.72 + tintPhase * 0.15);
+        mesh.setColorAt(index, tint);
         centreX += placement.x;
         centreZ += placement.z;
         minX = Math.min(minX, placement.x);
@@ -318,6 +327,7 @@ export class GrassSystem {
         this.admittedPlacements.push(placement);
       });
       mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
       mesh.onBeforeRender = (activeRenderer) => {
         const renderFrame = activeRenderer.info.render.frame;
@@ -332,7 +342,7 @@ export class GrassSystem {
       // distance prevents a long verge chunk popping out while its centre is far
       // away but nearby blades are still in view.
       if (!Number.isFinite(centreX / admitted.length) || !Number.isFinite(centreZ / admitted.length)) {
-        throw new Error(`Pass 29 grass chunk ${chunkIndex} has non-finite placement data`);
+        throw new Error(`Pass 30 grass chunk ${chunkIndex} has non-finite placement data`);
       }
       this.chunkBounds.push(Object.freeze({ minX, maxX, minZ, maxZ }));
       this.chunks.push(mesh);
@@ -406,7 +416,7 @@ export class GrassSystem {
 
   telemetry(): GrassTelemetry {
     return {
-      pass: 29,
+      pass: 30,
       profile: this.profile,
       enabled: this.bypass === null && this.config.enabled,
       bypassReason: this.bypass,

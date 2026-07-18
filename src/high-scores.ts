@@ -49,8 +49,8 @@ export function isHighScoreEntry(value: unknown, now = Date.now()): value is Hig
 }
 
 export function compareHighScores(a: HighScoreEntry, b: HighScoreEntry): number {
-  return b.kills - a.kills
-    || b.bestStreak - a.bestStreak
+  return b.bestStreak - a.bestStreak
+    || b.kills - a.kills
     || a.deaths - b.deaths
     || Number(b.won) - Number(a.won)
     || a.recordedAt - b.recordedAt
@@ -97,4 +97,27 @@ export function personalBest(entries: readonly HighScoreEntry[], playerName: str
   return entries
     .filter((entry) => entry.name.toLocaleLowerCase() === normalized)
     .sort(compareHighScores)[0] ?? null;
+}
+
+export function immediateStreakEntry(
+  installId: string,
+  playerName: string,
+  streak: number,
+  kills: number,
+  deaths: number,
+  recordedAt = Date.now(),
+): HighScoreEntry | null {
+  const name = normalizeRequiredPlayerName(playerName);
+  const safeInstallId = installId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+  if (!name || safeInstallId.length < 8 || !Number.isSafeInteger(streak) || streak <= 0 || streak > MAX_MATCH_KILLS) return null;
+  const nameKey = name.toLocaleLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 24);
+  return {
+    id: `global:${nameKey}`,
+    name,
+    kills: Math.min(MAX_MATCH_KILLS, Math.max(streak, Math.floor(kills))),
+    deaths: Math.min(200, Math.max(0, Math.floor(deaths))),
+    bestStreak: streak,
+    won: false,
+    recordedAt,
+  };
 }

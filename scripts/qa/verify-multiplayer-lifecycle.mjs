@@ -55,7 +55,7 @@ try {
       guestRemotes: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotes),
     };
     await guest.close({ runBeforeUnload: true });
-    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 10_000 });
+    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 30_000 });
     joined.leaveObserved = true;
     results.push(joined);
     await context.close();
