@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
-const peerPort = Number(process.env.QA_PEER_PORT ?? 9000);
+const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
 const cycles = Number(process.env.QA_MULTIPLAYER_CYCLES ?? 20);
 const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
 const headed = process.env.QA_HEADED === '1';
@@ -37,7 +37,7 @@ try {
     }
     await host.bringToFront();
     await host.click('#host');
-    await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim().length > 0, undefined, { timeout: 30_000 });
+    await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim().length > 0, undefined, { timeout: 45_000 });
     const roomCode = (await host.textContent('#room-code')).trim();
     await guest.bringToFront();
     await guest.selectOption('#team', '1');

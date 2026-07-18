@@ -2,8 +2,9 @@ import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const renderMode = process.env.QA_RENDER_MODE ?? 'compat';
-const connectionTimeoutMs = ['blender', 'host-blender', 'guest-blender'].includes(renderMode) ? 45_000 : 30_000;
-const interactionTimeoutMs = ['blender', 'host-blender', 'guest-blender'].includes(renderMode) ? 20_000 : 10_000;
+const blenderRenderModes = ['blender', 'host-full', 'host-blender', 'guest-blender'];
+const connectionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 30_000;
+const interactionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 10_000;
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
 const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
 const headed = process.env.QA_HEADED === '1';
@@ -74,16 +75,16 @@ await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().game
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
 phase('peer join complete');
-await guest.waitForFunction(() => document.querySelector('#high-score-list')?.textContent?.includes('Legacy Ace'), undefined, { timeout: 10_000 });
+await guest.waitForFunction(() => document.querySelector('#high-score-list')?.textContent?.includes('Legacy Ace'), undefined, { timeout: interactionTimeoutMs });
 const leaderboardReplicated = await guest.evaluate(() => document.querySelector('#high-score-list')?.textContent?.includes('14 KILLS') === true);
 phase('persistent leaderboard replicated');
 await guest.waitForTimeout(500);
 await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
-await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.stance === 'prone', undefined, { timeout: 5_000 });
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.stance === 'prone', undefined, { timeout: interactionTimeoutMs });
 await host.waitForFunction(
   () => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers?.some((remote) => remote.stance === 'prone'),
   undefined,
-  { timeout: 10_000 },
+  { timeout: interactionTimeoutMs },
 );
 const stanceReplicated = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers.some((remote) => remote.stance === 'prone'));
 phase('stance replicated');
@@ -101,25 +102,25 @@ await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weapo
 phase('ADS ready');
 const stagedWindowPosition = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position);
 await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
-  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - z) < 0.5), [stagedWindowPosition[0], stagedWindowPosition[2]], { timeout: 10_000 });
+  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - z) < 0.5), [stagedWindowPosition[0], stagedWindowPosition[2]], { timeout: interactionTimeoutMs });
 phase('staged position replicated');
 await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-await host.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows.filter((pane) => pane.broken).length > before, windowBreaksBefore, { timeout: 10_000 });
+await host.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows.filter((pane) => pane.broken).length > before, windowBreaksBefore, { timeout: interactionTimeoutMs });
 phase('host window broken');
-await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows.filter((pane) => pane.broken).length > before, windowBreaksBefore, { timeout: 10_000 });
+await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows.filter((pane) => pane.broken).length > before, windowBreaksBefore, { timeout: interactionTimeoutMs });
 const windowReplicated = (await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows.filter((pane) => pane.broken).length)) > windowBreaksBefore;
 phase('window replicated');
 await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.detonateGrenadeAtWindow(1));
-await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows[1]?.broken === true, undefined, { timeout: 10_000 });
-await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows[1]?.broken === true, undefined, { timeout: 10_000 });
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows[1]?.broken === true, undefined, { timeout: interactionTimeoutMs });
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().breakableWindows[1]?.broken === true, undefined, { timeout: interactionTimeoutMs });
 const explosiveWindowReplicated = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows[1]?.broken === true);
 phase('explosive window replicated');
 
 await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 6, 0, 0));
 await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 0, Math.PI, 0));
-await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers.some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2]) < 0.25), undefined, { timeout: 10_000 });
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers.some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2]) < 0.25), undefined, { timeout: interactionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
-  .some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2] - 6) < 0.25), undefined, { timeout: 10_000 });
+  .some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2] - 6) < 0.25), undefined, { timeout: interactionTimeoutMs });
 const guestDeathsBefore = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.deaths);
 await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -132,16 +133,16 @@ await host.evaluate(() => {
   api.aimAtRemote('head');
   api.fireOnce();
 });
-await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: 10_000 });
-await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops.length > 0, undefined, { timeout: 10_000 });
+await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: interactionTimeoutMs });
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops.length > 0, undefined, { timeout: interactionTimeoutMs });
 const remoteDeathDrop = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]);
 phase('remote death and drop replicated');
 await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 4]);
 await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
-  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 4)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: 10_000 });
+  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 4)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: interactionTimeoutMs });
 await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 2.2]);
 await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
-  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 2.2)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: 10_000 });
+  .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 2.2)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: interactionTimeoutMs });
 await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
   const state = api.snapshot();

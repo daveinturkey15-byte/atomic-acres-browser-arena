@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { HOUSE_LAYOUT } from './arena-layout';
+import type { ArenaLightingProfile } from './blender-lighting';
+import { createHouseArchitecture } from './house-navigation';
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
 export type WorldIdentityPresentation = {
@@ -7,6 +10,11 @@ export type WorldIdentityPresentation = {
   routeSigns: number;
   cueInstances: number;
   atmosphericParticles: number;
+  practicalLights: number;
+  streetLights: number;
+  interiorLights: number;
+  fixtureInstances: number;
+  ceilingInstances: number;
 };
 
 function cssColor(hex: number): string {
@@ -115,20 +123,118 @@ function createRouteSignMesh(): THREE.Mesh {
 
 export function createWorldIdentityPresentation(
   scene: THREE.Scene,
-  routeLightIntensity: number,
-  reducedMode: boolean,
+  lighting: ArenaLightingProfile,
+  softwareRenderer = false,
 ): WorldIdentityPresentation {
   const root = new THREE.Group();
   root.name = 'pass27-world-identity-presentation';
 
-  for (const route of ARENA_ROUTE_IDENTITIES) {
-    const light = new THREE.PointLight(route.secondaryColor, routeLightIntensity, 13, 2);
+  const practicalAnchors: Record<string, readonly [number, number, number]> = {
+    'west-cultivation': [-25.5, 3.65, 16],
+    'central-transit': [0, 5.35, 0.18],
+    'east-service': [26.8, 3.75, -11.8],
+  };
+  const admittedRouteLights = softwareRenderer ? 0 : lighting.routeLightCount;
+  for (const route of ARENA_ROUTE_IDENTITIES.slice(0, admittedRouteLights)) {
+    const light = new THREE.PointLight(route.secondaryColor, lighting.routeLightIntensity, 13, 2);
     light.name = `route-light-${route.id}`;
-    const [x, z] = route.cuePositions[Math.floor(route.cuePositions.length / 2)];
-    light.position.set(x, route.id === 'central-transit' ? 5.6 : 3.3, z);
+    light.position.set(...practicalAnchors[route.id]);
     light.castShadow = false;
-    if (reducedMode) light.intensity *= 0.7;
     root.add(light);
+  }
+
+  // These anchors exactly match the four authored streetlamp lenses in
+  // environment-assets.ts. They are presentation-only pools rather than route,
+  // objective or team markers.
+  const streetAnchors: readonly (readonly [number, number, number])[] = [
+    [-12, 5.08, -16],
+    [12, 5.08, 16],
+    [-12, 5.08, 22],
+    [12, 5.08, -22],
+  ];
+  const admittedStreetLights = softwareRenderer ? 0 : Math.min(lighting.streetLightCount, streetAnchors.length);
+  for (let index = 0; index < admittedStreetLights; index += 1) {
+    const light = new THREE.PointLight(0xffd2a0, lighting.streetLightIntensity, 14.5, 2);
+    light.name = `street-light-${index + 1}`;
+    light.position.set(...streetAnchors[index]);
+    light.castShadow = false;
+    root.add(light);
+  }
+
+  const houses = HOUSE_LAYOUT.map((entry) => createHouseArchitecture(entry.team, entry.x, entry.z, entry.facing));
+  const fixtureGeometry = new THREE.BoxGeometry(2.2, 0.06, 0.72);
+  const fixtureMaterial = new THREE.MeshBasicMaterial({ color: 0xffdca0, toneMapped: false });
+  const fixtureCount = houses.reduce((total, house) => total + house.rooms.length, 0);
+  const fixtures = new THREE.InstancedMesh(fixtureGeometry, fixtureMaterial, fixtureCount);
+  fixtures.name = 'pass29-interior-ceiling-panels';
+  fixtures.castShadow = false;
+  fixtures.receiveShadow = false;
+  fixtures.userData.presentationOnly = true;
+  fixtures.userData.blocksShots = false;
+  const matrix = new THREE.Matrix4();
+  let fixtureIndex = 0;
+  for (const house of houses) {
+    for (const room of house.rooms) {
+      matrix.makeTranslation(room.centre[0], room.level === 'upper' ? 6.66 : 3.18, room.centre[2]);
+      fixtures.setMatrixAt(fixtureIndex, matrix);
+      fixtureIndex += 1;
+    }
+  }
+  fixtures.instanceMatrix.needsUpdate = true;
+  root.add(fixtures);
+
+  const ceilingPlacements = [
+    ...houses.flatMap((house) => house.rooms
+      .filter((room) => room.level === 'upper')
+      .map((room) => ({ x: room.centre[0], y: 6.72, z: room.centre[2], width: room.size[0] - 0.5, depth: room.size[1] - 0.35 }))),
+    ...houses.flatMap((house) => house.solids
+      .filter((solid) => solid.name.startsWith('upper-floor-'))
+      .map((solid) => ({ x: solid.position[0], y: 3.28, z: solid.position[2], width: solid.size[0], depth: solid.size[2] }))),
+  ];
+  const ceilingGeometry = new THREE.BoxGeometry(1, 0.08, 1);
+  const ceilingMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd8d1bd,
+    roughness: 0.94,
+    metalness: 0,
+    emissive: 0x17120c,
+    emissiveIntensity: 0.18,
+  });
+  const ceilings = new THREE.InstancedMesh(ceilingGeometry, ceilingMaterial, ceilingPlacements.length);
+  ceilings.name = 'pass29-structural-room-ceilings';
+  ceilings.castShadow = false;
+  ceilings.receiveShadow = true;
+  ceilings.userData.presentationOnly = true;
+  ceilings.userData.blocksShots = false;
+  ceilingPlacements.forEach((placement, index) => {
+    matrix.compose(
+      new THREE.Vector3(placement.x, placement.y, placement.z),
+      new THREE.Quaternion(),
+      new THREE.Vector3(placement.width, 1, placement.depth),
+    );
+    ceilings.setMatrixAt(index, matrix);
+  });
+  ceilings.instanceMatrix.needsUpdate = true;
+  root.add(ceilings);
+
+  const admittedInteriorLights = softwareRenderer ? 0 : lighting.interiorLightCount;
+  if (admittedInteriorLights === 2) {
+    for (const house of houses) {
+      const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, 11.5, 2);
+      light.name = `interior-light-${house.id}-broad`;
+      light.position.set(house.origin.x, 3.1, house.origin.z);
+      light.castShadow = false;
+      root.add(light);
+    }
+  } else if (admittedInteriorLights === 4) {
+    for (const house of houses) {
+      for (const [level, y] of [['ground', 2.75], ['upper', 6.12]] as const) {
+        const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, 9.4, 2);
+        light.name = `interior-light-${house.id}-${level}`;
+        light.position.set(house.origin.x, y, house.origin.z);
+        light.castShadow = false;
+        root.add(light);
+      }
+    }
   }
 
   // One atlas-backed mesh carries all three route signs. Route cues and contact
@@ -137,9 +243,14 @@ export function createWorldIdentityPresentation(
   scene.add(root);
   return {
     root,
-    routeLights: ARENA_ROUTE_IDENTITIES.length,
+    routeLights: admittedRouteLights,
     routeSigns: ARENA_ROUTE_IDENTITIES.length,
     cueInstances: 0,
     atmosphericParticles: 0,
+    practicalLights: admittedRouteLights + admittedStreetLights,
+    streetLights: admittedStreetLights,
+    interiorLights: admittedInteriorLights,
+    fixtureInstances: fixtureCount,
+    ceilingInstances: ceilingPlacements.length,
   };
 }

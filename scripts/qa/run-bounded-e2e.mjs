@@ -23,7 +23,9 @@ if (requestedGroups.size > 0 && selectedGroups.length !== requestedGroups.size) 
 for (const group of selectedGroups) {
   console.log(`\n=== bounded e2e: ${group.name} ===`);
   const command = group.xvfb ? 'xvfb-run' : 'npx';
-  const args = group.xvfb ? ['-a', 'npx', 'playwright', 'test', ...group.args] : ['playwright', 'test', ...group.args];
+  const args = group.xvfb
+    ? ['-a', 'npx', 'playwright', 'test', ...group.args, '--retries=0']
+    : ['playwright', 'test', ...group.args, '--retries=0'];
   const result = spawnSync(command, args, {
     cwd: process.cwd(),
     env: { ...process.env, CI: '1' },

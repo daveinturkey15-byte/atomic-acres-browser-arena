@@ -271,7 +271,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('ATOMIC SIGNAL PASS 28');
+    await expect(page.locator('.eyebrow')).toContainText('DAWNFIELD PASS 29');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -423,8 +423,11 @@ test.describe('boot and authored presentation', () => {
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
-        exposure: 1, hemisphereIntensity: 0.9, ambientIntensity: 0.14,
-        sunIntensity: 3.25, fogNear: 58, fogFar: 128, routeLightIntensity: 1,
+        exposure: 1, hemisphereIntensity: 1.5, ambientIntensity: 0.52,
+        sunIntensity: 2.7, fogNear: 58, fogFar: 136,
+        routeLightIntensity: 5, streetLightIntensity: 6, interiorLightIntensity: 12,
+        routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
+        godRayStrength: 0.12, godRayLobes: 4,
       },
       blenderEnvironment: {
         status: 'ready', meshCount: 26, materialCount: 20, texturedMaterials: 12, pbrMaterials: 8, textureCount: 21, triangleCount: 24_176,
@@ -434,7 +437,17 @@ test.describe('boot and authored presentation', () => {
     });
     expect(menuState.worldIdentity).toMatchObject({ pass: 'world-identity-27', cuesInsideBounds: true });
     expect(menuState.worldIdentity.routes).toHaveLength(3);
-    expect(menuState.worldIdentityPresentation).toEqual({ routeLights: 3, routeSigns: 3, cueInstances: 0, atmosphericParticles: 0 });
+    expect(menuState.worldIdentityPresentation).toEqual({
+      routeLights: 0,
+      routeSigns: 3,
+      cueInstances: 0,
+      atmosphericParticles: 0,
+      practicalLights: 0,
+      streetLights: 0,
+      interiorLights: 0,
+      fixtureInstances: 8,
+      ceilingInstances: 10,
+    });
     expect(menuState.render.calls).toBeLessThanOrEqual(70);
     await expect(page.locator('#graphics-profile')).toHaveValue('blender');
     await startSolo(page);
@@ -492,7 +505,7 @@ test.describe('boot and authored presentation', () => {
       await expect.poll(async () => (await debug(page)).arenaZone).toBe(sample.zone);
       await expect(page.locator('#location-label')).toHaveText(sample.label);
       const state = await debug(page);
-      expect(state.worldIdentityPresentation).toMatchObject({ routeLights: 3, routeSigns: 3, cueInstances: 0 });
+      expect(state.worldIdentityPresentation).toMatchObject({ routeLights: 0, routeSigns: 3, cueInstances: 0 });
       expect(state.render.blenderEnvironment).toMatchObject({ routeLandmarks: 3, worldIdentityPass: true });
       await page.screenshot({ path: `test-results/pass27-route-${sample.id}.png` });
     }
@@ -1421,11 +1434,32 @@ test.describe('performance and stability', () => {
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
     expect(state.render.lighting).toMatchObject({
-      exposure: 1.08, hemisphereIntensity: 1.2, ambientIntensity: 0.24,
-      sunIntensity: 2.95, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
-      fogNear: 68, fogFar: 145, routeLightIntensity: 0.38,
+      exposure: 1.02, hemisphereIntensity: 1.5, ambientIntensity: 0.55,
+      sunIntensity: 2.7, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
+      fogNear: 64, fogFar: 148,
+      routeLightIntensity: 3, streetLightIntensity: 4, interiorLightIntensity: 8,
+      routeLightCount: 3, streetLightCount: 4, interiorLightCount: 2,
+      godRayStrength: 0.08, godRayLobes: 2,
     });
-    expect(state.worldIdentityPresentation).toEqual({ routeLights: 3, routeSigns: 3, cueInstances: 0, atmosphericParticles: 0 });
+    expect(state.worldIdentityPresentation).toEqual({
+      routeLights: 0,
+      routeSigns: 3,
+      cueInstances: 0,
+      atmosphericParticles: 0,
+      practicalLights: 0,
+      streetLights: 0,
+      interiorLights: 0,
+      fixtureInstances: 8,
+      ceilingInstances: 10,
+    });
+    expect(state.render.grass).toMatchObject({
+      enabled: false,
+      bypassReason: 'software-renderer',
+      blades: 0,
+      submissions: 0,
+      authoritative: false,
+    });
+    expect(state.render.sky).toMatchObject({ godRayStrength: 0, godRayLobes: 0, extraDraws: 0 });
     expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
     expect(state.render.antialias).toBe(false);
     expect(state.render.atomicSignal).toMatchObject({
@@ -1443,8 +1477,9 @@ test.describe('performance and stability', () => {
     const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
     expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.75));
     expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.75));
-    // Atomic Signal contributes exactly one bounded fullscreen draw on top of the retained profile budget.
-    expect(state.render.calls).toBeLessThanOrEqual(141);
+    // Retain the prior 141-call ceiling and account for exactly two Pass 29
+    // instanced submissions: practical fixture panels and structural ceilings.
+    expect(state.render.calls).toBeLessThanOrEqual(143);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
     expect(state.interiorTelemetry).toEqual({

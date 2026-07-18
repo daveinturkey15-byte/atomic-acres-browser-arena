@@ -65,6 +65,7 @@ import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
+import { GrassSystem } from './grass-system';
 import { TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE, consumeFieldSupport, createFieldSupportState, createTriPassTargeting, recordSupportDeath, recordSupportElimination, registerTriPassTarget, triPassSchedule, type FieldSupportId, type TriPassTargeting } from './field-support';
 import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
@@ -217,7 +218,7 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · ATOMIC SIGNAL PASS 28</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · DAWNFIELD PASS 29</div>
     <h1>ATOMIC <span>ACRES</span></h1>
     <p class="lede">Deploy into a shader-unified agritech test suburb with distinct cultivation, transit and solar-service routes.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -375,6 +376,10 @@ const atomicSignal = new AtomicSignalPass(renderer, renderProfile, (reason) => {
   document.documentElement.dataset.atomicSignal = 'fallback';
   console.warn('[Atomic Acres Atomic Signal fallback]', reason);
 }, atomicSignalBypass);
+const grassQuery = new URLSearchParams(window.location.search).get('grass');
+const raysQuery = new URLSearchParams(window.location.search).get('rays');
+const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on')) ? 0 : activeLighting.godRayStrength;
+const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
 document.documentElement.classList.toggle('atomic-signal-render', atomicSignal.telemetry().enabled);
 document.documentElement.dataset.atomicSignal = atomicSignal.telemetry().enabled ? 'active' : 'direct';
 let webglContextLost = false;
@@ -387,14 +392,6 @@ renderer.domElement.addEventListener('webglcontextlost', (event) => {
   webglContextLost = true;
   webglContextLosses += 1;
   document.documentElement.dataset.webglContext = 'lost';
-});
-renderer.domElement.addEventListener('webglcontextrestored', () => {
-  webglContextLost = false;
-  webglContextRestorations += 1;
-  document.documentElement.dataset.webglContext = 'ready';
-  renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
-  atomicSignal.invalidateValidation();
-  resize();
 });
 document.documentElement.dataset.webglContext = 'ready';
 // Both public profiles can reduce their internal framebuffer when sustained
@@ -466,6 +463,8 @@ function buildSky(): void {
       cloudColor: { value: new THREE.Color(activeLighting.skyCloud) },
       sunDirection: { value: new THREE.Vector3(...activeLighting.sunPosition).normalize() },
       cloudStrength: { value: reducedRenderMode ? 0 : renderProfile === 'blender' ? 0.08 : 0.045 },
+      rayStrength: { value: actualGodRayStrength },
+      rayLobes: { value: actualGodRayLobes },
     },
     vertexShader: `
       varying vec3 skyDirection;
@@ -483,6 +482,8 @@ function buildSky(): void {
       uniform vec3 cloudColor;
       uniform vec3 sunDirection;
       uniform float cloudStrength;
+      uniform float rayStrength;
+      uniform float rayLobes;
       void main(){
         vec3 direction = normalize(skyDirection);
         float h = direction.y;
@@ -501,6 +502,11 @@ function buildSky(): void {
         float cloudMask = smoothstep(0.62, 0.9, waveA * 0.72 + waveB * 0.28) * max(highBand, lowBand * 0.72);
         color = mix(color, cloudColor, cloudMask * cloudStrength);
         `}
+        float rayAzimuth = atan(direction.z, direction.x);
+        float rayBands = 0.5 + 0.5 * sin(rayAzimuth * max(rayLobes, 1.0) + h * 13.0);
+        float rayShape = smoothstep(0.54, 0.96, rayBands) * pow(sunDot, 3.2);
+        float rayAltitude = smoothstep(-0.04, 0.24, h);
+        color += sunColor * rayShape * rayAltitude * rayStrength;
         color += sunColor * (sunDisc * 1.4 + sunHalo);
         gl_FragColor = vec4(color, 1.0);
       }
@@ -530,10 +536,28 @@ function buildSky(): void {
 buildSky();
 const worldIdentityPresentation = createWorldIdentityPresentation(
   scene,
-  activeLighting.routeLightIntensity,
-  reducedWorldDetail,
+  activeLighting,
+  softwareRenderer,
 );
 const arena: ArenaMap = buildArena(scene);
+const grassSystem = new GrassSystem(
+  scene,
+  renderProfile,
+  rendererLabel,
+  grassQuery,
+  arena.colliders,
+  activeLighting,
+);
+grassSystem.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  webglContextLost = false;
+  webglContextRestorations += 1;
+  document.documentElement.dataset.webglContext = 'ready';
+  renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
+  atomicSignal.invalidateValidation();
+  grassSystem.handleContextRestored();
+  resize();
+});
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
@@ -653,6 +677,10 @@ let lastPlayerSpawnAudit: {
 } | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let debugShadowProbe: THREE.Mesh | null = null;
+const debugCaptureCameraPosition = new THREE.Vector3();
+let debugCaptureCameraYaw = 0;
+let debugCaptureCameraPitch = 0;
+let debugCaptureCameraActive = false;
 let matchState: MatchState = createMatch(performance.now());
 let matchFinished = false;
 let respawnEndsAt = 0;
@@ -3543,6 +3571,7 @@ function frame(now: number): void {
     );
     if (adaptivePixelRatio !== null) {
       applyAdaptiveRenderBudget(adaptivePixelRatio);
+      grassSystem.setAdaptivePixelRatio(adaptivePixelRatio);
       resize();
     }
     const pacing = framePacing.summary();
@@ -3581,8 +3610,14 @@ function frame(now: number): void {
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
     if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
+    grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
     if (gameStarted) updateMinimap(now);
     updateHud(now);
+    if (debugCaptureCameraActive) {
+      camera.position.copy(debugCaptureCameraPosition);
+      camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
+      camera.updateMatrixWorld(true);
+    }
     refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !webglContextLost) {
       atomicSignal.render(scene, camera);
@@ -3618,6 +3653,7 @@ const debugWindow = window as Window & {
       run: number;
     } | null;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
+    setCaptureCameraPose: (x: number | null, y?: number, z?: number, yaw?: number, pitch?: number) => void;
     collisionProbe: (x: number, z: number) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
     setRenderPaused: (paused: boolean) => void;
@@ -3637,6 +3673,9 @@ const debugWindow = window as Window & {
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
     setReloadCaptureProgress: (progress: number | null) => void;
+    setGrassTime: (timeSeconds: number | null) => void;
+    setGrassInteractionProbe: (x: number | null, z: number | null) => void;
+    sampleGrassBend: (index: number) => Record<string, number> | null;
     renderAudit: () => Array<{ name: string; material: string; triangles: number }>;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
@@ -3856,6 +3895,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       routeSigns: worldIdentityPresentation.routeSigns,
       cueInstances: worldIdentityPresentation.cueInstances,
       atmosphericParticles: worldIdentityPresentation.atmosphericParticles,
+      practicalLights: worldIdentityPresentation.practicalLights,
+      streetLights: worldIdentityPresentation.streetLights,
+      interiorLights: worldIdentityPresentation.interiorLights,
+      fixtureInstances: worldIdentityPresentation.fixtureInstances,
+      ceilingInstances: worldIdentityPresentation.ceilingInstances,
     },
     arenaStoryReady: blenderArenaActive || ['route-marker-verdant-array', 'route-marker-civic-transit', 'route-marker-helio-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
@@ -3917,6 +3961,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       minimapRenders: minimapRenderCount,
       adaptive: adaptiveQuality.telemetry(),
       lighting: { ...activeLighting },
+      sky: {
+        pass: 29,
+        godRayStrength: actualGodRayStrength,
+        godRayLobes: actualGodRayLobes,
+        extraDraws: 0,
+        extraTextureSamples: 0,
+        linearHdr: true,
+      },
+      grass: grassSystem.telemetry(),
       blenderEnvironment: blenderArenaTelemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
         const material = node instanceof THREE.Mesh ? node.material : null;
@@ -4116,7 +4169,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.velocity.set(0, 0, 0);
     player.yaw = yaw;
     player.pitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
     player.invulnerableUntil = 0;
+  },
+  setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0) => {
+    debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
+    if (!debugCaptureCameraActive) return;
+    debugCaptureCameraPosition.set(x!, y, z);
+    debugCaptureCameraYaw = yaw;
+    debugCaptureCameraPitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
   },
   collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
     ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
@@ -4214,6 +4277,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setReloadCaptureProgress: (progress: number | null) => {
     debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
   },
+  setGrassTime: (timeSeconds: number | null) => grassSystem.setDebugTime(timeSeconds),
+  setGrassInteractionProbe: (x: number | null, z: number | null) => grassSystem.setDebugInteraction(x, z),
+  sampleGrassBend: (index: number) => grassSystem.sampleDebugBend(index),
   renderAudit: () => {
     scene.updateMatrixWorld(true);
     camera.updateMatrixWorld(true);
@@ -4338,7 +4404,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 28 live candidate — Atomic Signal shader, tuned PBR materials, distinct agritech routes and persistent records.');
+  setStatus('Pass 29 owner-review candidate — early-morning light, practical interiors, living grass, Atomic Signal and persistent records.');
   requestAnimationFrame(frame);
 }
 
