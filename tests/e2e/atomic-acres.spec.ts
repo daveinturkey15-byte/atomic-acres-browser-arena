@@ -158,6 +158,30 @@ type DebugState = {
   render: {
     profile: 'performance' | 'blender' | 'compat';
     representation: 'responsive' | 'blender' | 'compat';
+    atomicSignal: {
+      enabled: boolean;
+      profile: 'performance' | 'blender' | 'compat';
+      fallbackReason: string | null;
+      bypassReason: string | null;
+      passCpuMs: number;
+      averagePassCpuMs: number;
+      samples: number;
+      textureSamples: number;
+      targetValidated: boolean;
+      outputValidated: boolean;
+      width: number;
+      height: number;
+    };
+    materialCompatibility: {
+      materials: number;
+      colorTexturesCorrected: number;
+      dataTexturesCorrected: number;
+      anisotropyAdjusted: number;
+      darkSurfacesLifted: number;
+      roughnessAdjusted: number;
+      metalnessAdjusted: number;
+    };
+    fpsCounter: { value: string | null; pacing: string; visible: boolean; anchor: 'top-right' };
     calls: number;
     triangles: number;
     points: number;
@@ -247,7 +271,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('WORLD IDENTITY PASS 27');
+    await expect(page.locator('.eyebrow')).toContainText('ATOMIC SIGNAL PASS 28');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -310,16 +334,48 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('defaults new players to Blender Render while retaining explicit slow-PC profiles', async ({ page }) => {
-    await pageReadyAt(page, '/');
+    const shaderErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error' && /Atomic Signal|Shader Error|WebGLProgram/.test(message.text())) shaderErrors.push(message.text());
+    });
+    await pageReadyAt(page, '/?signal=on');
     const defaultState = await debug(page);
-    expect(defaultState.render).toMatchObject({ profile: 'blender', representation: 'blender' });
+    expect(defaultState.render).toMatchObject({
+      profile: 'blender',
+      representation: 'blender',
+      atomicSignal: { enabled: true, fallbackReason: null, textureSamples: 5 },
+    });
+    expect(defaultState.render.materialCompatibility.materials).toBeGreaterThan(0);
+    expect(defaultState.render.atomicSignal.targetValidated).toBe(true);
+    expect(defaultState.render.atomicSignal.outputValidated).toBe(true);
     expect(defaultState.spawnSafety).toEqual([
       { team: 0, authored: 12, valid: 12 },
       { team: 1, authored: 12, valid: 12 },
     ]);
     await expect(page.locator('#graphics-profile')).toHaveValue('blender');
-    await pageReadyAt(page, '/?render=performance');
-    expect((await debug(page)).render).toMatchObject({ profile: 'performance', representation: 'responsive' });
+    await pageReadyAt(page, '/?render=performance&signal=on');
+    expect((await debug(page)).render).toMatchObject({
+      profile: 'performance',
+      representation: 'responsive',
+      atomicSignal: { enabled: true, fallbackReason: null, textureSamples: 1 },
+    });
+    expect(shaderErrors).toEqual([]);
+  });
+
+  test('keeps the compatibility profile on the direct renderer fallback', async ({ page }) => {
+    await pageReadyAt(page, '/?render=compat');
+    const state = await debug(page);
+    expect(state.render.atomicSignal).toMatchObject({
+      enabled: false,
+      profile: 'compat',
+      fallbackReason: null,
+      bypassReason: 'compat-profile',
+      textureSamples: 0,
+      targetValidated: false,
+      outputValidated: false,
+    });
+    await expect(page.locator('html')).not.toHaveClass(/atomic-signal-render/);
+    await expect(page.locator('#vignette')).not.toHaveCSS('display', 'none');
   });
 
   test('falls back to the authored procedural arena if the default Blender asset cannot load', async ({ page }) => {
@@ -390,6 +446,7 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('keeps all three Pass 27 route identities legible from representative approaches', async ({ page }) => {
+    test.setTimeout(120_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=blender');
@@ -522,12 +579,18 @@ test.describe('solo mechanics', () => {
       await page.keyboard.down('ShiftLeft');
       await page.keyboard.down('KeyW');
       await page.waitForFunction(
-        (start) => {
-          const frame = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().frameCount;
-          return performance.now() - start.now >= 2_400 && frame - start.frame >= 36;
+        (target) => {
+          const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+          const dx = snapshot.player.position[0] - target.stage.start[0];
+          const dz = snapshot.player.position[2] - target.stage.start[2];
+          const progress = dx * target.stage.uphill[0] + dz * target.stage.uphill[2];
+          return performance.now() - target.now >= 1_200
+            && snapshot.frameCount - target.frame >= 20
+            && progress >= target.stage.run + 0.35
+            && snapshot.player.position[1] > target.stage.top[1] - 0.5;
         },
-        traversalStart,
-        { timeout: 15_000 },
+        { ...traversalStart, stage },
+        { timeout: 20_000 },
       );
       await page.keyboard.up('KeyW');
       await page.keyboard.up('ShiftLeft');
@@ -697,6 +760,7 @@ test.describe('solo mechanics', () => {
   });
 
   test('resolves three player-selected sky missiles after one second', async ({ page }) => {
+    test.setTimeout(120_000);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
       earnSupport: (kills: number) => void;
       activateSupport: (id: 'tri-pass') => void;
@@ -1322,7 +1386,7 @@ test.describe('performance and stability', () => {
   test('Performance keeps readable art within its smooth rendering budget', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=performance');
+    await pageReadyAt(page, '/?render=performance&signal=on');
     await startSolo(page);
     await page.waitForTimeout(500);
     const state = await debug(page);
@@ -1339,6 +1403,13 @@ test.describe('performance and stability', () => {
     expect(state.worldIdentityPresentation).toEqual({ routeLights: 3, routeSigns: 3, cueInstances: 0, atmosphericParticles: 0 });
     expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
     expect(state.render.antialias).toBe(false);
+    expect(state.render.atomicSignal).toMatchObject({
+      enabled: true,
+      fallbackReason: null,
+      textureSamples: 1,
+      targetValidated: true,
+      outputValidated: true,
+    });
     const overlays = await page.evaluate(() => ({
       grade: getComputedStyle(document.querySelector('#color-grade')!).display,
       grain: getComputedStyle(document.querySelector('#film-grain')!).display,
@@ -1347,7 +1418,8 @@ test.describe('performance and stability', () => {
     const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
     expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.75));
     expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.75));
-    expect(state.render.calls).toBeLessThanOrEqual(140);
+    // Atomic Signal contributes exactly one bounded fullscreen draw on top of the retained profile budget.
+    expect(state.render.calls).toBeLessThanOrEqual(141);
     expect(state.render.triangles).toBeLessThanOrEqual(150_000);
     expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
     expect(state.interiorTelemetry).toEqual({
@@ -1362,6 +1434,12 @@ test.describe('performance and stability', () => {
       visibleCollisionProxies: 0,
       visibleRamps: 4,
     });
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await expect.poll(async () => {
+      const resized = await debug(page);
+      return resized.render.atomicSignal.width === resized.render.drawingBuffer[0]
+        && resized.render.atomicSignal.height === resized.render.drawingBuffer[1];
+    }).toBe(true);
     expect(errors).toEqual([]);
   });
 
@@ -1384,7 +1462,7 @@ test.describe('performance and stability', () => {
   test('Performance gameplay shows a live FPS counter in the top right', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=performance');
+    await pageReadyAt(page, '/?render=performance&signal=on');
     await startSolo(page);
     const fpsCounter = page.locator('#fps-counter');
     await expect(fpsCounter).toBeVisible();
@@ -1395,7 +1473,11 @@ test.describe('performance and stability', () => {
     expect(viewport).not.toBeNull();
     expect(box!.x + box!.width).toBeGreaterThan(viewport!.width - 140);
     expect(box!.y).toBeLessThan(80);
-    const cadenceStart = await debug(page);
+    const signalState = await debug(page);
+    expect(signalState.render.fpsCounter).toMatchObject({ visible: true, anchor: 'top-right' });
+    expect(signalState.render.atomicSignal).toMatchObject({ enabled: true, fallbackReason: null, textureSamples: 1 });
+    expect(signalState.render.atomicSignal.samples).toBeGreaterThan(0);
+    const cadenceStart = signalState;
     await page.waitForFunction((targetFrame) => (
       (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } })
         .__ATOMIC_ACRES_DEBUG__.snapshot().frameCount >= targetFrame

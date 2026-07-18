@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
+import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { PATROL_LAYOUT } from './arena-layout';
@@ -56,6 +57,7 @@ import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { createWorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
+import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import { arenaLightingProfile } from './blender-lighting';
@@ -215,9 +217,9 @@ app.innerHTML = `
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · WORLD IDENTITY PASS 27</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · ATOMIC SIGNAL PASS 28</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Deploy into a sun-bleached agritech test suburb with distinct cultivation, transit and solar-service routes.</p>
+    <p class="lede">Deploy into a shader-unified agritech test suburb with distinct cultivation, transit and solar-service routes.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -361,6 +363,20 @@ renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = activeLighting.exposure;
+const signalQuery = new URLSearchParams(window.location.search).get('signal');
+const gl = renderer.getContext();
+const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info') as { UNMASKED_RENDERER_WEBGL: number } | null;
+const rendererLabel = rendererInfo ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
+const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
+const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
+document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
+const atomicSignal = new AtomicSignalPass(renderer, renderProfile, (reason) => {
+  document.documentElement.classList.remove('atomic-signal-render');
+  document.documentElement.dataset.atomicSignal = 'fallback';
+  console.warn('[Atomic Acres Atomic Signal fallback]', reason);
+}, atomicSignalBypass);
+document.documentElement.classList.toggle('atomic-signal-render', atomicSignal.telemetry().enabled);
+document.documentElement.dataset.atomicSignal = atomicSignal.telemetry().enabled ? 'active' : 'direct';
 let webglContextLost = false;
 let webglContextLosses = 0;
 let webglContextRestorations = 0;
@@ -522,6 +538,15 @@ const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
+let materialCompatibility: AtomicSignalMaterialAudit = {
+  materials: 0,
+  colorTexturesCorrected: 0,
+  dataTexturesCorrected: 0,
+  anisotropyAdjusted: 0,
+  darkSurfacesLifted: 0,
+  roughnessAdjusted: 0,
+  metalnessAdjusted: 0,
+};
 
 const player = {
   id: createPlayerId(),
@@ -3203,6 +3228,7 @@ function resize(): void {
   const width = window.innerWidth;
   const height = window.innerHeight;
   renderer.setSize(width, height, false);
+  atomicSignal.resize();
   camera.aspect = width / Math.max(1, height);
   camera.updateProjectionMatrix();
 }
@@ -3558,7 +3584,7 @@ function frame(now: number): void {
     updateHud(now);
     refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !webglContextLost) {
-      renderer.render(scene, camera);
+      atomicSignal.render(scene, camera);
       if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
     }
     requestAnimationFrame(frame);
@@ -3857,6 +3883,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     render: {
       profile: renderProfile,
       representation: activeRenderConfig.representation,
+      atomicSignal: atomicSignal.telemetry(),
+      materialCompatibility: { ...materialCompatibility },
+      fpsCounter: {
+        value: fpsCounterValue.textContent,
+        pacing: fpsCounter.dataset.pacing ?? 'warming',
+        visible: !hudRoot.hidden,
+        anchor: 'top-right',
+      },
       pixelRatio: renderer.getPixelRatio(),
       drawingBuffer: renderer.getDrawingBufferSize(new THREE.Vector2()).toArray(),
       antialias: renderer.getContext().getContextAttributes()?.antialias ?? false,
@@ -4107,7 +4141,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       .addScaledVector(right, THREE.MathUtils.clamp(horizontalOffset, -3, 3));
     debugShadowProbe.position.y = 1;
     renderer.shadowMap.needsUpdate = true;
-    renderer.render(scene, camera);
+    atomicSignal.render(scene, camera);
     const gl = renderer.getContext();
     const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
     gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -4235,20 +4269,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
 
 };
 
-function liftCrushedEnvironmentBlacks(root: THREE.Object3D, excluded: THREE.Object3D): void {
-  const adjusted = new Set<THREE.Material>();
-  root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh) || excluded.getObjectById(node.id)) return;
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    for (const material of materials) {
-      if (adjusted.has(material) || !(material instanceof THREE.MeshStandardMaterial)) continue;
-      adjusted.add(material);
-      const { r, g, b } = material.color;
-      if (Math.max(r, g, b) < 0.16) material.color.lerp(new THREE.Color(0x5b6664), 0.24);
-    }
-  });
-}
-
 async function bootstrap(): Promise<void> {
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
@@ -4293,6 +4313,12 @@ async function bootstrap(): Promise<void> {
   art.root.traverse((node) => {
     if (node instanceof THREE.Mesh && node.userData.blocksShots === true) arena.raycastMeshes.push(node);
   });
+  materialCompatibility = tuneMaterialsForAtomicSignal(
+    scene,
+    weaponView.root,
+    renderProfile,
+    renderer.capabilities.getMaxAnisotropy(),
+  );
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (!blenderArenaActive) {
     if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', staticMaterialMode);
@@ -4300,7 +4326,6 @@ async function bootstrap(): Promise<void> {
     batchStaticMeshes(art.root, scene, () => '', decorativeMaterialMode);
   }
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
-  liftCrushedEnvironmentBlacks(scene, weaponView.root);
   weaponView.setWeapon(player.weapon, true);
   respawn();
   weaponView.root.visible = false;
@@ -4312,7 +4337,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 27 owner-review build — three distinct agritech routes, continuous streaks and persistent peer-synchronised records.');
+  setStatus('Pass 28 live candidate — Atomic Signal shader, tuned PBR materials, distinct agritech routes and persistent records.');
   requestAnimationFrame(frame);
 }
 

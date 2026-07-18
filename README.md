@@ -50,6 +50,20 @@ This is a friendly-session architecture, not cheat-resistant competitive netcode
 - Same-origin tabs update live through `BroadcastChannel`; active PeerJS players exchange bounded leaderboard snapshots on join and new records at match end.
 - This serverless leaderboard is durable per browser and peer-carried between players who meet. It is not a tamper-resistant global ladder; that would require a separately deployed authoritative HTTPS backend.
 
+## Rendering and performance
+
+Pass 28 adds **Atomic Signal**, one bounded full-screen post-process that keeps the authored scene in linear HDR, then applies the same ACES filmic response used by the direct renderer plus restrained contrast, route-aware shadow/highlight tint, dithering, a soft vignette, and optional five-tap sharpening in Blender Render.
+
+- **Performance:** one source sample, no sharpening, 0.75 initial pixel ratio, adaptive quality, no shadows.
+- **Blender Render:** five source samples, restrained sharpening, authored environment and static shadows.
+- **Compatibility:** bypasses Atomic Signal and uses the direct ACES renderer.
+- Detected software rasterizers such as SwiftShader and llvmpipe also use direct ACES by default so post-processing cannot collapse already-limited frame pacing. `?signal=on` is the explicit QA override; `?signal=off` is the deterministic direct-render baseline.
+- The render target and first output frame are validated; an incomplete framebuffer, shader-black output, or runtime post-process exception falls back to direct rendering.
+- Runtime material auditing keeps albedo/emissive maps in sRGB, data maps linear, anisotropy profile-bounded, dark non-protected surfaces readable, and PBR values within restrained limits.
+- The live FPS counter is always anchored in the top-right during gameplay. Its cadence, active profile, render-target dimensions, shader health, texture-sample count and material corrections are available in the debug snapshot.
+
+See `docs/PASS28_ATOMIC_SIGNAL_RENDER_SPEC_2026-07-17.md` for the exact color-space contract and verification evidence.
+
 ## Local development
 
 ```bash
