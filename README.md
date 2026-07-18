@@ -57,7 +57,7 @@ Pass 28 adds **Atomic Signal**, one bounded full-screen post-process that keeps 
 - **Performance:** one source sample, no sharpening, 0.75 initial pixel ratio, adaptive quality, no shadows.
 - **Blender Render:** five source samples, restrained sharpening, authored environment and static shadows.
 - **Compatibility:** bypasses Atomic Signal and uses the direct ACES renderer.
-- Detected software rasterizers such as SwiftShader and llvmpipe also use direct ACES by default so post-processing cannot collapse already-limited frame pacing. `?signal=on` is the explicit QA override; `?signal=off` is the deterministic direct-render baseline.
+- Detected software rasterizers such as SwiftShader, llvmpipe, WARP and Microsoft Basic Render Driver also use direct ACES by default so post-processing cannot collapse already-limited frame pacing. `?signal=on` is the explicit QA override; `?signal=off` is the deterministic direct-render baseline.
 - The render target and first output frame are validated; an incomplete framebuffer, shader-black output, or runtime post-process exception falls back to direct rendering.
 - Runtime material auditing keeps albedo/emissive maps in sRGB, data maps linear, anisotropy profile-bounded, dark non-protected surfaces readable, and PBR values within restrained limits.
 - The live FPS counter is always anchored in the top-right during gameplay. Its cadence, active profile, render-target dimensions, shader health, texture-sample count and material corrections are available in the debug snapshot.

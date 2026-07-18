@@ -13,7 +13,8 @@ try {
   await page.goto(`${baseUrl}?render=performance&signal=on&seed=pass26-fps`);
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
-  await page.waitForFunction(() => /^\d{1,3}$/.test(document.querySelector('#fps-counter b')?.textContent ?? ''), undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => /^\d{1,3}$/.test(document.querySelector('#fps-counter b')?.textContent ?? '')
+    && window.__ATOMIC_ACRES_DEBUG__?.snapshot().render.atomicSignal.samples >= 2, undefined, { timeout: 30_000 });
   const result = await page.evaluate(() => {
     const counter = document.querySelector('#fps-counter');
     const box = counter?.getBoundingClientRect();
@@ -35,7 +36,8 @@ try {
   }
   if (result.fpsCounter.anchor !== 'top-right' || !result.atomicSignal.enabled
     || result.atomicSignal.fallbackReason !== null || result.atomicSignal.textureSamples !== 1
-    || result.atomicSignal.samples < 1 || result.atomicSignal.passCpuMs > 12) {
+    || result.atomicSignal.samples < 2 || result.atomicSignal.passCpuMs > 12
+    || result.atomicSignal.averagePassCpuMs > 12) {
     throw new Error(`Atomic Signal Performance path is outside its bounded contract: ${JSON.stringify(result)}`);
   }
   console.log(JSON.stringify({ ok: true, ...result }));

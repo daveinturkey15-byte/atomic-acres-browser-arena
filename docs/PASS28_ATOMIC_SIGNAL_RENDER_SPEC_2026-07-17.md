@@ -15,14 +15,14 @@ Give Atomic Acres a more coherent modern image without adopting expensive cinema
 2. validate framebuffer completeness on first use;
 3. grade the source with restrained contrast/saturation, cool shadows, warm highlights and distance desaturation;
 4. use the Three.js r185 ACES fit under renamed local GLSL symbols, avoiding renderer-injected uniform collisions;
-5. apply a fine ordered dither and soft peripheral vignette;
+5. apply a soft peripheral vignette in linear display space, then a fine ordered dither after the sRGB transfer so its amplitude remains within the intended output-code budget;
 6. use one texture sample in Performance and five only in Blender Render for restrained sharpening;
 7. convert linear output to sRGB exactly once;
 8. validate representative output pixels once, then fall back to direct rendering if the result is all black.
 
 The enabled path sets the renderer to `NoToneMapping` because Atomic Signal owns the single ACES/output transform. Compatibility mode retains the direct renderer's `ACESFilmicToneMapping`. Runtime fallback temporarily restores direct ACES rendering. No render target, shader, geometry or uniform object is allocated per frame.
 
-The diagnostic-only `?signal=off` query bypasses the pass for exact same-origin A/B checks. Detected software rasterizers (`SwiftShader`, `llvmpipe`, `softpipe`) also bypass it by default because the extra full-screen pass can dominate an already cadence-limited renderer. `?signal=on` is the explicit QA override that proves shader compilation, framebuffer completeness and visible output even on software WebGL. The public menu exposes neither query as a normal player option.
+The diagnostic-only `?signal=off` query bypasses the pass for exact same-origin A/B checks. Detected software rasterizers (`SwiftShader`, `llvmpipe`, `softpipe`, WARP and Microsoft Basic Render Driver) also bypass it by default because the extra full-screen pass can dominate an already cadence-limited renderer. `?signal=on` is the explicit QA override that proves shader compilation, framebuffer completeness and visible output even on software WebGL. The public menu exposes neither query as a normal player option.
 
 ## Profile contract
 
@@ -68,7 +68,7 @@ Material counts and correction counts are exposed as `render.materialCompatibili
 - framebuffer and output validation state;
 - render-target dimensions.
 
-Compatibility mode and detected software renderers bypass the pass. Enabled or explicitly forced profiles verify framebuffer completeness and a non-black first output. JavaScript/render exceptions use direct ACES rendering rather than leaving a black screen.
+Compatibility mode and detected software renderers bypass the pass. Enabled or explicitly forced profiles verify framebuffer completeness and a non-black first output. WebGL context restoration invalidates both validation flags and requires a fresh framebuffer/output check before telemetry can report healthy output. JavaScript/render exceptions use direct ACES rendering rather than leaving a black screen, and inactive/fallback telemetry reports zero pass work.
 
 ## Verification evidence
 
@@ -86,7 +86,7 @@ Passing on the final candidate before release:
 - Chromium top-right live FPS geometry/cadence check;
 - WebKit capability smoke with shader compile, framebuffer validation and non-black output validation;
 - visual screenshot histogram checks: no black frame, no highlight clipping, and restrained central-view change relative to direct ACES rendering;
-- Performance profile telemetry on the explicit `signal=on` oracle: one texture sample, validated target/output and a latest sampled post-pass CPU submission of 3.9 ms under WSL headless SwiftShader (release ceiling: 12 ms). The same harness reported only 2 FPS overall because this environment's software renderer was cadence-limited; that number is not a hardware FPS claim.
+- Performance profile telemetry on the explicit `signal=on` oracle: one texture sample, validated target/output, a latest fullscreen-pass CPU submission of 0.10 ms and a warm rolling average of 0.15 ms under WSL headless SwiftShader (release ceiling: 12 ms). Scene submission is excluded by construction and is not misreported as post-process overhead. The same harness reported only 1 FPS overall because this environment's software renderer was cadence-limited; that number is not a hardware FPS claim.
 
 Firefox headless is not a usable shader oracle on this WSL host: Firefox reports `AllowWebgl2:false` and cannot create any WebGL2 renderer, including the pre-shader direct path. Chromium and WebKit provide the available cross-engine WebGL2 evidence here.
 

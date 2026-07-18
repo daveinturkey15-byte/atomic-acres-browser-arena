@@ -22,6 +22,8 @@ describe('Atomic Signal profile contract', () => {
   it('bypasses software renderers by default while preserving explicit QA overrides', () => {
     expect(isSoftwareWebGLRenderer('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))')).toBe(true);
     expect(isSoftwareWebGLRenderer('llvmpipe (LLVM 18.1.8, 256 bits)')).toBe(true);
+    expect(isSoftwareWebGLRenderer('ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11)')).toBe(true);
+    expect(isSoftwareWebGLRenderer('ANGLE (Microsoft, WARP Direct3D11)')).toBe(true);
     expect(isSoftwareWebGLRenderer('ANGLE (NVIDIA GeForce RTX 4070 Direct3D11)')).toBe(false);
     expect(atomicSignalBypassReason(null, 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))')).toBe('software-renderer');
     expect(atomicSignalBypassReason(null, 'ANGLE (NVIDIA GeForce RTX 4070 Direct3D11)')).toBeNull();
@@ -42,6 +44,7 @@ describe('Atomic Signal profile contract', () => {
     }
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('orderedDither');
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('atomicAcesFilmicToneMapping');
+    expect(ATOMIC_SIGNAL_FRAGMENT.indexOf('vec3 encoded = linearToSrgb')).toBeLessThan(ATOMIC_SIGNAL_FRAGMENT.indexOf('encoded += (orderedDither'));
     expect(ATOMIC_SIGNAL_FRAGMENT).not.toContain('chromatic');
   });
 });

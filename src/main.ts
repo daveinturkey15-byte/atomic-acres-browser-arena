@@ -393,6 +393,7 @@ renderer.domElement.addEventListener('webglcontextrestored', () => {
   webglContextRestorations += 1;
   document.documentElement.dataset.webglContext = 'ready';
   renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
+  atomicSignal.invalidateValidation();
   resize();
 });
 document.documentElement.dataset.webglContext = 'ready';

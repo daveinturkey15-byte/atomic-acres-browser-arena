@@ -378,6 +378,31 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#vignette')).not.toHaveCSS('display', 'none');
   });
 
+  test('uses the default direct path only when the live renderer is classified as software', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance');
+    const state = await debug(page);
+    const rendererKind = await page.evaluate(() => document.documentElement.dataset.atomicSignalRenderer);
+    if (rendererKind === 'software') {
+      expect(state.render.atomicSignal).toMatchObject({
+        enabled: false,
+        fallbackReason: null,
+        bypassReason: 'software-renderer',
+        textureSamples: 0,
+        samples: 0,
+      });
+    } else {
+      expect(rendererKind).toBe('hardware');
+      expect(state.render.atomicSignal).toMatchObject({
+        enabled: true,
+        fallbackReason: null,
+        bypassReason: null,
+      });
+    }
+    expect(errors).toEqual([]);
+  });
+
   test('falls back to the authored procedural arena if the default Blender asset cannot load', async ({ page }) => {
     await page.route('**/atomic-acres-blender-arena.glb', (route) => route.abort('failed'));
     await pageReadyAt(page, '/');

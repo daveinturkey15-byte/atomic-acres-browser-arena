@@ -148,13 +148,14 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
     float edge = smoothstep(0.32, 1.30, dot(centered, centered));
     color *= 1.0 - edge * vignette;
 
-    color += (orderedDither(gl_FragCoord.xy) - 0.46875) * (dither / 255.0);
-    gl_FragColor = vec4(linearToSrgb(clamp(color, 0.0, 1.0)), 1.0);
+    vec3 encoded = linearToSrgb(clamp(color, 0.0, 1.0));
+    encoded += (orderedDither(gl_FragCoord.xy) - 0.46875) * (dither / 255.0);
+    gl_FragColor = vec4(clamp(encoded, 0.0, 1.0), 1.0);
   }
 `;
 
 export function isSoftwareWebGLRenderer(rendererLabel: string): boolean {
-  return /swiftshader|llvmpipe|software|softpipe/i.test(rendererLabel);
+  return /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic render driver/i.test(rendererLabel);
 }
 
 export function atomicSignalBypassReason(signalQuery: string | null, rendererLabel: string): string | null {
@@ -298,6 +299,12 @@ export class AtomicSignalPass {
     (this.material.uniforms.inverseResolution.value as THREE.Vector2).set(1 / width, 1 / height);
   }
 
+  invalidateValidation(): void {
+    if (!this.config.enabled || this.fallbackReason) return;
+    this.targetValidated = false;
+    this.outputValidated = false;
+  }
+
   private renderDirect(scene: THREE.Scene, camera: THREE.Camera): void {
     const previousToneMapping = this.renderer.toneMapping;
     this.renderer.toneMapping = this.screenToneMapping;
@@ -347,7 +354,6 @@ export class AtomicSignalPass {
       return;
     }
 
-    const started = performance.now();
     try {
       (this.material.uniforms.signalExposure as { value: number }).value = this.renderer.toneMappingExposure * this.config.exposureScale;
       this.renderer.setRenderTarget(this.target);
@@ -355,11 +361,14 @@ export class AtomicSignalPass {
       this.renderer.clear();
       this.renderer.render(scene, camera);
       this.renderer.setRenderTarget(null);
+      const passStarted = performance.now();
       this.renderer.render(this.quadScene, this.quadCamera);
       this.validateOutput();
-      this.passCpuMs = Math.max(0, performance.now() - started);
+      this.passCpuMs = Math.max(0, performance.now() - passStarted);
       this.samples += 1;
-      this.averagePassCpuMs += (this.passCpuMs - this.averagePassCpuMs) / Math.min(this.samples, 120);
+      if (this.samples === 1) this.averagePassCpuMs = 0;
+      else if (this.samples === 2) this.averagePassCpuMs = this.passCpuMs;
+      else this.averagePassCpuMs += (this.passCpuMs - this.averagePassCpuMs) / Math.min(this.samples - 1, 120);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.fallbackReason = message || 'post-processing render failed';
@@ -369,17 +378,18 @@ export class AtomicSignalPass {
   }
 
   telemetry(): AtomicSignalTelemetry {
+    const active = this.config.enabled && this.fallbackReason === null;
     return {
-      enabled: this.config.enabled && this.fallbackReason === null,
+      enabled: active,
       profile: this.config.profile,
       fallbackReason: this.fallbackReason,
       bypassReason: this.bypassReason,
-      passCpuMs: this.passCpuMs,
-      averagePassCpuMs: this.averagePassCpuMs,
-      samples: this.samples,
-      textureSamples: atomicSignalTextureSamples(this.config),
-      targetValidated: this.targetValidated,
-      outputValidated: this.outputValidated,
+      passCpuMs: active ? this.passCpuMs : 0,
+      averagePassCpuMs: active ? this.averagePassCpuMs : 0,
+      samples: active ? this.samples : 0,
+      textureSamples: active ? atomicSignalTextureSamples(this.config) : 0,
+      targetValidated: active && this.targetValidated,
+      outputValidated: active && this.outputValidated,
       width: this.width,
       height: this.height,
     };

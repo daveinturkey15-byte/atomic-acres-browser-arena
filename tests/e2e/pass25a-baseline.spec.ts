@@ -32,6 +32,7 @@ type Pass25State = {
     shadowAutoUpdate: boolean;
     staticShadowDynamicRefreshes: number;
     contextLifecycle: { lost: boolean; losses: number; restorations: number };
+    atomicSignal: { enabled: boolean; targetValidated: boolean; outputValidated: boolean };
   };
 };
 
@@ -39,8 +40,8 @@ async function snapshot(page: Page): Promise<Pass25State> {
   return page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__.snapshot());
 }
 
-async function ready(page: Page, profile: 'performance' | 'blender' = 'performance'): Promise<void> {
-  await page.goto(`/?render=${profile}&seed=pass25a-browser-baseline`);
+async function ready(page: Page, profile: 'performance' | 'blender' = 'performance', forceSignal = false): Promise<void> {
+  await page.goto(`/?render=${profile}&seed=pass25a-browser-baseline${forceSignal ? '&signal=on' : ''}`);
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     const solo = document.querySelector<HTMLButtonElement>('#solo');
@@ -118,7 +119,8 @@ test.describe('Pass 25A baseline and lifecycle', () => {
   }
 
   test('restores a deliberately lost WebGL context without reloading the match', async ({ page }) => {
-    await ready(page);
+    test.setTimeout(120_000);
+    await ready(page, 'performance', true);
     await startSolo(page);
     const before = await snapshot(page);
     const supported = await page.evaluate(() => {
@@ -134,6 +136,10 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     await expect.poll(async () => (await snapshot(page)).render.contextLifecycle.lost).toBe(true);
     await page.evaluate(() => (window as unknown as { __PASS25_CONTEXT_EXTENSION__: WEBGL_lose_context }).__PASS25_CONTEXT_EXTENSION__.restoreContext());
     await expect.poll(async () => (await snapshot(page)).render.contextLifecycle.restorations, { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => {
+      const signal = (await snapshot(page)).render.atomicSignal;
+      return signal.enabled && signal.targetValidated && signal.outputValidated;
+    }, { timeout: 30_000 }).toBe(true);
     const restored = await snapshot(page);
     expect(restored.render.contextLifecycle).toEqual({ lost: false, losses: 1, restorations: 1 });
     expect(restored.gameStarted).toBe(true);
