@@ -1,7 +1,7 @@
 # Pass 28 — Atomic Signal Render Specification
 
 Date: 2026-07-17
-Status: release candidate
+Status: deployed and publicly verified 2026-07-18
 
 ## Intent
 
@@ -95,3 +95,16 @@ The exact local candidate also passed the bounded Chromium/WebKit matrix (baseli
 ## Gameplay preservation
 
 Pass 28 does not change collision, movement, spawn rules, weapons, lethality, bot decisions, networking, score replication or replay state. The authoritative gameplay contract and golden replay files remain unchanged.
+
+## Canonical promotion evidence
+
+- Source commit: `495101e28cc127510f72aa5e83a040d66f782680`
+- Pages commit: `c65ac65d12a36a2f64dbb9cdf967e0df183d5875`
+- Pages build status: `built`
+- Canonical root/index and the two hashed JS/CSS bundles matched the exact local `dist` bytes over HTTP 200.
+- The Blender arena GLB matched the exact local artifact.
+- Public browser telemetry reported Pass 28, WebGL2, Atomic Signal enabled, no fallback, one Performance sample, framebuffer/output validation, and matching `960x432` target/drawing-buffer dimensions.
+- Public gameplay exposed the FPS counter at `top=16px`, `right=24px` with the `top-right` telemetry anchor.
+- Public console: zero JavaScript/shader errors (only the non-fatal absence of `KHR_parallel_shader_compile`).
+- Archived `review/` tree before/after: `55b0f92c22f6db6fb59e99ebaf5e5206e359b6b1`.
+- All 18 archived review indexes and their directly referenced hashed assets returned HTTP 200.
