@@ -98,12 +98,13 @@ Pass 28 does not change collision, movement, spawn rules, weapons, lethality, bo
 
 ## Canonical promotion evidence
 
-- Source commit: `495101e28cc127510f72aa5e83a040d66f782680`
-- Pages commit: `c65ac65d12a36a2f64dbb9cdf967e0df183d5875`
+- Initial implementation commit: `495101e28cc127510f72aa5e83a040d66f782680`
+- Independent-review hardening commit: `f144f6d0faa42d7e4ac215e7a3c7abe2010f3956`
+- Current Pages commit: `4040abcab5526dd2d8a7f2d151df9be3ffe12ead`
 - Pages build status: `built`
 - Canonical root/index and the two hashed JS/CSS bundles matched the exact local `dist` bytes over HTTP 200.
 - The Blender arena GLB matched the exact local artifact.
-- Public browser telemetry reported Pass 28, WebGL2, Atomic Signal enabled, no fallback, one Performance sample, framebuffer/output validation, and matching `960x432` target/drawing-buffer dimensions.
+- Public browser telemetry reported Pass 28, WebGL2, Atomic Signal enabled, no fallback, one Performance texture sample, fresh framebuffer/output validation, a warm fullscreen-pass CPU average of approximately `0.11 ms`, and matching `960x432` target/drawing-buffer dimensions.
 - Public gameplay exposed the FPS counter at `top=16px`, `right=24px` with the `top-right` telemetry anchor.
 - Public console: zero JavaScript/shader errors (only the non-fatal absence of `KHR_parallel_shader_compile`).
 - Archived `review/` tree before/after: `55b0f92c22f6db6fb59e99ebaf5e5206e359b6b1`.
