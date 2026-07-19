@@ -26,6 +26,7 @@ Status: implementation locked; canonical Pass 30 remains unchanged until an isol
 3. Exterior dressing adds original planters, flower beds, hedges, saplings, bins, hydrants, benches, bicycles, utility boxes, signs, bollards and street clutter while preserving every authoritative route/collider.
 4. Lightweight fauna is presentation-only: bounded bird silhouettes and butterfly/moth particles outside combat-critical sightlines, disabled or reduced in Performance/Compatibility.
 5. Placement is deterministic and non-colliding unless a visible prop intentionally has a matching authored collider.
+6. Blender, Performance and Compatibility profiles lift ambient/hemisphere exposure and add a bounded shadow-side fill so roads, yards and both house levels remain readable without removing the authored dawn contrast.
 
 ## 4. Weapon, arms, and animation reconstruction
 
@@ -38,7 +39,7 @@ Status: implementation locked; canonical Pass 30 remains unchanged until an isol
 
 ## 5. Solo pressure and spawn flow
 
-1. Solo uses exactly two low-damage opponents, both rendered with the same dark source-rigged humanoid operator model.
+1. Solo uses exactly two low-damage opponents, both rendered with the same source-rigged humanoid operator model, neon-purple uniform treatment, additive haze sprite and bounded local glow.
 2. Bot damage multiplier decreases from `0.5` to `0.25` (half the current damage).
 3. Existing 22 m fire cutoff, reaction delay, range-dependent aim error, bounds checks, cover trust, and respawn protection remain.
 4. Player and bot spawns use hard minimum-exposure tiers, occupancy rejection, previous-spawn avoidance and bounded top-pool variation.
@@ -63,7 +64,7 @@ Original identity: **Overdrive Core** (mechanically inspired by classic arena da
 - Focused unit tests for every new pure contract and all five carried hotfixes.
 - Gameplay contract/replay updates only for explicitly approved bot and Overdrive mechanics.
 - Full lint, type-check, Vitest, build, dependency, release-tree and diff gates.
-- Solo browser proof: two matching rigged bots at quarter multiplier, safe/flip spawns, Overdrive spawn/claim/4x/expiry, compact vertical support HUD, no console errors.
+- Solo browser proof: two matching neon-purple haze bots at quarter multiplier, safe/flip spawns, brighter route/interior luminance, Overdrive spawn/claim/4x/expiry, compact vertical support HUD, no console errors.
 - Two-peer proof: one authoritative Overdrive winner, replicated timer/expiry and 4x damage, source-aware Tri-Pass acceptance between 6.2 m and 15 m.
 - Visual matrix: each weapon at hip/ADS/fire/reload/sprint/melee; both houses/garages and exterior dressing in Quality/Performance; desktop and short-height HUD.
 - Renderer calls/triangles remain within approved profile ceilings; flora/fauna and wall variation are bounded.

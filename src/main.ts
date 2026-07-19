@@ -650,6 +650,11 @@ function buildSky(): void {
   sun.shadow.bias = activeLighting.shadowBias;
   sun.shadow.normalBias = activeLighting.shadowNormalBias;
   scene.add(sun);
+  const fill = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity);
+  fill.name = 'shadow-side-arena-fill';
+  fill.position.set(...activeLighting.fillPosition);
+  fill.castShadow = false;
+  scene.add(fill);
 }
 buildSky();
 const worldIdentityPresentation = createWorldIdentityPresentation(
@@ -2571,18 +2576,68 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
   return valid.find(({ index }) => index === selectedIndex)!.candidate;
 }
 
+let botHazeTexture: THREE.CanvasTexture | null = null;
+
+function neonBotHazeTexture(): THREE.CanvasTexture {
+  if (botHazeTexture) return botHazeTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas 2D context unavailable for neon bot haze');
+  const gradient = context.createRadialGradient(64, 64, 5, 64, 64, 62);
+  gradient.addColorStop(0, 'rgba(255,214,255,0.9)');
+  gradient.addColorStop(0.2, 'rgba(227,112,255,0.72)');
+  gradient.addColorStop(0.5, 'rgba(171,43,255,0.32)');
+  gradient.addColorStop(1, 'rgba(104,0,191,0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 128, 128);
+  botHazeTexture = new THREE.CanvasTexture(canvas);
+  botHazeTexture.name = 'neon-purple-bot-haze-texture';
+  botHazeTexture.colorSpace = THREE.SRGBColorSpace;
+  botHazeTexture.needsUpdate = true;
+  return botHazeTexture;
+}
+
+function addNeonBotHaze(root: THREE.Group, index: number): void {
+  const haze = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: neonBotHazeTexture(),
+    color: 0xec8cff,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  }));
+  haze.name = 'neon-purple-bot-haze';
+  haze.position.y = 1.24;
+  haze.scale.set(2.35, 3.15, 1);
+  haze.userData.presentationOnly = true;
+  haze.userData.blocksShots = false;
+  haze.userData.phase = index * Math.PI;
+  haze.raycast = () => undefined;
+  const glow = new THREE.PointLight(0xc54dff, 1.55, 4.8, 2);
+  glow.name = 'neon-purple-bot-glow';
+  glow.position.y = 1.28;
+  glow.castShadow = false;
+  root.userData.neonBotHaze = true;
+  root.add(haze, glow);
+}
+
 function spawnBots(): void {
   clearBots();
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const names = ['RIVET', 'MICA'].slice(0, SOLO_BOT_COUNT);
   names.forEach((name, index) => {
     const id = `bot-${index}`;
-    // Both solo opponents use the same dark source-rigged humanoid. The lead
+    // Both solo opponents use the same source-rigged humanoid with a bright
+    // neon-purple combat treatment. The lead
     // alone owns the dynamic shadow pass so the second rig does not duplicate
     // Blender's bounded static-shadow refresh.
     // Team colour, authored weapons, movement/stance posing and identical
     // authoritative hit proxies remain intact.
-    const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', true);
+    const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', true, 'neon-purple');
+    addNeonBotHaze(root, index);
     root.traverse((node) => {
       if (node instanceof THREE.Mesh) node.castShadow = false;
     });
@@ -2739,6 +2794,12 @@ function updateBots(dt: number, now: number): void {
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
+    const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+    if (haze instanceof THREE.Sprite && haze.material instanceof THREE.SpriteMaterial) {
+      const pulse = Math.sin(now * 0.0022 + Number(haze.userData.phase ?? 0));
+      haze.material.opacity = 0.33 + pulse * 0.055;
+      haze.scale.set(2.35 + pulse * 0.08, 3.15 + pulse * 0.12, 1);
+    }
     if (!bot.alive) {
       bot.root.visible = now < bot.deathVisibleUntil;
       if (bot.root.visible) poseOperator(bot.root, 'stand', 0, now * 0.001);
@@ -4857,6 +4918,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         return count;
       })(),
       operatorModel: riggedOperatorTelemetry(bot.root),
+      neonHaze: bot.root.userData.neonBotHaze === true
+        && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite
+        && bot.root.getObjectByName('neon-purple-bot-glow') instanceof THREE.PointLight,
       presentationReady: riggedOperatorTelemetry(bot.root) !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
         .every((name) => bot.root.getObjectByName(name) !== undefined),
       presentationWeaponSafe: (() => {
@@ -5606,7 +5670,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 31 release candidate — three-operator solo pressure, living neighbourhood detail, five-tier Field Support and the 4× Overdrive Core.');
+  setStatus('Pass 31 — two neon-haze solo rivals, brighter neighbourhood sightlines, five-tier Field Support and the 4× Overdrive Core.');
   requestAnimationFrame(frame);
 }
 

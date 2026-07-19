@@ -23,6 +23,9 @@ export type ArenaLightingProfile = {
   ambientColor: number;
   sunColor: number;
   sunPosition: readonly [number, number, number];
+  fillColor: number;
+  fillIntensity: number;
+  fillPosition: readonly [number, number, number];
   routeLightIntensity: number;
   streetLightIntensity: number;
   interiorLightIntensity: number;
@@ -34,10 +37,10 @@ export type ArenaLightingProfile = {
 };
 
 const DEFAULT_LIGHTING: ArenaLightingProfile = {
-  exposure: 1.02,
-  hemisphereIntensity: 1.5,
-  ambientIntensity: 0.55,
-  sunIntensity: 2.7,
+  exposure: 1.16,
+  hemisphereIntensity: 1.82,
+  ambientIntensity: 0.78,
+  sunIntensity: 2.65,
   shadowBias: -0.00028,
   shadowNormalBias: 0.025,
   softShadows: false,
@@ -52,13 +55,16 @@ const DEFAULT_LIGHTING: ArenaLightingProfile = {
   skyCloudShadow: 0x442953,
   skyCloudLight: 0xff914c,
   hemisphereSky: 0xcbbacb,
-  hemisphereGround: 0x777361,
-  ambientColor: 0xc7cfca,
+  hemisphereGround: 0x9d967f,
+  ambientColor: 0xdce3dd,
   sunColor: 0xffd2a2,
   sunPosition: [-62, 25, 38],
+  fillColor: 0xd8ddff,
+  fillIntensity: 0.58,
+  fillPosition: [54, 20, -42],
   routeLightIntensity: 3,
   streetLightIntensity: 4,
-  interiorLightIntensity: 8,
+  interiorLightIntensity: 11,
   routeLightCount: 3,
   streetLightCount: 4,
   interiorLightCount: 2,
@@ -67,9 +73,9 @@ const DEFAULT_LIGHTING: ArenaLightingProfile = {
 };
 
 const BLENDER_LIGHTING: ArenaLightingProfile = {
-  exposure: 1,
-  hemisphereIntensity: 1.5,
-  ambientIntensity: 0.52,
+  exposure: 1.18,
+  hemisphereIntensity: 1.9,
+  ambientIntensity: 0.82,
   sunIntensity: 2.7,
   shadowBias: -0.00012,
   shadowNormalBias: 0.04,
@@ -85,13 +91,16 @@ const BLENDER_LIGHTING: ArenaLightingProfile = {
   skyCloudShadow: 0x382149,
   skyCloudLight: 0xff873f,
   hemisphereSky: 0xcbb4ca,
-  hemisphereGround: 0x6e6b5a,
-  ambientColor: 0xbfc9c4,
+  hemisphereGround: 0xa39a84,
+  ambientColor: 0xdfe3dc,
   sunColor: 0xffc995,
   sunPosition: [-62, 25, 38],
+  fillColor: 0xd8ddff,
+  fillIntensity: 0.7,
+  fillPosition: [54, 20, -42],
   routeLightIntensity: 5,
   streetLightIntensity: 6,
-  interiorLightIntensity: 12,
+  interiorLightIntensity: 15,
   routeLightCount: 3,
   streetLightCount: 4,
   interiorLightCount: 4,
@@ -101,10 +110,11 @@ const BLENDER_LIGHTING: ArenaLightingProfile = {
 
 const COMPAT_LIGHTING: ArenaLightingProfile = {
   ...DEFAULT_LIGHTING,
-  exposure: 1.02,
-  hemisphereIntensity: 1.55,
-  ambientIntensity: 0.62,
-  sunIntensity: 2.55,
+  exposure: 1.16,
+  hemisphereIntensity: 1.9,
+  ambientIntensity: 0.86,
+  sunIntensity: 2.5,
+  fillIntensity: 0.66,
   routeLightIntensity: 0,
   streetLightIntensity: 0,
   interiorLightIntensity: 0,
@@ -117,5 +127,5 @@ const COMPAT_LIGHTING: ArenaLightingProfile = {
 
 export function arenaLightingProfile(profile: RenderProfile): ArenaLightingProfile {
   const source = profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
-  return { ...source, sunPosition: [...source.sunPosition] };
+  return { ...source, sunPosition: [...source.sunPosition], fillPosition: [...source.fillPosition] };
 }

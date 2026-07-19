@@ -47,7 +47,8 @@ type DebugState = {
     screenPosition: number[];
     presentationReady: boolean;
     presentationWeaponSafe: boolean;
-    operatorModel: { source: string; skinnedMeshes: number; visibleSkinnedMeshes: number; mergedVertexLod: boolean; clips: number; weaponChildren: number; activeClip: string } | null;
+    operatorModel: { source: string; appearance: string; skinnedMeshes: number; visibleSkinnedMeshes: number; mergedVertexLod: boolean; clips: number; weaponChildren: number; activeClip: string } | null;
+    neonHaze: boolean;
   }>;
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -743,10 +744,13 @@ test.describe('solo mechanics', () => {
     expect(before.bots.every((bot) => bot.alive)).toBe(true);
     expect(before.bots.every((bot) => bot.operatorModel !== null
       && bot.operatorModel.source === 'Quaternius Ultimate Modular Males / Swat.gltf'
+      && bot.operatorModel.appearance === 'neon-purple'
       && bot.operatorModel.skinnedMeshes > 0
-      && bot.operatorModel.visibleSkinnedMeshes > 0)).toBe(true);
+      && bot.operatorModel.visibleSkinnedMeshes > 0
+      && bot.neonHaze)).toBe(true);
     expect(new Set(before.bots.map((bot) => JSON.stringify({
       source: bot.operatorModel?.source,
+      appearance: bot.operatorModel?.appearance,
       skinnedMeshes: bot.operatorModel?.skinnedMeshes,
       mergedVertexLod: bot.operatorModel?.mergedVertexLod,
       clips: bot.operatorModel?.clips,

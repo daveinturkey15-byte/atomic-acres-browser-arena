@@ -29,15 +29,40 @@ export type RiggedOperatorInstance = {
   weaponSocket: THREE.Group;
 };
 
+export type OperatorAppearance = 'team' | 'neon-purple';
+
 let operatorAsset: RiggedOperatorAsset | null = null;
 let firstPersonArmsAsset: THREE.Group | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
 
-function materialForTeam(material: THREE.Material, team: Team, flattenMaterials: boolean): THREE.Material {
+function materialForTeam(
+  material: THREE.Material,
+  team: Team,
+  flattenMaterials: boolean,
+  appearance: OperatorAppearance = 'team',
+): THREE.Material {
   if (!(material instanceof THREE.MeshStandardMaterial)) return material.clone();
   const result = material.clone();
   const name = material.name.toLowerCase();
-  if (name === 'swat') {
+  if (appearance === 'neon-purple' && name === 'swat') {
+    result.color.setHex(0xd85cff);
+    result.emissive.setHex(0x7d16bd);
+    result.emissiveIntensity = 1.2;
+    result.roughness = 0.46;
+    result.metalness = 0.08;
+  } else if (appearance === 'neon-purple' && name.includes('swat_black')) {
+    result.color.setHex(0xa93cff);
+    result.emissive.setHex(0x5d0ca8);
+    result.emissiveIntensity = 1.05;
+    result.roughness = 0.5;
+    result.metalness = 0.06;
+  } else if (appearance === 'neon-purple' && name.includes('grey')) {
+    result.color.setHex(0xe3a5ff);
+    result.emissive.setHex(0x64119e);
+    result.emissiveIntensity = 0.72;
+    result.roughness = 0.54;
+    result.metalness = 0.04;
+  } else if (name === 'swat') {
     result.color.setHex(team === 0 ? 0x2d7882 : 0xb34d3f);
     result.emissive.setHex(team === 0 ? 0x061a1d : 0x240906);
     result.emissiveIntensity = flattenMaterials ? 0.34 : 0.14;
@@ -48,14 +73,18 @@ function materialForTeam(material: THREE.Material, team: Team, flattenMaterials:
   } else if (name.includes('grey')) {
     result.color.setHex(team === 0 ? 0x6d9b9e : 0xb98276);
   }
-  if (flattenMaterials) {
+  if (flattenMaterials && appearance !== 'neon-purple') {
     result.roughness = 1;
     result.metalness = 0;
   }
   return result;
 }
 
-function flattenOperatorMaterialGroups(mesh: THREE.Mesh, materials: THREE.Material[]): void {
+function flattenOperatorMaterialGroups(
+  mesh: THREE.Mesh,
+  materials: THREE.Material[],
+  appearance: OperatorAppearance,
+): void {
   const cloned = mesh.geometry.clone();
   const geometry = cloned.index ? cloned.toNonIndexed() : cloned;
   if (geometry !== cloned) cloned.dispose();
@@ -81,8 +110,10 @@ function flattenOperatorMaterialGroups(mesh: THREE.Mesh, materials: THREE.Materi
   mesh.material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
-    roughness: 1,
-    metalness: 0,
+    roughness: appearance === 'neon-purple' ? 0.46 : 1,
+    metalness: appearance === 'neon-purple' ? 0.06 : 0,
+    emissive: appearance === 'neon-purple' ? 0x4f078d : 0x000000,
+    emissiveIntensity: appearance === 'neon-purple' ? 0.92 : 0,
   });
 }
 
@@ -242,7 +273,12 @@ function playOneShot(runtimeState: RiggedOperatorRuntime, name: string, timeScal
   action.fadeIn(0.035).play();
 }
 
-export function createRiggedOperator(team: Team, name: string, flattenMaterials: boolean): RiggedOperatorInstance | null {
+export function createRiggedOperator(
+  team: Team,
+  name: string,
+  flattenMaterials: boolean,
+  appearance: OperatorAppearance = 'team',
+): RiggedOperatorInstance | null {
   if (!operatorAsset) return null;
   const root = new THREE.Group();
   root.name = name;
@@ -261,13 +297,13 @@ export function createRiggedOperator(team: Team, name: string, flattenMaterials:
     node.userData.presentationOnly = true;
     node.raycast = () => undefined;
     if (Array.isArray(node.material)) {
-      const materials = node.material.map((material) => materialForTeam(material, team, flattenMaterials));
+      const materials = node.material.map((material) => materialForTeam(material, team, flattenMaterials, appearance));
       if (flattenMaterials) {
-        flattenOperatorMaterialGroups(node, materials);
+        flattenOperatorMaterialGroups(node, materials, appearance);
       } else {
         node.material = materials;
       }
-    } else node.material = materialForTeam(node.material, team, flattenMaterials);
+    } else node.material = materialForTeam(node.material, team, flattenMaterials, appearance);
     if (node.name === 'Pistol') node.visible = false;
   });
   if (flattenMaterials) mergeFlattenedOperatorMeshes(visual);
@@ -300,6 +336,7 @@ export function createRiggedOperator(team: Team, name: string, flattenMaterials:
     skinnedMeshes: 5,
     clips: operatorAsset.clips.length,
   };
+  root.userData.operatorAppearance = appearance;
   return { root, weaponSocket };
 }
 
@@ -400,6 +437,7 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
   });
   return {
     source: root.userData.operatorAsset?.source,
+    appearance: root.userData.operatorAppearance,
     license: root.userData.operatorAsset?.license,
     skinnedMeshes: root.userData.operatorAsset?.skinnedMeshes,
     clips: root.userData.operatorAsset?.clips,

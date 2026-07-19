@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator } from './operator-model';
+import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { createImportedWeaponModel } from './weapon-model';
 import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
@@ -1068,8 +1068,9 @@ export function buildOperator(
   flattenMaterials = false,
   weaponId: WeaponId = 'carbine',
   preferRigged = true,
+  appearance: OperatorAppearance = 'team',
 ): THREE.Group {
-  const rigged = preferRigged ? createRiggedOperator(team, name, flattenMaterials) : null;
+  const rigged = preferRigged ? createRiggedOperator(team, name, flattenMaterials, appearance) : null;
   if (rigged) {
     const { root, weaponSocket } = rigged;
     const hitProxyRoot = new THREE.Group();
