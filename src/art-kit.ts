@@ -698,15 +698,33 @@ export function buildRetroCoach(): THREE.Group {
   return root;
 }
 
-export function buildRetroDeliveryTruck(): THREE.Group {
-  const root = new THREE.Group(); root.name = 'original-delivery-truck';
-  part(root, roundedBox('cargo-body', [4.9, 3.75, 7.4], MAT.tealMetal(), 0.24, 5), [0, 2.35, 1.3]);
-  part(root, roundedBox('cab', [4.7, 2.95, 3.5], MAT.cream(), 0.34, 5), [0, 1.75, -4.05]);
-  part(root, roundedBox('windscreen', [3.55, 1.05, 0.07], MAT.glass(), 0.08), [0, 2.5, -5.82], [-0.08, 0, 0]);
-  for (const side of [-1, 1]) part(root, roundedBox('cab-side-window', [0.06, 0.9, 1.35], MAT.glass(), 0.08), [side * 2.37, 2.45, -4.2]);
-  for (const x of [-1.7, 1.7]) for (const z of [-3.55, 2.7]) wheel(root, x, z, 0.68);
-  part(root, roundedBox('front-bumper', [4.9, 0.35, 0.35], MAT.dark(), 0.08), [0, 0.72, -5.92]);
-  const sign = decal('ACRES SUPPLY', 3.5, 0.85); sign.position.set(0, 2.65, 5.02); sign.rotation.y = Math.PI; root.add(sign);
+export function buildRetroShuttleBus(): THREE.Group {
+  const root = new THREE.Group(); root.name = 'original-acres-shuttle-bus';
+  const body = texturedMaterial('./assets/original/textures/painted-metal-teal.png', {
+    color: 0x4f9fa1, roughness: 0.5, metalness: 0.24,
+    normalPath: './assets/original/textures/painted-metal-teal-normal.png',
+    roughnessPath: './assets/original/textures/painted-metal-teal-roughness.png',
+  });
+  part(root, roundedBox('shuttle-body', [4.9, 3.45, 10.6], body, 0.36, 5), [0, 2.02, 0]);
+  part(root, roundedBox('shuttle-lower-skirt', [5.02, 0.7, 10.2], MAT.dark(), 0.18), [0, 0.78, 0]);
+  part(root, roundedBox('shuttle-roof', [4.62, 0.32, 9.95], MAT.cream(), 0.15), [0, 3.86, 0]);
+  const glass = MAT.glass();
+  part(root, roundedBox('shuttle-windshield', [3.9, 1.32, 0.08], glass, 0.08), [0, 2.62, -5.34], [-0.08, 0, 0]);
+  part(root, roundedBox('shuttle-rear-glass', [3.75, 1.08, 0.08], glass, 0.08), [0, 2.56, 5.34]);
+  for (const side of [-1, 1]) {
+    for (const z of [-3.55, -1.25, 1.05, 3.35]) {
+      part(root, roundedBox('shuttle-window', [0.055, 1.24, 1.55], glass, 0.07), [side * 2.47, 2.58, z]);
+    }
+    const door = roundedBox('shuttle-passenger-door', [0.065, 2.38, 1.55], glass, 0.06);
+    door.position.set(side * 2.51, 1.62, -3.5 + (side < 0 ? 6.7 : 0));
+    root.add(door);
+    part(root, roundedBox('shuttle-mirror-arm', [0.5, 0.08, 0.08], MAT.dark(), 0.02), [side * 2.7, 2.35, -4.72]);
+    part(root, roundedBox('shuttle-mirror', [0.1, 0.4, 0.28], glass, 0.04), [side * 2.96, 2.35, -4.72]);
+  }
+  for (const x of [-1.72, 1.72]) for (const z of [-3.45, 3.35]) wheel(root, x, z, 0.7);
+  part(root, roundedBox('shuttle-front-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, -5.42]);
+  part(root, roundedBox('shuttle-rear-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, 5.42]);
+  const sign = decal('ACRES SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
   return root;
 }
 

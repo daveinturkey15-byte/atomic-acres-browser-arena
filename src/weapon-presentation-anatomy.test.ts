@@ -3,25 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { WeaponPresentation } from './weapon-presentation';
 
 describe('first-person anatomical presentation', () => {
-  it('uses three vertex-coloured animated assemblies per arm', () => {
+  it('preserves detailed PBR sleeve, hand and finger meshes in the quality viewmodel', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);
     const arms = presentation.root.getObjectByName('first-person-arms');
     expect(arms).toBeDefined();
 
     for (const side of ['left', 'right'] as const) {
-      for (const assemblyName of [`${side}-upper-arm`, `${side}-forearm`, `${side}-glove`]) {
-        const assembly = arms!.getObjectByName(assemblyName);
-        expect(assembly).toBeInstanceOf(THREE.Mesh);
-        const geometry = (assembly as THREE.Mesh).geometry;
-        expect(geometry.getAttribute('position')).toBeDefined();
-        expect(geometry.getAttribute('normal')).toBeDefined();
-        expect(geometry.getAttribute('color')).toBeDefined();
+      for (const detailName of [`${side}-upper-arm`, `${side}-forearm`, `${side}-palm`, `${side}-thumb`, `${side}-finger-0`]) {
+        const detail = arms!.getObjectByName(detailName);
+        expect(detail).toBeInstanceOf(THREE.Mesh);
+        expect((detail as THREE.Mesh).material).toBeInstanceOf(THREE.MeshStandardMaterial);
       }
       expect(arms!.getObjectByName(`${side}-wrist-joint`)).toBeInstanceOf(THREE.Group);
     }
 
-    expect(presentation.presentationState().armMeshCount).toBe(6);
+    expect(presentation.presentationState().armMeshCount).toBeGreaterThanOrEqual(30);
   });
 
   it('pins a readable fire cycle for deterministic visual evidence', () => {
@@ -81,7 +78,7 @@ describe('first-person anatomical presentation', () => {
     for (const side of ['left', 'right'] as const) {
       const glove = arms?.getObjectByName(`${side}-glove`) as THREE.Mesh;
       expect(glove.geometry.getAttribute('position').count).toBeGreaterThan(300);
-      expect(glove.userData.style).toBe('atomic-tactical-v2');
+      expect(glove.userData.style).toBe('atomic-tactical-v3-detailed');
       expect(glove.userData.cuffConnected).toBe(true);
       expect(glove.userData.sourcePartCount).toBeGreaterThanOrEqual(10);
       const material = glove.material as THREE.MeshBasicMaterial;

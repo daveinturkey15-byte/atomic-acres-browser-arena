@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   batchStaticMeshes,
   buildRetroCoach,
-  buildRetroDeliveryTruck,
+  buildRetroShuttleBus,
   roundedBox,
   texturedMaterial,
 } from './art-kit';
@@ -15,7 +15,7 @@ export type ArenaArtResult = {
 };
 
 const LEGACY_VEHICLE_NAMES = new Set([
-  'tour coach', 'coach roof', 'coach window', 'delivery truck', 'truck cab', 'truck windshield',
+  'tour coach', 'coach roof', 'coach window', 'south shuttle bus', 'shuttle bus roof', 'shuttle bus window',
 ]);
 
 function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
@@ -640,11 +640,10 @@ export async function loadArenaArt(
   root.add(coach);
   onProgress?.(1, 12);
 
-  const truck = buildRetroDeliveryTruck();
-  truck.position.set(4.2, 0, -8.8);
-  truck.rotation.y = Math.PI;
-  truck.traverse((node) => { node.userData.blocksShots = true; });
-  root.add(truck);
+  const shuttle = buildRetroShuttleBus();
+  shuttle.position.set(4.2, 0, -8.8);
+  shuttle.traverse((node) => { node.userData.blocksShots = true; });
+  root.add(shuttle);
   onProgress?.(2, 12);
 
   addTree(root, -29, -23, 1.05); onProgress?.(3, 12);

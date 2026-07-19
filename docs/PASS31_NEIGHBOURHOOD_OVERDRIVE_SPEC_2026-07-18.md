@@ -69,3 +69,13 @@ Original identity: **Overdrive Core** (mechanically inspired by classic arena da
 - Visual matrix: each weapon at hip/ADS/fire/reload/sprint/melee; both houses/garages and exterior dressing in Quality/Performance; desktop and short-height HUD.
 - Renderer calls/triangles remain within approved profile ceilings; flora/fauna and wall variation are bounded.
 - Publish only to an additive isolated `review/pass31-*` HTTPS subtree. Preserve the canonical root and every existing `review/*` archive until Dave approves promotion.
+
+## 8. Pass 31.3 authored-cover and viewmodel polish
+
+1. Firing the final round automatically enters the existing deterministic reload pathway when reserve ammunition exists. An empty magazine cannot cancel that reload by holding fire, while manual reload, ammo accounting and action events remain unchanged.
+2. The centre route contains two original modeled transit-bus assets with body shells, glazing, doors, destination panels, wheel assemblies, mirrors and lamps. Matching authoritative AABBs block both movement and shots across more than ten metres of cover length.
+3. Both houses receive original furnishing sets: dining tables and chairs, sofas, media consoles, upstairs beds, shelving and workstations. Asset markers and Blender telemetry prove two bus assets and two furnishing sets are present in the shipped GLB.
+4. Quality viewmodels preserve authored PBR weapon materials, normal/roughness maps, receiver details and separate anatomical glove/finger parts. Reduced profiles retain merged bounded representations.
+5. The field knife adds a shaped blade, fuller, guard, ridged wrap and pommel, with a forearm silhouette extending naturally out of frame.
+6. Atmosphere adds five shader-driven, texture-free smoke/haze plumes alongside ten pooled ground-mist cards. The pass remains presentation-only, uses two submissions, performs no per-frame allocation or volumetric ray marching, and stays disabled by default on reduced/software profiles.
+7. Upper-floor house glazing is transparent (`opacity 0.2`, no depth write) while its existing breakable-window and collision authority remains unchanged.

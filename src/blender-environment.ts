@@ -16,7 +16,10 @@ export type BlenderArenaTelemetry = {
   triangleCount: number;
   semanticWindows: number;
   boundWindows: number;
+  transparentUpperWindows: number;
   routeLandmarks: number;
+  modeledBuses: number;
+  housePropSets: number;
   worldIdentityPass: boolean;
   proceduralWorldHidden: boolean;
   error: string | null;
@@ -33,7 +36,10 @@ const telemetry: BlenderArenaTelemetry = {
   triangleCount: 0,
   semanticWindows: 0,
   boundWindows: 0,
+  transparentUpperWindows: 0,
   routeLandmarks: 0,
+  modeledBuses: 0,
+  housePropSets: 0,
   worldIdentityPass: false,
   proceduralWorldHidden: false,
   error: null,
@@ -68,10 +74,15 @@ export async function loadBlenderArena(
   const pbrMaterials = new Set<THREE.Material>();
   const windows = new Map<string, THREE.Mesh>();
   const routeLandmarks = new Set<string>();
+  let modeledBuses = 0;
+  let housePropSets = 0;
+  let transparentUpperWindows = 0;
   let meshCount = 0;
   let triangleCount = 0;
   root.traverse((node) => {
     node.userData.blenderAuthoredEnvironment = true;
+    if (node.userData.atomic_asset_class === 'physical-transit-bus') modeledBuses += 1;
+    if (node.userData.atomic_asset_class === 'authored-house-furnishing-set') housePropSets += 1;
     const routeId = typeof node.userData.atomic_route_id === 'string' ? node.userData.atomic_route_id : null;
     if (node.userData.atomic_semantic === 'route-landmark' && routeId) routeLandmarks.add(routeId);
     if (!(node instanceof THREE.Mesh)) return;
@@ -96,6 +107,25 @@ export async function loadBlenderArena(
     });
     const windowId = typeof node.userData.atomic_window_id === 'string' ? node.userData.atomic_window_id : null;
     if (windowId) {
+      if (windowId.includes('upper-window')) {
+        transparentUpperWindows += 1;
+        const makeUpperGlass = (material: THREE.Material): THREE.Material => {
+          if (!(material instanceof THREE.MeshStandardMaterial)) return material;
+          const glass = material.clone();
+          glass.color.setHex(0xb9eef2);
+          glass.roughness = 0.06;
+          glass.metalness = 0;
+          glass.transparent = true;
+          glass.opacity = 0.2;
+          glass.depthWrite = false;
+          glass.side = THREE.DoubleSide;
+          glass.needsUpdate = true;
+          return glass;
+        };
+        node.material = Array.isArray(node.material)
+          ? node.material.map(makeUpperGlass)
+          : makeUpperGlass(node.material);
+      }
       node.userData.breakableWindowId = windowId;
       node.userData.dynamic = true;
       windows.set(windowId, node);
@@ -109,6 +139,9 @@ export async function loadBlenderArena(
   const missingRoutes = ARENA_ROUTE_IDENTITIES.filter((route) => !routeLandmarks.has(route.id));
   if (missingRoutes.length > 0) {
     throw new Error(`Blender arena is missing route landmarks: ${missingRoutes.map((route) => route.id).join(', ')}`);
+  }
+  if (modeledBuses !== 2 || housePropSets !== 2) {
+    throw new Error(`Blender arena asset contract failed: buses=${modeledBuses}, housePropSets=${housePropSets}`);
   }
 
   // Retain the original visual meshes underneath as invisible presentation and
@@ -132,7 +165,10 @@ export async function loadBlenderArena(
   telemetry.triangleCount = Math.round(triangleCount);
   telemetry.semanticWindows = windows.size;
   telemetry.boundWindows = arena.breakableWindows.length;
+  telemetry.transparentUpperWindows = transparentUpperWindows;
   telemetry.routeLandmarks = routeLandmarks.size;
+  telemetry.modeledBuses = modeledBuses;
+  telemetry.housePropSets = housePropSets;
   telemetry.worldIdentityPass = routeLandmarks.size === ARENA_ROUTE_IDENTITIES.length;
   telemetry.proceduralWorldHidden = true;
   onProgress?.(1, 1);

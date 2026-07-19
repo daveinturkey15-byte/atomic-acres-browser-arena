@@ -267,8 +267,13 @@ export class WeaponPresentation {
       sleevePatch.position.set(sign * 0.068, -0.07, -upperLength * 0.44);
       sleevePatch.rotation.z = sign * 0.09;
       shoulder.add(sleevePatch);
-      mergeArmAssembly(shoulder, [upper, sleeveBand, sleevePatch], `${side}-upper-arm`);
-      mergeArmAssembly(elbow, [forearm, elbowCap], `${side}-forearm`);
+      if (this.flattenMaterials) {
+        mergeArmAssembly(shoulder, [upper, sleeveBand, sleevePatch], `${side}-upper-arm`);
+        mergeArmAssembly(elbow, [forearm, elbowCap], `${side}-forearm`);
+      } else {
+        upper.userData.anatomicalSleeve = true;
+        forearm.userData.anatomicalSleeve = true;
+      }
       const wristExtras: THREE.Mesh[] = [];
       if (side === 'left') {
         const displayHousing = roundedBox('left-wrist-display-housing', [0.13, 0.045, 0.1], glove, 0.012, 2);
@@ -288,8 +293,10 @@ export class WeaponPresentation {
       const gloveSources = [cuff, cuffAccent, wristGuard, hand, palmHeel, knucklePad, thumb, ...fingers, ...wristExtras];
       const silhouetteOffset = new THREE.Vector3(sign * 0.02, -0.012, 0);
       gloveSources.forEach((part) => part.position.add(silhouetteOffset));
-      const gloveAssembly = mergeArmAssembly(wrist, gloveSources, `${side}-glove`);
-      gloveAssembly.userData.style = 'atomic-tactical-v2';
+      const gloveAssembly = this.flattenMaterials
+        ? mergeArmAssembly(wrist, gloveSources, `${side}-glove`)
+        : wrist;
+      gloveAssembly.userData.style = 'atomic-tactical-v3-detailed';
       gloveAssembly.userData.cuffConnected = true;
       gloveAssembly.userData.sourcePartCount = gloveSources.length;
 
@@ -324,12 +331,32 @@ export class WeaponPresentation {
     );
     blade.name = 'field-knife-blade';
     blade.position.set(0, 0.02, -0.03);
-    this.meleeKnife.add(knifeHandle, knifeGuard, blade);
+    const bladeDetailMaterial = flattenMaterials
+      ? new THREE.MeshBasicMaterial({ color: 0x59696d })
+      : new THREE.MeshStandardMaterial({ color: 0x56666a, roughness: 0.34, metalness: 0.74 });
+    const bladeFuller = roundedBox('field-knife-fuller', [0.035, 0.64, 0.018], bladeDetailMaterial, 0.008, 2);
+    bladeFuller.position.set(0, 0.43, 0.022);
+    const pommel = roundedBox('field-knife-pommel', [0.18, 0.1, 0.16], sleeveTrim, 0.028, 3);
+    pommel.position.set(0, -0.49, 0);
+    this.meleeKnife.add(knifeHandle, knifeGuard, blade, bladeFuller, pommel);
+    for (let ridge = 0; ridge < 6; ridge += 1) {
+      const wrap = roundedBox(`field-knife-grip-ridge-${ridge}`, [0.164, 0.026, 0.152], sleeveTrim, 0.01, 2);
+      wrap.position.set(0, -0.075 - ridge * 0.062, 0);
+      wrap.rotation.z = ridge % 2 === 0 ? 0.08 : -0.08;
+      this.meleeKnife.add(wrap);
+    }
     this.meleeRig.name = 'field-knife-arm-rig';
-    const meleeForearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.46, 5, 9), sleeve);
-    meleeForearm.name = 'knife-forearm';
-    meleeForearm.position.set(0.38, -0.42, 0.08);
-    meleeForearm.rotation.z = 0.42;
+    const meleeForearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.82, 8, 16), sleeve);
+    meleeForearm.name = 'field-knife-forearm';
+    meleeForearm.position.set(0.56, -0.58, 0.12);
+    meleeForearm.rotation.z = 0.55;
+    const meleeUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.17, 1.4, 14, 1, false), sleeve);
+    meleeUpperArm.name = 'field-knife-upper-arm';
+    meleeUpperArm.position.set(0.82, -1.55, 0.14);
+    meleeUpperArm.rotation.z = 0.08;
+    const meleeElbow = roundedBox('field-knife-elbow-guard', [0.25, 0.2, 0.18], glove, 0.055, 3);
+    meleeElbow.position.set(0.73, -0.92, 0.13);
+    meleeElbow.rotation.z = 0.52;
     const meleeCuff = roundedBox('knife-glove-cuff', [0.21, 0.18, 0.15], sleeveTrim, 0.04, 2);
     meleeCuff.position.set(0.24, -0.13, -0.04);
     meleeCuff.rotation.z = 0.3;
@@ -339,7 +366,7 @@ export class WeaponPresentation {
     this.meleeKnife.position.set(0.19, 0.1, -0.2);
     this.meleeKnife.rotation.set(0.04, -0.06, -0.48);
     this.meleeKnife.visible = true;
-    this.meleeRig.add(meleeForearm, meleeCuff, meleeHand, this.meleeKnife);
+    this.meleeRig.add(meleeUpperArm, meleeElbow, meleeForearm, meleeCuff, meleeHand, this.meleeKnife);
     this.meleeRig.visible = false;
     this.root.add(this.meleeRig);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
@@ -419,10 +446,8 @@ export class WeaponPresentation {
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     const ids = Object.keys(WEAPONS) as WeaponId[];
     ids.forEach((id, index) => {
-      // The imported gun scenes remain licensed source assets, but their
-      // visual transforms do not share the explicit grip/muzzle contract and
-      // produced detached hands plus edge-on receivers in Pass 16. The authored
-      // models are built around these sockets and are the refined view path.
+      // Camera-space weapons use the project-authored high-detail model. The
+      // imported low-poly assets remain suitable for distant world operators.
       const model = buildWeaponModel(id, this.flattenMaterials, false);
       const firstPersonHidden: Record<WeaponId, Set<string>> = {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
@@ -444,7 +469,10 @@ export class WeaponPresentation {
           reticle.renderOrder = 1_000;
         }
       }
-      optimizeAttachedWeapon(model, this.flattenMaterials ? 'palette-basic' : 'vertex-lit');
+      // Preserve the authored PBR materials, normal/roughness maps and small
+      // receiver parts in the quality viewmodel. Reduced profiles retain the
+      // bounded merged path.
+      if (this.flattenMaterials) optimizeAttachedWeapon(model, 'palette-basic');
       model.visible = false;
       this.models.set(id, model);
       this.root.add(model);

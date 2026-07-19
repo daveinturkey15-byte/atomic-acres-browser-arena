@@ -16,6 +16,7 @@ export type ArenaMap = {
   targets: PracticeTarget[];
   houses: readonly HouseArchitecture[];
   breakableWindows: BreakableWindow[];
+  physicalCover: Array<{ id: string; bounds: Box2; blocksMovement: true; blocksShots: true }>;
   bounds: Box2;
   houseTelemetry: {
     houses: number;
@@ -39,6 +40,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const targets: PracticeTarget[] = [];
   const houses: HouseArchitecture[] = [];
   const breakableWindows: BreakableWindow[] = [];
+  const physicalCover: ArenaMap['physicalCover'] = [];
   const houseTelemetry = {
     houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0,
     wallMaterialVariants: 6,
@@ -170,6 +172,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       light: new THREE.MeshBasicMaterial({ color: 0xffe2a3, toneMapped: false }),
     };
     const wallMaterial = (solid: HouseArchitecture['solids'][number]): THREE.Material => {
+      if (solid.surface === 'glass' && solid.name.includes('upper-window')) {
+        return new THREE.MeshPhysicalMaterial({
+          color: 0xb9eef2,
+          roughness: 0.06,
+          metalness: 0,
+          transparent: true,
+          opacity: 0.2,
+          transmission: 0.48,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+      }
       if (solid.surface === 'aqua') {
         if (solid.name.includes('upper')) return palette.aquaUpper;
         if (solid.name.startsWith('rear-ground')) return palette.cream;
@@ -214,8 +228,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
 
-  // Distinctive central silhouettes: an atomic-tour coach and a delivery truck.
-  box('tour coach', [-3.8, 1.75, 7], [5.4, 3.5, 14], palette.mustard);
+  // Two large transit anchors create unmistakable physical hard cover through
+  // the centre while their detailed authored meshes live in the art layer.
+  box('north tour bus', [-3.8, 1.9, 7.2], [5.6, 3.8, 14.2], palette.mustard);
+  physicalCover.push({ id: 'north-tour-bus', bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
   box('coach roof', [-3.8, 3.62, 7], [5.15, 0.25, 13.2], palette.white, false);
   for (const z of [2.6, 6, 9.4, 12.8]) {
     box('coach window', [-6.53, 2.35, z], [0.12, 1.1, 2.3], palette.glass, false, false);
@@ -230,9 +246,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     }
   }
 
-  box('delivery truck', [4.2, 1.55, -8], [4.8, 3.1, 8.8], palette.aqua);
-  box('truck cab', [4.2, 1.35, -13], [4.8, 2.7, 3.4], palette.cream);
-  box('truck windshield', [4.2, 2.05, -14.73], [3.5, 1.05, 0.1], palette.glass, false, false);
+  box('south shuttle bus', [4.2, 1.75, -8.8], [4.9, 3.5, 10.8], palette.aqua);
+  physicalCover.push({ id: 'south-shuttle-bus', bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
+  box('shuttle bus roof', [4.2, 3.62, -8.8], [4.65, 0.25, 10.2], palette.white, false);
+  for (const z of [-12.1, -9.9, -7.7, -5.5]) {
+    box('shuttle bus window', [1.72, 2.35, z], [0.12, 1.1, 1.55], palette.glass, false, false);
+    box('shuttle bus window', [6.68, 2.35, z], [0.12, 1.1, 1.55], palette.glass, false, false);
+  }
 
   // Garages and backyard flow lanes deliberately differ from the copyrighted map.
   const [northGarage, southGarage] = GARAGE_LAYOUT;
@@ -330,6 +350,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     targets,
     houses,
     breakableWindows,
+    physicalCover,
     houseTelemetry,
     bounds: { ...ARENA_BOUNDS },
     spawns: {

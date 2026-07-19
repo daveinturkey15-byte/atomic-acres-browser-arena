@@ -2344,6 +2344,9 @@ function tryFire(now: number): void {
   if (!triggerHeld && spec.automatic) return;
   if (now < player.switchingUntil) return;
   if (player.reloadState) {
+    // An empty magazine must finish its automatic reload even if the player
+    // keeps the trigger held. Non-empty tactical reloads remain cancellable.
+    if (player.ammo[player.weapon] <= 0) return;
     if (!cancelReload(player.reloadState, now)) return;
     player.reloadState = null;
     weaponView.cancelReload();
@@ -2362,6 +2365,12 @@ function tryFire(now: number): void {
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
   player.ammo[player.weapon] -= 1;
+  if (player.ammo[player.weapon] === 0) {
+    const emptiedWeapon = player.weapon;
+    window.setTimeout(() => {
+      if (player.weapon === emptiedWeapon && player.ammo[emptiedWeapon] === 0) reload();
+    }, 110);
+  }
   const ammoDisplay = element<HTMLElement>('#ammo');
   ammoDisplay.classList.remove('fired');
   requestAnimationFrame(() => ammoDisplay.classList.add('fired'));
@@ -2461,7 +2470,6 @@ function tryFire(now: number): void {
       }
     }
   }
-  if (player.ammo[player.weapon] === 0) setTimeout(reload, 120);
 }
 
 type ShotCastResult = {
@@ -5053,6 +5061,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       broken: window.broken,
       visible: window.mesh.visible,
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
+    })),
+    physicalCover: arena.physicalCover.map((cover) => ({
+      id: cover.id,
+      bounds: { ...cover.bounds },
+      blocksMovement: cover.blocksMovement,
+      blocksShots: cover.blocksShots,
     })),
     minimap: {
       backingWidth: minimapCanvas.width,

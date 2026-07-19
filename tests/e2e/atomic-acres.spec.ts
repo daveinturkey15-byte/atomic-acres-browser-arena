@@ -119,6 +119,12 @@ type DebugState = {
   };
   deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
   breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
+  physicalCover: Array<{
+    id: string;
+    bounds: { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+    blocksMovement: true;
+    blocksShots: true;
+  }>;
   minimap: { backingWidth: number; cssWidth: number; headingDegrees: number };
   spawnSafety: Array<{ team: 0 | 1; authored: number; valid: number }>;
   houseNavigation: Array<{
@@ -264,6 +270,7 @@ type DebugState = {
       enabled: boolean;
       bypassReason: string | null;
       mistCards: number;
+      smokeCards: number;
       triangles: number;
       submissions: number;
       volumetricRayMarching: false;
@@ -282,7 +289,10 @@ type DebugState = {
       triangleCount: number;
       semanticWindows: number;
       boundWindows: number;
+      transparentUpperWindows: number;
       routeLandmarks: number;
+      modeledBuses: number;
+      housePropSets: number;
       worldIdentityPass: boolean;
       proceduralWorldHidden: boolean;
       error: string | null;
@@ -512,15 +522,15 @@ test.describe('boot and authored presentation', () => {
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
-        exposure: 1, hemisphereIntensity: 1.5, ambientIntensity: 0.52,
+        exposure: 1.18, hemisphereIntensity: 1.9, ambientIntensity: 0.82,
         sunIntensity: 2.7, fogNear: 50, fogFar: 128,
-        routeLightIntensity: 5, streetLightIntensity: 6, interiorLightIntensity: 12,
+        routeLightIntensity: 5, streetLightIntensity: 6, interiorLightIntensity: 15,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.12, godRayLobes: 4,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 30, materialCount: 24, texturedMaterials: 16, pbrMaterials: 16, textureCount: 32, triangleCount: 24_176,
-        semanticWindows: 6, boundWindows: 6, routeLandmarks: 3, worldIdentityPass: true,
+        status: 'ready', meshCount: 30, materialCount: 24, texturedMaterials: 16, pbrMaterials: 16, textureCount: 32, triangleCount: 32_204,
+        semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
     });
@@ -538,6 +548,13 @@ test.describe('boot and authored presentation', () => {
       ceilingInstances: 10,
     });
     expect(menuState.render.calls).toBeLessThanOrEqual(75);
+    expect(menuState.physicalCover.map((cover) => cover.id)).toEqual(['north-tour-bus', 'south-shuttle-bus']);
+    for (const cover of menuState.physicalCover) {
+      expect(cover.blocksMovement).toBe(true);
+      expect(cover.blocksShots).toBe(true);
+      expect(cover.bounds.maxY! - cover.bounds.minY!).toBeGreaterThanOrEqual(3.5);
+      expect(Math.max(cover.bounds.maxX - cover.bounds.minX, cover.bounds.maxZ - cover.bounds.minZ)).toBeGreaterThanOrEqual(10);
+    }
     await expect(page.locator('#graphics-profile')).toHaveValue('blender');
     await startSolo(page);
     await page.evaluate(() => {
@@ -558,7 +575,9 @@ test.describe('boot and authored presentation', () => {
     const activeState = await debug(page);
     expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
-    expect(activeState.render.calls).toBeLessThanOrEqual(120);
+    // Quality keeps separate PBR viewmodel receiver/hand parts; remain under a
+    // deliberately bounded ceiling while reduced profiles retain merged meshes.
+    expect(activeState.render.calls).toBeLessThanOrEqual(150);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -566,7 +585,7 @@ test.describe('boot and authored presentation', () => {
     }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_100);
     const stableState = await debug(page);
-    expect(stableState.render.calls).toBeLessThanOrEqual(95);
+    expect(stableState.render.calls).toBeLessThanOrEqual(125);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png' });
@@ -1536,6 +1555,28 @@ test.describe('solo mechanics', () => {
     expect((await debug(page)).player.weapon).toBe('pistol');
     await page.keyboard.press('Digit1');
     await expect.poll(async () => (await debug(page)).player.weapon).toBe('carbine');
+  });
+
+  test('automatically completes a reload when the final round empties the magazine', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: {
+          equipWeapon: (weapon: 'carbine') => void;
+          setAmmo: (weapon: 'carbine', ammo: number, reserve: number) => void;
+          fireOnce: () => void;
+        };
+      }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon('carbine');
+      api.setAmmo('carbine', 1, 30);
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).player.ammo).toBe(0);
+    await expect.poll(async () => (await debug(page)).player.reloading).toBe(true);
+    await expect.poll(async () => (await debug(page)).player.ammo, { timeout: 3_000 }).toBe(30);
+    const after = await debug(page);
+    expect(after.player.reloading).toBe(false);
+    expect(after.player.reserve).toBe(0);
+    expect(after.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
   });
 
   test('starts with two frags and resolves a prewarmed Hallelujah explosion without a detonation hitch', async ({ page }) => {
