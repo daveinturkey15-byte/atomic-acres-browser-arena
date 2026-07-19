@@ -191,6 +191,7 @@ test.describe('Pass 25A baseline and lifecycle', () => {
   test('refreshes Blender static shadows at a bounded rate for moving casters', async ({ page }) => {
     await ready(page, 'blender');
     await startSolo(page);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
     const before = await snapshot(page);
     expect(before.render.shadowMode).toBe('static');
     expect(before.render.shadowAutoUpdate).toBe(false);

@@ -131,6 +131,10 @@ M = {
     "concrete_dark": make_material("MAT_concrete_dark", 0x454B4D, 0.92, texture="roof-shingles.png", tile_metres=2.4),
     "aqua": make_material("MAT_aqua_oxidized", 0x356E73, 0.73, 0.05, texture="siding-aqua.png", tile_metres=2.6),
     "coral": make_material("MAT_coral_oxide", 0x8B4B40, 0.76, 0.04, texture="siding-coral.png", tile_metres=2.6),
+    "aqua_upper": make_material("MAT_aqua_upper_brick", 0x638B87, 0.82, 0.03, texture="brick-warm.png", tile_metres=2.15),
+    "coral_upper": make_material("MAT_coral_upper_plaster", 0xB26F5D, 0.86, 0.02, texture="plaster-warm.png", tile_metres=3.15),
+    "aqua_rear": make_material("MAT_aqua_rear_plaster", 0x819D97, 0.88, 0.02, texture="plaster-warm.png", tile_metres=2.45),
+    "coral_rear": make_material("MAT_coral_rear_brick", 0x805244, 0.9, 0.02, texture="brick-warm.png", tile_metres=2.6),
     "plaster": make_material("MAT_plaster_sand", 0xB8AE95, 0.9, texture="plaster-warm.png", tile_metres=2.8),
     "trim": make_material("MAT_trim_bone", 0xD4CBB7, 0.67, texture="plaster-warm.png", tile_metres=2.1),
     "brick": make_material("MAT_brick_brown", 0x6F4436, 0.91, texture="brick-warm.png", tile_metres=2.4),
@@ -284,9 +288,15 @@ for house_index, house in enumerate(spec["houses"]):
     for solid_index, solid in enumerate(house["solids"]):
         semantic = solid["id"] if solid["kind"] == "glass" and solid["breakable"] else None
         rotation = tuple(solid.get("rotation") or (0, 0, 0))
+        solid_material = surface_material[solid["surface"]]
+        if solid["surface"] in ("aqua", "coral"):
+            if "upper" in solid["name"]:
+                solid_material = M["aqua_upper"] if house["team"] == 0 else M["coral_upper"]
+            elif solid["name"].startswith("rear-ground"):
+                solid_material = M["aqua_rear"] if house["team"] == 0 else M["coral_rear"]
         add_box(
             f"BLD_HOUSE_{prefix}_{solid_index:03d}_{solid['name']}", solid["position"], solid["size"],
-            surface_material[solid["surface"]], 0.025 if solid["kind"] != "glass" else 0,
+            solid_material, 0.025 if solid["kind"] != "glass" else 0,
             rotation=rotation, semantic=semantic,
         )
     x, z = house["origin"]["x"], house["origin"]["z"]

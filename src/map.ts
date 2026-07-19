@@ -24,6 +24,8 @@ export type ArenaMap = {
     doors: number;
     windows: number;
     ramps: number;
+    wallMaterialVariants: number;
+    pbrMaterialFamilies: number;
   };
 };
 
@@ -37,27 +39,42 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const targets: PracticeTarget[] = [];
   const houses: HouseArchitecture[] = [];
   const breakableWindows: BreakableWindow[] = [];
-  const houseTelemetry = { houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0 };
+  const houseTelemetry = {
+    houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0,
+    wallMaterialVariants: 6,
+    pbrMaterialFamilies: 9,
+  };
   const world = new THREE.Group();
   world.name = 'Atomic Acres arena';
   scene.add(world);
 
+  const pbrTexture = (stem: string, options: Parameters<typeof texturedMaterial>[1] = {}) => texturedMaterial(
+    `./assets/original/textures/${stem}.png`,
+    {
+      ...options,
+      normalPath: `./assets/original/textures/${stem}-normal.png`,
+      roughnessPath: `./assets/original/textures/${stem}-roughness.png`,
+    },
+  );
+
   const palette = {
-    grass: texturedMaterial('./assets/original/textures/grass-turf.png', { roughness: 1, repeatX: 12, repeatY: 16 }),
+    grass: pbrTexture('grass-turf', { roughness: 1, repeatX: 12, repeatY: 16, normalScale: 0.24 }),
     grassDark: texturedMaterial('./assets/original/textures/grass-turf.png', { color: 0x7e916a, roughness: 1, repeatX: 8, repeatY: 8 }),
-    road: texturedMaterial('./assets/original/textures/asphalt-aged.png', { roughness: 0.98, repeatX: 5, repeatY: 20 }),
-    concrete: texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.94, repeatX: 3, repeatY: 3 }),
-    cream: texturedMaterial('./assets/original/textures/plaster-warm.png', { roughness: 0.92, repeatX: 3, repeatY: 3 }),
-    aqua: texturedMaterial('./assets/original/textures/siding-aqua.png', { roughness: 0.76, repeatX: 4, repeatY: 4 }),
-    coral: texturedMaterial('./assets/original/textures/siding-coral.png', { roughness: 0.76, repeatX: 4, repeatY: 4 }),
+    road: pbrTexture('asphalt-aged', { roughness: 0.98, repeatX: 5, repeatY: 20, normalScale: 0.32 }),
+    concrete: pbrTexture('concrete-poured', { roughness: 0.94, repeatX: 3, repeatY: 3, normalScale: 0.38 }),
+    cream: pbrTexture('plaster-warm', { roughness: 0.92, repeatX: 3, repeatY: 3, normalScale: 0.36 }),
+    aqua: pbrTexture('siding-aqua', { roughness: 0.76, repeatX: 4, repeatY: 4, normalScale: 0.5 }),
+    aquaUpper: pbrTexture('siding-aqua', { color: 0xc1e4dd, roughness: 0.8, repeatX: 6, repeatY: 5, normalScale: 0.65 }),
+    coral: pbrTexture('siding-coral', { roughness: 0.76, repeatX: 4, repeatY: 4, normalScale: 0.5 }),
+    coralUpper: pbrTexture('brick-warm', { color: 0xe7c0ad, roughness: 0.91, repeatX: 7, repeatY: 4, normalScale: 0.72 }),
     mustard: material(0xd9a43b, 0.58, 0.18),
     dark: texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { roughness: 0.56, metalness: 0.3, repeatX: 3, repeatY: 2 }),
-    timber: texturedMaterial('./assets/original/textures/wood-deck.png', { roughness: 0.92, repeatX: 4, repeatY: 2 }),
+    timber: pbrTexture('wood-deck', { roughness: 0.92, repeatX: 4, repeatY: 2, normalScale: 0.42 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0x78bad0, roughness: 0.1, metalness: 0.04, transparent: true, opacity: 0.54, transmission: 0.12 }),
     white: material(0xf0e4c9, 0.68),
     chrome: material(0xaebdc1, 0.23, 0.76),
-    brick: texturedMaterial('./assets/original/textures/brick-warm.png', { roughness: 0.9, repeatX: 5, repeatY: 3 }),
-    roof: texturedMaterial('./assets/original/textures/roof-shingles.png', { roughness: 0.86, repeatX: 5, repeatY: 6 }),
+    brick: pbrTexture('brick-warm', { roughness: 0.9, repeatX: 5, repeatY: 3, normalScale: 0.65 }),
+    roof: pbrTexture('roof-shingles', { roughness: 0.86, repeatX: 5, repeatY: 6, normalScale: 0.48 }),
   };
   // Performance batching otherwise lifts reflective chrome to near-white and lets
   // stair rails overpower route geometry. Quality preserves the authored material.
@@ -152,10 +169,22 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       ceiling: palette.cream,
       light: new THREE.MeshBasicMaterial({ color: 0xffe2a3, toneMapped: false }),
     };
+    const wallMaterial = (solid: HouseArchitecture['solids'][number]): THREE.Material => {
+      if (solid.surface === 'aqua') {
+        if (solid.name.includes('upper')) return palette.aquaUpper;
+        if (solid.name.startsWith('rear-ground')) return palette.cream;
+      }
+      if (solid.surface === 'coral') {
+        if (solid.name.includes('upper')) return palette.coralUpper;
+        if (solid.name.startsWith('rear-ground')) return palette.cream;
+      }
+      return surfaceMaterial[solid.surface];
+    };
 
     for (const solid of architecture.solids) {
+      const solidMaterial = wallMaterial(solid);
       if (solid.kind === 'ramp') {
-        const rendered = box(solid.name, solid.position, solid.size, surfaceMaterial[solid.surface], false, true, false);
+        const rendered = box(solid.name, solid.position, solid.size, solidMaterial, false, true, false);
         if (solid.rotation) rendered.rotation.set(...solid.rotation);
         physicsColliders.push(solidBounds(solid));
         continue;
@@ -165,7 +194,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         solid.name,
         solid.position,
         solid.size,
-        surfaceMaterial[solid.surface],
+        solidMaterial,
         solid.collidable,
         solid.kind !== 'glass',
         isBreakableGlass || solid.collidable,

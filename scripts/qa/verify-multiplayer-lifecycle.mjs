@@ -4,7 +4,10 @@ import { chromium } from '@playwright/test';
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
 const cycles = Number(process.env.QA_MULTIPLAYER_CYCLES ?? 20);
-const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
+const chromiumArgs = [
+  '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
+  '--allow-loopback-in-peer-connection', '--disable-features=WebRtcHideLocalIpsWithMdns',
+];
 const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 const results = [];
@@ -31,18 +34,19 @@ try {
       page.on('response', (response) => {
         if (response.status() >= 400) errors.push(`cycle ${cycle} ${label}: HTTP ${response.status()} ${response.url()}`);
       });
-      await page.goto(`${baseUrl}?render=performance&seed=pass25a-mp-${cycle}-${label}&multiplayerQa=1&peerQaPort=${peerPort}`);
+      await page.goto(`${baseUrl}?render=compatibility&seed=pass25a-mp-${cycle}-${label}&multiplayerQa=1&peerQaPort=${peerPort}`);
       await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
+      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
       await page.fill('#player-name', `${label} ${cycle}`);
     }
     await host.bringToFront();
-    await host.click('#host');
+    await host.evaluate(() => document.querySelector('#host')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim().length > 0, undefined, { timeout: 45_000 });
     const roomCode = (await host.textContent('#room-code')).trim();
     await guest.bringToFront();
     await guest.selectOption('#team', '1');
     await guest.fill('#room-input', roomCode);
-    await guest.click('#join');
+    await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await host.bringToFront();
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });

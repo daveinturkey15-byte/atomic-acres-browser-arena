@@ -15,6 +15,7 @@ import {
   movementProfile,
 } from './gameplay';
 import { createHouseArchitecture } from './house-navigation';
+import { SOLO_BOT_COUNT } from './bot-ai';
 import {
   FIELD_SUPPORT,
   HUNTER_SWARM_BLAST_RADIUS,
@@ -39,6 +40,13 @@ import { FIELD_KITS } from './loadout';
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS } from './network-sync';
 import { CHARACTER_PHYSICS_CONFIG, STANCE_SHAPES } from './physics';
 import { renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
+import {
+  OVERDRIVE_DAMAGE_MULTIPLIER,
+  OVERDRIVE_DURATION_MS,
+  OVERDRIVE_PICKUP_RADIUS,
+  OVERDRIVE_POSITION,
+  OVERDRIVE_SPAWN_INTERVAL_MS,
+} from './overdrive';
 
 const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'compat'];
 const movementContexts = {
@@ -54,7 +62,7 @@ export function buildGameplayContract(): Record<string, unknown> {
   const houses = HOUSE_LAYOUT.map((entry) => createHouseArchitecture(entry.team, entry.x, entry.z, entry.facing));
   return {
     schemaVersion: 2,
-    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 30 deltas',
+    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 31 deltas',
     simulation: {
       hz: SIMULATION_HZ,
       maximumFrameDtSeconds: 0.05,
@@ -67,10 +75,18 @@ export function buildGameplayContract(): Record<string, unknown> {
     },
     combat: {
       botDamageMultiplier: BOT_DAMAGE_MULTIPLIER,
+      soloBotCount: SOLO_BOT_COUNT,
       weapons: Object.values(WEAPONS).map((weapon) => ({ ...weapon })),
       grenade: { radius: GRENADE_RADIUS, maximumDamage: GRENADE_MAX_DAMAGE },
       melee: { cooldownMs: MELEE_COOLDOWN_MS, range: MELEE_RANGE, damage: MELEE_DAMAGE },
       match: { warmupMs: MATCH_WARMUP_MS, durationMs: MATCH_DURATION_MS, scoreLimit: MATCH_SCORE_LIMIT },
+      overdrive: {
+        spawnIntervalMs: OVERDRIVE_SPAWN_INTERVAL_MS,
+        durationMs: OVERDRIVE_DURATION_MS,
+        damageMultiplier: OVERDRIVE_DAMAGE_MULTIPLIER,
+        pickupRadius: OVERDRIVE_PICKUP_RADIUS,
+        position: [OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z],
+      },
     },
     inventory: {
       fieldKits: FIELD_KITS,

@@ -26,7 +26,7 @@ export type WeaponPose = {
   reloadProgress: number | null;
 };
 
-type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; active: boolean };
+type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; frames: number; active: boolean };
 type ViewSmoke = { velocity: THREE.Vector3; life: number; maxLife: number; active: boolean };
 type RiggedViewArm = FirstPersonArmChain & {
   bindShoulder: THREE.Quaternion;
@@ -85,6 +85,7 @@ export class WeaponPresentation {
   private swayX = 0;
   private swayY = 0;
   private meleeStart = 0;
+  private meleePresentationFrames = 0;
   private debugMeleeProgress: number | null = null;
   private grenadeStart = 0;
   private readonly muzzleLight: THREE.PointLight;
@@ -109,7 +110,6 @@ export class WeaponPresentation {
   private casingCursor = 0;
   private smokeCursor = 0;
   private pendingScattergunShell = false;
-  private pendingCasing = false;
   private adsBlend = 0;
   private sprintBlend = 0;
   private weaponHeat = 0;
@@ -228,6 +228,9 @@ export class WeaponPresentation {
       const cuffAccent = roundedBox(`${side}-cuff-accent`, [0.178, 0.15, 0.032], sleeveTrim, 0.009, 2);
       cuffAccent.position.z = 0.098;
       wrist.add(cuffAccent);
+      const wristGuard = roundedBox(`${side}-wrist-guard`, [0.19, 0.075, 0.12], glove, 0.022, 3);
+      wristGuard.position.set(0, -0.045, 0.018);
+      wrist.add(wristGuard);
       const hand = roundedBox(`${side}-palm`, [0.2, 0.13, 0.21], glovePalm, 0.048, 4);
       hand.position.set(sign * -0.014, -0.002, -0.035);
       wrist.add(hand);
@@ -260,15 +263,36 @@ export class WeaponPresentation {
       const sleeveBand = roundedBox(`${side}-sleeve-band`, [0.166, 0.166, 0.048], sleeveTrim, 0.014, 2);
       sleeveBand.position.z = -upperLength * 0.72;
       shoulder.add(sleeveBand);
-      mergeArmAssembly(shoulder, [upper, sleeveBand], `${side}-upper-arm`);
+      const sleevePatch = roundedBox(`${side}-sleeve-patch`, [0.115, 0.035, 0.15], sleeveTrim, 0.012, 2);
+      sleevePatch.position.set(sign * 0.068, -0.07, -upperLength * 0.44);
+      sleevePatch.rotation.z = sign * 0.09;
+      shoulder.add(sleevePatch);
+      mergeArmAssembly(shoulder, [upper, sleeveBand, sleevePatch], `${side}-upper-arm`);
       mergeArmAssembly(elbow, [forearm, elbowCap], `${side}-forearm`);
-      const gloveSources = [cuff, cuffAccent, hand, palmHeel, knucklePad, thumb, ...fingers];
+      const wristExtras: THREE.Mesh[] = [];
+      if (side === 'left') {
+        const displayHousing = roundedBox('left-wrist-display-housing', [0.13, 0.045, 0.1], glove, 0.012, 2);
+        displayHousing.position.set(-0.015, -0.09, 0.035);
+        const display = roundedBox(
+          'left-wrist-display', [0.094, 0.01, 0.064],
+          flattenMaterials
+            ? new THREE.MeshBasicMaterial({ color: 0x6ef5e8 })
+            : new THREE.MeshStandardMaterial({ color: 0x74f4e7, emissive: 0x167e77, emissiveIntensity: 0.82, roughness: 0.2 }),
+          0.006, 2,
+        );
+        display.position.set(-0.015, -0.116, 0.03);
+        display.rotation.x = -0.05;
+        wrist.add(displayHousing, display);
+        wristExtras.push(displayHousing, display);
+      }
+      const gloveSources = [cuff, cuffAccent, wristGuard, hand, palmHeel, knucklePad, thumb, ...fingers, ...wristExtras];
       const silhouetteOffset = new THREE.Vector3(sign * 0.02, -0.012, 0);
       gloveSources.forEach((part) => part.position.add(silhouetteOffset));
       const gloveAssembly = mergeArmAssembly(wrist, gloveSources, `${side}-glove`);
       gloveAssembly.userData.style = 'atomic-tactical-v2';
       gloveAssembly.userData.cuffConnected = true;
       gloveAssembly.userData.sourcePartCount = gloveSources.length;
+
       this.armRigs.push({ side, shoulder, elbow, hand: wrist, upperLength, lowerLength });
       return shoulder;
     };
@@ -388,7 +412,7 @@ export class WeaponPresentation {
       mesh.visible = false;
       mesh.rotation.z = Math.PI / 2;
       this.root.add(mesh);
-      this.casings.push({ mesh, velocity: new THREE.Vector3(), life: 0, active: false });
+      this.casings.push({ mesh, velocity: new THREE.Vector3(), life: 0, frames: 0, active: false });
     }
   }
 
@@ -438,7 +462,6 @@ export class WeaponPresentation {
     this.switchBlend = immediate ? 1 : 0;
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
-    this.pendingCasing = false;
     for (const [weaponId, model] of this.models) model.visible = weaponId === id;
     const activeModel = this.models.get(id);
     const muzzleSocket = activeModel?.getObjectByName('muzzle-socket');
@@ -462,6 +485,7 @@ export class WeaponPresentation {
       shell ? 0.16 : 0.1,
     );
     casing.life = shell ? 0.62 : 0.42;
+    casing.frames = 0;
     casing.active = true;
   }
 
@@ -503,8 +527,12 @@ export class WeaponPresentation {
     (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 
+    // Rifle and pistol actions eject with the accepted shot. Doing this at the
+    // action boundary keeps the pooled casing visible even when a software-
+    // rendered frame takes longer than the authored bolt marker. Scattergun
+    // shells remain tied to the delayed pump cycle below.
     if (this.active === 'scattergun') this.pendingScattergunShell = true;
-    else this.pendingCasing = true;
+    else this.ejectCasing(false);
   }
 
   reload(): void {
@@ -519,6 +547,7 @@ export class WeaponPresentation {
 
   melee(): void {
     this.meleeStart = performance.now();
+    this.meleePresentationFrames = 0;
     this.meleeRig.visible = true;
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) arms.visible = false;
@@ -791,12 +820,14 @@ export class WeaponPresentation {
 
     for (const casing of this.casings) {
       if (!casing.active) continue;
-      casing.life -= pose.dt;
-      casing.velocity.y -= 4.5 * pose.dt;
-      casing.mesh.position.addScaledVector(casing.velocity, pose.dt);
-      casing.mesh.rotation.x += pose.dt * 18;
-      casing.mesh.rotation.z += pose.dt * 11;
-      if (casing.life <= 0) {
+      casing.frames += 1;
+      const casingDt = Math.min(pose.dt, 1 / 20);
+      casing.life -= casingDt;
+      casing.velocity.y -= 4.5 * casingDt;
+      casing.mesh.position.addScaledVector(casing.velocity, casingDt);
+      casing.mesh.rotation.x += casingDt * 18;
+      casing.mesh.rotation.z += casingDt * 11;
+      if (casing.life <= 0 && casing.frames >= 3) {
         casing.active = false;
         casing.mesh.visible = false;
       }
@@ -851,9 +882,6 @@ export class WeaponPresentation {
     if (this.active === 'scattergun' && this.pendingScattergunShell && fireCycle.casingReady) {
       this.ejectCasing(true);
       this.pendingScattergunShell = false;
-    } else if (this.active !== 'scattergun' && this.pendingCasing && fireCycle.casingReady) {
-      this.ejectCasing(false);
-      this.pendingCasing = false;
     }
     const bolt = activeModel?.getObjectByName('bolt-or-slide');
     if (bolt) {
@@ -922,8 +950,15 @@ export class WeaponPresentation {
       bolt.position.z = restZ + reloadPose.actionPull * (this.active === 'smg' ? 0.1 : 0.12);
     }
 
+    if (this.meleeStart > 0) this.meleePresentationFrames += 1;
     const timedMeleeProgress = THREE.MathUtils.clamp((performance.now() - this.meleeStart) / MELEE_PRESENTATION_MS, 0, 1);
-    const meleeProgress = this.debugMeleeProgress ?? timedMeleeProgress;
+    // A software-rendered frame may take longer than the authored 620 ms arc.
+    // Preserve at least three presented frames so a valid knife action cannot
+    // disappear entirely while keeping authoritative melee timing unchanged.
+    const presentedMeleeProgress = this.meleeStart > 0 && this.meleePresentationFrames <= 3
+      ? Math.min(timedMeleeProgress, 0.98)
+      : timedMeleeProgress;
+    const meleeProgress = this.debugMeleeProgress ?? presentedMeleeProgress;
     const meleeArc = this.meleeStart > 0 && meleeProgress < 1 ? Math.sin(meleeProgress * Math.PI) : 0;
     const meleeActive = this.debugMeleeProgress !== null || (this.meleeStart > 0 && meleeProgress < 1);
     this.actionContract = characterActionContract({

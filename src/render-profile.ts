@@ -8,7 +8,7 @@ export type RenderProfileConfig = {
   reducedRepresentation: boolean;
   reducedWorldDetail: boolean;
   reducedPresentationDetail: boolean;
-  staticMaterialMode: 'preserve' | 'texture-lit' | 'palette-lit' | 'palette-basic';
+  staticMaterialMode: 'preserve' | 'texture-lit' | 'palette-lit' | 'palette-basic' | 'vertex-lit';
   antialias: boolean;
   shadows: boolean;
   shadowMode: 'off' | 'static' | 'dynamic';
@@ -66,7 +66,7 @@ export function renderProfileConfig(profile: RenderProfile): RenderProfileConfig
     reducedRepresentation: true,
     reducedWorldDetail: true,
     reducedPresentationDetail: true,
-    staticMaterialMode: 'palette-basic',
+    staticMaterialMode: 'vertex-lit',
     antialias: false,
     shadows: false,
     shadowMode: 'off',

@@ -75,7 +75,7 @@ export function batchStaticMeshes(
 ): StaticBatchStats {
   const simplifyMaterials = materialMode !== 'preserve';
   root.updateWorldMatrix(true, true);
-  const groups = new Map<string, { material: THREE.Material; classification: string; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[] }>();
+  const groups = new Map<string, { material: THREE.Material; classification: string; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[]; palette: Set<string> }>();
   root.traverse((node) => {
     const hasDynamicAncestor = (() => {
       let current: THREE.Object3D | null = node;
@@ -132,9 +132,11 @@ export function batchStaticMeshes(
         classification,
         meshes: [],
         geometries: [],
+        palette: new Set<string>(),
       };
       groups.set(key, entry);
     }
+    entry.palette.add(displayColor.getHexString());
     let geometry = node.geometry.clone();
     if (geometry.index) {
       const indexed = geometry;
@@ -178,6 +180,7 @@ export function batchStaticMeshes(
       continue;
     }
     const mesh = new THREE.Mesh(geometry, entry.material);
+    mesh.userData.sourcePalette = [...entry.palette];
     if (entry.classification) mesh.userData.hitZone = entry.classification;
     const preserveShadowResponse = materialMode === 'preserve' || materialMode === 'texture-lit';
     mesh.castShadow = materialMode === 'preserve' && entry.meshes.some((item) => item.castShadow);
@@ -216,12 +219,12 @@ export function optimizeAttachedWeapon(
   return stats;
 }
 
-function texture(path: string, repeatX = 1, repeatY = 1): THREE.Texture {
-  const key = `${path}:${repeatX}:${repeatY}`;
+function texture(path: string, repeatX = 1, repeatY = 1, colorData = true): THREE.Texture {
+  const key = `${path}:${repeatX}:${repeatY}:${colorData ? 'srgb' : 'data'}`;
   const cached = textureCache.get(key);
   if (cached) return cached;
   const value = textureLoader.load(path);
-  value.colorSpace = THREE.SRGBColorSpace;
+  value.colorSpace = colorData ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   value.wrapS = value.wrapT = THREE.RepeatWrapping;
   value.repeat.set(repeatX, repeatY);
   value.anisotropy = 8;
@@ -231,14 +234,28 @@ function texture(path: string, repeatX = 1, repeatY = 1): THREE.Texture {
 
 export function texturedMaterial(
   path: string,
-  options: { color?: number; roughness?: number; metalness?: number; repeatX?: number; repeatY?: number } = {},
+  options: {
+    color?: number;
+    roughness?: number;
+    metalness?: number;
+    repeatX?: number;
+    repeatY?: number;
+    normalPath?: string;
+    roughnessPath?: string;
+    normalScale?: number;
+  } = {},
 ): THREE.MeshStandardMaterial {
+  const repeatX = options.repeatX ?? 1;
+  const repeatY = options.repeatY ?? 1;
   const material = new THREE.MeshStandardMaterial({
-    map: texture(path, options.repeatX ?? 1, options.repeatY ?? 1),
+    map: texture(path, repeatX, repeatY),
+    normalMap: options.normalPath ? texture(options.normalPath, repeatX, repeatY, false) : null,
+    roughnessMap: options.roughnessPath ? texture(options.roughnessPath, repeatX, repeatY, false) : null,
     color: options.color ?? 0xffffff,
     roughness: options.roughness ?? 0.78,
     metalness: options.metalness ?? 0.03,
   });
+  if (material.normalMap) material.normalScale.setScalar(options.normalScale ?? 0.55);
   const base = Object.entries(textureBatchColors).find(([suffix]) => path.endsWith(suffix))?.[1] ?? 0xffffff;
   material.userData.batchColor = new THREE.Color(base).multiply(new THREE.Color(options.color ?? 0xffffff)).getHex();
   return material;
@@ -259,13 +276,23 @@ export function roundedBox(
 }
 
 const MAT = {
-  gunmetal: () => texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { color: 0xb8bfbd, roughness: 0.38, metalness: 0.62, repeatX: 2 }),
+  gunmetal: () => texturedMaterial('./assets/original/textures/weapon-gunmetal.png', {
+    color: 0xb8bfbd, roughness: 0.38, metalness: 0.62, repeatX: 2,
+    normalPath: './assets/original/textures/weapon-gunmetal-normal.png',
+    roughnessPath: './assets/original/textures/weapon-gunmetal-roughness.png',
+    normalScale: 0.34,
+  }),
   dark: () => new THREE.MeshStandardMaterial({ color: 0x252c31, roughness: 0.42, metalness: 0.5 }),
   rubber: () => new THREE.MeshStandardMaterial({ color: 0x202628, roughness: 0.9 }),
   brass: () => new THREE.MeshStandardMaterial({ color: 0xb8883c, roughness: 0.3, metalness: 0.76 }),
   glass: () => new THREE.MeshPhysicalMaterial({ color: 0x84cfe3, roughness: 0.12, metalness: 0.08, transparent: true, opacity: 0.7 }),
   cream: () => new THREE.MeshStandardMaterial({ color: 0xe7dbc1, roughness: 0.68 }),
-  tealMetal: () => texturedMaterial('./assets/original/textures/painted-metal-teal.png', { roughness: 0.54, metalness: 0.28, repeatX: 3 }),
+  tealMetal: () => texturedMaterial('./assets/original/textures/painted-metal-teal.png', {
+    roughness: 0.54, metalness: 0.28, repeatX: 3,
+    normalPath: './assets/original/textures/painted-metal-teal-normal.png',
+    roughnessPath: './assets/original/textures/painted-metal-teal-roughness.png',
+    normalScale: 0.3,
+  }),
 };
 
 function part(root: THREE.Group, mesh: THREE.Mesh, position: [number, number, number], rotation: [number, number, number] = [0, 0, 0]): THREE.Mesh {
@@ -273,6 +300,23 @@ function part(root: THREE.Group, mesh: THREE.Mesh, position: [number, number, nu
   mesh.rotation.set(...rotation);
   root.add(mesh);
   return mesh;
+}
+
+function finalizeWeaponGeometryLod(root: THREE.Group, flattenMaterials: boolean): THREE.Group {
+  if (!flattenMaterials) return root;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || node.geometry.type !== 'RoundedBoxGeometry') return;
+    node.geometry.computeBoundingBox();
+    const bounds = node.geometry.boundingBox;
+    if (!bounds) return;
+    const size = bounds.getSize(new THREE.Vector3());
+    const centre = bounds.getCenter(new THREE.Vector3());
+    const simplified = new THREE.BoxGeometry(size.x, size.y, size.z);
+    simplified.translate(centre.x, centre.y, centre.z);
+    node.geometry.dispose();
+    node.geometry = simplified;
+  });
+  return root;
 }
 
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
@@ -316,7 +360,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
       const opticPart = root.getObjectByName(name);
       if (opticPart) opticPart.position.y = 0.3;
     }
-    return root;
+    return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
@@ -606,7 +650,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
       node.receiveShadow = false;
     }
   });
-  return root;
+  return finalizeWeaponGeometryLod(root, flattenMaterials);
 }
 
 function wheel(root: THREE.Group, x: number, z: number, radius: number): void {
@@ -939,8 +983,93 @@ export function poseOperator(
   }
 }
 
-export function buildOperator(team: Team, name = 'operator', flattenMaterials = false, weaponId: WeaponId = 'carbine'): THREE.Group {
-  const rigged = createRiggedOperator(team, name, flattenMaterials);
+function buildBoundedOperatorLod(team: Team, name: string, weaponId: WeaponId): THREE.Group {
+  const root = new THREE.Group();
+  root.name = name;
+  root.userData.dynamic = true;
+  root.userData.boundedOperatorLod = true;
+  const pelvis = new THREE.Group();
+  pelvis.name = 'pelvis-joint';
+  pelvis.position.y = 0.9;
+  root.add(pelvis);
+  const spine = new THREE.Group();
+  spine.name = 'spine-joint';
+  spine.position.y = 0.18;
+  pelvis.add(spine);
+  const teamColor = new THREE.Color(team === 0 ? 0x55d8d2 : 0xff745e);
+  const teamAccent = new THREE.Color(team === 0 ? 0x8ffff7 : 0xffb09d);
+  const armour = new THREE.Color(0x29393d);
+  const skin = new THREE.Color(0xd8a781);
+  const parts: THREE.BufferGeometry[] = [];
+  const addPart = (geometry: THREE.BufferGeometry, position: [number, number, number], color: THREE.Color) => {
+    geometry.translate(...position);
+    const expanded = geometry.index ? geometry.toNonIndexed() : geometry;
+    if (expanded !== geometry) geometry.dispose();
+    const colors = new Float32Array(expanded.getAttribute('position').count * 3);
+    for (let index = 0; index < colors.length; index += 3) {
+      colors[index] = color.r; colors[index + 1] = color.g; colors[index + 2] = color.b;
+    }
+    expanded.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    parts.push(expanded);
+  };
+  addPart(new THREE.BoxGeometry(0.52, 0.3, 0.34), [0, 0, 0], armour);
+  addPart(new THREE.BoxGeometry(0.68, 0.7, 0.38), [0, 0.48, 0], teamColor);
+  addPart(new THREE.BoxGeometry(0.72, 0.09, 0.42), [0, 0.62, -0.02], teamAccent);
+  addPart(new THREE.OctahedronGeometry(0.24, 0), [0, 1.17, 0], skin);
+  addPart(new THREE.BoxGeometry(0.5, 0.12, 0.36), [0, 1.32, 0], armour);
+  for (const side of [-1, 1]) {
+    addPart(new THREE.BoxGeometry(0.2, 0.78, 0.22), [side * 0.45, 0.35, 0], armour);
+    addPart(new THREE.BoxGeometry(0.25, 0.9, 0.3), [side * 0.17, -0.57, 0], teamColor);
+    addPart(new THREE.BoxGeometry(0.27, 0.16, 0.4), [side * 0.17, -1.05, -0.07], armour);
+  }
+  const merged = mergeGeometries(parts, false);
+  if (!merged) throw new Error('Could not assemble bounded operator LOD');
+  const visual = new THREE.Mesh(merged, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true }));
+  visual.name = 'bounded-operator-lod';
+  visual.userData.presentationOnly = true;
+  visual.raycast = () => undefined;
+  pelvis.add(visual);
+
+  const leftUpperArm = new THREE.Group(); const rightUpperArm = new THREE.Group();
+  const leftForearm = new THREE.Group(); const rightForearm = new THREE.Group();
+  const leftThigh = new THREE.Group(); const rightThigh = new THREE.Group();
+  const leftShin = new THREE.Group(); const rightShin = new THREE.Group();
+  const reactionRoot = new THREE.Group(); reactionRoot.name = 'presentation-reaction-gear'; spine.add(reactionRoot);
+  for (const detailName of ['field-radio-pack', 'asymmetric-shoulder-plate', 'utility-pouch', 'team-radio-antenna']) {
+    const placeholder = new THREE.Group(); placeholder.name = detailName; reactionRoot.add(placeholder);
+  }
+  const meleeKnife = new THREE.Group(); meleeKnife.name = 'operator-melee-knife'; meleeKnife.visible = false; rightForearm.add(meleeKnife);
+  const weaponSocket = new THREE.Group(); weaponSocket.name = 'weapon-socket'; weaponSocket.position.set(0.22, 0.43, -0.36); spine.add(weaponSocket);
+  const hitProxyRoot = new THREE.Group(); hitProxyRoot.name = 'authoritative-hit-proxies'; root.add(hitProxyRoot);
+  const proxyMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, colorWrite: false, depthWrite: false });
+  const proxy = (proxyName: string, zone: 'head' | 'body' | 'limb', size: [number, number, number], position: [number, number, number]) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), proxyMaterial);
+    mesh.name = proxyName; mesh.position.set(...position); mesh.visible = false;
+    mesh.userData.hitZone = zone; mesh.userData.authoritativeProxy = true; hitProxyRoot.add(mesh);
+  };
+  proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
+  proxy('hit-proxy-head', 'head', [0.62, 0.62, 0.62], [0, 2.13, 0]);
+  proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
+  proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
+  proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
+  proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
+  root.userData.operatorRig = {
+    rigged: false, pelvis, spine, leftUpperArm, rightUpperArm, leftForearm, rightForearm,
+    leftThigh, rightThigh, leftShin, rightShin, weaponSocket, reactionRoot, hitProxyRoot, meleeKnife, weaponId,
+  } satisfies OperatorRig;
+  setOperatorWeapon(root, weaponId, true);
+  root.traverse((node) => { node.userData.targetRoot = root; });
+  return root;
+}
+
+export function buildOperator(
+  team: Team,
+  name = 'operator',
+  flattenMaterials = false,
+  weaponId: WeaponId = 'carbine',
+  preferRigged = true,
+): THREE.Group {
+  const rigged = preferRigged ? createRiggedOperator(team, name, flattenMaterials) : null;
   if (rigged) {
     const { root, weaponSocket } = rigged;
     const hitProxyRoot = new THREE.Group();
@@ -975,6 +1104,7 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
     root.traverse((node) => { node.userData.targetRoot = root; });
     return root;
   }
+  if (!preferRigged) return buildBoundedOperatorLod(team, name, weaponId);
   const root = new THREE.Group(); root.name = name;
   root.userData.dynamic = true;
   const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;
@@ -1120,5 +1250,5 @@ export function buildOperator(team: Team, name = 'operator', flattenMaterials = 
       node.raycast = () => undefined;
     }
   });
-  return root;
+  return finalizeWeaponGeometryLod(root, flattenMaterials);
 }

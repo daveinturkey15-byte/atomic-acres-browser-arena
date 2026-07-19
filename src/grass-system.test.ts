@@ -83,7 +83,10 @@ describe('Pass 30 living-grass system', () => {
     expect(source).toContain('toneMapped: true');
     expect(source).toContain('#include <tonemapping_fragment>');
     expect(source).toContain('#include <colorspace_fragment>');
-    expect(source).toContain('attribute vec3 instanceColor');
+    // Three injects instanceColor for coloured InstancedMesh programs. An
+    // explicit duplicate declaration is rejected by WebKit's strict compiler.
+    expect(source).not.toContain('attribute vec3 instanceColor');
+    expect(source).toContain('vInstanceColor = instanceColor');
     expect(source).toContain('mesh.setColorAt(index, tint)');
     expect(signalSource).toContain('renderer.toneMapping = THREE.NoToneMapping');
     expect(signalSource).toContain('this.renderer.toneMapping = this.screenToneMapping');

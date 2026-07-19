@@ -78,15 +78,26 @@ async function digest(value: string): Promise<string> {
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function admitRateLimit(db: D1Database, key: string, limit: number, now: number): Promise<boolean> {
+export async function admitRateLimit(db: D1Database, key: string, limit: number, now: number): Promise<boolean> {
   const bucket = Math.floor(now / RATE_WINDOW_MS);
-  await db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO rate_limits (key, bucket, count, updated_at)
     VALUES (?, ?, 1, ?)
-    ON CONFLICT(key, bucket) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at
-  `).bind(key, bucket, now).run();
-  const row = await db.prepare('SELECT count FROM rate_limits WHERE key = ? AND bucket = ?').bind(key, bucket).first<{ count: number }>();
-  return (row?.count ?? limit + 1) <= limit;
+    ON CONFLICT(key, bucket) DO UPDATE SET
+      count = count + 1,
+      updated_at = excluded.updated_at
+    WHERE count < ?
+  `).bind(key, bucket, now, limit).run();
+  return result.meta.changes === 1;
+}
+
+export function leaderboardNameKey(name: string): string {
+  return [...normalizedName(name).toLocaleLowerCase()].map((character) => {
+    if (/[a-z0-9]/.test(character)) return character;
+    if (character === ' ') return '_20';
+    if (character === '-') return '_2d';
+    return '_5f';
+  }).join('');
 }
 
 async function listLeaderboard(request: Request, env: Env, origin: string | null): Promise<Response> {
@@ -144,7 +155,7 @@ async function submitStreak(request: Request, env: Env, origin: string, context:
   const existingClaim = await env.DB.prepare('SELECT idempotency_key FROM streak_claims WHERE idempotency_key = ?')
     .bind(submission.idempotencyKey).first<{ idempotency_key: string }>();
   if (existingClaim) return json({ accepted: true, updated: false, idempotent: true }, 200, origin, env);
-  const nameKey = normalizedName(submission.name).toLocaleLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const nameKey = leaderboardNameKey(submission.name);
   const result = await env.DB.prepare(`
     INSERT INTO leaderboard (name_key, name, best_streak, kills, deaths, updated_at, build_id, install_hash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)

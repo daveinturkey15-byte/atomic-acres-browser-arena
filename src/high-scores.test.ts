@@ -3,6 +3,7 @@ import {
   HIGH_SCORE_STORAGE_KEY,
   immediateStreakEntry,
   isHighScoreEntry,
+  leaderboardNameKey,
   loadHighScores,
   mergeHighScores,
   normalizeRequiredPlayerName,
@@ -56,7 +57,7 @@ describe('persistent high scores', () => {
   it('survives reloads through a versioned stable-origin storage key', () => {
     const storage = new MemoryStorage();
     saveHighScores(storage, [entry()]);
-    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":1');
+    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":2');
     expect(loadHighScores(storage, now)).toEqual([entry()]);
   });
 
@@ -76,5 +77,21 @@ describe('persistent high scores', () => {
       recordedAt: now,
     });
     expect(immediateStreakEntry('bad', 'Dave', 8, 8, 0, now)).toBeNull();
+  });
+
+  it('uses collision-free keys for every accepted callsign separator', () => {
+    expect(leaderboardNameKey('A B')).toBe('a_20b');
+    expect(leaderboardNameKey('A_B')).toBe('a_5fb');
+    expect(leaderboardNameKey('A-B')).toBe('a_2db');
+    expect(new Set(['A B', 'A_B', 'A-B'].map((name) => leaderboardNameKey(name))).size).toBe(3);
+  });
+
+  it('migrates version-one global ids to the collision-free key without losing records', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(HIGH_SCORE_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      entries: [entry({ id: 'global:a_b', name: 'A B' })],
+    }));
+    expect(loadHighScores(storage, now)[0]?.id).toBe('global:a_20b');
   });
 });

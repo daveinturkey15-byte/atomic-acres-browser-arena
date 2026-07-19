@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 
@@ -52,6 +53,68 @@ function materialForTeam(material: THREE.Material, team: Team, flattenMaterials:
     result.metalness = 0;
   }
   return result;
+}
+
+function flattenOperatorMaterialGroups(mesh: THREE.Mesh, materials: THREE.Material[]): void {
+  const cloned = mesh.geometry.clone();
+  const geometry = cloned.index ? cloned.toNonIndexed() : cloned;
+  if (geometry !== cloned) cloned.dispose();
+  const vertexCount = geometry.getAttribute('position')?.count ?? 0;
+  const colors = new Float32Array(vertexCount * 3);
+  const groups = geometry.groups.length > 0
+    ? [...geometry.groups]
+    : [{ start: 0, count: vertexCount, materialIndex: 0 }];
+  for (const group of groups) {
+    const source = materials[group.materialIndex ?? 0] ?? materials[0];
+    const candidate = source as THREE.MeshStandardMaterial;
+    const color = candidate.color?.clone() ?? new THREE.Color(0xffffff);
+    if (candidate.emissive && candidate.emissiveIntensity > 0) {
+      color.lerp(candidate.emissive, Math.min(0.34, candidate.emissiveIntensity * 0.3));
+    }
+    const end = Math.min(vertexCount, group.start + group.count);
+    for (let vertex = group.start; vertex < end; vertex += 1) color.toArray(colors, vertex * 3);
+  }
+  geometry.clearGroups();
+  if (vertexCount > 0) geometry.addGroup(0, vertexCount, 0);
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  mesh.geometry = geometry;
+  mesh.material = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 1,
+    metalness: 0,
+  });
+}
+
+function mergeFlattenedOperatorMeshes(visual: THREE.Group): void {
+  const meshes: THREE.SkinnedMesh[] = [];
+  visual.traverse((node) => {
+    if (node instanceof THREE.SkinnedMesh && node.visible) meshes.push(node);
+  });
+  if (meshes.length < 2) return;
+  const first = meshes[0];
+  if (!meshes.every((mesh) => mesh.skeleton.bones.length === first.skeleton.bones.length)) return;
+  const allowedAttributes = new Set(['position', 'normal', 'color', 'skinIndex', 'skinWeight']);
+  const geometries = meshes.map((mesh) => {
+    const geometry = mesh.geometry.clone();
+    for (const attribute of Object.keys(geometry.attributes)) {
+      if (!allowedAttributes.has(attribute)) geometry.deleteAttribute(attribute);
+    }
+    return geometry;
+  });
+  const geometry = mergeGeometries(geometries, false);
+  geometries.forEach((candidate) => candidate.dispose());
+  if (!geometry) return;
+  const merged = new THREE.SkinnedMesh(geometry, first.material);
+  merged.name = 'Swat_Merged_Vertex_LOD';
+  merged.castShadow = false;
+  merged.receiveShadow = false;
+  merged.userData.presentationOnly = true;
+  merged.raycast = () => undefined;
+  merged.bindMode = first.bindMode;
+  merged.bind(first.skeleton, first.bindMatrix);
+  meshes.forEach((mesh) => { mesh.visible = false; });
+  visual.add(merged);
 }
 
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
@@ -200,17 +263,14 @@ export function createRiggedOperator(team: Team, name: string, flattenMaterials:
     if (Array.isArray(node.material)) {
       const materials = node.material.map((material) => materialForTeam(material, team, flattenMaterials));
       if (flattenMaterials) {
-        node.material = materials[0];
-        node.geometry = node.geometry.clone();
-        const drawCount = node.geometry.index?.count ?? node.geometry.getAttribute('position')?.count ?? 0;
-        node.geometry.clearGroups();
-        if (drawCount > 0) node.geometry.addGroup(0, drawCount, 0);
+        flattenOperatorMaterialGroups(node, materials);
       } else {
         node.material = materials;
       }
     } else node.material = materialForTeam(node.material, team, flattenMaterials);
     if (node.name === 'Pistol') node.visible = false;
   });
+  if (flattenMaterials) mergeFlattenedOperatorMeshes(visual);
   root.add(visual);
 
   const wrist = visual.getObjectByName('WristR') ?? visual.getObjectByName('Wrist.R');
@@ -334,6 +394,10 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     }
   }
   const localMountBounds = weaponRoot ? objectLocalGeometryBounds(weaponRoot) : null;
+  let visibleSkinnedMeshes = 0;
+  runtimeState.visual.traverse((node) => {
+    if (node instanceof THREE.SkinnedMesh && node.visible) visibleSkinnedMeshes += 1;
+  });
   return {
     source: root.userData.operatorAsset?.source,
     license: root.userData.operatorAsset?.license,
@@ -347,6 +411,8 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       mixerBeforeSupportIk: true,
     },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
+    visibleSkinnedMeshes,
+    mergedVertexLod: runtimeState.visual.getObjectByName('Swat_Merged_Vertex_LOD')?.visible === true,
     weaponChildren: runtimeState.weaponSocket.children.length,
     weaponSocketWorld: runtimeState.weaponSocket.getWorldPosition(new THREE.Vector3()).toArray(),
     weaponSocketQuaternion: runtimeState.weaponSocket.getWorldQuaternion(new THREE.Quaternion()).toArray(),

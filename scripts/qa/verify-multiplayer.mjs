@@ -4,9 +4,15 @@ const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const renderMode = process.env.QA_RENDER_MODE ?? 'compat';
 const blenderRenderModes = ['blender', 'host-full', 'host-blender', 'guest-blender'];
 const connectionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 30_000;
-const interactionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : renderMode === 'performance' ? 20_000 : 10_000;
+const interactionTimeoutMs = process.env.QA_HEADED === '1' ? 30_000 : blenderRenderModes.includes(renderMode) ? 45_000 : renderMode === 'performance' ? 20_000 : 10_000;
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
-const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
+const chromiumArgs = [
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+  '--allow-loopback-in-peer-connection',
+  '--disable-features=WebRtcHideLocalIpsWithMdns',
+];
 const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 const host = await browser.newPage({ viewport: { width: 960, height: 540 } });
@@ -26,7 +32,7 @@ for (const page of [host, guest]) {
 const errors = [];
 const phase = (name) => console.error(`[multiplayer-qa] ${name}`);
 
-async function movePlayerSmoothly(page, target, steps = 10) {
+async function movePlayerSmoothly(page, target, steps = 48) {
   const start = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position);
   for (let step = 1; step <= steps; step += 1) {
     const progress = step / steps;
@@ -57,11 +63,12 @@ for (const [label, page] of [['host', host], ['guest', guest]]) {
   if (Number.isInteger(peerQaPort) && peerQaPort >= 1_024 && peerQaPort <= 65_535) url.searchParams.set('peerQaPort', String(peerQaPort));
   await page.goto(url.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: connectionTimeoutMs });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
   await page.fill('#player-name', label === 'host' ? 'Host QA' : 'Guest QA');
 }
 phase('both pages ready');
 
-await host.click('#host');
+await host.evaluate(() => document.querySelector('#host')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim().length > 0, undefined, { timeout: connectionTimeoutMs });
 const roomCode = (await host.textContent('#room-code')).trim();
 phase('room created');
@@ -70,7 +77,7 @@ phase('room created');
 await guest.selectOption('#team', '1');
 const teams = { host: 0, guest: Number(await guest.inputValue('#team')) };
 await guest.fill('#room-input', roomCode);
-await guest.click('#join');
+await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: connectionTimeoutMs });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
@@ -116,8 +123,13 @@ await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().brea
 const explosiveWindowReplicated = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows[1]?.broken === true);
 phase('explosive window replicated');
 
-await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 6, 0, 0));
-await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(-25, 1.7, 0, Math.PI, 0));
+await movePlayerSmoothly(host, [-25, 1.7, 6]);
+await movePlayerSmoothly(guest, [-25, 1.7, 0]);
+await guest.waitForTimeout(1_000);
+await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('stand'));
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.stance === 'stand', undefined, { timeout: interactionTimeoutMs });
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
+  .some((remote) => remote.stance === 'stand'), undefined, { timeout: interactionTimeoutMs });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers.some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2]) < 0.25), undefined, { timeout: interactionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
   .some((remote) => Math.abs(remote.position[0] + 25) < 0.25 && Math.abs(remote.position[2] - 6) < 0.25), undefined, { timeout: interactionTimeoutMs });
@@ -128,12 +140,28 @@ await host.evaluate(() => {
   api.setAds(true);
 });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponPresentation.adsProgress >= 0.98, undefined, { timeout: interactionTimeoutMs });
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
+  .some((remote) => remote.weapon === 'sniper'), undefined, { timeout: interactionTimeoutMs });
 await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
   api.aimAtRemote('head');
   api.fireOnce();
 });
-await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: interactionTimeoutMs });
+try {
+  await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: interactionTimeoutMs });
+} catch (error) {
+  console.error('[multiplayer-qa] shot authority diagnostics', JSON.stringify({
+    guest: await guest.evaluate(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { hp: snapshot.player.hp, remoteHitAdmission: snapshot.remoteHitAdmission, remotes: snapshot.remotePlayers };
+    }),
+    host: await host.evaluate(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return { alignment: snapshot.lastPrincipalShotAlignment, history: snapshot.weaponActionHistory.slice(-4), remotes: snapshot.remotePlayers };
+    }),
+  }, null, 2));
+  throw error;
+}
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops.length > 0, undefined, { timeout: interactionTimeoutMs });
 const remoteDeathDrop = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]);
 phase('remote death and drop replicated');
@@ -172,6 +200,9 @@ const spawnSeparation = Math.hypot(
   hostState.player.position[0] - guestState.player.position[0],
   hostState.player.position[2] - guestState.player.position[2],
 );
+await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+await host.waitForTimeout(1_000);
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
 console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, leaderboardReplicated, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));

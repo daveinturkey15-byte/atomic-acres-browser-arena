@@ -1,6 +1,8 @@
 import type { Stance } from './gameplay';
+import type { ExplosiveSource } from './protocol';
 
-export type FieldSupportId = 'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
+export const FIELD_SUPPORT_IDS = ['scout-sweep', 'yardhawk', 'tri-pass', 'hunter-swarm', 'nuke'] as const;
+export type FieldSupportId = typeof FIELD_SUPPORT_IDS[number];
 
 export type FieldSupportDefinition = {
   id: FieldSupportId;
@@ -27,6 +29,19 @@ export const HUNTER_SWARM_SPLASH_DAMAGE = 100;
 export const HUNTER_SWARM_PRONE_MULTIPLIER = 0.09;
 export const NUKE_WARNING_MS = 5_000;
 export const NUKE_DAMAGE = 1_000;
+export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
+
+export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {
+  if (source === 'tri-pass') return TRI_PASS_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
+  if (source === 'hunter-swarm') return HUNTER_SWARM_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
+  if (source === 'nuke') return Number.POSITIVE_INFINITY;
+  return 6.2;
+}
+
+export function cycleFieldSupportSelection(current: FieldSupportId, direction: -1 | 1): FieldSupportId {
+  const index = FIELD_SUPPORT_IDS.indexOf(current);
+  return FIELD_SUPPORT_IDS[(index + direction + FIELD_SUPPORT_IDS.length) % FIELD_SUPPORT_IDS.length];
+}
 
 const REPEATABLE_REWARD_THRESHOLD = 7;
 
@@ -92,7 +107,7 @@ export function recordSupportDeath(state: FieldSupportState): FieldSupportState 
   return {
     streak: 0,
     rewardCycle: 0,
-    available: { ...state.available },
+    available: { ...state.available, 'hunter-swarm': false, nuke: false },
     earnedThisStreak: supportFlags(),
   };
 }

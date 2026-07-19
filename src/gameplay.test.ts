@@ -26,9 +26,9 @@ import {
 } from './gameplay';
 
 describe('solo bot tuning', () => {
-  it('deals exactly half the equivalent player weapon damage', () => {
-    expect(BOT_DAMAGE_MULTIPLIER).toBe(0.5);
-    expect(computeDamage(WEAPONS.carbine, 10, 'body') * BOT_DAMAGE_MULTIPLIER).toBe(15.5);
+  it('deals exactly half the previous Pass 30 bot damage', () => {
+    expect(BOT_DAMAGE_MULTIPLIER).toBe(0.25);
+    expect(computeDamage(WEAPONS.carbine, 10, 'body') * BOT_DAMAGE_MULTIPLIER).toBe(7.75);
   });
 });
 

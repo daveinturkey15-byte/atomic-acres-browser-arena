@@ -8,7 +8,7 @@ export type RemoteShotAdmissionState = {
 
 export type RemoteShotAdmission = {
   accepted: boolean;
-  reason: 'accepted' | 'unknown-sender' | 'weapon-mismatch' | 'duplicate' | 'invalid-direction' | 'origin-mismatch' | 'cadence';
+  reason: 'accepted' | 'unknown-sender' | 'weapon-mismatch' | 'duplicate' | 'invalid-direction' | 'invalid-pellets' | 'origin-mismatch' | 'cadence';
   nextState: RemoteShotAdmissionState;
 };
 
@@ -28,6 +28,11 @@ export function admitRemoteShot(
   if (state.recentNonces.includes(message.nonce)) return reject('duplicate');
   const directionMagnitude = Math.hypot(...message.direction);
   if (!Number.isFinite(directionMagnitude) || directionMagnitude < 0.96 || directionMagnitude > 1.04) return reject('invalid-direction');
+  if (message.pelletDirections.length !== WEAPONS[message.weapon].pellets
+    || message.pelletDirections.some((direction) => {
+      const magnitude = Math.hypot(...direction);
+      return !Number.isFinite(magnitude) || magnitude < 0.96 || magnitude > 1.04;
+    })) return reject('invalid-pellets');
   const originDistance = Math.hypot(
     message.origin[0] - sender.x,
     message.origin[1] - sender.y,
@@ -35,8 +40,10 @@ export function admitRemoteShot(
   );
   if (!Number.isFinite(originDistance) || originDistance > 2.25) return reject('origin-mismatch');
   const authoredInterval = 60_000 / WEAPONS[message.weapon].rpm;
-  // Reliable transport may bunch adjacent packets; still cap presentation at a bounded 45% cadence tolerance.
-  if (now - state.lastAcceptedAt < authoredInterval * 0.45) return reject('cadence');
+  // Damage authority uses host receipt time. Reliable delivery preserves order;
+  // accepting a fraction of the authored interval would permit sustained
+  // fire above the weapon contract rather than merely tolerate packet bunching.
+  if (now - state.lastAcceptedAt + 1e-6 < authoredInterval) return reject('cadence');
   return {
     accepted: true,
     reason: 'accepted',

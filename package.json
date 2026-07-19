@@ -15,6 +15,7 @@
     "qa:release": "node scripts/qa/capture-release.mjs",
     "qa:multiplayer": "node scripts/qa/verify-multiplayer.mjs",
     "qa:pass30:multiplayer": "node scripts/qa/verify-pass30-supports.mjs",
+    "qa:pass31:overdrive": "node scripts/qa/verify-pass31-overdrive.mjs",
     "qa:multiplayer:lifecycle": "node scripts/qa/verify-multiplayer-lifecycle.mjs",
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
     "qa:network-chaos:soak": "tsx scripts/qa/run-network-chaos-soak.ts",

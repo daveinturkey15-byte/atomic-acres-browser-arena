@@ -1,0 +1,114 @@
+import * as THREE from 'three';
+import { computeDamage, grenadeDamage, WEAPONS, type HitZone, type Stance } from './gameplay';
+import {
+  HUNTER_SWARM_BLAST_RADIUS,
+  TRI_PASS_BLAST_RADIUS,
+  TRI_PASS_MAX_DAMAGE,
+  hunterSwarmDamage,
+} from './field-support';
+import type { ExplosiveSource, WeaponId } from './protocol';
+
+type ShotTarget = Readonly<{
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  stance: Stance;
+}>;
+
+type HitProxy = Readonly<{
+  zone: HitZone;
+  size: readonly [number, number, number];
+  position: readonly [number, number, number];
+}>;
+
+const HIT_PROXIES: readonly HitProxy[] = [
+  { zone: 'body', size: [0.72, 1.02, 0.5], position: [0, 1.38, 0] },
+  { zone: 'head', size: [0.62, 0.62, 0.62], position: [0, 2.13, 0] },
+  { zone: 'limb', size: [0.3, 1.08, 0.35], position: [-0.5, 1.35, 0] },
+  { zone: 'limb', size: [0.3, 1.08, 0.35], position: [0.5, 1.35, 0] },
+  { zone: 'limb', size: [0.32, 0.95, 0.38], position: [-0.18, 0.48, 0] },
+  { zone: 'limb', size: [0.32, 0.95, 0.38], position: [0.18, 0.48, 0] },
+];
+
+function stanceEyeHeight(stance: Stance): number {
+  return stance === 'prone' ? 0.5 : stance === 'crouch' ? 1.16 : 1.7;
+}
+
+function firstProxyHit(
+  originTuple: readonly [number, number, number],
+  directionTuple: readonly [number, number, number],
+  target: ShotTarget,
+): { zone: HitZone; distance: number; point: THREE.Vector3 } | null {
+  const origin = new THREE.Vector3(...originTuple);
+  const direction = new THREE.Vector3(...directionTuple).normalize();
+  const worldRay = new THREE.Ray(origin, direction);
+  const base = new THREE.Matrix4().makeTranslation(target.x, target.y - stanceEyeHeight(target.stance), target.z)
+    .multiply(new THREE.Matrix4().makeRotationY(target.yaw))
+    .multiply(new THREE.Matrix4().makeTranslation(0, target.stance === 'prone' ? 0.52 : target.stance === 'crouch' ? -0.28 : 0, 0))
+    .multiply(new THREE.Matrix4().makeRotationX(target.stance === 'prone' ? -Math.PI / 2 : 0));
+  let first: { zone: HitZone; distance: number; point: THREE.Vector3 } | null = null;
+  for (const proxy of HIT_PROXIES) {
+    const matrix = base.clone().multiply(new THREE.Matrix4().makeTranslation(...proxy.position));
+    const localRay = worldRay.clone().applyMatrix4(matrix.clone().invert());
+    const half = new THREE.Vector3(...proxy.size).multiplyScalar(0.5);
+    const localPoint = localRay.intersectBox(new THREE.Box3(half.clone().multiplyScalar(-1), half), new THREE.Vector3());
+    if (!localPoint) continue;
+    const point = localPoint.applyMatrix4(matrix);
+    const distance = point.distanceTo(origin);
+    if (distance <= 110 && (!first || distance < first.distance)) first = { zone: proxy.zone, distance, point };
+  }
+  return first;
+}
+
+export function deriveRemoteShotBaseDamage(
+  weapon: WeaponId,
+  origin: readonly [number, number, number],
+  pelletDirections: readonly (readonly [number, number, number])[],
+  target: ShotTarget,
+  blocked: (origin: THREE.Vector3, impact: THREE.Vector3) => boolean = () => false,
+): number {
+  const spec = WEAPONS[weapon];
+  if (pelletDirections.length !== spec.pellets) return 0;
+  let damage = 0;
+  for (const direction of pelletDirections) {
+    const hit = firstProxyHit(origin, direction, target);
+    if (!hit || blocked(new THREE.Vector3(...origin), hit.point)) continue;
+    damage += computeDamage(spec, hit.distance, hit.zone);
+  }
+  return Math.min(100, damage);
+}
+
+export function maximumRemoteShotBaseDamage(weapon: WeaponId): number {
+  const spec = WEAPONS[weapon];
+  return Math.min(100, spec.damage * spec.headMultiplier * spec.pellets);
+}
+
+export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance): number {
+  if (!Number.isFinite(distance) || distance < 0) return 0;
+  if (source === 'grenade') return Math.min(100, grenadeDamage(distance));
+  if (source === 'yardhawk') {
+    if (distance > 3.2) return 0;
+    return Math.min(100, Math.max(1, Math.round(200 * (1 - distance / 3.2))));
+  }
+  if (source === 'tri-pass') {
+    if (distance > TRI_PASS_BLAST_RADIUS) return 0;
+    return Math.min(100, Math.max(1, Math.round(TRI_PASS_MAX_DAMAGE * (1 - distance / TRI_PASS_BLAST_RADIUS))));
+  }
+  if (source === 'hunter-swarm') {
+    if (distance > HUNTER_SWARM_BLAST_RADIUS) return 0;
+    return Math.min(100, hunterSwarmDamage(distance, stance));
+  }
+  return 100;
+}
+
+export function admitRemoteBaseDamage(claimed: number, maximum: number): boolean {
+  return Number.isFinite(claimed) && claimed > 0 && Number.isFinite(maximum) && maximum > 0 && claimed <= maximum + 1e-6;
+}
+
+/** Incoming wire damage is always unpowered; the receiver applies the host-authored multiplier once. */
+export function resolveRemotePoweredDamage(baseDamage: number, multiplier: number): number {
+  const boundedBase = Math.max(0, Math.min(100, Number.isFinite(baseDamage) ? baseDamage : 0));
+  const boundedMultiplier = multiplier === 4 ? 4 : 1;
+  return Math.min(100, boundedBase * boundedMultiplier);
+}

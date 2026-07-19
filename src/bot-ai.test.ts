@@ -3,14 +3,18 @@ import {
   BOT_FIRE_RANGE,
   BOT_REACTION_DELAY,
   SOLO_BOT_COUNT,
+  SPAWN_FLIP_SUSTAIN_MS,
+  advanceSpawnFlipHysteresis,
   botAimJitter,
   botCanFireWhileProtected,
   chooseBotIntent,
   chooseTacticalWaypoint,
+  createSpawnFlipHysteresis,
   operatorYawToward,
   respawnBotState,
   scoreBotSpawn,
   selectFarthestSpawnCandidate,
+  shouldFlipSpawnSide,
   type BotSense,
 } from './bot-ai';
 
@@ -33,8 +37,8 @@ describe('chooseBotIntent', () => {
     expect(chooseBotIntent({ ...base, lastShotAt: 1_800 }).fire).toBe(false);
   });
 
-  it('uses one deliberately close-to-medium-range solo opponent', () => {
-    expect(SOLO_BOT_COUNT).toBe(1);
+  it('uses three deliberately low-damage close-to-medium-range solo opponents', () => {
+    expect(SOLO_BOT_COUNT).toBe(3);
     expect(BOT_FIRE_RANGE).toBe(22);
     expect(BOT_REACTION_DELAY).toBeGreaterThanOrEqual(600);
     expect(botAimJitter(8)).toBeLessThan(botAimJitter(16));
@@ -64,6 +68,26 @@ describe('chooseBotIntent', () => {
 });
 
 describe('tactical bot scoring', () => {
+  it('flips spawn sides only when the authored opposite side is materially safer', () => {
+    expect(shouldFlipSpawnSide(
+      { minimumVisibleThreats: 2, safestNearestThreatDistanceSq: 64 },
+      { minimumVisibleThreats: 0, safestNearestThreatDistanceSq: 625 },
+    )).toBe(true);
+    expect(shouldFlipSpawnSide(
+      { minimumVisibleThreats: 0, safestNearestThreatDistanceSq: 900 },
+      { minimumVisibleThreats: 0, safestNearestThreatDistanceSq: 1_600 },
+    )).toBe(false);
+  });
+
+  it('requires sustained pressure and resets hysteresis when pressure clears', () => {
+    const started = advanceSpawnFlipHysteresis(createSpawnFlipHysteresis(), true, 1_000);
+    expect(started.flip).toBe(false);
+    const early = advanceSpawnFlipHysteresis(started.state, true, 1_000 + SPAWN_FLIP_SUSTAIN_MS - 1);
+    expect(early.flip).toBe(false);
+    expect(advanceSpawnFlipHysteresis(early.state, true, 1_000 + SPAWN_FLIP_SUSTAIN_MS).flip).toBe(true);
+    expect(advanceSpawnFlipHysteresis(early.state, false, 3_000).state.pressuredSince).toBeNull();
+  });
+
   it('orients the operator negative-Z forward axis toward movement and fire targets', () => {
     expect(operatorYawToward({ x: 0, z: 0 }, { x: 0, z: -5 })).toBeCloseTo(0);
     expect(operatorYawToward({ x: 0, z: 0 }, { x: 5, z: 0 })).toBeCloseTo(-Math.PI / 2);

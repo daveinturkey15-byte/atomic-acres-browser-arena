@@ -47,6 +47,16 @@ describe('first-person anatomical presentation', () => {
     presentation.setFireCaptureAgeMs(null);
   });
 
+  it('makes a non-scattergun casing visible at the accepted shot boundary', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+
+    expect(presentation.presentationState().activeCasings).toBe(0);
+    presentation.fire(0.02);
+
+    expect(presentation.presentationState().activeCasings).toBe(1);
+  });
+
   it('shows the knife immediately when melee is accepted', () => {
     const camera = new THREE.PerspectiveCamera();
     const presentation = new WeaponPresentation(camera, false);

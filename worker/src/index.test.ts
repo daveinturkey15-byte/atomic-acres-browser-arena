@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import worker, { allowedOrigin, validateStreakSubmission } from './index';
+import worker, { admitRateLimit, allowedOrigin, leaderboardNameKey, validateStreakSubmission } from './index';
 
 const valid = {
   name: 'Dave',
@@ -10,6 +10,34 @@ const valid = {
   buildId: 'pass30-local',
   idempotencyKey: 'install_123456789:15',
 };
+
+class RateLimitDb {
+  readonly counts = new Map<string, number>();
+  writes = 0;
+
+  prepare(query: string) {
+    let values: unknown[] = [];
+    const statement = {
+      bind: (...next: unknown[]) => { values = next; return statement; },
+      first: async () => {
+        const compound = `${String(values[0])}:${String(values[1])}`;
+        const count = this.counts.get(compound);
+        return count === undefined ? null : { count };
+      },
+      run: async () => {
+        if (!query.includes('INSERT INTO rate_limits')) return { meta: { changes: 0 } };
+        const compound = `${String(values[0])}:${String(values[1])}`;
+        const limit = Number(values[3]);
+        const current = this.counts.get(compound) ?? 0;
+        if (current >= limit) return { meta: { changes: 0 } };
+        this.counts.set(compound, current + 1);
+        this.writes += 1;
+        return { meta: { changes: 1 } };
+      },
+    };
+    return statement;
+  }
+}
 
 describe('global leaderboard worker policy', () => {
   it('allows only configured production origins plus bounded localhost QA origins', () => {
@@ -53,5 +81,23 @@ describe('global leaderboard worker policy', () => {
     expect(validateStreakSubmission({ ...valid, installId: 'short' }).error).toBe('invalid installId');
     expect(validateStreakSubmission({ ...valid, buildId: 'x' }).error).toBe('invalid buildId');
     expect(validateStreakSubmission({ ...valid, idempotencyKey: 'tiny' }).error).toBe('invalid idempotencyKey');
+  });
+
+  it('keeps accepted callsigns collision-free in D1 identity keys', () => {
+    expect(leaderboardNameKey('A B')).toBe('a_20b');
+    expect(leaderboardNameKey('A_B')).toBe('a_5fb');
+    expect(leaderboardNameKey('A-B')).toBe('a_2db');
+  });
+
+  it('stops D1 counter writes once a fixed-window rate bucket is saturated', async () => {
+    const db = new RateLimitDb();
+    const d1 = db as unknown as D1Database;
+    expect(await admitRateLimit(d1, 'install:test', 2, 1_000)).toBe(true);
+    expect(await admitRateLimit(d1, 'install:test', 2, 1_001)).toBe(true);
+    expect(await admitRateLimit(d1, 'install:test', 2, 1_002)).toBe(false);
+    expect(await admitRateLimit(d1, 'install:test', 2, 1_003)).toBe(false);
+    expect(db.writes).toBe(2);
+    expect(await admitRateLimit(d1, 'install:test', 2, 10 * 60_000 + 1_000)).toBe(true);
+    expect(db.writes).toBe(3);
   });
 });

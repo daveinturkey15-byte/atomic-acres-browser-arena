@@ -2670,9 +2670,9 @@
         ]
       }
     },
-    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 30 deltas",
+    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 31 deltas",
     "combat": {
-      "botDamageMultiplier": 0.5,
+      "botDamageMultiplier": 0.25,
       "grenade": {
         "maximumDamage": 115,
         "radius": 8
@@ -2687,6 +2687,18 @@
         "damage": 100,
         "range": 1.75
       },
+      "overdrive": {
+        "damageMultiplier": 4,
+        "durationMs": 15000,
+        "pickupRadius": 1.65,
+        "position": [
+          0,
+          0.82,
+          0
+        ],
+        "spawnIntervalMs": 120000
+      },
+      "soloBotCount": 3,
       "weapons": [
         {
           "adsSpreadMultiplier": 0.28,
@@ -3167,7 +3179,7 @@
             "shadowMapSize": 0,
             "shadowMode": "off",
             "shadows": false,
-            "staticMaterialMode": "palette-basic"
+            "staticMaterialMode": "vertex-lit"
           },
           "lighting": {
             "ambientColor": 13094858,

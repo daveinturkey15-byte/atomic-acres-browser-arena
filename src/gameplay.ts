@@ -3,8 +3,8 @@ import type { WeaponId } from './protocol';
 export type HitZone = 'head' | 'body' | 'limb';
 export type Stance = 'stand' | 'crouch' | 'prone';
 
-/** Solo bots deal half of the equivalent player-weapon damage. */
-export const BOT_DAMAGE_MULTIPLIER = 0.5;
+/** Solo bots deal one quarter of equivalent player-weapon damage (half the Pass 30 value). */
+export const BOT_DAMAGE_MULTIPLIER = 0.25;
 export const SIMULATION_HZ = 120;
 export const MATCH_WARMUP_MS = 3_000;
 export const MATCH_DURATION_MS = 300_000;

@@ -370,6 +370,20 @@ export class ArenaAudio {
     this.noise({ duration: 0.24, volume: 0.044, filter: 'bandpass', frequency: 1_600, q: 0.85, delay: offset }, this.ambience);
   }
 
+  overdrivePickup(): void {
+    this.unlock();
+    this.sweep(180, 920, 0.42, 0.095, 'sawtooth', this.feedback);
+    this.tone(440, 0.2, 0.055, 'square', this.feedback, 0.08);
+    this.tone(660, 0.28, 0.05, 'triangle', this.feedback, 0.18);
+    this.tone(880, 0.34, 0.042, 'sine', this.ambience, 0.26);
+  }
+
+  overdriveExpire(): void {
+    this.unlock();
+    this.sweep(720, 140, 0.34, 0.055, 'triangle', this.feedback);
+    this.tone(110, 0.22, 0.035, 'sine', this.ambience, 0.12);
+  }
+
   nukeWarning(): void {
     this.unlock();
     for (let pulse = 0; pulse < 5; pulse += 1) {

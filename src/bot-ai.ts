@@ -20,7 +20,7 @@ export type BotIntent = {
   changeWaypoint: boolean;
 };
 
-export const SOLO_BOT_COUNT = 1;
+export const SOLO_BOT_COUNT = 3;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
 
@@ -34,6 +34,49 @@ export type SpawnCandidate = {
   nearestPlayerDistanceSq: number;
   visibleThreats: number;
 };
+
+export type SpawnSidePressure = Readonly<{
+  minimumVisibleThreats: number;
+  safestNearestThreatDistanceSq: number;
+}>;
+
+export const SPAWN_FLIP_SUSTAIN_MS = 1_200;
+export type SpawnFlipHysteresis = Readonly<{ pressuredSince: number | null }>;
+
+export function createSpawnFlipHysteresis(): SpawnFlipHysteresis {
+  return { pressuredSince: null };
+}
+
+/** A transient pressure sample starts observation; only sustained pressure flips the authored side. */
+export function advanceSpawnFlipHysteresis(
+  state: SpawnFlipHysteresis,
+  pressured: boolean,
+  now: number,
+): { state: SpawnFlipHysteresis; flip: boolean } {
+  if (!pressured || !Number.isFinite(now)) return { state: createSpawnFlipHysteresis(), flip: false };
+  const pressuredSince = state.pressuredSince ?? now;
+  return {
+    state: { pressuredSince },
+    flip: now - pressuredSince >= SPAWN_FLIP_SUSTAIN_MS,
+  };
+}
+
+/** Flip only when the home side is materially pressured and the authored opposite side is safer. */
+export function shouldFlipSpawnSide(home: SpawnSidePressure, opposite: SpawnSidePressure): boolean {
+  const homeVisible = Math.max(0, home.minimumVisibleThreats);
+  const oppositeVisible = Math.max(0, opposite.minimumVisibleThreats);
+  const homeDistance = Number.isFinite(home.safestNearestThreatDistanceSq)
+    ? Math.max(0, home.safestNearestThreatDistanceSq)
+    : Number.POSITIVE_INFINITY;
+  const oppositeDistance = Number.isFinite(opposite.safestNearestThreatDistanceSq)
+    ? Math.max(0, opposite.safestNearestThreatDistanceSq)
+    : Number.POSITIVE_INFINITY;
+  if (homeVisible >= 2 && oppositeVisible < homeVisible) return true;
+  return homeVisible >= 1
+    && oppositeVisible <= homeVisible
+    && homeDistance < 12 * 12
+    && oppositeDistance > homeDistance * 1.8;
+}
 
 /**
  * Selects from the least-exposed spawn tier first, then the farthest bounded

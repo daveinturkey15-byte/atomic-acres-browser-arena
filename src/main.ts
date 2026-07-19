@@ -8,13 +8,17 @@ import { PATROL_LAYOUT } from './arena-layout';
 import {
   BOT_REACTION_DELAY,
   SOLO_BOT_COUNT,
+  advanceSpawnFlipHysteresis,
   botAimJitter,
   botCanFireWhileProtected,
   chooseBotIntent,
   chooseTacticalWaypoint,
+  createSpawnFlipHysteresis,
   operatorYawToward,
   respawnBotState,
   selectFarthestSpawnCandidate,
+  shouldFlipSpawnSide,
+  type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
@@ -59,7 +63,7 @@ import { routeIdentityTelemetry } from './world-identity';
 import { createWorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
-import { loadArenaArt, updateArenaArt } from './environment-assets';
+import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
@@ -67,6 +71,19 @@ import { advanceFootsteps, strideLength, type FootstepAccumulator } from './foot
 import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { GrassSystem } from './grass-system';
+import {
+  OVERDRIVE_DAMAGE_MULTIPLIER,
+  OVERDRIVE_DURATION_MS,
+  OVERDRIVE_PICKUP_RADIUS,
+  OVERDRIVE_POSITION,
+  OVERDRIVE_SPAWN_INTERVAL_MS,
+  advanceOverdrive,
+  claimOverdrive,
+  createOverdriveState,
+  overdriveDamageMultiplier,
+  overdriveRemainingMs,
+  type OverdriveState,
+} from './overdrive';
 import {
   HUNTER_SWARM_BLAST_RADIUS,
   HUNTER_SWARM_COUNT,
@@ -77,10 +94,12 @@ import {
   consumeFieldSupport,
   createFieldSupportState,
   createTriPassTargeting,
+  cycleFieldSupportSelection,
   hunterSwarmDamage,
   nukeDamageForTarget,
   recordSupportDeath,
   recordSupportElimination,
+  remoteExplosiveHitMaximumDistance,
   registerTriPassTarget,
   triPassSchedule,
   type FieldSupportId,
@@ -124,6 +143,11 @@ import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeam
 import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
 import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint, type RemoteMeleeAdmissionState } from './remote-melee-admission';
+import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
+import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
+import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
+import { admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
 import { CharacterPhysics } from './physics';
 import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
@@ -135,7 +159,13 @@ import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRan
 import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
 import {
   DeathMessage,
+  ExplosiveSource,
   GameMessage,
+  HitMessage,
+  MeleeMessage,
+  OffensiveSupportSource,
+  OverdriveClaimMessage,
+  OverdriveStateMessage,
   PlayerSnapshot,
   PickupMessage,
   PrimaryWeaponId,
@@ -163,6 +193,27 @@ type RemotePlayer = {
   target: THREE.Vector3;
   targetYaw: number;
   lastSeen: number;
+  claimEligibleAt: number;
+  claimRequiresCoreExit: boolean;
+};
+
+type AdmittedRemoteShot = {
+  message: ShotMessage;
+  receivedAt: number;
+  targets: Set<string>;
+};
+
+type AdmittedRemoteMelee = {
+  message: MeleeMessage;
+  receivedAt: number;
+  targets: Set<string>;
+};
+
+type AdmittedRemoteExplosion = {
+  source: ExplosiveSource;
+  origin: THREE.Vector3;
+  receivedAt: number;
+  targets: Set<string>;
 };
 
 type BotPlayer = {
@@ -196,6 +247,7 @@ type GrenadeEntity = {
   angularVelocity: THREE.Vector3;
   explodeAt: number;
   lastBounceAt: number;
+  actionNonce: number;
 };
 
 type YardhawkEntity = {
@@ -264,9 +316,9 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · STORMFRONT PASS 30</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · NEIGHBOURHOOD OVERDRIVE · PASS 31</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Deploy beneath a purple-orange stormfront with global streak records, modernized living ground and escalating field support.</p>
+    <p class="lede">Fight through a richer living neighbourhood with upgraded weapon handling, adaptive spawns and a contested 4× Overdrive Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -343,14 +395,15 @@ app.innerHTML = `
     <div id="support-block">
       <div class="support-heading"><span>FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
       <div class="support-list">
-        <b data-support="scout-sweep"><kbd>3</kbd><span><small>3 KILLS</small>SCOUT SWEEP</span></b>
-        <b data-support="yardhawk"><kbd>4</kbd><span><small>5 KILLS</small>YARDHAWK</span></b>
-        <b data-support="tri-pass"><kbd>5</kbd><span><small>7 KILLS</small>TRI-PASS</span></b>
-        <b data-support="hunter-swarm"><kbd>6</kbd><span><small>8 KILLS</small>HUNTER SWARM</span></b>
-        <b data-support="nuke"><kbd>7</kbd><span><small>15 KILLS</small>NUKE</span></b>
+        <b data-support="scout-sweep"><span class="support-meta"><kbd>3</kbd><small>3 KILLS</small></span><span class="support-name">SCOUT SWEEP</span><em class="support-state">LOCKED</em></b>
+        <b data-support="yardhawk"><span class="support-meta"><kbd>4</kbd><small>5 KILLS</small></span><span class="support-name">YARDHAWK</span><em class="support-state">LOCKED</em></b>
+        <b data-support="tri-pass"><span class="support-meta"><kbd>5</kbd><small>7 KILLS</small></span><span class="support-name">TRI-PASS</span><em class="support-state">LOCKED</em></b>
+        <b data-support="hunter-swarm"><span class="support-meta"><kbd>6</kbd><small>8 KILLS</small></span><span class="support-name">HUNTER SWARM</span><em class="support-state">LOCKED</em></b>
+        <b data-support="nuke"><span class="support-meta"><kbd>7</kbd><small>15 KILLS</small></span><span class="support-name">NUKE</span><em class="support-state">LOCKED</em></b>
       </div>
-      <small class="support-help">PRESS 3–7 TO ACTIVATE</small>
+      <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </div>
+    <div id="overdrive-hud" hidden><small>4× DAMAGE</small><strong id="overdrive-time">15.0</strong><span>OVERDRIVE</span></div>
     <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
@@ -605,6 +658,36 @@ const worldIdentityPresentation = createWorldIdentityPresentation(
   softwareRenderer,
 );
 const arena: ArenaMap = buildArena(scene);
+const neighbourhoodLifeRoot = addNeighbourhoodLife(scene, reducedWorldDetail);
+const overdriveRoot = new THREE.Group();
+overdriveRoot.name = 'overdrive-core-pickup';
+overdriveRoot.position.set(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z);
+overdriveRoot.visible = false;
+overdriveRoot.userData.dynamic = true;
+overdriveRoot.userData.presentationOnly = true;
+const overdriveCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.44, reducedRenderMode ? 1 : 2),
+  new THREE.MeshStandardMaterial({ color: 0x8ff7ef, emissive: 0x2d62a7, emissiveIntensity: 2.2, roughness: 0.22, metalness: 0.56 }),
+);
+overdriveCore.name = 'overdrive-energy-core';
+const overdriveRings = [0, Math.PI / 2].map((rotation, index) => {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.68 + index * 0.08, 0.055, 8, reducedRenderMode ? 20 : 36),
+    new THREE.MeshBasicMaterial({ color: index === 0 ? 0x78f5ed : 0x9d6bff, transparent: true, opacity: 0.86, toneMapped: false }),
+  );
+  ring.name = `overdrive-ring-${index}`;
+  ring.rotation.set(Math.PI / 2, rotation, rotation * 0.5);
+  return ring;
+});
+const overdrivePedestal = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.72, 0.9, 0.18, reducedRenderMode ? 12 : 24),
+  new THREE.MeshStandardMaterial({ color: 0x273b43, emissive: 0x132d40, emissiveIntensity: 0.65, roughness: 0.48, metalness: 0.52 }),
+);
+overdrivePedestal.name = 'overdrive-pedestal';
+overdrivePedestal.position.y = -0.69;
+overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal);
+overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
+scene.add(overdriveRoot);
 const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery);
 const grassSystem = new GrassSystem(
   scene,
@@ -684,12 +767,17 @@ let lastGrenadeExplosionProfile = {
   totalSyncMs: 0,
 };
 let fieldSupport = createFieldSupportState();
+let overdriveState: OverdriveState = createOverdriveState(0);
+let overdriveClaimGeneration = -1;
+let overdriveSpawns = 0;
+let overdrivePickups = 0;
+let overdriveExpiries = 0;
 let bestStreakThisMatch = 0;
 let matchScoreRecorded = false;
 let highScores: HighScoreEntry[] = [];
 try { highScores = loadHighScores(localStorage); } catch { /* Gameplay remains available when persistent storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
-const LEADERBOARD_BUILD_ID = 'stormfront-pass30';
+const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
@@ -711,6 +799,23 @@ let nukeLaunches = 0;
 let nukeDetonations = 0;
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
+const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
+const admittedRemoteMelees = new Map<string, Map<number, AdmittedRemoteMelee>>();
+const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplosion>>();
+const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
+const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
+const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const localSupportNonces = new Map<OffensiveSupportSource, number>();
+const remoteHitAdmissionTelemetry: Record<string, number> = {};
+function recordRemoteHitAdmission(label: string): void {
+  remoteHitAdmissionTelemetry[label] = (remoteHitAdmissionTelemetry[label] ?? 0) + 1;
+}
+const supportNetworkHitTelemetry: Record<OffensiveSupportSource, { sent: number; blocked: number; outOfRange: number; missingAuthorization: number }> = {
+  yardhawk: { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+  'tri-pass': { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+  'hunter-swarm': { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+  nuke: { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+};
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
 const remotePingAdmissions = new Map<string, TeamPingAdmissionState>();
 let localPingAdmission = createTeamPingAdmissionState();
@@ -746,12 +851,19 @@ let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
 let lastPlayerSpawnIndex = -1;
+const lastBotSpawnIndices = new Map<Team, number>();
+let spawnFlipHysteresis: [SpawnFlipHysteresis, SpawnFlipHysteresis] = [
+  createSpawnFlipHysteresis(),
+  createSpawnFlipHysteresis(),
+];
 let lastPlayerSpawnAudit: {
   previousIndex: number;
   selectedIndex: number;
   selectedVisibleThreats: number;
   minimumVisibleThreats: number;
   safeTierCount: number;
+  selectedSide: Team;
+  flipped: boolean;
 } | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let debugShadowProbe: THREE.Mesh | null = null;
@@ -773,6 +885,7 @@ let gamepadTriggerArmed = true;
 let gamepadAdsArmed = true;
 
 let previousGamepadButtons: boolean[] = [];
+let gamepadSupportSelection: FieldSupportId = 'scout-sweep';
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
@@ -1084,7 +1197,16 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
 
   root.position.set(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z);
   scene.add(root);
-  return { root, snapshot, target: new THREE.Vector3(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z), targetYaw: snapshot.yaw, lastSeen: performance.now() };
+  const now = performance.now();
+  return {
+    root,
+    snapshot,
+    target: new THREE.Vector3(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z),
+    targetYaw: snapshot.yaw,
+    lastSeen: now,
+    claimEligibleAt: now + 1_500,
+    claimRequiresCoreExit: false,
+  };
 }
 
 function snapshot(): PlayerSnapshot {
@@ -1190,6 +1312,14 @@ function updateTeamPings(now: number): void {
 }
 
 function onNetworkMessage(message: GameMessage): void {
+  if (message.type === 'overdrive-claim') {
+    acceptOverdriveClaim(message);
+    return;
+  }
+  if (message.type === 'overdrive-state') {
+    acceptOverdriveState(message);
+    return;
+  }
   if (message.type === 'high-score') {
     if (message.by === player.id) return;
     const sender = remotes.get(message.by);
@@ -1209,25 +1339,60 @@ function onNetworkMessage(message: GameMessage): void {
     if (!remote) {
       remote = createRemote(incoming);
       remotes.set(incoming.id, remote);
+      remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+      remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+      remoteHealthAuthorities.set(incoming.id, createRemoteHealthAuthorityState(incoming.hp > 0));
+      if (network.role === 'host') network.send({ type: 'join', player: { ...incoming, hp: incoming.hp > 0 ? 100 : 0 } });
       addFeed(`${incoming.name} entered the test block`, incoming.team === 0 ? 'aqua' : 'coral');
       if (message.type === 'join') {
         network.send({ type: 'state', player: snapshot() });
         sendLeaderboardSync();
+        broadcastOverdriveState(performance.now());
       }
     }
     if (incoming.seq > remote.snapshot.seq) {
       const now = performance.now();
-      const respawned = remote.snapshot.hp <= 0 && incoming.hp > 0;
-      const pickup = authorizedRemotePickups.get(incoming.id);
-      const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === incoming.primary;
-      if (incoming.team !== remote.snapshot.team) return;
-      if (incoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
-      if (pickupAllowed) authorizedRemotePickups.delete(incoming.id);
-      remote.snapshot = incoming;
-      remote.target.set(incoming.x, incoming.y - stanceEyeHeight(incoming.stance), incoming.z);
-      remote.targetYaw = incoming.yaw;
-      remote.lastSeen = performance.now();
-      remote.root.visible = incoming.hp > 0;
+      let admittedIncoming = incoming;
+      let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0;
+      if (network.role === 'host') {
+        const health = remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0);
+        const respawnAdmission = admitAuthoritativeRemoteRespawn(health, incoming.hp, now);
+        if (respawnAdmission.respawned) {
+          remoteHealthAuthorities.set(incoming.id, respawnAdmission.state);
+          remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+        }
+        const authoritativeHealth = respawnAdmission.state;
+        respawned = respawnAdmission.respawned;
+        admittedIncoming = { ...incoming, hp: authoritativeHealth.hp };
+      }
+      const movement = admitRemoteSnapshotMovement(
+        remote.snapshot,
+        admittedIncoming,
+        now,
+        remote.lastSeen,
+        remote.claimEligibleAt,
+        respawned,
+      );
+      if (!movement.accepted) return;
+      const pickup = authorizedRemotePickups.get(admittedIncoming.id);
+      const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
+      if (admittedIncoming.team !== remote.snapshot.team) return;
+      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+      if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
+      remote.claimEligibleAt = movement.claimEligibleAt;
+      const coreDistance = Math.hypot(admittedIncoming.x - OVERDRIVE_POSITION.x, admittedIncoming.z - OVERDRIVE_POSITION.z);
+      if (movement.resynchronized && coreDistance <= OVERDRIVE_PICKUP_RADIUS + 3) remote.claimRequiresCoreExit = true;
+      else if (remote.claimRequiresCoreExit && !movement.resynchronized && coreDistance > OVERDRIVE_PICKUP_RADIUS + 3) {
+        remote.claimRequiresCoreExit = false;
+        remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
+      }
+      remote.snapshot = admittedIncoming;
+      remote.target.set(admittedIncoming.x, admittedIncoming.y - stanceEyeHeight(admittedIncoming.stance), admittedIncoming.z);
+      remote.targetYaw = admittedIncoming.yaw;
+      remote.lastSeen = now;
+      remote.root.visible = admittedIncoming.hp > 0;
+      if (network.role === 'host') network.send({ type: 'state', player: admittedIncoming });
     }
     return;
   }
@@ -1250,6 +1415,36 @@ function onNetworkMessage(message: GameMessage): void {
     acceptRemotePickup(message);
     return;
   }
+  if (message.type === 'support-activate') {
+    const state = remoteSupportAuthorities.get(message.by);
+    const sender = remotes.get(message.by);
+    if (!state || !sender || sender.snapshot.hp <= 0) return;
+    if (message.effectOrigins.some((origin) => !pointInsideBounds(new THREE.Vector3(...origin), arena.bounds, 0))) return;
+    if (message.targetIds.some((id) => {
+      if (id === player.id) return !player.alive || player.team === sender.snapshot.team;
+      const target = remotes.get(id);
+      const botTarget = bots.get(id);
+      if (target) return target.snapshot.hp <= 0 || target.snapshot.team === sender.snapshot.team;
+      if (botTarget) return !botTarget.alive || botTarget.team === sender.snapshot.team;
+      return true;
+    })) return;
+    const admission = admitRemoteSupportActivation(state, message, performance.now());
+    if (admission.accepted) {
+      remoteSupportAuthorities.set(message.by, admission.state);
+      if (network.role === 'host') network.send(message);
+    }
+    return;
+  }
+  if (message.type === 'grenade-throw') {
+    const state = remoteGrenadeAuthorities.get(message.by);
+    const sender = remotes.get(message.by);
+    if (!state || !sender) return;
+    const admission = admitRemoteGrenadeThrow(state, message, sender.snapshot, performance.now());
+    if (!admission.accepted) return;
+    remoteGrenadeAuthorities.set(message.by, admission.state);
+    if (network.role === 'host') network.send(message);
+    return;
+  }
   if (message.type === 'shot') {
     if (message.by === player.id) return;
     const sender = remotes.get(message.by);
@@ -1257,41 +1452,152 @@ function onNetworkMessage(message: GameMessage): void {
     const admission = admitRemoteShot(message, sender?.snapshot, performance.now(), prior);
     if (!admission.accepted) return;
     remoteShotAdmissions.set(message.by, admission.nextState);
+    const now = performance.now();
+    const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) if (now - action.receivedAt > 1_000) actions.delete(nonce);
+    actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
+    admittedRemoteShots.set(message.by, actions);
+    if (network.role === 'host') network.send(message);
     renderRemoteShot(message);
     return;
   }
   if (message.type === 'melee') {
     if (message.by === player.id) return;
+    const now = performance.now();
     const sender = remotes.get(message.by);
     const prior = remoteMeleeAdmissions.get(message.by) ?? createRemoteMeleeAdmissionState();
-    const admission = admitRemoteMelee(message, sender?.snapshot, performance.now(), prior);
+    const admission = admitRemoteMelee(message, sender?.snapshot, now, prior);
     if (!admission.accepted || !sender) return;
     remoteMeleeAdmissions.set(message.by, admission.nextState);
+    const actions = admittedRemoteMelees.get(message.by) ?? new Map<number, AdmittedRemoteMelee>();
+    for (const [nonce, action] of actions) if (now - action.receivedAt > 1_000) actions.delete(nonce);
+    actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
+    admittedRemoteMelees.set(message.by, actions);
+    if (network.role === 'host') network.send(message);
     const operator = sender.root.userData.operator as THREE.Group | undefined;
     if (operator) meleeOperator(operator);
     audio.melee();
     const origin = new THREE.Vector3(...message.origin);
-    if (player.alive && sender.snapshot.team !== player.team
+    if (network.role !== 'client' && player.alive && sender.snapshot.team !== player.team
       && meleeActionHitsPoint(message, player.position)
       && !arena.colliders.some((box) => segmentIntersectsBox(origin, player.position, box))) {
-      applyDamage(100, message.by);
+      applyDamage(100 * overdriveDamageMultiplier(overdriveState, message.by, now), message.by);
     }
     return;
   }
-  if (message.type === 'hit' && message.target === player.id && !processedNonces.has(message.nonce)) {
+  if (message.type === 'hit' && !processedNonces.has(message.nonce)) {
     const attacker = remotes.get(message.by);
     if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
-    let validationOrigin: THREE.Vector3;
-    if (message.kind === 'explosive') {
-      if (!message.origin) return;
-      validationOrigin = new THREE.Vector3(...message.origin);
-      if (!pointInsideBounds(validationOrigin, arena.bounds, 0) || validationOrigin.distanceTo(player.position) > 6.2) return;
+    const targetIsLocal = message.target === player.id;
+    const remoteTarget = targetIsLocal ? undefined : remotes.get(message.target);
+    if (!targetIsLocal && (network.role !== 'host' || !remoteTarget)) return;
+    const targetTeam = targetIsLocal ? player.team : remoteTarget!.snapshot.team;
+    if (attacker.snapshot.team === targetTeam) return;
+    const targetStance = targetIsLocal ? player.stance : remoteTarget!.snapshot.stance ?? 'stand';
+    const shotTargetPosition = targetIsLocal
+      ? player.position.clone()
+      : new THREE.Vector3(remoteTarget!.snapshot.x, remoteTarget!.snapshot.y, remoteTarget!.snapshot.z);
+    const blastTargetPosition = shotTargetPosition.clone();
+    blastTargetPosition.y += 1.1 - stanceEyeHeight(targetStance);
+    const now = performance.now();
+    let admittedDamage = 0;
+
+    if (message.kind === 'shot') {
+      const action = admittedRemoteShots.get(message.by)?.get(message.actionNonce);
+      if (!action) { recordRemoteHitAdmission('shot-missing-action'); return; }
+      if (now - action.receivedAt > 1_000) { recordRemoteHitAdmission('shot-expired-action'); return; }
+      if (action.targets.has(message.target)) { recordRemoteHitAdmission('shot-duplicate-target'); return; }
+      if (action.message.weapon !== attacker.snapshot.weapon) { recordRemoteHitAdmission('shot-weapon-mismatch'); return; }
+      const derivedDamage = deriveRemoteShotBaseDamage(
+        action.message.weapon,
+        action.message.origin,
+        action.message.pelletDirections,
+        {
+          x: shotTargetPosition.x,
+          y: shotTargetPosition.y,
+          z: shotTargetPosition.z,
+          yaw: targetIsLocal ? player.yaw : remoteTarget!.snapshot.yaw,
+          stance: targetStance,
+        },
+        (origin, impact) => arena.colliders.some((box) => segmentIntersectsBox(origin, impact, box)),
+      );
+      if (derivedDamage <= 0) { recordRemoteHitAdmission('shot-ray-miss'); return; }
+      if (Math.abs(message.damage - derivedDamage) > 1e-6) {
+        recordRemoteHitAdmission('shot-damage-mismatch');
+        return;
+      }
+      action.targets.add(message.target);
+      recordRemoteHitAdmission('shot-admitted');
+      admittedDamage = resolveRemotePoweredDamage(
+        derivedDamage,
+        overdriveDamageMultiplier(overdriveState, message.by, now),
+      );
+    } else if (message.kind === 'melee') {
+      const action = admittedRemoteMelees.get(message.by)?.get(message.actionNonce);
+      if (!action || now - action.receivedAt > 1_000 || action.targets.has(message.target)) return;
+      if (Math.abs(message.damage - 100) > 1e-6
+        || !meleeActionHitsPoint(action.message, blastTargetPosition)
+        || arena.colliders.some((box) => segmentIntersectsBox(new THREE.Vector3(...action.message.origin), blastTargetPosition, box))) return;
+      action.targets.add(message.target);
+      admittedDamage = resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now));
     } else {
-      validationOrigin = new THREE.Vector3(attacker.snapshot.x, attacker.snapshot.y, attacker.snapshot.z);
+      const source = message.explosiveSource;
+      const originTuple = message.origin;
+      if (!source || !originTuple) return;
+      const validationOrigin = new THREE.Vector3(...originTuple);
+      if (!pointInsideBounds(validationOrigin, arena.bounds, 0)) return;
+      const distance = validationOrigin.distanceTo(blastTargetPosition);
+      if (distance > remoteExplosiveHitMaximumDistance(source)) return;
+      if (source !== 'nuke' && arena.colliders.some((box) => segmentIntersectsBox(validationOrigin, blastTargetPosition, box))) return;
+      const maximumBaseDamage = maximumRemoteExplosiveBaseDamage(source, distance, targetStance);
+      if (!admitRemoteBaseDamage(message.damage, maximumBaseDamage)
+        || Math.abs(message.damage - maximumBaseDamage) > 1e-6) return;
+
+      if (source === 'grenade') {
+        const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+        if (!grenadeAuthority) return;
+        const grenadeAdmission = admitRemoteGrenadeHit(grenadeAuthority, {
+          actionNonce: message.actionNonce,
+          explosionOrigin: originTuple,
+          target: message.target,
+          now,
+        });
+        if (!grenadeAdmission.accepted) return;
+        remoteGrenadeAuthorities.set(message.by, grenadeAdmission.state);
+      } else {
+        const supportNonce = message.supportNonce;
+        const authority = remoteSupportAuthorities.get(message.by);
+        if (supportNonce === undefined || !authority) return;
+        const supportAdmission = admitRemoteSupportHit(authority, {
+          source,
+          activationNonce: supportNonce,
+          origin: originTuple,
+          target: message.target,
+          now,
+        });
+        if (!supportAdmission.accepted) return;
+        remoteSupportAuthorities.set(message.by, supportAdmission.state);
+      }
+
+      const actions = admittedRemoteExplosions.get(message.by) ?? new Map<number, AdmittedRemoteExplosion>();
+      for (const [nonce, action] of actions) if (now - action.receivedAt > 30_000) actions.delete(nonce);
+      const priorAction = actions.get(message.actionNonce);
+      if (priorAction) {
+        if (priorAction.source !== source || priorAction.origin.distanceTo(validationOrigin) > 0.01 || priorAction.targets.has(message.target)) return;
+        priorAction.targets.add(message.target);
+      } else {
+        actions.set(message.actionNonce, { source, origin: validationOrigin, receivedAt: now, targets: new Set([message.target]) });
+      }
+      admittedRemoteExplosions.set(message.by, actions);
+      admittedDamage = resolveRemotePoweredDamage(
+        message.damage,
+        overdriveDamageMultiplier(overdriveState, message.by, now),
+      );
     }
-    if (arena.colliders.some((box) => segmentIntersectsBox(validationOrigin, player.position, box))) return;
+
     processedNonces.add(message.nonce);
-    applyDamage(message.damage, message.by);
+    if (targetIsLocal) applyDamage(admittedDamage, message.by);
+    else sendAuthoritativeHit(message);
     trimNonceSet();
     return;
   }
@@ -1306,6 +1612,32 @@ function onNetworkMessage(message: GameMessage): void {
 
 function trimNonceSet(): void {
   if (processedNonces.size > 512) processedNonces.clear();
+}
+
+function sendAuthoritativeHit(message: HitMessage): void {
+  if (network.role !== 'host') {
+    network.send(message);
+    return;
+  }
+  const remote = remotes.get(message.target);
+  const health = remoteHealthAuthorities.get(message.target);
+  if (!remote || !health) return;
+  const now = performance.now();
+  const finalDamage = resolveRemotePoweredDamage(
+    message.damage,
+    overdriveDamageMultiplier(overdriveState, message.by, now),
+  );
+  const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
+  if (!result.applied) return;
+  remoteHealthAuthorities.set(message.target, result.state);
+  remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
+  remote.root.visible = result.state.alive;
+  network.send(message);
+  if (result.died) {
+    const death: DeathMessage = { type: 'death', killer: message.by, victim: message.target, nonce: randomNonce() };
+    network.send(death);
+    processDeath(death);
+  }
 }
 
 function renderRemoteShot(message: ShotMessage): void {
@@ -1352,8 +1684,10 @@ function applyDamage(damage: number, attacker: string): void {
     fieldSupport = recordSupportDeath(fieldSupport);
     updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, nonce: randomNonce() };
-    network.send(death);
-    processDeath(death);
+    if (network.role !== 'client') {
+      network.send(death);
+      processDeath(death);
+    }
     element<HTMLElement>('#respawn').hidden = false;
     respawnEndsAt = now + 1_900;
     document.exitPointerLock();
@@ -1696,6 +2030,25 @@ function processDeath(message: DeathMessage): void {
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   spawnDeathDrop(message);
+  if (message.victim === player.id && player.alive) {
+    const now = performance.now();
+    interruptReload(true, now);
+    player.hp = 0;
+    player.alive = false;
+    player.deaths += 1;
+    fieldSupport = recordSupportDeath(fieldSupport);
+    updateFieldSupportHud();
+    element<HTMLElement>('#respawn').hidden = false;
+    respawnEndsAt = now + 1_900;
+    document.exitPointerLock();
+  }
+  if (message.killer !== message.victim) {
+    const killerAuthority = remoteSupportAuthorities.get(message.killer);
+    if (killerAuthority) remoteSupportAuthorities.set(message.killer, recordRemoteSupportElimination(killerAuthority));
+  }
+  const victimAuthority = remoteSupportAuthorities.get(message.victim);
+  if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
+  if (remoteGrenadeAuthorities.has(message.victim)) remoteGrenadeAuthorities.set(message.victim, resetRemoteGrenadeAuthorityState());
   if (message.killer === player.id && message.victim !== player.id) {
     player.kills += 1;
     awardSupportElimination();
@@ -1708,7 +2061,10 @@ function processDeath(message: DeathMessage): void {
   }
   addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
   const remote = remotes.get(message.victim);
-  if (remote) remote.root.visible = false;
+  if (remote) {
+    remote.snapshot = { ...remote.snapshot, hp: 0 };
+    remote.root.visible = false;
+  }
   const bot = bots.get(message.victim);
   if (bot) bot.root.visible = false;
   checkMatchEnd();
@@ -1721,6 +2077,12 @@ function removeRemote(id: string, reason: string): void {
   remotes.delete(id);
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
+  admittedRemoteShots.delete(id);
+  admittedRemoteMelees.delete(id);
+  admittedRemoteExplosions.delete(id);
+  remoteSupportAuthorities.delete(id);
+  remoteGrenadeAuthorities.delete(id);
+  remoteHealthAuthorities.delete(id);
   remoteMeleeAdmissions.delete(id);
   remotePingAdmissions.delete(id);
   authorizedRemotePickups.delete(id);
@@ -1728,7 +2090,6 @@ function removeRemote(id: string, reason: string): void {
 }
 
 function spawnPoint(): THREE.Vector3 {
-  const options = arena.spawns[player.team];
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
@@ -1742,13 +2103,34 @@ function spawnPoint(): THREE.Vector3 {
       .filter((bot) => bot.team !== player.team && bot.alive)
       .map((bot) => bot.position.clone().add(new THREE.Vector3(0, 1.42, 0))),
   ];
-  const valid = options.map((point, index) => ({ point, index })).filter(({ point }) => {
-    const bodyPoint = { x: point.x, y: 0, z: point.z };
-    return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
-      && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-      && !isBlocked(bodyPoint, arena.colliders, 0.44);
-  });
-  if (valid.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  const validForSide = (side: Team) => arena.spawns[side]
+    .map((point, localIndex) => ({ point, side, index: side * 100 + localIndex }))
+    .filter(({ point }) => {
+      const bodyPoint = { x: point.x, y: 0, z: point.z };
+      return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
+        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
+        && !isBlocked(bodyPoint, arena.colliders, 0.44);
+    });
+  const home = validForSide(player.team);
+  const oppositeTeam: Team = player.team === 0 ? 1 : 0;
+  const opposite = validForSide(oppositeTeam);
+  if (home.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  const pressure = (options: ReturnType<typeof validForSide>) => {
+    const scored = options.map(({ point }) => ({
+      visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
+      nearestThreatDistanceSq: threats.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...threats.map((threat) => threat.distanceToSquared(point))),
+    }));
+    const minimumVisibleThreats = Math.min(...scored.map((entry) => entry.visibleThreats));
+    return {
+      minimumVisibleThreats,
+      safestNearestThreatDistanceSq: Math.max(...scored.filter((entry) => entry.visibleThreats === minimumVisibleThreats).map((entry) => entry.nearestThreatDistanceSq)),
+    };
+  };
+  const instantaneousFlip = threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const flipDecision = advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
+  spawnFlipHysteresis[player.team] = flipDecision.state;
+  const flipped = flipDecision.flip;
+  const valid = flipped ? opposite : home;
   const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < 20));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
   const candidates = selectable.map(({ point, index }) => ({
@@ -1762,15 +2144,18 @@ function spawnPoint(): THREE.Vector3 {
   const selectedIndex = selectFarthestSpawnCandidate(candidates, gameplayRandom(), 3, previousIndex);
   const minimumVisibleThreats = Math.min(...candidates.map((candidate) => candidate.visibleThreats));
   const selected = candidates.find((candidate) => candidate.index === selectedIndex)!;
+  const selectedSpawn = valid.find(({ index }) => index === selectedIndex)!;
   lastPlayerSpawnAudit = {
     previousIndex,
     selectedIndex,
     selectedVisibleThreats: selected.visibleThreats,
     minimumVisibleThreats,
     safeTierCount: candidates.filter((candidate) => candidate.visibleThreats === minimumVisibleThreats).length,
+    selectedSide: selectedSpawn.side,
+    flipped,
   };
   lastPlayerSpawnIndex = selectedIndex;
-  return valid.find(({ index }) => index === selectedIndex)!.point.clone();
+  return selectedSpawn.point.clone();
 }
 
 function requestGamePointerLock(): void {
@@ -1816,7 +2201,7 @@ function respawn(requestLock = true): void {
   player.alive = true;
   respawnEndsAt = 0;
   player.invulnerableUntil = performance.now() + 1350;
-  player.yaw = player.team === 0 ? Math.PI : 0;
+  player.yaw = operatorYawToward({ x: player.position.x, z: player.position.z }, { x: 0, z: 0 });
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
   stanceRecoveryUntil = 0;
@@ -1856,8 +2241,17 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   gameMode = mode;
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
+  spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
-  matchState = createMatch(performance.now());
+  const matchStartedAt = performance.now();
+  matchState = createMatch(matchStartedAt);
+  overdriveState = createOverdriveState(matchStartedAt);
+  overdriveClaimGeneration = -1;
+  overdriveSpawns = 0;
+  overdrivePickups = 0;
+  overdriveExpiries = 0;
+  overdriveRoot.visible = false;
+  element<HTMLElement>('#overdrive-hud').hidden = true;
   matchFinished = false;
   previousHudScores = [0, 0];
   respawnEndsAt = 0;
@@ -1872,6 +2266,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   if (mode !== 'solo') {
     network.send({ type: 'join', player: snapshot() });
     sendLeaderboardSync();
+    if (mode === 'host') broadcastOverdriveState(matchStartedAt);
   }
 }
 
@@ -1984,6 +2379,7 @@ function tryFire(now: number): void {
     sustainedShots: player.sustainedShots,
   });
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
+  const pelletDirections: [number, number, number][] = [];
   let impactAudioPlayed = false;
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
@@ -1993,6 +2389,7 @@ function tryFire(now: number): void {
       .addScaledVector(cameraRight, sample.x)
       .addScaledVector(cameraUp, sample.y)
       .normalize();
+    pelletDirections.push(direction.toArray() as [number, number, number]);
     if (pellet === 0) {
       lastPrincipalShotAlignment = {
         weapon: player.weapon,
@@ -2029,30 +2426,36 @@ function tryFire(now: number): void {
     }
     if (result.targetId) hitPracticeTarget(result.targetId);
   }
-  for (const [target, hit] of hitDamage) {
-    const bot = bots.get(target);
-    if (bot) applyBotDamage(bot, Math.min(100, hit.damage), hit.zone);
-    else {
-      const remote = remotes.get(target);
-      if (remote && remote.snapshot.team !== player.team) {
-        const remoteOperator = remote.root.userData.operator as THREE.Group | undefined;
-        if (remoteOperator) reactOperator(remoteOperator, hit.zone);
-        const nonce = randomNonce();
-        network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), kind: 'shot', nonce });
-        showHitmarker(hit.zone === 'head');
-        audio.hit(hit.zone === 'head');
-      }
-    }
-  }
   const shot: ShotMessage = {
     type: 'shot',
     by: player.id,
     weapon: player.weapon,
     origin: origin.toArray() as [number, number, number],
     direction: baseDirection.toArray() as [number, number, number],
+    pelletDirections,
     nonce: randomNonce(),
   };
+  // Reliable channels preserve this admission event ahead of its correlated hit claims.
   network.send(shot);
+  for (const [target, hit] of hitDamage) {
+    const poweredDamage = outgoingDamage(hit.damage, now);
+    const bot = bots.get(target);
+    if (bot) applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+    else {
+      const remote = remotes.get(target);
+      if (remote && remote.snapshot.team !== player.team) {
+        const remoteOperator = remote.root.userData.operator as THREE.Group | undefined;
+        if (remoteOperator) reactOperator(remoteOperator, hit.zone);
+        const nonce = randomNonce();
+        sendAuthoritativeHit({
+          type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), kind: 'shot',
+          actionNonce: shot.nonce, nonce,
+        });
+        showHitmarker(hit.zone === 'head');
+        audio.hit(hit.zone === 'head');
+      }
+    }
+  }
   if (player.ammo[player.weapon] === 0) setTimeout(reload, 120);
 }
 
@@ -2118,7 +2521,6 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
 }
 
 function selectSafeBotSpawn(team: Team): THREE.Vector3 {
-  const options = arena.spawns[team];
   const otherPlayers = [
     ...(player.alive ? [player.position.clone()] : []),
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
@@ -2130,13 +2532,32 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
       .filter((remote) => remote.snapshot.team !== team && remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
   ];
-  const valid = options.map((candidate, index) => ({ candidate, index })).filter(({ candidate }) => {
-    const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
-    return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
-      && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-      && !isBlocked(bodyPoint, arena.colliders, 0.44);
-  });
-  if (valid.length === 0) throw new Error(`No valid authored spawn for team ${team}`);
+  const validForSide = (side: Team) => arena.spawns[side]
+    .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
+    .filter(({ candidate }) => {
+      const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+      return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
+        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
+        && !isBlocked(bodyPoint, arena.colliders, 0.44);
+    });
+  const home = validForSide(team);
+  const opposite = validForSide(team === 0 ? 1 : 0);
+  if (home.length === 0) throw new Error(`No valid authored spawn for team ${team}`);
+  const pressure = (options: ReturnType<typeof validForSide>) => {
+    const scores = options.map(({ candidate }) => ({
+      visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
+      distance: threats.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...threats.map((threat) => threat.distanceToSquared(candidate))),
+    }));
+    const minimumVisibleThreats = Math.min(...scores.map((score) => score.visibleThreats));
+    return {
+      minimumVisibleThreats,
+      safestNearestThreatDistanceSq: Math.max(...scores.filter((score) => score.visibleThreats === minimumVisibleThreats).map((score) => score.distance)),
+    };
+  };
+  const instantaneousFlip = threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const flipDecision = advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
+  spawnFlipHysteresis[team] = flipDecision.state;
+  const valid = flipDecision.flip ? opposite : home;
   const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < 20));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
   const selectedIndex = selectFarthestSpawnCandidate(selectable.map(({ candidate, index }) => ({
@@ -2145,17 +2566,40 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
       ? Number.POSITIVE_INFINITY
       : Math.min(...otherPlayers.map((other) => other.distanceToSquared(candidate))),
     visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
-  })), gameplayRandom());
+  })), gameplayRandom(), 3, lastBotSpawnIndices.get(team) ?? -1);
+  lastBotSpawnIndices.set(team, selectedIndex);
   return valid.find(({ index }) => index === selectedIndex)!.candidate;
 }
 
 function spawnBots(): void {
   clearBots();
   const botTeam: Team = player.team === 0 ? 1 : 0;
-  const names = ['RIVET'].slice(0, SOLO_BOT_COUNT);
+  const names = ['RIVET', 'MICA', 'THORN'].slice(0, SOLO_BOT_COUNT);
   names.forEach((name, index) => {
     const id = `bot-${index}`;
-    const root = buildOperator(botTeam, 'bot-operator', flattenOperatorMaterials);
+    // Keep one source-rigged lead opponent and use the bounded tactical
+    // silhouette for the two added squadmates in every profile. The lead alone
+    // owns the dynamic shadow pass so three operators do not triple Blender's
+    // bounded static-shadow refresh.
+    // Team colour, authored weapons, movement/stance posing and identical
+    // authoritative hit proxies remain intact.
+    const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', index === 0);
+    root.traverse((node) => {
+      if (node instanceof THREE.Mesh) node.castShadow = false;
+    });
+    if (!reducedRenderMode && index === 0) {
+      const shadowProxy = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.48, 1.1, 4, 8),
+        new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+      );
+      shadowProxy.name = 'lead-bot-shadow-proxy';
+      shadowProxy.position.y = 1.05;
+      shadowProxy.castShadow = true;
+      shadowProxy.userData.presentationOnly = true;
+      shadowProxy.userData.blocksShots = false;
+      shadowProxy.raycast = () => undefined;
+      root.add(shadowProxy);
+    }
     root.userData.playerId = id;
     root.traverse((node) => {
       node.userData.playerId = id;
@@ -2172,12 +2616,13 @@ function spawnBots(): void {
       invulnerableUntil: performance.now() + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
     });
   });
-  addFeed('One hostile operator entered the block', 'coral');
+  addFeed(`${SOLO_BOT_COUNT} low-damage hostile operators entered the block`, 'coral');
 }
 
 function clearBots(): void {
   for (const bot of bots.values()) scene.remove(bot.root);
   bots.clear();
+  lastBotSpawnIndices.clear();
 }
 
 function botHasLineOfSight(bot: BotPlayer): boolean {
@@ -2452,7 +2897,8 @@ function melee(): void {
   audio.melee();
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const direction = camera.getWorldDirection(new THREE.Vector3());
-  network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: randomNonce() });
+  const meleeNonce = randomNonce();
+  network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: meleeNonce });
   const hit = castShot(origin, direction);
   if (hit.windowId) {
     const strike = meleeStrike(hit.distance, now, previousMeleeAt);
@@ -2471,7 +2917,11 @@ function melee(): void {
   const strike = meleeStrike(hit.distance, now, previousMeleeAt);
   if (!strike.hit) return;
   const bot = bots.get(hit.playerId);
-  if (bot) applyBotDamage(bot, strike.damage, hit.hitZone ?? 'body');
+  if (bot) applyBotDamage(bot, outgoingDamage(strike.damage, now), hit.hitZone ?? 'body');
+  else if (remotes.has(hit.playerId)) sendAuthoritativeHit({
+    type: 'hit', by: player.id, target: hit.playerId, damage: strike.damage, kind: 'melee',
+    actionNonce: meleeNonce, nonce: randomNonce(),
+  });
 }
 
 function throwGrenade(): void {
@@ -2481,16 +2931,26 @@ function throwGrenade(): void {
   weaponView.throwGrenade();
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
+  const velocity = direction.clone().multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0));
+  const actionNonce = randomNonce();
+  network.send({
+    type: 'grenade-throw', by: player.id,
+    origin: origin.toArray() as [number, number, number],
+    velocity: velocity.toArray() as [number, number, number],
+    actionNonce,
+    nonce: randomNonce(),
+  });
   const mesh = createGrenadePresentation();
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
   grenades.push({
     mesh,
-    velocity: direction.multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0)),
+    velocity,
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
     explodeAt: performance.now() + 2_300,
     lastBounceAt: 0,
+    actionNonce,
   });
 }
 
@@ -2537,14 +2997,18 @@ function explodeGrenade(entity: GrenadeEntity): void {
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
-    const damage = blocked ? 0 : grenadeDamage(bot.position.distanceTo(point));
+    const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), now);
     if (damage > 0) applyBotDamage(bot, damage, 'body');
   }
+  const blastNonce = entity.actionNonce;
   for (const remote of remotes.values()) {
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
-    const damage = grenadeDamage(target.distanceTo(point));
-    if (damage > 0) network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage, kind: 'explosive', origin: point.toArray(), nonce: randomNonce() });
+    const baseDamage = grenadeDamage(target.distanceTo(point));
+    if (baseDamage > 0) sendAuthoritativeHit({
+      type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, baseDamage), kind: 'explosive',
+      explosiveSource: 'grenade', origin: point.toArray(), actionNonce: blastNonce, nonce: randomNonce(),
+    });
   }
   const afterTargets = performance.now();
   const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
@@ -2669,8 +3133,122 @@ function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
 function updateFieldSupportHud(): void {
   element<HTMLElement>('#support-streak').textContent = `STREAK ${fieldSupport.streak}`;
   document.querySelectorAll<HTMLElement>('[data-support]').forEach((item) => {
-    item.classList.toggle('ready', fieldSupport.available[item.dataset.support as FieldSupportId] === true);
+    const support = item.dataset.support as FieldSupportId;
+    const ready = fieldSupport.available[support] === true;
+    item.classList.toggle('ready', ready);
+    item.classList.toggle('controller-selected', support === gamepadSupportSelection);
+    const state = item.querySelector<HTMLElement>('.support-state');
+    if (state) state.textContent = ready ? 'READY' : 'LOCKED';
   });
+}
+
+function overdriveStateMessage(now: number): OverdriveStateMessage {
+  return {
+    type: 'overdrive-state', by: player.id, holderId: overdriveState.holderId, available: overdriveState.available,
+    generation: overdriveState.generation,
+    activeRemainingMs: Math.min(OVERDRIVE_DURATION_MS, Math.max(0, overdriveState.activeUntil - now)),
+    nextSpawnInMs: Math.min(OVERDRIVE_SPAWN_INTERVAL_MS, Math.max(0, overdriveState.nextSpawnAt - now)),
+    nonce: randomNonce(),
+  };
+}
+
+function broadcastOverdriveState(now: number): void {
+  if (network.role === 'host') network.send(overdriveStateMessage(now));
+}
+
+function registerOverdrivePickup(holderId: string, now: number): void {
+  overdrivePickups += 1;
+  overdriveClaimGeneration = overdriveState.generation;
+  const holderName = holderId === player.id ? player.name : remotes.get(holderId)?.snapshot.name ?? 'Operator';
+  addFeed(`${holderName} secured 4× OVERDRIVE · 15 SECONDS`, 'gold');
+  if (holderId === player.id) audio.overdrivePickup();
+  broadcastOverdriveState(now);
+}
+
+function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
+  if (network.role !== 'host' || message.generation !== overdriveState.generation || processedNonces.has(message.nonce)) return;
+  const remote = remotes.get(message.by);
+  if (!remote || remote.snapshot.hp <= 0 || !pointInsideBounds(remote.snapshot, arena.bounds, 0.44)) return;
+  const now = performance.now();
+  if (remote.claimRequiresCoreExit || !remoteCanClaimTimedPickup(now, remote.lastSeen, remote.claimEligibleAt)) return;
+  const claimedPosition = new THREE.Vector3(...message.position);
+  const authoritativePosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  if (claimedPosition.distanceTo(authoritativePosition) > 1.25) return;
+  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now);
+  if (!result.claimed) return;
+  processedNonces.add(message.nonce);
+  overdriveState = result.state;
+  registerOverdrivePickup(message.by, now);
+  trimNonceSet();
+}
+
+function acceptOverdriveState(message: OverdriveStateMessage): void {
+  if (network.role !== 'client' || message.by === player.id || !remotes.has(message.by) || message.generation < overdriveState.generation) return;
+  const now = performance.now();
+  const previousHolder = overdriveState.holderId;
+  const previousGeneration = overdriveState.generation;
+  overdriveState = {
+    generation: message.generation,
+    available: message.available,
+    holderId: message.holderId,
+    activeUntil: message.holderId ? now + message.activeRemainingMs : 0,
+    nextSpawnAt: now + message.nextSpawnInMs,
+  };
+  if (message.available && previousGeneration !== message.generation) {
+    overdriveSpawns += 1;
+    overdriveClaimGeneration = -1;
+  }
+  if (message.holderId && message.holderId !== previousHolder) registerOverdrivePickup(message.holderId, now);
+}
+
+function outgoingDamage(value: number, now = performance.now()): number {
+  return value * overdriveDamageMultiplier(overdriveState, player.id, now);
+}
+
+function updateOverdrive(now: number): void {
+  const wasAvailable = overdriveState.available;
+  const previousHolder = overdriveState.holderId;
+  if (network.role !== 'client') overdriveState = advanceOverdrive(overdriveState, now);
+  if (!wasAvailable && overdriveState.available) {
+    overdriveSpawns += 1;
+    overdriveClaimGeneration = -1;
+    addFeed('OVERDRIVE CORE ONLINE · MID MAP', 'gold');
+    broadcastOverdriveState(now);
+  }
+  if (previousHolder !== null && overdriveState.holderId === null) {
+    overdriveExpiries += 1;
+    if (previousHolder === player.id) audio.overdriveExpire();
+    broadcastOverdriveState(now);
+  }
+  const distance = Math.hypot(player.position.x - OVERDRIVE_POSITION.x, player.position.z - OVERDRIVE_POSITION.z);
+  if (gameStarted && matchState.phase === 'active' && player.alive && overdriveState.available && distance <= OVERDRIVE_PICKUP_RADIUS) {
+    if (network.role === 'client') {
+      if (overdriveClaimGeneration !== overdriveState.generation) {
+        overdriveClaimGeneration = overdriveState.generation;
+        network.send({ type: 'overdrive-claim', by: player.id, position: player.position.toArray(), generation: overdriveState.generation, nonce: randomNonce() });
+      }
+    } else {
+      const result = claimOverdrive(overdriveState, player.id, player.position, true, now);
+      if (result.claimed) {
+        overdriveState = result.state;
+        registerOverdrivePickup(player.id, now);
+      }
+    }
+  } else if (distance > OVERDRIVE_PICKUP_RADIUS + 0.5) overdriveClaimGeneration = -1;
+
+  overdriveRoot.visible = overdriveState.available && gameStarted && matchState.phase === 'active';
+  if (overdriveRoot.visible) {
+    overdriveRoot.position.y = OVERDRIVE_POSITION.y + Math.sin(now * 0.0032) * 0.14;
+    overdriveCore.rotation.y = now * 0.0017;
+    overdriveCore.rotation.x = Math.sin(now * 0.0011) * 0.32;
+    overdriveRings[0].rotation.z = now * 0.0013;
+    overdriveRings[1].rotation.y = -now * 0.0016;
+  }
+  const localRemaining = overdriveRemainingMs(overdriveState, player.id, now);
+  const hud = element<HTMLElement>('#overdrive-hud');
+  hud.hidden = localRemaining <= 0;
+  if (localRemaining > 0) element<HTMLElement>('#overdrive-time').textContent = (localRemaining / 1_000).toFixed(1);
+  document.documentElement.dataset.overdrive = localRemaining > 0 ? 'active' : overdriveState.available ? 'available' : 'charging';
 }
 
 function awardSupportElimination(syncGlobalLeaderboard = true): void {
@@ -2765,9 +3343,9 @@ function makeHunterDrone(index: number): THREE.Group {
   return root;
 }
 
-function spawnHunterSwarm(now: number): boolean {
+function spawnHunterSwarm(now: number): string[] | null {
   const assignments = hunterTargetAssignments();
-  if (assignments.length === 0) return false;
+  if (assignments.length === 0) return null;
   const centre = new THREE.Vector3(0, 13.5, 0);
   assignments.forEach((targetId, index) => {
     const angle = index / HUNTER_SWARM_COUNT * Math.PI * 2 - Math.PI / 2;
@@ -2787,17 +3365,19 @@ function spawnHunterSwarm(now: number): boolean {
   });
   hunterSwarmLaunches += assignments.length;
   addFeed('HUNTER SWARM · FIVE DRONES OVER MID-MAP', 'gold');
-  return true;
+  return assignments;
 }
 
 function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): void {
-  supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0);
+  supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0, 'hunter-swarm');
+  const blastNonce = randomNonce();
+  const supportNonce = localSupportNonces.get('hunter-swarm');
   for (const bot of bots.values()) {
     if (!bot.alive || bot.team === player.team) continue;
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
     if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
-    const damage = hunterSwarmDamage(distance, 'stand');
+    const damage = outgoingDamage(hunterSwarmDamage(distance, 'stand'));
     if (damage > 0) applyBotDamage(bot, damage, 'body');
   }
   for (const remote of remotes.values()) {
@@ -2805,15 +3385,18 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
     if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
-    const damage = hunterSwarmDamage(distance, remote.snapshot.stance ?? 'stand');
-    if (damage > 0) {
-      network.send({
+    const baseDamage = hunterSwarmDamage(distance, remote.snapshot.stance ?? 'stand');
+    if (baseDamage > 0 && supportNonce !== undefined) {
+      sendAuthoritativeHit({
         type: 'hit',
         by: player.id,
         target: remote.snapshot.id,
-        damage: Math.min(100, damage),
+        damage: Math.min(100, baseDamage),
         kind: 'explosive',
+        explosiveSource: 'hunter-swarm',
         origin: point.toArray(),
+        actionNonce: blastNonce,
+        supportNonce,
         nonce: randomNonce(),
       });
     }
@@ -2862,26 +3445,27 @@ function detonateNuke(sequence: NukeSequence): void {
   flash.style.opacity = '1';
   landingImpulse = Math.max(landingImpulse, 1);
   nukeDetonations += 1;
+  const blastNonce = randomNonce();
+  const supportNonce = localSupportNonces.get('nuke');
   for (const remote of remotes.values()) {
     const damage = nukeDamageForTarget(player.team, remote.snapshot.team, remote.snapshot.hp > 0);
-    if (damage <= 0) continue;
-    network.send({
+    if (damage <= 0 || supportNonce === undefined) continue;
+    sendAuthoritativeHit({
       type: 'hit',
       by: player.id,
       target: remote.snapshot.id,
-      damage: 100,
+      damage: Math.min(100, damage),
       kind: 'explosive',
-      // Nuke damage is field-wide, but the existing receiver deliberately
-      // admits explosive hits only when their validation origin is local to
-      // the target. Use the authoritative remote snapshot here so the hit
-      // crosses that bounded validation path without weakening it globally.
-      origin: [remote.snapshot.x, remote.snapshot.y, remote.snapshot.z],
+      explosiveSource: 'nuke',
+      origin: [0, 1.5, 0],
+      actionNonce: blastNonce,
+      supportNonce,
       nonce: randomNonce(),
     });
   }
   for (const bot of [...bots.values()]) {
     const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
-    if (damage > 0) applyBotDamage(bot, damage, 'body');
+    if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body');
   }
   addFeed('ATOMIC DETONATION · HOSTILE FIELD PURGED', 'gold');
 }
@@ -2955,7 +3539,7 @@ function disposeSupportRoot(root: THREE.Object3D): void {
   });
 }
 
-function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: number): void {
+function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: number, explosiveSource: OffensiveSupportSource): void {
   audio.explosion();
   const flash = new THREE.Mesh(
     new THREE.SphereGeometry(1, reducedRenderMode ? 10 : 18, reducedRenderMode ? 7 : 12),
@@ -2977,14 +3561,34 @@ function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: numbe
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
     if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
-    applyBotDamage(bot, Math.max(1, Math.round(maximumDamage * (1 - distance / radius))), 'body');
+    const damage = Math.min(400, outgoingDamage(Math.max(1, Math.round(maximumDamage * (1 - distance / radius)))));
+    applyBotDamage(bot, damage, 'body');
   }
+  const blastNonce = randomNonce();
+  const supportNonce = localSupportNonces.get(explosiveSource);
   for (const remote of remotes.values()) {
     if (remote.snapshot.team === player.team || remote.snapshot.hp <= 0) continue;
+    if (supportNonce === undefined) {
+      supportNetworkHitTelemetry[explosiveSource].missingAuthorization += 1;
+      continue;
+    }
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
-    if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
-    network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, Math.max(1, Math.round(maximumDamage * (1 - distance / radius)))), kind: 'explosive', origin: point.toArray(), nonce: randomNonce() });
+    if (distance > radius) {
+      supportNetworkHitTelemetry[explosiveSource].outOfRange += 1;
+      continue;
+    }
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) {
+      supportNetworkHitTelemetry[explosiveSource].blocked += 1;
+      continue;
+    }
+    const baseDamage = Math.max(1, Math.round(maximumDamage * (1 - distance / radius)));
+    supportNetworkHitTelemetry[explosiveSource].sent += 1;
+    sendAuthoritativeHit({
+      type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, baseDamage),
+      kind: 'explosive', explosiveSource, origin: point.toArray(), actionNonce: blastNonce,
+      supportNonce, nonce: randomNonce(),
+    });
   }
 }
 
@@ -3093,6 +3697,7 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
   triPassTargeting = next;
   drawStrikeMap();
   if (next.complete) {
+    authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
     scheduleTriPassMissiles(next.points, confirmedAt);
     cancelTriPassTargeting(false);
   }
@@ -3102,6 +3707,19 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
 strikeMapCanvas.addEventListener('click', (event) => {
   registerTriPassClick(event.clientX, event.clientY);
 });
+
+function authorizeLocalOffensiveSupport(
+  source: OffensiveSupportSource,
+  effectOrigins: [number, number, number][] = [],
+  targetIds: string[] = [],
+): number {
+  const activationNonce = randomNonce();
+  localSupportNonces.set(source, activationNonce);
+  if (network.role !== 'offline') {
+    network.send({ type: 'support-activate', by: player.id, source, activationNonce, effectOrigins, targetIds, nonce: randomNonce() });
+  }
+  return activationNonce;
+}
 
 function activateFieldSupport(id: FieldSupportId): void {
   if (!player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
@@ -3138,15 +3756,18 @@ function activateFieldSupport(id: FieldSupportId): void {
       armedAt: now + 450,
       expiresAt: now + 6_500,
     };
+    authorizeLocalOffensiveSupport('yardhawk', [], [target.id]);
     addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
   } else if (id === 'tri-pass') {
     beginTriPassTargeting();
   } else if (id === 'hunter-swarm') {
-    if (!spawnHunterSwarm(now)) {
+    const assignments = spawnHunterSwarm(now);
+    if (!assignments) {
       fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'hunter-swarm': true } };
       addFeed('HUNTER SWARM · NO HOSTILE TARGETS · REFUNDED', 'gold');
-    }
+    } else authorizeLocalOffensiveSupport('hunter-swarm', [], assignments);
   } else {
+    authorizeLocalOffensiveSupport('nuke');
     beginNuke(now);
   }
   updateFieldSupportHud();
@@ -3154,7 +3775,7 @@ function activateFieldSupport(id: FieldSupportId): void {
 
 function detonateYardhawk(point: THREE.Vector3, radius: number, maxDamage: number): void {
   if (!yardhawk) return;
-  supportBlast(point, radius, maxDamage);
+  supportBlast(point, radius, maxDamage, 'yardhawk');
   yardhawkExplosions += 1;
   disposeSupportRoot(yardhawk.root);
   yardhawk = null;
@@ -3270,7 +3891,7 @@ function updateFieldSupport(dt: number, now: number): void {
     strike.marker.scale.setScalar(0.88 + progress * 0.22);
     if (!strike.resolved && now >= strike.impactAt) {
       strike.resolved = true;
-      supportBlast(strike.target, TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE);
+      supportBlast(strike.target, TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE, 'tri-pass');
       triPassImpacts += 1;
       triPassLastImpactDelayMs = now - strike.startedAt;
       disposeSupportRoot(strike.missile);
@@ -3320,6 +3941,13 @@ function clearFieldSupport(): void {
   nukeLaunches = 0;
   nukeDetonations = 0;
   fieldSupport = createFieldSupportState();
+  localSupportNonces.clear();
+  admittedRemoteShots.clear();
+  admittedRemoteMelees.clear();
+  admittedRemoteExplosions.clear();
+  for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
+  for (const id of remotes.keys()) remoteGrenadeAuthorities.set(id, createRemoteGrenadeAuthorityState());
+  for (const id of remotes.keys()) remoteHealthAuthorities.set(id, createRemoteHealthAuthorityState(true));
   updateFieldSupportHud();
 }
 
@@ -3570,6 +4198,18 @@ function updateMinimap(now: number): void {
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
+  if (overdriveState.available) {
+    const [x, y] = point(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.z);
+    context.save();
+    context.translate(x, y);
+    context.rotate(Math.PI / 4);
+    context.fillStyle = '#9b83ff';
+    context.strokeStyle = '#79f3eb';
+    context.lineWidth = 3;
+    context.fillRect(-7, -7, 14, 14);
+    context.strokeRect(-9, -9, 18, 18);
+    context.restore();
+  }
   context.restore();
   const px = width / 2;
   const py = height / 2;
@@ -3742,6 +4382,20 @@ graphicsProfileInput.addEventListener('change', () => {
   window.location.assign(next);
 });
 
+const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
+  'scout-sweep': 'SCOUT SWEEP',
+  yardhawk: 'YARDHAWK',
+  'tri-pass': 'TRI-PASS',
+  'hunter-swarm': 'HUNTER SWARM',
+  nuke: 'NUKE',
+};
+
+function selectGamepadSupport(direction: -1 | 1): void {
+  gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction);
+  addFeed(`PAD SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
+  updateFieldSupportHud();
+}
+
 function pollGamepad(dt: number): void {
   const pad = navigator.getGamepads?.().find((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected));
   if (!pad) {
@@ -3790,9 +4444,9 @@ function pollGamepad(dt: number): void {
     if (pressed(3)) switchWeapon(player.weapon === 'pistol' ? 0 : 1);
     if (pressed(4)) throwGrenade();
     if (pressed(5)) melee();
-    if (pressed(12)) activateFieldSupport('scout-sweep');
-    if (pressed(14)) activateFieldSupport('yardhawk');
-    if (pressed(15)) activateFieldSupport('tri-pass');
+    if (pressed(14)) selectGamepadSupport(-1);
+    if (pressed(15)) selectGamepadSupport(1);
+    if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
   }
   previousGamepadButtons = buttons;
 }
@@ -3970,8 +4624,17 @@ window.addEventListener('beforeunload', () => {
 });
 
 function refreshStaticShadowsForDynamicCasters(now: number): void {
-  const hasDynamicCasters = [...bots.values()].some((bot) => bot.alive && bot.root.visible)
-    || remotes.size > 0 || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0 || hunterDrones.length > 0;
+  const castsVisibleShadow = (root: THREE.Object3D): boolean => {
+    if (!root.visible) return false;
+    let casts = false;
+    root.traverse((node) => {
+      if (!casts && node.visible && node instanceof THREE.Mesh && node.castShadow) casts = true;
+    });
+    return casts;
+  };
+  const hasDynamicCasters = !botsFrozen && [...bots.values()].some((bot) => bot.alive && castsVisibleShadow(bot.root))
+    || [...remotes.values()].some((remote) => castsVisibleShadow(remote.root))
+    || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0 || hunterDrones.length > 0;
   const admittedAt = admitStaticShadowDynamicRefresh({
     shadowMode: activeRenderConfig.shadowMode,
     shadowsEnabled: renderer.shadowMap.enabled,
@@ -4033,12 +4696,14 @@ function frame(now: number): void {
     updateGrenades(frameDt, now);
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
+    updateOverdrive(now);
     updateTeamPings(now);
     updateDeathDrops(now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
     if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
+    updateArenaArt(neighbourhoodLifeRoot, now);
     atmosphereSystem.update(now / 1_000);
     grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
     if (gameStarted) updateMinimap(now);
@@ -4085,6 +4750,8 @@ const debugWindow = window as Window & {
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setCaptureCameraPose: (x: number | null, y?: number, z?: number, yaw?: number, pitch?: number) => void;
     collisionProbe: (x: number, z: number) => boolean;
+    segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
+    selectTriPassWorldTargets: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
@@ -4109,8 +4776,10 @@ const debugWindow = window as Window & {
     renderAudit: () => Array<{ name: string; material: string; triangles: number }>;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
+    damageFromRemote: (amount: number) => void;
     earnSupport: (eliminations: number) => void;
     activateSupport: (id: FieldSupportId) => void;
+    setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     sendPing: (kind: TeamPingKind) => void;
     holdPings: (durationMs?: number) => void;
     endMatch: () => void;
@@ -4207,6 +4876,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       interpolationRate: REMOTE_INTERPOLATION_RATE,
     },
     networkLifecycle: network.diagnostics(),
+    remoteHitAdmission: { ...remoteHitAdmissionTelemetry },
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
       hp: remote.snapshot.hp,
@@ -4274,6 +4944,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       })),
       hunterSwarmLaunches,
       hunterSwarmImpacts,
+      gamepadSelection: gamepadSupportSelection,
       nuke: nukeSequence ? {
         active: true,
         detonated: nukeSequence.detonated,
@@ -4282,6 +4953,29 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : { active: false, detonated: false, detonateInMs: 0, finishInMs: 0 },
       nukeActivations: nukeLaunches,
       nukeDetonations,
+      networkHits: Object.fromEntries(Object.entries(supportNetworkHitTelemetry).map(([source, telemetry]) => [source, { ...telemetry }])),
+    },
+    remoteSupportAuthority: [...remoteSupportAuthorities.entries()].map(([id, authority]) => ({
+      id,
+      streak: authority.progression.streak,
+      available: { ...authority.progression.available },
+      authorizations: Object.fromEntries(
+        Object.entries(authority.authorizations).map(([source, authorization]) => [source, authorization ? {
+          activationNonce: authorization.activationNonce,
+          expiresInMs: Math.max(0, authorization.expiresAt - performance.now()),
+          admittedOrigins: Object.keys(authorization.targetsByOrigin).length,
+        } : null]),
+      ),
+    })),
+    overdrive: {
+      ...overdriveState,
+      position: [OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z],
+      damageMultiplier: overdriveDamageMultiplier(overdriveState, player.id, performance.now()),
+      remainingMs: overdriveRemainingMs(overdriveState, player.id, performance.now()),
+      spawns: overdriveSpawns,
+      pickups: overdrivePickups,
+      expiries: overdriveExpiries,
+      visible: overdriveRoot.visible,
     },
     deathDrops: deathDrops.map((entity) => ({
       id: entity.drop.id,
@@ -4348,6 +5042,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       fixtureInstances: worldIdentityPresentation.fixtureInstances,
       ceilingInstances: worldIdentityPresentation.ceilingInstances,
     },
+    neighbourhoodLife: (() => {
+      const root = scene.getObjectByName('pass31-neighbourhood-life');
+      let floraInstances = 0;
+      let faunaInstances = 0;
+      let streetItems = 0;
+      root?.traverse((node) => {
+        if (node instanceof THREE.InstancedMesh && /flower/.test(node.name)) floraInstances += node.count;
+        if (node instanceof THREE.InstancedMesh && /butterfl|bird/.test(node.name)) faunaInstances += node.count;
+        if (/^(street-bench|street-recycling-bin|street-bicycle)$/.test(node.name)) streetItems += 1;
+        if (node.name === 'street-wayfinding-markers' && node instanceof THREE.InstancedMesh) streetItems += node.count;
+      });
+      return { loaded: root !== undefined, floraInstances, faunaInstances, streetItems };
+    })(),
     arenaStoryReady: blenderArenaActive || ['route-marker-verdant-array', 'route-marker-civic-transit', 'route-marker-helio-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
     interiorTelemetry: (() => {
@@ -4428,11 +5135,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       grass: grassSystem.telemetry(),
       atmosphere: atmosphereSystem.telemetry(),
       blenderEnvironment: blenderArenaTelemetry(),
-      staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.map((node) => {
+      staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.flatMap((node) => {
+        const sourcePalette = node.userData.sourcePalette;
+        if (Array.isArray(sourcePalette)) return sourcePalette.filter((color): color is string => typeof color === 'string');
         const material = node instanceof THREE.Mesh ? node.material : null;
         return !Array.isArray(material) && material && 'color' in material
-          ? (material as THREE.MeshBasicMaterial).color.getHexString()
-          : null;
+          ? [(material as THREE.MeshBasicMaterial).color.getHexString()]
+          : [];
       }) ?? [],
     },
   }),
@@ -4641,6 +5350,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
     ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
     : true,
+  segmentBlocked: (x1, z1, x2, z2) => arena.colliders.some((box) => segmentIntersectsBox(
+    new THREE.Vector3(x1, 0.2, z1),
+    new THREE.Vector3(x2, 1.1, z2),
+    box,
+  )),
+  selectTriPassWorldTargets: (points) => {
+    if (!triPassTargeting || !tacticalMapOpen) return false;
+    let next = triPassTargeting;
+    for (const [x, z] of points.slice(0, 3)) next = registerTriPassTarget(next, { x, z }, arena.bounds);
+    triPassTargeting = next;
+    drawStrikeMap();
+    if (!next.complete) return false;
+    authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
+    scheduleTriPassMissiles(next.points, performance.now());
+    cancelTriPassTargeting(false);
+    return true;
+  },
   captureShadowProbeFrame: (horizontalOffset) => {
     if (!debugShadowProbe) {
       debugShadowProbe = new THREE.Mesh(
@@ -4772,10 +5498,28 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.invulnerableUntil = 0;
     applyDamage(amount, bots.keys().next().value ?? player.id);
   },
+  damageFromRemote: (amount: number) => {
+    const remoteId = remotes.keys().next().value as string | undefined;
+    if (!remoteId) return;
+    player.invulnerableUntil = 0;
+    applyDamage(amount, remoteId);
+  },
   earnSupport: (eliminations: number) => {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
   },
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
+  setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
+    const now = performance.now();
+    if (mode === 'charging') overdriveState = createOverdriveState(now);
+    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: true, nextSpawnAt: now };
+    else if (mode === 'active') overdriveState = {
+      generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
+      holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,
+    };
+    else overdriveState = { ...overdriveState, available: false, holderId: null, activeUntil: 0, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS };
+    updateOverdrive(now);
+    broadcastOverdriveState(now);
+  },
   sendPing: (kind: TeamPingKind) => sendTeamPing(kind),
   holdPings: (durationMs = 30_000) => {
     const expiresAt = performance.now() + Math.max(0, Math.min(60_000, durationMs));
@@ -4849,6 +5593,8 @@ async function bootstrap(): Promise<void> {
     const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
     batchStaticMeshes(art.root, scene, () => '', decorativeMaterialMode);
   }
+  const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+  batchStaticMeshes(neighbourhoodLifeRoot, scene, () => '', lifeMaterialMode);
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   weaponView.setWeapon(player.weapon, true);
   respawn();
@@ -4861,7 +5607,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 29 owner-review candidate — early-morning light, practical interiors, living grass, Atomic Signal and persistent records.');
+  setStatus('Pass 31 release candidate — three-operator solo pressure, living neighbourhood detail, five-tier Field Support and the 4× Overdrive Core.');
   requestAnimationFrame(frame);
 }
 

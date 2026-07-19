@@ -16,7 +16,7 @@ function shotEvents(count: number): Array<NetworkEvent<ShotMessage>> {
     sentAt: index * 100,
     payload: {
       type: 'shot', by: sender.id, weapon: 'carbine',
-      origin: [sender.x, sender.y, sender.z], direction: [0, 0, -1], nonce: index + 1,
+      origin: [sender.x, sender.y, sender.z], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: index + 1,
     },
   }));
 }

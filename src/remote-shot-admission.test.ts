@@ -9,6 +9,7 @@ const sender: PlayerSnapshot = {
 const shot = (overrides: Partial<ShotMessage> = {}): ShotMessage => ({
   type: 'shot', by: sender.id, weapon: 'carbine', origin: [2, 1.7, 3], direction: [0, 0, -1], nonce: 10,
   ...overrides,
+  pelletDirections: overrides.pelletDirections ?? [[0, 0, -1]],
 });
 
 describe('remote shot admission', () => {

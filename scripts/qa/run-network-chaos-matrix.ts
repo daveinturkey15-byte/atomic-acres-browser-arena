@@ -23,8 +23,11 @@ async function main(): Promise<void> {
   };
   const source: NetworkEvent<ShotMessage>[] = Array.from({ length: 100 }, (_, index) => ({
     id: `shot-${index}`,
-    sentAt: index * 100,
-    payload: { type: 'shot', by: sender.id, nonce: index + 1, weapon: 'carbine', origin: [0, 1.7, 0], direction: [0, 0, -1] },
+    sentAt: index * 120,
+    payload: {
+      type: 'shot', by: sender.id, nonce: index + 1, weapon: 'carbine',
+      origin: [0, 1.7, 0], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]],
+    },
   }));
   if (source.length === 0) throw new Error('network-chaos source fixture must not be empty');
 

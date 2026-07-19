@@ -17,7 +17,10 @@ function createArenaPeer(): Peer {
       port,
       path: '/peerjs',
       secure: false,
-      config: { iceServers: [] },
+      // Keep local host candidates and PeerJS's default STUN fallback. Modern
+      // headless Chromium may mDNS-obfuscate host candidates, so an empty ICE
+      // server list can leave deterministic local QA signalling connected but
+      // the reliable data channel permanently unopened.
     });
   }
   return new Peer();
@@ -30,6 +33,7 @@ export class ArenaNetwork {
   private hostConnection: DataConnection | null = null;
   private guests = new Set<DataConnection>();
   private guestTeams = new Map<DataConnection, Team>();
+  private guestPlayerOwners = new Map<string, DataConnection>();
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
   private onMessage: MessageHandler;
   private onStatus: StatusHandler;
@@ -129,6 +133,7 @@ export class ArenaNetwork {
     }
     this.guests.clear();
     this.guestTeams.clear();
+    this.guestPlayerOwners.clear();
     if (this.joinDeadline) clearTimeout(this.joinDeadline);
     this.joinDeadline = null;
     this.hostConnection = null;
@@ -149,10 +154,43 @@ export class ArenaNetwork {
       if (!isGameMessage(payload)) return;
       if (!playerId) {
         if (payload.type !== 'join') return;
+        const existingOwner = this.guestPlayerOwners.get(payload.player.id);
+        if (existingOwner && existingOwner !== connection) {
+          this.onStatus('Duplicate player identity rejected', 'error');
+          connection.close();
+          return;
+        }
         playerId = payload.player.id;
+        this.guestPlayerOwners.set(playerId, connection);
         this.guestTeams.set(connection, payload.player.team);
       }
       if (!messageBelongsToPlayer(payload, playerId)) return;
+      // Overdrive pickup races are host-authoritative. Guest claims are delivered
+      // only to the host simulation; guest-authored state is never relayed.
+      if (payload.type === 'overdrive-state' || payload.type === 'death') return;
+      if (payload.type === 'overdrive-claim') {
+        this.onMessage(payload);
+        return;
+      }
+      // Guest-authored hit claims are admitted by the host simulation before
+      // any target guest receives them. This prevents bypassing host source,
+      // action-nonce, support-progression and damage checks.
+      if (payload.type === 'hit') {
+        this.onMessage(payload);
+        return;
+      }
+      if (payload.type === 'join' || payload.type === 'state' || payload.type === 'shot' || payload.type === 'melee') {
+        this.onMessage(payload);
+        return;
+      }
+      if (payload.type === 'support-activate') {
+        this.onMessage(payload);
+        return;
+      }
+      if (payload.type === 'grenade-throw') {
+        this.onMessage(payload);
+        return;
+      }
       if (payload.type === 'ping' && !pingMatchesBoundTeam(payload, this.guestTeams.get(connection))) return;
       this.onMessage(payload);
       this.broadcast(payload, connection);
@@ -160,6 +198,7 @@ export class ArenaNetwork {
     connection.on('close', () => {
       this.guests.delete(connection);
       this.guestTeams.delete(connection);
+      if (playerId) this.guestPlayerOwners.delete(playerId);
       if (playerId) {
         const leave: GameMessage = { type: 'leave', playerId };
         this.onMessage(leave);

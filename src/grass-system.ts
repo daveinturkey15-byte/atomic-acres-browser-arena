@@ -167,7 +167,6 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
       uniform vec2 uPlayerPosition;
       uniform float uInteractionRadius;
       uniform float uInteractionStrength;
-      attribute vec3 instanceColor;
       varying float vBladeHeight;
       varying vec3 vWorldNormal;
       varying vec3 vWorldPosition;

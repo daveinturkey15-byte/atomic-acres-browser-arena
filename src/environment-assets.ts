@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  batchStaticMeshes,
   buildRetroCoach,
   buildRetroDeliveryTruck,
   roundedBox,
@@ -132,6 +133,146 @@ function addStreetProps(root: THREE.Group): void {
     const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.08, 10), lampGlow);
     lens.position.set(x + direction, 5.18, z); decorative(lens); root.add(lens);
   }
+}
+
+type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;
+
+export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'pass31-neighbourhood-life';
+  group.userData.presentationOnly = true;
+  group.userData.blocksShots = false;
+
+  const flowerCount = reduced ? 24 : 72;
+  const flowerBeds: ReadonlyArray<readonly [number, number]> = [
+    [-17.5, -29], [-14.8, -20], [-27.8, 18], [17.5, 29], [14.8, 20], [27.8, -18],
+  ];
+  const stems = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.018, 0.025, 0.42, 5),
+    new THREE.MeshLambertMaterial({ color: 0x4d7d48 }),
+    flowerCount,
+  );
+  stems.name = 'pass31-flower-stems';
+  const blooms = new THREE.InstancedMesh(
+    new THREE.OctahedronGeometry(0.09, 0),
+    new THREE.MeshLambertMaterial({ color: 0xf1b65f, emissive: 0x2d1608, emissiveIntensity: 0.18 }),
+    flowerCount,
+  );
+  blooms.name = 'pass31-flower-blooms';
+  const matrix = new THREE.Matrix4();
+  for (let index = 0; index < flowerCount; index += 1) {
+    const bed = flowerBeds[index % flowerBeds.length];
+    const ring = Math.floor(index / flowerBeds.length);
+    const angle = index * 2.399963229728653;
+    const radius = 0.28 + (ring % 4) * 0.24;
+    const x = bed[0] + Math.cos(angle) * radius;
+    const z = bed[1] + Math.sin(angle) * radius * 0.62;
+    const height = 0.32 + (index % 5) * 0.035;
+    matrix.compose(new THREE.Vector3(x, height / 2 + 0.04, z), new THREE.Quaternion(), new THREE.Vector3(1, height / 0.42, 1));
+    stems.setMatrixAt(index, matrix);
+    const bloomScale = 0.82 + (index % 4) * 0.09;
+    matrix.compose(new THREE.Vector3(x, height + 0.05, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(index * 0.17, angle, 0)), new THREE.Vector3(bloomScale, bloomScale, bloomScale));
+    blooms.setMatrixAt(index, matrix);
+    if (index % 3 === 1) blooms.setColorAt(index, new THREE.Color(0xd85f6c));
+    else if (index % 3 === 2) blooms.setColorAt(index, new THREE.Color(0x79cfd0));
+  }
+  stems.instanceMatrix.needsUpdate = true;
+  blooms.instanceMatrix.needsUpdate = true;
+  stems.userData.dynamic = true;
+  blooms.userData.dynamic = true;
+  if (blooms.instanceColor) blooms.instanceColor.needsUpdate = true;
+  decorative(stems); decorative(blooms); group.add(stems, blooms);
+
+  const timber = texturedMaterial('./assets/original/textures/wood-deck.png', {
+    color: 0x9c7450, roughness: 0.9, repeatX: 3,
+    normalPath: './assets/original/textures/wood-deck-normal.png',
+    roughnessPath: './assets/original/textures/wood-deck-roughness.png',
+    normalScale: 0.35,
+  });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x34484e, roughness: 0.52, metalness: 0.52 });
+  const streetBox = (name: string, size: [number, number, number], material: THREE.Material): THREE.Mesh => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.name = name;
+    return mesh;
+  };
+  for (const [x, z, rotation] of [[-15.2, -7, 0], [15.2, 7, Math.PI], [-15.2, 26, 0], [15.2, -26, Math.PI]] as Array<[number, number, number]>) {
+    const bench = new THREE.Group(); bench.name = 'street-bench'; bench.position.set(x, 0, z); bench.rotation.y = rotation;
+    const seat = streetBox('bench-seat', [2.5, 0.16, 0.62], timber); seat.position.y = 0.72;
+    const back = streetBox('bench-back', [2.5, 0.92, 0.14], timber); back.position.set(0, 1.22, 0.29); back.rotation.x = -0.1;
+    for (const side of [-1, 1]) {
+      const leg = streetBox('bench-leg', [0.13, 0.72, 0.42], steel); leg.position.set(side * 0.9, 0.36, 0); bench.add(leg);
+    }
+    bench.add(seat, back); decorative(bench); group.add(bench);
+  }
+
+  const binLayout: Array<[number, number]> = [[-14.3, -33], [14.3, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34]];
+  const binColors = [0x315b5e, 0x704c43, 0x3e5a45];
+  for (const [index, [x, z]] of binLayout.entries()) {
+    const bin = streetBox('street-recycling-bin', [0.72, 1.08, 0.66], new THREE.MeshStandardMaterial({ color: binColors[index % binColors.length], roughness: 0.72, metalness: 0.18 }));
+    bin.position.set(x, 0.54, z); decorative(bin); group.add(bin);
+  }
+
+  if (!reduced) {
+    const tyre = new THREE.MeshStandardMaterial({ color: 0x151b1d, roughness: 0.88 });
+    const frameMaterial = new THREE.LineBasicMaterial({ color: 0xe0ad45 });
+    for (const [x, z, rotation] of [[-16, -35, 0.12], [16, 35, Math.PI + 0.12], [29.4, 14, Math.PI / 2]] as Array<[number, number, number]>) {
+      const bicycle = new THREE.Group(); bicycle.name = 'street-bicycle'; bicycle.position.set(x, 0, z); bicycle.rotation.y = rotation;
+      for (const wheelX of [-0.62, 0.62]) {
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.035, 6, 18), tyre);
+        wheel.position.set(wheelX, 0.4, 0); wheel.rotation.y = Math.PI / 2; bicycle.add(wheel);
+      }
+      const frame = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
+        new THREE.Vector3(0, 0.82, 0), new THREE.Vector3(0.56, 0.4, 0),
+        new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0.25, 0.4, 0),
+        new THREE.Vector3(0.25, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
+      ]), frameMaterial);
+      bicycle.add(frame); decorative(bicycle); group.add(bicycle);
+    }
+
+    const butterflyFlights: FaunaFlight[] = [
+      { x: -18, z: -28, radius: 1.8, height: 1.25, phase: 0.2, speed: 0.72 },
+      { x: -27, z: 18, radius: 1.4, height: 1.5, phase: 2.1, speed: 0.84 },
+      { x: 18, z: 28, radius: 1.8, height: 1.2, phase: 3.5, speed: 0.68 },
+      { x: 27, z: -18, radius: 1.5, height: 1.45, phase: 4.7, speed: 0.79 },
+      { x: -15, z: -20, radius: 1.1, height: 1.05, phase: 5.8, speed: 0.91 },
+      { x: 15, z: 20, radius: 1.2, height: 1.1, phase: 1.3, speed: 0.88 },
+    ];
+    const butterflies = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.095, 0), new THREE.MeshBasicMaterial({ color: 0xffc65c, toneMapped: false }), butterflyFlights.length);
+    butterflies.name = 'animated-butterfly-fauna'; butterflies.userData.dynamic = true; butterflies.userData.presentationOnly = true; butterflies.raycast = () => undefined;
+    group.add(butterflies); group.userData.animationButterflies = butterflies; group.userData.butterflyFlights = butterflyFlights;
+
+    const birdFlights: FaunaFlight[] = [
+      { x: -4, z: 2, radius: 21, height: 12, phase: 0, speed: 0.12 },
+      { x: 5, z: -8, radius: 17, height: 14, phase: 2.2, speed: 0.1 },
+      { x: 0, z: 10, radius: 24, height: 16, phase: 4.1, speed: 0.08 },
+    ];
+    const birds = new THREE.InstancedMesh(new THREE.ConeGeometry(0.18, 0.55, 3), new THREE.MeshBasicMaterial({ color: 0x26343b, toneMapped: false, side: THREE.DoubleSide }), birdFlights.length);
+    birds.name = 'animated-bird-fauna'; birds.userData.dynamic = true; birds.userData.presentationOnly = true; birds.raycast = () => undefined;
+    group.add(birds); group.userData.animationBirds = birds; group.userData.birdFlights = birdFlights;
+  } else {
+    const markers = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.18, 0.72, 0.18),
+      new THREE.MeshBasicMaterial({ color: 0xe0ad45, toneMapped: false }),
+      3,
+    );
+    markers.name = 'street-wayfinding-markers';
+    markers.userData.dynamic = true;
+    markers.userData.presentationOnly = true;
+    markers.raycast = () => undefined;
+    const markerMatrix = new THREE.Matrix4();
+    [[-16, -35], [16, 35], [29.4, 14]].forEach(([x, z], index) => {
+      markerMatrix.makeTranslation(x, 0.36, z);
+      markers.setMatrixAt(index, markerMatrix);
+    });
+    markers.instanceMatrix.needsUpdate = true;
+    group.add(markers);
+  }
+
+  group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
+  group.userData.neighbourhoodLife = { flowers: flowerCount, benches: 4, bins: 6, bicycles: reduced ? 0 : 3, markers: reduced ? 3 : 0, butterflies: reduced ? 0 : 6, birds: reduced ? 0 : 3 };
+  root.add(group);
+  return group;
 }
 
 function decorative(mesh: THREE.Object3D): THREE.Object3D {
@@ -449,6 +590,30 @@ export function updateArenaArt(root: THREE.Group, now: number): void {
     const material = beacon.material;
     if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = 1.7 + state.beaconPulse * 2;
   }
+  const updateFlights = (mesh: THREE.InstancedMesh | undefined, flights: FaunaFlight[], flutter: boolean): void => {
+    if (!mesh) return;
+    const seconds = now * 0.001;
+    const matrix = new THREE.Matrix4();
+    for (const [index, flight] of flights.entries()) {
+      const angle = flight.phase + seconds * flight.speed;
+      const position = new THREE.Vector3(
+        flight.x + Math.cos(angle) * flight.radius,
+        flight.height + Math.sin(angle * (flutter ? 3.7 : 1.9)) * (flutter ? 0.18 : 0.6),
+        flight.z + Math.sin(angle) * flight.radius,
+      );
+      const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        flutter ? Math.sin(angle * 8) * 0.25 : 0,
+        -angle + Math.PI / 2,
+        flutter ? Math.sin(angle * 12) * 0.45 : Math.sin(angle * 2) * 0.12,
+      ));
+      const pulse = flutter ? 0.72 + Math.abs(Math.sin(angle * 11)) * 0.55 : 1;
+      matrix.compose(position, rotation, new THREE.Vector3(pulse, 1, pulse));
+      mesh.setMatrixAt(index, matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  };
+  updateFlights(root.userData.animationButterflies as THREE.InstancedMesh | undefined, (root.userData.butterflyFlights as FaunaFlight[] | undefined) ?? [], true);
+  updateFlights(root.userData.animationBirds as THREE.InstancedMesh | undefined, (root.userData.birdFlights as FaunaFlight[] | undefined) ?? [], false);
 }
 
 /** Builds original Atomic Acres hero vehicles and environmental props. */

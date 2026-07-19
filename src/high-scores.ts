@@ -1,5 +1,5 @@
 export const HIGH_SCORE_STORAGE_KEY = 'atomic-acres:high-scores:v1';
-export const HIGH_SCORE_SCHEMA_VERSION = 1;
+export const HIGH_SCORE_SCHEMA_VERSION = 2;
 export const MAX_HIGH_SCORE_ENTRIES = 20;
 // Team score ends at 25, but one explosive resolution can admit several
 // eliminations before the next match-state tick. Preserve that legitimate
@@ -30,6 +30,17 @@ export function normalizeRequiredPlayerName(value: string): string | null {
     .trim()
     .slice(0, 16);
   return /[a-zA-Z0-9]/.test(clean) ? clean : null;
+}
+
+export function leaderboardNameKey(value: string): string | null {
+  const name = normalizeRequiredPlayerName(value);
+  if (!name) return null;
+  return [...name.toLocaleLowerCase()].map((character) => {
+    if (/[a-z0-9]/.test(character)) return character;
+    if (character === ' ') return '_20';
+    if (character === '-') return '_2d';
+    return '_5f';
+  }).join('');
 }
 
 export function isHighScoreEntry(value: unknown, now = Date.now()): value is HighScoreEntry {
@@ -75,9 +86,14 @@ export function loadHighScores(storage: ScoreStorage, now = Date.now()): HighSco
   try {
     const raw = storage.getItem(HIGH_SCORE_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as Partial<HighScoreDocument>;
-    if (parsed.version !== HIGH_SCORE_SCHEMA_VERSION || !Array.isArray(parsed.entries)) return [];
-    return mergeHighScores([], parsed.entries, now);
+    const parsed = JSON.parse(raw) as { version?: number; entries?: unknown[] };
+    if ((parsed.version !== 1 && parsed.version !== HIGH_SCORE_SCHEMA_VERSION) || !Array.isArray(parsed.entries)) return [];
+    const migrated = parsed.entries.map((entry) => {
+      if (!isHighScoreEntry(entry, now) || !entry.id.startsWith('global:')) return entry;
+      const key = leaderboardNameKey(entry.name);
+      return key ? { ...entry, id: `global:${key}` } : entry;
+    });
+    return mergeHighScores([], migrated, now);
   } catch {
     return [];
   }
@@ -110,7 +126,8 @@ export function immediateStreakEntry(
   const name = normalizeRequiredPlayerName(playerName);
   const safeInstallId = installId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
   if (!name || safeInstallId.length < 8 || !Number.isSafeInteger(streak) || streak <= 0 || streak > MAX_MATCH_KILLS) return null;
-  const nameKey = name.toLocaleLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 24);
+  const nameKey = leaderboardNameKey(name);
+  if (!nameKey) return null;
   return {
     id: `global:${nameKey}`,
     name,

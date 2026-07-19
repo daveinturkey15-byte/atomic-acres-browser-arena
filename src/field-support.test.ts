@@ -8,11 +8,13 @@ import {
   consumeFieldSupport,
   createFieldSupportState,
   createTriPassTargeting,
+  cycleFieldSupportSelection,
   hunterSwarmDamage,
   nukeDamageForTarget,
   registerTriPassTarget,
   recordSupportDeath,
   recordSupportElimination,
+  remoteExplosiveHitMaximumDistance,
   triPassSchedule,
 } from './field-support';
 
@@ -55,6 +57,19 @@ describe('field support rewards', () => {
     expect(state.available.yardhawk).toBe(true);
   });
 
+  it('drops unused one-use-per-life rewards on death so they cannot be carried and earned twice', () => {
+    let state = createFieldSupportState();
+    for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
+    expect(state.available['hunter-swarm']).toBe(true);
+    expect(state.available.nuke).toBe(true);
+    state = recordSupportDeath(state);
+    expect(state.available['hunter-swarm']).toBe(false);
+    expect(state.available.nuke).toBe(false);
+    expect(consumeFieldSupport(state, 'hunter-swarm').activated).toBe(false);
+    for (let index = 0; index < 8; index += 1) state = recordSupportElimination(state);
+    expect(consumeFieldSupport(state, 'hunter-swarm').activated).toBe(true);
+  });
+
   it('consumes each reward at most once until it is earned again', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
@@ -69,6 +84,14 @@ describe('field support rewards', () => {
   it('gives the owner-approved Tri-Pass a decisive blast contract', () => {
     expect(TRI_PASS_BLAST_RADIUS).toBe(15);
     expect(TRI_PASS_MAX_DAMAGE).toBe(450);
+    expect(remoteExplosiveHitMaximumDistance('tri-pass')).toBeGreaterThan(15);
+    expect(remoteExplosiveHitMaximumDistance('grenade')).toBe(6.2);
+  });
+
+  it('cycles every support for standard-gamepad selection', () => {
+    expect(cycleFieldSupportSelection('scout-sweep', -1)).toBe('nuke');
+    expect(cycleFieldSupportSelection('tri-pass', 1)).toBe('hunter-swarm');
+    expect(cycleFieldSupportSelection('hunter-swarm', 1)).toBe('nuke');
   });
 
   it('unlocks Hunter Swarm and Nuke once per uninterrupted life while keeping 3/5/7 repeatable', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
-import { isGameMessage, isPlayerSnapshot, messageBelongsToPlayer, sanitizeName } from './protocol';
+import { isGameMessage, isPlayerSnapshot, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type SupportActivateMessage } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -29,18 +29,27 @@ describe('network protocol guards', () => {
   });
 
   it('validates shot vectors and known weapon ids', () => {
-    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 3 })).toBe(true);
-    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'sniper', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 4 })).toBe(true);
-    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'machine-pistol', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 5 })).toBe(true);
-    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'laser', origin: [0, 1, 2], direction: [0, 0, -1], nonce: 3 })).toBe(false);
-    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1], direction: [0, 0, -1], nonce: 3 })).toBe(false);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 3 })).toBe(true);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'sniper', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 4 })).toBe(true);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'machine-pistol', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 5 })).toBe(true);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'laser', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 3 })).toBe(false);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 3 })).toBe(false);
   });
 
-  it('requires typed hit authority and an origin for explosive damage', () => {
-    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 34, kind: 'shot', nonce: 4 })).toBe(true);
-    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 100, kind: 'melee', nonce: 5 })).toBe(false);
-    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', nonce: 6 })).toBe(false);
-    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', origin: [1, 0, 2], nonce: 6 })).toBe(true);
+  it('requires action-correlated typed hit authority and earned support metadata', () => {
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 34, kind: 'shot', actionNonce: 3, nonce: 4 })).toBe(true);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 34, kind: 'shot', nonce: 4 })).toBe(false);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 100, kind: 'melee', actionNonce: 3, nonce: 5 })).toBe(true);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', actionNonce: 3, nonce: 6 })).toBe(false);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'tri-pass', origin: [1, 0, 2], actionNonce: 3, supportNonce: 2, nonce: 6 })).toBe(true);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'tri-pass', origin: [1, 0, 2], actionNonce: 3, nonce: 6 })).toBe(false);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'magic', origin: [1, 0, 2], actionNonce: 3, supportNonce: 2, nonce: 6 })).toBe(false);
+    const activation: SupportActivateMessage = { type: 'support-activate', by: 'a', source: 'nuke', activationNonce: 7, effectOrigins: [], targetIds: [], nonce: 8 };
+    expect(isGameMessage(activation)).toBe(true);
+    expect(messageBelongsToPlayer(activation, 'a')).toBe(true);
+    const grenadeThrow: GrenadeThrowMessage = { type: 'grenade-throw', by: 'a', origin: [0, 1.7, 0], velocity: [0, 5.2, -13], actionNonce: 9, nonce: 10 };
+    expect(isGameMessage(grenadeThrow)).toBe(true);
+    expect(messageBelongsToPlayer(grenadeThrow, 'a')).toBe(true);
   });
 
   it('validates replicated pickup and breakable-window messages', () => {
@@ -58,6 +67,17 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...pickup, mode: 'duplicate' })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, origin: [Infinity, 1.7, 2] })).toBe(false);
     expect(messageBelongsToPlayer({ ...brokenWindow, by: 'spoof' }, 'abc')).toBe(false);
+  });
+
+  it('validates bounded host-authoritative Overdrive claims and state', () => {
+    const claim = { type: 'overdrive-claim' as const, by: 'abc', position: [0, 1.7, 0] as [number, number, number], generation: 2, nonce: 90 };
+    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, activeRemainingMs: 15_000, nextSpawnInMs: 120_000, nonce: 91 };
+    expect(isGameMessage(claim)).toBe(true);
+    expect(isGameMessage(state)).toBe(true);
+    expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
+    expect(isGameMessage({ ...claim, position: [Infinity, 1.7, 0] })).toBe(false);
+    expect(isGameMessage({ ...state, activeRemainingMs: 15_001 })).toBe(false);
+    expect(isGameMessage({ ...state, nextSpawnInMs: 120_001 })).toBe(false);
   });
 
   it('admits the machine pistol only as the sniper sidearm in snapshots', () => {
@@ -84,8 +104,8 @@ describe('network protocol guards', () => {
 
   it('binds relayed guest claims to the established player id', () => {
     expect(messageBelongsToPlayer({ type: 'state', player }, 'abc')).toBe(true);
-    expect(messageBelongsToPlayer({ type: 'shot', by: 'abc', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], nonce: 1 }, 'abc')).toBe(true);
-    expect(messageBelongsToPlayer({ type: 'shot', by: 'spoof', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], nonce: 1 }, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer({ type: 'shot', by: 'abc', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 1 }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ type: 'shot', by: 'spoof', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 1 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'melee', by: 'abc', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'melee', by: 'spoof', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'ping', by: 'abc', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(true);
