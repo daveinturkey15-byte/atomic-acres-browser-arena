@@ -28,7 +28,7 @@ describe('remote hit admission', () => {
 
   it('rejects sender-prepowered gun damage and applies Overdrive once at the receiver', () => {
     const maximum = maximumRemoteShotBaseDamage('carbine');
-    expect(maximum).toBeCloseTo(44.95);
+    expect(maximum).toBeCloseTo(46.5);
     expect(admitRemoteBaseDamage(100, maximum)).toBe(false);
     expect(admitRemoteBaseDamage(31, maximum)).toBe(true);
     expect(resolveRemotePoweredDamage(31, 4)).toBe(100);

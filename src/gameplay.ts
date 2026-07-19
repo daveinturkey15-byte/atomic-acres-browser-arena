@@ -14,6 +14,7 @@ export const GRENADE_MAX_DAMAGE = 115;
 export const MELEE_COOLDOWN_MS = 650;
 export const MELEE_RANGE = 1.75;
 export const MELEE_DAMAGE = 100;
+export const HEADSHOT_DAMAGE_MULTIPLIER = 1.5;
 
 export type WeaponSpec = {
   id: WeaponId;
@@ -46,7 +47,7 @@ export type WeaponSpec = {
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   carbine: {
     id: 'carbine', name: 'M86 Carbine', damage: 31, minimumDamage: 20,
-    falloffStart: 24, falloffEnd: 72, headMultiplier: 1.45, limbMultiplier: 0.82,
+    falloffStart: 24, falloffEnd: 72, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.82,
     rpm: 650, mag: 30, reserve: 120, reload: 1.8,
     hipSpread: 0.012, adsSpreadMultiplier: 0.28, movementSpreadMultiplier: 1.65,
     crouchSpreadMultiplier: 0.78, sustainedSpreadPerShot: 0.0016, maximumSpread: 0.045,
@@ -55,7 +56,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   smg: {
     id: 'smg', name: 'Vectorline SMG', damage: 23, minimumDamage: 14,
-    falloffStart: 15, falloffEnd: 52, headMultiplier: 1.35, limbMultiplier: 0.8,
+    falloffStart: 15, falloffEnd: 52, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
     rpm: 860, mag: 32, reserve: 128, reload: 1.5,
     hipSpread: 0.018, adsSpreadMultiplier: 0.42, movementSpreadMultiplier: 1.45,
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0021, maximumSpread: 0.058,
@@ -64,7 +65,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   scattergun: {
     id: 'scattergun', name: 'Model 12 Scattergun', damage: 17, minimumDamage: 7,
-    falloffStart: 8, falloffEnd: 30, headMultiplier: 1.15, limbMultiplier: 0.88,
+    falloffStart: 8, falloffEnd: 30, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.88,
     rpm: 82, mag: 8, reserve: 40, reload: 2.35,
     hipSpread: 0.068, adsSpreadMultiplier: 0.72, movementSpreadMultiplier: 1.22,
     crouchSpreadMultiplier: 0.88, sustainedSpreadPerShot: 0.002, maximumSpread: 0.09,
@@ -72,8 +73,8 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
   },
   sniper: {
-    id: 'sniper', name: 'Longline 86', damage: 55, minimumDamage: 55,
-    falloffStart: 96, falloffEnd: 120, headMultiplier: 2, limbMultiplier: 0.9,
+    id: 'sniper', name: 'Longline 86', damage: 67, minimumDamage: 67,
+    falloffStart: 96, falloffEnd: 120, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.9,
     rpm: 55, mag: 5, reserve: 25, reload: 2.6,
     hipSpread: 0.052, adsSpreadMultiplier: 0.05, movementSpreadMultiplier: 1.8,
     crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,
@@ -82,7 +83,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   pistol: {
     id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
-    falloffStart: 20, falloffEnd: 58, headMultiplier: 1.5, limbMultiplier: 0.84,
+    falloffStart: 20, falloffEnd: 58, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.84,
     rpm: 420, mag: 15, reserve: 60, reload: 1.35,
     hipSpread: 0.02, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.42,
     crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.0024, maximumSpread: 0.052,
@@ -91,7 +92,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   'machine-pistol': {
     id: 'machine-pistol', name: 'G18 AUTO', damage: 18, minimumDamage: 11,
-    falloffStart: 11, falloffEnd: 34, headMultiplier: 1.35, limbMultiplier: 0.8,
+    falloffStart: 11, falloffEnd: 34, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
     rpm: 900, mag: 20, reserve: 80, reload: 1.55,
     hipSpread: 0.026, adsSpreadMultiplier: 0.46, movementSpreadMultiplier: 1.55,
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0032, maximumSpread: 0.072,

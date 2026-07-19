@@ -154,8 +154,17 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     await startSolo(page);
     await page.locator('#game').click({ position: { x: 100, y: 100 } });
     await expect.poll(() => page.evaluate(() => document.pointerLockElement?.id ?? null)).toBe('game');
-    await page.keyboard.down('KeyW');
-    await page.waitForTimeout(250);
+    const beforeMove = await snapshot(page);
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyW', key: 'w', bubbles: true,
+    })));
+    await expect.poll(async () => {
+      const moving = await snapshot(page);
+      return Math.hypot(
+        moving.player.position[0] - beforeMove.player.position[0],
+        moving.player.position[2] - beforeMove.player.position[2],
+      );
+    }, { timeout: 10_000 }).toBeGreaterThan(0.02);
     await page.evaluate(() => {
       window.dispatchEvent(new Event('blur'));
       if (document.pointerLockElement) document.exitPointerLock();

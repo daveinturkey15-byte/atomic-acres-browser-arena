@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOT_DAMAGE_MULTIPLIER,
+  HEADSHOT_DAMAGE_MULTIPLIER,
   WEAPONS,
   advanceMatch,
   applyRadialDeadzone,
@@ -29,6 +30,15 @@ describe('solo bot tuning', () => {
   it('deals exactly half the previous Pass 30 bot damage', () => {
     expect(BOT_DAMAGE_MULTIPLIER).toBe(0.25);
     expect(computeDamage(WEAPONS.carbine, 10, 'body') * BOT_DAMAGE_MULTIPLIER).toBe(7.75);
+  });
+});
+
+describe('headshot damage contract', () => {
+  it('uses exactly 1.5× head damage for every firearm', () => {
+    expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
+    for (const weapon of Object.values(WEAPONS)) {
+      expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
+    }
   });
 });
 
@@ -199,10 +209,11 @@ describe('weapon tuning', () => {
     expect(sniper.automatic).toBe(false);
     expect(sniper.mag).toBe(5);
     expect(sniper.reserve).toBe(25);
-    expect(body).toBe(55);
+    expect(body).toBe(67);
     expect(body).toBeLessThan(100);
     expect(body * 2).toBeGreaterThanOrEqual(100);
     expect(head).toBeGreaterThanOrEqual(100);
+    expect(head).toBe(Math.round(body * HEADSHOT_DAMAGE_MULTIPLIER));
     expect(sniper.rpm).toBeLessThan(WEAPONS.scattergun.rpm);
     expect(sniper.hipSpread).toBeGreaterThan(WEAPONS.carbine.hipSpread);
     expect(sniper.hipSpread * sniper.adsSpreadMultiplier).toBeLessThan(

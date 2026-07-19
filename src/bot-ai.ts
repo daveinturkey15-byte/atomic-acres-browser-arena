@@ -21,8 +21,15 @@ export type BotIntent = {
 };
 
 export const SOLO_BOT_COUNT = 2;
+export const BOT_DEATHS_PER_REINFORCEMENT = 5;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
+
+/** Initial solo population plus one persistent reinforcement per five bot deaths. */
+export function soloBotTargetForDeaths(botDeaths: number): number {
+  const deaths = Number.isFinite(botDeaths) ? Math.max(0, Math.floor(botDeaths)) : 0;
+  return SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT);
+}
 
 /** Yaw that points Atomic Acres' authoritative -Z operator-forward axis toward a target. */
 export function operatorYawToward(from: { x: number; z: number }, target: { x: number; z: number }): number {

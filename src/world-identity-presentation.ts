@@ -121,6 +121,36 @@ function createRouteSignMesh(): THREE.Mesh {
   return mesh;
 }
 
+function createRouteSignSupports(): THREE.InstancedMesh {
+  // West/east atlas signs previously hovered without visible mounting. Ground
+  // each boundary sign on a slim authored post; the central sign already sits
+  // on the Civic Transit gantry.
+  const placements: readonly (readonly [number, number, number])[] = [
+    [-30.82, 6.55, 8.5],
+    [26.82, 6.15, -7.5],
+  ];
+  const geometry = new THREE.BoxGeometry(0.2, 1, 0.2);
+  const material = new THREE.MeshStandardMaterial({ color: 0x20292c, roughness: 0.66, metalness: 0.58 });
+  const supports = new THREE.InstancedMesh(geometry, material, placements.length);
+  supports.name = 'pass32-grounded-route-sign-posts';
+  const matrix = new THREE.Matrix4();
+  placements.forEach(([x, signY, z], index) => {
+    const height = signY - 0.48;
+    matrix.compose(
+      new THREE.Vector3(x, height / 2, z),
+      new THREE.Quaternion(),
+      new THREE.Vector3(1, height, 1),
+    );
+    supports.setMatrixAt(index, matrix);
+  });
+  supports.instanceMatrix.needsUpdate = true;
+  supports.castShadow = true;
+  supports.receiveShadow = true;
+  supports.userData.presentationOnly = true;
+  supports.userData.blocksShots = false;
+  return supports;
+}
+
 export function createWorldIdentityPresentation(
   scene: THREE.Scene,
   lighting: ArenaLightingProfile,
@@ -239,7 +269,7 @@ export function createWorldIdentityPresentation(
 
   // One atlas-backed mesh carries all three route signs. Route cues and contact
   // grounding already exist in the authored GLB, avoiding redundant runtime draws.
-  root.add(createRouteSignMesh());
+  root.add(createRouteSignMesh(), createRouteSignSupports());
   scene.add(root);
   return {
     root,

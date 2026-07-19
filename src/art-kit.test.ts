@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { batchStaticMeshes, optimizeAttachedWeapon } from './art-kit';
+import { batchStaticMeshes, buildWeaponModel, optimizeAttachedWeapon } from './art-kit';
 
 describe('palette static batching', () => {
   it('preserves ordinary material colours instead of blending the default black emissive channel', () => {
@@ -102,6 +102,25 @@ describe('palette static batching', () => {
 });
 
 describe('attached weapon draw-call batching', () => {
+  it('keeps the machine pistol recognisably richer than the service pistol after bounded batching', () => {
+    const pistol = buildWeaponModel('pistol', true, false);
+    const machinePistol = buildWeaponModel('machine-pistol', true, false);
+    const pistolMagazine = pistol.getObjectByName('pistol-magazine');
+    const machineMagazine = machinePistol.getObjectByName('pistol-magazine');
+    const pistolMagazineHeight = new THREE.Box3().setFromObject(pistolMagazine!).getSize(new THREE.Vector3()).y;
+    const machineMagazineHeight = new THREE.Box3().setFromObject(machineMagazine!).getSize(new THREE.Vector3()).y;
+
+    expect(machinePistol.getObjectByName('auto-selector')).toBeDefined();
+    expect(machinePistol.getObjectByName('machine-pistol-compensator')).toBeDefined();
+    expect(machinePistol.getObjectByName('machine-pistol-charging-wings')).toBeDefined();
+    expect(machineMagazineHeight).toBeGreaterThan(pistolMagazineHeight);
+
+    const pistolStats = optimizeAttachedWeapon(pistol, 'palette-basic');
+    const machinePistolStats = optimizeAttachedWeapon(machinePistol, 'palette-basic');
+    expect(machinePistolStats.sourceMeshes).toBeGreaterThan(pistolStats.sourceMeshes);
+    expect(machinePistolStats.batches).toBeLessThanOrEqual(pistolStats.batches + 1);
+  });
+
   it('keeps compound magazines dynamic while batching their visible parts', () => {
     const weapon = new THREE.Group();
     weapon.name = 'compound-magazine-weapon';

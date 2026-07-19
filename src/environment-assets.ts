@@ -15,7 +15,7 @@ export type ArenaArtResult = {
 };
 
 const LEGACY_VEHICLE_NAMES = new Set([
-  'tour coach', 'coach roof', 'coach window', 'south shuttle bus', 'shuttle bus roof', 'shuttle bus window',
+  'north tour bus', 'tour coach', 'coach roof', 'coach window', 'south shuttle bus', 'shuttle bus roof', 'shuttle bus window',
 ]);
 
 function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
@@ -137,6 +137,11 @@ function addStreetProps(root: THREE.Group): void {
 
 type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;
 
+export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]> = Object.freeze([
+  [-21.2, -29], [-13.8, -18.2], [-27.8, 18],
+  [21.2, 29], [13.8, 18.2], [27.8, -18],
+]);
+
 export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
   const group = new THREE.Group();
   group.name = 'pass31-neighbourhood-life';
@@ -144,9 +149,7 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   group.userData.blocksShots = false;
 
   const flowerCount = reduced ? 24 : 72;
-  const flowerBeds: ReadonlyArray<readonly [number, number]> = [
-    [-17.5, -29], [-14.8, -20], [-27.8, 18], [17.5, 29], [14.8, 20], [27.8, -18],
-  ];
+  const flowerBeds = NEIGHBOURHOOD_FLOWER_BEDS;
   const stems = new THREE.InstancedMesh(
     new THREE.CylinderGeometry(0.018, 0.025, 0.42, 5),
     new THREE.MeshLambertMaterial({ color: 0x4d7d48 }),
@@ -230,26 +233,6 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
       bicycle.add(frame); decorative(bicycle); group.add(bicycle);
     }
 
-    const butterflyFlights: FaunaFlight[] = [
-      { x: -18, z: -28, radius: 1.8, height: 1.25, phase: 0.2, speed: 0.72 },
-      { x: -27, z: 18, radius: 1.4, height: 1.5, phase: 2.1, speed: 0.84 },
-      { x: 18, z: 28, radius: 1.8, height: 1.2, phase: 3.5, speed: 0.68 },
-      { x: 27, z: -18, radius: 1.5, height: 1.45, phase: 4.7, speed: 0.79 },
-      { x: -15, z: -20, radius: 1.1, height: 1.05, phase: 5.8, speed: 0.91 },
-      { x: 15, z: 20, radius: 1.2, height: 1.1, phase: 1.3, speed: 0.88 },
-    ];
-    const butterflies = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.095, 0), new THREE.MeshBasicMaterial({ color: 0xffc65c, toneMapped: false }), butterflyFlights.length);
-    butterflies.name = 'animated-butterfly-fauna'; butterflies.userData.dynamic = true; butterflies.userData.presentationOnly = true; butterflies.raycast = () => undefined;
-    group.add(butterflies); group.userData.animationButterflies = butterflies; group.userData.butterflyFlights = butterflyFlights;
-
-    const birdFlights: FaunaFlight[] = [
-      { x: -4, z: 2, radius: 21, height: 12, phase: 0, speed: 0.12 },
-      { x: 5, z: -8, radius: 17, height: 14, phase: 2.2, speed: 0.1 },
-      { x: 0, z: 10, radius: 24, height: 16, phase: 4.1, speed: 0.08 },
-    ];
-    const birds = new THREE.InstancedMesh(new THREE.ConeGeometry(0.18, 0.55, 3), new THREE.MeshBasicMaterial({ color: 0x26343b, toneMapped: false, side: THREE.DoubleSide }), birdFlights.length);
-    birds.name = 'animated-bird-fauna'; birds.userData.dynamic = true; birds.userData.presentationOnly = true; birds.raycast = () => undefined;
-    group.add(birds); group.userData.animationBirds = birds; group.userData.birdFlights = birdFlights;
   } else {
     const markers = new THREE.InstancedMesh(
       new THREE.BoxGeometry(0.18, 0.72, 0.18),
@@ -270,7 +253,7 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   }
 
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
-  group.userData.neighbourhoodLife = { flowers: flowerCount, benches: 4, bins: 6, bicycles: reduced ? 0 : 3, markers: reduced ? 3 : 0, butterflies: reduced ? 0 : 6, birds: reduced ? 0 : 3 };
+  group.userData.neighbourhoodLife = { flowers: flowerCount, benches: 4, bins: 6, bicycles: reduced ? 0 : 3, markers: reduced ? 3 : 0, butterflies: 0, birds: 0 };
   root.add(group);
   return group;
 }
@@ -505,6 +488,53 @@ function addRouteArchitecture(root: THREE.Group): void {
 
   // Layered modular lane barriers retain the exact invisible gameplay box while losing the blockout-cube silhouette.
   COVER_LAYOUT.forEach(([x, z, width, depth], index) => {
+    if (index === 4) {
+      const cargo = new THREE.Group(); cargo.name = 'north-authored-cargo-stack';
+      for (const [cx, cy, cz, sx, sy, sz] of [
+        [-0.95, 0.62, 0, 1.72, 1.18, 1.78], [0.95, 0.62, 0, 1.72, 1.18, 1.78], [0, 1.65, 0, 1.72, 0.86, 1.78],
+      ] as Array<[number, number, number, number, number, number]>) {
+        const crate = routeBox('cargo-crate', [sx, sy, sz], concrete, 0.1);
+        crate.position.set(cx, cy, cz); cargo.add(crate);
+        for (const band of [-0.42, 0.42]) {
+          const strap = routeBox('cargo-ratchet-strap', [0.1, sy + 0.04, sz + 0.04], trim, 0.02);
+          strap.position.set(cx + band, cy, cz); cargo.add(strap);
+        }
+      }
+      cargo.position.set(x, 0, z); decorative(cargo); root.add(cargo);
+    } else if (index === 5) {
+      const pipes = new THREE.Group(); pipes.name = 'south-authored-pipe-stack';
+      for (const [offsetX, y] of [[-0.9, 0.62], [0, 0.62], [0.9, 0.62], [-0.45, 1.48], [0.45, 1.48]] as Array<[number, number]>) {
+        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, Math.max(1.2, width - 0.3), 16, 1, true), concrete);
+        pipe.name = 'stacked-concrete-pipe';
+        pipe.position.set(offsetX, y, 0); pipe.rotation.z = Math.PI / 2; pipes.add(pipe);
+      }
+      pipes.position.set(x, 0, z); decorative(pipes); root.add(pipes);
+    } else if (index === 6) {
+      const skip = new THREE.Group(); skip.name = 'west-authored-service-skip'; skip.position.set(x, 0, z);
+      const body = routeBox('service-skip-body', [width - 0.12, 1.72, depth - 0.18], concrete, 0.16);
+      body.position.y = 0.91; skip.add(body);
+      for (const side of [-1, 1]) {
+        const rail = routeBox('service-skip-rim', [width + 0.08, 0.14, 0.18], trim, 0.035);
+        rail.position.set(0, 1.82, side * (depth / 2 - 0.12)); skip.add(rail);
+      }
+      const label = routeBox('service-skip-warning-panel', [width - 0.45, 0.5, 0.06], trim, 0.03);
+      label.position.set(0, 1.05, depth / 2); skip.add(label); decorative(skip); root.add(skip);
+    } else if (index === 7) {
+      const generator = new THREE.Group(); generator.name = 'east-authored-generator-trailer'; generator.position.set(x, 0, z);
+      const shell = routeBox('generator-shell', [width - 0.18, 1.72, depth - 0.42], frame, 0.14);
+      shell.position.y = 1.1; generator.add(shell);
+      const roof = routeBox('generator-roof', [width, 0.18, depth - 0.18], trim, 0.06);
+      roof.position.y = 2.02; generator.add(roof);
+      for (const side of [-1, 0, 1]) {
+        const vent = routePanel('generator-vent', [width - 0.5, 0.08, 0.06], trim);
+        vent.position.set(0, 0.82 + side * 0.28, depth / 2 - 0.17); generator.add(vent);
+      }
+      for (const zWheel of [-depth * 0.3, depth * 0.3]) {
+        const tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, width + 0.08, 14), frame);
+        tyre.name = 'generator-trailer-wheel'; tyre.rotation.z = Math.PI / 2; tyre.position.set(0, 0.44, zWheel); generator.add(tyre);
+      }
+      decorative(generator); root.add(generator);
+    }
     const cap = routeBox('barrier-cap', [width + 0.18, 0.16, depth + 0.18], index % 2 ? trim : frame, 0.05);
     cap.position.set(x, 1.58, z); decorative(cap); root.add(cap);
     for (const side of [-1, 1]) {

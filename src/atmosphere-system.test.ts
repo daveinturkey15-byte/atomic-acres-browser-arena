@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { atmosphereBypassReason } from './atmosphere-system';
+import * as THREE from 'three';
+import { AtmosphereSystem, atmosphereBypassReason } from './atmosphere-system';
 
 describe('Pass 30 atmosphere budget', () => {
   it('enables subtle mist only on hardware Blender by default', () => {
@@ -12,5 +13,21 @@ describe('Pass 30 atmosphere budget', () => {
     expect(atmosphereBypassReason('blender', 'Google SwiftShader', null)).toBe('software-renderer');
     expect(atmosphereBypassReason('blender', 'Google SwiftShader', 'on')).toBeNull();
     expect(atmosphereBypassReason('blender', 'ANGLE (NVIDIA RTX)', 'off')).toBe('query-disabled');
+  });
+
+  it('uses a bounded shader mist, smoke and low-altitude dust budget', () => {
+    const system = new AtmosphereSystem(new THREE.Scene(), 'blender', 'ANGLE (NVIDIA RTX)', null);
+    system.update(1.25);
+    expect(system.telemetry()).toMatchObject({
+      enabled: true,
+      mistCards: 10,
+      smokeCards: 5,
+      dustMotes: 96,
+      triangles: 30,
+      textureSamples: 0,
+      volumetricRayMarching: false,
+      perFrameAllocations: 0,
+      time: 1.25,
+    });
   });
 });

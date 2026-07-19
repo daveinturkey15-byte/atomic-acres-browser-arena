@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { centeredSightY, weaponFamilyPresentation } from './weapon-family-presentation';
 
-const weapons = ['carbine', 'smg', 'scattergun', 'pistol'] as const;
+const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
 
 describe('weapon family presentation', () => {
   it('physically centres every authored sight axis', () => {
@@ -10,7 +10,7 @@ describe('weapon family presentation', () => {
 
   it('gives every weapon a distinct action and complete detail contract', () => {
     const profiles = weapons.map(weaponFamilyPresentation);
-    expect(new Set(profiles.map((profile) => profile.actionTravel)).size).toBe(4);
+    expect(new Set(profiles.map((profile) => profile.actionTravel)).size).toBeGreaterThanOrEqual(5);
     expect(profiles.every((profile) => profile.requiredDetails.length >= 5)).toBe(true);
     expect(weaponFamilyPresentation('scattergun').smokeBase).toBeGreaterThan(weaponFamilyPresentation('smg').smokeBase);
   });

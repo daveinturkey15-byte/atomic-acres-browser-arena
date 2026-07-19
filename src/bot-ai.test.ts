@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOT_DEATHS_PER_REINFORCEMENT,
   BOT_FIRE_RANGE,
   BOT_REACTION_DELAY,
   SOLO_BOT_COUNT,
@@ -15,6 +16,7 @@ import {
   scoreBotSpawn,
   selectFarthestSpawnCandidate,
   shouldFlipSpawnSide,
+  soloBotTargetForDeaths,
   type BotSense,
 } from './bot-ai';
 
@@ -44,6 +46,17 @@ describe('chooseBotIntent', () => {
     expect(botAimJitter(8)).toBeLessThan(botAimJitter(16));
     expect(botAimJitter(16)).toBeLessThan(botAimJitter(BOT_FIRE_RANGE));
     expect(botAimJitter(BOT_FIRE_RANGE)).toBe(0.1);
+  });
+
+  it('adds one persistent solo opponent after every fifth cumulative bot death', () => {
+    expect(BOT_DEATHS_PER_REINFORCEMENT).toBe(5);
+    expect(soloBotTargetForDeaths(0)).toBe(2);
+    expect(soloBotTargetForDeaths(4)).toBe(2);
+    expect(soloBotTargetForDeaths(5)).toBe(3);
+    expect(soloBotTargetForDeaths(9)).toBe(3);
+    expect(soloBotTargetForDeaths(10)).toBe(4);
+    expect(soloBotTargetForDeaths(20)).toBe(6);
+    expect(soloBotTargetForDeaths(Number.NaN)).toBe(2);
   });
 
   it('honours reaction delay and accelerates follow-up shots inside a burst', () => {

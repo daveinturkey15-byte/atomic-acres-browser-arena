@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { presentationRandom } from './runtime-random';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildWeaponModel, optimizeAttachedWeapon, roundedBox } from './art-kit';
+import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial } from './art-kit';
 import type { FirstPersonArmChain } from './operator-model';
 import { solveTwoBoneElbow } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
@@ -55,12 +55,12 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
 };
 
 const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
-  carbine: { left: [-0.085, -0.02, 0.015], right: [0.1, -0.03, 0.015] },
-  smg: { left: [0, 0, 0], right: [0, 0, 0] },
-  scattergun: { left: [0, 0, 0], right: [0, 0, 0] },
-  sniper: { left: [-0.075, -0.015, 0.012], right: [0.09, -0.03, 0.015] },
-  pistol: { left: [0, 0, 0], right: [0, 0, 0] },
-  'machine-pistol': { left: [0, 0, 0], right: [0, 0, 0] },
+  carbine: { left: [-0.06, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
+  smg: { left: [-0.055, -0.02, 0.02], right: [0.08, -0.025, 0.015] },
+  scattergun: { left: [-0.055, -0.025, 0.015], right: [0.08, -0.025, 0.015] },
+  sniper: { left: [-0.055, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
+  pistol: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
+  'machine-pistol': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
 };
 
 const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
@@ -120,22 +120,37 @@ export class WeaponPresentation {
 
   constructor(private readonly camera: THREE.Camera, private readonly flattenMaterials = false) {
     this.root.name = 'original-weapon-view';
-    this.root.position.set(0.36, -0.38, -0.78);
-    this.root.scale.setScalar(0.6);
+    this.root.position.set(0.28, -0.34, -0.88);
+    this.root.scale.setScalar(0.64);
     camera.add(this.root);
+    const viewmodelFill = new THREE.PointLight(0xe6f2ef, flattenMaterials ? 0 : 1.05, 2.6, 2);
+    viewmodelFill.name = 'first-person-viewmodel-fill';
+    viewmodelFill.position.set(-0.48, 0.72, 0.4);
+    viewmodelFill.castShadow = false;
+    viewmodelFill.userData.presentationOnly = true;
+    this.root.add(viewmodelFill);
+
+    const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
+      if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
+      return texturedMaterial('./assets/original/textures/fabric-weave.png', {
+        color, roughness, repeatX, repeatY,
+        normalPath: './assets/original/textures/fabric-weave-normal.png',
+        roughnessPath: './assets/original/textures/fabric-weave-roughness.png', normalScale,
+      });
+    };
 
     const sleeve: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x2f6570 })
-      : new THREE.MeshStandardMaterial({ color: 0x285863, emissive: 0x061419, emissiveIntensity: 0.1, roughness: 0.9 });
+      ? new THREE.MeshBasicMaterial({ color: 0x4a6870 })
+      : fabricMaterial(0x78979d, 0.96, 5, 2, 0.32);
     const sleeveTrim: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0xd6b458 })
-      : new THREE.MeshStandardMaterial({ color: 0xb99a45, emissive: 0x1b1304, emissiveIntensity: 0.07, roughness: 0.7, metalness: 0.06 });
+      ? new THREE.MeshBasicMaterial({ color: 0x9c8c62 })
+      : fabricMaterial(0xa99a70, 0.9, 6, 3, 0.24);
     const glove: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x1c3034 })
-      : new THREE.MeshStandardMaterial({ color: 0x1a2a2e, emissive: 0x030708, emissiveIntensity: 0.06, roughness: 0.92 });
+      ? new THREE.MeshBasicMaterial({ color: 0x514b40 })
+      : fabricMaterial(0x625b4c, 0.98, 7, 4, 0.38);
     const glovePalm: THREE.Material = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x38555a })
-      : new THREE.MeshStandardMaterial({ color: 0x314b50, roughness: 0.84 });
+      ? new THREE.MeshBasicMaterial({ color: 0x766d5c })
+      : fabricMaterial(0x8a806c, 0.91, 8, 5, 0.3);
     // The licensed full-body derivative remains available for future authored
     // grip poses, but its current bind/IK calibration fails the viewmodel
     // acceptance gate (detached hands and sleeves outside the viewport). Keep
@@ -248,17 +263,41 @@ export class WeaponPresentation {
       wrist.add(thumb);
       const fingers: THREE.Mesh[] = [];
       for (let finger = 0; finger < 4; finger += 1) {
-        const ridge = roundedBox(
-          `${side}-finger-${finger}`,
-          [0.031, 0.05, 0.105 - finger * 0.004],
-          glove,
-          0.012,
-          2,
-        );
-        ridge.position.set(sign * (0.055 - finger * 0.037), -0.064, -0.126 + finger * 0.004);
-        ridge.rotation.set(-0.4 - finger * 0.025, 0, sign * (finger - 1.5) * 0.045);
-        wrist.add(ridge);
-        fingers.push(ridge);
+        const proximal = new THREE.Mesh(new THREE.CapsuleGeometry(0.0225, 0.054 - finger * 0.002, 4, flattenMaterials ? 6 : 9), glove);
+        proximal.name = `${side}-finger-${finger}-proximal`;
+        proximal.position.set(sign * (0.055 - finger * 0.037), -0.062, -0.121 + finger * 0.004);
+        proximal.rotation.set(Math.PI / 2 + 0.28 + finger * 0.025, 0, sign * (finger - 1.5) * 0.045);
+        const distal = new THREE.Mesh(new THREE.CapsuleGeometry(0.0195, 0.034 - finger * 0.0015, 4, flattenMaterials ? 6 : 9), glove);
+        distal.name = `${side}-finger-${finger}-distal`;
+        distal.position.set(sign * (0.055 - finger * 0.037), -0.047, -0.176 + finger * 0.004);
+        distal.rotation.set(Math.PI / 2 + 0.64 + finger * 0.03, 0, sign * (finger - 1.5) * 0.052);
+        wrist.add(proximal, distal);
+        fingers.push(proximal, distal);
+      }
+      // Preserve all eight authored phalange shapes while collapsing them into
+      // one material-compatible draw per hand. Geometry is transformed into
+      // glove-local space before merging, so the silhouette stays unchanged.
+      const fingerGeometries = fingers.map((fingerMesh) => {
+        fingerMesh.updateMatrix();
+        const geometry = fingerMesh.geometry.clone();
+        geometry.applyMatrix4(fingerMesh.matrix);
+        return geometry;
+      });
+      const mergedFingerGeometry = mergeGeometries(fingerGeometries, false);
+      fingerGeometries.forEach((geometry) => geometry.dispose());
+      if (mergedFingerGeometry) {
+        for (const fingerMesh of fingers) {
+          wrist.remove(fingerMesh);
+          fingerMesh.geometry.dispose();
+        }
+        const fingerCluster = new THREE.Mesh(mergedFingerGeometry, glove);
+        fingerCluster.name = `${side}-finger-articulated-cluster`;
+        fingerCluster.castShadow = true;
+        fingerCluster.receiveShadow = true;
+        fingerCluster.userData.segmentCount = 8;
+        fingerCluster.userData.anatomy = 'four articulated two-segment fingers';
+        wrist.add(fingerCluster);
+        fingers.splice(0, fingers.length, fingerCluster);
       }
       const sleeveBand = roundedBox(`${side}-sleeve-band`, [0.166, 0.166, 0.048], sleeveTrim, 0.014, 2);
       sleeveBand.position.z = -upperLength * 0.72;
@@ -298,7 +337,8 @@ export class WeaponPresentation {
         : wrist;
       gloveAssembly.userData.style = 'atomic-tactical-v3-detailed';
       gloveAssembly.userData.cuffConnected = true;
-      gloveAssembly.userData.sourcePartCount = gloveSources.length;
+      gloveAssembly.userData.sourcePartCount = gloveSources.length
+        + Math.max(0, (fingers[0]?.userData.segmentCount ?? 1) - 1);
 
       this.armRigs.push({ side, shoulder, elbow, hand: wrist, upperLength, lowerLength });
       return shoulder;
@@ -448,12 +488,16 @@ export class WeaponPresentation {
     ids.forEach((id, index) => {
       // Camera-space weapons use the project-authored high-detail model. The
       // imported low-poly assets remain suitable for distant world operators.
+      // The low-poly imported pickups remain valid world assets, but first
+      // person needs the authored PBR receiver, functional action parts and
+      // calibrated sockets rather than a camera-close pickup mesh.
       const model = buildWeaponModel(id, this.flattenMaterials, false);
+      model.userData.firstPersonSource = 'authored-pbr-v5-six-weapon';
       const firstPersonHidden: Record<WeaponId, Set<string>> = {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
         scattergun: new Set(['stock', 'stock-cheek-panel']),
-        sniper: new Set(['stock-shoulder-pad', 'stock-support-rod']),
+        sniper: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         pistol: new Set(),
         'machine-pistol': new Set(),
       };
@@ -617,8 +661,10 @@ export class WeaponPresentation {
   }
 
   private sightReference(model: THREE.Object3D | undefined): THREE.Object3D | undefined {
-    const sightName = this.active === 'carbine' || this.active === 'sniper'
+    const sightName = this.active === 'carbine'
       ? 'optic-reticle'
+      : this.active === 'sniper'
+        ? 'sniper-scope'
       : this.active === 'smg'
         ? 'smg-aperture'
         : this.active === 'pistol' || this.active === 'machine-pistol'
@@ -679,6 +725,7 @@ export class WeaponPresentation {
       activeSmoke: this.smokes.reduce((count, smoke) => count + Number(smoke.active), 0),
       detailsReady,
       modelKind: importedModel ? 'licensed-imported' : 'original-authored',
+      firstPersonSource: model?.userData.firstPersonSource ?? 'unknown',
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
@@ -1009,9 +1056,9 @@ export class WeaponPresentation {
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 
     const targetPosition = new THREE.Vector3(
-      0.36 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
-      -0.38 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
-      -0.78 + adsZ + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
+      0.28 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
+      -0.34 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
+      -0.88 + adsZ + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
     );
     this.root.position.lerp(targetPosition, smoothing(18));
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));

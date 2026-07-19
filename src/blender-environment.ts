@@ -19,6 +19,7 @@ export type BlenderArenaTelemetry = {
   transparentUpperWindows: number;
   routeLandmarks: number;
   modeledBuses: number;
+  largeCoverAssets: number;
   housePropSets: number;
   worldIdentityPass: boolean;
   proceduralWorldHidden: boolean;
@@ -39,6 +40,7 @@ const telemetry: BlenderArenaTelemetry = {
   transparentUpperWindows: 0,
   routeLandmarks: 0,
   modeledBuses: 0,
+  largeCoverAssets: 0,
   housePropSets: 0,
   worldIdentityPass: false,
   proceduralWorldHidden: false,
@@ -75,6 +77,7 @@ export async function loadBlenderArena(
   const windows = new Map<string, THREE.Mesh>();
   const routeLandmarks = new Set<string>();
   let modeledBuses = 0;
+  let largeCoverAssets = 0;
   let housePropSets = 0;
   let transparentUpperWindows = 0;
   let meshCount = 0;
@@ -82,6 +85,7 @@ export async function loadBlenderArena(
   root.traverse((node) => {
     node.userData.blenderAuthoredEnvironment = true;
     if (node.userData.atomic_asset_class === 'physical-transit-bus') modeledBuses += 1;
+    if (node.userData.atomic_asset_class === 'authored-large-physical-cover') largeCoverAssets += 1;
     if (node.userData.atomic_asset_class === 'authored-house-furnishing-set') housePropSets += 1;
     const routeId = typeof node.userData.atomic_route_id === 'string' ? node.userData.atomic_route_id : null;
     if (node.userData.atomic_semantic === 'route-landmark' && routeId) routeLandmarks.add(routeId);
@@ -140,8 +144,8 @@ export async function loadBlenderArena(
   if (missingRoutes.length > 0) {
     throw new Error(`Blender arena is missing route landmarks: ${missingRoutes.map((route) => route.id).join(', ')}`);
   }
-  if (modeledBuses !== 2 || housePropSets !== 2) {
-    throw new Error(`Blender arena asset contract failed: buses=${modeledBuses}, housePropSets=${housePropSets}`);
+  if (modeledBuses !== 2 || largeCoverAssets !== 4 || housePropSets !== 2) {
+    throw new Error(`Blender arena asset contract failed: buses=${modeledBuses}, largeCoverAssets=${largeCoverAssets}, housePropSets=${housePropSets}`);
   }
 
   // Retain the original visual meshes underneath as invisible presentation and
@@ -168,6 +172,7 @@ export async function loadBlenderArena(
   telemetry.transparentUpperWindows = transparentUpperWindows;
   telemetry.routeLandmarks = routeLandmarks.size;
   telemetry.modeledBuses = modeledBuses;
+  telemetry.largeCoverAssets = largeCoverAssets;
   telemetry.housePropSets = housePropSets;
   telemetry.worldIdentityPass = routeLandmarks.size === ARENA_ROUTE_IDENTITIES.length;
   telemetry.proceduralWorldHidden = true;

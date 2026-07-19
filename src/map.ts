@@ -16,7 +16,14 @@ export type ArenaMap = {
   targets: PracticeTarget[];
   houses: readonly HouseArchitecture[];
   breakableWindows: BreakableWindow[];
-  physicalCover: Array<{ id: string; bounds: Box2; blocksMovement: true; blocksShots: true }>;
+  physicalCover: Array<{
+    id: string;
+    bounds: Box2;
+    blocksMovement: true;
+    blocksShots: true;
+    performanceVisualKind?: 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer';
+    performanceVisualMeshes?: number;
+  }>;
   bounds: Box2;
   houseTelemetry: {
     houses: number;
@@ -124,6 +131,90 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // replaces it with the rounded authored route art in environment-assets.
     proxy.visible = true;
     proxy.userData.collisionProxy = true;
+  }
+
+  function performanceCoverBox(
+    coverId: string,
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    mat: THREE.Material,
+  ): THREE.Mesh {
+    const mesh = box(name, position, size, mat, false, false, false);
+    mesh.userData.performanceCoverId = coverId;
+    mesh.userData.presentationOnly = true;
+    mesh.userData.blocksShots = false;
+    return mesh;
+  }
+
+  function performanceCoverCylinder(
+    coverId: string,
+    name: string,
+    position: [number, number, number],
+    radius: number,
+    length: number,
+    mat: THREE.Material,
+    rotation: [number, number, number],
+  ): THREE.Mesh {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 10), mat);
+    mesh.name = name;
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.receiveShadow = true;
+    mesh.userData.performanceCoverId = coverId;
+    mesh.userData.presentationOnly = true;
+    mesh.userData.blocksShots = false;
+    mesh.userData.impactSurface = 'metal';
+    world.add(mesh);
+    return mesh;
+  }
+
+  function addPerformanceLargeCover(
+    id: 'north-cargo-stack' | 'south-pipe-stack' | 'west-service-skip' | 'east-generator-trailer',
+    x: number,
+    z: number,
+  ): { kind: NonNullable<ArenaMap['physicalCover'][number]['performanceVisualKind']>; meshes: number } {
+    let meshes = 0;
+    const addBox = (name: string, position: [number, number, number], size: [number, number, number], mat: THREE.Material) => {
+      performanceCoverBox(id, name, position, size, mat);
+      meshes += 1;
+    };
+    const addCylinder = (name: string, position: [number, number, number], radius: number, length: number, mat: THREE.Material, rotation: [number, number, number]) => {
+      performanceCoverCylinder(id, name, position, radius, length, mat, rotation);
+      meshes += 1;
+    };
+
+    if (id === 'north-cargo-stack') {
+      for (const offset of [-1, 1]) addBox('performance-cargo-lower', [x + offset, 0.52, z], [1.85, 1.04, 1.82], offset < 0 ? palette.aqua : palette.mustard);
+      addBox('performance-cargo-upper', [x, 1.62, z], [2.15, 1.04, 1.82], palette.aqua);
+      for (const offset of [-0.82, 0.82]) addBox('performance-cargo-lock-rail', [x + offset, 1.62, z - 0.93], [0.12, 0.9, 0.08], palette.dark);
+      return { kind: 'cargo-stack', meshes };
+    }
+
+    if (id === 'south-pipe-stack') {
+      for (const offset of [-1.15, 0, 1.15]) addCylinder('performance-concrete-pipe', [x + offset, 0.53, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0]);
+      for (const offset of [-0.58, 0.58]) addCylinder('performance-concrete-pipe', [x + offset, 1.52, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0]);
+      return { kind: 'pipe-stack', meshes };
+    }
+
+    if (id === 'west-service-skip') {
+      addBox('performance-skip-floor', [x, 0.18, z], [2.8, 0.28, 4.75], palette.dark);
+      for (const offset of [-1.35, 1.35]) addBox('performance-skip-side', [x + offset, 1.02, z], [0.22, 1.72, 4.65], palette.aqua);
+      addBox('performance-skip-rear', [x, 1.02, z + 2.3], [2.7, 1.72, 0.22], palette.aqua);
+      addBox('performance-skip-front', [x, 0.62, z - 2.3], [2.7, 0.92, 0.22], palette.mustard);
+      for (const offset of [-1.35, 1.35]) addBox('performance-skip-top-rail', [x + offset, 1.92, z], [0.28, 0.16, 4.72], palette.mustard);
+      return { kind: 'service-skip', meshes };
+    }
+
+    addBox('performance-generator-chassis', [x, 0.48, z], [2.8, 0.22, 4.65], palette.dark);
+    addBox('performance-generator-body', [x, 1.28, z + 0.28], [2.42, 1.5, 3.05], palette.mustard);
+    addBox('performance-generator-panel', [x - 1.23, 1.3, z + 0.28], [0.08, 0.92, 1.75], palette.dark);
+    addBox('performance-generator-drawbar', [x, 0.48, z - 2.02], [0.18, 0.18, 1.0], palette.chrome);
+    for (const wheelX of [-1.34, 1.34]) for (const wheelZ of [-1.08, 1.08]) {
+      addCylinder('performance-generator-wheel', [x + wheelX, 0.48, z + wheelZ], 0.38, 0.24, palette.dark, [0, 0, Math.PI / 2]);
+    }
+    addCylinder('performance-generator-exhaust', [x + 0.83, 1.75, z + 0.82], 0.1, 0.82, palette.dark, [0, 0, 0]);
+    return { kind: 'generator-trailer', meshes };
   }
 
 
@@ -264,8 +355,35 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
   box('atomic landmark plinth', [27, 0.38, -1.5], [5.8, 0.76, 5.8], palette.concrete);
 
-  // Lane cover interrupts ordinary combat rays every 12–18 metres.
-  COVER_LAYOUT.forEach(([x, z, w, d], index) => box(`cover ${index}`, [x, 0.8, z], [w, 1.6, d], index % 2 ? palette.coral : palette.aqua));
+  // Lane cover interrupts ordinary combat rays every 12–18 metres. The four
+  // outer anchors receive taller collision aligned to recognisable authored
+  // cargo/utility assets in the Blender and fallback art layers.
+  const authoredLargeCoverIds = new Map<number, string>([
+    [4, 'north-cargo-stack'],
+    [5, 'south-pipe-stack'],
+    [6, 'west-service-skip'],
+    [7, 'east-generator-trailer'],
+  ]);
+  COVER_LAYOUT.forEach(([x, z, w, d], index) => {
+    const height = authoredLargeCoverIds.has(index) ? 2.2 : 1.6;
+    const authoritativeCover = box(`cover ${index}`, [x, height / 2, z], [w, height, d], index % 2 ? palette.coral : palette.aqua);
+    const id = authoredLargeCoverIds.get(index);
+    if (id) {
+      // Keep one simple AABB for movement/projectile authority, but render a
+      // recognisable low-cost semantic silhouette on the representative
+      // Performance profile instead of a generic coloured block.
+      authoritativeCover.visible = false;
+      const visual = addPerformanceLargeCover(id as Parameters<typeof addPerformanceLargeCover>[0], x, z);
+      physicalCover.push({
+        id,
+        bounds: { ...colliders[colliders.length - 1] },
+        blocksMovement: true,
+        blocksShots: true,
+        performanceVisualKind: visual.kind,
+        performanceVisualMeshes: visual.meshes,
+      });
+    }
+  });
 
   // Route-shaping collision proxies for three distinct lanes. Rounded visual shells live in environment-assets.ts.
   for (const x of [-29, -22]) for (const z of [-15, -5]) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55]);

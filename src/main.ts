@@ -18,6 +18,7 @@ import {
   respawnBotState,
   selectFarthestSpawnCandidate,
   shouldFlipSpawnSide,
+  soloBotTargetForDeaths,
   type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
@@ -27,6 +28,7 @@ import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanA
 import {
   BOT_DAMAGE_MULTIPLIER,
   GRENADE_RADIUS,
+  MATCH_SCORE_LIMIT,
   SIMULATION_HZ,
   WEAPONS,
   advanceMatch,
@@ -316,9 +318,9 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · NEIGHBOURHOOD OVERDRIVE · PASS 31</div>
+    <div class="eyebrow">ORIGINAL WEB ARENA · AUTHENTIC COVER · PASS 32</div>
     <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Fight through a richer living neighbourhood with upgraded weapon handling, adaptive spawns and a contested 4× Overdrive Core.</p>
+    <p class="lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -404,6 +406,7 @@ app.innerHTML = `
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </div>
     <div id="overdrive-hud" hidden><small>4× DAMAGE</small><strong id="overdrive-time">15.0</strong><span>OVERDRIVE</span></div>
+    <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>QUAD DAMAGE</strong><span>4× DAMAGE · 15 SECONDS</span></div>
     <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
@@ -690,7 +693,39 @@ const overdrivePedestal = new THREE.Mesh(
 );
 overdrivePedestal.name = 'overdrive-pedestal';
 overdrivePedestal.position.y = -0.69;
-overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal);
+const quadIconCanvas = document.createElement('canvas');
+quadIconCanvas.width = 256;
+quadIconCanvas.height = 128;
+const quadIconContext = quadIconCanvas.getContext('2d');
+if (!quadIconContext) throw new Error('Canvas2D unavailable for Quad Damage world icon');
+quadIconContext.fillStyle = 'rgba(10, 17, 32, .88)';
+quadIconContext.fillRect(12, 16, 232, 96);
+quadIconContext.strokeStyle = '#78f5ed';
+quadIconContext.lineWidth = 8;
+quadIconContext.strokeRect(12, 16, 232, 96);
+quadIconContext.fillStyle = '#f7edff';
+quadIconContext.font = '900 58px sans-serif';
+quadIconContext.textAlign = 'center';
+quadIconContext.fillText('4×', 128, 76);
+quadIconContext.fillStyle = '#a892ff';
+quadIconContext.font = '900 20px sans-serif';
+quadIconContext.fillText('QUAD DAMAGE', 128, 103);
+const quadIconTexture = new THREE.CanvasTexture(quadIconCanvas);
+quadIconTexture.colorSpace = THREE.SRGBColorSpace;
+const quadWorldIcon = new THREE.Sprite(new THREE.SpriteMaterial({ map: quadIconTexture, transparent: true, depthWrite: false, toneMapped: false }));
+quadWorldIcon.name = 'quad-damage-world-icon';
+quadWorldIcon.position.y = 1.75;
+quadWorldIcon.scale.set(3.4, 1.7, 1);
+const quadBeacon = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.18, 0.82, 3.1, reducedRenderMode ? 10 : 20, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0x7cf8ef, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+);
+quadBeacon.name = 'quad-damage-beacon';
+quadBeacon.position.y = 0.55;
+const quadGlow = new THREE.PointLight(0x8e78ff, 2.4, 8, 2);
+quadGlow.name = 'quad-damage-local-glow';
+quadGlow.position.y = 0.55;
+overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
 const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery);
@@ -759,6 +794,7 @@ const player = {
 const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
+let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
@@ -2632,58 +2668,67 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
   root.add(haze, glow);
 }
 
+const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
+
+function spawnBot(index: number): void {
+  const botTeam: Team = player.team === 0 ? 1 : 0;
+  const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
+  const id = `bot-${index}`;
+  // Every reinforcement uses the same source-rigged humanoid and approved
+  // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
+  const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', true, 'neon-purple');
+  addNeonBotHaze(root, index);
+  root.traverse((node) => {
+    if (node instanceof THREE.Mesh) node.castShadow = false;
+  });
+  if (!reducedRenderMode && index === 0) {
+    const shadowProxy = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.48, 1.1, 4, 8),
+      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+    );
+    shadowProxy.name = 'lead-bot-shadow-proxy';
+    shadowProxy.position.y = 1.05;
+    shadowProxy.castShadow = true;
+    shadowProxy.userData.presentationOnly = true;
+    shadowProxy.userData.blocksShots = false;
+    shadowProxy.raycast = () => undefined;
+    root.add(shadowProxy);
+  }
+  root.userData.playerId = id;
+  root.traverse((node) => {
+    node.userData.playerId = id;
+    node.userData.targetRoot = root;
+  });
+  const spawn = selectSafeBotSpawn(botTeam);
+  const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
+  root.position.copy(position);
+  scene.add(root);
+  bots.set(id, {
+    id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
+    kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
+    sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
+    invulnerableUntil: performance.now() + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
+  });
+}
+
 function spawnBots(): void {
   clearBots();
-  const botTeam: Team = player.team === 0 ? 1 : 0;
-  const names = ['RIVET', 'MICA'].slice(0, SOLO_BOT_COUNT);
-  names.forEach((name, index) => {
-    const id = `bot-${index}`;
-    // Both solo opponents use the same source-rigged humanoid with a bright
-    // neon-purple combat treatment. The lead
-    // alone owns the dynamic shadow pass so the second rig does not duplicate
-    // Blender's bounded static-shadow refresh.
-    // Team colour, authored weapons, movement/stance posing and identical
-    // authoritative hit proxies remain intact.
-    const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', true, 'neon-purple');
-    addNeonBotHaze(root, index);
-    root.traverse((node) => {
-      if (node instanceof THREE.Mesh) node.castShadow = false;
-    });
-    if (!reducedRenderMode && index === 0) {
-      const shadowProxy = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.48, 1.1, 4, 8),
-        new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
-      );
-      shadowProxy.name = 'lead-bot-shadow-proxy';
-      shadowProxy.position.y = 1.05;
-      shadowProxy.castShadow = true;
-      shadowProxy.userData.presentationOnly = true;
-      shadowProxy.userData.blocksShots = false;
-      shadowProxy.raycast = () => undefined;
-      root.add(shadowProxy);
-    }
-    root.userData.playerId = id;
-    root.traverse((node) => {
-      node.userData.playerId = id;
-      node.userData.targetRoot = root;
-    });
-    const spawn = selectSafeBotSpawn(botTeam);
-    const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
-    root.position.copy(position);
-    scene.add(root);
-    bots.set(id, {
-      id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
-      kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
-      sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
-      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
-    });
-  });
+  soloBotDeaths = 0;
+  for (let index = 0; index < SOLO_BOT_COUNT; index += 1) spawnBot(index);
   addFeed(`${SOLO_BOT_COUNT} low-damage hostile operators entered the block`, 'coral');
+}
+
+function spawnEarnedBotReinforcement(): void {
+  const target = soloBotTargetForDeaths(soloBotDeaths);
+  if (bots.size >= target || player.kills >= MATCH_SCORE_LIMIT) return;
+  spawnBot(bots.size);
+  addFeed(`HOSTILE REINFORCEMENT · ${bots.size} RIVALS NOW ACTIVE`, 'coral');
 }
 
 function clearBots(): void {
   for (const bot of bots.values()) scene.remove(bot.root);
   bots.clear();
+  soloBotDeaths = 0;
   lastBotSpawnIndices.clear();
 }
 
@@ -2716,6 +2761,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   if (bot.hp > 0) return;
   bot.alive = false;
   bot.deaths += 1;
+  soloBotDeaths += 1;
   spawnDeathDrop({ type: 'death', killer: player.id, victim: bot.id, nonce: randomNonce() }, now);
   bot.respawnAt = now + 2_200;
   bot.deathVisibleUntil = now + 1_050;
@@ -2724,6 +2770,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   awardSupportElimination();
   audio.kill();
   addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
+  spawnEarnedBotReinforcement();
   checkMatchEnd();
 }
 
@@ -3229,8 +3276,27 @@ function registerOverdrivePickup(holderId: string, now: number): void {
   overdriveClaimGeneration = overdriveState.generation;
   const holderName = holderId === player.id ? player.name : remotes.get(holderId)?.snapshot.name ?? 'Operator';
   addFeed(`${holderName} secured 4× OVERDRIVE · 15 SECONDS`, 'gold');
-  if (holderId === player.id) audio.overdrivePickup();
+  if (holderId === player.id) {
+    audio.overdrivePickup();
+    showQuadDamageAnnouncement('QUAD DAMAGE', '4× DAMAGE · 15 SECONDS');
+  } else showQuadDamageAnnouncement(`${holderName} HAS QUAD DAMAGE`, 'DENY THE POWER HOLDER');
   broadcastOverdriveState(now);
+}
+
+let quadAnnouncementTimer = 0;
+function showQuadDamageAnnouncement(title: string, subtitle: string): void {
+  const announcement = element<HTMLElement>('#power-announcement');
+  element<HTMLElement>('#power-announcement strong').textContent = title;
+  element<HTMLElement>('#power-announcement span').textContent = subtitle;
+  announcement.hidden = false;
+  announcement.classList.remove('announce');
+  void announcement.offsetWidth;
+  announcement.classList.add('announce');
+  window.clearTimeout(quadAnnouncementTimer);
+  quadAnnouncementTimer = window.setTimeout(() => {
+    announcement.hidden = true;
+    announcement.classList.remove('announce');
+  }, 3_500);
 }
 
 function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
@@ -3280,7 +3346,9 @@ function updateOverdrive(now: number): void {
   if (!wasAvailable && overdriveState.available) {
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
-    addFeed('OVERDRIVE CORE ONLINE · MID MAP', 'gold');
+    addFeed('QUAD DAMAGE ONLINE · VISIBLE MID-MAP ICON', 'gold');
+    showQuadDamageAnnouncement('QUAD DAMAGE ONLINE', 'CENTRE CORE · CLAIM 4× DAMAGE');
+    audio.overdriveAvailable();
     broadcastOverdriveState(now);
   }
   if (previousHolder !== null && overdriveState.holderId === null) {
@@ -3311,6 +3379,8 @@ function updateOverdrive(now: number): void {
     overdriveCore.rotation.x = Math.sin(now * 0.0011) * 0.32;
     overdriveRings[0].rotation.z = now * 0.0013;
     overdriveRings[1].rotation.y = -now * 0.0016;
+    quadWorldIcon.position.y = 1.75 + Math.sin(now * 0.004) * 0.12;
+    quadWorldIcon.material.rotation = Math.sin(now * 0.0014) * 0.025;
   }
   const localRemaining = overdriveRemainingMs(overdriveState, player.id, now);
   const hud = element<HTMLElement>('#overdrive-hud');
@@ -4270,13 +4340,18 @@ function updateMinimap(now: number): void {
     const [x, y] = point(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.z);
     context.save();
     context.translate(x, y);
-    context.rotate(Math.PI / 4);
-    context.fillStyle = '#9b83ff';
+    const pulse = 15 + Math.sin(now * 0.006) * 2;
+    context.fillStyle = '#7864dc';
     context.strokeStyle = '#79f3eb';
-    context.lineWidth = 3;
-    context.fillRect(-7, -7, 14, 14);
-    context.strokeRect(-9, -9, 18, 18);
+    context.lineWidth = 4;
+    context.beginPath(); context.arc(0, 0, pulse, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#fff7ff';
+    context.font = '900 15px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('4×', 0, 1);
     context.restore();
+    context.textBaseline = 'alphabetic';
   }
   context.restore();
   const px = width / 2;
@@ -4941,6 +5016,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         return safe;
       })(),
     })),
+    botEscalation: {
+      deaths: soloBotDeaths,
+      initialBots: SOLO_BOT_COUNT,
+      targetBots: soloBotTargetForDeaths(soloBotDeaths),
+      activeBots: bots.size,
+      nextReinforcementAt: (Math.floor(soloBotDeaths / 5) + 1) * 5,
+    },
     remotes: remotes.size,
     networkSync: {
       stateIntervalMs: STATE_BROADCAST_INTERVAL_MS,
@@ -5047,6 +5129,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       pickups: overdrivePickups,
       expiries: overdriveExpiries,
       visible: overdriveRoot.visible,
+      worldIconVisible: overdriveRoot.visible && quadWorldIcon.visible,
+      worldIconName: quadWorldIcon.name,
+      minimapSymbol: '4×',
     },
     deathDrops: deathDrops.map((entity) => ({
       id: entity.drop.id,
@@ -5067,6 +5152,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       bounds: { ...cover.bounds },
       blocksMovement: cover.blocksMovement,
       blocksShots: cover.blocksShots,
+      performanceVisualKind: cover.performanceVisualKind ?? null,
+      performanceVisualMeshes: cover.performanceVisualMeshes ?? 0,
     })),
     minimap: {
       backingWidth: minimapCanvas.width,
@@ -5232,8 +5319,30 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;
-    const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
-    bot.position.set(player.position.x, 0, player.position.z).addScaledVector(forward, THREE.MathUtils.clamp(distance, 2.5, 9));
+    const stagedDistance = THREE.MathUtils.clamp(distance, 2.5, 9);
+    const origin = player.position.clone();
+    let stagedPosition: THREE.Vector3 | null = null;
+    // QA combat staging must not place the target inside a house, bus or cover
+    // AABB. Try the requested forward ray first, then nearby clear bearings.
+    for (const yawOffset of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI]) {
+      const yaw = player.yaw + yawOffset;
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const candidate = new THREE.Vector3(player.position.x, 0, player.position.z)
+        .addScaledVector(forward, stagedDistance);
+      const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+      if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
+      const target = candidate.clone().add(new THREE.Vector3(0, 1.06, 0));
+      const ray = target.clone().sub(origin);
+      const targetDistance = ray.length();
+      const blocked = new THREE.Raycaster(origin, ray.normalize(), 0, targetDistance)
+        .intersectObjects(arena.raycastMeshes, false)
+        .some((hit) => hit.distance < targetDistance - 0.2);
+      if (blocked) continue;
+      stagedPosition = candidate;
+      break;
+    }
+    if (!stagedPosition) return;
+    bot.position.copy(stagedPosition);
     bot.root.position.copy(bot.position);
     bot.root.updateMatrixWorld(true);
     bot.velocity.set(0, 0, 0);
@@ -5364,7 +5473,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return true;
   },
   damageBot: (amount, zone = 'body') => {
-    const bot = bots.values().next().value as BotPlayer | undefined;
+    const bot = [...bots.values()].find((candidate) => candidate.alive);
     if (!bot || !Number.isFinite(amount) || amount <= 0) return;
     bot.invulnerableUntil = 0;
     applyBotDamage(bot, amount, zone);
@@ -5588,7 +5697,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
     const now = performance.now();
     if (mode === 'charging') overdriveState = createOverdriveState(now);
-    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: true, nextSpawnAt: now };
+    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: false, nextSpawnAt: now };
     else if (mode === 'active') overdriveState = {
       generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
       holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,

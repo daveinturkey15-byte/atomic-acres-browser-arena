@@ -223,7 +223,9 @@ function texture(path: string, repeatX = 1, repeatY = 1, colorData = true): THRE
   const key = `${path}:${repeatX}:${repeatY}:${colorData ? 'srgb' : 'data'}`;
   const cached = textureCache.get(key);
   if (cached) return cached;
-  const value = textureLoader.load(path);
+  // Unit/SSR model construction has no DOM image loader. Preserve the texture
+  // contract and cache key there; browsers still load the authored image.
+  const value = typeof document === 'undefined' ? new THREE.Texture() : textureLoader.load(path);
   value.colorSpace = colorData ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   value.wrapS = value.wrapT = THREE.RepeatWrapping;
   value.repeat.set(repeatX, repeatY);
@@ -325,41 +327,100 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   if (id === 'sniper') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
     root.name = 'sniper-original-weapon';
+    const sniperMetal = MAT.gunmetal();
+    const sniperDark = MAT.dark();
+    const sniperAccent = new THREE.MeshStandardMaterial({ color: 0x78977d, roughness: 0.58, metalness: 0.28 });
+
+    // Strip the carbine's close optic and short fore-end cues so the precision
+    // rifle reads as its own authored chassis rather than a scoped recolour.
+    const inheritedCarbineDetails = new Set([
+      'optic-bridge', 'optic-side-post', 'optic-top-frame', 'optic-ring', 'optic-lens', 'optic-reticle',
+      'rear-sight', 'front-sight', 'triangular-fore-end', 'fore-end-top-rail', 'fore-end-side-rail',
+      'fore-end-vent', 'rail-tooth', 'gas-block',
+    ]);
+    root.traverse((node) => { if (inheritedCarbineDetails.has(node.name)) node.visible = false; });
+
+    const chassis = roundedBox('sniper-chassis', [0.245, 0.2, 0.86], sniperMetal, 0.045, 4);
+    part(root, chassis, [0, 0.015, -0.56]);
+    part(root, roundedBox('sniper-chassis-rail', [0.19, 0.035, 0.92], sniperDark, 0.008, 2), [0, 0.13, -0.53]);
+    for (const side of [-1, 1]) {
+      part(root, roundedBox('sniper-chassis-panel', [0.025, 0.115, 0.55], sniperAccent, 0.007, 2), [side * 0.132, 0.015, -0.53]);
+      const ventPositions = flattenMaterials ? [-0.62] : [-0.8, -0.67, -0.54, -0.41];
+      for (const z of ventPositions) part(root, roundedBox('sniper-chassis-vent', [0.03, 0.045, 0.07], sniperDark, 0.005, 1), [side * 0.142, 0.04, z]);
+    }
+
     const muzzleSocket = root.getObjectByName('muzzle-socket');
-    if (muzzleSocket) muzzleSocket.position.z = -1.52;
+    if (muzzleSocket) muzzleSocket.position.set(0, 0.005, -1.88);
     const muzzle = root.children.find((node) => node.userData.muzzle === true);
-    if (muzzle) muzzle.position.z = -1.52;
+    if (muzzle) muzzle.position.z = -1.88;
     const flash = root.getObjectByName('world-muzzle-flash');
-    if (flash) flash.position.z = -1.7;
-    const longBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.032, 0.72, 12), MAT.dark());
+    if (flash) flash.position.z = -2.06;
+    const longBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.034, 1.18, 16), sniperDark);
     longBarrel.name = 'sniper-long-barrel';
-    part(root, longBarrel, [0, 0.005, -1.18], [Math.PI / 2, 0, 0]);
+    part(root, longBarrel, [0, 0.005, -1.32], [Math.PI / 2, 0, 0]);
+    const brake = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.045, 0.18, 12), sniperAccent);
+    brake.name = 'sniper-muzzle-brake';
+    part(root, brake, [0, 0.005, -1.89], [Math.PI / 2, 0, 0]);
+    for (const side of [-1, 1]) part(root, roundedBox('sniper-brake-port', [0.025, 0.055, 0.07], sniperDark, 0.005, 1), [side * 0.045, 0.012, -1.89]);
+
     const scope = new THREE.Group();
     scope.name = 'sniper-scope';
-    scope.position.set(0, 0.3, -0.08);
-    const scopeBody = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.48, 16), MAT.dark());
+    scope.position.set(0, 0.285, -0.18);
+    const scopeBody = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.58, 20), sniperDark);
     scopeBody.name = 'sniper-scope-body';
     scopeBody.rotation.x = Math.PI / 2;
     scope.add(scopeBody);
-    for (const z of [-0.25, 0.25]) {
-      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.074, 0.09, 16), MAT.dark());
+    for (const z of [-0.31, 0.31]) {
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.058, 0.11, 20), sniperDark);
       bell.name = 'sniper-scope-bell';
       bell.rotation.x = Math.PI / 2;
       bell.position.z = z;
       scope.add(bell);
     }
+    for (const z of [-0.15, 0.14]) {
+      const mount = new THREE.Mesh(new THREE.TorusGeometry(0.064, 0.012, 8, 20), sniperAccent);
+      mount.name = 'sniper-scope-mount';
+      mount.position.z = z;
+      scope.add(mount);
+      part(scope, roundedBox('sniper-scope-foot', [0.055, 0.075, 0.045], sniperDark, 0.008, 2), [0, -0.075, z]);
+    }
     const lens = new THREE.Mesh(
-      new THREE.CircleGeometry(0.066, 20),
-      new THREE.MeshBasicMaterial({ color: 0x8fe9ff, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide }),
+      new THREE.CircleGeometry(0.054, 24),
+      new THREE.MeshBasicMaterial({ color: 0x8fe9ff, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide }),
     );
     lens.name = 'sniper-scope-lens';
-    lens.position.z = -0.298;
+    lens.position.z = -0.37;
     scope.add(lens);
+    const ocular = new THREE.Mesh(
+      new THREE.CircleGeometry(0.052, 24),
+      new THREE.MeshBasicMaterial({ color: 0x263940, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    ocular.name = 'sniper-scope-ocular';
+    ocular.position.z = 0.37;
+    ocular.rotation.y = Math.PI;
+    scope.add(ocular);
+    const elevationTurret = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.08, 12), sniperAccent);
+    elevationTurret.name = 'sniper-elevation-turret';
+    elevationTurret.position.set(0, 0.085, 0);
+    scope.add(elevationTurret);
     root.add(scope);
-    for (const name of ['optic-ring', 'optic-lens', 'optic-reticle']) {
-      const opticPart = root.getObjectByName(name);
-      if (opticPart) opticPart.position.y = 0.3;
-    }
+
+    const boltHandle = new THREE.Group();
+    boltHandle.name = 'sniper-bolt-handle';
+    boltHandle.position.set(0.145, 0.095, 0.035);
+    const boltStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.16, 10), sniperAccent);
+    boltStem.rotation.z = Math.PI / 2;
+    boltHandle.add(boltStem);
+    const boltKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), sniperDark);
+    boltKnob.position.x = 0.095;
+    boltHandle.add(boltKnob);
+    root.add(boltHandle);
+    const action = root.getObjectByName('bolt-or-slide');
+    if (action) action.userData.precisionBolt = true;
+    const supportSocket = root.getObjectByName('support-socket-l');
+    if (supportSocket) supportSocket.position.set(-0.035, -0.095, -0.63);
+    const gripSocket = root.getObjectByName('grip-socket-r');
+    if (gripSocket) gripSocket.position.set(0.045, -0.15, 0.04);
     return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
   const root = new THREE.Group();
@@ -435,6 +496,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     for (const z of railTeeth) {
       part(root, roundedBox('rail-tooth', [0.18, 0.024, 0.035], dark, 0.004, 1), [0, 0.135, z]);
     }
+    part(root, roundedBox('angled-foregrip', [0.105, 0.22, 0.12], rubber, 0.028, 3), [0, -0.15, -0.57], [-0.18, 0, 0]);
+    part(root, roundedBox('foregrip-hand-stop', [0.14, 0.045, 0.14], accent, 0.01, 2), [0, -0.05, -0.62]);
     addBarrel(0.5, -0.96, 0.031);
     const gasBlock = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.095, 10), dark);
     gasBlock.name = 'gas-block';
@@ -474,7 +537,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('muzzle-socket', [0, 0.005, -1.24]);
     addSocket('eject-socket', [0.145, 0.055, -0.07]);
     addSocket('grip-socket-r', [0.035, -0.135, 0.045]);
-    addSocket('support-socket-l', [-0.035, -0.085, -0.32]);
+    addSocket('support-socket-l', [-0.035, -0.17, -0.57]);
   } else if (id === 'smg') {
     // Original Vectorline SMG: vertically layered receiver, forward heat cage,
     // compact aperture sights and an exposed side charging tab.
@@ -488,6 +551,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
       vent.name = 'smg-heat-vent';
       vent.rotation.y = Math.PI / 2; vent.position.set(side * 0.119, 0.012, z); root.add(vent);
     }
+    part(root, roundedBox('smg-foregrip', [0.1, 0.225, 0.11], rubber, 0.028, 3), [0, -0.145, -0.47], [-0.12, 0, 0]);
+    part(root, roundedBox('smg-hand-stop', [0.14, 0.04, 0.13], dark, 0.009, 2), [0, -0.045, -0.51]);
     part(root, roundedBox('raked-grip', [0.11, 0.255, 0.13], rubber, 0.025), [0, -0.18, 0.015], [-0.24, 0, 0]);
     part(root, roundedBox('trigger-bridge', [0.12, 0.025, 0.13], dark, 0.006, 1), [0, -0.12, -0.025]);
     const magazine = new THREE.Group();
@@ -520,7 +585,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('muzzle-socket', [0, 0.005, -0.96]);
     addSocket('eject-socket', [0.14, 0.06, -0.04]);
     addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
-    addSocket('support-socket-l', [-0.03, -0.08, -0.43]);
+    addSocket('support-socket-l', [-0.03, -0.16, -0.47]);
   } else if (pistolFamily) {
     // Original Aster/G18-style pistol family: compact stepped slide, open-frame
     // trigger guard and a high-contrast sight channel. The full-auto marksman
@@ -534,6 +599,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     root.add(slide);
     part(slide, roundedBox('pistol-slide', [0.205, 0.145, 0.58], dark, 0.025, 3), [0, 0, 0]);
     part(slide, roundedBox('pistol-slide-accent', [0.215, 0.035, 0.24], accent, 0.008, 1), [0, 0.06, 0.04]);
+    part(slide, roundedBox('pistol-ejection-port', [0.13, 0.012, 0.16], MAT.brass(), 0.005, 1), [0.035, 0.075, -0.03]);
+    part(root, roundedBox('pistol-frame-rail', [0.17, 0.045, 0.22], metal, 0.01, 2), [0, -0.105, -0.28]);
     if (id === 'machine-pistol') part(root, roundedBox('auto-selector', [0.035, 0.055, 0.07], accent, 0.008, 2), [0.12, 0.055, 0.02]);
     const serrations = flattenMaterials ? [0.08] : [0.02, 0.08, 0.14];
     for (const z of serrations) {
@@ -553,6 +620,20 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     part(root, roundedBox('pistol-trigger-guard', [0.19, 0.04, 0.2], dark, 0.012, 2), [0, -0.13, -0.1]);
     part(root, roundedBox('pistol-trigger', [0.028, 0.095, 0.028], accent, 0.007, 1), [0, -0.1, -0.08], [0.24, 0, 0]);
     addBarrel(0.43, -0.35, 0.028);
+    if (id === 'machine-pistol') {
+      const compensator = roundedBox('machine-pistol-compensator', [0.225, 0.185, 0.2], metal, 0.035, 4);
+      part(root, compensator, [0, 0.075, -0.53]);
+      for (const side of [-1, 1]) {
+        part(root, roundedBox('machine-pistol-comp-port', [0.035, 0.075, 0.065], dark, 0.007, 1), [side * 0.105, 0.09, -0.55]);
+      }
+      part(root, roundedBox('machine-pistol-underbarrel-stop', [0.16, 0.065, 0.16], accent, 0.012, 2), [0, -0.08, -0.43]);
+      const chargingWings = new THREE.Group();
+      chargingWings.name = 'machine-pistol-charging-wings';
+      chargingWings.position.set(0, 0.18, 0.12);
+      part(chargingWings, roundedBox('machine-pistol-wing-left', [0.08, 0.04, 0.06], accent, 0.008, 2), [-0.13, 0, 0]);
+      part(chargingWings, roundedBox('machine-pistol-wing-right', [0.08, 0.04, 0.06], accent, 0.008, 2), [0.13, 0, 0]);
+      root.add(chargingWings);
+    }
     const rearSight = new THREE.Group();
     rearSight.name = 'pistol-rear-sight';
     rearSight.position.set(0, 0.205, 0.09);
@@ -560,7 +641,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     part(rearSight, roundedBox('pistol-rear-sight-left', [0.045, 0.06, 0.04], accent, 0.008, 2), [-0.062, 0, 0]);
     part(rearSight, roundedBox('pistol-rear-sight-right', [0.045, 0.06, 0.04], accent, 0.008, 2), [0.062, 0, 0]);
     part(root, roundedBox('pistol-front-sight', [0.032, 0.07, 0.032], accent, 0.007, 2), [0, 0.205, -0.39]);
-    addSocket('muzzle-socket', [0, 0.105, -0.58]);
+    addSocket('muzzle-socket', [0, 0.105, id === 'machine-pistol' ? -0.66 : -0.58]);
     addSocket('eject-socket', [0.125, 0.13, -0.08]);
     addSocket('grip-socket-r', [0.03, -0.2, 0.08]);
     addSocket('support-socket-l', [-0.09, -0.1, -0.12]);
@@ -570,6 +651,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     const wood = new THREE.MeshStandardMaterial({ color: 0xb98a57, roughness: 0.78, metalness: 0.04 });
     part(root, roundedBox('rounded-receiver', [0.225, 0.225, 0.5], metal, 0.055), [0, 0, -0.05]);
     part(root, roundedBox('receiver-topstrap', [0.17, 0.045, 0.47], dark, 0.012, 2), [0, 0.135, -0.05]);
+    part(root, roundedBox('scattergun-trigger-guard', [0.15, 0.035, 0.19], dark, 0.01, 2), [0, -0.135, 0.065]);
+    part(root, roundedBox('scattergun-trigger', [0.025, 0.09, 0.025], accent, 0.006, 1), [0, -0.105, 0.055], [0.24, 0, 0]);
     part(root, roundedBox('stock', [0.18, 0.205, 0.5], wood, 0.06), [0, -0.015, 0.42], [-0.05, 0, 0]);
     part(root, roundedBox('stock-cheek-panel', [0.19, 0.08, 0.3], accent, 0.025, 2), [0, 0.085, 0.38]);
     part(root, roundedBox('grip', [0.115, 0.25, 0.14], rubber, 0.03), [0, -0.19, 0.13], [-0.2, 0, 0]);
@@ -588,7 +671,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     }
     const pump = new THREE.Group();
     pump.name = 'pump'; pump.position.set(0, -0.055, -0.49); pump.userData.restZ = pump.position.z; root.add(pump);
-    part(pump, roundedBox('pump-body', [0.205, 0.17, 0.35], wood, 0.05), [0, 0, 0]);
+    part(pump, roundedBox('pump-body', [0.245, 0.2, 0.42], wood, 0.055, 4), [0, -0.015, 0]);
+    part(pump, roundedBox('pump-hand-stop', [0.255, 0.055, 0.08], rubber, 0.012, 2), [0, -0.105, 0.17]);
     const pumpRibs = flattenMaterials ? [0] : [-0.12, -0.06, 0, 0.06, 0.12];
     for (const z of pumpRibs) part(pump, roundedBox('pump-rib', [0.215, 0.025, 0.018], dark, 0.004, 1), [0, 0.035, z]);
     const ghostRing = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.009, 7, 18), dark);

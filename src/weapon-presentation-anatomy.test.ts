@@ -10,15 +10,16 @@ describe('first-person anatomical presentation', () => {
     expect(arms).toBeDefined();
 
     for (const side of ['left', 'right'] as const) {
-      for (const detailName of [`${side}-upper-arm`, `${side}-forearm`, `${side}-palm`, `${side}-thumb`, `${side}-finger-0`]) {
+      for (const detailName of [`${side}-upper-arm`, `${side}-forearm`, `${side}-palm`, `${side}-thumb`, `${side}-finger-articulated-cluster`]) {
         const detail = arms!.getObjectByName(detailName);
         expect(detail).toBeInstanceOf(THREE.Mesh);
         expect((detail as THREE.Mesh).material).toBeInstanceOf(THREE.MeshStandardMaterial);
       }
+      expect(arms!.getObjectByName(`${side}-finger-articulated-cluster`)?.userData.segmentCount).toBe(8);
       expect(arms!.getObjectByName(`${side}-wrist-joint`)).toBeInstanceOf(THREE.Group);
     }
 
-    expect(presentation.presentationState().armMeshCount).toBeGreaterThanOrEqual(30);
+    expect(presentation.presentationState().armMeshCount).toBeGreaterThanOrEqual(16);
   });
 
   it('pins a readable fire cycle for deterministic visual evidence', () => {

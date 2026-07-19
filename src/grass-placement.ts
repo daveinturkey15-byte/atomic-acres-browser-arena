@@ -158,7 +158,9 @@ export function evaluateGrassBend(
 ): { x: number; z: number; flatten: number } {
   const safeTime = Number.isFinite(timeSeconds) ? timeSeconds : 0;
   const windPhase = placement.x * 0.19 + placement.z * 0.13 + safeTime * 1.35;
-  const wind = Math.sin(windPhase) * 0.105 + Math.sin(windPhase * 0.47 + 1.7) * 0.035;
+  const gust = 0.72 + Math.sin(safeTime * 0.42 + placement.x * 0.031 - placement.z * 0.027) * 0.28;
+  const wind = (Math.sin(windPhase) * 0.12 + Math.sin(windPhase * 2.17 + 1.7) * 0.026) * gust;
+  const crosswind = (Math.cos(windPhase * 0.82) * 0.062 + Math.sin(windPhase * 3.1) * 0.018) * gust;
   const dx = placement.x - interaction.playerX;
   const dz = placement.z - interaction.playerZ;
   const distance = Math.hypot(dx, dz);
@@ -167,7 +169,7 @@ export function evaluateGrassBend(
   const inverse = distance > 0.0001 ? 1 / distance : 0;
   return {
     x: wind + dx * inverse * flatten * 0.26,
-    z: Math.cos(windPhase * 0.82) * 0.045 + dz * inverse * flatten * 0.26,
+    z: crosswind + dz * inverse * flatten * 0.26,
     flatten,
   };
 }

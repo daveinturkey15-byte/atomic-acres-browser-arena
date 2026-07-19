@@ -378,6 +378,14 @@ export class ArenaAudio {
     this.tone(880, 0.34, 0.042, 'sine', this.ambience, 0.26);
   }
 
+  overdriveAvailable(): void {
+    this.unlock();
+    this.tone(330, 0.16, 0.04, 'square', this.feedback);
+    this.tone(495, 0.2, 0.05, 'triangle', this.feedback, 0.12);
+    this.tone(660, 0.3, 0.06, 'sine', this.ambience, 0.25);
+    this.noise({ duration: 0.32, volume: 0.035, filter: 'bandpass', frequency: 1_850, q: 0.9, delay: 0.05 }, this.feedback);
+  }
+
   overdriveExpire(): void {
     this.unlock();
     this.sweep(720, 140, 0.34, 0.055, 'triangle', this.feedback);

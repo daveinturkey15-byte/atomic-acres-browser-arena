@@ -8,6 +8,7 @@ export type AtmosphereTelemetry = Readonly<{
   bypassReason: string | null;
   mistCards: number;
   smokeCards: number;
+  dustMotes: number;
   triangles: number;
   submissions: number;
   textureSamples: 0;
@@ -42,6 +43,8 @@ export class AtmosphereSystem {
   private readonly mesh: THREE.InstancedMesh | null;
   private readonly smokeMaterial: THREE.ShaderMaterial | null;
   private readonly smokeMesh: THREE.InstancedMesh | null;
+  private readonly dustMaterial: THREE.ShaderMaterial | null;
+  private readonly dustPoints: THREE.Points | null;
   private submissions = 0;
   private submissionFrame = -1;
   private time = 0;
@@ -57,6 +60,8 @@ export class AtmosphereSystem {
       this.mesh = null;
       this.smokeMaterial = null;
       this.smokeMesh = null;
+      this.dustMaterial = null;
+      this.dustPoints = null;
       scene.add(this.root);
       return;
     }
@@ -75,7 +80,7 @@ export class AtmosphereSystem {
           uTime: { value: 0 },
           uShadowColor: { value: new THREE.Color(0x725f87) },
           uLightColor: { value: new THREE.Color(0xe9a57b) },
-          uOpacity: { value: profile === 'blender' ? 0.135 : 0.075 },
+          uOpacity: { value: profile === 'blender' ? 0.16 : 0.085 },
         },
       ]),
       vertexShader: `
@@ -164,7 +169,7 @@ export class AtmosphereSystem {
           uTime: { value: 0 },
           uSmokeColor: { value: new THREE.Color(0x84909a) },
           uWarmEdge: { value: new THREE.Color(0xc3a58d) },
-          uOpacity: { value: profile === 'blender' ? 0.072 : 0.045 },
+          uOpacity: { value: profile === 'blender' ? 0.082 : 0.05 },
         },
       ]),
       vertexShader: `
@@ -229,6 +234,76 @@ export class AtmosphereSystem {
     smokeMesh.onBeforeRender = mesh.onBeforeRender;
     this.smokeMesh = smokeMesh;
     this.root.add(smokeMesh);
+
+    const dustCount = profile === 'blender' ? 96 : 64;
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustPhases = new Float32Array(dustCount);
+    for (let index = 0; index < dustCount; index += 1) {
+      // Low-discrepancy deterministic distribution: dust reads as air volume,
+      // not large authored objects suspended in the sky.
+      const u = ((index * 37) % dustCount) / dustCount;
+      const v = ((index * 61) % dustCount) / dustCount;
+      dustPositions[index * 3] = -37 + u * 74;
+      dustPositions[index * 3 + 1] = 0.35 + ((index * 19) % 43) / 43 * 2.25;
+      dustPositions[index * 3 + 2] = -39 + v * 78;
+      dustPhases[index] = index * 1.61803398875;
+    }
+    const dustGeometry = new THREE.BufferGeometry();
+    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    dustGeometry.setAttribute('dustPhase', new THREE.BufferAttribute(dustPhases, 1));
+    this.dustMaterial = new THREE.ShaderMaterial({
+      name: 'pass32-bounded-airborne-dust',
+      transparent: true,
+      depthWrite: false,
+      fog: true,
+      toneMapped: true,
+      blending: THREE.NormalBlending,
+      uniforms: THREE.UniformsUtils.merge([
+        THREE.UniformsLib.fog,
+        { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xd8bd95) }, uOpacity: { value: 0.22 } },
+      ]),
+      vertexShader: `
+        #include <fog_pars_vertex>
+        attribute float dustPhase;
+        uniform float uTime;
+        varying float vDustFade;
+        void main() {
+          vec3 drifted = position;
+          float gust = 0.65 + 0.35 * sin(uTime * 0.27 + dustPhase * 0.31);
+          drifted.x += sin(uTime * 0.42 + dustPhase) * 0.42 * gust;
+          drifted.z += cos(uTime * 0.31 + dustPhase * 1.37) * 0.24;
+          drifted.y += sin(uTime * 0.18 + dustPhase * 0.71) * 0.14;
+          vec4 mvPosition = modelViewMatrix * vec4(drifted, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = clamp(17.0 / max(2.0, -mvPosition.z), 1.2, 3.2);
+          vDustFade = 0.68 + 0.32 * sin(dustPhase * 2.1);
+          #include <fog_vertex>
+        }
+      `,
+      fragmentShader: `
+        #include <fog_pars_fragment>
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying float vDustFade;
+        void main() {
+          vec2 centred = gl_PointCoord - 0.5;
+          float feather = 1.0 - smoothstep(0.18, 0.5, length(centred));
+          gl_FragColor = vec4(uColor, feather * vDustFade * uOpacity);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          #include <fog_fragment>
+        }
+      `,
+    });
+    this.dustPoints = new THREE.Points(dustGeometry, this.dustMaterial);
+    this.dustPoints.name = 'pass32-subtle-airborne-dust';
+    this.dustPoints.frustumCulled = true;
+    this.dustPoints.renderOrder = -1;
+    this.dustPoints.userData.presentationOnly = true;
+    this.dustPoints.userData.blocksShots = false;
+    this.dustPoints.raycast = () => undefined;
+    this.dustPoints.onBeforeRender = mesh.onBeforeRender;
+    this.root.add(this.dustPoints);
     scene.add(this.root);
   }
 
@@ -238,6 +313,7 @@ export class AtmosphereSystem {
     this.time = Number.isFinite(timeSeconds) ? timeSeconds : 0;
     this.material.uniforms.uTime.value = this.time;
     if (this.smokeMaterial) this.smokeMaterial.uniforms.uTime.value = this.time;
+    if (this.dustMaterial) this.dustMaterial.uniforms.uTime.value = this.time;
   }
 
   handleContextRestored(): void {
@@ -245,6 +321,8 @@ export class AtmosphereSystem {
     if (this.mesh) this.mesh.instanceMatrix.needsUpdate = true;
     if (this.smokeMaterial) this.smokeMaterial.needsUpdate = true;
     if (this.smokeMesh) this.smokeMesh.instanceMatrix.needsUpdate = true;
+    if (this.dustMaterial) this.dustMaterial.needsUpdate = true;
+    if (this.dustPoints) this.dustPoints.geometry.attributes.position.needsUpdate = true;
   }
 
   telemetry(): AtmosphereTelemetry {
@@ -254,6 +332,7 @@ export class AtmosphereSystem {
       bypassReason: this.bypass,
       mistCards: this.mesh?.count ?? 0,
       smokeCards: this.smokeMesh?.count ?? 0,
+      dustMotes: this.dustPoints?.geometry.attributes.position.count ?? 0,
       triangles: ((this.mesh?.count ?? 0) + (this.smokeMesh?.count ?? 0)) * 2,
       submissions: this.submissions,
       textureSamples: 0,

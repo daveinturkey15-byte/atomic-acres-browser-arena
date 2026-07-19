@@ -42,6 +42,7 @@ export type GrassTelemetry = Readonly<{
   maximumDistance: number;
   adaptiveDistance: number;
   windTime: number;
+  windModel: 'gusted-arc-v2';
   interactionRadius: number;
   interactionStrength: number;
   rejectedByStructure: number;
@@ -177,17 +178,21 @@ function createGrassMaterial(profile: GrassProfileConfig, lighting: ArenaLightin
         float bladeHeight = clamp(position.y, 0.0, 1.0);
         float bendWeight = bladeHeight * bladeHeight;
         float phase = baseWorld.x * 0.19 + baseWorld.z * 0.13 + uTime * 1.35;
+        float gust = 0.72 + sin(uTime * 0.42 + baseWorld.x * 0.031 - baseWorld.z * 0.027) * 0.28;
         vec2 wind = vec2(
-          sin(phase) * 0.105 + sin(phase * 0.47 + 1.7) * 0.035,
-          cos(phase * 0.82) * 0.045
-        ) * uWindStrength;
+          sin(phase) * 0.12 + sin(phase * 2.17 + 1.7) * 0.026,
+          cos(phase * 0.82) * 0.062 + sin(phase * 3.1) * 0.018
+        ) * gust * uWindStrength;
         vec2 away = baseWorld.xz - uPlayerPosition;
         float playerDistance = length(away);
         float interaction = (1.0 - smoothstep(0.0, uInteractionRadius, playerDistance)) * uInteractionStrength;
         vec2 interactionDirection = playerDistance > 0.0001 ? away / playerDistance : vec2(0.0);
         vec2 naturalCurl = vec2(sin(baseWorld.x * 0.41 + baseWorld.z * 0.29), cos(baseWorld.z * 0.37)) * 0.024;
         worldPosition.xz += (naturalCurl + wind + interactionDirection * interaction * 0.26) * bendWeight;
-        worldPosition.y -= interaction * bladeHeight * 0.11;
+        // Gusts bend the whole blade into a shallow arc instead of sliding
+        // every vertex sideways as one rigid card. Player contact adds a
+        // stronger temporary flattening response.
+        worldPosition.y -= (interaction * 0.11 + length(wind) * 0.16) * pow(bladeHeight, 1.65);
         vBladeHeight = bladeHeight;
         vWorldPosition = worldPosition.xyz;
         vWorldNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
@@ -432,6 +437,7 @@ export class GrassSystem {
       maximumDistance: this.config.maximumDistance,
       adaptiveDistance: this.adaptiveDistance,
       windTime: this.windTime,
+      windModel: 'gusted-arc-v2',
       interactionRadius: this.config.interactionRadius,
       interactionStrength: this.interactionStrength,
       rejectedByStructure: this.rejectedByStructure,

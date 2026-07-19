@@ -146,6 +146,9 @@ M = {
     "rubber": make_material("MAT_rubber", 0x15191A, 0.84),
     "glass": make_material("MAT_glass_tactical", 0x5E9AA5, 0.18, 0.16, 0.42),
     "foliage": make_material("MAT_foliage_military", 0x405D3D, 0.97, texture="grass-turf.png", tile_metres=1.8),
+    "fabric_aqua": make_material("MAT_upholstery_aqua_weave", 0x5A858A, 0.96, texture="fabric-weave.png", tile_metres=0.42),
+    "fabric_coral": make_material("MAT_upholstery_coral_weave", 0x9A6258, 0.96, texture="fabric-weave.png", tile_metres=0.42),
+    "fabric_neutral": make_material("MAT_bedding_neutral_weave", 0xD0C7B5, 0.98, texture="fabric-weave.png", tile_metres=0.38),
     "emissive_aqua": make_material("MAT_emissive_aqua", 0x55BDBB, 0.34, 0.22, emission=0x319C9A, emission_strength=1.8),
     "emissive_amber": make_material("MAT_emissive_amber", 0xDDAF5B, 0.37, 0.14, emission=0xC9832F, emission_strength=2.0),
     "grow_violet": make_material("MAT_route_grow_violet", 0xB08BC7, 0.32, 0.08, emission=0x8A55B8, emission_strength=3.2),
@@ -265,12 +268,18 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     add_box(f"{prefix}_body_colour", [x, 2.15, z], [5.0, 2.25, length - 0.35], body_material, 0.3)
     add_box(f"{prefix}_roof", [x, 3.52, z], [4.75, 0.34, length - 0.7], M["trim"], 0.14)
     add_box(f"{prefix}_front_glass", [x, 2.55, z - half - 0.015], [4.12, 1.24, 0.09], M["glass"], 0.03)
+    add_box(f"{prefix}_windshield_divider", [x, 2.55, z - half - 0.075], [0.12, 1.26, 0.08], M["metal"], 0.02)
     add_box(f"{prefix}_rear_glass", [x, 2.52, z + half + 0.015], [3.95, 1.12, 0.09], M["glass"], 0.03)
+    add_box(f"{prefix}_front_fascia", [x, 1.42, z - half - 0.07], [4.82, 0.94, 0.14], body_material, 0.05)
+    add_box(f"{prefix}_front_grille", [x, 0.92, z - half - 0.16], [2.35, 0.38, 0.08], M["metal_light"], 0.03)
+    for grille_x in (-0.8, -0.4, 0, 0.4, 0.8):
+        add_box(f"{prefix}_grille_slot_{grille_x}", [x + grille_x, 0.92, z - half - 0.21], [0.06, 0.28, 0.03], M["metal"], 0.01)
     window_count = 5 if length > 12 else 4
     for side in (-1, 1):
         for index in range(window_count):
             wz = z - half + 1.5 + index * ((length - 3.0) / max(1, window_count - 1))
             add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 2.54, wz], [0.07, 1.18, 1.62], M["glass"], 0.025)
+        add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.57, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
         door_z = z - half + (2.25 if side > 0 else length - 2.25)
         add_box(f"{prefix}_door_frame_{side}", [x + side * 2.57, 1.78, door_z], [0.08, 2.65, 1.75], M["metal_light"], 0.03)
         for leaf in (-1, 1):
@@ -285,6 +294,7 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
         for side in (-1, 1):
             add_uv_sphere(f"{prefix}_{end}_lamp_{side}", [x + side * 1.75, 1.35, end_z + (-0.08 if end == "front" else 0.08)], [0.22, 0.16, 0.08], M["emissive_amber"])
     add_box(f"{prefix}_destination", [x, 3.05, z - half - 0.09], [3.35, 0.48, 0.08], M["emissive_aqua"], 0.025)
+    add_box(f"{prefix}_number_plate", [x, 0.58, z - half - 0.22], [1.15, 0.28, 0.04], M["yellow"], 0.018)
     for side in (-1, 1):
         add_box(f"{prefix}_mirror_arm_{side}", [x + side * 2.85, 2.25, z - half + 0.55], [0.58, 0.08, 0.08], M["metal"], 0.02)
         add_box(f"{prefix}_mirror_{side}", [x + side * 3.12, 2.25, z - half + 0.55], [0.1, 0.42, 0.3], M["glass"], 0.03)
@@ -366,14 +376,14 @@ for house_index, house in enumerate(spec["houses"]):
     x, z = house["origin"]["x"], house["origin"]["z"]
     facing = house["origin"]["facing"]
     prefix = "AQUA" if house["team"] == 0 else "CORAL"
-    fabric = M["aqua"] if house["team"] == 0 else M["coral"]
+    fabric = M["fabric_aqua"] if house["team"] == 0 else M["fabric_coral"]
 
     table_x, table_z = x - 3.0, z - facing * 2.7
     add_box(f"P32_FURN_{prefix}_dining_top", [table_x, 0.91, table_z], [2.6, 0.16, 1.25], M["timber"], 0.07)
     for lx in (-1.08, 1.08):
         for lz in (-0.46, 0.46):
             add_box(f"P32_FURN_{prefix}_dining_leg_{lx}_{lz}", [table_x + lx, 0.45, table_z + lz], [0.13, 0.9, 0.13], M["metal_light"], 0.025)
-    add_uv_sphere(f"P32_FURN_{prefix}_table_bowl", [table_x, 1.08, table_z], [0.34, 0.12, 0.34], M["emissive_amber"], 16, 8)
+    add_uv_sphere(f"P32_FURN_{prefix}_table_bowl", [table_x, 1.08, table_z], [0.34, 0.12, 0.34], M["trim"], 16, 8)
     for chair_index, (cx, cz, rotation) in enumerate((
         (table_x - 1.72, table_z, math.pi / 2), (table_x + 1.72, table_z, -math.pi / 2),
         (table_x, table_z - 1.05, 0), (table_x, table_z + 1.05, math.pi),
@@ -401,11 +411,11 @@ for house_index, house in enumerate(spec["houses"]):
 
     bed_x, bed_z = x + 3.6, z - facing * 2.5
     add_box(f"P32_FURN_{prefix}_upper_bed_frame", [bed_x, 3.82, bed_z], [3.0, 0.32, 2.1], M["timber"], 0.08)
-    add_box(f"P32_FURN_{prefix}_upper_mattress", [bed_x, 4.12, bed_z], [2.82, 0.36, 1.96], M["trim"], 0.12)
+    add_box(f"P32_FURN_{prefix}_upper_mattress", [bed_x, 4.12, bed_z], [2.82, 0.36, 1.96], M["fabric_neutral"], 0.12)
     add_box(f"P32_FURN_{prefix}_upper_blanket", [bed_x, 4.34, bed_z + facing * 0.32], [2.7, 0.14, 1.22], fabric, 0.08)
     add_box(f"P32_FURN_{prefix}_upper_headboard", [bed_x, 4.72, bed_z - facing * 1.02], [3.08, 1.72, 0.2], M["timber"], 0.07)
     for side in (-1, 1):
-        add_box(f"P32_FURN_{prefix}_upper_pillow_{side}", [bed_x + side * 0.68, 4.37, bed_z - facing * 0.55], [1.05, 0.2, 0.55], M["plaster"], 0.12)
+        add_box(f"P32_FURN_{prefix}_upper_pillow_{side}", [bed_x + side * 0.68, 4.37, bed_z - facing * 0.55], [1.05, 0.2, 0.55], M["fabric_neutral"], 0.12)
 
     desk_x, desk_z = x - 3.2, z + facing * 2.8
     add_box(f"P32_FURN_{prefix}_upper_desk", [desk_x, 4.28, desk_z], [2.5, 0.16, 0.82], M["timber"], 0.06)
@@ -437,12 +447,42 @@ for index, garage in enumerate(spec["garages"]):
 add_transit_bus("P32_BUS_ATOM_LINER", (-3.8, 7.0), 14.0, M["yellow"], "ATOM_LINER_86")
 add_transit_bus("P32_BUS_ACRES_SHUTTLE", (4.2, -8.8), 10.8, M["aqua"], "ACRES_SHUTTLE")
 
-# Lane cover becomes authored modular military/agricultural barriers.
+# Lane cover becomes authored modular military/agricultural barriers. The four
+# outer anchors are recognisable large utility objects aligned to their taller
+# TypeScript collision bodies rather than another row of anonymous cubes.
 for index, (x, z, width, depth) in enumerate(spec["cover"]):
     accent = M["aqua"] if index % 2 == 0 else M["coral"]
-    add_box(f"BLD_COVER_{index}_core", [x, 0.8, z], [width, 1.6, depth], M["concrete_dark"], 0.15)
-    add_box(f"BLD_COVER_{index}_plate", [x, 1.32, z], [max(0.5, width - 0.25), 0.22, depth + 0.08], accent, 0.04)
-    for side in (-1, 1): add_box(f"BLD_COVER_{index}_foot_{side}", [x + side * (width / 2 - 0.18), 0.18, z], [0.28, 0.36, depth + 0.35], M["metal"], 0.04)
+    if index == 4:
+        for crate_index, (ox, oy, sy) in enumerate(((-0.95, 0.62, 1.18), (0.95, 0.62, 1.18), (0, 1.65, 0.86))):
+            add_box(f"P32_LARGE_COVER_cargo_crate_{crate_index}", [x + ox, oy, z], [1.72, sy, 1.78], M["timber"], 0.1)
+            for band in (-0.42, 0.42):
+                add_box(f"P32_LARGE_COVER_cargo_strap_{crate_index}_{band}", [x + ox + band, oy, z], [0.1, sy + 0.04, 1.82], M["yellow"], 0.02)
+    elif index == 5:
+        for pipe_index, (ox, oy) in enumerate(((-0.9, 0.62), (0, 0.62), (0.9, 0.62), (-0.45, 1.48), (0.45, 1.48))):
+            add_cylinder(f"P32_LARGE_COVER_concrete_pipe_{pipe_index}", [x + ox, oy, z], 0.43, width - 0.3, M["concrete"], 18, rotation=(0, math.pi / 2, 0))
+    elif index == 6:
+        add_box("P32_LARGE_COVER_service_skip_body", [x, 0.98, z], [width - 0.12, 1.86, depth - 0.18], M["coral"], 0.16)
+        for side in (-1, 1):
+            add_box(f"P32_LARGE_COVER_service_skip_rim_{side}", [x, 1.98, z + side * (depth / 2 - 0.12)], [width + 0.08, 0.14, 0.18], M["yellow"], 0.035)
+        add_box("P32_LARGE_COVER_service_skip_label", [x, 1.08, z + depth / 2], [width - 0.45, 0.5, 0.06], M["trim"], 0.03)
+    elif index == 7:
+        add_box("P32_LARGE_COVER_generator_shell", [x, 1.1, z], [width - 0.18, 1.72, depth - 0.42], M["metal"], 0.14)
+        add_box("P32_LARGE_COVER_generator_roof", [x, 2.02, z], [width, 0.18, depth - 0.18], M["yellow"], 0.06)
+        for vent_index, vent_y in enumerate((0.54, 0.82, 1.1)):
+            add_box(f"P32_LARGE_COVER_generator_vent_{vent_index}", [x, vent_y, z + depth / 2 - 0.17], [width - 0.5, 0.08, 0.06], M["metal_light"], 0.01)
+        for wheel_index, wheel_z in enumerate((z - depth * 0.3, z + depth * 0.3)):
+            add_cylinder(f"P32_LARGE_COVER_generator_wheel_{wheel_index}", [x, 0.44, wheel_z], 0.42, width + 0.08, M["rubber"], 16, rotation=(0, math.pi / 2, 0))
+    else:
+        add_box(f"BLD_COVER_{index}_core", [x, 0.8, z], [width, 1.6, depth], M["concrete_dark"], 0.15)
+        add_box(f"BLD_COVER_{index}_plate", [x, 1.32, z], [max(0.5, width - 0.25), 0.22, depth + 0.08], accent, 0.04)
+        for side in (-1, 1): add_box(f"BLD_COVER_{index}_foot_{side}", [x + side * (width / 2 - 0.18), 0.18, z], [0.28, 0.36, depth + 0.35], M["metal"], 0.04)
+    if index >= 4:
+        cover_marker = bpy.data.objects.new(f"P32_LARGE_COVER_ASSET_{index}", None)
+        cover_marker.location = game_location((x, 1.1, z))
+        cover_marker["atomic_asset_class"] = "authored-large-physical-cover"
+        cover_marker["atomic_cover_id"] = ("north-cargo-stack", "south-pipe-stack", "west-service-skip", "east-generator-trailer")[index - 4]
+        cover_marker["atomic_collision_authority"] = "typescript-cover-box"
+        env.objects.link(cover_marker)
 
 # Hydroponics frame, service trench and solar canopy—original lane landmarks.
 for x in (-29.0, -22.0):
