@@ -5793,7 +5793,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = false;
   hostButton.disabled = !webRtcSupported;
   joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 31 — two neon-haze solo rivals, brighter neighbourhood sightlines, five-tier Field Support and the 4× Overdrive Core.');
+  setStatus('Pass 32 — six tactical weapon families, authentic physical cover, fifth-death reinforcements and the 4× Quad Damage Core.');
   requestAnimationFrame(frame);
 }
 
