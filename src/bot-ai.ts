@@ -20,7 +20,7 @@ export type BotIntent = {
   changeWaypoint: boolean;
 };
 
-export const SOLO_BOT_COUNT = 3;
+export const SOLO_BOT_COUNT = 2;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
 

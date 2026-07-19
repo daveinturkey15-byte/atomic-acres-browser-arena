@@ -15,7 +15,7 @@ Status: implementation locked; canonical Pass 30 remains unchanged until an isol
 
 1. Field Supports become five semantic cards: activation key, kill threshold, reward name, and LOCKED/READY state.
 2. Text may wrap only inside its own named region and must never overlap card borders or neighbouring HUD panels.
-3. Desktop uses a bounded bottom-right two-row card rail; short/narrow viewports use a compact two-column or horizontal-scrolling safe layout without covering ammo, health, crosshair, or controls.
+3. Desktop and narrow/short viewports use a compact single-column card rail down the right edge without covering ammo, health, crosshair, or controls.
 4. Keyboard, mouse, and gamepad prompts remain visible and coherent.
 5. Browser geometry gates assert five cards, minimum font sizes, no clipping, and positive separation at representative desktop and short-height viewports.
 
@@ -38,7 +38,7 @@ Status: implementation locked; canonical Pass 30 remains unchanged until an isol
 
 ## 5. Solo pressure and spawn flow
 
-1. Solo bot count increases from one to three (`+2`).
+1. Solo uses exactly two low-damage opponents, both rendered with the same dark source-rigged humanoid operator model.
 2. Bot damage multiplier decreases from `0.5` to `0.25` (half the current damage).
 3. Existing 22 m fire cutoff, reaction delay, range-dependent aim error, bounds checks, cover trust, and respawn protection remain.
 4. Player and bot spawns use hard minimum-exposure tiers, occupancy rejection, previous-spawn avoidance and bounded top-pool variation.
@@ -63,7 +63,7 @@ Original identity: **Overdrive Core** (mechanically inspired by classic arena da
 - Focused unit tests for every new pure contract and all five carried hotfixes.
 - Gameplay contract/replay updates only for explicitly approved bot and Overdrive mechanics.
 - Full lint, type-check, Vitest, build, dependency, release-tree and diff gates.
-- Solo browser proof: three bots at quarter multiplier, safe/flip spawns, Overdrive spawn/claim/4x/expiry, improved HUD, no console errors.
+- Solo browser proof: two matching rigged bots at quarter multiplier, safe/flip spawns, Overdrive spawn/claim/4x/expiry, compact vertical support HUD, no console errors.
 - Two-peer proof: one authoritative Overdrive winner, replicated timer/expiry and 4x damage, source-aware Tri-Pass acceptance between 6.2 m and 15 m.
 - Visual matrix: each weapon at hip/ADS/fire/reload/sprint/melee; both houses/garages and exterior dressing in Quality/Performance; desktop and short-height HUD.
 - Renderer calls/triangles remain within approved profile ceilings; flora/fauna and wall variation are bounded.

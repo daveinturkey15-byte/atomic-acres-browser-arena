@@ -37,8 +37,8 @@ describe('chooseBotIntent', () => {
     expect(chooseBotIntent({ ...base, lastShotAt: 1_800 }).fire).toBe(false);
   });
 
-  it('uses three deliberately low-damage close-to-medium-range solo opponents', () => {
-    expect(SOLO_BOT_COUNT).toBe(3);
+  it('uses two deliberately low-damage close-to-medium-range solo opponents', () => {
+    expect(SOLO_BOT_COUNT).toBe(2);
     expect(BOT_FIRE_RANGE).toBe(22);
     expect(BOT_REACTION_DELAY).toBeGreaterThanOrEqual(600);
     expect(botAimJitter(8)).toBeLessThan(botAimJitter(16));

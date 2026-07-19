@@ -2698,7 +2698,7 @@
         ],
         "spawnIntervalMs": 120000
       },
-      "soloBotCount": 3,
+      "soloBotCount": 2,
       "weapons": [
         {
           "adsSpreadMultiplier": 0.28,

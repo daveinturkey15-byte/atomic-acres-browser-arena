@@ -47,7 +47,7 @@ type DebugState = {
     screenPosition: number[];
     presentationReady: boolean;
     presentationWeaponSafe: boolean;
-    operatorModel: { skinnedMeshes: number; visibleSkinnedMeshes: number; mergedVertexLod: boolean; clips: number; weaponChildren: number; activeClip: string } | null;
+    operatorModel: { source: string; skinnedMeshes: number; visibleSkinnedMeshes: number; mergedVertexLod: boolean; clips: number; weaponChildren: number; activeClip: string } | null;
   }>;
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -736,11 +736,21 @@ test.describe('solo mechanics', () => {
     }
   });
 
-  test('spawns three bounded low-damage combat bots and they navigate', async ({ page }) => {
+  test('spawns two matching rigged low-damage combat bots and they navigate', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
     const before = await debug(page);
-    expect(before.bots).toHaveLength(3);
+    expect(before.bots).toHaveLength(2);
     expect(before.bots.every((bot) => bot.alive)).toBe(true);
+    expect(before.bots.every((bot) => bot.operatorModel !== null
+      && bot.operatorModel.source === 'Quaternius Ultimate Modular Males / Swat.gltf'
+      && bot.operatorModel.skinnedMeshes > 0
+      && bot.operatorModel.visibleSkinnedMeshes > 0)).toBe(true);
+    expect(new Set(before.bots.map((bot) => JSON.stringify({
+      source: bot.operatorModel?.source,
+      skinnedMeshes: bot.operatorModel?.skinnedMeshes,
+      mergedVertexLod: bot.operatorModel?.mergedVertexLod,
+      clips: bot.operatorModel?.clips,
+    }))).size).toBe(1);
     await page.waitForTimeout(1_200);
     const after = await debug(page);
     const moved = after.bots.some((bot, index) => {
@@ -1283,15 +1293,23 @@ test.describe('solo mechanics', () => {
         ammoFont: Number.parseFloat(getComputedStyle(ammo).fontSize),
         cardCount: cards.length,
         supportWidth: supportBox.width,
+        supportHeight: supportBox.height,
+        rightGap: window.innerWidth - supportBox.right,
         verticalGap: weaponBox.top - supportBox.bottom,
+        verticallyStacked: boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom),
         overlap,
         overflow,
       };
     });
     expect(metrics.ammoFont).toBeGreaterThanOrEqual(64);
     expect(metrics.cardCount).toBe(5);
-    expect(metrics.supportWidth).toBeGreaterThanOrEqual(700);
+    expect(metrics.supportWidth).toBeGreaterThanOrEqual(145);
+    expect(metrics.supportWidth).toBeLessThanOrEqual(200);
+    expect(metrics.supportHeight).toBeGreaterThan(metrics.supportWidth);
+    expect(metrics.rightGap).toBeGreaterThanOrEqual(8);
+    expect(metrics.rightGap).toBeLessThanOrEqual(28);
     expect(metrics.verticalGap).toBeGreaterThanOrEqual(6);
+    expect(metrics.verticallyStacked).toBe(true);
     expect(metrics.overlap).toBe(false);
     expect(metrics.overflow).toBe(false);
   });

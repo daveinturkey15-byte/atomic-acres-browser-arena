@@ -2574,16 +2574,15 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
 function spawnBots(): void {
   clearBots();
   const botTeam: Team = player.team === 0 ? 1 : 0;
-  const names = ['RIVET', 'MICA', 'THORN'].slice(0, SOLO_BOT_COUNT);
+  const names = ['RIVET', 'MICA'].slice(0, SOLO_BOT_COUNT);
   names.forEach((name, index) => {
     const id = `bot-${index}`;
-    // Keep one source-rigged lead opponent and use the bounded tactical
-    // silhouette for the two added squadmates in every profile. The lead alone
-    // owns the dynamic shadow pass so three operators do not triple Blender's
-    // bounded static-shadow refresh.
+    // Both solo opponents use the same dark source-rigged humanoid. The lead
+    // alone owns the dynamic shadow pass so the second rig does not duplicate
+    // Blender's bounded static-shadow refresh.
     // Team colour, authored weapons, movement/stance posing and identical
     // authoritative hit proxies remain intact.
-    const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', index === 0);
+    const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', true);
     root.traverse((node) => {
       if (node instanceof THREE.Mesh) node.castShadow = false;
     });
