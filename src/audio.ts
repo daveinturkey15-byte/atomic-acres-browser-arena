@@ -5,6 +5,30 @@ import type { WeaponId } from './protocol';
 import { presentationRandom } from './runtime-random';
 
 export const SANCTIFIED_FRAG_CHOIR_ASSET = './assets/original/audio/sanctified-frag-hallelujah.wav';
+export const EXPLOSION_AUDIO_COALESCE_MS = 90;
+
+export type ExplosionAudioGate = {
+  lastMixAt: number;
+  requests: number;
+  mixes: number;
+  coalesced: number;
+};
+
+export function createExplosionAudioGate(): ExplosionAudioGate {
+  return { lastMixAt: Number.NEGATIVE_INFINITY, requests: 0, mixes: 0, coalesced: 0 };
+}
+
+export function admitExplosionAudioMix(state: ExplosionAudioGate, now: number): { state: ExplosionAudioGate; admitted: boolean } {
+  const requestedAt = Number.isFinite(now) ? now : state.lastMixAt;
+  const requests = state.requests + 1;
+  if (requestedAt - state.lastMixAt < EXPLOSION_AUDIO_COALESCE_MS) {
+    return { state: { ...state, requests, coalesced: state.coalesced + 1 }, admitted: false };
+  }
+  return {
+    state: { ...state, lastMixAt: requestedAt, requests, mixes: state.mixes + 1 },
+    admitted: true,
+  };
+}
 
 type SanctifiedFragChoirStatus = 'idle' | 'loading' | 'fetched' | 'decoding' | 'ready' | 'error';
 
@@ -39,6 +63,7 @@ export class ArenaAudio {
   private sanctifiedChoirPrewarming = false;
   private sanctifiedChoirPrewarmed = false;
   private sanctifiedChoirPlays = 0;
+  private explosionAudioGate = createExplosionAudioGate();
 
   preloadSanctifiedFragChoir(): Promise<void> {
     if (this.sanctifiedChoirLoadPromise) return this.sanctifiedChoirLoadPromise;
@@ -355,12 +380,16 @@ export class ArenaAudio {
     else void this.decodeSanctifiedFragChoir().then(play);
   }
 
-  explosion(): void {
+  explosion(now = performance.now()): boolean {
+    const admission = admitExplosionAudioMix(this.explosionAudioGate, now);
+    this.explosionAudioGate = admission.state;
+    if (!admission.admitted) return false;
     this.unlock();
-    if (!this.weapons) return;
+    if (!this.weapons) return true;
     this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons);
     this.noise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
     this.noise({ duration: 0.18, volume: 0.12, filter: 'highpass', frequency: 3100, q: 0.4, delay: 0.035 }, this.weapons);
+    return true;
   }
 
   hunterLaunch(index: number): void {
@@ -412,6 +441,7 @@ export class ArenaAudio {
   }
 
   telemetry(): {
+    explosionMix: ExplosionAudioGate & { coalesceMs: number };
     sanctifiedFragChoir: {
       asset: string;
       status: SanctifiedFragChoirStatus;
@@ -423,6 +453,7 @@ export class ArenaAudio {
     };
   } {
     return {
+      explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       sanctifiedFragChoir: {
         asset: SANCTIFIED_FRAG_CHOIR_ASSET,
         status: this.sanctifiedChoirStatus,

@@ -15,6 +15,7 @@ import {
   recordSupportDeath,
   recordSupportElimination,
   remoteExplosiveHitMaximumDistance,
+  selectTriPassHostiles,
   triPassSchedule,
 } from './field-support';
 
@@ -153,6 +154,19 @@ describe('field support rewards', () => {
     const targeting = registerTriPassTarget(createTriPassTargeting(), { x: 99, z: 0 }, { minX: -34, maxX: 34, minZ: -43, maxZ: 43 });
     expect(targeting.points).toHaveLength(0);
     expect(targeting.complete).toBe(false);
+  });
+
+  it('reveals only finite living hostiles while Tri-Pass targeting is active', () => {
+    expect(selectTriPassHostiles([
+      { id: 'friendly', kind: 'remote', team: 0, alive: true, x: 1, z: 2 },
+      { id: 'dead', kind: 'bot', team: 1, alive: false, x: 3, z: 4 },
+      { id: 'bad-position', kind: 'remote', team: 1, alive: true, x: Number.NaN, z: 4 },
+      { id: 'remote-z', kind: 'remote', team: 1, alive: true, x: 7, z: 8 },
+      { id: 'bot-a', kind: 'bot', team: 1, alive: true, x: -5, z: 6 },
+    ], 0)).toEqual([
+      { id: 'bot-a', kind: 'bot', x: -5, z: 6 },
+      { id: 'remote-z', kind: 'remote', x: 7, z: 8 },
+    ]);
   });
 
   it('schedules exactly three simultaneous missile impacts one second after confirmation', () => {

@@ -71,6 +71,7 @@ import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
 import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
+import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
 import {
   OVERDRIVE_DAMAGE_MULTIPLIER,
@@ -102,6 +103,7 @@ import {
   recordSupportElimination,
   remoteExplosiveHitMaximumDistance,
   registerTriPassTarget,
+  selectTriPassHostiles,
   triPassSchedule,
   type FieldSupportId,
   type TriPassTargeting,
@@ -122,6 +124,7 @@ import {
   scavengeDeathDrop,
   type DeathDrop,
 } from './death-drops';
+import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
 import {
   HIGH_SCORE_STORAGE_KEY,
@@ -285,7 +288,29 @@ type NukeSequence = {
   finishedAt: number;
   detonated: boolean;
   shockwave: THREE.Mesh;
-  light: THREE.PointLight;
+};
+
+type TriPassHostileMarker = {
+  id: string;
+  kind: 'bot' | 'remote';
+  world: [number, number];
+  canvas: [number, number];
+};
+
+type ExplosionSyncProfile = {
+  source: OffensiveSupportSource;
+  audioMs: number;
+  visualMs: number;
+  targetDamageMs: number;
+  totalSyncMs: number;
+};
+
+type ExplosionFrameProfile = {
+  frameSerial: number;
+  sources: OffensiveSupportSource[];
+  impacts: number;
+  totalSyncMs: number;
+  maxImpactSyncMs: number;
 };
 
 type ActiveTeamPing = {
@@ -315,7 +340,7 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 34</div>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 35</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -377,7 +402,7 @@ app.innerHTML = `
   <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
     <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
     <canvas id="strike-map" width="480" height="480"></canvas>
-    <footer>CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</footer>
+    <footer><strong id="strike-hostile-count">ENEMIES LIVE · 0</strong><span>CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</span></footer>
   </section>
   <div id="hud" hidden>
     <div id="pause-hint">ESC · MENU</div>
@@ -771,6 +796,33 @@ renderer.domElement.addEventListener('webglcontextrestored', () => {
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
+const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
+const deathDropPresentationPool = new DeathDropPresentationPool(scene, MAX_DEATH_DROPS);
+const nukeShockwave = new THREE.Mesh(
+  new THREE.SphereGeometry(1, reducedRenderMode ? 12 : 28, reducedRenderMode ? 8 : 18),
+  new THREE.MeshBasicMaterial({ color: 0xffb15c, transparent: true, opacity: 0, depthWrite: false, side: THREE.BackSide, toneMapped: false }),
+);
+nukeShockwave.name = 'pass35-prewarmed-nuke-shockwave';
+nukeShockwave.position.set(0, 1.5, 0);
+nukeShockwave.visible = false;
+nukeShockwave.userData.presentationOnly = true;
+let nukePresentationPrewarmed = false;
+
+async function prewarmNukePresentation(): Promise<void> {
+  if (nukePresentationPrewarmed) return;
+  nukeShockwave.visible = true;
+  nukeShockwave.scale.setScalar(0.0001);
+  try {
+    await renderer.compileAsync(scene, camera);
+    renderer.render(scene, camera);
+    nukePresentationPrewarmed = true;
+  } finally {
+    nukeShockwave.visible = false;
+    nukeShockwave.scale.setScalar(0.1);
+  }
+}
+nukeShockwave.raycast = () => undefined;
+scene.add(nukeShockwave);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
 let materialCompatibility: AtomicSignalMaterialAudit = {
@@ -814,17 +866,26 @@ const player = {
 const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
+const dormantBots = new Map<string, BotPlayer>();
+let dormantBotsPrewarmed = false;
 let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
 let lastPrincipalShotAlignment: { weapon: WeaponId; angularError: number; sample: [number, number]; direction: [number, number, number]; cameraDirection: [number, number, number] } | null = null;
 let lastGrenadeExplosionProfile = {
-  disposeMs: 0,
+  presentationDetachMs: 0,
   audioMs: 0,
   visualMs: 0,
   targetDamageMs: 0,
   selfDamageMs: 0,
+  totalSyncMs: 0,
+};
+let lastBotEliminationProfile = {
+  deathDropMs: 0,
+  deathPoseMs: 0,
+  rewardAndFeedMs: 0,
+  reinforcementMs: 0,
   totalSyncMs: 0,
 };
 let fieldSupport = createFieldSupportState();
@@ -847,9 +908,12 @@ let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
 const hunterDrones: HunterDroneEntity[] = [];
+const deferredSupportDisposals: THREE.Object3D[] = [];
 let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
 let tacticalMapOpen = false;
+let lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
+let triPassHostileMarkers: TriPassHostileMarker[] = [];
 let yardhawkExplosions = 0;
 let triPassLaunches = 0;
 let triPassImpacts = 0;
@@ -858,6 +922,36 @@ let hunterSwarmLaunches = 0;
 let hunterSwarmImpacts = 0;
 let nukeLaunches = 0;
 let nukeDetonations = 0;
+let supportExplosionFrameSerial = 0;
+let lastSupportExplosionProfile: ExplosionSyncProfile | null = null;
+let lastSupportExplosionFrameProfile: ExplosionFrameProfile = {
+  frameSerial: -1,
+  sources: [],
+  impacts: 0,
+  totalSyncMs: 0,
+  maxImpactSyncMs: 0,
+};
+
+function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
+  lastSupportExplosionProfile = profile;
+  if (lastSupportExplosionFrameProfile.frameSerial !== supportExplosionFrameSerial) {
+    lastSupportExplosionFrameProfile = {
+      frameSerial: supportExplosionFrameSerial,
+      sources: [profile.source],
+      impacts: 1,
+      totalSyncMs: profile.totalSyncMs,
+      maxImpactSyncMs: profile.totalSyncMs,
+    };
+    return;
+  }
+  lastSupportExplosionFrameProfile = {
+    ...lastSupportExplosionFrameProfile,
+    sources: [...lastSupportExplosionFrameProfile.sources, profile.source],
+    impacts: lastSupportExplosionFrameProfile.impacts + 1,
+    totalSyncMs: lastSupportExplosionFrameProfile.totalSyncMs + profile.totalSyncMs,
+    maxImpactSyncMs: Math.max(lastSupportExplosionFrameProfile.maxImpactSyncMs, profile.totalSyncMs),
+  };
+}
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
 const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
@@ -1760,13 +1854,7 @@ function applyDamage(damage: number, attacker: string): void {
 }
 
 function disposeDeathDrop(entity: DeathDropEntity): void {
-  scene.remove(entity.root);
-  entity.root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh)) return;
-    node.geometry.dispose();
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    materials.forEach((material) => material.dispose());
-  });
+  deathDropPresentationPool.release(entity.root);
 }
 
 function clearDeathDrops(): void {
@@ -1808,34 +1896,10 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
     Math.max(1, Math.ceil(spec.reserve * 0.25)),
     now,
   );
-  const root = new THREE.Group();
-  root.name = `death-drop-${victim.weapon}`;
-  root.position.copy(victim.position);
-  root.userData.deathDropId = id;
-  const model = buildWeaponModel(victim.weapon, true, false);
-  model.name = 'death-drop-weapon';
-  model.scale.setScalar(victim.weapon === 'sniper' ? 0.27 : 0.3);
-  model.rotation.set(0.12, 0, Math.PI / 2);
-  optimizeAttachedWeapon(model, 'palette-basic');
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.52, 0.72, 24),
-    new THREE.MeshBasicMaterial({ color: spec.color, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
-  );
-  ring.name = 'death-drop-ring';
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = -0.08;
-  const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.018, 0.07, 1.1, 8),
-    new THREE.MeshBasicMaterial({ color: spec.color, transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false }),
-  );
-  beacon.name = 'death-drop-beacon';
-  beacon.position.y = 0.55;
-  root.add(model, ring, beacon);
-  root.traverse((node) => { node.userData.presentationOnly = true; node.raycast = () => undefined; });
-  scene.add(root);
+  if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
+  const root = deathDropPresentationPool.acquire(id, spec.color, victim.position);
   const entity = { drop, root };
   deathDrops.unshift(entity);
-  while (deathDrops.length > MAX_DEATH_DROPS) disposeDeathDrop(deathDrops.pop()!);
   return entity;
 }
 
@@ -2708,12 +2772,8 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
   haze.userData.blocksShots = false;
   haze.userData.phase = index * Math.PI;
   haze.raycast = () => undefined;
-  const glow = new THREE.PointLight(0xc54dff, 1.55, 4.8, 2);
-  glow.name = 'neon-purple-bot-glow';
-  glow.position.y = 1.28;
-  glow.castShadow = false;
   root.userData.neonBotHaze = true;
-  root.add(haze, glow);
+  root.add(haze);
 }
 
 const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
@@ -2759,10 +2819,72 @@ function spawnBot(index: number): void {
   });
 }
 
+function prewarmDormantBotPresentations(): void {
+  if (dormantBots.size === 0) {
+    dormantBotsPrewarmed = true;
+    return;
+  }
+  for (const bot of dormantBots.values()) {
+    bot.root.visible = true;
+    bot.root.scale.setScalar(0.0001);
+  }
+  try {
+    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
+    dormantBotsPrewarmed = true;
+  } finally {
+    for (const bot of dormantBots.values()) {
+      bot.root.visible = false;
+      bot.root.scale.setScalar(1);
+    }
+  }
+}
+
+function activateDormantBot(index: number): boolean {
+  const id = `bot-${index}`;
+  const bot = dormantBots.get(id);
+  if (!bot) return false;
+  dormantBots.delete(id);
+  const now = performance.now();
+  const spawn = selectSafeBotSpawn(bot.team);
+  bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
+  bot.root.position.copy(bot.position);
+  bot.root.scale.setScalar(1);
+  bot.root.visible = true;
+  bot.hp = 100;
+  bot.alive = true;
+  bot.invulnerableUntil = now + 1_000;
+  bot.respawnAt = 0;
+  bot.deathVisibleUntil = 0;
+  bot.lastShotAt = 0;
+  bot.lastSightAt = 0;
+  bot.hasLineOfSight = false;
+  bot.sightStartedAt = 0;
+  bot.burstShots = 0;
+  bot.nextDecisionAt = 0;
+  bot.blockedSince = 0;
+  resetOperator(bot.root);
+  bots.set(id, bot);
+  return true;
+}
+
 function spawnBots(): void {
   clearBots();
   soloBotDeaths = 0;
+  dormantBotsPrewarmed = false;
   for (let index = 0; index < selectedArena.soloBotCount; index += 1) spawnBot(index);
+  const activeSpawnHistory = new Map(lastBotSpawnIndices);
+  for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
+    spawnBot(index);
+    const bot = bots.get(`bot-${index}`)!;
+    bots.delete(bot.id);
+    bot.alive = false;
+    bot.root.visible = false;
+    dormantBots.set(bot.id, bot);
+  }
+  lastBotSpawnIndices.clear();
+  for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
+  prewarmDormantBotPresentations();
   if (selectedArena.soloBotCount > 0) {
     addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
   }
@@ -2771,13 +2893,17 @@ function spawnBots(): void {
 function spawnEarnedBotReinforcement(): void {
   const target = activeSoloBotTarget(selectedArena, soloBotDeaths);
   if (bots.size >= target) return;
-  spawnBot(bots.size);
+  const index = bots.size;
+  if (!activateDormantBot(index)) spawnBot(index);
   addFeed(`HOSTILE REINFORCEMENT · ${bots.size} RIVALS NOW ACTIVE`, 'coral');
 }
 
 function clearBots(): void {
   for (const bot of bots.values()) scene.remove(bot.root);
+  for (const bot of dormantBots.values()) scene.remove(bot.root);
   bots.clear();
+  dormantBots.clear();
+  dormantBotsPrewarmed = false;
   soloBotDeaths = 0;
   lastBotSpawnIndices.clear();
 }
@@ -2809,18 +2935,30 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   showHitmarker(zone === 'head');
   audio.hit(zone === 'head');
   if (bot.hp > 0) return;
+  const eliminationStarted = performance.now();
   bot.alive = false;
   bot.deaths += 1;
   soloBotDeaths += 1;
   spawnDeathDrop({ type: 'death', killer: player.id, victim: bot.id, nonce: randomNonce() }, now);
+  const afterDeathDrop = performance.now();
   bot.respawnAt = now + 2_200;
   bot.deathVisibleUntil = now + 1_050;
   deathOperator(bot.root);
+  const afterDeathPose = performance.now();
   player.kills += 1;
   awardSupportElimination();
   audio.kill();
   addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
+  const afterRewardAndFeed = performance.now();
   spawnEarnedBotReinforcement();
+  const afterReinforcement = performance.now();
+  lastBotEliminationProfile = {
+    deathDropMs: afterDeathDrop - eliminationStarted,
+    deathPoseMs: afterDeathPose - afterDeathDrop,
+    rewardAndFeedMs: afterRewardAndFeed - afterDeathPose,
+    reinforcementMs: afterReinforcement - afterRewardAndFeed,
+    totalSyncMs: afterReinforcement - eliminationStarted,
+  };
   checkMatchEnd();
 }
 
@@ -3155,18 +3293,18 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3): number {
 function explodeGrenade(entity: GrenadeEntity): void {
   const started = performance.now();
   const point = entity.mesh.position.clone();
-  disposeGrenadePresentation(entity.mesh);
-  const afterDispose = performance.now();
+  if (entity.mesh.userData.fallback === true) retireSupportRoot(entity.mesh);
+  else scene.remove(entity.mesh);
+  const afterPresentationDetach = performance.now();
   audio.sanctifiedFragExplosion();
   const afterAudio = performance.now();
-  const now = performance.now();
-  spawnGrenadeExplosionVisual(point, now);
+  spawnGrenadeExplosionVisual(point, afterAudio);
   breakWindowsInGrenadeBlast(point);
   const afterVisual = performance.now();
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
-    const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), now);
+    const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), afterAudio);
     if (damage > 0) applyBotDamage(bot, damage, 'body');
   }
   const blastNonce = entity.actionNonce;
@@ -3185,8 +3323,8 @@ function explodeGrenade(entity: GrenadeEntity): void {
   if (selfDamage > 0) applyDamage(selfDamage, player.id);
   const finished = performance.now();
   lastGrenadeExplosionProfile = {
-    disposeMs: afterDispose - started,
-    audioMs: afterAudio - afterDispose,
+    presentationDetachMs: afterPresentationDetach - started,
+    audioMs: afterAudio - afterPresentationDetach,
     visualMs: afterVisual - afterAudio,
     targetDamageMs: afterTargets - afterVisual,
     selfDamageMs: finished - afterTargets,
@@ -3580,7 +3718,9 @@ function spawnHunterSwarm(now: number): string[] | null {
 }
 
 function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): void {
-  supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0, 'hunter-swarm');
+  const started = performance.now();
+  const presentationProfile = supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0, 'hunter-swarm', false);
+  const afterPresentation = performance.now();
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get('hunter-swarm');
   for (const bot of bots.values()) {
@@ -3612,30 +3752,30 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
       });
     }
   }
+  const finished = performance.now();
+  recordSupportExplosionProfile({
+    source: 'hunter-swarm',
+    audioMs: presentationProfile.audioMs,
+    visualMs: presentationProfile.visualMs,
+    targetDamageMs: finished - afterPresentation,
+    totalSyncMs: finished - started,
+  });
   hunterSwarmImpacts += 1;
-  disposeSupportRoot(drone.root);
+  retireSupportRoot(drone.root);
   const index = hunterDrones.indexOf(drone);
   if (index >= 0) hunterDrones.splice(index, 1);
 }
 
 function beginNuke(now: number): void {
-  const shockwave = new THREE.Mesh(
-    new THREE.SphereGeometry(1, reducedRenderMode ? 12 : 28, reducedRenderMode ? 8 : 18),
-    new THREE.MeshBasicMaterial({ color: 0xffb15c, transparent: true, opacity: 0, depthWrite: false, side: THREE.BackSide, toneMapped: false }),
-  );
-  shockwave.name = 'pass30-nuke-shockwave';
-  shockwave.position.set(0, 1.5, 0);
-  shockwave.visible = false;
-  const light = new THREE.PointLight(0xff9a52, 0, reducedRenderMode ? 45 : 90, 1.5);
-  light.position.set(0, 12, 0);
-  scene.add(shockwave, light);
+  nukeShockwave.scale.setScalar(0.1);
+  (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
+  nukeShockwave.visible = false;
   nukeSequence = {
     startedAt: now,
     detonateAt: now + NUKE_WARNING_MS,
     finishedAt: now + NUKE_WARNING_MS + 3_500,
     detonated: false,
-    shockwave,
-    light,
+    shockwave: nukeShockwave,
   };
   const warning = element<HTMLElement>('#nuke-warning');
   warning.hidden = false;
@@ -3646,16 +3786,18 @@ function beginNuke(now: number): void {
 }
 
 function detonateNuke(sequence: NukeSequence): void {
+  const started = performance.now();
   sequence.detonated = true;
   audio.nukeDetonation();
+  const afterAudio = performance.now();
   sequence.shockwave.visible = true;
   sequence.shockwave.scale.setScalar(0.1);
-  sequence.light.intensity = reducedRenderMode ? 12 : 34;
   const flash = element<HTMLElement>('#nuke-flash');
   flash.hidden = false;
   flash.style.opacity = '1';
   landingImpulse = Math.max(landingImpulse, 1);
   nukeDetonations += 1;
+  const afterVisual = performance.now();
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get('nuke');
   for (const remote of remotes.values()) {
@@ -3678,6 +3820,14 @@ function detonateNuke(sequence: NukeSequence): void {
     const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
     if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body');
   }
+  const finished = performance.now();
+  recordSupportExplosionProfile({
+    source: 'nuke',
+    audioMs: afterAudio - started,
+    visualMs: afterVisual - afterAudio,
+    targetDamageMs: finished - afterVisual,
+    totalSyncMs: finished - started,
+  });
   addFeed('ATOMIC DETONATION · HOSTILE FIELD PURGED', 'gold');
 }
 
@@ -3700,15 +3850,13 @@ function updateNuke(now: number): void {
   const flashStrength = Math.exp(-elapsed / 620);
   sequence.shockwave.scale.setScalar(0.1 + blastProgress * 125);
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
-  sequence.light.intensity = (reducedRenderMode ? 12 : 34) * flashStrength;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
   if (scene.fog) scene.fog.color.set(activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
-  scene.remove(sequence.shockwave, sequence.light);
-  sequence.shockwave.geometry.dispose();
-  (sequence.shockwave.material as THREE.Material).dispose();
+  sequence.shockwave.visible = false;
+  (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeLighting.fogColor);
   flash.hidden = true;
@@ -3734,9 +3882,7 @@ function makeSkyMissile(): THREE.Group {
     new THREE.MeshBasicMaterial({ color: 0x29393d }),
   );
   fins.position.y = 0.92;
-  const glow = new THREE.PointLight(0xff7a45, reducedRenderMode ? 0 : 3.5, 6);
-  glow.position.y = 1.2;
-  root.add(body, nose, fins, glow);
+  root.add(body, nose, fins);
   return root;
 }
 
@@ -3750,23 +3896,35 @@ function disposeSupportRoot(root: THREE.Object3D): void {
   });
 }
 
-function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: number, explosiveSource: OffensiveSupportSource): void {
-  audio.explosion();
-  const flash = new THREE.Mesh(
-    new THREE.SphereGeometry(1, reducedRenderMode ? 10 : 18, reducedRenderMode ? 7 : 12),
-    new THREE.MeshBasicMaterial({ color: 0xffb24c, transparent: true, opacity: 0.76, depthWrite: false }),
-  );
-  flash.position.copy(point); scene.add(flash);
+function retireSupportRoot(root: THREE.Object3D): void {
+  scene.remove(root);
+  root.visible = false;
+  deferredSupportDisposals.push(root);
+}
+
+function supportBlast(
+  point: THREE.Vector3,
+  radius: number,
+  maximumDamage: number,
+  explosiveSource: OffensiveSupportSource,
+  recordProfile = true,
+): ExplosionSyncProfile {
   const started = performance.now();
-  const animate = () => {
-    const t = (performance.now() - started) / 460;
-    if (t >= 1) { scene.remove(flash); flash.geometry.dispose(); (flash.material as THREE.Material).dispose(); return; }
-    flash.scale.setScalar(0.25 + t * radius);
-    (flash.material as THREE.MeshBasicMaterial).opacity = 0.76 * (1 - t);
-    requestAnimationFrame(animate);
-  };
-  animate();
-  if (maximumDamage <= 0) return;
+  audio.explosion(started);
+  const afterAudio = performance.now();
+  supportExplosionPresentation.emit(point, radius, started);
+  const afterVisual = performance.now();
+  if (maximumDamage <= 0) {
+    const profile: ExplosionSyncProfile = {
+      source: explosiveSource,
+      audioMs: afterAudio - started,
+      visualMs: afterVisual - afterAudio,
+      targetDamageMs: 0,
+      totalSyncMs: afterVisual - started,
+    };
+    if (recordProfile) recordSupportExplosionProfile(profile);
+    return profile;
+  }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
@@ -3801,9 +3959,40 @@ function supportBlast(point: THREE.Vector3, radius: number, maximumDamage: numbe
       supportNonce, nonce: randomNonce(),
     });
   }
+  const finished = performance.now();
+  const profile: ExplosionSyncProfile = {
+    source: explosiveSource,
+    audioMs: afterAudio - started,
+    visualMs: afterVisual - afterAudio,
+    targetDamageMs: finished - afterVisual,
+    totalSyncMs: finished - started,
+  };
+  if (recordProfile) recordSupportExplosionProfile(profile);
+  return profile;
 }
 
-function drawStrikeMap(): void {
+function currentTriPassHostiles(): Array<{ id: string; kind: 'bot' | 'remote'; x: number; z: number }> {
+  return selectTriPassHostiles([
+    ...[...bots.values()].map((bot) => ({
+      id: bot.id,
+      kind: 'bot' as const,
+      team: bot.team,
+      alive: bot.alive,
+      x: bot.position.x,
+      z: bot.position.z,
+    })),
+    ...[...remotes.values()].map((remote) => ({
+      id: remote.snapshot.id,
+      kind: 'remote' as const,
+      team: remote.snapshot.team,
+      alive: remote.snapshot.hp > 0,
+      x: remote.target.x,
+      z: remote.target.z,
+    })),
+  ], player.team);
+}
+
+function drawStrikeMap(now = performance.now()): void {
   const context = strikeMapContext;
   const width = strikeMapCanvas.width;
   const height = strikeMapCanvas.height;
@@ -3838,6 +4027,19 @@ function drawStrikeMap(): void {
     context.fillStyle = '#f6ead6'; context.font = '700 14px sans-serif'; context.textAlign = 'center';
     context.fillText(house.label.toUpperCase(), cx, cy + 5);
   }
+  const hostilePulse = 8 + Math.sin(now * 0.012) * 1.5;
+  triPassHostileMarkers = currentTriPassHostiles().map((hostile) => {
+    const [x, y] = worldToMinimap(hostile.x, hostile.z, arena.bounds, width, height);
+    context.fillStyle = 'rgba(255, 70, 49, 0.3)';
+    context.beginPath(); context.arc(x, y, hostilePulse + 7, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#ff4631';
+    context.beginPath(); context.arc(x, y, hostilePulse, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 2.5; context.stroke();
+    context.fillStyle = '#fff4d9'; context.font = '900 12px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText('!', x, y + 0.5);
+    return { id: hostile.id, kind: hostile.kind, world: [hostile.x, hostile.z], canvas: [x, y] };
+  });
+  element<HTMLElement>('#strike-hostile-count').textContent = `ENEMIES LIVE · ${triPassHostileMarkers.length}`;
   const points = triPassTargeting?.points ?? [];
   points.forEach((point, index) => {
     const [x, y] = worldToMinimap(point.x, point.z, arena.bounds, width, height);
@@ -3851,11 +4053,13 @@ function drawStrikeMap(): void {
   context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
   context.fillText('N', width / 2, 28);
   element<HTMLElement>('#strike-target-count').textContent = `${points.length} / 3`;
+  lastStrikeMapDrawAt = now;
 }
 
 function beginTriPassTargeting(): void {
   triPassTargeting = createTriPassTargeting();
   tacticalMapOpen = true;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
   const overlay = element<HTMLElement>('#strike-map-overlay');
   overlay.hidden = false;
   menu.classList.add('hidden');
@@ -3872,6 +4076,8 @@ function cancelTriPassTargeting(refund: boolean, reacquirePointer = true): void 
   }
   triPassTargeting = null;
   tacticalMapOpen = false;
+  triPassHostileMarkers = [];
+  element<HTMLElement>('#strike-hostile-count').textContent = 'ENEMIES LIVE · 0';
   element<HTMLElement>('#strike-map-overlay').hidden = true;
   updateFieldSupportHud();
   if (reacquirePointer && gameStarted && player.alive && !matchFinished) requestGamePointerLock();
@@ -3988,7 +4194,7 @@ function detonateYardhawk(point: THREE.Vector3, radius: number, maxDamage: numbe
   if (!yardhawk) return;
   supportBlast(point, radius, maxDamage, 'yardhawk');
   yardhawkExplosions += 1;
-  disposeSupportRoot(yardhawk.root);
+  retireSupportRoot(yardhawk.root);
   yardhawk = null;
 }
 
@@ -4035,6 +4241,9 @@ function updateHunterDrones(dt: number, now: number): void {
 }
 
 function updateFieldSupport(dt: number, now: number): void {
+  supportExplosionFrameSerial += 1;
+  supportExplosionPresentation.update(now);
+  if (tacticalMapOpen && now - lastStrikeMapDrawAt >= 100) drawStrikeMap(now);
   if (yardhawk) {
     if (now >= yardhawk.expiresAt) {
       detonateYardhawk(yardhawk.root.position.clone(), 2.8, 150);
@@ -4105,8 +4314,8 @@ function updateFieldSupport(dt: number, now: number): void {
       supportBlast(strike.target, TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE, 'tri-pass');
       triPassImpacts += 1;
       triPassLastImpactDelayMs = now - strike.startedAt;
-      disposeSupportRoot(strike.missile);
-      disposeSupportRoot(strike.marker);
+      retireSupportRoot(strike.missile);
+      retireSupportRoot(strike.marker);
       strikeMissiles.splice(index, 1);
     }
   }
@@ -4128,12 +4337,12 @@ function clearFieldSupport(): void {
   strikeMissiles.length = 0;
   for (const drone of hunterDrones) disposeSupportRoot(drone.root);
   hunterDrones.length = 0;
-  if (nukeSequence) {
-    scene.remove(nukeSequence.shockwave, nukeSequence.light);
-    nukeSequence.shockwave.geometry.dispose();
-    (nukeSequence.shockwave.material as THREE.Material).dispose();
-    nukeSequence = null;
-  }
+  for (const root of deferredSupportDisposals) disposeSupportRoot(root);
+  deferredSupportDisposals.length = 0;
+  supportExplosionPresentation.clear();
+  if (nukeSequence) nukeSequence = null;
+  nukeShockwave.visible = false;
+  (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
   if (scene.fog) scene.fog.color.set(activeLighting.fogColor);
   const nukeWarning = element<HTMLElement>('#nuke-warning');
@@ -5234,6 +5443,7 @@ const debugWindow = window as Window & {
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
+    activateDormantReinforcement: () => { activated: boolean; syncMs: number };
     stageHouseRamp: (kind: 'interior' | 'exterior', team?: Team) => {
       kind: 'interior' | 'exterior';
       start: number[];
@@ -5390,8 +5600,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       })(),
       operatorModel: riggedOperatorTelemetry(bot.root),
       neonHaze: bot.root.userData.neonBotHaze === true
-        && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite
-        && bot.root.getObjectByName('neon-purple-bot-glow') instanceof THREE.PointLight,
+        && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite,
       presentationReady: riggedOperatorTelemetry(bot.root) !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
         .every((name) => bot.root.getObjectByName(name) !== undefined),
       presentationWeaponSafe: (() => {
@@ -5409,10 +5618,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       initialBots: selectedArena.soloBotCount,
       targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
       activeBots: bots.size,
+      dormantBots: dormantBots.size,
+      dormantBotsPrewarmed,
+      dynamicReinforcementLights: 0,
       maximumBots: selectedArena.maximumSoloBots,
       nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
         ? (Math.floor(soloBotDeaths / 5) + 1) * 5
         : null,
+      lastEliminationProfile: { ...lastBotEliminationProfile },
     },
     remotes: remotes.size,
     networkSync: {
@@ -5471,6 +5684,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       yardhawkExplosions,
       tacticalMapOpen,
       tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
+      tacticalHostiles: triPassHostileMarkers.map((marker) => ({
+        id: marker.id,
+        kind: marker.kind,
+        world: [...marker.world] as [number, number],
+        canvas: [...marker.canvas] as [number, number],
+      })),
+      explosionPresentation: supportExplosionPresentation.telemetry(),
+      explosionProfile: lastSupportExplosionProfile
+        ? { ...lastSupportExplosionProfile }
+        : { source: null, audioMs: 0, visualMs: 0, targetDamageMs: 0, totalSyncMs: 0 },
+      explosionFrameProfile: { ...lastSupportExplosionFrameProfile, sources: [...lastSupportExplosionFrameProfile.sources] },
+      retiredPresentationRoots: deferredSupportDisposals.length,
+      prewarmedNuke: {
+        shockwaveInScene: nukeShockwave.parent === scene,
+        prewarmed: nukePresentationPrewarmed,
+        dynamicLights: 0,
+      },
       strikeMissiles: strikeMissiles.map((strike) => ({
         target: strike.target.toArray(),
         impactInMs: Math.max(0, strike.impactAt - performance.now()),
@@ -5524,6 +5754,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       worldIconName: quadWorldIcon.name,
       minimapSymbol: '4×',
     },
+    deathDropPresentation: deathDropPresentationPool.telemetry(),
     deathDrops: deathDrops.map((entity) => ({
       id: entity.drop.id,
       weapon: entity.drop.weapon,
@@ -5919,6 +6150,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.invulnerableUntil = 0;
     applyBotDamage(bot, amount, zone);
   },
+  activateDormantReinforcement: () => {
+    const started = performance.now();
+    const activated = activateDormantBot(bots.size);
+    return { activated, syncMs: performance.now() - started };
+  },
   stageHouseRamp: (kind: 'interior' | 'exterior', team: Team = 0) => {
     const house = arena.houses.find((candidate) => candidate.team === team);
     const footId = kind === 'interior' ? 'indoor-ramp-foot' : 'ramp-foot';
@@ -6229,6 +6465,9 @@ async function bootstrap(): Promise<void> {
   characterPhysics = physics;
   arenaArtRoot = art.root;
   await grenadeExplosionPresentation.prewarm(renderer, camera);
+  await supportExplosionPresentation.prewarm(renderer, camera);
+  await deathDropPresentationPool.prewarm(renderer, camera);
+  await prewarmNukePresentation();
   const visibleMapMeshes = atomicArena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
   atomicArena.raycastMeshes.splice(0, atomicArena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {

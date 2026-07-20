@@ -125,6 +125,29 @@ export type TriPassPoint = { x: number; z: number };
 export type TriPassBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 export type TriPassTargeting = { points: readonly TriPassPoint[]; complete: boolean };
 
+export type TriPassContactCandidate = Readonly<{
+  id: string;
+  kind: 'bot' | 'remote';
+  team: 0 | 1;
+  alive: boolean;
+  x: number;
+  z: number;
+}>;
+
+export function selectTriPassHostiles(
+  candidates: readonly TriPassContactCandidate[],
+  ownerTeam: 0 | 1,
+): Array<{ id: string; kind: 'bot' | 'remote'; x: number; z: number }> {
+  return candidates
+    .filter((candidate) => candidate.alive
+      && candidate.team !== ownerTeam
+      && candidate.id.length > 0
+      && Number.isFinite(candidate.x)
+      && Number.isFinite(candidate.z))
+    .map(({ id, kind, x, z }) => ({ id, kind, x, z }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
 export function createTriPassTargeting(): TriPassTargeting {
   return { points: [], complete: false };
 }

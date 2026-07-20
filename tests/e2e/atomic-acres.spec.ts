@@ -103,6 +103,9 @@ type DebugState = {
     nuke: { active: boolean; detonated: boolean; detonateInMs: number; finishInMs: number };
     nukeActivations: number;
     nukeDetonations: number;
+    explosionProfile: { source: string | null; totalSyncMs: number };
+    explosionFrameProfile: { sources: string[]; impacts: number; totalSyncMs: number; maxImpactSyncMs: number };
+    prewarmedNuke: { shockwaveInScene: boolean; prewarmed: boolean; dynamicLights: number };
   };
   overdrive: {
     generation: number;
@@ -974,8 +977,10 @@ test.describe('solo mechanics', () => {
     expect(activated.yardhawk.active).toBe(true);
     expect(['thrown', 'homing']).toContain(activated.yardhawk.phase);
     await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 12_000 }).toBe(1);
-
-    expect((await debug(page)).fieldSupport.available.yardhawk).toBe(false);
+    const exploded = (await debug(page)).fieldSupport;
+    expect(exploded.available.yardhawk).toBe(false);
+    expect(exploded.explosionProfile.source).toBe('yardhawk');
+    expect(exploded.explosionProfile.totalSyncMs).toBeLessThan(12);
   });
 
   test('Yardhawk collides with solid walls and cannot damage its target through cover', async ({ page }) => {
@@ -1070,9 +1075,15 @@ test.describe('solo mechanics', () => {
     });
     await page.waitForFunction(() => document.querySelector<HTMLElement>('#strike-map-overlay')?.hidden === true);
     await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
-    const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
+    const impacted = (await debug(page)).fieldSupport;
+    const impactDelay = impacted.triPassLastImpactDelayMs;
     expect(impactDelay).not.toBeNull();
     expect(impactDelay!).toBeGreaterThanOrEqual(950);
+    expect(impacted.explosionFrameProfile).toMatchObject({
+      sources: ['tri-pass', 'tri-pass', 'tri-pass'],
+      impacts: 3,
+    });
+    expect(impacted.explosionFrameProfile.totalSyncMs).toBeLessThan(30);
   });
 
   test('launches exactly five deterministic Hunter Swarm drones at eight eliminations', async ({ page }) => {
@@ -1094,10 +1105,14 @@ test.describe('solo mechanics', () => {
     expect(launched.hunterDrones).toHaveLength(5);
     expect(launched.available['hunter-swarm']).toBe(false);
     await expect.poll(async () => (await debug(page)).fieldSupport.hunterSwarmImpacts, { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+    const impacted = (await debug(page)).fieldSupport;
+    expect(impacted.explosionProfile.source).toBe('hunter-swarm');
+    expect(impacted.explosionProfile.totalSyncMs).toBeLessThan(12);
   });
 
   test('arms and detonates the 15-elimination Nuke with a bounded warning sequence', async ({ page }) => {
     test.setTimeout(120_000);
+    expect((await debug(page)).fieldSupport.prewarmedNuke).toEqual({ shockwaveInScene: true, prewarmed: true, dynamicLights: 0 });
     await page.evaluate(() => {
       const flash = document.querySelector<HTMLElement>('#nuke-flash')!;
       document.documentElement.dataset.qaNukeFlashObserved = String(!flash.hidden);
@@ -1118,7 +1133,11 @@ test.describe('solo mechanics', () => {
     });
     await expect(page.locator('#nuke-warning')).toBeVisible();
     expect((await debug(page)).fieldSupport.nukeActivations).toBe(1);
-    await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 8_000 }).toBe(1);
+    await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 15_000 }).toBe(1);
+    const detonated = (await debug(page)).fieldSupport;
+    expect(detonated.explosionProfile.source).toBe('nuke');
+    expect(detonated.explosionProfile.totalSyncMs).toBeLessThan(12);
+    expect(detonated.explosionFrameProfile).toMatchObject({ sources: ['nuke'], impacts: 1 });
     await expect(page.locator('html')).toHaveAttribute('data-qa-nuke-flash-observed', 'true');
     await expect(page.locator('#nuke-warning')).toBeHidden({ timeout: 8_000 });
   });

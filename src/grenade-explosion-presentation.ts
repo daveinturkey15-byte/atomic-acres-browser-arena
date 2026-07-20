@@ -85,16 +85,19 @@ export class GrenadeExplosionPresentation {
 
   async prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): Promise<void> {
     if (this.wasPrewarmed) return;
-    const slot = this.slots[0];
-    slot.root.visible = true;
-    slot.root.scale.setScalar(0.0001);
+    for (const slot of this.slots) {
+      slot.root.visible = true;
+      slot.root.scale.setScalar(0.0001);
+    }
     try {
       await renderer.compileAsync(this.root.parent as THREE.Scene, camera);
       renderer.render(this.root.parent as THREE.Scene, camera);
       this.wasPrewarmed = true;
     } finally {
-      slot.root.visible = false;
-      slot.root.scale.setScalar(1);
+      for (const slot of this.slots) {
+        slot.root.visible = false;
+        slot.root.scale.setScalar(1);
+      }
     }
   }
 
