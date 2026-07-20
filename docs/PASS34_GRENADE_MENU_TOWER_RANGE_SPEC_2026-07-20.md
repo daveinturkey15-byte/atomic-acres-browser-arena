@@ -1,7 +1,7 @@
 # Pass 34 — Grenade Power, Map Exit, Tall Rustworks Tower, and Armoured Range Targets
 
 Date: 2026-07-20
-Status: locally verified; immutable review and exact-byte promotion pending
+Status: released
 
 ## Requested outcome
 
@@ -74,16 +74,20 @@ Status: locally verified; immutable review and exact-byte promotion pending
 - Release-tree gate: **56 files**, zero rejected candidate or oversized files.
 - Rustworks GLB reproducibility: repeated authoring retained SHA-256 `5d24f722098aa40b7eec6fb5349a3934c0de4ee33430b94bba9c351b27cfdcbe`; the authoring script disables `.blend1` backup litter.
 - Direct local visual inspection passed for Performance Rustworks, Blender Rustworks, Gun Range, and the pause/main-menu UI.
+- A second isolated validation pass independently reran lint, the 310-test suite, production build, release-tree gate, 18-case ray matrix, and real Gun Range shots. The centre shot dealt `47` carbine headshot damage (`500 → 453`); an offset body shot dealt `31` (`500 → 469`). No release blocker surfaced.
+- Immutable HTTPS review inspection passed for Performance Rustworks, Blender Rustworks, Gun Range, and the paused main-menu flow. Browser telemetry reported zero WebGL context loss and no JavaScript errors.
 
 ## Release gate
 
-Build final bytes once, publish them under a new immutable Pass 34 review path, inspect all affected modes over HTTPS, then promote those exact bytes to production without rebuilding. Record source/review/production identities and byte-tree evidence below after promotion.
+The final bytes were built once from source commit `14ae108`, published under a new immutable Pass 34 review path, inspected over HTTPS, and promoted to production without rebuilding. The review subtree object remained unchanged across promotion.
 
 ## Release identities
 
-- Source commit: pending.
-- Immutable review: pending.
-- Review Pages commit: pending.
-- Production Pages commit: pending.
-- Release file count / bytes / tree SHA-256: pending.
-- Review/production mismatches: pending.
+- Source commit: `14ae10824f613a9086081a24c789ab7479caa8c3`.
+- Immutable review: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass34-grenade-menu-tower-range-14ae108/>.
+- Review Pages commit: `908ef1e8b7b37c5dfef35efa773d93e2e67193bf` (`built`).
+- Production: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/>.
+- Production Pages commit: `0c8113108fd937e872797e7f3c080ea56b74b504` (`built`).
+- Immutable review subtree: `5aef18bac9f9a5601eaa029392ccc5e331a592de` before and after promotion.
+- Release tree: **56 files / 20,445,465 bytes**; deterministic tree SHA-256 `f0b2b86aac73560b36200af95db15f16bcef51f13712797d0a78910f0b11e602`.
+- Live verification fetched all 56 files from review and production: **0 mismatches**, with both surfaces totaling **20,445,465 bytes**.
