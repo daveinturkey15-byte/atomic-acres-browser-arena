@@ -1,7 +1,7 @@
 # Pass 36 — Quality Graphics, Bot Arsenal, Gun Range Rules, Atmosphere, Windows, Drops, and Leaderboard
 
 **Date:** 2026-07-20  
-**Status:** implemented and locally verified; immutable review and production promotion pending
+**Status:** released to production from immutable reviewed bytes
 
 ## Overview
 
@@ -123,4 +123,15 @@ Pass 36 addresses Dave's reported gameplay defects without changing weapon damag
 
 ## Release policy
 
-Production remains on Pass 35 until all Pass 36 acceptance criteria pass. Source is committed/pushed before the single release build. Production receives the exact immutable-reviewed payload bytes with a complete manifest and zero mismatches.
+Production remained on Pass 35 until all Pass 36 acceptance criteria passed. Source was committed/pushed before the single release build. Production received the exact immutable-reviewed payload bytes with a complete manifest and zero mismatches.
+
+## Release record
+
+- Source implementation commit: `5d3cc58b00303b6f7c1a0121ceccaa0a02340d96`.
+- Immutable review Pages commit: `9eba3516b086eb5ff458082955919cb42a311648`.
+- Production Pages commit: `5b81e22d8d6b8e758de0491d1f3fbd921ed385b0`.
+- Immutable review: `review/pass36-quality-graphics-bot-arsenal-5d3cc58/`.
+- Frozen artifact: `/root/jigglyclaw/releases/atomic-acres-pass36-5d3cc58`.
+- Identity: **56 files**, **20,462,845 bytes**, tree SHA-256 `c10591a848946e006abac44fef89321689d6ebd7ac7c965c78f0a6d6d50546ca`.
+- Frozen/review/production comparison: **56/56 files checked, zero mismatches** at both HTTPS origins.
+- Live verification: Pass 36 label, `QUALITY GRAPHICS` option, no overlapping primary roots, deterministic mixed bot weapons, one admitted `0.25×` bot grenade with the second admission rejected, zero JavaScript errors, and zero WebGL context losses.
