@@ -142,6 +142,14 @@ export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]>
   [21.2, 29], [13.8, 18.2], [27.8, -18],
 ]);
 
+export const NEIGHBOURHOOD_BIN_POSITIONS: ReadonlyArray<readonly [number, number]> = Object.freeze([
+  [-21.4, -33], [21.4, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34],
+]);
+
+export const NEIGHBOURHOOD_BICYCLE_POSITIONS: ReadonlyArray<readonly [number, number, number]> = Object.freeze([
+  [-24.5, -35, 0.12], [24.5, 35, Math.PI + 0.12], [29.4, 14, Math.PI / 2],
+]);
+
 export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
   const group = new THREE.Group();
   group.name = 'pass31-neighbourhood-life';
@@ -151,7 +159,7 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   const flowerCount = reduced ? 24 : 72;
   const flowerBeds = NEIGHBOURHOOD_FLOWER_BEDS;
   const stems = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.018, 0.025, 0.42, 5),
+    new THREE.CylinderGeometry(0.018, 0.025, 0.42, reduced ? 3 : 5),
     new THREE.MeshLambertMaterial({ color: 0x4d7d48 }),
     flowerCount,
   );
@@ -208,52 +216,34 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     bench.add(seat, back); decorative(bench); group.add(bench);
   }
 
-  const binLayout: Array<[number, number]> = [[-14.3, -33], [14.3, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34]];
   const binColors = [0x315b5e, 0x704c43, 0x3e5a45];
-  for (const [index, [x, z]] of binLayout.entries()) {
+  for (const [index, [x, z]] of NEIGHBOURHOOD_BIN_POSITIONS.entries()) {
     const bin = streetBox('street-recycling-bin', [0.72, 1.08, 0.66], new THREE.MeshStandardMaterial({ color: binColors[index % binColors.length], roughness: 0.72, metalness: 0.18 }));
     bin.position.set(x, 0.54, z); decorative(bin); group.add(bin);
   }
 
-  if (!reduced) {
-    const tyre = new THREE.MeshStandardMaterial({ color: 0x151b1d, roughness: 0.88 });
-    const frameMaterial = new THREE.LineBasicMaterial({ color: 0xe0ad45 });
-    for (const [x, z, rotation] of [[-16, -35, 0.12], [16, 35, Math.PI + 0.12], [29.4, 14, Math.PI / 2]] as Array<[number, number, number]>) {
-      const bicycle = new THREE.Group(); bicycle.name = 'street-bicycle'; bicycle.position.set(x, 0, z); bicycle.rotation.y = rotation;
-      for (const wheelX of [-0.62, 0.62]) {
-        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.035, 6, 18), tyre);
-        wheel.position.set(wheelX, 0.4, 0); wheel.rotation.y = Math.PI / 2; bicycle.add(wheel);
-      }
-      const frame = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
-        new THREE.Vector3(0, 0.82, 0), new THREE.Vector3(0.56, 0.4, 0),
-        new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0.25, 0.4, 0),
-        new THREE.Vector3(0.25, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
-      ]), frameMaterial);
-      bicycle.add(frame); decorative(bicycle); group.add(bicycle);
+  const tyre = new THREE.MeshStandardMaterial({ color: 0x151b1d, roughness: 0.88, side: THREE.DoubleSide });
+  const frameMaterial = new THREE.LineBasicMaterial({ color: 0xe0ad45 });
+  for (const [x, z, rotation] of NEIGHBOURHOOD_BICYCLE_POSITIONS) {
+    const bicycle = new THREE.Group(); bicycle.name = 'street-bicycle'; bicycle.position.set(x, 0, z); bicycle.rotation.y = rotation;
+    for (const wheelX of [-0.62, 0.62]) {
+      const wheelGeometry = reduced
+        ? new THREE.RingGeometry(0.31, 0.37, 6)
+        : new THREE.TorusGeometry(0.36, 0.035, 6, 18);
+      const wheel = new THREE.Mesh(wheelGeometry, tyre);
+      wheel.position.set(wheelX, 0.4, 0); bicycle.add(wheel);
     }
-
-  } else {
-    const markers = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(0.18, 0.72, 0.18),
-      new THREE.MeshBasicMaterial({ color: 0xe0ad45, toneMapped: false }),
-      3,
-    );
-    markers.name = 'street-wayfinding-markers';
-    markers.userData.dynamic = true;
-    markers.userData.presentationOnly = true;
-    markers.raycast = () => undefined;
-    const markerMatrix = new THREE.Matrix4();
-    [[-16, -35], [16, 35], [29.4, 14]].forEach(([x, z], index) => {
-      markerMatrix.makeTranslation(x, 0.36, z);
-      markers.setMatrixAt(index, markerMatrix);
-    });
-    markers.instanceMatrix.needsUpdate = true;
-    group.add(markers);
+    const frame = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
+      new THREE.Vector3(0, 0.82, 0), new THREE.Vector3(0.56, 0.4, 0),
+      new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0.25, 0.4, 0),
+      new THREE.Vector3(0.25, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
+    ]), frameMaterial);
+    bicycle.add(frame); decorative(bicycle); group.add(bicycle);
   }
 
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
-  group.userData.neighbourhoodLife = { flowers: flowerCount, benches: 4, bins: 6, bicycles: reduced ? 0 : 3, markers: reduced ? 3 : 0, butterflies: 0, birds: 0 };
+  group.userData.neighbourhoodLife = { flowers: flowerCount, flowerBeds: flowerBeds.length, benches: 4, bins: 6, bicycles: 3, markers: 0, butterflies: 0, birds: 0 };
   root.add(group);
   return group;
 }
@@ -557,11 +547,117 @@ function addRouteArchitecture(root: THREE.Group): void {
   });
 }
 
+function addSemanticHouseInteriors(root: THREE.Group): void {
+  const interiors = new THREE.Group();
+  interiors.name = 'performance-interior-furnishing-sets';
+  const fabric = texturedMaterial('./assets/original/textures/fabric-weave.png', {
+    color: 0xc8d2c4,
+    roughness: 0.96,
+    repeatX: 2,
+    repeatY: 2,
+    normalPath: './assets/original/textures/fabric-weave-normal.png',
+    roughnessPath: './assets/original/textures/fabric-weave-roughness.png',
+    normalScale: 0.42,
+  });
+  fabric.name = 'interior-fabric-upholstery';
+  const timber = texturedMaterial('./assets/original/textures/wood-deck.png', {
+    color: 0xa67952,
+    roughness: 0.9,
+    repeatX: 3,
+    repeatY: 2,
+    normalPath: './assets/original/textures/wood-deck-normal.png',
+    roughnessPath: './assets/original/textures/wood-deck-roughness.png',
+    normalScale: 0.34,
+  });
+  timber.name = 'interior-timber-furniture';
+  const darkEquipment = texturedMaterial('./assets/original/textures/weapon-gunmetal.png', {
+    color: 0x39474d,
+    roughness: 0.54,
+    metalness: 0.34,
+    repeatX: 2,
+    normalPath: './assets/original/textures/weapon-gunmetal-normal.png',
+    roughnessPath: './assets/original/textures/weapon-gunmetal-roughness.png',
+    normalScale: 0.26,
+  });
+  darkEquipment.name = 'interior-dark-media-equipment';
+  const metal = texturedMaterial('./assets/original/textures/painted-metal-teal.png', {
+    color: 0x6f8e8c,
+    roughness: 0.62,
+    metalness: 0.42,
+    normalPath: './assets/original/textures/painted-metal-teal-normal.png',
+    roughnessPath: './assets/original/textures/painted-metal-teal-roughness.png',
+    normalScale: 0.25,
+  });
+  metal.name = 'interior-painted-metal-accents';
+
+  const addPiece = (
+    houseIndex: number,
+    house: (typeof HOUSE_LAYOUT)[number],
+    name: string,
+    localPosition: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    family: 'fabric' | 'timber' | 'dark-equipment' | 'metal',
+  ): THREE.Mesh => {
+    const piece = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    piece.name = `performance-interior-${houseIndex}-${name}`;
+    piece.position.set(
+      house.x + localPosition[0],
+      localPosition[1],
+      house.z + house.facing * localPosition[2],
+    );
+    piece.userData.interiorMaterialFamily = family;
+    piece.userData.presentationOnly = true;
+    piece.userData.blocksShots = false;
+    interiors.add(piece);
+    return piece;
+  };
+
+  HOUSE_LAYOUT.forEach((house, houseIndex) => {
+    const safeSide = house.team === 0 ? -1 : 1;
+    const safeX = safeSide * 5.8;
+    addPiece(houseIndex, house, 'dining-table', [safeX, 0.86, 3.9], [2.7, 0.18, 1.25], timber, 'timber');
+    for (const side of [-1, 1]) {
+      addPiece(houseIndex, house, `dining-chair-${side}`, [safeX + side * 1.65, 0.52, 3.9], [0.62, 1.04, 0.62], timber, 'timber');
+    }
+
+    addPiece(houseIndex, house, 'sofa-seat', [safeX, 0.48, -3.8], [3.1, 0.56, 1.28], fabric, 'fabric');
+    addPiece(houseIndex, house, 'sofa-back', [safeX, 1.08, -4.3], [3.1, 1.25, 0.3], fabric, 'fabric');
+    for (const side of [-1, 1]) {
+      addPiece(houseIndex, house, `sofa-arm-${side}`, [safeX + side * 1.45, 0.78, -3.8], [0.24, 0.76, 1.3], fabric, 'fabric');
+    }
+    addPiece(houseIndex, house, 'media-console', [-safeX, 0.52, -4.45], [2.5, 0.88, 0.56], darkEquipment, 'dark-equipment');
+    addPiece(houseIndex, house, 'media-screen', [-safeX, 1.55, -4.65], [2.15, 1.25, 0.14], darkEquipment, 'dark-equipment');
+
+    addPiece(houseIndex, house, 'bed-frame', [safeX, 3.78, 3.7], [3.25, 0.28, 2.3], timber, 'timber');
+    addPiece(houseIndex, house, 'bed-mattress', [safeX, 4.08, 3.7], [3.05, 0.4, 2.1], fabric, 'fabric');
+    addPiece(houseIndex, house, 'bed-pillow', [safeX, 4.42, 4.35], [1.55, 0.24, 0.62], fabric, 'fabric');
+
+    addPiece(houseIndex, house, 'shelving-body', [safeX * 1.42, 4.72, -4.5], [1.3, 2.45, 0.42], timber, 'timber');
+    for (const shelfY of [3.85, 4.65, 5.45]) {
+      addPiece(houseIndex, house, `shelf-${shelfY}`, [safeX * 1.42, shelfY, -4.23], [1.2, 0.11, 0.48], timber, 'timber');
+    }
+    addPiece(houseIndex, house, 'workstation-desk', [safeX, 3.95, -3.55], [2.5, 0.18, 1.05], timber, 'timber');
+    addPiece(houseIndex, house, 'workstation-monitor', [safeX, 4.75, -3.98], [1.35, 0.88, 0.12], darkEquipment, 'dark-equipment');
+    addPiece(houseIndex, house, 'workstation-leg-left', [safeX - 0.95, 3.55, -3.55], [0.13, 0.82, 0.72], metal, 'metal');
+    addPiece(houseIndex, house, 'workstation-leg-right', [safeX + 0.95, 3.55, -3.55], [0.13, 0.82, 0.72], metal, 'metal');
+  });
+
+  root.add(interiors);
+  const batchStats = batchStaticMeshes(interiors, interiors, () => '', 'texture-lit');
+  interiors.userData.dynamic = true;
+  interiors.userData.semanticInterior = {
+    houses: HOUSE_LAYOUT.length,
+    sourcePieces: batchStats.sourceMeshes,
+    batches: batchStats.batches,
+    materialFamilies: ['fabric', 'timber', 'dark-equipment', 'metal'],
+  };
+}
+
 function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
+  addSemanticHouseInteriors(root);
   const dark = new THREE.MeshStandardMaterial({ color: 0x25343a, roughness: 0.62, metalness: 0.28 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xe5b842, emissive: 0x6b4210, emissiveIntensity: 0.5, roughness: 0.52, metalness: 0.2 });
-  const domestic = new THREE.MeshStandardMaterial({ color: 0xd8c7a5, roughness: 0.88 });
-  const screen = new THREE.MeshStandardMaterial({ color: 0x78cfca, emissive: 0x1b6c70, emissiveIntensity: 1.4, roughness: 0.28 });
   const routeMarkers: Array<[string, number, number, number, number]> = [
     ['VERDANT ARRAY', -19.2, 2.7, -8, Math.PI / 2],
     ['CIVIC TRANSIT', 7.4, 2.7, 0, -Math.PI / 2],
@@ -584,16 +680,6 @@ function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   if (reduced) return;
   for (const house of HOUSE_LAYOUT) {
     const facing = house.facing;
-    const table = roundedBox('interior-dining-table', [2.5, 0.16, 1.15], domestic, 0.06, 2);
-    table.position.set(house.x - 2.7, 0.92, house.z - facing * 2.4); decorative(table); root.add(table);
-    for (const side of [-1, 1]) {
-      const chair = roundedBox('interior-dining-chair', [0.58, 1.05, 0.58], house.team === 0 ? screen : gold, 0.08, 2);
-      chair.position.set(house.x - 2.7 + side * 1.65, 0.53, house.z - facing * 2.4); decorative(chair); root.add(chair);
-    }
-    const consoleBody = roundedBox('interior-atom-console', [2.2, 1.15, 0.65], dark, 0.08, 2);
-    consoleBody.position.set(house.x + 3.4, 0.58, house.z + facing * 2.45); decorative(consoleBody); root.add(consoleBody);
-    const consoleScreen = roundedBox('interior-console-screen', [1.5, 0.52, 0.05], screen, 0.04, 2);
-    consoleScreen.position.set(house.x + 3.4, 0.83, house.z + facing * (2.8)); decorative(consoleScreen); root.add(consoleScreen);
     const plaque = new THREE.Mesh(
       new THREE.PlaneGeometry(3.7, 0.85),
       new THREE.MeshBasicMaterial({ map: createSignTexture(house.team === 0 ? 'AQUA MODEL HOME' : 'CORAL MODEL HOME'), side: THREE.DoubleSide }),

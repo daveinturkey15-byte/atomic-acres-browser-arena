@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerRelativeMinimapOffset, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerRelativeMinimapOffset, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
 
 const bounds = { minX: -40, maxX: 40, minZ: -50, maxZ: 50 };
 
@@ -79,5 +79,41 @@ describe('enemy reveal policy', () => {
     expect(shouldRevealEnemy(12, 10_000, 0)).toBe(true);
     expect(shouldRevealEnemy(40, 10_000, 8_000)).toBe(true);
     expect(shouldRevealEnemy(40, 10_000, 2_000)).toBe(false);
+  });
+});
+
+describe('meaningful physical-cover landmarks', () => {
+  it('assigns a minimap identity to both buses and all four semantic cover families', () => {
+    expect([
+      physicalCoverMinimapKind('north-tour-bus'),
+      physicalCoverMinimapKind('south-shuttle-bus'),
+      physicalCoverMinimapKind('north-cargo-stack', 'cargo-stack'),
+      physicalCoverMinimapKind('south-pipe-stack', 'pipe-stack'),
+      physicalCoverMinimapKind('west-service-skip', 'service-skip'),
+      physicalCoverMinimapKind('east-generator-trailer', 'generator-trailer'),
+    ]).toEqual(['bus', 'bus', 'cargo-stack', 'pipe-stack', 'service-skip', 'generator-trailer']);
+  });
+
+  it('provides a compact label for every semantic silhouette', () => {
+    expect([
+      minimapLandmarkLabel('bus'),
+      minimapLandmarkLabel('cargo-stack'),
+      minimapLandmarkLabel('pipe-stack'),
+      minimapLandmarkLabel('service-skip'),
+      minimapLandmarkLabel('generator-trailer'),
+    ]).toEqual(['BUS', 'CRGO', 'PIPE', 'SKIP', 'GEN']);
+  });
+
+  it('maps a landmark to its authoritative world-space footprint', () => {
+    const footprint = minimapLandmarkFootprint(
+      { minX: -10, maxX: 10, minZ: -5, maxZ: 5 },
+      bounds,
+      160,
+      200,
+    );
+    expect(footprint.x).toBeCloseTo(60);
+    expect(footprint.y).toBeCloseTo(90);
+    expect(footprint.width).toBeCloseTo(40);
+    expect(footprint.height).toBeCloseTo(20);
   });
 });

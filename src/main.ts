@@ -58,7 +58,7 @@ import {
   type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
-import { headingDegrees, minimapToWorld, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap, type MinimapLandmarkKind } from './minimap';
 import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
@@ -891,6 +891,7 @@ const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
+let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
 let spawnFlipHysteresis: [SpawnFlipHysteresis, SpawnFlipHysteresis] = [
@@ -4282,6 +4283,81 @@ function checkMatchEnd(): void {
   updateMatchState(performance.now());
 }
 
+function drawMinimapLandmark(
+  context: CanvasRenderingContext2D,
+  id: string,
+  kind: MinimapLandmarkKind,
+  footprint: { x: number; y: number; width: number; height: number },
+): void {
+  const { x, y, width, height } = footprint;
+  const inset = Math.max(1.5, Math.min(width, height) * 0.12);
+  context.save();
+  context.lineWidth = 2.5;
+  context.strokeStyle = '#fff1bd';
+  context.fillStyle = id.startsWith('south-') ? 'rgba(255, 118, 95, .66)' : 'rgba(88, 227, 220, .62)';
+
+  if (kind === 'bus') {
+    context.fillRect(x, y, width, height);
+    context.strokeRect(x, y, width, height);
+    context.strokeStyle = 'rgba(7, 15, 18, .88)';
+    context.beginPath();
+    context.moveTo(x + width * 0.18, y + inset);
+    context.lineTo(x + width * 0.18, y + height - inset);
+    context.moveTo(x + width * 0.82, y + inset);
+    context.lineTo(x + width * 0.82, y + height - inset);
+    context.stroke();
+  } else if (kind === 'cargo-stack') {
+    context.fillStyle = 'rgba(225, 171, 52, .76)';
+    context.fillRect(x, y, width, height);
+    context.strokeRect(x, y, width, height);
+    context.strokeStyle = 'rgba(7, 15, 18, .78)';
+    context.beginPath();
+    context.moveTo(x + width / 3, y); context.lineTo(x + width / 3, y + height);
+    context.moveTo(x + width * 2 / 3, y); context.lineTo(x + width * 2 / 3, y + height);
+    context.moveTo(x, y + height / 2); context.lineTo(x + width, y + height / 2);
+    context.stroke();
+  } else if (kind === 'pipe-stack') {
+    context.fillStyle = 'rgba(173, 186, 188, .72)';
+    const radius = Math.max(2.5, Math.min(width / 6, height / 3.2));
+    const centres: Array<[number, number]> = [
+      [0.22, 0.66], [0.5, 0.66], [0.78, 0.66], [0.36, 0.30], [0.64, 0.30],
+    ];
+    for (const [px, py] of centres) {
+      context.beginPath();
+      context.arc(x + width * px, y + height * py, radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+  } else if (kind === 'service-skip') {
+    context.fillStyle = 'rgba(225, 171, 52, .78)';
+    context.beginPath();
+    context.moveTo(x + inset, y);
+    context.lineTo(x + width - inset, y);
+    context.lineTo(x + width, y + height);
+    context.lineTo(x, y + height);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.strokeStyle = 'rgba(7, 15, 18, .82)';
+    context.beginPath();
+    context.moveTo(x + inset, y + height * 0.34);
+    context.lineTo(x + width - inset, y + height * 0.34);
+    context.stroke();
+  } else {
+    context.fillStyle = 'rgba(232, 203, 92, .74)';
+    context.fillRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
+    context.strokeRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
+    context.fillStyle = '#10232a';
+    const wheelRadius = Math.max(2.3, Math.min(width, height) * 0.13);
+    for (const wheelX of [x + width * 0.24, x + width * 0.76]) {
+      context.beginPath();
+      context.arc(wheelX, y + height - inset * 0.45, wheelRadius, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  context.restore();
+}
+
 function updateMinimap(now: number): void {
   minimapRenderCount += 1;
   const context = minimapContext;
@@ -4322,6 +4398,22 @@ function updateMinimap(now: number): void {
     context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
     context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
   }
+  const renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+  const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
+  for (const cover of arena.physicalCover) {
+    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
+    if (!kind) continue;
+    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
+    drawMinimapLandmark(context, cover.id, kind, footprint);
+    const label = minimapLandmarkLabel(kind);
+    const centre = context.getTransform().transformPoint(new DOMPoint(
+      footprint.x + footprint.width / 2,
+      footprint.y + footprint.height / 2,
+    ));
+    landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
+    renderedLandmarks.push({ id: cover.id, kind, label });
+  }
+  minimapLandmarksRendered = renderedLandmarks;
   for (const remote of remotes.values()) {
     const friendly = remote.snapshot.team === player.team;
     const scoutActive = now < scoutSweepUntil;
@@ -4352,6 +4444,20 @@ function updateMinimap(now: number): void {
     context.fillText('4×', 0, 1);
     context.restore();
     context.textBaseline = 'alphabetic';
+  }
+  context.restore();
+  context.save();
+  context.font = '900 15px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'bottom';
+  context.lineJoin = 'round';
+  context.lineWidth = 4;
+  context.strokeStyle = 'rgba(7, 15, 18, .94)';
+  context.fillStyle = '#fff1bd';
+  for (const label of landmarkLabels) {
+    if (label.x < 18 || label.x > width - 18 || label.y < 22 || label.y > height - 8) continue;
+    context.strokeText(label.label, label.x, label.y);
+    context.fillText(label.label, label.x, label.y);
   }
   context.restore();
   const px = width / 2;
@@ -5159,6 +5265,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       backingWidth: minimapCanvas.width,
       cssWidth: minimapCanvas.getBoundingClientRect().width,
       headingDegrees: headingDegrees(player.yaw),
+      landmarks: minimapLandmarksRendered.map((landmark) => ({ ...landmark })),
     },
     spawnSafety: ([0, 1] as Team[]).map((team) => ({
       team,
@@ -5217,20 +5324,64 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         if (/^(street-bench|street-recycling-bin|street-bicycle)$/.test(node.name)) streetItems += 1;
         if (node.name === 'street-wayfinding-markers' && node instanceof THREE.InstancedMesh) streetItems += node.count;
       });
-      return { loaded: root !== undefined, floraInstances, faunaInstances, streetItems };
+      const contract = root?.userData.neighbourhoodLife as {
+        flowerBeds?: number;
+        benches?: number;
+        bins?: number;
+        bicycles?: number;
+        markers?: number;
+      } | undefined;
+      return {
+        loaded: root !== undefined,
+        floraInstances,
+        faunaInstances,
+        streetItems,
+        flowerBeds: contract?.flowerBeds ?? 0,
+        benches: contract?.benches ?? 0,
+        bins: contract?.bins ?? 0,
+        bicycles: contract?.bicycles ?? 0,
+        genericMarkers: contract?.markers ?? 0,
+      };
     })(),
     arenaStoryReady: blenderArenaActive || ['route-marker-verdant-array', 'route-marker-civic-transit', 'route-marker-helio-service']
       .every((name) => scene.getObjectByName(name) !== undefined),
     interiorTelemetry: (() => {
       const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0, visibleRamps: 0 };
+      const materialFamilies = new Set<string>();
+      const texturedMaterialFamilies = new Set<string>();
       scene.traverse((node) => {
-        if (/^(upper-room-(bed|headboard|workbench|console)|performance-interior)/.test(node.name)) counts.furnishings += 1;
+        if (node instanceof THREE.Mesh && /^(upper-room-(bed|headboard|workbench|console)|performance-interior)/.test(node.name)) {
+          counts.furnishings += 1;
+          const family = typeof node.userData.interiorMaterialFamily === 'string'
+            ? node.userData.interiorMaterialFamily
+            : null;
+          if (family) {
+            materialFamilies.add(family);
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            if (materials.some((material) => material instanceof THREE.MeshStandardMaterial && material.map)) {
+              texturedMaterialFamilies.add(family);
+            }
+          }
+        }
         if (/interior-ceiling-light|balcony-rail|house-gable-finish|house-gutter|house-chimney/.test(node.name)) counts.fixtures += 1;
         if (node.userData.collisionProxy === true && node.visible) counts.visibleCollisionProxies += 1;
         if (/^(exterior|interior)-access-ramp$/.test(node.name)
           && (node.visible || node.userData.staticBatchRendered === true)) counts.visibleRamps += 1;
       });
-      return counts;
+      const semanticRoot = scene.getObjectByName('performance-interior-furnishing-sets');
+      const semantic = semanticRoot?.userData.semanticInterior as {
+        houses?: number;
+        sourcePieces?: number;
+        batches?: number;
+      } | undefined;
+      return {
+        ...counts,
+        furnishingSets: semantic?.houses ?? 0,
+        furnishingSourcePieces: semantic?.sourcePieces ?? 0,
+        furnishingBatches: semantic?.batches ?? 0,
+        furnishingMaterialFamilies: [...materialFamilies].sort(),
+        texturedFurnishingMaterialFamilies: [...texturedMaterialFamilies].sort(),
+      };
     })(),
     weaponReady: weaponView.isReady(),
     weaponPresentation: weaponView.presentationState(),

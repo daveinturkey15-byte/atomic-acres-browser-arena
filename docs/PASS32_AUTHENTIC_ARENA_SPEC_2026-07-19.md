@@ -1,7 +1,7 @@
 # Pass 32 — Authentic Arena Detail and Combat Escalation
 
 Date: 2026-07-19
-Status: verified release candidate
+Status: verified audit-correction release candidate
 
 ## Overview
 
@@ -48,3 +48,51 @@ Make Atomic Acres read as a deliberately authored compact early-2010s arena in o
 - Hostile-peer multiplayer hardening.
 - Broad movement, score-limit, reload, Field Support, or lighting redesign.
 - Replacing the existing original arena with copied commercial geometry or assets.
+
+## 2026-07-20 failed-claim audit and correction
+
+The original Pass 32 production release was valid for its combat, weapon, cover,
+Quad Damage and escalation gates, but a follow-up audit found five presentation
+requirements that had been omitted or incorrectly accepted:
+
+1. The player-up minimap did not draw the six collision-authoritative cover
+   landmarks. The correction derives two buses, cargo, pipes, skip and generator
+   directly from `arena.physicalCover`, with distinct silhouettes and upright
+   screen-space labels (`BUS`, `CRGO`, `PIPE`, `SKIP`, `GEN`).
+2. The retained Performance browser gate explicitly accepted `furnishings: 0`.
+   The correction adds two 20-piece semantic furnishing sets—dining set, sofa,
+   media console, bed, shelving and workstation—batched into four
+   texture-preserving fabric/timber/dark-equipment/metal submissions.
+3. Performance disabled the already-bounded atmosphere solely by profile. The
+   30-triangle, at-most-three-submission tier now defaults on for hardware
+   Performance while Compat and software renderers remain fail-safe bypasses;
+   forced software QA proves 10 mist cards, 5 smoke cards and 64 dust motes.
+4. Reduced-detail Performance substituted three generic markers for the three
+   specified bicycles. It now renders low-poly two-wheel/frame silhouettes.
+5. Two bicycles and two exterior recycling bins were positioned inside house
+   footprints. Flowers, bins and bicycles now use exported authoritative layouts
+   with radius-aware tests proving every exterior prop stays outside both houses.
+
+The physical pipe family was also corrected from capped drums to five hollow
+extruded-ring pipes, retaining the same authoritative collider footprint and
+five-mesh telemetry.
+
+### Audit-correction verification
+
+- Application and Worker TypeScript: pass.
+- Deterministic gameplay contract and golden replays: pass.
+- Unit suite: **299/299** across **61 files**.
+- Production build and 55-file release-tree verification: pass.
+- Production dependency audit: zero vulnerabilities.
+- Strict Performance gate: passed twice in fresh single-worker browser contexts
+  without raising the retained 147-call / 158,000-triangle ceilings.
+- Six distinct weapon/two-hand model gate: pass.
+- Performance atmosphere gate: pass.
+- Player-up minimap rotation, six-label telemetry and left/right agreement gate: pass.
+- Authoritative centre ray: all **18** weapon/viewport combinations pass.
+- Direct Performance inspection: minimap labels readable at 240 CSS pixels;
+  dining/sofa/media/bed/shelves/workstation materially distinct and route-clear;
+  flowers outside both houses; bicycle silhouette outdoors; hollow pipe cover
+  recognisable; atmosphere restrained and combat-readable.
+- Planned additive immutable review:
+  `review/pass32-audit-correction-20260720-024546/`.

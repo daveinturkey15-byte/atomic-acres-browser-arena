@@ -131,7 +131,16 @@ type DebugState = {
     performanceVisualKind: 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer' | null;
     performanceVisualMeshes: number;
   }>;
-  minimap: { backingWidth: number; cssWidth: number; headingDegrees: number };
+  minimap: {
+    backingWidth: number;
+    cssWidth: number;
+    headingDegrees: number;
+    landmarks: Array<{
+      id: string;
+      kind: 'bus' | 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer';
+      label: string;
+    }>;
+  };
   spawnSafety: Array<{ team: 0 | 1; authored: number; valid: number }>;
   houseNavigation: Array<{
     id: string;
@@ -154,7 +163,17 @@ type DebugState = {
     cuesInsideBounds: boolean;
   };
   worldIdentityPresentation: { routeLights: number; routeSigns: number; cueInstances: number; atmosphericParticles: number };
-  neighbourhoodLife: { loaded: boolean; floraInstances: number; faunaInstances: number; streetItems: number };
+  neighbourhoodLife: {
+    loaded: boolean;
+    floraInstances: number;
+    faunaInstances: number;
+    streetItems: number;
+    flowerBeds: number;
+    benches: number;
+    bins: number;
+    bicycles: number;
+    genericMarkers: number;
+  };
   arenaZone: string;
   arenaStoryReady: boolean;
   interiorTelemetry: {
@@ -170,6 +189,11 @@ type DebugState = {
     fixtures: number;
     visibleCollisionProxies: number;
     visibleRamps: number;
+    furnishingSets: number;
+    furnishingSourcePieces: number;
+    furnishingBatches: number;
+    furnishingMaterialFamilies: string[];
+    texturedFurnishingMaterialFamilies: string[];
   };
   weaponReady: boolean;
   weaponPresentation: {
@@ -1868,7 +1892,7 @@ test.describe('performance and stability', () => {
     expect(state.render.atmosphere).toMatchObject({
       pass: 30,
       enabled: false,
-      bypassReason: 'performance-budget',
+      bypassReason: 'software-renderer',
       mistCards: 0,
       volumetricRayMarching: false,
     });
@@ -1915,18 +1939,56 @@ test.describe('performance and stability', () => {
       ramps: 4,
       wallMaterialVariants: 6,
       pbrMaterialFamilies: 9,
-      furnishings: 0,
+      furnishings: 40,
       fixtures: 0,
       visibleCollisionProxies: 0,
       visibleRamps: 4,
+      furnishingSets: 2,
+      furnishingSourcePieces: 40,
+      furnishingBatches: 4,
+      furnishingMaterialFamilies: ['dark-equipment', 'fabric', 'metal', 'timber'],
+      texturedFurnishingMaterialFamilies: ['dark-equipment', 'fabric', 'metal', 'timber'],
     });
-    expect(state.neighbourhoodLife).toEqual({ loaded: true, floraInstances: 48, faunaInstances: 0, streetItems: 13 });
+    expect(state.neighbourhoodLife).toEqual({
+      loaded: true,
+      floraInstances: 48,
+      faunaInstances: 0,
+      streetItems: 13,
+      flowerBeds: 6,
+      benches: 4,
+      bins: 6,
+      bicycles: 3,
+      genericMarkers: 0,
+    });
     await page.setViewportSize({ width: 1000, height: 700 });
     await expect.poll(async () => {
       const resized = await debug(page);
       return resized.render.atomicSignal.width === resized.render.drawingBuffer[0]
         && resized.render.atomicSignal.height === resized.render.drawingBuffer[1];
     }).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('Performance hardware tier retains bounded mist, smoke and low-altitude dust', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance&mist=on');
+    await startSolo(page);
+    await page.waitForTimeout(300);
+    const atmosphere = (await debug(page)).render.atmosphere;
+    expect(atmosphere).toMatchObject({
+      pass: 30,
+      enabled: true,
+      bypassReason: null,
+      mistCards: 10,
+      smokeCards: 5,
+      dustMotes: 64,
+      triangles: 30,
+      textureSamples: 0,
+      volumetricRayMarching: false,
+      perFrameAllocations: 0,
+    });
+    expect(atmosphere.submissions).toBeLessThanOrEqual(3);
     expect(errors).toEqual([]);
   });
 
@@ -2023,6 +2085,15 @@ test.describe('performance and stability', () => {
     };
 
     await waitForTwoFrames();
+    const minimapState = await debug(page);
+    expect(minimapState.minimap.landmarks).toEqual([
+      { id: 'north-tour-bus', kind: 'bus', label: 'BUS' },
+      { id: 'south-shuttle-bus', kind: 'bus', label: 'BUS' },
+      { id: 'north-cargo-stack', kind: 'cargo-stack', label: 'CRGO' },
+      { id: 'south-pipe-stack', kind: 'pipe-stack', label: 'PIPE' },
+      { id: 'west-service-skip', kind: 'service-skip', label: 'SKIP' },
+      { id: 'east-generator-trailer', kind: 'generator-trailer', label: 'GEN' },
+    ]);
     expect(await markerCentreX()).toBeGreaterThan(180);
     const rightDamage = await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: { showBotDamageDirection: () => number | null } }

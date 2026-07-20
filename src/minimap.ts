@@ -1,5 +1,30 @@
 export type MinimapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
+export type MinimapLandmarkKind = 'bus' | 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer';
+
+export function minimapLandmarkLabel(kind: MinimapLandmarkKind): 'BUS' | 'CRGO' | 'PIPE' | 'SKIP' | 'GEN' {
+  if (kind === 'cargo-stack') return 'CRGO';
+  if (kind === 'pipe-stack') return 'PIPE';
+  if (kind === 'service-skip') return 'SKIP';
+  if (kind === 'generator-trailer') return 'GEN';
+  return 'BUS';
+}
+
+export type MinimapLandmarkFootprint = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export function physicalCoverMinimapKind(
+  id: string,
+  performanceVisualKind?: Exclude<MinimapLandmarkKind, 'bus'>,
+): MinimapLandmarkKind | null {
+  if (performanceVisualKind) return performanceVisualKind;
+  return id.endsWith('-bus') ? 'bus' : null;
+}
+
 export function worldToMinimap(
   x: number,
   z: number,
@@ -10,6 +35,22 @@ export function worldToMinimap(
   const normalizedX = Math.max(0, Math.min(1, (x - bounds.minX) / Math.max(0.001, bounds.maxX - bounds.minX)));
   const normalizedZ = Math.max(0, Math.min(1, (z - bounds.minZ) / Math.max(0.001, bounds.maxZ - bounds.minZ)));
   return [normalizedX * width, height - normalizedZ * height];
+}
+
+export function minimapLandmarkFootprint(
+  landmarkBounds: MinimapBounds,
+  arenaBounds: MinimapBounds,
+  width: number,
+  height: number,
+): MinimapLandmarkFootprint {
+  const [left, top] = worldToMinimap(landmarkBounds.minX, landmarkBounds.maxZ, arenaBounds, width, height);
+  const [right, bottom] = worldToMinimap(landmarkBounds.maxX, landmarkBounds.minZ, arenaBounds, width, height);
+  return {
+    x: left,
+    y: top,
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top),
+  };
 }
 
 export function shouldRevealEnemy(distance: number, now: number, lastShotAt: number): boolean {

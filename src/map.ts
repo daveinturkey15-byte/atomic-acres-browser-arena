@@ -155,8 +155,27 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     length: number,
     mat: THREE.Material,
     rotation: [number, number, number],
+    hollow = false,
   ): THREE.Mesh {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 10), mat);
+    let geometry: THREE.BufferGeometry;
+    if (hollow) {
+      const profile = new THREE.Shape();
+      profile.absarc(0, 0, radius, 0, Math.PI * 2, false);
+      const opening = new THREE.Path();
+      opening.absarc(0, 0, radius * 0.58, 0, Math.PI * 2, true);
+      profile.holes.push(opening);
+      geometry = new THREE.ExtrudeGeometry(profile, {
+        depth: length,
+        bevelEnabled: false,
+        steps: 1,
+        curveSegments: 6,
+      });
+      geometry.translate(0, 0, -length / 2);
+      geometry.rotateX(-Math.PI / 2);
+    } else {
+      geometry = new THREE.CylinderGeometry(radius, radius, length, 6);
+    }
+    const mesh = new THREE.Mesh(geometry, mat);
     mesh.name = name;
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
@@ -179,8 +198,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       performanceCoverBox(id, name, position, size, mat);
       meshes += 1;
     };
-    const addCylinder = (name: string, position: [number, number, number], radius: number, length: number, mat: THREE.Material, rotation: [number, number, number]) => {
-      performanceCoverCylinder(id, name, position, radius, length, mat, rotation);
+    const addCylinder = (name: string, position: [number, number, number], radius: number, length: number, mat: THREE.Material, rotation: [number, number, number], hollow = false) => {
+      performanceCoverCylinder(id, name, position, radius, length, mat, rotation, hollow);
       meshes += 1;
     };
 
@@ -192,8 +211,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     }
 
     if (id === 'south-pipe-stack') {
-      for (const offset of [-1.15, 0, 1.15]) addCylinder('performance-concrete-pipe', [x + offset, 0.53, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0]);
-      for (const offset of [-0.58, 0.58]) addCylinder('performance-concrete-pipe', [x + offset, 1.52, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0]);
+      for (const offset of [-1.15, 0, 1.15]) addCylinder('performance-concrete-pipe', [x + offset, 0.53, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
+      for (const offset of [-0.58, 0.58]) addCylinder('performance-concrete-pipe', [x + offset, 1.52, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
       return { kind: 'pipe-stack', meshes };
     }
 
@@ -330,7 +349,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
   for (const z of [2, 12]) {
     for (const x of [-5.7, -1.9]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.38, 16), palette.dark);
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.38, 8), palette.dark);
       wheel.rotation.z = Math.PI / 2;
       wheel.position.set(x, 0.7, z);
       world.add(wheel);

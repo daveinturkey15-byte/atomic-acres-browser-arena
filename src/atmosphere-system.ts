@@ -20,7 +20,6 @@ export type AtmosphereTelemetry = Readonly<{
 export function atmosphereBypassReason(profile: RenderProfile, rendererLabel: string, query: string | null): string | null {
   if (query === 'off') return 'query-disabled';
   if (profile === 'compat') return 'compat-profile';
-  if (profile === 'performance' && query !== 'on') return 'performance-budget';
   if (isSoftwareWebGLRenderer(rendererLabel) && query !== 'on') return 'software-renderer';
   return null;
 }
