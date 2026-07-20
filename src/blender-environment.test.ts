@@ -94,7 +94,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres Quality Graphics Arena');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(33_632);
+    expect(provenance.runtimeAudit.triangles).toBe(34_336);
     expect(provenance.runtimeAudit.targetedCoplanarOrUnder20mmPairsBefore).toBe(74);
     expect(provenance.runtimeAudit.targetedCoplanarOrUnder20mmPairsAfter).toBe(0);
   });

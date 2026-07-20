@@ -65,9 +65,9 @@ Gun Range had side berms, a backstop, and a player-only firing line, but no rear
 
 A headless Blender same-facing plane scan was run before and after re-authoring. The targeted exact/under-`20 mm` pairs across upper floors/landings, wall corners, ramps/rails, road overlays, bus trim, pipes, boundary corners, facade trim, and beacon rings changed from **74 to 0**. The GLB was then authored twice from the same sources and produced the same SHA-256 both times:
 
-`cfdbd99be3f68cdc6488a81299f5fe0883ad6ee4362d479647c718276e5639e5`
+`1e14fcf7bc57104c88642d3aa89358b6961d0c8e3224963b52dc3f37da913686`
 
-Final GLB contract: **33 meshes, 27 materials, 33,632 triangles, six semantic windows, no external URI, 7,076,664 bytes**.
+Final GLB contract: **33 meshes, 27 materials, 34,336 triangles, six semantic windows, no external URI, 7,130,044 bytes**. The additional triangles are the corrected open bus-door frames caught by pre-release review; the opaque plates were not promoted.
 
 ## Local verification
 

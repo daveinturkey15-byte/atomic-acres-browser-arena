@@ -281,7 +281,11 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
             add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 2.54, wz], [0.07, 1.18, 1.62], M["glass"], 0.025)
         add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
         door_z = z - half + (2.25 if side > 0 else length - 2.25)
-        add_box(f"{prefix}_door_frame_{side}", [x + side * 2.67, 1.78, door_z], [0.08, 2.65, 1.75], M["metal_light"], 0.03)
+        frame_x = x + side * 2.67
+        add_box(f"{prefix}_door_frame_{side}_top", [frame_x, 2.975, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
+        add_box(f"{prefix}_door_frame_{side}_bottom", [frame_x, 1.125, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
+        for frame_z in (-0.8, 0, 0.8):
+            add_box(f"{prefix}_door_frame_{side}_upright_{frame_z}", [frame_x, 2.05, door_z + frame_z], [0.08, 1.75, 0.1], M["metal_light"], 0.02)
         for leaf in (-1, 1):
             add_box(f"{prefix}_door_glass_{side}_{leaf}", [x + side * 2.615, 2.05, door_z + leaf * 0.41], [0.055, 1.75, 0.68], M["glass"], 0.018)
         add_box(f"{prefix}_step_{side}", [x + side * 2.72, 0.42, door_z], [0.42, 0.18, 1.45], M["metal_light"], 0.025)

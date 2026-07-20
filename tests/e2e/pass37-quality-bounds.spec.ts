@@ -60,7 +60,7 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
     await expect(page.locator('#graphics-profile option[value="blender"]')).toHaveText('QUALITY GRAPHICS');
     expect((await snapshot(page)).render.blenderEnvironment).toMatchObject({
       status: 'ready',
-      triangleCount: 33_632,
+      triangleCount: 34_336,
       surfaceSeparationPass: true,
       proceduralRootActuallyVisible: false,
       qualityArtRootVisible: true,
@@ -92,10 +92,10 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
     expect((await snapshot(page)).arenaSelection.physicsBoundaryWalls).toBe(4);
 
     for (const probe of [
-      { start: [14, 1.7, -17] as const, yaw: -Math.PI / 2 },
-      { start: [-14, 1.7, -17] as const, yaw: Math.PI / 2 },
-      { start: [0, 1.7, 8] as const, yaw: Math.PI },
-      { start: [0, 1.7, -41] as const, yaw: 0 },
+      { start: [14, 1.7, -17] as const, yaw: -Math.PI / 2, edge: 'right' as const },
+      { start: [-14, 1.7, -17] as const, yaw: Math.PI / 2, edge: 'left' as const },
+      { start: [0, 1.7, 8] as const, yaw: Math.PI, edge: 'rear' as const },
+      { start: [0, 1.7, -41] as const, yaw: 0, edge: 'downrange' as const },
     ]) {
       await page.evaluate(({ start, yaw }) => {
         const debug = api();
@@ -111,6 +111,10 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
       expect(z).toBeGreaterThan(state.arenaSelection.bounds.minZ);
       expect(z).toBeLessThan(state.arenaSelection.bounds.maxZ);
       expect(y).toBeGreaterThan(1.5);
+      if (probe.edge === 'right') expect(x).toBeGreaterThan(14.4);
+      if (probe.edge === 'left') expect(x).toBeLessThan(-14.4);
+      if (probe.edge === 'rear') expect(z).toBeGreaterThan(8.4);
+      if (probe.edge === 'downrange') expect(z).toBeLessThan(-41.4);
     }
     const final = await snapshot(page);
     expect(final.render.contextLifecycle).toMatchObject({ lost: false, losses: 0 });
