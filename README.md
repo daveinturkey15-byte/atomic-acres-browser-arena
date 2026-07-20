@@ -52,10 +52,10 @@ This is a friendly-session architecture, not cheat-resistant competitive netcode
 
 ## Rendering and performance
 
-Pass 28 adds **Atomic Signal**, one bounded full-screen post-process that keeps the authored scene in linear HDR, then applies the same ACES filmic response used by the direct renderer plus restrained contrast, route-aware shadow/highlight tint, dithering, a soft vignette, and optional five-tap sharpening in Blender Render.
+Pass 28 adds **Atomic Signal**, one bounded full-screen post-process that keeps the authored scene in linear HDR, then applies the same ACES filmic response used by the direct renderer plus restrained contrast, route-aware shadow/highlight tint, dithering, a soft vignette, and optional five-tap sharpening in Quality Graphics.
 
 - **Performance:** one source sample, no sharpening, 0.75 initial pixel ratio, adaptive quality, no shadows.
-- **Blender Render:** five source samples, restrained sharpening, authored environment and static shadows.
+- **Quality Graphics:** five source samples, restrained sharpening, authored environment and static shadows. The internal `blender` profile ID remains supported for saved settings and old links.
 - **Compatibility:** bypasses Atomic Signal and uses the direct ACES renderer.
 - Detected software rasterizers such as SwiftShader, llvmpipe, WARP and Microsoft Basic Render Driver also use direct ACES by default so post-processing cannot collapse already-limited frame pacing. `?signal=on` is the explicit QA override; `?signal=off` is the deterministic direct-render baseline.
 - The render target and first output frame are validated; an incomplete framebuffer, shader-black output, or runtime post-process exception falls back to direct rendering.

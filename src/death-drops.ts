@@ -1,7 +1,7 @@
 import { WEAPONS } from './gameplay';
 import type { PrimaryWeaponId, WeaponId } from './protocol';
 
-export const DEATH_DROP_LIFETIME_MS = 25_000;
+export const DEATH_DROP_LIFETIME_MS = 30_000;
 export const DEATH_DROP_INTERACTION_RANGE = 2.35;
 export const DEATH_DROP_SCAVENGE_HORIZONTAL_RANGE = 1.05;
 export const DEATH_DROP_SCAVENGE_RANGE = DEATH_DROP_SCAVENGE_HORIZONTAL_RANGE;

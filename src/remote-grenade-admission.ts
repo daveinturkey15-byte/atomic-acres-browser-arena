@@ -59,21 +59,18 @@ export function admitRemoteGrenadeThrow(
   };
 }
 
-export function admitRemoteGrenadeHit(
+export function admitRemoteGrenadeExplosion(
   state: RemoteGrenadeAuthorityState,
   input: Readonly<{
     actionNonce: number;
     explosionOrigin: readonly [number, number, number];
-    target: string;
     now: number;
   }>,
 ): { accepted: boolean; state: RemoteGrenadeAuthorityState } {
   const action = state.actions[input.actionNonce];
-  if (!action || !Number.isFinite(input.now) || input.target.length === 0) return { accepted: false, state };
+  if (!action || !Number.isFinite(input.now)) return { accepted: false, state };
   const age = input.now - action.thrownAt;
-  if (age < REMOTE_GRENADE_MIN_FUSE_MS || age > REMOTE_GRENADE_MAX_FUSE_MS || action.targets.includes(input.target)) {
-    return { accepted: false, state };
-  }
+  if (age < REMOTE_GRENADE_MIN_FUSE_MS || age > REMOTE_GRENADE_MAX_FUSE_MS) return { accepted: false, state };
   if (Math.hypot(
     input.explosionOrigin[0] - action.origin[0],
     input.explosionOrigin[1] - action.origin[1],
@@ -87,10 +84,33 @@ export function admitRemoteGrenadeHit(
   const nextAction: RemoteGrenadeAction = {
     ...action,
     explosionOrigin: action.explosionOrigin ?? input.explosionOrigin,
-    targets: [...action.targets, input.target],
   };
   return {
     accepted: true,
     state: { ...state, actions: { ...state.actions, [input.actionNonce]: nextAction } },
+  };
+}
+
+export function admitRemoteGrenadeHit(
+  state: RemoteGrenadeAuthorityState,
+  input: Readonly<{
+    actionNonce: number;
+    explosionOrigin: readonly [number, number, number];
+    target: string;
+    now: number;
+  }>,
+): { accepted: boolean; state: RemoteGrenadeAuthorityState } {
+  const action = state.actions[input.actionNonce];
+  if (!action || input.target.length === 0 || action.targets.includes(input.target)) return { accepted: false, state };
+  const explosion = admitRemoteGrenadeExplosion(state, input);
+  if (!explosion.accepted) return { accepted: false, state };
+  const admittedAction = explosion.state.actions[input.actionNonce]!;
+  const nextAction: RemoteGrenadeAction = {
+    ...admittedAction,
+    targets: [...admittedAction.targets, input.target],
+  };
+  return {
+    accepted: true,
+    state: { ...explosion.state, actions: { ...explosion.state.actions, [input.actionNonce]: nextAction } },
   };
 }

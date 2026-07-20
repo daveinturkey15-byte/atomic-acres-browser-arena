@@ -1,3 +1,5 @@
+import type { PrimaryWeaponId } from './protocol';
+
 export type BotMovement = 'idle' | 'advance' | 'retreat' | 'strafe-left' | 'strafe-right';
 
 export type BotSense = {
@@ -12,6 +14,7 @@ export type BotSense = {
   lineOfSightSince?: number;
   reactionDelay?: number;
   burstShotsRemaining?: number;
+  fireIntervalMs?: number;
 };
 
 export type BotIntent = {
@@ -25,6 +28,67 @@ export const MAX_SOLO_BOTS = 6;
 export const BOT_DEATHS_PER_REINFORCEMENT = 5;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
+export const BOT_GRENADE_MIN_RANGE = 7;
+export const BOT_GRENADE_MAX_RANGE = 18;
+export const BOT_GRENADE_COOLDOWN_MS = 12_000;
+export const BOT_WEAPON_POOL: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'scattergun', 'sniper']);
+
+export function assignBotWeapons(count: number, random: () => number): PrimaryWeaponId[] {
+  const total = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const assignments: PrimaryWeaponId[] = [];
+  while (assignments.length < total) {
+    const cycle = [...BOT_WEAPON_POOL];
+    for (let index = cycle.length - 1; index > 0; index -= 1) {
+      const sample = random();
+      const bounded = Number.isFinite(sample) ? Math.max(0, Math.min(0.999999999, sample)) : 0;
+      const swap = Math.floor(bounded * (index + 1));
+      [cycle[index], cycle[swap]] = [cycle[swap], cycle[index]];
+    }
+    if (assignments.length > 0 && cycle[0] === assignments[assignments.length - 1]) {
+      const alternate = cycle.findIndex((weapon) => weapon !== assignments[assignments.length - 1]);
+      [cycle[0], cycle[alternate]] = [cycle[alternate], cycle[0]];
+    }
+    assignments.push(...cycle.slice(0, total - assignments.length));
+  }
+  return assignments;
+}
+
+export function botWeaponBurstSize(weapon: PrimaryWeaponId, variation: number): number {
+  if (weapon === 'scattergun' || weapon === 'sniper') return 1;
+  return weapon === 'smg' ? 4 + Math.abs(Math.floor(variation)) % 2 : 3 + Math.abs(Math.floor(variation)) % 2;
+}
+
+export function botWeaponFireInterval(weapon: PrimaryWeaponId, burstActive: boolean): number {
+  if (weapon === 'sniper') return 1_250;
+  if (weapon === 'scattergun') return 920;
+  if (weapon === 'smg') return burstActive ? 92 : 520;
+  return burstActive ? 135 : 620;
+}
+
+export type BotGrenadeSense = Readonly<{
+  alive: boolean;
+  hasLineOfSight: boolean;
+  reacted: boolean;
+  distanceToPlayer: number;
+  now: number;
+  nextGrenadeAt: number;
+  botGrenadeActive: boolean;
+  activeBotGrenades: number;
+  random: number;
+}>;
+
+export function shouldBotThrowGrenade(sense: BotGrenadeSense): boolean {
+  return sense.alive
+    && sense.hasLineOfSight
+    && sense.reacted
+    && sense.distanceToPlayer >= BOT_GRENADE_MIN_RANGE
+    && sense.distanceToPlayer <= BOT_GRENADE_MAX_RANGE
+    && sense.now >= sense.nextGrenadeAt
+    && !sense.botGrenadeActive
+    && sense.activeBotGrenades === 0
+    && Number.isFinite(sense.random)
+    && sense.random < 0.32;
+}
 
 /** Fifth-death reinforcements, capped so an uncapped five-minute score race stays performant. */
 export function soloBotTargetForDeaths(botDeaths: number): number {
@@ -171,7 +235,9 @@ export function chooseBotIntent(sense: BotSense): BotIntent {
   if (!sense.alive) return { movement: 'idle', fire: false, changeWaypoint: false };
   const reacted = sense.hasLineOfSight
     && sense.now - (sense.lineOfSightSince ?? sense.now) >= (sense.reactionDelay ?? 0);
-  const shotInterval = (sense.burstShotsRemaining ?? 0) > 0 ? 135 : 620;
+  const shotInterval = Number.isFinite(sense.fireIntervalMs)
+    ? Math.max(40, sense.fireIntervalMs!)
+    : (sense.burstShotsRemaining ?? 0) > 0 ? 135 : 620;
   const fire = reacted
     && sense.distanceToPlayer <= BOT_FIRE_RANGE
     && sense.distanceToPlayer >= 2.5

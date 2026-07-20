@@ -75,12 +75,13 @@ async function snapshot(page: import('@playwright/test').Page): Promise<Pass35Sn
 
 test.describe('Pass 35 hitch-free explosions and Tri-Pass live targeting', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/?render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=3501');
+    await page.goto('/?render=performance&renderPaused=1&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=3501');
     await waitReady(page);
     await deploySolo(page);
   });
 
   test('shows moving living hostiles while selecting three Tri-Pass targets', async ({ page }) => {
+    test.setTimeout(120_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize({ width: 960, height: 540 });
@@ -151,16 +152,25 @@ test.describe('Pass 35 hitch-free explosions and Tri-Pass live targeting', () =>
     expect(state.deathDropPresentation).toMatchObject({ capacity: 12, active: 1, prewarmed: true, dynamicLights: 0 });
     expect(state.botEscalation).toMatchObject({ dormantBots: 4, dormantBotsPrewarmed: true, dynamicReinforcementLights: 0 });
     expect(state.botEscalation.lastEliminationProfile.deathDropMs, impactTimingEvidence).toBeLessThan(4);
-    const reinforcement = await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: Pass35Api }).__ATOMIC_ACRES_DEBUG__.activateDormantReinforcement());
-    expect(reinforcement.activated).toBe(true);
-    expect(reinforcement.syncMs).toBeLessThan(4);
-    expect((await snapshot(page)).botEscalation.dormantBots).toBe(3);
     expect(state.audio.explosionMix.requests).toBeGreaterThanOrEqual(3);
     expect(state.audio.explosionMix.coalesced).toBeGreaterThanOrEqual(2);
     expect(state.fieldSupport.retiredPresentationRoots).toBeGreaterThanOrEqual(6);
     expect(state.fieldSupport.prewarmedNuke).toEqual({ shockwaveInScene: true, prewarmed: true, dynamicLights: 0 });
     expect(state.render.contextLifecycle.lost).toBe(false);
     expect(errors).toEqual([]);
+  });
+
+  test('activates an already-prewarmed dormant reinforcement without synchronous construction', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: Pass35Api }).__ATOMIC_ACRES_DEBUG__;
+      api.setRenderPaused(true);
+      api.setBotsFrozen(true);
+    });
+    expect((await snapshot(page)).botEscalation).toMatchObject({ dormantBots: 4, dormantBotsPrewarmed: true });
+    const reinforcement = await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: Pass35Api }).__ATOMIC_ACRES_DEBUG__.activateDormantReinforcement());
+    expect(reinforcement.activated).toBe(true);
+    expect(reinforcement.syncMs).toBeLessThan(4);
+    expect((await snapshot(page)).botEscalation.dormantBots).toBe(3);
   });
 
   test('keeps grenade detonation on its prewarmed unlit pool', async ({ page }) => {

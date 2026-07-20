@@ -1,5 +1,5 @@
 export const HIGH_SCORE_STORAGE_KEY = 'atomic-acres:high-scores:v1';
-export const HIGH_SCORE_SCHEMA_VERSION = 2;
+export const HIGH_SCORE_SCHEMA_VERSION = 3;
 export const MAX_HIGH_SCORE_ENTRIES = 20;
 // Five-minute matches are uncapped, but valid local/peer records remain defensively
 // bounded against corrupted storage or hostile payloads. A 100-kill ceiling is well
@@ -43,6 +43,12 @@ export function leaderboardNameKey(value: string): string | null {
   }).join('');
 }
 
+export function peerOwnedHighScores(senderName: string, entries: readonly HighScoreEntry[]): HighScoreEntry[] {
+  const senderKey = leaderboardNameKey(senderName);
+  if (!senderKey) return [];
+  return entries.filter((entry) => leaderboardNameKey(entry.name) === senderKey);
+}
+
 export function isHighScoreEntry(value: unknown, now = Date.now()): value is HighScoreEntry {
   if (!value || typeof value !== 'object') return false;
   const entry = value as Record<string, unknown>;
@@ -73,13 +79,15 @@ export function mergeHighScores(
   incoming: readonly unknown[],
   now = Date.now(),
 ): HighScoreEntry[] {
-  const byId = new Map<string, HighScoreEntry>();
+  const byPlayer = new Map<string, HighScoreEntry>();
   for (const candidate of [...current, ...incoming]) {
     if (!isHighScoreEntry(candidate, now)) continue;
-    const existing = byId.get(candidate.id);
-    if (!existing || compareHighScores(candidate, existing) < 0) byId.set(candidate.id, { ...candidate });
+    const playerKey = leaderboardNameKey(candidate.name);
+    if (!playerKey) continue;
+    const existing = byPlayer.get(playerKey);
+    if (!existing || compareHighScores(candidate, existing) < 0) byPlayer.set(playerKey, { ...candidate });
   }
-  return [...byId.values()].sort(compareHighScores).slice(0, MAX_HIGH_SCORE_ENTRIES);
+  return [...byPlayer.values()].sort(compareHighScores).slice(0, MAX_HIGH_SCORE_ENTRIES);
 }
 
 export function loadHighScores(storage: ScoreStorage, now = Date.now()): HighScoreEntry[] {
@@ -87,13 +95,18 @@ export function loadHighScores(storage: ScoreStorage, now = Date.now()): HighSco
     const raw = storage.getItem(HIGH_SCORE_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { version?: number; entries?: unknown[] };
-    if ((parsed.version !== 1 && parsed.version !== HIGH_SCORE_SCHEMA_VERSION) || !Array.isArray(parsed.entries)) return [];
+    if ((parsed.version !== 1 && parsed.version !== 2 && parsed.version !== HIGH_SCORE_SCHEMA_VERSION) || !Array.isArray(parsed.entries)) return [];
     const migrated = parsed.entries.map((entry) => {
       if (!isHighScoreEntry(entry, now) || !entry.id.startsWith('global:')) return entry;
       const key = leaderboardNameKey(entry.name);
       return key ? { ...entry, id: `global:${key}` } : entry;
     });
-    return mergeHighScores([], migrated, now);
+    const merged = mergeHighScores([], migrated, now);
+    // Loading is also the migration point for legacy per-match/global rows.
+    // Rewrite the compact one-row-per-player document so the duplicate does
+    // not return on the next refresh or cross-tab sync.
+    saveHighScores(storage, merged);
+    return merged;
   } catch {
     return [];
   }

@@ -2,19 +2,24 @@ import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
-import { AtmosphereSystem } from './atmosphere-system';
+import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
-import { buildGunRange, buildRustworks1v1 } from './additional-maps';
+import { GUN_RANGE_FIRING_LINE_Z, buildGunRange, buildRustworks1v1 } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
+  BOT_GRENADE_COOLDOWN_MS,
+  assignBotWeapons,
   advanceSpawnFlipHysteresis,
   botAimJitter,
   botCanFireWhileProtected,
+  botWeaponBurstSize,
+  botWeaponFireInterval,
   chooseBotIntent,
   chooseTacticalWaypoint,
   createSpawnFlipHysteresis,
   operatorYawToward,
   respawnBotState,
+  shouldBotThrowGrenade,
   selectFarthestSpawnCandidate,
   shouldFlipSpawnSide,
   type SpawnFlipHysteresis,
@@ -36,6 +41,8 @@ import {
   computeDamage,
   computeRecoilImpulse,
   computeSpread,
+  botScaledDamage,
+  admittedPlayerDamage,
   createMatch,
   grenadeDamage,
   integrateGamepadLookRate,
@@ -64,7 +71,7 @@ import { createWorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
-import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
+import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
 import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry } from './rustworks-blender';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
@@ -73,6 +80,7 @@ import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
+import { advanceRangeScore, hasUnlimitedRangeAmmo, reloadSupply, reserveAfterCompletedReload, reserveHudValue } from './gun-range-rules';
 import {
   OVERDRIVE_DAMAGE_MULTIPLIER,
   OVERDRIVE_DURATION_MS,
@@ -128,11 +136,14 @@ import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
 import {
   HIGH_SCORE_STORAGE_KEY,
+  HIGH_SCORE_SCHEMA_VERSION,
   MAX_MATCH_KILLS,
   immediateStreakEntry,
+  leaderboardNameKey,
   loadHighScores,
   mergeHighScores,
   normalizeRequiredPlayerName,
+  peerOwnedHighScores,
   personalBest,
   saveHighScores,
   type HighScoreEntry,
@@ -150,7 +161,7 @@ import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint
 import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
 import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
-import { admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
 import { CharacterPhysics } from './physics';
 import { TracerPool } from './tracer-pool';
@@ -158,6 +169,7 @@ import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTeleme
 import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
 import { magnifiedFovDegrees } from './weapon-presentation-state';
+import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
@@ -243,6 +255,9 @@ type BotPlayer = {
   deathVisibleUntil: number;
   waypoint: number;
   blockedSince: number;
+  weapon: PrimaryWeaponId;
+  nextGrenadeAt: number;
+  grenadeActive: boolean;
 };
 
 type GrenadeEntity = {
@@ -252,6 +267,8 @@ type GrenadeEntity = {
   explodeAt: number;
   lastBounceAt: number;
   actionNonce: number;
+  ownerKind: 'player' | 'bot';
+  ownerId: string;
 };
 
 type YardhawkEntity = {
@@ -340,7 +357,7 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 35</div>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 36</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -392,7 +409,7 @@ app.innerHTML = `
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
         <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
-        <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="blender">BLENDER RENDER</option></select></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="blender">QUALITY GRAPHICS</option></select></label>
       </div>
       <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
@@ -709,6 +726,14 @@ let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.lo
 let arena: ArenaMap = arenaById[selectedArena.id];
 for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate === arena;
 document.documentElement.dataset.arenaId = selectedArena.id;
+function applyArenaFogProfile(): void {
+  const fog = atmosphereFogRange(renderProfile, selectedArena.id);
+  if (scene.fog instanceof THREE.Fog) {
+    scene.fog.near = fog.near;
+    scene.fog.far = fog.far;
+  }
+}
+applyArenaFogProfile();
 const neighbourhoodLifeRoot = addNeighbourhoodLife(scene, reducedWorldDetail);
 const overdriveRoot = new THREE.Group();
 overdriveRoot.name = 'overdrive-core-pickup';
@@ -771,7 +796,7 @@ quadGlow.position.y = 0.55;
 overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
-const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery);
+const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id);
 const grassSystem = new GrassSystem(
   scene,
   renderProfile,
@@ -870,6 +895,10 @@ const dormantBots = new Map<string, BotPlayer>();
 let dormantBotsPrewarmed = false;
 let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
+let botWeaponAssignments: PrimaryWeaponId[] = [];
+let botGrenadeThrows = 0;
+let botGrenadeMaxActive = 0;
+let lastBotGrenadeDamage = 0;
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
 let lastPrincipalShotAlignment: { weapon: WeaponId; angularError: number; sample: [number, number]; direction: [number, number, number]; cameraDirection: [number, number, number] } | null = null;
@@ -1481,13 +1510,15 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'high-score') {
     if (message.by === player.id) return;
     const sender = remotes.get(message.by);
-    if (!sender || sender.snapshot.name !== message.entry.name) return;
+    if (!sender || leaderboardNameKey(sender.snapshot.name) !== leaderboardNameKey(message.entry.name)) return;
     persistMergedHighScores([message.entry]);
     return;
   }
   if (message.type === 'leaderboard-sync') {
-    if (message.by === player.id || !remotes.has(message.by)) return;
-    persistMergedHighScores(message.entries);
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    if (!sender) return;
+    persistMergedHighScores(peerOwnedHighScores(sender.snapshot.name, message.entries));
     return;
   }
   if (message.type === 'join' || message.type === 'state') {
@@ -1826,10 +1857,10 @@ function showDamageDirection(attacker: string): void {
   requestAnimationFrame(() => indicator.classList.add('pulse'));
 }
 
-function applyDamage(damage: number, attacker: string): void {
+function applyDamage(damage: number, attacker: string, minimumDamage = 1): void {
   const now = performance.now();
   if (!player.alive || now < player.invulnerableUntil) return;
-  player.hp = Math.max(0, player.hp - Math.min(100, Math.max(1, damage)));
+  player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
   lastDamageAt = now;
   audio.damage();
   showDamageDirection(attacker);
@@ -1875,7 +1906,7 @@ function deathDropVictim(message: DeathMessage): { weapon: PrimaryWeaponId; posi
     return { weapon: remote.snapshot.primary, position: new THREE.Vector3(remote.snapshot.x, floorY, remote.snapshot.z) };
   }
   const bot = bots.get(message.victim);
-  if (bot) return { weapon: 'carbine', position: bot.position.clone().add(new THREE.Vector3(0, 0.18, 0)) };
+  if (bot) return { weapon: bot.weapon, position: bot.position.clone().add(new THREE.Vector3(0, 0.18, 0)) };
   return null;
 }
 
@@ -2104,6 +2135,7 @@ function breakHouseWindow(
   replicate: boolean,
   origin = camera.getWorldPosition(new THREE.Vector3()),
   kind: WindowBreakMessage['kind'] = 'shot',
+  actionNonce?: number,
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window || window.broken) return false;
@@ -2119,6 +2151,7 @@ function breakHouseWindow(
       windowId,
       origin: origin.toArray(),
       kind,
+      ...(kind === 'explosive' ? { actionNonce } : {}),
       nonce: randomNonce(),
     };
     network.send(message);
@@ -2135,12 +2168,23 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const explosive = message.kind === 'explosive';
-  const senderOriginLimit = explosive ? 42 : 2.8;
+  const senderOriginLimit = explosive ? 36 : 2.8;
   if (!pointInsideBounds(origin, arena.bounds, 0.44)
     || origin.distanceTo(sender) > senderOriginLimit
     || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
     || !explosive && origin.distanceTo(centre) > 110
-    || arena.colliders.some((box) => segmentIntersectsBox(origin, centre, box))) return;
+    || windowBreakPathBlocked(origin, centre, arena.colliders)) return;
+  if (explosive) {
+    const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+    if (!grenadeAuthority || !Number.isFinite(message.actionNonce)) return;
+    const admission = admitRemoteGrenadeExplosion(grenadeAuthority, {
+      actionNonce: message.actionNonce!,
+      explosionOrigin: message.origin,
+      now: performance.now(),
+    });
+    if (!admission.accepted) return;
+    remoteGrenadeAuthorities.set(message.by, admission.state);
+  }
   processedNonces.add(message.nonce);
   const normal = centre.clone().sub(origin).normalize().multiplyScalar(-1);
   breakHouseWindow(message.windowId, centre, normal, false, origin);
@@ -2448,8 +2492,9 @@ function reload(): void {
   if (!player.alive || matchState.phase !== 'active') return;
   const spec = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
-  if (player.reloadState || ammo >= spec.mag || player.reserve[player.weapon] <= 0) return;
-  player.reloadState = beginReload(spec, ammo, player.reserve[player.weapon], performance.now());
+  const availableReserve = reloadSupply(selectedArena.id, player.reserve[player.weapon], spec.mag);
+  if (player.reloadState || ammo >= spec.mag || availableReserve <= 0) return;
+  player.reloadState = beginReload(spec, ammo, availableReserve, performance.now());
   weaponActionHistory.length = 0;
   audio.reload();
   weaponView.reload();
@@ -2458,10 +2503,13 @@ function reload(): void {
 
 function finishReload(now: number): void {
   if (!player.reloadState) return;
-  const state = completeReloadState(player.reloadState, now, player.ammo[player.weapon], player.reserve[player.weapon]);
+  const spec = WEAPONS[player.weapon];
+  const currentReserve = player.reserve[player.weapon];
+  const availableReserve = reloadSupply(selectedArena.id, currentReserve, spec.mag);
+  const state = completeReloadState(player.reloadState, now, player.ammo[player.weapon], availableReserve);
   if (state.completed) {
     player.ammo[player.weapon] = state.ammo;
-    player.reserve[player.weapon] = state.reserve;
+    player.reserve[player.weapon] = reserveAfterCompletedReload(selectedArena.id, currentReserve, state.reserve);
     player.reloadState = null;
     weaponView.cancelReload();
   }
@@ -2509,7 +2557,7 @@ function tryFire(now: number): void {
   }
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
-  player.ammo[player.weapon] -= 1;
+  player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
   if (player.ammo[player.weapon] === 0) {
     const emptiedWeapon = player.weapon;
     window.setTimeout(() => {
@@ -2782,9 +2830,11 @@ function spawnBot(index: number): void {
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
   const id = `bot-${index}`;
+  const weapon = botWeaponAssignments[index] ?? assignBotWeapons(1, gameplayRandom)[0];
+  const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
-  const root = buildOperator(botTeam, 'bot-operator', true, 'carbine', true, 'neon-purple');
+  const root = buildOperator(botTeam, 'bot-operator', true, weapon, true, 'neon-purple');
   addNeonBotHaze(root, index);
   root.traverse((node) => {
     if (node instanceof THREE.Mesh) node.castShadow = false;
@@ -2815,7 +2865,8 @@ function spawnBot(index: number): void {
     id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
     kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
     sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
-    invulnerableUntil: performance.now() + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
+    invulnerableUntil: spawnedAt + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
+    weapon, nextGrenadeAt: spawnedAt + 5_000 + gameplayRandom() * 3_000, grenadeActive: false,
   });
 }
 
@@ -2870,6 +2921,10 @@ function activateDormantBot(index: number): boolean {
 
 function spawnBots(): void {
   clearBots();
+  botWeaponAssignments = assignBotWeapons(selectedArena.maximumSoloBots, gameplayRandom);
+  botGrenadeThrows = 0;
+  botGrenadeMaxActive = 0;
+  lastBotGrenadeDamage = 0;
   soloBotDeaths = 0;
   dormantBotsPrewarmed = false;
   for (let index = 0; index < selectedArena.soloBotCount; index += 1) spawnBot(index);
@@ -2906,12 +2961,54 @@ function clearBots(): void {
   dormantBotsPrewarmed = false;
   soloBotDeaths = 0;
   lastBotSpawnIndices.clear();
+  botWeaponAssignments = [];
 }
 
 function botHasLineOfSight(bot: BotPlayer): boolean {
   const origin = { x: bot.position.x, y: bot.position.y + 1.42, z: bot.position.z };
   const target = { x: player.position.x, y: player.position.y, z: player.position.z };
   return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
+}
+
+function activeBotGrenadeCount(): number {
+  return grenades.reduce((count, grenade) => count + (grenade.ownerKind === 'bot' ? 1 : 0), 0);
+}
+
+function releaseBotGrenadeOwner(entity: GrenadeEntity): void {
+  if (entity.ownerKind !== 'bot') return;
+  const owner = bots.get(entity.ownerId) ?? dormantBots.get(entity.ownerId);
+  if (owner) owner.grenadeActive = false;
+}
+
+function throwBotGrenade(bot: BotPlayer, now: number, fuseMs = 2_300, target = player.position): boolean {
+  if (!bot.alive || bot.grenadeActive || activeBotGrenadeCount() > 0) return false;
+  const origin = bot.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+  const targetGroundY = Math.max(0.18, target.y - stanceEyeHeight(player.stance) + 0.18);
+  const targetGround = new THREE.Vector3(target.x, targetGroundY, target.z);
+  const horizontalDistance = Math.hypot(targetGround.x - origin.x, targetGround.z - origin.z);
+  const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
+  const velocity = targetGround.clone().sub(origin).divideScalar(flightTime);
+  velocity.y += 9 * flightTime;
+  const mesh = createGrenadePresentation();
+  mesh.position.copy(origin);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  grenades.push({
+    mesh,
+    velocity,
+    angularVelocity: new THREE.Vector3(7.6, 5.8, 9.4),
+    explodeAt: now + Math.max(120, fuseMs),
+    lastBounceAt: 0,
+    actionNonce: randomNonce(),
+    ownerKind: 'bot',
+    ownerId: bot.id,
+  });
+  bot.grenadeActive = true;
+  bot.nextGrenadeAt = now + BOT_GRENADE_COOLDOWN_MS;
+  botGrenadeThrows += 1;
+  botGrenadeMaxActive = Math.max(botGrenadeMaxActive, activeBotGrenadeCount());
+  addFeed(`${bot.name} THREW FRAG`, 'coral');
+  return true;
 }
 
 function selectBotTacticalWaypoint(bot: BotPlayer): number {
@@ -2977,6 +3074,7 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
   bot.blockedSince = 0;
+  bot.nextGrenadeAt = Math.max(bot.nextGrenadeAt, now + 3_000);
   bot.deathVisibleUntil = 0;
   resetOperator(bot.root);
   bot.root.visible = true;
@@ -3085,7 +3183,8 @@ function updateBots(dt: number, now: number): void {
       }
     }
     const lineOfSight = bot.hasLineOfSight;
-    if (now >= bot.nextDecisionAt) {
+    const madeTacticalDecision = now >= bot.nextDecisionAt;
+    if (madeTacticalDecision) {
       bot.strafeSign = bot.strafeSign === 1 ? -1 : 1;
       bot.nextDecisionAt = now + 850 + botIndex * 95;
     }
@@ -3110,6 +3209,7 @@ function updateBots(dt: number, now: number): void {
       lineOfSightSince: bot.sightStartedAt,
       reactionDelay: BOT_REACTION_DELAY,
       burstShotsRemaining: bot.burstShots,
+      fireIntervalMs: botWeaponFireInterval(bot.weapon, bot.burstShots > 0),
     });
     if (intent.changeWaypoint && !waypointReached) bot.waypoint = selectBotTacticalWaypoint(bot);
     patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
@@ -3154,8 +3254,20 @@ function updateBots(dt: number, now: number): void {
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
-    if (botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
-      if (bot.burstShots <= 0) bot.burstShots = 2 + (botIndex % 2);
+    const threwBotGrenade = madeTacticalDecision && shouldBotThrowGrenade({
+      alive: bot.alive,
+      hasLineOfSight: lineOfSight,
+      reacted: bot.sightStartedAt > 0 && now - bot.sightStartedAt >= BOT_REACTION_DELAY,
+      distanceToPlayer: distance,
+      now,
+      nextGrenadeAt: bot.nextGrenadeAt,
+      botGrenadeActive: bot.grenadeActive,
+      activeBotGrenades: activeBotGrenadeCount(),
+      random: gameplayRandom(),
+    }) && throwBotGrenade(bot, now);
+
+    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
+      if (bot.burstShots <= 0) bot.burstShots = botWeaponBurstSize(bot.weapon, botIndex);
       bot.burstShots -= 1;
       bot.lastShotAt = now;
       fireOperator(bot.root);
@@ -3171,16 +3283,17 @@ function updateBots(dt: number, now: number): void {
       const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
       const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
       const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-      spawnTracer(botMuzzle ?? origin, visibleEnd, WEAPONS.carbine.color);
+      const botWeapon = WEAPONS[bot.weapon];
+      spawnTracer(botMuzzle ?? origin, visibleEnd, botWeapon.color);
       if (resolution.blockedByCover) {
         spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
         audio.impact('concrete', visibleEnd.distanceTo(player.position));
       } else if (!resolution.hitTarget) {
         audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
-      audio.shot('carbine', true);
+      audio.shot(bot.weapon, true);
       if (resolution.hitTarget) {
-        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * BOT_DAMAGE_MULTIPLIER;
+        const damage = botScaledDamage(computeDamage(botWeapon, distance, 'body'));
         applyDamage(damage, bot.id);
         if (!player.alive) {
           bot.kills += 1;
@@ -3258,6 +3371,8 @@ function throwGrenade(): void {
     explodeAt: performance.now() + 2_300,
     lastBounceAt: 0,
     actionNonce,
+    ownerKind: 'player',
+    ownerId: player.id,
   });
 }
 
@@ -3275,17 +3390,17 @@ function clearGrenadeExplosionVisuals(): void {
   grenadeExplosionPresentation.clear();
 }
 
-function breakWindowsInGrenadeBlast(point: THREE.Vector3): number {
+function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, replicate: boolean): number {
   let broken = 0;
   for (const pane of arena.breakableWindows) {
     if (pane.broken) continue;
     const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
     if (centre.distanceTo(point) > GRENADE_RADIUS) continue;
-    if (arena.colliders.some((box) => segmentIntersectsBox(point, centre, box))) continue;
+    if (windowBreakPathBlocked(point, centre, arena.colliders)) continue;
     const normal = centre.clone().sub(point);
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
-    if (breakHouseWindow(pane.id, centre, normal, true, point, 'explosive')) broken += 1;
+    if (breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)) broken += 1;
   }
   return broken;
 }
@@ -3295,12 +3410,37 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const point = entity.mesh.position.clone();
   if (entity.mesh.userData.fallback === true) retireSupportRoot(entity.mesh);
   else scene.remove(entity.mesh);
+  releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
-  audio.sanctifiedFragExplosion();
+  if (entity.ownerKind === 'bot') audio.explosion(afterPresentationDetach);
+  else audio.sanctifiedFragExplosion();
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
-  breakWindowsInGrenadeBlast(point);
+  breakWindowsInGrenadeBlast(point, entity.actionNonce, entity.ownerKind === 'player');
   const afterVisual = performance.now();
+  if (entity.ownerKind === 'bot') {
+    const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
+    const damage = blocked ? 0 : botScaledDamage(grenadeDamage(player.position.distanceTo(point)));
+    lastBotGrenadeDamage = damage;
+    if (damage > 0 && player.alive) {
+      applyDamage(damage, entity.ownerId, 0);
+      const owner = bots.get(entity.ownerId);
+      if (owner && !player.alive) {
+        owner.kills += 1;
+        checkMatchEnd();
+      }
+    }
+    const finished = performance.now();
+    lastGrenadeExplosionProfile = {
+      presentationDetachMs: afterPresentationDetach - started,
+      audioMs: afterAudio - afterPresentationDetach,
+      visualMs: afterVisual - afterAudio,
+      targetDamageMs: finished - afterVisual,
+      selfDamageMs: 0,
+      totalSyncMs: finished - started,
+    };
+    return;
+  }
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
@@ -3361,6 +3501,7 @@ function updateGrenades(dt: number, now: number): void {
       spawnImpactFlash(grenade.mesh.position.clone());
       audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
       disposeGrenadePresentation(grenade.mesh);
+      releaseBotGrenadeOwner(grenade);
       grenades.splice(index, 1);
       continue;
     }
@@ -3393,17 +3534,17 @@ function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): 
   showHitmarker(headshot);
   audio.hit(headshot);
   if (target.health > 0) {
-    if (selectedArena.id === 'gun-range') {
-      addFeed(`${headshot ? 'BULLSEYE · ' : ''}${Math.ceil(target.health)} / ${target.maxHealth} TARGET HP`, headshot ? 'gold' : undefined);
-    }
+    if (selectedArena.id === 'gun-range') addFeed(`${headshot ? 'BULLSEYE · ' : ''}${Math.ceil(target.health)} / ${target.maxHealth} HP`, headshot ? 'gold' : undefined);
     return;
   }
   target.active = false;
   target.respawnAt = performance.now() + 2_200;
   target.root.visible = false;
-  rangeScore += selectedArena.id === 'gun-range' ? target.scoreValue : 1;
+  rangeScore = selectedArena.id === 'gun-range'
+    ? advanceRangeScore(rangeScore, target.scoreValue)
+    : rangeScore + 1;
   addFeed(selectedArena.id === 'gun-range'
-    ? `${headshot ? 'BULLSEYE · ' : ''}${target.scoreValue} POINTS · ${rangeScore} TOTAL`
+    ? `${headshot ? 'BULLSEYE · ' : ''}+${target.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`
     : '+1 test mannequin', 'gold');
 }
 
@@ -4323,7 +4464,10 @@ function updateFieldSupport(dt: number, now: number): void {
 }
 
 function clearGrenades(): void {
-  for (const grenade of grenades) disposeGrenadePresentation(grenade.mesh);
+  for (const grenade of grenades) {
+    releaseBotGrenadeOwner(grenade);
+    disposeGrenadePresentation(grenade.mesh);
+  }
   grenades.length = 0;
 }
 
@@ -4824,7 +4968,7 @@ function updateHud(now: number): void {
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
-  element<HTMLElement>('#reserve').textContent = String(player.reserve[player.weapon]);
+  element<HTMLElement>('#reserve').textContent = reserveHudValue(selectedArena.id, player.reserve[player.weapon]);
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
   const hudScores: [number, number] = selectedArena.id === 'gun-range' ? [rangeScore, targetHits] : scores;
@@ -4864,7 +5008,7 @@ function updateRoster(): void {
     ...[...remotes.values()].map((remote) => remote.snapshot),
     ...[...bots.values()].map((bot) => ({
       id: bot.id, name: bot.name, team: bot.team, x: bot.position.x, y: bot.position.y, z: bot.position.z,
-      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: 'carbine' as PrimaryWeaponId, weapon: 'carbine' as WeaponId, seq: 0,
+      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: bot.weapon, weapon: bot.weapon, seq: 0,
     })),
   ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => `<div><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`).join('');
@@ -5125,10 +5269,15 @@ function syncArenaSelectionUi(): void {
 
 function setArenaPresentationVisibility(): void {
   const atomicVisible = selectedArena.id === 'atomic-acres';
-  for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate.id === selectedArena.id;
+  for (const candidate of Object.values(arenaById)) {
+    candidate.root.visible = candidate.id === selectedArena.id;
+    if (candidate === atomicArena) candidate.root.visible = proceduralArenaRootVisible(selectedArena.id, blenderArenaActive);
+  }
   worldIdentityPresentation.root.visible = atomicVisible;
   neighbourhoodLifeRoot.visible = atomicVisible;
-  atmosphereSystem.root.visible = atomicVisible;
+  atmosphereSystem.setArena(selectedArena.id);
+  atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
+  applyArenaFogProfile();
   grassSystem.root.visible = atomicVisible;
   if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
   overdriveRoot.visible = false;
@@ -5483,6 +5632,7 @@ const debugWindow = window as Window & {
     damage: (amount: number) => void;
     damageFromRemote: (amount: number) => void;
     earnSupport: (eliminations: number) => void;
+    forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     sendPing: (kind: TeamPingKind) => void;
@@ -5492,6 +5642,7 @@ const debugWindow = window as Window & {
     returnToMainMenu: () => void;
     selectArena: (id: ArenaId) => Promise<void>;
     hitRangeTarget: (id: string, damage?: number, zone?: HitZone) => void;
+    spawnDeathDrop: (ageMs?: number) => string | null;
     setKills: (kills: number) => void;
 
   };
@@ -5516,6 +5667,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       bounds: { ...arena.bounds },
       spawnCounts: [arena.spawns[0].length, arena.spawns[1].length],
       colliders: arena.colliders.length,
+      physicsColliders: arena.physicsColliders.length,
       navigationColliders: botNavigationColliders.length,
       navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
       raycastMeshes: arena.raycastMeshes.length,
@@ -5524,6 +5676,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     rangePractice: {
       score: rangeScore,
       hits: targetHits,
+      unlimitedAmmo: hasUnlimitedRangeAmmo(selectedArena.id),
+      reserveHud: reserveHudValue(selectedArena.id, player.reserve[player.weapon]),
+      firingLineZ: GUN_RANGE_FIRING_LINE_Z,
+      playerDownrange: selectedArena.id === 'gun-range' && player.position.z < GUN_RANGE_FIRING_LINE_Z,
       activeTargets: arena.targets.filter((target) => target.active).length,
       values: arena.targets.map((target) => target.scoreValue),
       targets: arena.targets.map((target) => ({
@@ -5535,6 +5691,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         position: target.root.position.toArray(),
         screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
       })),
+    },
+    leaderboard: {
+      schemaVersion: HIGH_SCORE_SCHEMA_VERSION,
+      entries: highScores.map((entry) => ({ ...entry })),
+      uniquePlayerKeys: new Set(highScores.map((entry) => leaderboardNameKey(entry.name))).size,
+      renderedRows: element<HTMLOListElement>('#high-score-list').querySelectorAll('li:not(.empty)').length,
     },
     random: runtimeRandomTelemetry(),
     aimAlignment: (() => {
@@ -5585,6 +5747,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hp: bot.hp,
       alive: bot.alive,
       kills: bot.kills,
+      weapon: bot.weapon,
+      nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
+      grenadeActive: bot.grenadeActive,
       position: bot.position.toArray(),
       waypoint: bot.waypoint,
       blockedSince: bot.blockedSince,
@@ -5646,6 +5811,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
+    botGrenades: {
+      active: activeBotGrenadeCount(),
+      maximumActiveObserved: botGrenadeMaxActive,
+      throws: botGrenadeThrows,
+      lastDamage: lastBotGrenadeDamage,
+      damageMultiplier: BOT_DAMAGE_MULTIPLIER,
+      ownerIds: grenades.filter((grenade) => grenade.ownerKind === 'bot').map((grenade) => grenade.ownerId),
+    },
     grenadeVisual: {
       ...grenadePresentationTelemetry(),
       active: grenades.map((grenade) => ({
@@ -5949,7 +6122,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       framePacing: framePacing.summary(),
       minimapRenders: minimapRenderCount,
       adaptive: adaptiveQuality.telemetry(),
-      lighting: { ...activeLighting },
+      lighting: {
+        ...activeLighting,
+        fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
+        fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
+      },
       sky: {
         pass: 30,
         top: `#${activeLighting.skyTop.toString(16).padStart(6, '0')}`,
@@ -5959,8 +6136,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         cloudLight: `#${activeLighting.skyCloudLight.toString(16).padStart(6, '0')}`,
         cloudBands: skyCloudsEnabled ? 2 : 0,
         fogColor: `#${activeLighting.fogColor.toString(16).padStart(6, '0')}`,
-        fogNear: activeLighting.fogNear,
-        fogFar: activeLighting.fogFar,
+        fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
+        fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
         godRayStrength: actualGodRayStrength,
         godRayLobes: actualGodRayLobes,
         extraDraws: 0,
@@ -5969,7 +6146,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       },
       grass: grassSystem.telemetry(),
       atmosphere: atmosphereSystem.telemetry(),
-      blenderEnvironment: blenderArenaTelemetry(),
+      blenderEnvironment: {
+        ...blenderArenaTelemetry(),
+        proceduralRootActuallyVisible: atomicArena.root.visible,
+        qualityArtRootVisible: blenderArenaActive && arenaArtRoot?.visible === true,
+        overlappingPrimaryArenaRoots: atomicArena.root.visible && blenderArenaActive && arenaArtRoot?.visible === true,
+      },
       rustworksBlender: rustworksBlenderTelemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.flatMap((node) => {
         const sourcePalette = node.userData.sourcePalette;
@@ -6078,8 +6260,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const nearestDistance = Math.hypot(target.x - nearest.origin.x, target.z - nearest.origin.z);
       return currentDistance < nearestDistance ? candidate : nearest;
     }, arena.houses[0]);
-    const outward = Math.sign(target.z - house.origin.z) || house.origin.facing;
-    const eye = new THREE.Vector3(target.x, target.y, target.z + outward * THREE.MathUtils.clamp(distance, 1.1, 8));
+    const staged = selectPlayableWindowApproach(target, house.origin, arena.bounds, arena.colliders, distance);
+    if (!staged) return;
+    const eye = new THREE.Vector3(staged.x, staged.y, staged.z);
     player.position.copy(eye);
     characterPhysics?.teleportEye(player.position);
     player.velocity.set(0, 0, 0);
@@ -6093,7 +6276,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   detonateGrenadeAtWindow: (index: number) => {
     const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
-    return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3())) : 0;
+    return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3()), randomNonce(), false) : 0;
   },
   stageYardhawkWall: (team: Team = 0) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
@@ -6370,6 +6553,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   earnSupport: (eliminations: number) => {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
   },
+  forceBotGrenade: (fuseMs = 1_100) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    return bot ? throwBotGrenade(bot, performance.now(), fuseMs) : false;
+  },
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
     const now = performance.now();
@@ -6410,7 +6597,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   returnToMainMenu,
   selectArena: async (id: ArenaId) => activateArenaSelection(id),
-  hitRangeTarget: (id: string, damage = 500, zone: HitZone = 'body') => hitPracticeTarget(id, damage, zone),
+  hitRangeTarget: (id, damage = 500, zone = 'body') => hitPracticeTarget(id, damage, zone),
+  spawnDeathDrop: (ageMs = 0) => spawnDeathDrop({
+    type: 'death',
+    killer: 'qa-drop-auditor',
+    victim: player.id,
+    nonce: randomNonce(),
+  }, performance.now() - THREE.MathUtils.clamp(ageMs, 0, 30_100))?.drop.id ?? null,
   setKills: (kills: number) => {
     if (Number.isFinite(kills)) player.kills = Math.max(0, Math.floor(kills));
   },
@@ -6435,15 +6628,15 @@ async function bootstrap(): Promise<void> {
         try {
           const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
             const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
-            setStatus(`Loading Blender Render arena ${percent}%…`);
+            setStatus(`Loading Quality Graphics arena ${percent}%…`);
           });
           blenderArenaActive = true;
           return art;
         } catch (error) {
           markBlenderArenaFallback(error);
-          console.error('[Atomic Acres Blender Render asset load failed; using authored fallback]', error);
+          console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
           return loadArenaArt(scene, (loaded, total) => {
-            setStatus(`Blender Render fallback ${loaded}/${total}…`);
+            setStatus(`Quality Graphics fallback ${loaded}/${total}…`);
           }, false);
         }
       })()

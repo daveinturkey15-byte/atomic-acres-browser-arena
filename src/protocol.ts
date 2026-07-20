@@ -92,6 +92,7 @@ export type WindowBreakMessage = {
   windowId: string;
   origin: [number, number, number];
   kind?: 'shot' | 'explosive';
+  actionNonce?: number;
   nonce: number;
 };
 export type LeaveMessage = { type: 'leave'; playerId: string };
@@ -213,6 +214,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return typeof msg.by === 'string'
         && typeof msg.windowId === 'string' && msg.windowId.length > 0 && msg.windowId.length <= 160
         && (msg.kind === undefined || msg.kind === 'shot' || msg.kind === 'explosive')
+        && (msg.kind === 'explosive' ? Number.isFinite(msg.actionNonce) : msg.actionNonce === undefined)
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'leave':

@@ -470,7 +470,7 @@ test.describe('boot and authored presentation', () => {
     await expect(qaScore).toContainText('×8 STREAK');
   });
 
-  test('defaults new players to Blender Render while retaining explicit slow-PC profiles', async ({ page }) => {
+  test('defaults new players to Quality Graphics while retaining explicit slow-PC profiles', async ({ page }) => {
     const shaderErrors: string[] = [];
     page.on('console', (message) => {
       if (message.type() === 'error' && /Atomic Signal|Shader Error|WebGLProgram/.test(message.text())) shaderErrors.push(message.text());
@@ -550,7 +550,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.originalArtLoaded).toBe(true);
   });
 
-  test('loads the complete Blender Render arena and binds authored breakable windows', async ({ page }) => {
+  test('loads the complete Quality Graphics arena and binds authored breakable windows', async ({ page }) => {
     test.setTimeout(120_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -676,7 +676,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#graphics-profile')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toHaveValue('performance');
     await expect(page.locator('#graphics-profile option')).toHaveCount(2);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'BLENDER RENDER']);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY GRAPHICS']);
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';
@@ -2025,12 +2025,12 @@ test.describe('performance and stability', () => {
     expect(errors).toEqual([]);
   });
 
-  test('legacy Quality migrates to Blender Render', async ({ page }) => {
+  test('legacy Quality alias loads Quality Graphics', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=quality');
     await expect(page.locator('#graphics-profile option')).toHaveCount(2);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'BLENDER RENDER']);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY GRAPHICS']);
     await startSolo(page);
     await page.waitForTimeout(1_000);
     const state = await debug(page);

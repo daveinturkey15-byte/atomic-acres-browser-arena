@@ -11,6 +11,16 @@ type Builder = {
   raycastMeshes: THREE.Object3D[];
 };
 
+export const GUN_RANGE_FIRING_LINE_Z = 1.2;
+export const GUN_RANGE_FIRING_LINE_BARRIER: Readonly<Box2> = Object.freeze({
+  minX: -15,
+  maxX: 15,
+  minZ: GUN_RANGE_FIRING_LINE_Z - 0.25,
+  maxZ: GUN_RANGE_FIRING_LINE_Z + 0.25,
+  minY: -2,
+  maxY: 8,
+});
+
 const standard = (color: number, roughness = 0.86, metalness = 0.08): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
@@ -270,7 +280,11 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   for (const x of [-10, -5, 0, 5, 10]) {
     box(builder, 'gun-range-booth-divider', [x, 1.35, 6], [0.16, 2.7, 7], dark);
   }
-  box(builder, 'gun-range-firing-line', [0, 0.05, 1.2], [30, 0.1, 0.5], safety, { solid: false, shots: false });
+  box(builder, 'gun-range-firing-line', [0, 0.05, GUN_RANGE_FIRING_LINE_Z], [30, 0.1, 0.5], safety, { solid: false, shots: false });
+  // The yellow line is a range-safety boundary, not ballistic cover. Keep its
+  // tall invisible barrier in authoritative character physics only so every
+  // stance and jump remains behind it while bullets pass into the lanes.
+  builder.physicsColliders.push({ ...GUN_RANGE_FIRING_LINE_BARRIER });
   for (const z of [-9, -22, -35]) {
     box(builder, 'gun-range-distance-stripe', [0, 0.035, z], [30, 0.06, 0.22], safety, { solid: false, shots: false });
   }

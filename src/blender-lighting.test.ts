@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { arenaLightingProfile } from './blender-lighting';
 
 describe('Pass 30 stormfront early-morning arena lighting', () => {
-  it('uses bounded purple-orange early-morning balance in Blender Render', () => {
+  it('uses bounded purple-orange early-morning balance in Quality Graphics', () => {
     const blender = arenaLightingProfile('blender');
     expect(blender).toMatchObject({
       exposure: 1.18,

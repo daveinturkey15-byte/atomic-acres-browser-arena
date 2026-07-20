@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { isSoftwareWebGLRenderer } from './atomic-signal';
+import type { ArenaId } from './map-selection';
 import type { RenderProfile } from './render-profile';
 
 export type AtmosphereTelemetry = Readonly<{
   pass: 30;
   enabled: boolean;
   bypassReason: string | null;
+  arenaId: ArenaId;
   mistCards: number;
   smokeCards: number;
   dustMotes: number;
@@ -24,17 +26,72 @@ export function atmosphereBypassReason(profile: RenderProfile, rendererLabel: st
   return null;
 }
 
-const MIST_LAYOUT: readonly (readonly [number, number, number, number])[] = [
-  [-27, -18, 17, 5.2], [-25, 13, 14, 4.4], [-17, 29, 12, 4.2],
-  [27, -23, 15, 4.8], [25, 15, 13, 4.3], [17, -32, 11, 3.8],
-  [-8, -35, 13, 3.5], [8, 35, 13, 3.5], [-18, 0, 10, 3.2], [18, 0, 10, 3.2],
-] as const;
+type MistCard = readonly [number, number, number, number];
+type SmokeCard = readonly [number, number, number, number, number];
+type AtmosphereLayout = Readonly<{ mist: readonly MistCard[]; smoke: readonly SmokeCard[] }>;
+type DustLayout = Readonly<{ count: number; minX: number; maxX: number; minZ: number; maxZ: number; color: number; opacity: number }>;
 
-const SMOKE_LAYOUT: readonly (readonly [number, number, number, number, number])[] = [
-  [-1.7, 13.4, 2.5, 4.4, 0.3], [5.8, -3.6, 2.2, 3.8, 1.7],
-  [-4.2, -31.2, 2.6, 4.8, 3.1], [13.8, 31.2, 2.6, 4.8, 4.6],
-  [29.8, -14.2, 2.4, 4.2, 5.8],
-] as const;
+const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.freeze({
+  'atomic-acres': Object.freeze({
+    mist: Object.freeze([
+      [-27, -18, 17, 5.2], [-25, 13, 14, 4.4], [-17, 29, 12, 4.2],
+      [27, -23, 15, 4.8], [25, 15, 13, 4.3], [17, -32, 11, 3.8],
+      [-8, -35, 13, 3.5], [8, 35, 13, 3.5], [-18, 0, 10, 3.2], [18, 0, 10, 3.2],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-1.7, 13.4, 2.5, 4.4, 0.3], [5.8, -3.6, 2.2, 3.8, 1.7],
+      [-4.2, -31.2, 2.6, 4.8, 3.1], [13.8, 31.2, 2.6, 4.8, 4.6],
+      [29.8, -14.2, 2.4, 4.2, 5.8],
+    ] as SmokeCard[]),
+  }),
+  'rustworks-1v1': Object.freeze({
+    mist: Object.freeze([
+      [-21, -18, 12, 4.2], [20, 18, 12, 4.2], [-18, 14, 10, 3.5],
+      [18, -13, 10, 3.5], [-4, -24, 11, 3.2], [5, 24, 11, 3.2],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-19, 9, 2.2, 4.2, 0.8], [19, -10, 2.2, 4.2, 2.7], [0, 1, 2.5, 5.2, 4.4],
+    ] as SmokeCard[]),
+  }),
+  'gun-range': Object.freeze({
+    mist: Object.freeze([
+      [-11.5, -7, 7, 2.8], [10.5, -17, 7, 2.8], [-9, -28, 6.5, 2.5], [9, -38, 6.5, 2.5],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-13.5, -18, 1.8, 3.8, 1.2], [13.5, -32, 1.8, 3.8, 4.1],
+    ] as SmokeCard[]),
+  }),
+});
+
+const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
+const MAX_SMOKE_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.smoke.length));
+
+function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLayout {
+  const quality = profile === 'blender';
+  if (arenaId === 'atomic-acres') return {
+    count: quality ? 96 : 64, minX: -37, maxX: 37, minZ: -39, maxZ: 39, color: 0xd8bd95, opacity: quality ? 0.22 : 0.18,
+  };
+  if (arenaId === 'rustworks-1v1') return {
+    count: quality ? 48 : 32, minX: -27, maxX: 27, minZ: -27, maxZ: 27, color: 0xb99370, opacity: quality ? 0.16 : 0.12,
+  };
+  return {
+    count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
+  };
+}
+
+export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Readonly<{ near: number; far: number }> {
+  if (profile === 'compat') return { near: 56, far: 140 };
+  if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 32, far: 104 } : { near: 36, far: 112 };
+  if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 28, far: 86 } : { near: 30, far: 92 };
+  return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
+}
+
+function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{ mist: number; smoke: number }> {
+  const quality = profile === 'blender';
+  if (arenaId === 'atomic-acres') return quality ? { mist: 0.24, smoke: 0.13 } : { mist: 0.18, smoke: 0.09 };
+  if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.18, smoke: 0.1 } : { mist: 0.13, smoke: 0.075 };
+  return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
+}
 
 export class AtmosphereSystem {
   readonly root = new THREE.Group();
@@ -48,11 +105,15 @@ export class AtmosphereSystem {
   private submissionFrame = -1;
   private time = 0;
   private readonly bypass: string | null;
+  private readonly profile: RenderProfile;
+  private arenaId: ArenaId;
 
-  constructor(scene: THREE.Scene, profile: RenderProfile, rendererLabel: string, query: string | null) {
+  constructor(scene: THREE.Scene, profile: RenderProfile, rendererLabel: string, query: string | null, arenaId: ArenaId = 'atomic-acres') {
     this.root.name = 'pass30-subtle-ground-mist';
     this.root.userData.presentationOnly = true;
     this.root.userData.blocksShots = false;
+    this.profile = profile;
+    this.arenaId = arenaId;
     this.bypass = atmosphereBypassReason(profile, rendererLabel, query);
     if (this.bypass) {
       this.material = null;
@@ -65,7 +126,7 @@ export class AtmosphereSystem {
       return;
     }
     const geometry = new THREE.PlaneGeometry(1, 1, 1, 1);
-    geometry.setAttribute('mistPhase', new THREE.InstancedBufferAttribute(new Float32Array(MIST_LAYOUT.map((_, index) => index * 1.731)), 1));
+    geometry.setAttribute('mistPhase', new THREE.InstancedBufferAttribute(new Float32Array(Array.from({ length: MAX_MIST_CARDS }, (_, index) => index * 1.731)), 1));
     this.material = new THREE.ShaderMaterial({
       name: 'pass30-ground-mist-linear-hdr',
       transparent: true,
@@ -79,7 +140,7 @@ export class AtmosphereSystem {
           uTime: { value: 0 },
           uShadowColor: { value: new THREE.Color(0x725f87) },
           uLightColor: { value: new THREE.Color(0xe9a57b) },
-          uOpacity: { value: profile === 'blender' ? 0.16 : 0.085 },
+          uOpacity: { value: atmosphereOpacity(profile, arenaId).mist },
         },
       ]),
       vertexShader: `
@@ -120,7 +181,7 @@ export class AtmosphereSystem {
         }
       `,
     });
-    const mesh = new THREE.InstancedMesh(geometry, this.material, MIST_LAYOUT.length);
+    const mesh = new THREE.InstancedMesh(geometry, this.material, MAX_MIST_CARDS);
     mesh.name = 'pass30-mist-cards';
     mesh.frustumCulled = true;
     mesh.castShadow = false;
@@ -132,8 +193,10 @@ export class AtmosphereSystem {
     const position = new THREE.Vector3();
     const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
     const scale = new THREE.Vector3();
-    for (let index = 0; index < MIST_LAYOUT.length; index += 1) {
-      const [x, z, width, depth] = MIST_LAYOUT[index];
+    const initialLayout = ATMOSPHERE_LAYOUTS[arenaId];
+    mesh.count = initialLayout.mist.length;
+    for (let index = 0; index < initialLayout.mist.length; index += 1) {
+      const [x, z, width, depth] = initialLayout.mist[index];
       position.set(x, 0.16 + (index % 3) * 0.025, z);
       scale.set(width, depth, 1);
       matrix.compose(position, rotation, scale);
@@ -154,7 +217,7 @@ export class AtmosphereSystem {
     this.root.add(mesh);
 
     const smokeGeometry = new THREE.PlaneGeometry(1, 1, 1, 1);
-    smokeGeometry.setAttribute('smokePhase', new THREE.InstancedBufferAttribute(new Float32Array(SMOKE_LAYOUT.map((entry) => entry[4])), 1));
+    smokeGeometry.setAttribute('smokePhase', new THREE.InstancedBufferAttribute(new Float32Array(Array.from({ length: MAX_SMOKE_CARDS }, (_, index) => index * 1.47)), 1));
     this.smokeMaterial = new THREE.ShaderMaterial({
       name: 'pass31-subtle-smoke-haze-linear-hdr',
       transparent: true,
@@ -168,7 +231,7 @@ export class AtmosphereSystem {
           uTime: { value: 0 },
           uSmokeColor: { value: new THREE.Color(0x84909a) },
           uWarmEdge: { value: new THREE.Color(0xc3a58d) },
-          uOpacity: { value: profile === 'blender' ? 0.082 : 0.05 },
+          uOpacity: { value: atmosphereOpacity(profile, arenaId).smoke },
         },
       ]),
       vertexShader: `
@@ -215,15 +278,16 @@ export class AtmosphereSystem {
         }
       `,
     });
-    const smokeMesh = new THREE.InstancedMesh(smokeGeometry, this.smokeMaterial, SMOKE_LAYOUT.length);
+    const smokeMesh = new THREE.InstancedMesh(smokeGeometry, this.smokeMaterial, MAX_SMOKE_CARDS);
     smokeMesh.name = 'pass31-subtle-smoke-cards';
     smokeMesh.castShadow = false;
     smokeMesh.receiveShadow = false;
     smokeMesh.renderOrder = -1;
     smokeMesh.userData.presentationOnly = true;
     smokeMesh.userData.blocksShots = false;
-    for (let index = 0; index < SMOKE_LAYOUT.length; index += 1) {
-      const [x, z, width, height] = SMOKE_LAYOUT[index];
+    smokeMesh.count = initialLayout.smoke.length;
+    for (let index = 0; index < initialLayout.smoke.length; index += 1) {
+      const [x, z, width, height] = initialLayout.smoke[index];
       matrix.compose(new THREE.Vector3(x, height / 2 + 0.15, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
       smokeMesh.setMatrixAt(index, matrix);
     }
@@ -233,18 +297,13 @@ export class AtmosphereSystem {
     smokeMesh.onBeforeRender = mesh.onBeforeRender;
     this.smokeMesh = smokeMesh;
     this.root.add(smokeMesh);
+    this.setArena(arenaId);
 
     const dustCount = profile === 'blender' ? 96 : 64;
     const dustPositions = new Float32Array(dustCount * 3);
     const dustPhases = new Float32Array(dustCount);
     for (let index = 0; index < dustCount; index += 1) {
-      // Low-discrepancy deterministic distribution: dust reads as air volume,
-      // not large authored objects suspended in the sky.
-      const u = ((index * 37) % dustCount) / dustCount;
-      const v = ((index * 61) % dustCount) / dustCount;
-      dustPositions[index * 3] = -37 + u * 74;
       dustPositions[index * 3 + 1] = 0.35 + ((index * 19) % 43) / 43 * 2.25;
-      dustPositions[index * 3 + 2] = -39 + v * 78;
       dustPhases[index] = index * 1.61803398875;
     }
     const dustGeometry = new THREE.BufferGeometry();
@@ -303,7 +362,66 @@ export class AtmosphereSystem {
     this.dustPoints.raycast = () => undefined;
     this.dustPoints.onBeforeRender = mesh.onBeforeRender;
     this.root.add(this.dustPoints);
+    this.setArena(arenaId);
     scene.add(this.root);
+  }
+
+  setArena(arenaId: ArenaId): void {
+    this.arenaId = arenaId;
+    if (!this.mesh || !this.smokeMesh || !this.material || !this.smokeMaterial) return;
+    const layout = ATMOSPHERE_LAYOUTS[arenaId];
+    const matrix = new THREE.Matrix4();
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    this.mesh.count = layout.mist.length;
+    for (let index = 0; index < layout.mist.length; index += 1) {
+      const [x, z, width, depth] = layout.mist[index];
+      matrix.compose(
+        new THREE.Vector3(x, 0.16 + (index % 3) * 0.025, z),
+        rotation,
+        new THREE.Vector3(width, depth, 1),
+      );
+      this.mesh.setMatrixAt(index, matrix);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.computeBoundingSphere();
+
+    this.smokeMesh.count = layout.smoke.length;
+    for (let index = 0; index < layout.smoke.length; index += 1) {
+      const [x, z, width, height] = layout.smoke[index];
+      matrix.compose(new THREE.Vector3(x, height / 2 + 0.15, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
+      this.smokeMesh.setMatrixAt(index, matrix);
+    }
+    this.smokeMesh.instanceMatrix.needsUpdate = true;
+    this.smokeMesh.computeBoundingSphere();
+
+    const opacity = atmosphereOpacity(this.profile, arenaId);
+    this.material.uniforms.uOpacity.value = opacity.mist;
+    this.smokeMaterial.uniforms.uOpacity.value = opacity.smoke;
+    const palette = arenaId === 'atomic-acres'
+      ? { shadow: 0x725f87, light: 0xe9a57b, smoke: 0x84909a, warm: 0xc3a58d }
+      : arenaId === 'rustworks-1v1'
+        ? { shadow: 0x665f5c, light: 0xc08b68, smoke: 0x756d66, warm: 0xb97d58 }
+        : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
+    (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
+    (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);
+    (this.smokeMaterial.uniforms.uSmokeColor.value as THREE.Color).setHex(palette.smoke);
+    (this.smokeMaterial.uniforms.uWarmEdge.value as THREE.Color).setHex(palette.warm);
+    if (this.dustPoints && this.dustMaterial) {
+      const dust = atmosphereDustLayout(this.profile, arenaId);
+      const position = this.dustPoints.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const capacity = position.count;
+      for (let index = 0; index < capacity; index += 1) {
+        const u = ((index * 37) % dust.count) / dust.count;
+        const v = ((index * 61) % dust.count) / dust.count;
+        position.setX(index, dust.minX + u * (dust.maxX - dust.minX));
+        position.setZ(index, dust.minZ + v * (dust.maxZ - dust.minZ));
+      }
+      position.needsUpdate = true;
+      this.dustPoints.geometry.setDrawRange(0, dust.count);
+      this.dustPoints.geometry.computeBoundingSphere();
+      (this.dustMaterial.uniforms.uColor.value as THREE.Color).setHex(dust.color);
+      this.dustMaterial.uniforms.uOpacity.value = dust.opacity;
+    }
   }
 
   update(timeSeconds: number): void {
@@ -329,9 +447,10 @@ export class AtmosphereSystem {
       pass: 30,
       enabled: this.material !== null,
       bypassReason: this.bypass,
+      arenaId: this.arenaId,
       mistCards: this.mesh?.count ?? 0,
       smokeCards: this.smokeMesh?.count ?? 0,
-      dustMotes: this.dustPoints?.geometry.attributes.position.count ?? 0,
+      dustMotes: this.dustPoints?.geometry.drawRange.count ?? 0,
       triangles: ((this.mesh?.count ?? 0) + (this.smokeMesh?.count ?? 0)) * 2,
       submissions: this.submissions,
       textureSamples: 0,

@@ -58,7 +58,9 @@ describe('network protocol guards', () => {
     expect(isGameMessage(pickup)).toBe(true);
     expect(isGameMessage({ ...pickup, mode: 'scavenge' })).toBe(true);
     expect(isGameMessage(brokenWindow)).toBe(true);
-    expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(false);
+    expect(isGameMessage({ ...brokenWindow, kind: 'explosive', actionNonce: 55 })).toBe(true);
+    expect(isGameMessage({ ...brokenWindow, kind: 'shot', actionNonce: 55 })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'magic' })).toBe(false);
     expect(messageBelongsToPlayer(pickup, 'abc')).toBe(true);
     expect(messageBelongsToPlayer(brokenWindow, 'abc')).toBe(true);

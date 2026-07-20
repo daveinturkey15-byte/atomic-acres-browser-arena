@@ -184,7 +184,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     ).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.activeTargets), { timeout: 4_000 }).toBe(9);
   });
 
-  test('Blender Render loads the original tall Rustworks tower detail asset', async ({ page }) => {
+  test('Quality Graphics loads the original tall Rustworks tower detail asset', async ({ page }) => {
     await page.goto(`/?${blenderLightweight}&seed=3404&map=rustworks-1v1`);
     await waitReady(page);
     const state = await snapshot(page);

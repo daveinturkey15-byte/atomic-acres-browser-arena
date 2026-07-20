@@ -122,7 +122,7 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
   void main() {
     vec3 color = sampleLinear(vUv);
 
-    // Blender Render gets a restrained four-neighbour clarity pass. Performance
+    // Quality Graphics gets a restrained four-neighbour clarity pass. Performance
     // sets sharpen to zero, so uniform branching avoids the extra samples.
     if (sharpen > 0.0001) {
       vec3 neighbours = sampleLinear(vUv + vec2(inverseResolution.x, 0.0))

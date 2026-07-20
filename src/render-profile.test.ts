@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderProfileConfig, resolveRenderProfile } from './render-profile';
 
 describe('render profiles', () => {
-  it('defaults new players to the highest-quality Blender Render profile', () => {
+  it('defaults new players to the highest-quality Quality Graphics profile', () => {
     expect(resolveRenderProfile('', null)).toBe('blender');
     expect(renderProfileConfig('blender')).toMatchObject({
       representation: 'blender',
@@ -17,7 +17,7 @@ describe('render profiles', () => {
     });
   });
 
-  it('allows Blender Render and compatibility overrides while migrating legacy Quality', () => {
+  it('allows Quality Graphics and compatibility overrides while migrating legacy Quality', () => {
     expect(resolveRenderProfile('?render=quality', 'compat')).toBe('blender');
     expect(resolveRenderProfile('?render=blender', 'performance')).toBe('blender');
     expect(resolveRenderProfile('?render=compat', 'blender')).toBe('compat');

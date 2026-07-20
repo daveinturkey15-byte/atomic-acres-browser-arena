@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GrenadeThrowMessage, PlayerSnapshot } from './protocol';
 import {
   REMOTE_GRENADE_MIN_FUSE_MS,
+  admitRemoteGrenadeExplosion,
   admitRemoteGrenadeHit,
   admitRemoteGrenadeThrow,
   createRemoteGrenadeAuthorityState,
@@ -57,6 +58,26 @@ describe('remote grenade authority', () => {
     const admitted = admitRemoteGrenadeThrow(createRemoteGrenadeAuthorityState(), thrown(9), sender, 0);
     expect(admitRemoteGrenadeHit(admitted.state, {
       actionNonce: 9, explosionOrigin: [40, 0.2, 40], target: 'host', now: 2_300,
+    }).accepted).toBe(false);
+  });
+
+  it('correlates window-break explosions with a fused admitted throw', () => {
+    const admitted = admitRemoteGrenadeThrow(createRemoteGrenadeAuthorityState(), thrown(12), sender, 1_000);
+    expect(admitRemoteGrenadeExplosion(admitted.state, {
+      actionNonce: 99, explosionOrigin: [1, 0.2, -8], now: 3_000,
+    }).accepted).toBe(false);
+    expect(admitRemoteGrenadeExplosion(admitted.state, {
+      actionNonce: 12, explosionOrigin: [1, 0.2, -8], now: 1_000 + REMOTE_GRENADE_MIN_FUSE_MS - 1,
+    }).accepted).toBe(false);
+    const explosion = admitRemoteGrenadeExplosion(admitted.state, {
+      actionNonce: 12, explosionOrigin: [1, 0.2, -8], now: 1_000 + REMOTE_GRENADE_MIN_FUSE_MS,
+    });
+    expect(explosion.accepted).toBe(true);
+    expect(admitRemoteGrenadeHit(explosion.state, {
+      actionNonce: 12, explosionOrigin: [1, 0.2, -8], target: 'host', now: 3_000,
+    }).accepted).toBe(true);
+    expect(admitRemoteGrenadeExplosion(explosion.state, {
+      actionNonce: 12, explosionOrigin: [5, 0.2, -8], now: 3_000,
     }).accepted).toBe(false);
   });
 });

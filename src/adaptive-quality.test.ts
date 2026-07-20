@@ -8,7 +8,7 @@ describe('adaptive quality controller', () => {
     expect(adaptiveShadowsEnabled('performance', true, 0.75)).toBe(false);
   });
 
-  it('keeps Blender Render within its authored resolution ladder', () => {
+  it('keeps Quality Graphics within its authored resolution ladder', () => {
     const controller = new AdaptiveQualityController({
       profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,
     });

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { ArenaMap } from './map';
+import type { ArenaId } from './map-selection';
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
 export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb';
@@ -51,6 +52,11 @@ export function blenderArenaTelemetry(): BlenderArenaTelemetry {
   return { ...telemetry };
 }
 
+/** The procedural Atomic Acres root is authority-only while Quality art is live. */
+export function proceduralArenaRootVisible(selectedArenaId: ArenaId, qualityArenaActive: boolean): boolean {
+  return selectedArenaId === 'atomic-acres' && !qualityArenaActive;
+}
+
 export function markBlenderArenaFallback(error: unknown): void {
   telemetry.status = 'fallback';
   telemetry.error = error instanceof Error ? error.message : String(error);
@@ -69,7 +75,7 @@ export async function loadBlenderArena(
     onProgress?.(event.loaded, event.total || event.loaded || 1);
   });
   const root = gltf.scene;
-  root.name = 'Atomic Acres Blender Render arena';
+  root.name = 'Atomic Acres Quality Graphics arena';
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
   const texturedMaterials = new Set<THREE.Material>();

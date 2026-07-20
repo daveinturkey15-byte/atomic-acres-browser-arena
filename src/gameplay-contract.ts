@@ -14,7 +14,7 @@ import {
   movementProfile,
 } from './gameplay';
 import { createHouseArchitecture } from './house-navigation';
-import { SOLO_BOT_COUNT } from './bot-ai';
+import { BOT_GRENADE_COOLDOWN_MS, BOT_GRENADE_MAX_RANGE, BOT_GRENADE_MIN_RANGE, BOT_WEAPON_POOL, SOLO_BOT_COUNT } from './bot-ai';
 import { ARENA_SELECTIONS } from './map-selection';
 import {
   FIELD_SUPPORT,
@@ -76,6 +76,14 @@ export function buildGameplayContract(): Record<string, unknown> {
     combat: {
       botDamageMultiplier: BOT_DAMAGE_MULTIPLIER,
       soloBotCount: SOLO_BOT_COUNT,
+      botWeapons: [...BOT_WEAPON_POOL],
+      botGrenade: {
+        damageMultiplier: BOT_DAMAGE_MULTIPLIER,
+        minimumRange: BOT_GRENADE_MIN_RANGE,
+        maximumRange: BOT_GRENADE_MAX_RANGE,
+        cooldownMs: BOT_GRENADE_COOLDOWN_MS,
+        maximumActive: 1,
+      },
       weapons: Object.values(WEAPONS).map((weapon) => ({ ...weapon })),
       grenade: { radius: GRENADE_RADIUS, maximumDamage: GRENADE_MAX_DAMAGE },
       melee: { cooldownMs: MELEE_COOLDOWN_MS, range: MELEE_RANGE, damage: MELEE_DAMAGE },

@@ -2673,6 +2673,19 @@
     "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 33 deltas",
     "combat": {
       "botDamageMultiplier": 0.25,
+      "botGrenade": {
+        "cooldownMs": 12000,
+        "damageMultiplier": 0.25,
+        "maximumActive": 1,
+        "maximumRange": 18,
+        "minimumRange": 7
+      },
+      "botWeapons": [
+        "carbine",
+        "smg",
+        "scattergun",
+        "sniper"
+      ],
       "grenade": {
         "maximumDamage": 230,
         "radius": 16
@@ -2892,7 +2905,7 @@
     "inventory": {
       "deathDrops": {
         "interactionRange": 2.35,
-        "lifetimeMs": 25000,
+        "lifetimeMs": 30000,
         "maximumActive": 12,
         "scavengeHorizontalRange": 1.05,
         "scavengeVerticalRange": 2.4

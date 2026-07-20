@@ -5,6 +5,13 @@ export type Stance = 'stand' | 'crouch' | 'prone';
 
 /** Solo bots deal one quarter of equivalent player-weapon damage (half the Pass 30 value). */
 export const BOT_DAMAGE_MULTIPLIER = 0.25;
+export function botScaledDamage(rawDamage: number): number {
+  return Math.max(0, Number.isFinite(rawDamage) ? rawDamage : 0) * BOT_DAMAGE_MULTIPLIER;
+}
+
+export function admittedPlayerDamage(damage: number, minimumDamage = 1): number {
+  return Math.min(100, Math.max(minimumDamage, damage));
+}
 export const SIMULATION_HZ = 120;
 export const MATCH_WARMUP_MS = 3_000;
 export const MATCH_DURATION_MS = 300_000;

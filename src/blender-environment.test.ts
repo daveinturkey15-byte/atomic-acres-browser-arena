@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BLENDER_ARENA_ASSET } from './blender-environment';
+import { BLENDER_ARENA_ASSET, proceduralArenaRootVisible } from './blender-environment';
 
 const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
@@ -14,7 +14,14 @@ function glbJson(buffer: Buffer): Record<string, unknown> {
   return JSON.parse(buffer.toString('utf8', 20, 20 + jsonLength).trimEnd());
 }
 
-describe('Blender Render environment asset', () => {
+describe('Quality Graphics environment asset', () => {
+  it('never renders the coplanar procedural and Quality arena roots together', () => {
+    expect(proceduralArenaRootVisible('atomic-acres', true)).toBe(false);
+    expect(proceduralArenaRootVisible('atomic-acres', false)).toBe(true);
+    expect(proceduralArenaRootVisible('rustworks-1v1', true)).toBe(false);
+    expect(proceduralArenaRootVisible('gun-range', false)).toBe(false);
+  });
+
   it('ships a self-contained, bounded original arena GLB with semantic windows', () => {
     const buffer = readFileSync(assetPath);
     const gltf = glbJson(buffer) as {

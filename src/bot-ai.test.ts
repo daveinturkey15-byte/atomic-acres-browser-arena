@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   BOT_DEATHS_PER_REINFORCEMENT,
   BOT_FIRE_RANGE,
+  BOT_GRENADE_COOLDOWN_MS,
+  BOT_GRENADE_MAX_RANGE,
+  BOT_GRENADE_MIN_RANGE,
   BOT_REACTION_DELAY,
   MAX_SOLO_BOTS,
   SOLO_BOT_COUNT,
   SPAWN_FLIP_SUSTAIN_MS,
   advanceSpawnFlipHysteresis,
+  assignBotWeapons,
   botAimJitter,
   botCanFireWhileProtected,
+  botWeaponBurstSize,
+  botWeaponFireInterval,
   chooseBotIntent,
   chooseTacticalWaypoint,
   createSpawnFlipHysteresis,
@@ -17,6 +23,7 @@ import {
   scoreBotSpawn,
   selectFarthestSpawnCandidate,
   shouldFlipSpawnSide,
+  shouldBotThrowGrenade,
   soloBotTargetForDeaths,
   type BotSense,
 } from './bot-ai';
@@ -33,6 +40,48 @@ const base: BotSense = {
 };
 
 describe('chooseBotIntent', () => {
+  it('assigns a seeded random mixed weapon cycle with no avoidable duplicates', () => {
+    const samples = [0.1, 0.8, 0.35, 0.65, 0.2, 0.9, 0.45, 0.75];
+    const run = () => {
+      let index = 0;
+      return assignBotWeapons(6, () => samples[index++ % samples.length]);
+    };
+    const first = run();
+    expect(first).toEqual(run());
+    expect(new Set(first.slice(0, 4)).size).toBe(4);
+    expect(first.every((weapon, index) => index === 0 || weapon !== first[index - 1])).toBe(true);
+    expect(first).toEqual(expect.arrayContaining(['carbine', 'smg', 'scattergun', 'sniper']));
+  });
+
+  it('uses weapon-specific burst and fire cadence', () => {
+    expect(botWeaponBurstSize('scattergun', 0)).toBe(1);
+    expect(botWeaponBurstSize('sniper', 1)).toBe(1);
+    expect(botWeaponBurstSize('smg', 1)).toBe(5);
+    expect(botWeaponFireInterval('smg', true)).toBeLessThan(botWeaponFireInterval('carbine', true));
+    expect(botWeaponFireInterval('sniper', false)).toBeGreaterThan(botWeaponFireInterval('scattergun', false));
+  });
+
+  it('admits only one reacted in-range bot grenade and enforces its cooldown', () => {
+    const ready = {
+      alive: true,
+      hasLineOfSight: true,
+      reacted: true,
+      distanceToPlayer: 12,
+      now: 20_000,
+      nextGrenadeAt: 10_000,
+      botGrenadeActive: false,
+      activeBotGrenades: 0,
+      random: 0.1,
+    };
+    expect(shouldBotThrowGrenade(ready)).toBe(true);
+    expect(shouldBotThrowGrenade({ ...ready, botGrenadeActive: true })).toBe(false);
+    expect(shouldBotThrowGrenade({ ...ready, activeBotGrenades: 1 })).toBe(false);
+    expect(shouldBotThrowGrenade({ ...ready, nextGrenadeAt: ready.now + BOT_GRENADE_COOLDOWN_MS })).toBe(false);
+    expect(shouldBotThrowGrenade({ ...ready, distanceToPlayer: BOT_GRENADE_MIN_RANGE - 0.01 })).toBe(false);
+    expect(shouldBotThrowGrenade({ ...ready, distanceToPlayer: BOT_GRENADE_MAX_RANGE + 0.01 })).toBe(false);
+    expect(shouldBotThrowGrenade({ ...ready, random: 0.9 })).toBe(false);
+  });
+
   it('fires only with line of sight, range and cadence', () => {
     expect(chooseBotIntent(base).fire).toBe(true);
     expect(chooseBotIntent({ ...base, hasLineOfSight: false }).fire).toBe(false);

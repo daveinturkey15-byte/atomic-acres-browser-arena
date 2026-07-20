@@ -8,7 +8,7 @@ describe('Atomic Signal profile contract', () => {
     expect(atomicSignalTextureSamples(config)).toBe(0);
   });
 
-  it('uses one texture sample in Performance and bounded clarity taps in Blender Render', () => {
+  it('uses one texture sample in Performance and bounded clarity taps in Quality Graphics', () => {
     const performance = atomicSignalConfig('performance');
     const blender = atomicSignalConfig('blender');
     expect(performance.enabled).toBe(true);

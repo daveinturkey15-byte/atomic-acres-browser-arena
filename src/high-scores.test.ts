@@ -7,6 +7,7 @@ import {
   loadHighScores,
   mergeHighScores,
   normalizeRequiredPlayerName,
+  peerOwnedHighScores,
   personalBest,
   saveHighScores,
   type HighScoreEntry,
@@ -39,10 +40,10 @@ describe('persistent high scores', () => {
 
   it('orders records by streak, kills, deaths and victory without duplicates', () => {
     const scores = mergeHighScores([], [
-      entry({ id: 'a', kills: 8, bestStreak: 4, deaths: 2 }),
-      entry({ id: 'b', kills: 8, bestStreak: 6, deaths: 5 }),
-      entry({ id: 'c', kills: 9, bestStreak: 3, deaths: 7 }),
-      entry({ id: 'b', kills: 8, bestStreak: 6, deaths: 5 }),
+      entry({ id: 'a', name: 'ALPHA', kills: 8, bestStreak: 4, deaths: 2 }),
+      entry({ id: 'b', name: 'BRAVO', kills: 8, bestStreak: 6, deaths: 5 }),
+      entry({ id: 'c', name: 'CHARLIE', kills: 9, bestStreak: 3, deaths: 7 }),
+      entry({ id: 'b', name: 'BRAVO', kills: 8, bestStreak: 6, deaths: 5 }),
     ], now);
     expect(scores.map((score) => score.id)).toEqual(['b', 'a', 'c']);
   });
@@ -57,7 +58,7 @@ describe('persistent high scores', () => {
   it('survives reloads through a versioned stable-origin storage key', () => {
     const storage = new MemoryStorage();
     saveHighScores(storage, [entry()]);
-    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":2');
+    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":3');
     expect(loadHighScores(storage, now)).toEqual([entry()]);
   });
 
@@ -93,5 +94,41 @@ describe('persistent high scores', () => {
       entries: [entry({ id: 'global:a_b', name: 'A B' })],
     }));
     expect(loadHighScores(storage, now)[0]?.id).toBe('global:a_20b');
+    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":3');
+  });
+
+  it('collapses immediate, completed-match, peer and global ids to one best row per callsign', () => {
+    const scores = mergeHighScores([], [
+      entry({ id: 'global:dave', name: 'Dave', kills: 12, bestStreak: 8, deaths: 4 }),
+      entry({ id: 'score:local:one', name: 'dave', kills: 15, bestStreak: 8, deaths: 3 }),
+      entry({ id: 'score:peer:two', name: 'DAVE', kills: 11, bestStreak: 9, deaths: 7 }),
+      entry({ id: 'global:ellis', name: 'Ellis', kills: 10, bestStreak: 6 }),
+    ], now);
+    expect(scores).toHaveLength(2);
+    expect(scores.filter((score) => score.name.toLowerCase() === 'dave')).toEqual([
+      expect.objectContaining({ id: 'score:peer:two', bestStreak: 9 }),
+    ]);
+  });
+
+  it('accepts only the sender-owned row from peer leaderboard synchronization', () => {
+    const own = entry({ id: 'peer-own', name: 'Dave', kills: 8, bestStreak: 5 });
+    const forged = entry({ id: 'peer-forged', name: 'Ellis', kills: 100, bestStreak: 100 });
+    expect(peerOwnedHighScores('dave', [own, forged])).toEqual([own]);
+    expect(peerOwnedHighScores('DAVE', [own, forged])).toEqual([own]);
+  });
+
+  it('rewrites existing duplicate version-two storage to one version-three row', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(HIGH_SCORE_STORAGE_KEY, JSON.stringify({
+      version: 2,
+      entries: [
+        entry({ id: 'global:dave', kills: 10, bestStreak: 6 }),
+        entry({ id: 'score:player:later', kills: 14, bestStreak: 8 }),
+      ],
+    }));
+    expect(loadHighScores(storage, now)).toEqual([entry({ id: 'score:player:later', kills: 14, bestStreak: 8 })]);
+    const rewritten = JSON.parse(storage.getItem(HIGH_SCORE_STORAGE_KEY)!) as { version: number; entries: HighScoreEntry[] };
+    expect(rewritten.version).toBe(3);
+    expect(rewritten.entries).toHaveLength(1);
   });
 });

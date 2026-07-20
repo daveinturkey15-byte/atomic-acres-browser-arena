@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOT_DAMAGE_MULTIPLIER,
+  admittedPlayerDamage,
+  botScaledDamage,
   HEADSHOT_DAMAGE_MULTIPLIER,
   WEAPONS,
   advanceMatch,
@@ -29,7 +31,10 @@ import {
 describe('solo bot tuning', () => {
   it('deals exactly half the previous Pass 30 bot damage', () => {
     expect(BOT_DAMAGE_MULTIPLIER).toBe(0.25);
-    expect(computeDamage(WEAPONS.carbine, 10, 'body') * BOT_DAMAGE_MULTIPLIER).toBe(7.75);
+    expect(botScaledDamage(computeDamage(WEAPONS.carbine, 10, 'body'))).toBe(7.75);
+    expect(botScaledDamage(230)).toBe(57.5);
+    expect(admittedPlayerDamage(botScaledDamage(grenadeDamage(15)), 0)).toBe(0.25);
+    expect(botScaledDamage(Number.NaN)).toBe(0);
   });
 });
 

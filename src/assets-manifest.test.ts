@@ -66,7 +66,7 @@ describe('third-party asset provenance', () => {
     expect(sha256(asset?.sourceBlend as string)).toBe(asset?.sourceBlendSha256);
   });
 
-  it('records exact checksums for the Blender Render GLB, editable source, and authoritative arena spec', () => {
+  it('records exact checksums for the Quality Graphics GLB, editable source, and authoritative arena spec', () => {
     const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
     const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-blender-render-arena-2026-07-17');
     expect(asset).toBeTruthy();

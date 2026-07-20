@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEATH_DROP_LIFETIME_MS,
   consumeDeathDropWeapon,
   createDeathDrop,
   deathDropAmmoAvailable,
@@ -12,6 +13,19 @@ import {
 } from './death-drops';
 
 describe('death-drop inventory contract', () => {
+  it('keeps both dropped gun and ammo available for 30 seconds, then expires both exactly', () => {
+    expect(DEATH_DROP_LIFETIME_MS).toBe(30_000);
+    const drop = createDeathDrop('death-30s', 'carbine', { x: 0, y: 0, z: 0 }, 15, 30, 1_000);
+    expect(drop.expiresAt).toBe(31_000);
+    expect(deathDropAmmoAvailable(drop, 30_999)).toBe(true);
+    expect(deathDropWeaponAvailable(drop, 30_999)).toBe(true);
+    expect(deathDropAvailable(drop, 30_999)).toBe(true);
+    expect(deathDropAmmoAvailable(drop, 31_000)).toBe(false);
+    expect(deathDropWeaponAvailable(drop, 31_000)).toBe(false);
+    expect(deathDropAvailable(drop, 31_000)).toBe(false);
+    expect(pruneDeathDrops([drop], 31_000)).toEqual([]);
+  });
+
   it('scavenges carried-weapon ammo and one grenade without selecting the dropped gun', () => {
     const drop = createDeathDrop('death-1', 'sniper', { x: 1, y: 0, z: 1 }, 5, 4, 1_000);
     const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 116, grenades: 1 }, 120, 2, 1_100);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { pointInsideBounds } from './collision';
-import { buildGunRange, buildRustworks1v1 } from './additional-maps';
+import { GUN_RANGE_FIRING_LINE_BARRIER, GUN_RANGE_FIRING_LINE_Z, buildGunRange, buildRustworks1v1 } from './additional-maps';
 
 function expectSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
   for (const team of [0, 1] as const) {
@@ -52,6 +52,11 @@ describe('additional authored maps', () => {
     expect(map.targets.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
     expect(map.targets.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
     expect(map.root.getObjectByName('gun-range-firing-line')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-firing-line')?.position.z).toBe(GUN_RANGE_FIRING_LINE_Z);
+    expect(map.physicsColliders).toContainEqual(GUN_RANGE_FIRING_LINE_BARRIER);
+    expect(map.colliders).not.toContainEqual(GUN_RANGE_FIRING_LINE_BARRIER);
+    expect(map.raycastMeshes.some((mesh) => mesh.name === 'gun-range-firing-line')).toBe(false);
+    expect(GUN_RANGE_FIRING_LINE_BARRIER.maxY).toBeGreaterThan(5);
     expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
     expectSpawnContract(map);
   });
