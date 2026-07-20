@@ -94,5 +94,10 @@ five-mesh telemetry.
   dining/sofa/media/bed/shelves/workstation materially distinct and route-clear;
   flowers outside both houses; bicycle silhouette outdoors; hollow pipe cover
   recognisable; atmosphere restrained and combat-readable.
-- Planned additive immutable review:
+- Published additive immutable review:
   `review/pass32-audit-correction-20260720-024546/`.
+- Verified source commit: `7eb19228a826fc747a60a9c10a6506ca96356f26`.
+- Immutable review Pages commit: `affec6656ab3b3f5478e3187054ff53b32697955`.
+- Exact-byte production Pages commit: `b5a81221e8484191099149f58e4166644d265da2`.
+- Artifact/review/production: **55 files**, **20,306,153 bytes**, SHA-256
+  `264d458fd0cfc6aad779a4ded1208ab44186835795381de027915a7355ad05b2`.
