@@ -1,7 +1,7 @@
 # Pass 37 — Quality Surface Separation and Fall-Proof Arena Bounds
 
 **Date:** 2026-07-20  
-**Status:** local implementation and verification complete; production remains Pass 36 until immutable review promotion
+**Status:** live; corrected immutable review promoted byte-for-byte to production
 
 ## Overview
 
@@ -90,7 +90,19 @@ Final GLB contract: **33 meshes, 27 materials, 34,336 triangles, six semantic wi
 
 ## Release gate
 
-Production remains Pass 36 until the committed Pass 37 source is built once, frozen, copied to a new immutable review path, compared over HTTPS, visually inspected, and promoted byte-for-byte without rebuilding.
+The first immutable candidate was rejected before promotion because independent review found that an opaque box named as a bus door frame hid the glass, and that the browser containment assertion could pass with no movement. The source now builds the frame from five abutting bars and requires every browser probe to reach its intended edge before asserting containment.
+
+- Release source: `245804d`
+- Frozen artifact: `/root/jigglyclaw/releases/atomic-acres-pass37-245804d`
+- Manifest: `/root/jigglyclaw/releases/atomic-acres-pass37-245804d.manifest.sha256`
+- Manifest SHA-256: `c294a2e6b32beaf4d0010916584102f9f48da8c7dbd489a59983544d71f79617`
+- Payload: **56 files, 20,510,026 bytes**
+- Corrected immutable review: `review/pass37-quality-surface-bounds-245804d/`
+- Review Pages commit: `6f7dd687a6016ac1d3d198d708f849d4bc46e5a2`
+- Production Pages commit: `4103344479bcb20860c40501ca4fdaaabbda2958`
+- Frozen ↔ review HTTPS comparison: **56/56**, zero mismatches
+- Frozen ↔ production HTTPS comparison: **56/56**, zero mismatches
+- Live telemetry: Pass 37, separation true, Quality art visible, procedural primary root hidden, root overlap false, four movement walls, zero JavaScript errors, zero WebGL losses
 
 ## Out of scope
 
