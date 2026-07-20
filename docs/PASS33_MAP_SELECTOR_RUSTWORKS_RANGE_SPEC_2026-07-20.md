@@ -1,7 +1,7 @@
 # Pass 33 — Map Selector, 1v1 Rustworks, and Gun Range
 
 Date: 2026-07-20
-Status: verified release candidate — immutable review pending
+Status: released
 
 ## Overview
 
@@ -73,4 +73,13 @@ An independent static review found three map-switch state defects before release
 2. Atomic-only grass placements are always seeded from Atomic Acres colliders, including when the page is deep-linked into a solo map.
 3. Failed physics creation now restores the previous arena, physics world, presentation, match state, spawn, and menu camera instead of mixing fallback visuals with the wrong collision world.
 
-Immutable review and production commit identities are recorded after external publication.
+## Release identities
+
+- Source commit: `9d0749fe5c89e96b7a2f92249ad1720ea4344318`.
+- Immutable review: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass33-map-selector-rustworks-range-9d0749f/>.
+- Review Pages commit: `c5db411659f747795c3b2ecf4d074b2517b4e095`.
+- Production: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/>.
+- Production Pages commit: `74dd444d62b71d1dfcba63dd7ccaa3af80dd13fc`.
+- Review subtree remained immutable across promotion: `d56b2906f7a1cb97820e48b98cde110bad4f2a14` before and after production commit.
+- Live verification fetched all **55 files / 20,322,405 bytes** from both review and production and found zero byte mismatches.
+- GitHub Pages reported both deployment commits as `built`; production loaded Pass 33 with current-map Rustworks navigation, no WebGL context loss, and zero JavaScript errors.
