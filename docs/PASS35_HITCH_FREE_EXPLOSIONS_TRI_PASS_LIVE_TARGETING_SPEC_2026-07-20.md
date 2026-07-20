@@ -1,7 +1,7 @@
 # Pass 35 — Hitch-Free Explosions and Live Tri-Pass Targeting
 
 Date: 2026-07-20
-Status: implemented and locally verified; immutable release pending
+Status: released and verified
 
 ## Overview
 
@@ -86,3 +86,15 @@ Browser debug telemetry must expose the marker IDs, source kind, world positions
 - Production dependency audit: zero vulnerabilities.
 - Performance telemetry remained at Atomic Acres 48 calls / 107,340 triangles, Rustworks 46 / 2,230, and Gun Range 50 / 2,296.
 - Local 1280×720 Performance visual review: two live enemy contacts were prominent, labels/count/instructions were readable, and no overlay clipping or overlap was found.
+
+## Release identities
+
+- Source implementation commit: `8e37775`.
+- Immutable review: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass35-hitch-free-explosions-tri-pass-8e37775/>.
+- Review Pages commit: `5e5c8bd8c9ad46d8b11fefc78dd9d575765d59b4` (`built`).
+- Production: <https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/>.
+- Production Pages commit: `130c2d36cd9b3f552ff9ae81a7910de62333671e` (`built`).
+- Immutable review subtree: `63cedc3cd604bc56afc8d800388b90306ad7e59a` before and after promotion.
+- Frozen release: 56 files / 20,453,619 bytes; deterministic tree SHA-256 `827bd906119344b0af087570c0f382f0892f9c78e83799d1dad7a27c0d4354c5`.
+- Live fetch comparison: all 56 review and production files matched frozen `dist`; zero mismatches.
+- Immutable visual review passed at 1280×720 and 960×540. Production reported zero JavaScript errors and zero WebGL context loss.
