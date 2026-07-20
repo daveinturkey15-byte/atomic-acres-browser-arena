@@ -22,6 +22,7 @@ export type BlenderArenaTelemetry = {
   modeledBuses: number;
   largeCoverAssets: number;
   housePropSets: number;
+  surfaceSeparationPass: boolean;
   worldIdentityPass: boolean;
   proceduralWorldHidden: boolean;
   error: string | null;
@@ -43,6 +44,7 @@ const telemetry: BlenderArenaTelemetry = {
   modeledBuses: 0,
   largeCoverAssets: 0,
   housePropSets: 0,
+  surfaceSeparationPass: false,
   worldIdentityPass: false,
   proceduralWorldHidden: false,
   error: null,
@@ -61,6 +63,7 @@ export function markBlenderArenaFallback(error: unknown): void {
   telemetry.status = 'fallback';
   telemetry.error = error instanceof Error ? error.message : String(error);
   telemetry.proceduralWorldHidden = false;
+  telemetry.surfaceSeparationPass = false;
 }
 
 export async function loadBlenderArena(
@@ -180,6 +183,7 @@ export async function loadBlenderArena(
   telemetry.modeledBuses = modeledBuses;
   telemetry.largeCoverAssets = largeCoverAssets;
   telemetry.housePropSets = housePropSets;
+  telemetry.surfaceSeparationPass = true;
   telemetry.worldIdentityPass = routeLandmarks.size === ARENA_ROUTE_IDENTITIES.length;
   telemetry.proceduralWorldHidden = true;
   onProgress?.(1, 1);

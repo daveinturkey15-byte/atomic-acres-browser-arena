@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { pointInsideBounds } from './collision';
 import { GUN_RANGE_FIRING_LINE_BARRIER, GUN_RANGE_FIRING_LINE_Z, buildGunRange, buildRustworks1v1 } from './additional-maps';
+import { CharacterPhysics } from './physics';
 
 function expectSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
   for (const team of [0, 1] as const) {
@@ -59,5 +60,28 @@ describe('additional authored maps', () => {
     expect(GUN_RANGE_FIRING_LINE_BARRIER.maxY).toBeGreaterThan(5);
     expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
     expectSpawnContract(map);
+  });
+
+  it('physically contains the Gun Range player at all four map edges', async () => {
+    const map = buildGunRange(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    try {
+      for (const direction of [
+        { x: 0.3, z: 0 }, { x: -0.3, z: 0 }, { x: 0, z: 0.3 }, { x: 0, z: -0.3 },
+      ]) {
+        physics.teleportEye({ x: 0, y: 1.7, z: -17 });
+        let position = physics.eyePosition();
+        for (let step = 0; step < 240; step += 1) {
+          position = physics.move({ x: direction.x, y: -0.01, z: direction.z }, 1 / 120).position;
+        }
+        expect(position.x).toBeGreaterThan(map.bounds.minX);
+        expect(position.x).toBeLessThan(map.bounds.maxX);
+        expect(position.z).toBeGreaterThan(map.bounds.minZ);
+        expect(position.z).toBeLessThan(map.bounds.maxZ);
+        expect(position.y).toBeGreaterThan(1.5);
+      }
+    } finally {
+      physics.dispose();
+    }
   });
 });

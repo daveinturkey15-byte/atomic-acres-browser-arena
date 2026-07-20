@@ -29,7 +29,10 @@ const spec = {
     road: { position: [0, 0.015, 0], size: [19, 0.03, 88] },
     curbs: [-10.25, 10.25].map((x) => ({ position: [x, 0.12, 0], size: [1.4, 0.24, 88] })),
     sidewalks: [-12.6, 12.6].map((x) => ({ position: [x, 0.07, 0], size: [3.2, 0.14, 88] })),
-    laneMarkers: Array.from({ length: 10 }, (_, index) => ({ position: [0, 0.055, -36 + index * 8], size: [0.18, 0.03, 3.6] })),
+    // Pull the two centre-line segments away from the crosswalk footprints;
+    // stacking them a few millimetres below the white bars shimmered at range.
+    laneMarkers: [-36, -28, -22, -12, -4, 4, 12, 22, 28, 36]
+      .map((z) => ({ position: [0, 0.055, z], size: [0.18, 0.03, 3.6] })),
     crosswalks: [-18, 18].flatMap((z) => Array.from({ length: 7 }, (_, index) => ({
       position: [-7.5 + index * 2.5, 0.062, z], size: [1.4, 0.025, 3.2],
     }))),
@@ -45,8 +48,8 @@ const spec = {
     { id: 'atomic-beacon', position: [27, 0, -1.5] },
   ],
   boundaries: [
-    { id: 'west', position: [-34.3, 1.5, 0], size: [0.6, 3, 88] },
-    { id: 'east', position: [34.3, 1.5, 0], size: [0.6, 3, 88] },
+    { id: 'west', position: [-34.3, 1.5, 0], size: [0.6, 3, 86] },
+    { id: 'east', position: [34.3, 1.5, 0], size: [0.6, 3, 86] },
     { id: 'north', position: [0, 1.5, -43.3], size: [69, 3, 0.6] },
     { id: 'south', position: [0, 1.5, 43.3], size: [69, 3, 0.6] },
   ],

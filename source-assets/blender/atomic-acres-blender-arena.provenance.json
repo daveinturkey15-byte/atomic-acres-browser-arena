@@ -1,6 +1,6 @@
 {
   "id": "atomic-acres-blender-render-arena-2026-07-17",
-  "title": "Atomic Acres Blender Render Arena",
+  "title": "Atomic Acres Quality Graphics Arena",
   "creator": "Atomic Acres project / Jigglyclaw",
   "created": "2026-07-17",
   "license": "Project-original; no third-party assets",
@@ -13,14 +13,14 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "a09744b791044ed089f47ca68cf130ccf706e2c0a3f7643a86a24efa654ad4fe",
-  "sourceBlendSha256": "689be779705df26e34b97827121e32f679420b3fe4f14db9bc468f239c2ab3c2",
-  "sourceSpecSha256": "239c91038d234f77b2678fab6513b4cf5eced563e6fcb3f3d62573f32d2218f1",
+  "runtimeGlbSha256": "cfdbd99be3f68cdc6488a81299f5fe0883ad6ee4362d479647c718276e5639e5",
+  "sourceBlendSha256": "9f87b6a505ff7fe9f4363eef57f0afaef23a7f9d7d1e4eae74ff6d5a6b3525bd",
+  "sourceSpecSha256": "963dcfbe1b9eab8613c52413689e830c6ec2badaa634fa58868ec8d33a9643eb",
   "runtimeAudit": {
-    "bytes": 7083324,
+    "bytes": 7076664,
     "meshNodes": 33,
     "materials": 27,
-    "triangles": 33720,
+    "triangles": 33632,
     "semanticBreakableWindows": 6,
     "semanticRouteLandmarks": 3,
     "modeledTransitBuses": 2,
@@ -30,7 +30,9 @@
     "textureBindings": 57,
     "pbrMaterials": 19,
     "groundLayout": "split-road-verges-v2",
-    "externalUris": 0
+    "externalUris": 0,
+    "targetedCoplanarOrUnder20mmPairsBefore": 74,
+    "targetedCoplanarOrUnder20mmPairsAfter": 0
   },
   "determinism": {
     "command": "npm run author:blender-arena",

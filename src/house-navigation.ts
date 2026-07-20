@@ -121,10 +121,12 @@ function splitSideWallAroundDoor(
 ): LocalSolid[] {
   const rearEdge = centreZ - width / 2;
   const frontEdge = centreZ + width / 2;
+  const sideRear = -HALF_DEPTH + WALL / 2;
+  const sideFront = HALF_DEPTH - WALL / 2;
   const height = baseY === 0 ? GROUND_HEIGHT : UPPER_HEIGHT;
   return [
-    solid(`${name}-rear`, [x, baseY + height / 2, (-HALF_DEPTH + rearEdge) / 2], [WALL, height, rearEdge + HALF_DEPTH], surface),
-    solid(`${name}-front`, [x, baseY + height / 2, (frontEdge + HALF_DEPTH) / 2], [WALL, height, HALF_DEPTH - frontEdge], surface),
+    solid(`${name}-rear`, [x, baseY + height / 2, (sideRear + rearEdge) / 2], [WALL, height, rearEdge - sideRear], surface),
+    solid(`${name}-front`, [x, baseY + height / 2, (frontEdge + sideFront) / 2], [WALL, height, sideFront - frontEdge], surface),
     solid(`${name}-lintel`, [x, baseY + height - 0.28, centreZ], [WALL, 0.56, width], 'trim'),
   ];
 }
@@ -226,7 +228,10 @@ function indoorRampSolids(side: 1 | -1): LocalSolid[] {
   const x = side * INDOOR_RAMP_X;
   const y = INDOOR_RAMP_RISE / 2 + 0.04;
   const z = (INDOOR_RAMP_BOTTOM_Z + INDOOR_RAMP_TOP_Z) / 2;
-  const railXs = [x - side * (INDOOR_RAMP_WIDTH / 2 - 0.05), x + side * (INDOOR_RAMP_WIDTH / 2 - 0.05)];
+  // Keep the presentation rails outside the timber ramp instead of embedding
+  // their long side faces one centimetre into it. The former overlap was
+  // coplanar enough to shimmer along almost the complete indoor incline.
+  const railXs = [x - side * (INDOOR_RAMP_WIDTH / 2 + 0.07), x + side * (INDOOR_RAMP_WIDTH / 2 + 0.07)];
   const posts = [0.18, 0.82].flatMap((progress, index) => {
     const postZ = INDOOR_RAMP_BOTTOM_Z - INDOOR_RAMP_RUN * progress;
     const postBaseY = INDOOR_RAMP_RISE * progress;
@@ -251,8 +256,10 @@ function upperFloorSolids(indoorSide: 1 | -1): LocalSolid[] {
   const mainInnerEdge = indoorSide * INDOOR_OPENING_INNER_X;
   const mainMinX = indoorSide === 1 ? -FLOOR_OUTER_X : mainInnerEdge;
   const mainMaxX = indoorSide === 1 ? mainInnerEdge : FLOOR_OUTER_X;
-  const stripMinX = indoorSide === 1 ? INDOOR_OPENING_INNER_X - 0.08 : -FLOOR_OUTER_X;
-  const stripMaxX = indoorSide === 1 ? FLOOR_OUTER_X : -INDOOR_OPENING_INNER_X + 0.08;
+  // Adjacent upper-floor boxes meet edge-to-edge. Earlier 8 cm overlaps kept
+  // traversal sealed but exported duplicate top faces at exactly the same depth.
+  const stripMinX = indoorSide === 1 ? INDOOR_OPENING_INNER_X : -FLOOR_OUTER_X;
+  const stripMaxX = indoorSide === 1 ? FLOOR_OUTER_X : -INDOOR_OPENING_INNER_X;
   const floorDepth = FLOOR_OUTER_Z * 2;
   const frontDepth = FLOOR_OUTER_Z - INDOOR_OPENING_FRONT_Z;
   const rearDepth = INDOOR_OPENING_REAR_Z + FLOOR_OUTER_Z;
@@ -275,15 +282,16 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
   const partitionOpeningX = 2;
   const rampWallX = rampSide * HALF_WIDTH;
   const indoorRampSide = -rampSide as 1 | -1;
+  const sideWallDepth = DEPTH - WALL;
   const westUpperWall = rampSide === -1
     ? splitSideWallAroundDoor('upper-ramp-side-wall', -HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
-    : [solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface)];
+    : [solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, sideWallDepth], surface)];
   const eastUpperWall = rampSide === 1
     ? splitSideWallAroundDoor('upper-ramp-side-wall', HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
-    : [solid('upper-east-wall', [HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, DEPTH + WALL], surface)];
+    : [solid('upper-east-wall', [HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, sideWallDepth], surface)];
   const solids: LocalSolid[] = [
-    solid('ground-west-wall', [-HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, DEPTH + WALL], surface),
-    solid('ground-east-wall', [HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, DEPTH + WALL], surface),
+    solid('ground-west-wall', [-HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, sideWallDepth], surface),
+    solid('ground-east-wall', [HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, sideWallDepth], surface),
     ...groundRearWall(surface),
     ...groundFrontWall(surface),
     ...doorFrame('front-entry', doorX, HALF_DEPTH + DOOR_FRAME_OUTSET),
@@ -305,16 +313,16 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     ...upperFloorSolids(indoorRampSide),
     solid(
       'ramp-top-landing',
-      [rampSide * (HALF_WIDTH + 0.85), FLOOR_Y, ((RAMP_TOP_Z + RAMP_LANDING_OVERLAP) + (RAMP_ENTRY_Z - 0.4)) / 2],
-      [3.8, 0.32, (RAMP_TOP_Z + RAMP_LANDING_OVERLAP) - (RAMP_ENTRY_Z - 0.4)],
+      [rampSide * (HALF_WIDTH + RAMP_SIDE_OUTSET), FLOOR_Y, ((RAMP_TOP_Z + RAMP_LANDING_OVERLAP) + (RAMP_ENTRY_Z - 0.4)) / 2],
+      [3.9, 0.32, (RAMP_TOP_Z + RAMP_LANDING_OVERLAP) - (RAMP_ENTRY_Z - 0.4)],
       'timber',
       true,
       'landing',
     ),
     solid(
       'interior-ramp-top-landing',
-      [indoorRampSide * (INDOOR_OPENING_INNER_X + 0.2), FLOOR_Y, ((INDOOR_RAMP_TOP_Z + RAMP_LANDING_OVERLAP) + (INDOOR_OPENING_REAR_Z - 0.2)) / 2],
-      [3.5, 0.32, (INDOOR_RAMP_TOP_Z + RAMP_LANDING_OVERLAP) - (INDOOR_OPENING_REAR_Z - 0.2)],
+      [indoorRampSide * ((INDOOR_OPENING_INNER_X + INDOOR_RAMP_X + INDOOR_RAMP_WIDTH / 2) / 2), FLOOR_Y, ((INDOOR_RAMP_TOP_Z + RAMP_LANDING_OVERLAP) + INDOOR_OPENING_REAR_Z) / 2],
+      [INDOOR_RAMP_X + INDOOR_RAMP_WIDTH / 2 - INDOOR_OPENING_INNER_X, 0.32, (INDOOR_RAMP_TOP_Z + RAMP_LANDING_OVERLAP) - INDOOR_OPENING_REAR_Z],
       'timber',
       true,
       'landing',

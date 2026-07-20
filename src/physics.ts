@@ -20,6 +20,20 @@ export const STANCE_SHAPES: Readonly<Record<Stance, { halfHeight: number; radius
   prone: { halfHeight: 0.04, radius: 0.31, eyeFromCenter: 0.15 },
 };
 
+export const WORLD_BOUNDARY_THICKNESS = 0.5;
+export const WORLD_BOUNDARY_MIN_Y = -2;
+export const WORLD_BOUNDARY_MAX_Y = 14;
+
+/** Physics-only perimeter walls. Their inner faces exactly match playable bounds. */
+export function worldBoundaryColliders(bounds: Box2): readonly Box2[] {
+  return [
+    { minX: bounds.minX - WORLD_BOUNDARY_THICKNESS, maxX: bounds.minX, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.maxX, maxX: bounds.maxX + WORLD_BOUNDARY_THICKNESS, minZ: bounds.minZ, maxZ: bounds.maxZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ - WORLD_BOUNDARY_THICKNESS, maxZ: bounds.minZ, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
+    { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.maxZ, maxZ: bounds.maxZ + WORLD_BOUNDARY_THICKNESS, minY: WORLD_BOUNDARY_MIN_Y, maxY: WORLD_BOUNDARY_MAX_Y },
+  ];
+}
+
 export type CharacterMoveResult = {
   position: Point3;
   grounded: boolean;
@@ -88,7 +102,7 @@ export class CharacterPhysics {
       ),
     );
 
-    for (const box of colliders) {
+    for (const box of [...worldBoundaryColliders(bounds), ...colliders]) {
       const minY = box.minY ?? 0;
       const maxY = box.maxY ?? 8;
       const halfX = Math.max(0.01, (box.maxX - box.minX) / 2);

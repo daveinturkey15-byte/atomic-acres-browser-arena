@@ -92,7 +92,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await waitReady(page);
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'rustworks-1v1');
     await expect(page.locator('.map-card[data-arena-id="rustworks-1v1"]')).toHaveAttribute('aria-pressed', 'true');
-    expect((await snapshot(page)).render.grass.checksum).toBe('81871ba9');
+    expect((await snapshot(page)).render.grass.checksum).toBe('c15dd4d5');
     await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'atomic-acres');
     await page.locator('.map-card[data-arena-id="rustworks-1v1"]').click();
@@ -117,7 +117,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(selected.arenaSelection.navigationCollidersMatchArena).toBe(true);
     expect(selected.menuCamera.towerNdc[0]).toBeGreaterThan(0.2);
     expect(selected.menuCamera.towerNdc[0]).toBeLessThan(0.75);
-    expect(selected.render.grass.checksum).toBe('81871ba9');
+    expect(selected.render.grass.checksum).toBe('c15dd4d5');
     await deploySolo(page, 'DUELIST');
     const active = await snapshot(page);
     expect(active.bots).toHaveLength(1);

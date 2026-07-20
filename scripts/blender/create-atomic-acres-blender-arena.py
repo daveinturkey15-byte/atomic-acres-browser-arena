@@ -273,15 +273,15 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     add_box(f"{prefix}_front_fascia", [x, 1.42, z - half - 0.07], [4.82, 0.94, 0.14], body_material, 0.05)
     add_box(f"{prefix}_front_grille", [x, 0.92, z - half - 0.16], [2.35, 0.38, 0.08], M["metal_light"], 0.03)
     for grille_x in (-0.8, -0.4, 0, 0.4, 0.8):
-        add_box(f"{prefix}_grille_slot_{grille_x}", [x + grille_x, 0.92, z - half - 0.21], [0.06, 0.28, 0.03], M["metal"], 0.01)
+        add_box(f"{prefix}_grille_slot_{grille_x}", [x + grille_x, 0.92, z - half - 0.26], [0.06, 0.28, 0.03], M["metal"], 0.01)
     window_count = 5 if length > 12 else 4
     for side in (-1, 1):
         for index in range(window_count):
             wz = z - half + 1.5 + index * ((length - 3.0) / max(1, window_count - 1))
             add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 2.54, wz], [0.07, 1.18, 1.62], M["glass"], 0.025)
-        add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.57, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
+        add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
         door_z = z - half + (2.25 if side > 0 else length - 2.25)
-        add_box(f"{prefix}_door_frame_{side}", [x + side * 2.57, 1.78, door_z], [0.08, 2.65, 1.75], M["metal_light"], 0.03)
+        add_box(f"{prefix}_door_frame_{side}", [x + side * 2.67, 1.78, door_z], [0.08, 2.65, 1.75], M["metal_light"], 0.03)
         for leaf in (-1, 1):
             add_box(f"{prefix}_door_glass_{side}_{leaf}", [x + side * 2.615, 2.05, door_z + leaf * 0.41], [0.055, 1.75, 0.68], M["glass"], 0.018)
         add_box(f"{prefix}_step_{side}", [x + side * 2.72, 0.42, door_z], [0.42, 0.18, 1.45], M["metal_light"], 0.025)
@@ -293,7 +293,7 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
         add_box(f"{prefix}_{end}_bumper", [x, 0.58, end_z], [5.25, 0.32, 0.22], M["metal_light"], 0.07)
         for side in (-1, 1):
             add_uv_sphere(f"{prefix}_{end}_lamp_{side}", [x + side * 1.75, 1.35, end_z + (-0.08 if end == "front" else 0.08)], [0.22, 0.16, 0.08], M["emissive_amber"])
-    add_box(f"{prefix}_destination", [x, 3.05, z - half - 0.09], [3.35, 0.48, 0.08], M["emissive_aqua"], 0.025)
+    add_box(f"{prefix}_destination", [x, 3.05, z - half - 0.15], [3.35, 0.48, 0.08], M["emissive_aqua"], 0.025)
     add_box(f"{prefix}_number_plate", [x, 0.58, z - half - 0.22], [1.15, 0.28, 0.04], M["yellow"], 0.018)
     for side in (-1, 1):
         add_box(f"{prefix}_mirror_arm_{side}", [x + side * 2.85, 2.25, z - half + 0.55], [0.58, 0.08, 0.08], M["metal"], 0.02)
@@ -323,8 +323,8 @@ for index, item in enumerate(roadway["crosswalks"]): add_box(f"BLD_ROAD_crosswal
 for side in (-1, 1):
     for index, z in enumerate((-31, -15, 1, 17, 33)):
         add_box(f"BLD_ROAD_drain_{side}_{index}", [side * 9.18, 0.056, z], [0.62, 0.032, 1.2], M["metal"], 0.015)
-for index, (x, z, width, depth) in enumerate(((-3.2, -21, 3.4, 5.2), (3.5, 24, 4.2, 4.6), (2.8, -2, 2.8, 3.5))):
-    add_box(f"BLD_ROAD_repair_{index}", [x, 0.047, z], [width, 0.012, depth], M["asphalt"], 0.02)
+for index, (x, z, width, depth) in enumerate(((-3.2, -28, 3.4, 5.2), (3.5, 27, 4.2, 4.6), (2.8, 4, 2.8, 3.5))):
+    add_box(f"BLD_ROAD_repair_{index}", [x, 0.059, z], [width, 0.012, depth], M["asphalt"], 0.02)
 
 # Full two-storey house shells, floors, frames, rails, ramps and semantic glass.
 surface_material = {
@@ -361,7 +361,7 @@ for house_index, house in enumerate(spec["houses"]):
     add_box(f"BLD_HOUSE_{prefix}_roof_plant", [x + 4.8, 7.65, z - facing * 2.2], [3.1, 0.9, 2.2], M["concrete_dark"], 0.12)
     for offset in (-1.05, 0, 1.05):
         add_box(f"BLD_HOUSE_{prefix}_roof_vent_{offset}", [x + 4.8 + offset, 8.18, z - facing * 2.2], [0.12, 0.32, 1.6], M["metal_light"], 0.02)
-    add_box(f"BLD_HOUSE_{prefix}_identity_strip", [x, 6.55, z + facing * (depth / 2 + 0.28)], [7.5, 0.2, 0.1], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
+    add_box(f"BLD_HOUSE_{prefix}_identity_strip", [x, 6.55, z + facing * (depth / 2 + 0.38)], [7.5, 0.2, 0.1], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
     # Lightweight entrance canopy and recessed wayfinding light: presentation
     # only, above the traversal envelope, batched into existing materials.
     entrance_z = z + facing * (depth / 2 + 0.58)
@@ -458,8 +458,8 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
             for band in (-0.42, 0.42):
                 add_box(f"P32_LARGE_COVER_cargo_strap_{crate_index}_{band}", [x + ox + band, oy, z], [0.1, sy + 0.04, 1.82], M["yellow"], 0.02)
     elif index == 5:
-        for pipe_index, (ox, oy) in enumerate(((-0.9, 0.62), (0, 0.62), (0.9, 0.62), (-0.45, 1.48), (0.45, 1.48))):
-            add_cylinder(f"P32_LARGE_COVER_concrete_pipe_{pipe_index}", [x + ox, oy, z], 0.43, width - 0.3, M["concrete"], 18, rotation=(0, math.pi / 2, 0))
+        for pipe_index, (oz, oy) in enumerate(((-0.9, 0.62), (0, 0.62), (0.9, 0.62), (-0.45, 1.48), (0.45, 1.48))):
+            add_cylinder(f"P32_LARGE_COVER_concrete_pipe_{pipe_index}", [x, oy, z + oz], 0.43, width - 0.3, M["concrete"], 18, rotation=(0, math.pi / 2, 0))
     elif index == 6:
         add_box("P32_LARGE_COVER_service_skip_body", [x, 0.98, z], [width - 0.12, 1.86, depth - 0.18], M["coral"], 0.16)
         for side in (-1, 1):
@@ -504,7 +504,8 @@ for z in (-19.5, -15.5, -11.5):
 # Atomic beacon landmark with original geometry.
 add_box("BLD_BEACON_plinth", [27, 0.38, -1.5], [5.8, 0.76, 5.8], M["concrete"], 0.14)
 add_cylinder("BLD_BEACON_mast", [27, 3.6, -1.5], 0.28, 6.4, M["metal"], 16)
-for angle in (0, math.pi / 3, -math.pi / 3): add_torus(f"BLD_BEACON_ring_{angle}", [27, 3.5, -1.5], 1.65, 0.1, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
+for angle, major_radius in ((0, 1.45), (math.pi / 3, 1.65), (-math.pi / 3, 1.85)):
+    add_torus(f"BLD_BEACON_ring_{angle}", [27, 3.5, -1.5], major_radius, 0.1, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
 add_uv_sphere("BLD_BEACON_core", [27, 3.5, -1.5], [0.48, 0.48, 0.48], M["emissive_amber"])
 
 # Pass 27 World Identity: presentation-only route signatures, atmospheric
@@ -540,8 +541,10 @@ for x in (-11.3, 11.3):
 add_box("P27_CIVIC_signal_beam", [0.0, 6.25, 0.0], [22.8, 0.28, 0.32], M["metal_light"], 0.05)
 for index, x in enumerate((-5.2, 0.0, 5.2)):
     add_box(f"P27_CIVIC_signal_{index}", [x, 5.95, 0.0], [2.2, 0.36, 0.18], M["emissive_amber"], 0.04)
-for index, z in enumerate(range(-32, 33, 8)):
-    offset = -2.6 if index % 2 == 0 else 2.6
+for index, z in enumerate((-32, -24, -14, 0, 14, 24, 32)):
+    # Negative chevrons stay west and positive chevrons stay east so neither
+    # crosses the broad contact patch beneath its nearby transit bus.
+    offset = -2.6 if z < 0 else 2.6
     stripe = add_box(f"P27_CIVIC_evacuation_chevron_{index}", [offset, 0.073, z], [3.2, 0.016, 0.28], M["metal_light"], 0.02, rotation=(0, 0, (-0.24 if offset < 0 else 0.24)))
     stripe["atomic_route_cue"] = "central-transit"
 

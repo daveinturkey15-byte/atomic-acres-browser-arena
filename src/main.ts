@@ -163,7 +163,7 @@ import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosi
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
-import { CharacterPhysics } from './physics';
+import { CharacterPhysics, worldBoundaryColliders } from './physics';
 import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import { loadImportedWeaponAssets } from './weapon-model';
@@ -357,7 +357,7 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 36</div>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 37</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -5668,6 +5668,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       spawnCounts: [arena.spawns[0].length, arena.spawns[1].length],
       colliders: arena.colliders.length,
       physicsColliders: arena.physicsColliders.length,
+      physicsBoundaryWalls: worldBoundaryColliders(arena.bounds).length,
       navigationColliders: botNavigationColliders.length,
       navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
       raycastMeshes: arena.raycastMeshes.length,

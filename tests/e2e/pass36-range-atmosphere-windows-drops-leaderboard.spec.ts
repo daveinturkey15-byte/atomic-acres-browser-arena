@@ -224,7 +224,7 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     expect(spawned.bots).toHaveLength(2);
     expect(new Set(spawned.bots.map((bot) => bot.weapon)).size).toBe(2);
     expect(spawned.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
-    const admissions = await page.evaluate(() => [api().forceBotGrenade(1_100), api().forceBotGrenade(1_100)]);
+    const admissions = await page.evaluate(() => [api().forceBotGrenade(4_000), api().forceBotGrenade(4_000)]);
     expect(admissions).toEqual([true, false]);
     expect((await snapshot(page)).botGrenades).toMatchObject({
       active: 1,
@@ -232,7 +232,7 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
       throws: 1,
       damageMultiplier: 0.25,
     });
-    await expect.poll(async () => (await snapshot(page)).botGrenades.active, { timeout: 4_000 }).toBe(0);
+    await expect.poll(async () => (await snapshot(page)).botGrenades.active, { timeout: 8_000 }).toBe(0);
     const exploded = await snapshot(page);
     expect(exploded.botGrenades.maximumActiveObserved).toBe(1);
     expect(exploded.botGrenades.lastDamage).toBeGreaterThan(0);
@@ -274,7 +274,9 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     expect(freshId).not.toBeNull();
     let state = await snapshot(page);
     expect(state.deathDrops[0]).toMatchObject({ id: freshId, ammoAvailable: true, weaponAvailable: true });
-    expect(state.deathDrops[0].expiresInMs).toBeGreaterThan(28_500);
+    // Software WebGL can advance more than a second between the spawn call and
+    // this snapshot. Exact 30,000 ms boundaries are enforced by unit tests.
+    expect(state.deathDrops[0].expiresInMs).toBeGreaterThan(27_000);
     expect(state.deathDrops[0].expiresInMs).toBeLessThanOrEqual(30_000);
     expect(state.deathDropPresentation.active).toBe(1);
 

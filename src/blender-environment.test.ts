@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BLENDER_ARENA_ASSET, proceduralArenaRootVisible } from './blender-environment';
 
 const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
+const provenancePath = new URL('../source-assets/blender/atomic-acres-blender-arena.provenance.json', import.meta.url);
 
 function glbJson(buffer: Buffer): Record<string, unknown> {
   expect(buffer.toString('ascii', 0, 4)).toBe('glTF');
@@ -75,6 +77,26 @@ describe('Quality Graphics environment asset', () => {
       node.name === 'BLD_BATCH_MAT_ground_olive' || node.name === 'BLD_BATCH_MAT_asphalt_charcoal');
     expect(groundBatches).toHaveLength(2);
     expect(groundBatches.every((node) => node.extras?.atomic_ground_layout === 'split-road-verges-v2')).toBe(true);
+  });
+
+  it('binds the runtime GLB to the audited source-separation provenance', () => {
+    const buffer = readFileSync(assetPath);
+    const provenance = JSON.parse(readFileSync(provenancePath, 'utf8')) as {
+      title: string;
+      runtimeGlbSha256: string;
+      runtimeAudit: {
+        bytes: number;
+        triangles: number;
+        targetedCoplanarOrUnder20mmPairsBefore: number;
+        targetedCoplanarOrUnder20mmPairsAfter: number;
+      };
+    };
+    expect(provenance.title).toBe('Atomic Acres Quality Graphics Arena');
+    expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
+    expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
+    expect(provenance.runtimeAudit.triangles).toBe(33_632);
+    expect(provenance.runtimeAudit.targetedCoplanarOrUnder20mmPairsBefore).toBe(74);
+    expect(provenance.runtimeAudit.targetedCoplanarOrUnder20mmPairsAfter).toBe(0);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {
