@@ -6,7 +6,16 @@ describe('match presentation', () => {
   it('formats bounded clocks and warmup countdowns', () => {
     expect(formatMatchClock(299_999)).toBe('04:59');
     expect(formatMatchClock(-5)).toBe('00:00');
+    expect(formatMatchClock(Number.POSITIVE_INFINITY)).toBe('--:--');
     expect(matchPresentationAt(createMatch(1_000), 2_100, [0, 0], 0).headline).toBe('2');
+  });
+
+  it('describes Atomic as a five-minute uncapped score race', () => {
+    const rules = { durationMs: 300_000, scoreLimit: null } as const;
+    const active = advanceMatch(createMatch(0, rules), 3_001, [0, 0], rules);
+    const presentation = matchPresentationAt(active, 4_000, [30, 22], 0, rules, 'Atomic Acres');
+    expect(presentation.objective).toBe('ATOMIC ACRES · FIVE MINUTES · MOST KILLS WINS · YOUR SQUAD LEADS');
+    expect(presentation.objective).not.toContain('25');
   });
 
   it('states score and time endings without changing match authority', () => {

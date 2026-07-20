@@ -288,4 +288,23 @@ describe('match flow', () => {
     state = advanceMatch({ ...state, rematchRequested: true }, state.phaseStartedAt + 1, [12, 9]);
     expect(state).toMatchObject({ phase: 'warmup', winner: null });
   });
+
+  it('keeps Atomic active above 25 kills and ends only at five minutes', () => {
+    const rules = { durationMs: 300_000, scoreLimit: null } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceMatch(state, 3_000, [0, 0], rules);
+    expect(state).toMatchObject({ phase: 'active', endsAt: 303_000 });
+    state = advanceMatch(state, 302_999, [80, 72], rules);
+    expect(state.phase).toBe('active');
+    state = advanceMatch(state, 303_000, [80, 72], rules);
+    expect(state).toMatchObject({ phase: 'ended', endReason: 'time', winner: 0 });
+  });
+
+  it('supports an untimed and uncapped practice session', () => {
+    const rules = { durationMs: null, scoreLimit: null } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceMatch(state, 3_000, [0, 0], rules);
+    expect(state.endsAt).toBe(Number.POSITIVE_INFINITY);
+    expect(advanceMatch(state, 99_000_000, [999, 0], rules).phase).toBe('active');
+  });
 });

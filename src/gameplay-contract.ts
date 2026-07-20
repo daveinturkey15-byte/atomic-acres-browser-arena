@@ -5,7 +5,6 @@ import {
   GRENADE_MAX_DAMAGE,
   GRENADE_RADIUS,
   MATCH_DURATION_MS,
-  MATCH_SCORE_LIMIT,
   MATCH_WARMUP_MS,
   MELEE_COOLDOWN_MS,
   MELEE_DAMAGE,
@@ -16,6 +15,7 @@ import {
 } from './gameplay';
 import { createHouseArchitecture } from './house-navigation';
 import { SOLO_BOT_COUNT } from './bot-ai';
+import { ARENA_SELECTIONS } from './map-selection';
 import {
   FIELD_SUPPORT,
   HUNTER_SWARM_BLAST_RADIUS,
@@ -61,8 +61,8 @@ const movementContexts = {
 export function buildGameplayContract(): Record<string, unknown> {
   const houses = HOUSE_LAYOUT.map((entry) => createHouseArchitecture(entry.team, entry.x, entry.z, entry.facing));
   return {
-    schemaVersion: 2,
-    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 31 deltas',
+    schemaVersion: 3,
+    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 33 deltas',
     simulation: {
       hz: SIMULATION_HZ,
       maximumFrameDtSeconds: 0.05,
@@ -79,7 +79,17 @@ export function buildGameplayContract(): Record<string, unknown> {
       weapons: Object.values(WEAPONS).map((weapon) => ({ ...weapon })),
       grenade: { radius: GRENADE_RADIUS, maximumDamage: GRENADE_MAX_DAMAGE },
       melee: { cooldownMs: MELEE_COOLDOWN_MS, range: MELEE_RANGE, damage: MELEE_DAMAGE },
-      match: { warmupMs: MATCH_WARMUP_MS, durationMs: MATCH_DURATION_MS, scoreLimit: MATCH_SCORE_LIMIT },
+      match: {
+        warmupMs: MATCH_WARMUP_MS,
+        defaultDurationMs: MATCH_DURATION_MS,
+        arenas: ARENA_SELECTIONS.map((selection) => ({
+          id: selection.id,
+          soloBotCount: selection.soloBotCount,
+          maximumSoloBots: selection.maximumSoloBots,
+          multiplayer: selection.multiplayer,
+          ...selection.matchRules,
+        })),
+      },
       overdrive: {
         spawnIntervalMs: OVERDRIVE_SPAWN_INTERVAL_MS,
         durationMs: OVERDRIVE_DURATION_MS,

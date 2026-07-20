@@ -3,6 +3,7 @@ import {
   BOT_DEATHS_PER_REINFORCEMENT,
   BOT_FIRE_RANGE,
   BOT_REACTION_DELAY,
+  MAX_SOLO_BOTS,
   SOLO_BOT_COUNT,
   SPAWN_FLIP_SUSTAIN_MS,
   advanceSpawnFlipHysteresis,
@@ -48,7 +49,7 @@ describe('chooseBotIntent', () => {
     expect(botAimJitter(BOT_FIRE_RANGE)).toBe(0.1);
   });
 
-  it('adds one persistent solo opponent after every fifth cumulative bot death', () => {
+  it('adds fifth-death reinforcements but caps an uncapped match at six rivals', () => {
     expect(BOT_DEATHS_PER_REINFORCEMENT).toBe(5);
     expect(soloBotTargetForDeaths(0)).toBe(2);
     expect(soloBotTargetForDeaths(4)).toBe(2);
@@ -56,6 +57,8 @@ describe('chooseBotIntent', () => {
     expect(soloBotTargetForDeaths(9)).toBe(3);
     expect(soloBotTargetForDeaths(10)).toBe(4);
     expect(soloBotTargetForDeaths(20)).toBe(6);
+    expect(MAX_SOLO_BOTS).toBe(6);
+    expect(soloBotTargetForDeaths(100)).toBe(6);
     expect(soloBotTargetForDeaths(Number.NaN)).toBe(2);
   });
 

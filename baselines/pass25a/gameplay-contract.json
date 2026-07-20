@@ -2670,7 +2670,7 @@
         ]
       }
     },
-    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 31 deltas",
+    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 33 deltas",
     "combat": {
       "botDamageMultiplier": 0.25,
       "grenade": {
@@ -2678,8 +2678,33 @@
         "radius": 8
       },
       "match": {
-        "durationMs": 300000,
-        "scoreLimit": 25,
+        "arenas": [
+          {
+            "durationMs": 300000,
+            "id": "atomic-acres",
+            "maximumSoloBots": 6,
+            "multiplayer": true,
+            "scoreLimit": null,
+            "soloBotCount": 2
+          },
+          {
+            "durationMs": 300000,
+            "id": "rustworks-1v1",
+            "maximumSoloBots": 1,
+            "multiplayer": false,
+            "scoreLimit": 25,
+            "soloBotCount": 1
+          },
+          {
+            "durationMs": null,
+            "id": "gun-range",
+            "maximumSoloBots": 0,
+            "multiplayer": false,
+            "scoreLimit": null,
+            "soloBotCount": 0
+          }
+        ],
+        "defaultDurationMs": 300000,
         "warmupMs": 3000
       },
       "melee": {
@@ -3241,7 +3266,7 @@
         }
       }
     },
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "simulation": {
       "hz": 120,
       "maximumCatchupSteps": 6,

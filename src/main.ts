@@ -4,10 +4,9 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { AtmosphereSystem } from './atmosphere-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
-import { PATROL_LAYOUT } from './arena-layout';
+import { buildGunRange, buildRustworks1v1 } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
-  SOLO_BOT_COUNT,
   advanceSpawnFlipHysteresis,
   botAimJitter,
   botCanFireWhileProtected,
@@ -18,7 +17,6 @@ import {
   respawnBotState,
   selectFarthestSpawnCandidate,
   shouldFlipSpawnSide,
-  soloBotTargetForDeaths,
   type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
@@ -28,7 +26,6 @@ import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanA
 import {
   BOT_DAMAGE_MULTIPLIER,
   GRENADE_RADIUS,
-  MATCH_SCORE_LIMIT,
   SIMULATION_HZ,
   WEAPONS,
   advanceMatch,
@@ -58,6 +55,7 @@ import {
   type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
+import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap, type MinimapLandmarkKind } from './minimap';
 import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
@@ -299,8 +297,6 @@ type DeathDropEntity = {
   root: THREE.Group;
 };
 
-const BOT_PATROL_POINTS = PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z));
-
 function createPlayerId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
   return `player-${Date.now().toString(36)}-${Math.floor(presentationRandom() * 0x1_0000_0000).toString(36)}`;
@@ -318,9 +314,9 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · AUTHENTIC COVER · PASS 32</div>
-    <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 33</div>
+    <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
+    <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -331,6 +327,14 @@ app.innerHTML = `
         <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" required aria-describedby="player-name-error" placeholder="Enter callsign" value="${storedPlayerName}"><small id="player-name-error" class="input-error" hidden>Enter a callsign before deployment.</small></label>
         <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
       </div>
+      <section class="map-selector" aria-label="Choose map">
+        <div class="map-selector-heading"><span>SELECT MAP</span><small>Choose before deployment</small></div>
+        <div class="map-card-grid">
+          ${ARENA_SELECTIONS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" aria-pressed="${index === 0}" disabled>
+            <span>${entry.selectorLabel}</span><strong>${entry.summary}</strong><small>${entry.rulesLabel}</small>
+          </button>`).join('')}
+        </div>
+      </section>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
       <div class="menu-actions">
         <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
@@ -374,7 +378,7 @@ app.innerHTML = `
     <footer>CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</footer>
   </section>
   <div id="hud" hidden>
-    <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
+    <header id="matchbar"><div><span class="tiny" id="match-mode-label">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua"><em id="aqua-label">AQUA</em> <b id="aqua-score">0</b></span><i id="score-limit">—</i><span class="coral"><b id="coral-score">0</b> <em id="coral-label">CORAL</em></span></div><div id="connection-pill">SOLO</div></header>
     <div id="fps-counter" aria-label="Frame rate"><b>--</b><span>FPS</span></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope">
@@ -383,7 +387,7 @@ app.innerHTML = `
       <small>3×</small>
     </div>
     <div id="killfeed"></div>
-    <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
+    <div id="objective">ATOMIC ACRES · FIVE MINUTES · MOST KILLS WINS</div>
     <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
     <div id="map-heading">N · 000°</div>
     <div id="location-label">CIVIC TRANSIT</div>
@@ -665,7 +669,18 @@ const worldIdentityPresentation = createWorldIdentityPresentation(
   activeLighting,
   softwareRenderer,
 );
-const arena: ArenaMap = buildArena(scene);
+const atomicArena = buildArena(scene);
+const rustworksArena = buildRustworks1v1(scene);
+const gunRangeArena = buildGunRange(scene);
+const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
+  'atomic-acres': atomicArena,
+  'rustworks-1v1': rustworksArena,
+  'gun-range': gunRangeArena,
+};
+let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
+let arena: ArenaMap = arenaById[selectedArena.id];
+for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate === arena;
+document.documentElement.dataset.arenaId = selectedArena.id;
 const neighbourhoodLifeRoot = addNeighbourhoodLife(scene, reducedWorldDetail);
 const overdriveRoot = new THREE.Group();
 overdriveRoot.name = 'overdrive-core-pickup';
@@ -734,7 +749,9 @@ const grassSystem = new GrassSystem(
   renderProfile,
   rendererLabel,
   grassQuery,
-  arena.colliders,
+  // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
+  // must never seed its permanent placements from their collision geometry.
+  atomicArena.colliders,
   activeLighting,
 );
 grassSystem.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
@@ -870,6 +887,7 @@ let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let triggerHeld = false;
 let targetHits = 0;
+let rangeScore = 0;
 let accumulator = 0;
 let frameCount = 0;
 let recoilVisual = 0;
@@ -913,7 +931,7 @@ const debugCaptureCameraPosition = new THREE.Vector3();
 let debugCaptureCameraYaw = 0;
 let debugCaptureCameraPitch = 0;
 let debugCaptureCameraActive = false;
-let matchState: MatchState = createMatch(performance.now());
+let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let respawnEndsAt = 0;
 let previousHudScores: [number, number] = [0, 0];
@@ -938,6 +956,7 @@ let debugInputUnlocked = false;
 let debugAdsOverride: boolean | null = null;
 let debugReloadProgress: number | null = null;
 let characterPhysics: CharacterPhysics | null = null;
+let arenaSelectionReady = false;
 
 function gameplayInputEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden');
@@ -2271,13 +2290,25 @@ function respawn(requestLock = true): void {
 }
 
 function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
+  if (mode !== 'solo' && !selectedArena.multiplayer) {
+    setStatus(`${selectedArena.displayName} is solo-only.`, 'warn');
+    return;
+  }
   const requiredName = requirePlayerName();
   if (!requiredName) return;
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  syncArenaSelectionUi();
   bestStreakThisMatch = 0;
   matchScoreRecorded = false;
+  targetHits = 0;
+  rangeScore = 0;
+  for (const target of arena.targets) {
+    target.active = true;
+    target.respawnAt = 0;
+    target.root.visible = true;
+  }
   refreshWarningUntil = performance.now() + 6_000;
   weaponView.root.visible = true;
   gameMode = mode;
@@ -2286,7 +2317,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
   const matchStartedAt = performance.now();
-  matchState = createMatch(matchStartedAt);
+  matchState = createMatch(matchStartedAt, selectedArena.matchRules);
   overdriveState = createOverdriveState(matchStartedAt);
   overdriveClaimGeneration = -1;
   overdriveSpawns = 0;
@@ -2299,12 +2330,21 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   respawnEndsAt = 0;
   menu.classList.add('hidden');
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = mode === 'solo' ? 'BOT SKIRMISH' : mode === 'host' ? 'HOST' : 'PEER';
+  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+    ? 'SOLO RANGE'
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
+  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? 'ONE VERSUS ONE' : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
+  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
+  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
+  element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
+  element<HTMLElement>('#ping-block').hidden = !selectedArena.multiplayer;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
   respawn(requestLock);
   if (mode === 'solo') spawnBots();
   audio.unlock();
-  addFeed('Welcome to Atomic Acres', 'gold');
+  addFeed(`Welcome to ${arena.label}`, 'gold');
+  if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
   if (mode !== 'solo') {
     network.send({ type: 'join', player: snapshot() });
     sendLeaderboardSync();
@@ -2715,13 +2755,15 @@ function spawnBot(index: number): void {
 function spawnBots(): void {
   clearBots();
   soloBotDeaths = 0;
-  for (let index = 0; index < SOLO_BOT_COUNT; index += 1) spawnBot(index);
-  addFeed(`${SOLO_BOT_COUNT} low-damage hostile operators entered the block`, 'coral');
+  for (let index = 0; index < selectedArena.soloBotCount; index += 1) spawnBot(index);
+  if (selectedArena.soloBotCount > 0) {
+    addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
+  }
 }
 
 function spawnEarnedBotReinforcement(): void {
-  const target = soloBotTargetForDeaths(soloBotDeaths);
-  if (bots.size >= target || player.kills >= MATCH_SCORE_LIMIT) return;
+  const target = activeSoloBotTarget(selectedArena, soloBotDeaths);
+  if (bots.size >= target) return;
   spawnBot(bots.size);
   addFeed(`HOSTILE REINFORCEMENT · ${bots.size} RIVALS NOW ACTIVE`, 'coral');
 }
@@ -2741,7 +2783,7 @@ function botHasLineOfSight(bot: BotPlayer): boolean {
 
 function selectBotTacticalWaypoint(bot: BotPlayer): number {
   const target = { x: player.position.x, y: player.position.y, z: player.position.z };
-  return chooseTacticalWaypoint(BOT_PATROL_POINTS.map((point, index) => {
+  return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
     const eye = { x: point.x, y: 1.42, z: point.z };
     return {
       index,
@@ -2839,11 +2881,15 @@ function botElevationAt(position: THREE.Vector3, previousY: number): number {
   return 0;
 }
 
-const botNavigationColliders = arena.colliders.filter((box) => {
-  const minY = box.minY ?? 0;
-  const maxY = box.maxY ?? 8;
-  return !(minY > 2 && maxY - minY <= 0.5);
-});
+function navigationCollidersFor(activeArena: ArenaMap): ArenaMap['colliders'] {
+  return activeArena.colliders.filter((box) => {
+    const minY = box.minY ?? 0;
+    const maxY = box.maxY ?? 8;
+    return !(minY > 2 && maxY - minY <= 0.5);
+  });
+}
+
+let botNavigationColliders = navigationCollidersFor(arena);
 
 function updateBots(dt: number, now: number): void {
   if (gameMode !== 'solo' || matchState.phase !== 'active') return;
@@ -2899,12 +2945,12 @@ function updateBots(dt: number, now: number): void {
       bot.nextDecisionAt = now + 850 + botIndex * 95;
     }
 
-    let patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
+    let patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
     let toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
     const waypointReached = toPatrol.lengthSq() < 5.2;
     if (waypointReached) {
       bot.waypoint = lineOfSight
-        ? (bot.waypoint + 1 + botIndex) % BOT_PATROL_POINTS.length
+        ? (bot.waypoint + 1 + botIndex) % arena.patrolPoints.length
         : selectBotTacticalWaypoint(bot);
     }
     const intent = chooseBotIntent({
@@ -2921,7 +2967,7 @@ function updateBots(dt: number, now: number): void {
       burstShotsRemaining: bot.burstShots,
     });
     if (intent.changeWaypoint && !waypointReached) bot.waypoint = selectBotTacticalWaypoint(bot);
-    patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
+    patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
     toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
     const verticalRouteTarget = botVerticalRouteTarget(bot);
@@ -3195,24 +3241,25 @@ function hitPracticeTarget(id: string): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
   target.active = false;
+  target.respawnAt = performance.now() + 2_200;
   target.root.visible = false;
-  target.respawnAt = performance.now() + 3200;
   targetHits += 1;
-  showHitmarker();
-  audio.hit();
-  addFeed('+1 test mannequin', 'gold');
+  rangeScore += selectedArena.id === 'gun-range' ? target.scoreValue : 1;
+  showHitmarker(selectedArena.id === 'gun-range' && target.distanceBand === 'far');
+  audio.hit(selectedArena.id === 'gun-range' && target.distanceBand === 'far');
+  addFeed(selectedArena.id === 'gun-range'
+    ? `${target.scoreValue} POINTS · ${rangeScore} TOTAL`
+    : '+1 test mannequin', 'gold');
 }
 
 function updateTargets(now: number): void {
   for (const target of arena.targets) {
-    if (gameMode === 'solo') {
+    if (gameMode === 'solo' && selectedArena.id !== 'gun-range') {
       target.root.visible = false;
       continue;
     }
-    if (!target.active && now >= target.respawnAt) {
-      target.active = true;
-      target.root.visible = true;
-    }
+    if (!target.active && now >= target.respawnAt) target.active = true;
+    target.root.visible = target.active;
   }
 }
 
@@ -3341,6 +3388,11 @@ function outgoingDamage(value: number, now = performance.now()): number {
 }
 
 function updateOverdrive(now: number): void {
+  if (!selectedArena.overdrive) {
+    overdriveRoot.visible = false;
+    element<HTMLElement>('#overdrive-hud').hidden = true;
+    return;
+  }
   const wasAvailable = overdriveState.available;
   const previousHolder = overdriveState.holderId;
   if (network.role !== 'client') overdriveState = advanceOverdrive(overdriveState, now);
@@ -3861,7 +3913,7 @@ function authorizeLocalOffensiveSupport(
 }
 
 function activateFieldSupport(id: FieldSupportId): void {
-  if (!player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
+  if (!selectedArena.fieldSupport || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
   const consumed = consumeFieldSupport(fieldSupport, id);
   if (!consumed.activated) return;
   const now = performance.now();
@@ -4245,8 +4297,8 @@ function teamScores(): [number, number] {
 function updateMatchState(now: number): void {
   const previous = matchState.phase;
   const scores = teamScores();
-  matchState = advanceMatch(matchState, now, scores);
-  const presentation = matchPresentationAt(matchState, now, scores, player.team);
+  matchState = advanceMatch(matchState, now, scores, selectedArena.matchRules);
+  const presentation = matchPresentationAt(matchState, now, scores, player.team, selectedArena.matchRules, arena.label);
   const countdown = element<HTMLElement>('#countdown');
   if (matchState.phase === 'warmup') {
     countdown.textContent = presentation.headline ?? '';
@@ -4257,7 +4309,7 @@ function updateMatchState(now: number): void {
   if (previous === matchState.phase) return;
   const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
-    banner.innerHTML = '<strong>ENGAGE</strong><span>First squad to 25</span>';
+    banner.innerHTML = `<strong>ENGAGE</strong><span>${selectedArena.rulesLabel}</span>`;
     banner.hidden = false;
     window.setTimeout(() => { if (matchState.phase === 'active') banner.hidden = true; }, 900);
     return;
@@ -4379,39 +4431,55 @@ function updateMinimap(now: number): void {
   context.scale(playerUpScaleX(), 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
-  const [roadLeft] = point(-10.25, 0);
-  const [roadRight] = point(10.25, 0);
-  context.fillStyle = 'rgba(126, 137, 132, .23)';
-  context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
-  context.strokeStyle = 'rgba(244, 196, 79, .42)';
-  context.lineWidth = 2;
-  context.setLineDash([10, 10]);
-  context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
-  context.setLineDash([]);
-  for (const house of arena.houses) {
-    const [cx, cy] = point(house.origin.x, house.origin.z);
-    const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
-    const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
-    context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
-    context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
-    context.lineWidth = 2;
-    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-    context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-  }
   const renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
   const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
-  for (const cover of arena.physicalCover) {
-    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-    if (!kind) continue;
-    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-    drawMinimapLandmark(context, cover.id, kind, footprint);
-    const label = minimapLandmarkLabel(kind);
-    const centre = context.getTransform().transformPoint(new DOMPoint(
-      footprint.x + footprint.width / 2,
-      footprint.y + footprint.height / 2,
-    ));
-    landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
-    renderedLandmarks.push({ id: cover.id, kind, label });
+  if (selectedArena.id === 'atomic-acres') {
+    const [roadLeft] = point(-10.25, 0);
+    const [roadRight] = point(10.25, 0);
+    context.fillStyle = 'rgba(126, 137, 132, .23)';
+    context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
+    context.strokeStyle = 'rgba(244, 196, 79, .42)';
+    context.lineWidth = 2;
+    context.setLineDash([10, 10]);
+    context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
+    context.setLineDash([]);
+    for (const house of arena.houses) {
+      const [cx, cy] = point(house.origin.x, house.origin.z);
+      const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
+      const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
+      context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
+      context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
+      context.lineWidth = 2;
+      context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+      context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    }
+    for (const cover of arena.physicalCover) {
+      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
+      if (!kind) continue;
+      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
+      drawMinimapLandmark(context, cover.id, kind, footprint);
+      const label = minimapLandmarkLabel(kind);
+      const centre = context.getTransform().transformPoint(new DOMPoint(
+        footprint.x + footprint.width / 2,
+        footprint.y + footprint.height / 2,
+      ));
+      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
+      renderedLandmarks.push({ id: cover.id, kind, label });
+    }
+  } else {
+    context.lineWidth = 1.5;
+    context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
+    context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
+    for (const collider of arena.colliders) {
+      const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
+      context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
+      context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    }
+    for (const target of arena.targets) {
+      const [x, y] = point(target.root.position.x, target.root.position.z);
+      context.fillStyle = target.distanceBand === 'near' ? '#58e3dc' : target.distanceBand === 'mid' ? '#f4c44f' : '#ff765f';
+      context.beginPath(); context.arc(x, y, target.active ? 5 : 2.5, 0, Math.PI * 2); context.fill();
+    }
   }
   minimapLandmarksRendered = renderedLandmarks;
   for (const remote of remotes.values()) {
@@ -4428,7 +4496,7 @@ function updateMinimap(now: number): void {
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
-  if (overdriveState.available) {
+  if (selectedArena.overdrive && overdriveState.available) {
     const [x, y] = point(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.z);
     context.save();
     context.translate(x, y);
@@ -4516,9 +4584,11 @@ function updateHud(now: number): void {
   crosshair.classList.toggle('ads', adsSettled);
   const [aqua, coral] = teamScores();
   const scores: [number, number] = [aqua, coral];
-  const presentation = matchPresentationAt(matchState, now, scores, player.team);
+  const presentation = matchPresentationAt(matchState, now, scores, player.team, selectedArena.matchRules, arena.label);
   const arenaZone = classifyArenaZone(player.position.x, player.position.z);
-  element<HTMLElement>('#location-label').textContent = arenaZoneLabel(arenaZone);
+  element<HTMLElement>('#location-label').textContent = selectedArena.id === 'atomic-acres'
+    ? arenaZoneLabel(arenaZone)
+    : arena.label.toUpperCase();
   audio.setArenaZone(arenaZone);
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
@@ -4527,24 +4597,29 @@ function updateHud(now: number): void {
   element<HTMLElement>('#reserve').textContent = String(player.reserve[player.weapon]);
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
-  aquaScore.textContent = String(aqua);
-  coralScore.textContent = String(coral);
-  scores.forEach((score, team) => {
+  const hudScores: [number, number] = selectedArena.id === 'gun-range' ? [rangeScore, targetHits] : scores;
+  aquaScore.textContent = String(hudScores[0]);
+  coralScore.textContent = String(hudScores[1]);
+  hudScores.forEach((score, team) => {
     if (score === previousHudScores[team]) return;
     const scoreElement = team === 0 ? aquaScore : coralScore;
     scoreElement.classList.remove('score-pulse');
     requestAnimationFrame(() => scoreElement.classList.add('score-pulse'));
   });
-  previousHudScores = scores;
+  previousHudScores = hudScores;
   element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = presentation.objective;
+  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+    ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
+    : presentation.objective;
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
   const reloadStateElement = element<HTMLElement>('#reload-state');
   reloadStateElement.textContent = player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
-    : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
+    : selectedArena.id === 'gun-range'
+      ? `SCORE ${rangeScore} · ${targetHits} TARGETS HIT`
+      : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
   reloadStateElement.classList.toggle('active', player.reloadState !== null);
   element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
   element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
@@ -4788,6 +4863,119 @@ document.addEventListener('pointerlockchange', () => {
   }
 });
 
+function syncArenaSelectionUi(): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
+    const selected = button.dataset.arenaId === selectedArena.id;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    button.disabled = !arenaSelectionReady || gameStarted;
+  }
+  const soloButton = element<HTMLButtonElement>('#solo');
+  const hostButton = element<HTMLButtonElement>('#host');
+  const joinButton = element<HTMLButtonElement>('#join');
+  soloButton.textContent = selectedArena.id === 'gun-range' ? 'START RANGE' : selectedArena.id === 'rustworks-1v1' ? '1V1 BOT' : 'BOT SKIRMISH';
+  hostButton.textContent = selectedArena.id === 'rustworks-1v1' ? 'HOST 1V1' : 'HOST LOBBY';
+  soloButton.disabled = !arenaSelectionReady;
+  hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
+  joinButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
+  element<HTMLInputElement>('#room-input').disabled = !selectedArena.multiplayer;
+  element<HTMLElement>('#arena-title').innerHTML = selectedArena.id === 'atomic-acres'
+    ? 'ATOMIC <span>ACRES</span>'
+    : selectedArena.id === 'rustworks-1v1'
+      ? '1V1 <span>RUST</span>'
+      : 'GUN <span>RANGE</span>';
+  element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
+    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.'
+    : selectedArena.id === 'rustworks-1v1'
+      ? 'Duel one rival through an original rusted processing yard with a climbable central tower, asymmetric cover and tight rotations.'
+      : 'Step to the firing line, hit reusable 100 / 200 / 300 point plates, and build an untimed score with any field kit.';
+}
+
+function setArenaPresentationVisibility(): void {
+  const atomicVisible = selectedArena.id === 'atomic-acres';
+  for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate.id === selectedArena.id;
+  worldIdentityPresentation.root.visible = atomicVisible;
+  neighbourhoodLifeRoot.visible = atomicVisible;
+  atmosphereSystem.root.visible = atomicVisible;
+  grassSystem.root.visible = atomicVisible;
+  if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
+  overdriveRoot.visible = false;
+  if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
+  atomicSignal.invalidateValidation();
+}
+
+function setArenaMenuCamera(): void {
+  const centreX = (arena.bounds.minX + arena.bounds.maxX) / 2;
+  const centreZ = (arena.bounds.minZ + arena.bounds.maxZ) / 2;
+  if (selectedArena.id === 'gun-range') {
+    camera.position.set(12, 13.5, 8);
+    camera.lookAt(0, 1.2, -25);
+  } else {
+    camera.position.set(centreX + (selectedArena.id === 'rustworks-1v1' ? 18 : 0), 31, centreZ - 22);
+    camera.lookAt(centreX, selectedArena.id === 'rustworks-1v1' ? 2.4 : 0.8, centreZ);
+  }
+  camera.fov = 65;
+  camera.updateProjectionMatrix();
+}
+
+async function activateArenaSelection(id: ArenaId): Promise<void> {
+  if (gameStarted || !arenaSelectionReady || id === selectedArena.id) return;
+  const nextSelection = arenaSelection(id);
+  const previousSelection = selectedArena;
+  const previousArena = arena;
+  const previousPhysics = characterPhysics;
+  let nextPhysics: CharacterPhysics | null = null;
+  arenaSelectionReady = false;
+  syncArenaSelectionUi();
+  setStatus(`Loading ${nextSelection.displayName} collision…`);
+  try {
+    const nextArena = arenaById[nextSelection.id];
+    nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
+    characterPhysics = nextPhysics;
+    selectedArena = nextSelection;
+    arena = nextArena;
+    botNavigationColliders = navigationCollidersFor(arena);
+    document.documentElement.dataset.arenaId = selectedArena.id;
+    setArenaPresentationVisibility();
+    matchState = createMatch(performance.now(), selectedArena.matchRules);
+    lastPlayerSpawnIndex = -1;
+    lastPlayerSpawnAudit = null;
+    respawn(false);
+    setArenaMenuCamera();
+    try {
+      previousPhysics?.dispose();
+    } catch (disposeError) {
+      console.warn('[Atomic Acres previous map physics disposal failed]', disposeError);
+    }
+    setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
+  } catch (error) {
+    console.error('[Atomic Acres map selection failed]', error);
+    if (nextPhysics) nextPhysics.dispose();
+    characterPhysics = previousPhysics;
+    selectedArena = previousSelection;
+    arena = previousArena;
+    botNavigationColliders = navigationCollidersFor(arena);
+    document.documentElement.dataset.arenaId = selectedArena.id;
+    setArenaPresentationVisibility();
+    matchState = createMatch(performance.now(), selectedArena.matchRules);
+    lastPlayerSpawnIndex = -1;
+    lastPlayerSpawnAudit = null;
+    respawn(false);
+    setArenaMenuCamera();
+    setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
+  } finally {
+    arenaSelectionReady = true;
+    syncArenaSelectionUi();
+  }
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
+  button.addEventListener('click', () => {
+    const id = button.dataset.arenaId as ArenaId | undefined;
+    if (id) void activateArenaSelection(id);
+  });
+}
+
 function resetForMode(): void {
   interruptReload(true);
   lastPrincipalShotAlignment = null;
@@ -4800,6 +4988,12 @@ function resetForMode(): void {
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
   targetHits = 0;
+  rangeScore = 0;
+  for (const target of arena.targets) {
+    target.active = true;
+    target.respawnAt = 0;
+    target.root.visible = true;
+  }
   previousHudScores = [0, 0];
   respawnEndsAt = 0;
   clearBots();
@@ -4951,10 +5145,12 @@ function frame(now: number): void {
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
-    if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
-    updateArenaArt(neighbourhoodLifeRoot, now);
-    atmosphereSystem.update(now / 1_000);
-    grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
+    if (selectedArena.id === 'atomic-acres') {
+      if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
+      updateArenaArt(neighbourhoodLifeRoot, now);
+      atmosphereSystem.update(now / 1_000);
+      grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
+    }
     if (gameStarted) updateMinimap(now);
     updateHud(now);
     if (debugCaptureCameraActive) {
@@ -5033,6 +5229,9 @@ const debugWindow = window as Window & {
     holdPings: (durationMs?: number) => void;
     endMatch: () => void;
     rematch: () => void;
+    selectArena: (id: ArenaId) => Promise<void>;
+    hitRangeTarget: (id: string) => void;
+    setKills: (kills: number) => void;
 
   };
 };
@@ -5044,6 +5243,36 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     matchPhase: matchState.phase,
     matchEndReason: matchState.endReason ?? null,
     scores: teamScores(),
+    arenaSelection: {
+      id: selectedArena.id,
+      label: arena.label,
+      rules: selectedArena.matchRules,
+      rulesLabel: selectedArena.rulesLabel,
+      multiplayer: selectedArena.multiplayer,
+      soloBotCount: selectedArena.soloBotCount,
+      rootVisible: arena.root.visible,
+      activeRoots: Object.values(arenaById).filter((entry) => entry.root.visible).map((entry) => entry.id),
+      bounds: { ...arena.bounds },
+      spawnCounts: [arena.spawns[0].length, arena.spawns[1].length],
+      colliders: arena.colliders.length,
+      navigationColliders: botNavigationColliders.length,
+      navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
+      raycastMeshes: arena.raycastMeshes.length,
+      targets: arena.targets.length,
+    },
+    rangePractice: {
+      score: rangeScore,
+      hits: targetHits,
+      activeTargets: arena.targets.filter((target) => target.active).length,
+      values: arena.targets.map((target) => target.scoreValue),
+      targets: arena.targets.map((target) => ({
+        id: target.id,
+        active: target.active,
+        visible: target.root.visible,
+        position: target.root.position.toArray(),
+        screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
+      })),
+    },
     random: runtimeRandomTelemetry(),
     aimAlignment: (() => {
       const canvasBounds = canvas.getBoundingClientRect();
@@ -5124,10 +5353,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     })),
     botEscalation: {
       deaths: soloBotDeaths,
-      initialBots: SOLO_BOT_COUNT,
-      targetBots: soloBotTargetForDeaths(soloBotDeaths),
+      initialBots: selectedArena.soloBotCount,
+      targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
       activeBots: bots.size,
-      nextReinforcementAt: (Math.floor(soloBotDeaths / 5) + 1) * 5,
+      maximumBots: selectedArena.maximumSoloBots,
+      nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
+        ? (Math.floor(soloBotDeaths / 5) + 1) * 5
+        : null,
     },
     remotes: remotes.size,
     networkSync: {
@@ -5863,13 +6095,29 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     for (const ping of activeTeamPings) ping.expiresAt = expiresAt;
   },
   endMatch: () => {
-    player.kills = 25;
-    updateMatchState(performance.now());
+    const now = performance.now();
+    matchState = {
+      phase: 'active',
+      phaseStartedAt: now - (selectedArena.matchRules.durationMs ?? 0),
+      endsAt: now,
+      winner: null,
+    };
+    if (selectedArena.matchRules.durationMs === null) {
+      matchState = { phase: 'ended', phaseStartedAt: now, endsAt: now, winner: 0, endReason: 'time' };
+      matchFinished = true;
+      return;
+    }
+    updateMatchState(now);
   },
   rematch: () => {
     network.close();
     resetForMode();
     startGame('solo', false);
+  },
+  selectArena: async (id: ArenaId) => activateArenaSelection(id),
+  hitRangeTarget: (id: string) => hitPracticeTarget(id),
+  setKills: (kills: number) => {
+    if (Number.isFinite(kills)) player.kills = Math.max(0, Math.floor(kills));
   },
 
 };
@@ -5890,7 +6138,7 @@ async function bootstrap(): Promise<void> {
   const artPromise = renderProfile === 'blender'
     ? (async () => {
         try {
-          const art = await loadBlenderArena(scene, arena, (loaded, total) => {
+          const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
             const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
             setStatus(`Loading Blender Render arena ${percent}%…`);
           });
@@ -5913,10 +6161,10 @@ async function bootstrap(): Promise<void> {
   characterPhysics = physics;
   arenaArtRoot = art.root;
   await grenadeExplosionPresentation.prewarm(renderer, camera);
-  const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
-  arena.raycastMeshes.splice(0, arena.raycastMeshes.length, ...visibleMapMeshes);
+  const visibleMapMeshes = atomicArena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
+  atomicArena.raycastMeshes.splice(0, atomicArena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {
-    if (node instanceof THREE.Mesh && node.userData.blocksShots === true) arena.raycastMeshes.push(node);
+    if (node instanceof THREE.Mesh && node.userData.blocksShots === true) atomicArena.raycastMeshes.push(node);
   });
   materialCompatibility = tuneMaterialsForAtomicSignal(
     scene,
@@ -5926,25 +6174,22 @@ async function bootstrap(): Promise<void> {
   );
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (!blenderArenaActive) {
-    if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', staticMaterialMode);
+    if (arenaRoot) batchStaticMeshes(arenaRoot, arenaRoot, () => '', staticMaterialMode);
     const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
-    batchStaticMeshes(art.root, scene, () => '', decorativeMaterialMode);
+    batchStaticMeshes(art.root, art.root, () => '', decorativeMaterialMode);
   }
   const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
-  batchStaticMeshes(neighbourhoodLifeRoot, scene, () => '', lifeMaterialMode);
+  batchStaticMeshes(neighbourhoodLifeRoot, neighbourhoodLifeRoot, () => '', lifeMaterialMode);
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   weaponView.setWeapon(player.weapon, true);
+  setArenaPresentationVisibility();
   respawn();
   weaponView.root.visible = false;
-  camera.position.set(0, 30, -22);
-  camera.lookAt(0, 0.8, 4);
-  camera.fov = 65;
-  camera.updateProjectionMatrix();
+  setArenaMenuCamera();
 
-  soloButton.disabled = false;
-  hostButton.disabled = !webRtcSupported;
-  joinButton.disabled = !webRtcSupported;
-  setStatus('Pass 32 — six tactical weapon families, authentic physical cover, fifth-death reinforcements and the 4× Quad Damage Core.');
+  arenaSelectionReady = true;
+  syncArenaSelectionUi();
+  setStatus(`${selectedArena.displayName} ready · ${selectedArena.rulesLabel}.`);
   requestAnimationFrame(frame);
 }
 

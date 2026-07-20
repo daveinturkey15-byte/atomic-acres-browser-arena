@@ -21,14 +21,15 @@ export type BotIntent = {
 };
 
 export const SOLO_BOT_COUNT = 2;
+export const MAX_SOLO_BOTS = 6;
 export const BOT_DEATHS_PER_REINFORCEMENT = 5;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
 
-/** Initial solo population plus one persistent reinforcement per five bot deaths. */
+/** Fifth-death reinforcements, capped so an uncapped five-minute score race stays performant. */
 export function soloBotTargetForDeaths(botDeaths: number): number {
   const deaths = Number.isFinite(botDeaths) ? Math.max(0, Math.floor(botDeaths)) : 0;
-  return SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT);
+  return Math.min(MAX_SOLO_BOTS, SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));
 }
 
 /** Yaw that points Atomic Acres' authoritative -Z operator-forward axis toward a target. */

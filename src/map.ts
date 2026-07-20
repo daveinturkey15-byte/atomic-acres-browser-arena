@@ -1,18 +1,29 @@
 import * as THREE from 'three';
 import { texturedMaterial } from './art-kit';
-import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
+import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, PATROL_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
 import { createHouseArchitecture, HouseSurface, solidBounds, type HouseArchitecture } from './house-navigation';
 import { Team } from './protocol';
 
-export type PracticeTarget = { id: string; root: THREE.Group; active: boolean; respawnAt: number };
+export type PracticeTarget = {
+  id: string;
+  root: THREE.Group;
+  active: boolean;
+  respawnAt: number;
+  scoreValue: number;
+  distanceBand: 'near' | 'mid' | 'far';
+};
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
 export type ArenaMap = {
+  id: 'atomic-acres' | 'rustworks-1v1' | 'gun-range';
+  label: string;
+  root: THREE.Group;
   colliders: Box2[];
   physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
   spawns: Record<Team, THREE.Vector3[]>;
+  patrolPoints: THREE.Vector3[];
   targets: PracticeTarget[];
   houses: readonly HouseArchitecture[];
   breakableWindows: BreakableWindow[];
@@ -462,7 +473,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     root.add(torso, head);
     root.traverse((child) => { child.userData.targetRoot = root; });
     world.add(root);
-    targets.push({ id, root, active: true, respawnAt: 0 });
+    targets.push({ id, root, active: true, respawnAt: 0, scoreValue: 1, distanceBand: 'mid' });
   }
   target('north-yard', -20, -34, 1);
   target('north-lane', 18, -12, 1);
@@ -481,9 +492,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // Original trees and street props are assembled in environment-assets.ts.
 
   return {
+    id: 'atomic-acres',
+    label: 'Atomic Acres',
+    root: world,
     colliders,
     physicsColliders,
     raycastMeshes,
+    patrolPoints: PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     targets,
     houses,
     breakableWindows,

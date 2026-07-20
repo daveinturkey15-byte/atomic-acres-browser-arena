@@ -1,9 +1,9 @@
 export const HIGH_SCORE_STORAGE_KEY = 'atomic-acres:high-scores:v1';
 export const HIGH_SCORE_SCHEMA_VERSION = 2;
 export const MAX_HIGH_SCORE_ENTRIES = 20;
-// Team score ends at 25, but one explosive resolution can admit several
-// eliminations before the next match-state tick. Preserve that legitimate
-// overshoot while still bounding hostile peer payloads.
+// Five-minute matches are uncapped, but valid local/peer records remain defensively
+// bounded against corrupted storage or hostile payloads. A 100-kill ceiling is well
+// above plausible five-minute play while keeping score documents finite.
 export const MAX_MATCH_KILLS = 100;
 
 export type HighScoreEntry = {

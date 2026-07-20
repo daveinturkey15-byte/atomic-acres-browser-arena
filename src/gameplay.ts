@@ -9,6 +9,11 @@ export const SIMULATION_HZ = 120;
 export const MATCH_WARMUP_MS = 3_000;
 export const MATCH_DURATION_MS = 300_000;
 export const MATCH_SCORE_LIMIT = 25;
+export type MatchRules = Readonly<{ durationMs: number | null; scoreLimit: number | null }>;
+export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
+  durationMs: MATCH_DURATION_MS,
+  scoreLimit: MATCH_SCORE_LIMIT,
+});
 export const GRENADE_RADIUS = 8;
 export const GRENADE_MAX_DAMAGE = 115;
 export const MELEE_COOLDOWN_MS = 650;
@@ -356,20 +361,33 @@ export type MatchState = {
   rematchRequested?: boolean;
 };
 
-export function createMatch(now: number): MatchState {
+export function createMatch(now: number, _rules: MatchRules = DEFAULT_MATCH_RULES): MatchState {
   return { phase: 'warmup', phaseStartedAt: now, endsAt: now + MATCH_WARMUP_MS, winner: null };
 }
 
-export function advanceMatch(state: MatchState, now: number, scores: [number, number]): MatchState {
-  if (state.phase === 'ended' && state.rematchRequested) return createMatch(now);
+export function advanceMatch(
+  state: MatchState,
+  now: number,
+  scores: [number, number],
+  rules: MatchRules = DEFAULT_MATCH_RULES,
+): MatchState {
+  if (state.phase === 'ended' && state.rematchRequested) return createMatch(now, rules);
   if (state.phase === 'warmup' && now >= state.endsAt) {
-    return { phase: 'active', phaseStartedAt: now, endsAt: now + MATCH_DURATION_MS, winner: null };
+    return {
+      phase: 'active',
+      phaseStartedAt: now,
+      endsAt: rules.durationMs === null ? Number.POSITIVE_INFINITY : now + rules.durationMs,
+      winner: null,
+    };
   }
-  if (state.phase === 'active' && (scores[0] >= MATCH_SCORE_LIMIT || scores[1] >= MATCH_SCORE_LIMIT || now >= state.endsAt)) {
+  const scoreReached = rules.scoreLimit !== null
+    && (scores[0] >= rules.scoreLimit || scores[1] >= rules.scoreLimit);
+  const timeReached = rules.durationMs !== null && now >= state.endsAt;
+  if (state.phase === 'active' && (scoreReached || timeReached)) {
     const winner = scores[0] === scores[1] ? 'draw' : scores[0] > scores[1] ? 0 : 1;
     return {
       phase: 'ended', phaseStartedAt: now, endsAt: now, winner,
-      endReason: scores[0] >= MATCH_SCORE_LIMIT || scores[1] >= MATCH_SCORE_LIMIT ? 'score' : 'time',
+      endReason: scoreReached ? 'score' : 'time',
     };
   }
   return state;

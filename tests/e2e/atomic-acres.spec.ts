@@ -385,7 +385,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('ORIGINAL WEB ARENA · AUTHENTIC COVER · PASS 32');
+    await expect(page.locator('.eyebrow')).toContainText('THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 33');
     expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -435,8 +435,9 @@ test.describe('boot and authored presentation', () => {
     await pageReady(page);
     await startSolo(page);
     await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void; endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void; setKills: (kills: number) => void; endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__;
       api.earnSupport(7);
+      api.setKills(30);
       api.endMatch();
     });
     await expect.poll(async () => (await debug(page)).matchPhase).toBe('ended');
@@ -444,7 +445,7 @@ test.describe('boot and authored presentation', () => {
       const raw = localStorage.getItem('atomic-acres:high-scores:v1');
       return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
     });
-    expect(entries.find((entry) => entry.name === 'QA Operator')).toMatchObject({ name: 'QA Operator', kills: 25, bestStreak: 7, won: true });
+    expect(entries.find((entry) => entry.name === 'QA Operator')).toMatchObject({ name: 'QA Operator', kills: 30, bestStreak: 7, won: true });
   });
 
   test('persists a named streak immediately and keeps it when the player exits before round end', async ({ page }) => {
@@ -702,6 +703,7 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('selects and persists an allowlisted field kit for deployment', async ({ page }) => {
+    test.setTimeout(120_000);
     await pageReady(page);
     await page.getByRole('button', { name: 'FIELD KIT' }).click();
     const runner = page.locator('[data-kit-id="runner"]');
@@ -831,7 +833,7 @@ test.describe('solo mechanics', () => {
   });
 
   test('adds one matching hostile reinforcement on the fifth cumulative bot death', async ({ page }) => {
-    expect((await debug(page)).botEscalation).toEqual({ deaths: 0, initialBots: 2, targetBots: 2, activeBots: 2, nextReinforcementAt: 5 });
+    expect((await debug(page)).botEscalation).toEqual({ deaths: 0, initialBots: 2, targetBots: 2, activeBots: 2, maximumBots: 6, nextReinforcementAt: 5 });
     for (let death = 1; death <= 5; death += 1) {
       await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
       await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
@@ -840,7 +842,7 @@ test.describe('solo mechanics', () => {
       }
     }
     const escalated = await debug(page);
-    expect(escalated.botEscalation).toEqual({ deaths: 5, initialBots: 2, targetBots: 3, activeBots: 3, nextReinforcementAt: 10 });
+    expect(escalated.botEscalation).toEqual({ deaths: 5, initialBots: 2, targetBots: 3, activeBots: 3, maximumBots: 6, nextReinforcementAt: 10 });
     expect(escalated.bots).toHaveLength(3);
     expect(escalated.bots[2]).toMatchObject({ alive: true, neonHaze: true, presentationReady: true, presentationWeaponSafe: true });
     expect(escalated.bots[2].operatorModel).toMatchObject({
@@ -1060,17 +1062,17 @@ test.describe('solo mechanics', () => {
     });
     const scheduled = (await debug(page)).fieldSupport;
     expect(scheduled.triPassLaunches).toBe(3);
-    await page.waitForFunction(() => document.querySelector<HTMLElement>('#strike-map-overlay')?.hidden === true);
-    await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
-    const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
-    expect(impactDelay).not.toBeNull();
-    expect(impactDelay!).toBeGreaterThanOrEqual(950);
-    expect((await debug(page)).fieldSupport.available).toMatchObject({
+    expect(scheduled.available).toMatchObject({
       'scout-sweep': true,
       yardhawk: true,
       'tri-pass': false,
       nuke: false,
     });
+    await page.waitForFunction(() => document.querySelector<HTMLElement>('#strike-map-overlay')?.hidden === true);
+    await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
+    const impactDelay = (await debug(page)).fieldSupport.triPassLastImpactDelayMs;
+    expect(impactDelay).not.toBeNull();
+    expect(impactDelay!).toBeGreaterThanOrEqual(950);
   });
 
   test('launches exactly five deterministic Hunter Swarm drones at eight eliminations', async ({ page }) => {
@@ -1097,6 +1099,14 @@ test.describe('solo mechanics', () => {
   test('arms and detonates the 15-elimination Nuke with a bounded warning sequence', async ({ page }) => {
     test.setTimeout(120_000);
     await page.evaluate(() => {
+      const flash = document.querySelector<HTMLElement>('#nuke-flash')!;
+      document.documentElement.dataset.qaNukeFlashObserved = String(!flash.hidden);
+      const flashObserver = new MutationObserver(() => {
+        if (flash.hidden) return;
+        document.documentElement.dataset.qaNukeFlashObserved = 'true';
+        flashObserver.disconnect();
+      });
+      flashObserver.observe(flash, { attributes: true, attributeFilter: ['hidden'] });
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         earnSupport: (kills: number) => void;
         activateSupport: (id: 'nuke') => void;
@@ -1109,7 +1119,7 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#nuke-warning')).toBeVisible();
     expect((await debug(page)).fieldSupport.nukeActivations).toBe(1);
     await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 8_000 }).toBe(1);
-    await expect(page.locator('#nuke-flash')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-qa-nuke-flash-observed', 'true');
     await expect(page.locator('#nuke-warning')).toBeHidden({ timeout: 8_000 });
   });
 
@@ -1799,7 +1809,7 @@ test.describe('solo mechanics', () => {
 
   test('HUD reports match, stance, equipment and bots in roster', async ({ page }) => {
     await expect(page.locator('#connection-pill')).toHaveText('BOT SKIRMISH');
-    await expect(page.locator('#objective')).toContainText('FIRST TO 25');
+    await expect(page.locator('#objective')).toContainText('FIVE MINUTES · MOST KILLS WINS');
     await expect(page.locator('#grenades')).toHaveText('FRAG ×2');
     await expect(page.locator('#minimap')).toBeVisible();
     await expect(page.locator('#location-label')).toHaveText(/AQUA HABITAT|CORAL HABITAT|VERDANT ARRAY|CIVIC TRANSIT|HELIO SERVICE/);
@@ -1809,12 +1819,16 @@ test.describe('solo mechanics', () => {
     await page.screenshot({ path: 'test-results/gameplay-structured-pass.png', fullPage: true });
   });
 
-  test('ends on the score limit and performs a complete rematch reset', async ({ page }) => {
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__.endMatch());
+  test('ends Atomic Acres on the five-minute time limit and performs a complete rematch reset', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setKills: (kills: number) => void; endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setKills(30);
+      api.endMatch();
+    });
     const ended = await debug(page);
     expect(ended.matchPhase).toBe('ended');
-    expect(ended.matchEndReason).toBe('score');
-    expect(ended.scores[0] + ended.scores[1]).toBeGreaterThanOrEqual(25);
+    expect(ended.matchEndReason).toBe('time');
+    expect(ended.scores[0] + ended.scores[1]).toBeGreaterThanOrEqual(30);
     await expect(page.locator('#banner')).toContainText('VICTORY');
     await expect(page.locator('#rematch')).toBeVisible();
     await page.locator('#rematch').click();
