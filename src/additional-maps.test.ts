@@ -28,6 +28,11 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('rustworks-lower-deck')).toBeTruthy();
     expect(map.root.getObjectByName('rustworks-upper-deck')).toBeTruthy();
     expect(map.root.getObjectByName('rustworks-lower-ramp')).toBeTruthy();
+    expect(map.root.getObjectByName('rustworks-upper-deck')?.position.y).toBe(8.15);
+    const towerLeg = map.root.getObjectByName('rustworks-tower-leg') as THREE.Mesh;
+    towerLeg.geometry.computeBoundingBox();
+    expect(towerLeg.geometry.boundingBox?.max.y).toBeCloseTo(5.4);
+    expect(map.root.getObjectByName('rustworks-crane-boom')?.position.y).toBe(13.4);
     expectSpawnContract(map);
   });
 
@@ -43,6 +48,9 @@ describe('additional authored maps', () => {
       100, 100, 100, 200, 200, 200, 300, 300, 300,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
+    expect(map.targets.every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
+    expect(map.targets.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
+    expect(map.targets.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
     expect(map.root.getObjectByName('gun-range-firing-line')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
     expectSpawnContract(map);

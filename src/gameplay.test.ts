@@ -266,9 +266,9 @@ describe('reload state', () => {
 
 describe('equipment and melee', () => {
   it('uses bounded grenade blast falloff', () => {
-    expect(grenadeDamage(0)).toBe(115);
-    expect(grenadeDamage(4)).toBeGreaterThan(grenadeDamage(7));
-    expect(grenadeDamage(9)).toBe(0);
+    expect(grenadeDamage(0)).toBe(230);
+    expect(grenadeDamage(8)).toBeGreaterThan(grenadeDamage(14));
+    expect(grenadeDamage(16)).toBe(0);
   });
 
   it('requires melee range and cooldown', () => {

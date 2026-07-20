@@ -4,6 +4,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "author:blender-arena": "npx vite-node scripts/blender/export-atomic-acres-arena-spec.ts source-assets/blender/atomic-acres-arena-spec.json && PYTHONHASHSEED=0 blender --background --factory-startup --python scripts/blender/create-atomic-acres-blender-arena.py",
+    "author:rustworks-tower": "PYTHONHASHSEED=0 blender --background --factory-startup --python scripts/blender/create-rustworks-central-tower.py",
     "baseline:generate": "tsx scripts/qa/generate-pass25a-baselines.ts",
     "verify:gameplay-contract": "tsx scripts/qa/generate-pass25a-baselines.ts --check",
     "test": "vitest run",

@@ -2674,8 +2674,8 @@
     "combat": {
       "botDamageMultiplier": 0.25,
       "grenade": {
-        "maximumDamage": 115,
-        "radius": 8
+        "maximumDamage": 230,
+        "radius": 16
       },
       "match": {
         "arenas": [

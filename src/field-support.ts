@@ -1,4 +1,4 @@
-import type { Stance } from './gameplay';
+import { GRENADE_RADIUS, type Stance } from './gameplay';
 import type { ExplosiveSource } from './protocol';
 
 export const FIELD_SUPPORT_IDS = ['scout-sweep', 'yardhawk', 'tri-pass', 'hunter-swarm', 'nuke'] as const;
@@ -32,6 +32,7 @@ export const NUKE_DAMAGE = 1_000;
 export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
 
 export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {
+  if (source === 'grenade') return GRENADE_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'tri-pass') return TRI_PASS_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'hunter-swarm') return HUNTER_SWARM_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'nuke') return Number.POSITIVE_INFINITY;

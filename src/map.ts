@@ -13,6 +13,8 @@ export type PracticeTarget = {
   respawnAt: number;
   scoreValue: number;
   distanceBand: 'near' | 'mid' | 'far';
+  maxHealth: number;
+  health: number;
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
 export type ArenaMap = {
@@ -473,7 +475,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     root.add(torso, head);
     root.traverse((child) => { child.userData.targetRoot = root; });
     world.add(root);
-    targets.push({ id, root, active: true, respawnAt: 0, scoreValue: 1, distanceBand: 'mid' });
+    targets.push({ id, root, active: true, respawnAt: 0, scoreValue: 1, distanceBand: 'mid', maxHealth: 1, health: 1 });
   }
   target('north-yard', -20, -34, 1);
   target('north-lane', 18, -12, 1);

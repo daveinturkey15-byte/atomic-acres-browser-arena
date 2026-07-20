@@ -65,6 +65,7 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
+import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry } from './rustworks-blender';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
@@ -314,7 +315,7 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 33</div>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 34</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -338,6 +339,7 @@ app.innerHTML = `
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
       <div class="menu-actions">
         <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
+        <button id="main-menu" hidden>MAIN MENU · CHANGE MAP</button>
         <button id="solo" class="primary">BOT SKIRMISH</button>
         <button id="host">HOST LOBBY</button>
       </div>
@@ -378,6 +380,7 @@ app.innerHTML = `
     <footer>CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</footer>
   </section>
   <div id="hud" hidden>
+    <div id="pause-hint">ESC · MENU</div>
     <header id="matchbar"><div><span class="tiny" id="match-mode-label">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua"><em id="aqua-label">AQUA</em> <b id="aqua-score">0</b></span><i id="score-limit">—</i><span class="coral"><b id="coral-score">0</b> <em id="coral-label">CORAL</em></span></div><div id="connection-pill">SOLO</div></header>
     <div id="fps-counter" aria-label="Frame rate"><b>--</b><span>FPS</span></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
@@ -2306,6 +2309,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
   rangeScore = 0;
   for (const target of arena.targets) {
     target.active = true;
+    target.health = target.maxHealth;
     target.respawnAt = 0;
     target.root.visible = true;
   }
@@ -2515,7 +2519,10 @@ function tryFire(now: number): void {
       const prior = hitDamage.get(result.playerId);
       hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
     }
-    if (result.targetId) hitPracticeTarget(result.targetId);
+    if (result.targetId) {
+      const zone = result.hitZone ?? 'body';
+      hitPracticeTarget(result.targetId, computeDamage(spec, result.distance, zone), zone);
+    }
   }
   const shot: ShotMessage = {
     type: 'shot',
@@ -3237,18 +3244,28 @@ function updateGrenades(dt: number, now: number): void {
   }
 }
 
-function hitPracticeTarget(id: string): void {
+function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
+  const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
+  if (admittedDamage <= 0) return;
+  target.health = Math.max(0, target.health - admittedDamage);
+  targetHits += 1;
+  const headshot = selectedArena.id === 'gun-range' && zone === 'head';
+  showHitmarker(headshot);
+  audio.hit(headshot);
+  if (target.health > 0) {
+    if (selectedArena.id === 'gun-range') {
+      addFeed(`${headshot ? 'BULLSEYE · ' : ''}${Math.ceil(target.health)} / ${target.maxHealth} TARGET HP`, headshot ? 'gold' : undefined);
+    }
+    return;
+  }
   target.active = false;
   target.respawnAt = performance.now() + 2_200;
   target.root.visible = false;
-  targetHits += 1;
   rangeScore += selectedArena.id === 'gun-range' ? target.scoreValue : 1;
-  showHitmarker(selectedArena.id === 'gun-range' && target.distanceBand === 'far');
-  audio.hit(selectedArena.id === 'gun-range' && target.distanceBand === 'far');
   addFeed(selectedArena.id === 'gun-range'
-    ? `${target.scoreValue} POINTS · ${rangeScore} TOTAL`
+    ? `${headshot ? 'BULLSEYE · ' : ''}${target.scoreValue} POINTS · ${rangeScore} TOTAL`
     : '+1 test mannequin', 'gold');
 }
 
@@ -3258,7 +3275,10 @@ function updateTargets(now: number): void {
       target.root.visible = false;
       continue;
     }
-    if (!target.active && now >= target.respawnAt) target.active = true;
+    if (!target.active && now >= target.respawnAt) {
+      target.active = true;
+      target.health = target.maxHealth;
+    }
     target.root.visible = target.active;
   }
 }
@@ -4319,7 +4339,7 @@ function updateMatchState(now: number): void {
     recordCompletedMatch();
     clearGrenades();
     clearFieldSupport();
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><button id="rematch" type="button">REMATCH</button>`;
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><div class="match-end-actions"><button id="rematch" type="button">REMATCH</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
     banner.hidden = false;
     const rematch = element<HTMLButtonElement>('#rematch');
     rematch.addEventListener('click', () => {
@@ -4327,6 +4347,7 @@ function updateMatchState(now: number): void {
       resetForMode();
       startGame('solo', false);
     }, { once: true });
+    element<HTMLButtonElement>('#match-main-menu').addEventListener('click', returnToMainMenu, { once: true });
     document.exitPointerLock();
   }
 }
@@ -4854,11 +4875,13 @@ document.addEventListener('pointerlockchange', () => {
       return;
     }
     if (gameStarted && player.alive && !matchFinished) {
-      element<HTMLButtonElement>('#resume').hidden = matchFinished;
+      element<HTMLButtonElement>('#resume').hidden = false;
+      element<HTMLButtonElement>('#main-menu').hidden = false;
       menu.classList.remove('hidden');
     }
   } else {
     element<HTMLButtonElement>('#resume').hidden = true;
+    element<HTMLButtonElement>('#main-menu').hidden = true;
     menu.classList.add('hidden');
   }
 });
@@ -4888,7 +4911,7 @@ function syncArenaSelectionUi(): void {
     ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.'
     : selectedArena.id === 'rustworks-1v1'
       ? 'Duel one rival through an original rusted processing yard with a climbable central tower, asymmetric cover and tight rotations.'
-      : 'Step to the firing line, hit reusable 100 / 200 / 300 point plates, and build an untimed score with any field kit.';
+      : 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.';
 }
 
 function setArenaPresentationVisibility(): void {
@@ -4910,9 +4933,13 @@ function setArenaMenuCamera(): void {
   if (selectedArena.id === 'gun-range') {
     camera.position.set(12, 13.5, 8);
     camera.lookAt(0, 1.2, -25);
+  } else if (selectedArena.id === 'rustworks-1v1') {
+    // Keep the tall tower on the unobstructed right side of the deployment panel.
+    camera.position.set(18, 20, -28);
+    camera.lookAt(centreX + 14, 5.8, centreZ);
   } else {
-    camera.position.set(centreX + (selectedArena.id === 'rustworks-1v1' ? 18 : 0), 31, centreZ - 22);
-    camera.lookAt(centreX, selectedArena.id === 'rustworks-1v1' ? 2.4 : 0.8, centreZ);
+    camera.position.set(centreX, 31, centreZ - 22);
+    camera.lookAt(centreX, 0.8, centreZ);
   }
   camera.fov = 65;
   camera.updateProjectionMatrix();
@@ -4991,6 +5018,7 @@ function resetForMode(): void {
   rangeScore = 0;
   for (const target of arena.targets) {
     target.active = true;
+    target.health = target.maxHealth;
     target.respawnAt = 0;
     target.root.visible = true;
   }
@@ -5017,9 +5045,31 @@ function resetForMode(): void {
   player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
 }
 
+function returnToMainMenu(): void {
+  if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id });
+  network.close();
+  resetForMode();
+  gameStarted = false;
+  matchFinished = false;
+  weaponView.root.visible = false;
+  hudRoot.hidden = true;
+  roomCard.hidden = true;
+  roomCodeEl.textContent = '';
+  element<HTMLElement>('#room-hud').textContent = '';
+  element<HTMLButtonElement>('#resume').hidden = true;
+  element<HTMLButtonElement>('#main-menu').hidden = true;
+  menu.classList.remove('hidden');
+  arenaSelectionReady = true;
+  syncArenaSelectionUi();
+  setArenaMenuCamera();
+  setStatus(`${selectedArena.displayName} ready · choose a map or deploy again.`);
+  if (document.pointerLockElement) void document.exitPointerLock();
+}
+
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
   if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
+element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainMenu);
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (!requirePlayerName()) return;
   network.close();
@@ -5229,8 +5279,9 @@ const debugWindow = window as Window & {
     holdPings: (durationMs?: number) => void;
     endMatch: () => void;
     rematch: () => void;
+    returnToMainMenu: () => void;
     selectArena: (id: ArenaId) => Promise<void>;
-    hitRangeTarget: (id: string) => void;
+    hitRangeTarget: (id: string, damage?: number, zone?: HitZone) => void;
     setKills: (kills: number) => void;
 
   };
@@ -5268,6 +5319,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       targets: arena.targets.map((target) => ({
         id: target.id,
         active: target.active,
+        health: target.health,
+        maxHealth: target.maxHealth,
         visible: target.root.visible,
         position: target.root.position.toArray(),
         screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
@@ -5626,6 +5679,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
+    menuCamera: {
+      position: camera.position.toArray(),
+      towerNdc: new THREE.Vector3(0, 6, 0).project(camera).toArray(),
+    },
     render: {
       profile: renderProfile,
       representation: activeRenderConfig.representation,
@@ -5682,6 +5739,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       grass: grassSystem.telemetry(),
       atmosphere: atmosphereSystem.telemetry(),
       blenderEnvironment: blenderArenaTelemetry(),
+      rustworksBlender: rustworksBlenderTelemetry(),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.flatMap((node) => {
         const sourcePalette = node.userData.sourcePalette;
         if (Array.isArray(sourcePalette)) return sourcePalette.filter((color): color is string => typeof color === 'string');
@@ -6114,8 +6172,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     resetForMode();
     startGame('solo', false);
   },
+  returnToMainMenu,
   selectArena: async (id: ArenaId) => activateArenaSelection(id),
-  hitRangeTarget: (id: string) => hitPracticeTarget(id),
+  hitRangeTarget: (id: string, damage = 500, zone: HitZone = 'body') => hitPracticeTarget(id, damage, zone),
   setKills: (kills: number) => {
     if (Number.isFinite(kills)) player.kills = Math.max(0, Math.floor(kills));
   },
@@ -6155,9 +6214,18 @@ async function bootstrap(): Promise<void> {
     : loadArenaArt(scene, (loaded, total) => {
         setStatus(`Loading authored arena models ${loaded}/${total}…`);
       }, reducedWorldDetail);
+  const rustworksArtPromise = renderProfile === 'blender'
+    ? loadRustworksBlenderTower(rustworksArena.root).catch((error) => {
+        markRustworksBlenderFallback(error);
+        console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+        return null;
+      })
+    : Promise.resolve(null);
   const grenadePromise = loadGrenadePresentation();
   const choirPromise = audio.preloadSanctifiedFragChoir();
-  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise, grenadePromise, choirPromise]);
+  const [physics, , art] = await Promise.all([
+    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise, choirPromise,
+  ]);
   characterPhysics = physics;
   arenaArtRoot = art.root;
   await grenadeExplosionPresentation.prewarm(renderer, camera);

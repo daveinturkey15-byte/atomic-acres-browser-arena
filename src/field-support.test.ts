@@ -85,7 +85,7 @@ describe('field support rewards', () => {
     expect(TRI_PASS_BLAST_RADIUS).toBe(15);
     expect(TRI_PASS_MAX_DAMAGE).toBe(450);
     expect(remoteExplosiveHitMaximumDistance('tri-pass')).toBeGreaterThan(15);
-    expect(remoteExplosiveHitMaximumDistance('grenade')).toBe(6.2);
+    expect(remoteExplosiveHitMaximumDistance('grenade')).toBe(17.3);
   });
 
   it('cycles every support for standard-gamepad selection', () => {

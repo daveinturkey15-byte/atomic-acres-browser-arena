@@ -18,8 +18,18 @@ type DebugSnapshot = {
     navigationCollidersMatchArena: boolean;
     targets: number;
   };
-  rangePractice: { score: number; hits: number; activeTargets: number; values: number[] };
-  render: { grass: { checksum: string } };
+  rangePractice: {
+    score: number;
+    hits: number;
+    activeTargets: number;
+    values: number[];
+    targets: Array<{ id: string; active: boolean; health: number; maxHealth: number }>;
+  };
+  menuCamera: { position: number[]; towerNdc: number[] };
+  render: {
+    grass: { checksum: string };
+    rustworksBlender: { status: string; meshCount: number; triangleCount: number; authoredHeight: number; semanticParts: number };
+  };
   bots: Array<{ id: string; alive: boolean }>;
   player: { kills: number; position: [number, number, number] };
 };
@@ -27,7 +37,8 @@ type DebugSnapshot = {
 type DebugApi = {
   snapshot(): DebugSnapshot;
   startSolo(): void;
-  hitRangeTarget(id: string): void;
+  returnToMainMenu(): void;
+  hitRangeTarget(id: string, damage?: number, zone?: 'head' | 'body' | 'limb'): void;
   setKills(kills: number): void;
   teleportPlayer(x: number, y: number, z: number, yaw?: number, pitch?: number): void;
   fireOnce(): void;
@@ -51,8 +62,9 @@ async function deploySolo(page: import('@playwright/test').Page, name: string): 
 }
 
 const lightweight = 'render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&renderPaused=1';
+const blenderLightweight = 'render=blender&signal=off&grass=off&mist=off&clouds=off&rays=off&renderPaused=1';
 
-test.describe('Pass 33 map selector and mode contracts', () => {
+test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
   test('Atomic Acres keeps five minutes and does not end at 25 kills', async ({ page }) => {
     await page.goto(`/?${lightweight}&seed=3301`);
     await waitReady(page);
@@ -103,6 +115,8 @@ test.describe('Pass 33 map selector and mode contracts', () => {
     expect(selected.arenaSelection.navigationColliders).toBeGreaterThan(0);
     expect(selected.arenaSelection.navigationColliders).toBeLessThanOrEqual(selected.arenaSelection.colliders);
     expect(selected.arenaSelection.navigationCollidersMatchArena).toBe(true);
+    expect(selected.menuCamera.towerNdc[0]).toBeGreaterThan(0.2);
+    expect(selected.menuCamera.towerNdc[0]).toBeLessThan(0.75);
     expect(selected.render.grass.checksum).toBe('81871ba9');
     await deploySolo(page, 'DUELIST');
     const active = await snapshot(page);
@@ -110,6 +124,13 @@ test.describe('Pass 33 map selector and mode contracts', () => {
     expect(active.bots[0].alive).toBe(true);
     expect(active.player.position[0]).toBeGreaterThanOrEqual(active.arenaSelection.bounds.minX);
     expect(active.player.position[0]).toBeLessThanOrEqual(active.arenaSelection.bounds.maxX);
+    await page.evaluate(() => document.dispatchEvent(new Event('pointerlockchange')));
+    await expect(page.locator('#menu')).toBeVisible();
+    await expect(page.locator('#main-menu')).toBeVisible();
+    await page.locator('#main-menu').click();
+    await expect(page.locator('#main-menu')).toBeHidden();
+    await expect(page.locator('.map-card[data-arena-id="gun-range"]')).toBeEnabled();
+    expect((await snapshot(page)).gameStarted).toBe(false);
   });
 
   test('Gun Range is untimed solo score practice with three target values', async ({ page }) => {
@@ -144,12 +165,33 @@ test.describe('Pass 33 map selector and mode contracts', () => {
       api.teleportPlayer(0, 1.7, 6, 0, 0);
       api.fireOnce();
     });
+    await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.hits === 1);
+    state = await snapshot(page);
+    expect(state.rangePractice).toMatchObject({ score: 0, hits: 1, activeTargets: 9 });
+    const centreTarget = state.rangePractice.targets.find((target) => target.id === 'near-0');
+    expect(centreTarget?.maxHealth).toBe(500);
+    expect(centreTarget?.health).toBeGreaterThan(0);
+    expect(centreTarget?.health).toBeLessThan(500);
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.hitRangeTarget('near-0', 500, 'body');
+    });
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.score === 100);
     state = await snapshot(page);
-    expect(state.rangePractice).toMatchObject({ score: 100, hits: 1, activeTargets: 8 });
-    await expect(page.locator('#objective')).toContainText('SCORE 100 · 1 HITS');
+    expect(state.rangePractice).toMatchObject({ score: 100, hits: 2, activeTargets: 8 });
+    await expect(page.locator('#objective')).toContainText('SCORE 100 · 2 HITS');
     await expect.poll(() => page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.activeTargets), { timeout: 4_000 }).toBe(9);
+  });
+
+  test('Blender Render loads the original tall Rustworks tower detail asset', async ({ page }) => {
+    await page.goto(`/?${blenderLightweight}&seed=3404&map=rustworks-1v1`);
+    await waitReady(page);
+    const state = await snapshot(page);
+    expect(state.arenaSelection.id).toBe('rustworks-1v1');
+    expect(state.render.rustworksBlender).toMatchObject({ status: 'ready', meshCount: 55 });
+    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(50);
+    expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(13);
+    expect(state.render.rustworksBlender.triangleCount).toBeGreaterThan(0);
   });
 });

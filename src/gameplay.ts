@@ -14,8 +14,8 @@ export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
   durationMs: MATCH_DURATION_MS,
   scoreLimit: MATCH_SCORE_LIMIT,
 });
-export const GRENADE_RADIUS = 8;
-export const GRENADE_MAX_DAMAGE = 115;
+export const GRENADE_RADIUS = 16;
+export const GRENADE_MAX_DAMAGE = 230;
 export const MELEE_COOLDOWN_MS = 650;
 export const MELEE_RANGE = 1.75;
 export const MELEE_DAMAGE = 100;

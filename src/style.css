@@ -117,3 +117,9 @@
 @media(max-width:700px){.map-card-grid{grid-template-columns:1fr}.map-card{min-height:64px}.map-selector{padding:9px}}
 @media(max-height:760px) and (min-width:701px){.map-selector{margin-top:8px;padding:8px}.map-card{min-height:68px;padding:7px}.map-card strong{display:none}}
 #scoreline em{font-style:normal}
+
+/* Pass 34: explicit pause-to-menu affordance and two-choice end-of-match flow. */
+.menu-actions #main-menu{grid-column:1/-1;background:#17272c;border-color:rgba(244,196,79,.62);color:var(--gold)}
+#pause-hint{position:absolute;left:max(18px,env(safe-area-inset-left));top:max(16px,env(safe-area-inset-top));z-index:4;padding:7px 10px;border-left:2px solid var(--gold);background:linear-gradient(90deg,rgba(7,15,18,.8),transparent);font:800 9px/1 Inter,sans-serif;letter-spacing:.16em;color:#d7c77f}
+.match-end-actions{display:flex;justify-content:center;gap:10px;margin-top:10px}.match-end-actions button{min-width:130px}
+@media(max-width:700px){#pause-hint{left:10px;top:12px;font-size:7px}.match-end-actions{flex-direction:column}}

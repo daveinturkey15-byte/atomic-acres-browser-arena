@@ -102,18 +102,20 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [0, -29.5, 56, 1], [0, 29.5, 56, 1], [-27.5, 0, 1, 60], [27.5, 0, 1, 60],
   ] as const) box(builder, 'rustworks-perimeter-sheeting', [x, 2.2, z], [sx, 4.4, sz], rustDark);
 
-  // Original four-leg processing tower with two readable combat decks.
+  // Original four-leg processing tower with two readable combat decks. Pass 34
+  // raises the silhouette and keeps both decks reachable through longer ramps.
   for (const x of [-3.2, 3.2]) for (const z of [-3.2, 3.2]) {
-    box(builder, 'rustworks-tower-leg', [x, 3.4, z], [0.52, 6.8, 0.52], steel);
+    box(builder, 'rustworks-tower-leg', [x, 5.4, z], [0.52, 10.8, 0.52], steel);
   }
-  box(builder, 'rustworks-lower-deck', [0, 2.65, 0], [8.4, 0.34, 8.4], steel);
-  box(builder, 'rustworks-upper-deck', [0, 5.45, 0], [6.8, 0.34, 6.8], rust);
-  box(builder, 'rustworks-control-hut', [0.7, 6.55, 0.4], [3.6, 2.0, 3.3], rustDark);
-  box(builder, 'rustworks-lower-ramp', [0, 1.35, -7.3], [3.1, 0.34, 8.5], steel, { rotation: [-0.31, 0, 0] });
-  box(builder, 'rustworks-upper-ramp', [5.7, 4.0, 0], [7.0, 0.34, 2.5], rust, { rotation: [0, 0, -0.39] });
-  for (const x of [-4.1, 4.1]) box(builder, 'rustworks-deck-rail', [x, 3.45, 0], [0.16, 1.4, 8.2], hazard, { solid: false });
-  box(builder, 'rustworks-crane-boom', [-5.5, 9.2, 0], [11.5, 0.38, 0.38], steel, { solid: false });
-  box(builder, 'rustworks-crane-cable', [-10.9, 6.2, 0], [0.12, 6.2, 0.12], rustDark, { solid: false });
+  box(builder, 'rustworks-lower-deck', [0, 3.35, 0], [8.4, 0.34, 8.4], steel);
+  box(builder, 'rustworks-upper-deck', [0, 8.15, 0], [6.8, 0.34, 6.8], rust);
+  box(builder, 'rustworks-control-hut', [0.7, 9.45, 0.4], [3.6, 2.4, 3.3], rustDark);
+  box(builder, 'rustworks-lower-ramp', [0, 1.7, -7.45], [3.1, 0.34, 9.2], steel, { rotation: [-0.37, 0, 0] });
+  box(builder, 'rustworks-upper-ramp', [5.65, 5.72, 0], [9.0, 0.34, 2.5], rust, { rotation: [0, 0, -0.58] });
+  for (const x of [-4.1, 4.1]) box(builder, 'rustworks-lower-deck-rail', [x, 4.1, 0], [0.16, 1.4, 8.2], hazard, { solid: false });
+  for (const z of [-3.3, 3.3]) box(builder, 'rustworks-upper-deck-rail', [0, 8.9, z], [6.6, 1.4, 0.16], hazard, { solid: false });
+  box(builder, 'rustworks-crane-boom', [-5.5, 13.4, 0], [11.5, 0.38, 0.38], steel, { solid: false });
+  box(builder, 'rustworks-crane-cable', [-10.9, 9.8, 0], [0.12, 7.2, 0.12], rustDark, { solid: false });
 
   // Asymmetric outer cover keeps each rotation distinct.
   for (const [x, z, color] of [
@@ -146,7 +148,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     }
   }
 
-  const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 8.0, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false });
+  const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false });
   labelBoard.userData.label = 'RUSTWORKS 1V1';
 
   return {
@@ -216,10 +218,12 @@ function rangeTarget(
     standard(distanceBand === 'near' ? 0x58e3dc : distanceBand === 'mid' ? 0xf4c44f : 0xff765f, 0.58, 0.28),
   );
   plate.name = `${scoreValue}-point-range-plate`;
+  plate.userData.hitZone = 'body';
   plate.position.y = 1.65;
   plate.rotation.x = Math.PI / 2;
   const bullseye = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.135, 20), standard(0xf5eee0, 0.48, 0.18));
   bullseye.name = 'range-bullseye';
+  bullseye.userData.hitZone = 'head';
   bullseye.position.set(0, 1.65, 0.01);
   bullseye.rotation.x = Math.PI / 2;
   root.add(stand, plate, bullseye);
@@ -236,7 +240,7 @@ function rangeTarget(
     child.userData.impactSurface = 'metal';
   });
   builder.root.add(root);
-  targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand });
+  targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500 });
 }
 
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
