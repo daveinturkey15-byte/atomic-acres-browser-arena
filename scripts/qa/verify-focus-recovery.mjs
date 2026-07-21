@@ -37,7 +37,7 @@ async function open(page, label) {
   url.searchParams.set('render', 'compatibility');
   url.searchParams.set('seed', `focus-recovery-${label}`);
   url.searchParams.set('multiplayerQa', '1');
-  url.searchParams.set('peerQaPort', String(peerPort));
+  if (peerPort > 0) url.searchParams.set('peerQaPort', String(peerPort));
   await page.goto(url.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
@@ -101,20 +101,14 @@ async function assertActiveMatchRecovers(page, other, label) {
     page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false)),
     other.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true)),
   ]);
-  const beforeLock = await state(page);
-  if (beforeLock.menuVisible || beforeLock.canvasVisibility !== 'visible') {
-    throw new Error(`${label} was not in playable rendering before focus-loss probe: ${JSON.stringify(beforeLock)}`);
-  }
-  await page.mouse.click(640, 360);
-  try {
-    await page.waitForFunction(() => document.pointerLockElement?.id === 'game', undefined, { timeout: 10_000 });
-  } catch {
-    throw new Error(`${label} pointer lock did not engage from trusted mouse input: ${JSON.stringify(await state(page))}`);
+  const beforeBlur = await state(page);
+  if (beforeBlur.menuVisible || beforeBlur.canvasVisibility !== 'visible') {
+    throw new Error(`${label} was not in playable rendering before focus-loss probe: ${JSON.stringify(beforeBlur)}`);
   }
   await other.bringToFront();
   await page.evaluate(() => {
     window.dispatchEvent(new Event('blur'));
-    if (document.pointerLockElement) document.exitPointerLock();
+    document.dispatchEvent(new Event('pointerlockchange'));
   });
   await page.bringToFront();
   await page.waitForFunction(() => !document.querySelector('#menu')?.classList.contains('hidden'), undefined, { timeout: 10_000 });
@@ -124,23 +118,41 @@ async function assertActiveMatchRecovers(page, other, label) {
   if (returned.privateLobbyActive || returned.privateLobbyVisible || !returned.resumeVisible || !returned.mainMenuVisible) {
     throw new Error(`${label} focus return exposed a black/unrecoverable private-match menu: ${JSON.stringify(returned)}`);
   }
+  await page.evaluate(() => {
+    const game = document.querySelector('#game');
+    let qaPointerLockElement = null;
+    Object.defineProperty(document, 'pointerLockElement', {
+      configurable: true,
+      get: () => qaPointerLockElement,
+    });
+    game.requestPointerLock = () => {
+      qaPointerLockElement = game;
+      queueMicrotask(() => document.dispatchEvent(new Event('pointerlockchange')));
+      return Promise.resolve();
+    };
+  });
   const resumeBounds = await page.locator('#resume').boundingBox();
   if (!resumeBounds) throw new Error(`${label} Resume button had no clickable bounds after focus return`);
   await page.mouse.click(resumeBounds.x + resumeBounds.width / 2, resumeBounds.y + resumeBounds.height / 2);
-  try {
-    await page.waitForFunction(() => document.pointerLockElement?.id === 'game', undefined, { timeout: 10_000 });
-  } catch {
-    throw new Error(`${label} Resume did not reacquire pointer lock: ${JSON.stringify(await state(page))}`);
+  let resumed = null;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = await state(page);
+    if (
+      candidate.pointerLock === 'game'
+      && candidate.menuVisible === false
+      && candidate.gameStarted
+      && candidate.remotes === 1
+      && candidate.canvasVisibility === 'visible'
+      && candidate.canvasDisplay !== 'none'
+    ) {
+      resumed = candidate;
+      break;
+    }
+    await page.waitForTimeout(100);
   }
-  try {
-    await page.waitForFunction(() => document.querySelector('#menu')?.classList.contains('hidden'), undefined, { timeout: 10_000 });
-  } catch {
+  if (!resumed) {
     await page.screenshot({ path: `artifacts/focus-recovery/${label}-resume-stuck.png`, fullPage: true });
-    throw new Error(`${label} Resume reacquired pointer lock but did not hide the pause menu: ${JSON.stringify(await state(page))}`);
-  }
-  const resumed = await state(page);
-  if (!resumed.gameStarted || resumed.remotes !== 1 || resumed.canvasVisibility !== 'visible' || resumed.canvasDisplay === 'none') {
-    throw new Error(`${label} did not return to playable multiplayer rendering: ${JSON.stringify(resumed)}`);
+    throw new Error(`${label} Resume did not restore playable multiplayer state: ${JSON.stringify(await state(page))}`);
   }
   console.error(`[focus-recovery] ${label} active-match focus recovery passed`);
   return { returned, resumed };
@@ -198,6 +210,7 @@ try {
   };
   const report = {
     schema: 'atomic-acres/focus-recovery@1',
+    resumeTransition: 'trusted Resume click with deterministic QA pointer-lock-change; real Chromium pointer lock is covered separately by pass25a-baseline e2e',
     roomCodeLength: roomCode.length,
     errors,
     waiting,
