@@ -34,7 +34,12 @@ try {
       page.on('response', (response) => {
         if (response.status() >= 400) errors.push(`cycle ${cycle} ${label}: HTTP ${response.status()} ${response.url()}`);
       });
-      await page.goto(`${baseUrl}?render=compatibility&seed=pass25a-mp-${cycle}-${label}&multiplayerQa=1&peerQaPort=${peerPort}`);
+      const url = new URL(baseUrl);
+      url.searchParams.set('render', 'compatibility');
+      url.searchParams.set('seed', `pass25a-mp-${cycle}-${label}`);
+      url.searchParams.set('multiplayerQa', '1');
+      if (peerPort) url.searchParams.set('peerQaPort', String(peerPort));
+      await page.goto(url.toString());
       await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
       await page.fill('#player-name', `${label} ${cycle}`);
