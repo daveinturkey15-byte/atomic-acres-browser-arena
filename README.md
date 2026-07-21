@@ -9,10 +9,11 @@ A polished, original near-future agritech browser arena FPS with three readable 
 1. Open the deployed site in a desktop Chromium/Firefox browser.
 2. Enter a callsign and choose **Aqua** or **Coral**.
 3. Choose:
-   - **Bot Skirmish** for an offline team match.
-   - **Host Lobby** to generate a room code and invite link.
+   - **Bot Skirmish** for an offline match with bots.
+   - **Host Lobby** to open a human-only waiting room and generate a room code/invite link.
    - **Join** after opening an invite link or pasting a room code.
-4. Click the game view to capture the mouse.
+4. In a private lobby, the host chooses **Team Deathmatch** or **Free For All**, a four- or six-player capacity, and optional team auto-balance. Everyone marks ready; only the host can start.
+5. Click the game view to capture the mouse after the synchronized deployment countdown.
 
 ### Controls
 
@@ -31,16 +32,18 @@ A polished, original near-future agritech browser arena FPS with three readable 
 
 ## Multiplayer architecture
 
-The host is a lightweight relay over PeerJS/WebRTC. Static files can therefore run on free hosting without a paid game server.
+The host browser is an authoritative lightweight relay over PeerJS/WebRTC. Static files can therefore run on free hosting without a paid game server.
 
-- Host and guests exchange validated, bounded protocol messages.
-- Player snapshots are interpolated on peers.
-- Shots, damage, deaths, respawns, team scores and disconnects are relayed through the host.
-- Versioned high-score records persist in the browser and merge with current-lobby peers through bounded protocol messages.
-- Invite links prefill the room code; `autojoin=1` is available for automated smoke testing.
-- The default public PeerJS signalling service is used. Strict corporate/mobile NATs may require a TURN-backed PeerJS deployment later.
+- Private multiplayer is human-only: four-player rooms reject a fifth connection, while six-player rooms support one host plus five guests. Bots remain exclusive to Bot Skirmish.
+- A reliable, ordered event lane carries lobby control, match start, combat, scores, pickups and world changes.
+- A separate unordered movement lane uses `maxRetransmits: 0`; snapshots run at a 50 ms/20 Hz baseline, adapt downward under latency, and are interpolated by peers.
+- Guests connect only to the host. The host binds messages to admitted player identities, owns lobby settings/readiness/start time and score replication, and suppresses a guest's own movement echo.
+- The synchronized match epoch is estimated from host clock probes, so every browser derives countdown and remaining time from the same host-owned timeline.
+- A 30-second reservation and browser-local resume token allow a reloaded guest to reclaim the same identity and recover an active match. Host loss still ends the session; host migration is intentionally out of scope.
+- Invite links prefill the room code; `autojoin=1` is available for automated smoke testing. Room codes are unlisted invitations, not account/password authentication.
+- The default public PeerJS service provides signalling, not TURN relay. Restrictive NATs, VPNs, firewalls, symmetric NAT or blocked UDP can still prevent a connection; add TURN only if real multi-household testing demonstrates that need.
 
-This is a friendly-session architecture, not cheat-resistant competitive netcode. Clients currently report hits; a future public-ranked version should use host-authoritative rewind validation.
+This remains a friendly-session architecture, not cheat-resistant ranked netcode. The host validates and owns match/lobby state, but clients still report some hit outcomes; a public-ranked version should use server-authoritative rewind validation.
 
 ## Callsigns and persistent records
 
@@ -80,13 +83,20 @@ npm run lint
 npm test
 npm run build
 npm run preview
+
+# Against a running preview and PeerServer:
+QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 npm run qa:multiplayer
+QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 QA_MULTIPLAYER_CYCLES=3 npm run qa:multiplayer:lifecycle
+QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 npm run qa:private-lobby
 ```
 
-The test suite covers collision sliding/bounds, deterministic gameplay, framerate-independent interpolation, mandatory callsigns, continuous streak/reward-cycle separation, persistent-score validation, protocol admission and malformed-message rejection. A real two-peer browser smoke test should also be run before each release:
+The automated private-lobby gate uses isolated browser contexts and checks the initial four-player room, capacity-four overflow rejection, real six-player admission/start, TDM auto-balance, FFA settings, shared match epoch/timer, zero bots, event/state channel properties, ping samples, self-echo suppression and active-match reload recovery. This is strong local topology evidence, not a six-household WAN/NAT guarantee.
 
-1. Host a room in one tab.
-2. Open the invite in another tab/profile.
-3. Confirm both roster entries, movement replication, firing, damage, death, respawn and disconnect cleanup.
+Before release, also run a real multi-device or multi-household smoke test:
+
+1. Host a room on one device/network.
+2. Open the invite on the other devices/networks.
+3. Confirm roster/settings/readiness, synchronized start, movement, combat, disconnect grace and reload recovery.
 
 ## Free hosting
 

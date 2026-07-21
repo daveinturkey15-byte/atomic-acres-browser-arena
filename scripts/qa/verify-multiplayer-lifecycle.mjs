@@ -48,6 +48,12 @@ try {
     await guest.fill('#room-input', roomCode);
     await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await host.bringToFront();
+    await host.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: 30_000 });
+    await guest.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: 30_000 });
+    await host.click('#lobby-ready');
+    await guest.click('#lobby-ready');
+    await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 30_000 });
+    await host.click('#lobby-start');
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
     const joined = {
@@ -57,18 +63,22 @@ try {
       guestMode: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameMode),
       hostRemotes: await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotes),
       guestRemotes: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotes),
+      hostNetwork: await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle),
+      guestNetwork: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle),
     };
     await guest.close({ runBeforeUnload: true });
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 30_000 });
+    await host.waitForFunction(() => document.querySelector('#lobby-roster')?.textContent?.includes('REJOINING'), undefined, { timeout: 30_000 });
     joined.leaveObserved = true;
+    joined.rejoinGraceObserved = true;
     results.push(joined);
     await context.close();
   }
-  const report = { schema: 'atomic-acres/pass25a-multiplayer-lifecycle@1', cycles, errors, results };
-  await mkdir('artifacts/pass25a', { recursive: true });
-  await writeFile('artifacts/pass25a/multiplayer-lifecycle.json', `${JSON.stringify(report, null, 2)}\n`);
+  const report = { schema: 'atomic-acres/pass38-multiplayer-lifecycle@1', cycles, errors, results };
+  await mkdir('artifacts/pass38', { recursive: true });
+  await writeFile('artifacts/pass38/multiplayer-lifecycle.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
-  if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client' || !result.leaveObserved)) process.exitCode = 1;
+  if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client' || !result.leaveObserved || !result.rejoinGraceObserved || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1 || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false || result.hostNetwork.stateChannelMaxRetransmits !== 0 || result.guestNetwork.stateChannelMaxRetransmits !== 0)) process.exitCode = 1;
 } finally {
   await browser.close();
 }

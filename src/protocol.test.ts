@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
-import { isGameMessage, isPlayerSnapshot, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type SupportActivateMessage } from './protocol';
+import { isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type SupportActivateMessage } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -114,6 +114,32 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ type: 'ping', by: 'spoof', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', nonce: 2 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', nonce: 2 }, 'abc')).toBe(false);
+  });
+
+  it('validates bounded lobby control traffic and identifies host authority', () => {
+    const join = { type: 'lobby-join' as const, playerId: 'abc', name: 'Tester', requestedTeam: 0 as const, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 };
+    const lobbyState = {
+      type: 'lobby-state' as const,
+      by: 'host',
+      snapshot: {
+        revision: 2,
+        hostId: 'host',
+        phase: 'waiting' as const,
+        config: { mode: 'tdm' as const, capacity: 4 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
+        members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0 }],
+        scores: [{ id: 'host', kills: 0, deaths: 0 }],
+        activeAtEpochMs: null,
+      },
+      nonce: 2,
+    };
+    expect(isGameMessage(join)).toBe(true);
+    expect(messageBelongsToPlayer(join, 'abc')).toBe(true);
+    expect(isGameMessage({ ...join, resumeToken: 'short' })).toBe(false);
+    expect(isGameMessage(lobbyState)).toBe(true);
+    expect(isHostAuthorityMessage(lobbyState)).toBe(true);
+    expect(isStateTrafficMessage({ type: 'state', player })).toBe(true);
+    expect(isStateTrafficMessage(lobbyState)).toBe(false);
+    expect(isGameMessage({ ...lobbyState, snapshot: { ...lobbyState.snapshot, config: { ...lobbyState.snapshot.config, capacity: 5 } } })).toBe(false);
   });
 });
 

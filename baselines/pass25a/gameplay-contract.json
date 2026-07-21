@@ -3068,7 +3068,7 @@
     },
     "networking": {
       "remoteInterpolationRate": 24,
-      "stateBroadcastIntervalMs": 33
+      "stateBroadcastIntervalMs": 50
     },
     "physics": {
       "controller": {

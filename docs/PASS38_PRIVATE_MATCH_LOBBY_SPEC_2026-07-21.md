@@ -29,7 +29,7 @@ Pass 37 already connects one host and three guests with zero bots. The current h
 
 - **C1:** Unit tests reject malformed lobby/settings/clock/score messages, host-only spoofing, over-capacity joins and reconnect-token mismatch.
 - **C2:** Pure lobby tests prove deterministic 2v2 balancing, all-ready gating, 4/6 caps, FFA hostility and grace-period rejoin.
-- **C3:** Network tests prove state/event channel routing, `reliable: false` state connection intent, 50 ms state cadence and source self-echo suppression.
+- **C3:** Network tests prove state/event channel routing, an actual unordered state `RTCDataChannel` with `maxRetransmits: 0`, 50 ms state cadence and source self-echo suppression.
 - **C4:** One host plus three guests reaches the waiting lobby with zero bots; nobody starts before host start.
 - **C5:** A 2v2 four-peer run readies all players, host starts once, and all peers enter active play within 150 ms of the host epoch estimate with equivalent deadlines.
 - **C6:** FFA admits damage between equal presentation teams and exposes a per-player authoritative leader.
@@ -53,7 +53,24 @@ Pass 37 already connects one host and three guests with zero bots. The current h
 
 - Default room capacity: 4; optional host setting: 6.
 - Default mode: 2-team TDM with automatic balance enabled.
-- Movement snapshots: 20 Hz (`50 ms`), JSON serialization, `reliable: false`; gameplay/control events remain reliable JSON.
+- Movement snapshots: 20 Hz (`50 ms`), JSON serialization, unordered `RTCDataChannel` with `maxRetransmits: 0`; gameplay/control events remain reliable and ordered JSON.
 - Rejoin grace: 30 seconds; bounded reconnect attempts with backoff.
 - Host clock: epoch milliseconds carried in bounded ping/pong/start messages; clients estimate host offset using midpoint RTT.
 - FFA keeps existing two operator colour families for readability but hostility is ID-based, not colour/team-based.
+
+## Verification status — 2026-07-21
+
+Local release gates passed:
+
+- TypeScript and production build;
+- 70 Vitest files / 348 tests;
+- gameplay-contract verification and production dependency audit (zero vulnerabilities);
+- existing two-peer combat/world replication QA;
+- three complete join/start/disconnect lifecycle cycles;
+- one host plus five guests in six isolated browser contexts, with five remotes and zero bots on every peer;
+- capacity-four overflow rejection before expanding the same lobby to six;
+- synchronized `04:59` timers and identical host-owned active epochs on all six peers;
+- five host event channels and five unordered `maxRetransmits: 0` state channels;
+- active-match reload recovery with the same player identity and no duplicate roster entry.
+
+These browser contexts used one machine and a local PeerServer. C12 and real multi-household NAT/firewall testing remain separate gates; local six-peer success is not a universal internet-connectivity claim.

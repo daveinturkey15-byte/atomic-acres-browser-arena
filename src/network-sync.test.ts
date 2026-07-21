@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha } from './network-sync';
+import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha, stateBroadcastIntervalMs } from './network-sync';
 
 describe('network synchronization pacing', () => {
-  it('broadcasts snapshots at approximately 30 Hz', () => {
-    expect(STATE_BROADCAST_INTERVAL_MS).toBeGreaterThanOrEqual(32);
-    expect(STATE_BROADCAST_INTERVAL_MS).toBeLessThanOrEqual(34);
+  it('broadcasts healthy snapshots at 20 Hz and adapts under high latency', () => {
+    expect(STATE_BROADCAST_INTERVAL_MS).toBe(50);
+    expect(stateBroadcastIntervalMs(null)).toBe(50);
+    expect(stateBroadcastIntervalMs(140)).toBe(50);
+    expect(stateBroadcastIntervalMs(200)).toBe(66);
+    expect(stateBroadcastIntervalMs(300)).toBe(100);
   });
 
   it('uses a bounded frame-rate-independent interpolation response', () => {

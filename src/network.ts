@@ -1,11 +1,45 @@
 import { DataConnection, Peer } from 'peerjs';
-import { GameMessage, isGameMessage, messageBelongsToPlayer, type Team } from './protocol';
+import {
+  type GameMessage,
+  isGameMessage,
+  isHostAuthorityMessage,
+  isStateTrafficMessage,
+  messageBelongsToPlayer,
+  type Team,
+} from './protocol';
 import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
 
 export type NetworkRole = 'offline' | 'host' | 'client';
 
 type MessageHandler = (message: GameMessage) => void;
 type StatusHandler = (text: string, kind?: 'ok' | 'warn' | 'error') => void;
+type ChannelKind = 'events' | 'state';
+
+type GuestBundle = {
+  playerId: string;
+  peerId: string;
+  team: Team;
+  events: DataConnection;
+  state: DataConnection | null;
+};
+
+type NetworkDiagnostics = Record<string, unknown> & {
+  role: NetworkRole;
+  eventChannels: number;
+  stateChannels: number;
+  stateChannelReliable: boolean | null;
+  stateChannelOrdered: boolean | null;
+  stateChannelMaxRetransmits: number | null;
+  stateMessagesSent: number;
+  stateMessagesRelayed: number;
+  selfStateEchoesSuppressed: number;
+  reconnectAttempts: number;
+};
+
+const STATE_LABEL = 'atomic-acres-state-v1';
+const EVENT_LABEL = 'atomic-acres-events-v1';
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAYS_MS = [500, 1_500, 3_000] as const;
 
 function createArenaPeer(): Peer {
   const params = new URLSearchParams(window.location.search);
@@ -17,35 +51,89 @@ function createArenaPeer(): Peer {
       port,
       path: '/peerjs',
       secure: false,
-      // Keep local host candidates and PeerJS's default STUN fallback. Modern
-      // headless Chromium may mDNS-obfuscate host candidates, so an empty ICE
-      // server list can leave deterministic local QA signalling connected but
-      // the reliable data channel permanently unopened.
     });
   }
   return new Peer();
+}
+
+function channelKind(connection: DataConnection): ChannelKind {
+  return connection.label === STATE_LABEL || connection.metadata?.channel === 'state' ? 'state' : 'events';
+}
+
+function connectLossyStateChannel(peer: Peer, roomCode: string): DataConnection {
+  // PeerJS 1.5 only forwards `reliable` as RTCDataChannel.ordered. Intercept its
+  // synchronous channel creation for this one labelled lane so stale movement is
+  // never retransmitted behind current state. The receiver inherits these SCTP
+  // properties from the DATA_CHANNEL_OPEN message.
+  const prototype = RTCPeerConnection.prototype;
+  const originalCreateDataChannel = prototype.createDataChannel;
+  let intercepted = false;
+  prototype.createDataChannel = function createAtomicStateChannel(label: string, options?: RTCDataChannelInit): RTCDataChannel {
+    if (label === STATE_LABEL) {
+      intercepted = true;
+      return originalCreateDataChannel.call(this, label, {
+        ...options,
+        ordered: false,
+        maxRetransmits: 0,
+      });
+    }
+    return originalCreateDataChannel.call(this, label, options);
+  };
+  try {
+    const connection = peer.connect(roomCode, {
+      label: STATE_LABEL,
+      metadata: { channel: 'state' },
+      reliable: false,
+      serialization: 'json',
+    });
+    if (!intercepted) {
+      connection.close();
+      throw new Error('PeerJS did not synchronously create the transient state channel');
+    }
+    return connection;
+  } finally {
+    prototype.createDataChannel = originalCreateDataChannel;
+  }
 }
 
 export class ArenaNetwork {
   role: NetworkRole = 'offline';
   roomCode = '';
   private peer: Peer | null = null;
-  private hostConnection: DataConnection | null = null;
-  private guests = new Set<DataConnection>();
-  private guestTeams = new Map<DataConnection, Team>();
-  private guestPlayerOwners = new Map<string, DataConnection>();
+  private hostEventConnection: DataConnection | null = null;
+  private hostStateConnection: DataConnection | null = null;
+  private guestBundles = new Map<string, GuestBundle>();
+  private guestPeerOwners = new Map<string, string>();
+  private pendingStateConnections = new Map<string, DataConnection>();
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private onMessage: MessageHandler;
   private onStatus: StatusHandler;
   private onReady: (() => void) | null = null;
+  private maximumPlayers = 4;
+  private manualClose = false;
+  private reconnectAttempts = 0;
+  private stateMessagesSent = 0;
+  private stateMessagesRelayed = 0;
+  private selfStateEchoesSuppressed = 0;
 
   constructor(onMessage: MessageHandler, onStatus: StatusHandler) {
     this.onMessage = onMessage;
     this.onStatus = onStatus;
   }
 
+  setCapacity(maximumPlayers: 4 | 6): void {
+    this.maximumPlayers = maximumPlayers;
+  }
+
+  setPlayerTeam(playerId: string, team: Team): void {
+    const bundle = this.guestBundles.get(playerId);
+    if (bundle) bundle.team = team;
+  }
+
   host(onReady: () => void): void {
     this.close();
+    this.manualClose = false;
     this.role = 'host';
     this.onReady = onReady;
     this.onStatus('Opening a secure peer lobby…');
@@ -53,61 +141,77 @@ export class ArenaNetwork {
     this.peer = peer;
     peer.on('open', (id) => {
       this.roomCode = id;
-      this.onStatus('Lobby ready — share the room code', 'ok');
+      this.onStatus('Lobby ready — share the invite after setup', 'ok');
       onReady();
     });
-    peer.on('connection', (connection) => this.wireGuest(connection));
+    peer.on('connection', (connection) => this.wireIncomingGuest(connection));
     peer.on('error', (error) => this.onStatus(this.describeError(error), 'error'));
     peer.on('disconnected', () => this.onStatus('Signalling disconnected; existing peers may continue', 'warn'));
   }
 
   join(roomCode: string, onReady: () => void): void {
     this.close();
+    this.manualClose = false;
     this.role = 'client';
     this.roomCode = roomCode.trim();
     this.onReady = onReady;
+    this.reconnectAttempts = 0;
     if (!this.roomCode) {
       this.role = 'offline';
       this.onReady = null;
       this.onStatus('Enter a room code first', 'error');
       return;
     }
-    this.onStatus('Connecting to peer lobby…');
-    this.joinDeadline = setTimeout(() => {
-      if (this.role !== 'client' || this.hostConnection?.open) return;
-      const staleConnection = this.hostConnection;
-      const stalePeer = this.peer;
-      this.hostConnection = null;
-      this.peer = null;
-      this.role = 'offline';
-      this.joinDeadline = null;
-      try { staleConnection?.close(); } catch { /* no-op */ }
-      try { stalePeer?.destroy(); } catch { /* no-op */ }
-      this.onStatus('Connection timed out. Check the room code and retry.', 'error');
-    }, 12_000);
-    const peer = createArenaPeer();
-    this.peer = peer;
-    peer.on('open', () => {
-      const connection = peer.connect(this.roomCode, { reliable: true, serialization: 'json' });
-      this.hostConnection = connection;
-      this.wireHost(connection);
-    });
-    peer.on('error', (error) => this.onStatus(this.describeError(error), 'error'));
-    peer.on('disconnected', () => {
-      if (this.role === 'client') this.onStatus('Signalling disconnected; attempting to preserve session', 'warn');
-    });
+    this.connectClient(false);
   }
 
-  send(message: GameMessage): void {
+  send(message: GameMessage, exceptPlayerId?: string): void {
     if (!isGameMessage(message)) return;
     if (this.role === 'host') {
-      this.broadcast(message);
-    } else if (this.role === 'client' && this.hostConnection?.open) {
-      this.hostConnection.send(message);
+      this.broadcast(message, exceptPlayerId);
+    } else if (this.role === 'client') {
+      const connection = isStateTrafficMessage(message) ? this.hostStateConnection : this.hostEventConnection;
+      if (connection?.open) {
+        connection.send(message);
+        if (isStateTrafficMessage(message)) this.stateMessagesSent += 1;
+      }
     }
   }
 
-  diagnostics(): Record<string, unknown> {
+  sendToPlayer(playerId: string, message: GameMessage): boolean {
+    if (this.role !== 'host' || !isGameMessage(message)) return false;
+    const bundle = this.guestBundles.get(playerId);
+    const connection = isStateTrafficMessage(message) ? bundle?.state : bundle?.events;
+    if (!connection?.open) return false;
+    connection.send(message);
+    if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
+    return true;
+  }
+
+  connectedPlayerIds(): string[] {
+    return [...this.guestBundles.keys()];
+  }
+
+  disconnectPlayer(playerId: string): void {
+    if (this.role !== 'host') return;
+    const bundle = this.guestBundles.get(playerId);
+    if (!bundle) return;
+    try { bundle.events.close(); } catch { /* no-op */ }
+    try { bundle.state?.close(); } catch { /* no-op */ }
+    this.dropGuest(playerId, bundle.peerId);
+  }
+
+  diagnostics(): NetworkDiagnostics {
+    const eventChannels = this.role === 'host'
+      ? [...this.guestBundles.values()].filter((bundle) => bundle.events.open).length
+      : Number(this.hostEventConnection?.open ?? false);
+    const stateChannels = this.role === 'host'
+      ? [...this.guestBundles.values()].filter((bundle) => bundle.state?.open).length
+      : Number(this.hostStateConnection?.open ?? false);
+    const clientStateReliable = this.hostStateConnection?.reliable;
+    const hostStateConnection = [...this.guestBundles.values()].find((bundle) => bundle.state)?.state ?? null;
+    const hostStateReliability = hostStateConnection?.reliable;
+    const stateDataChannel = this.hostStateConnection?.dataChannel ?? hostStateConnection?.dataChannel ?? null;
     return {
       role: this.role,
       roomCodeLength: this.roomCode.length,
@@ -115,28 +219,45 @@ export class ArenaNetwork {
       peerOpen: this.peer?.open ?? false,
       peerDisconnected: this.peer?.disconnected ?? false,
       peerDestroyed: this.peer?.destroyed ?? false,
-      hostConnectionPresent: this.hostConnection !== null,
-      hostConnectionOpen: this.hostConnection?.open ?? false,
-      guestConnections: this.guests.size,
-      boundGuestTeams: this.guestTeams.size,
-      openGuestConnections: [...this.guests].filter((connection) => connection.open).length,
+      hostConnectionPresent: this.hostEventConnection !== null,
+      hostConnectionOpen: this.hostEventConnection?.open ?? false,
+      guestConnections: this.guestBundles.size,
+      boundGuestTeams: this.guestBundles.size,
+      openGuestConnections: eventChannels,
       joinDeadlineActive: this.joinDeadline !== null,
+      capacity: this.maximumPlayers,
+      eventChannels,
+      stateChannels,
+      stateChannelReliable: clientStateReliable ?? hostStateReliability ?? null,
+      stateChannelOrdered: stateDataChannel?.ordered ?? null,
+      stateChannelMaxRetransmits: stateDataChannel?.maxRetransmits ?? null,
+      stateMessagesSent: this.stateMessagesSent,
+      stateMessagesRelayed: this.stateMessagesRelayed,
+      selfStateEchoesSuppressed: this.selfStateEchoesSuppressed,
+      reconnectAttempts: this.reconnectAttempts,
+      pendingStateChannels: this.pendingStateConnections.size,
     };
   }
 
   close(): void {
-    if (this.hostConnection) {
-      try { this.hostConnection.close(); } catch { /* no-op */ }
+    this.manualClose = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.clearJoinDeadline();
+    try { this.hostEventConnection?.close(); } catch { /* no-op */ }
+    try { this.hostStateConnection?.close(); } catch { /* no-op */ }
+    for (const bundle of this.guestBundles.values()) {
+      try { bundle.events.close(); } catch { /* no-op */ }
+      try { bundle.state?.close(); } catch { /* no-op */ }
     }
-    for (const connection of this.guests) {
+    for (const connection of this.pendingStateConnections.values()) {
       try { connection.close(); } catch { /* no-op */ }
     }
-    this.guests.clear();
-    this.guestTeams.clear();
-    this.guestPlayerOwners.clear();
-    if (this.joinDeadline) clearTimeout(this.joinDeadline);
-    this.joinDeadline = null;
-    this.hostConnection = null;
+    this.guestBundles.clear();
+    this.guestPeerOwners.clear();
+    this.pendingStateConnections.clear();
+    this.hostEventConnection = null;
+    this.hostStateConnection = null;
     if (this.peer) {
       try { this.peer.destroy(); } catch { /* no-op */ }
     }
@@ -146,89 +267,229 @@ export class ArenaNetwork {
     this.onReady = null;
   }
 
-  private wireGuest(connection: DataConnection): void {
-    this.guests.add(connection);
+  private connectClient(reconnecting: boolean): void {
+    if (this.manualClose || this.role !== 'client') return;
+    this.clearJoinDeadline();
+    this.onStatus(reconnecting ? `Reconnecting to host (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})…` : 'Connecting to peer lobby…', reconnecting ? 'warn' : undefined);
+    this.joinDeadline = setTimeout(() => {
+      if (this.role !== 'client' || this.channelsReady()) return;
+      this.destroyClientTransport();
+      this.scheduleReconnect('Connection timed out');
+    }, 12_000);
+    const peer = createArenaPeer();
+    this.peer = peer;
+    peer.on('open', () => {
+      if (this.manualClose || this.role !== 'client') return;
+      const events = peer.connect(this.roomCode, {
+        label: EVENT_LABEL,
+        metadata: { channel: 'events' },
+        reliable: true,
+        serialization: 'json',
+      });
+      const state = connectLossyStateChannel(peer, this.roomCode);
+      this.hostEventConnection = events;
+      this.hostStateConnection = state;
+      this.wireHostChannel(events, 'events');
+      this.wireHostChannel(state, 'state');
+    });
+    peer.on('error', (error) => this.onStatus(this.describeError(error), 'error'));
+    peer.on('disconnected', () => {
+      if (this.role === 'client') this.onStatus('Signalling disconnected; preserving active data channels', 'warn');
+    });
+  }
+
+  private wireIncomingGuest(connection: DataConnection): void {
+    if (this.role !== 'host') {
+      connection.close();
+      return;
+    }
+    if (channelKind(connection) === 'state') {
+      this.wireGuestState(connection);
+      return;
+    }
+    this.wireGuestEvents(connection);
+  }
+
+  private wireGuestEvents(connection: DataConnection): void {
     let playerId = '';
-    connection.on('open', () => this.onStatus(`${this.guests.size} guest connection${this.guests.size === 1 ? '' : 's'}`, 'ok'));
     connection.on('data', (payload) => {
       if (!isGameMessage(payload)) return;
       if (!playerId) {
-        if (payload.type !== 'join') return;
-        const existingOwner = this.guestPlayerOwners.get(payload.player.id);
-        if (existingOwner && existingOwner !== connection) {
-          this.onStatus('Duplicate player identity rejected', 'error');
-          connection.close();
+        if (payload.type !== 'lobby-join' && payload.type !== 'join') return;
+        const requestedId = payload.type === 'lobby-join' ? payload.playerId : payload.player.id;
+        const requestedTeam = payload.type === 'lobby-join' ? payload.requestedTeam : payload.player.team;
+        const existing = this.guestBundles.get(requestedId);
+        if (existing?.events.open) {
+          this.rejectConnection(connection, 'identity-in-use');
           return;
         }
-        playerId = payload.player.id;
-        this.guestPlayerOwners.set(playerId, connection);
-        this.guestTeams.set(connection, payload.player.team);
+        if (!existing && this.guestBundles.size >= this.maximumPlayers - 1) {
+          this.rejectConnection(connection, 'room-full');
+          return;
+        }
+        playerId = requestedId;
+        const bundle: GuestBundle = {
+          playerId,
+          peerId: connection.peer,
+          team: requestedTeam,
+          events: connection,
+          state: this.pendingStateConnections.get(connection.peer) ?? null,
+        };
+        this.pendingStateConnections.delete(connection.peer);
+        this.guestBundles.set(playerId, bundle);
+        this.guestPeerOwners.set(connection.peer, playerId);
+        this.onStatus(`${this.guestBundles.size} guest connection${this.guestBundles.size === 1 ? '' : 's'}`, 'ok');
+        this.onMessage(payload);
+        return;
       }
-      if (!messageBelongsToPlayer(payload, playerId)) return;
-      // Overdrive pickup races are host-authoritative. Guest claims are delivered
-      // only to the host simulation; guest-authored state is never relayed.
+      if (isHostAuthorityMessage(payload) || !messageBelongsToPlayer(payload, playerId)) return;
+      if (payload.type === 'state') return;
       if (payload.type === 'overdrive-state' || payload.type === 'death') return;
-      if (payload.type === 'overdrive-claim') {
+      if (payload.type === 'overdrive-claim' || payload.type === 'hit'
+        || payload.type === 'join' || payload.type === 'shot' || payload.type === 'melee'
+        || payload.type === 'support-activate' || payload.type === 'grenade-throw'
+        || payload.type === 'lobby-ready' || payload.type === 'lobby-team'
+        || payload.type === 'lobby-balance' || payload.type === 'clock-ping') {
         this.onMessage(payload);
         return;
       }
-      // Guest-authored hit claims are admitted by the host simulation before
-      // any target guest receives them. This prevents bypassing host source,
-      // action-nonce, support-progression and damage checks.
-      if (payload.type === 'hit') {
-        this.onMessage(payload);
-        return;
-      }
-      if (payload.type === 'join' || payload.type === 'state' || payload.type === 'shot' || payload.type === 'melee') {
-        this.onMessage(payload);
-        return;
-      }
-      if (payload.type === 'support-activate') {
-        this.onMessage(payload);
-        return;
-      }
-      if (payload.type === 'grenade-throw') {
-        this.onMessage(payload);
-        return;
-      }
-      if (payload.type === 'ping' && !pingMatchesBoundTeam(payload, this.guestTeams.get(connection))) return;
+      if (payload.type === 'ping' && !pingMatchesBoundTeam(payload, this.guestBundles.get(playerId)?.team)) return;
       this.onMessage(payload);
-      this.broadcast(payload, connection);
+      this.broadcast(payload, playerId);
     });
-    connection.on('close', () => {
-      this.guests.delete(connection);
-      this.guestTeams.delete(connection);
-      if (playerId) this.guestPlayerOwners.delete(playerId);
-      if (playerId) {
-        const leave: GameMessage = { type: 'leave', playerId };
-        this.onMessage(leave);
-        this.broadcast(leave);
-      }
-      this.onStatus('A guest left the lobby', 'warn');
-    });
-    connection.on('error', () => this.onStatus('Guest data channel failed', 'error'));
+    connection.on('close', () => this.dropGuest(playerId, connection.peer));
+    connection.on('error', () => this.onStatus('Guest event channel failed', 'error'));
   }
 
-  private wireHost(connection: DataConnection): void {
+  private wireGuestState(connection: DataConnection): void {
+    this.pendingStateConnections.set(connection.peer, connection);
+    const owner = this.guestPeerOwners.get(connection.peer);
+    if (owner) {
+      const bundle = this.guestBundles.get(owner);
+      if (bundle) bundle.state = connection;
+      this.pendingStateConnections.delete(connection.peer);
+    }
     connection.on('open', () => {
-      if (this.joinDeadline) clearTimeout(this.joinDeadline);
-      this.joinDeadline = null;
-      this.onStatus('Connected to host', 'ok');
-      this.onReady?.();
+      const boundOwner = this.guestPeerOwners.get(connection.peer);
+      const bundle = boundOwner ? this.guestBundles.get(boundOwner) : undefined;
+      if (bundle) {
+        bundle.state = connection;
+        this.pendingStateConnections.delete(connection.peer);
+      }
     });
     connection.on('data', (payload) => {
-      if (isGameMessage(payload)) this.onMessage(payload);
+      if (!isGameMessage(payload) || payload.type !== 'state') return;
+      const playerId = this.guestPeerOwners.get(connection.peer);
+      if (!playerId || !messageBelongsToPlayer(payload, playerId)) return;
+      this.onMessage(payload);
     });
-    connection.on('close', () => this.onStatus('Host connection closed', 'error'));
-    connection.on('error', () => this.onStatus('Could not establish peer data channel', 'error'));
+    connection.on('close', () => {
+      this.pendingStateConnections.delete(connection.peer);
+      const playerId = this.guestPeerOwners.get(connection.peer);
+      const bundle = playerId ? this.guestBundles.get(playerId) : undefined;
+      if (bundle?.state === connection) bundle.state = null;
+    });
+    connection.on('error', () => this.onStatus('Guest movement channel degraded', 'warn'));
   }
 
-  private broadcast(message: GameMessage, except?: DataConnection): void {
-    for (const connection of this.guests) {
-      if (connection === except || !connection.open) continue;
-      if (!shouldRelayMessageToTeam(message, this.guestTeams.get(connection))) continue;
-      connection.send(message);
+  private wireHostChannel(connection: DataConnection, kind: ChannelKind): void {
+    connection.on('open', () => this.maybeClientReady());
+    connection.on('data', (payload) => {
+      if (!isGameMessage(payload)) return;
+      if (kind === 'state' && payload.type !== 'state') return;
+      if (kind === 'events' && payload.type === 'state') return;
+      this.onMessage(payload);
+    });
+    connection.on('close', () => {
+      if (this.manualClose || this.role !== 'client') return;
+      if (kind === 'events') this.scheduleReconnect('Host connection closed');
+      else this.onStatus('Movement channel closed; attempting recovery', 'warn');
+    });
+    connection.on('error', () => {
+      if (kind === 'events') this.onStatus('Could not establish peer event channel', 'error');
+      else this.onStatus('Could not establish movement channel', 'warn');
+    });
+  }
+
+  private maybeClientReady(): void {
+    if (!this.channelsReady()) return;
+    this.clearJoinDeadline();
+    this.reconnectAttempts = 0;
+    this.onStatus('Connected to host', 'ok');
+    this.onReady?.();
+  }
+
+  private channelsReady(): boolean {
+    return Boolean(this.hostEventConnection?.open && this.hostStateConnection?.open);
+  }
+
+  private scheduleReconnect(reason: string): void {
+    if (this.manualClose || this.role !== 'client' || this.reconnectTimer) return;
+    this.destroyClientTransport();
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      this.onStatus(`${reason}. Rejoin from the lobby.`, 'error');
+      return;
     }
+    const delay = RECONNECT_DELAYS_MS[this.reconnectAttempts] ?? RECONNECT_DELAYS_MS.at(-1)!;
+    this.reconnectAttempts += 1;
+    this.onStatus(`${reason}; retrying…`, 'warn');
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connectClient(true);
+    }, delay);
+  }
+
+  private destroyClientTransport(): void {
+    this.clearJoinDeadline();
+    try { this.hostEventConnection?.close(); } catch { /* no-op */ }
+    try { this.hostStateConnection?.close(); } catch { /* no-op */ }
+    this.hostEventConnection = null;
+    this.hostStateConnection = null;
+    if (this.peer) {
+      try { this.peer.destroy(); } catch { /* no-op */ }
+    }
+    this.peer = null;
+  }
+
+  private dropGuest(playerId: string, peerId: string): void {
+    if (!playerId) {
+      this.pendingStateConnections.delete(peerId);
+      return;
+    }
+    const bundle = this.guestBundles.get(playerId);
+    if (!bundle || bundle.events.peer !== peerId) return;
+    this.guestBundles.delete(playerId);
+    this.guestPeerOwners.delete(peerId);
+    this.pendingStateConnections.delete(peerId);
+    try { bundle.state?.close(); } catch { /* no-op */ }
+    const leave: GameMessage = { type: 'leave', playerId };
+    this.onMessage(leave);
+    this.broadcast(leave, playerId);
+    this.onStatus('A guest disconnected; rejoin slot held briefly', 'warn');
+  }
+
+  private rejectConnection(connection: DataConnection, reason: 'room-full' | 'identity-in-use'): void {
+    if (connection.open) connection.send({ type: 'lobby-reject', reason, nonce: Date.now() } satisfies GameMessage);
+    window.setTimeout(() => connection.close(), 50);
+  }
+
+  private broadcast(message: GameMessage, exceptPlayerId?: string): void {
+    for (const bundle of this.guestBundles.values()) {
+      if (bundle.playerId === exceptPlayerId) {
+        if (isStateTrafficMessage(message)) this.selfStateEchoesSuppressed += 1;
+        continue;
+      }
+      if (!shouldRelayMessageToTeam(message, bundle.team)) continue;
+      const connection = isStateTrafficMessage(message) ? bundle.state : bundle.events;
+      if (!connection?.open) continue;
+      connection.send(message);
+      if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
+    }
+  }
+
+  private clearJoinDeadline(): void {
+    if (this.joinDeadline) clearTimeout(this.joinDeadline);
+    this.joinDeadline = null;
   }
 
   private describeError(error: unknown): string {

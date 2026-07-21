@@ -23,6 +23,7 @@
     "qa:pass36:gameplay": "playwright test tests/e2e/pass36-range-atmosphere-windows-drops-leaderboard.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass37:quality-bounds": "playwright test tests/e2e/pass37-quality-bounds.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:multiplayer:lifecycle": "node scripts/qa/verify-multiplayer-lifecycle.mjs",
+    "qa:private-lobby": "node scripts/qa/verify-private-lobby.mjs",
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
     "qa:network-chaos:soak": "tsx scripts/qa/run-network-chaos-soak.ts",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",

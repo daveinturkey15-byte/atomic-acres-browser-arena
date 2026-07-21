@@ -6,6 +6,7 @@ import {
   HEADSHOT_DAMAGE_MULTIPLIER,
   WEAPONS,
   advanceMatch,
+  advanceFreeForAllMatch,
   applyRadialDeadzone,
   beginReload,
   cancelReload,
@@ -311,5 +312,16 @@ describe('match flow', () => {
     state = advanceMatch(state, 3_000, [0, 0], rules);
     expect(state.endsAt).toBe(Number.POSITIVE_INFINITY);
     expect(advanceMatch(state, 99_000_000, [999, 0], rules).phase).toBe('active');
+  });
+
+  it('ends free-for-all with one player winner or a draw', () => {
+    const rules = { durationMs: 60_000, scoreLimit: null } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceFreeForAllMatch(state, 3_100, [{ id: 'a', kills: 0 }], rules);
+    expect(state).toMatchObject({ phase: 'active', phaseStartedAt: 3_000, endsAt: 63_000 });
+    const winner = advanceFreeForAllMatch(state, 63_000, [{ id: 'a', kills: 8 }, { id: 'b', kills: 7 }], rules);
+    expect(winner).toMatchObject({ phase: 'ended', winner: null, winnerPlayerId: 'a' });
+    const draw = advanceFreeForAllMatch(state, 63_000, [{ id: 'a', kills: 8 }, { id: 'b', kills: 8 }], rules);
+    expect(draw).toMatchObject({ phase: 'ended', winner: 'draw' });
   });
 });

@@ -78,10 +78,22 @@ await guest.selectOption('#team', '1');
 const teams = { host: 0, guest: Number(await guest.inputValue('#team')) };
 await guest.fill('#room-input', roomCode);
 await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+await host.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: connectionTimeoutMs });
+await guest.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: connectionTimeoutMs });
+phase('waiting room joined');
+await host.click('#lobby-ready');
+await guest.click('#lobby-ready');
+await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: connectionTimeoutMs });
+const lobbyReady = await host.evaluate(() => document.querySelectorAll('#lobby-roster .lobby-player em').length === 2
+  && [...document.querySelectorAll('#lobby-roster .lobby-player em')].every((element) => element.textContent === 'READY'));
+await host.click('#lobby-start');
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: connectionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true, undefined, { timeout: connectionTimeoutMs });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
 await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes >= 1, undefined, { timeout: connectionTimeoutMs });
-phase('peer join complete');
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: connectionTimeoutMs });
+await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: connectionTimeoutMs });
+phase('ready gate and synchronized match start complete');
 await guest.waitForFunction(() => document.querySelector('#high-score-list')?.textContent?.includes('Legacy Ace'), undefined, { timeout: interactionTimeoutMs });
 const leaderboardReplicated = await guest.evaluate(() => document.querySelector('#high-score-list')?.textContent?.includes('14 KILLS') === true);
 phase('persistent leaderboard replicated');
@@ -136,17 +148,18 @@ await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remo
 const guestDeathsBefore = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.deaths);
 await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
-  api.equipWeapon('sniper');
+  api.equipWeapon('carbine');
   api.setAds(true);
 });
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponPresentation.adsProgress >= 0.98, undefined, { timeout: interactionTimeoutMs });
-await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
-  .some((remote) => remote.weapon === 'sniper'), undefined, { timeout: interactionTimeoutMs });
-await host.evaluate(() => {
-  const api = window.__ATOMIC_ACRES_DEBUG__;
-  api.aimAtRemote('head');
-  api.fireOnce();
-});
+for (let shot = 0; shot < 3; shot += 1) {
+  await host.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.aimAtRemote('head');
+    api.fireOnce();
+  });
+  await host.waitForTimeout(180);
+}
 try {
   await guest.waitForFunction((before) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.deaths > before, guestDeathsBefore, { timeout: interactionTimeoutMs });
 } catch (error) {
@@ -171,6 +184,8 @@ await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot(
 await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 2.2]);
 await guest.waitForFunction(([x, z]) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers
   .some((remote) => Math.abs(remote.position[0] - x) < 0.5 && Math.abs(remote.position[2] - (z + 2.2)) < 0.5), [remoteDeathDrop.position[0], remoteDeathDrop.position[2]], { timeout: interactionTimeoutMs });
+await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.equipWeapon('sniper'));
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().player.primaryWeapon === 'sniper', undefined, { timeout: interactionTimeoutMs });
 await host.evaluate(() => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
   const state = api.snapshot();
@@ -205,6 +220,6 @@ await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false))
 await host.waitForTimeout(1_000);
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
-console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, leaderboardReplicated, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths } }, null, 2));
-if (errors.length || !leaderboardReplicated || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest) process.exitCode = 1;
+console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, lobbyReady, leaderboardReplicated, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon, network: hostState.networkLifecycle }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths, network: guestState.networkLifecycle } }, null, 2));
+if (errors.length || !lobbyReady || !leaderboardReplicated || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest || hostState.networkLifecycle.stateChannels < 1 || guestState.networkLifecycle.stateChannels < 1 || hostState.networkLifecycle.stateChannelOrdered !== false || guestState.networkLifecycle.stateChannelOrdered !== false || hostState.networkLifecycle.stateChannelMaxRetransmits !== 0 || guestState.networkLifecycle.stateChannelMaxRetransmits !== 0 || hostState.networkLifecycle.selfStateEchoesSuppressed < 1) process.exitCode = 1;
 await browser.close();

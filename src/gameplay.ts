@@ -364,6 +364,7 @@ export type MatchState = {
   phaseStartedAt: number;
   endsAt: number;
   winner: 0 | 1 | 'draw' | null;
+  winnerPlayerId?: string;
   endReason?: 'score' | 'time';
   rematchRequested?: boolean;
 };
@@ -380,10 +381,11 @@ export function advanceMatch(
 ): MatchState {
   if (state.phase === 'ended' && state.rematchRequested) return createMatch(now, rules);
   if (state.phase === 'warmup' && now >= state.endsAt) {
+    const activeAt = state.endsAt;
     return {
       phase: 'active',
-      phaseStartedAt: now,
-      endsAt: rules.durationMs === null ? Number.POSITIVE_INFINITY : now + rules.durationMs,
+      phaseStartedAt: activeAt,
+      endsAt: rules.durationMs === null ? Number.POSITIVE_INFINITY : activeAt + rules.durationMs,
       winner: null,
     };
   }
@@ -394,6 +396,39 @@ export function advanceMatch(
     const winner = scores[0] === scores[1] ? 'draw' : scores[0] > scores[1] ? 0 : 1;
     return {
       phase: 'ended', phaseStartedAt: now, endsAt: now, winner,
+      endReason: scoreReached ? 'score' : 'time',
+    };
+  }
+  return state;
+}
+
+export function advanceFreeForAllMatch(
+  state: MatchState,
+  now: number,
+  scores: readonly { id: string; kills: number }[],
+  rules: MatchRules = DEFAULT_MATCH_RULES,
+): MatchState {
+  if (state.phase === 'ended' && state.rematchRequested) return createMatch(now, rules);
+  if (state.phase === 'warmup' && now >= state.endsAt) {
+    return {
+      phase: 'active',
+      phaseStartedAt: state.endsAt,
+      endsAt: rules.durationMs === null ? Number.POSITIVE_INFINITY : state.endsAt + rules.durationMs,
+      winner: null,
+    };
+  }
+  const ordered = [...scores].sort((a, b) => b.kills - a.kills || a.id.localeCompare(b.id));
+  const scoreReached = rules.scoreLimit !== null && (ordered[0]?.kills ?? 0) >= rules.scoreLimit;
+  const timeReached = rules.durationMs !== null && now >= state.endsAt;
+  if (state.phase === 'active' && (scoreReached || timeReached)) {
+    const topKills = ordered[0]?.kills ?? 0;
+    const leaders = ordered.filter((entry) => entry.kills === topKills);
+    return {
+      phase: 'ended',
+      phaseStartedAt: now,
+      endsAt: now,
+      winner: leaders.length === 1 ? null : 'draw',
+      winnerPlayerId: leaders.length === 1 ? leaders[0].id : undefined,
       endReason: scoreReached ? 'score' : 'time',
     };
   }

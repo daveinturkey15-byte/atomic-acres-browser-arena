@@ -1,5 +1,13 @@
 import { presentationRandom } from './runtime-random';
 import { MAX_HIGH_SCORE_ENTRIES, isHighScoreEntry, type HighScoreEntry } from './high-scores';
+import {
+  isLobbySnapshot,
+  isPlayerScore,
+  isPrivateMatchConfig,
+  type LobbySnapshot,
+  type PlayerScore,
+  type PrivateMatchConfig,
+} from './private-match';
 
 export type Team = 0 | 1;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun' | 'sniper';
@@ -95,7 +103,7 @@ export type WindowBreakMessage = {
   actionNonce?: number;
   nonce: number;
 };
-export type LeaveMessage = { type: 'leave'; playerId: string };
+export type LeaveMessage = { type: 'leave'; playerId: string; voluntary?: boolean };
 export type TeamPingKind = 'enemy' | 'regroup' | 'push' | 'nice';
 export type TeamPingMessage = {
   type: 'ping';
@@ -124,7 +132,28 @@ export type OverdriveStateMessage = {
   nextSpawnInMs: number;
   nonce: number;
 };
-export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage;
+export type LobbyJoinMessage = {
+  type: 'lobby-join';
+  playerId: string;
+  name: string;
+  requestedTeam: Team;
+  resumeToken: string;
+  nonce: number;
+};
+export type LobbyReadyMessage = { type: 'lobby-ready'; by: string; ready: boolean; nonce: number };
+export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; nonce: number };
+export type LobbyConfigMessage = { type: 'lobby-config'; by: string; config: PrivateMatchConfig; nonce: number };
+export type LobbyBalanceMessage = { type: 'lobby-balance'; by: string; nonce: number };
+export type LobbyStateMessage = { type: 'lobby-state'; by: string; snapshot: LobbySnapshot; nonce: number };
+export type LobbyStartMessage = { type: 'lobby-start'; by: string; activeAtEpochMs: number; revision: number; nonce: number };
+export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config';
+export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReason; nonce: number };
+export type ClockPingMessage = { type: 'clock-ping'; by: string; sentAtEpochMs: number; reportedRttMs: number | null; nonce: number };
+export type ClockPongMessage = { type: 'clock-pong'; by: string; forPlayerId: string; sentAtEpochMs: number; hostEpochMs: number; nonce: number };
+export type MatchScoreMessage = { type: 'match-score'; by: string; scores: PlayerScore[]; nonce: number };
+
+export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage;
 
 const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol']);
 const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun', 'sniper']);
@@ -218,7 +247,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'leave':
-      return typeof msg.playerId === 'string';
+      return typeof msg.playerId === 'string' && msg.playerId.length > 0 && msg.playerId.length <= 80
+        && (msg.voluntary === undefined || typeof msg.voluntary === 'boolean');
     case 'ping':
       return typeof msg.by === 'string'
         && (msg.team === 0 || msg.team === 1)
@@ -245,6 +275,52 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.activeRemainingMs) && Number(msg.activeRemainingMs) >= 0 && Number(msg.activeRemainingMs) <= 15_000
         && Number.isFinite(msg.nextSpawnInMs) && Number(msg.nextSpawnInMs) >= 0 && Number(msg.nextSpawnInMs) <= 120_000
         && Number.isFinite(msg.nonce);
+    case 'lobby-join':
+      return typeof msg.playerId === 'string' && msg.playerId.length > 0 && msg.playerId.length <= 80
+        && typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 20
+        && (msg.requestedTeam === 0 || msg.requestedTeam === 1)
+        && typeof msg.resumeToken === 'string' && msg.resumeToken.length >= 24 && msg.resumeToken.length <= 128
+        && /^[a-zA-Z0-9_-]+$/.test(msg.resumeToken)
+        && Number.isFinite(msg.nonce);
+    case 'lobby-ready':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.ready === 'boolean' && Number.isFinite(msg.nonce);
+    case 'lobby-team':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && (msg.team === 0 || msg.team === 1) && Number.isFinite(msg.nonce);
+    case 'lobby-config':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isPrivateMatchConfig(msg.config) && Number.isFinite(msg.nonce);
+    case 'lobby-balance':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80 && Number.isFinite(msg.nonce);
+    case 'lobby-state':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isLobbySnapshot(msg.snapshot) && Number.isFinite(msg.nonce);
+    case 'lobby-start':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Number.isFinite(msg.activeAtEpochMs) && Number(msg.activeAtEpochMs) >= 0 && Number(msg.activeAtEpochMs) <= 10_000_000_000_000
+        && Number.isSafeInteger(msg.revision) && Number(msg.revision) >= 0
+        && Number.isFinite(msg.nonce);
+    case 'lobby-reject':
+      return (msg.reason === 'room-full' || msg.reason === 'identity-in-use' || msg.reason === 'rejoin-denied'
+        || msg.reason === 'match-active' || msg.reason === 'invalid-config')
+        && Number.isFinite(msg.nonce);
+    case 'clock-ping':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Number.isFinite(msg.sentAtEpochMs) && Number(msg.sentAtEpochMs) >= 0 && Number(msg.sentAtEpochMs) <= 10_000_000_000_000
+        && (msg.reportedRttMs === null || Number.isFinite(msg.reportedRttMs) && Number(msg.reportedRttMs) >= 0 && Number(msg.reportedRttMs) <= 5_000)
+        && Number.isFinite(msg.nonce);
+    case 'clock-pong':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && Number.isFinite(msg.sentAtEpochMs) && Number(msg.sentAtEpochMs) >= 0 && Number(msg.sentAtEpochMs) <= 10_000_000_000_000
+        && Number.isFinite(msg.hostEpochMs) && Number(msg.hostEpochMs) >= 0 && Number(msg.hostEpochMs) <= 10_000_000_000_000
+        && Number.isFinite(msg.nonce);
+    case 'match-score':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Array.isArray(msg.scores) && msg.scores.length <= 6 && msg.scores.every(isPlayerScore)
+        && new Set(msg.scores.map((score) => score.id)).size === msg.scores.length
+        && Number.isFinite(msg.nonce);
     default:
       return false;
   }
@@ -256,6 +332,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'join':
     case 'state':
       return message.player.id === playerId;
+    case 'lobby-join':
+      return message.playerId === playerId;
     case 'shot':
     case 'melee':
     case 'grenade-throw':
@@ -268,12 +346,36 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'leaderboard-sync':
     case 'overdrive-claim':
     case 'overdrive-state':
+    case 'lobby-ready':
+    case 'lobby-team':
+    case 'lobby-config':
+    case 'lobby-balance':
+    case 'lobby-state':
+    case 'lobby-start':
+    case 'clock-ping':
+    case 'clock-pong':
+    case 'match-score':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;
     case 'leave':
       return message.playerId === playerId;
+    case 'lobby-reject':
+      return false;
   }
+}
+
+export function isHostAuthorityMessage(message: GameMessage): boolean {
+  return message.type === 'lobby-config'
+    || message.type === 'lobby-state'
+    || message.type === 'lobby-start'
+    || message.type === 'lobby-reject'
+    || message.type === 'clock-pong'
+    || message.type === 'match-score';
+}
+
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage {
+  return message.type === 'state';
 }
 
 export function sanitizeName(value: string): string {
