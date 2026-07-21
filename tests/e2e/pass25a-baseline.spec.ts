@@ -201,14 +201,23 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     await ready(page, 'blender');
     await startSolo(page);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
-    const before = await snapshot(page);
-    expect(before.render.shadowMode).toBe('static');
-    expect(before.render.shadowAutoUpdate).toBe(false);
+    const before = await page.evaluate(() => ({
+      now: performance.now(),
+      state: (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__.snapshot(),
+    }));
+    expect(before.state.render.shadowMode).toBe('static');
+    expect(before.state.render.shadowAutoUpdate).toBe(false);
     await page.waitForTimeout(750);
-    const after = await snapshot(page);
-    const refreshes = after.render.staticShadowDynamicRefreshes - before.render.staticShadowDynamicRefreshes;
+    const after = await page.evaluate(() => ({
+      now: performance.now(),
+      state: (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__.snapshot(),
+    }));
+    const refreshes = after.state.render.staticShadowDynamicRefreshes - before.state.render.staticShadowDynamicRefreshes;
     expect(refreshes).toBeGreaterThanOrEqual(1);
-    expect(refreshes).toBeLessThanOrEqual(8);
+    // Keep this a rate assertion rather than assuming waitForTimeout advances the
+    // busy Windows renderer by exactly 750 ms. The production gate is 100 ms.
+    const elapsedMs = after.now - before.now;
+    expect(refreshes).toBeLessThanOrEqual(Math.ceil(elapsedMs / 100) + 1);
     const outputHashes = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         setBotsFrozen: (frozen: boolean) => void;

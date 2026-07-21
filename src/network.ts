@@ -60,6 +60,27 @@ function channelKind(connection: DataConnection): ChannelKind {
   return connection.label === STATE_LABEL || connection.metadata?.channel === 'state' ? 'state' : 'events';
 }
 
+export function isCurrentGuestEventConnection(
+  current: DataConnection | undefined,
+  closing: DataConnection,
+): boolean {
+  return current === closing;
+}
+
+export function joinTimeoutAction(reconnecting: boolean): 'retry' | 'offline' {
+  return reconnecting ? 'retry' : 'offline';
+}
+
+export function replaceGuestPeerOwner(
+  owners: Map<string, string>,
+  playerId: string,
+  previousPeerId: string | undefined,
+  nextPeerId: string,
+): void {
+  if (previousPeerId && previousPeerId !== nextPeerId) owners.delete(previousPeerId);
+  owners.set(nextPeerId, playerId);
+}
+
 function connectLossyStateChannel(peer: Peer, roomCode: string): DataConnection {
   // PeerJS 1.5 only forwards `reliable` as RTCDataChannel.ordered. Intercept its
   // synchronous channel creation for this one labelled lane so stale movement is
@@ -198,7 +219,7 @@ export class ArenaNetwork {
     if (!bundle) return;
     try { bundle.events.close(); } catch { /* no-op */ }
     try { bundle.state?.close(); } catch { /* no-op */ }
-    this.dropGuest(playerId, bundle.peerId);
+    this.dropGuest(playerId, bundle.events);
   }
 
   diagnostics(): NetworkDiagnostics {
@@ -274,7 +295,14 @@ export class ArenaNetwork {
     this.joinDeadline = setTimeout(() => {
       if (this.role !== 'client' || this.channelsReady()) return;
       this.destroyClientTransport();
-      this.scheduleReconnect('Connection timed out');
+      if (joinTimeoutAction(reconnecting) === 'retry') {
+        this.scheduleReconnect('Connection timed out');
+      } else {
+        this.role = 'offline';
+        this.roomCode = '';
+        this.onReady = null;
+        this.onStatus('Connection timed out. Check the room code and try again.', 'error');
+      }
     }, 12_000);
     const peer = createArenaPeer();
     this.peer = peer;
@@ -337,7 +365,7 @@ export class ArenaNetwork {
         };
         this.pendingStateConnections.delete(connection.peer);
         this.guestBundles.set(playerId, bundle);
-        this.guestPeerOwners.set(connection.peer, playerId);
+        replaceGuestPeerOwner(this.guestPeerOwners, playerId, existing?.peerId, connection.peer);
         this.onStatus(`${this.guestBundles.size} guest connection${this.guestBundles.size === 1 ? '' : 's'}`, 'ok');
         this.onMessage(payload);
         return;
@@ -357,7 +385,7 @@ export class ArenaNetwork {
       this.onMessage(payload);
       this.broadcast(payload, playerId);
     });
-    connection.on('close', () => this.dropGuest(playerId, connection.peer));
+    connection.on('close', () => this.dropGuest(playerId, connection));
     connection.on('error', () => this.onStatus('Guest event channel failed', 'error'));
   }
 
@@ -427,6 +455,9 @@ export class ArenaNetwork {
     if (this.manualClose || this.role !== 'client' || this.reconnectTimer) return;
     this.destroyClientTransport();
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      this.role = 'offline';
+      this.roomCode = '';
+      this.onReady = null;
       this.onStatus(`${reason}. Rejoin from the lobby.`, 'error');
       return;
     }
@@ -451,13 +482,16 @@ export class ArenaNetwork {
     this.peer = null;
   }
 
-  private dropGuest(playerId: string, peerId: string): void {
+  private dropGuest(playerId: string, connection: DataConnection): void {
+    const peerId = connection.peer;
     if (!playerId) {
       this.pendingStateConnections.delete(peerId);
       return;
     }
     const bundle = this.guestBundles.get(playerId);
-    if (!bundle || bundle.events.peer !== peerId) return;
+    // A close callback can arrive after a same-peer reconnect installed a
+    // replacement bundle. Stable peer IDs cannot distinguish those sessions.
+    if (!bundle || !isCurrentGuestEventConnection(bundle.events, connection)) return;
     this.guestBundles.delete(playerId);
     this.guestPeerOwners.delete(peerId);
     this.pendingStateConnections.delete(peerId);

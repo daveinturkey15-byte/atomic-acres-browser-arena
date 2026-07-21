@@ -1,7 +1,8 @@
 import { chromium } from '@playwright/test';
+import { tmpdir } from 'node:os';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
-const screenshotDir = process.env.QA_SCREENSHOT_DIR ?? '/tmp';
+const screenshotDir = process.env.QA_SCREENSHOT_DIR ?? tmpdir();
 const browser = await chromium.launch({ headless: true });
 const reports = [];
 try {

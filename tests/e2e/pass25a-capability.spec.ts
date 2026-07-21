@@ -13,6 +13,10 @@ test.describe('Pass 25A browser capability smoke', () => {
     await expect(page.locator('#menu')).toBeVisible();
     await expect(page.locator('#solo')).toBeEnabled({ timeout: 30_000 });
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().render.calls > 0, undefined, { timeout: 30_000 });
+    await page.waitForFunction(() => {
+      const signal = window.__ATOMIC_ACRES_DEBUG__?.snapshot().render.atomicSignal;
+      return signal?.bypassReason === 'software-renderer' || signal?.targetValidated && signal?.outputValidated;
+    }, undefined, { timeout: 30_000 });
     const capability = await page.evaluate(() => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return {

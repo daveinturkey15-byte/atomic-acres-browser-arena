@@ -157,32 +157,39 @@ async function submitStreak(request: Request, env: Env, origin: string, context:
     admitRateLimit(env.DB, `install:${installHash}`, INSTALL_RATE_LIMIT, now),
   ]);
   if (!ipAllowed || !installAllowed) return json({ error: 'rate limit exceeded' }, 429, origin, env);
-  const existingClaim = await env.DB.prepare('SELECT idempotency_key FROM streak_claims WHERE idempotency_key = ?')
-    .bind(submission.idempotencyKey).first<{ idempotency_key: string }>();
-  if (existingClaim) return json({ accepted: true, updated: false, idempotent: true }, 200, origin, env);
+  const claim = await env.DB.prepare(
+    'INSERT INTO streak_claims (idempotency_key, received_at) VALUES (?, ?) ON CONFLICT(idempotency_key) DO NOTHING',
+  ).bind(submission.idempotencyKey, now).run();
+  if ((claim.meta.changes ?? 0) === 0) {
+    return json({ accepted: true, updated: false, idempotent: true }, 200, origin, env);
+  }
   const nameKey = leaderboardNameKey(submission.name);
-  const result = await env.DB.prepare(`
-    INSERT INTO leaderboard (name_key, name, best_streak, kills, deaths, updated_at, build_id, install_hash)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(name_key) DO UPDATE SET
-      name = excluded.name,
-      best_streak = excluded.best_streak,
-      kills = excluded.kills,
-      deaths = excluded.deaths,
-      updated_at = excluded.updated_at,
-      build_id = excluded.build_id,
-      install_hash = excluded.install_hash
-    WHERE excluded.best_streak > leaderboard.best_streak
-       OR (excluded.best_streak = leaderboard.best_streak AND excluded.kills > leaderboard.kills)
-       OR (excluded.best_streak = leaderboard.best_streak AND excluded.kills = leaderboard.kills AND excluded.deaths < leaderboard.deaths)
-  `).bind(nameKey, submission.name, submission.streak, submission.kills, submission.deaths, now, submission.buildId, installHash).run();
-  await env.DB.prepare('INSERT INTO streak_claims (idempotency_key, received_at) VALUES (?, ?)')
-    .bind(submission.idempotencyKey, now).run();
-  context.waitUntil(Promise.all([
-    env.DB.prepare('DELETE FROM streak_claims WHERE received_at < ?').bind(now - 7 * 24 * 60 * 60_000).run(),
-    env.DB.prepare('DELETE FROM rate_limits WHERE updated_at < ?').bind(now - 2 * 60 * 60_000).run(),
-  ]).then(() => undefined));
-  return json({ accepted: true, updated: (result.meta.changes ?? 0) > 0, idempotent: false }, 200, origin, env);
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO leaderboard (name_key, name, best_streak, kills, deaths, updated_at, build_id, install_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(name_key) DO UPDATE SET
+        name = excluded.name,
+        best_streak = excluded.best_streak,
+        kills = excluded.kills,
+        deaths = excluded.deaths,
+        updated_at = excluded.updated_at,
+        build_id = excluded.build_id,
+        install_hash = excluded.install_hash
+      WHERE excluded.best_streak > leaderboard.best_streak
+         OR (excluded.best_streak = leaderboard.best_streak AND excluded.kills > leaderboard.kills)
+         OR (excluded.best_streak = leaderboard.best_streak AND excluded.kills = leaderboard.kills AND excluded.deaths < leaderboard.deaths)
+    `).bind(nameKey, submission.name, submission.streak, submission.kills, submission.deaths, now, submission.buildId, installHash).run();
+    context.waitUntil(Promise.all([
+      env.DB.prepare('DELETE FROM streak_claims WHERE received_at < ?').bind(now - 7 * 24 * 60 * 60_000).run(),
+      env.DB.prepare('DELETE FROM rate_limits WHERE updated_at < ?').bind(now - 2 * 60 * 60_000).run(),
+    ]).then(() => undefined));
+    return json({ accepted: true, updated: (result.meta.changes ?? 0) > 0, idempotent: false }, 200, origin, env);
+  } catch (error) {
+    await env.DB.prepare('DELETE FROM streak_claims WHERE idempotency_key = ?')
+      .bind(submission.idempotencyKey).run().catch(() => undefined);
+    throw error;
+  }
 }
 
 export default {

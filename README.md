@@ -90,6 +90,12 @@ QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 QA_MULTIPLAYER_CYCLES=3 npm
 QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 npm run qa:private-lobby
 ```
 
+Current release and verification documentation:
+
+- [`docs/INDEX.md`](docs/INDEX.md) — canonical documentation map and historical-pass boundary.
+- [`docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md`](docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — current Pass 52 product contract.
+- [`docs/VERIFICATION_AND_RELEASE_HYGIENE.md`](docs/VERIFICATION_AND_RELEASE_HYGIENE.md) — local/CI gates, portability, provenance, and legal-distinction rules.
+
 The automated private-lobby gate uses isolated browser contexts and checks the initial four-player room, capacity-four overflow rejection, real six-player admission/start, TDM auto-balance, FFA settings, shared match epoch/timer, zero bots, event/state channel properties, ping samples, self-echo suppression and active-match reload recovery. This is strong local topology evidence, not a six-household WAN/NAT guarantee.
 
 Before release, also run a real multi-device or multi-household smoke test:

@@ -1,0 +1,19 @@
+# Keep tracked text byte-stable across Windows, Linux, CI, and release builds.
+# Asset provenance and gameplay baselines hash exact bytes, so CRLF checkout
+# conversion would otherwise invalidate committed checksums on Windows.
+* text=auto eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.gltf text eol=lf
+
+# Explicit binary formats used by the project.
+*.blend -text
+*.fbx -text
+*.glb -text
+*.jpg -text
+*.jpeg -text
+*.png -text
+*.wav -text
+*.woff -text
+*.woff2 -text

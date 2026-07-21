@@ -9,7 +9,7 @@
       "generatedAsOf": "2026-07-18",
       "license": "Original project work",
       "files": "public/assets/original/textures/*.png",
-      "contactSheet": "public/assets/original/texture-contact-sheet.jpg",
+      "contactSheet": "docs/assets/texture-contact-sheet.jpg",
       "modifications": "Thirty-four deterministic project-generated textures: twelve original albedo surfaces plus eleven tangent-normal and eleven roughness companions. Pass 31 adds plaster, timber, gunmetal and painted-metal maps generated locally from project-authored source pixels with no external imagery.",
       "attributionRequired": false
     },
@@ -76,7 +76,7 @@
       "modifications": "Swat.gltf is preserved as the reference source. Swat_FirstPersonArms.glb is a Blender 5.1.1 derivative retaining the original arm, hand, finger skin weights and skeleton while removing torso geometry at the authored shoulder seam. The derivative is bundled for continued calibration but is not selected by the current public first-person presentation because it failed the visual grip/framing gate.",
       "attributionRequired": false,
       "files": [
-        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt", "sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt", "sha256": "579a64b783673647182ed18944026c27a48421fb1b1c2c9207f3c650fe4546f2" },
         { "path": "public/assets/third-party/quaternius/ultimate-modular-males/README.md", "sha256": "ad892fe9f10736999e164eb2d477180b7c704e690928ecf079eb61e6c41b3c4f" },
         { "path": "public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf", "sha256": "622b3f36fcac90539ef8f7121ec1f11b5e1ae603a085019b3fa96eba20dddfd3" },
         { "path": "public/assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb", "sha256": "f5ea36848878cc3d94a661716879f1cc56d04cdeaf00ca826eacacca9f5332a8" }

@@ -26,6 +26,14 @@ export function resetRemoteGrenadeAuthorityState(): RemoteGrenadeAuthorityState 
   return createRemoteGrenadeAuthorityState();
 }
 
+export function replenishRemoteGrenadeAuthorityState(
+  state: RemoteGrenadeAuthorityState,
+  amount = 1,
+): RemoteGrenadeAuthorityState {
+  if (!Number.isFinite(amount) || amount <= 0) return state;
+  return { ...state, remaining: Math.min(2, state.remaining + Math.floor(amount)) };
+}
+
 export function admitRemoteGrenadeThrow(
   state: RemoteGrenadeAuthorityState,
   message: GrenadeThrowMessage,

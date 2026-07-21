@@ -68,7 +68,8 @@ async function verify(path: string, value: unknown): Promise<void> {
     return;
   }
   const actual = await readFile(path, 'utf8');
-  if (actual !== expected) throw new Error(`Baseline drift: ${path}. Run npm run baseline:generate and review the diff.`);
+  const normalizeCheckoutEol = (text: string) => text.replaceAll('\r\n', '\n');
+  if (normalizeCheckoutEol(actual) !== normalizeCheckoutEol(expected)) throw new Error(`Baseline drift: ${path}. Run npm run baseline:generate and review the diff.`);
   console.log(`verified ${path}`);
 }
 

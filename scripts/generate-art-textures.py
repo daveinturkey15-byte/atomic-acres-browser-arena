@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 OUT = Path(__file__).resolve().parents[1] / "public/assets/original/textures"
+CONTACT_SHEET = Path(__file__).resolve().parents[1] / "docs/assets/texture-contact-sheet.jpg"
 SIZE = 512
 PBR_SIZE = 256
 SEED = 860711
@@ -211,7 +212,8 @@ def make_contact_sheet() -> None:
     sheet = Image.new("RGB", (220 * 4, 250 * math.ceil(len(thumbs) / 4)), (12, 17, 19))
     for index, thumb in enumerate(thumbs):
         sheet.paste(thumb, ((index % 4) * 220, (index // 4) * 250))
-    sheet.save(OUT.parent / "texture-contact-sheet.jpg", quality=90)
+    CONTACT_SHEET.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(CONTACT_SHEET, quality=90)
 
 
 def main() -> None:

@@ -388,8 +388,8 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 33');
-    expect(state.networkSync).toEqual({ stateIntervalMs: 33, interpolationRate: 24 });
+    await expect(page.locator('.eyebrow')).toContainText('THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 52');
+    expect(state.networkSync).toEqual({ stateIntervalMs: 50, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -454,15 +454,22 @@ test.describe('boot and authored presentation', () => {
   test('persists a named streak immediately and keeps it when the player exits before round end', async ({ page }) => {
     await pageReady(page);
     await startSolo(page);
-    await page.evaluate(() => (window as unknown as {
-      __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
-    }).__ATOMIC_ACRES_DEBUG__.earnSupport(8));
-    expect((await debug(page)).matchPhase).toBe('active');
-    const immediate = await page.evaluate(() => {
-      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
-      return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
+    await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void; setKills: (kills: number) => void };
+      }).__ATOMIC_ACRES_DEBUG__;
+      // Real eliminations increment the match kill count before support is awarded.
+      // Keep the debug scenario faithful so the shared leaderboard policy accepts
+      // the immediate row (kills must be greater than or equal to the streak).
+      api.setKills(8);
+      api.earnSupport(8);
     });
-    expect(immediate.find((entry) => entry.name === 'QA Operator')).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
+    expect((await debug(page)).matchPhase).toBe('active');
+    await expect.poll(async () => page.evaluate(() => {
+      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+      const entries = raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
+      return entries.find((entry) => entry.name === 'QA Operator');
+    })).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
     await page.reload();
     await pageReady(page);
     const qaScore = page.locator('#high-score-list li').filter({ hasText: 'QA Operator' });
@@ -561,13 +568,13 @@ test.describe('boot and authored presentation', () => {
       shadows: true, shadowMode: 'static',
       lighting: {
         exposure: 1.18, hemisphereIntensity: 1.9, ambientIntensity: 0.82,
-        sunIntensity: 2.7, fogNear: 50, fogFar: 128,
+        sunIntensity: 2.7, fogNear: 32, fogFar: 104,
         routeLightIntensity: 5, streetLightIntensity: 6, interiorLightIntensity: 15,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.12, godRayLobes: 4,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 33, materialCount: 27, texturedMaterials: 19, pbrMaterials: 19, textureCount: 35, triangleCount: 33_720,
+        status: 'ready', meshCount: 33, materialCount: 27, texturedMaterials: 19, pbrMaterials: 19, textureCount: 35, triangleCount: 34_336,
         semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },

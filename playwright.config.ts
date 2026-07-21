@@ -7,7 +7,7 @@ export default defineConfig({
   fullyParallel: false, // multiplayer tests share browser state
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1, // the GPU-heavy suite and multiplayer harness share one preview server
   reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
   outputDir: 'artifacts/pass25a/playwright-results',
   use: {
@@ -35,7 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run preview',
+    command: 'node scripts/qa/playwright-web-server.mjs',
     port: 4173,
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

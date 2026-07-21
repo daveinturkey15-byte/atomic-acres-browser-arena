@@ -213,7 +213,7 @@ import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint
 import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
 import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
-import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
 import { TracerPool } from './tracer-pool';
@@ -2832,6 +2832,8 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   processedNonces.add(message.nonce);
   if (message.mode === 'scavenge') {
     entity.drop = { ...entity.drop, ammoConsumedAt: now };
+    const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+    if (grenadeAuthority) remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
   } else {
     entity.drop = { ...entity.drop, weaponConsumedAt: now };
     authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });

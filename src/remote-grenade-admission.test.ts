@@ -6,6 +6,7 @@ import {
   admitRemoteGrenadeHit,
   admitRemoteGrenadeThrow,
   createRemoteGrenadeAuthorityState,
+  replenishRemoteGrenadeAuthorityState,
   resetRemoteGrenadeAuthorityState,
 } from './remote-grenade-admission';
 
@@ -30,6 +31,13 @@ describe('remote grenade authority', () => {
     expect(second.accepted).toBe(true); state = second.state;
     expect(admitRemoteGrenadeThrow(state, thrown(3), sender, 400).accepted).toBe(false);
     expect(resetRemoteGrenadeAuthorityState().remaining).toBe(2);
+  });
+
+  it('restores scavenged capacity without exceeding the authoritative cap', () => {
+    const depleted = { ...createRemoteGrenadeAuthorityState(), remaining: 0 };
+    expect(replenishRemoteGrenadeAuthorityState(depleted).remaining).toBe(1);
+    expect(replenishRemoteGrenadeAuthorityState(depleted, 99).remaining).toBe(2);
+    expect(replenishRemoteGrenadeAuthorityState(depleted, 0)).toBe(depleted);
   });
 
   it('requires a fused admitted throw and one stable explosion origin', () => {

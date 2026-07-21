@@ -39,6 +39,53 @@ class RateLimitDb {
   }
 }
 
+class LeaderboardDb {
+  readonly claims = new Set<string>();
+  readonly queries: string[] = [];
+  failLeaderboard = false;
+
+  prepare(query: string) {
+    let values: unknown[] = [];
+    const statement = {
+      bind: (...next: unknown[]) => { values = next; return statement; },
+      first: async () => null,
+      run: async () => {
+        const normalized = query.replace(/\s+/g, ' ').trim();
+        this.queries.push(normalized);
+        if (normalized.includes('INSERT INTO rate_limits')) return { meta: { changes: 1 } };
+        if (normalized.includes('INSERT INTO streak_claims')) {
+          const key = String(values[0]);
+          if (this.claims.has(key)) return { meta: { changes: 0 } };
+          this.claims.add(key);
+          return { meta: { changes: 1 } };
+        }
+        if (normalized.includes('DELETE FROM streak_claims WHERE idempotency_key')) {
+          const removed = this.claims.delete(String(values[0]));
+          return { meta: { changes: removed ? 1 : 0 } };
+        }
+        if (normalized.includes('INSERT INTO leaderboard')) {
+          if (this.failLeaderboard) throw new Error('leaderboard write failed');
+          return { meta: { changes: 1 } };
+        }
+        return { meta: { changes: 0 } };
+      },
+    };
+    return statement;
+  }
+}
+
+function streakRequest(): Request {
+  return new Request('https://leaderboard.example/v1/streak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'http://127.0.0.1:4173' },
+    body: JSON.stringify(valid),
+  });
+}
+
+function executionContext(): ExecutionContext {
+  return { waitUntil: () => undefined } as unknown as ExecutionContext;
+}
+
 describe('global leaderboard worker policy', () => {
   it('allows only configured production origins plus bounded localhost QA origins', () => {
     expect(allowedOrigin('https://daveinturkey15-byte.github.io', 'https://daveinturkey15-byte.github.io')).toBe(true);
@@ -107,5 +154,39 @@ describe('global leaderboard worker policy', () => {
     expect(db.writes).toBe(2);
     expect(await admitRateLimit(d1, 'install:test', 2, 10 * 60_000 + 1_000)).toBe(true);
     expect(db.writes).toBe(3);
+  });
+
+  it('claims an idempotency key before writing the leaderboard', async () => {
+    const db = new LeaderboardDb();
+    const response = await worker.fetch(streakRequest(), {
+      ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
+    }, executionContext());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: true, updated: true, idempotent: false });
+    const claimIndex = db.queries.findIndex((query) => query.includes('INSERT INTO streak_claims'));
+    const leaderboardIndex = db.queries.findIndex((query) => query.includes('INSERT INTO leaderboard'));
+    expect(claimIndex).toBeGreaterThanOrEqual(0);
+    expect(claimIndex).toBeLessThan(leaderboardIndex);
+  });
+
+  it('returns duplicate success without replaying the leaderboard write', async () => {
+    const db = new LeaderboardDb();
+    db.claims.add(valid.idempotencyKey);
+    const response = await worker.fetch(streakRequest(), {
+      ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
+    }, executionContext());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: true, updated: false, idempotent: true });
+    expect(db.queries.some((query) => query.includes('INSERT INTO leaderboard'))).toBe(false);
+  });
+
+  it('rolls back the claim when the leaderboard write fails', async () => {
+    const db = new LeaderboardDb();
+    db.failLeaderboard = true;
+    const response = await worker.fetch(streakRequest(), {
+      ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
+    }, executionContext());
+    expect(response.status).toBe(503);
+    expect(db.claims.has(valid.idempotencyKey)).toBe(false);
   });
 });
