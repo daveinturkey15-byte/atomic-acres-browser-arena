@@ -23,11 +23,13 @@ describe('opening arena selection', () => {
     expect(atomic.maximumSoloBots).toBe(6);
   });
 
-  it('defines one rival for Rustworks and no rivals for the range', () => {
+  it('defines one-bot solo Rustworks with private multiplayer hosting', () => {
     expect(arenaSelection('rustworks-1v1')).toMatchObject({
       soloBotCount: 1,
       maximumSoloBots: 1,
-      multiplayer: false,
+      multiplayer: true,
+      matchRules: { durationMs: 300_000, scoreLimit: null },
+      rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
     });
     expect(arenaSelection('gun-range')).toMatchObject({
       soloBotCount: 0,

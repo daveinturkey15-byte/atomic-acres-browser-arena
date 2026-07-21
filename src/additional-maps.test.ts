@@ -6,6 +6,7 @@ import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
   RUSTWORKS_TOWER,
+  applyRustworksPresentationProfile,
   buildGunRange,
   buildRustworks1v1,
   rustworksDeckTopY,
@@ -14,7 +15,21 @@ import { CharacterPhysics } from './physics';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
 
-function expectSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
+function expectRustworksSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
+  for (const team of [0, 1] as const) {
+    expect(map.spawns[team].length).toBeGreaterThanOrEqual(6);
+    for (const spawn of map.spawns[team]) {
+      expect(Number.isFinite(spawn.x)).toBe(true);
+      expect(Number.isFinite(spawn.z)).toBe(true);
+      expect(pointInsideBounds({ x: spawn.x, y: spawn.y, z: spawn.z }, map.bounds, 0.5)).toBe(true);
+      expect(map.colliders.some((box) => spawn.x > box.minX && spawn.x < box.maxX && spawn.z > box.minZ && spawn.z < box.maxZ)).toBe(false);
+      // Keep spawns off the central tower apron so private lobbies open cleanly.
+      expect(Math.hypot(spawn.x, spawn.z)).toBeGreaterThan(12);
+    }
+  }
+}
+
+function expectGunRangeSpawnContract(map: ReturnType<typeof buildGunRange>): void {
   for (const team of [0, 1] as const) {
     expect(map.spawns[team].length).toBeGreaterThan(0);
     for (const spawn of map.spawns[team]) {
@@ -88,7 +103,7 @@ describe('additional authored maps', () => {
   it('builds an original compact collision-backed industrial 1v1 arena', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     expect(map.id).toBe('rustworks-1v1');
-    expect(map.label).toBe('Rustworks 1V1');
+    expect(map.label).toBe('Rustworks');
     expect(map.root.name).toContain('Rustworks');
     expect(map.colliders.length).toBeGreaterThanOrEqual(25);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(25);
@@ -102,7 +117,19 @@ describe('additional authored maps', () => {
     towerLeg.geometry.computeBoundingBox();
     expect(towerLeg.geometry.boundingBox?.max.y).toBeCloseTo(5.4);
     expect(map.root.getObjectByName('rustworks-crane-boom')?.position.y).toBe(13.4);
-    expectSpawnContract(map);
+    expectRustworksSpawnContract(map);
+  });
+
+
+  it('shows Quality-only industrial decoration only under the blender profile', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const crane = map.root.getObjectByName('rustworks-crane-boom');
+    expect(crane).toBeTruthy();
+    applyRustworksPresentationProfile(map.root, 'performance');
+    expect(crane?.visible).toBe(false);
+    expect(map.root.getObjectByName('rustworks-lower-ramp')?.visible).not.toBe(false);
+    applyRustworksPresentationProfile(map.root, 'blender');
+    expect(crane?.visible).toBe(true);
   });
 
   it('exposes Pass 40 semantic structures for access, bracing, process gear and cover', () => {
@@ -301,7 +328,7 @@ describe('additional authored maps', () => {
     expect(map.raycastMeshes.some((mesh) => mesh.name === 'gun-range-firing-line')).toBe(false);
     expect(GUN_RANGE_FIRING_LINE_BARRIER.maxY).toBeGreaterThan(5);
     expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
-    expectSpawnContract(map);
+    expectGunRangeSpawnContract(map);
   });
 
   it('physically contains the Gun Range player at all four map edges', async () => {

@@ -1,4 +1,4 @@
-import { MATCH_DURATION_MS, MATCH_SCORE_LIMIT, type MatchRules } from './gameplay';
+import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
 
 export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range';
@@ -33,16 +33,16 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   Object.freeze({
     id: 'rustworks-1v1' as const,
-    selectorLabel: '1V1 RUST',
-    displayName: 'Rustworks 1V1',
-    summary: 'Original compact industrial tower duel',
-    rulesLabel: '1 RIVAL · 5 MIN · FIRST TO 25',
+    selectorLabel: 'RUSTWORKS',
+    displayName: 'Rustworks',
+    summary: 'Industrial tower · private lobbies up to 6 · one-bot solo',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
     soloBotCount: 1,
     maximumSoloBots: 1,
-    multiplayer: false,
+    multiplayer: true,
     fieldSupport: false,
     overdrive: false,
-    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: MATCH_SCORE_LIMIT }),
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
     id: 'gun-range' as const,

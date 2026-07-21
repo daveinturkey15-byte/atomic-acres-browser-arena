@@ -98,7 +98,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await expect(page.locator('#timer')).toHaveText(/04:5[5-9]/);
   });
 
-  test('1V1 Rust selects an original collision-backed arena and exactly one rival', async ({ page }) => {
+  test('Rustworks selects an original collision-backed arena with private host options and one solo bot', async ({ page }) => {
     await page.goto(`/?${lightweight}&seed=3302&map=rustworks-1v1`);
     await waitReady(page);
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'rustworks-1v1');
@@ -108,16 +108,16 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'atomic-acres');
     await page.locator('.map-card[data-arena-id="rustworks-1v1"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'rustworks-1v1');
-    await expect(page.locator('#arena-title')).toContainText('1V1 RUST');
-    await expect(page.locator('#solo')).toHaveText('1V1 BOT');
-    await expect(page.locator('#host')).toBeDisabled();
-    await expect(page.locator('#join')).toBeDisabled();
+    await expect(page.locator('#arena-title')).toContainText('RUST');
+    await expect(page.locator('#solo')).toHaveText('1 BOT SKIRMISH');
+    await expect(page.locator('#host')).toBeEnabled();
+    await expect(page.locator('#join')).toBeEnabled();
     const selected = await snapshot(page);
     expect(selected.arenaSelection).toMatchObject({
       id: 'rustworks-1v1',
-      label: 'Rustworks 1V1',
-      rules: { durationMs: 300_000, scoreLimit: 25 },
-      multiplayer: false,
+      label: 'Rustworks',
+      rules: { durationMs: 300_000, scoreLimit: null },
+      multiplayer: true,
       soloBotCount: 1,
       rootVisible: true,
       activeRoots: ['rustworks-1v1'],
@@ -137,8 +137,6 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(active.player.position[0]).toBeLessThanOrEqual(active.arenaSelection.bounds.maxX);
     await page.evaluate(() => document.dispatchEvent(new Event('pointerlockchange')));
     await expect(page.locator('#menu')).toBeVisible();
-    await expect(page.locator('#main-menu')).toBeVisible();
-    await page.locator('#main-menu').click();
     await expect(page.locator('#main-menu')).toBeHidden();
     await expect(page.locator('.map-card[data-arena-id="gun-range"]')).toBeEnabled();
     expect((await snapshot(page)).gameStarted).toBe(false);

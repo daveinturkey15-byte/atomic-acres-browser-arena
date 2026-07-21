@@ -4,7 +4,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
-import { GUN_RANGE_FIRING_LINE_Z, buildGunRange, buildRustworks1v1 } from './additional-maps';
+import { GUN_RANGE_FIRING_LINE_Z, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1 } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -764,6 +764,7 @@ const worldIdentityPresentation = createWorldIdentityPresentation(
 );
 const atomicArena = buildArena(scene);
 const rustworksArena = buildRustworks1v1(scene);
+applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
 const gunRangeArena = buildGunRange(scene);
 const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
   'atomic-acres': atomicArena,
@@ -3050,7 +3051,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
     ? 'SOLO RANGE'
     : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? 'ONE VERSUS ONE' : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTWORKS DUEL' : 'RUSTWORKS MATCH') : 'TEAM DEATHMATCH';
   element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
@@ -5905,8 +5906,8 @@ function syncArenaSelectionUi(): void {
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
   const joinButton = element<HTMLButtonElement>('#join');
-  soloButton.textContent = selectedArena.id === 'gun-range' ? 'START RANGE' : selectedArena.id === 'rustworks-1v1' ? '1V1 BOT' : 'BOT SKIRMISH';
-  hostButton.textContent = selectedArena.id === 'rustworks-1v1' ? 'HOST 1V1' : 'HOST LOBBY';
+  soloButton.textContent = selectedArena.id === 'gun-range' ? 'START RANGE' : selectedArena.id === 'rustworks-1v1' ? '1 BOT SKIRMISH' : 'BOT SKIRMISH';
+  hostButton.textContent = 'HOST LOBBY';
   soloButton.disabled = !arenaSelectionReady;
   hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
   joinButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
@@ -5914,12 +5915,12 @@ function syncArenaSelectionUi(): void {
   element<HTMLElement>('#arena-title').innerHTML = selectedArena.id === 'atomic-acres'
     ? 'ATOMIC <span>ACRES</span>'
     : selectedArena.id === 'rustworks-1v1'
-      ? '1V1 <span>RUST</span>'
+      ? 'RUST<span>WORKS</span>'
       : 'GUN <span>RANGE</span>';
   element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
     ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.'
     : selectedArena.id === 'rustworks-1v1'
-      ? 'Duel one rival through an original rusted processing yard with a climbable central tower, asymmetric cover and tight rotations.'
+      ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
       : 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.';
 }
 
@@ -7406,12 +7407,19 @@ async function bootstrap(): Promise<void> {
         setStatus(`Loading authored arena models ${loaded}/${total}…`);
       }, reducedWorldDetail);
   const rustworksArtPromise = renderProfile === 'blender'
-    ? loadRustworksBlenderTower(rustworksArena.root).catch((error) => {
+    ? loadRustworksBlenderTower(rustworksArena.root).then((root) => {
+        applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        return root;
+      }).catch((error) => {
         markRustworksBlenderFallback(error);
         console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+        applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
         return null;
       })
-    : Promise.resolve(null);
+    : Promise.resolve(null).then((value) => {
+        applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        return value;
+      });
   const grenadePromise = loadGrenadePresentation();
   const choirPromise = audio.preloadSanctifiedFragChoir();
   const [physics, , art] = await Promise.all([
