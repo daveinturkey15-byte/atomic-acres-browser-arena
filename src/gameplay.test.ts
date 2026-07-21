@@ -17,6 +17,7 @@ import {
   grenadeDamage,
   integrateGamepadLookRate,
   integrateHorizontalVelocity,
+  isSingleShotLethalFromFullHp,
   meleeStrike,
   mouseSensitivityMultiplier,
   movementProfile,
@@ -25,6 +26,7 @@ import {
   reloadProgress,
   sampleSpreadDisk,
   sampleWeaponPellet,
+  shotsToDownFromFullHp,
   sprintEligible,
   type MatchState,
 } from './gameplay';
@@ -47,11 +49,24 @@ describe('headshot damage contract', () => {
     }
   });
 
-  it('SMG body is 23 and headshot is 1.5× (35), never a one-shot', () => {
+  it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
     expect(computeDamage(WEAPONS.smg, 8, 'body')).toBe(23);
     expect(computeDamage(WEAPONS.smg, 8, 'head')).toBe(35);
     expect(computeDamage(WEAPONS.smg, 8, 'head')).toBeLessThan(100);
     expect(computeDamage(WEAPONS.smg, 8, 'head') / computeDamage(WEAPONS.smg, 8, 'body')).toBeCloseTo(1.5, 1);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.smg, 'head')).toBe(false);
+    expect(shotsToDownFromFullHp(WEAPONS.smg, 'head')).toBe(3); // 35+35+30
+    expect(shotsToDownFromFullHp(WEAPONS.smg, 'body')).toBe(5); // 23*4=92, +23
+  });
+
+  it('only sniper head and close scattergun are single-shot lethal without Overdrive', () => {
+    expect(isSingleShotLethalFromFullHp(WEAPONS.sniper, 'head')).toBe(true);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.sniper, 'body')).toBe(false);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.carbine, 'head')).toBe(false);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.pistol, 'head')).toBe(false);
+    expect(isSingleShotLethalFromFullHp(WEAPONS['machine-pistol'], 'head')).toBe(false);
+    // Scattergun multi-pellet at point blank is intentionally lethal.
+    expect(isSingleShotLethalFromFullHp(WEAPONS.scattergun, 'body')).toBe(true);
   });
 });
 

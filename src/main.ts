@@ -3731,10 +3731,16 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return;
   reactOperator(bot.root, zone);
+  const dealt = Math.min(bot.hp, Math.max(0, damage));
   bot.hp = Math.max(0, bot.hp - damage);
   showHitmarker(zone === 'head');
   audio.hit(zone === 'head');
-  if (bot.hp > 0) return;
+  if (bot.hp > 0) {
+    if (zone === 'head') {
+      addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
+    }
+    return;
+  }
   const eliminationStarted = performance.now();
   bot.alive = false;
   bot.deaths += 1;
@@ -3748,7 +3754,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   player.kills += 1;
   awardSupportElimination();
   audio.kill();
-  addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
+  addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
   const afterRewardAndFeed = performance.now();
   spawnEarnedBotReinforcement();
   const afterReinforcement = performance.now();

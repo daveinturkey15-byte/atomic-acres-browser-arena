@@ -8,13 +8,15 @@ import {
 } from './remote-hit-admission';
 
 describe('remote hit admission', () => {
-  it('derives range and hit-zone damage from the admitted ray', () => {
+  it('derives SMG head as 35 (1.5× body) and never one-shots from full HP without OD', () => {
     const target = { x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
-    const head = deriveRemoteShotBaseDamage('carbine', [0, 2.18, 6], [[0, 0, -1]], target);
-    const body = deriveRemoteShotBaseDamage('carbine', [0, 1.38, 6], [[0, 0, -1]], target);
-    expect(head).toBeGreaterThan(body);
-    expect(body).toBeGreaterThan(0);
-    expect(deriveRemoteShotBaseDamage('carbine', [0, 1.38, 6], [[1, 0, 0]], target)).toBe(0);
+    const body = deriveRemoteShotBaseDamage('smg', [0, 1.38, 6], [[0, 0, -1]], target);
+    const head = deriveRemoteShotBaseDamage('smg', [0, 2.2, 6], [[0, 0, -1]], target);
+    expect(body).toBe(23);
+    expect(head).toBe(35);
+    expect(head).toBeLessThan(100);
+    expect(resolveRemotePoweredDamage(head, 1)).toBe(35);
+    expect(resolveRemotePoweredDamage(head, 4)).toBe(100); // OD×4 can finish
   });
 
   it('requires every authored scattergun pellet and derives only intersecting rays', () => {
@@ -28,7 +30,7 @@ describe('remote hit admission', () => {
 
   it('rejects sender-prepowered gun damage and applies Overdrive once at the receiver', () => {
     const maximum = maximumRemoteShotBaseDamage('carbine');
-    expect(maximum).toBeCloseTo(46.5);
+    expect(maximum).toBe(47);
     expect(admitRemoteBaseDamage(100, maximum)).toBe(false);
     expect(admitRemoteBaseDamage(31, maximum)).toBe(true);
     expect(resolveRemotePoweredDamage(31, 4)).toBe(100);

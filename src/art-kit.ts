@@ -7,6 +7,7 @@ import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
 import type { Team, WeaponId } from './protocol';
 import { hitReactionAt } from './weapon-presentation-state';
+import { AUTHORITATIVE_HIT_PROXIES } from './hit-proxies';
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
@@ -1149,12 +1150,9 @@ function buildBoundedOperatorLod(team: Team, name: string, weaponId: WeaponId): 
     mesh.name = proxyName; mesh.position.set(...position); mesh.visible = false;
     mesh.userData.hitZone = zone; mesh.userData.authoritativeProxy = true; hitProxyRoot.add(mesh);
   };
-  proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-  proxy('hit-proxy-head', 'head', [0.48, 0.42, 0.48], [0, 2.18, 0]);
-  proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
-  proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
-  proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
-  proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
+    for (const [index, def] of AUTHORITATIVE_HIT_PROXIES.entries()) {
+      proxy(`hit-proxy-${def.zone}-${index}`, def.zone, [def.size[0], def.size[1], def.size[2]], [def.position[0], def.position[1], def.position[2]]);
+    }
   root.userData.operatorRig = {
     rigged: false, pelvis, spine, leftUpperArm, rightUpperArm, leftForearm, rightForearm,
     leftThigh, rightThigh, leftShin, rightShin, weaponSocket, reactionRoot, hitProxyRoot, meleeKnife, weaponId,
@@ -1188,12 +1186,9 @@ export function buildOperator(
       mesh.userData.authoritativeProxy = true;
       hitProxyRoot.add(mesh);
     };
-    proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-    proxy('hit-proxy-head', 'head', [0.48, 0.42, 0.48], [0, 2.18, 0]);
-    proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
-    proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
-    proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
-    proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
+    for (const [index, def] of AUTHORITATIVE_HIT_PROXIES.entries()) {
+      proxy(`hit-proxy-${def.zone}-${index}`, def.zone, [def.size[0], def.size[1], def.size[2]], [def.position[0], def.position[1], def.position[2]]);
+    }
     root.userData.operatorRig = { rigged: true, weaponSocket, hitProxyRoot, weaponId } satisfies OperatorRig;
     const shoulderL = root.getObjectByName('UpperArmL');
     const elbowL = root.getObjectByName('LowerArmL');
@@ -1204,7 +1199,14 @@ export function buildOperator(
       (root.userData.operatorRig as OperatorRig & { rigged: true }).leftWristBone = wristL;
     }
     setOperatorWeapon(root, weaponId, flattenMaterials);
-    root.traverse((node) => { node.userData.targetRoot = root; });
+    root.traverse((node) => {
+      node.userData.targetRoot = root;
+      // Combat rays use authoritative proxies only — presentation mesh never defines zones/damage.
+      if (node instanceof THREE.Mesh && node.userData.authoritativeProxy !== true) {
+        node.userData.presentationOnly = true;
+        node.raycast = () => undefined;
+      }
+    });
     return root;
   }
   if (!preferRigged) return buildBoundedOperatorLod(team, name, weaponId);
@@ -1328,12 +1330,9 @@ export function buildOperator(
     mesh.userData.authoritativeProxy = true;
     hitProxyRoot.add(mesh);
   };
-  proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-  proxy('hit-proxy-head', 'head', [0.48, 0.42, 0.48], [0, 2.18, 0]);
-  proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
-  proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
-  proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
-  proxy('hit-proxy-right-leg', 'limb', [0.32, 0.95, 0.38], [0.18, 0.48, 0]);
+    for (const [index, def] of AUTHORITATIVE_HIT_PROXIES.entries()) {
+      proxy(`hit-proxy-${def.zone}-${index}`, def.zone, [def.size[0], def.size[1], def.size[2]], [def.position[0], def.position[1], def.position[2]]);
+    }
   const rig: OperatorRig = {
     rigged: false,
     pelvis, spine,
@@ -1348,7 +1347,7 @@ export function buildOperator(
   poseOperator(root, 'stand', 0, 0, 1);
   root.traverse((node) => {
     node.userData.targetRoot = root;
-    if (node instanceof THREE.Mesh && node.userData.hitZone && node.userData.authoritativeProxy !== true) {
+    if (node instanceof THREE.Mesh && node.userData.authoritativeProxy !== true) {
       node.userData.presentationOnly = true;
       node.raycast = () => undefined;
     }

@@ -284,6 +284,18 @@ export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZon
   return Math.max(1, Math.round(base * multiplier));
 }
 
+/** Full-HP player TTK for a single pellet/shot at point-blank (no Overdrive). */
+export function shotsToDownFromFullHp(weapon: WeaponSpec, zone: HitZone, maxHp = 100): number {
+  const perShot = computeDamage(weapon, 0, zone) * Math.max(1, weapon.pellets);
+  const effective = Math.min(maxHp, perShot);
+  return Math.max(1, Math.ceil(maxHp / effective));
+}
+
+/** True only when a single non-Overdrive shot at the zone kills a full-HP player. */
+export function isSingleShotLethalFromFullHp(weapon: WeaponSpec, zone: HitZone, maxHp = 100): boolean {
+  return shotsToDownFromFullHp(weapon, zone, maxHp) <= 1;
+}
+
 export type ReloadState = {
   weapon: WeaponId;
   startedAt: number;

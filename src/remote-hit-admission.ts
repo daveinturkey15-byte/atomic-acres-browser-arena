@@ -6,6 +6,7 @@ import {
   TRI_PASS_MAX_DAMAGE,
   hunterSwarmDamage,
 } from './field-support';
+import { AUTHORITATIVE_HIT_PROXIES } from './hit-proxies';
 import type { ExplosiveSource, WeaponId } from './protocol';
 
 type ShotTarget = Readonly<{
@@ -16,20 +17,7 @@ type ShotTarget = Readonly<{
   stance: Stance;
 }>;
 
-type HitProxy = Readonly<{
-  zone: HitZone;
-  size: readonly [number, number, number];
-  position: readonly [number, number, number];
-}>;
-
-const HIT_PROXIES: readonly HitProxy[] = [
-  { zone: 'body', size: [0.72, 1.02, 0.5], position: [0, 1.38, 0] },
-  { zone: 'head', size: [0.48, 0.42, 0.48], position: [0, 2.18, 0] },
-  { zone: 'limb', size: [0.3, 1.08, 0.35], position: [-0.5, 1.35, 0] },
-  { zone: 'limb', size: [0.3, 1.08, 0.35], position: [0.5, 1.35, 0] },
-  { zone: 'limb', size: [0.32, 0.95, 0.38], position: [-0.18, 0.48, 0] },
-  { zone: 'limb', size: [0.32, 0.95, 0.38], position: [0.18, 0.48, 0] },
-];
+const HIT_PROXIES = AUTHORITATIVE_HIT_PROXIES;
 
 function stanceEyeHeight(stance: Stance): number {
   return stance === 'prone' ? 0.5 : stance === 'crouch' ? 1.16 : 1.7;
@@ -81,7 +69,8 @@ export function deriveRemoteShotBaseDamage(
 
 export function maximumRemoteShotBaseDamage(weapon: WeaponId): number {
   const spec = WEAPONS[weapon];
-  return Math.min(100, spec.damage * spec.headMultiplier * spec.pellets);
+  // Match computeDamage rounding so a legitimate headshot claim is never rejected.
+  return Math.min(100, computeDamage(spec, 0, 'head') * spec.pellets);
 }
 
 export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance): number {
