@@ -1399,6 +1399,11 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
 
 function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): void {
   if (network.role !== 'host') return;
+  const localMember = hostLobbyMembers.get(player.id);
+  if (localMember) {
+    player.team = localMember.team;
+    element<HTMLSelectElement>('#team').value = String(localMember.team);
+  }
   privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot(phase);
   network.setCapacity(privateLobbySnapshot.config.capacity);
@@ -6427,6 +6432,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       weaponError: importedWeaponLoadError,
     },
     player: {
+      team: player.team,
       hp: player.hp,
       alive: player.alive,
       lastMeleeAt: player.lastMeleeAt,

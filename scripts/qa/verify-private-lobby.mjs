@@ -39,6 +39,7 @@ async function openPlayer(label) {
 try {
   const host = await openPlayer('Host Four');
   const guests = [await openPlayer('Guest One'), await openPlayer('Guest Two'), await openPlayer('Guest Three')];
+  await host.selectOption('#team', '1');
   await host.click('#host');
   await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim(), undefined, { timeout: 45_000 });
   const roomCode = (await host.textContent('#room-code')).trim();
@@ -53,6 +54,11 @@ try {
     counts[member.team] += 1;
     return counts;
   }, [0, 0]));
+  const hostTeamSynchronized = await host.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const hostMember = state.privateMatch.members.find((member) => member.name === 'Host Four');
+    return hostMember?.team === state.player.team && document.querySelector('#team')?.value === String(state.player.team);
+  });
   const startBlockedBeforeReady = await host.locator('#lobby-start').isDisabled();
 
   const overflow = await openPlayer('Overflow Five');
@@ -141,6 +147,7 @@ try {
     errors,
     roomCodeLength: roomCode.length,
     balancedTeams,
+    hostTeamSynchronized,
     startBlockedBeforeReady,
     overflowRejected,
     sixCapacityReplicated,
@@ -171,6 +178,7 @@ try {
   const pass = errors.length === 0
     && roomCode.length === 36
     && balancedTeams[0] === 2 && balancedTeams[1] === 2
+    && hostTeamSynchronized
     && startBlockedBeforeReady && overflowRejected && sixCapacityReplicated && sixPlayersAdmitted && allReady
     && ffaTeamControlsDisabled.every(Boolean)
     && pingSamples.slice(1).every((ping) => Number.isFinite(ping))
