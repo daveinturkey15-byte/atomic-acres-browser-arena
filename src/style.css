@@ -141,3 +141,45 @@
 #menu.private-lobby-active>.eyebrow,#menu.private-lobby-active>#arena-title,#menu.private-lobby-active>.lede,#menu.private-lobby-active>.menu-tabs{display:none}#menu.private-lobby-active [data-menu-panel="deploy"]>.map-selector,#menu.private-lobby-active [data-menu-panel="deploy"]>#selected-kit-summary,#menu.private-lobby-active [data-menu-panel="deploy"]>.menu-actions,#menu.private-lobby-active [data-menu-panel="deploy"]>.join-row,#menu.private-lobby-active [data-menu-panel="deploy"]>#high-score-card{display:none}
 @media(max-height:680px) and (min-width:701px){#menu.private-lobby-active{padding:12px 24px}#menu.private-lobby-active #room-card{margin-top:6px;padding:7px 10px}#menu.private-lobby-active #private-lobby{margin-top:6px;padding:8px}.private-lobby-heading{margin-bottom:5px}.lobby-settings{gap:4px}.lobby-roster{gap:3px;margin:5px 0}.lobby-player{padding:4px 7px}.lobby-actions{grid-template-columns:repeat(3,minmax(0,1fr))}#lobby-guidance{margin:5px 0 0}#menu.private-lobby-active #network-status{margin-top:5px}}
 @media(max-width:700px){.lobby-settings{grid-template-columns:1fr}.lobby-check{grid-column:auto}.lobby-actions{grid-template-columns:1fr}#private-lobby{padding:9px}}
+
+/* Pass 50: main-menu last-updated changelog */
+#last-updated-btn{
+  position:fixed;z-index:22;top:clamp(12px,2.2vh,22px);right:clamp(12px,2vw,24px);
+  pointer-events:auto;border:1px solid rgba(244,196,79,.42);
+  background:linear-gradient(135deg,rgba(12,21,25,.92),rgba(22,39,43,.88));
+  color:var(--gold);padding:10px 14px;
+  font:800 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.14em;
+  box-shadow:0 10px 28px rgba(0,0,0,.45);clip-path:polygon(0 0,96% 0,100% 18%,100% 100%,4% 100%,0 82%);
+  transition:transform .12s ease,border-color .12s ease,background .12s ease;
+}
+#last-updated-btn:hover{transform:translateY(-1px);border-color:var(--gold);background:linear-gradient(135deg,rgba(244,196,79,.16),rgba(12,21,25,.94))}
+#last-updated-btn:active{transform:translateY(0)}
+#menu.hidden ~ #last-updated-btn,
+#menu.private-lobby-active ~ #last-updated-btn{display:none!important}
+#changelog-backdrop{position:fixed;inset:0;z-index:28;background:rgba(4,9,12,.72);backdrop-filter:blur(4px)}
+#changelog-panel{
+  z-index:30;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(560px,calc(100vw - 28px));max-height:min(78vh,720px);
+  padding:22px 24px 18px;overflow:auto;
+}
+#changelog-panel .changelog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px}
+#changelog-panel .changelog-header small{display:block;font:800 9px/1 Inter;letter-spacing:.18em;color:#8fa7a4}
+#changelog-panel .changelog-header strong{display:block;margin-top:4px;font:900 28px/.9 'Barlow Condensed',sans-serif;letter-spacing:.08em;color:#fff}
+#changelog-close{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);color:#eaf2ea;padding:9px 12px;font:800 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.12em}
+#changelog-close:hover{border-color:var(--gold);color:var(--gold)}
+.changelog-lede{margin:0 0 14px;color:#9eb5af;font:600 12px/1.45 Inter}
+#changelog-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+#changelog-list>li{padding:12px 12px 11px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(0,0,0,.18));border-left:3px solid var(--aqua)}
+#changelog-list>li:first-child{border-left-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(244,196,79,.12)}
+.changelog-entry-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:6px}
+.changelog-entry-head span{font:800 10px/1 Inter;letter-spacing:.16em;color:var(--gold)}
+.changelog-entry-head time{font:700 9px/1 Inter;letter-spacing:.08em;color:#8fa7a4}
+#changelog-list>li>strong{display:block;font:900 20px/.95 'Barlow Condensed',sans-serif;letter-spacing:.06em;color:#fff}
+#changelog-list>li>p{margin:6px 0 8px;color:#c5d2cb;font:600 12px/1.45 Inter}
+#changelog-list>li>ul{margin:0;padding:0 0 0 16px;display:grid;gap:4px}
+#changelog-list>li>ul>li{color:#9eb5af;font:600 11px/1.4 Inter}
+@media(max-width:700px){
+  #last-updated-btn{top:10px;right:10px;padding:8px 10px;font-size:11px;letter-spacing:.1em}
+  #changelog-panel{padding:18px 16px 14px}
+  #changelog-panel .changelog-header strong{font-size:24px}
+}

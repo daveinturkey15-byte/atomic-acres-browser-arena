@@ -26,6 +26,7 @@ import {
   type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
+import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogDate } from './changelog';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -414,7 +415,7 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 38</div>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -491,6 +492,31 @@ app.innerHTML = `
   <aside id="menu-showcase" aria-hidden="true">
     <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg" alt="" decoding="async">
   </aside>
+  <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
+  <div id="changelog-backdrop" hidden></div>
+  <section id="changelog-panel" class="panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+    <header class="changelog-header">
+      <div>
+        <small>BUILD NOTES</small>
+        <strong id="changelog-title">RECENT CHANGES</strong>
+      </div>
+      <button id="changelog-close" type="button" aria-label="Close changelog">CLOSE</button>
+    </header>
+    <p class="changelog-lede">What shipped lately on the live build. Newest first.</p>
+    <ol id="changelog-list">
+      ${CHANGELOG.map((entry) => `
+        <li data-changelog-id="${entry.id}">
+          <div class="changelog-entry-head">
+            <span>${entry.pass}</span>
+            <time datetime="${entry.updatedAt}">${formatChangelogDate(entry.updatedAt)}</time>
+          </div>
+          <strong>${entry.title}</strong>
+          <p>${entry.summary}</p>
+          <ul>${entry.highlights.map((line) => `<li>${line}</li>`).join('')}</ul>
+        </li>
+      `).join('')}
+    </ol>
+  </section>
   <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
   <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
     <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
@@ -6330,6 +6356,30 @@ element<HTMLButtonElement>('#resume').addEventListener('click', () => {
   if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
 element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainMenu);
+
+function setChangelogOpen(open: boolean): void {
+  const panel = element<HTMLElement>('#changelog-panel');
+  const backdrop = element<HTMLElement>('#changelog-backdrop');
+  const button = element<HTMLButtonElement>('#last-updated-btn');
+  panel.hidden = !open;
+  backdrop.hidden = !open;
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) element<HTMLButtonElement>('#changelog-close').focus();
+  else button.focus();
+}
+
+element<HTMLButtonElement>('#last-updated-btn').addEventListener('click', () => {
+  setChangelogOpen(true);
+});
+element<HTMLButtonElement>('#changelog-close').addEventListener('click', () => setChangelogOpen(false));
+element<HTMLElement>('#changelog-backdrop').addEventListener('click', () => setChangelogOpen(false));
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !element<HTMLElement>('#changelog-panel').hidden) {
+    event.preventDefault();
+    setChangelogOpen(false);
+  }
+});
+
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (!requirePlayerName()) return;
   network.close();
