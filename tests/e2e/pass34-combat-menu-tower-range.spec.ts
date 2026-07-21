@@ -208,9 +208,9 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     const state = await snapshot(page);
     expect(state.arenaSelection.id).toBe('rustworks-1v1');
     expect(state.render.rustworksBlender.status).toBe('ready');
-    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(200);
+    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(140);
     expect(state.render.rustworksBlender.meshCount).toBeLessThanOrEqual(550);
-    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(200);
+    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(140);
     expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(14);
     expect(state.render.rustworksBlender.triangleCount).toBeGreaterThan(0);
     expect(state.render.rustworksBlender.texturedMaterials ?? 0).toBeGreaterThanOrEqual(8);

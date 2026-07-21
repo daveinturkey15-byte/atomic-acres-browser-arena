@@ -150,16 +150,18 @@ describe('additional authored maps', () => {
       'rustworks-process-pipe-run',
       'rustworks-tower-hardstand',
       'rustworks-freight-crate',
-      'rustworks-scrap-cover',
-      'rustworks-pallet-stack',
       'rustworks-barrier-low',
+      'rustworks-rig-deck-top',
+      'rustworks-rig-leg',
+      'rustworks-perimeter-rail',
     ];
     for (const name of required) {
       expect(map.root.getObjectByName(name), name).toBeTruthy();
     }
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
-    expect(namedCount(map.root, 'rustworks-scrap-cover')).toBeGreaterThanOrEqual(6);
+    expect(namedCount(map.root, 'rustworks-freight-crate')).toBeGreaterThanOrEqual(4);
+    expect(namedCount(map.root, 'rustworks-rig-leg')).toBeGreaterThanOrEqual(8);
     const batches = map.root.userData.rustworksPresentationBatches as {
       sourceMeshes: number;
       batches: number;

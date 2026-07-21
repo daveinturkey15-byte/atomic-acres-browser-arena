@@ -4,6 +4,7 @@ import { arenaLightingProfile } from './blender-lighting';
 import {
   createRustworksQualityLights,
   enhanceRustworksQualityMaterials,
+  ensureRustworksStarfield,
   rustworksLightingTint,
   rustworksQualityTelemetry,
   setRustworksQualityPresentationActive,
@@ -11,24 +12,32 @@ import {
 import { buildRustworks1v1 } from './additional-maps';
 
 describe('Rustworks Quality Graphics parity', () => {
-  it('tints industrial lighting only for Rustworks Quality mode', () => {
+  it('applies night oil-rig lighting only for Rustworks', () => {
     const base = arenaLightingProfile('blender');
     const rust = rustworksLightingTint(base, 'blender', 'rustworks-1v1');
     const atomic = rustworksLightingTint(base, 'blender', 'atomic-acres');
     expect(atomic.fogColor).toBe(base.fogColor);
     expect(rust.fogColor).not.toBe(base.fogColor);
+    // Night: darker sky, stronger warm fill floods, soft moon key.
+    expect(rust.skyTop).toBeLessThan(base.skyTop);
     expect(rust.fillIntensity).toBeGreaterThanOrEqual(base.fillIntensity);
-    expect(rust.godRayStrength).toBeGreaterThanOrEqual(base.godRayStrength);
+    expect(rust.sunIntensity).toBeLessThan(base.sunIntensity);
   });
 
-  it('adds local work lights and richer materials under Quality Graphics', () => {
-    const map = buildRustworks1v1(new THREE.Scene());
+  it('adds flood lights, starfield, and richer materials for the night rig', () => {
+    const scene = new THREE.Scene();
+    const map = buildRustworks1v1(scene);
     const lights = createRustworksQualityLights(map.root, 'blender');
-    expect(lights.children.some((node) => node instanceof THREE.PointLight)).toBe(true);
+    const pointLights = lights.children.filter((node) => node instanceof THREE.PointLight);
+    expect(pointLights.length).toBeGreaterThanOrEqual(16);
     const enhanced = enhanceRustworksQualityMaterials(map.root, 'blender');
     expect(enhanced).toBeGreaterThan(10);
+    const stars = ensureRustworksStarfield(scene, 'rustworks-1v1');
+    expect(stars).not.toBeNull();
+    expect(stars?.visible).toBe(true);
     setRustworksQualityPresentationActive(true, 'blender');
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').active).toBe(true);
+    expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').night).toBe(true);
     setRustworksQualityPresentationActive(false, 'blender');
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').active).toBe(false);
     expect(enhanceRustworksQualityMaterials(map.root, 'performance')).toBe(0);

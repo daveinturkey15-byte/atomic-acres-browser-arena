@@ -4,9 +4,8 @@ import type { ArenaLightingProfile } from './blender-lighting';
 import type { RenderProfile } from './render-profile';
 
 /**
- * Apply the same Quality Graphics rules Atomic Acres enjoys, tuned for an
- * industrial yard: richer metal read, local work lights, and a dustier fog
- * palette — only when Quality Graphics is active on Rustworks.
+ * Night oil-rig presentation for Rustworks: dark sky, moon fill, dense flood
+ * lighting so the deck never falls into pure black.
  */
 
 export type RustworksQualityTelemetry = Readonly<{
@@ -14,10 +13,16 @@ export type RustworksQualityTelemetry = Readonly<{
   enhancedMaterials: number;
   profile: RenderProfile;
   active: boolean;
+  night: boolean;
 }>;
 
-const qualityState: { lightsRoot: THREE.Group | null; enhanced: number } = {
+const qualityState: {
+  lightsRoot: THREE.Group | null;
+  starsRoot: THREE.Points | null;
+  enhanced: number;
+} = {
   lightsRoot: null,
+  starsRoot: null,
   enhanced: 0,
 };
 
@@ -28,36 +33,41 @@ export function rustworksLightingTint(
 ): ArenaLightingProfile {
   if (arenaId !== 'rustworks-1v1') return base;
   const quality = profile === 'blender';
+  // Night industrial pad — cool moon + warm floods; keep ambient high enough for play.
   return {
     ...base,
-    // Dustier industrial haze; keep sun strength so metal reads.
-    fogColor: quality ? 0xa89890 : 0xb0a59a,
-    skyTop: quality ? 0x3f3a4d : base.skyTop,
-    skyHorizon: quality ? 0xc48a72 : base.skyHorizon,
-    skyBottom: quality ? 0xe39a58 : base.skyBottom,
-    hemisphereSky: quality ? 0xc2b4b8 : base.hemisphereSky,
-    hemisphereGround: quality ? 0x8f7f6a : base.hemisphereGround,
-    ambientColor: quality ? 0xd8d2c8 : base.ambientColor,
-    sunColor: quality ? 0xffc48a : base.sunColor,
-    fillColor: quality ? 0xb8c4d8 : base.fillColor,
-    fillIntensity: quality ? Math.max(base.fillIntensity, 0.82) : base.fillIntensity,
-    sunIntensity: quality ? Math.max(base.sunIntensity, 2.85) : base.sunIntensity,
-    hemisphereIntensity: quality ? Math.max(base.hemisphereIntensity, 1.95) : base.hemisphereIntensity,
-    ambientIntensity: quality ? Math.max(base.ambientIntensity, 0.88) : base.ambientIntensity,
-    godRayStrength: quality ? Math.max(base.godRayStrength, 0.14) : base.godRayStrength,
-    godRayLobes: quality ? Math.max(base.godRayLobes, 4) : base.godRayLobes,
+    fogColor: quality ? 0x0b1220 : 0x101820,
+    skyTop: quality ? 0x050814 : 0x0a1018,
+    skyHorizon: quality ? 0x1a2740 : 0x1c2838,
+    skyBottom: quality ? 0x0e1828 : 0x121c28,
+    skySun: quality ? 0xc8d6ff : 0xb0c0e0,
+    skyCloud: quality ? 0x1a2438 : 0x222c3c,
+    skyCloudShadow: quality ? 0x080c14 : 0x0c1018,
+    skyCloudLight: quality ? 0x3a4a68 : 0x2e3a50,
+    hemisphereSky: quality ? 0x6a7a9a : 0x5a6a82,
+    hemisphereGround: quality ? 0x2a2418 : 0x282418,
+    ambientColor: quality ? 0x6a7488 : 0x5c6678,
+    sunColor: quality ? 0xd0dcff : 0xc0cce8,
+    fillColor: quality ? 0xffb060 : 0xe8a050,
+    // Soft moon key + strong warm fill so metal reads without day sky.
+    sunIntensity: quality ? 0.55 : 0.42,
+    fillIntensity: quality ? 1.15 : 0.9,
+    hemisphereIntensity: quality ? 1.35 : 1.1,
+    ambientIntensity: quality ? 0.72 : 0.62,
+    exposure: quality ? Math.max(base.exposure, 1.05) : Math.max(base.exposure * 0.95, 0.95),
+    godRayStrength: 0.04,
+    godRayLobes: 2,
   };
 }
 
 function isMetalName(name: string): boolean {
-  return /steel|rust|grate|tower|pipe|crane|tank|rail|ladder|brace|manifold|crown|hook|stringer|cable|spool|post|sheeting|barrier|pallet|deck|ramp|landing|access|leg|saddle|beam|riser|sign|awning/i.test(name);
+  return /steel|rust|grate|tower|pipe|crane|tank|rail|ladder|brace|manifold|crown|hook|stringer|cable|spool|post|sheeting|barrier|pallet|deck|ramp|landing|access|leg|saddle|beam|riser|sign|awning|rig|flood/i.test(name);
 }
 
 function isHazardName(name: string): boolean {
-  return /hazard|chevron|marking|sign|rail|rung|awning|hook/i.test(name);
+  return /hazard|chevron|marking|sign|rail|rung|awning|hook|flood/i.test(name);
 }
 
-/** Boost MeshStandard materials on Quality Graphics only (leave Performance batches alone). */
 export function enhanceRustworksQualityMaterials(root: THREE.Object3D, profile: RenderProfile): number {
   if (profile !== 'blender') return 0;
   let count = 0;
@@ -72,16 +82,16 @@ export function enhanceRustworksQualityMaterials(root: THREE.Object3D, profile: 
       const clone = material.clone();
       const name = `${node.name} ${material.name || ''}`;
       if (isMetalName(name)) {
-        clone.metalness = Math.min(1, Math.max(clone.metalness, 0.62) + 0.12);
-        clone.roughness = Math.min(0.72, Math.max(0.22, clone.roughness * 0.82));
-        clone.envMapIntensity = Math.max(clone.envMapIntensity || 1, 1.15);
+        clone.metalness = Math.min(1, Math.max(clone.metalness, 0.58) + 0.1);
+        clone.roughness = Math.min(0.75, Math.max(0.2, clone.roughness * 0.85));
+        clone.envMapIntensity = Math.max(clone.envMapIntensity || 1, 0.95);
       } else {
         clone.roughness = Math.min(0.96, Math.max(0.35, clone.roughness));
-        clone.envMapIntensity = Math.max(clone.envMapIntensity || 1, 0.85);
+        clone.envMapIntensity = Math.max(clone.envMapIntensity || 1, 0.7);
       }
       if (isHazardName(name)) {
-        clone.emissive = new THREE.Color(0x4a2a08);
-        clone.emissiveIntensity = Math.max(clone.emissiveIntensity, 0.18);
+        clone.emissive = new THREE.Color(0x5a3208);
+        clone.emissiveIntensity = Math.max(clone.emissiveIntensity, 0.28);
       }
       clone.needsUpdate = true;
       touched = true;
@@ -91,14 +101,8 @@ export function enhanceRustworksQualityMaterials(root: THREE.Object3D, profile: 
     if (touched) {
       node.material = Array.isArray(node.material) ? next : next[0];
       node.userData.rustworksQualityEnhanced = true;
-      // Quality surfaces cast/receive shadows like Atomic's Blender arena meshes.
-      if (!node.userData.presentationOnly || node.userData.rustworksDetail !== 'quality') {
-        node.castShadow = true;
-        node.receiveShadow = true;
-      } else {
-        node.castShadow = true;
-        node.receiveShadow = true;
-      }
+      node.castShadow = true;
+      node.receiveShadow = true;
     }
   });
   qualityState.enhanced = count;
@@ -110,39 +114,70 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
   root.name = 'rustworks-quality-work-lights';
   root.userData.presentationOnly = true;
   root.userData.blocksShots = false;
-  // Local accent lights mirror Atomic street/route lights: no extra shadow casters.
-  const fixtures: Array<{ position: [number, number, number]; color: number; intensity: number; distance: number }> = [
-    { position: [0, 13.2, 0], color: 0xffc27a, intensity: 3.8, distance: 32 },
-    { position: [-4.2, 8.6, -4.2], color: 0xffb35c, intensity: 2.4, distance: 18 },
-    { position: [4.2, 8.6, 4.2], color: 0xffb35c, intensity: 2.4, distance: 18 },
-    { position: [shipLightX(), 7.4, 5.6], color: 0xd7e6ff, intensity: 1.9, distance: 16 },
-    { position: [0, 4.8, -7.8], color: 0xff9a4a, intensity: 2.0, distance: 16 },
-    { position: [-18, 3.6, 12], color: 0xffc27a, intensity: 1.7, distance: 14 },
-    { position: [18, 3.6, -12], color: 0xffc27a, intensity: 1.7, distance: 14 },
-    { position: [0, 3.0, 24], color: 0xc9d6e8, intensity: 1.4, distance: 16 },
-    { position: [-22, 8.8, -22], color: 0xffd0a0, intensity: 2.2, distance: 20 },
-    { position: [22, 8.8, 22], color: 0xffd0a0, intensity: 2.2, distance: 20 },
-    { position: [-22, 8.8, 22], color: 0xffb070, intensity: 1.8, distance: 18 },
-    { position: [22, 8.8, -22], color: 0xffb070, intensity: 1.8, distance: 18 },
-    { position: [0, 9.0, -28], color: 0xe8f0ff, intensity: 1.6, distance: 18 },
-    { position: [0, 9.0, 28], color: 0xe8f0ff, intensity: 1.6, distance: 18 },
+
+  // Flood grid: warm sodium + cool work LEDs. High intensity / long range so corners stay lit at night.
+  const fixtures: Array<{ position: [number, number, number]; color: number; intensity: number; distance: number; warm?: boolean }> = [
+    // Tower crown floods
+    { position: [0, 14.2, 0], color: 0xffd9a0, intensity: 5.5, distance: 42, warm: true },
+    { position: [-3.8, 9.2, -3.8], color: 0xffc27a, intensity: 3.6, distance: 26, warm: true },
+    { position: [3.8, 9.2, 3.8], color: 0xffc27a, intensity: 3.6, distance: 26, warm: true },
+    { position: [3.9, 9.2, -3.8], color: 0xd7e6ff, intensity: 2.8, distance: 22 },
+    { position: [-3.9, 9.2, 3.8], color: 0xd7e6ff, intensity: 2.8, distance: 22 },
+    // Deck mid floods
+    { position: [0, 6.2, -8.5], color: 0xffb35c, intensity: 3.2, distance: 24, warm: true },
+    { position: [0, 6.2, 8.5], color: 0xffb35c, intensity: 3.2, distance: 24, warm: true },
+    { position: [-9, 5.4, 0], color: 0xe8f0ff, intensity: 2.6, distance: 22 },
+    { position: [9, 5.4, 0], color: 0xe8f0ff, intensity: 2.6, distance: 22 },
+    // Yard corner towers
+    { position: [-22, 11, -22], color: 0xffd0a0, intensity: 4.2, distance: 36, warm: true },
+    { position: [22, 11, 22], color: 0xffd0a0, intensity: 4.2, distance: 36, warm: true },
+    { position: [-22, 11, 22], color: 0xffc080, intensity: 3.8, distance: 34, warm: true },
+    { position: [22, 11, -22], color: 0xffc080, intensity: 3.8, distance: 34, warm: true },
+    // Edge mid-span
+    { position: [0, 10, -28], color: 0xc9d6e8, intensity: 3.0, distance: 30 },
+    { position: [0, 10, 28], color: 0xc9d6e8, intensity: 3.0, distance: 30 },
+    { position: [-26, 10, 0], color: 0xffd4a8, intensity: 3.0, distance: 30, warm: true },
+    { position: [26, 10, 0], color: 0xffd4a8, intensity: 3.0, distance: 30, warm: true },
+    // Fill under-look / apron
+    { position: [-14, 4.2, 14], color: 0xffb070, intensity: 2.2, distance: 20, warm: true },
+    { position: [14, 4.2, -14], color: 0xffb070, intensity: 2.2, distance: 20, warm: true },
+    { position: [0, 3.5, 0], color: 0xa8b8d0, intensity: 1.8, distance: 18 },
   ];
+
   for (const [index, fixture] of fixtures.entries()) {
-    const light = new THREE.PointLight(fixture.color, fixture.intensity, fixture.distance, 2);
+    const light = new THREE.PointLight(fixture.color, fixture.intensity, fixture.distance, 1.7);
     light.name = `rustworks-work-light-${index}`;
     light.position.set(...fixture.position);
     light.castShadow = false;
     light.userData.presentationOnly = true;
     root.add(light);
-    // Small visible bulb so Quality mode has readable industrial cues.
+
+    const housing = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.22, 0.4),
+      new THREE.MeshStandardMaterial({
+        color: 0x2a2e32,
+        metalness: 0.7,
+        roughness: 0.4,
+        emissive: new THREE.Color(fixture.color),
+        emissiveIntensity: 0.35,
+      }),
+    );
+    housing.name = `rustworks-flood-housing-${index}`;
+    housing.position.copy(light.position);
+    housing.position.y += 0.15;
+    housing.userData.presentationOnly = true;
+    housing.userData.blocksShots = false;
+    housing.raycast = () => undefined;
+    root.add(housing);
+
     const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.12, 8, 8),
+      new THREE.SphereGeometry(0.16, 10, 10),
       new THREE.MeshStandardMaterial({
         color: fixture.color,
         emissive: new THREE.Color(fixture.color),
-        emissiveIntensity: 1.4,
-        roughness: 0.35,
-        metalness: 0.1,
+        emissiveIntensity: 2.4,
+        roughness: 0.25,
+        metalness: 0.05,
       }),
     );
     bulb.name = `rustworks-work-bulb-${index}`;
@@ -154,28 +189,95 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
     bulb.raycast = () => undefined;
     root.add(bulb);
   }
-  root.visible = profile === 'blender';
+
+  root.visible = profile === 'blender' || profile === 'performance';
+  // Performance still gets floods — night needs them.
+  if (profile === 'performance') {
+    root.traverse((node) => {
+      if (node instanceof THREE.PointLight) {
+        node.intensity *= 0.85;
+        node.distance *= 0.9;
+      }
+    });
+  }
   parent.add(root);
   qualityState.lightsRoot = root;
   return root;
 }
 
-function shipLightX(): number {
-  // Matches the ship-ladder +X rim used by the tower builder.
-  return 8.5 / 2 - 0.35;
+/** Build / refresh a starfield sphere (shared for Quality + Performance night). */
+export function ensureRustworksStarfield(scene: THREE.Scene, arenaId: ArenaId): THREE.Points | null {
+  if (arenaId !== 'rustworks-1v1') {
+    if (qualityState.starsRoot) qualityState.starsRoot.visible = false;
+    return qualityState.starsRoot;
+  }
+  if (qualityState.starsRoot) {
+    qualityState.starsRoot.visible = true;
+    return qualityState.starsRoot;
+  }
+  const count = 2200;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const radius = 180;
+  for (let i = 0; i < count; i += 1) {
+    // Upper hemisphere bias
+    const u = Math.random();
+    const v = Math.random();
+    const theta = u * Math.PI * 2;
+    const phi = Math.acos(1 - v * 0.72); // mostly above horizon
+    const r = radius * (0.92 + Math.random() * 0.08);
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.cos(phi);
+    const z = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
+    const warm = Math.random() > 0.85;
+    const c = warm ? new THREE.Color(0xffe6c0) : new THREE.Color(0xd8e6ff);
+    const b = 0.55 + Math.random() * 0.45;
+    colors[i * 3] = c.r * b;
+    colors[i * 3 + 1] = c.g * b;
+    colors[i * 3 + 2] = c.b * b;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.PointsMaterial({
+    size: 0.55,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const stars = new THREE.Points(geometry, material);
+  stars.name = 'rustworks-starfield';
+  stars.frustumCulled = false;
+  stars.userData.presentationOnly = true;
+  stars.userData.blocksShots = false;
+  stars.raycast = () => undefined;
+  scene.add(stars);
+  qualityState.starsRoot = stars;
+  return stars;
 }
 
 export function setRustworksQualityPresentationActive(active: boolean, profile: RenderProfile): void {
-  if (!qualityState.lightsRoot) return;
-  qualityState.lightsRoot.visible = active && profile === 'blender';
+  if (qualityState.lightsRoot) {
+    qualityState.lightsRoot.visible = active && (profile === 'blender' || profile === 'performance');
+  }
+  if (qualityState.starsRoot) {
+    qualityState.starsRoot.visible = active;
+  }
 }
 
 export function rustworksQualityTelemetry(profile: RenderProfile, arenaId: ArenaId): RustworksQualityTelemetry {
-  const active = arenaId === 'rustworks-1v1' && profile === 'blender' && qualityState.lightsRoot?.visible === true;
+  const active = arenaId === 'rustworks-1v1' && qualityState.lightsRoot?.visible === true;
   return {
     lights: qualityState.lightsRoot?.children.filter((node) => node instanceof THREE.PointLight).length ?? 0,
     enhancedMaterials: qualityState.enhanced,
     profile,
     active,
+    night: arenaId === 'rustworks-1v1',
   };
 }

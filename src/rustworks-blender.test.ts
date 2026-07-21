@@ -36,19 +36,19 @@ describe('Rustworks Blender Quality plant asset', () => {
     expect(source.byteLength).toBeGreaterThan(400_000);
     expect(buffer.byteLength).toBeGreaterThan(2_500_000);
     expect(buffer.byteLength).toBeLessThan(12_000_000);
-    expect((gltf.meshes?.length ?? 0)).toBeGreaterThanOrEqual(200);
+    expect((gltf.meshes?.length ?? 0)).toBeGreaterThanOrEqual(150);
     expect((gltf.materials?.length ?? 0)).toBeGreaterThanOrEqual(10);
     expect((gltf.images?.length ?? 0)).toBeGreaterThanOrEqual(10);
     expect((gltf.textures?.length ?? 0)).toBeGreaterThanOrEqual(10);
-    expect(authored.length).toBeGreaterThanOrEqual(200);
+    expect(authored.length).toBeGreaterThanOrEqual(150);
     expect(root?.name).toBe('RUSTWORKS_AUTHORED_CENTRAL_TOWER');
     expect(root?.extras?.asset_version).toBe(RUSTWORKS_BLENDER_EXPECTED_VERSION);
-    expect(root?.extras?.quality_pass).toBe('pass45-flow-water-plant');
+    expect(root?.extras?.quality_pass).toBe('pass47-oil-rig-night');
     expect(Number(root?.extras?.authored_height_metres)).toBeGreaterThanOrEqual(14.8);
 
     for (const semantic of [
       'ship-ladder', 'ship-ladder-rung', 'lower-ramp', 'process-equipment', 'upper-access',
-      'upper-deck', 'yard-tank', 'yard-silo', 'ground-hardstand', 'ground-asphalt', 'pipe-rack',
+      'upper-deck', 'yard-tank', 'yard-crate', 'rig-leg', 'rig-deck',
       'perimeter', 'crane-detail', 'control-hut',
     ] as const) {
       expect(authored.some((node) => node.extras?.rustworks_semantic === semantic), semantic).toBe(true);

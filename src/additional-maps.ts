@@ -217,44 +217,53 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const oxide = standard(0x4a2c22, 0.9, 0.3);
   const grate = standard(0x4e585c, 0.62, 0.55);
 
-  // Island pad — slightly inset from bounds so ocean reads past the fence when looking out.
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(52, 56), sand);
-  ground.name = 'rustworks-compacted-earth';
+  // Raised oil-rig deck (playable surface stays at y≈0 for physics). Ocean sits far below.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(54, 58), steel);
+  ground.name = 'rustworks-rig-deck-top';
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.0;
   ground.receiveShadow = true;
-  ground.userData.impactSurface = 'soil';
+  ground.userData.impactSurface = 'metal';
   root.add(ground);
   builder.raycastMeshes.push(ground);
-  // Thin cliff rim for a readable shore without blocking movement.
-  box(builder, 'rustworks-island-rim', [0, -0.18, 0], [53.2, 0.36, 57.2], concreteDark, { solid: false, cast: false, shots: false });
-
-  // Hardstand under the tower + lane chevrons for industrial ground read.
-  box(builder, 'rustworks-tower-hardstand', [0, 0.04, 0], [18, 0.08, 18], packed, { solid: false, cast: false });
-  box(builder, 'rustworks-service-lane', [0, 0.05, -16], [8.5, 0.06, 18], concreteDark, { solid: false, cast: false });
-  for (const z of [-24, -18, -12, 12, 18, 24]) {
-    box(builder, 'rustworks-ground-chevron', [0, 0.055, z], [3.2, 0.04, 0.55], hazardDark, { solid: false, cast: false, shots: false });
+  // Thick deck plate + edge lip so the drop to water reads when looking over.
+  box(builder, 'rustworks-rig-deck-slab', [0, -0.85, 0], [54.5, 1.6, 58.5], rustDark, { solid: false, cast: true, shots: false });
+  box(builder, 'rustworks-rig-deck-edge', [0, -0.08, 0], [55.2, 0.22, 59.2], hazardDark, { solid: false, cast: false, shots: false });
+  // Support legs down toward the ocean (visual only — no snag colliders).
+  for (const x of [-22, -8, 8, 22]) for (const z of [-24, -8, 8, 24]) {
+    box(builder, 'rustworks-rig-leg', [x, -8.5, z], [1.35, 15.5, 1.35], steelBright, { solid: false, detail: 'performance' });
+    box(builder, 'rustworks-rig-leg-brace', [x, -4.2, z], [2.4, 0.35, 0.35], oxide, { solid: false, detail: 'quality' });
   }
-  for (const x of [-10.5, 10.5]) {
-    box(builder, 'rustworks-ground-marking', [x, 0.055, 0], [0.45, 0.04, 14], hazard, { solid: false, cast: false, shots: false });
+  // Cross girders under deck
+  for (const z of [-18, 0, 18]) {
+    box(builder, 'rustworks-rig-girder', [0, -1.55, z], [50, 0.55, 0.7], steel, { solid: false, detail: 'performance' });
+  }
+  for (const x of [-18, 0, 18]) {
+    box(builder, 'rustworks-rig-girder', [x, -1.55, 0], [0.7, 0.55, 54], steel, { solid: false, detail: 'performance' });
   }
 
-  // Perimeter fence is visual only (lower so ocean shows past it). Playable exit is stopped by world bounds.
+  // Painted walk lanes — presentation only, clear paths for bots/players.
+  box(builder, 'rustworks-tower-hardstand', [0, 0.03, 0], [16, 0.06, 16], packed, { solid: false, cast: false });
+  box(builder, 'rustworks-service-lane', [0, 0.04, 0], [5.5, 0.05, 48], concreteDark, { solid: false, cast: false });
+  box(builder, 'rustworks-service-lane', [0, 0.04, 0], [48, 0.05, 5.5], concreteDark, { solid: false, cast: false });
+  for (const z of [-20, 20]) {
+    box(builder, 'rustworks-ground-chevron', [0, 0.05, z], [2.8, 0.03, 0.45], hazard, { solid: false, cast: false, shots: false });
+  }
+
+  // Open safety rail (NOT solid walls) — world bounds stop exits; ocean stays visible.
   for (const [x, z, sx, sz] of [
-    [0, -29.5, 54, 0.55], [0, 29.5, 54, 0.55], [-27.5, 0, 0.55, 58], [27.5, 0, 0.55, 58],
-  ] as const) box(builder, 'rustworks-perimeter-sheeting', [x, 1.35, z], [sx, 2.7, sz], rustDark, { solid: false });
+    [0, -29.2, 52, 0.18], [0, 29.2, 52, 0.18], [-26.8, 0, 0.18, 56], [26.8, 0, 0.18, 56],
+  ] as const) {
+    box(builder, 'rustworks-perimeter-rail', [x, 1.15, z], [sx, 0.12, sz], hazard, { solid: false, detail: 'performance' });
+    box(builder, 'rustworks-perimeter-rail', [x, 0.55, z], [sx, 0.1, sz], steel, { solid: false, detail: 'performance' });
+  }
   for (const [x, z] of [
-    [-18, -29.2], [-6, -29.2], [6, -29.2], [18, -29.2],
-    [-18, 29.2], [-6, 29.2], [6, 29.2], [18, 29.2],
-    [-27.2, -18], [-27.2, 0], [-27.2, 18],
-    [27.2, -18], [27.2, 0], [27.2, 18],
+    [-20, -29], [-8, -29], [8, -29], [20, -29],
+    [-20, 29], [-8, 29], [8, 29], [20, 29],
+    [-26.6, -16], [-26.6, 0], [-26.6, 16],
+    [26.6, -16], [26.6, 0], [26.6, 16],
   ] as const) {
-    box(builder, 'rustworks-perimeter-post', [x, 2.4, z], [0.42, 4.8, 0.42], steel, { solid: false, detail: 'quality' });
-  }
-  for (const [x, z, sx, sz] of [
-    [-12, -29.15, 4.5, 0.35], [12, 29.15, 4.5, 0.35], [-27.15, 10, 0.35, 4.5], [27.15, -10, 0.35, 4.5],
-  ] as const) {
-    box(builder, 'rustworks-perimeter-gate-recess', [x, 1.5, z], [sx, 3.0, sz], hazardDark, { solid: false });
+    box(builder, 'rustworks-perimeter-post', [x, 0.7, z], [0.28, 1.4, 0.28], steel, { solid: false, detail: 'performance' });
   }
 
   const {
@@ -510,61 +519,34 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-process-pipe-run', [x, y, z], [sx, sy, sz], steel, { solid: false, detail: 'quality' });
   }
 
-  // Outer cover kept off the tower hardstand so middle approaches stay open.
+  // Sparse corner cover only — open cross-lanes for smooth player/bot pathing.
+  // Keep a clear ~12m apron around the tower and open ±X / ±Z corridors.
   for (const [x, z, color, sx, sy, sz] of [
-    [-19, -19, tarp, 3.6, 2.3, 5.8],
-    [-14.5, -20, rust, 3.2, 2.1, 5.2],
-    [19, 20, hazard, 3.6, 2.3, 5.8],
-    [14.5, 20, rustDark, 3.2, 2.0, 5.0],
-    [-21, 14, oxide, 2.8, 1.7, 3.2],
-    [21, -14, tarp, 2.8, 1.7, 3.2],
+    [-20, -20, tarp, 3.2, 2.1, 3.2],
+    [20, 20, hazard, 3.2, 2.1, 3.2],
+    [-20, 20, rustDark, 3.0, 2.0, 3.0],
+    [20, -20, oxide, 3.0, 2.0, 3.0],
   ] as const) {
     box(builder, 'rustworks-freight-crate', [x, sy / 2, z], [sx, sy, sz], color);
-    box(builder, 'rustworks-crate-lid', [x, sy + 0.08, z], [sx + 0.15, 0.16, sz + 0.15], steel, { solid: false, detail: 'quality' });
+    box(builder, 'rustworks-crate-lid', [x, sy + 0.08, z], [sx + 0.12, 0.14, sz + 0.12], steel, { solid: false, detail: 'quality' });
   }
-  for (const [x, z] of [[-19, 9], [19, -10], [0, 22]] as const) {
-    box(builder, 'rustworks-tank-collider', [x, 1.55, z], [3.4, 3.1, 2.6], steel);
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 3.2, 12), rust);
+  // One process tank per long side, pulled to the rail so mid-lanes stay clear.
+  for (const [x, z] of [[-22, 0], [22, 0]] as const) {
+    box(builder, 'rustworks-tank-collider', [x, 1.4, z], [2.6, 2.8, 4.2], steel);
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 4.0, 14), rust);
     tank.name = 'rustworks-horizontal-process-tank';
-    tank.rotation.z = Math.PI / 2;
-    tank.position.set(x, 1.7, z);
+    tank.rotation.x = Math.PI / 2;
+    tank.position.set(x, 1.5, z);
     tank.castShadow = true;
     tank.receiveShadow = true;
     tank.userData.presentationOnly = true;
     tank.userData.rustworksDetail = 'quality';
     tank.userData.impactSurface = 'metal';
     root.add(tank);
-    box(builder, 'rustworks-tank-saddle', [x - 1.2, 0.45, z], [0.35, 0.9, 2.2], concrete, { solid: false, detail: 'quality' });
-    box(builder, 'rustworks-tank-saddle', [x + 1.2, 0.45, z], [0.35, 0.9, 2.2], concrete, { solid: false, detail: 'quality' });
   }
-  // Outer-yard cover only. Keep open lanes on ±X/±Z axes and a clear 10m tower apron.
-  for (const [x, z, sx, sz] of [
-    [-14, 16, 4.2, 1.8], [14, -16, 4.4, 1.8], [-18, -8, 3.0, 2.0], [18, 8, 3.0, 2.0],
-    [-8, 23, 3.6, 1.6], [8, -24, 3.6, 1.6],
-  ] as const) {
-    box(builder, 'rustworks-scrap-cover', [x, 0.85, z], [sx, 1.7, sz], concrete);
-    box(builder, 'rustworks-cover-detail-beam', [x, 1.85, z], [Math.min(sx, 2.8), 0.16, 0.2], hazard, { solid: false, detail: 'performance' });
-  }
-  // Smaller pipe spools tucked in corners — no 3m solid cubes on approach lanes.
-  for (const [x, z] of [[-18, -16], [18, 17], [-21, 18], [21, -18]] as const) {
-    box(builder, 'rustworks-pipe-bundle-collider', [x, 0.7, z], [2.1, 1.4, 2.1], rustDark);
-    for (const offset of [-0.55, 0.55]) {
-      const pipe = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.1, 6, 12), steel);
-      pipe.name = 'rustworks-pipe-opening';
-      pipe.position.set(x + offset, 0.72, z - 1.0);
-      pipe.rotation.x = Math.PI / 2;
-      pipe.userData.presentationOnly = true;
-      pipe.userData.rustworksDetail = 'quality';
-      root.add(pipe);
-    }
-  }
-  for (const [x, z] of [[-15, 7], [15, -8], [-10, 20], [10, -21]] as const) {
-    box(builder, 'rustworks-pallet-stack', [x, 0.4, z], [1.4, 0.8, 1.05], oxide);
-    box(builder, 'rustworks-cable-spool', [x + 1.7, 0.6, z], [1.1, 1.2, 0.4], steel, { solid: false, detail: 'performance' });
-  }
-  // Low barriers as soft cover, not L-traps on the diagonal routes.
-  for (const [x, z] of [[-19, 14], [19, -14]] as const) {
-    box(builder, 'rustworks-barrier-low', [x, 0.5, z], [2.8, 1.0, 0.4], hazard);
+  // Two low hazard barriers as soft mid-range cover (not L-traps).
+  for (const [x, z] of [[-12, 18], [12, -18]] as const) {
+    box(builder, 'rustworks-barrier-low', [x, 0.45, z], [2.4, 0.9, 0.35], hazard);
   }
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });

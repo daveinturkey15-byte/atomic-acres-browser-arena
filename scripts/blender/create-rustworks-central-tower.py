@@ -16,7 +16,7 @@ GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-centr
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
 PREVIEW_PATH = ROOT / "artifacts" / "pass44" / "rustworks-quality-plant-preview.png"
 
-ASSET_VERSION = "pass45-v1"
+ASSET_VERSION = "pass47-v1"
 AUTHORED_HEIGHT_M = 15.2
 
 LOADED: dict[str, bpy.types.Image] = {}
@@ -217,7 +217,7 @@ def main():
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
     root["access_scheme"] = "lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "pass45-flow-water-plant"
+    root["quality_pass"] = "pass47-oil-rig-night"
     root["material_count_target"] = 11
 
     # ========== GROUND ==========
@@ -434,101 +434,57 @@ def main():
     cube("RW_lower_handrail_w", (-4.3, -0.2, lower_rail_y), (0.12, 7.6, 1.15), M_hazard, "lower-handrail")
     cube("RW_lower_handrail_e", (4.3, 0.45, lower_rail_y), (0.12, 5.8, 1.15), M_hazard, "lower-handrail")
 
-    # ========== YARD ==========
-    # Vertical silos
-    for i, (x, z, h, r) in enumerate((
-        (-20, -18, 9.5, 2.2), (-15.2, -18.5, 8.2, 1.9), (19, 18, 9.5, 2.2), (14.2, 18.5, 7.8, 1.8),
-    )):
-        cylinder(f"RW_silo_{i}", (x, -z, h / 2), r, h, M_corr if i % 2 == 0 else M_tank, vertices=28, kind="yard-silo")
-        # Flat cap disc — plate steel avoids streaky rust looking like wood on top faces.
-        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=r * 0.98, depth=0.35, location=(x, -z, h + 0.18))
-        cap = bpy.context.object
-        cap.name = f"RW_silo_cap_{i}"
-        smart_uv(cap)
-        assign(cap, M_plate)
-        tag(cap, "yard-silo")
-        CREATED.append(cap)
-        cube(f"RW_silo_ladder_{i}", (x + r + 0.15, -z, h * 0.45), (0.12, 0.35, h * 0.85), M_hazard, "yard-silo", do_bevel=False)
-        cube(f"RW_silo_pad_{i}", (x, -z, 0.15), (r * 2.4, r * 2.4, 0.3), M_concrete, "yard-silo")
-        # Vertical ribs for silhouette
-        for rib in range(6):
-            ang = rib * math.pi / 3
-            rx = x + math.cos(ang) * (r + 0.04)
-            rz = z + math.sin(ang) * (r + 0.04)
-            cube(f"RW_silo_rib_{i}_{rib}", (rx, -rz, h * 0.45), (0.1, 0.1, h * 0.85), M_oxide, "yard-silo", do_bevel=False)
-
-    # Horizontal tanks
-    for i, (x, z) in enumerate(((-20, 10), (20, -11), (0, 24), (-8, 22))):
-        cylinder(f"RW_tank_{i}", (x, -z, 1.85), 1.7, 5.2, M_tank, rotation=(0, math.pi / 2, 0), vertices=20, kind="yard-tank")
-        cube(f"RW_tank_saddle_a_{i}", (x - 1.5, -z, 0.5), (0.4, 2.0, 1.0), M_concrete, "yard-tank")
-        cube(f"RW_tank_saddle_b_{i}", (x + 1.5, -z, 0.5), (0.4, 2.0, 1.0), M_concrete, "yard-tank")
-        cylinder(f"RW_tank_hatch_{i}", (x, -z, 3.5), 0.35, 0.25, M_rust, kind="yard-tank")
-
-    # Pipe rack corridors
-    for i, (x, z0, z1) in enumerate(((-12, -10, 10), (12, -10, 10), (-6, 16, 26))):
-        for y in (2.2, 3.4):
-            i_beam(f"RW_rack_beam_{i}_{y}", (x, -((z0 + z1) / 2), y), abs(z1 - z0), 0.4, M_plate, axis="y")
-        for z in (z0, (z0 + z1) / 2, z1):
-            cube(f"RW_rack_post_{i}_{z}", (x, -z, 1.8), (0.25, 0.25, 3.6), M_rust, "pipe-rack")
-        pipe_run(f"RW_rack_pipe_{i}", [(x - 0.35, -z0, 2.6), (x - 0.35, -z1, 2.6)], 0.12, M_oxide)
-        pipe_run(f"RW_rack_pipe2_{i}", [(x + 0.35, -z0, 3.0), (x + 0.35, -z1, 3.0)], 0.1, M_tank)
-
-    # Crates / scrap cover
+    # ========== YARD (sparse oil-rig deck — open lanes, corner cover only) ==========
+    # Four corner crates aligned with TS colliders.
     for i, (x, z, sx, sy, sz) in enumerate((
-        (-17, 14, 4.5, 2.8, 3.2), (16, -16, 4.8, 2.5, 3.0), (-14, 4, 3.2, 2.2, 2.8),
-        (15, 6, 3.4, 2.0, 2.6), (-4, 20, 5.2, 2.0, 2.4), (5, -22, 5.0, 1.9, 2.5),
-        (-22, -4, 2.8, 3.5, 2.2), (22, 4, 2.8, 3.2, 2.2),
+        (-20, -20, 3.2, 2.1, 3.2), (20, 20, 3.2, 2.1, 3.2),
+        (-20, 20, 3.0, 2.0, 3.0), (20, -20, 3.0, 2.0, 3.0),
     )):
         cube(f"RW_crate_{i}", (x, -z, sy / 2), (sx, sz, sy), M_rust if i % 2 == 0 else M_oxide, "yard-crate")
-        cube(f"RW_crate_lid_{i}", (x, -z, sy + 0.1), (sx + 0.2, sz + 0.2, 0.16), M_plate, "yard-crate")
-        if i % 3 == 0:
-            cube(f"RW_crate_band_{i}", (x, -z, sy * 0.55), (sx + 0.05, sz + 0.05, 0.12), M_hazard, "yard-crate", do_bevel=False)
+        cube(f"RW_crate_lid_{i}", (x, -z, sy + 0.1), (sx + 0.15, sz + 0.15, 0.14), M_plate, "yard-crate")
 
-    # Scrap piles / low cover
-    for i, (x, z, sx, sz) in enumerate((
-        (-11, 16, 5.5, 2.2), (12, -14, 5.8, 2.1), (-16, -6, 3.6, 2.5), (17, 8, 3.6, 2.5),
-        (-7, 24, 5.2, 2.0), (7, -25, 5.2, 2.0), (0, -20, 4.0, 1.8),
-    )):
-        cube(f"RW_scrap_{i}", (x, -z, 1.05), (sx, sz, 2.1), M_concrete, "yard-cover")
-        cube(f"RW_scrap_beam_{i}", (x, -z, 2.25), (min(sx, 3.4), 0.24, 0.2), M_hazard, "yard-cover")
-        cube(f"RW_scrap_sheet_{i}", (x + 0.4, -z + 0.3, 1.8), (sx * 0.4, sz * 0.5, 0.08), M_corr, "yard-cover", do_bevel=False)
+    # Side process tanks on ±X rail only.
+    for i, (x, z) in enumerate(((-22, 0), (22, 0))):
+        cylinder(f"RW_tank_{i}", (x, -z, 1.5), 1.35, 4.0, M_tank, rotation=(math.pi / 2, 0, 0), vertices=20, kind="yard-tank")
 
-    # Perimeter fence posts + panels
+    # Low barriers matching TS soft cover.
+    for i, (x, z) in enumerate(((-12, 18), (12, -18))):
+        cube(f"RW_barrier_{i}", (x, -z, 0.45), (2.4, 0.35, 0.9), M_hazard, "yard-cover")
+
+    # Open safety rail (not solid walls).
     posts = []
-    for x in range(-28, 29, 7):
-        posts.append((x, -30))
-        posts.append((x, 30))
-    for z in range(-23, 24, 7):
-        posts.append((-30, z))
-        posts.append((30, z))
+    for x in range(-24, 25, 8):
+        posts.append((x, -29))
+        posts.append((x, 29))
+    for z in range(-20, 21, 8):
+        posts.append((-26.6, z))
+        posts.append((26.6, z))
     for i, (x, z) in enumerate(posts):
-        # Lower fence so Quality Graphics can see ocean beyond the yard edge.
-        cube(f"RW_perimeter_post_{i}", (x, -z, 1.5), (0.32, 0.32, 3.0), M_plate, "perimeter")
-        cube(f"RW_perimeter_cap_{i}", (x, -z, 3.1), (0.45, 0.45, 0.18), M_hazard, "perimeter", do_bevel=False)
-    for z in (-30, 30):
-        cube(f"RW_fence_rail_z_{z}_lo", (0, -z, 0.9), (56, 0.08, 0.1), M_oxide, "perimeter", do_bevel=False)
-        cube(f"RW_fence_rail_z_{z}_hi", (0, -z, 2.4), (56, 0.08, 0.1), M_oxide, "perimeter", do_bevel=False)
-    for x in (-30, 30):
-        cube(f"RW_fence_rail_x_{x}_lo", (x, 0, 0.9), (0.08, 56, 0.1), M_oxide, "perimeter", do_bevel=False)
-        cube(f"RW_fence_rail_x_{x}_hi", (x, 0, 2.4), (0.08, 56, 0.1), M_oxide, "perimeter", do_bevel=False)
+        cube(f"RW_perimeter_post_{i}", (x, -z, 0.7), (0.28, 0.28, 1.4), M_plate, "perimeter")
+    for z in (-29.2, 29.2):
+        cube(f"RW_fence_rail_z_{z}", (0, -z, 1.15), (52, 0.1, 0.12), M_hazard, "perimeter", do_bevel=False)
+    for x in (-26.8, 26.8):
+        cube(f"RW_fence_rail_x_{x}", (x, 0, 1.15), (0.1, 56, 0.12), M_hazard, "perimeter", do_bevel=False)
+
+    # Oil-rig legs + thick deck slab (ocean sits far below in runtime water system).
+    for i, (x, y) in enumerate(((-22, -24), (-22, 24), (22, -24), (22, 24), (-8, -8), (8, 8), (-8, 8), (8, -8))):
+        cube(f"RW_rig_leg_{i}", (x, y, -8.0), (1.3, 1.3, 15.0), M_plate, "rig-leg")
+    cube("RW_rig_deck_slab", (0, 0, -0.85), (54.5, 58.5, 1.6), M_rust, "rig-deck")
+    for z in (-18, 0, 18):
+        cube(f"RW_rig_girder_z_{z}", (0, -z, -1.55), (50, 0.7, 0.55), M_plate, "rig-deck")
+    for x in (-18, 0, 18):
+        cube(f"RW_rig_girder_x_{x}", (x, 0, -1.55), (0.7, 54, 0.55), M_plate, "rig-deck")
 
     # Signage
     cube("RW_plant_sign", (0, -2.2, 11.3), (4.4, 0.16, 0.9), M_sign, "signage")
     cube("RW_plant_sign_frame", (0, -2.15, 11.3), (4.7, 0.08, 1.1), M_plate, "signage", do_bevel=False)
-    cube("RW_yard_sign_a", (-10, 12, 3.2), (0.12, 2.2, 1.4), M_sign, "signage")
-    cube("RW_yard_sign_b", (10, -12, 3.2), (0.12, 2.2, 1.4), M_hazard, "signage")
 
-    # Floodlight poles
+    # Floodlight poles at corners / edges
     for i, (x, z) in enumerate(((-22, -22), (22, 22), (-22, 22), (22, -22), (0, -28), (0, 28))):
         cube(f"RW_light_pole_{i}", (x, -z, 4.5), (0.28, 0.28, 9.0), M_plate, "yard-light")
         cube(f"RW_light_arm_{i}", (x + 0.8, -z, 8.8), (1.6, 0.18, 0.18), M_rust, "yard-light")
         cube(f"RW_light_head_{i}", (x + 1.5, -z, 8.6), (0.7, 0.5, 0.35), M_hazard, "yard-light",
              do_bevel=False)
-
-    # Spool props
-    for i, (x, z) in enumerate(((-8, -14), (9, 15), (-18, 0))):
-        cylinder(f"RW_spool_{i}", (x, -z, 1.1), 1.1, 0.9, M_oxide, rotation=(math.pi / 2, 0, 0), vertices=16, kind="yard-prop")
-        cylinder(f"RW_spool_core_{i}", (x, -z, 1.1), 0.35, 1.0, M_rust, rotation=(math.pi / 2, 0, 0), vertices=12, kind="yard-prop")
 
     # Parent all
     for obj in CREATED:
