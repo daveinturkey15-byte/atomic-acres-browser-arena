@@ -1,27 +1,38 @@
-# Pass 44 Rustworks Quality plant — release notes
+# Pass 44 — Rustworks Quality plant public release
 
 Date: 2026-07-21  
-Branch: `overhaul/pass44-rustworks-quality-plant`  
-Asset: `pass44-v1`
+Status: **live in production**  
+Functional source revision: `be33aed37e9ba3c58e2e372cd9322b0016ddb5ea`  
+Source branch: `overhaul/pass44-rustworks-quality-plant`  
+Production `gh-pages` revision: `ad197a1`  
+Rollback production root: `588e8e54007f7a958867113684ef1e3e74ab8e49` (Pass 40) while preserving `review/`  
 
-## Delivered
-- **~10.1 MB** authored Quality plant GLB (was 0.17 MB untextured overlay → 3.9 MB rushed Pass 43 → **10.1 MB** dense plant)
-- **460** presentation meshes, **11** industrial materials, **33** embedded texture images
-- 1024px original PBR set: rust steel, plate, grate, diamond plate, concrete, hazard, oxide, tank paint, asphalt, signage, corrugated
-- Full yard: silos, tanks, pipe racks, crates, scrap cover, perimeter, floodlights, spools, apron rings
-- Middle tower: lattice legs, dual decks, open upper centre, corner hut/manifold, crane, clear ramp + ship ladder
-- Quality mode hides procedural bulk when kit ready; 14 industrial work lights; denser dust
-- Blender preview: `artifacts/pass44/rustworks-quality-plant-preview.png`
+Public URL: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/  
+Immutable review URL: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass44-rustworks-quality-plant-be33aed/
 
-## How to view
-1. QUALITY GRAPHICS  
-2. RUSTWORKS  
-3. Hard refresh after deploy  
+## What shipped
+- Pass 44 Quality industrial plant GLB (~10.1 MB, `pass44-v1`)
+- 11 embedded industrial PBR materials + 1024 texture set
+- ~460 authored presentation meshes (tower + yard + ground)
+- Quality mode hides procedural bulk when kit ready
+- Private lobby / hosting lineage from Pass 42 retained in source tree
 
-## Gates
-- tsc clean  
-- vitest focused suites green  
-- production build green  
+## Exact-byte verification (live vs local dist)
+- Production `index.html` references `assets/index-55CjdPfj.js`
+- `rustworks-central-tower.glb` SHA-256 match:
+  `9e6edf951a3304165f392a9dc766180a7f2cffa631b537d6c3987f73ba6435f5`
+- Live size: **10,119,804** bytes
+- Manifest (production root, excl. review):  
+  files **91**, totalBytes **37,830,986**,  
+  manifestSha256 `c7062679ef6651d34186f55905d3cb4fd2ad7146011032c656e01e5a2c2c5f5f`
+- Immutable review path HTTP **200**
+- Historical `review/` trees preserved
 
-## Not yet
-- Public `gh-pages` promote (awaiting your go)
+## How to inspect
+1. Hard refresh the public URL  
+2. **QUALITY GRAPHICS**  
+3. Map **RUSTWORKS**  
+4. Let the ~10 MB plant load once  
+
+## Rollback
+Restore production-root files from `588e8e5` / Pass 40 promote while **keeping** the current `review/` directory (including pass44). Keep `.nojekyll`.
