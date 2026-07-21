@@ -21,6 +21,8 @@ Safely reconcile the Codex multiplayer/telemetry work with the verified Pass 51 
 
 - The host-selected arena is carried in private-match configuration and synchronized to guests before start.
 - Lobby, match start, active map root, navigation collision, respawn bounds, and DOM/debug identity remain aligned.
+- Guest arena switches are serialized rather than dropped when repeated lobby-state snapshots arrive during physics creation.
+- Map cards lock once a private lobby exists; Ready and Start remain disabled until the selected arena and lobby configuration match.
 - Respawn selection uses the active map bounds and handles wide/non-square arenas.
 - Team and free-for-all spawn selection use opponent separation appropriate to the current match mode.
 
@@ -45,7 +47,7 @@ Safely reconcile the Codex multiplayer/telemetry work with the verified Pass 51 
 3. Full Vitest suite passes.
 4. Production build and release-tree verification pass.
 5. Dependency audit reports zero vulnerabilities.
-6. Rustworks host/guest lobby synchronization passes with identical active roots, colliders, bounds, and DOM arena identity.
+6. Rustworks host/guest lobby synchronization passes with an 800 ms forced local physics-switch window: Ready is disabled and map cards remain locked during synchronization, then both peers expose enabled Ready controls plus identical active roots, colliders, bounds, and DOM arena identity.
 7. Main multiplayer replication passes including damage telemetry and spawn separation.
 8. Four-/six-player private lobby, overflow, synchronized timer, FFA, reconnect, and zero-bot gates pass.
 9. Three repeated multiplayer lifecycle cycles pass.

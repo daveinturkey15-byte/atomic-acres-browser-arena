@@ -1055,6 +1055,9 @@ const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+const localArenaSwitchQaDelayMs = localMultiplayerQa
+  ? Math.min(1_000, Math.max(0, Number(new URLSearchParams(window.location.search).get('arenaSwitchQaDelayMs')) || 0))
+  : 0;
 let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
 const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v1') : null;
 let scoutSweepUntil = 0;
@@ -1225,6 +1228,7 @@ let debugAdsOverride: boolean | null = null;
 let debugReloadProgress: number | null = null;
 let characterPhysics: CharacterPhysics | null = null;
 let arenaSelectionReady = false;
+let arenaSelectionTask: Promise<void> = Promise.resolve();
 
 function gameplayInputEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden');
@@ -1817,7 +1821,9 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   privateLobbySnapshot = message.snapshot;
   privateMatchConfig = message.snapshot.config;
   privateMatchMode = message.snapshot.config.mode;
-  lobbyArenaSyncPromise = synchronizeLobbyArena();
+  lobbyArenaSyncPromise = lobbyArenaSyncPromise
+    .catch(() => undefined)
+    .then(() => synchronizeLobbyArena());
   authoritativeScores.clear();
   for (const score of message.snapshot.scores) authoritativeScores.set(score.id, score);
   const localMember = message.snapshot.members.find((member) => member.id === player.id);
@@ -1919,6 +1925,7 @@ function renderPrivateLobby(): void {
   const section = element<HTMLElement>('#private-lobby');
   const lobbyActive = network.role !== 'offline' || privateLobbySnapshot !== null;
   menu.classList.toggle('private-lobby-active', lobbyActive);
+  syncArenaSelectionUi();
   if (network.role === 'offline' && !privateLobbySnapshot) {
     section.hidden = true;
     return;
@@ -1945,14 +1952,16 @@ function renderPrivateLobby(): void {
   balanceInput.disabled = !hostControls || modeInput.value === 'ffa';
   element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa';
   const localMember = members.find((member) => member.id === player.id);
+  const lobbyArenaSynchronized = !snapshot
+    || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
   localLobbyReady = localMember?.ready ?? localLobbyReady;
   const ready = element<HTMLButtonElement>('#lobby-ready');
   ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
   ready.classList.toggle('primary', localLobbyReady);
-  ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting';
+  ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
   const start = element<HTMLButtonElement>('#lobby-start');
   start.hidden = network.role !== 'host';
-  start.disabled = network.role !== 'host' || !snapshot || !canHostStart(snapshot);
+  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostStart(snapshot);
   const teamInput = element<HTMLSelectElement>('#team');
   teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   const roster = element<HTMLElement>('#lobby-roster');
@@ -1964,7 +1973,9 @@ function renderPrivateLobby(): void {
     return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b><em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
   }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
   const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
-  element<HTMLElement>('#lobby-guidance').textContent = snapshot?.phase === 'active'
+  element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
+    ? `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
+    : snapshot?.phase === 'active'
     ? 'Match active · disconnected players have a 30 second rejoin slot.'
     : snapshot?.phase === 'countdown'
       ? 'Synchronized deployment countdown started.'
@@ -6206,11 +6217,12 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 function syncArenaSelectionUi(): void {
+  const lobbyArenaLocked = network.role !== 'offline' || privateLobbySnapshot !== null;
   for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
     const selected = button.dataset.arenaId === selectedArena.id;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
-    button.disabled = !arenaSelectionReady || gameStarted;
+    button.disabled = !arenaSelectionReady || gameStarted || lobbyArenaLocked;
   }
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
@@ -6329,7 +6341,7 @@ function setArenaMenuCamera(): void {
   camera.updateProjectionMatrix();
 }
 
-async function activateArenaSelection(id: ArenaId): Promise<void> {
+async function performArenaSelection(id: ArenaId): Promise<void> {
   if (gameStarted || !arenaSelectionReady || id === selectedArena.id) return;
   const nextSelection = arenaSelection(id);
   const previousSelection = selectedArena;
@@ -6341,6 +6353,9 @@ async function activateArenaSelection(id: ArenaId): Promise<void> {
   setStatus(`Loading ${nextSelection.displayName} collision…`);
   try {
     const nextArena = arenaById[nextSelection.id];
+    if (localArenaSwitchQaDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
+    }
     nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
@@ -6378,7 +6393,16 @@ async function activateArenaSelection(id: ArenaId): Promise<void> {
   } finally {
     arenaSelectionReady = true;
     syncArenaSelectionUi();
+    if (network.role !== 'offline' || privateLobbySnapshot) renderPrivateLobby();
   }
+}
+
+function activateArenaSelection(id: ArenaId): Promise<void> {
+  const queued = arenaSelectionTask
+    .catch(() => undefined)
+    .then(() => performArenaSelection(id));
+  arenaSelectionTask = queued;
+  return queued;
 }
 
 for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {

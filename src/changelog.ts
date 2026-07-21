@@ -25,6 +25,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     summary: 'Private matches now carry the host-selected arena cleanly through lobby, start, respawn, and live diagnostics.',
     highlights: Object.freeze([
       'Host arena selection is synchronized to every guest before the match starts',
+      'Map selection locks in the lobby; Ready and Start wait for map collision sync',
       'Respawns use the active map bounds, including wide and non-square arenas',
       'Team and free-for-all spawn choices keep safer separation from opponents',
       'Combat telemetry now reports kills, deaths, damage dealt, damage taken, and ping',

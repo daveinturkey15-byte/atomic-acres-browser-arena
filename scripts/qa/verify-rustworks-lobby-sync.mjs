@@ -2,6 +2,7 @@ import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
+const forceArenaSyncGate = ['127.0.0.1', 'localhost'].includes(new URL(baseUrl).hostname);
 const browser = await chromium.launch({
   headless: true,
   args: [
@@ -24,6 +25,7 @@ try {
     const url = new URL(baseUrl);
     url.searchParams.set('render', 'compat');
     url.searchParams.set('multiplayerQa', '1');
+    url.searchParams.set('arenaSwitchQaDelayMs', '800');
     url.searchParams.set('seed', `rustworks-sync-${label}`);
     if (peerPort) url.searchParams.set('peerQaPort', String(peerPort));
     await page.goto(url.toString());
@@ -41,6 +43,21 @@ try {
   await guest.click('#join');
 
   await Promise.all([host, guest].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 2, undefined, { timeout: 45_000 })));
+  let arenaSyncGate = null;
+  if (forceArenaSyncGate) {
+    await guest.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state.privateMatch?.arenaId === 'rustworks-1v1' && state.arenaSelection.id === 'atomic-acres';
+    }, undefined, { timeout: 15_000 });
+    arenaSyncGate = await guest.evaluate(() => ({
+      readyDisabled: document.querySelector('#lobby-ready')?.disabled === true,
+      guidance: document.querySelector('#lobby-guidance')?.textContent?.trim(),
+      mapCardsLocked: [...document.querySelectorAll('.map-card[data-arena-id]')].every((button) => button.disabled),
+    }));
+    if (!arenaSyncGate.readyDisabled || !arenaSyncGate.mapCardsLocked || !arenaSyncGate.guidance?.startsWith('Synchronizing Rustworks')) {
+      throw new Error(`Arena synchronization gate missing: ${JSON.stringify(arenaSyncGate)}`);
+    }
+  }
   try {
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -56,6 +73,13 @@ try {
       return { privateMatch: state.privateMatch, arenaSelection: state.arenaSelection, status: document.querySelector('#network-status')?.textContent };
     }))), null, 2));
     throw error;
+  }
+  const postSyncControls = await Promise.all([host, guest].map((page) => page.evaluate(() => ({
+    readyDisabled: document.querySelector('#lobby-ready')?.disabled === true,
+    mapCardsLocked: [...document.querySelectorAll('.map-card[data-arena-id]')].every((button) => button.disabled),
+  }))));
+  if (postSyncControls.some((controls) => controls.readyDisabled || !controls.mapCardsLocked)) {
+    throw new Error(`Post-sync lobby controls invalid: ${JSON.stringify(postSyncControls)}`);
   }
 
   await host.click('#lobby-ready');
@@ -81,7 +105,7 @@ try {
       domArenaId: document.documentElement.dataset.arenaId,
     };
   })));
-  const report = { errors, roomCodeLength: roomCode.length, states };
+  const report = { errors, roomCodeLength: roomCode.length, arenaSyncGate, postSyncControls, states };
   console.log(JSON.stringify(report, null, 2));
   const canonical = JSON.stringify(states[0]);
   if (errors.length > 0 || roomCode.length !== 36 || states.some((state) => state.arenaId !== 'rustworks-1v1'
