@@ -35,7 +35,8 @@ describe('opening arena selection', () => {
       soloBotCount: 0,
       maximumSoloBots: 0,
       multiplayer: false,
-      matchRules: { durationMs: null, scoreLimit: null },
+      matchRules: { durationMs: 120_000, scoreLimit: null },
+      rulesLabel: '2 MIN · NO GRENADES · SCORE ATTACK',
     });
   });
 

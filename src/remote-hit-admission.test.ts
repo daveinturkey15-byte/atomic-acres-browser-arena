@@ -10,7 +10,7 @@ import {
 describe('remote hit admission', () => {
   it('derives range and hit-zone damage from the admitted ray', () => {
     const target = { x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
-    const head = deriveRemoteShotBaseDamage('carbine', [0, 2.13, 6], [[0, 0, -1]], target);
+    const head = deriveRemoteShotBaseDamage('carbine', [0, 2.18, 6], [[0, 0, -1]], target);
     const body = deriveRemoteShotBaseDamage('carbine', [0, 1.38, 6], [[0, 0, -1]], target);
     expect(head).toBeGreaterThan(body);
     expect(body).toBeGreaterThan(0);

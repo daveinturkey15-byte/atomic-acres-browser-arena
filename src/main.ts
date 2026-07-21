@@ -90,7 +90,26 @@ import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
-import { advanceRangeScore, hasUnlimitedRangeAmmo, reloadSupply, reserveAfterCompletedReload, reserveHudValue } from './gun-range-rules';
+import {
+  advanceRangeScore,
+  formatRangeAccuracy,
+  GUN_RANGE_ROUND_MS,
+  hasUnlimitedRangeAmmo,
+  isGunRange,
+  rangeAccuracyPercent,
+  rangeGrenadesAllowed,
+  reloadSupply,
+  reserveAfterCompletedReload,
+  reserveHudValue,
+} from './gun-range-rules';
+import {
+  createGunRangeScoreEntry,
+  loadGunRangeScores,
+  mergeGunRangeScores,
+  personalBestGunRange,
+  saveGunRangeScores,
+  type GunRangeScoreEntry,
+} from './gun-range-leaderboard';
 import {
   OVERDRIVE_DAMAGE_MULTIPLIER,
   OVERDRIVE_DURATION_MS,
@@ -441,10 +460,10 @@ app.innerHTML = `
         <p id="lobby-guidance">Choose teams, ready up, then the host starts one synchronized countdown.</p>
       </section>
       <div id="network-status" data-kind="ok">Ready for deployment.</div>
-      <section id="high-score-card" aria-labelledby="high-score-title">
+      <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak">
         <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
         <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
-        <p>Global streak records sync across builds and devices · local cache remains available offline.</p>
+        <p id="high-score-footnote">Global streak records sync across builds and devices · local cache remains available offline.</p>
       </section>
     </div>
     <div class="menu-panel" data-menu-panel="kit" hidden>
@@ -997,6 +1016,8 @@ let bestStreakThisMatch = 0;
 let matchScoreRecorded = false;
 let highScores: HighScoreEntry[] = [];
 try { highScores = loadHighScores(localStorage); } catch { /* Gameplay remains available when persistent storage is blocked. */ }
+let gunRangeScores: GunRangeScoreEntry[] = [];
+try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
@@ -1099,6 +1120,7 @@ const authoritativeScores = new Map<string, PlayerScore>();
 let triggerHeld = false;
 let targetHits = 0;
 let rangeScore = 0;
+let rangeShotsFired = 0;
 let accumulator = 0;
 let frameCount = 0;
 let recoilVisual = 0;
@@ -1222,6 +1244,29 @@ function areCombatantsHostile(aId: string, aTeam: Team, bId: string, bTeam: Team
 
 function renderHighScores(): void {
   const list = element<HTMLOListElement>('#high-score-list');
+  const card = element<HTMLElement>('#high-score-card');
+  const currentName = normalizeRequiredPlayerName(element<HTMLInputElement>('#player-name').value) ?? storedPlayerName;
+  if (selectedArena.id === 'gun-range') {
+    card.dataset.board = 'gun-range';
+    element<HTMLElement>('#global-leaderboard-status').textContent = 'LOCAL RANGE RECORDS';
+    element<HTMLElement>('#high-score-title').textContent = 'GUN RANGE LEADERBOARD';
+    element<HTMLElement>('#high-score-footnote').textContent = 'Timed 2-minute rounds · ranked by score, then accuracy · local to this browser.';
+    if (gunRangeScores.length === 0) {
+      list.innerHTML = '<li class="empty">Run a 2-minute score attack to set the first range record.</li>';
+    } else {
+      list.innerHTML = gunRangeScores.slice(0, 8).map((entry, index) => (
+        `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>${entry.score.toLocaleString()} PTS</span><small>${entry.hits} HITS · ${entry.accuracy}% ACC · ${entry.shots} SHOTS</small></li>`
+      )).join('');
+    }
+    const best = personalBestGunRange(gunRangeScores, currentName);
+    element<HTMLElement>('#personal-best').textContent = best
+      ? `YOUR BEST ${best.score.toLocaleString()} · ${best.accuracy}% ACC`
+      : 'NO RANGE PERSONAL BEST';
+    return;
+  }
+  card.dataset.board = 'streak';
+  element<HTMLElement>('#high-score-title').textContent = 'ACRES LEADERBOARD';
+  element<HTMLElement>('#high-score-footnote').textContent = 'Global streak records sync across builds and devices · local cache remains available offline.';
   if (highScores.length === 0) {
     list.innerHTML = '<li class="empty">Set the first named streak record.</li>';
   } else {
@@ -1229,7 +1274,6 @@ function renderHighScores(): void {
       `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>×${entry.bestStreak} STREAK</span><small>${entry.kills} KILLS · ${entry.deaths}D${entry.won ? ' · WIN' : ''}</small></li>`
     )).join('');
   }
-  const currentName = normalizeRequiredPlayerName(element<HTMLInputElement>('#player-name').value) ?? storedPlayerName;
   const best = personalBest(highScores, currentName);
   element<HTMLElement>('#personal-best').textContent = best
     ? `YOUR BEST ×${best.bestStreak} · ${best.kills} KILLS`
@@ -1241,6 +1285,25 @@ function renderHighScores(): void {
       : globalLeaderboardState === 'pending'
         ? 'GLOBAL STREAK RECORDS · CONNECTING'
         : 'GLOBAL STREAK RECORDS · OFFLINE CACHE';
+}
+
+function persistMergedGunRangeScores(incoming: readonly unknown[]): void {
+  gunRangeScores = mergeGunRangeScores(gunRangeScores, incoming);
+  try {
+    saveGunRangeScores(localStorage, gunRangeScores);
+  } catch {
+    /* optional */
+  }
+  renderHighScores();
+}
+
+function recordGunRangeRound(): void {
+  if (!isGunRange(selectedArena.id)) return;
+  const recordedAt = Date.now();
+  const entry = createGunRangeScoreEntry(player.name, rangeScore, targetHits, rangeShotsFired, recordedAt);
+  if (!entry) return;
+  persistMergedGunRangeScores([entry]);
+  addFeed(`RANGE ROUND · ${entry.score.toLocaleString()} PTS · ${entry.hits} HITS · ${entry.accuracy}% ACC`, 'gold');
 }
 
 function persistMergedHighScores(incoming: readonly unknown[], notifyTabs = true): void {
@@ -1311,6 +1374,10 @@ function recordImmediateStreak(syncGlobal = true): void {
 function recordCompletedMatch(): void {
   if (matchScoreRecorded || matchState.phase !== 'ended') return;
   matchScoreRecorded = true;
+  if (isGunRange(selectedArena.id)) {
+    recordGunRangeRound();
+    return;
+  }
   const recordedAt = Date.now();
   const authoritativeLocal = gameMode === 'solo' ? null : authoritativeScores.get(player.id) ?? null;
   const entry: HighScoreEntry = {
@@ -3020,6 +3087,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   matchScoreRecorded = false;
   targetHits = 0;
   rangeScore = 0;
+  rangeShotsFired = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -3185,6 +3253,7 @@ function tryFire(now: number): void {
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
+  if (isGunRange(selectedArena.id)) rangeShotsFired += 1;
   if (player.ammo[player.weapon] === 0) {
     const emptiedWeapon = player.weapon;
     window.setTimeout(() => {
@@ -3284,12 +3353,15 @@ function tryFire(now: number): void {
         const remoteOperator = remote.root.userData.operator as THREE.Group | undefined;
         if (remoteOperator) reactOperator(remoteOperator, hit.zone);
         const nonce = randomNonce();
+        const dealt = Math.min(100, hit.damage);
         sendAuthoritativeHit({
-          type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), kind: 'shot',
+          type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
           actionNonce: shot.nonce, nonce,
         });
         showHitmarker(hit.zone === 'head');
         audio.hit(hit.zone === 'head');
+        const zoneTag = hit.zone === 'head' ? 'HEADSHOT' : hit.zone === 'limb' ? 'LIMB' : 'BODY';
+        addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · ${zoneTag} · ${dealt} DMG`, hit.zone === 'head' ? 'gold' : undefined);
       }
     }
   }
@@ -3972,6 +4044,10 @@ function melee(): void {
 }
 
 function throwGrenade(): void {
+  if (!rangeGrenadesAllowed(selectedArena.id)) {
+    addFeed('GRENADES LOCKED ON THE GUN RANGE');
+    return;
+  }
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
   endSpawnProtectionOnOffense(performance.now());
   player.grenades -= 1;
@@ -6145,6 +6221,7 @@ async function activateArenaSelection(id: ArenaId): Promise<void> {
       console.warn('[Atomic Acres previous map physics disposal failed]', disposeError);
     }
     setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
+    renderHighScores();
   } catch (error) {
     console.error('[Atomic Acres map selection failed]', error);
     if (nextPhysics) nextPhysics.dispose();
@@ -6186,6 +6263,7 @@ function resetForMode(): void {
   characterPhysics?.setStance('stand');
   targetHits = 0;
   rangeScore = 0;
+  rangeShotsFired = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;

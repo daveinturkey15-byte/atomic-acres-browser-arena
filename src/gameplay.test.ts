@@ -46,6 +46,13 @@ describe('headshot damage contract', () => {
       expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
     }
   });
+
+  it('SMG body is 23 and headshot is 1.5× (35), never a one-shot', () => {
+    expect(computeDamage(WEAPONS.smg, 8, 'body')).toBe(23);
+    expect(computeDamage(WEAPONS.smg, 8, 'head')).toBe(35);
+    expect(computeDamage(WEAPONS.smg, 8, 'head')).toBeLessThan(100);
+    expect(computeDamage(WEAPONS.smg, 8, 'head') / computeDamage(WEAPONS.smg, 8, 'body')).toBeCloseTo(1.5, 1);
+  });
 });
 
 describe('movementProfile', () => {

@@ -1,5 +1,6 @@
 import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
+import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 
 export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range';
 
@@ -48,14 +49,14 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     id: 'gun-range' as const,
     selectorLabel: 'GUN RANGE',
     displayName: 'Acres Gun Range',
-    summary: 'Untimed solo score practice',
-    rulesLabel: '3 DISTANCES · SCORE ATTACK',
+    summary: 'Timed solo lane · score, hits, accuracy',
+    rulesLabel: '2 MIN · NO GRENADES · SCORE ATTACK',
     soloBotCount: 0,
     maximumSoloBots: 0,
     multiplayer: false,
     fieldSupport: false,
     overdrive: false,
-    matchRules: Object.freeze({ durationMs: null, scoreLimit: null }),
+    matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
   }),
 ]);
 

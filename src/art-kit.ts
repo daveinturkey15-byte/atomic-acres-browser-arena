@@ -1150,7 +1150,7 @@ function buildBoundedOperatorLod(team: Team, name: string, weaponId: WeaponId): 
     mesh.userData.hitZone = zone; mesh.userData.authoritativeProxy = true; hitProxyRoot.add(mesh);
   };
   proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-  proxy('hit-proxy-head', 'head', [0.62, 0.62, 0.62], [0, 2.13, 0]);
+  proxy('hit-proxy-head', 'head', [0.48, 0.42, 0.48], [0, 2.18, 0]);
   proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
   proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
   proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
@@ -1189,7 +1189,7 @@ export function buildOperator(
       hitProxyRoot.add(mesh);
     };
     proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-    proxy('hit-proxy-head', 'head', [0.62, 0.62, 0.62], [0, 2.13, 0]);
+    proxy('hit-proxy-head', 'head', [0.48, 0.42, 0.48], [0, 2.18, 0]);
     proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
     proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
     proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);
@@ -1329,7 +1329,7 @@ export function buildOperator(
     hitProxyRoot.add(mesh);
   };
   proxy('hit-proxy-body', 'body', [0.72, 1.02, 0.5], [0, 1.38, 0]);
-  proxy('hit-proxy-head', 'head', [0.62, 0.62, 0.62], [0, 2.13, 0]);
+  proxy('hit-proxy-head', 'head', [0.48, 0.42, 0.48], [0, 2.18, 0]);
   proxy('hit-proxy-left-arm', 'limb', [0.3, 1.08, 0.35], [-0.5, 1.35, 0]);
   proxy('hit-proxy-right-arm', 'limb', [0.3, 1.08, 0.35], [0.5, 1.35, 0]);
   proxy('hit-proxy-left-leg', 'limb', [0.32, 0.95, 0.38], [-0.18, 0.48, 0]);

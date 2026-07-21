@@ -24,7 +24,7 @@ type HitProxy = Readonly<{
 
 const HIT_PROXIES: readonly HitProxy[] = [
   { zone: 'body', size: [0.72, 1.02, 0.5], position: [0, 1.38, 0] },
-  { zone: 'head', size: [0.62, 0.62, 0.62], position: [0, 2.13, 0] },
+  { zone: 'head', size: [0.48, 0.42, 0.48], position: [0, 2.18, 0] },
   { zone: 'limb', size: [0.3, 1.08, 0.35], position: [-0.5, 1.35, 0] },
   { zone: 'limb', size: [0.3, 1.08, 0.35], position: [0.5, 1.35, 0] },
   { zone: 'limb', size: [0.32, 0.95, 0.38], position: [-0.18, 0.48, 0] },
