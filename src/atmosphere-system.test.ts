@@ -37,7 +37,7 @@ describe('Pass 30 atmosphere budget', () => {
     const system = new AtmosphereSystem(new THREE.Scene(), 'performance', 'ANGLE (NVIDIA RTX)', null);
     expect(system.telemetry()).toMatchObject({ arenaId: 'atomic-acres', mistCards: 10, smokeCards: 5, dustMotes: 64, triangles: 30 });
     system.setArena('rustworks-1v1');
-    expect(system.telemetry()).toMatchObject({ arenaId: 'rustworks-1v1', mistCards: 10, smokeCards: 5, dustMotes: 36, triangles: 30, perFrameAllocations: 0 });
+    expect(system.telemetry()).toMatchObject({ arenaId: 'rustworks-1v1', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30, perFrameAllocations: 0 });
     system.setArena('gun-range');
     expect(system.telemetry()).toMatchObject({ arenaId: 'gun-range', mistCards: 4, smokeCards: 2, dustMotes: 24, triangles: 12, perFrameAllocations: 0 });
   });

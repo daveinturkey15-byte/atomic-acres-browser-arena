@@ -112,14 +112,20 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
   root.userData.blocksShots = false;
   // Local accent lights mirror Atomic street/route lights: no extra shadow casters.
   const fixtures: Array<{ position: [number, number, number]; color: number; intensity: number; distance: number }> = [
-    { position: [0, 12.2, 0], color: 0xffc27a, intensity: 3.2, distance: 28 },
-    { position: [-4.2, 8.4, -4.2], color: 0xffb35c, intensity: 2.1, distance: 16 },
-    { position: [4.2, 8.4, 4.2], color: 0xffb35c, intensity: 2.1, distance: 16 },
-    { position: [shipLightX(), 7.2, 5.4], color: 0xd7e6ff, intensity: 1.6, distance: 14 },
-    { position: [0, 4.6, -7.5], color: 0xff9a4a, intensity: 1.8, distance: 15 },
-    { position: [-18, 3.4, 12], color: 0xffc27a, intensity: 1.4, distance: 12 },
-    { position: [18, 3.4, -12], color: 0xffc27a, intensity: 1.4, distance: 12 },
-    { position: [0, 2.8, 22], color: 0xc9d6e8, intensity: 1.1, distance: 14 },
+    { position: [0, 13.2, 0], color: 0xffc27a, intensity: 3.8, distance: 32 },
+    { position: [-4.2, 8.6, -4.2], color: 0xffb35c, intensity: 2.4, distance: 18 },
+    { position: [4.2, 8.6, 4.2], color: 0xffb35c, intensity: 2.4, distance: 18 },
+    { position: [shipLightX(), 7.4, 5.6], color: 0xd7e6ff, intensity: 1.9, distance: 16 },
+    { position: [0, 4.8, -7.8], color: 0xff9a4a, intensity: 2.0, distance: 16 },
+    { position: [-18, 3.6, 12], color: 0xffc27a, intensity: 1.7, distance: 14 },
+    { position: [18, 3.6, -12], color: 0xffc27a, intensity: 1.7, distance: 14 },
+    { position: [0, 3.0, 24], color: 0xc9d6e8, intensity: 1.4, distance: 16 },
+    { position: [-22, 8.8, -22], color: 0xffd0a0, intensity: 2.2, distance: 20 },
+    { position: [22, 8.8, 22], color: 0xffd0a0, intensity: 2.2, distance: 20 },
+    { position: [-22, 8.8, 22], color: 0xffb070, intensity: 1.8, distance: 18 },
+    { position: [22, 8.8, -22], color: 0xffb070, intensity: 1.8, distance: 18 },
+    { position: [0, 9.0, -28], color: 0xe8f0ff, intensity: 1.6, distance: 18 },
+    { position: [0, 9.0, 28], color: 0xe8f0ff, intensity: 1.6, distance: 18 },
   ];
   for (const [index, fixture] of fixtures.entries()) {
     const light = new THREE.PointLight(fixture.color, fixture.intensity, fixture.distance, 2);

@@ -74,7 +74,7 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
     count: quality ? 96 : 64, minX: -37, maxX: 37, minZ: -39, maxZ: 39, color: 0xd8bd95, opacity: quality ? 0.22 : 0.18,
   };
   if (arenaId === 'rustworks-1v1') return {
-    count: quality ? 72 : 36, minX: -27, maxX: 27, minZ: -29, maxZ: 29, color: 0xc2a07a, opacity: quality ? 0.2 : 0.13,
+    count: quality ? 96 : 40, minX: -28, maxX: 28, minZ: -30, maxZ: 30, color: 0xc2a07a, opacity: quality ? 0.24 : 0.14,
   };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,

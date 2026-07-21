@@ -177,7 +177,7 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     await expect.poll(async () => (await snapshot(page)).arenaSelection.id).toBe('rustworks-1v1');
     expect((await snapshot(page)).render).toMatchObject({
       lighting: { fogNear: 30, fogFar: 94 },
-      atmosphere: { enabled: true, arenaId: 'rustworks-1v1', mistCards: 10, smokeCards: 5, dustMotes: 36, triangles: 30, perFrameAllocations: 0 },
+      atmosphere: { enabled: true, arenaId: 'rustworks-1v1', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30, perFrameAllocations: 0 },
     });
     await page.evaluate(() => api().selectArena('gun-range'));
     await expect.poll(async () => (await snapshot(page)).arenaSelection.id).toBe('gun-range');

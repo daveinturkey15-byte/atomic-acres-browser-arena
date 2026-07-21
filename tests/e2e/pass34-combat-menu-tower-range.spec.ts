@@ -28,7 +28,16 @@ type DebugSnapshot = {
   menuCamera: { position: number[]; towerNdc: number[] };
   render: {
     grass: { checksum: string };
-    rustworksBlender: { status: string; meshCount: number; triangleCount: number; authoredHeight: number; semanticParts: number };
+    rustworksBlender: {
+      status: string;
+      meshCount: number;
+      triangleCount: number;
+      authoredHeight: number;
+      semanticParts: number;
+      texturedMaterials?: number;
+      pbrMaterials?: number;
+      assetVersion?: string | null;
+    };
   };
   bots: Array<{ id: string; alive: boolean }>;
   player: { kills: number; position: [number, number, number] };
@@ -199,12 +208,12 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     const state = await snapshot(page);
     expect(state.arenaSelection.id).toBe('rustworks-1v1');
     expect(state.render.rustworksBlender.status).toBe('ready');
-    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(120);
-    expect(state.render.rustworksBlender.meshCount).toBeLessThanOrEqual(220);
-    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(120);
-    expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(13);
+    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(200);
+    expect(state.render.rustworksBlender.meshCount).toBeLessThanOrEqual(550);
+    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(200);
+    expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(14);
     expect(state.render.rustworksBlender.triangleCount).toBeGreaterThan(0);
-    expect(state.render.rustworksBlender.texturedMaterials ?? 0).toBeGreaterThanOrEqual(1);
+    expect(state.render.rustworksBlender.texturedMaterials ?? 0).toBeGreaterThanOrEqual(8);
   });
 
   test('Rustworks access routes walk ascending and descending with normal movement', async ({ page }) => {
