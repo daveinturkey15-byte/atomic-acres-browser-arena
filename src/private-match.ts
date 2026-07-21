@@ -1,12 +1,14 @@
 import type { Team } from './protocol';
+import type { ArenaId } from './map-selection';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
 export type MatchMode = 'tdm' | 'ffa';
 export type LobbyPhase = 'waiting' | 'countdown' | 'active' | 'ended';
+export type MultiplayerArenaId = Exclude<ArenaId, 'gun-range'>;
 
 export type PrivateMatchConfig = Readonly<{
-  arenaId: 'atomic-acres';
+  arenaId: MultiplayerArenaId;
   mode: MatchMode;
   capacity: RoomCapacity;
   autoBalance: boolean;
@@ -26,6 +28,8 @@ export type PlayerScore = Readonly<{
   id: string;
   kills: number;
   deaths: number;
+  damageDealt: number;
+  damageTaken: number;
 }>;
 
 export type LobbySnapshot = Readonly<{
@@ -62,7 +66,7 @@ export function isMatchMode(value: unknown): value is MatchMode {
 export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
-  return config.arenaId === 'atomic-acres'
+  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1')
     && isMatchMode(config.mode)
     && isRoomCapacity(config.capacity)
     && typeof config.autoBalance === 'boolean'
@@ -87,7 +91,29 @@ export function isPlayerScore(value: unknown): value is PlayerScore {
   const score = value as Record<string, unknown>;
   return typeof score.id === 'string' && score.id.length > 0 && score.id.length <= 80
     && Number.isSafeInteger(score.kills) && Number(score.kills) >= 0 && Number(score.kills) <= 500
-    && Number.isSafeInteger(score.deaths) && Number(score.deaths) >= 0 && Number(score.deaths) <= 500;
+    && Number.isSafeInteger(score.deaths) && Number(score.deaths) >= 0 && Number(score.deaths) <= 500
+    && Number.isSafeInteger(score.damageDealt) && Number(score.damageDealt) >= 0 && Number(score.damageDealt) <= 1_000_000
+    && Number.isSafeInteger(score.damageTaken) && Number(score.damageTaken) >= 0 && Number(score.damageTaken) <= 1_000_000;
+}
+
+export function emptyPlayerScore(id: string): PlayerScore {
+  return { id, kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 };
+}
+
+export function recordPlayerDamage(
+  scores: ReadonlyMap<string, PlayerScore>,
+  attackerId: string,
+  victimId: string,
+  damage: number,
+): Map<string, PlayerScore> {
+  const next = new Map(scores);
+  if (attackerId === victimId || !Number.isFinite(damage) || damage <= 0) return next;
+  const admittedDamage = Math.max(1, Math.round(damage));
+  const attacker = next.get(attackerId) ?? emptyPlayerScore(attackerId);
+  const victim = next.get(victimId) ?? emptyPlayerScore(victimId);
+  next.set(attackerId, { ...attacker, damageDealt: Math.min(1_000_000, attacker.damageDealt + admittedDamage) });
+  next.set(victimId, { ...victim, damageTaken: Math.min(1_000_000, victim.damageTaken + admittedDamage) });
+  return next;
 }
 
 export function isLobbySnapshot(value: unknown): value is LobbySnapshot {

@@ -176,6 +176,24 @@ try {
   throw error;
 }
 await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().deathDrops.length > 0, undefined, { timeout: interactionTimeoutMs });
+await guest.waitForFunction(() => {
+  const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+  return state?.player.alive === true && state.player.hp === 100 && document.querySelector('#respawn')?.hidden === true;
+}, undefined, { timeout: interactionTimeoutMs });
+await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers.some((remote) => remote.hp === 100), undefined, { timeout: interactionTimeoutMs });
+const guestRespawned = true;
+const damageTelemetryVisible = await Promise.all([host, guest].map((page) => page.evaluate(() => {
+  const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+  const local = state.privateMatch.scores.find((score) => score.id === state.privateMatch.members.find((member) => member.name === (state.gameMode === 'host' ? 'Host QA' : 'Guest QA'))?.id);
+  return {
+    networkRows: document.querySelectorAll('#network-strip span').length,
+    dealt: Number(document.querySelector('#damage-dealt')?.textContent ?? 0),
+    taken: Number(document.querySelector('#damage-taken')?.textContent ?? 0),
+    feedDamageDealt: Number(document.querySelector('#killfeed [data-damage-dealt]')?.dataset.damageDealt ?? 0),
+    feedDamageTaken: Number(document.querySelector('#killfeed [data-damage-taken]')?.dataset.damageTaken ?? 0),
+    score: local,
+  };
+})));
 const remoteDeathDrop = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().deathDrops[0]);
 phase('remote death and drop replicated');
 await movePlayerSmoothly(host, [remoteDeathDrop.position[0], remoteDeathDrop.position[1] + 1.55, remoteDeathDrop.position[2] + 4]);
@@ -220,6 +238,6 @@ await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false))
 await host.waitForTimeout(1_000);
 await host.screenshot({ path: 'test-results/release-multiplayer-host.png' });
 await guest.screenshot({ path: 'test-results/release-multiplayer-guest.png' });
-console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, lobbyReady, leaderboardReplicated, stanceReplicated, windowReplicated, explosiveWindowReplicated, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon, network: hostState.networkLifecycle }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths, network: guestState.networkLifecycle } }, null, 2));
-if (errors.length || !lobbyReady || !leaderboardReplicated || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest || hostState.networkLifecycle.stateChannels < 1 || guestState.networkLifecycle.stateChannels < 1 || hostState.networkLifecycle.stateChannelOrdered !== false || guestState.networkLifecycle.stateChannelOrdered !== false || hostState.networkLifecycle.stateChannelMaxRetransmits !== 0 || guestState.networkLifecycle.stateChannelMaxRetransmits !== 0 || hostState.networkLifecycle.selfStateEchoesSuppressed < 1) process.exitCode = 1;
+console.log(JSON.stringify({ baseUrl, renderMode, roomCodeLength: roomCode.length, errors, lobbyReady, leaderboardReplicated, stanceReplicated, windowReplicated, explosiveWindowReplicated, guestRespawned, damageTelemetryVisible, scavengeReplicated, pickupReplicated, spawnSeparation, teams, host: { mode: hostState.gameMode, remotes: hostState.remotes, team: hostState.player.team, primary: hostState.player.primaryWeapon, network: hostState.networkLifecycle }, guest: { mode: guestState.gameMode, remotes: guestState.remotes, stance: guestState.player.stance, team: guestState.player.team, deaths: guestState.player.deaths, network: guestState.networkLifecycle } }, null, 2));
+if (errors.length || !lobbyReady || !leaderboardReplicated || !stanceReplicated || !windowReplicated || !explosiveWindowReplicated || !guestRespawned || damageTelemetryVisible.some((sample) => sample.networkRows < 2 || !sample.score) || damageTelemetryVisible[0].dealt <= 0 || damageTelemetryVisible[0].feedDamageDealt <= 0 || damageTelemetryVisible[1].taken <= 0 || damageTelemetryVisible[1].feedDamageTaken <= 0 || !scavengeReplicated || !pickupReplicated || spawnSeparation < 5 || hostState.gameMode !== 'host' || guestState.gameMode !== 'client' || hostState.remotes < 1 || guestState.remotes < 1 || teams.host === teams.guest || hostState.networkLifecycle.stateChannels < 1 || guestState.networkLifecycle.stateChannels < 1 || hostState.networkLifecycle.stateChannelOrdered !== false || guestState.networkLifecycle.stateChannelOrdered !== false || hostState.networkLifecycle.stateChannelMaxRetransmits !== 0 || guestState.networkLifecycle.stateChannelMaxRetransmits !== 0 || hostState.networkLifecycle.selfStateEchoesSuppressed < 1) process.exitCode = 1;
 await browser.close();
