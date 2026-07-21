@@ -43,13 +43,13 @@ describe('Rustworks Blender Quality plant asset', () => {
     expect(authored.length).toBeGreaterThanOrEqual(150);
     expect(root?.name).toBe('RUSTWORKS_AUTHORED_CENTRAL_TOWER');
     expect(root?.extras?.asset_version).toBe(RUSTWORKS_BLENDER_EXPECTED_VERSION);
-    expect(root?.extras?.quality_pass).toBe('pass47-oil-rig-night');
+    expect(root?.extras?.quality_pass).toBe('pass51-clean-tower-cover');
     expect(Number(root?.extras?.authored_height_metres)).toBeGreaterThanOrEqual(14.8);
 
     for (const semantic of [
       'ship-ladder', 'ship-ladder-rung', 'lower-ramp', 'process-equipment', 'upper-access',
       'upper-deck', 'yard-tank', 'yard-crate', 'rig-leg', 'rig-deck',
-      'perimeter', 'crane-detail', 'control-hut',
+      'perimeter', 'control-hut', 'canopy-post', 'tower-crown', 'yard-container', 'yard-pallet',
     ] as const) {
       expect(authored.some((node) => node.extras?.rustworks_semantic === semantic), semantic).toBe(true);
     }
@@ -60,6 +60,12 @@ describe('Rustworks Blender Quality plant asset', () => {
     expect(controlHut?.translation?.[2]).toBeCloseTo(-2.25, 1);
     expect(manifold?.translation?.[0]).toBeCloseTo(2.3, 1);
     expect(manifold?.translation?.[2]).toBeCloseTo(2.3, 1);
+
+    for (const forbidden of ['crane', 'pulley', 'hook', 'cable_tray', 'process_riser', 'RW_pipe']) {
+      expect((gltf.nodes ?? []).some((node) => node.name?.toLowerCase().includes(forbidden.toLowerCase())), forbidden).toBe(false);
+    }
+    expect((gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_shipping_container_'))).toHaveLength(4);
+    expect((gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_pallet_stack_'))).toHaveLength(4);
 
     const upperLanding = (gltf.nodes ?? []).find((node) => node.name === 'RW_ship_ladder_upper_landing');
     const upperLandingZ = upperLanding?.translation?.[2] ?? 0;

@@ -2704,12 +2704,12 @@
             "durationMs": 300000,
             "id": "rustworks-1v1",
             "maximumSoloBots": 1,
-            "multiplayer": false,
-            "scoreLimit": 25,
+            "multiplayer": true,
+            "scoreLimit": null,
             "soloBotCount": 1
           },
           {
-            "durationMs": null,
+            "durationMs": 120000,
             "id": "gun-range",
             "maximumSoloBots": 0,
             "multiplayer": false,

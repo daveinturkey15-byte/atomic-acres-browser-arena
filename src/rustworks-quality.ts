@@ -151,43 +151,9 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
     light.castShadow = false;
     light.userData.presentationOnly = true;
     root.add(light);
-
-    const housing = new THREE.Mesh(
-      new THREE.BoxGeometry(0.55, 0.22, 0.4),
-      new THREE.MeshStandardMaterial({
-        color: 0x2a2e32,
-        metalness: 0.7,
-        roughness: 0.4,
-        emissive: new THREE.Color(fixture.color),
-        emissiveIntensity: 0.35,
-      }),
-    );
-    housing.name = `rustworks-flood-housing-${index}`;
-    housing.position.copy(light.position);
-    housing.position.y += 0.15;
-    housing.userData.presentationOnly = true;
-    housing.userData.blocksShots = false;
-    housing.raycast = () => undefined;
-    root.add(housing);
-
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 10, 10),
-      new THREE.MeshStandardMaterial({
-        color: fixture.color,
-        emissive: new THREE.Color(fixture.color),
-        emissiveIntensity: 2.4,
-        roughness: 0.25,
-        metalness: 0.05,
-      }),
-    );
-    bulb.name = `rustworks-work-bulb-${index}`;
-    bulb.position.copy(light.position);
-    bulb.castShadow = false;
-    bulb.receiveShadow = false;
-    bulb.userData.presentationOnly = true;
-    bulb.userData.blocksShots = false;
-    bulb.raycast = () => undefined;
-    root.add(bulb);
+    // Point lights stay invisible. The old generic housing/bulb geometry was
+    // generated at every light origin without a supporting pole or tower mount,
+    // producing the random floating cubes and lamps visible above the rig.
   }
 
   root.visible = profile === 'blender' || profile === 'performance';

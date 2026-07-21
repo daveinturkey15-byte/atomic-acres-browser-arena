@@ -30,6 +30,10 @@ describe('Rustworks Quality Graphics parity', () => {
     const lights = createRustworksQualityLights(map.root, 'blender');
     const pointLights = lights.children.filter((node) => node instanceof THREE.PointLight);
     expect(pointLights.length).toBeGreaterThanOrEqual(16);
+    // Light emitters are invisible; no unsupported fixture cubes/bulbs float in the sky.
+    expect(lights.children).toHaveLength(pointLights.length);
+    expect(lights.getObjectByName('rustworks-flood-housing-0')).toBeUndefined();
+    expect(lights.getObjectByName('rustworks-work-bulb-0')).toBeUndefined();
     const enhanced = enhanceRustworksQualityMaterials(map.root, 'blender');
     expect(enhanced).toBeGreaterThan(10);
     const stars = ensureRustworksStarfield(scene, 'rustworks-1v1');

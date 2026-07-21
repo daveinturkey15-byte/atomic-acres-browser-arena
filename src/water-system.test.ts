@@ -14,7 +14,13 @@ describe('WaterSystem', () => {
       waterLevel: -16.5,
     });
     expect(water.telemetry().waveAmp).toBeGreaterThan(1);
-    expect(water.root.children.length).toBe(1);
+    expect(water.telemetry().nearSize).toBeGreaterThanOrEqual(400);
+    expect(water.telemetry().horizonRadius).toBeGreaterThanOrEqual(1_000);
+    expect(water.root.children.length).toBe(2);
+    expect(water.root.getObjectByName('arena-ocean-surface')).toBeTruthy();
+    expect(water.root.getObjectByName('arena-ocean-horizon')).toBeTruthy();
+    const horizon = water.root.getObjectByName('arena-ocean-horizon') as THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+    expect(horizon.material.fog).toBe(false);
     water.update(1.25);
     const onDeck = water.samplePhysics(new THREE.Vector3(0, 1.5, 0));
     expect(onDeck.inWater).toBe(false);

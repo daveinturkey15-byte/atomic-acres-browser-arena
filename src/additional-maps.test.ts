@@ -116,23 +116,26 @@ describe('additional authored maps', () => {
     const towerLeg = map.root.getObjectByName('rustworks-tower-leg') as THREE.Mesh;
     towerLeg.geometry.computeBoundingBox();
     expect(towerLeg.geometry.boundingBox?.max.y).toBeCloseTo(5.4);
-    expect(map.root.getObjectByName('rustworks-crane-boom')?.position.y).toBe(13.4);
+    expect(map.root.getObjectByName('rustworks-canopy-roof')?.position.y).toBe(12.65);
+    expect(map.root.getObjectByName('rustworks-crane-boom')).toBeUndefined();
+    expect(map.root.getObjectByName('rustworks-crane-cable')).toBeUndefined();
+    expect(map.root.getObjectByName('rustworks-crane-hook')).toBeUndefined();
     expectRustworksSpawnContract(map);
   });
 
 
-  it('shows Quality-only industrial decoration only under the blender profile', () => {
+  it('shows the clean Quality canopy only under the blender profile', () => {
     const map = buildRustworks1v1(new THREE.Scene());
-    const crane = map.root.getObjectByName('rustworks-crane-boom');
-    expect(crane).toBeTruthy();
+    const canopy = map.root.getObjectByName('rustworks-canopy-roof');
+    expect(canopy).toBeTruthy();
     applyRustworksPresentationProfile(map.root, 'performance');
-    expect(crane?.visible).toBe(false);
+    expect(canopy?.visible).toBe(false);
     expect(map.root.getObjectByName('rustworks-lower-ramp')?.visible).not.toBe(false);
     applyRustworksPresentationProfile(map.root, 'blender');
-    expect(crane?.visible).toBe(true);
+    expect(canopy?.visible).toBe(true);
   });
 
-  it('exposes Pass 40 semantic structures for access, bracing, process gear and cover', () => {
+  it('exposes Pass 51 clean access, bracing, process gear and shipping cover', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const required = [
       'rustworks-lower-ramp',
@@ -146,10 +149,10 @@ describe('additional authored maps', () => {
       'rustworks-ship-ladder-rung-0',
       'rustworks-structural-brace',
       'rustworks-process-manifold',
-      'rustworks-process-riser',
-      'rustworks-process-pipe-run',
       'rustworks-tower-hardstand',
       'rustworks-freight-crate',
+      'rustworks-shipping-container',
+      'rustworks-pallet-stack',
       'rustworks-barrier-low',
       'rustworks-rig-deck-top',
       'rustworks-rig-leg',
@@ -161,6 +164,10 @@ describe('additional authored maps', () => {
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBeGreaterThanOrEqual(4);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(4);
+    expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(4);
+    expect(namedCount(map.root, 'rustworks-process-riser')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-process-pipe-run')).toBe(0);
     expect(namedCount(map.root, 'rustworks-rig-leg')).toBeGreaterThanOrEqual(8);
     const batches = map.root.userData.rustworksPresentationBatches as {
       sourceMeshes: number;
@@ -174,6 +181,40 @@ describe('additional authored maps', () => {
       .toBe(batches.batches);
     expect(map.root.userData.rustworksRoutes?.['ground-to-lower']).toBeTruthy();
     expect(map.root.userData.rustworksRoutes?.['lower-to-upper']).toBeTruthy();
+  });
+
+  it('gives every shipping container and pallet stack full player, physics, and shot authority', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const cover: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && (node.name === 'rustworks-shipping-container' || node.name === 'rustworks-pallet-stack')) {
+        cover.push(node);
+      }
+    });
+    expect(cover).toHaveLength(8);
+    for (const mesh of cover) {
+      const geometry = mesh.geometry as THREE.BoxGeometry;
+      const { width, height, depth } = geometry.parameters;
+      const expected = {
+        minX: mesh.position.x - width / 2,
+        maxX: mesh.position.x + width / 2,
+        minY: mesh.position.y - height / 2,
+        maxY: mesh.position.y + height / 2,
+        minZ: mesh.position.z - depth / 2,
+        maxZ: mesh.position.z + depth / 2,
+      };
+      const matches = (box: (typeof map.colliders)[number]) =>
+        Math.abs(box.minX - expected.minX) < 1e-6
+        && Math.abs(box.maxX - expected.maxX) < 1e-6
+        && Math.abs((box.minY ?? -Infinity) - expected.minY) < 1e-6
+        && Math.abs((box.maxY ?? Infinity) - expected.maxY) < 1e-6
+        && Math.abs(box.minZ - expected.minZ) < 1e-6
+        && Math.abs(box.maxZ - expected.maxZ) < 1e-6;
+      expect(map.colliders.some(matches), `${mesh.name} player collider`).toBe(true);
+      expect(map.physicsColliders.some(matches), `${mesh.name} physics collider`).toBe(true);
+      expect(map.raycastMeshes).toContain(mesh);
+    }
+    expectRustworksSpawnContract(map);
   });
 
   it('keeps ramp and ship-ladder surfaces at or under the 50 degree climb limit with coherent landings', () => {

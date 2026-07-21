@@ -497,27 +497,12 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-upper-deck-rail-post', [x, upperTop + 0.62, z], [0.12, 1.2, 0.12], hazard, { solid: false, detail: 'performance' });
   }
 
-  // Quality-only crown/crane/process silhouette — Performance keeps the readable tower without clutter.
-  box(builder, 'rustworks-tower-crown-beam', [0, 12.35, 0], [7.2, 0.28, 7.2], rust, { solid: false, detail: 'quality' });
-  box(builder, 'rustworks-tower-crown-ridge', [0, 12.85, 0], [0.35, 0.7, 7.4], hazard, { solid: false, detail: 'quality' });
+  // Clean crown only. The old crane/cable/hook and decorative process runs
+  // produced disconnected silhouettes above the tower and are deliberately gone.
   for (const x of [-2.7, 2.7]) for (const z of [-2.7, 2.7]) {
     box(builder, 'rustworks-canopy-post', [x, 11.4, z], [0.18, 2.4, 0.18], steel, { solid: false, detail: 'quality' });
   }
-  box(builder, 'rustworks-crane-boom', [-5.5, 13.4, 0], [11.5, 0.38, 0.38], steelBright, { solid: false, detail: 'quality' });
-  box(builder, 'rustworks-crane-cable', [-10.9, 9.8, 0], [0.12, 7.2, 0.12], rustDark, { solid: false, detail: 'quality' });
-  box(builder, 'rustworks-crane-hook', [-10.9, 6.2, 0], [0.35, 0.55, 0.28], rust, { solid: false, detail: 'quality' });
-  // Risers parked outside the upper walk ring so the ladder bridge stays clear.
-  for (const x of [-2.6, 2.6]) {
-    box(builder, 'rustworks-process-riser', [x, 6.1, -3.55], [0.38, 10.2, 0.38], oxide, { solid: false, detail: 'quality' });
-    box(builder, 'rustworks-process-riser-cap', [x, 11.35, -3.55], [0.55, 0.28, 0.55], rust, { solid: false, detail: 'quality' });
-  }
-  for (const [x, y, z, sx, sy, sz] of [
-    [-2.6, 4.6, 2.9, 1.6, 0.32, 0.32],
-    [2.4, 6.8, -2.8, 0.32, 0.32, 1.8],
-    [0.2, 10.5, 2.7, 2.0, 0.28, 0.28],
-  ] as const) {
-    box(builder, 'rustworks-process-pipe-run', [x, y, z], [sx, sy, sz], steel, { solid: false, detail: 'quality' });
-  }
+  box(builder, 'rustworks-canopy-roof', [0, 12.65, 0], [6.9, 0.24, 6.9], rust, { solid: false, detail: 'quality' });
 
   // Sparse corner cover only — open cross-lanes for smooth player/bot pathing.
   // Keep a clear ~12m apron around the tower and open ±X / ±Z corridors.
@@ -530,6 +515,29 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-freight-crate', [x, sy / 2, z], [sx, sy, sz], color);
     box(builder, 'rustworks-crate-lid', [x, sy + 0.08, z], [sx + 0.12, 0.14, sz + 0.12], steel, { solid: false, detail: 'quality' });
   }
+  // Collision-backed shipping cover: large containers + low pallet stacks.
+  // All groups stay outside the central 12m apron and away from private-match spawns.
+  for (const [index, x, z, rotationY] of [
+    [0, -20, -12, 0],
+    [1, 20, 12, 0],
+    [2, -12, -20, Math.PI / 2],
+    [3, 12, 20, Math.PI / 2],
+  ] as const) {
+    const containerSize: [number, number, number] = rotationY === 0 ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
+    box(builder, 'rustworks-shipping-container', [x, 1.3, z], containerSize, index % 2 === 0 ? rustDark : tarp);
+    // Full-collision pallet cover sits beside, not inside, the container footprint.
+    const palletX = x + (x < 0 ? 4.2 : -4.2);
+    box(builder, 'rustworks-pallet-stack', [palletX, 0.55, z], [2.2, 1.1, 1.8], hazardDark);
+    for (const y of [0.12, 0.42, 0.72, 1.02]) {
+      box(builder, `rustworks-pallet-slat-${index}`, [palletX, y, z], [2.35, 0.08, 1.95], steel, {
+        solid: false,
+        shots: false,
+        cast: false,
+        detail: 'quality',
+      });
+    }
+  }
+
   // One process tank per long side, pulled to the rail so mid-lanes stay clear.
   for (const [x, z] of [[-22, 0], [22, 0]] as const) {
     box(builder, 'rustworks-tank-collider', [x, 1.4, z], [2.6, 2.8, 4.2], steel);

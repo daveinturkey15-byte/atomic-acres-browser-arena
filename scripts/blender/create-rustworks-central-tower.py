@@ -16,7 +16,7 @@ GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-centr
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
 PREVIEW_PATH = ROOT / "artifacts" / "pass44" / "rustworks-quality-plant-preview.png"
 
-ASSET_VERSION = "pass47-v1"
+ASSET_VERSION = "pass51-v1"
 AUTHORED_HEIGHT_M = 15.2
 
 LOADED: dict[str, bpy.types.Image] = {}
@@ -217,7 +217,7 @@ def main():
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
     root["access_scheme"] = "lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "pass47-oil-rig-night"
+    root["quality_pass"] = "pass51-clean-tower-cover"
     root["material_count_target"] = 11
 
     # ========== GROUND ==========
@@ -297,40 +297,13 @@ def main():
     cube("RW_control_hut_awning", (-2.25, 1.55, 10.5), (1.7, 0.9, 0.12), M_hazard, "control-hut")
     cube("RW_process_manifold", (2.3, -2.3, 9.1), (0.85, 0.85, 1.35), M_plate, "process-equipment")
     cylinder("RW_manifold_stack", (2.3, -2.3, 10.0), 0.2, 0.75, M_rust, kind="process-equipment")
-    # Cable trays stay outside the walk ring
-    cube("RW_cable_tray_a", (0, -3.85, 8.75), (4.8, 0.35, 0.12), M_oxide, "cable-tray")
-    cube("RW_cable_tray_b", (3.85, 0.5, 8.75), (0.35, 4.4, 0.12), M_oxide, "cable-tray")
-
-    # ========== CROWN / CRANE ==========
+    # ========== CLEAN CROWN ==========
+    # Keep one supported canopy only. The old gantry/trolley/cable/hook/pulley
+    # and loose process runs created disconnected pieces floating above the rig.
     for x in (-2.8, 2.8):
         for z in (-2.8, 2.8):
             cube(f"RW_canopy_post_{x}_{z}", (x, -z, 11.6), (0.22, 0.22, 2.7), M_plate, "canopy-post")
-    cube("RW_canopy_roof", (0, 0, 13.05), (6.9, 6.9, 0.28), M_corr, "tower-crown")
-    cube("RW_canopy_ridge", (0, 0, 13.45), (0.36, 7.2, 0.6), M_hazard, "tower-crown")
-    # Crane gantry
-    i_beam("RW_crane_gantry", (-1.0, 0, 13.7), 12.5, 0.55, M_plate, axis="x")
-    cube("RW_crane_trolley", (-8.5, 0, 13.55), (1.1, 0.7, 0.55), M_rust, "crane-detail")
-    cylinder("RW_crane_drop", (-10.9, 0, 10.2), 0.055, 6.6, M_oxide, kind="crane-cable")
-    cube("RW_crane_hook_block", (-10.9, 0, 6.7), (0.4, 0.45, 0.7), M_rust, "crane-hook")
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.42, minor_radius=0.07, major_segments=20, minor_segments=8,
-                                     location=(-10.9, 0, 13.7), rotation=(math.pi / 2, 0, 0))
-    pulley = bpy.context.object
-    pulley.name = "RW_crane_pulley"
-    assign(pulley, M_hazard)
-    tag(pulley, "crane-detail")
-    CREATED.append(pulley)
-
-    # ========== PROCESS RISERS / PIPES ==========
-    for x in (-2.65, 2.65):
-        cylinder(f"RW_process_riser_{x}", (x, 3.7, 6.2), 0.22, 10.5, M_oxide, kind="process-pipe")
-        cylinder(f"RW_process_cap_{x}", (x, 3.7, 11.55), 0.34, 0.3, M_rust, kind="process-pipe")
-        # Ladder cages on risers
-        for y in (2, 4, 6, 8, 10):
-            cube(f"RW_riser_band_{x}_{y}", (x, 3.7, y), (0.55, 0.55, 0.08), M_plate, "process-pipe", do_bevel=False)
-
-    pipe_run("RW_pipeA", [(-4.5, 2.0, 4.2), (0.0, 2.0, 4.2), (0.0, -2.5, 4.2), (3.5, -2.5, 6.5)], 0.14, M_plate)
-    pipe_run("RW_pipeB", [(4.0, -3.8, 5.5), (4.0, 1.5, 5.5), (-1.0, 1.5, 7.8), (-1.0, 1.5, 10.2)], 0.12, M_rust)
-    pipe_run("RW_pipeC", [(-3.8, -3.8, 9.0), (2.5, -3.8, 9.0), (2.5, -3.8, 11.0)], 0.11, M_tank)
+    cube("RW_canopy_roof", (0, 0, 12.95), (6.9, 6.9, 0.24), M_corr, "tower-crown")
 
     # ========== ACCESS — ramp + ship ladder (TS-aligned) ==========
     landing_overlap = 0.06
@@ -443,6 +416,21 @@ def main():
         cube(f"RW_crate_{i}", (x, -z, sy / 2), (sx, sz, sy), M_rust if i % 2 == 0 else M_oxide, "yard-crate")
         cube(f"RW_crate_lid_{i}", (x, -z, sy + 0.1), (sx + 0.15, sz + 0.15, 0.14), M_plate, "yard-crate")
 
+    # Full-collision shipping cover is authoritative in TypeScript; these
+    # presentation meshes match those exact footprints in Quality Graphics.
+    for i, (x, z, sx, sy, sz) in enumerate((
+        (-20, -12, 5.8, 2.6, 2.5), (20, 12, 5.8, 2.6, 2.5),
+        (-12, -20, 2.5, 2.6, 5.8), (12, 20, 2.5, 2.6, 5.8),
+    )):
+        cube(f"RW_shipping_container_{i}", (x, -z, sy / 2), (sx, sz, sy),
+             M_corr if i % 2 else M_rust, "yard-container")
+        pallet_x = x + (4.2 if x < 0 else -4.2)
+        cube(f"RW_pallet_stack_{i}", (pallet_x, -z, 0.55), (2.2, 1.8, 1.1),
+             M_oxide, "yard-pallet")
+        for layer, height in enumerate((0.12, 0.42, 0.72, 1.02)):
+            cube(f"RW_pallet_slat_{i}_{layer}", (pallet_x, -z, height), (2.35, 1.95, 0.08),
+                 M_plate, "yard-pallet", do_bevel=False)
+
     # Side process tanks on ±X rail only.
     for i, (x, z) in enumerate(((-22, 0), (22, 0))):
         cylinder(f"RW_tank_{i}", (x, -z, 1.5), 1.35, 4.0, M_tank, rotation=(math.pi / 2, 0, 0), vertices=20, kind="yard-tank")
@@ -492,7 +480,7 @@ def main():
 
     # Smooth a few hero pieces
     for obj in CREATED:
-        if obj.type == "MESH" and any(k in obj.name for k in ("RW_leg_sleeve", "RW_silo_", "RW_tank_", "RW_crane_")):
+        if obj.type == "MESH" and any(k in obj.name for k in ("RW_leg_sleeve", "RW_silo_", "RW_tank_")):
             bpy.context.view_layer.objects.active = obj
             obj.select_set(True)
             bpy.ops.object.shade_smooth()

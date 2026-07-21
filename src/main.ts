@@ -26,7 +26,7 @@ import {
   type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
-import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogDate } from './changelog';
+import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestamp } from './changelog';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -508,7 +508,7 @@ app.innerHTML = `
         <li data-changelog-id="${entry.id}">
           <div class="changelog-entry-head">
             <span>${entry.pass}</span>
-            <time datetime="${entry.updatedAt}">${formatChangelogDate(entry.updatedAt)}</time>
+            <time datetime="${entry.updatedAt}">${formatChangelogTimestamp(entry.updatedAt)}</time>
           </div>
           <strong>${entry.title}</strong>
           <p>${entry.summary}</p>
@@ -6147,6 +6147,12 @@ function setArenaPresentationVisibility(): void {
   }
   worldIdentityPresentation.root.visible = atomicVisible;
   neighbourhoodLifeRoot.visible = atomicVisible;
+  // Rustworks' ocean needs a long view frustum so water, not void, meets the horizon.
+  const desiredFarPlane = rustworksVisible ? 1_400 : 180;
+  if (camera.far !== desiredFarPlane) {
+    camera.far = desiredFarPlane;
+    camera.updateProjectionMatrix();
+  }
   atmosphereSystem.setArena(selectedArena.id);
   atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
   waterSystem.configure(selectedArena.id, renderProfile, {

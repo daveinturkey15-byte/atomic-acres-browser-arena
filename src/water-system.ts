@@ -8,6 +8,8 @@ export type WaterTelemetry = Readonly<{
   waveAmp: number;
   segments: number;
   waterLevel: number;
+  nearSize: number;
+  horizonRadius: number;
   physicsActive: boolean;
 }>;
 
@@ -18,6 +20,7 @@ export type WaterTelemetry = Readonly<{
 export class WaterSystem {
   readonly root = new THREE.Group();
   private mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null;
+  private horizonMesh: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null = null;
   private material: THREE.ShaderMaterial | null = null;
   private arenaId: ArenaId | null = null;
   private enabled = false;
@@ -25,6 +28,8 @@ export class WaterSystem {
   private segments = 140;
   /** Metres below the playable deck (oil-rig height). */
   private waterLevel = -16.5;
+  private nearSize = 480;
+  private horizonRadius = 1_600;
   private islandHalfX = 27;
   private islandHalfZ = 29;
   private night = true;
@@ -61,11 +66,17 @@ export class WaterSystem {
       this.mesh = null;
       this.material = null;
     }
+    if (this.horizonMesh) {
+      this.root.remove(this.horizonMesh);
+      this.horizonMesh.geometry.dispose();
+      this.horizonMesh.material.dispose();
+      this.horizonMesh = null;
+    }
     if (!this.enabled) {
       this.root.visible = false;
       return;
     }
-    const size = 360;
+    const size = this.nearSize;
     const geometry = new THREE.PlaneGeometry(size, size, this.segments, this.segments);
     geometry.rotateX(-Math.PI / 2);
     const deep = this.night ? new THREE.Color(0x020814) : new THREE.Color(0x0a3a4a);
@@ -162,6 +173,31 @@ export class WaterSystem {
     this.mesh.raycast = () => undefined;
     this.mesh.frustumCulled = false;
     this.root.add(this.mesh);
+
+    // Cheap far-ocean ring. The animated near plane remains dense enough for
+    // readable swells; this low-poly overlap carries the sea through the longer
+    // Rustworks camera frustum so its square edge can never reveal sky/void.
+    const horizonGeometry = new THREE.RingGeometry(size * 0.4, this.horizonRadius, 192, 1);
+    horizonGeometry.rotateX(-Math.PI / 2);
+    const horizonMaterial = new THREE.MeshBasicMaterial({
+      color: deep,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+      // The animated near-water shader does not consume Three.js fog chunks.
+      // Fogging only the far ring creates a bright horizontal colour step where
+      // the two overlap, so keep both surfaces on the same night/day palette.
+      fog: false,
+    });
+    this.horizonMesh = new THREE.Mesh(horizonGeometry, horizonMaterial);
+    this.horizonMesh.name = 'arena-ocean-horizon';
+    this.horizonMesh.position.y = this.waterLevel - 0.35;
+    this.horizonMesh.receiveShadow = false;
+    this.horizonMesh.castShadow = false;
+    this.horizonMesh.userData.presentationOnly = true;
+    this.horizonMesh.userData.blocksShots = false;
+    this.horizonMesh.raycast = () => undefined;
+    this.horizonMesh.frustumCulled = false;
+    this.root.add(this.horizonMesh);
     this.root.visible = true;
   }
 
@@ -207,6 +243,8 @@ export class WaterSystem {
       waveAmp: this.waveAmp,
       segments: this.segments,
       waterLevel: this.waterLevel,
+      nearSize: this.nearSize,
+      horizonRadius: this.horizonRadius,
       physicsActive: this.enabled,
     };
   }
