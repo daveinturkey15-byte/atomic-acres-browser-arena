@@ -111,10 +111,22 @@ async function assertActiveMatchRecovers(page, other, label) {
     document.dispatchEvent(new Event('pointerlockchange'));
   });
   await page.bringToFront();
-  await page.waitForFunction(() => !document.querySelector('#menu')?.classList.contains('hidden'), undefined, { timeout: 10_000 });
-  const returned = await state(page);
+  let returned = null;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = await state(page);
+    if (candidate.menuVisible) {
+      returned = candidate;
+      break;
+    }
+    await page.waitForTimeout(100);
+  }
+  if (!returned) throw new Error(`${label} did not expose a pause menu after focus return: ${JSON.stringify(await state(page))}`);
   await mkdir('artifacts/focus-recovery', { recursive: true });
-  await page.screenshot({ path: `artifacts/focus-recovery/${label}-focus-return.png`, fullPage: true });
+  try {
+    await page.screenshot({ path: `artifacts/focus-recovery/${label}-focus-return.png`, fullPage: true, timeout: 15_000 });
+  } catch (error) {
+    console.error(`[focus-recovery] optional ${label} screenshot skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
   if (returned.privateLobbyActive || returned.privateLobbyVisible || !returned.resumeVisible || !returned.mainMenuVisible) {
     throw new Error(`${label} focus return exposed a black/unrecoverable private-match menu: ${JSON.stringify(returned)}`);
   }
