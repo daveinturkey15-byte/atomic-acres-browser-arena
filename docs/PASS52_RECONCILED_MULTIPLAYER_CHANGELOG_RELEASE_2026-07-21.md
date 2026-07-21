@@ -7,23 +7,25 @@ Status: **live in production**
 
 - Original Codex feature revision on the older Pass 50 branch: `e437f8f882a532db71a597a645f7f8a0d3a6a9b4`.
 - Reconciled Codex revision containing Pass 51: `f6a3a8607077bea0a05b42291aa1e2d2c6dc4f37`.
-- Audited Pass 52 source revision: `3297d5544c8b6fdcdb995e151a6fb44943233883`.
+- Initial audited Pass 52 source revision: `3297d5544c8b6fdcdb995e151a6fb44943233883`.
+- Final arena-sync-safe functional source revision: `4175e663b3aff3bc16d99191b78dbbe986af81a6`.
 - Source branch: `overhaul/pass52-reconciled-multiplayer-changelog`.
-- Immutable HTTPS review revision: `77eea21aa4f38463968512a4e52d2b9bb3450abd`.
-- Production `gh-pages` revision: `d6cc0046d72c0da6cb6fd4bcc88ec47b5035692f`.
-- Previous production root: `9edbc5f74b3586ec70bba22bd2f990753701f351` (also retained at review commit parent `77eea21`).
+- Final immutable HTTPS review revision: `3f1e54158e5c675c2f67c3620cafdb304d16da8d`.
+- Final production `gh-pages` revision: `71d614ddf895a9ac157c7af0e59e933b01962617`.
+- Earlier Pass 52 review/production revisions `77eea21` / `d6cc004` remain in history; the final hotfix supersedes them.
+- Previous production root for rollback: `d6cc0046d72c0da6cb6fd4bcc88ec47b5035692f`.
 
 ## URLs
 
 - Production: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/
-- Immutable review: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass52-reconciled-multiplayer-changelog-3297d55/
+- Final immutable review: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/review/pass52-arena-sync-hotfix-4175e66/
 
 ## Frozen artifact
 
 - Files including `.nojekyll`: **91**.
 - Served files: **90**.
-- Total bytes: **37,350,608**.
-- Path-sensitive tree SHA-256: `ff3d8673e4c32f864063c6681abf5649d5126c0215f50126f289cf74f845df47`.
+- Total bytes: **37,351,162**.
+- Path-sensitive tree SHA-256: `7dd30489d91aa6be283ca3f75969fd8eb5bd9650b759412ccc79ce44c5e41e18`.
 - Review exact-byte verification: **90/90**, zero mismatches.
 - Production exact-byte verification: **90/90**, zero mismatches.
 - Historical `review/` content was preserved; no review path changed during production promotion.
@@ -42,8 +44,9 @@ Status: **live in production**
 Focused reconciliation verification passed:
 
 - Changelog/private-match/protocol: **25/25 tests**.
-- `qa:rustworks-lobby-sync`: host and guest both reported `rustworks-1v1`, one active map root, 35 navigation colliders, 35 physics colliders, identical `[-27,27] × [-29,29]` bounds, two network rows, and zero browser errors.
-- `qa:multiplayer`: waiting-room ready/start, leaderboard, stance, windows, explosive windows, death/drop, scavenging and pickup replication passed; damage-dealt/taken telemetry matched host authority; spawn separation was approximately 57.45 units; zero browser errors.
+- Read-only authority review found no release-blocking or high-severity issue. Its two medium findings were fixed before the final review: arena-switch promises now serialize rather than being replaced, and lobby map cards/Ready/Start are locked until arena collision synchronization completes.
+- `qa:rustworks-lobby-sync`: a forced 800 ms local physics-switch window observed Ready disabled, `Synchronizing Rustworks before ready-up…`, and all map cards locked. After synchronization, both peers exposed enabled Ready controls while map cards remained locked; both reported `rustworks-1v1`, one active map root, 35 navigation colliders, 35 physics colliders, identical `[-27,27] × [-29,29]` bounds, two network rows, and zero browser errors. Final review/live HTTPS reruns also passed.
+- `qa:multiplayer`: waiting-room ready/start, leaderboard, stance, windows, explosive windows, death/drop, scavenging and pickup replication passed; damage-dealt/taken telemetry matched host authority; the final rerun retained approximately 49.40 units of spawn separation; zero browser errors.
 - `qa:private-lobby`: four- and six-human admission, overflow rejection, auto-balance, FFA, synchronized active epoch/timers, unreliable unordered state channels, zero bots, and reconnect identity recovery passed.
 - `qa:multiplayer:lifecycle`: three complete host/join/leave cycles passed with reconnect grace and zero browser errors.
 - `qa:pass52:changelog`: desktop 1440×900 and mobile 390×844 passed locally, on immutable HTTPS review, and in production. Eight entries rendered with no horizontal overflow or browser errors.
@@ -60,4 +63,4 @@ Focused reconciliation verification passed:
 
 ## Release result
 
-The exact reviewed artifact is live. Pass 51 Rustworks cleanup/horizon ocean remains present, the Codex private-match map sync and damage telemetry are reconciled on top of it, and production no longer contains the stale root JavaScript/CSS artifacts left by the earlier generic `Updates` deployment.
+The final exact reviewed artifact is live. Pass 51 Rustworks cleanup/horizon ocean remains present, the Codex private-match map sync and damage telemetry are reconciled on top of it, the guest arena-sync race and lobby map-control ambiguity are fixed, and production no longer contains stale root JavaScript/CSS artifacts from the earlier generic `Updates` deployment.

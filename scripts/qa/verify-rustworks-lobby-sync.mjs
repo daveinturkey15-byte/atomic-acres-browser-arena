@@ -31,6 +31,7 @@ try {
     await page.goto(url.toString());
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+    await page.waitForFunction(() => [...document.querySelectorAll('.map-card[data-arena-id]')].some((button) => !button.disabled), undefined, { timeout: 60_000 });
     await page.fill('#player-name', label === 'host' ? 'Rust Host' : 'Atomic Guest');
   }
 
