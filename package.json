@@ -24,6 +24,8 @@
     "qa:pass37:quality-bounds": "playwright test tests/e2e/pass37-quality-bounds.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:multiplayer:lifecycle": "node scripts/qa/verify-multiplayer-lifecycle.mjs",
     "qa:private-lobby": "node scripts/qa/verify-private-lobby.mjs",
+    "qa:rustworks-lobby-sync": "node scripts/qa/verify-rustworks-lobby-sync.mjs",
+    "qa:pass52:changelog": "node scripts/qa/verify-pass52-changelog.mjs",
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
     "qa:network-chaos:soak": "tsx scripts/qa/run-network-chaos-soak.ts",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",

@@ -26,7 +26,7 @@ import {
   type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
-import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestamp } from './changelog';
+import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -499,20 +499,21 @@ app.innerHTML = `
   <section id="changelog-panel" class="panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
     <header class="changelog-header">
       <div>
-        <small>BUILD NOTES</small>
+        <small>PUBLIC RELEASE HISTORY</small>
         <strong id="changelog-title">RECENT CHANGES</strong>
       </div>
       <button id="changelog-close" type="button" aria-label="Close changelog">CLOSE</button>
     </header>
-    <p class="changelog-lede">What shipped lately on the live build. Newest first.</p>
+    <p class="changelog-lede">Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.</p>
     <ol id="changelog-list">
-      ${CHANGELOG.map((entry) => `
+      ${CHANGELOG.map((entry, index) => `
         <li data-changelog-id="${entry.id}">
           <div class="changelog-entry-head">
-            <span>${entry.pass}</span>
-            <time datetime="${entry.updatedAt}">${formatChangelogTimestamp(entry.updatedAt)}</time>
+            <div class="changelog-entry-pass"><span>${entry.pass}</span>${index === 0 ? '<b>CURRENT LIVE</b>' : ''}</div>
+            <time datetime="${entry.releasedAt}"><small>PUBLISHED</small>${formatChangelogTimestampDetail(entry.releasedAt)}</time>
           </div>
           <strong>${entry.title}</strong>
+          <div class="changelog-areas">${entry.areas.map((area) => `<span>${area}</span>`).join('')}</div>
           <p>${entry.summary}</p>
           <ul>${entry.highlights.map((line) => `<li>${line}</li>`).join('')}</ul>
         </li>
