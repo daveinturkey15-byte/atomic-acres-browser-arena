@@ -199,11 +199,12 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     const state = await snapshot(page);
     expect(state.arenaSelection.id).toBe('rustworks-1v1');
     expect(state.render.rustworksBlender.status).toBe('ready');
-    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(55);
-    expect(state.render.rustworksBlender.meshCount).toBeLessThanOrEqual(120);
-    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(50);
+    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(120);
+    expect(state.render.rustworksBlender.meshCount).toBeLessThanOrEqual(220);
+    expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(120);
     expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(13);
     expect(state.render.rustworksBlender.triangleCount).toBeGreaterThan(0);
+    expect(state.render.rustworksBlender.texturedMaterials ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   test('Rustworks access routes walk ascending and descending with normal movement', async ({ page }) => {

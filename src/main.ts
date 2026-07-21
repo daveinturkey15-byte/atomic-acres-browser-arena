@@ -74,7 +74,7 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
-import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry } from './rustworks-blender';
+import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
   enhanceRustworksQualityMaterials,
@@ -4632,23 +4632,31 @@ function updateNuke(now: number): void {
   nukeSequence = null;
 }
 
+const triPassMissileBodyGeometry = new THREE.CylinderGeometry(0.14, 0.18, 2.4, 10);
+const triPassMissileNoseGeometry = new THREE.ConeGeometry(0.18, 0.55, 10);
+const triPassMissileFinGeometry = new THREE.BoxGeometry(0.9, 0.08, 0.28);
+const triPassMissileBodyMaterial = new THREE.MeshBasicMaterial({ color: 0xd5bf76 });
+const triPassMissileNoseMaterial = new THREE.MeshBasicMaterial({ color: 0xff765f });
+const triPassMissileFinMaterial = new THREE.MeshBasicMaterial({ color: 0x29393d });
+const triPassMarkerGeometry = new THREE.RingGeometry(1.35, 1.75, 28);
+const triPassMarkerMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff684f,
+  transparent: true,
+  opacity: 0.7,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+  toneMapped: false,
+});
+
 function makeSkyMissile(): THREE.Group {
   const root = new THREE.Group();
   root.name = 'tri-pass-sky-missile';
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14, 0.18, 2.4, 10),
-    new THREE.MeshBasicMaterial({ color: 0xd5bf76 }),
-  );
-  const nose = new THREE.Mesh(
-    new THREE.ConeGeometry(0.18, 0.55, 10),
-    new THREE.MeshBasicMaterial({ color: 0xff765f }),
-  );
+  root.userData.pooledSupportPresentation = true;
+  const body = new THREE.Mesh(triPassMissileBodyGeometry, triPassMissileBodyMaterial);
+  const nose = new THREE.Mesh(triPassMissileNoseGeometry, triPassMissileNoseMaterial);
   nose.position.y = -1.45;
   nose.rotation.z = Math.PI;
-  const fins = new THREE.Mesh(
-    new THREE.BoxGeometry(0.9, 0.08, 0.28),
-    new THREE.MeshBasicMaterial({ color: 0x29393d }),
-  );
+  const fins = new THREE.Mesh(triPassMissileFinGeometry, triPassMissileFinMaterial);
   fins.position.y = 0.92;
   root.add(body, nose, fins);
   return root;
@@ -4656,6 +4664,11 @@ function makeSkyMissile(): THREE.Group {
 
 function disposeSupportRoot(root: THREE.Object3D): void {
   scene.remove(root);
+  // Shared Tri-Pass missile/marker GPU resources must not be disposed per impact.
+  if (root.userData.pooledSupportPresentation === true) {
+    root.visible = false;
+    return;
+  }
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.geometry.dispose();
@@ -4901,10 +4914,9 @@ function scheduleTriPassMissiles(points: readonly { x: number; z: number }[], co
     const missile = makeSkyMissile();
     missile.position.set(target.x, 30 + index * 1.5, target.z);
     scene.add(missile);
-    const marker = new THREE.Mesh(
-      new THREE.RingGeometry(1.35, 1.75, 28),
-      new THREE.MeshBasicMaterial({ color: 0xff765f, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
-    );
+    const marker = new THREE.Mesh(triPassMarkerGeometry, triPassMarkerMaterial);
+    marker.name = 'tri-pass-impact-marker';
+    marker.userData.pooledSupportPresentation = true;
     marker.rotation.x = -Math.PI / 2;
     marker.position.copy(target);
     scene.add(marker);
@@ -6006,7 +6018,14 @@ function setArenaPresentationVisibility(): void {
   applyArenaFogProfile();
   applyArenaLightingForSelection();
   setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
-  if (rustworksVisible) applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+  if (rustworksVisible) {
+    if (renderProfile === 'blender' && rustworksBlenderTelemetry().status === 'ready') {
+      setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+    } else {
+      applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+      setRustworksProceduralPresentationVisible(rustworksArena.root, true);
+    }
+  }
   grassSystem.root.visible = atomicVisible;
   if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
   overdriveRoot.visible = false;
@@ -7519,16 +7538,20 @@ async function bootstrap(): Promise<void> {
       }, reducedWorldDetail);
   const rustworksArtPromise = renderProfile === 'blender'
     ? loadRustworksBlenderTower(rustworksArena.root).then((root) => {
-        applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        // Authored kit is the Quality silhouette; keep only dirt ray-target + lights from procedural.
+        setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+        setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
         return root;
       }).catch((error) => {
         markRustworksBlenderFallback(error);
         console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
         applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        setRustworksProceduralPresentationVisible(rustworksArena.root, true);
         return null;
       })
     : Promise.resolve(null).then((value) => {
         applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        setRustworksProceduralPresentationVisible(rustworksArena.root, true);
         return value;
       });
   const grenadePromise = loadGrenadePresentation();
