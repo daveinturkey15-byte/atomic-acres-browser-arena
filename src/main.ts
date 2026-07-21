@@ -460,6 +460,9 @@ app.innerHTML = `
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
   </section>
+  <aside id="menu-showcase" aria-hidden="true">
+    <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg" alt="" decoding="async">
+  </aside>
   <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
   <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
     <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
