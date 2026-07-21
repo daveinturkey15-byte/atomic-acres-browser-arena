@@ -194,11 +194,13 @@ import {
   REJOIN_GRACE_MS,
   balanceLobbyTeams,
   canHostStart,
+  emptyPlayerScore,
   estimateHostClockOffset,
   freeForAllLeaders,
   latencyQuality,
   localPerformanceAtHostEpoch,
   playersAreHostile,
+  recordPlayerDamage,
   teamTotals,
   type LobbyMember,
   type LobbySnapshot,
@@ -527,6 +529,7 @@ app.innerHTML = `
     <div id="pause-hint">ESC · MENU</div>
     <header id="matchbar"><div><span class="tiny" id="match-mode-label">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua"><em id="aqua-label">AQUA</em> <b id="aqua-score">0</b></span><i id="score-limit">—</i><span class="coral"><b id="coral-score">0</b> <em id="coral-label">CORAL</em></span></div><div id="connection-pill">SOLO</div></header>
     <div id="fps-counter" aria-label="Frame rate"><b>--</b><span>FPS</span></div>
+    <div id="network-strip" aria-label="Live player latency"></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope">
       <div class="scope-ring"></div>
@@ -539,6 +542,7 @@ app.innerHTML = `
     <div id="map-heading">N · 000°</div>
     <div id="location-label">CIVIC TRANSIT</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
+    <div id="combat-stats" aria-label="Match damage"><span>DEALT <b id="damage-dealt">0</b></span><span>TAKEN <b id="damage-taken">0</b></span></div>
     <div id="weapon-block">
       <span id="weapon-name">M86 CARBINE</span>
       <div class="ammo-row"><b id="ammo">30</b><div class="reserve-stack"><small>RESERVE</small><span><i>/</i><em id="reserve">120</em></span></div></div>
@@ -1139,6 +1143,7 @@ let hostClockOffsetMs = 0;
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localResumeToken = '';
+let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
 let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 const hostLobbyMembers = new Map<string, LobbyMember>();
@@ -1195,6 +1200,7 @@ let debugCaptureCameraActive = false;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let respawnEndsAt = 0;
+let respawnTimer: ReturnType<typeof setTimeout> | null = null;
 let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let mouseTriggerHeld = false;
@@ -1496,6 +1502,7 @@ function resetPrivateLobbyState(): void {
   localLobbyPingMs = null;
   localLobbyReady = false;
   localResumeToken = '';
+  lobbyArenaSyncPromise = Promise.resolve();
   hostLobbyMembers.clear();
   hostLobbyTokens.clear();
   hostDisconnectedAt.clear();
@@ -1505,7 +1512,7 @@ function resetPrivateLobbyState(): void {
 
 function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): LobbySnapshot {
   const members = [...hostLobbyMembers.values()].sort((a, b) => Number(b.id === player.id) - Number(a.id === player.id) || a.id.localeCompare(b.id));
-  const scores = members.map((member) => authoritativeScores.get(member.id) ?? { id: member.id, kills: 0, deaths: 0 });
+  const scores = members.map((member) => authoritativeScores.get(member.id) ?? emptyPlayerScore(member.id));
   return {
     revision: privateLobbyRevision,
     hostId: player.id,
@@ -1534,7 +1541,7 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
 }
 
 function initializeHostLobby(): void {
-  privateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
+  privateMatchConfig = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id === 'rustworks-1v1' ? 'rustworks-1v1' : 'atomic-acres' };
   privateMatchMode = privateMatchConfig.mode;
   localResumeToken = randomLobbyCredential();
   hostLobbyTokens.set(player.id, localResumeToken);
@@ -1546,7 +1553,7 @@ function initializeHostLobby(): void {
     connected: true,
     pingMs: 0,
   });
-  authoritativeScores.set(player.id, { id: player.id, kills: 0, deaths: 0 });
+  authoritativeScores.set(player.id, emptyPlayerScore(player.id));
   roomCard.hidden = false;
   roomCodeEl.textContent = network.roomCode;
   broadcastHostLobby('waiting');
@@ -1605,7 +1612,7 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
       connected: true,
       pingMs: null,
     });
-    authoritativeScores.set(message.playerId, { id: message.playerId, kills: 0, deaths: 0 });
+    authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
   }
   if (currentPhase === 'waiting' && privateMatchConfig.autoBalance) {
     for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
@@ -1703,8 +1710,27 @@ function sendAuthoritativeScores(targetPlayerId?: string): void {
   else network.send(message);
 }
 
+function presentLocalDamageDelta(previous: PlayerScore | undefined, next: PlayerScore | undefined): void {
+  if (!next) return;
+  const dealt = next.damageDealt - (previous?.damageDealt ?? 0);
+  const taken = next.damageTaken - (previous?.damageTaken ?? 0);
+  if (dealt > 0) addFeed(`DAMAGE DEALT +${dealt} · ${next.damageDealt} TOTAL`, 'gold', { damageDealt: dealt });
+  if (taken > 0) addFeed(`DAMAGE TAKEN +${taken} · ${next.damageTaken} TOTAL`, 'coral', { damageTaken: taken });
+}
+
+function recordAuthoritativeDamage(attackerId: string, victimId: string, damage: number): void {
+  if (network.role !== 'host' || attackerId === victimId || damage <= 0) return;
+  const previousLocal = authoritativeScores.get(player.id);
+  const next = recordPlayerDamage(authoritativeScores, attackerId, victimId, damage);
+  authoritativeScores.clear();
+  for (const [id, score] of next) authoritativeScores.set(id, score);
+  presentLocalDamageDelta(previousLocal, authoritativeScores.get(player.id));
+  sendAuthoritativeScores();
+}
+
 function acceptAuthoritativeScores(message: MatchScoreMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
+  const previousLocal = authoritativeScores.get(player.id);
   authoritativeScores.clear();
   for (const score of message.scores) {
     authoritativeScores.set(score.id, score);
@@ -1716,9 +1742,23 @@ function acceptAuthoritativeScores(message: MatchScoreMessage): void {
     if (remote) remote.snapshot = { ...remote.snapshot, kills: score.kills, deaths: score.deaths };
   }
   if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, scores: message.scores };
+  presentLocalDamageDelta(previousLocal, authoritativeScores.get(player.id));
 }
 
-function beginPrivateMatch(mode: 'host' | 'client', activeAtEpochMs: number): void {
+async function synchronizeLobbyArena(): Promise<void> {
+  const arenaId = privateLobbySnapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+  if (selectedArena.id !== arenaId) await activateArenaSelection(arenaId);
+}
+
+async function beginPrivateMatch(mode: 'host' | 'client', activeAtEpochMs: number): Promise<void> {
+  await lobbyArenaSyncPromise;
+  await synchronizeLobbyArena();
+  if (gameStarted) return;
+  const arenaId = privateLobbySnapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+  if (selectedArena.id !== arenaId) {
+    setStatus(`Could not synchronize ${arenaSelection(arenaId).displayName}; deployment stopped.`, 'error');
+    return;
+  }
   privateMatchActiveAtEpochMs = activeAtEpochMs;
   privateMatchMode = privateLobbySnapshot?.config.mode ?? privateMatchConfig.mode;
   startGame(mode, false, activeAtEpochMs);
@@ -1740,7 +1780,7 @@ function hostStartPrivateMatch(): void {
     revision: privateLobbyRevision, nonce: randomNonce(),
   });
   renderPrivateLobby();
-  beginPrivateMatch('host', privateMatchActiveAtEpochMs);
+  void beginPrivateMatch('host', privateMatchActiveAtEpochMs);
 }
 
 function returnPrivateMatchToLobby(asHost: boolean): void {
@@ -1761,7 +1801,7 @@ function returnPrivateMatchToLobby(asHost: boolean): void {
     authoritativeScores.clear();
     for (const member of hostLobbyMembers.values()) {
       hostLobbyMembers.set(member.id, { ...member, ready: false });
-      authoritativeScores.set(member.id, { id: member.id, kills: 0, deaths: 0 });
+      authoritativeScores.set(member.id, emptyPlayerScore(member.id));
     }
     broadcastHostLobby('waiting');
   }
@@ -1776,6 +1816,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   privateLobbySnapshot = message.snapshot;
   privateMatchConfig = message.snapshot.config;
   privateMatchMode = message.snapshot.config.mode;
+  lobbyArenaSyncPromise = synchronizeLobbyArena();
   authoritativeScores.clear();
   for (const score of message.snapshot.scores) authoritativeScores.set(score.id, score);
   const localMember = message.snapshot.members.find((member) => member.id === player.id);
@@ -1790,7 +1831,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   }
   renderPrivateLobby();
   if (message.snapshot.activeAtEpochMs !== null && message.snapshot.phase !== 'waiting' && !gameStarted) {
-    beginPrivateMatch('client', message.snapshot.activeAtEpochMs);
+    void beginPrivateMatch('client', message.snapshot.activeAtEpochMs);
   }
 }
 
@@ -1815,7 +1856,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
     if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId && message.revision >= (privateLobbySnapshot?.revision ?? 0)) {
       privateMatchActiveAtEpochMs = message.activeAtEpochMs;
       if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'countdown', activeAtEpochMs: message.activeAtEpochMs };
-      if (!gameStarted) beginPrivateMatch('client', message.activeAtEpochMs);
+      if (!gameStarted) void beginPrivateMatch('client', message.activeAtEpochMs);
     }
     return true;
   }
@@ -2502,12 +2543,15 @@ function sendAuthoritativeHit(message: HitMessage): void {
   );
   const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
   if (!result.applied) return;
+  const appliedDamage = Math.max(0, health.hp - result.state.hp);
   remoteHealthAuthorities.set(message.target, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
+  recordAuthoritativeDamage(message.by, message.target, appliedDamage);
   network.send(message);
   if (result.died) {
     const death: DeathMessage = { type: 'death', killer: message.by, victim: message.target, nonce: randomNonce() };
+    processedNonces.add(death.nonce);
     network.send(death);
     processDeath(death);
   }
@@ -2541,10 +2585,23 @@ function showDamageDirection(attacker: string): void {
   requestAnimationFrame(() => indicator.classList.add('pulse'));
 }
 
+function scheduleLocalRespawn(now = performance.now()): void {
+  element<HTMLElement>('#respawn').hidden = false;
+  if (respawnTimer) return;
+  respawnEndsAt = now + 1_900;
+  respawnTimer = setTimeout(() => {
+    respawnTimer = null;
+    if (gameStarted && !matchFinished) respawn();
+  }, 1_900);
+}
+
 function applyDamage(damage: number, attacker: string, minimumDamage = 1): void {
   const now = performance.now();
   if (!player.alive || now < player.invulnerableUntil) return;
+  const previousHp = player.hp;
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
+  const appliedDamage = Math.max(0, previousHp - player.hp);
+  if (network.role === 'host') recordAuthoritativeDamage(attacker, player.id, appliedDamage);
   lastDamageAt = now;
   audio.damage();
   showDamageDirection(attacker);
@@ -2561,10 +2618,8 @@ function applyDamage(damage: number, attacker: string, minimumDamage = 1): void 
       network.send(death);
       processDeath(death);
     }
-    element<HTMLElement>('#respawn').hidden = false;
-    respawnEndsAt = now + 1_900;
+    scheduleLocalRespawn(now);
     document.exitPointerLock();
-    setTimeout(respawn, 1900);
   }
 }
 
@@ -2894,10 +2949,9 @@ function processDeath(message: DeathMessage): void {
     if (gameMode === 'solo') player.deaths += 1;
     fieldSupport = recordSupportDeath(fieldSupport);
     updateFieldSupportHud();
-    element<HTMLElement>('#respawn').hidden = false;
-    respawnEndsAt = now + 1_900;
     document.exitPointerLock();
   }
+  if (message.victim === player.id) scheduleLocalRespawn();
   if (message.killer !== message.victim) {
     const killerAuthority = remoteSupportAuthorities.get(message.killer);
     if (killerAuthority) remoteSupportAuthorities.set(message.killer, recordRemoteSupportElimination(killerAuthority));
@@ -2909,8 +2963,8 @@ function processDeath(message: DeathMessage): void {
     const killerMember = hostLobbyMembers.get(message.killer);
     const victimMember = hostLobbyMembers.get(message.victim);
     if (killerMember && victimMember && areCombatantsHostile(killerMember.id, killerMember.team, victimMember.id, victimMember.team)) {
-      const killerScore = authoritativeScores.get(message.killer) ?? { id: message.killer, kills: 0, deaths: 0 };
-      const victimScore = authoritativeScores.get(message.victim) ?? { id: message.victim, kills: 0, deaths: 0 };
+      const killerScore = authoritativeScores.get(message.killer) ?? emptyPlayerScore(message.killer);
+      const victimScore = authoritativeScores.get(message.victim) ?? emptyPlayerScore(message.victim);
       authoritativeScores.set(message.killer, { ...killerScore, kills: killerScore.kills + 1 });
       authoritativeScores.set(message.victim, { ...victimScore, deaths: victimScore.deaths + 1 });
       const hostScore = authoritativeScores.get(player.id);
@@ -3060,6 +3114,8 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
 }
 
 function respawn(requestLock = true): void {
+  if (respawnTimer) clearTimeout(respawnTimer);
+  respawnTimer = null;
   interruptReload(true);
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
@@ -3162,6 +3218,8 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#overdrive-hud').hidden = true;
   matchFinished = false;
   previousHudScores = [0, 0];
+  if (respawnTimer) clearTimeout(respawnTimer);
+  respawnTimer = null;
   respawnEndsAt = 0;
   menu.classList.add('hidden');
   hudRoot.hidden = false;
@@ -4320,10 +4378,18 @@ function showHitmarker(headshot = false): void {
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
-function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
+function addFeed(
+  text: string,
+  kind?: 'aqua' | 'coral' | 'gold',
+  details?: { damageDealt?: number; damageTaken?: number },
+): void {
   const feed = element<HTMLElement>('#killfeed');
   const row = document.createElement('div');
   row.textContent = text;
+  row.title = text;
+  row.setAttribute('aria-label', text);
+  if (details?.damageDealt !== undefined) row.dataset.damageDealt = String(details.damageDealt);
+  if (details?.damageTaken !== undefined) row.dataset.damageTaken = String(details.damageTaken);
   if (kind) row.classList.add(kind);
   feed.prepend(row);
   while (feed.children.length > 6) feed.lastElementChild?.remove();
@@ -5830,6 +5896,10 @@ function updateHud(now: number): void {
   audio.setArenaZone(arenaZone);
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
+  const localScore = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
+  element<HTMLElement>('#damage-dealt').textContent = String(localScore.damageDealt);
+  element<HTMLElement>('#damage-taken').textContent = String(localScore.damageTaken);
+  renderMatchNetworkStrip();
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
   element<HTMLElement>('#reserve').textContent = reserveHudValue(selectedArena.id, player.reserve[player.weapon]);
@@ -5873,6 +5943,23 @@ function updateHud(now: number): void {
   if (!element<HTMLElement>('#roster').hidden) updateRoster();
 }
 
+function renderMatchNetworkStrip(): void {
+  const strip = element<HTMLElement>('#network-strip');
+  if (gameMode === 'solo') {
+    strip.hidden = true;
+    strip.innerHTML = '';
+    return;
+  }
+  const members = privateLobbySnapshot?.members ?? [];
+  strip.hidden = members.length === 0;
+  strip.innerHTML = members.filter((member) => member.connected).map((member) => {
+    const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
+    const quality = latencyQuality(ping);
+    const label = ping === null ? '—' : `${Math.round(ping)} ms`;
+    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} latency: ${label}"><b>${escapeHtml(member.name)}</b> ${label}</span>`;
+  }).join('');
+}
+
 function updateRoster(): void {
   const entries = [
     snapshot(),
@@ -5882,7 +5969,14 @@ function updateRoster(): void {
       yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: bot.weapon, weapon: bot.weapon, seq: 0,
     })),
   ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-  element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => `<div><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`).join('');
+  element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => {
+    const score = authoritativeScores.get(entry.id) ?? emptyPlayerScore(entry.id);
+    const member = privateLobbySnapshot?.members.find((candidate) => candidate.id === entry.id);
+    const ping = member?.id === player.id && network.role === 'client' ? localLobbyPingMs : member?.pingMs ?? null;
+    const latency = ping === null ? '—' : `${Math.round(ping)}ms`;
+    const title = `${entry.name}: ${entry.kills} kills, ${entry.deaths} deaths, ${score.damageDealt} damage dealt, ${score.damageTaken} damage taken, ${latency} ping`;
+    return `<div title="${escapeHtml(title)}"><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><strong>${score.damageDealt} / ${score.damageTaken} DMG</strong><small>${latency}</small><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`;
+  }).join('');
 }
 
 function escapeHtml(value: string): string {
@@ -6667,6 +6761,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     matchEndReason: matchState.endReason ?? null,
     privateMatch: privateLobbySnapshot ? {
       mode: privateMatchMode,
+      arenaId: privateLobbySnapshot.config.arenaId,
       phase: privateLobbySnapshot.phase,
       revision: privateLobbySnapshot.revision,
       capacity: privateLobbySnapshot.config.capacity,

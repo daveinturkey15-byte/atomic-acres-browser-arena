@@ -129,7 +129,7 @@ describe('network protocol guards', () => {
         phase: 'waiting' as const,
         config: { mode: 'tdm' as const, capacity: 4 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
         members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0 }],
-        scores: [{ id: 'host', kills: 0, deaths: 0 }],
+        scores: [{ id: 'host', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 }],
         activeAtEpochMs: null,
       },
       nonce: 2,

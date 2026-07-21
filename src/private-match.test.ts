@@ -9,6 +9,7 @@ import {
   latencyQuality,
   localPerformanceAtHostEpoch,
   playersAreHostile,
+  recordPlayerDamage,
   teamTotals,
   type LobbyMember,
   type LobbySnapshot,
@@ -27,7 +28,7 @@ const snapshot = (changes: Partial<LobbySnapshot> = {}): LobbySnapshot => ({
   phase: 'waiting',
   config: DEFAULT_PRIVATE_MATCH_CONFIG,
   members,
-  scores: members.map((member) => ({ id: member.id, kills: 0, deaths: 0 })),
+  scores: members.map((member) => ({ id: member.id, kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 })),
   activeAtEpochMs: null,
   ...changes,
 });
@@ -56,13 +57,21 @@ describe('private match lobby', () => {
   it('derives team totals and stable FFA leaders from authoritative scores', () => {
     const balanced = balanceLobbyTeams(members);
     const scores = [
-      { id: 'host', kills: 4, deaths: 2 },
-      { id: 'b', kills: 5, deaths: 4 },
-      { id: 'c', kills: 5, deaths: 3 },
-      { id: 'd', kills: 1, deaths: 5 },
+      { id: 'host', kills: 4, deaths: 2, damageDealt: 400, damageTaken: 200 },
+      { id: 'b', kills: 5, deaths: 4, damageDealt: 500, damageTaken: 400 },
+      { id: 'c', kills: 5, deaths: 3, damageDealt: 500, damageTaken: 300 },
+      { id: 'd', kills: 1, deaths: 5, damageDealt: 100, damageTaken: 500 },
     ];
     expect(teamTotals(scores, balanced)).toEqual([9, 6]);
     expect(freeForAllLeaders(scores).map((score) => score.id)).toEqual(['c', 'b', 'host', 'd']);
+  });
+
+  it('records bounded authoritative damage for both combatants', () => {
+    const scores = new Map(snapshot().scores.map((score) => [score.id, score]));
+    const next = recordPlayerDamage(scores, 'host', 'b', 31.4);
+    expect(next.get('host')).toMatchObject({ damageDealt: 31, damageTaken: 0 });
+    expect(next.get('b')).toMatchObject({ damageDealt: 0, damageTaken: 31 });
+    expect(recordPlayerDamage(next, 'host', 'host', 100)).toEqual(next);
   });
 
   it('estimates midpoint host-clock offset and rejects extreme RTT', () => {
@@ -73,6 +82,8 @@ describe('private match lobby', () => {
 
   it('validates bounded snapshots and capacity', () => {
     expect(isLobbySnapshot(snapshot())).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'rustworks-1v1' } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range' as 'atomic-acres' } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: [...members, ...members, members[0]] }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, capacity: 5 as 4 } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, pingMs: 6_000 })) }))).toBe(false);
