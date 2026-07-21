@@ -3356,6 +3356,7 @@ function tryFire(now: number): void {
         if (remoteOperator) reactOperator(remoteOperator, hit.zone);
         const nonce = randomNonce();
         const dealt = Math.min(100, hit.damage);
+        const powered = Math.min(100, poweredDamage);
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
           actionNonce: shot.nonce, nonce,
@@ -3363,7 +3364,8 @@ function tryFire(now: number): void {
         showHitmarker(hit.zone === 'head');
         audio.hit(hit.zone === 'head');
         const zoneTag = hit.zone === 'head' ? 'HEADSHOT' : hit.zone === 'limb' ? 'LIMB' : 'BODY';
-        addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · ${zoneTag} · ${dealt} DMG`, hit.zone === 'head' ? 'gold' : undefined);
+        const overdriveTag = powered > dealt + 0.5 ? ` · OD×${Math.round(powered / Math.max(1, dealt))}` : '';
+        addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · ${zoneTag} · ${dealt} DMG${overdriveTag}`, hit.zone === 'head' ? 'gold' : undefined);
       }
     }
   }
