@@ -1495,6 +1495,11 @@ function restoreRoomIdentity(roomCode: string): void {
   try { sessionStorage.setItem(key, JSON.stringify({ playerId: player.id, token: localResumeToken })); } catch { /* Rejoin becomes same-page only. */ }
 }
 
+function hidePrivateLobbyPresentation(): void {
+  menu.classList.remove('private-lobby-active');
+  element<HTMLElement>('#private-lobby').hidden = true;
+}
+
 function resetPrivateLobbyState(): void {
   if (lobbyClockTimer) clearTimeout(lobbyClockTimer);
   lobbyClockTimer = null;
@@ -1512,7 +1517,7 @@ function resetPrivateLobbyState(): void {
   hostLobbyTokens.clear();
   hostDisconnectedAt.clear();
   authoritativeScores.clear();
-  element<HTMLElement>('#private-lobby').hidden = true;
+  hidePrivateLobbyPresentation();
 }
 
 function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): LobbySnapshot {
@@ -1923,14 +1928,15 @@ function handleLobbyMessage(message: GameMessage): boolean {
 
 function renderPrivateLobby(): void {
   const section = element<HTMLElement>('#private-lobby');
-  const lobbyActive = network.role !== 'offline' || privateLobbySnapshot !== null;
-  menu.classList.toggle('private-lobby-active', lobbyActive);
+  const lobbyAvailable = network.role !== 'offline' || privateLobbySnapshot !== null;
+  const lobbyVisible = !gameStarted && lobbyAvailable;
+  menu.classList.toggle('private-lobby-active', lobbyVisible);
   syncArenaSelectionUi();
-  if (network.role === 'offline' && !privateLobbySnapshot) {
+  if (!lobbyAvailable) {
     section.hidden = true;
     return;
   }
-  section.hidden = false;
+  section.hidden = !lobbyVisible;
   element<HTMLButtonElement>('#solo').disabled = true;
   element<HTMLButtonElement>('#host').disabled = true;
   element<HTMLButtonElement>('#join').disabled = true;
@@ -3178,6 +3184,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  hidePrivateLobbyPresentation();
   syncArenaSelectionUi();
   bestStreakThisMatch = 0;
   matchScoreRecorded = false;
