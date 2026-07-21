@@ -16,7 +16,7 @@ GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-centr
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
 PREVIEW_PATH = ROOT / "artifacts" / "pass44" / "rustworks-quality-plant-preview.png"
 
-ASSET_VERSION = "pass44-v1"
+ASSET_VERSION = "pass45-v1"
 AUTHORED_HEIGHT_M = 15.2
 
 LOADED: dict[str, bpy.types.Image] = {}
@@ -217,7 +217,7 @@ def main():
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
     root["access_scheme"] = "lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "pass44-industrial-plant"
+    root["quality_pass"] = "pass45-flow-water-plant"
     root["material_count_target"] = 11
 
     # ========== GROUND ==========
@@ -290,17 +290,16 @@ def main():
         cube(f"RW_lower_kick_x_{three_x}", (three_x, 0, 3.55), (0.08, 8.6, 0.18), M_hazard, "lower-handrail", do_bevel=False)
 
     # Corner-only utilities — open centre
-    cube("RW_control_hut_shell", (-2.15, 2.15, 9.5), (2.0, 2.0, 2.35), M_corr, "control-hut")
-    cube("RW_control_hut_door", (-2.15, 1.1, 9.15), (0.95, 0.1, 1.7), M_plate, "control-hut")
-    cube("RW_control_hut_window", (-1.15, 2.15, 9.7), (0.08, 0.7, 0.55), M_sign, "control-hut")
-    cube("RW_control_hut_awning", (-2.15, 1.2, 10.8), (2.2, 1.1, 0.14), M_hazard, "control-hut")
-    cube("RW_control_hut_ac", (-2.15, 2.9, 10.9), (0.7, 0.55, 0.45), M_oxide, "control-hut")
-    cube("RW_process_manifold", (2.2, -2.2, 9.25), (1.15, 1.15, 1.7), M_plate, "process-equipment")
-    cylinder("RW_manifold_stack", (2.2, -2.2, 10.35), 0.26, 1.0, M_rust, kind="process-equipment")
-    cylinder("RW_manifold_valve", (2.2, -1.4, 9.0), 0.18, 0.35, M_hazard, rotation=(math.pi / 2, 0, 0), kind="process-equipment")
-    # Cable trays on upper rim (outside walk)
-    cube("RW_cable_tray_a", (0, -3.7, 8.7), (5.5, 0.4, 0.15), M_oxide, "cable-tray")
-    cube("RW_cable_tray_b", (3.7, 0.4, 8.7), (0.4, 5.0, 0.15), M_oxide, "cable-tray")
+    # Corner-only hut/manifold — keep upper centre open for fights (aligned with TS colliders).
+    cube("RW_control_hut_shell", (-2.25, 2.25, 9.35), (1.45, 1.45, 2.0), M_corr, "control-hut")
+    cube("RW_control_hut_door", (-2.25, 1.45, 9.05), (0.8, 0.08, 1.45), M_plate, "control-hut")
+    cube("RW_control_hut_window", (-1.5, 2.25, 9.55), (0.08, 0.55, 0.45), M_sign, "control-hut")
+    cube("RW_control_hut_awning", (-2.25, 1.55, 10.5), (1.7, 0.9, 0.12), M_hazard, "control-hut")
+    cube("RW_process_manifold", (2.3, -2.3, 9.1), (0.85, 0.85, 1.35), M_plate, "process-equipment")
+    cylinder("RW_manifold_stack", (2.3, -2.3, 10.0), 0.2, 0.75, M_rust, kind="process-equipment")
+    # Cable trays stay outside the walk ring
+    cube("RW_cable_tray_a", (0, -3.85, 8.75), (4.8, 0.35, 0.12), M_oxide, "cable-tray")
+    cube("RW_cable_tray_b", (3.85, 0.5, 8.75), (0.35, 4.4, 0.12), M_oxide, "cable-tray")
 
     # ========== CROWN / CRANE ==========
     for x in (-2.8, 2.8):
@@ -342,7 +341,7 @@ def main():
     upper_half = 7.1 / 2
 
     lower_angle = math.radians(22.0)
-    lower_width = 3.9
+    lower_width = 4.0
     lower_thick = 0.3
     lower_landing_depth = 1.6
     lower_ramp_len = (lower_top - 0.12) / math.sin(lower_angle)
@@ -377,7 +376,7 @@ def main():
     ship_rise = upper_top - lower_top
     ship_run = ship_rise / math.tan(ship_angle)
     ship_len = ship_rise / math.sin(ship_angle)
-    ship_width = 1.8
+    ship_width = 1.95
     ship_thick = 0.24
     ship_x = lower_half - 0.4
     ship_lower_landing_depth = 1.35
@@ -503,15 +502,15 @@ def main():
         posts.append((-30, z))
         posts.append((30, z))
     for i, (x, z) in enumerate(posts):
-        cube(f"RW_perimeter_post_{i}", (x, -z, 2.5), (0.35, 0.35, 5.0), M_plate, "perimeter")
-        cube(f"RW_perimeter_cap_{i}", (x, -z, 5.15), (0.5, 0.5, 0.2), M_hazard, "perimeter", do_bevel=False)
-    # Fence rails
+        # Lower fence so Quality Graphics can see ocean beyond the yard edge.
+        cube(f"RW_perimeter_post_{i}", (x, -z, 1.5), (0.32, 0.32, 3.0), M_plate, "perimeter")
+        cube(f"RW_perimeter_cap_{i}", (x, -z, 3.1), (0.45, 0.45, 0.18), M_hazard, "perimeter", do_bevel=False)
     for z in (-30, 30):
-        cube(f"RW_fence_rail_z_{z}_lo", (0, -z, 1.2), (58, 0.08, 0.12), M_oxide, "perimeter", do_bevel=False)
-        cube(f"RW_fence_rail_z_{z}_hi", (0, -z, 3.6), (58, 0.08, 0.12), M_oxide, "perimeter", do_bevel=False)
+        cube(f"RW_fence_rail_z_{z}_lo", (0, -z, 0.9), (56, 0.08, 0.1), M_oxide, "perimeter", do_bevel=False)
+        cube(f"RW_fence_rail_z_{z}_hi", (0, -z, 2.4), (56, 0.08, 0.1), M_oxide, "perimeter", do_bevel=False)
     for x in (-30, 30):
-        cube(f"RW_fence_rail_x_{x}_lo", (x, 0, 1.2), (0.08, 58, 0.12), M_oxide, "perimeter", do_bevel=False)
-        cube(f"RW_fence_rail_x_{x}_hi", (x, 0, 3.6), (0.08, 58, 0.12), M_oxide, "perimeter", do_bevel=False)
+        cube(f"RW_fence_rail_x_{x}_lo", (x, 0, 0.9), (0.08, 56, 0.1), M_oxide, "perimeter", do_bevel=False)
+        cube(f"RW_fence_rail_x_{x}_hi", (x, 0, 2.4), (0.08, 56, 0.1), M_oxide, "perimeter", do_bevel=False)
 
     # Signage
     cube("RW_plant_sign", (0, -2.2, 11.3), (4.4, 0.16, 0.9), M_sign, "signage")

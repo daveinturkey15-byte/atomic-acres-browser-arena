@@ -217,13 +217,17 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const oxide = standard(0x4a2c22, 0.9, 0.3);
   const grate = standard(0x4e585c, 0.62, 0.55);
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(56, 60), sand);
+  // Island pad — slightly inset from bounds so ocean reads past the fence when looking out.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(52, 56), sand);
   ground.name = 'rustworks-compacted-earth';
   ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0.0;
   ground.receiveShadow = true;
   ground.userData.impactSurface = 'soil';
   root.add(ground);
   builder.raycastMeshes.push(ground);
+  // Thin cliff rim for a readable shore without blocking movement.
+  box(builder, 'rustworks-island-rim', [0, -0.18, 0], [53.2, 0.36, 57.2], concreteDark, { solid: false, cast: false, shots: false });
 
   // Hardstand under the tower + lane chevrons for industrial ground read.
   box(builder, 'rustworks-tower-hardstand', [0, 0.04, 0], [18, 0.08, 18], packed, { solid: false, cast: false });
@@ -235,10 +239,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-ground-marking', [x, 0.055, 0], [0.45, 0.04, 14], hazard, { solid: false, cast: false, shots: false });
   }
 
-  // Perimeter corrugated barrier with intermittent posts and gate recesses.
+  // Perimeter fence is visual only (lower so ocean shows past it). Playable exit is stopped by world bounds.
   for (const [x, z, sx, sz] of [
-    [0, -29.5, 56, 1], [0, 29.5, 56, 1], [-27.5, 0, 1, 60], [27.5, 0, 1, 60],
-  ] as const) box(builder, 'rustworks-perimeter-sheeting', [x, 2.2, z], [sx, 4.4, sz], rustDark);
+    [0, -29.5, 54, 0.55], [0, 29.5, 54, 0.55], [-27.5, 0, 0.55, 58], [27.5, 0, 0.55, 58],
+  ] as const) box(builder, 'rustworks-perimeter-sheeting', [x, 1.35, z], [sx, 2.7, sz], rustDark, { solid: false });
   for (const [x, z] of [
     [-18, -29.2], [-6, -29.2], [6, -29.2], [18, -29.2],
     [-18, 29.2], [-6, 29.2], [6, 29.2], [18, 29.2],
@@ -270,7 +274,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   // Four-leg processing tower with denser structural silhouette.
   for (const x of [-3.2, 3.2]) for (const z of [-3.2, 3.2]) {
     box(builder, 'rustworks-tower-leg', [x, 5.4, z], [0.58, 10.8, 0.58], steelBright);
-    box(builder, 'rustworks-tower-leg-base', [x, 0.35, z], [1.1, 0.7, 1.1], concrete);
+    box(builder, 'rustworks-tower-leg-base', [x, 0.28, z], [0.95, 0.56, 0.95], concrete);
   }
   // X-bracing stays outside the walkable deck cores so rotations stay open.
   for (const z of [-3.35, 3.35]) {
@@ -315,9 +319,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   box(builder, 'rustworks-lower-deck', [0, lowerDeckCenterY, 0], [lowerDeckSize, deckThickness, lowerDeckSize], grate);
   box(builder, 'rustworks-upper-deck', [0, upperDeckCenterY, 0], [upperDeckSize, deckThickness, upperDeckSize], rust);
   // Keep the upper deck walkable: corner utility only, open centre circulation ring.
-  box(builder, 'rustworks-control-hut', [-2.05, 9.45, -2.05], [1.9, 2.2, 1.9], rustDark);
-  box(builder, 'rustworks-control-hut-awning', [-2.05, 10.7, -1.15], [2.1, 0.14, 1.0], hazard, { solid: false, detail: 'performance' });
-  box(builder, 'rustworks-process-manifold', [2.15, 9.2, 2.15], [1.0, 1.5, 1.0], steel);
+  // Corner utilities stay small so the upper deck centre stays a clean fight space.
+  box(builder, 'rustworks-control-hut', [-2.25, 9.35, -2.25], [1.45, 2.0, 1.45], rustDark);
+  box(builder, 'rustworks-control-hut-awning', [-2.25, 10.5, -1.45], [1.7, 0.12, 0.85], hazard, { solid: false, detail: 'performance' });
+  box(builder, 'rustworks-process-manifold', [2.3, 9.1, 2.3], [0.85, 1.35, 0.85], steel);
   box(builder, 'rustworks-lower-deck-grating-trim', [0, lowerTop + 0.02, 0], [lowerDeckSize - 0.8, 0.04, lowerDeckSize - 0.8], steel, {
     solid: false,
     cast: false,
@@ -335,7 +340,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const lowerRampAngle = (lowerRampAngleDegrees * Math.PI) / 180;
   const lowerRampLength = (lowerTop - 0.12) / Math.sin(lowerRampAngle);
   const lowerRampThickness = 0.28;
-  const lowerRampWidth = 3.7;
+  const lowerRampWidth = 4.0;
   const lowerLandingDepth = 1.55;
   const lowerDeckEdgeZ = -lowerHalf;
   const lowerLandingCenterZ = lowerDeckEdgeZ - lowerLandingDepth / 2 + landingOverlap;
@@ -378,7 +383,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const shipRun = shipRise / Math.tan(shipAngle);
   const shipLength = shipRise / Math.sin(shipAngle);
   const shipThickness = 0.22;
-  const shipWidth = 1.7;
+  const shipWidth = 1.95;
   const shipX = lowerHalf - 0.35;
   const lowerShipLandingDepth = 1.25;
   const upperOutboardLandingDepth = 1.35;
@@ -507,18 +512,18 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
 
   // Outer cover kept off the tower hardstand so middle approaches stay open.
   for (const [x, z, color, sx, sy, sz] of [
-    [-18, -18, tarp, 4.0, 2.5, 7.2],
-    [-13.5, -18, rust, 3.6, 2.3, 6.4],
-    [17, 19, hazard, 4.0, 2.5, 7.2],
-    [12.5, 19, rustDark, 3.6, 2.2, 6.0],
-    [-20, 12, oxide, 3.2, 1.8, 3.8],
-    [20, -12, tarp, 3.2, 1.8, 3.8],
+    [-19, -19, tarp, 3.6, 2.3, 5.8],
+    [-14.5, -20, rust, 3.2, 2.1, 5.2],
+    [19, 20, hazard, 3.6, 2.3, 5.8],
+    [14.5, 20, rustDark, 3.2, 2.0, 5.0],
+    [-21, 14, oxide, 2.8, 1.7, 3.2],
+    [21, -14, tarp, 2.8, 1.7, 3.2],
   ] as const) {
     box(builder, 'rustworks-freight-crate', [x, sy / 2, z], [sx, sy, sz], color);
     box(builder, 'rustworks-crate-lid', [x, sy + 0.08, z], [sx + 0.15, 0.16, sz + 0.15], steel, { solid: false, detail: 'quality' });
   }
   for (const [x, z] of [[-19, 9], [19, -10], [0, 22]] as const) {
-    box(builder, 'rustworks-tank-collider', [x, 1.7, z], [4.0, 3.4, 4.0], steel);
+    box(builder, 'rustworks-tank-collider', [x, 1.55, z], [3.4, 3.1, 2.6], steel);
     const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 3.2, 12), rust);
     tank.name = 'rustworks-horizontal-process-tank';
     tank.rotation.z = Math.PI / 2;
@@ -532,33 +537,34 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-tank-saddle', [x - 1.2, 0.45, z], [0.35, 0.9, 2.2], concrete, { solid: false, detail: 'quality' });
     box(builder, 'rustworks-tank-saddle', [x + 1.2, 0.45, z], [0.35, 0.9, 2.2], concrete, { solid: false, detail: 'quality' });
   }
-  // Scrap cover stays in the outer yard only — no piles on the tower apron.
+  // Outer-yard cover only. Keep open lanes on ±X/±Z axes and a clear 10m tower apron.
   for (const [x, z, sx, sz] of [
-    [-12, 14, 5.2, 2.0], [13, -15, 5.6, 2.0], [-16, -4, 3.4, 2.4], [16, 5, 3.4, 2.4],
-    [-5.5, 21, 5.0, 1.9], [6, -23, 5.0, 1.9],
+    [-14, 16, 4.2, 1.8], [14, -16, 4.4, 1.8], [-18, -8, 3.0, 2.0], [18, 8, 3.0, 2.0],
+    [-8, 23, 3.6, 1.6], [8, -24, 3.6, 1.6],
   ] as const) {
-    box(builder, 'rustworks-scrap-cover', [x, 1.0, z], [sx, 2.0, sz], concrete);
-    box(builder, 'rustworks-cover-detail-beam', [x, 2.15, z], [Math.min(sx, 3.2), 0.18, 0.22], hazard, { solid: false, detail: 'performance' });
+    box(builder, 'rustworks-scrap-cover', [x, 0.85, z], [sx, 1.7, sz], concrete);
+    box(builder, 'rustworks-cover-detail-beam', [x, 1.85, z], [Math.min(sx, 2.8), 0.16, 0.2], hazard, { solid: false, detail: 'performance' });
   }
-  for (const [x, z] of [[-11, -13], [12, 13], [-20, 20], [20, -20], [15, 9], [-15, -9]] as const) {
-    box(builder, 'rustworks-pipe-bundle-collider', [x, 0.8, z], [3.0, 1.6, 3.0], rustDark);
-    for (const offset of [-0.85, 0, 0.85]) {
-      const pipe = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.12, 6, 12), steel);
+  // Smaller pipe spools tucked in corners — no 3m solid cubes on approach lanes.
+  for (const [x, z] of [[-18, -16], [18, 17], [-21, 18], [21, -18]] as const) {
+    box(builder, 'rustworks-pipe-bundle-collider', [x, 0.7, z], [2.1, 1.4, 2.1], rustDark);
+    for (const offset of [-0.55, 0.55]) {
+      const pipe = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.1, 6, 12), steel);
       pipe.name = 'rustworks-pipe-opening';
-      pipe.position.set(x + offset, 0.82, z - 1.5);
+      pipe.position.set(x + offset, 0.72, z - 1.0);
       pipe.rotation.x = Math.PI / 2;
       pipe.userData.presentationOnly = true;
       pipe.userData.rustworksDetail = 'quality';
       root.add(pipe);
     }
   }
-  for (const [x, z] of [[-12, 5], [12, -6], [-5, 17], [6, -18]] as const) {
-    box(builder, 'rustworks-pallet-stack', [x, 0.45, z], [1.6, 0.9, 1.2], oxide);
-    box(builder, 'rustworks-cable-spool', [x + 2.1, 0.7, z], [1.3, 1.4, 0.45], steel, { detail: 'performance' });
+  for (const [x, z] of [[-15, 7], [15, -8], [-10, 20], [10, -21]] as const) {
+    box(builder, 'rustworks-pallet-stack', [x, 0.4, z], [1.4, 0.8, 1.05], oxide);
+    box(builder, 'rustworks-cable-spool', [x + 1.7, 0.6, z], [1.1, 1.2, 0.4], steel, { solid: false, detail: 'performance' });
   }
-  for (const [x, z] of [[-17, 15], [17, -15]] as const) {
-    box(builder, 'rustworks-barrier-low', [x, 0.55, z], [3.5, 1.1, 0.45], hazard);
-    box(builder, 'rustworks-barrier-low', [x, 0.55, z + 2.2], [0.45, 1.1, 3.2], hazardDark);
+  // Low barriers as soft cover, not L-traps on the diagonal routes.
+  for (const [x, z] of [[-19, 14], [19, -14]] as const) {
+    box(builder, 'rustworks-barrier-low', [x, 0.5, z], [2.8, 1.0, 0.4], hazard);
   }
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });

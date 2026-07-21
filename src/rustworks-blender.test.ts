@@ -43,7 +43,7 @@ describe('Rustworks Blender Quality plant asset', () => {
     expect(authored.length).toBeGreaterThanOrEqual(200);
     expect(root?.name).toBe('RUSTWORKS_AUTHORED_CENTRAL_TOWER');
     expect(root?.extras?.asset_version).toBe(RUSTWORKS_BLENDER_EXPECTED_VERSION);
-    expect(root?.extras?.quality_pass).toBe('pass44-industrial-plant');
+    expect(root?.extras?.quality_pass).toBe('pass45-flow-water-plant');
     expect(Number(root?.extras?.authored_height_metres)).toBeGreaterThanOrEqual(14.8);
 
     for (const semantic of [
@@ -56,10 +56,10 @@ describe('Rustworks Blender Quality plant asset', () => {
 
     const controlHut = (gltf.nodes ?? []).find((node) => node.name === 'RW_control_hut_shell');
     const manifold = (gltf.nodes ?? []).find((node) => node.name === 'RW_process_manifold');
-    expect(controlHut?.translation?.[0]).toBeCloseTo(-2.15, 1);
-    expect(controlHut?.translation?.[2]).toBeCloseTo(-2.15, 1);
-    expect(manifold?.translation?.[0]).toBeCloseTo(2.2, 1);
-    expect(manifold?.translation?.[2]).toBeCloseTo(2.2, 1);
+    expect(controlHut?.translation?.[0]).toBeCloseTo(-2.25, 1);
+    expect(controlHut?.translation?.[2]).toBeCloseTo(-2.25, 1);
+    expect(manifold?.translation?.[0]).toBeCloseTo(2.3, 1);
+    expect(manifold?.translation?.[2]).toBeCloseTo(2.3, 1);
 
     const upperLanding = (gltf.nodes ?? []).find((node) => node.name === 'RW_ship_ladder_upper_landing');
     const upperLandingZ = upperLanding?.translation?.[2] ?? 0;

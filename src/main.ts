@@ -3,6 +3,7 @@ import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
+import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { GUN_RANGE_FIRING_LINE_Z, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1 } from './additional-maps';
 import {
@@ -861,6 +862,11 @@ overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorld
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
 const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id);
+const waterSystem = new WaterSystem(scene);
+waterSystem.configure(selectedArena.id, renderProfile, {
+  halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
+  halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
+});
 const grassSystem = new GrassSystem(
   scene,
   renderProfile,
@@ -5255,6 +5261,14 @@ function updatePhysics(dt: number): void {
   }
 
   const impactVelocity = player.velocity.y;
+  // Ocean buoyancy/drag when looking/falling outside the island pad.
+  const preWater = waterSystem.samplePhysics(player.position);
+  if (preWater.inWater) {
+    player.velocity.y += preWater.buoyancy * dt;
+    player.velocity.x *= Math.max(0.2, 1 - preWater.drag * dt);
+    player.velocity.z *= Math.max(0.2, 1 - preWater.drag * dt);
+    player.velocity.y *= Math.max(0.25, 1 - preWater.drag * 0.65 * dt);
+  }
   const movement = characterPhysics.move({
     x: player.velocity.x * dt,
     y: player.velocity.y * dt,
@@ -5262,6 +5276,14 @@ function updatePhysics(dt: number): void {
   }, dt);
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
+  const postWater = waterSystem.samplePhysics(player.position);
+  if (postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
+    // Soft float toward surface so OOB falls feel like water, not a void clip.
+    player.position.y = Math.min(postWater.surfaceY + 0.55, Math.max(player.position.y, postWater.surfaceY - 0.9));
+    characterPhysics.teleportEye(player.position);
+    if (player.velocity.y < 0.4) player.velocity.y = Math.max(player.velocity.y, 1.2);
+    playerGrounded = false;
+  }
   if (playerGrounded) lastGroundedAt = now;
   if (playerGrounded && !wasGrounded && impactVelocity < -5) {
     landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
@@ -6015,6 +6037,10 @@ function setArenaPresentationVisibility(): void {
   neighbourhoodLifeRoot.visible = atomicVisible;
   atmosphereSystem.setArena(selectedArena.id);
   atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
+  waterSystem.configure(selectedArena.id, renderProfile, {
+    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
+    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
+  });
   applyArenaFogProfile();
   applyArenaLightingForSelection();
   setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
@@ -6387,7 +6413,10 @@ function frame(now: number): void {
       updateArenaArt(neighbourhoodLifeRoot, now);
       atmosphereSystem.update(now / 1_000);
       grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
+    } else if (selectedArena.id === 'rustworks-1v1') {
+      atmosphereSystem.update(now / 1_000);
     }
+    waterSystem.update(now / 1_000);
     if (gameStarted) updateMinimap(now);
     updateHud(now);
     if (debugCaptureCameraActive) {
@@ -6997,6 +7026,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       },
       grass: grassSystem.telemetry(),
       atmosphere: atmosphereSystem.telemetry(),
+      water: waterSystem.telemetry(),
       blenderEnvironment: {
         ...blenderArenaTelemetry(),
         proceduralRootActuallyVisible: atomicArena.root.visible,
