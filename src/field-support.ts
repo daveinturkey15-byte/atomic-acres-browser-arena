@@ -137,13 +137,15 @@ export type TriPassContactCandidate = Readonly<{
 export function selectTriPassHostiles(
   candidates: readonly TriPassContactCandidate[],
   ownerTeam: 0 | 1,
+  options: { freeForAll?: boolean } = {},
 ): Array<{ id: string; kind: 'bot' | 'remote'; x: number; z: number }> {
+  const freeForAll = options.freeForAll === true;
   return candidates
     .filter((candidate) => candidate.alive
-      && candidate.team !== ownerTeam
       && candidate.id.length > 0
       && Number.isFinite(candidate.x)
-      && Number.isFinite(candidate.z))
+      && Number.isFinite(candidate.z)
+      && (freeForAll || candidate.team !== ownerTeam))
     .map(({ id, kind, x, z }) => ({ id, kind, x, z }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }

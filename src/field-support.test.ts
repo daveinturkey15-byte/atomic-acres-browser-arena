@@ -169,6 +169,16 @@ describe('field support rewards', () => {
     ]);
   });
 
+  it('reveals every other living contact in free-for-all targeting', () => {
+    expect(selectTriPassHostiles([
+      { id: 'self-side', kind: 'remote', team: 0, alive: true, x: 1, z: 2 },
+      { id: 'enemy-side', kind: 'bot', team: 1, alive: true, x: 3, z: 4 },
+    ], 0, { freeForAll: true })).toEqual([
+      { id: 'enemy-side', kind: 'bot', x: 3, z: 4 },
+      { id: 'self-side', kind: 'remote', x: 1, z: 2 },
+    ]);
+  });
+
   it('schedules exactly three simultaneous missile impacts one second after confirmation', () => {
     expect(triPassSchedule(1_000)).toEqual([2_000, 2_000, 2_000]);
   });

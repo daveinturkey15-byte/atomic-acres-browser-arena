@@ -75,6 +75,13 @@ import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
 import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry } from './rustworks-blender';
+import {
+  createRustworksQualityLights,
+  enhanceRustworksQualityMaterials,
+  rustworksLightingTint,
+  rustworksQualityTelemetry,
+  setRustworksQualityPresentationActive,
+} from './rustworks-quality';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
 import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
@@ -735,27 +742,33 @@ function buildSky(): void {
   sky.onBeforeRender = () => sky.position.copy(camera.position);
   skyMaterial = material;
   scene.add(sky);
-  scene.add(new THREE.HemisphereLight(activeLighting.hemisphereSky, activeLighting.hemisphereGround, activeLighting.hemisphereIntensity));
-  scene.add(new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity));
-  const sun = new THREE.DirectionalLight(activeLighting.sunColor, activeLighting.sunIntensity);
-  sun.position.set(...activeLighting.sunPosition);
-  sun.castShadow = activeRenderConfig.shadows;
-  if (activeRenderConfig.shadows) sun.shadow.mapSize.set(activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize);
-  sun.shadow.camera.left = -48;
-  sun.shadow.camera.right = 48;
-  sun.shadow.camera.top = 54;
-  sun.shadow.camera.bottom = -54;
-  sun.shadow.camera.near = 10;
-  sun.shadow.camera.far = 150;
-  sun.shadow.bias = activeLighting.shadowBias;
-  sun.shadow.normalBias = activeLighting.shadowNormalBias;
-  scene.add(sun);
-  const fill = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity);
-  fill.name = 'shadow-side-arena-fill';
-  fill.position.set(...activeLighting.fillPosition);
-  fill.castShadow = false;
-  scene.add(fill);
+  hemisphereLight = new THREE.HemisphereLight(activeLighting.hemisphereSky, activeLighting.hemisphereGround, activeLighting.hemisphereIntensity);
+  ambientLight = new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity);
+  scene.add(hemisphereLight);
+  scene.add(ambientLight);
+  sunLight = new THREE.DirectionalLight(activeLighting.sunColor, activeLighting.sunIntensity);
+  sunLight.position.set(...activeLighting.sunPosition);
+  sunLight.castShadow = activeRenderConfig.shadows;
+  if (activeRenderConfig.shadows) sunLight.shadow.mapSize.set(activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize);
+  sunLight.shadow.camera.left = -48;
+  sunLight.shadow.camera.right = 48;
+  sunLight.shadow.camera.top = 54;
+  sunLight.shadow.camera.bottom = -54;
+  sunLight.shadow.camera.near = 10;
+  sunLight.shadow.camera.far = 150;
+  sunLight.shadow.bias = activeLighting.shadowBias;
+  sunLight.shadow.normalBias = activeLighting.shadowNormalBias;
+  scene.add(sunLight);
+  fillLight = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity);
+  fillLight.name = 'shadow-side-arena-fill';
+  fillLight.position.set(...activeLighting.fillPosition);
+  fillLight.castShadow = false;
+  scene.add(fillLight);
 }
+let hemisphereLight: THREE.HemisphereLight;
+let ambientLight: THREE.AmbientLight;
+let sunLight: THREE.DirectionalLight;
+let fillLight: THREE.DirectionalLight;
 buildSky();
 const worldIdentityPresentation = createWorldIdentityPresentation(
   scene,
@@ -765,6 +778,8 @@ const worldIdentityPresentation = createWorldIdentityPresentation(
 const atomicArena = buildArena(scene);
 const rustworksArena = buildRustworks1v1(scene);
 applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+createRustworksQualityLights(rustworksArena.root, renderProfile);
+if (renderProfile === 'blender') enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
 const gunRangeArena = buildGunRange(scene);
 const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
   'atomic-acres': atomicArena,
@@ -4725,6 +4740,7 @@ function supportBlast(
 }
 
 function currentTriPassHostiles(): Array<{ id: string; kind: 'bot' | 'remote'; x: number; z: number }> {
+  const freeForAll = gameMode !== 'solo' && privateMatchMode === 'ffa';
   return selectTriPassHostiles([
     ...[...bots.values()].map((bot) => ({
       id: bot.id,
@@ -4734,7 +4750,9 @@ function currentTriPassHostiles(): Array<{ id: string; kind: 'bot' | 'remote'; x
       x: bot.position.x,
       z: bot.position.z,
     })),
-    ...[...remotes.values()].map((remote) => ({
+    ...[...remotes.values()]
+      .filter((remote) => remote.snapshot.id !== player.id)
+      .map((remote) => ({
       id: remote.snapshot.id,
       kind: 'remote' as const,
       team: remote.snapshot.team,
@@ -4742,7 +4760,7 @@ function currentTriPassHostiles(): Array<{ id: string; kind: 'bot' | 'remote'; x
       x: remote.target.x,
       z: remote.target.z,
     })),
-  ], player.team);
+  ], player.team, { freeForAll });
 }
 
 function drawStrikeMap(now = performance.now()): void {
@@ -4758,10 +4776,13 @@ function drawStrikeMap(now = performance.now()): void {
     context.beginPath(); context.moveTo(line * width / 8, 0); context.lineTo(line * width / 8, height); context.stroke();
     context.beginPath(); context.moveTo(0, line * height / 8); context.lineTo(width, line * height / 8); context.stroke();
   }
-  const [roadLeft] = worldToMinimap(-9.5, 0, arena.bounds, width, height);
-  const [roadRight] = worldToMinimap(9.5, 0, arena.bounds, width, height);
-  context.fillStyle = 'rgba(88, 102, 105, 0.78)';
-  context.fillRect(roadLeft, 0, roadRight - roadLeft, height);
+  // Road band is Atomic Acres-specific; other maps get a lighter centre guide only.
+  if (selectedArena.id === 'atomic-acres') {
+    const [roadLeft] = worldToMinimap(-9.5, 0, arena.bounds, width, height);
+    const [roadRight] = worldToMinimap(9.5, 0, arena.bounds, width, height);
+    context.fillStyle = 'rgba(88, 102, 105, 0.78)';
+    context.fillRect(roadLeft, 0, roadRight - roadLeft, height);
+  }
   context.strokeStyle = '#e3bd5f';
   context.setLineDash([10, 10]);
   context.beginPath(); context.moveTo(width / 2, 0); context.lineTo(width / 2, height); context.stroke();
@@ -4780,19 +4801,55 @@ function drawStrikeMap(now = performance.now()): void {
     context.fillStyle = '#f6ead6'; context.font = '700 14px sans-serif'; context.textAlign = 'center';
     context.fillText(house.label.toUpperCase(), cx, cy + 5);
   }
-  const hostilePulse = 8 + Math.sin(now * 0.012) * 1.5;
-  triPassHostileMarkers = currentTriPassHostiles().map((hostile) => {
+  // Yard cover / solid props for maps without houses (Rustworks) so you can aim bombs relative to structure.
+  if (arena.houses.length === 0) {
+    context.fillStyle = 'rgba(120, 112, 98, 0.55)';
+    context.strokeStyle = 'rgba(210, 190, 150, 0.35)';
+    context.lineWidth = 1;
+    let drawn = 0;
+    for (const box of arena.colliders) {
+      const sizeX = box.maxX - box.minX;
+      const sizeZ = box.maxZ - box.minZ;
+      if (sizeX < 1.2 || sizeZ < 1.2 || sizeX > 30 || sizeZ > 30) continue;
+      if ((box.maxY ?? 4) < 0.8) continue;
+      const [minX, minY] = worldToMinimap(box.minX, box.maxZ, arena.bounds, width, height);
+      const [maxX, maxY] = worldToMinimap(box.maxX, box.minZ, arena.bounds, width, height);
+      context.fillRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
+      context.strokeRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
+      drawn += 1;
+      if (drawn >= 48) break;
+    }
+  }
+  // Local player always drawn so you can orient bombs relative to yourself.
+  {
+    const [px, py] = worldToMinimap(player.position.x, player.position.z, arena.bounds, width, height);
+    context.fillStyle = 'rgba(120, 245, 237, 0.28)';
+    context.beginPath(); context.arc(px, py, 16, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#78f5ed';
+    context.beginPath(); context.arc(px, py, 9, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 2; context.stroke();
+    context.fillStyle = '#10232a'; context.font = '900 10px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText('YOU', px, py);
+    context.textBaseline = 'alphabetic';
+  }
+  const hostilePulse = 10 + Math.sin(now * 0.012) * 2;
+  triPassHostileMarkers = currentTriPassHostiles().map((hostile, index) => {
     const [x, y] = worldToMinimap(hostile.x, hostile.z, arena.bounds, width, height);
-    context.fillStyle = 'rgba(255, 70, 49, 0.3)';
-    context.beginPath(); context.arc(x, y, hostilePulse + 7, 0, Math.PI * 2); context.fill();
+    context.fillStyle = 'rgba(255, 70, 49, 0.38)';
+    context.beginPath(); context.arc(x, y, hostilePulse + 10, 0, Math.PI * 2); context.fill();
     context.fillStyle = '#ff4631';
     context.beginPath(); context.arc(x, y, hostilePulse, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = '#fff4d9'; context.lineWidth = 2.5; context.stroke();
-    context.fillStyle = '#fff4d9'; context.font = '900 12px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
-    context.fillText('!', x, y + 0.5);
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
+    context.fillStyle = '#fff4d9'; context.font = '900 11px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText(hostile.kind === 'bot' ? 'BOT' : 'P', x, y + 0.5);
+    context.textBaseline = 'alphabetic';
+    context.fillStyle = '#ffd2a8'; context.font = '800 11px sans-serif';
+    context.fillText(String(index + 1), x, y - hostilePulse - 8);
     return { id: hostile.id, kind: hostile.kind, world: [hostile.x, hostile.z], canvas: [x, y] };
   });
-  element<HTMLElement>('#strike-hostile-count').textContent = `ENEMIES LIVE · ${triPassHostileMarkers.length}`;
+  element<HTMLElement>('#strike-hostile-count').textContent = triPassHostileMarkers.length === 0
+    ? 'NO LIVE ENEMIES ON MAP'
+    : `ENEMIES LIVE · ${triPassHostileMarkers.length} (red = people/bots)`;
   const points = triPassTargeting?.points ?? [];
   points.forEach((point, index) => {
     const [x, y] = worldToMinimap(point.x, point.z, arena.bounds, width, height);
@@ -4861,7 +4918,18 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
   const rect = strikeMapCanvas.getBoundingClientRect();
   const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
   const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
-  const point = minimapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  // Prefer locking onto a live hostile when the click is near their blip.
+  let point = minimapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  let nearestDistance = 36;
+  for (const marker of triPassHostileMarkers) {
+    const dx = marker.canvas[0] - x;
+    const dy = marker.canvas[1] - y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      point = { x: marker.world[0], z: marker.world[1] };
+    }
+  }
   const next = registerTriPassTarget(triPassTargeting, point, arena.bounds);
   if (next === triPassTargeting) return false;
   triPassTargeting = next;
@@ -5926,6 +5994,7 @@ function syncArenaSelectionUi(): void {
 
 function setArenaPresentationVisibility(): void {
   const atomicVisible = selectedArena.id === 'atomic-acres';
+  const rustworksVisible = selectedArena.id === 'rustworks-1v1';
   for (const candidate of Object.values(arenaById)) {
     candidate.root.visible = candidate.id === selectedArena.id;
     if (candidate === atomicArena) candidate.root.visible = proceduralArenaRootVisible(selectedArena.id, blenderArenaActive);
@@ -5935,11 +6004,52 @@ function setArenaPresentationVisibility(): void {
   atmosphereSystem.setArena(selectedArena.id);
   atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
   applyArenaFogProfile();
+  applyArenaLightingForSelection();
+  setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
+  if (rustworksVisible) applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
   grassSystem.root.visible = atomicVisible;
   if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
   overdriveRoot.visible = false;
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   atomicSignal.invalidateValidation();
+}
+
+function applyArenaLightingForSelection(): void {
+  const lighting = rustworksLightingTint(activeLighting, renderProfile, selectedArena.id);
+  renderer.toneMappingExposure = lighting.exposure;
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(lighting.fogColor);
+  if (skyMaterial) {
+    skyMaterial.uniforms.top.value.setHex(lighting.skyTop);
+    skyMaterial.uniforms.horizon.value.setHex(lighting.skyHorizon);
+    skyMaterial.uniforms.bottom.value.setHex(lighting.skyBottom);
+    skyMaterial.uniforms.sunColor.value.setHex(lighting.skySun);
+    skyMaterial.uniforms.cloudColor.value.setHex(lighting.skyCloud);
+    skyMaterial.uniforms.cloudShadow.value.setHex(lighting.skyCloudShadow);
+    skyMaterial.uniforms.cloudLight.value.setHex(lighting.skyCloudLight);
+    skyMaterial.uniforms.rayStrength.value = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on'))
+      ? 0
+      : lighting.godRayStrength;
+    skyMaterial.uniforms.rayLobes.value = skyMaterial.uniforms.rayStrength.value > 0 ? lighting.godRayLobes : 0;
+  }
+  if (hemisphereLight) {
+    hemisphereLight.color.setHex(lighting.hemisphereSky);
+    hemisphereLight.groundColor.setHex(lighting.hemisphereGround);
+    hemisphereLight.intensity = lighting.hemisphereIntensity;
+  }
+  if (ambientLight) {
+    ambientLight.color.setHex(lighting.ambientColor);
+    ambientLight.intensity = lighting.ambientIntensity;
+  }
+  if (sunLight) {
+    sunLight.color.setHex(lighting.sunColor);
+    sunLight.intensity = lighting.sunIntensity;
+    sunLight.position.set(...lighting.sunPosition);
+  }
+  if (fillLight) {
+    fillLight.color.setHex(lighting.fillColor);
+    fillLight.intensity = lighting.fillIntensity;
+    fillLight.position.set(...lighting.fillPosition);
+  }
 }
 
 function setArenaMenuCamera(): void {
@@ -6875,6 +6985,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         overlappingPrimaryArenaRoots: atomicArena.root.visible && blenderArenaActive && arenaArtRoot?.visible === true,
       },
       rustworksBlender: rustworksBlenderTelemetry(),
+      rustworksQuality: rustworksQualityTelemetry(renderProfile, selectedArena.id),
       staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.flatMap((node) => {
         const sourcePalette = node.userData.sourcePalette;
         if (Array.isArray(sourcePalette)) return sourcePalette.filter((color): color is string => typeof color === 'string');
@@ -7443,6 +7554,11 @@ async function bootstrap(): Promise<void> {
     renderer.capabilities.getMaxAnisotropy(),
   );
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
+  if (renderProfile !== 'blender') {
+    batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
+  } else {
+    enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
+  }
   if (!blenderArenaActive) {
     if (arenaRoot) batchStaticMeshes(arenaRoot, arenaRoot, () => '', staticMaterialMode);
     const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;

@@ -46,11 +46,13 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
   }),
   'rustworks-1v1': Object.freeze({
     mist: Object.freeze([
-      [-21, -18, 12, 4.2], [20, 18, 12, 4.2], [-18, 14, 10, 3.5],
-      [18, -13, 10, 3.5], [-4, -24, 11, 3.2], [5, 24, 11, 3.2],
+      [-21, -18, 13, 4.4], [20, 18, 13, 4.4], [-18, 14, 11, 3.7],
+      [18, -13, 11, 3.7], [-4, -24, 12, 3.4], [5, 24, 12, 3.4],
+      [-14, 0, 10, 3.2], [14, 0, 10, 3.2], [0, -12, 9, 3.0], [0, 14, 9, 3.0],
     ] as MistCard[]),
     smoke: Object.freeze([
-      [-19, 9, 2.2, 4.2, 0.8], [19, -10, 2.2, 4.2, 2.7], [0, 1, 2.5, 5.2, 4.4],
+      [-19, 9, 2.4, 4.4, 0.8], [19, -10, 2.4, 4.4, 2.7], [0, 1, 2.8, 5.4, 4.4],
+      [-10, -16, 2.2, 3.8, 1.5], [11, 16, 2.2, 3.8, 5.1],
     ] as SmokeCard[]),
   }),
   'gun-range': Object.freeze({
@@ -72,7 +74,7 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
     count: quality ? 96 : 64, minX: -37, maxX: 37, minZ: -39, maxZ: 39, color: 0xd8bd95, opacity: quality ? 0.22 : 0.18,
   };
   if (arenaId === 'rustworks-1v1') return {
-    count: quality ? 48 : 32, minX: -27, maxX: 27, minZ: -27, maxZ: 27, color: 0xb99370, opacity: quality ? 0.16 : 0.12,
+    count: quality ? 72 : 36, minX: -27, maxX: 27, minZ: -29, maxZ: 29, color: 0xc2a07a, opacity: quality ? 0.2 : 0.13,
   };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
@@ -82,14 +84,14 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
 export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Readonly<{ near: number; far: number }> {
   if (profile === 'compat') return { near: 56, far: 140 };
   if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 32, far: 104 } : { near: 36, far: 112 };
-  if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 28, far: 86 } : { near: 30, far: 92 };
+  if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 26, far: 90 } : { near: 30, far: 94 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 
 function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{ mist: number; smoke: number }> {
   const quality = profile === 'blender';
   if (arenaId === 'atomic-acres') return quality ? { mist: 0.24, smoke: 0.13 } : { mist: 0.18, smoke: 0.09 };
-  if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.18, smoke: 0.1 } : { mist: 0.13, smoke: 0.075 };
+  if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.22, smoke: 0.12 } : { mist: 0.14, smoke: 0.08 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 
