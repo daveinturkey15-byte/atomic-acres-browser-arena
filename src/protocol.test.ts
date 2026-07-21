@@ -100,7 +100,9 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(score, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ ...score, by: 'spoof' }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer(sync, 'abc')).toBe(true);
-    expect(isGameMessage({ ...score, entry: { ...entry, kills: 999 } })).toBe(false);
+    expect(isGameMessage({ ...score, entry: { ...entry, kills: 1_000, bestStreak: 1_000 } })).toBe(true);
+    expect(isGameMessage({ ...score, entry: { ...entry, kills: 10_000 } })).toBe(false);
+    expect(isGameMessage({ ...score, entry: { ...entry, bestStreak: 10_000 } })).toBe(false);
     expect(isGameMessage({ ...sync, entries: Array.from({ length: 21 }, () => entry) })).toBe(false);
   });
 

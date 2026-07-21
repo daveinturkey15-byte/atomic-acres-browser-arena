@@ -72,9 +72,17 @@ describe('global leaderboard worker policy', () => {
   it('rejects spoofing fields, malformed names and impossible score relationships', () => {
     expect(validateStreakSubmission({ ...valid, admin: true }).error).toBe('unexpected fields');
     expect(validateStreakSubmission({ ...valid, name: '<script>' }).error).toBe('invalid name');
-    expect(validateStreakSubmission({ ...valid, streak: 101 }).error).toBe('invalid streak');
+    expect(validateStreakSubmission({ ...valid, streak: 1_000, kills: 1_050, idempotencyKey: 'install_123456789:1000' })).toEqual({
+      submission: { ...valid, streak: 1_000, kills: 1_050, idempotencyKey: 'install_123456789:1000' },
+      error: null,
+    });
+    expect(validateStreakSubmission({ ...valid, streak: 10_000, kills: 10_000 }).error).toBe('invalid streak');
     expect(validateStreakSubmission({ ...valid, kills: 14 }).error).toBe('invalid kills');
     expect(validateStreakSubmission({ ...valid, deaths: -1 }).error).toBe('invalid deaths');
+    expect(validateStreakSubmission({ ...valid, kills: Number.POSITIVE_INFINITY }).error).toBe('invalid kills');
+    expect(validateStreakSubmission({ ...valid, kills: 18.5 }).error).toBe('invalid kills');
+    expect(validateStreakSubmission({ ...valid, streak: Number.NaN }).error).toBe('invalid streak');
+    expect(validateStreakSubmission({ ...valid, deaths: 0.25 }).error).toBe('invalid deaths');
   });
 
   it('rejects weak install, build and idempotency identifiers', () => {

@@ -49,8 +49,9 @@ describe('persistent high scores', () => {
   });
 
   it('rejects impossible or future peer claims', () => {
-    expect(isHighScoreEntry(entry({ kills: 101 }), now)).toBe(false);
-    expect(isHighScoreEntry(entry({ bestStreak: 101 }), now)).toBe(false);
+    expect(isHighScoreEntry(entry({ kills: 1_000, bestStreak: 1_000 }), now)).toBe(true);
+    expect(isHighScoreEntry(entry({ kills: 10_000 }), now)).toBe(false);
+    expect(isHighScoreEntry(entry({ bestStreak: 10_000 }), now)).toBe(false);
     expect(isHighScoreEntry(entry({ recordedAt: now + 6 * 60_000 }), now)).toBe(false);
     expect(isHighScoreEntry(entry({ name: '<script>' }), now)).toBe(false);
   });
@@ -77,7 +78,29 @@ describe('persistent high scores', () => {
       won: false,
       recordedAt: now,
     });
+    expect(immediateStreakEntry('install_12345678', 'Dave', 1_000, 1_050, 12, now)).toEqual({
+      id: 'global:dave',
+      name: 'Dave',
+      kills: 1_050,
+      deaths: 12,
+      bestStreak: 1_000,
+      won: false,
+      recordedAt: now,
+    });
+    expect(immediateStreakEntry('install_12345678', 'Dave', 10_000, 10_000, 0, now)).toBeNull();
     expect(immediateStreakEntry('bad', 'Dave', 8, 8, 0, now)).toBeNull();
+  });
+
+  it('rejects hostile immediate-streak kills/deaths/timestamps instead of clamping them', () => {
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, Number.POSITIVE_INFINITY, 0, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, Number.NaN, 0, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 8.7, 0, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 7, 0, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 8, -1, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 8, 0.5, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 8, 201, now, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', 8, 8, 0, now + 6 * 60_000, now)).toBeNull();
+    expect(immediateStreakEntry('install_12345678', 'Dave', Number.POSITIVE_INFINITY, 8, 0, now, now)).toBeNull();
   });
 
   it('uses collision-free keys for every accepted callsign separator', () => {

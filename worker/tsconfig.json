@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["src", "*.test.ts"]
+  "include": ["src", "*.test.ts", "../shared/**/*.ts"]
 }

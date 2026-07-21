@@ -1,8 +1,18 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import type { Point3 } from './collision';
 import { pointInsideBounds } from './collision';
-import { GUN_RANGE_FIRING_LINE_BARRIER, GUN_RANGE_FIRING_LINE_Z, buildGunRange, buildRustworks1v1 } from './additional-maps';
+import {
+  GUN_RANGE_FIRING_LINE_BARRIER,
+  GUN_RANGE_FIRING_LINE_Z,
+  RUSTWORKS_TOWER,
+  buildGunRange,
+  buildRustworks1v1,
+  rustworksDeckTopY,
+} from './additional-maps';
 import { CharacterPhysics } from './physics';
+
+type RouteAnchor = { id: string; position: [number, number, number] };
 
 function expectSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
   for (const team of [0, 1] as const) {
@@ -13,6 +23,64 @@ function expectSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
       expect(pointInsideBounds({ x: spawn.x, y: spawn.y, z: spawn.z }, map.bounds, 0.5)).toBe(true);
       expect(map.colliders.some((box) => spawn.x > box.minX && spawn.x < box.maxX && spawn.z > box.minZ && spawn.z < box.maxZ)).toBe(false);
     }
+  }
+}
+
+function namedCount(root: THREE.Object3D, name: string): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (node.name === name) count += 1;
+  });
+  return count;
+}
+
+function namedPrefixCount(root: THREE.Object3D, prefix: string): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (node.name.startsWith(prefix)) count += 1;
+  });
+  return count;
+}
+
+async function walkToward(physics: CharacterPhysics, target: Point3, maxSteps = 2_400): Promise<Point3> {
+  for (let step = 0; step < maxSteps; step += 1) {
+    const current = physics.eyePosition();
+    const dx = target.x - current.x;
+    const dz = target.z - current.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < 0.16 && Math.abs(target.y - current.y) < 0.28) return current;
+    const amount = Math.min(0.034, distance);
+    physics.move({
+      x: distance > 0 ? (dx / distance) * amount : 0,
+      y: -0.002,
+      z: distance > 0 ? (dz / distance) * amount : 0,
+    }, 1 / 120);
+  }
+  return physics.eyePosition();
+}
+
+async function traverseRoute(
+  map: ReturnType<typeof buildRustworks1v1>,
+  anchors: readonly RouteAnchor[],
+  reverse = false,
+): Promise<void> {
+  const ordered = reverse ? [...anchors].reverse() : [...anchors];
+  const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+  try {
+    const start = ordered[0].position;
+    physics.teleportEye({ x: start[0], y: start[1], z: start[2] });
+    for (const anchor of ordered.slice(1)) {
+      const target = { x: anchor.position[0], y: anchor.position[1], z: anchor.position[2] };
+      const result = await walkToward(physics, target);
+      const horizontalError = Math.hypot(result.x - target.x, result.z - target.z);
+      expect(
+        horizontalError,
+        `${anchor.id}:horizontal result=${JSON.stringify(result)} target=${JSON.stringify(target)}`,
+      ).toBeLessThan(0.55);
+      expect(Math.abs(result.y - target.y), `${anchor.id}:vertical`).toBeLessThan(0.55);
+    }
+  } finally {
+    physics.dispose();
   }
 }
 
@@ -29,12 +97,186 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('rustworks-lower-deck')).toBeTruthy();
     expect(map.root.getObjectByName('rustworks-upper-deck')).toBeTruthy();
     expect(map.root.getObjectByName('rustworks-lower-ramp')).toBeTruthy();
-    expect(map.root.getObjectByName('rustworks-upper-deck')?.position.y).toBe(8.15);
+    expect(map.root.getObjectByName('rustworks-upper-deck')?.position.y).toBe(RUSTWORKS_TOWER.upperDeckCenterY);
     const towerLeg = map.root.getObjectByName('rustworks-tower-leg') as THREE.Mesh;
     towerLeg.geometry.computeBoundingBox();
     expect(towerLeg.geometry.boundingBox?.max.y).toBeCloseTo(5.4);
     expect(map.root.getObjectByName('rustworks-crane-boom')?.position.y).toBe(13.4);
     expectSpawnContract(map);
+  });
+
+  it('exposes Pass 40 semantic structures for access, bracing, process gear and cover', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const required = [
+      'rustworks-lower-ramp',
+      'rustworks-lower-ramp-landing',
+      'rustworks-upper-access',
+      'rustworks-ship-ladder',
+      'rustworks-ship-ladder-lower-landing',
+      'rustworks-ship-ladder-upper-landing',
+      'rustworks-ship-ladder-rail-east',
+      'rustworks-ship-ladder-rail-west',
+      'rustworks-ship-ladder-rung-0',
+      'rustworks-structural-brace',
+      'rustworks-process-manifold',
+      'rustworks-process-riser',
+      'rustworks-process-pipe-run',
+      'rustworks-tower-hardstand',
+      'rustworks-freight-crate',
+      'rustworks-scrap-cover',
+      'rustworks-pallet-stack',
+      'rustworks-barrier-low',
+    ];
+    for (const name of required) {
+      expect(map.root.getObjectByName(name), name).toBeTruthy();
+    }
+    expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
+    expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
+    expect(namedCount(map.root, 'rustworks-scrap-cover')).toBeGreaterThanOrEqual(6);
+    const batches = map.root.userData.rustworksPresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(40);
+    expect(batches.batches).toBeGreaterThan(0);
+    expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(35);
+    expect(map.root.children.filter((node) => node.userData.staticBatchRendered === true && node.visible).length)
+      .toBe(batches.batches);
+    expect(map.root.userData.rustworksRoutes?.['ground-to-lower']).toBeTruthy();
+    expect(map.root.userData.rustworksRoutes?.['lower-to-upper']).toBeTruthy();
+  });
+
+  it('keeps ramp and ship-ladder surfaces at or under the 50 degree climb limit with coherent landings', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const access = map.root.userData.rustworksAccess as {
+      lowerRampAngleDegrees: number;
+      shipLadderAngleDegrees: number;
+      lowerRamp: {
+        position: [number, number, number];
+        size: [number, number, number];
+        rotation: [number, number, number];
+        landingPosition: [number, number, number];
+        landingSize: [number, number, number];
+      };
+      shipLadder: {
+        position: [number, number, number];
+        size: [number, number, number];
+        rotation: [number, number, number];
+        lowerLandingPosition: [number, number, number];
+        lowerLandingSize: [number, number, number];
+        upperLandingPosition: [number, number, number];
+        upperLandingSize: [number, number, number];
+      };
+    };
+    expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
+    expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
+    expect(access.shipLadderAngleDegrees).toBeGreaterThan(40);
+
+    const lowerAngle = Math.abs(access.lowerRamp.rotation[0]);
+    const lowerHalfRun = Math.cos(lowerAngle) * access.lowerRamp.size[2] / 2;
+    const lowerTopZ = access.lowerRamp.position[2] + lowerHalfRun; // negative X-rot → uphill +Z
+    const landingDownhillZ = access.lowerRamp.landingPosition[2] - access.lowerRamp.landingSize[2] / 2;
+    const lowerOverlap = Math.abs(landingDownhillZ - lowerTopZ);
+    const lowerTopSurface = access.lowerRamp.position[1]
+      + Math.sin(lowerAngle) * access.lowerRamp.size[2] / 2
+      + Math.cos(lowerAngle) * access.lowerRamp.size[1] / 2;
+    const lowerRampLandingTop = rustworksDeckTopY(access.lowerRamp.landingPosition[1], access.lowerRamp.landingSize[1]);
+    const lowerLip = lowerRampLandingTop - (lowerTopSurface - Math.tan(lowerAngle) * lowerOverlap);
+    expect(lowerOverlap, 'lower-ramp landing overlap').toBeLessThanOrEqual(RUSTWORKS_TOWER.maxLandingOverlap);
+    expect(Math.abs(lowerLip), 'lower-ramp landing lip').toBeLessThan(RUSTWORKS_TOWER.maxTransitionLip);
+
+    const shipAngle = Math.abs(access.shipLadder.rotation[0]);
+    const shipHalfRun = Math.cos(shipAngle) * access.shipLadder.size[2] / 2;
+    // Positive X rotation: local +Z downhill, local -Z uphill.
+    const shipLowZ = access.shipLadder.position[2] + shipHalfRun;
+    const shipHighZ = access.shipLadder.position[2] - shipHalfRun;
+    const lowerLandingInnerZ = access.shipLadder.lowerLandingPosition[2] - access.shipLadder.lowerLandingSize[2] / 2;
+    const upperLandingOuterZ = access.shipLadder.upperLandingPosition[2] + access.shipLadder.upperLandingSize[2] / 2;
+    const lowOverlap = Math.abs(lowerLandingInnerZ - shipLowZ);
+    const highOverlap = Math.abs(upperLandingOuterZ - shipHighZ);
+    const shipHighSurface = access.shipLadder.position[1]
+      + Math.sin(shipAngle) * access.shipLadder.size[2] / 2
+      + Math.cos(shipAngle) * access.shipLadder.size[1] / 2;
+    const shipLowSurface = access.shipLadder.position[1]
+      - Math.sin(shipAngle) * access.shipLadder.size[2] / 2
+      + Math.cos(shipAngle) * access.shipLadder.size[1] / 2;
+    const upperLandingTop = rustworksDeckTopY(access.shipLadder.upperLandingPosition[1], access.shipLadder.upperLandingSize[1]);
+    const shipLowerLandingTop = rustworksDeckTopY(access.shipLadder.lowerLandingPosition[1], access.shipLadder.lowerLandingSize[1]);
+    const highLip = upperLandingTop - (shipHighSurface - Math.tan(shipAngle) * highOverlap);
+    const lowLip = shipLowerLandingTop - (shipLowSurface - Math.tan(shipAngle) * lowOverlap);
+    expect(lowOverlap, 'ship-ladder lower overlap').toBeLessThanOrEqual(RUSTWORKS_TOWER.maxLandingOverlap + 0.02);
+    expect(highOverlap, 'ship-ladder upper overlap').toBeLessThanOrEqual(RUSTWORKS_TOWER.maxLandingOverlap + 0.02);
+    expect(Math.abs(highLip), 'ship-ladder upper lip').toBeLessThan(RUSTWORKS_TOWER.maxTransitionLip);
+    expect(Math.abs(lowLip), 'ship-ladder lower lip').toBeLessThan(RUSTWORKS_TOWER.maxTransitionLip);
+  });
+
+  it('walks the lower ramp and ship-ladder bidirectionally with Rapier-backed collision', async () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const routes = map.root.userData.rustworksRoutes as Record<string, RouteAnchor[]>;
+    await traverseRoute(map, routes['ground-to-lower']);
+    await traverseRoute(map, routes['ground-to-lower'], true);
+    await traverseRoute(map, routes['lower-to-upper']);
+    await traverseRoute(map, routes['lower-to-upper'], true);
+  }, 20_000);
+
+  it('keeps thin split rails clear of both authored access corridors', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const access = map.root.userData.rustworksAccess as {
+      lowerRamp: { landingPosition: [number, number, number]; landingSize: [number, number, number] };
+      shipLadder: {
+        upperLandingPosition: [number, number, number];
+        upperLandingSize: [number, number, number];
+        bridgePosition: [number, number, number];
+        bridgeSize: [number, number, number];
+      };
+    };
+    const solidMeshes: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && /deck-rail|rail-post/i.test(node.name) && !node.name.includes('ship-ladder')) {
+        solidMeshes.push(node);
+      }
+    });
+    expect(solidMeshes.length).toBeGreaterThanOrEqual(10);
+    const corridors = [
+      {
+        minX: access.lowerRamp.landingPosition[0] - access.lowerRamp.landingSize[0] / 2,
+        maxX: access.lowerRamp.landingPosition[0] + access.lowerRamp.landingSize[0] / 2,
+        minY: rustworksDeckTopY(access.lowerRamp.landingPosition[1], access.lowerRamp.landingSize[1]),
+        maxY: rustworksDeckTopY(access.lowerRamp.landingPosition[1], access.lowerRamp.landingSize[1]) + 2.0,
+        minZ: access.lowerRamp.landingPosition[2] - access.lowerRamp.landingSize[2] / 2,
+        maxZ: access.lowerRamp.landingPosition[2] + access.lowerRamp.landingSize[2] / 2,
+      },
+      {
+        minX: access.shipLadder.upperLandingPosition[0] - access.shipLadder.upperLandingSize[0] / 2,
+        maxX: access.shipLadder.upperLandingPosition[0] + access.shipLadder.upperLandingSize[0] / 2,
+        minY: rustworksDeckTopY(access.shipLadder.upperLandingPosition[1], access.shipLadder.upperLandingSize[1]),
+        maxY: rustworksDeckTopY(access.shipLadder.upperLandingPosition[1], access.shipLadder.upperLandingSize[1]) + 2.0,
+        minZ: access.shipLadder.upperLandingPosition[2] - access.shipLadder.upperLandingSize[2] / 2,
+        maxZ: access.shipLadder.upperLandingPosition[2] + access.shipLadder.upperLandingSize[2] / 2,
+      },
+      {
+        minX: access.shipLadder.bridgePosition[0] - access.shipLadder.bridgeSize[0] / 2,
+        maxX: access.shipLadder.bridgePosition[0] + access.shipLadder.bridgeSize[0] / 2,
+        minY: rustworksDeckTopY(access.shipLadder.bridgePosition[1], access.shipLadder.bridgeSize[1]),
+        maxY: rustworksDeckTopY(access.shipLadder.bridgePosition[1], access.shipLadder.bridgeSize[1]) + 2.0,
+        minZ: access.shipLadder.bridgePosition[2] - access.shipLadder.bridgeSize[2] / 2,
+        maxZ: access.shipLadder.bridgePosition[2] + access.shipLadder.bridgeSize[2] / 2,
+      },
+    ];
+    for (const mesh of solidMeshes) {
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      for (const corridor of corridors) {
+        const overlaps = box.max.x > corridor.minX + 0.05
+          && box.min.x < corridor.maxX - 0.05
+          && box.max.y > corridor.minY + 0.05
+          && box.min.y < corridor.maxY - 0.05
+          && box.max.z > corridor.minZ + 0.05
+          && box.min.z < corridor.maxZ - 0.05;
+        expect(overlaps, `${mesh.name} blocks access corridor`).toBe(false);
+      }
+    }
   });
 
   it('builds an untimed three-distance score range with reusable targets', () => {

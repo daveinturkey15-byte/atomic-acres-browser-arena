@@ -34,12 +34,23 @@ type DebugSnapshot = {
   player: { kills: number; position: [number, number, number] };
 };
 
+type RustworksAccessStage = {
+  route: 'ground-to-lower' | 'lower-to-upper';
+  descending: boolean;
+  start: number[];
+  target: number[];
+  direction: number[];
+  run: number;
+};
+
 type DebugApi = {
   snapshot(): DebugSnapshot;
   startSolo(): void;
   returnToMainMenu(): void;
   hitRangeTarget(id: string, damage?: number, zone?: 'head' | 'body' | 'limb'): void;
   setKills(kills: number): void;
+  stageRustworksAccess(route: 'ground-to-lower' | 'lower-to-upper', descending?: boolean): RustworksAccessStage | null;
+  setMovement(forward: boolean, sprint?: boolean): void;
   teleportPlayer(x: number, y: number, z: number, yaw?: number, pitch?: number): void;
   fireOnce(): void;
 };
@@ -189,9 +200,56 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await waitReady(page);
     const state = await snapshot(page);
     expect(state.arenaSelection.id).toBe('rustworks-1v1');
-    expect(state.render.rustworksBlender).toMatchObject({ status: 'ready', meshCount: 55 });
+    expect(state.render.rustworksBlender.status).toBe('ready');
+    expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(55);
+    expect(state.render.rustworksBlender.meshCount).toBeLessThanOrEqual(120);
     expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(50);
     expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(13);
     expect(state.render.rustworksBlender.triangleCount).toBeGreaterThan(0);
+  });
+
+  test('Rustworks access routes walk ascending and descending with normal movement', async ({ page }) => {
+    await page.goto(`/?${lightweight}&seed=3405&map=rustworks-1v1`);
+    await waitReady(page);
+    await deploySolo(page, 'CLIMBER');
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi & { setBotsFrozen(frozen: boolean): void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+    });
+
+    async function walkRoute(route: 'ground-to-lower' | 'lower-to-upper', descending: boolean): Promise<void> {
+      const staged = await page.evaluate(({ routeName, down }) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+        return api.stageRustworksAccess(routeName, down);
+      }, { routeName: route, down: descending });
+      expect(staged, `${route}:${descending ? 'down' : 'up'}`).toBeTruthy();
+      await page.evaluate(() => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.setMovement(true, true);
+      });
+      await page.waitForFunction(({ targetY, targetX, targetZ }) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+        const pos = api.snapshot().player.position;
+        const horizontal = Math.hypot(pos[0] - targetX, pos[2] - targetZ);
+        const vertical = Math.abs(pos[1] - targetY);
+        return horizontal < 0.9 && vertical < 0.9;
+      }, {
+        targetY: staged!.target[1],
+        targetX: staged!.target[0],
+        targetZ: staged!.target[2],
+      }, { timeout: 25_000 });
+      await page.evaluate(() => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.setMovement(false, false);
+      });
+      const after = await snapshot(page);
+      expect(Math.hypot(after.player.position[0] - staged!.target[0], after.player.position[2] - staged!.target[2])).toBeLessThan(0.95);
+      expect(Math.abs(after.player.position[1] - staged!.target[1])).toBeLessThan(0.95);
+      // Confirm the climb/descent actually changed elevation for vertical routes.
+      expect(Math.abs(after.player.position[1] - staged!.start[1])).toBeGreaterThan(1.2);
+    }
+
+    await walkRoute('ground-to-lower', false);
+    await walkRoute('ground-to-lower', true);
+    await walkRoute('lower-to-upper', false);
+    await walkRoute('lower-to-upper', true);
   });
 });

@@ -5624,8 +5624,8 @@ function updateHud(now: number): void {
     ? [rangeScore, targetHits]
     : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
   element<HTMLElement>('#match-mode-label').textContent = ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
-  element<HTMLElement>('#aqua-label').textContent = ffaHud ? 'YOU' : 'AQUA';
-  element<HTMLElement>('#coral-label').textContent = ffaHud ? 'LEADER' : 'CORAL';
+  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
+  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);
   coralScore.textContent = String(hudScores[1]);
   hudScores.forEach((score, team) => {
@@ -6298,6 +6298,14 @@ const debugWindow = window as Window & {
       foot: number[];
       top: number[];
       uphill: number[];
+      run: number;
+    } | null;
+    stageRustworksAccess: (route: 'ground-to-lower' | 'lower-to-upper', descending?: boolean) => {
+      route: 'ground-to-lower' | 'lower-to-upper';
+      descending: boolean;
+      start: number[];
+      target: number[];
+      direction: number[];
       run: number;
     } | null;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
@@ -7084,6 +7092,47 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       foot: [...foot.position],
       top: [...top.position],
       uphill: uphill.toArray(),
+      run,
+    };
+  },
+  stageRustworksAccess: (route: 'ground-to-lower' | 'lower-to-upper', descending = false) => {
+    if (selectedArena.id !== 'rustworks-1v1') return null;
+    const routes = arena.root.userData.rustworksRoutes as Record<string, Array<{
+      id: string;
+      position: [number, number, number];
+    }>> | undefined;
+    const anchors = routes?.[route];
+    if (!anchors || anchors.length < 2) return null;
+    const from = descending ? anchors[1] : anchors[0];
+    const to = descending ? anchors[0] : anchors[1];
+    const direction = new THREE.Vector3(
+      to.position[0] - from.position[0],
+      0,
+      to.position[2] - from.position[2],
+    );
+    const run = direction.length();
+    if (run < 0.01) return null;
+    direction.multiplyScalar(1 / run);
+    const start = new THREE.Vector3(...from.position);
+    player.position.copy(start);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    playerGrounded = false;
+    wasGrounded = false;
+    player.yaw = Math.atan2(-direction.x, -direction.z);
+    player.pitch = 0;
+    player.hp = 100;
+    player.alive = true;
+    player.invulnerableUntil = performance.now() + 30_000;
+    camera.position.copy(player.position);
+    camera.rotation.set(0, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      route,
+      descending,
+      start: start.toArray(),
+      target: [...to.position],
+      direction: direction.toArray(),
       run,
     };
   },

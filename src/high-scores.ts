@@ -1,10 +1,22 @@
+import {
+  MAX_MATCH_DEATHS,
+  MAX_MATCH_KILLS,
+  isValidDeathCount,
+  isValidKillCount,
+  isValidRecordedAt,
+  isValidStreakCount,
+  parseImmediateStreakScalars,
+} from '../shared/leaderboard-policy';
+
+export { MAX_MATCH_DEATHS, MAX_MATCH_KILLS } from '../shared/leaderboard-policy';
+
 export const HIGH_SCORE_STORAGE_KEY = 'atomic-acres:high-scores:v1';
 export const HIGH_SCORE_SCHEMA_VERSION = 3;
 export const MAX_HIGH_SCORE_ENTRIES = 20;
 // Five-minute matches are uncapped, but valid local/peer records remain defensively
-// bounded against corrupted storage or hostile payloads. A 100-kill ceiling is well
-// above plausible five-minute play while keeping score documents finite.
-export const MAX_MATCH_KILLS = 100;
+// bounded against corrupted storage or hostile payloads. Pass 40 raises the shared
+// client/Worker ceiling to 9,999 so legitimate long sessions are preserved while
+// impossible and hostile values stay rejected.
 
 export type HighScoreEntry = {
   id: string;
@@ -56,13 +68,11 @@ export function isHighScoreEntry(value: unknown, now = Date.now()): value is Hig
   return typeof entry.id === 'string'
     && /^[a-zA-Z0-9:_-]{1,120}$/.test(entry.id)
     && normalizedName === entry.name
-    && Number.isSafeInteger(entry.kills) && Number(entry.kills) >= 0 && Number(entry.kills) <= MAX_MATCH_KILLS
-    && Number.isSafeInteger(entry.deaths) && Number(entry.deaths) >= 0 && Number(entry.deaths) <= 200
-    && Number.isSafeInteger(entry.bestStreak) && Number(entry.bestStreak) >= 0 && Number(entry.bestStreak) <= MAX_MATCH_KILLS
+    && isValidKillCount(entry.kills)
+    && isValidDeathCount(entry.deaths)
+    && isValidStreakCount(entry.bestStreak)
     && typeof entry.won === 'boolean'
-    && Number.isSafeInteger(entry.recordedAt)
-    && Number(entry.recordedAt) >= Date.UTC(2026, 0, 1)
-    && Number(entry.recordedAt) <= now + 5 * 60_000;
+    && isValidRecordedAt(entry.recordedAt, now);
 }
 
 export function compareHighScores(a: HighScoreEntry, b: HighScoreEntry): number {
@@ -135,19 +145,22 @@ export function immediateStreakEntry(
   kills: number,
   deaths: number,
   recordedAt = Date.now(),
+  now = Date.now(),
 ): HighScoreEntry | null {
   const name = normalizeRequiredPlayerName(playerName);
   const safeInstallId = installId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
-  if (!name || safeInstallId.length < 8 || !Number.isSafeInteger(streak) || streak <= 0 || streak > MAX_MATCH_KILLS) return null;
+  if (!name || safeInstallId.length < 8) return null;
+  const scalars = parseImmediateStreakScalars(streak, kills, deaths, recordedAt, now);
+  if (!scalars) return null;
   const nameKey = leaderboardNameKey(name);
   if (!nameKey) return null;
   return {
     id: `global:${nameKey}`,
     name,
-    kills: Math.min(MAX_MATCH_KILLS, Math.max(streak, Math.floor(kills))),
-    deaths: Math.min(200, Math.max(0, Math.floor(deaths))),
-    bestStreak: streak,
+    kills: scalars.kills,
+    deaths: scalars.deaths,
+    bestStreak: scalars.streak,
     won: false,
-    recordedAt,
+    recordedAt: scalars.recordedAt,
   };
 }

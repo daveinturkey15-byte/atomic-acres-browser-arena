@@ -1,3 +1,9 @@
+import {
+  isValidDeathCount,
+  isValidKillsForStreak,
+  isValidSubmittedStreak,
+} from '../../shared/leaderboard-policy';
+
 export interface Env {
   DB: D1Database;
   ALLOWED_ORIGINS: string;
@@ -15,7 +21,6 @@ export type StreakSubmission = Readonly<{
 }>;
 
 const MAX_BODY_BYTES = 2_048;
-const MAX_STREAK = 100;
 const RATE_WINDOW_MS = 10 * 60_000;
 const IP_RATE_LIMIT = 90;
 const INSTALL_RATE_LIMIT = 30;
@@ -63,9 +68,9 @@ export function validateStreakSubmission(value: unknown): { submission: StreakSu
   const expectedKeys = ['buildId', 'deaths', 'idempotencyKey', 'installId', 'kills', 'name', 'streak'];
   if (Object.keys(item).sort().join(',') !== expectedKeys.sort().join(',')) return { submission: null, error: 'unexpected fields' };
   if (typeof item.name !== 'string' || normalizedName(item.name) !== item.name || !NAME_PATTERN.test(item.name)) return { submission: null, error: 'invalid name' };
-  if (!Number.isSafeInteger(item.streak) || Number(item.streak) < 1 || Number(item.streak) > MAX_STREAK) return { submission: null, error: 'invalid streak' };
-  if (!Number.isSafeInteger(item.kills) || Number(item.kills) < Number(item.streak) || Number(item.kills) > MAX_STREAK) return { submission: null, error: 'invalid kills' };
-  if (!Number.isSafeInteger(item.deaths) || Number(item.deaths) < 0 || Number(item.deaths) > 200) return { submission: null, error: 'invalid deaths' };
+  if (!isValidSubmittedStreak(item.streak)) return { submission: null, error: 'invalid streak' };
+  if (!isValidKillsForStreak(item.kills, item.streak)) return { submission: null, error: 'invalid kills' };
+  if (!isValidDeathCount(item.deaths)) return { submission: null, error: 'invalid deaths' };
   if (typeof item.installId !== 'string' || !INSTALL_PATTERN.test(item.installId)) return { submission: null, error: 'invalid installId' };
   if (typeof item.buildId !== 'string' || !BUILD_PATTERN.test(item.buildId)) return { submission: null, error: 'invalid buildId' };
   if (typeof item.idempotencyKey !== 'string' || !IDEMPOTENCY_PATTERN.test(item.idempotencyKey)) return { submission: null, error: 'invalid idempotencyKey' };
