@@ -51,6 +51,7 @@
     "pipeline:doctor": "node scripts/release/pipeline-guard.mjs doctor",
     "pipeline:preflight": "node scripts/release/pipeline-guard.mjs contribute",
     "pipeline:release-check": "node scripts/release/pipeline-guard.mjs release",
+    "stage:stable-channel": "node scripts/release/stage-stable-channel.mjs",
     "deploy": "npm run build && gh-pages -d dist --add",
     "deploy:ci": "gh-pages -d dist --add"
   },

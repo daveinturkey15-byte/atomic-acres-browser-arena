@@ -42,6 +42,10 @@ jobs:
         run: npm run verify:pass25a:core
       - name: Build production bytes
         run: npm run build
+      - name: Stage exact pinned recent-stable channel
+        run: |
+          git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
+          npm run stage:stable-channel
       - name: Configure release commit identity
         run: |
           git config user.name "github-actions[bot]"

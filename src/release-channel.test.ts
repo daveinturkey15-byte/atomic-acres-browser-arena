@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest';
+import { releaseChannelDecision, stableReleaseUrl } from './release-channel';
+
+const canonical = 'daveinturkey15-byte.github.io';
+
+describe('release channel entry routing', () => {
+  it('shows the chooser on an ordinary canonical production landing', () => {
+    expect(releaseChannelDecision('', canonical, canonical)).toBe('choose');
+  });
+
+  it('does not interrupt local development or browser QA unless forced', () => {
+    expect(releaseChannelDecision('', 'localhost', canonical)).toBe('latest');
+    expect(releaseChannelDecision('?release=choose', 'localhost', canonical)).toBe('choose');
+  });
+
+  it('honours explicit latest and stable routes', () => {
+    expect(releaseChannelDecision('?release=latest', canonical, canonical)).toBe('latest');
+    expect(releaseChannelDecision('?release=stable', canonical, canonical)).toBe('stable');
+  });
+
+  it('keeps room invitations on the current multiplayer client', () => {
+    expect(releaseChannelDecision('?room=abc&autojoin=1&release=choose', canonical, canonical)).toBe('latest');
+  });
+
+  it('resolves the pinned stable tree beneath the repository Pages root', () => {
+    expect(stableReleaseUrl(
+      'https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/',
+      'channels/recent-stable',
+    )).toBe('https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/recent-stable/');
+  });
+
+  it('rejects paths that could escape the deployed root', () => {
+    expect(() => stableReleaseUrl('https://example.test/game/', '../old')).toThrow(/safe relative path/);
+  });
+});

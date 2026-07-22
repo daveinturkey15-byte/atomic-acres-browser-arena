@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "canonicalHostname": "daveinturkey15-byte.github.io",
+  "latest": {
+    "label": "NEW BUILD",
+    "description": "The newest approved production build."
+  },
+  "stable": {
+    "label": "RECENT STABLE",
+    "description": "The exact version that was live immediately before the new build.",
+    "pass": "PASS 57",
+    "pagesSha": "cf26f26ee65c3cdd9a7faffaa29418937db9e0af",
+    "path": "channels/recent-stable"
+  }
+}
