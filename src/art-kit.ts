@@ -414,7 +414,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     const flash = root.getObjectByName('world-muzzle-flash');
     if (flash) flash.position.z = -2.1;
     const supportSocket = root.getObjectByName('support-socket-l');
-    if (supportSocket) supportSocket.position.set(-0.04, -0.13, -0.82);
+    if (supportSocket) supportSocket.position.set(-0.04, -0.13, -0.68);
     return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
   if (id === 'sniper') {

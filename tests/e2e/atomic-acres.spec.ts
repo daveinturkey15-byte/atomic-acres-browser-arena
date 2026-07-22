@@ -1014,7 +1014,7 @@ test.describe('solo mechanics', () => {
       finishIds.add(operator.weaponMount.finishId);
       await page.screenshot({ path: `test-results/refined-operator-${weapon}.png`, animations: 'disabled' });
     }
-    expect(modelIds.size).toBe(6);
+    expect(modelIds.size).toBe(7);
     expect(finishIds.size).toBe(7);
 
     const poses = [

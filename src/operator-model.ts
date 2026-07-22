@@ -4,6 +4,7 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
+import { solveTwoBoneElbow } from './ik';
 
 const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
 const FIRST_PERSON_ARMS_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb';
@@ -34,6 +35,8 @@ type RiggedOperatorRuntime = {
     upperLegRight?: THREE.Bone;
     lowerLegLeft?: THREE.Bone;
     lowerLegRight?: THREE.Bone;
+    footLeft?: THREE.Bone;
+    footRight?: THREE.Bone;
   };
   poseBeforeStance?: Array<{
     bone: THREE.Bone;
@@ -97,6 +100,42 @@ function addLocalPose(bone: THREE.Bone | undefined, x: number, y: number, z: num
   bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(x * weight, y * weight, z * weight, 'XYZ')));
 }
 
+function orientBoneTowardWorld(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
+  bone.updateWorldMatrix(true, true);
+  const origin = bone.getWorldPosition(new THREE.Vector3());
+  const currentDirection = child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
+  const desiredDirection = targetWorld.clone().sub(origin).normalize();
+  if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
+  const currentWorld = bone.getWorldQuaternion(new THREE.Quaternion());
+  const desiredWorld = new THREE.Quaternion().setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
+  const parentWorld = bone.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+  bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
+  bone.updateWorldMatrix(false, true);
+}
+
+function plantCrouchLeg(
+  upper: THREE.Bone | undefined,
+  lower: THREE.Bone | undefined,
+  foot: THREE.Bone | undefined,
+  footTarget: THREE.Vector3 | null,
+  bendHint: THREE.Vector3,
+): void {
+  if (!upper || !lower || !foot || !footTarget) return;
+  upper.updateWorldMatrix(true, true);
+  const hip = upper.getWorldPosition(new THREE.Vector3());
+  const knee = lower.getWorldPosition(new THREE.Vector3());
+  const ankle = foot.getWorldPosition(new THREE.Vector3());
+  const upperLength = hip.distanceTo(knee);
+  const lowerLength = knee.distanceTo(ankle);
+  const footWorldRotation = foot.getWorldQuaternion(new THREE.Quaternion());
+  const kneeTarget = solveTwoBoneElbow(hip, footTarget, upperLength, lowerLength, bendHint);
+  orientBoneTowardWorld(upper, lower, kneeTarget);
+  orientBoneTowardWorld(lower, foot, footTarget);
+  const parentWorld = foot.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+  foot.quaternion.copy(parentWorld.invert().multiply(footWorldRotation));
+  foot.updateWorldMatrix(false, true);
+}
+
 function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void {
   const target = riggedStanceTarget(runtimeState.stance);
   const alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
@@ -123,7 +162,7 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   const proneMount = PRONE_WEAPON_MOUNT[weaponId] ?? PRONE_WEAPON_MOUNT.carbine;
   const weaponX = runtimeState.stance === 'prone' ? proneMount.x : 0;
   const weaponY = runtimeState.stance === 'prone' ? proneMount.y
-    : runtimeState.stance === 'crouch' ? 0.7
+    : runtimeState.stance === 'crouch' ? 0.82
       : THREE.MathUtils.lerp(1.31, 1.14, sprint);
   const weaponZ = runtimeState.stance === 'prone' ? proneMount.z
     : THREE.MathUtils.lerp(-0.18, -0.08, sprint);
@@ -136,15 +175,27 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   const crouch = runtimeState.crouchBlend;
   const prone = runtimeState.proneBlend;
   const bones = runtimeState.poseBones;
-  if (bones.hips) bones.hips.position.y -= 0.3 * crouch;
+  const leftFootTarget = crouch > 0.001 ? bones.footLeft?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  const rightFootTarget = crouch > 0.001 ? bones.footRight?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  if (bones.hips) bones.hips.position.y -= 0.44 * crouch;
   addLocalPose(bones.hips, 0.05, 0, 0, crouch);
   addLocalPose(bones.abdomen, 0.08, 0, 0, crouch);
   addLocalPose(bones.torso, 0.12, 0, 0, crouch);
   addLocalPose(bones.chest, -0.05, 0, 0, crouch);
-  addLocalPose(bones.upperLegLeft, -0.78, 0.025, -0.04, crouch);
-  addLocalPose(bones.upperLegRight, -0.78, -0.025, 0.04, crouch);
-  addLocalPose(bones.lowerLegLeft, 1.35, 0, 0, crouch);
-  addLocalPose(bones.lowerLegRight, 1.35, 0, 0, crouch);
+  if (crouch > 0.001) {
+    runtimeState.visual.updateWorldMatrix(true, true);
+    const bodyRotation = runtimeState.stancePivot.getWorldQuaternion(new THREE.Quaternion());
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(bodyRotation);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(bodyRotation);
+    plantCrouchLeg(
+      bones.upperLegLeft, bones.lowerLegLeft, bones.footLeft, leftFootTarget,
+      forward.clone().addScaledVector(right, -0.18),
+    );
+    plantCrouchLeg(
+      bones.upperLegRight, bones.lowerLegRight, bones.footRight, rightFootTarget,
+      forward.clone().addScaledVector(right, 0.18),
+    );
+  }
 
   // The whole-pelvis pivot supplies the prone silhouette. Keep the authored
   // idle legs intact: layering walk-knee offsets here produced a raised foot
@@ -469,6 +520,8 @@ export function createRiggedOperator(
       upperLegRight: poseBone('UpperLegR', 'UpperLeg.R'),
       lowerLegLeft: poseBone('LowerLegL', 'LowerLeg.L'),
       lowerLegRight: poseBone('LowerLegR', 'LowerLeg.R'),
+      footLeft: poseBone('FootL', 'Foot.L'),
+      footRight: poseBone('FootR', 'Foot.R'),
     },
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
