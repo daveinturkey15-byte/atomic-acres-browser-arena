@@ -91,7 +91,10 @@ describe('meaningful physical-cover landmarks', () => {
       physicalCoverMinimapKind('south-pipe-stack', 'pipe-stack'),
       physicalCoverMinimapKind('west-service-skip', 'service-skip'),
       physicalCoverMinimapKind('east-generator-trailer', 'generator-trailer'),
-    ]).toEqual(['bus', 'bus', 'cargo-stack', 'pipe-stack', 'service-skip', 'generator-trailer']);
+      physicalCoverMinimapKind('jetliner-fuselage'),
+      physicalCoverMinimapKind('terminal-connector'),
+      physicalCoverMinimapKind('fuel-trailer-station'),
+    ]).toEqual(['bus', 'bus', 'cargo-stack', 'pipe-stack', 'service-skip', 'generator-trailer', 'jetliner', 'terminal', 'fuel']);
   });
 
   it('provides a compact label for every semantic silhouette', () => {
@@ -101,7 +104,10 @@ describe('meaningful physical-cover landmarks', () => {
       minimapLandmarkLabel('pipe-stack'),
       minimapLandmarkLabel('service-skip'),
       minimapLandmarkLabel('generator-trailer'),
-    ]).toEqual(['BUS', 'CRGO', 'PIPE', 'SKIP', 'GEN']);
+      minimapLandmarkLabel('jetliner'),
+      minimapLandmarkLabel('terminal'),
+      minimapLandmarkLabel('fuel'),
+    ]).toEqual(['BUS', 'CRGO', 'PIPE', 'SKIP', 'GEN', 'JET', 'TERM', 'FUEL']);
   });
 
   it('maps a landmark to its authoritative world-space footprint', () => {

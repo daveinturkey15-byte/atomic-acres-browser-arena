@@ -66,7 +66,7 @@ export function isMatchMode(value: unknown): value is MatchMode {
 export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
-  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1')
+  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1' || config.arenaId === 'skyline-terminal')
     && isMatchMode(config.mode)
     && isRoomCapacity(config.capacity)
     && typeof config.autoBalance === 'boolean'

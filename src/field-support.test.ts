@@ -58,7 +58,7 @@ describe('field support rewards', () => {
     expect(state.available.yardhawk).toBe(true);
   });
 
-  it('drops unused one-use-per-life rewards on death so they cannot be carried and earned twice', () => {
+  it('drops unused high-tier rewards on death rather than carrying them into the next life', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
     expect(state.available['hunter-swarm']).toBe(true);
@@ -95,20 +95,22 @@ describe('field support rewards', () => {
     expect(cycleFieldSupportSelection('hunter-swarm', 1)).toBe('nuke');
   });
 
-  it('unlocks Hunter Swarm and Nuke once per uninterrupted life while keeping 3/5/7 repeatable', () => {
+  it('re-earns Hunter Swarm and Nuke at independent streak multiples without requiring death', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
     expect(state.streak).toBe(15);
     expect(state.available['hunter-swarm']).toBe(true);
     expect(state.available.nuke).toBe(true);
     state = consumeFieldSupport(consumeFieldSupport(state, 'hunter-swarm').state, 'nuke').state;
-    for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
-    expect(state.available['hunter-swarm']).toBe(false);
-    expect(state.available.nuke).toBe(false);
-    expect(state.available['tri-pass']).toBe(true);
-    state = recordSupportDeath(state);
-    for (let index = 0; index < 8; index += 1) state = recordSupportElimination(state);
+    state = recordSupportElimination(state);
+    expect(state.streak).toBe(16);
     expect(state.available['hunter-swarm']).toBe(true);
+    expect(state.available.nuke).toBe(false);
+    state = consumeFieldSupport(state, 'hunter-swarm').state;
+    for (let index = 0; index < 14; index += 1) state = recordSupportElimination(state);
+    expect(state.streak).toBe(30);
+    expect(state.available.nuke).toBe(true);
+    expect(state.available['tri-pass']).toBe(true);
   });
 
   it('assigns exactly five deterministic hostile Hunter Swarm targets and excludes friendlies/dead targets', () => {

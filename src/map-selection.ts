@@ -2,7 +2,7 @@ import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 
-export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range';
+export type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range' | 'skyline-terminal';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -58,6 +58,20 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     overdrive: false,
     matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
   }),
+  Object.freeze({
+    id: 'skyline-terminal' as const,
+    selectorLabel: 'SKYLINE TERMINAL',
+    displayName: 'Skyline Terminal',
+    summary: 'Airport terminal & jetliner apron · private lobbies up to 6',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: SOLO_BOT_COUNT,
+    maximumSoloBots: MAX_SOLO_BOTS,
+    multiplayer: true,
+    // Atomic-specific support positions have no Skyline authority yet.
+    fieldSupport: false,
+    overdrive: false,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
 ]);
 
 export function arenaSelection(id: string | null | undefined): ArenaSelection {
@@ -65,6 +79,6 @@ export function arenaSelection(id: string | null | undefined): ArenaSelection {
 }
 
 export function activeSoloBotTarget(selection: ArenaSelection, cumulativeDeaths: number): number {
-  if (selection.id !== 'atomic-acres') return selection.soloBotCount;
+  if (selection.id !== 'atomic-acres' && selection.id !== 'skyline-terminal') return selection.soloBotCount;
   return Math.min(selection.maximumSoloBots, soloBotTargetForDeaths(cumulativeDeaths));
 }

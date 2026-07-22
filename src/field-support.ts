@@ -15,8 +15,8 @@ export const FIELD_SUPPORT: readonly FieldSupportDefinition[] = [
   { id: 'scout-sweep', name: 'Scout Sweep', eliminations: 3, repeatable: true },
   { id: 'yardhawk', name: 'Yardhawk', eliminations: 5, repeatable: true },
   { id: 'tri-pass', name: 'Tri-Pass Strike', eliminations: 7, repeatable: true },
-  { id: 'hunter-swarm', name: 'Hunter Swarm', eliminations: 8, repeatable: false },
-  { id: 'nuke', name: 'Nuke', eliminations: 15, repeatable: false },
+  { id: 'hunter-swarm', name: 'Hunter Swarm', eliminations: 8, repeatable: true },
+  { id: 'nuke', name: 'Nuke', eliminations: 15, repeatable: true },
 ] as const;
 
 export const TRI_PASS_BLAST_RADIUS = 15;
@@ -59,7 +59,7 @@ function supportFlags(value = false): Record<FieldSupportId, boolean> {
 export type FieldSupportState = {
   /** Continuous combat streak. Resets only on death or a new match. */
   streak: number;
-  /** Progress through the repeatable 3/5/7 field-support eligibility cycle. */
+  /** Progress through the compact 3/5/7 field-support eligibility cycle. */
   rewardCycle: number;
   available: Record<FieldSupportId, boolean>;
   earnedThisStreak: Record<FieldSupportId, boolean>;
@@ -80,10 +80,17 @@ export function recordSupportElimination(state: FieldSupportState): FieldSupport
   const available = { ...state.available };
   const earnedThisStreak = { ...state.earnedThisStreak };
   for (const reward of FIELD_SUPPORT) {
-    const thresholdReached = reward.repeatable
-      ? nextRewardCycle === reward.eliminations
-      : nextStreak === reward.eliminations;
-    if (thresholdReached && !earnedThisStreak[reward.id]) {
+    const usesCompactCycle = reward.repeatable && reward.eliminations <= REPEATABLE_REWARD_THRESHOLD;
+    const thresholdReached = !reward.repeatable
+      ? nextStreak === reward.eliminations
+      : usesCompactCycle
+        ? nextRewardCycle === reward.eliminations
+        : nextStreak % reward.eliminations === 0;
+    // High-tier rewards use independent streak multiples (8, 16, 24… and
+    // 15, 30, 45…). They must be earnable again after use without forcing a
+    // death, while an unused copy simply stays banked.
+    const canEarnAgain = reward.repeatable && !usesCompactCycle;
+    if (thresholdReached && (canEarnAgain || !earnedThisStreak[reward.id])) {
       available[reward.id] = true;
       earnedThisStreak[reward.id] = true;
     }

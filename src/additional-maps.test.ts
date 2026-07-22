@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
-import { pointInsideBounds } from './collision';
+import { isBlocked, pointInsideBounds } from './collision';
 import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
   RUSTWORKS_TOWER,
+  applyAdditionalMapPresentationProfile,
   applyRustworksPresentationProfile,
   buildGunRange,
   buildRustworks1v1,
+  buildSkylineTerminal,
   rustworksDeckTopY,
 } from './additional-maps';
+import type { ArenaMap } from './map';
 import { CharacterPhysics } from './physics';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
@@ -75,7 +78,7 @@ async function walkToward(physics: CharacterPhysics, target: Point3, maxSteps = 
 }
 
 async function traverseRoute(
-  map: ReturnType<typeof buildRustworks1v1>,
+  map: Pick<ArenaMap, 'physicsColliders' | 'bounds'>,
   anchors: readonly RouteAnchor[],
   reverse = false,
 ): Promise<void> {
@@ -395,5 +398,100 @@ describe('additional authored maps', () => {
     } finally {
       physics.dispose();
     }
+  });
+
+  it('builds an original airport-terminal arena with concourse, jet bridge, fuselage, and tarmac apron', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.id).toBe('skyline-terminal');
+    expect(map.label).toBe('Skyline Terminal');
+    expect(map.root.name).toContain('Skyline Terminal');
+    expect(map.colliders.length).toBeGreaterThanOrEqual(15);
+    expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(15);
+    expect(map.spawns[0].length).toBeGreaterThanOrEqual(6);
+    expect(map.spawns[1].length).toBeGreaterThanOrEqual(6);
+    expect(map.patrolPoints.length).toBeGreaterThanOrEqual(12);
+    expect(map.breakableWindows.length).toBeGreaterThanOrEqual(4);
+    expect(map.physicalCover.length).toBeGreaterThanOrEqual(5);
+    expect(map.root.getObjectByName('skyline-tarmac-apron')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-concourse-floor')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-jetbridge-floor')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-jetliner-fuselage-top')).toBeTruthy();
+  });
+
+  it('exposes detailed terminal signage, baggage carousel, fuel trailer, and presentation batching', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
+    expect(mainSign).toBeTruthy();
+    expect(mainSign?.userData.label).toBe('SKYLINE TERMINAL - GATES 1-12');
+
+    const flightDisplay = map.root.getObjectByName('skyline-flight-display-board');
+    expect(flightDisplay).toBeTruthy();
+    expect(flightDisplay?.userData.label).toBe('DEPARTURES - FLIGHT AERO 86');
+
+    expect(map.root.getObjectByName('skyline-baggage-claim-carousel')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-fuel-trailer')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-fuel-trailer-tank')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-jetliner-cockpit-partition')).toBeTruthy();
+
+    const batches = map.root.userData.skylinePresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(10);
+    expect(batches.batches).toBeGreaterThan(0);
+  });
+
+  it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const team of [0, 1] as const) {
+      expect(map.spawns[team]).toHaveLength(6);
+      for (const spawn of map.spawns[team]) {
+        expect(pointInsideBounds(spawn, map.bounds, 0.5)).toBe(true);
+        expect(isBlocked(spawn, map.colliders, 0.44), `${team}:${spawn.toArray().join(',')}`).toBe(false);
+      }
+      for (let first = 0; first < map.spawns[team].length; first += 1) {
+        for (let second = first + 1; second < map.spawns[team].length; second += 1) {
+          expect(map.spawns[team][first].distanceTo(map.spawns[team][second])).toBeGreaterThanOrEqual(6);
+        }
+      }
+    }
+  });
+
+  it('applies the Performance/Quality split to Skyline instead of rendering Quality props on low-spec profiles', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
+    const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
+    expect(qualityBoard).toBeTruthy();
+    applyAdditionalMapPresentationProfile(map.root, 'performance');
+    expect(qualityBoard?.visible).toBe(false);
+    expect(coreFloor?.visible).not.toBe(false);
+    applyAdditionalMapPresentationProfile(map.root, 'blender');
+    expect(qualityBoard?.visible).toBe(true);
+  });
+
+  it('walks every Skyline route in both directions with Rapier-backed collision', async () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const routes = map.root.userData.skylineRoutes as Record<string, RouteAnchor[]>;
+    for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac']) {
+      await traverseRoute(map, routes[id]);
+      await traverseRoute(map, routes[id], true);
+    }
+  }, 30_000);
+
+  it('provides climbable access angles and coherent route anchors across terminal zones', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const access = map.root.userData.skylineAccess as {
+      escalatorAngleDegrees: number;
+      airstairAngleDegrees: number;
+      maxClimbDegrees: number;
+    };
+    expect(access.escalatorAngleDegrees).toBeLessThanOrEqual(access.maxClimbDegrees);
+    expect(access.airstairAngleDegrees).toBeLessThanOrEqual(access.maxClimbDegrees);
+
+    const routes = map.root.userData.skylineRoutes as Record<string, RouteAnchor[]>;
+    expect(routes['concourse-to-mezzanine']).toHaveLength(3);
+    expect(routes['mezzanine-to-jetbridge']).toHaveLength(5);
+    expect(routes['fuselage-to-tarmac']).toHaveLength(4);
   });
 });

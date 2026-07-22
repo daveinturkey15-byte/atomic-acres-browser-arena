@@ -5,7 +5,7 @@ import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrame
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
-import { GUN_RANGE_FIRING_LINE_Z, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1 } from './additional-maps';
+import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -68,6 +68,7 @@ import {
 import { ArenaMap, buildArena } from './map';
 import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap, type MinimapLandmarkKind } from './minimap';
+import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
@@ -417,7 +418,7 @@ app.innerHTML = `
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
+    <div class="eyebrow">FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
@@ -833,10 +834,13 @@ applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
 createRustworksQualityLights(rustworksArena.root, renderProfile);
 if (renderProfile === 'blender') enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
 const gunRangeArena = buildGunRange(scene);
+const skylineTerminalArena = buildSkylineTerminal(scene);
+applyAdditionalMapPresentationProfile(skylineTerminalArena.root, renderProfile);
 const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
   'atomic-acres': atomicArena,
   'rustworks-1v1': rustworksArena,
   'gun-range': gunRangeArena,
+  'skyline-terminal': skylineTerminalArena,
 };
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 let arena: ArenaMap = arenaById[selectedArena.id];
@@ -3898,6 +3902,12 @@ function houseContainsXZ(house: ArenaMap['houses'][number], point: THREE.Vector3
 }
 
 function botVerticalRouteTarget(bot: BotPlayer): THREE.Vector3 | null {
+  const authored = authoredVerticalRouteTarget(
+    arena.root.userData.verticalNavigation as ArenaVerticalNavigation | undefined,
+    bot.position,
+    player.position,
+  );
+  if (authored) return new THREE.Vector3(authored.x, authored.y, authored.z);
   const playerUpper = player.position.y > 3;
   const botOnGround = bot.position.y <= 0.1;
   const botOnUpper = bot.position.y >= 3.2;
@@ -3914,6 +3924,8 @@ function botVerticalRouteTarget(bot: BotPlayer): THREE.Vector3 | null {
 }
 
 function botElevationAt(position: THREE.Vector3, previousY: number): number {
+  const authoredNavigation = arena.root.userData.verticalNavigation as ArenaVerticalNavigation | undefined;
+  if (authoredNavigation) return authoredElevationAt(authoredNavigation, position, previousY);
   for (const house of arena.houses) {
     for (const prefix of ['indoor-ramp', 'ramp'] as const) {
       const foot = house.anchors.find((anchor) => anchor.id === `${prefix}-foot`);
@@ -3940,7 +3952,8 @@ function navigationCollidersFor(activeArena: ArenaMap): ArenaMap['colliders'] {
   return activeArena.colliders.filter((box) => {
     const minY = box.minY ?? 0;
     const maxY = box.maxY ?? 8;
-    return !(minY > 2 && maxY - minY <= 0.5);
+    const thinSurface = maxY - minY <= 0.5;
+    return !(thinSurface && (minY > 2 || Boolean(box.rotation)));
   });
 }
 
@@ -5714,6 +5727,22 @@ function drawMinimapLandmark(
     context.moveTo(x + inset, y + height * 0.34);
     context.lineTo(x + width - inset, y + height * 0.34);
     context.stroke();
+  } else if (kind === 'jetliner') {
+    context.fillStyle = 'rgba(226, 240, 244, .78)';
+    context.beginPath();
+    context.ellipse(x + width / 2, y + height / 2, Math.max(3, width / 2), Math.max(3, height / 2), 0, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+  } else if (kind === 'terminal') {
+    context.fillStyle = 'rgba(56, 178, 165, .62)';
+    context.fillRect(x, y, width, Math.max(3, height));
+    context.strokeRect(x, y, width, Math.max(3, height));
+  } else if (kind === 'fuel') {
+    context.fillStyle = 'rgba(217, 159, 46, .82)';
+    context.beginPath();
+    context.ellipse(x + width / 2, y + height / 2, Math.max(3, width / 2), Math.max(3, height / 2), 0, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
   } else {
     context.fillStyle = 'rgba(232, 203, 92, .74)';
     context.fillRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
@@ -5793,6 +5822,19 @@ function updateMinimap(now: number): void {
       const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
       context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
       context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    }
+    for (const cover of arena.physicalCover) {
+      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
+      if (!kind) continue;
+      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
+      drawMinimapLandmark(context, cover.id, kind, footprint);
+      const label = minimapLandmarkLabel(kind);
+      const centre = context.getTransform().transformPoint(new DOMPoint(
+        footprint.x + footprint.width / 2,
+        footprint.y + footprint.height / 2,
+      ));
+      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
+      renderedLandmarks.push({ id: cover.id, kind, label });
     }
     for (const target of arena.targets) {
       const [x, y] = point(target.root.position.x, target.root.position.z);
@@ -6244,12 +6286,16 @@ function syncArenaSelectionUi(): void {
     ? 'ATOMIC <span>ACRES</span>'
     : selectedArena.id === 'rustworks-1v1'
       ? 'RUST<span>WORKS</span>'
-      : 'GUN <span>RANGE</span>';
+      : selectedArena.id === 'gun-range'
+        ? 'GUN <span>RANGE</span>'
+        : 'SKYLINE <span>TERMINAL</span>';
   element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
     ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.'
     : selectedArena.id === 'rustworks-1v1'
       ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
-      : 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.';
+      : selectedArena.id === 'gun-range'
+        ? 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.'
+        : 'Fight through an original airport concourse and jetliner apron with security chokes, a narrow gangway, and open tarmac sightlines.';
 }
 
 function setArenaPresentationVisibility(): void {
@@ -6277,6 +6323,7 @@ function setArenaPresentationVisibility(): void {
   applyArenaFogProfile();
   applyArenaLightingForSelection();
   setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
+  applyAdditionalMapPresentationProfile(skylineTerminalArena.root, renderProfile);
   if (rustworksVisible) {
     if (renderProfile === 'blender' && rustworksBlenderTelemetry().status === 'ready') {
       setRustworksProceduralPresentationVisible(rustworksArena.root, false);
@@ -6340,6 +6387,9 @@ function setArenaMenuCamera(): void {
     // Keep the tall tower on the unobstructed right side of the deployment panel.
     camera.position.set(18, 20, -28);
     camera.lookAt(centreX + 14, 5.8, centreZ);
+  } else if (selectedArena.id === 'skyline-terminal') {
+    camera.position.set(18, 16, -20);
+    camera.lookAt(0, 3.2, 2.0);
   } else {
     camera.position.set(centreX, 31, centreZ - 22);
     camera.lookAt(centreX, 0.8, centreZ);

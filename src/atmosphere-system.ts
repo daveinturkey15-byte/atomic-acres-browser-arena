@@ -63,6 +63,15 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-13.5, -18, 1.8, 3.8, 1.2], [13.5, -32, 1.8, 3.8, 4.1],
     ] as SmokeCard[]),
   }),
+  'skyline-terminal': Object.freeze({
+    mist: Object.freeze([
+      [-22, 10, 14, 4.2], [22, 10, 14, 4.2], [-15, -20, 12, 3.8],
+      [15, -20, 12, 3.8], [0, 24, 15, 4.5], [0, -10, 10, 3.2],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-18, 16, 2.4, 4.2, 1.1], [18, 16, 2.4, 4.2, 3.5], [0, -22, 2.2, 3.8, 2.1],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
@@ -76,6 +85,9 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'rustworks-1v1') return {
     count: quality ? 96 : 40, minX: -28, maxX: 28, minZ: -30, maxZ: 30, color: 0xc2a07a, opacity: quality ? 0.24 : 0.14,
   };
+  if (arenaId === 'skyline-terminal') return {
+    count: quality ? 80 : 48, minX: -34, maxX: 34, minZ: -34, maxZ: 34, color: 0xd2dbe0, opacity: quality ? 0.20 : 0.15,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -85,6 +97,7 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   if (profile === 'compat') return { near: 56, far: 140 };
   if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 32, far: 104 } : { near: 36, far: 112 };
   if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 26, far: 90 } : { near: 30, far: 94 };
+  if (arenaId === 'skyline-terminal') return profile === 'blender' ? { near: 34, far: 108 } : { near: 38, far: 116 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 
@@ -92,6 +105,7 @@ function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{
   const quality = profile === 'blender';
   if (arenaId === 'atomic-acres') return quality ? { mist: 0.24, smoke: 0.13 } : { mist: 0.18, smoke: 0.09 };
   if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.22, smoke: 0.12 } : { mist: 0.14, smoke: 0.08 };
+  if (arenaId === 'skyline-terminal') return quality ? { mist: 0.20, smoke: 0.10 } : { mist: 0.15, smoke: 0.07 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 

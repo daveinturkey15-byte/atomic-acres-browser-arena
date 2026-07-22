@@ -83,6 +83,7 @@ describe('private match lobby', () => {
   it('validates bounded snapshots and capacity', () => {
     expect(isLobbySnapshot(snapshot())).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'rustworks-1v1' } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'skyline-terminal' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range' as 'atomic-acres' } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: [...members, ...members, members[0]] }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, capacity: 5 as 4 } }))).toBe(false);
