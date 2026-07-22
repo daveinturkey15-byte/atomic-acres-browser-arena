@@ -8272,6 +8272,7 @@ async function bootstrap(): Promise<void> {
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (renderProfile !== 'blender') {
     batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
+    batchStaticMeshes(gunRangeArena.root, gunRangeArena.root, () => '', staticMaterialMode);
   } else {
     enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
   }

@@ -672,6 +672,8 @@ export class WeaponPresentation {
       ? 'optic-reticle'
       : this.active === 'sniper'
         ? 'sniper-scope'
+      : this.active === 'lmg'
+        ? 'rear-sight'
       : this.active === 'smg'
         ? 'smg-aperture'
         : this.active === 'pistol' || this.active === 'machine-pistol'

@@ -65,7 +65,10 @@ const results = [];
       if (errors.length) throw new Error(`${viewport.width}x${viewport.height}: browser errors ${JSON.stringify(errors)}`);
       await page.close();
     }
-    if (results.length !== 18) throw new Error(`Expected 18 combinations, got ${results.length}`);
+    const expectedCombinations = viewports.length * weapons.length;
+    if (results.length !== expectedCombinations) {
+      throw new Error(`Expected ${expectedCombinations} combinations, got ${results.length}`);
+    }
     console.log(JSON.stringify({ combinations: results.length, results }, null, 2));
   } finally {
     await browser.close();
