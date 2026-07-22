@@ -65,21 +65,21 @@ def safe_tag(value: str) -> str:
     return tag[:80]
 
 
-def native_path(path: Path) -> Path:
+def native_path(path: str | Path) -> Path:
     """Translate an MSYS `/c/...` argument for a native Windows Python process."""
     value = str(path)
-    if os.name == "nt" and re.match(r"^/[a-zA-Z]/", value):
+    if os.name == "nt" and re.match(r"^[\\/][a-zA-Z][\\/]", value):
         value = f"{value[1].upper()}:{value[2:]}"
     return Path(value)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prompt", type=Path, required=True, help="Task prompt markdown file")
+    parser.add_argument("--prompt", required=True, help="Task prompt markdown file")
     parser.add_argument("--mode", choices=("plan", "write"), default="plan")
     parser.add_argument("--tag", type=safe_tag, required=True)
-    parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument("--agy", type=Path, default=DEFAULT_AGY)
+    parser.add_argument("--repo", default=str(Path.cwd()))
+    parser.add_argument("--agy", default=str(DEFAULT_AGY))
     parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument(
         "--allow-path",
@@ -94,9 +94,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--cache-root",
-        type=Path,
-        default=Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
-        / "hermes/cache/atomic-acres-agy-runs",
+        default=str(
+            Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+            / "hermes/cache/atomic-acres-agy-runs"
+        ),
     )
     return parser.parse_args()
 
