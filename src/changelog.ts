@@ -17,6 +17,22 @@ export type ChangelogEntry = Readonly<{
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass53',
+    pass: 'PASS 53',
+    title: 'Skyline Terminal, repeatable streaks & lobby copy',
+    releasedAt: '2026-07-22T09:27:28+01:00',
+    areas: Object.freeze(['MAP', 'STREAKS', 'MULTIPLAYER']),
+    summary: 'A fourth airport arena joins the rotation, high-tier streaks recycle during long lives, and lobby codes copy reliably.',
+    highlights: Object.freeze([
+      'Skyline Terminal is selectable for bot skirmishes and private matches',
+      'Terminal, mezzanine, escalator, jetbridge, jetliner, and airstair routes use real collision and multilevel bot navigation',
+      'Hunter Swarm returns at 8, 16, 24… kills without dying',
+      'Nuke returns at 15, 30, 45… kills without dying',
+      'Copy Code writes the actual 36-character lobby code and falls back on browsers that block the modern Clipboard API',
+      'Multiplayer lifecycle, verification, and cross-platform asset checks include the reconciled Desky backlog',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass52',
     pass: 'PASS 52',
     title: 'Private-match map sync & combat telemetry',

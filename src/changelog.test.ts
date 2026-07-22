@@ -11,13 +11,13 @@ describe('changelog', () => {
   it('keeps the current public release first with an explicit UK timezone', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass52');
+    expect(latest.id).toBe('pass53');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(formatChangelogTimestamp('2026-07-21T19:47:24+01:00')).toBe('21 JUL 2026 · 19:47 BST');
-    expect(formatChangelogTimestampDetail('2026-07-21T19:47:24+01:00')).toBe(
-      '21 JUL 2026 · 19:47 BST · UTC+1 · 19:47:24',
+    expect(formatChangelogTimestamp('2026-07-22T09:27:28+01:00')).toBe('22 JUL 2026 · 09:27 BST');
+    expect(formatChangelogTimestampDetail('2026-07-22T09:27:28+01:00')).toBe(
+      '22 JUL 2026 · 09:27 BST · UTC+1 · 09:27:28',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · 21 JUL 2026 · 19:47 BST');
+    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · 22 JUL 2026 · 09:27 BST');
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
