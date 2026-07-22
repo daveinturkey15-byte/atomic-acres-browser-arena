@@ -24,7 +24,7 @@ describe('Pass 30 atmosphere budget', () => {
       arenaId: 'atomic-acres',
       mistCards: 10,
       smokeCards: 5,
-      dustMotes: 96,
+      dustMotes: 64,
       triangles: 30,
       textureSamples: 0,
       volumetricRayMarching: false,
@@ -35,7 +35,7 @@ describe('Pass 30 atmosphere budget', () => {
 
   it('reuses one bounded pool with map-specific visible layouts across every arena', () => {
     const system = new AtmosphereSystem(new THREE.Scene(), 'performance', 'ANGLE (NVIDIA RTX)', null);
-    expect(system.telemetry()).toMatchObject({ arenaId: 'atomic-acres', mistCards: 10, smokeCards: 5, dustMotes: 64, triangles: 30 });
+    expect(system.telemetry()).toMatchObject({ arenaId: 'atomic-acres', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30 });
     system.setArena('rustworks-1v1');
     expect(system.telemetry()).toMatchObject({ arenaId: 'rustworks-1v1', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30, perFrameAllocations: 0 });
     system.setArena('gun-range');
@@ -45,7 +45,7 @@ describe('Pass 30 atmosphere budget', () => {
   });
 
   it('brings restrained distance fog into the playable depth of every non-compat arena', () => {
-    expect(atmosphereFogRange('performance', 'atomic-acres')).toEqual({ near: 36, far: 112 });
+    expect(atmosphereFogRange('performance', 'atomic-acres')).toEqual({ near: 56, far: 148 });
     expect(atmosphereFogRange('performance', 'rustworks-1v1')).toEqual({ near: 30, far: 94 });
     expect(atmosphereFogRange('performance', 'gun-range')).toEqual({ near: 42, far: 105 });
     expect(atmosphereFogRange('performance', 'skyline-terminal')).toEqual({ near: 44, far: 130 });

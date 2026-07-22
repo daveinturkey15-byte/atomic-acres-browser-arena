@@ -2,13 +2,20 @@
 
 ## Current development and release
 
+- [Player-facing production release ledger](../src/changelog.ts) - canonical Pass number, public notes, and first-successful-promotion time for the live game.
+- [Player feedback contribution specification](PLAYER_FEEDBACK_CONTRIBUTION_SPEC_2026-07-22.md) - weapon presentation, movement/collision, combat feedback, round statistics, and season-aware leaderboard reset contract.
+- [Atomic Acres aesthetic overhaul specification](ATOMIC_ACRES_AESTHETIC_OVERHAUL_SPEC_2026-07-22.md) - authored model-home, garden, material, lighting, performance, and deterministic browser-review contract.
+- [Skyline Terminal overhaul specification](SKYLINE_TERMINAL_OVERHAUL_SPEC_2026-07-22.md) - active traversal, cover, asset, material, preview, and verification contract for the original airport arena.
+- [Skyline Terminal overhaul evidence](SKYLINE_TERMINAL_OVERHAUL_EVIDENCE_2026-07-22.md) - browser, clearance, performance, provenance, and integration evidence for the isolated Terminal branch.
+- [Rustworks tower overhaul specification](RUSTWORKS_TOWER_OVERHAUL_SPEC_2026-07-22.md) - derrick, undercroft, trench, container-route, collision, ballistics, and performance contract.
+- [Rustworks tower overhaul handoff](RUSTWORKS_TOWER_OVERHAUL_HANDOFF_2026-07-22.md) - exact authored asset, test, provenance, and integration evidence.
 - [Pass 55 indoor range and walk-up armory specification](PASS55_INDOOR_RANGE_ARMORY_SPEC_2026-07-22.md) - expanded indoor Gun Range, walk-up weapon pickups, Mastiff 63 LMG, and instant sniper ADS.
 - [Pass 54 wall penetration specification](PASS54_WALL_PENETRATION_SPEC_2026-07-22.md) - canonical FMJ-like material, weapon, distance, angle, multiplayer-authority, and future-asset coverage rule.
 
 - [README](../README.md) — product overview, controls, and setup.
 - [Pass 54 Skyline Terminal polish specification](PASS54_SKYLINE_TERMINAL_POLISH_SPEC_2026-07-22.md) — active authored-detail, originality, performance, and verification contract for Skyline Terminal.
 - [Pass 54 Skyline Terminal verification record](PASS54_SKYLINE_TERMINAL_POLISH_RELEASE_2026-07-22.md) — implementation summary, mechanical gates, render evidence, and exact Gemini sidecar receipts.
-- [Pass 52 specification](PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — current multiplayer and changelog contract retained beneath Pass 54.
+- [Pass 52 specification](PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — retained multiplayer and changelog foundation, superseded where newer scoped contracts and executable tests differ.
 - [Pass 52 release record](PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_RELEASE_2026-07-21.md) — release-facing implementation notes.
 - [Verification and release hygiene](VERIFICATION_AND_RELEASE_HYGIENE.md) — canonical local/CI gates, portability, provenance, and legal-distinction rules.
 - [Contribution and production pipeline](CONTRIBUTION_AND_RELEASE_PIPELINE.md) — canonical multi-machine, multi-harness contribution ledger and serialized Pages release process.
@@ -16,7 +23,7 @@
 
 ## Historical passes
 
-The other dated pass documents in this directory are an implementation archive. They are evidence of the route to the current build, not independent sources of current product truth. When an older document conflicts with the active Pass 54 Skyline contract, retained Pass 52 multiplayer contract, or executable tests, use the newer scoped contract and tests.
+The other dated pass documents in this directory are an implementation archive. They are evidence of the route to the current build, not independent sources of current product truth. When documents conflict, use the player-facing release ledger for what is live, then the newest applicable scoped contract and executable tests. A contribution handoff does not become production truth until its exact `main` SHA is promoted and verified.
 
 ## Asset sources and licensing
 

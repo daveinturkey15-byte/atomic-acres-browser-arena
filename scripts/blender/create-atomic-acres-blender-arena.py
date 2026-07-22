@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import struct
 from pathlib import Path
 
 import bpy
@@ -64,7 +65,8 @@ def load_authored_texture(filename: str, color_space: str = "sRGB") -> bpy.types
 
 def make_material(name: str, color: int, roughness: float, metallic: float = 0.0,
                   alpha: float = 1.0, emission: int | None = None, emission_strength: float = 0.0,
-                  texture: str | None = None, tile_metres: float = 2.5):
+                  texture: str | None = None, tile_metres: float = 2.5,
+                  texture_tint: int | None = None):
     material = bpy.data.materials.new(name)
     material.use_nodes = True
     bsdf = material.node_tree.nodes.get("Principled BSDF")
@@ -79,7 +81,18 @@ def make_material(name: str, color: int, roughness: float, metallic: float = 0.0
         image_node.image = load_authored_texture(texture)
         image_node.interpolation = "Linear"
         image_node.extension = "REPEAT"
-        material.node_tree.links.new(image_node.outputs["Color"], bsdf.inputs["Base Color"])
+        if texture_tint is None:
+            material.node_tree.links.new(image_node.outputs["Color"], bsdf.inputs["Base Color"])
+        else:
+            tint = material.node_tree.nodes.new("ShaderNodeMixRGB")
+            tint.name = f"Authored_{Path(texture).stem}_tint"
+            tint.label = "Project-authored albedo tint"
+            tint.blend_type = "COLOR"
+            tint.inputs[0].default_value = 0.78
+            tint.inputs[2].default_value = rgba(texture_tint)
+            material.node_tree.links.new(image_node.outputs["Color"], tint.inputs[1])
+            material.node_tree.links.new(tint.outputs["Color"], bsdf.inputs["Base Color"])
+            material["atomic_texture_tint"] = f"#{texture_tint:06x}"
         material["atomic_texture"] = texture
         material["atomic_tile_metres"] = tile_metres
         stem = Path(texture).stem
@@ -128,12 +141,16 @@ M = {
     "earth": make_material("MAT_earth_edge", 0x3A3329, 1.0),
     "asphalt": make_material("MAT_asphalt_charcoal", 0x292F31, 0.96, texture="asphalt-aged.png", tile_metres=3.4),
     "concrete": make_material("MAT_concrete_weathered", 0x7B7D76, 0.9, texture="concrete-poured.png", tile_metres=2.8),
+    "boundary": make_material(
+        "MAT_boundary_warm_concrete", 0xB9B29E, 0.92,
+        texture="concrete-poured.png", tile_metres=3.8, texture_tint=0xD8D1BE,
+    ),
     "concrete_dark": make_material("MAT_concrete_dark", 0x454B4D, 0.92, texture="roof-shingles.png", tile_metres=2.4),
     "aqua": make_material("MAT_aqua_oxidized", 0x356E73, 0.73, 0.05, texture="siding-aqua.png", tile_metres=2.6),
     "coral": make_material("MAT_coral_oxide", 0x8B4B40, 0.76, 0.04, texture="siding-coral.png", tile_metres=2.6),
-    "aqua_upper": make_material("MAT_aqua_upper_brick", 0x638B87, 0.82, 0.03, texture="brick-warm.png", tile_metres=2.15),
-    "coral_upper": make_material("MAT_coral_upper_plaster", 0xB26F5D, 0.86, 0.02, texture="plaster-warm.png", tile_metres=3.15),
-    "aqua_rear": make_material("MAT_aqua_rear_plaster", 0x819D97, 0.88, 0.02, texture="plaster-warm.png", tile_metres=2.45),
+    "aqua_upper": make_material("MAT_aqua_upper_brick", 0x638B87, 0.82, 0.03, texture="brick-warm.png", tile_metres=2.15, texture_tint=0xA9C8C2),
+    "coral_upper": make_material("MAT_coral_upper_plaster", 0xB26F5D, 0.86, 0.02, texture="plaster-warm.png", tile_metres=3.15, texture_tint=0xF2B6A2),
+    "aqua_rear": make_material("MAT_aqua_rear_plaster", 0x819D97, 0.88, 0.02, texture="plaster-warm.png", tile_metres=2.45, texture_tint=0xBFE0DA),
     "coral_rear": make_material("MAT_coral_rear_brick", 0x805244, 0.9, 0.02, texture="brick-warm.png", tile_metres=2.6),
     "plaster": make_material("MAT_plaster_sand", 0xB8AE95, 0.9, texture="plaster-warm.png", tile_metres=2.8),
     "trim": make_material("MAT_trim_bone", 0xD4CBB7, 0.67, texture="plaster-warm.png", tile_metres=2.1),
@@ -236,13 +253,18 @@ def add_cylinder(name: str, position, radius: float, depth: float, material, ver
 
 
 def add_uv_sphere(name: str, position, scale, material, segments=12, rings=8):
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1, location=game_location(position))
+    bpy.ops.mesh.primitive_uv_sphere_add(
+        segments=max(8, segments), ring_count=max(6, rings), radius=1,
+        location=game_location(position),
+    )
     obj = bpy.context.object
     obj.name = name
     obj.scale = game_dimensions(scale)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     scale_existing_uvs(obj, material)
     obj.data.materials.append(material)
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = True
     obj["atomic_environment"] = True
     link_only_env(obj)
     return obj
@@ -267,6 +289,8 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     add_box(f"{prefix}_body_lower", [x, 1.25, z], [5.2, 2.2, length], M["metal"], 0.24)
     add_box(f"{prefix}_body_colour", [x, 2.15, z], [5.0, 2.25, length - 0.35], body_material, 0.3)
     add_box(f"{prefix}_roof", [x, 3.52, z], [4.75, 0.34, length - 0.7], M["trim"], 0.14)
+    # Original Atomic Acres civic-showcase trim, held inside the existing footprint.
+    add_box(f"{prefix}_roof_visor", [x, 3.58, z - half - 0.18], [4.3, 0.18, 0.55], body_material, 0.08)
     add_box(f"{prefix}_front_glass", [x, 2.55, z - half - 0.015], [4.12, 1.24, 0.09], M["glass"], 0.03)
     add_box(f"{prefix}_windshield_divider", [x, 2.55, z - half - 0.075], [0.12, 1.26, 0.08], M["metal"], 0.02)
     add_box(f"{prefix}_rear_glass", [x, 2.52, z + half + 0.015], [3.95, 1.12, 0.09], M["glass"], 0.03)
@@ -280,6 +304,7 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
             wz = z - half + 1.5 + index * ((length - 3.0) / max(1, window_count - 1))
             add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 2.54, wz], [0.07, 1.18, 1.62], M["glass"], 0.025)
         add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
+        add_box(f"{prefix}_side_sweep_{side}", [x + side * 2.67, 1.86, z + 0.35], [0.05, 0.42, length - 2.2], body_material, 0.025)
         door_z = z - half + (2.25 if side > 0 else length - 2.25)
         frame_x = x + side * 2.67
         add_box(f"{prefix}_door_frame_{side}_top", [frame_x, 2.975, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
@@ -357,19 +382,27 @@ for house_index, house in enumerate(spec["houses"]):
     width, depth = house["dimensions"]["width"], house["dimensions"]["depth"]
     accent = M["aqua"] if house["team"] == 0 else M["coral"]
     add_box(f"BLD_HOUSE_{prefix}_roof", [x, 7.18, z], [width + 0.8, 0.48, depth + 0.8], M["roof"], 0.08)
-    # Original tactical facade ribs, rooftop equipment and faction beacon strips.
+    # Deliberately asymmetric model-home trim preserves every structural opening.
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_corner_{side}", [x + side * (width / 2 + 0.06), 3.55, z], [0.18, 7.1, depth + 0.25], M["metal"], 0.02)
-    for offset in (-7.0, -3.5, 0, 3.5, 7.0):
-        add_box(f"BLD_HOUSE_{prefix}_facade_rib_{offset}", [x + offset, 5.55, z + facing * (depth / 2 + 0.24)], [0.13, 2.6, 0.16], accent, 0.02)
-    add_box(f"BLD_HOUSE_{prefix}_roof_plant", [x + 4.8, 7.65, z - facing * 2.2], [3.1, 0.9, 2.2], M["concrete_dark"], 0.12)
-    for offset in (-1.05, 0, 1.05):
-        add_box(f"BLD_HOUSE_{prefix}_roof_vent_{offset}", [x + 4.8 + offset, 8.18, z - facing * 2.2], [0.12, 0.32, 1.6], M["metal_light"], 0.02)
-    add_box(f"BLD_HOUSE_{prefix}_identity_strip", [x, 6.55, z + facing * (depth / 2 + 0.38)], [7.5, 0.2, 0.1], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
+    facade_z = z + facing * (depth / 2 + 0.24)
+    add_box(f"BLD_HOUSE_{prefix}_facade_band", [x, 6.35, facade_z], [14.8, 0.34, 0.18], accent, 0.035)
+    for offset in (-7.0, 7.0):
+        add_box(f"BLD_HOUSE_{prefix}_facade_endcap_{offset}", [x + offset, 5.45, facade_z], [0.28, 2.15, 0.22], M["trim"], 0.035)
+    feature_x = x + (-4.3 if house["team"] == 0 else 4.3)
+    add_box(f"BLD_HOUSE_{prefix}_feature_panel", [feature_x, 5.18, facade_z + facing * 0.06], [2.2, 1.7, 0.12], accent, 0.06)
+    for stripe in (-0.65, 0.0, 0.65):
+        add_box(f"BLD_HOUSE_{prefix}_feature_reveal_{stripe}", [feature_x + stripe, 5.18, facade_z + facing * 0.14], [0.06, 1.45, 0.06], M["trim"], 0.015)
+    add_box(f"BLD_HOUSE_{prefix}_roof_plant", [x + 4.8, 7.52, z - facing * 2.2], [2.5, 0.58, 1.7], M["boundary"], 0.12)
+    for offset in (-0.72, 0.72):
+        add_box(f"BLD_HOUSE_{prefix}_roof_vent_{offset}", [x + 4.8 + offset, 7.92, z - facing * 2.2], [0.1, 0.24, 1.15], M["metal_light"], 0.02)
     # Lightweight entrance canopy and recessed wayfinding light: presentation
     # only, above the traversal envelope, batched into existing materials.
     entrance_z = z + facing * (depth / 2 + 0.58)
-    add_box(f"BLD_HOUSE_{prefix}_entrance_canopy", [x, 3.05, entrance_z], [3.8, 0.16, 1.25], M["metal"], 0.04)
+    entrance_x = x + (0.55 if house["team"] == 0 else -0.55)
+    add_box(f"BLD_HOUSE_{prefix}_entrance_canopy", [entrance_x, 3.05, entrance_z], [4.4, 0.16, 1.4], M["metal"], 0.04)
+    for side in (-1, 1):
+        add_box(f"BLD_HOUSE_{prefix}_entrance_frame_{side}", [entrance_x + side * 2.05, 1.65, entrance_z - facing * 0.34], [0.18, 2.8, 0.18], accent, 0.025)
     add_box(f"BLD_HOUSE_{prefix}_entrance_light", [x, 2.92, entrance_z - facing * 0.18], [2.4, 0.05, 0.12], M["emissive_aqua"] if house["team"] == 0 else M["emissive_amber"], 0.01)
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_window_hood_{side}", [x + side * 5.7, 5.62, z + facing * (depth / 2 + 0.35)], [3.2, 0.1, 0.62], M["metal_light"], 0.025)
@@ -381,6 +414,7 @@ for house_index, house in enumerate(spec["houses"]):
     facing = house["origin"]["facing"]
     prefix = "AQUA" if house["team"] == 0 else "CORAL"
     fabric = M["fabric_aqua"] if house["team"] == 0 else M["fabric_coral"]
+    accent = M["aqua"] if house["team"] == 0 else M["coral"]
 
     table_x, table_z = x - 3.0, z - facing * 2.7
     add_box(f"P32_FURN_{prefix}_dining_top", [table_x, 0.91, table_z], [2.6, 0.16, 1.25], M["timber"], 0.07)
@@ -405,6 +439,19 @@ for house_index, house in enumerate(spec["houses"]):
         add_box(f"P32_FURN_{prefix}_sofa_back_{cushion}", [sofa_x + cushion, 1.25, sofa_z + facing * 0.48], [0.88, 0.82, 0.24], fabric, 0.12)
     for side in (-1, 1):
         add_box(f"P32_FURN_{prefix}_sofa_arm_{side}", [sofa_x + side * 1.48, 0.85, sofa_z], [0.22, 0.72, 1.08], fabric, 0.1)
+
+    # Edge-aligned galley, rug and decor make this a staged model home without
+    # filling the central traversal envelope with implied cover.
+    kitchen_z = z - facing * 5.25
+    for cabinet_index, cabinet_x in enumerate((x - 5.25, x - 3.9, x - 2.55, x - 1.2)):
+        add_box(f"P32_FURN_{prefix}_kitchen_base_{cabinet_index}", [cabinet_x, 0.52, kitchen_z], [1.2, 0.95, 0.62], M["trim"], 0.045)
+        add_box(f"P32_FURN_{prefix}_kitchen_upper_{cabinet_index}", [cabinet_x, 1.85, kitchen_z - facing * 0.05], [1.2, 0.85, 0.5], M["boundary"], 0.035)
+    add_box(f"P32_FURN_{prefix}_kitchen_counter", [x - 3.23, 1.04, kitchen_z + facing * 0.04], [5.5, 0.13, 0.72], M["timber"], 0.035)
+    add_box(f"P32_FURN_{prefix}_kitchen_fridge", [x - 6.45, 1.12, kitchen_z], [1.05, 2.15, 0.72], M["metal_light"], 0.06)
+    add_box(f"P32_FURN_{prefix}_living_rug", [sofa_x - 0.3, 0.095, sofa_z - facing * 1.5], [4.0, 0.035, 2.2], fabric, 0.025)
+    add_box(f"P32_FURN_{prefix}_coffee_table", [sofa_x - 0.3, 0.42, sofa_z - facing * 1.5], [1.8, 0.22, 0.82], M["timber"], 0.08)
+    for art_index, art_x in enumerate((x + 1.8, x + 3.2)):
+        add_box(f"P32_FURN_{prefix}_wall_art_{art_index}", [art_x, 1.85, z + facing * 5.28], [1.05, 0.78, 0.06], accent, 0.025)
 
     console_x, console_z = x + 3.7, z - facing * 3.1
     add_box(f"P32_FURN_{prefix}_media_cabinet", [console_x, 0.58, console_z], [2.45, 0.9, 0.62], M["timber"], 0.08)
@@ -505,12 +552,12 @@ for z in (-19.5, -15.5, -11.5):
     panel = add_box(f"BLD_SOLAR_panel_{z}", [26, 4.35, z], [8.4, 0.16, 3.2], M["aqua"], 0.04, rotation=(0.12, 0, 0))
     add_box(f"BLD_SOLAR_spine_{z}", [26, 4.0, z], [0.22, 0.65, 3.4], M["metal_light"], 0.03)
 
-# Atomic beacon landmark with original geometry.
-add_box("BLD_BEACON_plinth", [27, 0.38, -1.5], [5.8, 0.76, 5.8], M["concrete"], 0.14)
-add_cylinder("BLD_BEACON_mast", [27, 3.6, -1.5], 0.28, 6.4, M["metal"], 16)
-for angle, major_radius in ((0, 1.45), (math.pi / 3, 1.65), (-math.pi / 3, 1.85)):
-    add_torus(f"BLD_BEACON_ring_{angle}", [27, 3.5, -1.5], major_radius, 0.1, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
-add_uv_sphere("BLD_BEACON_core", [27, 3.5, -1.5], [0.48, 0.48, 0.48], M["emissive_amber"])
+# Compact original Atomic Acres campus beacon, subordinate to the model homes.
+add_box("BLD_BEACON_plinth", [27, 0.24, -1.5], [4.4, 0.48, 4.4], M["boundary"], 0.14)
+add_cylinder("BLD_BEACON_mast", [27, 2.45, -1.5], 0.2, 4.4, M["metal"], 16)
+for angle, major_radius in ((0, 1.0), (math.pi / 2, 1.22)):
+    add_torus(f"BLD_BEACON_ring_{angle}", [27, 2.55, -1.5], major_radius, 0.07, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
+add_uv_sphere("BLD_BEACON_core", [27, 2.55, -1.5], [0.33, 0.33, 0.33], M["emissive_amber"])
 
 # Pass 27 World Identity: presentation-only route signatures, atmospheric
 # grounding and civil-defence/agritech storytelling. Everything is overhead,
@@ -591,12 +638,18 @@ for index, (x, z, height) in enumerate(((-50, -24, 16), (52, 34, 20), (-49, 42, 
         )
         arm["atomic_skyline_only"] = True
 
-# Boundary walls receive armored posts, preserving the authoritative playable bounds silhouette.
-for boundary in spec["boundaries"]: add_box(f"BLD_BOUNDARY_{boundary['id']}", boundary["position"], boundary["size"], M["concrete_dark"], 0.08)
+# Warm campus walls and low posts contain the exhibit without reading as a fortress.
+for boundary in spec["boundaries"]: add_box(f"BLD_BOUNDARY_{boundary['id']}", boundary["position"], boundary["size"], M["boundary"], 0.08)
 for x in (-33.9, 33.9):
-    for z in range(-39, 40, 6): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 2.1, z], [0.75, 4.2, 0.75], M["metal"], 0.08)
+    for z in range(-39, 40, 8): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
 for z in (-42.9, 42.9):
-    for x in range(-30, 31, 6): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 2.1, z], [0.75, 4.2, 0.75], M["metal"], 0.08)
+    for x in range(-30, 31, 8): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
+for ridge_index, (x, z, sx, sy, sz) in enumerate((
+    (-45, -34, 20, 5.5, 13), (46, -26, 17, 4.6, 15),
+    (-42, 34, 16, 4.2, 12), (44, 39, 21, 5.2, 11),
+)):
+    ridge = add_uv_sphere(f"P33_SKYLINE_earth_bank_{ridge_index}", [x, -0.8, z], [sx, sy, sz], M["earth"], 16, 8)
+    ridge["atomic_skyline_only"] = True
 
 # Lamps, trees, utility boxes and compact tactical signage.
 for index, (x, z) in enumerate(((-13, -16), (13, 16), (-13, 22), (13, -22), (-29, 4), (29, -4))):
@@ -638,13 +691,11 @@ for material in list(M.values()):
     objects[0].name = f"BLD_BATCH_{material.name}"
     objects[0]["atomic_environment"] = True
     if material in (M["grass"], M["asphalt"]):
-        objects[0]["atomic_ground_layout"] = "split-road-verges-v2"
+        objects[0]["atomic_ground_layout"] = "manicured-verges-v3"
 
 for obj in env.objects:
     if obj.type == "MESH":
         obj.select_set(False)
-        for polygon in obj.data.polygons:
-            polygon.use_smooth = False
 
 # Preview camera and original lighting are saved in the editable source but excluded from GLB.
 scene = bpy.context.scene
@@ -680,6 +731,64 @@ def point_camera(camera_obj, target_game):
 point_camera(camera, (0, 2.5, 0))
 camera.data.lens = 47
 
+
+def canonicalize_glb_vertex_data(path: Path) -> None:
+    """Remove sub-pixel Blender 5.x parallel-evaluation drift from GLB attributes."""
+    data = bytearray(path.read_bytes())
+    json_length = struct.unpack_from("<I", data, 12)[0]
+    gltf = json.loads(bytes(data[20:20 + json_length]).decode("utf-8").rstrip())
+    binary_start = 20 + json_length + 8
+    accessor_semantics: dict[int, str] = {}
+    index_accessors: set[int] = set()
+    for mesh in gltf.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            if "indices" in primitive:
+                index_accessors.add(primitive["indices"])
+            for semantic, accessor_index in primitive.get("attributes", {}).items():
+                accessor_semantics.setdefault(accessor_index, semantic)
+    component_counts = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
+    quantums = {"NORMAL": 1e-3, "TANGENT": 1e-3, "TEXCOORD_0": 1e-4, "TEXCOORD_1": 1e-4}
+    for accessor_index, semantic in accessor_semantics.items():
+        quantum = quantums.get(semantic)
+        accessor = gltf["accessors"][accessor_index]
+        if quantum is None or accessor.get("componentType") != 5126 or "bufferView" not in accessor:
+            continue
+        view = gltf["bufferViews"][accessor["bufferView"]]
+        components = component_counts[accessor["type"]]
+        stride = view.get("byteStride", components * 4)
+        start = binary_start + view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+        for item_index in range(accessor["count"]):
+            for component_index in range(components):
+                offset = start + item_index * stride + component_index * 4
+                value = struct.unpack_from("<f", data, offset)[0]
+                canonical = round(value / quantum) * quantum
+                if abs(canonical) < quantum / 2:
+                    canonical = 0.0
+                struct.pack_into("<f", data, offset, canonical)
+    # Blender 5.x can emit equivalent triangles in a different order between
+    # factory-startup runs. Rotate each triangle without changing its winding,
+    # then sort the triangle records so the checked GLB remains byte-stable.
+    index_formats = {5121: ("B", 1), 5123: ("H", 2), 5125: ("I", 4)}
+    for accessor_index in index_accessors:
+        accessor = gltf["accessors"][accessor_index]
+        if accessor.get("type") != "SCALAR" or accessor["count"] % 3 != 0:
+            continue
+        component_format, component_size = index_formats[accessor["componentType"]]
+        view = gltf["bufferViews"][accessor["bufferView"]]
+        stride = view.get("byteStride", component_size)
+        start = binary_start + view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+        values = [struct.unpack_from(f"<{component_format}", data, start + index * stride)[0]
+                  for index in range(accessor["count"])]
+        triangles = []
+        for index in range(0, len(values), 3):
+            triangle = values[index:index + 3]
+            minimum = triangle.index(min(triangle))
+            triangles.append(tuple(triangle[minimum:] + triangle[:minimum]))
+        flattened = [value for triangle in sorted(triangles) for value in triangle]
+        for index, value in enumerate(flattened):
+            struct.pack_into(f"<{component_format}", data, start + index * stride, value)
+    path.write_bytes(data)
+
 # Deterministic authoring runs replace this source file intentionally; do not emit
 # Blender's rotating .blend1 backup into the source tree on every regeneration.
 bpy.context.preferences.filepaths.save_version = 0
@@ -694,6 +803,7 @@ bpy.ops.export_scene.gltf(
     filepath=str(GLB_PATH), export_format="GLB", use_selection=True, export_extras=True,
     export_apply=True, export_yup=True, export_materials="EXPORT", export_cameras=False, export_lights=False,
 )
+canonicalize_glb_vertex_data(GLB_PATH)
 
 meshes = [obj for obj in env.objects if obj.type == "MESH"]
 triangles = sum(len(obj.data.loop_triangles) if obj.data.loop_triangles else (obj.data.calc_loop_triangles() or len(obj.data.loop_triangles)) for obj in meshes)

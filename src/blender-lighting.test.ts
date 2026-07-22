@@ -66,4 +66,22 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
     expect(first.fillPosition).not.toBe(second.fillPosition);
     expect(first).toEqual(second);
   });
+
+  it('scopes the clear retro-future daylight palette to Atomic Acres', () => {
+    const atomic = arenaLightingProfile('blender', 'atomic-acres');
+    const otherMap = arenaLightingProfile('blender', 'rustworks-1v1');
+    expect(atomic).toMatchObject({
+      exposure: 1.06,
+      fogColor: 0xaebdbd,
+      fogNear: 58,
+      fogFar: 148,
+      skyTop: 0x4d83a5,
+      skyHorizon: 0xdda77d,
+      sunPosition: [-48, 42, 30],
+      routeLightIntensity: 3,
+      interiorLightIntensity: 10,
+      godRayStrength: 0.05,
+    });
+    expect(otherMap).toEqual(arenaLightingProfile('blender'));
+  });
 });

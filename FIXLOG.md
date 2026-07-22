@@ -1,5 +1,7 @@
 # Cul-de-Sac 2025 Fix Log
 
+> **Historical archive:** this file records early rescue/swarm activity from 6–8 July 2026, including failed intermediate cycles. It is not the current backlog, release ledger, or proof of production state. Use `src/changelog.ts`, `docs/INDEX.md`, current Git/GitHub checks, and the centralized release receipt for current truth.
+
 ## Manual rescue fix — 2026-07-06T10:30 BST
 
 - Build after change: `pass`

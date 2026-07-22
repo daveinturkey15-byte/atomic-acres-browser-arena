@@ -68,7 +68,7 @@ describe('third-party asset provenance', () => {
 
   it('records exact checksums for the Quality Graphics GLB, editable source, and authoritative arena spec', () => {
     const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
-    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-blender-render-arena-2026-07-17');
+    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-aesthetic-overhaul-2026-07-22');
     expect(asset).toBeTruthy();
     expect(asset?.files).toBe('public/assets/original/models/atomic-acres-blender-arena.glb');
     expect(sha256(asset?.files as string)).toBe(asset?.sha256);

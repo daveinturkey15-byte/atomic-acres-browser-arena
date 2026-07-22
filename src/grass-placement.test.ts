@@ -7,7 +7,7 @@ import {
   isGrassGround,
 } from './grass-placement';
 
-describe('Pass 29 deterministic grass placement', () => {
+describe('Atomic Acres deterministic manicured-verge placement', () => {
   it('admits only the split green verges and rejects road, bounds, structures and expanded colliders', () => {
     expect(isGrassGround(-20, 0)).toBe(true);
     expect(isGrassGround(20, 0)).toBe(true);
@@ -22,8 +22,8 @@ describe('Pass 29 deterministic grass placement', () => {
     const first = createGrassPlacements([]);
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
-    expect(first.placements).toHaveLength(2_400);
-    expect(first.checksum).toBe('1be430a1');
+    expect(first.placements).toHaveLength(720);
+    expect(first.checksum).toBe('27c37a93');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);

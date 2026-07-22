@@ -619,7 +619,11 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
 );
 const activeRenderConfig = renderProfileConfig(renderProfile);
-const activeLighting = arenaLightingProfile(renderProfile);
+const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
+let activeLighting = arenaLightingProfile(
+  renderProfile,
+  arenaSelection(new URLSearchParams(window.location.search).get('map')).id,
+);
 const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
 const staticMaterialMode = activeRenderConfig.staticMaterialMode;
@@ -840,7 +844,7 @@ let fillLight: THREE.DirectionalLight;
 buildSky();
 const worldIdentityPresentation = createWorldIdentityPresentation(
   scene,
-  activeLighting,
+  atomicLighting,
   softwareRenderer,
 );
 const atomicArena = buildArena(scene);
@@ -960,7 +964,7 @@ const grassSystem = new GrassSystem(
   // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
   // must never seed its permanent placements from their collision geometry.
   atomicArena.colliders,
-  activeLighting,
+  atomicLighting,
 );
 grassSystem.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
 renderer.domElement.addEventListener('webglcontextrestored', () => {
@@ -6634,6 +6638,7 @@ function setArenaPresentationVisibility(): void {
 }
 
 function applyArenaLightingForSelection(): void {
+  activeLighting = arenaLightingProfile(renderProfile, selectedArena.id);
   const lighting = rustworksLightingTint(activeLighting, renderProfile, selectedArena.id);
   renderer.toneMappingExposure = lighting.exposure;
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(lighting.fogColor);
@@ -6682,8 +6687,11 @@ function setArenaMenuCamera(): void {
     camera.position.set(18, 20, -28);
     camera.lookAt(centreX + 14, 5.8, centreZ);
   } else if (selectedArena.id === 'skyline-terminal') {
-    camera.position.set(18, 16, -20);
-    camera.lookAt(0, 3.2, 2.0);
+    // Compose the facade, jetbridge and aircraft from the open apron. The old
+    // high concourse camera could sit behind dark roof/soffit geometry and
+    // leave the deploy-menu preview black even after selection completed.
+    camera.position.set(29, 10.5, 27);
+    camera.lookAt(1.5, 3.35, -6);
   } else {
     camera.position.set(centreX, 31, centreZ - 22);
     camera.lookAt(centreX, 0.8, centreZ);
@@ -7199,6 +7207,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
       raycastMeshes: arena.raycastMeshes.length,
       targets: arena.targets.length,
+      skylineAssetAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineAssetAudit : null,
+      skylineCabinClearance: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineCabinClearance : null,
     },
     ballistics: {
       activeSurfaces: activeBallisticSurfaces().length,

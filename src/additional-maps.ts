@@ -95,6 +95,34 @@ function box(
   return mesh;
 }
 
+/** Presentation-only beam between two authored points. */
+function presentationBeam(
+  builder: Builder,
+  name: string,
+  start: [number, number, number],
+  end: [number, number, number],
+  width: number,
+  material: THREE.Material,
+  detail: 'performance' | 'quality' = 'performance',
+): THREE.Mesh {
+  const a = new THREE.Vector3(...start);
+  const b = new THREE.Vector3(...end);
+  const delta = b.clone().sub(a);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, width, delta.length()), material);
+  mesh.name = name;
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.copy(delta.clone().normalize().lengthSq() > 0
+    ? new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), delta.clone().normalize())
+    : new THREE.Quaternion());
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.impactSurface = 'metal';
+  mesh.userData.rustworksDetail = detail;
+  mesh.userData.presentationBatchCandidate = true;
+  builder.root.add(mesh);
+  return mesh;
+}
+
 type SingleMaterialMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
 
 type PresentationBatchTelemetry = Readonly<{
@@ -210,6 +238,10 @@ export const RUSTWORKS_TOWER = Object.freeze({
   landingOverlap: 0.06,
   maxLandingOverlap: 0.08,
   maxTransitionLip: 0.1,
+  undercroftPassageWidth: 3.1,
+  undercroftClearHeight: 2.75,
+  openContainerClearWidth: 2.32,
+  openContainerClearHeight: 2.46,
 });
 
 export function rustworksDeckTopY(centerY: number, thickness: number = RUSTWORKS_TOWER.deckThickness): number {
@@ -314,14 +346,45 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const upperTop = rustworksDeckTopY(upperDeckCenterY, deckThickness);
   const lowerHalf = lowerDeckSize / 2;
 
-  // Four-leg processing tower with denser structural silhouette.
+  // Four load-bearing legs remain authoritative. Armoured corner modules wrap
+  // their bases and turn the lower deck into two intersecting maintenance
+  // tunnels instead of a visually noisy open brace cage.
   for (const x of [-3.2, 3.2]) for (const z of [-3.2, 3.2]) {
     box(builder, 'rustworks-tower-leg', [x, 5.4, z], [0.58, 10.8, 0.58], steelBright);
     box(builder, 'rustworks-tower-leg-base', [x, 0.28, z], [0.95, 0.56, 0.95], concrete);
   }
-  // X-bracing stays outside the walkable deck cores so rotations stay open.
+  const undercroftModuleSize = 2.2;
+  const undercroftModuleOffset = (RUSTWORKS_TOWER.undercroftPassageWidth + undercroftModuleSize) / 2;
+  for (const x of [-undercroftModuleOffset, undercroftModuleOffset]) {
+    for (const z of [-undercroftModuleOffset, undercroftModuleOffset]) {
+      const module = box(
+        builder,
+        'rustworks-undercroft-module',
+        [x, RUSTWORKS_TOWER.undercroftClearHeight / 2, z],
+        [undercroftModuleSize, RUSTWORKS_TOWER.undercroftClearHeight, undercroftModuleSize],
+        rustDark,
+        { ballisticMaterial: 'structural-metal' },
+      );
+      module.userData.rustworksRouteRole = 'undercroft-corner-cover';
+      box(builder, 'rustworks-undercroft-module-cap', [x, RUSTWORKS_TOWER.undercroftClearHeight - 0.08, z], [2.45, 0.16, 2.45], hazardDark, {
+        solid: false,
+        shots: false,
+        detail: 'performance',
+      });
+    }
+  }
+  box(builder, 'rustworks-undercroft-floor-east-west', [0, 0.045, 0], [8.1, 0.05, 2.7], grate, { solid: false, cast: false, shots: false });
+  box(builder, 'rustworks-undercroft-floor-north-south', [0, 0.05, 0], [2.7, 0.05, 8.1], grate, { solid: false, cast: false, shots: false });
+  for (const [x, z, sx, sz] of [
+    [0, -4.0, 3.25, 0.12], [0, 4.0, 3.25, 0.12], [-4.0, 0, 0.12, 3.25], [4.0, 0, 0.12, 3.25],
+  ] as const) {
+    box(builder, 'rustworks-undercroft-portal-header', [x, 2.72, z], [sx, 0.18, sz], hazard, { solid: false, shots: false, detail: 'performance' });
+  }
+
+  // Sparse upper-bay X-bracing preserves the oil-rig read without blocking the
+  // undercroft portals or recreating the former cage silhouette.
   for (const z of [-3.35, 3.35]) {
-    for (const [y0, y1] of [[0.55, 3.1], [3.7, 7.85], [8.45, 11.1]] as const) {
+    for (const [y0, y1] of [[3.7, 7.85], [8.45, 11.1]] as const) {
       const midY = (y0 + y1) / 2;
       const rise = y1 - y0;
       const run = 6.4;
@@ -340,7 +403,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     }
   }
   for (const x of [-3.35, 3.35]) {
-    for (const [y0, y1] of [[0.55, 3.1], [3.7, 7.85], [8.45, 11.1]] as const) {
+    for (const [y0, y1] of [[3.7, 7.85], [8.45, 11.1]] as const) {
       const midY = (y0 + y1) / 2;
       const rise = y1 - y0;
       const run = 6.4;
@@ -531,50 +594,170 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-upper-deck-rail-post', [x, upperTop + 0.62, z], [0.12, 1.2, 0.12], hazard, { solid: false, detail: 'performance' });
   }
 
-  // Clean crown only. The old crane/cable/hook and decorative process runs
-  // produced disconnected silhouettes above the tower and are deliberately gone.
-  for (const x of [-2.7, 2.7]) for (const z of [-2.7, 2.7]) {
-    box(builder, 'rustworks-canopy-post', [x, 11.4, z], [0.18, 2.4, 0.18], steel, { solid: false, detail: 'quality' });
+  // A tapered derrick crown replaces the former flat canopy slab. Every member
+  // terminates at a supported ring, keeping the silhouette tall but coherent.
+  const derrickBaseY = upperTop + 0.15;
+  const derrickRingY = 11.35;
+  const derrickTopY = 14.35;
+  for (const x of [-2.75, 2.75]) for (const z of [-2.75, 2.75]) {
+    presentationBeam(
+      builder,
+      'rustworks-derrick-leg',
+      [x, derrickBaseY, z],
+      [Math.sign(x) * 0.78, derrickTopY, Math.sign(z) * 0.78],
+      0.22,
+      x === z ? rust : steelBright,
+      'performance',
+    );
   }
-  box(builder, 'rustworks-canopy-roof', [0, 12.65, 0], [6.9, 0.24, 6.9], rust, { solid: false, detail: 'quality' });
+  for (const y of [derrickRingY, derrickTopY] as const) {
+    const half = y === derrickRingY ? 1.9 : 0.84;
+    box(builder, 'rustworks-derrick-ring', [0, y, -half], [half * 2, 0.16, 0.16], steelBright, { solid: false, shots: false, detail: 'performance' });
+    box(builder, 'rustworks-derrick-ring', [0, y, half], [half * 2, 0.16, 0.16], steelBright, { solid: false, shots: false, detail: 'performance' });
+    box(builder, 'rustworks-derrick-ring', [-half, y, 0], [0.16, 0.16, half * 2], steelBright, { solid: false, shots: false, detail: 'performance' });
+    box(builder, 'rustworks-derrick-ring', [half, y, 0], [0.16, 0.16, half * 2], steelBright, { solid: false, shots: false, detail: 'performance' });
+  }
+  box(builder, 'rustworks-derrick-service-platform', [0, derrickRingY - 0.12, 0], [4.3, 0.18, 4.3], grate, { solid: false, shots: false, detail: 'quality' });
+  box(builder, 'rustworks-derrick-beacon-mast', [0, 15.05, 0], [0.16, 1.4, 0.16], hazard, { solid: false, shots: false, detail: 'quality' });
+  box(builder, 'rustworks-derrick-beacon', [0, 15.78, 0], [0.42, 0.18, 0.42], hazard, { solid: false, shots: false, detail: 'quality' });
 
-  // One disciplined perimeter ring: six equally counted, mirrored containers
-  // on every side. The wider centre gap preserves all four primary lanes and
-  // keeps team spawns clear, while the repeated finish order reads as an
-  // intentional layout instead of scattered prop dressing.
-  const perimeterSlots = [-19, -12, -5, 5, 12, 19] as const;
+  // West-side maintenance trench: a deck-level, grated service lane with low
+  // blast walls and repeated lateral exits. The continuous physics floor means
+  // the lane reads as recessed without introducing a cross-map floor-hole rule.
+  const trenchX = -13.8;
+  const trenchWallXs = [trenchX - 1.85, trenchX + 1.85] as const;
+  const trenchSegments = [-12, 0, 12] as const;
+  box(builder, 'rustworks-service-trench-floor', [trenchX, 0.045, 0], [3.4, 0.05, 34], grate, { solid: false, cast: false, shots: false });
+  for (const x of trenchWallXs) {
+    for (const z of trenchSegments) {
+      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark);
+      wall.userData.rustworksRouteRole = 'west-service-trench-cover';
+      box(builder, 'rustworks-service-trench-coping', [x, 1.34, z], [0.46, 0.08, 7.05], hazard, {
+        solid: false,
+        shots: false,
+        detail: 'performance',
+      });
+    }
+  }
+  for (const z of [-6, 6] as const) {
+    box(builder, 'rustworks-service-trench-crossover', [trenchX, 2.55, z], [4.35, 0.16, 1.2], steelBright, {
+      solid: false,
+      shots: false,
+      detail: 'quality',
+    });
+  }
+
+  // Four containers per side (16 total). Nine-metre centres leave 3.2 m clear
+  // between adjacent 5.8 m shells. One placement per side is open end-to-end.
+  const perimeterSlots = [-18, -9, 9, 18] as const;
+  const perimeterRow = 21.5;
   const containerRows = [
-    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -23 })),
-    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: 23 })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -23, z })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: 23, z })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -perimeterRow, open: slot === 1 })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: perimeterRow, open: slot === 2 })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -perimeterRow, z, open: slot === 1 })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: perimeterRow, z, open: slot === 2 })),
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
+  const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
   for (const [index, placement] of containerRows.entries()) {
     const alongX = placement.side === 'north' || placement.side === 'south';
     const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
-    const container = box(
-      builder,
-      'rustworks-shipping-container',
-      [placement.x, 1.3, placement.z],
-      containerSize,
-      containerPalette[placement.slot % containerPalette.length],
-    );
-    container.userData.rustworksContainerSide = placement.side;
+    const marker = new THREE.Group();
+    marker.name = 'rustworks-container-placement';
+    marker.position.set(placement.x, 0, placement.z);
+    marker.userData.rustworksContainerSide = placement.side;
+    marker.userData.rustworksContainerSlot = placement.slot;
+    marker.userData.rustworksContainerType = placement.open ? 'open' : 'closed';
+    root.add(marker);
 
-    // Presentation-only corrugation adds readable scale without extra collision clutter.
-    for (const offset of [-2.15, -1.1, 0, 1.1, 2.15]) {
-      const ribPosition: [number, number, number] = alongX
-        ? [placement.x + offset, 1.3, placement.z + (placement.side === 'north' ? -1.27 : 1.27)]
-        : [placement.x + (placement.side === 'west' ? -1.27 : 1.27), 1.3, placement.z + offset];
-      box(builder, `rustworks-container-rib-${index}`, ribPosition, alongX ? [0.08, 2.25, 0.05] : [0.05, 2.25, 0.08], steelBright, {
+    if (placement.open) {
+      const thickness = 0.14;
+      const material = containerPalette[placement.slot % containerPalette.length];
+      const shellParts = alongX
+        ? [
+          { suffix: 'wall-a', position: [placement.x, 1.3, placement.z - (containerSize[2] - thickness) / 2], size: [containerSize[0], containerSize[1], thickness] },
+          { suffix: 'wall-b', position: [placement.x, 1.3, placement.z + (containerSize[2] - thickness) / 2], size: [containerSize[0], containerSize[1], thickness] },
+          { suffix: 'roof', position: [placement.x, containerSize[1] - thickness / 2, placement.z], size: [containerSize[0], thickness, containerSize[2]] },
+        ]
+        : [
+          { suffix: 'wall-a', position: [placement.x - (containerSize[0] - thickness) / 2, 1.3, placement.z], size: [thickness, containerSize[1], containerSize[2]] },
+          { suffix: 'wall-b', position: [placement.x + (containerSize[0] - thickness) / 2, 1.3, placement.z], size: [thickness, containerSize[1], containerSize[2]] },
+          { suffix: 'roof', position: [placement.x, containerSize[1] - thickness / 2, placement.z], size: [containerSize[0], thickness, containerSize[2]] },
+        ];
+      for (const part of shellParts) {
+        const shell = box(
+          builder,
+          `rustworks-open-container-${part.suffix}`,
+          part.position as [number, number, number],
+          part.size as [number, number, number],
+          material,
+        );
+        shell.userData.rustworksContainerSide = placement.side;
+        shell.userData.rustworksContainerSlot = placement.slot;
+      }
+      box(builder, `rustworks-open-container-floor-${index}`, [placement.x, 0.045, placement.z], [containerSize[0], 0.05, containerSize[2]], grate, {
         solid: false,
         shots: false,
         cast: false,
         detail: 'performance',
       });
+      const halfLength = (alongX ? containerSize[0] : containerSize[2]) / 2;
+      openContainerRoutes.push({
+        id: `open-container-${placement.side}`,
+        side: placement.side,
+        axis: alongX ? 'x' : 'z',
+        anchors: alongX
+          ? [[placement.x - halfLength - 0.8, 1.7, placement.z], [placement.x, 1.7, placement.z], [placement.x + halfLength + 0.8, 1.7, placement.z]]
+          : [[placement.x, 1.7, placement.z - halfLength - 0.8], [placement.x, 1.7, placement.z], [placement.x, 1.7, placement.z + halfLength + 0.8]],
+      });
+    } else {
+      const container = box(
+        builder,
+        'rustworks-shipping-container',
+        [placement.x, 1.3, placement.z],
+        containerSize,
+        containerPalette[placement.slot % containerPalette.length],
+      );
+      container.userData.rustworksContainerSide = placement.side;
+      container.userData.rustworksContainerSlot = placement.slot;
+
+      // Three strong ribs read more cleanly than five thin stripes at combat distance.
+      for (const offset of [-1.45, 0, 1.45]) {
+        const ribPosition: [number, number, number] = alongX
+          ? [placement.x + offset, 1.3, placement.z + (placement.side === 'north' ? -1.27 : 1.27)]
+          : [placement.x + (placement.side === 'west' ? -1.27 : 1.27), 1.3, placement.z + offset];
+        box(builder, `rustworks-container-rib-${index}`, ribPosition, alongX ? [0.08, 2.2, 0.05] : [0.05, 2.2, 0.08], steelBright, {
+          solid: false,
+          shots: false,
+          cast: false,
+          detail: 'performance',
+        });
+      }
     }
   }
+
+  root.userData.rustworksContainerLayout = {
+    total: containerRows.length,
+    closed: containerRows.filter((placement) => !placement.open).length,
+    open: containerRows.filter((placement) => placement.open).length,
+    perSide: 4,
+    slots: [...perimeterSlots],
+    row: perimeterRow,
+    minimumEndGap: 9 - 5.8,
+  };
+  root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
+  root.userData.rustworksUndercroft = {
+    passageWidth: RUSTWORKS_TOWER.undercroftPassageWidth,
+    clearHeight: RUSTWORKS_TOWER.undercroftClearHeight,
+    portals: ['north', 'south', 'west', 'east'],
+  };
+  root.userData.rustworksTrench = {
+    side: 'west',
+    x: trenchX,
+    width: 3.4,
+    segmentCentres: [...trenchSegments],
+    lateralExitGaps: 4,
+  };
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });
   labelBoard.userData.label = 'RUSTWORKS';
@@ -595,6 +778,21 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       { id: 'ship-ladder-foot', position: [shipX, lowerTop + 1.7, shipLowerLandingCenterZ] },
       { id: 'ship-ladder-top', position: [shipX, upperTop + 1.7, upperOutboardCenterZ] },
       { id: 'upper-deck-center', position: [0.4, upperTop + 1.7, 0.2] },
+    ],
+    'undercroft-east-west': [
+      { id: 'undercroft-west-portal', position: [-5.2, 1.7, 0] },
+      { id: 'undercroft-centre-ew', position: [0, 1.7, 0] },
+      { id: 'undercroft-east-portal', position: [5.2, 1.7, 0] },
+    ],
+    'undercroft-north-south': [
+      { id: 'undercroft-north-portal', position: [0, 1.7, -5.2] },
+      { id: 'undercroft-centre-ns', position: [0, 1.7, 0] },
+      { id: 'undercroft-south-portal', position: [0, 1.7, 5.2] },
+    ],
+    'west-service-trench': [
+      { id: 'trench-north', position: [trenchX, 1.7, -17] },
+      { id: 'trench-centre', position: [trenchX, 1.7, 0] },
+      { id: 'trench-south', position: [trenchX, 1.7, 17] },
     ],
   };
   root.userData.rustworksAccess = {
@@ -692,6 +890,18 @@ export function applyAdditionalMapPresentationProfile(
     node.visible = visible;
     if (visible) shown += 1;
     else hidden += 1;
+  });
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || node.userData.skylineQualityPlaceholder !== true) return;
+    const replaced = allowQuality;
+    node.castShadow = !replaced;
+    node.receiveShadow = !replaced;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      material.colorWrite = !replaced;
+      material.depthWrite = !replaced;
+      material.needsUpdate = true;
+    }
   });
   return { hidden, shown };
 }
@@ -992,6 +1202,146 @@ function terminalWayfindingMaterial(title: string, subtitle: string, accent: str
   return new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
 }
 
+type TerminalSurfacePattern = 'terrazzo' | 'panel' | 'rubber' | 'fabric' | 'aircraft' | 'cargo' | 'asphalt';
+
+function terminalSurfaceTexture(
+  pattern: TerminalSurfacePattern,
+  base: string,
+  accent: string,
+  repeat: [number, number],
+): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.fillStyle = base;
+  context.fillRect(0, 0, 256, 256);
+  context.strokeStyle = accent;
+  context.fillStyle = accent;
+
+  if (pattern === 'terrazzo' || pattern === 'asphalt') {
+    const count = pattern === 'terrazzo' ? 170 : 260;
+    for (let index = 0; index < count; index += 1) {
+      const x = (index * 73 + 19) % 256;
+      const y = (index * 151 + 47) % 256;
+      const radius = pattern === 'terrazzo' ? 1 + (index % 3) : 0.6 + (index % 2);
+      context.globalAlpha = pattern === 'terrazzo' ? 0.34 : 0.2;
+      context.fillRect(x, y, radius, radius);
+    }
+    context.globalAlpha = 1;
+  } else if (pattern === 'panel') {
+    context.globalAlpha = 0.34;
+    context.lineWidth = 2;
+    for (let x = 0; x <= 256; x += 64) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, 256);
+      context.stroke();
+    }
+    for (let y = 0; y <= 256; y += 128) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(256, y);
+      context.stroke();
+    }
+    context.globalAlpha = 1;
+  } else if (pattern === 'rubber' || pattern === 'fabric') {
+    context.globalAlpha = pattern === 'fabric' ? 0.24 : 0.3;
+    context.lineWidth = 1;
+    for (let offset = -256; offset < 512; offset += pattern === 'fabric' ? 12 : 20) {
+      context.beginPath();
+      context.moveTo(offset, 0);
+      context.lineTo(offset + 256, 256);
+      context.stroke();
+      if (pattern === 'fabric') {
+        context.beginPath();
+        context.moveTo(offset + 256, 0);
+        context.lineTo(offset, 256);
+        context.stroke();
+      }
+    }
+    context.globalAlpha = 1;
+  } else if (pattern === 'aircraft') {
+    context.globalAlpha = 0.32;
+    context.lineWidth = 2;
+    for (let x = 0; x <= 256; x += 64) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, 256);
+      context.stroke();
+    }
+    for (let y = 32; y < 256; y += 64) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(256, y);
+      context.stroke();
+      for (let x = 12; x < 256; x += 32) context.fillRect(x, y - 1, 2, 2);
+    }
+    context.globalAlpha = 1;
+  } else if (pattern === 'cargo') {
+    context.globalAlpha = 0.32;
+    context.lineWidth = 5;
+    for (let x = 10; x < 256; x += 24) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, 256);
+      context.stroke();
+    }
+    context.globalAlpha = 1;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(...repeat);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function terminalSurfaceMaterial(
+  pattern: TerminalSurfacePattern,
+  color: number,
+  accent: string,
+  roughness: number,
+  metalness: number,
+  repeat: [number, number],
+): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({ color, roughness, metalness });
+  material.userData.assetOwner = 'skyline-terminal';
+  material.userData.assetKind = 'runtime-generated-surface';
+  material.userData.surfacePattern = pattern;
+  const base = `#${color.toString(16).padStart(6, '0')}`;
+  const texture = terminalSurfaceTexture(pattern, base, accent, repeat);
+  if (texture) material.map = texture;
+  return material;
+}
+
+function prismGeometryXZ(points: Array<[number, number]>, thickness: number): THREE.BufferGeometry {
+  const half = thickness / 2;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const y of [-half, half]) {
+    for (const [x, z] of points) positions.push(x, y, z);
+  }
+  const count = points.length;
+  for (let index = 1; index < count - 1; index += 1) {
+    indices.push(0, index + 1, index);
+    indices.push(count, count + index, count + index + 1);
+  }
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    indices.push(index, next, count + next, index, count + next, count + index);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Skyline Terminal arena';
@@ -1000,9 +1350,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
 
-  const tarmacMat = standard(0x30383a, 0.95, 0.05);
-  const floorMat = standard(0x9ca6a2, 0.52, 0.1);
-  const wallMat = standard(0x263238, 0.86, 0.22);
+  const tarmacMat = terminalSurfaceMaterial('asphalt', 0x30383a, '#6f7777', 0.95, 0.05, [5, 5]);
+  const floorMat = terminalSurfaceMaterial('terrazzo', 0x9ca6a2, '#3f5457', 0.52, 0.1, [5, 5]);
+  const wallMat = terminalSurfaceMaterial('panel', 0x263238, '#718083', 0.82, 0.24, [6, 3]);
   const trimMat = standard(0x46575c, 0.52, 0.48);
   // Avoid transmission/refraction on the low-spec path: alpha glass is much
   // cheaper under software WebGL and still reads clearly as breakable glazing.
@@ -1014,18 +1364,25 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     opacity: 0.34,
     depthWrite: false,
   });
-  const planeHullMat = standard(0xe5e8e4, 0.32, 0.35);
-  const planeWingMat = standard(0x7a8587, 0.44, 0.6);
+  const planeHullMat = terminalSurfaceMaterial('aircraft', 0xe5e8e4, '#8a9898', 0.32, 0.35, [8, 2]);
+  const planeWingMat = terminalSurfaceMaterial('panel', 0x7a8587, '#303b3d', 0.44, 0.6, [4, 2]);
   const engineMat = standard(0x222a2e, 0.3, 0.78);
-  const jetbridgeMat = standard(0x566267, 0.58, 0.52);
+  const jetbridgeMat = terminalSurfaceMaterial('panel', 0x566267, '#1f292d', 0.58, 0.52, [5, 2]);
   const kioskMat = standard(0x574738, 0.86, 0.1);
-  const cargoMat = standard(0xb9602e, 0.72, 0.28);
+  const cargoMat = terminalSurfaceMaterial('cargo', 0xb9602e, '#542817', 0.72, 0.28, [3, 2]);
   const hazardMat = standard(0xd69a2d, 0.58, 0.28);
   const floorBorderMat = standard(0x252c30, 0.48, 0.16);
-  const floorInsetMat = standard(0x4a5555, 0.58, 0.12);
+  const floorInsetMat = new THREE.MeshStandardMaterial({
+    color: 0x62706f,
+    roughness: 0.58,
+    metalness: 0.12,
+    emissive: 0x263332,
+    emissiveIntensity: 0.14,
+  });
   const wallLowerMat = standard(0x455157, 0.8, 0.18);
   const structureMat = standard(0x222b30, 0.5, 0.68);
-  const rubberMat = standard(0x171c1f, 0.92, 0.04);
+  const rubberMat = terminalSurfaceMaterial('rubber', 0x171c1f, '#536063', 0.92, 0.04, [4, 4]);
+  const seatMat = terminalSurfaceMaterial('fabric', 0x48636b, '#9ab0ad', 0.86, 0.02, [4, 4]);
   const cockpitMat = standard(0x111c25, 0.18, 0.72);
   const planeStripeMat = standard(0x31464c, 0.46, 0.42);
   const stainMat = standard(0x242a28, 1.0, 0.0);
@@ -1036,6 +1393,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     emissive: 0xffa94d,
     emissiveIntensity: 0.72,
   });
+  // An unlit pale underside prevents the deep connector/mezzanine overhangs
+  // from collapsing into featureless black on the low-ratio quality path.
+  const soffitMat = new THREE.MeshBasicMaterial({ color: 0x9da49c });
 
   const skylineClusterIds = [
     'floor-language',
@@ -1045,6 +1405,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     'aircraft-skin',
     'apron-marking',
     'terminal-story',
+    'concourse-cover',
+    'boarding-route',
+    'quality-aircraft',
+    'service-equipment',
   ] as const;
   type SkylineClusterId = typeof skylineClusterIds[number];
   const detailBox = (
@@ -1065,9 +1429,51 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       cast,
     });
     mesh.userData.skylineCluster = cluster;
+    mesh.userData.assetOwner = 'skyline-terminal';
+    return mesh;
+  };
+  const detailMesh = (
+    cluster: SkylineClusterId,
+    name: string,
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    position: [number, number, number],
+    rotation: [number, number, number] = [0, 0, 0],
+    detail: 'performance' | 'quality' = 'quality',
+    cast = true,
+  ): THREE.Mesh => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = name;
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.castShadow = cast;
+    mesh.receiveShadow = true;
+    mesh.userData.presentationOnly = true;
+    mesh.userData.blocksShots = false;
+    mesh.userData.rustworksDetail = detail;
+    mesh.userData.skylineCluster = cluster;
+    mesh.userData.assetOwner = 'skyline-terminal';
+    mesh.raycast = () => undefined;
+    root.add(mesh);
+    return mesh;
+  };
+  const qualityPlaceholderBox = (
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.MeshStandardMaterial,
+  ): THREE.Mesh => {
+    const mesh = box(builder, name, position, size, material.clone());
+    mesh.userData.skylineQualityPlaceholder = true;
     return mesh;
   };
   root.userData.skylineDetailClusters = [...skylineClusterIds];
+  root.userData.skylineAssetAudit = {
+    retained: ['terminal-shell', 'mezzanine-routes', 'breakable-facade', 'jetbridge', 'airstair', 'apron-boundaries'],
+    adjusted: ['team-aqua-spawns', 'cabin-seat-clearance', 'jetbridge-lighting', 'concourse-cover'],
+    qualityReplaced: ['fuselage-roof', 'aircraft-nose', 'wing-boxes', 'engine-boxes', 'cargo-boxes', 'fuel-trailer-box'],
+    generatedOriginal: ['runtime-surface-patterns', 'curved-aircraft-shell', 'airport-uld-shells'],
+  };
 
   const tarmac = new THREE.Mesh(new THREE.PlaneGeometry(76, 76), tarmacMat);
   tarmac.name = 'skyline-tarmac-apron';
@@ -1129,6 +1535,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-mezzanine-front-center', [0, 3.2, -25.25], [36.4, 0.28, 6.5], floorMat);
   box(builder, 'skyline-mezzanine-front-west', [-23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
   box(builder, 'skyline-mezzanine-front-east', [23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
+  // A pale coffered underside keeps the deployment end readable without
+  // changing the collision-authoritative mezzanine slabs above it.
+  detailBox('wall-structure', 'skyline-mezzanine-soffit-back', [0, 3.035, -31.25], [51.4, 0.035, 4.95], soffitMat);
+  detailBox('wall-structure', 'skyline-mezzanine-soffit-center', [0, 3.035, -25.25], [35.9, 0.035, 5.95], soffitMat);
+  detailBox('wall-structure', 'skyline-mezzanine-soffit-west', [-23.8, 3.035, -25.25], [4.0, 0.035, 5.95], soffitMat);
+  detailBox('wall-structure', 'skyline-mezzanine-soffit-east', [23.8, 3.035, -25.25], [4.0, 0.035, 5.95], soffitMat);
+  for (const lightX of [-18, -10, 0, 10, 18]) {
+    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.005, -29.8], [5.4, 0.025, 0.11], practicalMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.005, -24.3], [5.4, 0.025, 0.11], practicalMat);
+  }
   detailBox('floor-language', 'skyline-mezzanine-front-edge', [0, 3.36, -22.12], [52, 0.12, 0.34], floorBorderMat);
   for (const x of [-23.5, -16, -8, 0, 8, 16, 23.5]) {
     detailBox('floor-language', `skyline-mezzanine-inlay-${x}`, [x, 3.355, -27.1], [0.035, 0.025, 12.8], floorBorderMat);
@@ -1137,9 +1553,43 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // not visually pass through a barrier.
   box(builder, 'skyline-mezzanine-rail', [-14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
   box(builder, 'skyline-mezzanine-rail', [14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
-  box(builder, 'skyline-gate-connector-floor', [0, 3.2, -17], [3.6, 0.24, 10], jetbridgeMat);
+  box(builder, 'skyline-gate-connector-floor', [0, 3.2, -17], [3.6, 0.24, 10], soffitMat);
+  detailBox('boarding-route', 'skyline-gate-connector-soffit', [0, 3.065, -17], [3.42, 0.035, 9.72], soffitMat);
+  for (const lightZ of [-20.2, -17, -13.8]) {
+    detailBox('boarding-route', `skyline-gate-connector-underlight-${lightZ}`, [0, 3.035, lightZ], [2.65, 0.025, 0.11], practicalMat);
+  }
   box(builder, 'skyline-gate-connector-rail-left', [-1.75, 4.15, -17], [0.12, 1.7, 10], trimMat, { solid: false, detail: 'performance' });
   box(builder, 'skyline-gate-connector-rail-right', [1.75, 4.15, -17], [0.12, 1.7, 10], trimMat, { solid: false, detail: 'performance' });
+
+  // Two seating islands create deliberate waist-high cover while preserving
+  // the centre runner and both exterior flank routes.
+  for (const seatX of [-10, 10]) {
+    box(builder, `skyline-concourse-seat-cover-${seatX}`, [seatX, 0.57, -16.7], [5.2, 1.14, 0.5], seatMat);
+    detailBox('concourse-cover', `skyline-concourse-seat-plinth-${seatX}`, [seatX, 0.18, -16.7], [5.5, 0.34, 1.5], structureMat);
+    for (const offsetX of [-1.9, -0.95, 0, 0.95, 1.9]) {
+      detailBox('concourse-cover', `skyline-concourse-seat-pad-${seatX}-${offsetX}`, [seatX + offsetX, 0.57, -16.28], [0.82, 0.18, 0.82], seatMat);
+      detailBox('concourse-cover', `skyline-concourse-seat-back-${seatX}-${offsetX}`, [seatX + offsetX, 0.96, -16.83], [0.82, 0.72, 0.14], seatMat);
+    }
+    detailBox('concourse-cover', `skyline-concourse-seat-endcap-left-${seatX}`, [seatX - 2.65, 0.62, -16.7], [0.12, 0.82, 1.2], trimMat);
+    detailBox('concourse-cover', `skyline-concourse-seat-endcap-right-${seatX}`, [seatX + 2.65, 0.62, -16.7], [0.12, 0.82, 1.2], trimMat);
+  }
+  for (const planterX of [-25, 25]) {
+    box(builder, `skyline-concourse-charging-planter-${planterX}`, [planterX, 0.56, -18], [3.8, 1.12, 1.55], wallLowerMat);
+    detailBox('concourse-cover', `skyline-concourse-planter-cap-${planterX}`, [planterX, 1.15, -18], [4.0, 0.12, 1.7], trimMat);
+    detailBox('concourse-cover', `skyline-concourse-planter-soil-${planterX}`, [planterX, 1.23, -18], [3.45, 0.08, 1.2], stainMat);
+    for (const leafOffset of [-1.05, 0, 1.05]) {
+      detailMesh(
+        'concourse-cover',
+        `skyline-concourse-planter-leaf-${planterX}-${leafOffset}`,
+        new THREE.ConeGeometry(0.35, 1.15, 7),
+        standard(0x40584a, 0.9, 0.02),
+        [planterX + leafOffset, 1.78, -18],
+        [0, leafOffset * 0.2, leafOffset * 0.1],
+        'quality',
+        false,
+      );
+    }
+  }
 
   const mainSign = box(builder, 'skyline-terminal-main-sign', [0, 6.2, -33.8], [14.0, 1.2, 0.2], terminalWayfindingMaterial('SKYLINE TERMINAL', 'GATES 01—12  •  CONCOURSE A', '#d69a2d'), { solid: false, shots: false, detail: 'performance' });
   mainSign.userData.label = 'SKYLINE TERMINAL - GATES 1-12';
@@ -1198,6 +1648,15 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   box(builder, 'skyline-security-belt', [0, 0.55, -20], [8.0, 1.1, 1.4], wallMat);
   detailBox('terminal-story', 'skyline-security-belt-top', [0, 1.13, -20], [8.15, 0.12, 1.52], rubberMat);
+  for (const [index, x, z] of [
+    [0, -11, -18.6], [1, -11, -21.4], [2, -8.5, -18.6], [3, -8.5, -21.4],
+    [4, 8.5, -18.6], [5, 8.5, -21.4], [6, 11, -18.6], [7, 11, -21.4],
+  ] as const) {
+    detailMesh('terminal-story', `skyline-queue-post-${index}`, new THREE.CylinderGeometry(0.07, 0.1, 1.05, 10), trimMat, [x, 0.525, z], [0, 0, 0], 'performance', false);
+  }
+  for (const [index, x, z] of [[0, -9.75, -18.6], [1, -9.75, -21.4], [2, 9.75, -18.6], [3, 9.75, -21.4]] as const) {
+    detailBox('terminal-story', `skyline-queue-belt-${index}`, [x, 0.91, z], [2.35, 0.09, 0.05], hazardMat);
+  }
 
   box(builder, 'skyline-cafe-counter', [-14, 0.55, -28], [5.5, 1.1, 2.8], kioskMat);
   box(builder, 'skyline-dutyfree-kiosk', [14, 0.55, -28], [5.5, 1.1, 2.8], kioskMat);
@@ -1241,6 +1700,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-jetbridge-wall-left', [-1.75, 4.4, -6], [0.15, 2.2, 12], wallMat);
   box(builder, 'skyline-jetbridge-wall-right', [1.75, 4.4, -6], [0.15, 2.2, 12], wallMat);
   box(builder, 'skyline-jetbridge-roof', [0, 5.5, -6], [3.6, 0.15, 12], jetbridgeMat, { solid: false, shots: false });
+  for (const sideX of [-1.66, 1.66]) {
+    detailBox('boarding-route', `skyline-jetbridge-inner-panel-${sideX}`, [sideX, 3.8, -6], [0.035, 0.7, 11.4], soffitMat);
+    detailBox('boarding-route', `skyline-jetbridge-window-band-${sideX}`, [sideX, 4.68, -6], [0.028, 0.72, 10.8], cockpitMat, 'quality');
+  }
+  for (const lightZ of [-10, -7, -4, -1.8]) {
+    detailBox('boarding-route', `skyline-jetbridge-practical-${lightZ}`, [0, 5.36, lightZ], [2.55, 0.045, 0.13], practicalMat);
+  }
   const jetbridgeRampAngle = Math.atan2(0.79, 2.2);
   box(builder, 'skyline-jetbridge-cabin-ramp', [0, 2.935, -1], [3.6, 0.24, 2.2], jetbridgeMat, {
     rotation: [jetbridgeRampAngle, 0, 0],
@@ -1257,16 +1723,58 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('floor-language', 'skyline-gate-threshold-aircraft', [0, 2.69, -0.18], [3.35, 0.04, 0.42], hazardMat);
   detailBox('terminal-story', 'skyline-jetbridge-light-spine', [0, 5.38, -6.2], [0.24, 0.06, 10.2], practicalMat);
 
-  box(builder, 'skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
+  // Boarding portal: the mechanical wall gap already exists, but these pieces
+  // make the aperture read as an open aircraft door instead of missing geometry.
+  detailBox('boarding-route', 'skyline-aircraft-door-jamb-left', [-1.67, 3.88, 0.075], [0.18, 2.55, 0.28], trimMat, 'performance', undefined, true);
+  detailBox('boarding-route', 'skyline-aircraft-door-jamb-right', [1.67, 3.88, 0.075], [0.18, 2.55, 0.28], trimMat, 'performance', undefined, true);
+  detailBox('boarding-route', 'skyline-aircraft-door-header', [0, 5.12, 0.075], [3.52, 0.18, 0.28], trimMat, 'performance', undefined, true);
+  detailBox('boarding-route', 'skyline-aircraft-door-threshold-seal', [0, 2.69, 0.08], [3.28, 0.09, 0.32], rubberMat);
+  detailBox('boarding-route', 'skyline-aircraft-open-door-leaf', [-1.34, 3.88, 0.26], [0.42, 2.25, 0.12], planeHullMat, 'performance');
+  detailBox('boarding-route', 'skyline-aircraft-door-handle', [-1.12, 3.94, 0.18], [0.08, 0.42, 0.12], hazardMat, 'quality');
+  const boardingSign = box(builder, 'skyline-aircraft-boarding-sign', [0, 5.42, -0.12], [3.35, 0.52, 0.08], terminalWayfindingMaterial('GATE 07', 'BOARDING BRIDGE', '#d69a2d'), { solid: false, shots: false, detail: 'performance' });
+  boardingSign.userData.skylineCluster = 'boarding-route';
+
+  qualityPlaceholderBox('skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
   box(builder, 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
   // Split the north fuselage wall around the jetbridge doorway. A single solid
   // wall made the authored bridge-to-cabin route stop outside the aircraft.
   box(builder, 'skyline-jetliner-side-north', [-9.65, 3.75, 0.2], [15.7, 2.4, 0.2], planeHullMat);
   box(builder, 'skyline-jetliner-side-north', [9.65, 3.75, 0.2], [15.7, 2.4, 0.2], planeHullMat);
   box(builder, 'skyline-jetliner-side-south', [0, 3.75, 3.8], [35.0, 2.4, 0.2], planeHullMat);
-  box(builder, 'skyline-jetliner-nose', [-19.0, 3.75, 2.0], [2.2, 2.4, 3.8], trimMat);
+  qualityPlaceholderBox('skyline-jetliner-nose', [-19.0, 3.75, 2.0], [2.2, 2.4, 3.8], trimMat);
   box(builder, 'skyline-jetliner-cockpit-partition', [-16.8, 3.75, 2.0], [0.15, 2.4, 3.6], wallMat, { solid: false, detail: 'quality' });
-  box(builder, 'skyline-jetliner-tail', [19.0, 6.3, 2.0], [2.2, 3.0, 0.4], trimMat, { solid: false, shots: false });
+  const fuselageShell = detailMesh(
+    'quality-aircraft',
+    'skyline-quality-fuselage-shell',
+    new THREE.CylinderGeometry(2.1, 2.1, 36, 28, 1, true, 0, Math.PI),
+    planeHullMat,
+    [0, 4.3, 2],
+    [0, 0, Math.PI / 2],
+  );
+  fuselageShell.userData.assetOwner = 'skyline-terminal';
+  const qualityNose = detailMesh(
+    'quality-aircraft',
+    'skyline-quality-aircraft-nose',
+    new THREE.SphereGeometry(1, 28, 16),
+    planeHullMat,
+    [-18.2, 4.3, 2],
+  );
+  qualityNose.scale.set(2.45, 2.1, 2.1);
+  qualityNose.userData.assetOwner = 'skyline-terminal';
+  const tailShape = new THREE.Shape();
+  tailShape.moveTo(0, 0);
+  tailShape.lineTo(3.1, 0);
+  tailShape.lineTo(2.15, 4.25);
+  tailShape.lineTo(0.55, 4.25);
+  tailShape.closePath();
+  const qualityTail = detailMesh(
+    'quality-aircraft',
+    'skyline-quality-aircraft-tail-fin',
+    new THREE.ExtrudeGeometry(tailShape, { depth: 0.32, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 2 }),
+    planeStripeMat,
+    [16.7, 4.35, 1.84],
+  );
+  qualityTail.userData.assetOwner = 'skyline-terminal';
   detailBox('aircraft-skin', 'skyline-aircraft-belly-north', [0, 3.12, 0.06], [34.2, 0.58, 0.08], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-aircraft-belly-south', [0, 3.12, 3.94], [34.2, 0.58, 0.08], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-aircraft-roof-spine', [0, 6.43, 2], [33.8, 0.12, 0.54], planeStripeMat, 'quality');
@@ -1282,15 +1790,25 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('aircraft-skin', 'skyline-tail-slate-panel', [19.02, 6.42, 2.22], [1.86, 2.55, 0.06], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-tail-amber-mark', [19.02, 6.55, 2.27], [1.35, 0.28, 0.07], hazardMat);
 
+  const cabinSeatDepth = 0.72;
+  const cabinSeatLeftZ = 0.86;
+  const cabinSeatRightZ = 3.14;
+  const cabinAisleClearance = cabinSeatRightZ - cabinSeatDepth / 2 - (cabinSeatLeftZ + cabinSeatDepth / 2);
+  root.userData.skylineCabinClearance = {
+    aisleMetres: cabinAisleClearance,
+    physicsPlayerDiameterMetres: 0.76,
+    clearanceProbeDiameterMetres: 0.88,
+    doorVisibleApertureMetres: 2.68,
+  };
   for (const seatX of [-12, -8, -4, 4, 8, 12]) {
-    box(builder, `skyline-cabin-seat-left-${seatX}`, [seatX, 3.1, 1.1], [1.1, 1.1, 1.0], wallMat);
-    box(builder, `skyline-cabin-seat-right-${seatX}`, [seatX, 3.1, 2.9], [1.1, 1.1, 1.0], wallMat);
-    box(builder, `skyline-cabin-overhead-bin-left-${seatX}`, [seatX, 4.5, 0.65], [1.8, 0.45, 0.65], planeHullMat, { solid: false, shots: false });
-    box(builder, `skyline-cabin-overhead-bin-right-${seatX}`, [seatX, 4.5, 3.35], [1.8, 0.45, 0.65], planeHullMat, { solid: false, shots: false });
-    detailBox('terminal-story', `skyline-seat-headrest-left-${seatX}`, [seatX, 3.48, 1.1], [0.78, 0.28, 0.82], planeStripeMat);
-    detailBox('terminal-story', `skyline-seat-headrest-right-${seatX}`, [seatX, 3.48, 2.9], [0.78, 0.28, 0.82], planeStripeMat);
-    detailBox('terminal-story', `skyline-bin-latch-left-${seatX}`, [seatX, 4.3, 1.0], [0.44, 0.06, 0.05], hazardMat);
-    detailBox('terminal-story', `skyline-bin-latch-right-${seatX}`, [seatX, 4.3, 3.0], [0.44, 0.06, 0.05], hazardMat);
+    box(builder, `skyline-cabin-seat-left-${seatX}`, [seatX, 3.05, cabinSeatLeftZ], [1.0, 1.0, cabinSeatDepth], seatMat);
+    box(builder, `skyline-cabin-seat-right-${seatX}`, [seatX, 3.05, cabinSeatRightZ], [1.0, 1.0, cabinSeatDepth], seatMat);
+    box(builder, `skyline-cabin-overhead-bin-left-${seatX}`, [seatX, 4.5, 0.58], [1.8, 0.45, 0.58], planeHullMat, { solid: false, shots: false });
+    box(builder, `skyline-cabin-overhead-bin-right-${seatX}`, [seatX, 4.5, 3.42], [1.8, 0.45, 0.58], planeHullMat, { solid: false, shots: false });
+    detailBox('terminal-story', `skyline-seat-headrest-left-${seatX}`, [seatX, 3.45, cabinSeatLeftZ], [0.78, 0.3, 0.58], planeStripeMat);
+    detailBox('terminal-story', `skyline-seat-headrest-right-${seatX}`, [seatX, 3.45, cabinSeatRightZ], [0.78, 0.3, 0.58], planeStripeMat);
+    detailBox('terminal-story', `skyline-bin-latch-left-${seatX}`, [seatX, 4.3, 0.9], [0.44, 0.06, 0.05], hazardMat);
+    detailBox('terminal-story', `skyline-bin-latch-right-${seatX}`, [seatX, 4.3, 3.1], [0.44, 0.06, 0.05], hazardMat);
   }
   detailBox('floor-language', 'skyline-cabin-aisle-runner', [-0.25, 2.77, 2], [31.8, 0.035, 0.72], floorInsetMat);
   detailBox('terminal-story', 'skyline-cabin-light-north', [-0.5, 5.47, 1.12], [31, 0.07, 0.11], practicalMat);
@@ -1306,10 +1824,26 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('terminal-story', 'skyline-cockpit-door-mark', [-16.67, 4.65, 2], [0.04, 0.25, 0.92], hazardMat);
   detailBox('terminal-story', 'skyline-cabin-exit-sign', [15.9, 4.95, 2], [0.1, 0.32, 1.25], practicalMat);
 
-  box(builder, 'skyline-jetliner-wing-port', [0, 2.8, 11.0], [5.0, 0.3, 15.0], planeWingMat);
-  box(builder, 'skyline-jetliner-wing-starboard', [0, 2.8, -7.0], [5.0, 0.3, 15.0], planeWingMat);
-  box(builder, 'skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
-  box(builder, 'skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
+  qualityPlaceholderBox('skyline-jetliner-wing-port', [0, 2.8, 11.0], [5.0, 0.3, 15.0], planeWingMat);
+  qualityPlaceholderBox('skyline-jetliner-wing-starboard', [0, 2.8, -7.0], [5.0, 0.3, 15.0], planeWingMat);
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
+  const portWing = detailMesh(
+    'quality-aircraft',
+    'skyline-quality-wing-port',
+    prismGeometryXZ([[-3.2, 0], [2.7, 0], [1.8, 16.8], [-1.3, 16.8]], 0.28),
+    planeWingMat,
+    [0, 2.82, 3.6],
+  );
+  portWing.userData.assetOwner = 'skyline-terminal';
+  const starboardWing = detailMesh(
+    'quality-aircraft',
+    'skyline-quality-wing-starboard',
+    prismGeometryXZ([[-3.2, 0], [2.7, 0], [1.8, -16.8], [-1.3, -16.8]], 0.28),
+    planeWingMat,
+    [0, 2.82, 0.4],
+  );
+  starboardWing.userData.assetOwner = 'skyline-terminal';
   detailBox('aircraft-skin', 'skyline-wingtip-port', [0, 2.99, 18.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wingtip-starboard', [0, 2.99, -14.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wing-navigation-port', [-2.35, 3.06, 18.48], [0.42, 0.16, 0.16], practicalMat);
@@ -1349,7 +1883,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('floor-language', 'skyline-airstair-comb-foot', [21.35, 0.08, 2], [0.5, 0.04, 2.15], hazardMat);
   detailBox('floor-language', 'skyline-airstair-comb-top', [17.45, 2.7, 2], [0.5, 0.04, 2.15], hazardMat);
 
-  box(builder, 'skyline-fuel-trailer', [-10, 1.2, 18], [5.8, 2.4, 2.6], hazardMat);
+  qualityPlaceholderBox('skyline-fuel-trailer', [-10, 1.2, 18], [5.8, 2.4, 2.6], hazardMat);
   const fuelTank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 14), cargoMat);
   fuelTank.name = 'skyline-fuel-trailer-tank';
   fuelTank.rotation.z = Math.PI / 2;
@@ -1358,8 +1892,27 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   fuelTank.receiveShadow = true;
   fuelTank.userData.presentationOnly = true;
   fuelTank.userData.impactSurface = 'metal';
+  fuelTank.userData.rustworksDetail = 'quality';
+  fuelTank.userData.skylineCluster = 'service-equipment';
+  fuelTank.userData.assetOwner = 'skyline-terminal';
+  fuelTank.raycast = () => undefined;
   root.add(fuelTank);
+  detailBox('service-equipment', 'skyline-fuel-trailer-chassis', [-10, 0.38, 18], [6.1, 0.28, 2.3], structureMat, 'performance');
+  for (const wheelX of [-12.1, -8.2]) {
+    for (const wheelZ of [17.05, 18.95]) {
+      detailMesh('service-equipment', `skyline-fuel-trailer-wheel-${wheelX}-${wheelZ}`, new THREE.CylinderGeometry(0.38, 0.38, 0.22, 14), rubberMat, [wheelX, 0.38, wheelZ], [Math.PI / 2, 0, 0], 'performance');
+    }
+  }
+  detailMesh('service-equipment', 'skyline-fuel-hose-reel', new THREE.TorusGeometry(0.58, 0.12, 8, 18), rubberMat, [-7.25, 1.3, 18], [0, Math.PI / 2, 0], 'quality');
+  detailBox('service-equipment', 'skyline-fuel-control-cabinet', [-7.15, 1.15, 16.95], [0.9, 1.6, 0.48], wallMat, 'quality');
 
+  const uldShape = new THREE.Shape();
+  uldShape.moveTo(-2.25, 0);
+  uldShape.lineTo(2.25, 0);
+  uldShape.lineTo(2.02, 2.6);
+  uldShape.lineTo(-1.72, 2.6);
+  uldShape.lineTo(-2.25, 1.95);
+  uldShape.closePath();
   for (const [x, z, col] of [
     [-20, 18, cargoMat],
     [20, 18, wallMat],
@@ -1367,7 +1920,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [12, 26, cargoMat],
     [0, 28, trimMat],
   ] as const) {
-    box(builder, 'skyline-tarmac-cargo', [x, 1.3, z], [4.5, 2.6, 2.6], col);
+    qualityPlaceholderBox(`skyline-tarmac-cargo-${x}-${z}`, [x, 1.3, z], [4.5, 2.6, 2.6], col);
+    const shell = detailMesh(
+      'service-equipment',
+      `skyline-quality-uld-${x}-${z}`,
+      new THREE.ExtrudeGeometry(uldShape, { depth: 2.6, bevelEnabled: true, bevelSize: 0.06, bevelThickness: 0.06, bevelSegments: 2 }),
+      col,
+      [x, 0, z - 1.3],
+    );
+    shell.userData.assetOwner = 'skyline-terminal';
+    detailBox('service-equipment', `skyline-uld-rail-${x}-${z}`, [x, 1.42, z + 1.34], [4.15, 0.12, 0.08], hazardMat, 'quality');
   }
 
   for (const [x, z] of [[-8, 14], [8, 14], [-22, 26], [22, 26]] as const) {
@@ -1395,6 +1957,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const physicalCover: ArenaMap['physicalCover'] = [
     { id: 'jetliner-engine-south', bounds: { minX: -1.1, maxX: 1.1, minZ: 9.75, maxZ: 14.25 }, blocksMovement: true, blocksShots: true },
     { id: 'terminal-backwall', bounds: { minX: -31, maxX: 31, minZ: -34.3, maxZ: -33.9 }, blocksMovement: true, blocksShots: true },
+    { id: 'concourse-seating-west', bounds: { minX: -12.6, maxX: -7.4, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },
+    { id: 'concourse-seating-east', bounds: { minX: 7.4, maxX: 12.6, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },
+    { id: 'concourse-planter-west', bounds: { minX: -26.9, maxX: -23.1, minZ: -18.78, maxZ: -17.22 }, blocksMovement: true, blocksShots: true },
+    { id: 'concourse-planter-east', bounds: { minX: 23.1, maxX: 26.9, minZ: -18.78, maxZ: -17.22 }, blocksMovement: true, blocksShots: true },
     { id: 'cargo-stack-north', bounds: { minX: -22.3, maxX: -17.7, minZ: 16.7, maxZ: 19.3 }, blocksMovement: true, blocksShots: true },
     { id: 'cargo-stack-south', bounds: { minX: 17.7, maxX: 22.3, minZ: 16.7, maxZ: 19.3 }, blocksMovement: true, blocksShots: true },
     { id: 'fuel-trailer-station', bounds: { minX: -13.0, maxX: -7.0, minZ: 16.6, maxZ: 19.4 }, blocksMovement: true, blocksShots: true },
@@ -1420,6 +1986,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       { id: 'airstair-top', position: [17.45, 4.25, 2.0] },
       { id: 'airstair-foot', position: [21.35, 1.7, 2.0] },
       { id: 'apron-tarmac', position: [24.0, 1.7, 2.0] },
+    ],
+    'cabin-through-aisle': [
+      { id: 'cabin-forward', position: [-15.4, 4.25, 2.0] },
+      { id: 'cabin-mid', position: [0, 4.25, 2.0] },
+      { id: 'cabin-rear', position: [15.4, 4.25, 2.0] },
     ],
   };
 
@@ -1463,7 +2034,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [-24, -30], [-16, -30], [-8, -30], [8, -30], [16, -30], [24, -30],
+        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14],
       ],
       [
         [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30],

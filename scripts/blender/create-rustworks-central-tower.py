@@ -1,4 +1,4 @@
-"""Pass 44 — Rustworks Quality industrial plant (Sol-depth authored environment).
+"""Rustworks-owned tower, undercroft, trench, and container overhaul.
 
 Presentation-only GLB. Collision / shot authority remains TypeScript.
 """
@@ -14,10 +14,10 @@ ROOT = Path(__file__).resolve().parents[2]
 BLEND_PATH = ROOT / "source-assets" / "blender" / "rustworks-central-tower.blend"
 GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-central-tower.glb"
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
-PREVIEW_PATH = ROOT / "artifacts" / "pass44" / "rustworks-quality-plant-preview.png"
+PREVIEW_PATH = ROOT / "artifacts" / "rustworks-tower-overhaul" / "rustworks-tower-overhaul-preview.png"
 
-ASSET_VERSION = "pass54-v2"
-AUTHORED_HEIGHT_M = 15.2
+ASSET_VERSION = "rustworks-tower-overhaul-v1"
+AUTHORED_HEIGHT_M = 15.87
 
 LOADED: dict[str, bpy.types.Image] = {}
 CREATED: list = []
@@ -82,10 +82,20 @@ def mat(name: str, albedo: str, *, metallic: float, roughness: float, tile: floa
 
 
 def tag(obj, kind: str):
+    obj["rustworks_asset_owner"] = "Rustworks"
     obj["rustworks_asset_class"] = "authored-central-tower"
     obj["rustworks_semantic"] = kind
     obj["collision_authority"] = "typescript-rustworks-boxes"
     obj["asset_version"] = ASSET_VERSION
+    return obj
+
+
+def empty(name: str, loc, kind: str):
+    obj = bpy.data.objects.new(name, None)
+    bpy.context.collection.objects.link(obj)
+    obj.location = loc
+    tag(obj, kind)
+    CREATED.append(obj)
     return obj
 
 
@@ -215,8 +225,10 @@ def main():
     tag(root, "tower-root")
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
-    root["access_scheme"] = "lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "pass54-rustworks-water-layout-rig"
+    root["access_scheme"] = "undercroft-cross-plus-lower-ramp-plus-ship-ladder"
+    root["quality_pass"] = "rustworks-tower-overhaul"
+    root["container_layout"] = "four-per-side-one-open-per-side"
+    root["service_trench"] = "west-deck-level"
     root["material_count_target"] = 10
 
     # ========== GROUND ==========
@@ -243,14 +255,36 @@ def main():
                 cylinder(f"RW_anchor_{x}_{z}_{ox}_{oz}", (x + ox, -(z + oz), 0.95), 0.06, 0.18, M_hazard, vertices=8, kind="leg-base")
             cube(f"RW_leg_cap_{x}_{z}", (x, -z, 11.2), (0.85, 0.85, 0.32), M_rust, "leg-cap")
 
-    # Three clean structural bays per face; enough silhouette without the old
-    # cage of twenty criss-crossing braces around the central fight space.
+    # Four armoured service modules produce two clear, intersecting tunnels
+    # beneath the lower deck while visually grounding the tower legs.
+    undercroft_passage = 3.1
+    undercroft_module_size = 2.2
+    undercroft_height = 2.75
+    undercroft_offset = (undercroft_passage + undercroft_module_size) / 2
+    for x in (-undercroft_offset, undercroft_offset):
+        for z in (-undercroft_offset, undercroft_offset):
+            module = cube(
+                f"RW_undercroft_module_{x}_{z}", (x, -z, undercroft_height / 2),
+                (undercroft_module_size, undercroft_module_size, undercroft_height), M_corr, "tower-undercroft"
+            )
+            module["rustworks_route_role"] = "undercroft-corner-cover"
+            cube(
+                f"RW_undercroft_cap_{x}_{z}", (x, -z, undercroft_height - 0.08),
+                (2.45, 2.45, 0.16), M_hazard, "tower-undercroft"
+            )
+    cube("RW_undercroft_floor_east_west", (0, 0, 0.045), (8.1, 2.7, 0.05), M_grate, "tower-undercroft", do_bevel=False)
+    cube("RW_undercroft_floor_north_south", (0, 0, 0.05), (2.7, 8.1, 0.05), M_grate, "tower-undercroft", do_bevel=False)
+    for index, (x, z, sx, sy) in enumerate(((0, -4.0, 3.25, 0.12), (0, 4.0, 3.25, 0.12), (-4.0, 0, 0.12, 3.25), (4.0, 0, 0.12, 3.25))):
+        cube(f"RW_undercroft_portal_{index}", (x, -z, 2.72), (sx, sy, 0.18), M_hazard, "tower-undercroft", do_bevel=False)
+
+    # Two sparse structural bays per face; enough silhouette without the old
+    # cage of criss-crossing braces around the under-tower fight space.
     for z in (-3.55, 3.55):
-        for y0, y1 in ((0.55, 3.1), (3.7, 7.85), (8.45, 11.1)):
+        for y0, y1 in ((3.7, 7.85), (8.45, 11.1)):
             beam(f"RW_brace_a_{z}_{y0}", (-3.35, -z, y0), (3.35, -z, y1), 0.12, M_rust)
             beam(f"RW_brace_b_{z}_{y0}", (3.35, -z, y0), (-3.35, -z, y1), 0.12, M_rust)
     for x in (-3.55, 3.55):
-        for y0, y1 in ((0.55, 3.1), (3.7, 7.85), (8.45, 11.1)):
+        for y0, y1 in ((3.7, 7.85), (8.45, 11.1)):
             beam(f"RW_brace_c_{x}_{y0}", (x, 3.35, y0), (x, -3.35, y1), 0.12, M_plate)
             beam(f"RW_brace_d_{x}_{y0}", (x, -3.35, y0), (x, 3.35, y1), 0.12, M_plate)
 
@@ -276,13 +310,30 @@ def main():
     for three_x in (-4.3, 4.3):
         cube(f"RW_lower_kick_x_{three_x}", (three_x, 0, 3.55), (0.08, 8.6, 0.18), M_hazard, "lower-handrail", do_bevel=False)
 
-    # ========== CLEAN CROWN ==========
-    # Keep one supported canopy only. The old gantry/trolley/cable/hook/pulley
-    # and loose process runs created disconnected pieces floating above the rig.
-    for x in (-2.8, 2.8):
-        for z in (-2.8, 2.8):
-            cube(f"RW_canopy_post_{x}_{z}", (x, -z, 11.6), (0.22, 0.22, 2.7), M_plate, "canopy-post")
-    cube("RW_canopy_roof", (0, 0, 12.95), (6.9, 6.9, 0.24), M_corr, "tower-crown")
+    # ========== TAPERED DERRICK CROWN ==========
+    # Four continuous sloped members converge on supported rings. This replaces
+    # the flat canopy slab and disconnected-looking upper silhouette.
+    derrick_base_z = 8.47
+    derrick_ring_z = 11.35
+    derrick_top_z = 14.35
+    for x in (-2.75, 2.75):
+        for y in (-2.75, 2.75):
+            beam(
+                f"RW_derrick_leg_{x}_{y}",
+                (x, y, derrick_base_z),
+                (math.copysign(0.78, x), math.copysign(0.78, y), derrick_top_z),
+                0.22,
+                M_rust if x == y else M_plate,
+                "derrick-crown",
+            )
+    for z, half in ((derrick_ring_z, 1.9), (derrick_top_z, 0.84)):
+        beam(f"RW_derrick_ring_n_{z}", (-half, -half, z), (half, -half, z), 0.16, M_plate, "derrick-crown")
+        beam(f"RW_derrick_ring_s_{z}", (-half, half, z), (half, half, z), 0.16, M_plate, "derrick-crown")
+        beam(f"RW_derrick_ring_w_{z}", (-half, -half, z), (-half, half, z), 0.16, M_plate, "derrick-crown")
+        beam(f"RW_derrick_ring_e_{z}", (half, -half, z), (half, half, z), 0.16, M_plate, "derrick-crown")
+    cube("RW_derrick_service_platform", (0, 0, derrick_ring_z - 0.12), (4.3, 4.3, 0.18), M_grate, "derrick-service-platform")
+    cylinder("RW_derrick_beacon_mast", (0, 0, 15.05), 0.08, 1.4, M_hazard, vertices=12, kind="derrick-beacon")
+    cylinder("RW_derrick_beacon", (0, 0, 15.78), 0.21, 0.18, M_hazard, vertices=16, kind="derrick-beacon")
 
     # ========== ACCESS — ramp + ship ladder (TS-aligned) ==========
     landing_overlap = 0.06
@@ -386,22 +437,92 @@ def main():
     cube("RW_lower_handrail_w", (-4.3, -0.2, lower_rail_y), (0.12, 7.6, 1.15), M_hazard, "lower-handrail")
     cube("RW_lower_handrail_e", (4.3, 0.45, lower_rail_y), (0.12, 5.8, 1.15), M_hazard, "lower-handrail")
 
-    # ========== YARD (one symmetric container ring, no loose prop clusters) ==========
-    perimeter_slots = (-19.0, -12.0, -5.0, 5.0, 12.0, 19.0)
+    # ========== WEST SERVICE TRENCH ==========
+    trench_x = -13.8
+    trench_wall_xs = (trench_x - 1.85, trench_x + 1.85)
+    trench_segments = (-12.0, 0.0, 12.0)
+    cube("RW_service_trench_floor", (trench_x, 0, 0.045), (3.4, 34.0, 0.05), M_grate, "service-trench", do_bevel=False)
+    for x in trench_wall_xs:
+        for z in trench_segments:
+            wall = cube(f"RW_service_trench_wall_{x}_{z}", (x, -z, 0.65), (0.32, 7.0, 1.3), M_concrete, "service-trench")
+            wall["rustworks_route_role"] = "west-service-trench-cover"
+            cube(f"RW_service_trench_coping_{x}_{z}", (x, -z, 1.34), (0.46, 7.05, 0.08), M_hazard, "service-trench")
+    for z in (-6.0, 6.0):
+        cube(f"RW_service_trench_crossover_{z}", (trench_x, -z, 2.55), (4.35, 1.2, 0.16), M_plate, "service-trench-crossover")
+
+    # ========== YARD (four containers per side; one pass-through per side) ==========
+    perimeter_slots = (-18.0, -9.0, 9.0, 18.0)
+    perimeter_row = 21.5
     container_materials = (M_hazard, M_rust, M_corr)
     container_index = 0
     for side in ("north", "south", "west", "east"):
         for slot, offset in enumerate(perimeter_slots):
             if side in ("north", "south"):
-                x, z, sx, sz = offset, (-23.0 if side == "north" else 23.0), 5.8, 2.5
+                x, z, sx, sy = offset, (-perimeter_row if side == "north" else perimeter_row), 5.8, 2.5
+                is_open = slot == (1 if side == "north" else 2)
             else:
-                x, z, sx, sz = (-23.0 if side == "west" else 23.0), offset, 2.5, 5.8
-            container = cube(
-                f"RW_shipping_container_{side}_{slot}", (x, -z, 1.3), (sx, sz, 2.6),
-                container_materials[slot % len(container_materials)], "yard-container"
-            )
-            container["rustworks_side"] = side
-            container["rustworks_slot"] = slot
+                x, z, sx, sy = (-perimeter_row if side == "west" else perimeter_row), offset, 2.5, 5.8
+                is_open = slot == (1 if side == "west" else 2)
+            marker = empty(f"RW_container_placement_{side}_{slot}", (x, -z, 0), "yard-container-placement")
+            marker["rustworks_side"] = side
+            marker["rustworks_slot"] = slot
+            marker["rustworks_open"] = is_open
+            marker["rustworks_axis"] = "x" if side in ("north", "south") else "z"
+
+            material = container_materials[slot % len(container_materials)]
+            if is_open:
+                thickness = 0.14
+                if side in ("north", "south"):
+                    shell_specs = (
+                        ("wall_a", (x, -z - (sy - thickness) / 2, 1.3), (sx, thickness, 2.6)),
+                        ("wall_b", (x, -z + (sy - thickness) / 2, 1.3), (sx, thickness, 2.6)),
+                        ("roof", (x, -z, 2.6 - thickness / 2), (sx, sy, thickness)),
+                    )
+                else:
+                    shell_specs = (
+                        ("wall_a", (x - (sx - thickness) / 2, -z, 1.3), (thickness, sy, 2.6)),
+                        ("wall_b", (x + (sx - thickness) / 2, -z, 1.3), (thickness, sy, 2.6)),
+                        ("roof", (x, -z, 2.6 - thickness / 2), (sx, sy, thickness)),
+                    )
+                for suffix, loc, scale in shell_specs:
+                    shell = cube(f"RW_open_container_{side}_{slot}_{suffix}", loc, scale, material, "yard-open-container")
+                    shell["rustworks_side"] = side
+                    shell["rustworks_slot"] = slot
+                cube(f"RW_open_container_{side}_{slot}_floor", (x, -z, 0.045), (sx, sy, 0.05), M_grate, "yard-open-container", do_bevel=False)
+                for end in (-1, 1):
+                    if side in ("north", "south"):
+                        end_axis = x + end * (sx / 2 - 0.07)
+                        for edge in (-1, 1):
+                            cube(
+                                f"RW_open_container_{side}_{slot}_end_{end}_post_{edge}",
+                                (end_axis, -z + edge * (sy / 2 - 0.08), 1.3),
+                                (0.14, 0.16, 2.6), M_plate, "yard-open-container-frame", do_bevel=False
+                            )
+                        cube(
+                            f"RW_open_container_{side}_{slot}_end_{end}_header",
+                            (end_axis, -z, 2.53), (0.14, sy - 0.32, 0.14),
+                            M_plate, "yard-open-container-frame", do_bevel=False
+                        )
+                    else:
+                        end_axis = -z + end * (sy / 2 - 0.07)
+                        for edge in (-1, 1):
+                            cube(
+                                f"RW_open_container_{side}_{slot}_end_{end}_post_{edge}",
+                                (x + edge * (sx / 2 - 0.08), end_axis, 1.3),
+                                (0.16, 0.14, 2.6), M_plate, "yard-open-container-frame", do_bevel=False
+                            )
+                        cube(
+                            f"RW_open_container_{side}_{slot}_end_{end}_header",
+                            (x, end_axis, 2.53), (sx - 0.32, 0.14, 0.14),
+                            M_plate, "yard-open-container-frame", do_bevel=False
+                        )
+            else:
+                container = cube(
+                    f"RW_shipping_container_{side}_{slot}", (x, -z, 1.3), (sx, sy, 2.6),
+                    material, "yard-container"
+                )
+                container["rustworks_side"] = side
+                container["rustworks_slot"] = slot
             container_index += 1
 
     # Open safety rail (not solid walls).
@@ -459,9 +580,9 @@ def main():
     cam_data = bpy.data.cameras.new("RW_PreviewCam")
     cam = bpy.data.objects.new("RW_PreviewCam", cam_data)
     bpy.context.collection.objects.link(cam)
-    cam.location = (22.0, -30.0, 16.0)
-    cam.rotation_euler = (math.radians(58), 0, math.radians(36))
-    cam_data.lens = 28
+    cam.location = (24.0, -34.0, 19.0)
+    cam.rotation_euler = (Vector((0.0, 0.0, 6.5)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+    cam_data.lens = 34
     bpy.context.scene.camera = cam
     sun = bpy.data.lights.new(name="RW_Sun", type="SUN")
     sun.energy = 4.0
