@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { buildWeaponModel } from './art-kit';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
+import { WEAPONS } from './gameplay';
+import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
 import type { Team } from './protocol';
 
@@ -17,8 +20,8 @@ type Builder = {
 
 export const GUN_RANGE_FIRING_LINE_Z = 1.2;
 export const GUN_RANGE_FIRING_LINE_BARRIER: Readonly<Box2> = Object.freeze({
-  minX: -15,
-  maxX: 15,
+  minX: -20,
+  maxX: 20,
   minZ: GUN_RANGE_FIRING_LINE_Z - 0.25,
   maxZ: GUN_RANGE_FIRING_LINE_Z + 0.25,
   minY: -2,
@@ -738,6 +741,33 @@ function scoreTexture(value: number): THREE.CanvasTexture | null {
   return texture;
 }
 
+function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Sprite | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.fillStyle = 'rgba(10, 17, 20, 0.94)';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = `#${accent.toString(16).padStart(6, '0')}`;
+  context.lineWidth = 10;
+  context.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.fillStyle = '#f8f0d2';
+  context.font = '900 58px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + 3);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, toneMapped: false }));
+  sprite.name = name;
+  sprite.scale.set(scale[0], scale[1], 1);
+  sprite.userData.presentationOnly = true;
+  return sprite;
+}
+
 function rangeTarget(
   builder: Builder,
   targets: PracticeTarget[],
@@ -786,21 +816,25 @@ function rangeTarget(
 
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
-  root.name = 'Acres Gun Range arena';
+  root.name = 'Acres Indoor Gun Range arena';
   scene.add(root);
   const builder: Builder = {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
-  const concrete = standard(0x6d7472, 0.98, 0.02);
-  const dark = standard(0x1f292c, 0.78, 0.44);
-  const timber = standard(0x6f4b30, 0.94, 0.02);
-  const safety = standard(0xe1a32f, 0.72, 0.26);
+  const concrete = standard(0x444b4e, 0.98, 0.02);
+  const wall = standard(0x242d32, 0.88, 0.22);
+  const dark = standard(0x11191d, 0.7, 0.62);
+  const acoustic = standard(0x303b3f, 0.96, 0.08);
+  const timber = standard(0x765136, 0.91, 0.04);
+  const safety = new THREE.MeshStandardMaterial({ color: 0xe0aa37, emissive: 0x4b2b00, emissiveIntensity: 0.5, roughness: 0.62, metalness: 0.28 });
+  const redSafety = new THREE.MeshStandardMaterial({ color: 0xc74235, emissive: 0x4a0804, emissiveIntensity: 0.72, roughness: 0.54, metalness: 0.2 });
+  const lamp = new THREE.MeshStandardMaterial({ color: 0xd9eff2, emissive: 0x9edfe9, emissiveIntensity: 2.5, roughness: 0.22, metalness: 0.08 });
   const targets: PracticeTarget[] = [];
 
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(32, 54), concrete);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(42, 70), concrete);
   floor.name = 'gun-range-concrete-lanes';
   floor.rotation.x = -Math.PI / 2;
-  floor.position.z = -17;
+  floor.position.z = -14.5;
   floor.receiveShadow = true;
   floor.userData.impactSurface = 'concrete';
   root.add(floor);
@@ -815,49 +849,131 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   builder.shotSurfaces.push(floorSurface);
   floor.userData.ballisticSurfaceId = floorSurface.id;
 
-  box(builder, 'gun-range-backstop', [0, 3.5, -43], [32, 7, 1.2], dark);
-  box(builder, 'gun-range-left-berm', [-15.5, 2.1, -17], [1.0, 4.2, 53], timber);
-  box(builder, 'gun-range-right-berm', [15.5, 2.1, -17], [1.0, 4.2, 53], timber);
-  box(builder, 'gun-range-firing-line-roof', [0, 4.3, 5.8], [31, 0.35, 8], dark, { solid: false, shots: false });
-  for (const x of [-10, -5, 0, 5, 10]) {
-    box(builder, 'gun-range-booth-divider', [x, 1.35, 6], [0.16, 2.7, 7], dark);
+  // Full indoor shell: deep charcoal walls and ceiling keep attention on the
+  // warm armory, cool lane lighting and bright target faces.
+  box(builder, 'gun-range-backstop', [0, 3.6, -49], [42, 7.2, 1.2], dark);
+  box(builder, 'gun-range-left-wall', [-20.5, 3.6, -14.5], [1, 7.2, 70], wall);
+  box(builder, 'gun-range-right-wall', [20.5, 3.6, -14.5], [1, 7.2, 70], wall);
+  box(builder, 'gun-range-rear-wall', [0, 3.6, 20], [42, 7.2, 1], wall);
+  box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], dark, { solid: false, shots: true });
+
+  // Suspended acoustic baffles and side ventilation sell the large industrial
+  // interior while leaving the floor plan broad and readable.
+  for (const z of [-41, -31, -21, -11, -1, 9, 17]) {
+    box(builder, 'gun-range-acoustic-baffle', [0, 6.35, z], [37, 0.32, 1.15], acoustic, { solid: false, shots: false, cast: false });
   }
-  box(builder, 'gun-range-firing-line', [0, 0.05, GUN_RANGE_FIRING_LINE_Z], [30, 0.1, 0.5], safety, { solid: false, shots: false });
+  for (const side of [-1, 1]) {
+    box(builder, 'gun-range-ventilation-duct', [side * 17.7, 5.7, -17], [2.1, 1.25, 51], dark, { solid: false, shots: false, cast: false });
+    for (const z of [-38, -24, -10, 4, 15]) {
+      box(builder, 'gun-range-vent-grille', [side * 16.62, 5.7, z], [0.08, 0.8, 3.4], acoustic, { solid: false, shots: false, cast: false });
+    }
+  }
+
+  for (const z of [-42, -32, -22, -12, -2, 8, 16]) {
+    box(builder, 'gun-range-ceiling-light', [0, 6.82, z], [18, 0.08, 0.28], lamp, { solid: false, shots: false, cast: false });
+    const light = new THREE.PointLight(z > 1 ? 0xffd59a : 0xc8f3ff, z > 1 ? 13 : 10, 17, 2.1);
+    light.name = 'gun-range-interior-light';
+    light.position.set(z % 4 === 0 ? -7 : 7, 5.9, z);
+    light.castShadow = false;
+    light.userData.presentationOnly = true;
+    root.add(light);
+  }
+
+  box(builder, 'gun-range-control-room', [-16.5, 2.1, 15.5], [6.2, 4.2, 6.2], wall, { ballisticMaterial: 'interior-wall' });
+  box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: false });
+  box(builder, 'gun-range-ready-bench', [16.2, 0.62, 15.4], [6.4, 1.05, 2.1], timber);
+  box(builder, 'gun-range-ready-lockers', [18.5, 2.35, 8.4], [2.8, 4.6, 5.8], acoustic, { ballisticMaterial: 'structural-metal' });
+
+  // Five roomy firing bays retain safe forward lanes without making the ready
+  // room feel like a narrow corridor.
+  for (const x of [-12, -6, 0, 6, 12]) {
+    box(builder, 'gun-range-booth-divider', [x, 1.45, 4.2], [0.16, 2.9, 5.5], dark);
+    box(builder, 'gun-range-booth-safety-lamp', [x, 3.35, 4.2], [0.18, 0.18, 1.1], redSafety, { solid: false, shots: false });
+  }
+  box(builder, 'gun-range-firing-line', [0, 0.05, GUN_RANGE_FIRING_LINE_Z], [40, 0.1, 0.5], safety, { solid: false, shots: false });
   // The yellow line is a range-safety boundary, not ballistic cover. Keep its
   // tall invisible barrier in authoritative character physics only so every
   // stance and jump remains behind it while bullets pass into the lanes.
   builder.physicsColliders.push({ ...GUN_RANGE_FIRING_LINE_BARRIER });
   for (const z of [-9, -22, -35]) {
-    box(builder, 'gun-range-distance-stripe', [0, 0.035, z], [30, 0.06, 0.22], safety, { solid: false, shots: false });
+    box(builder, 'gun-range-distance-stripe', [0, 0.035, z], [40, 0.06, 0.22], safety, { solid: false, shots: false });
   }
   for (const [band, z, score] of [
     ['near', -10, 100], ['mid', -23, 200], ['far', -36, 300],
   ] as const) {
     for (const x of [-7, 0, 7]) rangeTarget(builder, targets, `${band}-${x}`, x, z, score, band);
   }
-  for (const x of [-12, 12]) {
-    box(builder, 'gun-range-weapon-bench', [x, 0.72, 5.5], [4.2, 1.0, 1.2], timber);
-    box(builder, 'gun-range-safety-post', [x, 1.7, 2.0], [0.18, 3.4, 0.18], safety);
+  for (const station of GUN_RANGE_WEAPON_STATIONS) {
+    const accent = new THREE.MeshStandardMaterial({
+      color: WEAPONS[station.weapon].color,
+      emissive: WEAPONS[station.weapon].color,
+      emissiveIntensity: 0.34,
+      roughness: 0.48,
+      metalness: 0.32,
+    });
+    box(builder, 'gun-range-weapon-bench', [station.position.x, 0.62, station.position.z], [4.6, 1.05, 1.35], timber);
+    box(builder, `gun-range-station-accent-${station.weapon}`, [station.position.x, 1.17, station.position.z + 0.55], [4.2, 0.09, 0.15], accent, { solid: false, shots: false });
+    const stationRoot = new THREE.Group();
+    stationRoot.name = `gun-range-weapon-station-${station.weapon}`;
+    stationRoot.position.set(station.position.x, station.position.y, station.position.z);
+    stationRoot.userData.stationId = station.id;
+    stationRoot.userData.weapon = station.weapon;
+    stationRoot.userData.label = `${station.label} / ${WEAPONS[station.weapon].name}`;
+    const weapon = buildWeaponModel(station.weapon, true, false);
+    weapon.name = `gun-range-rack-weapon-${station.weapon}`;
+    weapon.rotation.set(0.08, Math.PI / 2, -0.08);
+    weapon.scale.setScalar(station.weapon === 'lmg' ? 0.52 : 0.58);
+    weapon.traverse((node) => {
+      node.userData.presentationOnly = true;
+      if (node instanceof THREE.Mesh) node.raycast = () => undefined;
+    });
+    stationRoot.add(weapon);
+    const label = rangeSign(`${station.label} · ${WEAPONS[station.weapon].name.toUpperCase()}`, WEAPONS[station.weapon].color, `gun-range-station-label-${station.weapon}`, [4.15, 0.62]);
+    if (label) {
+      label.position.set(0, 0.78, 0.65);
+      stationRoot.add(label);
+    }
+    const stationLight = new THREE.PointLight(WEAPONS[station.weapon].color, 5.5, 7, 2);
+    stationLight.name = 'gun-range-armory-light';
+    stationLight.position.set(0, 2.2, 0.6);
+    stationLight.userData.presentationOnly = true;
+    stationRoot.add(stationLight);
+    root.add(stationRoot);
+  }
+
+  box(builder, 'gun-range-armory-header', [0, 3.8, 12.2], [32, 1.15, 0.25], dark, { solid: false, shots: false });
+  box(builder, 'gun-range-live-fire-sign', [0, 4.45, 1.0], [12, 0.75, 0.22], redSafety, { solid: false, shots: false });
+  root.getObjectByName('gun-range-armory-header')!.userData.label = 'CHOOSE A WEAPON · PRESS F';
+  root.getObjectByName('gun-range-live-fire-sign')!.userData.label = 'LIVE FIRE · EYES AND EARS';
+  const armorySign = rangeSign('ARMORY · PICK UP WITH F', 0x58e3dc, 'gun-range-armory-sign-text', [18, 1.25]);
+  if (armorySign) {
+    armorySign.position.set(0, 3.8, 12.02);
+    root.add(armorySign);
+  }
+  const liveFireSign = rangeSign('LIVE FIRE · EYES AND EARS', 0xff765f, 'gun-range-live-fire-sign-text', [10.5, 0.82]);
+  if (liveFireSign) {
+    liveFireSign.position.set(0, 4.45, 0.86);
+    root.add(liveFireSign);
   }
 
   return {
     id: 'gun-range',
-    label: 'Acres Gun Range',
+    label: 'Acres Indoor Gun Range',
     root,
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
-      [[2.5, 7], [-7.5, 7], [7.5, 7]],
-      [[2.5, 7], [-7.5, 7], [7.5, 7]],
+      [[0, 16.5], [-8, 16.5], [8, 16.5]],
+      [[0, 16.5], [-8, 16.5], [8, 16.5]],
     ),
     patrolPoints: [],
     targets,
     houses: [],
     breakableWindows: [],
     physicalCover: [],
-    bounds: { minX: -15, maxX: 15, minZ: -42, maxZ: 9 },
+    bounds: { minX: -20, maxX: 20, minZ: -48, maxZ: 19.5 },
     houseTelemetry: emptyTelemetry(),
   };
 }

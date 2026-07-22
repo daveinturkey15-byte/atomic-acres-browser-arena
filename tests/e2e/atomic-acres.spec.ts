@@ -887,7 +887,7 @@ test.describe('solo mechanics', () => {
       api.placeBotAhead(5);
     });
     await page.waitForTimeout(150);
-    const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
+    const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
     const sourceMeshCounts = new Map<string, number>();
     for (const weapon of weapons) {
       await page.evaluate((selected) => {
@@ -898,7 +898,7 @@ test.describe('solo mechanics', () => {
       expect(weaponState.armsVisible, `${weapon}:armsVisible`).toBe(true);
       expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(6);
       expect(weaponState.modelKind, `${weapon}:modelKind`).toBe('original-authored');
-      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('authored-pbr-v5-six-weapon');
+      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('authored-pbr-v6-seven-weapon');
       expect(weaponState.importedModel, `${weapon}:importedModel`).toBeNull();
       expect(weaponState.detailsReady, `${weapon}:detailsReady`).toBe(true);
       expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeGreaterThanOrEqual(8);
@@ -1281,7 +1281,7 @@ test.describe('solo mechanics', () => {
     });
     expect(reticle).toEqual({ offsetX: 0, offsetY: 0, dotVisible: true });
 
-    for (const weapon of ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const) {
+    for (const weapon of ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const) {
       await page.evaluate((weaponId) => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
           equipWeapon: (id: typeof weaponId) => void;

@@ -31,6 +31,32 @@ export function rustworksLightingTint(
   profile: RenderProfile,
   arenaId: ArenaId,
 ): ArenaLightingProfile {
+  if (arenaId === 'gun-range') {
+    const quality = profile === 'blender';
+    return {
+      ...base,
+      fogColor: 0x263136,
+      skyTop: 0x11191d,
+      skyHorizon: 0x263136,
+      skyBottom: 0x171f23,
+      skySun: 0xd9eff2,
+      skyCloud: 0x303b3f,
+      skyCloudShadow: 0x11191d,
+      skyCloudLight: 0x63767a,
+      hemisphereSky: 0xa5c5ca,
+      hemisphereGround: 0x342b22,
+      ambientColor: 0x9ab1b3,
+      sunColor: 0xc8edf0,
+      fillColor: 0xffc27c,
+      sunIntensity: quality ? 0.34 : 0.28,
+      fillIntensity: quality ? 1.18 : 1.02,
+      hemisphereIntensity: quality ? 1.12 : 1.0,
+      ambientIntensity: quality ? 0.86 : 0.78,
+      exposure: Math.max(base.exposure, quality ? 1.08 : 1.02),
+      godRayStrength: 0,
+      godRayLobes: 1,
+    };
+  }
   if (arenaId !== 'rustworks-1v1') return base;
   const quality = profile === 'blender';
   // Night industrial pad — cool moon + warm floods; keep ambient high enough for play.

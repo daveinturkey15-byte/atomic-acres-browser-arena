@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { centeredSightY, weaponFamilyPresentation } from './weapon-family-presentation';
 
-const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
+const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
 
 describe('weapon family presentation', () => {
   it('physically centres every authored sight axis', () => {

@@ -358,7 +358,7 @@ describe('additional authored maps', () => {
   it('builds an untimed three-distance score range with reusable targets', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
-    expect(map.label).toBe('Acres Gun Range');
+    expect(map.label).toBe('Acres Indoor Gun Range');
     expect(map.targets).toHaveLength(9);
     expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(3);
     expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(3);
@@ -377,6 +377,17 @@ describe('additional authored maps', () => {
     expect(map.raycastMeshes.some((mesh) => mesh.name === 'gun-range-firing-line')).toBe(false);
     expect(GUN_RANGE_FIRING_LINE_BARRIER.maxY).toBeGreaterThan(5);
     expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-ceiling')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-left-wall')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-right-wall')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-control-room')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
+    expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
+    const stations = map.root.children.filter((child) => child.name.startsWith('gun-range-weapon-station-'));
+    expect(stations).toHaveLength(5);
+    expect(stations.map((station) => station.userData.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+    expect(map.bounds.maxX - map.bounds.minX).toBeGreaterThanOrEqual(40);
+    expect(map.bounds.maxZ - map.bounds.minZ).toBeGreaterThanOrEqual(67);
     expectGunRangeSpawnContract(map);
   });
 

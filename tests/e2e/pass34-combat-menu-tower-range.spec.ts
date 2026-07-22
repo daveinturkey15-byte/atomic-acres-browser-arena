@@ -21,6 +21,9 @@ type DebugSnapshot = {
   rangePractice: {
     score: number;
     hits: number;
+    armoryOnly: boolean;
+    primaryUnlocked: boolean;
+    stations: Array<{ id: string; weapon: string; label: string; position: number[]; visible: boolean }>;
     activeTargets: number;
     values: number[];
     targets: Array<{ id: string; active: boolean; health: number; maxHealth: number }>;
@@ -40,7 +43,9 @@ type DebugSnapshot = {
     };
   };
   bots: Array<{ id: string; alive: boolean }>;
-  player: { kills: number; position: [number, number, number] };
+  player: { kills: number; weapon: string; primaryWeapon: string; position: [number, number, number] };
+  weaponPresentation: { weapon: string; adsProgress: number; detailsReady: boolean };
+  sniperScope: { active: boolean; baseFov: number; cameraFov: number; viewmodelVisible: boolean };
 };
 
 type RustworksAccessStage = {
@@ -62,6 +67,8 @@ type DebugApi = {
   setMovement(forward: boolean, sprint?: boolean): void;
   teleportPlayer(x: number, y: number, z: number, yaw?: number, pitch?: number): void;
   fireOnce(): void;
+  interactDrop(): boolean;
+  setAds(held: boolean): void;
 };
 
 async function snapshot(page: import('@playwright/test').Page): Promise<DebugSnapshot> {
@@ -88,7 +95,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
   test('Atomic Acres keeps five minutes and does not end at 25 kills', async ({ page }) => {
     await page.goto(`/?${lightweight}&seed=3301`);
     await waitReady(page);
-    await expect(page.locator('.map-card[data-arena-id]')).toHaveCount(3);
+    await expect(page.locator('.map-card[data-arena-id]')).toHaveCount(4);
     await expect(page.locator('.map-card[data-arena-id="atomic-acres"]')).toHaveAttribute('aria-pressed', 'true');
     const before = await snapshot(page);
     expect(before.arenaSelection).toMatchObject({
@@ -162,11 +169,13 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await expect(page.locator('#solo')).toHaveText('START RANGE');
     await expect(page.locator('#host')).toBeDisabled();
     await expect(page.locator('#join')).toBeDisabled();
+    await expect(page.locator('[data-menu-tab="kit"]')).toBeHidden();
+    await expect(page.locator('#selected-kit-summary')).toContainText('PICK UP YOUR WEAPON INSIDE');
     await deploySolo(page, 'RANGER');
     let state = await snapshot(page);
     expect(state.arenaSelection).toMatchObject({
       id: 'gun-range',
-      label: 'Acres Gun Range',
+      label: 'Acres Indoor Gun Range',
       rules: { durationMs: 120_000, scoreLimit: null },
       multiplayer: false,
       soloBotCount: 0,
@@ -176,6 +185,36 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
       navigationCollidersMatchArena: true,
     });
     expect(state.bots).toHaveLength(0);
+    expect(state.player.weapon).toBe('pistol');
+    expect(state.rangePractice).toMatchObject({ armoryOnly: true, primaryUnlocked: false });
+    expect(state.rangePractice.stations.map((station) => station.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+    expect(state.rangePractice.stations.every((station) => station.visible)).toBe(true);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(0, 1.7, 12.5, 0, 0);
+      api.interactDrop();
+    });
+    state = await snapshot(page);
+    expect(state.player.weapon).toBe('lmg');
+    expect(state.player.primaryWeapon).toBe('lmg');
+    expect(state.rangePractice.primaryUnlocked).toBe(true);
+    expect(state.weaponPresentation).toMatchObject({ weapon: 'lmg', detailsReady: true });
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(12, 1.7, 12.5, 0, 0);
+      api.interactDrop();
+      api.setAds(true);
+    });
+    await expect.poll(async () => (await snapshot(page)).weaponPresentation.adsProgress).toBe(1);
+    state = await snapshot(page);
+    expect(state.player.weapon).toBe('sniper');
+    expect(state.sniperScope.active).toBe(true);
+    expect(state.sniperScope.cameraFov).toBeLessThan(state.sniperScope.baseFov / 2);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.setAds(false));
+    await expect.poll(async () => (await snapshot(page)).weaponPresentation.adsProgress).toBe(0);
+    state = await snapshot(page);
+    expect(state.sniperScope.active).toBe(false);
+    expect(state.sniperScope.cameraFov).toBe(state.sniperScope.baseFov);
     expect(state.rangePractice.values.sort((a, b) => a - b)).toEqual([
       100, 100, 100, 200, 200, 200, 300, 300, 300,
     ]);
@@ -184,7 +223,15 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await expect(page.locator('#coral-label')).toHaveText('HITS');
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
-      api.teleportPlayer(0, 1.7, 6, 0, 0);
+      api.teleportPlayer(0, 1.7, 12.5, 0, 0);
+      api.interactDrop();
+      // Keep the debug-only teleport inside the centre firing bay rather than
+      // embedding the camera in the x=0 booth divider's collision volume.
+      api.teleportPlayer(0.45, 1.7, 6, 0, 0);
+    });
+    await page.waitForTimeout(450);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
       api.fireOnce();
     });
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.hits === 1);

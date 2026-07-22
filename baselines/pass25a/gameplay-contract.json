@@ -2827,6 +2827,43 @@
           "switchSeconds": 0.4
         },
         {
+          "adsSpreadMultiplier": 0.34,
+          "automatic": true,
+          "color": 10476146,
+          "crouchSpreadMultiplier": 0.7,
+          "damage": 27,
+          "falloffEnd": 82,
+          "falloffStart": 30,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.022,
+          "id": "lmg",
+          "limbMultiplier": 0.82,
+          "mag": 62,
+          "maximumSpread": 0.064,
+          "minimumDamage": 18,
+          "movementSpreadMultiplier": 1.78,
+          "name": "Mastiff 63 LMG",
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 90,
+            "energyFalloffStart": 30,
+            "fmjMultiplier": 1.14,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.58,
+            "minimumWallDamageMultiplier": 0.4,
+            "penetrationPower": 6.9
+          },
+          "recoilPitch": 0.019,
+          "recoilRecovery": 10,
+          "recoilYaw": 0.01,
+          "reload": 3.25,
+          "reserve": 186,
+          "rpm": 720,
+          "sustainedSpreadPerShot": 0.0025,
+          "switchSeconds": 0.78
+        },
+        {
           "adsRecoilMultiplier": 0.84,
           "adsSpreadMultiplier": 0.72,
           "automatic": false,
@@ -3383,10 +3420,11 @@
       "pass30-hunter-swarm-eight-streak",
       "pass30-nuke-fifteen-streak",
       "pass30-stormfront-lighting",
-      "pass54-wall-penetration"
+      "pass54-wall-penetration",
+      "pass55-range-armory-lmg"
     ],
     "baseSourceRevision": "72c313c494853ed1ee4673f06a8f064330ac9efc",
-    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 54",
+    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 55",
     "dependencies": {
       "@dimforge/rapier3d-compat": "0.19.3",
       "peerjs": "1.5.5",

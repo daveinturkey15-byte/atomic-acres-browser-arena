@@ -29,6 +29,7 @@ import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type 
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
+import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
@@ -255,6 +256,7 @@ import {
   OverdriveStateMessage,
   PlayerSnapshot,
   PickupMessage,
+  PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
   ShotMessage,
   Team,
@@ -1023,8 +1025,8 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -1196,6 +1198,7 @@ let triggerHeld = false;
 let targetHits = 0;
 let rangeScore = 0;
 let rangeShotsFired = 0;
+let rangePrimaryUnlocked = false;
 let accumulator = 0;
 let frameCount = 0;
 let recoilVisual = 0;
@@ -2070,6 +2073,7 @@ const weaponView = new WeaponPresentation(camera, reducedRenderMode);
 let selectedFieldKit: FieldKitId = parseFieldKitSelection(localStorage.getItem(FIELD_KIT_STORAGE_KEY));
 
 function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
+  if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
   document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
     const active = button.dataset.menuTab === tab;
     button.classList.toggle('active', active);
@@ -2083,6 +2087,14 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
 }
 
 function renderFieldKitSelection(): void {
+  const summary = element<HTMLElement>('#selected-kit-summary');
+  if (selectedArena.id === 'gun-range') {
+    summary.dataset.rangeArmory = 'true';
+    const equipped = rangePrimaryUnlocked ? WEAPONS[player.primaryWeapon].name : 'Service Pistol';
+    summary.innerHTML = `<span>RANGE ARMORY</span><strong>PICK UP YOUR WEAPON INSIDE</strong><b>${equipped} · PRESS F AT A BENCH</b>`;
+    return;
+  }
+  delete summary.dataset.rangeArmory;
   const kit = fieldKitById(selectedFieldKit);
   const queued = gameStarted && player.primaryWeapon !== kit.weapon;
   element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>`;
@@ -2777,6 +2789,34 @@ function updateDeathDropPresentation(entity: DeathDropEntity, now = performance.
   }
 }
 
+function nearbyGunRangeWeaponStation(): GunRangeWeaponStation | null {
+  if (selectedArena.id !== 'gun-range' || !player.alive || matchState.phase !== 'active') return null;
+  return nearestGunRangeWeaponStation(player.position);
+}
+
+function interactWithGunRangeArmory(now = performance.now()): boolean {
+  const station = nearbyGunRangeWeaponStation();
+  if (!station) return false;
+  interruptReload(true, now);
+  const changedWeapon = !rangePrimaryUnlocked || player.primaryWeapon !== station.weapon;
+  player.primaryWeapon = station.weapon;
+  player.weapon = station.weapon;
+  player.ammo[station.weapon] = WEAPONS[station.weapon].mag;
+  player.reserve[station.weapon] = WEAPONS[station.weapon].reserve;
+  player.switchingUntil = now + 360;
+  player.sustainedShots = 0;
+  rangePrimaryUnlocked = true;
+  weaponView.setWeapon(station.weapon);
+  audio.weaponSwitch();
+  addFeed(`${WEAPONS[station.weapon].name.toUpperCase()} ${changedWeapon ? 'EQUIPPED' : 'REFILLED'}`, 'gold');
+  renderFieldKitSelection();
+  return true;
+}
+
+function interactWithWeaponPickup(now = performance.now()): boolean {
+  return interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
+}
+
 function interactWithDeathDrop(now = performance.now()): boolean {
   if (!player.alive || matchState.phase !== 'active') return false;
   const candidates = deathDrops
@@ -2872,12 +2912,17 @@ function updateDeathDrops(now: number): void {
   const candidates = deathDrops
     .map((entity) => entity.drop)
     .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
-  const nearby = player.alive
+  const nearbyStation = nearbyGunRangeWeaponStation();
+  const nearby = player.alive && !nearbyStation
     ? nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon')
     : null;
   const prompt = element<HTMLElement>('#pickup-prompt');
-  prompt.hidden = !nearby;
-  if (nearby) {
+  prompt.hidden = !nearby && !nearbyStation;
+  if (nearbyStation) {
+    const replenish = rangePrimaryUnlocked && nearbyStation.weapon === player.primaryWeapon;
+    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REFILL' : 'EQUIP';
+    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearbyStation.weapon].name.toUpperCase();
+  } else if (nearby) {
     const replenish = nearby.weapon === player.primaryWeapon;
     prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REPLENISH' : 'PICK UP';
     prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearby.weapon].name.toUpperCase();
@@ -3230,16 +3275,26 @@ function respawn(requestLock = true): void {
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
   footstepAccumulator = { distance: 0, side: 0 };
-  const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
-  player.primaryWeapon = deploymentWeapon;
-  for (const weapon of deployedWeapons(deploymentWeapon)) {
-    player.ammo[weapon] = WEAPONS[weapon].mag;
-    player.reserve[weapon] = WEAPONS[weapon].reserve;
-  }
-  if (player.weapon !== player.primaryWeapon) {
-    player.weapon = player.primaryWeapon;
+  if (selectedArena.id === 'gun-range') {
+    rangePrimaryUnlocked = false;
+    player.primaryWeapon = 'carbine';
+    player.weapon = 'pistol';
+    player.ammo.pistol = WEAPONS.pistol.mag;
+    player.reserve.pistol = WEAPONS.pistol.reserve;
     player.switchingUntil = 0;
-    weaponView.setWeapon(player.primaryWeapon, true);
+    weaponView.setWeapon('pistol', true);
+  } else {
+    const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
+    player.primaryWeapon = deploymentWeapon;
+    for (const weapon of deployedWeapons(deploymentWeapon)) {
+      player.ammo[weapon] = WEAPONS[weapon].mag;
+      player.reserve[weapon] = WEAPONS[weapon].reserve;
+    }
+    if (player.weapon !== player.primaryWeapon) {
+      player.weapon = player.primaryWeapon;
+      player.switchingUntil = 0;
+      weaponView.setWeapon(player.primaryWeapon, true);
+    }
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
@@ -3346,8 +3401,9 @@ function endSpawnProtectionOnOffense(now: number): void {
 }
 
 function switchWeapon(index: number): void {
-  const equippedWeapons = deployedWeapons(player.primaryWeapon);
-  const id = equippedWeapons[index];
+  const id = selectedArena.id === 'gun-range'
+    ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? 'pistol' : undefined
+    : deployedWeapons(player.primaryWeapon)[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -5700,7 +5756,8 @@ function updatePhysics(dt: number): void {
   const aimingFov = player.weapon === 'sniper'
     ? magnifiedFovDegrees(preferredFov, 3)
     : Math.max(55, preferredFov - 20);
-  camera.fov = damp(camera.fov, adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov, player.weapon === 'sniper' ? 18 : 10, dt);
+  const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
+  camera.fov = player.weapon === 'sniper' ? targetFov : damp(camera.fov, targetFov, 10, dt);
   camera.updateProjectionMatrix();
   const sniperScopeActive = player.alive
     && player.weapon === 'sniper'
@@ -6357,7 +6414,7 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
-  if (event.code === 'KeyF' && !event.repeat) interactWithDeathDrop();
+  if (event.code === 'KeyF' && !event.repeat) interactWithWeaponPickup();
   if (event.code === 'KeyT' && !event.repeat) sendTeamPing('enemy');
   if (event.code === 'KeyY' && !event.repeat) sendTeamPing('regroup');
   if (event.code === 'KeyU' && !event.repeat) sendTeamPing('push');
@@ -6436,6 +6493,11 @@ document.addEventListener('pointerlockchange', () => {
 
 function syncArenaSelectionUi(): void {
   const lobbyArenaLocked = network.role !== 'offline' || privateLobbySnapshot !== null;
+  const rangeArmoryMode = selectedArena.id === 'gun-range';
+  const fieldKitTab = element<HTMLButtonElement>('[data-menu-tab="kit"]');
+  fieldKitTab.hidden = rangeArmoryMode;
+  fieldKitTab.disabled = rangeArmoryMode;
+  if (rangeArmoryMode && fieldKitTab.classList.contains('active')) setMenuTab('deploy');
   for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
     const selected = button.dataset.arenaId === selectedArena.id;
     button.classList.toggle('selected', selected);
@@ -6463,8 +6525,9 @@ function syncArenaSelectionUi(): void {
     : selectedArena.id === 'rustworks-1v1'
       ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
       : selectedArena.id === 'gun-range'
-        ? 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.'
+        ? 'Explore the indoor armory, pick a weapon from a bench, then work the 100 / 200 / 300 point lanes.'
         : 'Fight through an original airport concourse and jetliner apron with security chokes, a narrow gangway, and open tarmac sightlines.';
+  renderFieldKitSelection();
 }
 
 function setArenaPresentationVisibility(): void {
@@ -6550,8 +6613,8 @@ function setArenaMenuCamera(): void {
   const centreX = (arena.bounds.minX + arena.bounds.maxX) / 2;
   const centreZ = (arena.bounds.minZ + arena.bounds.maxZ) / 2;
   if (selectedArena.id === 'gun-range') {
-    camera.position.set(12, 13.5, 8);
-    camera.lookAt(0, 1.2, -25);
+    camera.position.set(17, 5.35, 17.5);
+    camera.lookAt(0, 1.65, -28);
   } else if (selectedArena.id === 'rustworks-1v1') {
     // Keep the tall tower on the unobstructed right side of the deployment panel.
     camera.position.set(18, 20, -28);
@@ -6672,13 +6735,14 @@ function resetForMode(): void {
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
-  player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
-  player.weapon = player.primaryWeapon;
+  rangePrimaryUnlocked = false;
+  player.primaryWeapon = selectedArena.id === 'gun-range' ? 'carbine' : fieldKitById(selectedFieldKit).weapon;
+  player.weapon = selectedArena.id === 'gun-range' ? 'pistol' : player.primaryWeapon;
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
 }
 
 function returnToMainMenu(): void {
@@ -7079,6 +7143,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     rangePractice: {
       score: rangeScore,
       hits: targetHits,
+      armoryOnly: selectedArena.id === 'gun-range',
+      primaryUnlocked: rangePrimaryUnlocked,
+      stations: GUN_RANGE_WEAPON_STATIONS.map((station) => ({
+        id: station.id,
+        weapon: station.weapon,
+        label: station.label,
+        position: [station.position.x, station.position.y, station.position.z],
+        visible: arena.root.getObjectByName(`gun-range-weapon-station-${station.weapon}`)?.visible ?? false,
+      })),
       unlimitedAmmo: hasUnlimitedRangeAmmo(selectedArena.id),
       reserveHud: reserveHudValue(selectedArena.id, player.reserve[player.weapon]),
       firingLineZ: GUN_RANGE_FIRING_LINE_Z,
@@ -7134,7 +7207,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       deaths: player.deaths,
       weapon: player.weapon,
       primaryWeapon: player.primaryWeapon,
-      equippedWeapons: deployedWeapons(player.primaryWeapon),
+      equippedWeapons: selectedArena.id === 'gun-range'
+        ? [rangePrimaryUnlocked ? player.primaryWeapon : null, 'pistol']
+        : deployedWeapons(player.primaryWeapon),
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
       reloading: player.reloadState !== null,
@@ -7980,14 +8055,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     renderFieldKitSelection();
   },
   equipWeapon: (weapon: WeaponId) => {
-    if (weapon === 'carbine' || weapon === 'smg' || weapon === 'scattergun' || weapon === 'sniper') player.primaryWeapon = weapon;
+    if (PRIMARY_WEAPON_IDS.includes(weapon as PrimaryWeaponId)) {
+      player.primaryWeapon = weapon as PrimaryWeaponId;
+      if (selectedArena.id === 'gun-range') rangePrimaryUnlocked = true;
+    }
     player.weapon = weapon;
     player.ammo[weapon] = WEAPONS[weapon].mag;
     player.reserve[weapon] = WEAPONS[weapon].reserve;
     player.nextShotAt = 0;
     weaponView.setWeapon(weapon, true);
   },
-  interactDrop: () => interactWithDeathDrop(),
+  interactDrop: () => interactWithWeaponPickup(),
   setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
     player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));

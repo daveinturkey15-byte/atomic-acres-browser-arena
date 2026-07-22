@@ -94,6 +94,20 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
       minimumWallDamageMultiplier: 0.22, maxPenetratedSurfaces: 1,
     },
   },
+  lmg: {
+    id: 'lmg', name: 'Mastiff 63 LMG', damage: 27, minimumDamage: 18,
+    falloffStart: 30, falloffEnd: 82, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.82,
+    rpm: 720, mag: 62, reserve: 186, reload: 3.25,
+    hipSpread: 0.022, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.78,
+    crouchSpreadMultiplier: 0.7, sustainedSpreadPerShot: 0.0025, maximumSpread: 0.064,
+    pellets: 1, recoilPitch: 0.019, recoilYaw: 0.01, recoilRecovery: 10,
+    switchSeconds: 0.78, automatic: true, color: 0x9fda72,
+    penetration: {
+      caliber: '7.62 mm', penetrationPower: 6.9, fmjMultiplier: 1.14,
+      energyFalloffStart: 30, energyFalloffEnd: 90, minimumEnergyRetention: 0.58,
+      minimumWallDamageMultiplier: 0.4, maxPenetratedSurfaces: 2,
+    },
+  },
   scattergun: {
     id: 'scattergun', name: 'Model 12 Scattergun', damage: 17, minimumDamage: 7,
     falloffStart: 8, falloffEnd: 30, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.88,

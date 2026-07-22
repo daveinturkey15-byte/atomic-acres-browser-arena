@@ -87,7 +87,7 @@ test.describe('Pass 25A baseline and lifecycle', () => {
       await ready(page);
       await startSolo(page);
       await page.setViewportSize(viewport);
-      const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'];
+      const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'];
       for (const weapon of weapons) {
         await page.evaluate(({ selected }) => {
           const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {

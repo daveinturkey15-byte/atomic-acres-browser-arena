@@ -41,7 +41,7 @@ test('all live arenas use classified wallbang authority and actual authored cove
   });
 
   expect(Object.keys(result.snapshot.weaponProfiles).sort()).toEqual([
-    'carbine', 'machine-pistol', 'pistol', 'scattergun', 'smg', 'sniper',
+    'carbine', 'lmg', 'machine-pistol', 'pistol', 'scattergun', 'smg', 'sniper',
   ]);
   expect(Object.keys(result.snapshot.arenas).sort()).toEqual([
     'atomic-acres', 'gun-range', 'rustworks-1v1', 'skyline-terminal',
