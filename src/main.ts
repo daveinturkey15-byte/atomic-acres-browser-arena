@@ -30,7 +30,15 @@ import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelo
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import {
+  applyPenetrationDamage,
+  ballisticImpactSurface,
+  resolveBallisticHitscanAgainstTarget,
+  traceBallisticPath,
+  type BallisticSurface,
+  type BallisticTrace,
+} from './ballistics';
 import {
   BOT_DAMAGE_MULTIPLIER,
   GRENADE_RADIUS,
@@ -846,6 +854,20 @@ const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
 };
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 let arena: ArenaMap = arenaById[selectedArena.id];
+
+function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
+  const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+  return activeArena.shotSurfaces.filter((surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId));
+}
+
+function traceWeaponPath(
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  distance: number,
+  weapon: WeaponId,
+): BallisticTrace {
+  return traceBallisticPath(origin, direction, distance, WEAPONS[weapon].penetration, activeBallisticSurfaces());
+}
 for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate === arena;
 document.documentElement.dataset.arenaId = selectedArena.id;
 function applyArenaFogProfile(): void {
@@ -2480,7 +2502,12 @@ function onNetworkMessage(message: GameMessage): void {
           yaw: targetIsLocal ? player.yaw : remoteTarget!.snapshot.yaw,
           stance: targetStance,
         },
-        (origin, impact) => arena.colliders.some((box) => segmentIntersectsBox(origin, impact, box)),
+        (origin, impact, weapon) => {
+          const delta = impact.clone().sub(origin);
+          const distance = delta.length();
+          const trace = traceWeaponPath(origin, delta, distance, weapon);
+          return trace.reachedDistance ? trace.damageMultiplier : 0;
+        },
       );
       if (derivedDamage <= 0) { recordRemoteHitAdmission('shot-ray-miss'); return; }
       if (Math.abs(message.damage - derivedDamage) > 1e-6) {
@@ -2608,16 +2635,26 @@ function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
   const direction = new THREE.Vector3(...message.direction).normalize();
-  const end = origin.clone().addScaledVector(direction, 50);
-  const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
-  const visibleEnd = origin.clone().addScaledVector(direction, trace.tracerDistance);
+  const trace = traceWeaponPath(origin, direction, 50, message.weapon);
+  const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
   spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   if (remoteOperator) fireOperator(remoteOperator);
-  if (trace.blockedByCover) {
-    spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
-    audio.impact('concrete', visibleEnd.distanceTo(camera.position));
+  let impactAudioPlayed = false;
+  for (const impact of trace.impacts) {
+    const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+    const point = origin.clone().addScaledVector(direction, impactDistance);
+    const surface = ballisticImpactSurface(impact.surface.material);
+    spawnImpactFlash(point, surface, new THREE.Vector3(
+      impact.entryNormal.x,
+      impact.entryNormal.y,
+      impact.entryNormal.z,
+    ));
+    if (!impactAudioPlayed) {
+      impactAudioPlayed = true;
+      audio.impact(surface, point.distanceTo(camera.position));
+    }
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
@@ -2957,11 +2994,14 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const explosive = message.kind === 'explosive';
   const senderOriginLimit = explosive ? 36 : 2.8;
+  const shotDelta = centre.clone().sub(origin);
+  const shotTrace = explosive ? null : traceWeaponPath(origin, shotDelta, shotDelta.length(), remote.snapshot.weapon);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)
     || origin.distanceTo(sender) > senderOriginLimit
     || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
     || !explosive && origin.distanceTo(centre) > 110
-    || windowBreakPathBlocked(origin, centre, arena.colliders)) return;
+    || explosive && windowBreakPathBlocked(origin, centre, arena.colliders)
+    || !explosive && !shotTrace?.reachedDistance) return;
   if (explosive && !localMultiplayerQa) {
     const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
     if (!grenadeAuthority || !Number.isFinite(message.actionNonce)) return;
@@ -3426,6 +3466,7 @@ function tryFire(now: number): void {
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
   const pelletDirections: [number, number, number][] = [];
   let impactAudioPlayed = false;
+  const presentedSurfaceIds = new Set<string>();
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
@@ -3448,16 +3489,34 @@ function tryFire(now: number): void {
         moving,
       };
     }
-    const result = castShot(origin, direction);
+    const result = castShot(origin, direction, player.weapon, true);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     spawnTracer(visualStart, authoritativeEnd, spec.color);
+    for (const impact of result.ballisticTrace?.impacts ?? []) {
+      if (presentedSurfaceIds.has(impact.surface.id)) continue;
+      presentedSurfaceIds.add(impact.surface.id);
+      const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+      const point = origin.clone().addScaledVector(direction, impactDistance);
+      const normal = new THREE.Vector3(impact.entryNormal.x, impact.entryNormal.y, impact.entryNormal.z);
+      if (impact.surface.breakableWindowId) {
+        if (breakHouseWindow(impact.surface.breakableWindowId, point, normal, true, origin)) impactAudioPlayed = true;
+        continue;
+      }
+      const surface = ballisticImpactSurface(impact.surface.material);
+      spawnImpactFlash(point, surface, normal);
+      if (!impactAudioPlayed) {
+        impactAudioPlayed = true;
+        audio.impact(surface, point.distanceTo(camera.position));
+      }
+    }
     if (result.windowId) {
       const point = result.impactPoint ?? authoritativeEnd;
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
       if (breakHouseWindow(result.windowId, point, normal, true, origin)) impactAudioPlayed = true;
     }
-    if (!result.playerId && !result.targetId && !result.windowId && result.distance < 89) {
+    if (!result.playerId && !result.targetId && !result.windowId && result.distance < 89
+      && (result.ballisticTrace?.impacts.length ?? 0) === 0) {
       const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
       const surface = result.impactSurface ?? 'concrete';
@@ -3469,13 +3528,17 @@ function tryFire(now: number): void {
     }
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
-      const damage = computeDamage(spec, result.distance, zone);
+      const damage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
       const prior = hitDamage.get(result.playerId);
       hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
     }
     if (result.targetId) {
       const zone = result.hitZone ?? 'body';
-      hitPracticeTarget(result.targetId, computeDamage(spec, result.distance, zone), zone);
+      hitPracticeTarget(
+        result.targetId,
+        applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier),
+        zone,
+      );
     }
   }
   const shot: ShotMessage = {
@@ -3517,6 +3580,7 @@ function tryFire(now: number): void {
 
 type ShotCastResult = {
   distance: number;
+  damageMultiplier: number;
   playerId?: string;
   targetId?: string;
   windowId?: string;
@@ -3524,22 +3588,50 @@ type ShotCastResult = {
   impactPoint?: THREE.Vector3;
   impactNormal?: THREE.Vector3;
   impactSurface?: ImpactSurface;
+  ballisticTrace?: BallisticTrace;
 };
 
-function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResult {
+function castShot(
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  weapon: WeaponId = player.weapon,
+  allowPenetration = true,
+): ShotCastResult {
   const ray = new THREE.Raycaster(origin, direction, 0.1, 110);
   ray.camera = camera;
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
   const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
   const activeTargets = arena.targets.filter((target) => target.active).map((target) => target.root);
-  const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
-  const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
-    const windowId = object.userData.breakableWindowId;
-    return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
-  });
-  const intersections = ray.intersectObjects([...activeWorldMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
-  const first = intersections[0];
-  if (!first) return { distance: 90 };
+  let first: THREE.Intersection<THREE.Object3D> | undefined;
+  let ballisticTrace: BallisticTrace | undefined;
+  if (allowPenetration) {
+    first = ray.intersectObjects([...remoteObjects, ...botObjects, ...activeTargets], true)[0];
+    const requestedDistance = first?.distance ?? 90;
+    ballisticTrace = traceWeaponPath(origin, direction, requestedDistance, weapon);
+    if (!ballisticTrace.reachedDistance) {
+      const stoppedImpact = ballisticTrace.impacts.at(-1);
+      const impactPoint = origin.clone().addScaledVector(direction, ballisticTrace.travelDistance);
+      return {
+        distance: ballisticTrace.travelDistance,
+        damageMultiplier: 0,
+        impactPoint,
+        impactNormal: stoppedImpact
+          ? new THREE.Vector3(stoppedImpact.entryNormal.x, stoppedImpact.entryNormal.y, stoppedImpact.entryNormal.z)
+          : direction.clone().multiplyScalar(-1),
+        impactSurface: ballisticTrace.stoppedBy ? ballisticImpactSurface(ballisticTrace.stoppedBy.material) : 'concrete',
+        ballisticTrace,
+      };
+    }
+    if (!first) return { distance: 90, damageMultiplier: 1, ballisticTrace };
+  } else {
+    const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+    const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
+      const windowId = object.userData.breakableWindowId;
+      return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
+    });
+    first = ray.intersectObjects([...activeWorldMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true)[0];
+    if (!first) return { distance: 90, damageMultiplier: 1 };
+  }
   let node: THREE.Object3D | null = first.object;
   let playerId: string | undefined;
   let targetId: string | undefined;
@@ -3566,6 +3658,7 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
     ?? direction.clone().multiplyScalar(-1);
   return {
     distance: Math.min(first.distance, 110),
+    damageMultiplier: ballisticTrace?.damageMultiplier ?? 1,
     playerId,
     targetId,
     windowId,
@@ -3573,6 +3666,7 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
     impactPoint: first.point.clone(),
     impactNormal,
     impactSurface: classifyImpactSurface({ hint: surfaceHint, name: names.join(' '), metalness }),
+    ballisticTrace,
   };
 }
 
@@ -4142,20 +4236,43 @@ function updateBots(dt: number, now: number): void {
       direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
       const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
-      const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
+      const botWeapon = WEAPONS[bot.weapon];
+      const resolution = resolveBallisticHitscanAgainstTarget(
+        origin,
+        direction,
+        shotLength,
+        player.position,
+        targetRadius,
+        botWeapon.penetration,
+        activeBallisticSurfaces(),
+      );
       const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
       const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-      const botWeapon = WEAPONS[bot.weapon];
       spawnTracer(botMuzzle ?? origin, visibleEnd, botWeapon.color);
-      if (resolution.blockedByCover) {
-        spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
-        audio.impact('concrete', visibleEnd.distanceTo(player.position));
-      } else if (!resolution.hitTarget) {
+      let impactAudioPlayed = false;
+      for (const impact of resolution.trace.impacts) {
+        const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+        const point = origin.clone().addScaledVector(direction, impactDistance);
+        const surface = ballisticImpactSurface(impact.surface.material);
+        spawnImpactFlash(point, surface, new THREE.Vector3(
+          impact.entryNormal.x,
+          impact.entryNormal.y,
+          impact.entryNormal.z,
+        ));
+        if (!impactAudioPlayed) {
+          impactAudioPlayed = true;
+          audio.impact(surface, point.distanceTo(player.position));
+        }
+      }
+      if (!resolution.hitTarget && resolution.trace.impacts.length === 0) {
         audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
       audio.shot(bot.weapon, true);
       if (resolution.hitTarget) {
-        const damage = botScaledDamage(computeDamage(botWeapon, distance, 'body'));
+        const damage = botScaledDamage(applyPenetrationDamage(
+          computeDamage(botWeapon, distance, 'body'),
+          resolution.damageMultiplier,
+        ));
         applyDamage(damage, bot.id);
         if (!player.alive) {
           bot.kills += 1;
@@ -4181,7 +4298,7 @@ function melee(): void {
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const meleeNonce = randomNonce();
   network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: meleeNonce });
-  const hit = castShot(origin, direction);
+  const hit = castShot(origin, direction, player.weapon, false);
   if (hit.windowId) {
     const strike = meleeStrike(hit.distance, now, previousMeleeAt);
     if (strike.hit) {
@@ -6824,6 +6941,13 @@ window.setInterval(() => {
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
+    traceBallistics: (
+      weapon: WeaponId,
+      origin: [number, number, number],
+      direction: [number, number, number],
+      distance: number,
+      arenaId?: ArenaId,
+    ) => BallisticTrace;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     clearBots: () => void;
@@ -6942,6 +7066,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
       raycastMeshes: arena.raycastMeshes.length,
       targets: arena.targets.length,
+    },
+    ballistics: {
+      activeSurfaces: activeBallisticSurfaces().length,
+      weaponProfiles: Object.fromEntries(Object.entries(WEAPONS).map(([id, weapon]) => [id, { ...weapon.penetration }])),
+      arenas: Object.fromEntries(Object.entries(arenaById).map(([id, entry]) => [id, {
+        raycastMeshes: entry.raycastMeshes.length,
+        shotSurfaces: entry.shotSurfaces.length,
+        fallbackSurfaces: entry.shotSurfaces.filter((surface) => surface.classification === 'fallback').map((surface) => surface.name),
+      }])),
     },
     rangePractice: {
       score: rangeScore,
@@ -7438,6 +7571,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
+    const traceArena = arenaById[arenaId];
+    const brokenWindowIds = new Set(traceArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+    const surfaces = traceArena.shotSurfaces.filter(
+      (surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId),
+    );
+    return traceBallisticPath(
+      new THREE.Vector3(...origin),
+      new THREE.Vector3(...direction),
+      distance,
+      WEAPONS[weapon].penetration,
+      surfaces,
+    );
+  },
   startSolo: () => {
     element<HTMLInputElement>('#player-name').value = 'QA Operator';
     network.close();
