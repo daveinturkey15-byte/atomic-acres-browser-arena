@@ -544,7 +544,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   // Street lamps and a few decorative trees add depth without texture downloads.
   for (const [x, z] of [[-13, -16], [13, 16], [-13, 22], [13, -22]] as Array<[number, number]>) {
-    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, true, true, true);
+    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, true, true, true, 'structural-metal');
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffefb5, emissive: 0xffb84d, emissiveIntensity: 2.2 }));
     lamp.position.set(x, 5.55, z);
     world.add(lamp);
