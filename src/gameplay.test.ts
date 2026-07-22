@@ -12,6 +12,7 @@ import {
   cancelReload,
   completeReload,
   computeDamage,
+  computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
   grenadeDamage,
@@ -188,12 +189,14 @@ describe('weapon tuning', () => {
     expect(edge.y).toBeGreaterThan(0);
   });
 
-  it('keeps every weapon principal projectile exactly on the reticle ray', () => {
+  it('applies authored cone spread to single-projectile guns and keeps one shotgun pellet centred', () => {
     for (const weapon of Object.values(WEAPONS)) {
       const principal = sampleWeaponPellet(weapon, 0, weapon.maximumSpread, 1, 0.37);
-      expect(principal, weapon.id).toEqual({ x: 0, y: 0 });
       if (weapon.pellets === 1) {
-        expect(sampleWeaponPellet(weapon, 7, weapon.maximumSpread, 1, 0.37), weapon.id).toEqual({ x: 0, y: 0 });
+        expect(Math.hypot(principal.x, principal.y), weapon.id).toBeGreaterThan(0);
+        expect(Math.hypot(principal.x, principal.y), weapon.id).toBeCloseTo(Math.tan(weapon.maximumSpread), 8);
+      } else {
+        expect(principal, weapon.id).toEqual({ x: 0, y: 0 });
       }
     }
     expect(sampleWeaponPellet(WEAPONS.scattergun, 1, WEAPONS.scattergun.hipSpread, 1, 0.25).y).toBeGreaterThan(0);
@@ -227,7 +230,7 @@ describe('weapon tuning', () => {
     expect(auto.damage).toBeLessThan(WEAPONS.pistol.damage);
     expect(auto.mag).toBe(20);
     expect(auto.reserve).toBe(80);
-    expect(sampleWeaponPellet(auto, 0, auto.maximumSpread, 1, 0.5)).toEqual({ x: 0, y: 0 });
+    expect(Math.hypot(...Object.values(sampleWeaponPellet(auto, 0, auto.maximumSpread, 1, 0.5)))).toBeGreaterThan(0);
   });
 
   it('gives the Longline sniper an exact one-headshot two-body-shot lethality contract', () => {
@@ -265,6 +268,30 @@ describe('weapon tuning', () => {
     const recovered = recoverRecoilImpulse(impulse, WEAPONS.carbine, 0.2);
     expect(recovered.pitch).toBeLessThan(impulse.pitch);
     expect(recovered.yaw).toBeLessThan(impulse.yaw);
+  });
+
+  it('reduces recoil in ADS, crouch and prone for every firearm', () => {
+    for (const weapon of Object.values(WEAPONS)) {
+      const hip = computeRecoilImpulse(weapon, 6, 1, { ads: false, crouched: false });
+      const ads = computeRecoilImpulse(weapon, 6, 1, { ads: true, crouched: false });
+      const crouchedAds = computeRecoilImpulse(weapon, 6, 1, { ads: true, crouched: true });
+      const proneAds = computeRecoilImpulse(weapon, 6, 1, { ads: true, crouched: false, prone: true });
+      expect(ads.pitch, weapon.id).toBeLessThan(hip.pitch);
+      expect(crouchedAds.pitch, weapon.id).toBeLessThan(ads.pitch);
+      expect(proneAds.pitch, weapon.id).toBeLessThan(crouchedAds.pitch);
+      expect(Math.abs(proneAds.yaw), weapon.id).toBeLessThan(Math.abs(crouchedAds.yaw));
+    }
+  });
+});
+
+describe('fall damage', () => {
+  it('keeps ordinary landings safe and scales severe impacts to lethal damage', () => {
+    expect(computeFallDamage(0)).toBe(0);
+    expect(computeFallDamage(9.5)).toBe(0);
+    expect(computeFallDamage(14)).toBeGreaterThan(0);
+    expect(computeFallDamage(18)).toBeGreaterThan(computeFallDamage(14));
+    expect(computeFallDamage(22)).toBe(100);
+    expect(computeFallDamage(Number.NaN)).toBe(0);
   });
 });
 

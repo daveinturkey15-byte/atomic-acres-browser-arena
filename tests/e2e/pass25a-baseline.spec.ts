@@ -22,6 +22,10 @@ type Pass25State = {
     sample: [number, number];
     direction: [number, number, number];
     cameraDirection: [number, number, number];
+    spread: number;
+    ads: boolean;
+    stance: 'stand' | 'crouch' | 'prone';
+    moving: boolean;
   } | null;
   weaponReady: boolean;
   originalArtLoaded: boolean;
@@ -78,7 +82,7 @@ test.describe('Pass 25A baseline and lifecycle', () => {
 
   const aimViewports = [{ width: 960, height: 540 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }];
   for (const viewport of aimViewports) {
-    test(`keeps canvas reticle and principal shot on the authoritative ray for every weapon at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    test(`keeps the reticle centred while applying bounded weapon spread at ${viewport.width}x${viewport.height}`, async ({ page }) => {
       test.setTimeout(240_000);
       await ready(page);
       await startSolo(page);
@@ -97,8 +101,11 @@ test.describe('Pass 25A baseline and lifecycle', () => {
         }, { selected: weapon });
         await expect.poll(async () => (await snapshot(page)).lastPrincipalShotAlignment?.weapon).toBe(weapon);
         let state = await snapshot(page);
-        expect(state.lastPrincipalShotAlignment?.sample).toEqual([0, 0]);
-        expect(state.lastPrincipalShotAlignment?.angularError).toBeLessThanOrEqual(1e-7);
+        const hip = state.lastPrincipalShotAlignment!;
+        expect(hip.ads).toBe(false);
+        expect(hip.angularError).toBeLessThanOrEqual(hip.spread + 1e-7);
+        if (weapon === 'scattergun') expect(hip.sample).toEqual([0, 0]);
+        else expect(Math.hypot(...hip.sample)).toBeGreaterThan(0);
         await assertAimAlignment(page);
 
         await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(true));
@@ -113,8 +120,11 @@ test.describe('Pass 25A baseline and lifecycle', () => {
         await expect.poll(async () => (await snapshot(page)).weaponPresentation.shotsPresented).toBe(shotsBeforeAdsFire + 1);
         state = await snapshot(page);
         expect(state.lastPrincipalShotAlignment?.weapon).toBe(weapon);
-        expect(state.lastPrincipalShotAlignment?.sample).toEqual([0, 0]);
-        expect(state.lastPrincipalShotAlignment?.angularError).toBeLessThanOrEqual(1e-7);
+        const ads = state.lastPrincipalShotAlignment!;
+        expect(ads.ads).toBe(true);
+        expect(ads.spread).toBeLessThan(hip.spread);
+        expect(ads.angularError).toBeLessThanOrEqual(ads.spread + 1e-7);
+        if (weapon === 'scattergun') expect(ads.sample).toEqual([0, 0]);
       }
     });
   }
@@ -175,9 +185,11 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     await page.waitForTimeout(350);
     const afterBlur = await snapshot(page);
     expect(Math.hypot(afterBlur.player.position[0] - blurred.player.position[0], afterBlur.player.position[2] - blurred.player.position[2])).toBeLessThan(0.05);
+    expect(afterBlur.frameCount).toBeGreaterThan(blurred.frameCount);
+    await expect(page.locator('#menu')).toHaveClass(/hidden/);
     await page.setViewportSize({ width: 1_111, height: 777 });
     await assertAimAlignment(page);
-    await page.locator('#resume').click();
+    await page.locator('#game').click({ position: { x: 100, y: 100 } });
     await expect.poll(() => page.evaluate(() => document.pointerLockElement?.id ?? null)).toBe('game');
     await assertAimAlignment(page);
   });

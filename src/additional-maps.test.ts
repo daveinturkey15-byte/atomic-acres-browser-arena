@@ -138,7 +138,7 @@ describe('additional authored maps', () => {
     expect(canopy?.visible).toBe(true);
   });
 
-  it('exposes Pass 51 clean access, bracing, process gear and shipping cover', () => {
+  it('exposes clean access, bracing, and four-container perimeter rows', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const required = [
       'rustworks-lower-ramp',
@@ -151,11 +151,8 @@ describe('additional authored maps', () => {
       'rustworks-ship-ladder-rail-west',
       'rustworks-ship-ladder-rung-0',
       'rustworks-structural-brace',
-      'rustworks-process-manifold',
       'rustworks-tower-hardstand',
-      'rustworks-freight-crate',
       'rustworks-shipping-container',
-      'rustworks-pallet-stack',
       'rustworks-barrier-low',
       'rustworks-rig-deck-top',
       'rustworks-rig-leg',
@@ -166,9 +163,9 @@ describe('additional authored maps', () => {
     }
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
-    expect(namedCount(map.root, 'rustworks-freight-crate')).toBeGreaterThanOrEqual(4);
-    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(4);
-    expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(4);
+    expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(16);
+    expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(0);
     expect(namedCount(map.root, 'rustworks-process-riser')).toBe(0);
     expect(namedCount(map.root, 'rustworks-process-pipe-run')).toBe(0);
     expect(namedCount(map.root, 'rustworks-rig-leg')).toBeGreaterThanOrEqual(8);
@@ -186,15 +183,18 @@ describe('additional authored maps', () => {
     expect(map.root.userData.rustworksRoutes?.['lower-to-upper']).toBeTruthy();
   });
 
-  it('gives every shipping container and pallet stack full player, physics, and shot authority', () => {
+  it('gives all sixteen shipping containers full player, physics, and shot authority', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const cover: THREE.Mesh[] = [];
     map.root.traverse((node) => {
-      if (node instanceof THREE.Mesh && (node.name === 'rustworks-shipping-container' || node.name === 'rustworks-pallet-stack')) {
+      if (node instanceof THREE.Mesh && node.name === 'rustworks-shipping-container') {
         cover.push(node);
       }
     });
-    expect(cover).toHaveLength(8);
+    expect(cover).toHaveLength(16);
+    for (const side of ['north', 'south', 'west', 'east']) {
+      expect(cover.filter((mesh) => mesh.userData.rustworksContainerSide === side), `${side} container row`).toHaveLength(4);
+    }
     for (const mesh of cover) {
       const geometry = mesh.geometry as THREE.BoxGeometry;
       const { width, height, depth } = geometry.parameters;
@@ -244,7 +244,10 @@ describe('additional authored maps', () => {
     };
     expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
     expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
-    expect(access.shipLadderAngleDegrees).toBeGreaterThan(40);
+    expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(18);
+    expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(38);
+    expect(access.lowerRamp.size[0]).toBeGreaterThanOrEqual(4.8);
+    expect(access.shipLadder.size[0]).toBeGreaterThanOrEqual(2.6);
 
     const lowerAngle = Math.abs(access.lowerRamp.rotation[0]);
     const lowerHalfRun = Math.cos(lowerAngle) * access.lowerRamp.size[2] / 2;
@@ -347,7 +350,7 @@ describe('additional authored maps', () => {
           && box.min.y < corridor.maxY - 0.05
           && box.max.z > corridor.minZ + 0.05
           && box.min.z < corridor.maxZ - 0.05;
-        expect(overlaps, `${mesh.name} blocks access corridor`).toBe(false);
+        expect(overlaps, `${mesh.name}@${mesh.position.toArray().join(',')} blocks access corridor`).toBe(false);
       }
     }
   });

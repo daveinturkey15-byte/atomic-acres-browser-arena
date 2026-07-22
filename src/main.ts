@@ -44,6 +44,7 @@ import {
   cancelReload,
   completeReload as completeReloadState,
   computeDamage,
+  computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
   botScaledDamage,
@@ -494,7 +495,7 @@ app.innerHTML = `
     </div>
   </section>
   <aside id="menu-showcase" aria-hidden="true">
-    <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg" alt="" decoding="async">
+    <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
   </aside>
   <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
   <div id="changelog-backdrop" hidden></div>
@@ -1028,7 +1029,17 @@ let botGrenadeMaxActive = 0;
 let lastBotGrenadeDamage = 0;
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
-let lastPrincipalShotAlignment: { weapon: WeaponId; angularError: number; sample: [number, number]; direction: [number, number, number]; cameraDirection: [number, number, number] } | null = null;
+let lastPrincipalShotAlignment: {
+  weapon: WeaponId;
+  angularError: number;
+  sample: [number, number];
+  direction: [number, number, number];
+  cameraDirection: [number, number, number];
+  spread: number;
+  ads: boolean;
+  stance: Stance;
+  moving: boolean;
+} | null = null;
 let lastGrenadeExplosionProfile = {
   presentationDetachMs: 0,
   audioMs: 0,
@@ -1168,6 +1179,8 @@ let frameCount = 0;
 let recoilVisual = 0;
 let recoilCamera = { pitch: 0, yaw: 0 };
 let landingImpulse = 0;
+let lastFallDamage = 0;
+let lastFallImpactSpeed = 0;
 let weaponBob = 0;
 let cameraHeightOffset = 0;
 let cameraRoll = 0;
@@ -1180,6 +1193,7 @@ let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
 let footstepAccumulator: FootstepAccumulator = { distance: 0, side: 0 };
 let lastFrame = performance.now();
+let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
@@ -1206,6 +1220,7 @@ const debugCaptureCameraPosition = new THREE.Vector3();
 let debugCaptureCameraYaw = 0;
 let debugCaptureCameraPitch = 0;
 let debugCaptureCameraActive = false;
+let debugCaptureViewmodelHidden = false;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let respawnEndsAt = 0;
@@ -2627,9 +2642,9 @@ function scheduleLocalRespawn(now = performance.now()): void {
   }, 1_900);
 }
 
-function applyDamage(damage: number, attacker: string, minimumDamage = 1): void {
+function applyDamage(damage: number, attacker: string, minimumDamage = 1, bypassSpawnProtection = false): void {
   const now = performance.now();
-  if (!player.alive || now < player.invulnerableUntil) return;
+  if (!player.alive || (!bypassSpawnProtection && now < player.invulnerableUntil)) return;
   const previousHp = player.hp;
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
@@ -3158,6 +3173,8 @@ function respawn(requestLock = true): void {
   player.velocity.set(0, 0, 0);
   player.hp = 100;
   lastDamageAt = -10_000;
+  lastFallDamage = 0;
+  lastFallImpactSpeed = 0;
   player.grenades = 2;
   player.reloadState = null;
   player.alive = true;
@@ -3384,7 +3401,11 @@ function tryFire(now: number): void {
   const ammoDisplay = element<HTMLElement>('#ammo');
   ammoDisplay.classList.remove('fired');
   requestAnimationFrame(() => ammoDisplay.classList.add('fired'));
-  const recoil = computeRecoilImpulse(spec, player.sustainedShots, gameplayRandom());
+  const recoil = computeRecoilImpulse(spec, player.sustainedShots, gameplayRandom(), {
+    ads: adsHeld && weaponView.adsProgress() >= 0.9,
+    crouched: player.stance === 'crouch',
+    prone: player.stance === 'prone',
+  });
   recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
   recoilCamera.yaw = THREE.MathUtils.clamp(recoilCamera.yaw + recoil.yaw, -0.075, 0.075);
   recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
@@ -3421,6 +3442,10 @@ function tryFire(now: number): void {
         sample: [sample.x, sample.y],
         direction: direction.toArray(),
         cameraDirection: baseDirection.toArray(),
+        spread,
+        ads: adsSettled,
+        stance: player.stance,
+        moving,
       };
     }
     const result = castShot(origin, direction);
@@ -5508,8 +5533,12 @@ function updatePhysics(dt: number): void {
   }
   if (playerGrounded) lastGroundedAt = now;
   if (playerGrounded && !wasGrounded && impactVelocity < -5) {
-    landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
-    audio.land(Math.abs(impactVelocity));
+    const impactSpeed = Math.abs(impactVelocity);
+    landingImpulse = Math.min(1, impactSpeed / 14);
+    audio.land(impactSpeed);
+    lastFallImpactSpeed = impactSpeed;
+    lastFallDamage = computeFallDamage(impactSpeed);
+    if (lastFallDamage > 0) applyDamage(lastFallDamage, player.id, 0, true);
   }
   wasGrounded = playerGrounded;
   if (movement.blockedX && !movement.slopeAdjusted) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
@@ -5563,7 +5592,7 @@ function updatePhysics(dt: number): void {
     && Math.abs(camera.fov - aimingFov) < 0.35;
   sniperScopeOverlay.hidden = !sniperScopeActive;
   hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
-  weaponView.root.visible = gameStarted && !sniperScopeActive;
+  weaponView.root.visible = gameStarted && !sniperScopeActive && !debugCaptureViewmodelHidden;
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -6227,7 +6256,11 @@ window.addEventListener('keyup', (event) => {
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
+  lastWindowBlurAt = performance.now();
   clearGameplayInput();
+});
+window.addEventListener('focus', () => {
+  if (gameStarted && player.alive && !matchFinished) menu.classList.add('hidden');
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
@@ -6266,6 +6299,13 @@ document.addEventListener('pointerlockchange', () => {
       return;
     }
     if (gameStarted && player.alive && !matchFinished) {
+      const focusTransition = !document.hasFocus() || performance.now() - lastWindowBlurAt < 300;
+      if (focusTransition) {
+        // Losing pointer lock because another tab/app took focus must not pause
+        // a host or guest. The canvas click handler recaptures controls on return.
+        menu.classList.add('hidden');
+        return;
+      }
       element<HTMLButtonElement>('#resume').hidden = false;
       element<HTMLButtonElement>('#main-menu').hidden = false;
       menu.classList.remove('hidden');
@@ -6695,18 +6735,18 @@ function refreshStaticShadowsForDynamicCasters(now: number): void {
   staticShadowDynamicRefreshes += 1;
 }
 
-function frame(now: number): void {
+function frame(now: number, scheduleNext = true): void {
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
     // The HUD must report even pathologically slow software-rendered frames.
     // Adaptive quality still receives the unclamped sample and independently
     // rejects values above its 250 ms control window.
-    framePacing.record(Math.min(rawFrameMs, 1_000));
-    const adaptivePixelRatio = adaptiveQuality.record(
+    if (scheduleNext) framePacing.record(Math.min(rawFrameMs, 1_000));
+    const adaptivePixelRatio = scheduleNext ? adaptiveQuality.record(
       rawFrameMs,
       gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
-    );
+    ) : null;
     if (adaptivePixelRatio !== null) {
       applyAdaptiveRenderBudget(adaptivePixelRatio);
       grassSystem.setAdaptivePixelRatio(adaptivePixelRatio);
@@ -6765,15 +6805,22 @@ function frame(now: number): void {
       camera.updateMatrixWorld(true);
     }
     refreshStaticShadowsForDynamicCasters(now);
-    if (!debugRenderPaused && !webglContextLost) {
+    if (!debugRenderPaused && !webglContextLost && document.visibilityState === 'visible') {
       atomicSignal.render(scene, camera);
       if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
     }
-    requestAnimationFrame(frame);
+    if (scheduleNext) requestAnimationFrame(frame);
   } catch (error) {
     showFatalError(error);
   }
 }
+
+// requestAnimationFrame is suspended by background tabs. Keep a bounded,
+// no-render heartbeat so host/guest simulation, clocks, AI and network state do
+// not turn a tab switch into an implicit multiplayer pause.
+window.setInterval(() => {
+  if (document.visibilityState === 'hidden' && gameStarted && !matchFinished) frame(performance.now(), false);
+}, 50);
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
@@ -6810,6 +6857,8 @@ const debugWindow = window as Window & {
     } | null;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setCaptureCameraPose: (x: number | null, y?: number, z?: number, yaw?: number, pitch?: number) => void;
+    setCaptureViewmodelHidden: (hidden: boolean) => void;
+    stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
@@ -6961,6 +7010,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       prone: player.stance === 'prone',
       sprinting: currentSprinting,
       grenades: player.grenades,
+      lastFallDamage,
+      lastFallImpactSpeed,
       position: player.position.toArray(),
     },
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
@@ -7658,6 +7709,50 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraPosition.set(x!, y, z);
     debugCaptureCameraYaw = yaw;
     debugCaptureCameraPitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
+  },
+  setCaptureViewmodelHidden: (hidden) => { debugCaptureViewmodelHidden = hidden; },
+  stageLoadingCaptureSquad: () => {
+    if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
+      return { staged: false, characters: 0, positions: [] };
+    }
+    while (bots.size < 3 && activateDormantBot(bots.size)) {
+      // Capture three genuine runtime operators without changing live match defaults.
+    }
+    const captureCamera = new THREE.Vector3(0, 0, 18);
+    const placements = [
+      new THREE.Vector3(0.75, 0, 12.25),
+      new THREE.Vector3(3.35, 0, 10.3),
+      new THREE.Vector3(5.55, 0, 8.4),
+    ].map((position) => ({ position, yaw: operatorYawToward(position, captureCamera) }));
+    const stagedBots = [...bots.values()].slice(0, placements.length);
+    const now = performance.now();
+    for (let index = 0; index < stagedBots.length; index += 1) {
+      const bot = stagedBots[index];
+      const placement = placements[index];
+      bot.position.copy(placement.position);
+      bot.velocity.set(0, 0, 0);
+      bot.hp = 100;
+      bot.alive = true;
+      bot.hasLineOfSight = false;
+      bot.sightStartedAt = 0;
+      bot.burstShots = 0;
+      bot.invulnerableUntil = now + 60_000;
+      bot.root.position.copy(bot.position);
+      bot.root.rotation.set(0, placement.yaw, 0);
+      bot.root.scale.setScalar(1);
+      bot.root.visible = true;
+      const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+      if (haze) haze.visible = false;
+      resetOperator(bot.root);
+      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      bot.root.updateMatrixWorld(true);
+    }
+    botsFrozen = true;
+    return {
+      staged: stagedBots.length === placements.length,
+      characters: stagedBots.length,
+      positions: stagedBots.map((bot) => bot.position.toArray()),
+    };
   },
   collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
     ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)

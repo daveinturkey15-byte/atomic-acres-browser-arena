@@ -381,8 +381,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const [northGarage, southGarage] = GARAGE_LAYOUT;
   box('north garage', [northGarage.x, 1.7, northGarage.z], [12, 3.4, 6.5], palette.cream);
   box('south garage', [southGarage.x, 1.7, southGarage.z], [12, 3.4, 6.5], palette.cream);
-  box('garage door', [northGarage.x, 1.55, northGarage.z + 3.3], [9, 2.7, 0.18], palette.chrome, false, false);
-  box('garage door', [southGarage.x, 1.55, southGarage.z - 3.3], [9, 2.7, 0.18], palette.chrome, false, false);
+  // These read as closed, opaque doors, so movement and projectile authority
+  // must match the facade instead of relying on the slightly recessed shell.
+  box('garage door', [northGarage.x, 1.55, northGarage.z + 3.3], [9, 2.7, 0.18], palette.chrome, true, false, true);
+  box('garage door', [southGarage.x, 1.55, southGarage.z - 3.3], [9, 2.7, 0.18], palette.chrome, true, false, true);
 
   // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
   box('atomic landmark plinth', [27, 0.38, -1.5], [5.8, 0.76, 5.8], palette.concrete);
@@ -486,7 +488,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   // Street lamps and a few decorative trees add depth without texture downloads.
   for (const [x, z] of [[-13, -16], [13, 16], [-13, 22], [13, -22]] as Array<[number, number]>) {
-    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, false);
+    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, true, true, true);
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffefb5, emissive: 0xffb84d, emissiveIntensity: 2.2 }));
     lamp.position.set(x, 5.55, z);
     world.add(lamp);

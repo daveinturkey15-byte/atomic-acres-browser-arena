@@ -13,6 +13,33 @@ export type WaterTelemetry = Readonly<{
   physicsActive: boolean;
 }>;
 
+const OCEAN_WAVES = [
+  { x: 0.87, z: 0.49, frequency: 0.025, speed: 0.58, weight: 0.82, phase: 0.31 },
+  { x: -0.31, z: 0.95, frequency: 0.041, speed: 0.76, weight: 0.46, phase: 1.73 },
+  { x: 0.62, z: -0.78, frequency: 0.073, speed: 1.08, weight: 0.27, phase: 3.14 },
+  { x: -0.91, z: -0.42, frequency: 0.12, speed: 1.55, weight: 0.14, phase: 4.86 },
+] as const;
+
+export function sampleOceanWave(x: number, z: number, timeSeconds: number, amplitude: number): {
+  height: number;
+  normal: THREE.Vector3;
+} {
+  let height = 0;
+  let derivativeX = 0;
+  let derivativeZ = 0;
+  for (const wave of OCEAN_WAVES) {
+    const phase = (x * wave.x + z * wave.z) * wave.frequency + timeSeconds * wave.speed + wave.phase;
+    const scaledAmplitude = wave.weight * amplitude;
+    height += Math.sin(phase) * scaledAmplitude;
+    derivativeX += Math.cos(phase) * scaledAmplitude * wave.frequency * wave.x;
+    derivativeZ += Math.cos(phase) * scaledAmplitude * wave.frequency * wave.z;
+  }
+  return {
+    height,
+    normal: new THREE.Vector3(-derivativeX, 1, -derivativeZ).normalize(),
+  };
+}
+
 /**
  * Deep ocean under a raised oil-rig deck.
  * Water sits well below playable Y=0 so looking over the edge reads as height.
@@ -28,8 +55,8 @@ export class WaterSystem {
   private segments = 140;
   /** Metres below the playable deck (oil-rig height). */
   private waterLevel = -16.5;
-  private nearSize = 480;
-  private horizonRadius = 1_600;
+  private nearSize = 960;
+  private horizonRadius = 3_200;
   private islandHalfX = 27;
   private islandHalfZ = 29;
   private night = true;
@@ -53,7 +80,7 @@ export class WaterSystem {
     this.enabled = arenaId === 'rustworks-1v1';
     this.night = options?.night ?? arenaId === 'rustworks-1v1';
     this.waterLevel = options?.waterLevel ?? (this.enabled ? -16.5 : -0.55);
-    this.waveAmp = profile === 'blender' ? 1.65 : 1.15;
+    this.waveAmp = profile === 'blender' ? 1.9 : 1.4;
     this.segments = profile === 'blender' ? 160 : 96;
     this.rebuild();
   }
@@ -102,29 +129,25 @@ export class WaterSystem {
         varying vec3 vWorld;
         varying float vWave;
         varying vec3 vNormalW;
+        vec3 sampleWave(vec3 p, float dx, float dz, float frequency, float speed, float weight, float phaseOffset) {
+          float wavePhase = (p.x * dx + p.z * dz) * frequency + uTime * speed + phaseOffset;
+          float scaledAmplitude = weight * uAmp;
+          return vec3(
+            sin(wavePhase) * scaledAmplitude,
+            cos(wavePhase) * scaledAmplitude * frequency * dx,
+            cos(wavePhase) * scaledAmplitude * frequency * dz
+          );
+        }
         void main() {
           vec3 p = position;
           // Large rolling swells + chop — readable from the elevated deck.
-          float swell = sin(p.x * 0.035 + uTime * 0.55) * cos(p.z * 0.028 - uTime * 0.42);
-          float roll = sin(p.x * 0.07 - p.z * 0.05 + uTime * 0.9) * 0.65;
-          float chop = sin(p.x * 0.19 + uTime * 1.8) * cos(p.z * 0.17 - uTime * 1.4) * 0.35;
-          float ridge = sin((p.x + p.z) * 0.09 + uTime * 0.7) * 0.28;
-          float wave = (swell + roll + chop + ridge) * uAmp;
-          p.y += wave;
-          // Approximate normal from finite differences for lighting.
-          float e = 0.9;
-          float hx = (
-            sin((p.x + e) * 0.035 + uTime * 0.55) * cos(p.z * 0.028 - uTime * 0.42)
-            + sin((p.x + e) * 0.07 - p.z * 0.05 + uTime * 0.9) * 0.65
-          ) * uAmp;
-          float hz = (
-            sin(p.x * 0.035 + uTime * 0.55) * cos((p.z + e) * 0.028 - uTime * 0.42)
-            + sin(p.x * 0.07 - (p.z + e) * 0.05 + uTime * 0.9) * 0.65
-          ) * uAmp;
-          vec3 dx = normalize(vec3(e, hx - wave, 0.0));
-          vec3 dz = normalize(vec3(0.0, hz - wave, e));
-          vNormalW = normalize(cross(dz, dx));
-          vWave = wave;
+          vec3 wave = sampleWave(p, 0.87, 0.49, 0.025, 0.58, 0.82, 0.31)
+            + sampleWave(p, -0.31, 0.95, 0.041, 0.76, 0.46, 1.73)
+            + sampleWave(p, 0.62, -0.78, 0.073, 1.08, 0.27, 3.14)
+            + sampleWave(p, -0.91, -0.42, 0.12, 1.55, 0.14, 4.86);
+          p.y += wave.x;
+          vNormalW = normalize(mat3(modelMatrix) * vec3(-wave.y, 1.0, -wave.z));
+          vWave = wave.x;
           vec4 world = modelMatrix * vec4(p, 1.0);
           vWorld = world.xyz;
           gl_Position = projectionMatrix * viewMatrix * world;
@@ -152,17 +175,20 @@ export class WaterSystem {
           foam = max(foam, edge * 0.75);
           col = mix(col, uFoam, foam * (uNight > 0.5 ? 0.4 : 0.55));
           vec3 n = normalize(vNormalW);
-          float moon = pow(max(0.0, dot(n, uMoon)), 28.0) * (uNight > 0.5 ? 0.55 : 0.25);
-          col += moon * mix(vec3(0.6, 0.75, 1.0), vec3(1.0), 1.0 - uNight);
-          float fres = pow(1.0 - abs(normalize(cameraPosition - vWorld).y), 2.2);
-          col = mix(col, uShallow * 1.2, fres * 0.28);
+          vec3 viewDir = normalize(cameraPosition - vWorld);
+          vec3 halfVector = normalize(uMoon + viewDir);
+          float diffuse = 0.22 + max(0.0, dot(n, uMoon)) * 0.46;
+          float specular = pow(max(0.0, dot(n, halfVector)), uNight > 0.5 ? 92.0 : 58.0);
+          col *= diffuse + 0.56;
+          col += specular * mix(vec3(0.58, 0.76, 1.0), vec3(1.0, 0.92, 0.72), 1.0 - uNight);
+          float fres = pow(1.0 - max(0.0, dot(n, viewDir)), 3.2);
+          vec3 horizonTint = mix(vec3(0.055, 0.12, 0.22), vec3(0.34, 0.68, 0.76), 1.0 - uNight);
+          col = mix(col, horizonTint, fres * 0.52);
           float alpha = mix(0.92, 0.98, deepMix);
           gl_FragColor = vec4(col, alpha);
         }
       `,
     });
-    // uAmp used in fragment — bind same uniform
-    this.material.uniforms.uAmp = this.material.uniforms.uAmp;
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.name = 'arena-ocean-surface';
     this.mesh.position.y = this.waterLevel;
@@ -206,7 +232,7 @@ export class WaterSystem {
     this.material.uniforms.uTime.value = timeSeconds;
   }
 
-  samplePhysics(position: THREE.Vector3): {
+  samplePhysics(position: THREE.Vector3, timeSeconds = performance.now() * 0.001): {
     inWater: boolean;
     surfaceY: number;
     buoyancy: number;
@@ -218,12 +244,8 @@ export class WaterSystem {
     const nx = Math.abs(position.x) / (this.islandHalfX + 0.8);
     const nz = Math.abs(position.z) / (this.islandHalfZ + 0.8);
     const outside = Math.max(nx, nz) >= 0.98;
-    const t = performance.now() * 0.001;
-    const wave =
-      (Math.sin(position.x * 0.035 + t * 0.55) * Math.cos(position.z * 0.028 - t * 0.42)
-        + Math.sin(position.x * 0.07 - position.z * 0.05 + t * 0.9) * 0.65)
-      * this.waveAmp;
-    const surfaceY = this.waterLevel + wave;
+    const wave = sampleOceanWave(position.x, position.z, timeSeconds, this.waveAmp);
+    const surfaceY = this.waterLevel + wave.height;
     const depth = surfaceY - position.y;
     const inWater = outside && depth > -1.2;
     if (!inWater) return { inWater: false, surfaceY, buoyancy: 0, drag: 0 };

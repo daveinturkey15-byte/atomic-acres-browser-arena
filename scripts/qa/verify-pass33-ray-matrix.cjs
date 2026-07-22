@@ -48,7 +48,9 @@ const results = [];
         await page.waitForTimeout(90);
         const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
         if (!state.lastPrincipalShotAlignment || state.lastPrincipalShotAlignment.weapon !== weapon) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: no principal-shot telemetry`);
-        if (state.lastPrincipalShotAlignment.angularError > 1e-7 || Math.hypot(...state.lastPrincipalShotAlignment.sample) > 1e-9) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: principal shot left centre ray`);
+        if (!state.lastPrincipalShotAlignment.ads) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: shot was not ADS-settled`);
+        if (state.lastPrincipalShotAlignment.angularError > state.lastPrincipalShotAlignment.spread + 1e-7) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: shot escaped authored ADS cone`);
+        if (weapon === 'scattergun' && Math.hypot(...state.lastPrincipalShotAlignment.sample) > 1e-9) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: centred scattergun pellet drifted`);
         if (!state.weaponPresentation.sightOffset || Math.hypot(...state.weaponPresentation.sightOffset) >= 0.012) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: physical sight left centre ray`);
         if (state.aimAlignment.errorCssPixels >= 0.01) throw new Error(`${viewport.width}x${viewport.height}/${weapon}: HUD ray mismatch`);
         results.push({

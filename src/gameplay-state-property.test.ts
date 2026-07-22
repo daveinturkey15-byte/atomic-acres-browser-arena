@@ -56,7 +56,10 @@ function assertStateInvariants(state: ReturnType<typeof createGameplayReplayStat
     throw new Error('non-finite movement or recoil state');
   }
   if (state.tick < 0 || state.targetHp < 0 || state.targetHp > 100) throw new Error('tick or health outside contract');
-  if (!state.principalRayOffsets.every(({ x, y }) => x === 0 && y === 0)) throw new Error('principal projectile left the authoritative centre ray');
+  const maximumOffset = Math.tan(Math.max(...weapons.map((weapon) => WEAPONS[weapon].maximumSpread)));
+  if (!state.principalRayOffsets.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y) && Math.hypot(x, y) <= maximumOffset)) {
+    throw new Error('principal projectile left every authored weapon cone');
+  }
   for (const weapon of weapons) {
     if (state.ammo[weapon] < 0 || state.ammo[weapon] > WEAPONS[weapon].mag) throw new Error(`${weapon} magazine outside contract`);
     if (state.reserve[weapon] < 0 || state.reserve[weapon] > WEAPONS[weapon].reserve) throw new Error(`${weapon} reserve outside contract`);

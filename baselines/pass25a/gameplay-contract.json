@@ -2747,9 +2747,11 @@
       "soloBotCount": 2,
       "weapons": [
         {
+          "adsRecoilMultiplier": 0.72,
           "adsSpreadMultiplier": 0.28,
           "automatic": true,
           "color": 16765286,
+          "crouchRecoilMultiplier": 0.84,
           "crouchSpreadMultiplier": 0.78,
           "damage": 31,
           "falloffEnd": 72,
@@ -2764,6 +2766,7 @@
           "movementSpreadMultiplier": 1.65,
           "name": "M86 Carbine",
           "pellets": 1,
+          "proneRecoilMultiplier": 0.65,
           "recoilPitch": 0.016,
           "recoilRecovery": 12,
           "recoilYaw": 0.006,
@@ -2774,9 +2777,11 @@
           "switchSeconds": 0.48
         },
         {
+          "adsRecoilMultiplier": 0.78,
           "adsSpreadMultiplier": 0.42,
           "automatic": true,
           "color": 6678527,
+          "crouchRecoilMultiplier": 0.88,
           "crouchSpreadMultiplier": 0.82,
           "damage": 23,
           "falloffEnd": 52,
@@ -2791,6 +2796,7 @@
           "movementSpreadMultiplier": 1.45,
           "name": "Vectorline SMG",
           "pellets": 1,
+          "proneRecoilMultiplier": 0.72,
           "recoilPitch": 0.011,
           "recoilRecovery": 15,
           "recoilYaw": 0.009,
@@ -2801,9 +2807,11 @@
           "switchSeconds": 0.4
         },
         {
+          "adsRecoilMultiplier": 0.84,
           "adsSpreadMultiplier": 0.72,
           "automatic": false,
           "color": 16747099,
+          "crouchRecoilMultiplier": 0.9,
           "crouchSpreadMultiplier": 0.88,
           "damage": 17,
           "falloffEnd": 30,
@@ -2818,6 +2826,7 @@
           "movementSpreadMultiplier": 1.22,
           "name": "Model 12 Scattergun",
           "pellets": 9,
+          "proneRecoilMultiplier": 0.8,
           "recoilPitch": 0.052,
           "recoilRecovery": 8,
           "recoilYaw": 0.012,
@@ -2828,9 +2837,11 @@
           "switchSeconds": 0.62
         },
         {
+          "adsRecoilMultiplier": 0.6,
           "adsSpreadMultiplier": 0.05,
           "automatic": false,
           "color": 11134975,
+          "crouchRecoilMultiplier": 0.76,
           "crouchSpreadMultiplier": 0.72,
           "damage": 67,
           "falloffEnd": 120,
@@ -2845,6 +2856,7 @@
           "movementSpreadMultiplier": 1.8,
           "name": "Longline 86",
           "pellets": 1,
+          "proneRecoilMultiplier": 0.52,
           "recoilPitch": 0.072,
           "recoilRecovery": 6.5,
           "recoilYaw": 0.016,
@@ -2855,9 +2867,11 @@
           "switchSeconds": 0.68
         },
         {
+          "adsRecoilMultiplier": 0.74,
           "adsSpreadMultiplier": 0.34,
           "automatic": false,
           "color": 15255419,
+          "crouchRecoilMultiplier": 0.86,
           "crouchSpreadMultiplier": 0.8,
           "damage": 36,
           "falloffEnd": 58,
@@ -2872,6 +2886,7 @@
           "movementSpreadMultiplier": 1.42,
           "name": "Aster 9 Service Pistol",
           "pellets": 1,
+          "proneRecoilMultiplier": 0.7,
           "recoilPitch": 0.021,
           "recoilRecovery": 14,
           "recoilYaw": 0.008,
@@ -2882,9 +2897,11 @@
           "switchSeconds": 0.28
         },
         {
+          "adsRecoilMultiplier": 0.82,
           "adsSpreadMultiplier": 0.46,
           "automatic": true,
           "color": 16752451,
+          "crouchRecoilMultiplier": 0.9,
           "crouchSpreadMultiplier": 0.82,
           "damage": 18,
           "falloffEnd": 34,
@@ -2899,6 +2916,7 @@
           "movementSpreadMultiplier": 1.55,
           "name": "G18 AUTO",
           "pellets": 1,
+          "proneRecoilMultiplier": 0.78,
           "recoilPitch": 0.014,
           "recoilRecovery": 13,
           "recoilYaw": 0.012,

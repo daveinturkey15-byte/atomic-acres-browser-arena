@@ -65,6 +65,7 @@ async function state(page) {
       gameStarted: snapshot.gameStarted,
       gameMode: snapshot.gameMode,
       remotes: snapshot.remotes,
+      frameCount: snapshot.frameCount,
       menuVisible: !menu.classList.contains('hidden'),
       privateLobbyActive: menu.classList.contains('private-lobby-active'),
       privateLobbyVisible: visible(lobby),
@@ -110,25 +111,22 @@ async function assertActiveMatchRecovers(page, other, label) {
     window.dispatchEvent(new Event('blur'));
     document.dispatchEvent(new Event('pointerlockchange'));
   });
-  await page.bringToFront();
-  let returned = null;
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const candidate = await state(page);
-    if (candidate.menuVisible) {
-      returned = candidate;
-      break;
-    }
-    await page.waitForTimeout(100);
+  await page.waitForTimeout(350);
+  const background = await state(page);
+  if (!background.gameStarted || background.remotes !== 1 || background.menuVisible || background.frameCount <= beforeBlur.frameCount) {
+    throw new Error(`${label} did not continue its multiplayer heartbeat while unfocused: ${JSON.stringify({ beforeBlur, background })}`);
   }
-  if (!returned) throw new Error(`${label} did not expose a pause menu after focus return: ${JSON.stringify(await state(page))}`);
+  await page.bringToFront();
+  await page.waitForTimeout(100);
+  const returned = await state(page);
   await mkdir('artifacts/focus-recovery', { recursive: true });
   try {
     await page.screenshot({ path: `artifacts/focus-recovery/${label}-focus-return.png`, fullPage: true, timeout: 15_000 });
   } catch (error) {
     console.error(`[focus-recovery] optional ${label} screenshot skipped: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (returned.privateLobbyActive || returned.privateLobbyVisible || !returned.resumeVisible || !returned.mainMenuVisible) {
-    throw new Error(`${label} focus return exposed a black/unrecoverable private-match menu: ${JSON.stringify(returned)}`);
+  if (returned.menuVisible || returned.privateLobbyActive || returned.privateLobbyVisible || returned.canvasVisibility !== 'visible') {
+    throw new Error(`${label} focus return interrupted the active match: ${JSON.stringify(returned)}`);
   }
   await page.evaluate(() => {
     const game = document.querySelector('#game');
@@ -143,9 +141,9 @@ async function assertActiveMatchRecovers(page, other, label) {
       return Promise.resolve();
     };
   });
-  const resumeBounds = await page.locator('#resume').boundingBox();
-  if (!resumeBounds) throw new Error(`${label} Resume button had no clickable bounds after focus return`);
-  await page.mouse.click(resumeBounds.x + resumeBounds.width / 2, resumeBounds.y + resumeBounds.height / 2);
+  const canvasBounds = await page.locator('#game').boundingBox();
+  if (!canvasBounds) throw new Error(`${label} canvas had no clickable bounds after focus return`);
+  await page.mouse.click(canvasBounds.x + canvasBounds.width / 2, canvasBounds.y + canvasBounds.height / 2);
   let resumed = null;
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const candidate = await state(page);
@@ -164,7 +162,7 @@ async function assertActiveMatchRecovers(page, other, label) {
   }
   if (!resumed) {
     await page.screenshot({ path: `artifacts/focus-recovery/${label}-resume-stuck.png`, fullPage: true });
-    throw new Error(`${label} Resume did not restore playable multiplayer state: ${JSON.stringify(await state(page))}`);
+    throw new Error(`${label} canvas click did not reacquire pointer lock: ${JSON.stringify(await state(page))}`);
   }
   console.error(`[focus-recovery] ${label} active-match focus recovery passed`);
   return { returned, resumed };
@@ -222,7 +220,7 @@ try {
   };
   const report = {
     schema: 'atomic-acres/focus-recovery@1',
-    resumeTransition: 'trusted Resume click with deterministic QA pointer-lock-change; real Chromium pointer lock is covered separately by pass25a-baseline e2e',
+    resumeTransition: 'match heartbeat continues while unfocused; a direct canvas click reacquires pointer lock without opening the pause menu',
     roomCodeLength: roomCode.length,
     errors,
     waiting,

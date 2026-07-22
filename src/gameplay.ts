@@ -27,6 +27,8 @@ export const MELEE_COOLDOWN_MS = 650;
 export const MELEE_RANGE = 1.75;
 export const MELEE_DAMAGE = 100;
 export const HEADSHOT_DAMAGE_MULTIPLIER = 1.5;
+export const FALL_DAMAGE_SAFE_SPEED = 9.5;
+export const FALL_DAMAGE_LETHAL_SPEED = 22;
 
 export type WeaponSpec = {
   id: WeaponId;
@@ -51,6 +53,9 @@ export type WeaponSpec = {
   recoilPitch: number;
   recoilYaw: number;
   recoilRecovery: number;
+  adsRecoilMultiplier: number;
+  crouchRecoilMultiplier: number;
+  proneRecoilMultiplier: number;
   switchSeconds: number;
   automatic: boolean;
   color: number;
@@ -64,6 +69,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.012, adsSpreadMultiplier: 0.28, movementSpreadMultiplier: 1.65,
     crouchSpreadMultiplier: 0.78, sustainedSpreadPerShot: 0.0016, maximumSpread: 0.045,
     pellets: 1, recoilPitch: 0.016, recoilYaw: 0.006, recoilRecovery: 12,
+    adsRecoilMultiplier: 0.72, crouchRecoilMultiplier: 0.84, proneRecoilMultiplier: 0.65,
     switchSeconds: 0.48, automatic: true, color: 0xffd166,
   },
   smg: {
@@ -73,6 +79,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.018, adsSpreadMultiplier: 0.42, movementSpreadMultiplier: 1.45,
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0021, maximumSpread: 0.058,
     pellets: 1, recoilPitch: 0.011, recoilYaw: 0.009, recoilRecovery: 15,
+    adsRecoilMultiplier: 0.78, crouchRecoilMultiplier: 0.88, proneRecoilMultiplier: 0.72,
     switchSeconds: 0.4, automatic: true, color: 0x65e7ff,
   },
   scattergun: {
@@ -82,6 +89,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.068, adsSpreadMultiplier: 0.72, movementSpreadMultiplier: 1.22,
     crouchSpreadMultiplier: 0.88, sustainedSpreadPerShot: 0.002, maximumSpread: 0.09,
     pellets: 9, recoilPitch: 0.052, recoilYaw: 0.012, recoilRecovery: 8,
+    adsRecoilMultiplier: 0.84, crouchRecoilMultiplier: 0.9, proneRecoilMultiplier: 0.8,
     switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
   },
   sniper: {
@@ -91,6 +99,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.052, adsSpreadMultiplier: 0.05, movementSpreadMultiplier: 1.8,
     crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,
     pellets: 1, recoilPitch: 0.072, recoilYaw: 0.016, recoilRecovery: 6.5,
+    adsRecoilMultiplier: 0.6, crouchRecoilMultiplier: 0.76, proneRecoilMultiplier: 0.52,
     switchSeconds: 0.68, automatic: false, color: 0xa9e7ff,
   },
   pistol: {
@@ -100,6 +109,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.02, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.42,
     crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.0024, maximumSpread: 0.052,
     pellets: 1, recoilPitch: 0.021, recoilYaw: 0.008, recoilRecovery: 14,
+    adsRecoilMultiplier: 0.74, crouchRecoilMultiplier: 0.86, proneRecoilMultiplier: 0.7,
     switchSeconds: 0.28, automatic: false, color: 0xe8c77b,
   },
   'machine-pistol': {
@@ -109,6 +119,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.026, adsSpreadMultiplier: 0.46, movementSpreadMultiplier: 1.55,
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0032, maximumSpread: 0.072,
     pellets: 1, recoilPitch: 0.014, recoilYaw: 0.012, recoilRecovery: 13,
+    adsRecoilMultiplier: 0.82, crouchRecoilMultiplier: 0.9, proneRecoilMultiplier: 0.78,
     switchSeconds: 0.3, automatic: true, color: 0xff9f43,
   },
 };
@@ -259,9 +270,9 @@ export function sampleSpreadDisk(angle: number, radialRandom: number, angularRan
 }
 
 /**
- * The reticle is the authoritative principal ray. Single-projectile weapons
- * always fire through it; multi-pellet weapons reserve pellet zero for it and
- * distribute only their remaining pellets around that centre ray.
+ * Multi-pellet weapons reserve pellet zero for the reticle ray so a close shot
+ * remains readable. Single-projectile guns sample their authored cone; ADS and
+ * stance multipliers make that cone small rather than cosmetically ignoring it.
  */
 export function sampleWeaponPellet(
   weapon: WeaponSpec,
@@ -270,7 +281,7 @@ export function sampleWeaponPellet(
   radialRandom: number,
   angularRandom: number,
 ): { x: number; y: number } {
-  if (weapon.pellets <= 1 || pelletIndex <= 0) return { x: 0, y: 0 };
+  if (weapon.pellets > 1 && pelletIndex <= 0) return { x: 0, y: 0 };
   return sampleSpreadDisk(angle, radialRandom, angularRandom);
 }
 
@@ -282,6 +293,15 @@ export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZon
   const base = weapon.damage + (weapon.minimumDamage - weapon.damage) * falloff;
   const multiplier = zone === 'head' ? weapon.headMultiplier : zone === 'limb' ? weapon.limbMultiplier : 1;
   return Math.max(1, Math.round(base * multiplier));
+}
+
+/** BO2-like bounded landing damage: normal jumps are safe; severe drops become lethal. */
+export function computeFallDamage(impactSpeed: number): number {
+  const speed = Number.isFinite(impactSpeed) ? Math.max(0, impactSpeed) : 0;
+  if (speed <= FALL_DAMAGE_SAFE_SPEED) return 0;
+  if (speed >= FALL_DAMAGE_LETHAL_SPEED) return 100;
+  const normalized = (speed - FALL_DAMAGE_SAFE_SPEED) / (FALL_DAMAGE_LETHAL_SPEED - FALL_DAMAGE_SAFE_SPEED);
+  return Math.max(1, Math.round(100 * Math.pow(normalized, 1.35)));
 }
 
 /** Full-HP player TTK for a single pellet/shot at point-blank (no Overdrive). */
@@ -344,12 +364,22 @@ export function recoverRecoil(value: number, weapon: WeaponSpec, dt: number): nu
 
 export type RecoilImpulse = { pitch: number; yaw: number };
 
-export function computeRecoilImpulse(weapon: WeaponSpec, sustainedShots: number, random: number): RecoilImpulse {
+export type RecoilContext = Readonly<{ ads: boolean; crouched: boolean; prone?: boolean }>;
+
+export function computeRecoilImpulse(
+  weapon: WeaponSpec,
+  sustainedShots: number,
+  random: number,
+  context: RecoilContext = { ads: false, crouched: false },
+): RecoilImpulse {
   const buildup = 1 + Math.min(0.48, Math.max(0, sustainedShots) * 0.045);
   const centeredRandom = Math.max(-1, Math.min(1, random * 2 - 1));
+  let control = context.ads ? weapon.adsRecoilMultiplier : 1;
+  if (context.prone) control *= weapon.proneRecoilMultiplier;
+  else if (context.crouched) control *= weapon.crouchRecoilMultiplier;
   return {
-    pitch: weapon.recoilPitch * buildup,
-    yaw: weapon.recoilYaw * centeredRandom * (0.8 + buildup * 0.28),
+    pitch: weapon.recoilPitch * buildup * control,
+    yaw: weapon.recoilYaw * centeredRandom * (0.8 + buildup * 0.28) * control,
   };
 }
 

@@ -181,8 +181,8 @@ export const RUSTWORKS_TOWER = Object.freeze({
   lowerDeckSize: 8.4,
   upperDeckSize: 6.8,
   /** Character controller climb limit is 50°; ship-ladder stays strictly under it. */
-  shipLadderAngleDegrees: 48,
-  lowerRampAngleDegrees: 22,
+  shipLadderAngleDegrees: 38,
+  lowerRampAngleDegrees: 18,
   maxClimbDegrees: 50,
   landingOverlap: 0.06,
   maxLandingOverlap: 0.08,
@@ -329,9 +329,8 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   box(builder, 'rustworks-upper-deck', [0, upperDeckCenterY, 0], [upperDeckSize, deckThickness, upperDeckSize], rust);
   // Keep the upper deck walkable: corner utility only, open centre circulation ring.
   // Corner utilities stay small so the upper deck centre stays a clean fight space.
-  box(builder, 'rustworks-control-hut', [-2.25, 9.35, -2.25], [1.45, 2.0, 1.45], rustDark);
-  box(builder, 'rustworks-control-hut-awning', [-2.25, 10.5, -1.45], [1.7, 0.12, 0.85], hazard, { solid: false, detail: 'performance' });
-  box(builder, 'rustworks-process-manifold', [2.3, 9.1, 2.3], [0.85, 1.35, 0.85], steel);
+  // Keep the compact crown clear. The former hut/manifold blocks narrowed
+  // rotations and read as accidental clutter rather than useful cover.
   box(builder, 'rustworks-lower-deck-grating-trim', [0, lowerTop + 0.02, 0], [lowerDeckSize - 0.8, 0.04, lowerDeckSize - 0.8], steel, {
     solid: false,
     cast: false,
@@ -349,7 +348,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const lowerRampAngle = (lowerRampAngleDegrees * Math.PI) / 180;
   const lowerRampLength = (lowerTop - 0.12) / Math.sin(lowerRampAngle);
   const lowerRampThickness = 0.28;
-  const lowerRampWidth = 4.0;
+  const lowerRampWidth = 4.8;
   const lowerLandingDepth = 1.55;
   const lowerDeckEdgeZ = -lowerHalf;
   const lowerLandingCenterZ = lowerDeckEdgeZ - lowerLandingDepth / 2 + landingOverlap;
@@ -392,7 +391,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const shipRun = shipRise / Math.tan(shipAngle);
   const shipLength = shipRise / Math.sin(shipAngle);
   const shipThickness = 0.22;
-  const shipWidth = 1.95;
+  const shipWidth = 2.6;
   // Keep the capsule clear of the upper-deck slab edge while preserving lower-deck overlap.
   const shipX = lowerHalf - 0.1;
   const lowerShipLandingDepth = 1.25;
@@ -473,27 +472,27 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const lowerRailY = lowerTop + 1.2;
   box(builder, 'rustworks-lower-deck-rail', [-4.15, lowerRailY, 0.1], [0.12, 0.12, 7.6], hazard, { solid: false, detail: 'performance' });
   box(builder, 'rustworks-lower-deck-rail', [4.15, lowerRailY, -0.35], [0.12, 0.12, 5.4], hazard, { solid: false, detail: 'performance' });
-  box(builder, 'rustworks-lower-deck-rail', [-3.35, lowerRailY, -4.15], [1.6, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
-  box(builder, 'rustworks-lower-deck-rail', [3.35, lowerRailY, -4.15], [1.6, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
-  box(builder, 'rustworks-lower-deck-rail', [-0.6, lowerRailY, 4.15], [6.2, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
+  box(builder, 'rustworks-lower-deck-rail', [-3.4, lowerRailY, -4.15], [1.5, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
+  box(builder, 'rustworks-lower-deck-rail', [3.4, lowerRailY, -4.15], [1.5, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
+  box(builder, 'rustworks-lower-deck-rail', [-3.4, lowerRailY, 4.15], [1.5, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
+  box(builder, 'rustworks-lower-deck-rail', [3.4, lowerRailY, 4.15], [1.5, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
   for (const [x, z] of [
-    [-4.15, -4.15], [-2.55, -4.15], [2.55, -4.15], [4.15, -4.15],
-    [-4.15, 4.15], [2.5, 4.15], [4.15, 2.35],
+    [-4.15, -4.15], [-2.85, -4.15], [2.85, -4.15], [4.15, -4.15],
+    [-4.15, 4.15], [4.15, 4.15], [4.15, 2.35],
   ] as const) {
     box(builder, 'rustworks-lower-deck-rail-post', [x, lowerTop + 0.62, z], [0.12, 1.2, 0.12], hazard, { solid: false, detail: 'performance' });
   }
 
   const upperRailY = upperTop + 1.2;
   for (const z of [-3.35, 3.35]) {
-    box(builder, 'rustworks-upper-deck-rail', [-0.1, upperRailY, z], [6.0, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
+    box(builder, 'rustworks-upper-deck-rail', [-0.3, upperRailY, z], [5.6, 0.12, 0.12], hazard, { solid: false, detail: 'performance' });
   }
   box(builder, 'rustworks-upper-deck-rail', [-3.35, upperRailY, -0.15], [0.12, 0.12, 5.9], hazard, { solid: false, detail: 'performance' });
   // Split +X rails wider around the ship-ladder bridge corridor.
-  box(builder, 'rustworks-upper-deck-rail', [3.35, upperRailY, -2.55], [0.12, 0.12, 1.5], hazard, { solid: false, detail: 'performance' });
   box(builder, 'rustworks-upper-deck-rail', [3.35, upperRailY, 1.85], [0.12, 0.12, 2.9], hazard, { solid: false, detail: 'performance' });
   for (const [x, z] of [
-    [-3.35, -3.35], [2.7, -3.35], [-3.35, 3.35], [2.7, 3.35],
-    [3.35, -3.35], [3.35, -1.75], [3.35, 0.2], [3.35, 3.35],
+    [-3.35, -3.35], [-3.35, 3.35], [2.7, 3.35],
+    [3.35, -1.75], [3.35, 0.2], [3.35, 3.35],
   ] as const) {
     box(builder, 'rustworks-upper-deck-rail-post', [x, upperTop + 0.62, z], [0.12, 1.2, 0.12], hazard, { solid: false, detail: 'performance' });
   }
@@ -507,34 +506,34 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
 
   // Sparse corner cover only — open cross-lanes for smooth player/bot pathing.
   // Keep a clear ~12m apron around the tower and open ±X / ±Z corridors.
-  for (const [x, z, color, sx, sy, sz] of [
-    [-20, -20, tarp, 3.2, 2.1, 3.2],
-    [20, 20, hazard, 3.2, 2.1, 3.2],
-    [-20, 20, rustDark, 3.0, 2.0, 3.0],
-    [20, -20, oxide, 3.0, 2.0, 3.0],
-  ] as const) {
-    box(builder, 'rustworks-freight-crate', [x, sy / 2, z], [sx, sy, sz], color);
-    box(builder, 'rustworks-crate-lid', [x, sy + 0.08, z], [sx + 0.12, 0.14, sz + 0.12], steel, { solid: false, detail: 'quality' });
-  }
-  // Collision-backed shipping cover: large containers + low pallet stacks.
-  // All groups stay outside the central 12m apron and away from private-match spawns.
-  for (const [index, x, z, rotationY] of [
-    [0, -20, -12, 0],
-    [1, 20, 12, 0],
-    [2, -12, -20, Math.PI / 2],
-    [3, 12, 20, Math.PI / 2],
-  ] as const) {
-    const containerSize: [number, number, number] = rotationY === 0 ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
-    box(builder, 'rustworks-shipping-container', [x, 1.3, z], containerSize, index % 2 === 0 ? rustDark : tarp);
-    // Full-collision pallet cover sits beside, not inside, the container footprint.
-    const palletX = x + (x < 0 ? 4.2 : -4.2);
-    box(builder, 'rustworks-pallet-stack', [palletX, 0.55, z], [2.2, 1.1, 1.8], hazardDark);
-    for (const y of [0.12, 0.42, 0.72, 1.02]) {
-      box(builder, `rustworks-pallet-slat-${index}`, [palletX, y, z], [2.35, 0.08, 1.95], steel, {
+  const containerRows = [
+    ...[-19, -6.3, 6.3, 19].map((x) => ({ side: 'north', x, z: -23 })),
+    ...[-19, -6.3, 6.3, 19].map((x) => ({ side: 'south', x, z: 23 })),
+    ...[-18, -6, 6, 18].map((z) => ({ side: 'west', x: -23, z })),
+    ...[-18, -6, 6, 18].map((z) => ({ side: 'east', x: 23, z })),
+  ] as const;
+  for (const [index, placement] of containerRows.entries()) {
+    const alongX = placement.side === 'north' || placement.side === 'south';
+    const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
+    const container = box(
+      builder,
+      'rustworks-shipping-container',
+      [placement.x, 1.3, placement.z],
+      containerSize,
+      [hazardDark, rustDark, tarp][index % 3],
+    );
+    container.userData.rustworksContainerSide = placement.side;
+
+    // Presentation-only corrugation adds readable scale without extra collision clutter.
+    for (const offset of [-2.15, -1.1, 0, 1.1, 2.15]) {
+      const ribPosition: [number, number, number] = alongX
+        ? [placement.x + offset, 1.3, placement.z + (placement.side === 'north' ? -1.27 : 1.27)]
+        : [placement.x + (placement.side === 'west' ? -1.27 : 1.27), 1.3, placement.z + offset];
+      box(builder, `rustworks-container-rib-${index}`, ribPosition, alongX ? [0.08, 2.25, 0.05] : [0.05, 2.25, 0.08], steelBright, {
         solid: false,
         shots: false,
         cast: false,
-        detail: 'quality',
+        detail: 'performance',
       });
     }
   }
@@ -614,10 +613,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     raycastMeshes: builder.raycastMeshes,
     spawns: spawnRecord(
       [
-        [-22, 21], [-14, 25], [-4, 20], [-25, 8], [-17, 2], [-9, 14],
+        [0, 26], [-13, 26], [13, 26], [-26, 11], [-26, 0], [-13, 14],
       ],
       [
-        [22, -21], [14, -25], [4, -20], [25, -8], [17, -2], [9, -14],
+        [0, -26], [13, -26], [-13, -26], [26, -11], [26, 0], [13, -14],
       ],
     ),
     patrolPoints: [

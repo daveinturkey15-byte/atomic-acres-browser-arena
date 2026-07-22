@@ -65,18 +65,18 @@
     },
     {
       "id": "atomic-acres-original-menu-squad-2026-07-22",
-      "kind": "original-project-generated-menu-art",
+      "kind": "original-project-in-engine-menu-capture",
       "creator": "Atomic Acres project / Jigglyclaw",
       "source": "source-assets/menu/atomic-acres-menu-squad-original.provenance.json",
       "generatedAsOf": "2026-07-22",
       "license": "Original project work",
       "files": "public/assets/original/menu/atomic-acres-menu-squad-joke.jpg",
-      "sha256": "65259d081de2671ca6f89ca2bf4ea2687d46096ad29ecbd07aadbc610ccf35e9",
+      "sha256": "27979c58f27c8ea20d4417df4b20ca3487778ebfb633162b039b09fb79872505",
       "sourceImage": "source-assets/menu/atomic-acres-menu-squad-original.png",
-      "sourceImageSha256": "5e459f936c0812c4e1a531f6310e07de444b95062df35af6054c0edcda00b983",
+      "sourceImageSha256": "97acaba0d547842fb880354b2091f3d646c8381002ac13f856abaa3638e6be8d",
       "sourceProvenance": "source-assets/menu/atomic-acres-menu-squad-original.provenance.json",
-      "sourceProvenanceSha256": "1366eacb23d3d02c64c9dda5c1ea481a933dee8a29b01088ad0f3b1ae34b5cf2",
-      "modifications": "Original generated Atomic Acres squad illustration with four fictional characters and no input/reference image, real public figure, trademark, band merchandise, charity logo, or commercial-game UI. The versioned source PNG and full generation prompt/provenance are included.",
+      "sourceProvenanceSha256": "236818817d7f2b02e073f4b90f463d4f95c4124ba2eeb4900fdd8df358118f58",
+      "modifications": "Direct in-engine Quality Graphics capture of the Atomic Acres Civic Transit bus lane with the slightly funny close-up bus and three genuine runtime SWAT operators in clean idle weapon poses. The frame received a restrained contrast, gamma, saturation, and vignette grade. No generated or external image content is present.",
       "attributionRequired": false
     },
     {
