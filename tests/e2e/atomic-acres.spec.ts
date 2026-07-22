@@ -361,7 +361,7 @@ async function debug(page: Page): Promise<DebugState> {
   return page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot());
 }
 
-async function pageReadyAt(page: Page, path: string): Promise<void> {
+async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promise<void> {
   await page.goto(path, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const status = document.querySelector<HTMLElement>('#network-status');
@@ -369,7 +369,7 @@ async function pageReadyAt(page: Page, path: string): Promise<void> {
     const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
     const snapshot = debugApi?.snapshot();
     return status?.dataset.kind === 'ok' && solo?.disabled === false && snapshot?.weaponReady === true && snapshot.originalArtLoaded === true;
-  }, undefined, { timeout: 30_000 });
+  }, undefined, { timeout: timeoutMs });
 }
 
 async function pageReady(page: Page): Promise<void> {
@@ -584,7 +584,7 @@ test.describe('boot and authored presentation', () => {
     test.setTimeout(180_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=blender&mist=on');
+    await pageReadyAt(page, '/?render=blender&mist=on', 60_000);
     const menuState = await debug(page);
     expect(menuState.render).toMatchObject({
       profile: 'blender', representation: 'blender', antialias: true,

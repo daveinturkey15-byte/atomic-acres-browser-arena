@@ -84,6 +84,17 @@ Only the `release-production` GitHub Actions workflow may publish production.
 
 `npm run deploy` remains available for recovery archaeology but is prohibited for normal contribution and release tasks.
 
+## Player release channels
+
+The canonical root presents two explicit choices before loading the game:
+
+- **New build** loads the newest production source promoted by the protected workflow.
+- **Recent stable** loads an immutable copy of the exact Pages commit pinned in `release-channels.json`.
+
+The stable channel is a Git commit identity, not a moving branch or a manually copied folder. During every production promotion, `scripts/release/stage-stable-channel.mjs` reconstructs only that commit's root `index.html` and `assets/` beneath the configured channel path. Room invitation URLs bypass the chooser and continue into the newest multiplayer client so a shared lobby cannot split across incompatible releases.
+
+Changing the pinned stable SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test both the root chooser and the direct stable URL before promotion. Never infer "stable" from a pass number, branch name, local build, or chat claim.
+
 ## Multi-machine setup
 
 Each machine needs Git, Node 22, npm, and GitHub CLI authenticated for this repository. Contributors need `repo`; release owners who change workflow files also need `workflow`.
