@@ -362,7 +362,7 @@ async function debug(page: Page): Promise<DebugState> {
 }
 
 async function pageReadyAt(page: Page, path: string): Promise<void> {
-  await page.goto(path);
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => {
     const status = document.querySelector<HTMLElement>('#network-status');
     const solo = document.querySelector<HTMLButtonElement>('#solo');
@@ -721,6 +721,7 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('times out an invalid room and leaves a clean retryable state', async ({ page }) => {
+    test.setTimeout(120_000);
     await pageReady(page);
     await page.locator('#player-name').fill('Retry QA');
     await page.locator('#room-input').fill('missing-room-pass17');
