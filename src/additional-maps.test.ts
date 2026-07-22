@@ -383,6 +383,9 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('gun-range-control-room')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
+    const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
+    expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
+    expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);
     const stations = map.root.children.filter((child) => child.name.startsWith('gun-range-weapon-station-'));
     expect(stations).toHaveLength(5);
     expect(stations.map((station) => station.userData.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);

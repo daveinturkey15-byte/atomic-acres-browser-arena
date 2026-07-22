@@ -884,9 +884,10 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   box(builder, 'gun-range-ready-bench', [16.2, 0.62, 15.4], [6.4, 1.05, 2.1], timber);
   box(builder, 'gun-range-ready-lockers', [18.5, 2.35, 8.4], [2.8, 4.6, 5.8], acoustic, { ballisticMaterial: 'structural-metal' });
 
-  // Five roomy firing bays retain safe forward lanes without making the ready
-  // room feel like a narrow corridor.
-  for (const x of [-12, -6, 0, 6, 12]) {
+  // Six boundaries form five roomy firing bays centred on the target lanes.
+  // Keeping x=0 clear is gameplay-critical: the centre firing lane must not
+  // begin inside a structural-metal shot surface.
+  for (const x of [-15, -9, -3, 3, 9, 15]) {
     box(builder, 'gun-range-booth-divider', [x, 1.45, 4.2], [0.16, 2.9, 5.5], dark);
     box(builder, 'gun-range-booth-safety-lamp', [x, 3.35, 4.2], [0.18, 0.18, 1.1], redSafety, { solid: false, shots: false });
   }
