@@ -138,7 +138,7 @@ describe('additional authored maps', () => {
     expect(canopy?.visible).toBe(true);
   });
 
-  it('exposes clean access, bracing, and four-container perimeter rows', () => {
+  it('exposes clean access, bracing, and six-container perimeter rows', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const required = [
       'rustworks-lower-ramp',
@@ -153,7 +153,6 @@ describe('additional authored maps', () => {
       'rustworks-structural-brace',
       'rustworks-tower-hardstand',
       'rustworks-shipping-container',
-      'rustworks-barrier-low',
       'rustworks-rig-deck-top',
       'rustworks-rig-leg',
       'rustworks-perimeter-rail',
@@ -164,7 +163,10 @@ describe('additional authored maps', () => {
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
-    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(16);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(24);
+    expect(namedCount(map.root, 'rustworks-barrier-low')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-tank-collider')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-horizontal-process-tank')).toBe(0);
     expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(0);
     expect(namedCount(map.root, 'rustworks-process-riser')).toBe(0);
     expect(namedCount(map.root, 'rustworks-process-pipe-run')).toBe(0);
@@ -183,7 +185,7 @@ describe('additional authored maps', () => {
     expect(map.root.userData.rustworksRoutes?.['lower-to-upper']).toBeTruthy();
   });
 
-  it('gives all sixteen shipping containers full player, physics, and shot authority', () => {
+  it('gives all twenty-four evenly distributed shipping containers full player, physics, and shot authority', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const cover: THREE.Mesh[] = [];
     map.root.traverse((node) => {
@@ -191,9 +193,14 @@ describe('additional authored maps', () => {
         cover.push(node);
       }
     });
-    expect(cover).toHaveLength(16);
+    expect(cover).toHaveLength(24);
     for (const side of ['north', 'south', 'west', 'east']) {
-      expect(cover.filter((mesh) => mesh.userData.rustworksContainerSide === side), `${side} container row`).toHaveLength(4);
+      const row = cover.filter((mesh) => mesh.userData.rustworksContainerSide === side);
+      expect(row, `${side} container row`).toHaveLength(6);
+      const offsets = row
+        .map((mesh) => side === 'north' || side === 'south' ? mesh.position.x : mesh.position.z)
+        .sort((a, b) => a - b);
+      expect(offsets).toEqual([-19, -12, -5, 5, 12, 19]);
     }
     for (const mesh of cover) {
       const geometry = mesh.geometry as THREE.BoxGeometry;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb';
-export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'pass51-v1';
+export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'pass54-v2';
 
 type RustworksBlenderTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';
