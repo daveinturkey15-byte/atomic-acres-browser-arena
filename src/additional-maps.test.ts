@@ -465,6 +465,10 @@ describe('additional authored maps', () => {
       'aircraft-skin',
       'apron-marking',
       'terminal-story',
+      'concourse-cover',
+      'boarding-route',
+      'quality-aircraft',
+      'service-equipment',
     ];
     expect(map.root.userData.skylineDetailClusters).toEqual(clusterIds);
     for (const clusterId of clusterIds) {
@@ -526,25 +530,69 @@ describe('additional authored maps', () => {
     const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
     const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
     const qualityNacelles = map.root.getObjectByName('skyline-aircraft-engine-nacelles');
+    const qualityShell = map.root.getObjectByName('skyline-quality-fuselage-shell');
+    const fuselagePlaceholder = map.root.getObjectByName('skyline-jetliner-fuselage-top') as THREE.Mesh;
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
     expect(performanceSign).toBeTruthy();
     expect(qualityBoard).toBeTruthy();
     expect(qualityNacelles).toBeTruthy();
+    expect(qualityShell).toBeTruthy();
+    expect(qualityShell?.userData.assetOwner).toBe('skyline-terminal');
     applyAdditionalMapPresentationProfile(map.root, 'performance');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(false);
     expect(qualityNacelles?.visible).toBe(false);
+    expect(qualityShell?.visible).toBe(false);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(true);
     expect(coreFloor?.visible).not.toBe(false);
     applyAdditionalMapPresentationProfile(map.root, 'blender');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(true);
     expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShell?.visible).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+  });
+
+  it('authors a visible boarding door and a cabin aisle wider than the player controller', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const name of [
+      'skyline-aircraft-door-jamb-left',
+      'skyline-aircraft-door-jamb-right',
+      'skyline-aircraft-door-header',
+      'skyline-aircraft-door-threshold-seal',
+      'skyline-aircraft-open-door-leaf',
+      'skyline-aircraft-boarding-sign',
+    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
+    const clearance = map.root.userData.skylineCabinClearance as {
+      aisleMetres: number;
+      physicsPlayerDiameterMetres: number;
+      clearanceProbeDiameterMetres: number;
+      doorVisibleApertureMetres: number;
+    };
+    expect(clearance.aisleMetres).toBeGreaterThanOrEqual(1.15);
+    expect(clearance.physicsPlayerDiameterMetres).toBe(0.76);
+    expect(clearance.clearanceProbeDiameterMetres).toBe(0.88);
+    expect(clearance.aisleMetres).toBeGreaterThan(clearance.clearanceProbeDiameterMetres);
+    expect(clearance.doorVisibleApertureMetres).toBeGreaterThanOrEqual(1.8);
+  });
+
+  it('adds deliberate concourse cover while preserving centre and flank lanes', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.physicalCover.map((cover) => cover.id)).toEqual(expect.arrayContaining([
+      'concourse-seating-west',
+      'concourse-seating-east',
+      'concourse-planter-west',
+      'concourse-planter-east',
+    ]));
+    for (const [x, z] of [[0, -16.7], [-18, -16.7], [18, -16.7]] as const) {
+      expect(isBlocked({ x, y: 0, z }, map.colliders, 0.44), `${x}:${z}`).toBe(false);
+    }
   });
 
   it('walks every Skyline route in both directions with Rapier-backed collision', async () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const routes = map.root.userData.skylineRoutes as Record<string, RouteAnchor[]>;
-    for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac']) {
+    for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac', 'cabin-through-aisle']) {
       await traverseRoute(map, routes[id]);
       await traverseRoute(map, routes[id], true);
     }
@@ -564,5 +612,6 @@ describe('additional authored maps', () => {
     expect(routes['concourse-to-mezzanine']).toHaveLength(3);
     expect(routes['mezzanine-to-jetbridge']).toHaveLength(5);
     expect(routes['fuselage-to-tarmac']).toHaveLength(4);
+    expect(routes['cabin-through-aisle']).toHaveLength(3);
   });
 });

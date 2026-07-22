@@ -6687,8 +6687,11 @@ function setArenaMenuCamera(): void {
     camera.position.set(18, 20, -28);
     camera.lookAt(centreX + 14, 5.8, centreZ);
   } else if (selectedArena.id === 'skyline-terminal') {
-    camera.position.set(18, 16, -20);
-    camera.lookAt(0, 3.2, 2.0);
+    // Compose the facade, jetbridge and aircraft from the open apron. The old
+    // high concourse camera could sit behind dark roof/soffit geometry and
+    // leave the deploy-menu preview black even after selection completed.
+    camera.position.set(29, 10.5, 27);
+    camera.lookAt(1.5, 3.35, -6);
   } else {
     camera.position.set(centreX, 31, centreZ - 22);
     camera.lookAt(centreX, 0.8, centreZ);
@@ -7204,6 +7207,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
       raycastMeshes: arena.raycastMeshes.length,
       targets: arena.targets.length,
+      skylineAssetAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineAssetAudit : null,
+      skylineCabinClearance: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineCabinClearance : null,
     },
     ballistics: {
       activeSurfaces: activeBallisticSurfaces().length,

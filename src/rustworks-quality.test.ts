@@ -16,6 +16,7 @@ describe('Rustworks Quality Graphics parity', () => {
     const base = arenaLightingProfile('blender');
     const rust = rustworksLightingTint(base, 'blender', 'rustworks-1v1');
     const range = rustworksLightingTint(base, 'blender', 'gun-range');
+    const skyline = rustworksLightingTint(base, 'blender', 'skyline-terminal');
     const atomic = rustworksLightingTint(base, 'blender', 'atomic-acres');
     expect(atomic.fogColor).toBe(base.fogColor);
     expect(rust.fogColor).not.toBe(base.fogColor);
@@ -26,6 +27,9 @@ describe('Rustworks Quality Graphics parity', () => {
     expect(range.fogColor).not.toBe(base.fogColor);
     expect(range.fillIntensity).toBeGreaterThan(range.sunIntensity);
     expect(range.godRayStrength).toBe(0);
+    expect(skyline.ambientIntensity).toBeGreaterThan(base.ambientIntensity);
+    expect(skyline.hemisphereIntensity).toBeGreaterThanOrEqual(base.hemisphereIntensity);
+    expect(skyline.exposure).toBeGreaterThanOrEqual(1.2);
   });
 
   it('adds flood lights, starfield, and richer materials for the night rig', () => {
