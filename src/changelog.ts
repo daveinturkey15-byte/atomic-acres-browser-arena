@@ -17,6 +17,21 @@ export type ChangelogEntry = Readonly<{
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass57',
+    pass: 'PASS 57',
+    title: 'Rustworks rolling ocean & symmetric cargo ring',
+    releasedAt: '2026-07-22T15:43:16+01:00',
+    areas: Object.freeze(['RUSTWORKS', 'WATER', 'FLOW', 'VISUALS']),
+    summary: 'Rustworks now has a lower, broader rolling ocean, a tidy central rig, and evenly distributed shipping cover around every side.',
+    highlights: Object.freeze([
+      'Five warped swell bands create larger pseudo-random wave patterns with matched visual height, buoyancy, and vertical water velocity',
+      'The sea sits lower beneath the platform, reaches a wider horizon, and uses improved crest foam, normals, Fresnel, and specular lighting',
+      'Six evenly spaced shipping containers line each of the north, south, east, and west sides',
+      'Loose tanks, pallets, barriers, and other central clutter were removed from both Performance and Quality layouts',
+      'Quality geometry was rebuilt and the lower and upper ramps now align cleanly with their walkable collision',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass56',
     pass: 'PASS 56',
     title: 'Operator rigs, weapon finishes & HUD spacing',
