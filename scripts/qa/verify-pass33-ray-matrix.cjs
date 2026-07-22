@@ -6,7 +6,7 @@ const viewports = [
   { width: 1280, height: 720 },
   { width: 1920, height: 1080 },
 ];
-const weapons = ['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'];
+const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'];
 const results = [];
 
 (async () => {

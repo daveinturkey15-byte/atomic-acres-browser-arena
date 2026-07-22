@@ -10,9 +10,12 @@ import {
 } from './private-match';
 
 export type Team = 0 | 1;
-export type PrimaryWeaponId = 'carbine' | 'smg' | 'scattergun' | 'sniper';
+export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
+
+export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol']);
 
 export type PlayerSnapshot = {
   id: string;
@@ -155,8 +158,8 @@ export type MatchScoreMessage = { type: 'match-score'; by: string; scores: Playe
 export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage;
 
-const weapons = new Set<WeaponId>(['carbine', 'smg', 'scattergun', 'sniper', 'pistol', 'machine-pistol']);
-const primaryWeapons = new Set<PrimaryWeaponId>(['carbine', 'smg', 'scattergun', 'sniper']);
+const weapons = new Set<WeaponId>(WEAPON_IDS);
+const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
 const offensiveSupportSources = new Set<OffensiveSupportSource>(['yardhawk', 'tri-pass', 'hunter-swarm', 'nuke']);
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {

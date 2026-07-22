@@ -9,15 +9,17 @@ type ImportedWeaponRuntime = { mixer: THREE.AnimationMixer; actions: Map<string,
 
 const URLS: Record<WeaponId, string> = {
   carbine: './assets/third-party/quaternius/animated-guns/Rifle.glb',
+  lmg: './assets/third-party/quaternius/animated-guns/Rifle.glb',
   smg: './assets/third-party/quaternius/animated-guns/P90.glb',
   scattergun: './assets/third-party/quaternius/animated-guns/Shotgun.glb',
   sniper: './assets/third-party/quaternius/animated-guns/Rifle.glb',
   pistol: './assets/third-party/quaternius/animated-guns/Pistol.glb',
   'machine-pistol': './assets/third-party/quaternius/animated-guns/Pistol.glb',
 };
-const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, smg: 0.92, scattergun: 1.3, sniper: 1.55, pistol: 0.48, 'machine-pistol': 0.5 };
+const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, lmg: 1.7, smg: 0.92, scattergun: 1.3, sniper: 1.55, pistol: 0.48, 'machine-pistol': 0.5 };
 const PRESENTATION_YAW: Record<WeaponId, number> = {
   carbine: 0,
+  lmg: 0,
   smg: 0,
   scattergun: 0,
   sniper: 0,
@@ -26,6 +28,7 @@ const PRESENTATION_YAW: Record<WeaponId, number> = {
 };
 const PRESENTATION_ROLL: Record<WeaponId, number> = {
   carbine: -0.12,
+  lmg: -0.12,
   smg: -0.1,
   scattergun: -0.08,
   sniper: -0.1,
@@ -73,6 +76,7 @@ const SOCKETS: Record<WeaponId, {
   muzzle: [number, number, number]; eject: [number, number, number]; right: [number, number, number]; left: [number, number, number]; reload: [number, number, number]; sight: string;
 }> = {
   carbine: { muzzle: [0, 0.005, -1.24], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
+  lmg: { muzzle: [0, 0.005, -1.92], eject: [0.16, 0.065, -0.12], right: [-0.1, -0.15, 0.42], left: [-0.45, -0.09, 0.68], reload: [-0.24, -0.3, -0.24], sight: 'optic-reticle' },
   smg: { muzzle: [0, 0.005, -0.96], eject: [0.14, 0.06, -0.04], right: [0.03, -0.13, 0.02], left: [-0.03, -0.08, -0.43], reload: [-0.14, -0.16, -0.08], sight: 'smg-aperture' },
   scattergun: { muzzle: [0, 0.005, -1.24], eject: [0.14, 0.045, -0.03], right: [0.03, -0.14, 0.12], left: [-0.03, -0.025, -0.55], reload: [-0.18, -0.14, 0.02], sight: 'ghost-ring' },
   sniper: { muzzle: [0, 0.005, -1.52], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
@@ -90,7 +94,7 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
   const gunmetal = material(0x1d2930, 0.28, 0.78);
   const parkerized = material(0x344249, 0.4, 0.62);
   const grip = material(0x171c20, 0.72, 0.16);
-  const accent = material(id === 'scattergun' ? 0xc76f42 : id === 'sniper' ? 0x78d1c7 : 0xe2aa51, 0.34, 0.52, id === 'sniper' ? 0x0b2a2b : 0);
+  const accent = material(id === 'scattergun' ? 0xc76f42 : id === 'sniper' ? 0x78d1c7 : id === 'lmg' ? 0x789f54 : 0xe2aa51, 0.34, 0.52, id === 'sniper' ? 0x0b2a2b : 0);
   const lens = flattenMaterials
     ? new THREE.MeshBasicMaterial({ color: 0x78eef2, transparent: true, opacity: 0.58 })
     : new THREE.MeshStandardMaterial({ color: 0x78eef2, emissive: 0x123b43, emissiveIntensity: 0.7, roughness: 0.12, metalness: 0.2, transparent: true, opacity: 0.7 });
@@ -104,7 +108,7 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
     mesh.name = name; mesh.position.set(...position); mesh.rotation.x = Math.PI / 2; mesh.castShadow = !flattenMaterials; kit.add(mesh); return mesh;
   };
 
-  const longGun = id === 'carbine' || id === 'smg' || id === 'scattergun' || id === 'sniper';
+  const longGun = id === 'carbine' || id === 'lmg' || id === 'smg' || id === 'scattergun' || id === 'sniper';
   if (longGun) {
     const railLength = id === 'sniper' ? 0.72 : id === 'scattergun' ? 0.58 : 0.48;
     addBox('receiver-side-plate', [0.3, 0.17, id === 'smg' ? 0.5 : 0.62], [0, 0, -0.22], parkerized);
@@ -113,7 +117,14 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
     addCylinder('muzzle-brake', id === 'scattergun' ? 0.085 : 0.065, 0.16, [0, 0.005, SOCKETS[id].muzzle[2] + 0.07], gunmetal, 14);
   }
 
-  if (id === 'carbine') {
+  if (id === 'lmg') {
+    const magazine = addBox('lmg-box-magazine', [0.38, 0.4, 0.34], [0, -0.3, -0.25], grip); magazine.userData.originalAnimatedPart = true;
+    const bolt = addBox('bolt-or-slide', [0.22, 0.075, 0.22], [0.12, 0.045, -0.12], accent); bolt.userData.restZ = bolt.position.z;
+    addBox('lmg-heavy-receiver', [0.34, 0.28, 0.82], [0, 0.02, -0.28], parkerized);
+    addBox('lmg-heat-shield', [0.3, 0.18, 0.76], [0, 0, -0.92], gunmetal);
+    addBox('lmg-carry-handle', [0.34, 0.16, 0.1], [0, sightHeight + 0.09, -0.42], grip);
+    addBox('lmg-bipod', [0.32, 0.06, 0.48], [0, -0.14, -1.08], parkerized, [0.05, 0, 0]);
+  } else if (id === 'carbine') {
     const magazine = addBox('curved-magazine', [0.21, 0.48, 0.19], [0, -0.28, -0.08], grip, [0.12, 0, -0.06]);
     magazine.userData.originalAnimatedPart = true;
     const bolt = addBox('bolt-or-slide', [0.19, 0.07, 0.2], [0.11, 0.035, -0.05], accent); bolt.userData.restZ = bolt.position.z;

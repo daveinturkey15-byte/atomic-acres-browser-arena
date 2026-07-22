@@ -205,8 +205,8 @@ export function optimizeAttachedWeapon(
   materialMode: StaticBatchMaterialMode,
 ): StaticBatchStats {
   if (weapon.userData.attachedWeaponBatchStats) return weapon.userData.attachedWeaponBatchStats as StaticBatchStats;
-  const articulatedNames = new Set(['bolt-or-slide', 'pump', 'curved-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle']);
-  const compoundArticulatedNames = ['curved-magazine', 'straight-magazine', 'pistol-magazine'];
+  const articulatedNames = new Set(['bolt-or-slide', 'pump', 'curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle']);
+  const compoundArticulatedNames = ['curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine'];
   for (const name of compoundArticulatedNames) {
     const articulated = weapon.getObjectByName(name);
     if (articulated) batchStaticMeshes(articulated, articulated, () => '', materialMode);
@@ -323,8 +323,78 @@ function finalizeWeaponGeometryLod(root: THREE.Group, flattenMaterials: boolean)
 }
 
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
-  const imported = preferImported ? createImportedWeaponModel(id, flattenMaterials) : null;
+  const imported = preferImported && id !== 'lmg' ? createImportedWeaponModel(id, flattenMaterials) : null;
   if (imported) return imported;
+  if (id === 'lmg') {
+    const root = buildWeaponModel('carbine', flattenMaterials, false);
+    root.name = 'lmg-original-weapon';
+    const gunmetal = MAT.gunmetal();
+    const dark = MAT.dark();
+    const rubber = MAT.rubber();
+    const accent = new THREE.MeshStandardMaterial({ color: 0x789f54, roughness: 0.5, metalness: 0.32 });
+
+    // The Mastiff is an original belt-fed support weapon, not a stretched
+    // rifle. Suppress the inherited magazine and optic silhouette, then add a
+    // heavier receiver, box feed, heat shield, carry handle and folded bipod.
+    const inheritedDetails = new Set([
+      'curved-magazine', 'optic-bridge', 'optic-side-post', 'optic-top-frame',
+      'optic-ring', 'optic-lens', 'optic-reticle', 'triangular-fore-end',
+      'fore-end-side-rail', 'fore-end-vent', 'angled-foregrip', 'foregrip-hand-stop',
+    ]);
+    root.traverse((node) => {
+      if (inheritedDetails.has(node.name)) node.visible = false;
+      if (node.name === 'reload-socket-l') node.name = 'lmg-inherited-reload-socket';
+    });
+
+    part(root, roundedBox('lmg-heavy-receiver', [0.31, 0.27, 0.82], gunmetal, 0.055, 4), [0, 0.025, -0.25]);
+    part(root, roundedBox('lmg-feed-cover', [0.3, 0.075, 0.5], accent, 0.018, 3), [0, 0.19, -0.22]);
+    part(root, roundedBox('lmg-heat-shield', [0.285, 0.18, 0.76], dark, 0.04, 4), [0, 0.01, -0.9]);
+    const ventPositions = flattenMaterials ? [-0.9] : [-1.15, -0.98, -0.81, -0.64];
+    for (const z of ventPositions) {
+      for (const side of [-1, 1]) part(root, roundedBox('lmg-shield-vent', [0.032, 0.075, 0.095], accent, 0.008, 2), [side * 0.151, 0.035, z]);
+    }
+
+    const boxMagazine = new THREE.Group();
+    boxMagazine.name = 'lmg-box-magazine';
+    boxMagazine.position.set(0, -0.29, -0.28);
+    root.add(boxMagazine);
+    part(boxMagazine, roundedBox('lmg-ammo-box', [0.36, 0.38, 0.34], dark, 0.06, 4), [0, 0, 0]);
+    part(boxMagazine, roundedBox('lmg-ammo-box-lid', [0.38, 0.055, 0.36], accent, 0.015, 2), [0, 0.205, 0]);
+    const reloadSocket = new THREE.Object3D();
+    reloadSocket.name = 'reload-socket-l';
+    reloadSocket.position.set(-0.24, -0.08, 0.04);
+    boxMagazine.add(reloadSocket);
+
+    const carryHandle = new THREE.Group();
+    carryHandle.name = 'lmg-carry-handle';
+    carryHandle.position.set(0, 0.34, -0.45);
+    root.add(carryHandle);
+    for (const x of [-0.115, 0.115]) part(carryHandle, roundedBox('lmg-handle-post', [0.035, 0.2, 0.05], dark, 0.009, 2), [x, -0.08, 0]);
+    part(carryHandle, roundedBox('lmg-handle-grip', [0.27, 0.06, 0.08], rubber, 0.018, 2), [0, 0.025, 0]);
+
+    const bipod = new THREE.Group();
+    bipod.name = 'lmg-bipod';
+    bipod.position.set(0, -0.11, -1.08);
+    root.add(bipod);
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.47, 8), dark);
+      leg.name = 'lmg-bipod-leg';
+      part(bipod, leg, [side * 0.095, -0.16, 0.08], [0, 0, side * 0.38]);
+    }
+
+    const longBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.038, 0.88, 14), dark);
+    longBarrel.name = 'lmg-long-barrel';
+    part(root, longBarrel, [0, 0.005, -1.48], [Math.PI / 2, 0, 0]);
+    const muzzleSocket = root.getObjectByName('muzzle-socket');
+    if (muzzleSocket) muzzleSocket.position.set(0, 0.005, -1.92);
+    const muzzle = root.children.find((node) => node.userData.muzzle === true);
+    if (muzzle) muzzle.position.z = -1.92;
+    const flash = root.getObjectByName('world-muzzle-flash');
+    if (flash) flash.position.z = -2.1;
+    const supportSocket = root.getObjectByName('support-socket-l');
+    if (supportSocket) supportSocket.position.set(-0.04, -0.13, -0.82);
+    return finalizeWeaponGeometryLod(root, flattenMaterials);
+  }
   if (id === 'sniper') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
     root.name = 'sniper-original-weapon';
@@ -854,6 +924,7 @@ function operatorRig(root: THREE.Group): OperatorRig | undefined {
 // still inheriting wrist motion from walk, fire and hit-reaction clips.
 const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number]> = {
   carbine: [-0.571313, 0.612978, 0.442337, 0.319683],
+  lmg: [-0.571313, 0.612978, 0.442337, 0.319683],
   sniper: [-0.571313, 0.612978, 0.442337, 0.319683],
   smg: [-0.631, 0.653868, 0.351994, 0.224491],
   scattergun: [-0.631, 0.653868, 0.351994, 0.224491],
@@ -941,6 +1012,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   weapon.name = `operator-${weaponId}`;
   const riggedScale: Record<WeaponId, number> = {
     carbine: 0.58,
+    lmg: 0.5,
     sniper: 0.55,
     smg: 0.62,
     scattergun: 0.56,

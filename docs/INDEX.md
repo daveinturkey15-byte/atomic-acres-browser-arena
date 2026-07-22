@@ -2,6 +2,7 @@
 
 ## Current development
 
+- [Pass 55 indoor range and walk-up armory specification](PASS55_INDOOR_RANGE_ARMORY_SPEC_2026-07-22.md) - expanded indoor Gun Range, walk-up weapon pickups, Mastiff 63 LMG, and instant sniper ADS.
 - [Pass 54 wall penetration specification](PASS54_WALL_PENETRATION_SPEC_2026-07-22.md) - canonical FMJ-like material, weapon, distance, angle, multiplayer-authority, and future-asset coverage rule.
 
 ## Current release

@@ -26,11 +26,20 @@ export function magnifiedFovDegrees(baseFovDegrees: number, magnification: numbe
   return 2 * Math.atan(Math.tan(baseRadians / 2) / safeMagnification) * 180 / Math.PI;
 }
 
+/** Sniper aim is deliberately binary; every other family retains authored easing. */
+export function advanceAdsBlend(current: number, ads: boolean, dt: number, weapon: WeaponId): number {
+  if (weapon === 'sniper') return ads ? 1 : 0;
+  const safeCurrent = clamp01(finite(current));
+  const safeDt = Math.max(0, finite(dt));
+  const blend = 1 - Math.exp(-(ads ? 18 : 15) * safeDt);
+  return clamp01(safeCurrent + ((ads ? 1 : 0) - safeCurrent) * blend);
+}
+
 /** Bounded heat accumulator used only for original presentation smoke/flash layering. */
 export function advanceWeaponHeat(current: number, fired: boolean, dt: number, weapon: WeaponId): number {
   const safeCurrent = clamp01(finite(current));
   const safeDt = Math.max(0, finite(dt));
-  const perShot = weapon === 'scattergun' ? 0.32 : weapon === 'sniper' ? 0.26 : weapon === 'smg' || weapon === 'machine-pistol' ? 0.1 : 0.17;
+  const perShot = weapon === 'scattergun' ? 0.32 : weapon === 'sniper' ? 0.26 : weapon === 'lmg' ? 0.14 : weapon === 'smg' || weapon === 'machine-pistol' ? 0.1 : 0.17;
   const cooled = Math.max(0, safeCurrent - safeDt * 0.24);
   return clamp01(cooled + (fired ? perShot : 0));
 }
@@ -39,11 +48,11 @@ export function advanceWeaponHeat(current: number, fired: boolean, dt: number, w
 export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): FireCycleState {
   const ageMs = Math.max(0, finite(rawAgeMs));
   const fastAuto = weapon === 'smg' || weapon === 'machine-pistol';
-  const cycleMs = fastAuto ? 44 : weapon === 'scattergun' ? 620 : weapon === 'sniper' ? 920 : 62;
-  const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'sniper' ? 78 : fastAuto ? 36 : 52;
+  const cycleMs = fastAuto ? 44 : weapon === 'scattergun' ? 620 : weapon === 'sniper' ? 920 : weapon === 'lmg' ? 84 : 62;
+  const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'sniper' ? 78 : weapon === 'lmg' ? 62 : fastAuto ? 36 : 52;
   const flashProgress = clamp01(ageMs / flashDuration);
   const flash = (1 - flashProgress) ** 2;
-  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'sniper' ? 310 : fastAuto ? 50 : weapon === 'pistol' ? 58 : 62;
+  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'sniper' ? 310 : weapon === 'lmg' ? 105 : fastAuto ? 50 : weapon === 'pistol' ? 58 : 62;
   const kickProgress = clamp01(ageMs / kickDuration);
   const kick = kickProgress >= 1 ? 0 : (1 - kickProgress) ** 1.35;
   const actionAge = weapon === 'scattergun' ? Math.max(0, ageMs - 180) : weapon === 'sniper' ? Math.max(0, ageMs - 130) : ageMs;

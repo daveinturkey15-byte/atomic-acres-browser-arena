@@ -2,6 +2,7 @@
 
 :root{font-family:Inter,system-ui,sans-serif;color:#f7ecd4;background:#10171b;font-synthesis:none;--aqua:#58e3dc;--coral:#ff765f;--gold:#f4c44f;--ink:#0c1519;--panel:rgba(12,21,25,.93)}
 *{box-sizing:border-box}[hidden]{display:none!important}html,body,#app{margin:0;width:100%;height:100%;overflow:hidden}button,input,select{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.42;filter:grayscale(.8)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.menu-tabs:has([data-menu-tab=kit][hidden]){grid-template-columns:repeat(2,1fr)}.selected-kit-summary[data-range-armory=true]{border-color:var(--aqua);background:rgba(88,227,220,.08)}.selected-kit-summary[data-range-armory=true] span{color:var(--aqua)}
 #game{display:block;width:100%;height:100%;background:#c58f67}
 #app:has(#menu:not(.hidden)){background:#000}
 #app:has(#menu:not(.hidden))>:is(#game,#color-grade,#film-grain,#vignette){visibility:hidden}

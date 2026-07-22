@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees } from './weapon-presentation-state';
+import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees } from './weapon-presentation-state';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -33,6 +33,13 @@ describe('weapon presentation state', () => {
     expect(scopedFov).toBeCloseTo(29.15, 1);
     expect(angularRatio).toBeCloseTo(3, 8);
     expect(magnifiedFovDegrees(Number.NaN, Number.NaN)).toBeCloseTo(76, 8);
+  });
+
+  it('snaps sniper ADS both ways while preserving eased ADS for other weapons', () => {
+    expect(advanceAdsBlend(0.15, true, 1 / 120, 'sniper')).toBe(1);
+    expect(advanceAdsBlend(0.85, false, 1 / 120, 'sniper')).toBe(0);
+    expect(advanceAdsBlend(0, true, 1 / 120, 'carbine')).toBeGreaterThan(0);
+    expect(advanceAdsBlend(0, true, 1 / 120, 'carbine')).toBeLessThan(1);
   });
 
   it('returns bounded presentation-only hit reactions', () => {
