@@ -36,7 +36,7 @@ test('all live arenas use classified wallbang authority and actual authored cove
     const longSmg = api.traceBallistics('smg', [-17, 1.7, 10], [0, 0, -1], 35, 'atomic-acres');
     const longSniper = api.traceBallistics('sniper', [-17, 1.7, 10], [0, 0, -1], 35, 'atomic-acres');
     const fence = api.traceBallistics('carbine', [0, 1.5, -33], [0, 0, -1], 6, 'skyline-terminal');
-    const container = api.traceBallistics('sniper', [-20, 1.3, -8], [0, 0, -1], 8, 'rustworks-1v1');
+    const container = api.traceBallistics('sniper', [-19, 1.3, -18], [0, 0, -1], 8, 'rustworks-1v1');
     return { snapshot: api.snapshot().ballistics, closeSmg, longSmg, longSniper, fence, container };
   });
 
