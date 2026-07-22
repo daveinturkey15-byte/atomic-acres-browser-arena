@@ -57,6 +57,30 @@ export function rustworksLightingTint(
       godRayLobes: 1,
     };
   }
+  if (arenaId === 'skyline-terminal') {
+    const quality = profile === 'blender';
+    return {
+      ...base,
+      fogColor: 0xa9b6b8,
+      skyTop: 0x46607a,
+      skyHorizon: 0xd9ad9a,
+      skyBottom: 0xe9d9c8,
+      skySun: 0xffe2b4,
+      skyCloud: 0xd8b9ae,
+      skyCloudShadow: 0x39485b,
+      skyCloudLight: 0xffd8bd,
+      hemisphereSky: 0xd8e7e5,
+      hemisphereGround: 0x8b8d80,
+      ambientColor: 0xd1dfdc,
+      fillColor: 0xffcf9b,
+      hemisphereIntensity: Math.max(base.hemisphereIntensity, quality ? 2.15 : 1.9),
+      ambientIntensity: Math.max(base.ambientIntensity, quality ? 1.02 : 0.9),
+      fillIntensity: Math.max(base.fillIntensity, quality ? 0.92 : 0.78),
+      exposure: Math.max(base.exposure, quality ? 1.2 : 1.12),
+      godRayStrength: Math.min(base.godRayStrength, 0.08),
+      godRayLobes: Math.min(base.godRayLobes, 3),
+    };
+  }
   if (arenaId !== 'rustworks-1v1') return base;
   const quality = profile === 'blender';
   // Night industrial pad — cool moon + warm floods; keep ambient high enough for play.
