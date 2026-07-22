@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:4173';
-const maps = ['atomic-acres', 'rustworks-1v1', 'gun-range'];
+const maps = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'];
 const browser = await chromium.launch({ headless: true });
 const results = [];
 try {

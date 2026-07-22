@@ -2715,6 +2715,14 @@
             "multiplayer": false,
             "scoreLimit": null,
             "soloBotCount": 0
+          },
+          {
+            "durationMs": 300000,
+            "id": "skyline-terminal",
+            "maximumSoloBots": 6,
+            "multiplayer": true,
+            "scoreLimit": null,
+            "soloBotCount": 2
           }
         ],
         "defaultDurationMs": 300000,
@@ -3001,13 +3009,13 @@
             "eliminations": 8,
             "id": "hunter-swarm",
             "name": "Hunter Swarm",
-            "repeatable": false
+            "repeatable": true
           },
           {
             "eliminations": 15,
             "id": "nuke",
             "name": "Nuke",
-            "repeatable": false
+            "repeatable": true
           }
         ],
         "triPass": {

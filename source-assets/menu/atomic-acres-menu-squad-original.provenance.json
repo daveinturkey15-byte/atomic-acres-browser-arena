@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "assetId": "atomic-acres-original-menu-squad-2026-07-22",
+  "generatedAt": "2026-07-22",
+  "creator": "Atomic Acres project / Jigglyclaw",
+  "provider": "openai-codex",
+  "model": "gpt-image-2-medium",
+  "sourceImage": "source-assets/menu/atomic-acres-menu-squad-original.png",
+  "sourceImageSha256": "5e459f936c0812c4e1a531f6310e07de444b95062df35af6054c0edcda00b983",
+  "runtimeImage": "public/assets/original/menu/atomic-acres-menu-squad-joke.jpg",
+  "runtimeImageSha256": "65259d081de2671ca6f89ca2bf4ea2687d46096ad29ecbd07aadbc610ccf35e9",
+  "transform": "ffmpeg crop=1672:940:0:0, scale=1280:720:lanczos, JPEG quality 2",
+  "prompt": "Create an original 16:9 menu background illustration for the indie browser FPS game ‘Atomic Acres’. It should look like a polished in-engine screenshot from a stylized retro-future low-poly arena at sunset: a small agricultural test suburb, teal-and-cream modular houses, a retro transit bus, hydroponic structures and a distant utility tower. In the foreground stand four clearly fictional, distinct squad characters with different faces and silhouettes: (1) an original tactical operator holding a generic fictional rifle safely down, (2) an athletic runner in an unbranded black tracksuit, (3) an indie-music fan wearing an original abstract yellow-flower T-shirt with no band name or logo, and (4) a cheerful community soup volunteer in a plain red apron behind a small serving table. Add subtle original game-HUD framing, but no real-world names, no celebrities or public figures, no recognizable faces, no trademarks, no brand logos, no copyrighted game UI, no Nike swoosh, no band merchandise, and no charity logos. Include only the fictional location sign text ‘ATOMIC ACRES’ and optional generic labels such as ‘TEAM SKIRMISH’. Warm red-orange sky, readable silhouettes, playful squad-joke energy, coherent lighting, crisp high-quality game concept art, no watermark.",
+  "references": [],
+  "externalAssets": [],
+  "license": "Original project work",
+  "notes": "Generated without an input/reference image. Replaces the prior user-supplied composite whose creator and licence were not established and which visibly included a real public figure and third-party marks."
+}

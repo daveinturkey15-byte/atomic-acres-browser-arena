@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { classifyImpactSurface } from './combat-feedback';
 import type { Box2 } from './collision';
-import type { ArenaMap, PracticeTarget } from './map';
+import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
 import type { Team } from './protocol';
 
 type Builder = {
@@ -637,7 +637,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
  * Performance keeps climbable/combat core and sparse yard cover;
  * Quality enables heavy industrial decoration + Blender tower overlay.
  */
-export function applyRustworksPresentationProfile(
+export function applyAdditionalMapPresentationProfile(
   root: THREE.Object3D,
   profile: 'performance' | 'blender' | 'compat',
 ): { hidden: number; shown: number } {
@@ -674,6 +674,14 @@ export function applyRustworksPresentationProfile(
     else hidden += 1;
   });
   return { hidden, shown };
+}
+
+/** Backward-compatible name retained for existing Rustworks callers. */
+export function applyRustworksPresentationProfile(
+  root: THREE.Object3D,
+  profile: 'performance' | 'blender' | 'compat',
+): { hidden: number; shown: number } {
+  return applyAdditionalMapPresentationProfile(root, profile);
 }
 
 function scoreTexture(value: number): THREE.CanvasTexture | null {
@@ -807,6 +815,266 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     breakableWindows: [],
     physicalCover: [],
     bounds: { minX: -15, maxX: 15, minZ: -42, maxZ: 9 },
+    houseTelemetry: emptyTelemetry(),
+  };
+}
+
+export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
+  const root = new THREE.Group();
+  root.name = 'Skyline Terminal arena';
+  scene.add(root);
+  const builder: Builder = { root, colliders: [], physicsColliders: [], raycastMeshes: [] };
+
+  const tarmacMat = standard(0x404547, 0.96, 0.04);
+  const floorMat = standard(0xd0d8d5, 0.45, 0.08);
+  const wallMat = standard(0x2d373c, 0.82, 0.18);
+  const trimMat = standard(0x38b2a5, 0.5, 0.2);
+  // Avoid transmission/refraction on the low-spec path: alpha glass is much
+  // cheaper under software WebGL and still reads clearly as breakable glazing.
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0x78bad0,
+    roughness: 0.24,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+  });
+  const planeHullMat = standard(0xebf2f5, 0.4, 0.28);
+  const planeWingMat = standard(0x829096, 0.45, 0.55);
+  const engineMat = standard(0x384146, 0.35, 0.72);
+  const jetbridgeMat = standard(0x525c61, 0.6, 0.45);
+  const kioskMat = standard(0x6b4c33, 0.9, 0.04);
+  const cargoMat = standard(0xd4772c, 0.7, 0.3);
+  const hazardMat = standard(0xd99f2e, 0.65, 0.35);
+
+  const tarmac = new THREE.Mesh(new THREE.PlaneGeometry(76, 76), tarmacMat);
+  tarmac.name = 'skyline-tarmac-apron';
+  tarmac.rotation.x = -Math.PI / 2;
+  tarmac.position.y = 0.0;
+  tarmac.receiveShadow = true;
+  tarmac.userData.impactSurface = 'concrete';
+  root.add(tarmac);
+  builder.raycastMeshes.push(tarmac);
+
+  for (let z = -10; z <= 30; z += 10) {
+    box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
+  }
+
+  box(builder, 'skyline-concourse-floor', [0, 0.02, -23], [60, 0.08, 22], floorMat, { solid: false });
+  // Split the mezzanine around both escalators. A monolithic slab creates a
+  // low underside above each ramp and physically stops the character halfway.
+  box(builder, 'skyline-concourse-mezzanine', [0, 3.2, -31.25], [52, 0.28, 5.5], floorMat);
+  box(builder, 'skyline-mezzanine-front-center', [0, 3.2, -25.25], [36.4, 0.28, 6.5], floorMat);
+  box(builder, 'skyline-mezzanine-front-west', [-23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
+  box(builder, 'skyline-mezzanine-front-east', [23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
+  // Split the front rail around the central gate connector so the route does
+  // not visually pass through a barrier.
+  box(builder, 'skyline-mezzanine-rail', [-14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
+  box(builder, 'skyline-mezzanine-rail', [14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
+  box(builder, 'skyline-gate-connector-floor', [0, 3.2, -17], [3.6, 0.24, 10], jetbridgeMat);
+  box(builder, 'skyline-gate-connector-rail-left', [-1.75, 4.15, -17], [0.12, 1.7, 10], trimMat, { solid: false, detail: 'performance' });
+  box(builder, 'skyline-gate-connector-rail-right', [1.75, 4.15, -17], [0.12, 1.7, 10], trimMat, { solid: false, detail: 'performance' });
+
+  const mainSign = box(builder, 'skyline-terminal-main-sign', [0, 6.2, -33.8], [14.0, 1.2, 0.2], hazardMat, { solid: false, shots: false, detail: 'performance' });
+  mainSign.userData.label = 'SKYLINE TERMINAL - GATES 1-12';
+
+  const flightDisplay = box(builder, 'skyline-flight-display-board', [0, 4.8, -27.8], [6.5, 1.4, 0.25], wallMat, { solid: false, shots: false, detail: 'quality' });
+  flightDisplay.userData.label = 'DEPARTURES - FLIGHT AERO 86';
+
+  const rampAngle = (22 * Math.PI) / 180;
+  const rampLen = 3.2 / Math.sin(rampAngle);
+  for (const sideX of [-20, 20]) {
+    box(builder, 'skyline-concourse-escalator', [sideX, 1.6, -24.5], [3.2, 0.25, rampLen], jetbridgeMat, {
+      // Positive X rotation climbs from the front concourse toward -Z and the
+      // mezzanine. Gemini's negative sign inverted the physical route.
+      rotation: [rampAngle, 0, 0],
+    });
+  }
+
+  box(builder, 'skyline-terminal-backwall', [0, 3.5, -34.1], [62, 7.0, 0.4], wallMat);
+  box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
+  box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
+
+  for (const archX of [-6, 6]) {
+    box(builder, 'skyline-security-scanner', [archX, 1.35, -20], [0.35, 2.7, 1.8], trimMat);
+  }
+  box(builder, 'skyline-security-belt', [0, 0.55, -20], [8.0, 1.1, 1.4], wallMat);
+
+  box(builder, 'skyline-cafe-counter', [-14, 0.55, -28], [5.5, 1.1, 2.8], kioskMat);
+  box(builder, 'skyline-dutyfree-kiosk', [14, 0.55, -28], [5.5, 1.1, 2.8], kioskMat);
+
+  box(builder, 'skyline-baggage-claim-carousel', [0, 0.4, -31], [9.5, 0.8, 4.2], kioskMat);
+  box(builder, 'skyline-baggage-item-1', [-2.5, 0.9, -31], [1.1, 0.5, 0.7], cargoMat, { solid: false, detail: 'quality' });
+  box(builder, 'skyline-baggage-item-2', [2.2, 0.9, -31], [0.9, 0.45, 0.65], hazardMat, { solid: false, detail: 'quality' });
+
+  const breakableWindows: BreakableWindow[] = [];
+  for (const winX of [-22, -14, -6, 6, 14, 22]) {
+    const winMesh = box(builder, `skyline-facade-window-${winX}`, [winX, 2.5, -12], [6.8, 5.0, 0.2], glassMat, { solid: false, shots: true });
+    winMesh.userData.breakableWindowId = `skyline-window-${winX}`;
+    winMesh.userData.dynamic = true;
+    breakableWindows.push({ id: `skyline-window-${winX}`, mesh: winMesh, broken: false });
+  }
+
+  box(builder, 'skyline-jetbridge-bellows', [0, 4.3, -11.8], [4.1, 2.6, 0.5], jetbridgeMat, { solid: false, shots: false, detail: 'quality' });
+
+  box(builder, 'skyline-jetbridge-floor', [0, 3.2, -7], [3.6, 0.24, 10], jetbridgeMat);
+  box(builder, 'skyline-jetbridge-wall-left', [-1.75, 4.4, -6], [0.15, 2.2, 12], wallMat);
+  box(builder, 'skyline-jetbridge-wall-right', [1.75, 4.4, -6], [0.15, 2.2, 12], wallMat);
+  box(builder, 'skyline-jetbridge-roof', [0, 5.5, -6], [3.6, 0.15, 12], jetbridgeMat, { solid: false, shots: false });
+  const jetbridgeRampAngle = Math.atan2(0.79, 2.2);
+  box(builder, 'skyline-jetbridge-cabin-ramp', [0, 2.935, -1], [3.6, 0.24, 2.2], jetbridgeMat, {
+    rotation: [jetbridgeRampAngle, 0, 0],
+  });
+  for (const legZ of [-10, -2]) {
+    box(builder, 'skyline-jetbridge-leg', [0, 1.5, legZ], [0.4, 3.0, 0.4], jetbridgeMat, { solid: false });
+  }
+
+  box(builder, 'skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
+  box(builder, 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
+  // Split the north fuselage wall around the jetbridge doorway. A single solid
+  // wall made the authored bridge-to-cabin route stop outside the aircraft.
+  box(builder, 'skyline-jetliner-side-north', [-9.65, 3.75, 0.2], [15.7, 2.4, 0.2], planeHullMat);
+  box(builder, 'skyline-jetliner-side-north', [9.65, 3.75, 0.2], [15.7, 2.4, 0.2], planeHullMat);
+  box(builder, 'skyline-jetliner-side-south', [0, 3.75, 3.8], [35.0, 2.4, 0.2], planeHullMat);
+  box(builder, 'skyline-jetliner-nose', [-19.0, 3.75, 2.0], [2.2, 2.4, 3.8], trimMat);
+  box(builder, 'skyline-jetliner-cockpit-partition', [-16.8, 3.75, 2.0], [0.15, 2.4, 3.6], wallMat, { solid: false, detail: 'quality' });
+  box(builder, 'skyline-jetliner-tail', [19.0, 6.3, 2.0], [2.2, 3.0, 0.4], trimMat, { solid: false, shots: false });
+
+  for (const seatX of [-12, -8, -4, 4, 8, 12]) {
+    box(builder, `skyline-cabin-seat-left-${seatX}`, [seatX, 3.1, 1.1], [1.1, 1.1, 1.0], wallMat);
+    box(builder, `skyline-cabin-seat-right-${seatX}`, [seatX, 3.1, 2.9], [1.1, 1.1, 1.0], wallMat);
+    box(builder, `skyline-cabin-overhead-bin-left-${seatX}`, [seatX, 4.5, 0.65], [1.8, 0.45, 0.65], planeHullMat, { solid: false, shots: false });
+    box(builder, `skyline-cabin-overhead-bin-right-${seatX}`, [seatX, 4.5, 3.35], [1.8, 0.45, 0.65], planeHullMat, { solid: false, shots: false });
+  }
+
+  box(builder, 'skyline-jetliner-wing-port', [0, 2.8, 11.0], [5.0, 0.3, 15.0], planeWingMat);
+  box(builder, 'skyline-jetliner-wing-starboard', [0, 2.8, -7.0], [5.0, 0.3, 15.0], planeWingMat);
+  box(builder, 'skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
+  box(builder, 'skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
+
+  const stairAngle = (32 * Math.PI) / 180;
+  const stairLen = 2.4 / Math.sin(stairAngle);
+  // Place the high end at the cabin's rear edge instead of burying half the
+  // stair beneath the cabin floor.
+  box(builder, 'skyline-airstair', [19.4, 1.2, 2.0], [stairLen, 0.2, 2.2], trimMat, {
+    rotation: [0, 0, -stairAngle],
+  });
+
+  box(builder, 'skyline-fuel-trailer', [-10, 1.2, 18], [5.8, 2.4, 2.6], hazardMat);
+  const fuelTank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 14), cargoMat);
+  fuelTank.name = 'skyline-fuel-trailer-tank';
+  fuelTank.rotation.z = Math.PI / 2;
+  fuelTank.position.set(-10, 1.5, 18);
+  fuelTank.castShadow = true;
+  fuelTank.receiveShadow = true;
+  fuelTank.userData.presentationOnly = true;
+  fuelTank.userData.impactSurface = 'metal';
+  root.add(fuelTank);
+
+  for (const [x, z, col] of [
+    [-20, 18, cargoMat],
+    [20, 18, wallMat],
+    [-12, 26, hazardMat],
+    [12, 26, cargoMat],
+    [0, 28, trimMat],
+  ] as const) {
+    box(builder, 'skyline-tarmac-cargo', [x, 1.3, z], [4.5, 2.6, 2.6], col);
+  }
+
+  for (const [x, z] of [[-8, 14], [8, 14], [-22, 26], [22, 26]] as const) {
+    box(builder, 'skyline-luggage-cart', [x, 0.6, z], [2.4, 1.2, 1.6], hazardMat);
+  }
+
+  box(builder, 'skyline-fence-north', [0, 1.5, -35.8], [72, 3.0, 0.4], jetbridgeMat);
+  box(builder, 'skyline-fence-south', [0, 1.5, 35.8], [72, 3.0, 0.4], jetbridgeMat);
+  box(builder, 'skyline-fence-west', [-35.8, 1.5, 0], [0.4, 3.0, 72], jetbridgeMat);
+  box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 72], jetbridgeMat);
+
+  const physicalCover: ArenaMap['physicalCover'] = [
+    { id: 'jetliner-engine-south', bounds: { minX: -1.1, maxX: 1.1, minZ: 9.75, maxZ: 14.25 }, blocksMovement: true, blocksShots: true },
+    { id: 'terminal-backwall', bounds: { minX: -31, maxX: 31, minZ: -34.3, maxZ: -33.9 }, blocksMovement: true, blocksShots: true },
+    { id: 'cargo-stack-north', bounds: { minX: -22.3, maxX: -17.7, minZ: 16.7, maxZ: 19.3 }, blocksMovement: true, blocksShots: true },
+    { id: 'cargo-stack-south', bounds: { minX: 17.7, maxX: 22.3, minZ: 16.7, maxZ: 19.3 }, blocksMovement: true, blocksShots: true },
+    { id: 'fuel-trailer-station', bounds: { minX: -13.0, maxX: -7.0, minZ: 16.6, maxZ: 19.4 }, blocksMovement: true, blocksShots: true },
+  ];
+
+  root.userData.skylinePresentationBatches = batchPresentationOnlyBoxes(root);
+
+  root.userData.skylineRoutes = {
+    'concourse-to-mezzanine': [
+      { id: 'escalator-foot', position: [-20, 1.7, -20.45] },
+      { id: 'escalator-top', position: [-20, 5.04, -28.45] },
+      { id: 'mezzanine-center', position: [0, 5.04, -28.0] },
+    ],
+    'mezzanine-to-jetbridge': [
+      { id: 'mezzanine-gate', position: [0, 5.04, -22.0] },
+      { id: 'gate-connector', position: [0, 5.02, -17.0] },
+      { id: 'jetbridge-interior', position: [0, 5.02, -7.0] },
+      { id: 'jetbridge-ramp-top', position: [0, 5.02, -2.03] },
+      { id: 'cabin-door', position: [0, 4.25, 0.4] },
+    ],
+    'fuselage-to-tarmac': [
+      { id: 'cabin-rear', position: [14.0, 4.25, 2.0] },
+      { id: 'airstair-top', position: [17.45, 4.25, 2.0] },
+      { id: 'airstair-foot', position: [21.35, 1.7, 2.0] },
+      { id: 'apron-tarmac', position: [24.0, 1.7, 2.0] },
+    ],
+  };
+
+  root.userData.verticalNavigation = {
+    routes: [
+      { id: 'west-escalator', foot: [-20, 0, -20.45], top: [-20, 3.34, -28.45] },
+      { id: 'east-escalator', foot: [20, 0, -20.45], top: [20, 3.34, -28.45] },
+      { id: 'rear-airstair', foot: [21.35, 0, 2], top: [17.45, 2.55, 2] },
+    ],
+    ramps: [
+      { id: 'west-escalator', from: [-20, 0, -20.45], to: [-20, 3.34, -28.45], width: 3.2 },
+      { id: 'east-escalator', from: [20, 0, -20.45], to: [20, 3.34, -28.45], width: 3.2 },
+      { id: 'jetbridge-cabin-ramp', from: [0, 3.32, -2.03], to: [0, 2.55, 0.03], width: 3.6 },
+      { id: 'rear-airstair', from: [21.35, 0, 2], to: [17.45, 2.55, 2], width: 2.2 },
+    ],
+    platforms: [
+      { id: 'mezzanine-back', minX: -26, maxX: 26, minZ: -34, maxZ: -28.5, y: 3.34 },
+      { id: 'mezzanine-front-center', minX: -18.2, maxX: 18.2, minZ: -28.5, maxZ: -22, y: 3.34 },
+      { id: 'mezzanine-front-west', minX: -26, maxX: -21.6, minZ: -28.5, maxZ: -22, y: 3.34 },
+      { id: 'mezzanine-front-east', minX: 21.6, maxX: 26, minZ: -28.5, maxZ: -22, y: 3.34 },
+      { id: 'gate-connector', minX: -1.8, maxX: 1.8, minZ: -22, maxZ: -12, y: 3.32 },
+      { id: 'jetbridge', minX: -1.8, maxX: 1.8, minZ: -12, maxZ: -2, y: 3.32 },
+      { id: 'jetliner-cabin', minX: -17.5, maxX: 17.5, minZ: 0.1, maxZ: 3.9, y: 2.55 },
+    ],
+  };
+
+  root.userData.skylineAccess = {
+    escalatorAngleDegrees: 22,
+    jetbridgeRampAngleDegrees: THREE.MathUtils.radToDeg(jetbridgeRampAngle),
+    airstairAngleDegrees: 32,
+    maxClimbDegrees: 50,
+  };
+
+  return {
+    id: 'skyline-terminal',
+    label: 'Skyline Terminal',
+    root,
+    colliders: builder.colliders,
+    physicsColliders: builder.physicsColliders,
+    raycastMeshes: builder.raycastMeshes,
+    spawns: spawnRecord(
+      [
+        [-24, -30], [-16, -30], [-8, -30], [8, -30], [16, -30], [24, -30],
+      ],
+      [
+        [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30],
+      ],
+    ),
+    patrolPoints: [
+      [-26, -18], [-16, -18], [-8, -18], [8, -18], [16, -18], [26, -18], [0, 8],
+      [-18, 12], [18, 12], [-26, 24], [-4, 24], [4, 24], [26, 24], [0, 32],
+    ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
+    targets: [],
+    houses: [],
+    breakableWindows,
+    physicalCover,
+    bounds: { minX: -35, maxX: 35, minZ: -35, maxZ: 35 },
     houseTelemetry: emptyTelemetry(),
   };
 }

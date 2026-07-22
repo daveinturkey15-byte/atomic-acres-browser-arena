@@ -1,12 +1,23 @@
 export type MinimapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
-export type MinimapLandmarkKind = 'bus' | 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer';
+export type MinimapLandmarkKind =
+  | 'bus'
+  | 'cargo-stack'
+  | 'pipe-stack'
+  | 'service-skip'
+  | 'generator-trailer'
+  | 'jetliner'
+  | 'terminal'
+  | 'fuel';
 
-export function minimapLandmarkLabel(kind: MinimapLandmarkKind): 'BUS' | 'CRGO' | 'PIPE' | 'SKIP' | 'GEN' {
+export function minimapLandmarkLabel(kind: MinimapLandmarkKind): 'BUS' | 'CRGO' | 'PIPE' | 'SKIP' | 'GEN' | 'JET' | 'TERM' | 'FUEL' {
   if (kind === 'cargo-stack') return 'CRGO';
   if (kind === 'pipe-stack') return 'PIPE';
   if (kind === 'service-skip') return 'SKIP';
   if (kind === 'generator-trailer') return 'GEN';
+  if (kind === 'jetliner') return 'JET';
+  if (kind === 'terminal') return 'TERM';
+  if (kind === 'fuel') return 'FUEL';
   return 'BUS';
 }
 
@@ -22,7 +33,12 @@ export function physicalCoverMinimapKind(
   performanceVisualKind?: Exclude<MinimapLandmarkKind, 'bus'>,
 ): MinimapLandmarkKind | null {
   if (performanceVisualKind) return performanceVisualKind;
-  return id.endsWith('-bus') ? 'bus' : null;
+  if (id.endsWith('-bus')) return 'bus';
+  if (id.includes('jetliner')) return 'jetliner';
+  if (id.includes('terminal')) return 'terminal';
+  if (id.includes('fuel')) return 'fuel';
+  if (id.includes('cargo-stack')) return 'cargo-stack';
+  return null;
 }
 
 export function worldToMinimap(
