@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const previewPort = Number(process.env.QA_PREVIEW_PORT ?? '4173');
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60000,
@@ -11,7 +13,7 @@ export default defineConfig({
   reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
   outputDir: 'artifacts/pass25a/playwright-results',
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:4173',
+    baseURL: process.env.BASE_URL || `http://localhost:${previewPort}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     // Chromium screencasting caps requestAnimationFrame near 30 Hz and invalidates
@@ -36,7 +38,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'node scripts/qa/playwright-web-server.mjs',
-    port: 4173,
+    port: previewPort,
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },

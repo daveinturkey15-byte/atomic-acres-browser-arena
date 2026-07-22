@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { createImportedWeaponModel } from './weapon-model';
+import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
 import type { Team, WeaponId } from './protocol';
@@ -19,6 +20,12 @@ const textureBatchColors: Record<string, number> = {
   'siding-aqua.png': 0x4eaaa7,
   'siding-coral.png': 0xc66d5a,
   'weapon-gunmetal.png': 0x4b555a,
+  'weapon-carbine.png': 0x374244,
+  'weapon-smg.png': 0x244b4e,
+  'weapon-scattergun.png': 0x393230,
+  'weapon-sniper.png': 0x444f3e,
+  'weapon-pistol.png': 0x2f3030,
+  'weapon-machine-pistol.png': 0x363330,
   'wood-deck.png': 0x78513b,
   'roof-shingles.png': 0x595e63,
   'plaster-warm.png': 0xdcd2bb,
@@ -279,12 +286,18 @@ export function roundedBox(
 }
 
 const MAT = {
-  gunmetal: () => texturedMaterial('./assets/original/textures/weapon-gunmetal.png', {
-    color: 0xb8bfbd, roughness: 0.38, metalness: 0.62, repeatX: 2,
-    normalPath: './assets/original/textures/weapon-gunmetal-normal.png',
-    roughnessPath: './assets/original/textures/weapon-gunmetal-roughness.png',
-    normalScale: 0.34,
-  }),
+  gunmetal: (weapon: WeaponId) => {
+    const finish = weaponFinishProfile(weapon);
+    const material = texturedMaterial(finish.albedo, {
+      color: 0xffffff, roughness: 0.48, metalness: finish.metalness,
+      repeatX: finish.textureRepeat, repeatY: finish.textureRepeat,
+      normalPath: finish.normal, roughnessPath: finish.roughness,
+      normalScale: finish.normalScale,
+    });
+    material.name = finish.id;
+    material.userData.weaponFinishId = finish.id;
+    return material;
+  },
   dark: () => new THREE.MeshStandardMaterial({ color: 0x252c31, roughness: 0.42, metalness: 0.5 }),
   rubber: () => new THREE.MeshStandardMaterial({ color: 0x202628, roughness: 0.9 }),
   brass: () => new THREE.MeshStandardMaterial({ color: 0xb8883c, roughness: 0.3, metalness: 0.76 }),
@@ -328,7 +341,16 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   if (id === 'lmg') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
     root.name = 'lmg-original-weapon';
-    const gunmetal = MAT.gunmetal();
+    const gunmetal = MAT.gunmetal('lmg');
+    root.userData.weaponModelId = 'lmg-authored-v6';
+    root.userData.weaponFinishId = weaponFinishProfile('lmg').id;
+    root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const replace = (material: THREE.Material) => material.userData.weaponFinishId
+        ? gunmetal
+        : material;
+      node.material = Array.isArray(node.material) ? node.material.map(replace) : replace(node.material);
+    });
     const dark = MAT.dark();
     const rubber = MAT.rubber();
     const accent = new THREE.MeshStandardMaterial({ color: 0x789f54, roughness: 0.5, metalness: 0.32 });
@@ -398,7 +420,16 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   if (id === 'sniper') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
     root.name = 'sniper-original-weapon';
-    const sniperMetal = MAT.gunmetal();
+    const sniperMetal = MAT.gunmetal('sniper');
+    root.userData.weaponModelId = 'sniper-authored-v6';
+    root.userData.weaponFinishId = weaponFinishProfile('sniper').id;
+    root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const replace = (material: THREE.Material) => material.userData.weaponFinishId
+        ? sniperMetal
+        : material;
+      node.material = Array.isArray(node.material) ? node.material.map(replace) : replace(node.material);
+    });
     const sniperDark = MAT.dark();
     const sniperAccent = new THREE.MeshStandardMaterial({ color: 0x78977d, roughness: 0.58, metalness: 0.28 });
 
@@ -496,8 +527,10 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   }
   const root = new THREE.Group();
   root.name = `${id}-original-weapon`;
+  root.userData.weaponModelId = `${id}-authored-v6`;
+  root.userData.weaponFinishId = weaponFinishProfile(id).id;
   const pistolFamily = id === 'pistol' || id === 'machine-pistol';
-  const metal = MAT.gunmetal();
+  const metal = MAT.gunmetal(id);
   const dark = MAT.dark();
   const rubber = MAT.rubber();
   const accent = new THREE.MeshStandardMaterial({
@@ -913,23 +946,31 @@ type OperatorRig = {
   leftShoulderBone?: THREE.Bone;
   leftElbowBone?: THREE.Bone;
   leftWristBone?: THREE.Bone;
+  rightShoulderBone?: THREE.Bone;
+  rightElbowBone?: THREE.Bone;
+  rightWristBone?: THREE.Bone;
+  armPoseBeforeIk?: Array<{
+    bone: THREE.Bone;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+  }>;
 };
 
 function operatorRig(root: THREE.Group): OperatorRig | undefined {
   return root.userData.operatorRig as OperatorRig | undefined;
 }
 
-// Calibrated against the SWAT Idle_Gun_Shoot wrist basis. These offsets keep
-// each imported asset's authored forward axis on the operator's aim line while
-// still inheriting wrist motion from walk, fire and hit-reaction clips.
-const RIGGED_WEAPON_QUATERNION: Record<WeaponId, [number, number, number, number]> = {
-  carbine: [-0.571313, 0.612978, 0.442337, 0.319683],
-  lmg: [-0.571313, 0.612978, 0.442337, 0.319683],
-  sniper: [-0.571313, 0.612978, 0.442337, 0.319683],
-  smg: [-0.631, 0.653868, 0.351994, 0.224491],
-  scattergun: [-0.631, 0.653868, 0.351994, 0.224491],
-  pistol: [0.142442, -0.014047, 0.708358, 0.691189],
-  'machine-pistol': [0.142442, -0.014047, 0.708358, 0.691189],
+// Third-person support grips sit near the magazine well/receiver. Camera-space
+// grips can reach farther down a fore-end, but the source SWAT upper/lower arm
+// chain is shorter and otherwise clamps through the torso.
+const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> = {
+  carbine: [-0.035, -0.17, -0.21],
+  smg: [-0.03, -0.16, -0.16],
+  lmg: [-0.04, -0.13, -0.26],
+  scattergun: [-0.03, -0.025, 0.29],
+  sniper: [-0.035, -0.095, -0.21],
+  pistol: [-0.06, -0.15, 0.03],
+  'machine-pistol': [-0.06, -0.15, 0.03],
 };
 
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */
@@ -946,30 +987,59 @@ function orientBoneToward(bone: THREE.Bone, child: THREE.Bone, targetWorld: THRE
   bone.updateWorldMatrix(false, true);
 }
 
-/** Solve the rigged operator's left arm to grip the weapon's support-socket-l. */
-function applyRiggedLeftGrip(
-  shoulder: THREE.Bone, elbow: THREE.Bone, wrist: THREE.Bone, weapon: THREE.Group,
+/** Solve one animated arm onto a weapon grip while preserving its bind lengths. */
+function applyRiggedArmGrip(
+  shoulder: THREE.Bone,
+  elbow: THREE.Bone,
+  wrist: THREE.Bone,
+  weapon: THREE.Group,
+  socketName: 'support-socket-l' | 'grip-socket-r',
+  outwardSign: -1 | 1,
 ): Record<string, unknown> | null {
-  const support = weapon.getObjectByName('support-socket-l');
-  if (!support) return null;
+  const grip = weapon.getObjectByName(socketName);
+  if (!grip) return null;
   // The scattergun grip is parented to its animated pump. Resolve the complete
   // current hierarchy after the mixer/action part moved it; treating every
   // socket as a direct weapon child was the stale/far-target Pass 17 bug.
-  const target = resolveSocketWorld(support);
+  const target = resolveSocketWorld(grip);
   shoulder.updateWorldMatrix(true, true);
   const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3());
-  const elbowPos = elbow.getWorldPosition(new THREE.Vector3());
-  const wristPos = wrist.getWorldPosition(new THREE.Vector3());
+  let elbowPos = elbow.getWorldPosition(new THREE.Vector3());
+  let wristPos = wrist.getWorldPosition(new THREE.Vector3());
   const shoulderOffset = elbow.position.clone();
   const elbowOffset = wrist.position.clone();
-  const upperLength = shoulderPos.distanceTo(elbowPos) || 0.38;
-  const lowerLength = elbowPos.distanceTo(wristPos) || 0.35;
+  let upperLength = shoulderPos.distanceTo(elbowPos) || 0.38;
+  let lowerLength = elbowPos.distanceTo(wristPos) || 0.35;
+  // The source SWAT proportions use a short stylised arm chain. Permit a
+  // bounded uniform reach extension only when an authored grip would otherwise
+  // clamp; the clean animation offsets are restored before the next frame.
+  const reachStretch = THREE.MathUtils.clamp(
+    shoulderPos.distanceTo(target) / Math.max(0.001, (upperLength + lowerLength) * 0.985),
+    1,
+    1.22,
+  );
+  if (reachStretch > 1.0001) {
+    elbow.position.multiplyScalar(reachStretch);
+    wrist.position.multiplyScalar(reachStretch);
+    shoulder.updateWorldMatrix(true, true);
+    elbowPos = elbow.getWorldPosition(new THREE.Vector3());
+    wristPos = wrist.getWorldPosition(new THREE.Vector3());
+    upperLength = shoulderPos.distanceTo(elbowPos) || upperLength;
+    lowerLength = elbowPos.distanceTo(wristPos) || lowerLength;
+  }
+  const torsoReference = shoulder.parent?.parent ?? shoulder.parent;
+  const torsoPosition = torsoReference?.getWorldPosition(new THREE.Vector3()) ?? shoulderPos;
+  // Use the observed shoulder side, not a source-model axis. This remains
+  // stable after the imported visual's yaw correction and the prone pivot.
+  const bendHint = shoulderPos.clone().sub(torsoPosition);
+  if (bendHint.lengthSq() < 1e-6) bendHint.set(outwardSign, 0, 0);
+  bendHint.normalize().multiplyScalar(1.2).add(new THREE.Vector3(0, -0.18, 0));
   const elbowTarget = solveTwoBoneElbow(
     shoulderPos,
     target,
     upperLength,
     lowerLength,
-    new THREE.Vector3(-0.48, -1, 0.22),
+    bendHint,
   );
   orientBoneToward(shoulder, elbow, elbowTarget);
   orientBoneToward(elbow, wrist, target);
@@ -979,17 +1049,36 @@ function applyRiggedLeftGrip(
   const bounds = objectLocalGeometryBounds(weapon);
   const targetInWeapon = weapon.worldToLocal(target.clone());
   const elbowAngle = shoulderPos.clone().sub(solvedElbow).angleTo(solvedWrist.clone().sub(solvedElbow));
+  const elbowTorsoDistance = solvedElbow.distanceTo(torsoPosition);
+  const shoulderFromTorso = shoulderPos.clone().sub(torsoPosition);
+  const shoulderTorsoDistance = shoulderFromTorso.length();
+  const elbowTorsoOutward = shoulderTorsoDistance > 1e-5
+    ? solvedElbow.clone().sub(torsoPosition).dot(shoulderFromTorso.normalize())
+    : elbowTorsoDistance;
+  // Clearance is about staying on the support shoulder's side of the chest,
+  // not an arbitrary sphere around one spine joint. A tucked firing elbow may
+  // be closer to that joint than 20 cm while still remaining safely outboard.
+  const minimumOutwardClearance = shoulderTorsoDistance * 0.2;
   return {
     supportError: solvedWrist.distanceTo(target),
     reachRatio: shoulderPos.distanceTo(target) / Math.max(0.001, upperLength + lowerLength),
+    reachStretch,
     clamped: shoulderPos.distanceTo(target) >= upperLength + lowerLength - 1e-4,
     target: target.toArray(),
     targetInWeapon: targetInWeapon.toArray(),
     wrist: solvedWrist.toArray(),
-    socketParent: support.parent?.name ?? null,
-    nestedSocket: support.parent !== weapon,
+    socketName,
+    socketParent: grip.parent?.name ?? null,
+    nestedSocket: grip.parent !== weapon,
     elbowAngle,
-    bindOffsetsPreserved: shoulderOffset.equals(elbow.position) && elbowOffset.equals(wrist.position),
+    elbowTorsoDistance,
+    shoulderTorsoDistance,
+    elbowTorsoOutward,
+    minimumOutwardClearance,
+    torsoClear: elbowTorsoOutward >= minimumOutwardClearance,
+    torsoRelativeBendHint: true,
+    bindOffsetsPreserved: reachStretch === 1
+      && shoulderOffset.equals(elbow.position) && elbowOffset.equals(wrist.position),
     weaponLocalBounds: bounds ? {
       center: bounds.getCenter(new THREE.Vector3()).toArray(),
       size: bounds.getSize(new THREE.Vector3()).toArray(),
@@ -997,6 +1086,26 @@ function applyRiggedLeftGrip(
       distanceToTarget: bounds.distanceToPoint(targetInWeapon),
     } : null,
     finite: [...target.toArray(), ...solvedWrist.toArray()].every(Number.isFinite),
+  };
+}
+
+function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weapon: THREE.Group): Record<string, unknown> | null {
+  if (!rig.leftShoulderBone || !rig.leftElbowBone || !rig.leftWristBone
+    || !rig.rightShoulderBone || !rig.rightElbowBone || !rig.rightWristBone) return null;
+  const support = applyRiggedArmGrip(
+    rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone, weapon, 'support-socket-l', 1,
+  );
+  const dominant = applyRiggedArmGrip(
+    rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone, weapon, 'grip-socket-r', -1,
+  );
+  if (!support) return dominant;
+  return {
+    ...support,
+    dominantGrip: dominant,
+    bothHandsConnected: support.supportError !== undefined
+      && Number(support.supportError) <= 0.055
+      && dominant?.supportError !== undefined
+      && Number(dominant.supportError) <= 0.055,
   };
 }
 
@@ -1010,6 +1119,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   const weapon = buildWeaponModel(weaponId, flattenMaterials, false);
   optimizeAttachedWeapon(weapon, flattenMaterials ? 'palette-basic' : 'vertex-lit');
   weapon.name = `operator-${weaponId}`;
+  weapon.userData.weaponId = weaponId;
   const riggedScale: Record<WeaponId, number> = {
     carbine: 0.58,
     lmg: 0.5,
@@ -1021,8 +1131,14 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   };
   weapon.scale.setScalar(rig.rigged ? riggedScale[weaponId] : weaponId === 'smg' ? 0.72 : 0.68);
   if (rig.rigged) {
-    weapon.position.set(0.04, -0.03, -0.12);
-    weapon.quaternion.set(...RIGGED_WEAPON_QUATERNION[weaponId]);
+    weapon.position.set(0, 0, 0);
+    weapon.quaternion.identity();
+    weapon.userData.riggedForwardCorrection = 'stable-body-mount-minus-z';
+    const supportGrip = weapon.getObjectByName('support-socket-l');
+    if (supportGrip) {
+      supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId]);
+      supportGrip.userData.riggedReachCalibrated = true;
+    }
   } else {
     weapon.rotation.y = Math.PI;
   }
@@ -1037,13 +1153,10 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   rig.weapon = weapon;
   rig.weaponId = weaponId;
 
-  // Left-hand grip: solve the rigged skeleton arm to reach the support-socket-l
-  // on the weapon. The right wrist already drives the weapon-socket; this anchors
-  // the off-hand so the operator reads as gripping the forend or magazine well.
-  if (rig.rigged && (rig as OperatorRig & { rigged: true }).leftShoulderBone) {
-    const r = rig as OperatorRig & { rigged: true };
-    root.userData.operatorGripTelemetry = applyRiggedLeftGrip(r.leftShoulderBone!, r.leftElbowBone!, r.leftWristBone!, weapon);
-  }
+  // A rigged swap is solved on the next presentation frame, after the mixer
+  // restores the base animation. Solving here would use the previous weapon's
+  // already-IK'd bones and compound rotations across rapid loadout changes.
+  if (rig.rigged) root.userData.operatorGripTelemetry = null;
 }
 
 export function fireOperator(root: THREE.Group): void {
@@ -1089,12 +1202,28 @@ export function poseOperator(
   const rig = operatorRig(root);
   if (!rig) return;
   if (rig.rigged) {
+    // Three's mixer only writes properties that exist in the active clip. Put
+    // every arm bone back at the previous clean post-mixer pose first so IK
+    // cannot accumulate on an unkeyed shoulder or wrist across frames/swaps.
+    for (const entry of rig.armPoseBeforeIk ?? []) {
+      entry.bone.position.copy(entry.position);
+      entry.bone.quaternion.copy(entry.quaternion);
+    }
     updateRiggedOperator(root, speed, stance);
+    const armBones = [
+      rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone,
+      rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone,
+    ].filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone);
+    rig.armPoseBeforeIk = armBones.map((bone) => ({
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+    }));
     root.updateWorldMatrix(true, true);
-    if (rig.weapon && rig.leftShoulderBone && rig.leftElbowBone && rig.leftWristBone) {
-      // The mixer writes animated bones first; support-hand IK is the final
-      // presentation layer so walk/fire/hit clips cannot erase the grip.
-      root.userData.operatorGripTelemetry = applyRiggedLeftGrip(rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone, rig.weapon);
+    if (rig.weapon) {
+      // The mixer writes animated bones first; two-arm IK is the final
+      // presentation layer so locomotion/fire clips cannot steer the muzzle.
+      root.userData.operatorGripTelemetry = applyRiggedWeaponGrip(rig, rig.weapon);
     }
     return;
   }
@@ -1269,6 +1398,14 @@ export function buildOperator(
       (root.userData.operatorRig as OperatorRig & { rigged: true }).leftShoulderBone = shoulderL;
       (root.userData.operatorRig as OperatorRig & { rigged: true }).leftElbowBone = elbowL;
       (root.userData.operatorRig as OperatorRig & { rigged: true }).leftWristBone = wristL;
+    }
+    const shoulderR = root.getObjectByName('UpperArmR');
+    const elbowR = root.getObjectByName('LowerArmR');
+    const wristR = root.getObjectByName('WristR');
+    if (shoulderR instanceof THREE.Bone && elbowR instanceof THREE.Bone && wristR instanceof THREE.Bone) {
+      (root.userData.operatorRig as OperatorRig & { rigged: true }).rightShoulderBone = shoulderR;
+      (root.userData.operatorRig as OperatorRig & { rigged: true }).rightElbowBone = elbowR;
+      (root.userData.operatorRig as OperatorRig & { rigged: true }).rightWristBone = wristR;
     }
     setOperatorWeapon(root, weaponId, flattenMaterials);
     root.traverse((node) => {
