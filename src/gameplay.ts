@@ -3,8 +3,30 @@ import type { WeaponId } from './protocol';
 export type HitZone = 'head' | 'body' | 'limb';
 export type Stance = 'stand' | 'crouch' | 'prone';
 
-/** Solo bots deal half of the equivalent player-weapon damage. */
-export const BOT_DAMAGE_MULTIPLIER = 0.5;
+/** Solo bots deal one quarter of equivalent player-weapon damage (half the Pass 30 value). */
+export const BOT_DAMAGE_MULTIPLIER = 0.25;
+export function botScaledDamage(rawDamage: number): number {
+  return Math.max(0, Number.isFinite(rawDamage) ? rawDamage : 0) * BOT_DAMAGE_MULTIPLIER;
+}
+
+export function admittedPlayerDamage(damage: number, minimumDamage = 1): number {
+  return Math.min(100, Math.max(minimumDamage, damage));
+}
+export const SIMULATION_HZ = 120;
+export const MATCH_WARMUP_MS = 3_000;
+export const MATCH_DURATION_MS = 300_000;
+export const MATCH_SCORE_LIMIT = 25;
+export type MatchRules = Readonly<{ durationMs: number | null; scoreLimit: number | null }>;
+export const DEFAULT_MATCH_RULES: MatchRules = Object.freeze({
+  durationMs: MATCH_DURATION_MS,
+  scoreLimit: MATCH_SCORE_LIMIT,
+});
+export const GRENADE_RADIUS = 16;
+export const GRENADE_MAX_DAMAGE = 230;
+export const MELEE_COOLDOWN_MS = 650;
+export const MELEE_RANGE = 1.75;
+export const MELEE_DAMAGE = 100;
+export const HEADSHOT_DAMAGE_MULTIPLIER = 1.5;
 
 export type WeaponSpec = {
   id: WeaponId;
@@ -37,7 +59,7 @@ export type WeaponSpec = {
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   carbine: {
     id: 'carbine', name: 'M86 Carbine', damage: 31, minimumDamage: 20,
-    falloffStart: 24, falloffEnd: 72, headMultiplier: 1.45, limbMultiplier: 0.82,
+    falloffStart: 24, falloffEnd: 72, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.82,
     rpm: 650, mag: 30, reserve: 120, reload: 1.8,
     hipSpread: 0.012, adsSpreadMultiplier: 0.28, movementSpreadMultiplier: 1.65,
     crouchSpreadMultiplier: 0.78, sustainedSpreadPerShot: 0.0016, maximumSpread: 0.045,
@@ -46,7 +68,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   smg: {
     id: 'smg', name: 'Vectorline SMG', damage: 23, minimumDamage: 14,
-    falloffStart: 15, falloffEnd: 52, headMultiplier: 1.35, limbMultiplier: 0.8,
+    falloffStart: 15, falloffEnd: 52, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
     rpm: 860, mag: 32, reserve: 128, reload: 1.5,
     hipSpread: 0.018, adsSpreadMultiplier: 0.42, movementSpreadMultiplier: 1.45,
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0021, maximumSpread: 0.058,
@@ -54,13 +76,40 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     switchSeconds: 0.4, automatic: true, color: 0x65e7ff,
   },
   scattergun: {
-    id: 'scattergun', name: 'Model 12 Scattergun', damage: 14, minimumDamage: 5,
-    falloffStart: 8, falloffEnd: 30, headMultiplier: 1.15, limbMultiplier: 0.88,
+    id: 'scattergun', name: 'Model 12 Scattergun', damage: 17, minimumDamage: 7,
+    falloffStart: 8, falloffEnd: 30, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.88,
     rpm: 82, mag: 8, reserve: 40, reload: 2.35,
     hipSpread: 0.068, adsSpreadMultiplier: 0.72, movementSpreadMultiplier: 1.22,
     crouchSpreadMultiplier: 0.88, sustainedSpreadPerShot: 0.002, maximumSpread: 0.09,
     pellets: 9, recoilPitch: 0.052, recoilYaw: 0.012, recoilRecovery: 8,
     switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
+  },
+  sniper: {
+    id: 'sniper', name: 'Longline 86', damage: 67, minimumDamage: 67,
+    falloffStart: 96, falloffEnd: 120, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.9,
+    rpm: 55, mag: 5, reserve: 25, reload: 2.6,
+    hipSpread: 0.052, adsSpreadMultiplier: 0.05, movementSpreadMultiplier: 1.8,
+    crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,
+    pellets: 1, recoilPitch: 0.072, recoilYaw: 0.016, recoilRecovery: 6.5,
+    switchSeconds: 0.68, automatic: false, color: 0xa9e7ff,
+  },
+  pistol: {
+    id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
+    falloffStart: 20, falloffEnd: 58, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.84,
+    rpm: 420, mag: 15, reserve: 60, reload: 1.35,
+    hipSpread: 0.02, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.42,
+    crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.0024, maximumSpread: 0.052,
+    pellets: 1, recoilPitch: 0.021, recoilYaw: 0.008, recoilRecovery: 14,
+    switchSeconds: 0.28, automatic: false, color: 0xe8c77b,
+  },
+  'machine-pistol': {
+    id: 'machine-pistol', name: 'G18 AUTO', damage: 18, minimumDamage: 11,
+    falloffStart: 11, falloffEnd: 34, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
+    rpm: 900, mag: 20, reserve: 80, reload: 1.55,
+    hipSpread: 0.026, adsSpreadMultiplier: 0.46, movementSpreadMultiplier: 1.55,
+    crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0032, maximumSpread: 0.072,
+    pellets: 1, recoilPitch: 0.014, recoilYaw: 0.012, recoilRecovery: 13,
+    switchSeconds: 0.3, automatic: true, color: 0xff9f43,
   },
 };
 
@@ -115,10 +164,11 @@ export function integrateHorizontalVelocity(
   const target = { x: normalized.x * profile.maxSpeed, z: normalized.z * profile.maxSpeed };
   const rate = inputLength > 0.001 ? profile.acceleration : profile.deceleration;
   const maxDelta = Math.max(0, rate * Math.max(0, dt));
-  return {
-    x: approach(velocity.x, target.x, maxDelta),
-    z: approach(velocity.z, target.z, maxDelta),
-  };
+  const delta = { x: target.x - velocity.x, z: target.z - velocity.z };
+  const deltaLength = Math.hypot(delta.x, delta.z);
+  if (deltaLength <= maxDelta || deltaLength < 1e-8) return target;
+  const scale = maxDelta / deltaLength;
+  return { x: velocity.x + delta.x * scale, z: velocity.z + delta.z * scale };
 }
 
 export function sprintEligible(forwardInput: number, strafeInput: number, ads: boolean, crouched: boolean, prone = false): boolean {
@@ -141,10 +191,46 @@ export function mouseSensitivityMultiplier(ads: boolean, sprinting: boolean): nu
 }
 
 export function applyRadialDeadzone(x: number, y: number, deadzone = 0.14, exponent = 1.6): { x: number; y: number } {
-  const magnitude = Math.min(1, Math.hypot(x, y));
-  if (magnitude <= deadzone) return { x: 0, y: 0 };
-  const scaled = Math.pow((magnitude - deadzone) / Math.max(0.001, 1 - deadzone), exponent);
-  return { x: (x / magnitude) * scaled, y: (y / magnitude) * scaled };
+  if (![x, y, deadzone, exponent].every(Number.isFinite)) return { x: 0, y: 0 };
+  const safeDeadzone = Math.max(0, Math.min(0.99, deadzone));
+  const safeExponent = Math.max(0.01, exponent);
+  const rawMagnitude = Math.hypot(x, y);
+  if (rawMagnitude <= safeDeadzone || rawMagnitude < 1e-8) return { x: 0, y: 0 };
+  const clampedMagnitude = Math.min(1, rawMagnitude);
+  const scaled = Math.pow((clampedMagnitude - safeDeadzone) / Math.max(0.001, 1 - safeDeadzone), safeExponent);
+  return { x: (x / rawMagnitude) * scaled, y: (y / rawMagnitude) * scaled };
+}
+
+export type GamepadLookRate = { yaw: number; pitch: number };
+
+/**
+ * Converts shaped right-stick input into a bounded angular velocity. Acceleration is quick enough
+ * for target acquisition while the faster release rate prevents stick drift from leaving a tail.
+ */
+export function integrateGamepadLookRate(
+  current: GamepadLookRate,
+  input: { x: number; y: number },
+  dt: number,
+  ads: boolean,
+  sensitivity = 1,
+): GamepadLookRate {
+  const safeDt = Math.max(0, Math.min(0.05, dt));
+  const safeSensitivity = Math.max(0.5, Math.min(1.8, Number.isFinite(sensitivity) ? sensitivity : 1));
+  const magnitude = Math.min(1, Math.hypot(input.x, input.y));
+  const flickBoost = magnitude > 0.92 ? 1.08 : 1;
+  const maximumRate = (ads ? 2.02 : 3.78) * safeSensitivity * flickBoost;
+  const targetYaw = input.x * maximumRate;
+  const targetPitch = input.y * maximumRate * 0.8;
+  const acceleration = ads ? 16.5 : 22;
+  const release = 29;
+  const integrateAxis = (value: number, target: number): number => {
+    const building = (value === 0 || Math.sign(value) === Math.sign(target)) && Math.abs(target) > Math.abs(value);
+    return approach(value, target, (building ? acceleration : release) * safeDt);
+  };
+  return {
+    yaw: integrateAxis(current.yaw, targetYaw),
+    pitch: integrateAxis(current.pitch, targetPitch),
+  };
 }
 
 export type SpreadContext = {
@@ -172,6 +258,22 @@ export function sampleSpreadDisk(angle: number, radialRandom: number, angularRan
   return { x: Math.cos(theta) * radius, y: Math.sin(theta) * radius };
 }
 
+/**
+ * The reticle is the authoritative principal ray. Single-projectile weapons
+ * always fire through it; multi-pellet weapons reserve pellet zero for it and
+ * distribute only their remaining pellets around that centre ray.
+ */
+export function sampleWeaponPellet(
+  weapon: WeaponSpec,
+  pelletIndex: number,
+  angle: number,
+  radialRandom: number,
+  angularRandom: number,
+): { x: number; y: number } {
+  if (weapon.pellets <= 1 || pelletIndex <= 0) return { x: 0, y: 0 };
+  return sampleSpreadDisk(angle, radialRandom, angularRandom);
+}
+
 export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZone): number {
   const clampedDistance = Math.max(0, distance);
   const falloff = clampedDistance <= weapon.falloffStart
@@ -180,6 +282,18 @@ export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZon
   const base = weapon.damage + (weapon.minimumDamage - weapon.damage) * falloff;
   const multiplier = zone === 'head' ? weapon.headMultiplier : zone === 'limb' ? weapon.limbMultiplier : 1;
   return Math.max(1, Math.round(base * multiplier));
+}
+
+/** Full-HP player TTK for a single pellet/shot at point-blank (no Overdrive). */
+export function shotsToDownFromFullHp(weapon: WeaponSpec, zone: HitZone, maxHp = 100): number {
+  const perShot = computeDamage(weapon, 0, zone) * Math.max(1, weapon.pellets);
+  const effective = Math.min(maxHp, perShot);
+  return Math.max(1, Math.ceil(maxHp / effective));
+}
+
+/** True only when a single non-Overdrive shot at the zone kills a full-HP player. */
+export function isSingleShotLethalFromFullHp(weapon: WeaponSpec, zone: HitZone, maxHp = 100): boolean {
+  return shotsToDownFromFullHp(weapon, zone, maxHp) <= 1;
 }
 
 export type ReloadState = {
@@ -200,6 +314,12 @@ export function beginReload(weapon: WeaponSpec, ammo: number, reserve: number, n
     endsAt: now + duration,
     phase: 'eject',
   };
+}
+
+export function reloadProgress(state: ReloadState | null, now: number): number | null {
+  if (!state) return null;
+  const duration = Math.max(1, state.endsAt - state.startedAt);
+  return Math.min(1, Math.max(0, (now - state.startedAt) / duration));
 }
 
 export function cancelReload(state: ReloadState, now: number): boolean {
@@ -239,16 +359,15 @@ export function recoverRecoilImpulse(recoil: RecoilImpulse, weapon: WeaponSpec, 
 }
 
 export function grenadeDamage(distance: number): number {
-  const radius = 8;
-  if (distance >= radius) return 0;
-  const normalized = Math.max(0, 1 - Math.max(0, distance) / radius);
-  return Math.round(115 * normalized * normalized);
+  if (distance >= GRENADE_RADIUS) return 0;
+  const normalized = Math.max(0, 1 - Math.max(0, distance) / GRENADE_RADIUS);
+  return Math.round(GRENADE_MAX_DAMAGE * normalized * normalized);
 }
 
 export function meleeStrike(distance: number, now: number, lastMeleeAt: number): { hit: boolean; damage: number } {
-  const ready = now - lastMeleeAt >= 650;
-  const hit = ready && distance <= 1.75;
-  return { hit, damage: hit ? 100 : 0 };
+  const ready = now - lastMeleeAt >= MELEE_COOLDOWN_MS;
+  const hit = ready && distance <= MELEE_RANGE;
+  return { hit, damage: hit ? MELEE_DAMAGE : 0 };
 }
 
 export type MatchPhase = 'warmup' | 'active' | 'ended';
@@ -257,21 +376,73 @@ export type MatchState = {
   phaseStartedAt: number;
   endsAt: number;
   winner: 0 | 1 | 'draw' | null;
+  winnerPlayerId?: string;
+  endReason?: 'score' | 'time';
   rematchRequested?: boolean;
 };
 
-export function createMatch(now: number): MatchState {
-  return { phase: 'warmup', phaseStartedAt: now, endsAt: now + 3_000, winner: null };
+export function createMatch(now: number, _rules: MatchRules = DEFAULT_MATCH_RULES): MatchState {
+  return { phase: 'warmup', phaseStartedAt: now, endsAt: now + MATCH_WARMUP_MS, winner: null };
 }
 
-export function advanceMatch(state: MatchState, now: number, scores: [number, number]): MatchState {
-  if (state.phase === 'ended' && state.rematchRequested) return createMatch(now);
+export function advanceMatch(
+  state: MatchState,
+  now: number,
+  scores: [number, number],
+  rules: MatchRules = DEFAULT_MATCH_RULES,
+): MatchState {
+  if (state.phase === 'ended' && state.rematchRequested) return createMatch(now, rules);
   if (state.phase === 'warmup' && now >= state.endsAt) {
-    return { phase: 'active', phaseStartedAt: now, endsAt: now + 300_000, winner: null };
+    const activeAt = state.endsAt;
+    return {
+      phase: 'active',
+      phaseStartedAt: activeAt,
+      endsAt: rules.durationMs === null ? Number.POSITIVE_INFINITY : activeAt + rules.durationMs,
+      winner: null,
+    };
   }
-  if (state.phase === 'active' && (scores[0] >= 25 || scores[1] >= 25 || now >= state.endsAt)) {
+  const scoreReached = rules.scoreLimit !== null
+    && (scores[0] >= rules.scoreLimit || scores[1] >= rules.scoreLimit);
+  const timeReached = rules.durationMs !== null && now >= state.endsAt;
+  if (state.phase === 'active' && (scoreReached || timeReached)) {
     const winner = scores[0] === scores[1] ? 'draw' : scores[0] > scores[1] ? 0 : 1;
-    return { phase: 'ended', phaseStartedAt: now, endsAt: now, winner };
+    return {
+      phase: 'ended', phaseStartedAt: now, endsAt: now, winner,
+      endReason: scoreReached ? 'score' : 'time',
+    };
+  }
+  return state;
+}
+
+export function advanceFreeForAllMatch(
+  state: MatchState,
+  now: number,
+  scores: readonly { id: string; kills: number }[],
+  rules: MatchRules = DEFAULT_MATCH_RULES,
+): MatchState {
+  if (state.phase === 'ended' && state.rematchRequested) return createMatch(now, rules);
+  if (state.phase === 'warmup' && now >= state.endsAt) {
+    return {
+      phase: 'active',
+      phaseStartedAt: state.endsAt,
+      endsAt: rules.durationMs === null ? Number.POSITIVE_INFINITY : state.endsAt + rules.durationMs,
+      winner: null,
+    };
+  }
+  const ordered = [...scores].sort((a, b) => b.kills - a.kills || a.id.localeCompare(b.id));
+  const scoreReached = rules.scoreLimit !== null && (ordered[0]?.kills ?? 0) >= rules.scoreLimit;
+  const timeReached = rules.durationMs !== null && now >= state.endsAt;
+  if (state.phase === 'active' && (scoreReached || timeReached)) {
+    const topKills = ordered[0]?.kills ?? 0;
+    const leaders = ordered.filter((entry) => entry.kills === topKills);
+    return {
+      phase: 'ended',
+      phaseStartedAt: now,
+      endsAt: now,
+      winner: leaders.length === 1 ? null : 'draw',
+      winnerPlayerId: leaders.length === 1 ? leaders[0].id : undefined,
+      endReason: scoreReached ? 'score' : 'time',
+    };
   }
   return state;
 }

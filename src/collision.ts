@@ -1,4 +1,13 @@
-export type Box2 = { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+export type Box2 = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  minY?: number;
+  maxY?: number;
+  /** Optional visual-space Euler rotation consumed only by the Rapier physics adapter. */
+  rotation?: [number, number, number];
+};
 export type Point3 = { x: number; y: number; z: number };
 export type SweptSphereHit = { time: number; normal: Point3 };
 
@@ -159,6 +168,21 @@ export function resolveHorizontalMove(
   if (!isBlocked(zAttempt, colliders, radius)) next.z = clampedZ;
   next.y = desired.y;
   return next;
+}
+
+export function pointInsideBounds(point: Point3, bounds: Box2, margin = 0): boolean {
+  return point.x >= bounds.minX + margin
+    && point.x <= bounds.maxX - margin
+    && point.z >= bounds.minZ + margin
+    && point.z <= bounds.maxZ - margin;
+}
+
+export function clampPointToBounds(point: Point3, bounds: Box2, margin = 0): Point3 {
+  return {
+    x: Math.max(bounds.minX + margin, Math.min(point.x, bounds.maxX - margin)),
+    y: point.y,
+    z: Math.max(bounds.minZ + margin, Math.min(point.z, bounds.maxZ - margin)),
+  };
 }
 
 export function shortestAngleDelta(from: number, to: number): number {

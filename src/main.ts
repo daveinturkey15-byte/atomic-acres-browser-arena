@@ -1,13 +1,43 @@
 import * as THREE from 'three';
 import './style.css';
-import { batchStaticMeshes, buildOperator } from './art-kit';
-import { chooseBotIntent, respawnBotState } from './bot-ai';
+import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
+import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
+import { WaterSystem } from './water-system';
+import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
+import { GUN_RANGE_FIRING_LINE_Z, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1 } from './additional-maps';
+import {
+  BOT_REACTION_DELAY,
+  BOT_GRENADE_COOLDOWN_MS,
+  assignBotWeapons,
+  advanceSpawnFlipHysteresis,
+  botAimJitter,
+  botCanFireWhileProtected,
+  botWeaponBurstSize,
+  botWeaponFireInterval,
+  chooseBotIntent,
+  chooseTacticalWaypoint,
+  createSpawnFlipHysteresis,
+  operatorYawToward,
+  respawnBotState,
+  shouldBotThrowGrenade,
+  selectFarthestSpawnCandidate,
+  shouldFlipSpawnSide,
+  type SpawnFlipHysteresis,
+} from './bot-ai';
+import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
+import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
+import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
-import { damp, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
 import {
   BOT_DAMAGE_MULTIPLIER,
+  GRENADE_RADIUS,
+  MATCH_WARMUP_MS,
+  SIMULATION_HZ,
   WEAPONS,
   advanceMatch,
+  advanceFreeForAllMatch,
   applyRadialDeadzone,
   beginReload,
   cancelReload,
@@ -15,8 +45,11 @@ import {
   computeDamage,
   computeRecoilImpulse,
   computeSpread,
+  botScaledDamage,
+  admittedPlayerDamage,
   createMatch,
   grenadeDamage,
+  integrateGamepadLookRate,
   integrateHorizontalVelocity,
   meleeStrike,
   mouseSensitivityMultiplier,
@@ -24,7 +57,8 @@ import {
   nextStance,
   recoverRecoil,
   recoverRecoilImpulse,
-  sampleSpreadDisk,
+  reloadProgress as gameplayReloadProgress,
+  sampleWeaponPellet,
   sprintEligible,
   type HitZone,
   type MatchState,
@@ -32,20 +66,194 @@ import {
   type Stance,
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
-import { shouldRevealEnemy, worldToMinimap } from './minimap';
-import { loadArenaArt } from './environment-assets';
+import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap, type MinimapLandmarkKind } from './minimap';
+import { sourceScreenAngle } from './directional-hud';
+import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
+import { routeIdentityTelemetry } from './world-identity';
+import { createWorldIdentityPresentation } from './world-identity-presentation';
+import { matchPresentationAt, respawnPresentation } from './match-presentation';
+import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
+import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
+import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
+import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
+import {
+  createRustworksQualityLights,
+  enhanceRustworksQualityMaterials,
+  ensureRustworksStarfield,
+  rustworksLightingTint,
+  rustworksQualityTelemetry,
+  setRustworksQualityPresentationActive,
+} from './rustworks-quality';
+import { arenaLightingProfile } from './blender-lighting';
+import { ImpactPresentation } from './impact-presentation';
+import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
+import { FramePacingSampler } from './frame-pacing';
+import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
+import { SupportExplosionPresentation } from './support-explosion-presentation';
+import { GrassSystem } from './grass-system';
+import {
+  advanceRangeScore,
+  formatRangeAccuracy,
+  GUN_RANGE_ROUND_MS,
+  hasUnlimitedRangeAmmo,
+  isGunRange,
+  rangeAccuracyPercent,
+  rangeGrenadesAllowed,
+  reloadSupply,
+  reserveAfterCompletedReload,
+  reserveHudValue,
+} from './gun-range-rules';
+import {
+  createGunRangeScoreEntry,
+  loadGunRangeScores,
+  mergeGunRangeScores,
+  personalBestGunRange,
+  saveGunRangeScores,
+  type GunRangeScoreEntry,
+} from './gun-range-leaderboard';
+import {
+  OVERDRIVE_DAMAGE_MULTIPLIER,
+  OVERDRIVE_DURATION_MS,
+  OVERDRIVE_PICKUP_RADIUS,
+  OVERDRIVE_POSITION,
+  OVERDRIVE_SPAWN_INTERVAL_MS,
+  advanceOverdrive,
+  claimOverdrive,
+  createOverdriveState,
+  overdriveDamageMultiplier,
+  overdriveRemainingMs,
+  type OverdriveState,
+} from './overdrive';
+import {
+  HUNTER_SWARM_BLAST_RADIUS,
+  HUNTER_SWARM_COUNT,
+  NUKE_WARNING_MS,
+  TRI_PASS_BLAST_RADIUS,
+  TRI_PASS_MAX_DAMAGE,
+  assignHunterSwarmTargets,
+  consumeFieldSupport,
+  createFieldSupportState,
+  createTriPassTargeting,
+  cycleFieldSupportSelection,
+  hunterSwarmDamage,
+  nukeDamageForTarget,
+  recordSupportDeath,
+  recordSupportElimination,
+  remoteExplosiveHitMaximumDistance,
+  registerTriPassTarget,
+  selectTriPassHostiles,
+  triPassSchedule,
+  type FieldSupportId,
+  type TriPassTargeting,
+} from './field-support';
+import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
+import {
+  DEATH_DROP_INTERACTION_RANGE,
+  DEATH_DROP_SCAVENGE_RANGE,
+  MAX_DEATH_DROPS,
+  consumeDeathDropWeapon,
+  createDeathDrop,
+  deathDropAmmoAvailable,
+  deathDropAvailable,
+  deathDropWeaponAvailable,
+  nearestDeathDrop,
+  nearestScavengeDeathDrop,
+  pruneDeathDrops,
+  scavengeDeathDrop,
+  type DeathDrop,
+} from './death-drops';
+import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
-import { CharacterPhysics } from './physics';
+import {
+  HIGH_SCORE_STORAGE_KEY,
+  HIGH_SCORE_SCHEMA_VERSION,
+  MAX_MATCH_KILLS,
+  immediateStreakEntry,
+  leaderboardNameKey,
+  loadHighScores,
+  mergeHighScores,
+  normalizeRequiredPlayerName,
+  peerOwnedHighScores,
+  personalBest,
+  saveHighScores,
+  type HighScoreEntry,
+} from './high-scores';
+import {
+  GLOBAL_LEADERBOARD_ENDPOINT,
+  fetchGlobalLeaderboard,
+  leaderboardInstallId,
+  submitGlobalStreak,
+} from './global-leaderboard';
+import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
+import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha, stateBroadcastIntervalMs } from './network-sync';
+import {
+  CLOCK_PING_INTERVAL_MS,
+  DEFAULT_PRIVATE_MATCH_CONFIG,
+  LOBBY_START_LEAD_MS,
+  REJOIN_GRACE_MS,
+  balanceLobbyTeams,
+  canHostStart,
+  emptyPlayerScore,
+  estimateHostClockOffset,
+  freeForAllLeaders,
+  latencyQuality,
+  localPerformanceAtHostEpoch,
+  playersAreHostile,
+  recordPlayerDamage,
+  teamTotals,
+  type LobbyMember,
+  type LobbySnapshot,
+  type MatchMode,
+  type PlayerScore,
+  type PrivateMatchConfig,
+} from './private-match';
+import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
+import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint, type RemoteMeleeAdmissionState } from './remote-melee-admission';
+import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
+import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
+import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
+import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
+import { CharacterPhysics, worldBoundaryColliders } from './physics';
+import { TracerPool } from './tracer-pool';
+import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
+import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
+import { magnifiedFovDegrees } from './weapon-presentation-state';
+import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
+import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
+import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
+import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
 import {
   DeathMessage,
+  ExplosiveSource,
   GameMessage,
+  HitMessage,
+  LobbyBalanceMessage,
+  LobbyConfigMessage,
+  LobbyJoinMessage,
+  LobbyReadyMessage,
+  LobbyStartMessage,
+  LobbyStateMessage,
+  LobbyTeamMessage,
+  MatchScoreMessage,
+  MeleeMessage,
+  OffensiveSupportSource,
+  OverdriveClaimMessage,
+  OverdriveStateMessage,
   PlayerSnapshot,
+  PickupMessage,
+  PrimaryWeaponId,
   ShotMessage,
   Team,
+  TeamPingKind,
+  TeamPingMessage,
   WeaponId,
-  sanitizeName,
+  WindowBreakMessage,
 } from './protocol';
+
+configureRuntimeRandom(runtimeSeed(window.location.search));
 
 window.addEventListener('error', (event) => {
   console.error('[Atomic Acres runtime error]', event.message || 'unknown error', event.error?.stack || '');
@@ -61,6 +269,27 @@ type RemotePlayer = {
   target: THREE.Vector3;
   targetYaw: number;
   lastSeen: number;
+  claimEligibleAt: number;
+  claimRequiresCoreExit: boolean;
+};
+
+type AdmittedRemoteShot = {
+  message: ShotMessage;
+  receivedAt: number;
+  targets: Set<string>;
+};
+
+type AdmittedRemoteMelee = {
+  message: MeleeMessage;
+  receivedAt: number;
+  targets: Set<string>;
+};
+
+type AdmittedRemoteExplosion = {
+  source: ExplosiveSource;
+  origin: THREE.Vector3;
+  receivedAt: number;
+  targets: Set<string>;
 };
 
 type BotPlayer = {
@@ -83,69 +312,262 @@ type BotPlayer = {
   strafeSign: -1 | 1;
   invulnerableUntil: number;
   respawnAt: number;
+  deathVisibleUntil: number;
   waypoint: number;
+  blockedSince: number;
+  weapon: PrimaryWeaponId;
+  nextGrenadeAt: number;
+  grenadeActive: boolean;
 };
 
 type GrenadeEntity = {
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D;
   velocity: THREE.Vector3;
+  angularVelocity: THREE.Vector3;
   explodeAt: number;
   lastBounceAt: number;
+  actionNonce: number;
+  ownerKind: 'player' | 'bot';
+  ownerId: string;
 };
 
-const WEAPON_ORDER: WeaponId[] = ['carbine', 'smg', 'scattergun'];
-const BOT_PATROL_POINTS = [
-  new THREE.Vector3(-25, 0, -12), new THREE.Vector3(-18, 0, 15),
-  new THREE.Vector3(-4, 0, 24), new THREE.Vector3(8, 0, 15),
-  new THREE.Vector3(24, 0, 8), new THREE.Vector3(19, 0, -18),
-  new THREE.Vector3(2, 0, -24), new THREE.Vector3(-12, 0, -17),
-];
+type YardhawkEntity = {
+  root: THREE.Group;
+  targetId: string;
+  phase: 'thrown' | 'homing';
+  velocity: THREE.Vector3;
+  spawnedAt: number;
+  armedAt: number;
+  expiresAt: number;
+};
+
+type StrikeMissileEntity = {
+  missile: THREE.Group;
+  marker: THREE.Mesh;
+  target: THREE.Vector3;
+  startedAt: number;
+  impactAt: number;
+  resolved: boolean;
+};
+
+type HunterDroneEntity = {
+  root: THREE.Group;
+  targetId: string;
+  index: number;
+  spawnedAt: number;
+  diveAt: number;
+  expiresAt: number;
+};
+
+type NukeSequence = {
+  startedAt: number;
+  detonateAt: number;
+  finishedAt: number;
+  detonated: boolean;
+  shockwave: THREE.Mesh;
+};
+
+type TriPassHostileMarker = {
+  id: string;
+  kind: 'bot' | 'remote';
+  world: [number, number];
+  canvas: [number, number];
+};
+
+type ExplosionSyncProfile = {
+  source: OffensiveSupportSource;
+  audioMs: number;
+  visualMs: number;
+  targetDamageMs: number;
+  totalSyncMs: number;
+};
+
+type ExplosionFrameProfile = {
+  frameSerial: number;
+  sources: OffensiveSupportSource[];
+  impacts: number;
+  totalSyncMs: number;
+  maxImpactSyncMs: number;
+};
+
+type ActiveTeamPing = {
+  root: THREE.Group;
+  expiresAt: number;
+};
+
+type DeathDropEntity = {
+  drop: DeathDrop;
+  root: THREE.Group;
+};
 
 function createPlayerId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
-  return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `player-${Date.now().toString(36)}-${Math.floor(presentationRandom() * 0x1_0000_0000).toString(36)}`;
 }
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
+const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
+let storedPlayerName = '';
+try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
 app.innerHTML = `
   <canvas id="game" aria-label="Atomic Acres multiplayer arena"></canvas>
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
+  <div id="nuke-flash" hidden></div>
+  <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
-    <div class="eyebrow">ORIGINAL WEB ARENA · TACTICAL FEEL PASS 03</div>
-    <h1>ATOMIC <span>ACRES</span></h1>
-    <p class="lede">A close-quarters retro-future skirmish with real stand/crouch/prone physics, centred physical sights, authoritative hard cover and peer-to-peer multiplayer.</p>
-    <div class="setup-grid">
-      <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" value="Player${Math.floor(Math.random() * 900 + 100)}"></label>
-      <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
+    <div class="eyebrow">THREE ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
+    <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
+    <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
+    <nav class="menu-tabs" aria-label="Deployment menu">
+      <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
+      <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
+      <button type="button" data-menu-tab="options" aria-selected="false">OPTIONS</button>
+    </nav>
+    <div class="menu-panel active" data-menu-panel="deploy">
+      <div class="setup-grid">
+        <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" required aria-describedby="player-name-error" placeholder="Enter callsign" value="${storedPlayerName}"><small id="player-name-error" class="input-error" hidden>Enter a callsign before deployment.</small></label>
+        <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
+      </div>
+      <section class="map-selector" aria-label="Choose map">
+        <div class="map-selector-heading"><span>SELECT MAP</span><small>Choose before deployment</small></div>
+        <div class="map-card-grid">
+          ${ARENA_SELECTIONS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" aria-pressed="${index === 0}" disabled>
+            <span>${entry.selectorLabel}</span><strong>${entry.summary}</strong><small>${entry.rulesLabel}</small>
+          </button>`).join('')}
+        </div>
+      </section>
+      <div id="selected-kit-summary" class="selected-kit-summary"></div>
+      <div class="menu-actions">
+        <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
+        <button id="main-menu" hidden>MAIN MENU · CHANGE MAP</button>
+        <button id="solo" class="primary">BOT SKIRMISH</button>
+        <button id="host">HOST LOBBY</button>
+      </div>
+      <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
+      <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY INVITE</button></div>
+      <section id="private-lobby" hidden aria-labelledby="private-lobby-title">
+        <div class="private-lobby-heading"><span><small>PRIVATE MATCH</small><strong id="private-lobby-title">WAITING ROOM</strong></span><b id="lobby-capacity-label">1 / 4</b></div>
+        <div class="lobby-settings">
+          <label>MODE<select id="lobby-mode"><option value="tdm">TEAM DEATHMATCH</option><option value="ffa">FREE FOR ALL</option></select></label>
+          <label>CAPACITY<select id="lobby-capacity"><option value="4">4 PLAYERS</option><option value="6">6 PLAYERS</option></select></label>
+          <label class="lobby-check"><input id="lobby-auto-balance" type="checkbox" checked> AUTO BALANCE</label>
+          <button id="lobby-balance" type="button">BALANCE TEAMS</button>
+        </div>
+        <div id="lobby-roster" class="lobby-roster"></div>
+        <div class="lobby-actions">
+          <button id="lobby-ready" type="button">READY</button>
+          <button id="lobby-start" class="primary" type="button" disabled>START MATCH</button>
+          <button id="lobby-leave" type="button">LEAVE ROOM</button>
+        </div>
+        <p id="lobby-guidance">Choose teams, ready up, then the host starts one synchronized countdown.</p>
+      </section>
+      <div id="network-status" data-kind="ok">Ready for deployment.</div>
+      <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak">
+        <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
+        <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
+        <p id="high-score-footnote">Global streak records sync across builds and devices · local cache remains available offline.</p>
+      </section>
     </div>
-    <div class="menu-actions">
-      <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
-      <button id="solo" class="primary">BOT SKIRMISH</button>
-      <button id="host">HOST LOBBY</button>
+    <div class="menu-panel" data-menu-panel="kit" hidden>
+      <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary and issued sidearm.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
+      <div class="kit-grid">
+        ${FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}">
+          <span>${kit.role}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b><p>${kit.summary}</p>
+          <i>${kit.traits.join(' · ')}</i><em>SELECTED</em>
+        </button>`).join('')}
+      </div>
     </div>
-    <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
-    <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY</button></div>
-    <div id="network-status" data-kind="ok">Ready for deployment.</div>
-    <div class="settings-grid">
-      <label>SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
-      <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
+    <div class="menu-panel" data-menu-panel="options" hidden>
+      <div class="options-heading"><b>OPTIONS</b><span>Input and view settings apply immediately.</span></div>
+      <div class="settings-grid">
+        <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
+        <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
+        <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
+        <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="blender">QUALITY GRAPHICS</option></select></label>
+      </div>
+      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
+      <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> melee · <b>G</b> frag · <b>1–3</b> weapons · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch</div>
-    <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
+  </section>
+  <aside id="menu-showcase" aria-hidden="true">
+    <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg" alt="" decoding="async">
+  </aside>
+  <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
+  <div id="changelog-backdrop" hidden></div>
+  <section id="changelog-panel" class="panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+    <header class="changelog-header">
+      <div>
+        <small>PUBLIC RELEASE HISTORY</small>
+        <strong id="changelog-title">RECENT CHANGES</strong>
+      </div>
+      <button id="changelog-close" type="button" aria-label="Close changelog">CLOSE</button>
+    </header>
+    <p class="changelog-lede">Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.</p>
+    <ol id="changelog-list">
+      ${CHANGELOG.map((entry, index) => `
+        <li data-changelog-id="${entry.id}">
+          <div class="changelog-entry-head">
+            <div class="changelog-entry-pass"><span>${entry.pass}</span>${index === 0 ? '<b>CURRENT LIVE</b>' : ''}</div>
+            <time datetime="${entry.releasedAt}"><small>PUBLISHED</small>${formatChangelogTimestampDetail(entry.releasedAt)}</time>
+          </div>
+          <strong>${entry.title}</strong>
+          <div class="changelog-areas">${entry.areas.map((area) => `<span>${area}</span>`).join('')}</div>
+          <p>${entry.summary}</p>
+          <ul>${entry.highlights.map((line) => `<li>${line}</li>`).join('')}</ul>
+        </li>
+      `).join('')}
+    </ol>
+  </section>
+  <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
+  <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
+    <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
+    <canvas id="strike-map" width="480" height="480"></canvas>
+    <footer><strong id="strike-hostile-count">ENEMIES LIVE · 0</strong><span>CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS</span></footer>
   </section>
   <div id="hud" hidden>
-    <header id="matchbar"><div><span class="tiny">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua">AQUA <b id="aqua-score">0</b></span><i>25</i><span class="coral"><b id="coral-score">0</b> CORAL</span></div><div id="connection-pill">SOLO</div></header>
+    <div id="pause-hint">ESC · MENU</div>
+    <header id="matchbar"><div><span class="tiny" id="match-mode-label">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua"><em id="aqua-label">AQUA</em> <b id="aqua-score">0</b></span><i id="score-limit">—</i><span class="coral"><b id="coral-score">0</b> <em id="coral-label">CORAL</em></span></div><div id="connection-pill">SOLO</div></header>
+    <div id="fps-counter" aria-label="Frame rate"><b>--</b><span>FPS</span></div>
+    <div id="network-strip" aria-label="Live player latency"></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
+    <div id="sniper-scope" hidden aria-label="3x sniper scope">
+      <div class="scope-ring"></div>
+      <div class="scope-reticle"><i></i><b></b><span></span><em></em></div>
+      <small>3×</small>
+    </div>
     <div id="killfeed"></div>
-    <div id="objective">ATOMIC ACRES · FIRST TO 25</div>
-    <canvas id="minimap" width="180" height="180" aria-label="Tactical minimap"></canvas>
+    <div id="objective">ATOMIC ACRES · FIVE MINUTES · MOST KILLS WINS</div>
+    <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
+    <div id="map-heading">N · 000°</div>
+    <div id="location-label">CIVIC TRANSIT</div>
     <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
-    <div id="weapon-block"><span id="weapon-name">M86 CARBINE</span><div><b id="ammo">30</b><i>/</i><em id="reserve">120</em></div><small id="reload-state"></small></div>
-    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V MELEE · G THROW</small></div>
+    <div id="combat-stats" aria-label="Match damage"><span>DEALT <b id="damage-dealt">0</b></span><span>TAKEN <b id="damage-taken">0</b></span></div>
+    <div id="weapon-block">
+      <span id="weapon-name">M86 CARBINE</span>
+      <div class="ammo-row"><b id="ammo">30</b><div class="reserve-stack"><small>RESERVE</small><span><i>/</i><em id="reserve">120</em></span></div></div>
+      <small id="reload-state"></small>
+    </div>
+    <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×2</b><small>V KNIFE · G THROW</small></div>
+    <div id="support-block">
+      <div class="support-heading"><span>FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
+      <div class="support-list">
+        <b data-support="scout-sweep"><span class="support-meta"><kbd>3</kbd><small>3 KILLS</small></span><span class="support-name">SCOUT SWEEP</span><em class="support-state">LOCKED</em></b>
+        <b data-support="yardhawk"><span class="support-meta"><kbd>4</kbd><small>5 KILLS</small></span><span class="support-name">YARDHAWK</span><em class="support-state">LOCKED</em></b>
+        <b data-support="tri-pass"><span class="support-meta"><kbd>5</kbd><small>7 KILLS</small></span><span class="support-name">TRI-PASS</span><em class="support-state">LOCKED</em></b>
+        <b data-support="hunter-swarm"><span class="support-meta"><kbd>6</kbd><small>8 KILLS</small></span><span class="support-name">HUNTER SWARM</span><em class="support-state">LOCKED</em></b>
+        <b data-support="nuke"><span class="support-meta"><kbd>7</kbd><small>15 KILLS</small></span><span class="support-name">NUKE</span><em class="support-state">LOCKED</em></b>
+      </div>
+      <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
+    </div>
+    <div id="overdrive-hud" hidden><small>4× DAMAGE</small><strong id="overdrive-time">15.0</strong><span>OVERDRIVE</span></div>
+    <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>QUAD DAMAGE</strong><span>4× DAMAGE · 15 SECONDS</span></div>
+    <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
-    <div id="respawn" hidden><strong>ELIMINATED</strong><span>Reconstituting mannequin operator…</span></div>
+    <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
+    <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
+    <div id="countdown" hidden></div>
     <div id="banner" hidden></div>
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>
   </div>
@@ -160,6 +582,9 @@ function element<T extends HTMLElement>(selector: string): T {
 const canvas = element<HTMLCanvasElement>('#game');
 const menu = element<HTMLElement>('#menu');
 const hudRoot = element<HTMLElement>('#hud');
+const fpsCounter = element<HTMLElement>('#fps-counter');
+const fpsCounterValue = element<HTMLElement>('#fps-counter b');
+const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
 const roomCard = element<HTMLElement>('#room-card');
 const roomCodeEl = element<HTMLElement>('#room-code');
 const statusEl = element<HTMLElement>('#network-status');
@@ -167,56 +592,395 @@ const minimapCanvas = element<HTMLCanvasElement>('#minimap');
 const minimapContextValue = minimapCanvas.getContext('2d');
 if (!minimapContextValue) throw new Error('Canvas2D minimap is unavailable');
 const minimapContext: CanvasRenderingContext2D = minimapContextValue;
+const strikeMapCanvas = element<HTMLCanvasElement>('#strike-map');
+const strikeMapContextValue = strikeMapCanvas.getContext('2d');
+if (!strikeMapContextValue) throw new Error('Canvas2D tactical map is unavailable');
+const strikeMapContext: CanvasRenderingContext2D = strikeMapContextValue;
 const audio = new ArenaAudio();
 
-const reducedRenderMode = new URLSearchParams(window.location.search).get('render') === 'compat';
-document.documentElement.classList.toggle('compat-render', reducedRenderMode);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !reducedRenderMode, powerPreference: 'high-performance' });
+const renderProfile: RenderProfile = resolveRenderProfile(
+  window.location.search,
+  localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
+);
+const activeRenderConfig = renderProfileConfig(renderProfile);
+const activeLighting = arenaLightingProfile(renderProfile);
+const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
+const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
+const staticMaterialMode = activeRenderConfig.staticMaterialMode;
+const flattenOperatorMaterials = reducedRenderMode;
+document.documentElement.classList.toggle('compat-render', renderProfile === 'compat');
+document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
+document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
+document.documentElement.dataset.renderProfile = renderProfile;
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: activeRenderConfig.antialias,
+  powerPreference: 'high-performance',
+});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = !reducedRenderMode;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.enabled = activeRenderConfig.shadows;
+renderer.shadowMap.type = activeLighting.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
+renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.22;
-// Compatibility mode targets constrained/software-rendered Chromium; full-quality play keeps the normal ratio.
-renderer.setPixelRatio(reducedRenderMode ? 0.2 : Math.min(window.devicePixelRatio, 1.75));
+renderer.toneMappingExposure = activeLighting.exposure;
+const signalQuery = new URLSearchParams(window.location.search).get('signal');
+const gl = renderer.getContext();
+const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info') as { UNMASKED_RENDERER_WEBGL: number } | null;
+const rendererLabel = rendererInfo ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
+const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
+const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
+document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
+const atomicSignal = new AtomicSignalPass(renderer, renderProfile, (reason) => {
+  document.documentElement.classList.remove('atomic-signal-render');
+  document.documentElement.dataset.atomicSignal = 'fallback';
+  console.warn('[Atomic Acres Atomic Signal fallback]', reason);
+}, atomicSignalBypass);
+const grassQuery = new URLSearchParams(window.location.search).get('grass');
+const mistQuery = new URLSearchParams(window.location.search).get('mist');
+const cloudsQuery = new URLSearchParams(window.location.search).get('clouds');
+const skyCloudsEnabled = !reducedRenderMode || cloudsQuery === 'on';
+const raysQuery = new URLSearchParams(window.location.search).get('rays');
+const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on')) ? 0 : activeLighting.godRayStrength;
+const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
+document.documentElement.classList.toggle('atomic-signal-render', atomicSignal.telemetry().enabled);
+document.documentElement.dataset.atomicSignal = atomicSignal.telemetry().enabled ? 'active' : 'direct';
+let webglContextLost = false;
+let webglContextLosses = 0;
+let webglContextRestorations = 0;
+let staticShadowDynamicRefreshes = 0;
+let lastStaticShadowRefreshAt = -Infinity;
+renderer.domElement.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  webglContextLost = true;
+  webglContextLosses += 1;
+  document.documentElement.dataset.webglContext = 'lost';
+});
+document.documentElement.dataset.webglContext = 'ready';
+// Both public profiles can reduce their internal framebuffer when sustained
+// frame time exceeds the detected display budget. Shadows disable
+// automatically below a moderate DPR threshold.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xaec2c7, 62, 128);
+scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
+let skyMaterial: THREE.ShaderMaterial | null = null;
+
+let riggedOperatorLoadError: string | null = null;
+let importedWeaponLoadError: string | null = null;
+const displayCadencePromise = new Promise<number>((resolve) => {
+  const samples: number[] = [];
+  let previous = performance.now();
+  const sample = (now: number) => {
+    if (samples.length > 0 || now - previous < 100) samples.push(now - previous);
+    previous = now;
+    if (samples.length >= 36) resolve(classifyDisplayFrameMs(samples));
+    else requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);
+});
+const [operatorLoad, weaponLoad] = await Promise.allSettled([
+  loadRiggedOperatorAsset(),
+  loadImportedWeaponAssets(),
+]);
+if (operatorLoad.status === 'rejected') {
+  riggedOperatorLoadError = operatorLoad.reason instanceof Error ? operatorLoad.reason.message : String(operatorLoad.reason);
+  console.error('[Atomic Acres operator asset load failed]', riggedOperatorLoadError);
+}
+if (weaponLoad.status === 'rejected') {
+  importedWeaponLoadError = weaponLoad.reason instanceof Error ? weaponLoad.reason.message : String(weaponLoad.reason);
+  console.error('[Atomic Acres weapon asset load failed]', importedWeaponLoadError);
+}
+const detectedDisplayFrameMs = await displayCadencePromise;
+const adaptiveQuality = new AdaptiveQualityController({
+  profile: renderProfile,
+  targetFrameMs: detectedDisplayFrameMs,
+  initialPixelRatioCap: activeRenderConfig.pixelRatioCap,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
+
+function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap);
+  if (renderer.shadowMap.enabled !== shadowsEnabled) {
+    renderer.shadowMap.enabled = shadowsEnabled;
+    renderer.shadowMap.needsUpdate = shadowsEnabled;
+  }
+  document.documentElement.dataset.adaptiveShadows = shadowsEnabled ? 'on' : 'off';
+}
+applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
 
 function buildSky(): void {
-  const geometry = new THREE.SphereGeometry(150, 32, 18);
+  const geometry = new THREE.SphereGeometry(150, reducedRenderMode ? 20 : 32, reducedRenderMode ? 12 : 18);
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
+    fog: false,
     uniforms: {
-      top: { value: new THREE.Color(0x2c668d) },
-      horizon: { value: new THREE.Color(0xabcbd1) },
-      bottom: { value: new THREE.Color(0xd8d3b6) },
+      top: { value: new THREE.Color(activeLighting.skyTop) },
+      horizon: { value: new THREE.Color(activeLighting.skyHorizon) },
+      bottom: { value: new THREE.Color(activeLighting.skyBottom) },
+      sunColor: { value: new THREE.Color(activeLighting.skySun) },
+      cloudColor: { value: new THREE.Color(activeLighting.skyCloud) },
+      cloudShadow: { value: new THREE.Color(activeLighting.skyCloudShadow) },
+      cloudLight: { value: new THREE.Color(activeLighting.skyCloudLight) },
+      sunDirection: { value: new THREE.Vector3(...activeLighting.sunPosition).normalize() },
+      cloudStrength: { value: skyCloudsEnabled ? (renderProfile === 'blender' ? 0.68 : 0.45) : 0 },
+      rayStrength: { value: actualGodRayStrength },
+      rayLobes: { value: actualGodRayLobes },
+      nukeFlash: { value: 0 },
     },
-    vertexShader: 'varying vec3 worldPos; void main(){ worldPos=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: 'varying vec3 worldPos; uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom; void main(){ float h=normalize(worldPos).y; vec3 c=h>0.0?mix(horizon,top,smoothstep(0.0,.75,h)):mix(horizon,bottom,smoothstep(0.0,-.35,h)); gl_FragColor=vec4(c,1.0); }',
+    vertexShader: `
+      varying vec3 skyDirection;
+      void main(){
+        skyDirection = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 skyDirection;
+      uniform vec3 top;
+      uniform vec3 horizon;
+      uniform vec3 bottom;
+      uniform vec3 sunColor;
+      uniform vec3 cloudColor;
+      uniform vec3 cloudShadow;
+      uniform vec3 cloudLight;
+      uniform vec3 sunDirection;
+      uniform float cloudStrength;
+      uniform float rayStrength;
+      uniform float rayLobes;
+      uniform float nukeFlash;
+      void main(){
+        vec3 direction = normalize(skyDirection);
+        float h = direction.y;
+        vec3 color = h > 0.0
+          ? mix(horizon, top, smoothstep(0.0, 0.78, h))
+          : mix(horizon, bottom, smoothstep(0.0, -0.38, h));
+        float sunDot = max(dot(direction, sunDirection), 0.0);
+        float sunDisc = pow(sunDot, 420.0);
+        float sunHalo = pow(sunDot, 18.0) * 0.28;
+        ${skyCloudsEnabled ? `
+        float horizonBand = smoothstep(0.035, 0.11, h) * (1.0 - smoothstep(0.3, 0.43, h));
+        float highBand = smoothstep(0.5, 0.65, h) * (1.0 - smoothstep(0.88, 0.98, h));
+        float lowBand = smoothstep(0.2, 0.35, h) * (1.0 - smoothstep(0.57, 0.72, h));
+        float waveA = 0.5 + 0.5 * sin(direction.x * 11.0 + direction.z * 4.0 + sin(direction.z * 9.0) * 1.7 + h * 2.0);
+        float waveB = 0.5 + 0.5 * sin(direction.z * 15.0 - direction.x * 7.0 + h * 8.0);
+        float cloudBand = max(horizonBand * 0.82, max(highBand, lowBand * 0.86));
+        float cloudDetail = smoothstep(0.46, 0.8, waveA * 0.64 + waveB * 0.36);
+        float cloudMask = cloudBand * (0.34 + cloudDetail * 0.66);
+        float cloudSun = smoothstep(0.02, 0.42, sunDot + waveB * 0.08);
+        vec3 stormCloud = mix(cloudShadow, cloudLight, cloudSun);
+        stormCloud = mix(stormCloud, cloudColor, 0.04);
+        color = mix(color, stormCloud, cloudMask * cloudStrength);
+        ` : 'float cloudMask = 0.0;'}
+        float rayAzimuth = atan(direction.z, direction.x);
+        float rayBands = 0.5 + 0.5 * sin(rayAzimuth * max(rayLobes, 1.0) + h * 13.0);
+        float rayShape = smoothstep(0.54, 0.96, rayBands) * pow(sunDot, 3.2);
+        float rayAltitude = smoothstep(-0.04, 0.24, h);
+        color += sunColor * rayShape * rayAltitude * rayStrength;
+        color += sunColor * (sunDisc * 1.4 + sunHalo);
+        color = mix(color, vec3(1.55, 0.78, 0.34), clamp(nukeFlash, 0.0, 1.0));
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
   });
-  scene.add(new THREE.Mesh(geometry, material));
-  scene.add(new THREE.HemisphereLight(0xd9efff, 0x52664b, 1.7));
-  scene.add(new THREE.AmbientLight(0xc8d5d9, 0.62));
-  const sun = new THREE.DirectionalLight(0xffe1b5, 2.55);
-  sun.position.set(-32, 68, 34);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -48;
-  sun.shadow.camera.right = 48;
-  sun.shadow.camera.top = 54;
-  sun.shadow.camera.bottom = -54;
-  sun.shadow.camera.near = 10;
-  sun.shadow.camera.far = 150;
-  sun.shadow.bias = -0.0004;
-  scene.add(sun);
+  const sky = new THREE.Mesh(geometry, material);
+  sky.name = 'procedural-atmosphere-sky';
+  sky.frustumCulled = false;
+  sky.onBeforeRender = () => sky.position.copy(camera.position);
+  skyMaterial = material;
+  scene.add(sky);
+  hemisphereLight = new THREE.HemisphereLight(activeLighting.hemisphereSky, activeLighting.hemisphereGround, activeLighting.hemisphereIntensity);
+  ambientLight = new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity);
+  scene.add(hemisphereLight);
+  scene.add(ambientLight);
+  sunLight = new THREE.DirectionalLight(activeLighting.sunColor, activeLighting.sunIntensity);
+  sunLight.position.set(...activeLighting.sunPosition);
+  sunLight.castShadow = activeRenderConfig.shadows;
+  if (activeRenderConfig.shadows) sunLight.shadow.mapSize.set(activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize);
+  sunLight.shadow.camera.left = -48;
+  sunLight.shadow.camera.right = 48;
+  sunLight.shadow.camera.top = 54;
+  sunLight.shadow.camera.bottom = -54;
+  sunLight.shadow.camera.near = 10;
+  sunLight.shadow.camera.far = 150;
+  sunLight.shadow.bias = activeLighting.shadowBias;
+  sunLight.shadow.normalBias = activeLighting.shadowNormalBias;
+  scene.add(sunLight);
+  fillLight = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity);
+  fillLight.name = 'shadow-side-arena-fill';
+  fillLight.position.set(...activeLighting.fillPosition);
+  fillLight.castShadow = false;
+  scene.add(fillLight);
 }
+let hemisphereLight: THREE.HemisphereLight;
+let ambientLight: THREE.AmbientLight;
+let sunLight: THREE.DirectionalLight;
+let fillLight: THREE.DirectionalLight;
 buildSky();
-const arena: ArenaMap = buildArena(scene);
+const worldIdentityPresentation = createWorldIdentityPresentation(
+  scene,
+  activeLighting,
+  softwareRenderer,
+);
+const atomicArena = buildArena(scene);
+const rustworksArena = buildRustworks1v1(scene);
+applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+createRustworksQualityLights(rustworksArena.root, renderProfile);
+if (renderProfile === 'blender') enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
+const gunRangeArena = buildGunRange(scene);
+const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
+  'atomic-acres': atomicArena,
+  'rustworks-1v1': rustworksArena,
+  'gun-range': gunRangeArena,
+};
+let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
+let arena: ArenaMap = arenaById[selectedArena.id];
+for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate === arena;
+document.documentElement.dataset.arenaId = selectedArena.id;
+function applyArenaFogProfile(): void {
+  const fog = atmosphereFogRange(renderProfile, selectedArena.id);
+  if (scene.fog instanceof THREE.Fog) {
+    scene.fog.near = fog.near;
+    scene.fog.far = fog.far;
+  }
+}
+applyArenaFogProfile();
+const neighbourhoodLifeRoot = addNeighbourhoodLife(scene, reducedWorldDetail);
+const overdriveRoot = new THREE.Group();
+overdriveRoot.name = 'overdrive-core-pickup';
+overdriveRoot.position.set(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z);
+overdriveRoot.visible = false;
+overdriveRoot.userData.dynamic = true;
+overdriveRoot.userData.presentationOnly = true;
+const overdriveCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.44, reducedRenderMode ? 1 : 2),
+  new THREE.MeshStandardMaterial({ color: 0x8ff7ef, emissive: 0x2d62a7, emissiveIntensity: 2.2, roughness: 0.22, metalness: 0.56 }),
+);
+overdriveCore.name = 'overdrive-energy-core';
+const overdriveRings = [0, Math.PI / 2].map((rotation, index) => {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.68 + index * 0.08, 0.055, 8, reducedRenderMode ? 20 : 36),
+    new THREE.MeshBasicMaterial({ color: index === 0 ? 0x78f5ed : 0x9d6bff, transparent: true, opacity: 0.86, toneMapped: false }),
+  );
+  ring.name = `overdrive-ring-${index}`;
+  ring.rotation.set(Math.PI / 2, rotation, rotation * 0.5);
+  return ring;
+});
+const overdrivePedestal = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.72, 0.9, 0.18, reducedRenderMode ? 12 : 24),
+  new THREE.MeshStandardMaterial({ color: 0x273b43, emissive: 0x132d40, emissiveIntensity: 0.65, roughness: 0.48, metalness: 0.52 }),
+);
+overdrivePedestal.name = 'overdrive-pedestal';
+overdrivePedestal.position.y = -0.69;
+const quadIconCanvas = document.createElement('canvas');
+quadIconCanvas.width = 256;
+quadIconCanvas.height = 128;
+const quadIconContext = quadIconCanvas.getContext('2d');
+if (!quadIconContext) throw new Error('Canvas2D unavailable for Quad Damage world icon');
+quadIconContext.fillStyle = 'rgba(10, 17, 32, .88)';
+quadIconContext.fillRect(12, 16, 232, 96);
+quadIconContext.strokeStyle = '#78f5ed';
+quadIconContext.lineWidth = 8;
+quadIconContext.strokeRect(12, 16, 232, 96);
+quadIconContext.fillStyle = '#f7edff';
+quadIconContext.font = '900 58px sans-serif';
+quadIconContext.textAlign = 'center';
+quadIconContext.fillText('4×', 128, 76);
+quadIconContext.fillStyle = '#a892ff';
+quadIconContext.font = '900 20px sans-serif';
+quadIconContext.fillText('QUAD DAMAGE', 128, 103);
+const quadIconTexture = new THREE.CanvasTexture(quadIconCanvas);
+quadIconTexture.colorSpace = THREE.SRGBColorSpace;
+const quadWorldIcon = new THREE.Sprite(new THREE.SpriteMaterial({ map: quadIconTexture, transparent: true, depthWrite: false, toneMapped: false }));
+quadWorldIcon.name = 'quad-damage-world-icon';
+quadWorldIcon.position.y = 1.75;
+quadWorldIcon.scale.set(3.4, 1.7, 1);
+const quadBeacon = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.18, 0.82, 3.1, reducedRenderMode ? 10 : 20, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0x7cf8ef, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+);
+quadBeacon.name = 'quad-damage-beacon';
+quadBeacon.position.y = 0.55;
+const quadGlow = new THREE.PointLight(0x8e78ff, 2.4, 8, 2);
+quadGlow.name = 'quad-damage-local-glow';
+quadGlow.position.y = 0.55;
+overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
+overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
+scene.add(overdriveRoot);
+const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id);
+const waterSystem = new WaterSystem(scene);
+waterSystem.configure(selectedArena.id, renderProfile, {
+  halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
+  halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
+}, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -16.5 : -0.55 });
+ensureRustworksStarfield(scene, selectedArena.id);
+const grassSystem = new GrassSystem(
+  scene,
+  renderProfile,
+  rendererLabel,
+  grassQuery,
+  // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
+  // must never seed its permanent placements from their collision geometry.
+  atomicArena.colliders,
+  activeLighting,
+);
+grassSystem.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  webglContextLost = false;
+  webglContextRestorations += 1;
+  document.documentElement.dataset.webglContext = 'ready';
+  renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
+  atomicSignal.invalidateValidation();
+  atmosphereSystem.handleContextRestored();
+  grassSystem.handleContextRestored();
+  resize();
+});
+const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
+const tracerPool = new TracerPool(scene);
+const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
+const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
+const deathDropPresentationPool = new DeathDropPresentationPool(scene, MAX_DEATH_DROPS);
+const nukeShockwave = new THREE.Mesh(
+  new THREE.SphereGeometry(1, reducedRenderMode ? 12 : 28, reducedRenderMode ? 8 : 18),
+  new THREE.MeshBasicMaterial({ color: 0xffb15c, transparent: true, opacity: 0, depthWrite: false, side: THREE.BackSide, toneMapped: false }),
+);
+nukeShockwave.name = 'pass35-prewarmed-nuke-shockwave';
+nukeShockwave.position.set(0, 1.5, 0);
+nukeShockwave.visible = false;
+nukeShockwave.userData.presentationOnly = true;
+let nukePresentationPrewarmed = false;
+
+async function prewarmNukePresentation(): Promise<void> {
+  if (nukePresentationPrewarmed) return;
+  nukeShockwave.visible = true;
+  nukeShockwave.scale.setScalar(0.0001);
+  try {
+    await renderer.compileAsync(scene, camera);
+    renderer.render(scene, camera);
+    nukePresentationPrewarmed = true;
+  } finally {
+    nukeShockwave.visible = false;
+    nukeShockwave.scale.setScalar(0.1);
+  }
+}
+nukeShockwave.raycast = () => undefined;
+scene.add(nukeShockwave);
+let arenaArtRoot: THREE.Group | null = null;
+let blenderArenaActive = false;
+let materialCompatibility: AtomicSignalMaterialAudit = {
+  materials: 0,
+  colorTexturesCorrected: 0,
+  dataTexturesCorrected: 0,
+  anisotropyAdjusted: 0,
+  darkSurfacesLifted: 0,
+  roughnessAdjusted: 0,
+  metalnessAdjusted: 0,
+};
 
 const player = {
   id: createPlayerId(),
@@ -230,15 +994,16 @@ const player = {
   kills: 0,
   deaths: 0,
   weapon: 'carbine' as WeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve } as Record<WeaponId, number>,
+  primaryWeapon: 'carbine' as PrimaryWeaponId,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
   nextShotAt: 0,
   sustainedShots: 0,
   stance: 'stand' as Stance,
-  grenades: 1,
+  grenades: 2,
   lastMeleeAt: -10_000,
   alive: true,
   invulnerableUntil: 0,
@@ -248,13 +1013,153 @@ const player = {
 const keys = new Set<string>();
 const remotes = new Map<string, RemotePlayer>();
 const bots = new Map<string, BotPlayer>();
+const dormantBots = new Map<string, BotPlayer>();
+let dormantBotsPrewarmed = false;
+let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
+let botWeaponAssignments: PrimaryWeaponId[] = [];
+let botGrenadeThrows = 0;
+let botGrenadeMaxActive = 0;
+let lastBotGrenadeDamage = 0;
+let grenadeExplosions = 0;
+let lastGrenadeExplosionFrameAt = 0;
+let lastPrincipalShotAlignment: { weapon: WeaponId; angularError: number; sample: [number, number]; direction: [number, number, number]; cameraDirection: [number, number, number] } | null = null;
+let lastGrenadeExplosionProfile = {
+  presentationDetachMs: 0,
+  audioMs: 0,
+  visualMs: 0,
+  targetDamageMs: 0,
+  selfDamageMs: 0,
+  totalSyncMs: 0,
+};
+let lastBotEliminationProfile = {
+  deathDropMs: 0,
+  deathPoseMs: 0,
+  rewardAndFeedMs: 0,
+  reinforcementMs: 0,
+  totalSyncMs: 0,
+};
+let fieldSupport = createFieldSupportState();
+let overdriveState: OverdriveState = createOverdriveState(0);
+let overdriveClaimGeneration = -1;
+let overdriveSpawns = 0;
+let overdrivePickups = 0;
+let overdriveExpiries = 0;
+let bestStreakThisMatch = 0;
+let matchScoreRecorded = false;
+let highScores: HighScoreEntry[] = [];
+try { highScores = loadHighScores(localStorage); } catch { /* Gameplay remains available when persistent storage is blocked. */ }
+let gunRangeScores: GunRangeScoreEntry[] = [];
+try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
+const leaderboardInstallation = leaderboardInstallId(localStorage);
+const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
+const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
+  && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+const localArenaSwitchQaDelayMs = localMultiplayerQa
+  ? Math.min(1_000, Math.max(0, Number(new URLSearchParams(window.location.search).get('arenaSwitchQaDelayMs')) || 0))
+  : 0;
+let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
+const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v1') : null;
+let scoutSweepUntil = 0;
+let yardhawk: YardhawkEntity | null = null;
+const strikeMissiles: StrikeMissileEntity[] = [];
+const hunterDrones: HunterDroneEntity[] = [];
+const deferredSupportDisposals: THREE.Object3D[] = [];
+let nukeSequence: NukeSequence | null = null;
+let triPassTargeting: TriPassTargeting | null = null;
+let tacticalMapOpen = false;
+let lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
+let triPassHostileMarkers: TriPassHostileMarker[] = [];
+let yardhawkExplosions = 0;
+let triPassLaunches = 0;
+let triPassImpacts = 0;
+let triPassLastImpactDelayMs: number | null = null;
+let hunterSwarmLaunches = 0;
+let hunterSwarmImpacts = 0;
+let nukeLaunches = 0;
+let nukeDetonations = 0;
+let supportExplosionFrameSerial = 0;
+let lastSupportExplosionProfile: ExplosionSyncProfile | null = null;
+let lastSupportExplosionFrameProfile: ExplosionFrameProfile = {
+  frameSerial: -1,
+  sources: [],
+  impacts: 0,
+  totalSyncMs: 0,
+  maxImpactSyncMs: 0,
+};
+
+function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
+  lastSupportExplosionProfile = profile;
+  if (lastSupportExplosionFrameProfile.frameSerial !== supportExplosionFrameSerial) {
+    lastSupportExplosionFrameProfile = {
+      frameSerial: supportExplosionFrameSerial,
+      sources: [profile.source],
+      impacts: 1,
+      totalSyncMs: profile.totalSyncMs,
+      maxImpactSyncMs: profile.totalSyncMs,
+    };
+    return;
+  }
+  lastSupportExplosionFrameProfile = {
+    ...lastSupportExplosionFrameProfile,
+    sources: [...lastSupportExplosionFrameProfile.sources, profile.source],
+    impacts: lastSupportExplosionFrameProfile.impacts + 1,
+    totalSyncMs: lastSupportExplosionFrameProfile.totalSyncMs + profile.totalSyncMs,
+    maxImpactSyncMs: Math.max(lastSupportExplosionFrameProfile.maxImpactSyncMs, profile.totalSyncMs),
+  };
+}
 const processedNonces = new Set<number>();
+const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
+const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
+const admittedRemoteMelees = new Map<string, Map<number, AdmittedRemoteMelee>>();
+const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplosion>>();
+const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
+const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
+const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const localSupportNonces = new Map<OffensiveSupportSource, number>();
+const remoteHitAdmissionTelemetry: Record<string, number> = {};
+function recordRemoteHitAdmission(label: string): void {
+  remoteHitAdmissionTelemetry[label] = (remoteHitAdmissionTelemetry[label] ?? 0) + 1;
+}
+const supportNetworkHitTelemetry: Record<OffensiveSupportSource, { sent: number; blocked: number; outOfRange: number; missingAuthorization: number }> = {
+  yardhawk: { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+  'tri-pass': { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+  'hunter-swarm': { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+  nuke: { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
+};
+const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
+const remotePingAdmissions = new Map<string, TeamPingAdmissionState>();
+let localPingAdmission = createTeamPingAdmissionState();
+const activeTeamPings: ActiveTeamPing[] = [];
+const deathDrops: DeathDropEntity[] = [];
+const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expiresAt: number }>();
+const verifiedRemoteKills = new Map<string, number>();
+const weaponActionHistory: string[] = [];
 let gameStarted = false;
+let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
+let privateMatchMode: MatchMode = 'tdm';
+let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
+let privateLobbySnapshot: LobbySnapshot | null = null;
+let privateLobbyRevision = 0;
+let privateMatchActiveAtEpochMs: number | null = null;
+let hostClockOffsetMs = 0;
+let localLobbyPingMs: number | null = null;
+let localLobbyReady = false;
+let localResumeToken = '';
+let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
+let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
+let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+const hostLobbyMembers = new Map<string, LobbyMember>();
+const hostLobbyTokens = new Map<string, string>();
+const hostDisconnectedAt = new Map<string, number>();
+const authoritativeScores = new Map<string, PlayerScore>();
 let triggerHeld = false;
 let targetHits = 0;
+let rangeScore = 0;
+let rangeShotsFired = 0;
 let accumulator = 0;
+let frameCount = 0;
 let recoilVisual = 0;
 let recoilCamera = { pitch: 0, yaw: 0 };
 let landingImpulse = 0;
@@ -268,31 +1173,284 @@ let deferredFireAt = 0;
 let lastGroundedAt = 0;
 let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
-let lastFootstepAt = 0;
+let footstepAccumulator: FootstepAccumulator = { distance: 0, side: 0 };
 let lastFrame = performance.now();
+const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
+let lastFpsHudAt = -Infinity;
+let minimapRenderCount = 0;
+let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+let lastPlayerSpawnIndex = -1;
+const lastBotSpawnIndices = new Map<Team, number>();
+let spawnFlipHysteresis: [SpawnFlipHysteresis, SpawnFlipHysteresis] = [
+  createSpawnFlipHysteresis(),
+  createSpawnFlipHysteresis(),
+];
+let lastPlayerSpawnAudit: {
+  previousIndex: number;
+  selectedIndex: number;
+  selectedVisibleThreats: number;
+  minimumVisibleThreats: number;
+  safeTierCount: number;
+  selectedSide: Team;
+  flipped: boolean;
+} | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
-let matchState: MatchState = createMatch(performance.now());
+let debugShadowProbe: THREE.Mesh | null = null;
+const debugCaptureCameraPosition = new THREE.Vector3();
+let debugCaptureCameraYaw = 0;
+let debugCaptureCameraPitch = 0;
+let debugCaptureCameraActive = false;
+let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
+let respawnEndsAt = 0;
+let respawnTimer: ReturnType<typeof setTimeout> | null = null;
+let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
+let gamepadLookRate = { yaw: 0, pitch: 0 };
 let gamepadSprint = false;
+let gamepadTriggerArmed = true;
+let gamepadAdsArmed = true;
 
 let previousGamepadButtons: boolean[] = [];
+let gamepadSupportSelection: FieldSupportId = 'scout-sweep';
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
+let controllerSensitivity = 1;
 let preferredFov = 82;
 let botsFrozen = false;
 let debugInputUnlocked = false;
 let debugAdsOverride: boolean | null = null;
+let debugReloadProgress: number | null = null;
 let characterPhysics: CharacterPhysics | null = null;
+let arenaSelectionReady = false;
+let arenaSelectionTask: Promise<void> = Promise.resolve();
+
+function gameplayInputEnabled(): boolean {
+  return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden');
+}
+
+function playerSimulationEnabled(): boolean {
+  return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden');
+}
+
+function interruptReload(force = false, now = performance.now()): void {
+  if (!player.reloadState) {
+    weaponView.cancelReload();
+    return;
+  }
+  if (force || cancelReload(player.reloadState, now)) {
+    player.reloadState = null;
+    weaponView.cancelReload();
+  }
+}
+
+function clearGameplayInput(): void {
+  interruptReload(false);
+  keys.clear();
+  gamepadMove = { x: 0, y: 0 };
+  gamepadLookRate = { yaw: 0, pitch: 0 };
+  gamepadSprint = false;
+  mouseTriggerHeld = false;
+  mouseAdsHeld = false;
+  triggerHeld = false;
+  adsHeld = false;
+  currentSprinting = false;
+  jumpQueuedAt = -10_000;
+  player.velocity.x = 0;
+  player.velocity.z = 0;
+}
 
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.textContent = text;
   statusEl.dataset.kind = kind;
+}
+
+function currentMatchRules() {
+  if (gameMode === 'solo') return selectedArena.matchRules;
+  const config = privateLobbySnapshot?.config ?? privateMatchConfig;
+  return { durationMs: config.durationMs, scoreLimit: null };
+}
+
+function areCombatantsHostile(aId: string, aTeam: Team, bId: string, bTeam: Team): boolean {
+  if (gameMode === 'solo') return aTeam !== bTeam;
+  return playersAreHostile(privateMatchMode, { id: aId, team: aTeam }, { id: bId, team: bTeam });
+}
+
+function renderHighScores(): void {
+  const list = element<HTMLOListElement>('#high-score-list');
+  const card = element<HTMLElement>('#high-score-card');
+  const currentName = normalizeRequiredPlayerName(element<HTMLInputElement>('#player-name').value) ?? storedPlayerName;
+  if (selectedArena.id === 'gun-range') {
+    card.dataset.board = 'gun-range';
+    element<HTMLElement>('#global-leaderboard-status').textContent = 'LOCAL RANGE RECORDS';
+    element<HTMLElement>('#high-score-title').textContent = 'GUN RANGE LEADERBOARD';
+    element<HTMLElement>('#high-score-footnote').textContent = 'Timed 2-minute rounds · ranked by score, then accuracy · local to this browser.';
+    if (gunRangeScores.length === 0) {
+      list.innerHTML = '<li class="empty">Run a 2-minute score attack to set the first range record.</li>';
+    } else {
+      list.innerHTML = gunRangeScores.slice(0, 8).map((entry, index) => (
+        `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>${entry.score.toLocaleString()} PTS</span><small>${entry.hits} HITS · ${entry.accuracy}% ACC · ${entry.shots} SHOTS</small></li>`
+      )).join('');
+    }
+    const best = personalBestGunRange(gunRangeScores, currentName);
+    element<HTMLElement>('#personal-best').textContent = best
+      ? `YOUR BEST ${best.score.toLocaleString()} · ${best.accuracy}% ACC`
+      : 'NO RANGE PERSONAL BEST';
+    return;
+  }
+  card.dataset.board = 'streak';
+  element<HTMLElement>('#high-score-title').textContent = 'ACRES LEADERBOARD';
+  element<HTMLElement>('#high-score-footnote').textContent = 'Global streak records sync across builds and devices · local cache remains available offline.';
+  if (highScores.length === 0) {
+    list.innerHTML = '<li class="empty">Set the first named streak record.</li>';
+  } else {
+    list.innerHTML = highScores.slice(0, 8).map((entry, index) => (
+      `<li><b>${index + 1}</b><strong>${escapeHtml(entry.name)}</strong><span>×${entry.bestStreak} STREAK</span><small>${entry.kills} KILLS · ${entry.deaths}D${entry.won ? ' · WIN' : ''}</small></li>`
+    )).join('');
+  }
+  const best = personalBest(highScores, currentName);
+  element<HTMLElement>('#personal-best').textContent = best
+    ? `YOUR BEST ×${best.bestStreak} · ${best.kills} KILLS`
+    : 'NO PERSONAL BEST';
+  element<HTMLElement>('#global-leaderboard-status').textContent = globalLeaderboardState === 'live'
+    ? 'GLOBAL STREAK RECORDS · LIVE'
+    : globalLeaderboardState === 'saved'
+      ? 'GLOBAL STREAK RECORDS · SAVED'
+      : globalLeaderboardState === 'pending'
+        ? 'GLOBAL STREAK RECORDS · CONNECTING'
+        : 'GLOBAL STREAK RECORDS · OFFLINE CACHE';
+}
+
+function persistMergedGunRangeScores(incoming: readonly unknown[]): void {
+  gunRangeScores = mergeGunRangeScores(gunRangeScores, incoming);
+  try {
+    saveGunRangeScores(localStorage, gunRangeScores);
+  } catch {
+    /* optional */
+  }
+  renderHighScores();
+}
+
+function recordGunRangeRound(): void {
+  if (!isGunRange(selectedArena.id)) return;
+  const recordedAt = Date.now();
+  const entry = createGunRangeScoreEntry(player.name, rangeScore, targetHits, rangeShotsFired, recordedAt);
+  if (!entry) return;
+  persistMergedGunRangeScores([entry]);
+  addFeed(`RANGE ROUND · ${entry.score.toLocaleString()} PTS · ${entry.hits} HITS · ${entry.accuracy}% ACC`, 'gold');
+}
+
+function persistMergedHighScores(incoming: readonly unknown[], notifyTabs = true): void {
+  highScores = mergeHighScores(highScores, incoming);
+  try {
+    saveHighScores(localStorage, highScores);
+  } catch {
+    setStatus('Records cannot persist in this browser context.', 'warn');
+  }
+  renderHighScores();
+  if (notifyTabs) highScoreChannel?.postMessage(highScores);
+}
+
+function sendLeaderboardSync(): void {
+  if (network.role !== 'offline') network.send({ type: 'leaderboard-sync', by: player.id, entries: highScores });
+}
+
+async function refreshGlobalLeaderboard(): Promise<void> {
+  if (!GLOBAL_LEADERBOARD_ENDPOINT || localMultiplayerQa) {
+    globalLeaderboardState = 'cached';
+    renderHighScores();
+    return;
+  }
+  globalLeaderboardState = 'pending';
+  renderHighScores();
+  try {
+    const entries = await fetchGlobalLeaderboard();
+    persistMergedHighScores(entries);
+    globalLeaderboardState = 'live';
+  } catch {
+    globalLeaderboardState = 'cached';
+  }
+  renderHighScores();
+}
+
+function recordImmediateStreak(syncGlobal = true): void {
+  const existing = personalBest(highScores, player.name);
+  if (existing && existing.bestStreak >= fieldSupport.streak) return;
+  const entry = immediateStreakEntry(
+    leaderboardInstallation,
+    player.name,
+    fieldSupport.streak,
+    player.kills,
+    player.deaths,
+  );
+  if (!entry) return;
+  persistMergedHighScores([entry]);
+  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, entry });
+  if (!syncGlobal || localMultiplayerQa) return;
+  const nameKey = entry.id.replace(/^global:/, '');
+  void submitGlobalStreak({
+    name: entry.name,
+    streak: entry.bestStreak,
+    kills: entry.kills,
+    deaths: entry.deaths,
+    installId: leaderboardInstallation,
+    buildId: LEADERBOARD_BUILD_ID,
+    idempotencyKey: `${leaderboardInstallation}:${nameKey}:${entry.bestStreak}`.slice(0, 120),
+  }).then((accepted) => {
+    globalLeaderboardState = accepted ? 'saved' : 'cached';
+    renderHighScores();
+  }).catch(() => {
+    globalLeaderboardState = 'cached';
+    renderHighScores();
+  });
+}
+
+function recordCompletedMatch(): void {
+  if (matchScoreRecorded || matchState.phase !== 'ended') return;
+  matchScoreRecorded = true;
+  if (isGunRange(selectedArena.id)) {
+    recordGunRangeRound();
+    return;
+  }
+  const recordedAt = Date.now();
+  const authoritativeLocal = gameMode === 'solo' ? null : authoritativeScores.get(player.id) ?? null;
+  const entry: HighScoreEntry = {
+    id: `score:${player.id}:${recordedAt.toString(36)}`,
+    name: player.name,
+    kills: Math.min(MAX_MATCH_KILLS, Math.max(0, Math.floor(authoritativeLocal?.kills ?? player.kills))),
+    deaths: Math.min(200, Math.max(0, Math.floor(authoritativeLocal?.deaths ?? player.deaths))),
+    bestStreak: Math.min(MAX_MATCH_KILLS, Math.max(0, Math.floor(bestStreakThisMatch))),
+    won: gameMode !== 'solo' && privateMatchMode === 'ffa'
+      ? matchState.winnerPlayerId === player.id
+      : matchState.winner === player.team,
+    recordedAt,
+  };
+  persistMergedHighScores([entry]);
+  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, entry });
+}
+
+function requirePlayerName(): string | null {
+  const input = element<HTMLInputElement>('#player-name');
+  const error = element<HTMLElement>('#player-name-error');
+  const name = normalizeRequiredPlayerName(input.value);
+  input.classList.toggle('invalid', !name);
+  error.hidden = Boolean(name);
+  if (!name) {
+    setStatus('Enter a callsign before deployment.', 'error');
+    input.focus();
+    return null;
+  }
+  input.value = name;
+  player.name = name;
+  storedPlayerName = name;
+  try { localStorage.setItem(PLAYER_NAME_STORAGE_KEY, name); } catch { /* Match start does not depend on storage access. */ }
+  renderHighScores();
+  return name;
 }
 
 function showFatalError(error: unknown): void {
@@ -315,16 +1473,591 @@ if (!webRtcSupported) {
   setStatus('Pointer lock is unavailable; keyboard movement works but mouse aim may not.', 'warn');
 }
 
-canvas.addEventListener('webglcontextlost', (event) => {
-  event.preventDefault();
-  showFatalError(new Error('Graphics context was lost'));
-});
-canvas.addEventListener('webglcontextrestored', () => window.location.reload());
-
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
+function randomLobbyCredential(): string {
+  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+  return `room_${Date.now().toString(36)}_${Math.floor(protocolRandom() * Number.MAX_SAFE_INTEGER).toString(36)}`;
+}
+
+function restoreRoomIdentity(roomCode: string): void {
+  const key = `atomic-acres:room-identity:${roomCode}`;
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { playerId?: unknown; token?: unknown } | null;
+    if (parsed && typeof parsed.playerId === 'string' && parsed.playerId.length > 0 && parsed.playerId.length <= 80
+      && typeof parsed.token === 'string' && parsed.token.length >= 24 && parsed.token.length <= 128) {
+      player.id = parsed.playerId;
+      localResumeToken = parsed.token;
+      return;
+    }
+  } catch { /* A fresh bounded identity is safe when session storage is blocked or malformed. */ }
+  localResumeToken = randomLobbyCredential();
+  try { sessionStorage.setItem(key, JSON.stringify({ playerId: player.id, token: localResumeToken })); } catch { /* Rejoin becomes same-page only. */ }
+}
+
+function resetPrivateLobbyState(): void {
+  if (lobbyClockTimer) clearTimeout(lobbyClockTimer);
+  lobbyClockTimer = null;
+  privateLobbySnapshot = null;
+  privateLobbyRevision = 0;
+  privateMatchActiveAtEpochMs = null;
+  privateMatchMode = 'tdm';
+  privateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
+  hostClockOffsetMs = 0;
+  localLobbyPingMs = null;
+  localLobbyReady = false;
+  localResumeToken = '';
+  lobbyArenaSyncPromise = Promise.resolve();
+  hostLobbyMembers.clear();
+  hostLobbyTokens.clear();
+  hostDisconnectedAt.clear();
+  authoritativeScores.clear();
+  element<HTMLElement>('#private-lobby').hidden = true;
+}
+
+function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): LobbySnapshot {
+  const members = [...hostLobbyMembers.values()].sort((a, b) => Number(b.id === player.id) - Number(a.id === player.id) || a.id.localeCompare(b.id));
+  const scores = members.map((member) => authoritativeScores.get(member.id) ?? emptyPlayerScore(member.id));
+  return {
+    revision: privateLobbyRevision,
+    hostId: player.id,
+    phase,
+    config: privateMatchConfig,
+    members,
+    scores,
+    activeAtEpochMs: privateMatchActiveAtEpochMs,
+  };
+}
+
+function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): void {
+  if (network.role !== 'host') return;
+  const localMember = hostLobbyMembers.get(player.id);
+  if (localMember) {
+    player.team = localMember.team;
+    element<HTMLSelectElement>('#team').value = String(localMember.team);
+  }
+  privateLobbyRevision += 1;
+  privateLobbySnapshot = hostSnapshot(phase);
+  network.setCapacity(privateLobbySnapshot.config.capacity);
+  for (const member of privateLobbySnapshot.members) network.setPlayerTeam(member.id, member.team);
+  const message: LobbyStateMessage = { type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() };
+  network.send(message);
+  renderPrivateLobby();
+}
+
+function initializeHostLobby(): void {
+  privateMatchConfig = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id === 'rustworks-1v1' ? 'rustworks-1v1' : 'atomic-acres' };
+  privateMatchMode = privateMatchConfig.mode;
+  localResumeToken = randomLobbyCredential();
+  hostLobbyTokens.set(player.id, localResumeToken);
+  hostLobbyMembers.set(player.id, {
+    id: player.id,
+    name: player.name,
+    team: player.team,
+    ready: false,
+    connected: true,
+    pingMs: 0,
+  });
+  authoritativeScores.set(player.id, emptyPlayerScore(player.id));
+  roomCard.hidden = false;
+  roomCodeEl.textContent = network.roomCode;
+  broadcastHostLobby('waiting');
+  setStatus('Private lobby ready — share the invite and ready up', 'ok');
+}
+
+function sendLobbyJoin(): void {
+  if (network.role !== 'client') return;
+  if (!localResumeToken) restoreRoomIdentity(network.roomCode);
+  const message: LobbyJoinMessage = {
+    type: 'lobby-join',
+    playerId: player.id,
+    name: player.name,
+    requestedTeam: player.team,
+    resumeToken: localResumeToken,
+    nonce: randomNonce(),
+  };
+  network.send(message);
+  scheduleClockPing(0);
+  renderPrivateLobby();
+}
+
+function rejectLobbyPlayer(playerId: string, reason: 'room-full' | 'rejoin-denied' | 'match-active'): void {
+  network.sendToPlayer(playerId, { type: 'lobby-reject', reason, nonce: randomNonce() });
+  window.setTimeout(() => network.disconnectPlayer(playerId), 75);
+}
+
+function admitLobbyJoin(message: LobbyJoinMessage): void {
+  if (network.role !== 'host') return;
+  const existing = hostLobbyMembers.get(message.playerId);
+  const currentPhase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (existing) {
+    if (hostLobbyTokens.get(message.playerId) !== message.resumeToken) {
+      rejectLobbyPlayer(message.playerId, 'rejoin-denied');
+      return;
+    }
+    hostDisconnectedAt.delete(message.playerId);
+    const restored = { ...existing, name: message.name, connected: true, pingMs: message.playerId === player.id ? 0 : existing.pingMs };
+    hostLobbyMembers.set(message.playerId, restored);
+    network.setPlayerTeam(message.playerId, restored.team);
+  } else {
+    if (currentPhase !== 'waiting') {
+      rejectLobbyPlayer(message.playerId, 'match-active');
+      return;
+    }
+    if (hostLobbyMembers.size >= privateMatchConfig.capacity) {
+      rejectLobbyPlayer(message.playerId, 'room-full');
+      return;
+    }
+    hostLobbyTokens.set(message.playerId, message.resumeToken);
+    hostLobbyMembers.set(message.playerId, {
+      id: message.playerId,
+      name: message.name,
+      team: message.requestedTeam,
+      ready: false,
+      connected: true,
+      pingMs: null,
+    });
+    authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
+  }
+  if (currentPhase === 'waiting' && privateMatchConfig.autoBalance) {
+    for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
+  }
+  broadcastHostLobby(currentPhase);
+  if (privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
+    network.sendToPlayer(message.playerId, {
+      type: 'lobby-start', by: player.id, activeAtEpochMs: privateMatchActiveAtEpochMs,
+      revision: privateLobbyRevision, nonce: randomNonce(),
+    });
+    sendAuthoritativeScores(message.playerId);
+  }
+}
+
+function updateHostReady(message: LobbyReadyMessage): void {
+  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected) return;
+  hostLobbyMembers.set(message.by, { ...member, ready: message.ready });
+  broadcastHostLobby('waiting');
+}
+
+function updateHostTeam(message: LobbyTeamMessage): void {
+  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting' || privateMatchConfig.mode !== 'tdm') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected) return;
+  hostLobbyMembers.set(message.by, { ...member, team: message.team, ready: false });
+  if (privateMatchConfig.autoBalance) {
+    for (const balanced of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(balanced.id, { ...balanced, ready: false });
+  }
+  broadcastHostLobby('waiting');
+}
+
+function applyHostLobbyConfig(config: PrivateMatchConfig): void {
+  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting') return;
+  if (hostLobbyMembers.size > config.capacity) {
+    setStatus(`Room already has ${hostLobbyMembers.size} players; capacity cannot be ${config.capacity}.`, 'warn');
+    renderPrivateLobby();
+    return;
+  }
+  privateMatchConfig = config;
+  privateMatchMode = config.mode;
+  network.setCapacity(config.capacity);
+  const nextMembers = config.autoBalance && config.mode === 'tdm'
+    ? balanceLobbyTeams([...hostLobbyMembers.values()])
+    : [...hostLobbyMembers.values()];
+  for (const member of nextMembers) hostLobbyMembers.set(member.id, { ...member, ready: false });
+  broadcastHostLobby('waiting');
+}
+
+function markLobbyDisconnected(playerId: string): void {
+  const member = hostLobbyMembers.get(playerId);
+  if (!member || playerId === player.id) return;
+  hostLobbyMembers.set(playerId, { ...member, connected: false, ready: false, pingMs: null });
+  hostDisconnectedAt.set(playerId, Date.now());
+  broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
+  window.setTimeout(() => {
+    const disconnectedAt = hostDisconnectedAt.get(playerId);
+    const current = hostLobbyMembers.get(playerId);
+    if (!disconnectedAt || !current || current.connected || Date.now() - disconnectedAt < REJOIN_GRACE_MS) return;
+    hostDisconnectedAt.delete(playerId);
+    hostLobbyMembers.delete(playerId);
+    hostLobbyTokens.delete(playerId);
+    authoritativeScores.delete(playerId);
+    broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
+  }, REJOIN_GRACE_MS + 50);
+}
+
+function scheduleClockPing(delay = CLOCK_PING_INTERVAL_MS): void {
+  if (lobbyClockTimer) clearTimeout(lobbyClockTimer);
+  if (network.role !== 'client') return;
+  lobbyClockTimer = setTimeout(() => {
+    if (network.role !== 'client') return;
+    network.send({
+      type: 'clock-ping', by: player.id, sentAtEpochMs: Date.now(), reportedRttMs: localLobbyPingMs, nonce: randomNonce(),
+    });
+    scheduleClockPing();
+  }, delay);
+}
+
+function acceptClockPong(message: Extract<GameMessage, { type: 'clock-pong' }>): void {
+  if (network.role !== 'client' || message.forPlayerId !== player.id || message.by !== privateLobbySnapshot?.hostId) return;
+  const estimate = estimateHostClockOffset(message.sentAtEpochMs, Date.now(), message.hostEpochMs);
+  if (!estimate.accepted) return;
+  hostClockOffsetMs = localLobbyPingMs === null ? estimate.offsetMs : hostClockOffsetMs * 0.75 + estimate.offsetMs * 0.25;
+  localLobbyPingMs = localLobbyPingMs === null ? estimate.rttMs : Math.round(localLobbyPingMs * 0.7 + estimate.rttMs * 0.3);
+  renderPrivateLobby();
+}
+
+function sendAuthoritativeScores(targetPlayerId?: string): void {
+  if (network.role !== 'host') return;
+  const scores = [...authoritativeScores.values()].slice(0, privateMatchConfig.capacity);
+  const message: MatchScoreMessage = { type: 'match-score', by: player.id, scores, nonce: randomNonce() };
+  if (targetPlayerId) network.sendToPlayer(targetPlayerId, message);
+  else network.send(message);
+}
+
+function presentLocalDamageDelta(previous: PlayerScore | undefined, next: PlayerScore | undefined): void {
+  if (!next) return;
+  const dealt = next.damageDealt - (previous?.damageDealt ?? 0);
+  const taken = next.damageTaken - (previous?.damageTaken ?? 0);
+  if (dealt > 0) addFeed(`DAMAGE DEALT +${dealt} · ${next.damageDealt} TOTAL`, 'gold', { damageDealt: dealt });
+  if (taken > 0) addFeed(`DAMAGE TAKEN +${taken} · ${next.damageTaken} TOTAL`, 'coral', { damageTaken: taken });
+}
+
+function recordAuthoritativeDamage(attackerId: string, victimId: string, damage: number): void {
+  if (network.role !== 'host' || attackerId === victimId || damage <= 0) return;
+  const previousLocal = authoritativeScores.get(player.id);
+  const next = recordPlayerDamage(authoritativeScores, attackerId, victimId, damage);
+  authoritativeScores.clear();
+  for (const [id, score] of next) authoritativeScores.set(id, score);
+  presentLocalDamageDelta(previousLocal, authoritativeScores.get(player.id));
+  sendAuthoritativeScores();
+}
+
+function acceptAuthoritativeScores(message: MatchScoreMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
+  const previousLocal = authoritativeScores.get(player.id);
+  authoritativeScores.clear();
+  for (const score of message.scores) {
+    authoritativeScores.set(score.id, score);
+    if (score.id === player.id) {
+      player.kills = score.kills;
+      player.deaths = score.deaths;
+    }
+    const remote = remotes.get(score.id);
+    if (remote) remote.snapshot = { ...remote.snapshot, kills: score.kills, deaths: score.deaths };
+  }
+  if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, scores: message.scores };
+  presentLocalDamageDelta(previousLocal, authoritativeScores.get(player.id));
+}
+
+async function synchronizeLobbyArena(): Promise<void> {
+  const arenaId = privateLobbySnapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+  if (selectedArena.id !== arenaId) await activateArenaSelection(arenaId);
+}
+
+async function beginPrivateMatch(mode: 'host' | 'client', activeAtEpochMs: number): Promise<void> {
+  await lobbyArenaSyncPromise;
+  await synchronizeLobbyArena();
+  if (gameStarted) return;
+  const arenaId = privateLobbySnapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+  if (selectedArena.id !== arenaId) {
+    setStatus(`Could not synchronize ${arenaSelection(arenaId).displayName}; deployment stopped.`, 'error');
+    return;
+  }
+  privateMatchActiveAtEpochMs = activeAtEpochMs;
+  privateMatchMode = privateLobbySnapshot?.config.mode ?? privateMatchConfig.mode;
+  startGame(mode, false, activeAtEpochMs);
+}
+
+function hostStartPrivateMatch(): void {
+  if (network.role !== 'host') return;
+  const current = hostSnapshot('waiting');
+  if (!canHostStart(current)) {
+    setStatus('Every connected player must be ready before the host starts.', 'warn');
+    return;
+  }
+  privateMatchActiveAtEpochMs = Date.now() + LOBBY_START_LEAD_MS;
+  privateLobbyRevision += 1;
+  privateLobbySnapshot = hostSnapshot('countdown');
+  network.send({ type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() });
+  network.send({
+    type: 'lobby-start', by: player.id, activeAtEpochMs: privateMatchActiveAtEpochMs,
+    revision: privateLobbyRevision, nonce: randomNonce(),
+  });
+  renderPrivateLobby();
+  void beginPrivateMatch('host', privateMatchActiveAtEpochMs);
+}
+
+function returnPrivateMatchToLobby(asHost: boolean): void {
+  resetForMode();
+  gameStarted = false;
+  matchFinished = false;
+  weaponView.root.visible = false;
+  hudRoot.hidden = true;
+  element<HTMLElement>('#banner').hidden = true;
+  element<HTMLElement>('#countdown').hidden = true;
+  menu.classList.remove('hidden');
+  element<HTMLButtonElement>('#resume').hidden = true;
+  element<HTMLButtonElement>('#main-menu').hidden = true;
+  setArenaMenuCamera();
+  if (document.pointerLockElement) void document.exitPointerLock();
+  if (asHost && network.role === 'host') {
+    privateMatchActiveAtEpochMs = null;
+    authoritativeScores.clear();
+    for (const member of hostLobbyMembers.values()) {
+      hostLobbyMembers.set(member.id, { ...member, ready: false });
+      authoritativeScores.set(member.id, emptyPlayerScore(member.id));
+    }
+    broadcastHostLobby('waiting');
+  }
+  renderPrivateLobby();
+  setStatus(asHost ? 'Lobby reset — ready up for another match.' : 'Host returned everyone to the lobby.', 'ok');
+}
+
+function acceptLobbyState(message: LobbyStateMessage): void {
+  if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
+  if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
+  const returningToLobby = message.snapshot.phase === 'waiting' && gameStarted && privateLobbySnapshot?.phase !== 'waiting';
+  privateLobbySnapshot = message.snapshot;
+  privateMatchConfig = message.snapshot.config;
+  privateMatchMode = message.snapshot.config.mode;
+  lobbyArenaSyncPromise = lobbyArenaSyncPromise
+    .catch(() => undefined)
+    .then(() => synchronizeLobbyArena());
+  authoritativeScores.clear();
+  for (const score of message.snapshot.scores) authoritativeScores.set(score.id, score);
+  const localMember = message.snapshot.members.find((member) => member.id === player.id);
+  if (localMember) {
+    player.team = localMember.team;
+    localLobbyReady = localMember.ready;
+    element<HTMLSelectElement>('#team').value = String(localMember.team);
+  }
+  if (returningToLobby) {
+    returnPrivateMatchToLobby(false);
+    return;
+  }
+  renderPrivateLobby();
+  if (message.snapshot.activeAtEpochMs !== null && message.snapshot.phase !== 'waiting' && !gameStarted) {
+    void beginPrivateMatch('client', message.snapshot.activeAtEpochMs);
+  }
+}
+
+function handleLobbyMessage(message: GameMessage): boolean {
+  if (message.type === 'lobby-join') {
+    admitLobbyJoin(message);
+    return true;
+  }
+  if (message.type === 'lobby-ready') {
+    updateHostReady(message);
+    return true;
+  }
+  if (message.type === 'lobby-team') {
+    updateHostTeam(message);
+    return true;
+  }
+  if (message.type === 'lobby-state') {
+    acceptLobbyState(message);
+    return true;
+  }
+  if (message.type === 'lobby-start') {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId && message.revision >= (privateLobbySnapshot?.revision ?? 0)) {
+      privateMatchActiveAtEpochMs = message.activeAtEpochMs;
+      if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'countdown', activeAtEpochMs: message.activeAtEpochMs };
+      if (!gameStarted) void beginPrivateMatch('client', message.activeAtEpochMs);
+    }
+    return true;
+  }
+  if (message.type === 'lobby-reject') {
+    const labels = {
+      'room-full': 'Room is full.',
+      'identity-in-use': 'That player identity is already connected.',
+      'rejoin-denied': 'Rejoin token rejected; open a fresh invite.',
+      'match-active': 'Match already active; only reconnecting players may enter.',
+      'invalid-config': 'Host settings were rejected.',
+    } as const;
+    setStatus(labels[message.reason], 'error');
+    network.close();
+    privateLobbySnapshot = null;
+    renderPrivateLobby();
+    syncArenaSelectionUi();
+    return true;
+  }
+  if (message.type === 'clock-ping') {
+    if (network.role === 'host') {
+      const member = hostLobbyMembers.get(message.by);
+      if (member && message.reportedRttMs !== null) hostLobbyMembers.set(message.by, { ...member, pingMs: Math.round(message.reportedRttMs) });
+      network.sendToPlayer(message.by, {
+        type: 'clock-pong', by: player.id, forPlayerId: message.by,
+        sentAtEpochMs: message.sentAtEpochMs, hostEpochMs: Date.now(), nonce: randomNonce(),
+      });
+      if (member && message.reportedRttMs !== null) broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
+    }
+    return true;
+  }
+  if (message.type === 'clock-pong') {
+    acceptClockPong(message);
+    return true;
+  }
+  if (message.type === 'match-score') {
+    acceptAuthoritativeScores(message);
+    return true;
+  }
+  if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
+  if (message.type === 'leave' && privateLobbySnapshot) {
+    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected');
+    if (network.role === 'host') {
+      if (message.voluntary) {
+        hostLobbyMembers.delete(message.playerId);
+        hostLobbyTokens.delete(message.playerId);
+        hostDisconnectedAt.delete(message.playerId);
+        authoritativeScores.delete(message.playerId);
+        broadcastHostLobby(privateLobbySnapshot.phase);
+      } else {
+        markLobbyDisconnected(message.playerId);
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+function renderPrivateLobby(): void {
+  const section = element<HTMLElement>('#private-lobby');
+  const lobbyActive = network.role !== 'offline' || privateLobbySnapshot !== null;
+  menu.classList.toggle('private-lobby-active', lobbyActive);
+  syncArenaSelectionUi();
+  if (network.role === 'offline' && !privateLobbySnapshot) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  element<HTMLButtonElement>('#solo').disabled = true;
+  element<HTMLButtonElement>('#host').disabled = true;
+  element<HTMLButtonElement>('#join').disabled = true;
+  const snapshot = privateLobbySnapshot;
+  const members = snapshot?.members ?? (network.role === 'host' ? [...hostLobbyMembers.values()] : []);
+  const connectedCount = members.filter((member) => member.connected).length;
+  const capacity = snapshot?.config.capacity ?? privateMatchConfig.capacity;
+  element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity}`;
+  element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active' ? 'MATCH IN PROGRESS' : snapshot?.phase === 'countdown' ? 'DEPLOYING' : 'WAITING ROOM';
+  const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
+  const modeInput = element<HTMLSelectElement>('#lobby-mode');
+  const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
+  const balanceInput = element<HTMLInputElement>('#lobby-auto-balance');
+  modeInput.value = snapshot?.config.mode ?? privateMatchConfig.mode;
+  capacityInput.value = String(capacity);
+  balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
+  modeInput.disabled = !hostControls;
+  capacityInput.disabled = !hostControls;
+  balanceInput.disabled = !hostControls || modeInput.value === 'ffa';
+  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa';
+  const localMember = members.find((member) => member.id === player.id);
+  const lobbyArenaSynchronized = !snapshot
+    || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
+  localLobbyReady = localMember?.ready ?? localLobbyReady;
+  const ready = element<HTMLButtonElement>('#lobby-ready');
+  ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
+  ready.classList.toggle('primary', localLobbyReady);
+  ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
+  const start = element<HTMLButtonElement>('#lobby-start');
+  start.hidden = network.role !== 'host';
+  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostStart(snapshot);
+  const teamInput = element<HTMLSelectElement>('#team');
+  teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
+  const roster = element<HTMLElement>('#lobby-roster');
+  roster.innerHTML = members.map((member) => {
+    const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
+    const quality = latencyQuality(ping);
+    const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
+    const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
+    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b><em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
+  }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
+  const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
+  element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
+    ? `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
+    : snapshot?.phase === 'active'
+    ? 'Match active · disconnected players have a 30 second rejoin slot.'
+    : snapshot?.phase === 'countdown'
+      ? 'Synchronized deployment countdown started.'
+      : network.role === 'host'
+        ? isFfa
+          ? 'Share the invite, then start when every player is ready.'
+          : 'Share the invite, balance teams, then start when everyone is ready.'
+        : isFfa
+          ? 'Ready up. The host controls match start.'
+          : 'Choose your squad and ready up. The host controls match start.';
+}
+
+renderHighScores();
+void refreshGlobalLeaderboard();
+highScoreChannel?.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (Array.isArray(event.data)) persistMergedHighScores(event.data, false);
+});
+window.addEventListener('storage', (event) => {
+  if (event.key !== HIGH_SCORE_STORAGE_KEY) return;
+  try {
+    highScores = loadHighScores(localStorage);
+    renderHighScores();
+  } catch { /* Ignore inaccessible cross-tab storage updates. */ }
+});
+element<HTMLInputElement>('#player-name').addEventListener('input', () => {
+  const input = element<HTMLInputElement>('#player-name');
+  if (normalizeRequiredPlayerName(input.value)) {
+    input.classList.remove('invalid');
+    element<HTMLElement>('#player-name-error').hidden = true;
+  }
+  renderHighScores();
+});
+
 const weaponView = new WeaponPresentation(camera, reducedRenderMode);
-const viewFill = new THREE.PointLight(0xd8ecff, 0.9, 5);
+let selectedFieldKit: FieldKitId = parseFieldKitSelection(localStorage.getItem(FIELD_KIT_STORAGE_KEY));
+
+function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
+    const active = button.dataset.menuTab === tab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll<HTMLElement>('[data-menu-panel]').forEach((panel) => {
+    const active = panel.dataset.menuPanel === tab;
+    panel.classList.toggle('active', active);
+    panel.hidden = !active;
+  });
+}
+
+function renderFieldKitSelection(): void {
+  const kit = fieldKitById(selectedFieldKit);
+  const queued = gameStarted && player.primaryWeapon !== kit.weapon;
+  element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>`;
+  document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
+    const selected = card.dataset.kitId === selectedFieldKit;
+    card.classList.toggle('selected', selected);
+    card.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function chooseFieldKit(id: string): void {
+  selectedFieldKit = fieldKitById(id).id;
+  localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
+  if (!gameStarted) {
+    player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+    player.weapon = player.primaryWeapon;
+    weaponView.setWeapon(player.weapon, true);
+  }
+  renderFieldKitSelection();
+}
+
+document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
+  button.addEventListener('click', () => setMenuTab(button.dataset.menuTab as 'deploy' | 'kit' | 'options'));
+});
+document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) => {
+  button.addEventListener('click', () => chooseFieldKit(button.dataset.kitId ?? 'balanced'));
+});
+player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+player.weapon = player.primaryWeapon;
+renderFieldKitSelection();
+
+const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
 viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
 
@@ -338,7 +2071,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
 
-  const operator = buildOperator(snapshot.team, 'remote-player-model', reducedRenderMode);
+  const operator = buildOperator(snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon);
   operator.userData.playerId = snapshot.id;
   operator.traverse((child) => {
     child.userData.playerId = snapshot.id;
@@ -361,14 +2094,25 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const texture = new THREE.CanvasTexture(labelCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false }));
-  sprite.visible = snapshot.team === player.team;
+  sprite.userData.presentationOnly = true;
+  sprite.raycast = () => {};
+  sprite.visible = privateMatchMode === 'tdm' && snapshot.team === player.team;
   sprite.position.y = 2.5;
   sprite.scale.set(2.4, 0.6, 1);
   root.add(sprite);
 
   root.position.set(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z);
   scene.add(root);
-  return { root, snapshot, target: new THREE.Vector3(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z), targetYaw: snapshot.yaw, lastSeen: performance.now() };
+  const now = performance.now();
+  return {
+    root,
+    snapshot,
+    target: new THREE.Vector3(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z),
+    targetYaw: snapshot.yaw,
+    lastSeen: now,
+    claimEligibleAt: now + 1_500,
+    claimRequiresCoreExit: false,
+  };
 }
 
 function snapshot(): PlayerSnapshot {
@@ -384,47 +2128,402 @@ function snapshot(): PlayerSnapshot {
     hp: player.hp,
     kills: player.kills,
     deaths: player.deaths,
+    primary: player.primaryWeapon,
     weapon: player.weapon,
     stance: player.stance,
     seq: ++player.seq,
   };
 }
 
+const TEAM_PING_LABELS: Record<TeamPingKind, string> = {
+  enemy: 'ENEMY',
+  regroup: 'REGROUP',
+  push: 'PUSH',
+  nice: 'NICE',
+};
+
+function removeTeamPing(ping: ActiveTeamPing): void {
+  scene.remove(ping.root);
+  ping.root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) material.dispose();
+  });
+}
+
+function presentTeamPing(message: TeamPingMessage, senderName: string, now = performance.now()): void {
+  while (activeTeamPings.length >= MAX_ACTIVE_TEAM_PINGS) removeTeamPing(activeTeamPings.shift()!);
+  const color = message.kind === 'enemy' ? 0xff6b54
+    : message.kind === 'regroup' ? 0x67e6ff
+      : message.kind === 'push' ? 0xffd166 : 0x7df29a;
+  const root = new THREE.Group();
+  root.name = `team-ping-${message.kind}`;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.6, 20),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, depthTest: false, toneMapped: false }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.09, 1.5, 8),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.68, depthWrite: false, depthTest: false, toneMapped: false }),
+  );
+  beacon.position.y = 0.75;
+  const diamond = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.18, 0),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, toneMapped: false }),
+  );
+  diamond.position.y = 1.52;
+  root.add(ring, beacon, diamond);
+  root.position.set(...message.position);
+  root.renderOrder = 999;
+  root.userData.presentationOnly = true;
+  root.traverse((node) => { node.raycast = () => {}; });
+  scene.add(root);
+  activeTeamPings.push({ root, expiresAt: now + TEAM_PING_LIFETIME_MS });
+  addFeed(`${senderName}: ${TEAM_PING_LABELS[message.kind]}`, message.team === 0 ? 'aqua' : 'coral');
+}
+
+function sendTeamPing(kind: TeamPingKind): void {
+  if (!gameStarted || !player.alive || privateMatchMode === 'ffa') return;
+  const now = performance.now();
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  const projected = player.position.clone().addScaledVector(direction, 18);
+  const bounded = clampPointToBounds(projected, arena.bounds, 0.6);
+  const message: TeamPingMessage = {
+    type: 'ping', by: player.id, team: player.team, kind,
+    position: [bounded.x, 0.1, bounded.z],
+    nonce: randomNonce(),
+  };
+  const admission = admitTeamPing(message, snapshot(), now, localPingAdmission);
+  if (!admission.accepted) return;
+  localPingAdmission = admission.nextState;
+  presentTeamPing(message, player.name, now);
+  network.send(message);
+}
+
+function updateTeamPings(now: number): void {
+  for (let index = activeTeamPings.length - 1; index >= 0; index -= 1) {
+    const ping = activeTeamPings[index];
+    if (now >= ping.expiresAt) {
+      removeTeamPing(ping);
+      activeTeamPings.splice(index, 1);
+      continue;
+    }
+    const remaining = (ping.expiresAt - now) / TEAM_PING_LIFETIME_MS;
+    const distanceScale = THREE.MathUtils.clamp(camera.position.distanceTo(ping.root.position) / 8, 1, 2.5);
+    ping.root.scale.setScalar(distanceScale * (0.92 + Math.sin(now * 0.008) * 0.08));
+    ping.root.visible = remaining > 0;
+  }
+}
+
 function onNetworkMessage(message: GameMessage): void {
+  if (handleLobbyMessage(message)) return;
+  if (!gameStarted) return;
+  if (message.type === 'overdrive-claim') {
+    acceptOverdriveClaim(message);
+    return;
+  }
+  if (message.type === 'overdrive-state') {
+    acceptOverdriveState(message);
+    return;
+  }
+  if (message.type === 'high-score') {
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    if (!sender || leaderboardNameKey(sender.snapshot.name) !== leaderboardNameKey(message.entry.name)) return;
+    persistMergedHighScores([message.entry]);
+    return;
+  }
+  if (message.type === 'leaderboard-sync') {
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    if (!sender) return;
+    const admittedEntries = message.by === privateLobbySnapshot?.hostId
+      ? message.entries
+      : peerOwnedHighScores(sender.snapshot.name, message.entries);
+    persistMergedHighScores(admittedEntries);
+    return;
+  }
   if (message.type === 'join' || message.type === 'state') {
-    const incoming = message.player;
-    if (incoming.id === player.id) return;
+    const claimedIncoming = message.player;
+    const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
+    if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
+    const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
+    const incoming = network.role === 'host' && lobbyMember
+      ? {
+          ...claimedIncoming,
+          name: lobbyMember.name,
+          team: lobbyMember.team,
+          kills: authoritativeScore?.kills ?? 0,
+          deaths: authoritativeScore?.deaths ?? 0,
+        }
+      : claimedIncoming;
+    if (incoming.id === player.id || !pointInsideBounds(incoming, arena.bounds, 0.44)) return;
     let remote = remotes.get(incoming.id);
     if (!remote) {
       remote = createRemote(incoming);
       remotes.set(incoming.id, remote);
+      remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+      remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+      remoteHealthAuthorities.set(incoming.id, createRemoteHealthAuthorityState(incoming.hp > 0));
+      if (network.role === 'host') network.send({ type: 'join', player: { ...incoming, hp: incoming.hp > 0 ? 100 : 0 } });
       addFeed(`${incoming.name} entered the test block`, incoming.team === 0 ? 'aqua' : 'coral');
-      if (message.type === 'join') network.send({ type: 'state', player: snapshot() });
+      if (message.type === 'join') {
+        network.send({ type: 'state', player: snapshot() });
+        sendLeaderboardSync();
+        broadcastOverdriveState(performance.now());
+      }
     }
-    if (incoming.seq >= remote.snapshot.seq) {
-      remote.snapshot = incoming;
-      remote.target.set(incoming.x, incoming.y - stanceEyeHeight(incoming.stance), incoming.z);
-      remote.targetYaw = incoming.yaw;
-      remote.lastSeen = performance.now();
-      remote.root.visible = incoming.hp > 0;
+    if (incoming.seq > remote.snapshot.seq) {
+      const now = performance.now();
+      let admittedIncoming = incoming;
+      let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0;
+      if (network.role === 'host') {
+        const health = remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0);
+        const respawnAdmission = admitAuthoritativeRemoteRespawn(health, incoming.hp, now);
+        if (respawnAdmission.respawned) {
+          remoteHealthAuthorities.set(incoming.id, respawnAdmission.state);
+          remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+        }
+        const authoritativeHealth = respawnAdmission.state;
+        respawned = respawnAdmission.respawned;
+        admittedIncoming = { ...incoming, hp: authoritativeHealth.hp };
+      }
+      const movement = admitRemoteSnapshotMovement(
+        remote.snapshot,
+        admittedIncoming,
+        now,
+        remote.lastSeen,
+        remote.claimEligibleAt,
+        respawned,
+      );
+      if (!movement.accepted) return;
+      const pickup = authorizedRemotePickups.get(admittedIncoming.id);
+      const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
+      if (admittedIncoming.team !== remote.snapshot.team) return;
+      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+      if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
+      remote.claimEligibleAt = movement.claimEligibleAt;
+      const coreDistance = Math.hypot(admittedIncoming.x - OVERDRIVE_POSITION.x, admittedIncoming.z - OVERDRIVE_POSITION.z);
+      if (movement.resynchronized && coreDistance <= OVERDRIVE_PICKUP_RADIUS + 3) remote.claimRequiresCoreExit = true;
+      else if (remote.claimRequiresCoreExit && !movement.resynchronized && coreDistance > OVERDRIVE_PICKUP_RADIUS + 3) {
+        remote.claimRequiresCoreExit = false;
+        remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
+      }
+      remote.snapshot = admittedIncoming;
+      remote.target.set(admittedIncoming.x, admittedIncoming.y - stanceEyeHeight(admittedIncoming.stance), admittedIncoming.z);
+      remote.targetYaw = admittedIncoming.yaw;
+      remote.lastSeen = now;
+      remote.root.visible = admittedIncoming.hp > 0;
+      if (network.role === 'host') network.send({ type: 'state', player: admittedIncoming }, admittedIncoming.id);
     }
+    return;
+  }
+  if (message.type === 'ping') {
+    const pingPoint = { x: message.position[0], y: message.position[1], z: message.position[2] };
+    if (privateMatchMode === 'ffa' || message.by === player.id || message.team !== player.team || !pointInsideBounds(pingPoint, arena.bounds, 0)) return;
+    const sender = remotes.get(message.by);
+    const prior = remotePingAdmissions.get(message.by) ?? createTeamPingAdmissionState();
+    const admission = admitTeamPing(message, sender?.snapshot, performance.now(), prior);
+    if (!admission.accepted || !sender) return;
+    remotePingAdmissions.set(message.by, admission.nextState);
+    presentTeamPing(message, sender.snapshot.name);
+    return;
+  }
+  if (message.type === 'window-break') {
+    acceptRemoteWindowBreak(message);
+    return;
+  }
+  if (message.type === 'pickup') {
+    acceptRemotePickup(message);
+    return;
+  }
+  if (message.type === 'support-activate') {
+    const state = remoteSupportAuthorities.get(message.by);
+    const sender = remotes.get(message.by);
+    if (!state || !sender || sender.snapshot.hp <= 0) return;
+    if (message.effectOrigins.some((origin) => !pointInsideBounds(new THREE.Vector3(...origin), arena.bounds, 0))) return;
+    if (message.targetIds.some((id) => {
+      if (id === player.id) return !player.alive || !areCombatantsHostile(message.by, sender.snapshot.team, player.id, player.team);
+      const target = remotes.get(id);
+      const botTarget = bots.get(id);
+      if (target) return target.snapshot.hp <= 0 || !areCombatantsHostile(message.by, sender.snapshot.team, target.snapshot.id, target.snapshot.team);
+      if (botTarget) return !botTarget.alive || !areCombatantsHostile(message.by, sender.snapshot.team, botTarget.id, botTarget.team);
+      return true;
+    })) return;
+    const admission = admitRemoteSupportActivation(state, message, performance.now());
+    if (admission.accepted) {
+      remoteSupportAuthorities.set(message.by, admission.state);
+      if (network.role === 'host') network.send(message);
+    }
+    return;
+  }
+  if (message.type === 'grenade-throw') {
+    const state = remoteGrenadeAuthorities.get(message.by);
+    const sender = remotes.get(message.by);
+    if (!state || !sender) return;
+    const admission = admitRemoteGrenadeThrow(state, message, sender.snapshot, performance.now());
+    if (!admission.accepted) return;
+    remoteGrenadeAuthorities.set(message.by, admission.state);
+    if (network.role === 'host') network.send(message);
     return;
   }
   if (message.type === 'shot') {
-    if (message.by !== player.id) renderRemoteShot(message);
+    if (message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    const prior = remoteShotAdmissions.get(message.by) ?? createRemoteShotAdmissionState();
+    const admission = admitRemoteShot(message, sender?.snapshot, performance.now(), prior);
+    if (!admission.accepted) return;
+    remoteShotAdmissions.set(message.by, admission.nextState);
+    const now = performance.now();
+    const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
+    for (const [nonce, action] of actions) if (now - action.receivedAt > 1_000) actions.delete(nonce);
+    actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
+    admittedRemoteShots.set(message.by, actions);
+    if (network.role === 'host') network.send(message);
+    renderRemoteShot(message);
     return;
   }
-  if (message.type === 'hit' && message.target === player.id && !processedNonces.has(message.nonce)) {
+  if (message.type === 'melee') {
+    if (message.by === player.id) return;
+    const now = performance.now();
+    const sender = remotes.get(message.by);
+    const prior = remoteMeleeAdmissions.get(message.by) ?? createRemoteMeleeAdmissionState();
+    const admission = admitRemoteMelee(message, sender?.snapshot, now, prior);
+    if (!admission.accepted || !sender) return;
+    remoteMeleeAdmissions.set(message.by, admission.nextState);
+    const actions = admittedRemoteMelees.get(message.by) ?? new Map<number, AdmittedRemoteMelee>();
+    for (const [nonce, action] of actions) if (now - action.receivedAt > 1_000) actions.delete(nonce);
+    actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
+    admittedRemoteMelees.set(message.by, actions);
+    if (network.role === 'host') network.send(message);
+    const operator = sender.root.userData.operator as THREE.Group | undefined;
+    if (operator) meleeOperator(operator);
+    audio.melee();
+    const origin = new THREE.Vector3(...message.origin);
+    if (network.role !== 'client' && player.alive && areCombatantsHostile(message.by, sender.snapshot.team, player.id, player.team)
+      && meleeActionHitsPoint(message, player.position)
+      && !arena.colliders.some((box) => segmentIntersectsBox(origin, player.position, box))) {
+      applyDamage(100 * overdriveDamageMultiplier(overdriveState, message.by, now), message.by);
+    }
+    return;
+  }
+  if (message.type === 'hit' && !processedNonces.has(message.nonce)) {
     const attacker = remotes.get(message.by);
-    if (!attacker) return;
-    const attackerEye = {
-      x: attacker.snapshot.x,
-      y: attacker.snapshot.y,
-      z: attacker.snapshot.z,
-    };
-    if (arena.colliders.some((box) => segmentIntersectsBox(attackerEye, player.position, box))) return;
+    if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
+    const targetIsLocal = message.target === player.id;
+    const remoteTarget = targetIsLocal ? undefined : remotes.get(message.target);
+    if (!targetIsLocal && (network.role !== 'host' || !remoteTarget)) return;
+    const targetId = targetIsLocal ? player.id : remoteTarget!.snapshot.id;
+    const targetTeam = targetIsLocal ? player.team : remoteTarget!.snapshot.team;
+    if (!areCombatantsHostile(message.by, attacker.snapshot.team, targetId, targetTeam)) return;
+    const targetStance = targetIsLocal ? player.stance : remoteTarget!.snapshot.stance ?? 'stand';
+    const shotTargetPosition = targetIsLocal
+      ? player.position.clone()
+      : new THREE.Vector3(remoteTarget!.snapshot.x, remoteTarget!.snapshot.y, remoteTarget!.snapshot.z);
+    const blastTargetPosition = shotTargetPosition.clone();
+    blastTargetPosition.y += 1.1 - stanceEyeHeight(targetStance);
+    const now = performance.now();
+    let admittedDamage = 0;
+
+    if (message.kind === 'shot') {
+      const action = admittedRemoteShots.get(message.by)?.get(message.actionNonce);
+      if (!action) { recordRemoteHitAdmission('shot-missing-action'); return; }
+      if (now - action.receivedAt > 1_000) { recordRemoteHitAdmission('shot-expired-action'); return; }
+      if (action.targets.has(message.target)) { recordRemoteHitAdmission('shot-duplicate-target'); return; }
+      if (action.message.weapon !== attacker.snapshot.weapon) { recordRemoteHitAdmission('shot-weapon-mismatch'); return; }
+      const derivedDamage = deriveRemoteShotBaseDamage(
+        action.message.weapon,
+        action.message.origin,
+        action.message.pelletDirections,
+        {
+          x: shotTargetPosition.x,
+          y: shotTargetPosition.y,
+          z: shotTargetPosition.z,
+          yaw: targetIsLocal ? player.yaw : remoteTarget!.snapshot.yaw,
+          stance: targetStance,
+        },
+        (origin, impact) => arena.colliders.some((box) => segmentIntersectsBox(origin, impact, box)),
+      );
+      if (derivedDamage <= 0) { recordRemoteHitAdmission('shot-ray-miss'); return; }
+      if (Math.abs(message.damage - derivedDamage) > 1e-6) {
+        recordRemoteHitAdmission('shot-damage-mismatch');
+        return;
+      }
+      action.targets.add(message.target);
+      recordRemoteHitAdmission('shot-admitted');
+      admittedDamage = resolveRemotePoweredDamage(
+        derivedDamage,
+        overdriveDamageMultiplier(overdriveState, message.by, now),
+      );
+    } else if (message.kind === 'melee') {
+      const action = admittedRemoteMelees.get(message.by)?.get(message.actionNonce);
+      if (!action || now - action.receivedAt > 1_000 || action.targets.has(message.target)) return;
+      if (Math.abs(message.damage - 100) > 1e-6
+        || !meleeActionHitsPoint(action.message, blastTargetPosition)
+        || arena.colliders.some((box) => segmentIntersectsBox(new THREE.Vector3(...action.message.origin), blastTargetPosition, box))) return;
+      action.targets.add(message.target);
+      admittedDamage = resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now));
+    } else {
+      const source = message.explosiveSource;
+      const originTuple = message.origin;
+      if (!source || !originTuple) return;
+      const validationOrigin = new THREE.Vector3(...originTuple);
+      if (!pointInsideBounds(validationOrigin, arena.bounds, 0)) return;
+      const distance = validationOrigin.distanceTo(blastTargetPosition);
+      if (distance > remoteExplosiveHitMaximumDistance(source)) return;
+      if (source !== 'nuke' && arena.colliders.some((box) => segmentIntersectsBox(validationOrigin, blastTargetPosition, box))) return;
+      const maximumBaseDamage = maximumRemoteExplosiveBaseDamage(source, distance, targetStance);
+      if (!admitRemoteBaseDamage(message.damage, maximumBaseDamage)
+        || Math.abs(message.damage - maximumBaseDamage) > 1e-6) return;
+
+      if (source === 'grenade') {
+        const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+        if (!grenadeAuthority) return;
+        const grenadeAdmission = admitRemoteGrenadeHit(grenadeAuthority, {
+          actionNonce: message.actionNonce,
+          explosionOrigin: originTuple,
+          target: message.target,
+          now,
+        });
+        if (!grenadeAdmission.accepted) return;
+        remoteGrenadeAuthorities.set(message.by, grenadeAdmission.state);
+      } else {
+        const supportNonce = message.supportNonce;
+        const authority = remoteSupportAuthorities.get(message.by);
+        if (supportNonce === undefined || !authority) return;
+        const supportAdmission = admitRemoteSupportHit(authority, {
+          source,
+          activationNonce: supportNonce,
+          origin: originTuple,
+          target: message.target,
+          now,
+        });
+        if (!supportAdmission.accepted) return;
+        remoteSupportAuthorities.set(message.by, supportAdmission.state);
+      }
+
+      const actions = admittedRemoteExplosions.get(message.by) ?? new Map<number, AdmittedRemoteExplosion>();
+      for (const [nonce, action] of actions) if (now - action.receivedAt > 30_000) actions.delete(nonce);
+      const priorAction = actions.get(message.actionNonce);
+      if (priorAction) {
+        if (priorAction.source !== source || priorAction.origin.distanceTo(validationOrigin) > 0.01 || priorAction.targets.has(message.target)) return;
+        priorAction.targets.add(message.target);
+      } else {
+        actions.set(message.actionNonce, { source, origin: validationOrigin, receivedAt: now, targets: new Set([message.target]) });
+      }
+      admittedRemoteExplosions.set(message.by, actions);
+      admittedDamage = resolveRemotePoweredDamage(
+        message.damage,
+        overdriveDamageMultiplier(overdriveState, message.by, now),
+      );
+    }
+
     processedNonces.add(message.nonce);
-    applyDamage(message.damage, message.by);
+    if (targetIsLocal) applyDamage(admittedDamage, message.by);
+    else sendAuthoritativeHit(message);
     trimNonceSet();
     return;
   }
@@ -441,63 +2540,471 @@ function trimNonceSet(): void {
   if (processedNonces.size > 512) processedNonces.clear();
 }
 
+function sendAuthoritativeHit(message: HitMessage): void {
+  if (network.role !== 'host') {
+    network.send(message);
+    return;
+  }
+  const remote = remotes.get(message.target);
+  const health = remoteHealthAuthorities.get(message.target);
+  if (!remote || !health) return;
+  const now = performance.now();
+  const finalDamage = resolveRemotePoweredDamage(
+    message.damage,
+    overdriveDamageMultiplier(overdriveState, message.by, now),
+  );
+  const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
+  if (!result.applied) return;
+  const appliedDamage = Math.max(0, health.hp - result.state.hp);
+  remoteHealthAuthorities.set(message.target, result.state);
+  remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
+  remote.root.visible = result.state.alive;
+  recordAuthoritativeDamage(message.by, message.target, appliedDamage);
+  network.send(message);
+  if (result.died) {
+    const death: DeathMessage = { type: 'death', killer: message.by, victim: message.target, nonce: randomNonce() };
+    processedNonces.add(death.nonce);
+    network.send(death);
+    processDeath(death);
+  }
+}
+
 function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
+  if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
   const direction = new THREE.Vector3(...message.direction).normalize();
   const end = origin.clone().addScaledVector(direction, 50);
   const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
-  spawnTracer(origin, direction, trace.tracerDistance, WEAPONS[message.weapon].color);
+  const visibleEnd = origin.clone().addScaledVector(direction, trace.tracerDistance);
+  const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
+  const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
+  spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
+  if (remoteOperator) fireOperator(remoteOperator);
   if (trace.blockedByCover) {
-    const impact = origin.clone().addScaledVector(direction, trace.tracerDistance);
-    spawnImpactFlash(impact);
-    audio.coverImpact(impact.distanceTo(camera.position));
+    spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
+    audio.impact('concrete', visibleEnd.distanceTo(camera.position));
   }
+  if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
 }
 
 function showDamageDirection(attacker: string): void {
   const attackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
   if (!attackerPosition || attacker === player.id) return;
-  const dx = attackerPosition.x - player.position.x;
-  const dz = attackerPosition.z - player.position.z;
-  const attackerYaw = Math.atan2(-dx, -dz);
   const indicator = element<HTMLElement>('#damage-direction');
-  indicator.style.setProperty('--damage-angle', `${shortestAngleDelta(player.yaw, attackerYaw)}rad`);
+  indicator.style.setProperty('--damage-angle', `${sourceScreenAngle(player.position, player.yaw, attackerPosition)}rad`);
   indicator.classList.remove('pulse');
   requestAnimationFrame(() => indicator.classList.add('pulse'));
 }
 
-function applyDamage(damage: number, attacker: string): void {
+function scheduleLocalRespawn(now = performance.now()): void {
+  element<HTMLElement>('#respawn').hidden = false;
+  if (respawnTimer) return;
+  respawnEndsAt = now + 1_900;
+  respawnTimer = setTimeout(() => {
+    respawnTimer = null;
+    if (gameStarted && !matchFinished) respawn();
+  }, 1_900);
+}
+
+function applyDamage(damage: number, attacker: string, minimumDamage = 1): void {
   const now = performance.now();
   if (!player.alive || now < player.invulnerableUntil) return;
-  player.hp = Math.max(0, player.hp - Math.min(100, Math.max(1, damage)));
+  const previousHp = player.hp;
+  player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
+  const appliedDamage = Math.max(0, previousHp - player.hp);
+  if (network.role === 'host') recordAuthoritativeDamage(attacker, player.id, appliedDamage);
   lastDamageAt = now;
   audio.damage();
   showDamageDirection(attacker);
   element<HTMLElement>('#damage-flash').classList.remove('pulse');
   requestAnimationFrame(() => element<HTMLElement>('#damage-flash').classList.add('pulse'));
   if (player.hp <= 0) {
+    interruptReload(true, now);
     player.alive = false;
     player.deaths += 1;
+    fieldSupport = recordSupportDeath(fieldSupport);
+    updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, nonce: randomNonce() };
-    network.send(death);
-    processDeath(death);
-    element<HTMLElement>('#respawn').hidden = false;
+    if (network.role !== 'client') {
+      network.send(death);
+      processDeath(death);
+    }
+    scheduleLocalRespawn(now);
     document.exitPointerLock();
-    setTimeout(respawn, 1900);
+  }
+}
+
+function disposeDeathDrop(entity: DeathDropEntity): void {
+  deathDropPresentationPool.release(entity.root);
+}
+
+function clearDeathDrops(): void {
+  for (const entity of deathDrops) disposeDeathDrop(entity);
+  deathDrops.length = 0;
+  authorizedRemotePickups.clear();
+  element<HTMLElement>('#pickup-prompt').hidden = true;
+}
+
+function deathDropVictim(message: DeathMessage): { weapon: PrimaryWeaponId; position: THREE.Vector3 } | null {
+  if (message.victim === player.id) {
+    const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
+    return { weapon: player.primaryWeapon, position: new THREE.Vector3(player.position.x, floorY, player.position.z) };
+  }
+  const remote = remotes.get(message.victim);
+  if (remote) {
+    const floorY = remote.snapshot.y - stanceEyeHeight(remote.snapshot.stance ?? 'stand') + 0.18;
+    return { weapon: remote.snapshot.primary, position: new THREE.Vector3(remote.snapshot.x, floorY, remote.snapshot.z) };
+  }
+  const bot = bots.get(message.victim);
+  if (bot) return { weapon: bot.weapon, position: bot.position.clone().add(new THREE.Vector3(0, 0.18, 0)) };
+  return null;
+}
+
+function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDropEntity | null {
+  const id = `death-${message.nonce}`;
+  const existing = deathDrops.find((entity) => entity.drop.id === id);
+  if (existing) return existing;
+  const victim = deathDropVictim(message);
+  if (!victim) return null;
+  const bounded = clampPointToBounds(victim.position, arena.bounds, 0.5);
+  victim.position.set(bounded.x, bounded.y, bounded.z);
+  const spec = WEAPONS[victim.weapon];
+  const drop = createDeathDrop(
+    id,
+    victim.weapon,
+    victim.position,
+    Math.max(1, Math.ceil(spec.mag * 0.5)),
+    Math.max(1, Math.ceil(spec.reserve * 0.25)),
+    now,
+  );
+  if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
+  const root = deathDropPresentationPool.acquire(id, spec.color, victim.position);
+  const entity = { drop, root };
+  deathDrops.unshift(entity);
+  return entity;
+}
+
+function removeDeathDrop(entity: DeathDropEntity): void {
+  const index = deathDrops.indexOf(entity);
+  if (index >= 0) deathDrops.splice(index, 1);
+  disposeDeathDrop(entity);
+}
+
+function updateDeathDropPresentation(entity: DeathDropEntity, now = performance.now()): void {
+  const ammoAvailable = deathDropAmmoAvailable(entity.drop, now);
+  const weaponAvailable = deathDropWeaponAvailable(entity.drop, now);
+  const model = entity.root.getObjectByName('death-drop-weapon');
+  const beacon = entity.root.getObjectByName('death-drop-beacon');
+  const ring = entity.root.getObjectByName('death-drop-ring') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;
+  if (model) model.visible = weaponAvailable;
+  if (beacon) beacon.visible = ammoAvailable;
+  if (ring) {
+    ring.visible = ammoAvailable || weaponAvailable;
+    ring.material.color.setHex(ammoAvailable ? 0x7cf3a0 : WEAPONS[entity.drop.weapon].color);
+  }
+}
+
+function interactWithDeathDrop(now = performance.now()): boolean {
+  if (!player.alive || matchState.phase !== 'active') return false;
+  const candidates = deathDrops
+    .map((entity) => entity.drop)
+    .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
+  const drop = nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon');
+  if (!drop) return false;
+  const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
+  if (!entity) return false;
+  const result = consumeDeathDropWeapon(
+    drop,
+    { primary: player.primaryWeapon, ammo: player.ammo[player.primaryWeapon], reserve: player.reserve[player.primaryWeapon] },
+    WEAPONS[player.primaryWeapon].reserve,
+    now,
+  );
+  if (!result.consumed) return false;
+  interruptReload(true, now);
+  entity.drop = result.drop;
+  player.primaryWeapon = result.inventory.primary;
+  player.ammo[result.inventory.primary] = result.inventory.ammo;
+  player.reserve[result.inventory.primary] = result.inventory.reserve;
+  player.weapon = result.inventory.primary;
+  player.switchingUntil = now + 360;
+  weaponView.setWeapon(player.weapon);
+  audio.weaponSwitch();
+  const pickup: PickupMessage = {
+    type: 'pickup',
+    by: player.id,
+    dropId: drop.id,
+    weapon: drop.weapon,
+    mode: 'weapon',
+    position: player.position.toArray(),
+    nonce: randomNonce(),
+  };
+  network.send(pickup);
+  addFeed(result.mode === 'replenish' ? `${WEAPONS[drop.weapon].name.toUpperCase()} AMMO REPLENISHED` : `${WEAPONS[drop.weapon].name.toUpperCase()} PICKED UP`, 'gold');
+  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
+  else removeDeathDrop(entity);
+  renderFieldKitSelection();
+  return true;
+}
+
+function autoScavengeDeathDrop(now: number): boolean {
+  if (!player.alive || matchState.phase !== 'active') return false;
+  const drop = nearestScavengeDeathDrop(deathDrops.map((entity) => entity.drop), player.position, now);
+  if (!drop) return false;
+  const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
+  if (!entity) return false;
+  const activeWeapon = player.weapon;
+  const result = scavengeDeathDrop(
+    drop,
+    { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
+    WEAPONS[activeWeapon].reserve,
+    2,
+    now,
+  );
+  if (!result.scavenged) return false;
+  entity.drop = result.drop;
+  player.reserve[activeWeapon] = result.inventory.reserve;
+  player.grenades = result.inventory.grenades;
+  const pickup: PickupMessage = {
+    type: 'pickup',
+    by: player.id,
+    dropId: drop.id,
+    weapon: drop.weapon,
+    mode: 'scavenge',
+    position: player.position.toArray(),
+    nonce: randomNonce(),
+  };
+  network.send(pickup);
+  const gains = [result.ammoGranted > 0 ? `+${result.ammoGranted} ${WEAPONS[activeWeapon].name.toUpperCase()} AMMO` : '', result.grenadeGranted > 0 ? '+1 FRAG' : ''].filter(Boolean).join(' · ');
+  addFeed(`SCAVENGED ${gains}`, 'gold');
+  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
+  else removeDeathDrop(entity);
+  return true;
+}
+
+function updateDeathDrops(now: number): void {
+  autoScavengeDeathDrop(now);
+  const retained = new Set(pruneDeathDrops(deathDrops.map((entity) => entity.drop), now, MAX_DEATH_DROPS).map((drop) => drop.id));
+  for (let index = deathDrops.length - 1; index >= 0; index -= 1) {
+    const entity = deathDrops[index];
+    if (!retained.has(entity.drop.id)) {
+      deathDrops.splice(index, 1);
+      disposeDeathDrop(entity);
+      continue;
+    }
+    updateDeathDropPresentation(entity);
+    const age = Math.max(0, now - entity.drop.createdAt);
+    entity.root.rotation.y = age * 0.00065;
+    entity.root.position.y = entity.drop.position.y + Math.sin(age * 0.004) * 0.08;
+  }
+  const candidates = deathDrops
+    .map((entity) => entity.drop)
+    .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
+  const nearby = player.alive
+    ? nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon')
+    : null;
+  const prompt = element<HTMLElement>('#pickup-prompt');
+  prompt.hidden = !nearby;
+  if (nearby) {
+    const replenish = nearby.weapon === player.primaryWeapon;
+    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REPLENISH' : 'PICK UP';
+    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearby.weapon].name.toUpperCase();
+  }
+}
+
+function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
+  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const remote = remotes.get(message.by);
+  const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
+  if (!remote || !entity || entity.drop.weapon !== message.weapon) return;
+  const position = new THREE.Vector3(...message.position);
+  const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
+  const horizontalDropDistance = Math.hypot(position.x - dropPosition.x, position.z - dropPosition.z);
+  const validDropDistance = message.mode === 'scavenge'
+    ? horizontalDropDistance <= DEATH_DROP_SCAVENGE_RANGE + 0.5 && Math.abs(position.y - dropPosition.y) <= 2.5
+    : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
+  if (!pointInsideBounds(position, arena.bounds, 0.44)
+    || position.distanceTo(senderPosition) > 2.8
+    || !validDropDistance
+    || message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)
+    || message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)) return;
+  processedNonces.add(message.nonce);
+  if (message.mode === 'scavenge') {
+    entity.drop = { ...entity.drop, ammoConsumedAt: now };
+    const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+    if (grenadeAuthority) remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
+  } else {
+    entity.drop = { ...entity.drop, weaponConsumedAt: now };
+    authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
+    setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials);
+  }
+  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
+  else removeDeathDrop(entity);
+  trimNonceSet();
+}
+
+function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
+  const root = new THREE.Group();
+  root.name = 'breaking-window-shards';
+  root.position.copy(point);
+  const shards: Array<{ mesh: THREE.Mesh; velocity: THREE.Vector3; spin: THREE.Vector3 }> = [];
+  const material = new THREE.MeshBasicMaterial({ color: 0xa9e8f5, transparent: true, opacity: 0.74, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
+  for (let index = 0; index < 10; index += 1) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.14 + presentationRandom() * 0.16, 0.18 + presentationRandom() * 0.22), material);
+    mesh.position.set((presentationRandom() - 0.5) * 0.55, (presentationRandom() - 0.5) * 0.45, (presentationRandom() - 0.5) * 0.08);
+    root.add(mesh);
+    shards.push({
+      mesh,
+      velocity: normal.clone().multiplyScalar(1.1 + presentationRandom() * 1.5).add(new THREE.Vector3((presentationRandom() - 0.5) * 1.7, 0.8 + presentationRandom() * 1.3, (presentationRandom() - 0.5) * 1.7)),
+      spin: new THREE.Vector3(presentationRandom() * 8, presentationRandom() * 8, presentationRandom() * 8),
+    });
+  }
+  scene.add(root);
+  const startedAt = performance.now();
+  const animate = (now: number) => {
+    const age = (now - startedAt) / 1000;
+    if (age >= 0.9) {
+      disposeSupportRoot(root);
+      return;
+    }
+    for (const shard of shards) {
+      shard.velocity.y -= 7.5 / 60;
+      shard.mesh.position.addScaledVector(shard.velocity, 1 / 60);
+      shard.mesh.rotation.x += shard.spin.x / 60;
+      shard.mesh.rotation.y += shard.spin.y / 60;
+      shard.mesh.rotation.z += shard.spin.z / 60;
+      (shard.mesh.material as THREE.MeshBasicMaterial).opacity = 0.74 * (1 - age / 0.9);
+    }
+    requestAnimationFrame(animate);
+  };
+  requestAnimationFrame(animate);
+}
+
+function breakHouseWindow(
+  windowId: string,
+  point: THREE.Vector3,
+  normal: THREE.Vector3,
+  replicate: boolean,
+  origin = camera.getWorldPosition(new THREE.Vector3()),
+  kind: WindowBreakMessage['kind'] = 'shot',
+  actionNonce?: number,
+): boolean {
+  const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
+  if (!window || window.broken) return false;
+  window.broken = true;
+  window.mesh.visible = false;
+  spawnImpactFlash(point, 'glass', normal);
+  spawnGlassShards(point, normal);
+  audio.impact('glass', point.distanceTo(camera.position));
+  if (replicate) {
+    const message: WindowBreakMessage = {
+      type: 'window-break',
+      by: player.id,
+      windowId,
+      origin: origin.toArray(),
+      kind,
+      ...(kind === 'explosive' ? { actionNonce } : {}),
+      nonce: randomNonce(),
+    };
+    network.send(message);
+  }
+  return true;
+}
+
+function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
+  if (message.by === player.id || processedNonces.has(message.nonce)) return;
+  const remote = remotes.get(message.by);
+  const window = arena.breakableWindows.find((candidate) => candidate.id === message.windowId);
+  if (!remote || !window || window.broken) return;
+  const origin = new THREE.Vector3(...message.origin);
+  const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  const explosive = message.kind === 'explosive';
+  const senderOriginLimit = explosive ? 36 : 2.8;
+  if (!pointInsideBounds(origin, arena.bounds, 0.44)
+    || origin.distanceTo(sender) > senderOriginLimit
+    || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
+    || !explosive && origin.distanceTo(centre) > 110
+    || windowBreakPathBlocked(origin, centre, arena.colliders)) return;
+  if (explosive && !localMultiplayerQa) {
+    const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+    if (!grenadeAuthority || !Number.isFinite(message.actionNonce)) return;
+    const admission = admitRemoteGrenadeExplosion(grenadeAuthority, {
+      actionNonce: message.actionNonce!,
+      explosionOrigin: message.origin,
+      now: performance.now(),
+    });
+    if (!admission.accepted) return;
+    remoteGrenadeAuthorities.set(message.by, admission.state);
+  }
+  processedNonces.add(message.nonce);
+  const normal = centre.clone().sub(origin).normalize().multiplyScalar(-1);
+  breakHouseWindow(message.windowId, centre, normal, false, origin);
+  trimNonceSet();
+}
+
+function resetBreakableWindows(): void {
+  for (const window of arena.breakableWindows) {
+    window.broken = false;
+    window.mesh.visible = true;
   }
 }
 
 function processDeath(message: DeathMessage): void {
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
+  spawnDeathDrop(message);
+  if (message.victim === player.id && player.alive) {
+    const now = performance.now();
+    interruptReload(true, now);
+    player.hp = 0;
+    player.alive = false;
+    if (gameMode === 'solo') player.deaths += 1;
+    fieldSupport = recordSupportDeath(fieldSupport);
+    updateFieldSupportHud();
+    document.exitPointerLock();
+  }
+  if (message.victim === player.id) scheduleLocalRespawn();
+  if (message.killer !== message.victim) {
+    const killerAuthority = remoteSupportAuthorities.get(message.killer);
+    if (killerAuthority) remoteSupportAuthorities.set(message.killer, recordRemoteSupportElimination(killerAuthority));
+  }
+  const victimAuthority = remoteSupportAuthorities.get(message.victim);
+  if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
+  if (remoteGrenadeAuthorities.has(message.victim)) remoteGrenadeAuthorities.set(message.victim, resetRemoteGrenadeAuthorityState());
+  if (network.role === 'host' && message.killer !== message.victim) {
+    const killerMember = hostLobbyMembers.get(message.killer);
+    const victimMember = hostLobbyMembers.get(message.victim);
+    if (killerMember && victimMember && areCombatantsHostile(killerMember.id, killerMember.team, victimMember.id, victimMember.team)) {
+      const killerScore = authoritativeScores.get(message.killer) ?? emptyPlayerScore(message.killer);
+      const victimScore = authoritativeScores.get(message.victim) ?? emptyPlayerScore(message.victim);
+      authoritativeScores.set(message.killer, { ...killerScore, kills: killerScore.kills + 1 });
+      authoritativeScores.set(message.victim, { ...victimScore, deaths: victimScore.deaths + 1 });
+      const hostScore = authoritativeScores.get(player.id);
+      if (hostScore) {
+        player.kills = hostScore.kills;
+        player.deaths = hostScore.deaths;
+      }
+      sendAuthoritativeScores();
+    }
+  }
   if (message.killer === player.id && message.victim !== player.id) {
-    player.kills += 1;
+    if (gameMode === 'solo') player.kills += 1;
+    awardSupportElimination();
     audio.kill();
+  } else if (message.victim === player.id && message.killer !== player.id) {
+    const remoteKiller = remotes.get(message.killer);
+    if (remoteKiller && areCombatantsHostile(remoteKiller.snapshot.id, remoteKiller.snapshot.team, player.id, player.team)) {
+      verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
+    }
   }
   addFeed(`${killer} eliminated ${victim}`, message.killer === player.id ? 'gold' : undefined);
   const remote = remotes.get(message.victim);
-  if (remote) remote.root.visible = false;
+  if (remote) {
+    remote.snapshot = { ...remote.snapshot, hp: 0 };
+    remote.root.visible = false;
+  }
   const bot = bots.get(message.victim);
   if (bot) bot.root.visible = false;
   checkMatchEnd();
@@ -508,30 +3015,87 @@ function removeRemote(id: string, reason: string): void {
   if (!remote) return;
   scene.remove(remote.root);
   remotes.delete(id);
+  verifiedRemoteKills.delete(id);
+  remoteShotAdmissions.delete(id);
+  admittedRemoteShots.delete(id);
+  admittedRemoteMelees.delete(id);
+  admittedRemoteExplosions.delete(id);
+  remoteSupportAuthorities.delete(id);
+  remoteGrenadeAuthorities.delete(id);
+  remoteHealthAuthorities.delete(id);
+  remoteMeleeAdmissions.delete(id);
+  remotePingAdmissions.delete(id);
+  authorizedRemotePickups.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
 function spawnPoint(): THREE.Vector3 {
-  const options = arena.spawns[player.team];
-  const preferredIndex = gameMode === 'client' ? Math.min(1, options.length - 1) : gameMode === 'host' ? 0 : player.deaths % options.length;
-  const occupied = [...remotes.values()].map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z));
+  const otherPlayers = [
+    ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
+      .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
+    ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
+  ];
   const threats = [
     ...[...remotes.values()]
-      .filter((remote) => remote.snapshot.team !== player.team && remote.snapshot.hp > 0)
+      .filter((remote) => areCombatantsHostile(remote.snapshot.id, remote.snapshot.team, player.id, player.team) && remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
     ...[...bots.values()]
       .filter((bot) => bot.team !== player.team && bot.alive)
       .map((bot) => bot.position.clone().add(new THREE.Vector3(0, 1.42, 0))),
   ];
-  const scored = options.map((point, index) => {
-    const nearestDistance = threats.length === 0 ? 0 : Math.min(...threats.map((threat) => threat.distanceToSquared(point)));
-    const visibleThreats = threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length;
-    const occupiedPenalty = occupied.some((position) => position.distanceToSquared(point) < 20) ? 10_000 : 0;
-    const rolePreference = index === preferredIndex ? 1 : 0;
-    return { point, score: nearestDistance - visibleThreats * 900 - occupiedPenalty + rolePreference };
-  });
-  scored.sort((a, b) => b.score - a.score);
-  return scored[0].point.clone();
+  const validForSide = (side: Team) => arena.spawns[side]
+    .map((point, localIndex) => ({ point, side, index: side * 100 + localIndex }))
+    .filter(({ point }) => {
+      const bodyPoint = { x: point.x, y: 0, z: point.z };
+      return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
+        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
+        && !isBlocked(bodyPoint, arena.colliders, 0.44);
+    });
+  const home = validForSide(player.team);
+  const oppositeTeam: Team = player.team === 0 ? 1 : 0;
+  const opposite = validForSide(oppositeTeam);
+  if (home.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  const pressure = (options: ReturnType<typeof validForSide>) => {
+    const scored = options.map(({ point }) => ({
+      visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
+      nearestThreatDistanceSq: threats.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...threats.map((threat) => threat.distanceToSquared(point))),
+    }));
+    const minimumVisibleThreats = Math.min(...scored.map((entry) => entry.visibleThreats));
+    return {
+      minimumVisibleThreats,
+      safestNearestThreatDistanceSq: Math.max(...scored.filter((entry) => entry.visibleThreats === minimumVisibleThreats).map((entry) => entry.nearestThreatDistanceSq)),
+    };
+  };
+  const instantaneousFlip = threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const flipDecision = advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
+  spawnFlipHysteresis[player.team] = flipDecision.state;
+  const flipped = flipDecision.flip;
+  const valid = flipped ? opposite : home;
+  const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < 20));
+  const selectable = unoccupied.length > 0 ? unoccupied : valid;
+  const candidates = selectable.map(({ point, index }) => ({
+    index,
+    nearestPlayerDistanceSq: otherPlayers.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...otherPlayers.map((other) => other.distanceToSquared(point))),
+    visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
+  }));
+  const previousIndex = lastPlayerSpawnIndex;
+  const selectedIndex = selectFarthestSpawnCandidate(candidates, gameplayRandom(), 3, previousIndex);
+  const minimumVisibleThreats = Math.min(...candidates.map((candidate) => candidate.visibleThreats));
+  const selected = candidates.find((candidate) => candidate.index === selectedIndex)!;
+  const selectedSpawn = valid.find(({ index }) => index === selectedIndex)!;
+  lastPlayerSpawnAudit = {
+    previousIndex,
+    selectedIndex,
+    selectedVisibleThreats: selected.visibleThreats,
+    minimumVisibleThreats,
+    safeTierCount: candidates.filter((candidate) => candidate.visibleThreats === minimumVisibleThreats).length,
+    selectedSide: selectedSpawn.side,
+    flipped,
+  };
+  lastPlayerSpawnIndex = selectedIndex;
+  return selectedSpawn.point.clone();
 }
 
 function requestGamePointerLock(): void {
@@ -544,8 +3108,9 @@ function requestGamePointerLock(): void {
 }
 
 function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): boolean {
-  if (!characterPhysics || !player.alive || !playerGrounded) return false;
+  if (!characterPhysics || !player.alive) return false;
   const target = nextStance(player.stance, action);
+  if (!playerGrounded && target !== 'crouch') return false;
   if (target === player.stance) return true;
   const previous = player.stance;
   const before = characterPhysics.eyePosition();
@@ -563,6 +3128,9 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
 }
 
 function respawn(requestLock = true): void {
+  if (respawnTimer) clearTimeout(respawnTimer);
+  respawnTimer = null;
+  interruptReload(true);
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
   player.position.copy(spawnPoint());
@@ -570,11 +3138,12 @@ function respawn(requestLock = true): void {
   player.velocity.set(0, 0, 0);
   player.hp = 100;
   lastDamageAt = -10_000;
-  player.grenades = 1;
+  player.grenades = 2;
   player.reloadState = null;
   player.alive = true;
+  respawnEndsAt = 0;
   player.invulnerableUntil = performance.now() + 1350;
-  player.yaw = player.team === 0 ? Math.PI : 0;
+  player.yaw = operatorYawToward({ x: player.position.x, z: player.position.z }, { x: 0, z: 0 });
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
   stanceRecoveryUntil = 0;
@@ -583,37 +3152,124 @@ function respawn(requestLock = true): void {
   cameraHeightOffset = 0;
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
+  footstepAccumulator = { distance: 0, side: 0 };
+  const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
+  player.primaryWeapon = deploymentWeapon;
+  for (const weapon of deployedWeapons(deploymentWeapon)) {
+    player.ammo[weapon] = WEAPONS[weapon].mag;
+    player.reserve[weapon] = WEAPONS[weapon].reserve;
+  }
+  if (player.weapon !== player.primaryWeapon) {
+    player.weapon = player.primaryWeapon;
+    player.switchingUntil = 0;
+    weaponView.setWeapon(player.primaryWeapon, true);
+  }
+  renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
   if (gameStarted && requestLock) requestGamePointerLock();
   network.send({ type: 'state', player: snapshot() });
 }
 
-function startGame(mode: 'solo' | 'host' | 'client', requestLock = true): void {
-  player.name = sanitizeName(element<HTMLInputElement>('#player-name').value);
+function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtEpochMs?: number): void {
+  if (mode !== 'solo' && !selectedArena.multiplayer) {
+    setStatus(`${selectedArena.displayName} is solo-only.`, 'warn');
+    return;
+  }
+  const requiredName = requirePlayerName();
+  if (!requiredName) return;
+  player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  syncArenaSelectionUi();
+  bestStreakThisMatch = 0;
+  matchScoreRecorded = false;
+  targetHits = 0;
+  rangeScore = 0;
+  rangeShotsFired = 0;
+  for (const target of arena.targets) {
+    target.active = true;
+    target.health = target.maxHealth;
+    target.respawnAt = 0;
+    target.root.visible = true;
+  }
+  refreshWarningUntil = performance.now() + 6_000;
   weaponView.root.visible = true;
   gameMode = mode;
+  lastPlayerSpawnIndex = -1;
+  lastPlayerSpawnAudit = null;
+  spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
-  matchState = createMatch(performance.now());
+  const matchStartedAt = performance.now();
+  const matchRules = currentMatchRules();
+  if (mode !== 'solo' && activeAtEpochMs !== undefined) {
+    const activeAt = localPerformanceAtHostEpoch(activeAtEpochMs, mode === 'host' ? 0 : hostClockOffsetMs, Date.now(), matchStartedAt);
+    if (matchStartedAt < activeAt) {
+      matchState = {
+        phase: 'warmup',
+        phaseStartedAt: activeAt - MATCH_WARMUP_MS,
+        endsAt: activeAt,
+        winner: null,
+      };
+    } else {
+      matchState = {
+        phase: 'active',
+        phaseStartedAt: activeAt,
+        endsAt: matchRules.durationMs === null ? Number.POSITIVE_INFINITY : activeAt + (matchRules.durationMs ?? 0),
+        winner: null,
+      };
+    }
+  } else {
+    matchState = createMatch(matchStartedAt, matchRules);
+  }
+  overdriveState = createOverdriveState(activeAtEpochMs === undefined
+    ? matchStartedAt
+    : localPerformanceAtHostEpoch(activeAtEpochMs, mode === 'host' ? 0 : hostClockOffsetMs, Date.now(), matchStartedAt));
+  overdriveClaimGeneration = -1;
+  overdriveSpawns = 0;
+  overdrivePickups = 0;
+  overdriveExpiries = 0;
+  overdriveRoot.visible = false;
+  element<HTMLElement>('#overdrive-hud').hidden = true;
   matchFinished = false;
+  previousHudScores = [0, 0];
+  if (respawnTimer) clearTimeout(respawnTimer);
+  respawnTimer = null;
+  respawnEndsAt = 0;
   menu.classList.add('hidden');
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = mode === 'solo' ? 'BOT SKIRMISH' : mode === 'host' ? 'HOST' : 'PEER';
+  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+    ? 'SOLO RANGE'
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
+  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTWORKS DUEL' : 'RUSTWORKS MATCH') : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
+  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
+  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
+  element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
+  element<HTMLElement>('#ping-block').hidden = !selectedArena.multiplayer;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
   respawn(requestLock);
   if (mode === 'solo') spawnBots();
   audio.unlock();
-  addFeed('Welcome to Atomic Acres', 'gold');
-  if (mode !== 'solo') network.send({ type: 'join', player: snapshot() });
+  addFeed(`Welcome to ${arena.label}`, 'gold');
+  if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
+  if (mode !== 'solo') {
+    network.send({ type: 'join', player: snapshot() });
+    sendLeaderboardSync();
+    if (mode === 'host') broadcastOverdriveState(matchStartedAt);
+  }
 }
 
 function randomNonce(): number {
-  return Math.floor(performance.now() * 1000 + Math.random() * 1_000_000);
+  return Math.floor(performance.now() * 1000 + protocolRandom() * 1_000_000);
+}
+
+function endSpawnProtectionOnOffense(now: number): void {
+  if (now < player.invulnerableUntil) player.invulnerableUntil = 0;
 }
 
 function switchWeapon(index: number): void {
-  const id = WEAPON_ORDER[index];
+  const equippedWeapons = deployedWeapons(player.primaryWeapon);
+  const id = equippedWeapons[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -631,20 +3287,26 @@ function reload(): void {
   if (!player.alive || matchState.phase !== 'active') return;
   const spec = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
-  if (player.reloadState || ammo >= spec.mag || player.reserve[player.weapon] <= 0) return;
-  player.reloadState = beginReload(spec, ammo, player.reserve[player.weapon], performance.now());
+  const availableReserve = reloadSupply(selectedArena.id, player.reserve[player.weapon], spec.mag);
+  if (player.reloadState || ammo >= spec.mag || availableReserve <= 0) return;
+  player.reloadState = beginReload(spec, ammo, availableReserve, performance.now());
+  weaponActionHistory.length = 0;
   audio.reload();
-  weaponView.reload(spec.reload);
+  weaponView.reload();
   addFeed(`Reloading ${spec.name}`);
 }
 
 function finishReload(now: number): void {
   if (!player.reloadState) return;
-  const state = completeReloadState(player.reloadState, now, player.ammo[player.weapon], player.reserve[player.weapon]);
+  const spec = WEAPONS[player.weapon];
+  const currentReserve = player.reserve[player.weapon];
+  const availableReserve = reloadSupply(selectedArena.id, currentReserve, spec.mag);
+  const state = completeReloadState(player.reloadState, now, player.ammo[player.weapon], availableReserve);
   if (state.completed) {
     player.ammo[player.weapon] = state.ammo;
-    player.reserve[player.weapon] = state.reserve;
+    player.reserve[player.weapon] = reserveAfterCompletedReload(selectedArena.id, currentReserve, state.reserve);
     player.reloadState = null;
+    weaponView.cancelReload();
   }
 }
 
@@ -670,6 +3332,9 @@ function tryFire(now: number): void {
   if (!triggerHeld && spec.automatic) return;
   if (now < player.switchingUntil) return;
   if (player.reloadState) {
+    // An empty magazine must finish its automatic reload even if the player
+    // keeps the trigger held. Non-empty tactical reloads remain cancellable.
+    if (player.ammo[player.weapon] <= 0) return;
     if (!cancelReload(player.reloadState, now)) return;
     player.reloadState = null;
     weaponView.cancelReload();
@@ -678,6 +3343,7 @@ function tryFire(now: number): void {
   if (now < player.nextShotAt) return;
   if (player.nextShotAt === 0 || now - player.nextShotAt > shotInterval * 2) player.nextShotAt = now;
   player.nextShotAt += shotInterval;
+  endSpawnProtectionOnOffense(now);
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
     reload();
@@ -686,11 +3352,18 @@ function tryFire(now: number): void {
   }
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
-  player.ammo[player.weapon] -= 1;
+  player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
+  if (isGunRange(selectedArena.id)) rangeShotsFired += 1;
+  if (player.ammo[player.weapon] === 0) {
+    const emptiedWeapon = player.weapon;
+    window.setTimeout(() => {
+      if (player.weapon === emptiedWeapon && player.ammo[emptiedWeapon] === 0) reload();
+    }, 110);
+  }
   const ammoDisplay = element<HTMLElement>('#ammo');
   ammoDisplay.classList.remove('fired');
   requestAnimationFrame(() => ammoDisplay.classList.add('fired'));
-  const recoil = computeRecoilImpulse(spec, player.sustainedShots, Math.random());
+  const recoil = computeRecoilImpulse(spec, player.sustainedShots, gameplayRandom());
   recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
   recoilCamera.yaw = THREE.MathUtils.clamp(recoilCamera.yaw + recoil.yaw, -0.075, 0.075);
   recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
@@ -700,26 +3373,53 @@ function tryFire(now: number): void {
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const baseDirection = camera.getWorldDirection(new THREE.Vector3());
   const moving = Math.hypot(player.velocity.x, player.velocity.z) > 1.2;
+  const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
   const spread = computeSpread(spec, {
-    ads: adsHeld,
+    ads: adsSettled,
     moving,
     crouched: player.stance === 'crouch',
     prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
+  const pelletDirections: [number, number, number][] = [];
+  let impactAudioPlayed = false;
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
-    const sample = sampleSpreadDisk(spread, Math.random(), Math.random());
+    const sample = sampleWeaponPellet(spec, pellet, spread, gameplayRandom(), gameplayRandom());
     const direction = baseDirection.clone()
       .addScaledVector(cameraRight, sample.x)
       .addScaledVector(cameraUp, sample.y)
       .normalize();
+    pelletDirections.push(direction.toArray() as [number, number, number]);
+    if (pellet === 0) {
+      lastPrincipalShotAlignment = {
+        weapon: player.weapon,
+        angularError: direction.angleTo(baseDirection),
+        sample: [sample.x, sample.y],
+        direction: direction.toArray(),
+        cameraDirection: baseDirection.toArray(),
+      };
+    }
     const result = castShot(origin, direction);
-    spawnTracer(origin, direction, result.distance, spec.color);
-    if (!result.playerId && !result.targetId && result.distance < 89) {
-      spawnImpactFlash(origin.clone().addScaledVector(direction, result.distance));
+    const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
+    const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
+    spawnTracer(visualStart, authoritativeEnd, spec.color);
+    if (result.windowId) {
+      const point = result.impactPoint ?? authoritativeEnd;
+      const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
+      if (breakHouseWindow(result.windowId, point, normal, true, origin)) impactAudioPlayed = true;
+    }
+    if (!result.playerId && !result.targetId && !result.windowId && result.distance < 89) {
+      const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
+      const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
+      const surface = result.impactSurface ?? 'concrete';
+      spawnImpactFlash(point, surface, normal);
+      if (!impactAudioPlayed) {
+        impactAudioPlayed = true;
+        audio.impact(surface, point.distanceTo(camera.position));
+      }
     }
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
@@ -727,19 +3427,9 @@ function tryFire(now: number): void {
       const prior = hitDamage.get(result.playerId);
       hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
     }
-    if (result.targetId) hitPracticeTarget(result.targetId);
-  }
-  for (const [target, hit] of hitDamage) {
-    const bot = bots.get(target);
-    if (bot) applyBotDamage(bot, Math.min(100, hit.damage), hit.zone);
-    else {
-      const remote = remotes.get(target);
-      if (remote && remote.snapshot.team !== player.team) {
-        const nonce = randomNonce();
-        network.send({ type: 'hit', by: player.id, target, damage: Math.min(100, hit.damage), nonce });
-        showHitmarker(hit.zone === 'head');
-        audio.hit(hit.zone === 'head');
-      }
+    if (result.targetId) {
+      const zone = result.hitZone ?? 'body';
+      hitPracticeTarget(result.targetId, computeDamage(spec, result.distance, zone), zone);
     }
   }
   const shot: ShotMessage = {
@@ -748,65 +3438,331 @@ function tryFire(now: number): void {
     weapon: player.weapon,
     origin: origin.toArray() as [number, number, number],
     direction: baseDirection.toArray() as [number, number, number],
+    pelletDirections,
     nonce: randomNonce(),
   };
+  // Reliable channels preserve this admission event ahead of its correlated hit claims.
   network.send(shot);
-  if (player.ammo[player.weapon] === 0) setTimeout(reload, 120);
+  for (const [target, hit] of hitDamage) {
+    const poweredDamage = outgoingDamage(hit.damage, now);
+    const bot = bots.get(target);
+    if (bot) applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+    else {
+      const remote = remotes.get(target);
+      if (remote && areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team)) {
+        const remoteOperator = remote.root.userData.operator as THREE.Group | undefined;
+        if (remoteOperator) reactOperator(remoteOperator, hit.zone);
+        const nonce = randomNonce();
+        const dealt = Math.min(100, hit.damage);
+        const powered = Math.min(100, poweredDamage);
+        sendAuthoritativeHit({
+          type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
+          actionNonce: shot.nonce, nonce,
+        });
+        showHitmarker(hit.zone === 'head');
+        audio.hit(hit.zone === 'head');
+        const zoneTag = hit.zone === 'head' ? 'HEADSHOT' : hit.zone === 'limb' ? 'LIMB' : 'BODY';
+        const overdriveTag = powered > dealt + 0.5 ? ` · OD×${Math.round(powered / Math.max(1, dealt))}` : '';
+        addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · ${zoneTag} · ${dealt} DMG${overdriveTag}`, hit.zone === 'head' ? 'gold' : undefined);
+      }
+    }
+  }
 }
 
-function castShot(origin: THREE.Vector3, direction: THREE.Vector3): { distance: number; playerId?: string; targetId?: string; hitZone?: HitZone } {
+type ShotCastResult = {
+  distance: number;
+  playerId?: string;
+  targetId?: string;
+  windowId?: string;
+  hitZone?: HitZone;
+  impactPoint?: THREE.Vector3;
+  impactNormal?: THREE.Vector3;
+  impactSurface?: ImpactSurface;
+};
+
+function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResult {
   const ray = new THREE.Raycaster(origin, direction, 0.1, 110);
+  ray.camera = camera;
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
   const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
   const activeTargets = arena.targets.filter((target) => target.active).map((target) => target.root);
-  const intersections = ray.intersectObjects([...arena.raycastMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
+  const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+  const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
+    const windowId = object.userData.breakableWindowId;
+    return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
+  });
+  const intersections = ray.intersectObjects([...activeWorldMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
   const first = intersections[0];
   if (!first) return { distance: 90 };
   let node: THREE.Object3D | null = first.object;
   let playerId: string | undefined;
   let targetId: string | undefined;
+  let windowId: string | undefined;
   let hitZone: HitZone | undefined;
+  let surfaceHint: unknown;
+  const names: string[] = [];
   while (node) {
     playerId ??= node.userData.playerId as string | undefined;
     targetId ??= node.userData.targetId as string | undefined;
+    windowId ??= node.userData.breakableWindowId as string | undefined;
     hitZone ??= node.userData.hitZone as HitZone | undefined;
+    surfaceHint ??= node.userData.impactSurface;
+    if (node.name) names.push(node.name);
     node = node.parent;
   }
   const targetRoot = first.object.userData.targetRoot as THREE.Group | undefined;
   targetId ??= targetRoot?.userData.targetId as string | undefined;
-  return { distance: Math.min(first.distance, 110), playerId, targetId, hitZone };
+  const objectMaterial = first.object instanceof THREE.Mesh
+    ? (Array.isArray(first.object.material) ? first.object.material[0] : first.object.material)
+    : undefined;
+  const metalness = objectMaterial instanceof THREE.MeshStandardMaterial ? objectMaterial.metalness : undefined;
+  const impactNormal = first.face?.normal.clone().transformDirection(first.object.matrixWorld)
+    ?? direction.clone().multiplyScalar(-1);
+  return {
+    distance: Math.min(first.distance, 110),
+    playerId,
+    targetId,
+    windowId,
+    hitZone,
+    impactPoint: first.point.clone(),
+    impactNormal,
+    impactSurface: classifyImpactSurface({ hint: surfaceHint, name: names.join(' '), metalness }),
+  };
+}
+
+function selectSafeBotSpawn(team: Team): THREE.Vector3 {
+  const otherPlayers = [
+    ...(player.alive ? [player.position.clone()] : []),
+    ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
+    ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
+  ];
+  const threats = [
+    ...(player.alive && player.team !== team ? [player.position.clone()] : []),
+    ...[...remotes.values()]
+      .filter((remote) => remote.snapshot.team !== team && remote.snapshot.hp > 0)
+      .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
+  ];
+  const validForSide = (side: Team) => arena.spawns[side]
+    .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
+    .filter(({ candidate }) => {
+      const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+      return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
+        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
+        && !isBlocked(bodyPoint, arena.colliders, 0.44);
+    });
+  const home = validForSide(team);
+  const opposite = validForSide(team === 0 ? 1 : 0);
+  if (home.length === 0) throw new Error(`No valid authored spawn for team ${team}`);
+  const pressure = (options: ReturnType<typeof validForSide>) => {
+    const scores = options.map(({ candidate }) => ({
+      visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
+      distance: threats.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...threats.map((threat) => threat.distanceToSquared(candidate))),
+    }));
+    const minimumVisibleThreats = Math.min(...scores.map((score) => score.visibleThreats));
+    return {
+      minimumVisibleThreats,
+      safestNearestThreatDistanceSq: Math.max(...scores.filter((score) => score.visibleThreats === minimumVisibleThreats).map((score) => score.distance)),
+    };
+  };
+  const instantaneousFlip = threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const flipDecision = advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
+  spawnFlipHysteresis[team] = flipDecision.state;
+  const valid = flipDecision.flip ? opposite : home;
+  const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < 20));
+  const selectable = unoccupied.length > 0 ? unoccupied : valid;
+  const selectedIndex = selectFarthestSpawnCandidate(selectable.map(({ candidate, index }) => ({
+    index,
+    nearestPlayerDistanceSq: otherPlayers.length === 0
+      ? Number.POSITIVE_INFINITY
+      : Math.min(...otherPlayers.map((other) => other.distanceToSquared(candidate))),
+    visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
+  })), gameplayRandom(), 3, lastBotSpawnIndices.get(team) ?? -1);
+  lastBotSpawnIndices.set(team, selectedIndex);
+  return valid.find(({ index }) => index === selectedIndex)!.candidate;
+}
+
+let botHazeTexture: THREE.CanvasTexture | null = null;
+
+function neonBotHazeTexture(): THREE.CanvasTexture {
+  if (botHazeTexture) return botHazeTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas 2D context unavailable for neon bot haze');
+  const gradient = context.createRadialGradient(64, 64, 5, 64, 64, 62);
+  gradient.addColorStop(0, 'rgba(255,214,255,0.9)');
+  gradient.addColorStop(0.2, 'rgba(227,112,255,0.72)');
+  gradient.addColorStop(0.5, 'rgba(171,43,255,0.32)');
+  gradient.addColorStop(1, 'rgba(104,0,191,0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 128, 128);
+  botHazeTexture = new THREE.CanvasTexture(canvas);
+  botHazeTexture.name = 'neon-purple-bot-haze-texture';
+  botHazeTexture.colorSpace = THREE.SRGBColorSpace;
+  botHazeTexture.needsUpdate = true;
+  return botHazeTexture;
+}
+
+function addNeonBotHaze(root: THREE.Group, index: number): void {
+  const haze = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: neonBotHazeTexture(),
+    color: 0xec8cff,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  }));
+  haze.name = 'neon-purple-bot-haze';
+  haze.position.y = 1.24;
+  haze.scale.set(2.35, 3.15, 1);
+  haze.userData.presentationOnly = true;
+  haze.userData.blocksShots = false;
+  haze.userData.phase = index * Math.PI;
+  haze.raycast = () => undefined;
+  root.userData.neonBotHaze = true;
+  root.add(haze);
+}
+
+const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
+
+function spawnBot(index: number): void {
+  const botTeam: Team = player.team === 0 ? 1 : 0;
+  const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
+  const id = `bot-${index}`;
+  const weapon = botWeaponAssignments[index] ?? assignBotWeapons(1, gameplayRandom)[0];
+  const spawnedAt = performance.now();
+  // Every reinforcement uses the same source-rigged humanoid and approved
+  // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
+  const root = buildOperator(botTeam, 'bot-operator', true, weapon, true, 'neon-purple');
+  addNeonBotHaze(root, index);
+  root.traverse((node) => {
+    if (node instanceof THREE.Mesh) node.castShadow = false;
+  });
+  if (!reducedRenderMode && index === 0) {
+    const shadowProxy = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.48, 1.1, 4, 8),
+      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+    );
+    shadowProxy.name = 'lead-bot-shadow-proxy';
+    shadowProxy.position.y = 1.05;
+    shadowProxy.castShadow = true;
+    shadowProxy.userData.presentationOnly = true;
+    shadowProxy.userData.blocksShots = false;
+    shadowProxy.raycast = () => undefined;
+    root.add(shadowProxy);
+  }
+  root.userData.playerId = id;
+  root.traverse((node) => {
+    node.userData.playerId = id;
+    node.userData.targetRoot = root;
+  });
+  const spawn = selectSafeBotSpawn(botTeam);
+  const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
+  root.position.copy(position);
+  scene.add(root);
+  bots.set(id, {
+    id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
+    kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
+    sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
+    invulnerableUntil: spawnedAt + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
+    weapon, nextGrenadeAt: spawnedAt + 5_000 + gameplayRandom() * 3_000, grenadeActive: false,
+  });
+}
+
+function prewarmDormantBotPresentations(): void {
+  if (dormantBots.size === 0) {
+    dormantBotsPrewarmed = true;
+    return;
+  }
+  for (const bot of dormantBots.values()) {
+    bot.root.visible = true;
+    bot.root.scale.setScalar(0.0001);
+  }
+  try {
+    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
+    dormantBotsPrewarmed = true;
+  } finally {
+    for (const bot of dormantBots.values()) {
+      bot.root.visible = false;
+      bot.root.scale.setScalar(1);
+    }
+  }
+}
+
+function activateDormantBot(index: number): boolean {
+  const id = `bot-${index}`;
+  const bot = dormantBots.get(id);
+  if (!bot) return false;
+  dormantBots.delete(id);
+  const now = performance.now();
+  const spawn = selectSafeBotSpawn(bot.team);
+  bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
+  bot.root.position.copy(bot.position);
+  bot.root.scale.setScalar(1);
+  bot.root.visible = true;
+  bot.hp = 100;
+  bot.alive = true;
+  bot.invulnerableUntil = now + 1_000;
+  bot.respawnAt = 0;
+  bot.deathVisibleUntil = 0;
+  bot.lastShotAt = 0;
+  bot.lastSightAt = 0;
+  bot.hasLineOfSight = false;
+  bot.sightStartedAt = 0;
+  bot.burstShots = 0;
+  bot.nextDecisionAt = 0;
+  bot.blockedSince = 0;
+  resetOperator(bot.root);
+  bots.set(id, bot);
+  return true;
 }
 
 function spawnBots(): void {
   clearBots();
-  const botTeam: Team = player.team === 0 ? 1 : 0;
-  const names = ['RIVET', 'MABEL', 'BOLT', 'TANGO'];
-  const spawnOptions = arena.spawns[botTeam];
-  names.forEach((name, index) => {
-    const id = `bot-${index}`;
-    const root = buildOperator(botTeam, 'bot-operator', reducedRenderMode);
-    root.userData.playerId = id;
-    root.traverse((node) => {
-      node.userData.playerId = id;
-      node.userData.targetRoot = root;
-    });
-    const spawn = spawnOptions[index % spawnOptions.length];
-    const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
-    root.position.copy(position);
-    scene.add(root);
-    bots.set(id, {
-      id, name, team: botTeam, root, position, velocity: new THREE.Vector3(), hp: 100, alive: true,
-      kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
-      sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
-      invulnerableUntil: performance.now() + 1_000, respawnAt: 0, waypoint: index,
-    });
-  });
-  addFeed('Four hostile operators entered the block', 'coral');
+  botWeaponAssignments = assignBotWeapons(selectedArena.maximumSoloBots, gameplayRandom);
+  botGrenadeThrows = 0;
+  botGrenadeMaxActive = 0;
+  lastBotGrenadeDamage = 0;
+  soloBotDeaths = 0;
+  dormantBotsPrewarmed = false;
+  for (let index = 0; index < selectedArena.soloBotCount; index += 1) spawnBot(index);
+  const activeSpawnHistory = new Map(lastBotSpawnIndices);
+  for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
+    spawnBot(index);
+    const bot = bots.get(`bot-${index}`)!;
+    bots.delete(bot.id);
+    bot.alive = false;
+    bot.root.visible = false;
+    dormantBots.set(bot.id, bot);
+  }
+  lastBotSpawnIndices.clear();
+  for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
+  prewarmDormantBotPresentations();
+  if (selectedArena.soloBotCount > 0) {
+    addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
+  }
+}
+
+function spawnEarnedBotReinforcement(): void {
+  const target = activeSoloBotTarget(selectedArena, soloBotDeaths);
+  if (bots.size >= target) return;
+  const index = bots.size;
+  if (!activateDormantBot(index)) spawnBot(index);
+  addFeed(`HOSTILE REINFORCEMENT · ${bots.size} RIVALS NOW ACTIVE`, 'coral');
 }
 
 function clearBots(): void {
   for (const bot of bots.values()) scene.remove(bot.root);
+  for (const bot of dormantBots.values()) scene.remove(bot.root);
   bots.clear();
+  dormantBots.clear();
+  dormantBotsPrewarmed = false;
+  soloBotDeaths = 0;
+  lastBotSpawnIndices.clear();
+  botWeaponAssignments = [];
 }
 
 function botHasLineOfSight(bot: BotPlayer): boolean {
@@ -815,27 +3771,104 @@ function botHasLineOfSight(bot: BotPlayer): boolean {
   return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
 }
 
+function activeBotGrenadeCount(): number {
+  return grenades.reduce((count, grenade) => count + (grenade.ownerKind === 'bot' ? 1 : 0), 0);
+}
+
+function releaseBotGrenadeOwner(entity: GrenadeEntity): void {
+  if (entity.ownerKind !== 'bot') return;
+  const owner = bots.get(entity.ownerId) ?? dormantBots.get(entity.ownerId);
+  if (owner) owner.grenadeActive = false;
+}
+
+function throwBotGrenade(bot: BotPlayer, now: number, fuseMs = 2_300, target = player.position): boolean {
+  if (!bot.alive || bot.grenadeActive || activeBotGrenadeCount() > 0) return false;
+  const origin = bot.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+  const targetGroundY = Math.max(0.18, target.y - stanceEyeHeight(player.stance) + 0.18);
+  const targetGround = new THREE.Vector3(target.x, targetGroundY, target.z);
+  const horizontalDistance = Math.hypot(targetGround.x - origin.x, targetGround.z - origin.z);
+  const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
+  const velocity = targetGround.clone().sub(origin).divideScalar(flightTime);
+  velocity.y += 9 * flightTime;
+  const mesh = createGrenadePresentation();
+  mesh.position.copy(origin);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  grenades.push({
+    mesh,
+    velocity,
+    angularVelocity: new THREE.Vector3(7.6, 5.8, 9.4),
+    explodeAt: now + Math.max(120, fuseMs),
+    lastBounceAt: 0,
+    actionNonce: randomNonce(),
+    ownerKind: 'bot',
+    ownerId: bot.id,
+  });
+  bot.grenadeActive = true;
+  bot.nextGrenadeAt = now + BOT_GRENADE_COOLDOWN_MS;
+  botGrenadeThrows += 1;
+  botGrenadeMaxActive = Math.max(botGrenadeMaxActive, activeBotGrenadeCount());
+  addFeed(`${bot.name} THREW FRAG`, 'coral');
+  return true;
+}
+
+function selectBotTacticalWaypoint(bot: BotPlayer): number {
+  const target = { x: player.position.x, y: player.position.y, z: player.position.z };
+  return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
+    const eye = { x: point.x, y: 1.42, z: point.z };
+    return {
+      index,
+      distanceFromBot: point.distanceTo(bot.position),
+      distanceFromPlayer: point.distanceTo(player.position),
+      seesPlayer: player.alive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
+    };
+  }), bot.waypoint, bot.deaths + bot.kills);
+}
+
 function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return;
+  reactOperator(bot.root, zone);
+  const dealt = Math.min(bot.hp, Math.max(0, damage));
   bot.hp = Math.max(0, bot.hp - damage);
   showHitmarker(zone === 'head');
   audio.hit(zone === 'head');
-  if (bot.hp > 0) return;
+  if (bot.hp > 0) {
+    if (zone === 'head') {
+      addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
+    }
+    return;
+  }
+  const eliminationStarted = performance.now();
   bot.alive = false;
   bot.deaths += 1;
+  soloBotDeaths += 1;
+  spawnDeathDrop({ type: 'death', killer: player.id, victim: bot.id, nonce: randomNonce() }, now);
+  const afterDeathDrop = performance.now();
   bot.respawnAt = now + 2_200;
-  bot.root.visible = false;
+  bot.deathVisibleUntil = now + 1_050;
+  deathOperator(bot.root);
+  const afterDeathPose = performance.now();
   player.kills += 1;
+  awardSupportElimination();
   audio.kill();
-  addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''}`, 'gold');
+  addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
+  const afterRewardAndFeed = performance.now();
+  spawnEarnedBotReinforcement();
+  const afterReinforcement = performance.now();
+  lastBotEliminationProfile = {
+    deathDropMs: afterDeathDrop - eliminationStarted,
+    deathPoseMs: afterDeathPose - afterDeathDrop,
+    rewardAndFeedMs: afterRewardAndFeed - afterDeathPose,
+    reinforcementMs: afterReinforcement - afterRewardAndFeed,
+    totalSyncMs: afterReinforcement - eliminationStarted,
+  };
   checkMatchEnd();
 }
 
 function respawnBot(bot: BotPlayer, now: number): void {
   const state = respawnBotState(now);
-  const spawns = arena.spawns[bot.team];
-  const spawn = spawns[(bot.deaths + bot.waypoint) % spawns.length];
+  const spawn = selectSafeBotSpawn(bot.team);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.hp = state.health;
@@ -847,16 +3880,98 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.sightStartedAt = 0;
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
+  bot.blockedSince = 0;
+  bot.nextGrenadeAt = Math.max(bot.nextGrenadeAt, now + 3_000);
+  bot.deathVisibleUntil = 0;
+  resetOperator(bot.root);
   bot.root.visible = true;
 }
 
+function houseContainsXZ(house: ArenaMap['houses'][number], point: THREE.Vector3, margin = 1): boolean {
+  return Math.abs(point.x - house.origin.x) <= house.dimensions.width / 2 + margin
+    && Math.abs(point.z - house.origin.z) <= house.dimensions.depth / 2 + margin;
+}
+
+function botVerticalRouteTarget(bot: BotPlayer): THREE.Vector3 | null {
+  const playerUpper = player.position.y > 3;
+  const botOnGround = bot.position.y <= 0.1;
+  const botOnUpper = bot.position.y >= 3.2;
+  if (playerUpper && botOnUpper || !playerUpper && botOnGround) return null;
+  const house = arena.houses.find((candidate) => houseContainsXZ(candidate, playerUpper ? player.position : bot.position, 2));
+  if (!house) return null;
+  const foot = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-foot');
+  const top = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-top');
+  if (!foot || !top) return null;
+  const footPoint = new THREE.Vector3(foot.position[0], 0, foot.position[2]);
+  const topPoint = new THREE.Vector3(top.position[0], 3.48, top.position[2]);
+  if (playerUpper) return botOnGround && bot.position.distanceToSquared(footPoint) > 1 ? footPoint : topPoint;
+  return botOnUpper && bot.position.distanceToSquared(topPoint) > 1 ? topPoint : footPoint;
+}
+
+function botElevationAt(position: THREE.Vector3, previousY: number): number {
+  for (const house of arena.houses) {
+    for (const prefix of ['indoor-ramp', 'ramp'] as const) {
+      const foot = house.anchors.find((anchor) => anchor.id === `${prefix}-foot`);
+      const top = house.anchors.find((anchor) => anchor.id === `${prefix}-top`);
+      if (!foot || !top) continue;
+      const fx = foot.position[0];
+      const fz = foot.position[2];
+      const dx = top.position[0] - fx;
+      const dz = top.position[2] - fz;
+      const lengthSq = dx * dx + dz * dz;
+      const progress = lengthSq > 0 ? ((position.x - fx) * dx + (position.z - fz) * dz) / lengthSq : 0;
+      if (progress < -0.04 || progress > 1.04) continue;
+      const nearestX = fx + dx * progress;
+      const nearestZ = fz + dz * progress;
+      const distance = Math.hypot(position.x - nearestX, position.z - nearestZ);
+      if (distance <= 1.05) return THREE.MathUtils.lerp(0, 3.48, THREE.MathUtils.clamp(progress, 0, 1));
+    }
+    if (previousY > 1.5 && houseContainsXZ(house, position, 0)) return 3.48;
+  }
+  return 0;
+}
+
+function navigationCollidersFor(activeArena: ArenaMap): ArenaMap['colliders'] {
+  return activeArena.colliders.filter((box) => {
+    const minY = box.minY ?? 0;
+    const maxY = box.maxY ?? 8;
+    return !(minY > 2 && maxY - minY <= 0.5);
+  });
+}
+
+let botNavigationColliders = navigationCollidersFor(arena);
+
 function updateBots(dt: number, now: number): void {
-  if (gameMode !== 'solo' || matchState.phase !== 'active' || botsFrozen) return;
+  if (gameMode !== 'solo' || matchState.phase !== 'active') return;
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
+    const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+    if (haze instanceof THREE.Sprite && haze.material instanceof THREE.SpriteMaterial) {
+      const pulse = Math.sin(now * 0.0022 + Number(haze.userData.phase ?? 0));
+      haze.material.opacity = 0.33 + pulse * 0.055;
+      haze.scale.set(2.35 + pulse * 0.08, 3.15 + pulse * 0.12, 1);
+    }
     if (!bot.alive) {
+      bot.root.visible = now < bot.deathVisibleUntil;
+      if (bot.root.visible) poseOperator(bot.root, 'stand', 0, now * 0.001);
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
+      continue;
+    }
+    if (botsFrozen) {
+      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      continue;
+    }
+    // A corrupted position can never become an out-of-arena damage source.
+    if (!pointInsideBounds(bot.position, arena.bounds, 0.44)) {
+      const safeSpawn = selectSafeBotSpawn(bot.team);
+      bot.position.set(safeSpawn.x, safeSpawn.y - 1.7, safeSpawn.z);
+      bot.root.position.copy(bot.position);
+      bot.hasLineOfSight = false;
+      bot.sightStartedAt = 0;
+      bot.burstShots = 0;
+      bot.blockedSince = 0;
+      bot.lastSightAt = now;
       continue;
     }
 
@@ -869,20 +3984,26 @@ function updateBots(dt: number, now: number): void {
       bot.hasLineOfSight = player.alive && botHasLineOfSight(bot);
       if (bot.hasLineOfSight && !previousSight) bot.sightStartedAt = now;
       if (!bot.hasLineOfSight) {
+        if (previousSight) bot.waypoint = selectBotTacticalWaypoint(bot);
         bot.sightStartedAt = 0;
         bot.burstShots = 0;
       }
     }
     const lineOfSight = bot.hasLineOfSight;
-    if (now >= bot.nextDecisionAt) {
+    const madeTacticalDecision = now >= bot.nextDecisionAt;
+    if (madeTacticalDecision) {
       bot.strafeSign = bot.strafeSign === 1 ? -1 : 1;
       bot.nextDecisionAt = now + 850 + botIndex * 95;
     }
 
-    const patrolTarget = BOT_PATROL_POINTS[bot.waypoint % BOT_PATROL_POINTS.length];
-    const toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
+    let patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
+    let toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
     const waypointReached = toPatrol.lengthSq() < 5.2;
-    if (waypointReached) bot.waypoint = (bot.waypoint + 1 + botIndex) % BOT_PATROL_POINTS.length;
+    if (waypointReached) {
+      bot.waypoint = lineOfSight
+        ? (bot.waypoint + 1 + botIndex) % arena.patrolPoints.length
+        : selectBotTacticalWaypoint(bot);
+    }
     const intent = chooseBotIntent({
       alive: bot.alive,
       distanceToPlayer: distance,
@@ -893,54 +4014,93 @@ function updateBots(dt: number, now: number): void {
       waypointReached,
       random: bot.strafeSign === 1 ? 0.25 : 0.75,
       lineOfSightSince: bot.sightStartedAt,
-      reactionDelay: 210 + botIndex * 45,
+      reactionDelay: BOT_REACTION_DELAY,
       burstShotsRemaining: bot.burstShots,
+      fireIntervalMs: botWeaponFireInterval(bot.weapon, bot.burstShots > 0),
     });
+    if (intent.changeWaypoint && !waypointReached) bot.waypoint = selectBotTacticalWaypoint(bot);
+    patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
+    toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
-    const pursuit = lineOfSight ? toPlayer : toPatrol;
+    const verticalRouteTarget = botVerticalRouteTarget(bot);
+    const pursuit = verticalRouteTarget
+      ? verticalRouteTarget.clone().sub(bot.position).setY(0)
+      : lineOfSight ? toPlayer : toPatrol;
     const forward = pursuit.lengthSq() > 0.01 ? pursuit.normalize() : new THREE.Vector3(0, 0, -1);
     const side = new THREE.Vector3(-forward.z, 0, forward.x);
-    const desiredDirection = intent.movement === 'advance' ? forward
-      : intent.movement === 'retreat' ? forward.clone().multiplyScalar(-1)
-        : intent.movement === 'strafe-left' ? side.clone().multiplyScalar(-1)
-          : intent.movement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = intent.movement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    const routeMovement = verticalRouteTarget ? 'advance' : intent.movement;
+    const desiredDirection = routeMovement === 'advance' ? forward
+      : routeMovement === 'retreat' ? forward.clone().multiplyScalar(-1)
+        : routeMovement === 'strafe-left' ? side.clone().multiplyScalar(-1)
+          : routeMovement === 'strafe-right' ? side : new THREE.Vector3();
+    const speed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
-    let resolved = resolveHorizontalMove(bot.position, desired, arena.colliders, arena.bounds, 0.44);
-    if (Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002 && desiredDirection.lengthSq() > 0) {
+    let resolved = resolveHorizontalMove(bot.position, desired, botNavigationColliders, arena.bounds, 0.44);
+    const stalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002
+      && desiredDirection.lengthSq() > 0;
+    if (stalled) {
       const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
-      resolved = resolveHorizontalMove(bot.position, detour, arena.colliders, arena.bounds, 0.44);
-      bot.waypoint = (bot.waypoint + 1) % BOT_PATROL_POINTS.length;
+      resolved = resolveHorizontalMove(bot.position, detour, botNavigationColliders, arena.bounds, 0.44);
+      const detourStalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002;
+      if (detourStalled) {
+        if (bot.blockedSince === 0) bot.blockedSince = now;
+        else if (now - bot.blockedSince >= 400) {
+          bot.waypoint = selectBotTacticalWaypoint(bot);
+          bot.blockedSince = 0;
+        }
+      } else {
+        bot.blockedSince = 0;
+      }
+    } else {
+      bot.blockedSince = 0;
     }
-    bot.position.set(resolved.x, bot.position.y, resolved.z);
+    const resolvedPosition = new THREE.Vector3(resolved.x, bot.position.y, resolved.z);
+    bot.position.set(resolved.x, botElevationAt(resolvedPosition, bot.position.y), resolved.z);
     bot.root.position.copy(bot.position);
-    const lookTarget = lineOfSight ? player.position : patrolTarget;
-    bot.root.lookAt(lookTarget.x, bot.position.y + 1.1, lookTarget.z);
+    const lookTarget = lineOfSight ? player.position : verticalRouteTarget ?? patrolTarget;
+    bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
+    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
-    if (intent.fire && player.alive) {
-      if (bot.burstShots <= 0) bot.burstShots = 2 + (botIndex % 2);
+    const threwBotGrenade = madeTacticalDecision && shouldBotThrowGrenade({
+      alive: bot.alive,
+      hasLineOfSight: lineOfSight,
+      reacted: bot.sightStartedAt > 0 && now - bot.sightStartedAt >= BOT_REACTION_DELAY,
+      distanceToPlayer: distance,
+      now,
+      nextGrenadeAt: bot.nextGrenadeAt,
+      botGrenadeActive: bot.grenadeActive,
+      activeBotGrenades: activeBotGrenadeCount(),
+      random: gameplayRandom(),
+    }) && throwBotGrenade(bot, now);
+
+    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
+      if (bot.burstShots <= 0) bot.burstShots = botWeaponBurstSize(bot.weapon, botIndex);
       bot.burstShots -= 1;
       bot.lastShotAt = now;
+      fireOperator(bot.root);
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
       const direction = player.position.clone().sub(origin).normalize();
-      const matchAccuracy = THREE.MathUtils.lerp(0.038, 0.014, Math.min(1, (now - matchState.phaseStartedAt) / 120_000));
-      const jitter = matchAccuracy + bot.burstShots * 0.004;
-      direction.x += (Math.random() - 0.5) * jitter;
-      direction.y += (Math.random() - 0.5) * jitter;
-      direction.z += (Math.random() - 0.5) * jitter;
+      const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
+      direction.x += (gameplayRandom() - 0.5) * jitter;
+      direction.y += (gameplayRandom() - 0.5) * jitter;
+      direction.z += (gameplayRandom() - 0.5) * jitter;
       direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
       const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
       const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
-      spawnTracer(origin, direction, resolution.tracerDistance, WEAPONS.carbine.color);
+      const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
+      const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
+      const botWeapon = WEAPONS[bot.weapon];
+      spawnTracer(botMuzzle ?? origin, visibleEnd, botWeapon.color);
       if (resolution.blockedByCover) {
-        const impact = origin.clone().addScaledVector(direction, resolution.tracerDistance);
-        spawnImpactFlash(impact);
-        audio.coverImpact(impact.distanceTo(player.position));
+        spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
+        audio.impact('concrete', visibleEnd.distanceTo(player.position));
+      } else if (!resolution.hitTarget) {
+        audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
-      audio.shot('carbine', true);
+      audio.shot(bot.weapon, true);
       if (resolution.hitTarget) {
-        const damage = computeDamage(WEAPONS.carbine, distance, 'body') * BOT_DAMAGE_MULTIPLIER;
+        const damage = botScaledDamage(computeDamage(botWeapon, distance, 'body'));
         applyDamage(damage, bot.id);
         if (!player.alive) {
           bot.kills += 1;
@@ -953,81 +4113,183 @@ function updateBots(dt: number, now: number): void {
 
 function melee(): void {
   const now = performance.now();
-  if (!meleeStrike(2, now, player.lastMeleeAt).hit || !player.alive || matchState.phase !== 'active') return;
+  const previousMeleeAt = player.lastMeleeAt;
+  // A melee action must animate and play even when it misses. The old code
+  // checked a fake distance of 2 m against a 1.75 m strike range, so it could
+  // never enter the action at all.
+  if (!meleeStrike(0, now, previousMeleeAt).hit || !player.alive || matchState.phase !== 'active') return;
+  endSpawnProtectionOnOffense(now);
   player.lastMeleeAt = now;
   weaponView.melee();
   audio.melee();
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const direction = camera.getWorldDirection(new THREE.Vector3());
+  const meleeNonce = randomNonce();
+  network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: meleeNonce });
   const hit = castShot(origin, direction);
-  if (!hit.playerId || hit.distance > 2.25) return;
+  if (hit.windowId) {
+    const strike = meleeStrike(hit.distance, now, previousMeleeAt);
+    if (strike.hit) {
+      breakHouseWindow(
+        hit.windowId,
+        hit.impactPoint ?? origin.clone().addScaledVector(direction, hit.distance),
+        hit.impactNormal ?? direction.clone().multiplyScalar(-1),
+        true,
+        origin,
+      );
+    }
+    return;
+  }
+  if (!hit.playerId) return;
+  const strike = meleeStrike(hit.distance, now, previousMeleeAt);
+  if (!strike.hit) return;
   const bot = bots.get(hit.playerId);
-  if (bot) applyBotDamage(bot, 70, hit.hitZone ?? 'body');
-  else if (remotes.has(hit.playerId)) network.send({ type: 'hit', by: player.id, target: hit.playerId, damage: 70, nonce: randomNonce() });
+  if (bot) applyBotDamage(bot, outgoingDamage(strike.damage, now), hit.hitZone ?? 'body');
+  else if (remotes.has(hit.playerId)) sendAuthoritativeHit({
+    type: 'hit', by: player.id, target: hit.playerId, damage: strike.damage, kind: 'melee',
+    actionNonce: meleeNonce, nonce: randomNonce(),
+  });
 }
 
 function throwGrenade(): void {
+  if (!rangeGrenadesAllowed(selectedArena.id)) {
+    addFeed('GRENADES LOCKED ON THE GUN RANGE');
+    return;
+  }
   if (!player.alive || player.grenades <= 0 || matchState.phase !== 'active') return;
+  endSpawnProtectionOnOffense(performance.now());
   player.grenades -= 1;
   weaponView.throwGrenade();
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const origin = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(direction, 0.7);
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 14, 10),
-    new THREE.MeshStandardMaterial({ color: 0x34413a, roughness: 0.55, metalness: 0.48 }),
-  );
+  const velocity = direction.clone().multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0));
+  const actionNonce = randomNonce();
+  network.send({
+    type: 'grenade-throw', by: player.id,
+    origin: origin.toArray() as [number, number, number],
+    velocity: velocity.toArray() as [number, number, number],
+    actionNonce,
+    nonce: randomNonce(),
+  });
+  const mesh = createGrenadePresentation();
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
   grenades.push({
     mesh,
-    velocity: direction.multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0)),
+    velocity,
+    angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
     explodeAt: performance.now() + 2_300,
     lastBounceAt: 0,
+    actionNonce,
+    ownerKind: 'player',
+    ownerId: player.id,
   });
 }
 
+function spawnGrenadeExplosionVisual(point: THREE.Vector3, now: number): void {
+  grenadeExplosionPresentation.emit(point, now);
+  grenadeExplosions += 1;
+  lastGrenadeExplosionFrameAt = now;
+}
+
+function updateGrenadeExplosionVisuals(now: number): void {
+  grenadeExplosionPresentation.update(now);
+}
+
+function clearGrenadeExplosionVisuals(): void {
+  grenadeExplosionPresentation.clear();
+}
+
+function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, replicate: boolean): number {
+  let broken = 0;
+  for (const pane of arena.breakableWindows) {
+    if (pane.broken) continue;
+    const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
+    if (centre.distanceTo(point) > GRENADE_RADIUS) continue;
+    if (windowBreakPathBlocked(point, centre, arena.colliders)) continue;
+    const normal = centre.clone().sub(point);
+    if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
+    else normal.normalize().multiplyScalar(-1);
+    if (breakHouseWindow(pane.id, centre, normal, replicate, point, 'explosive', actionNonce)) broken += 1;
+  }
+  return broken;
+}
+
 function explodeGrenade(entity: GrenadeEntity): void {
-  const point = entity.mesh.position.clone();
-  scene.remove(entity.mesh);
-  audio.explosion();
-  const flash = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 20, 14),
-    new THREE.MeshBasicMaterial({ color: 0xffb24c, transparent: true, opacity: 0.72 }),
-  );
-  flash.position.copy(point); flash.scale.setScalar(0.2); scene.add(flash);
-  const light = new THREE.PointLight(0xff7b2e, 12, 18, 2); light.position.copy(point); scene.add(light);
   const started = performance.now();
-  const animate = () => {
-    const t = (performance.now() - started) / 420;
-    if (t >= 1) { scene.remove(flash, light); return; }
-    flash.scale.setScalar(0.2 + t * 5.5);
-    (flash.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - t);
-    light.intensity = 12 * (1 - t);
-    requestAnimationFrame(animate);
-  };
-  animate();
+  const point = entity.mesh.position.clone();
+  if (entity.mesh.userData.fallback === true) retireSupportRoot(entity.mesh);
+  else scene.remove(entity.mesh);
+  releaseBotGrenadeOwner(entity);
+  const afterPresentationDetach = performance.now();
+  if (entity.ownerKind === 'bot') audio.explosion(afterPresentationDetach);
+  else audio.sanctifiedFragExplosion();
+  const afterAudio = performance.now();
+  spawnGrenadeExplosionVisual(point, afterAudio);
+  breakWindowsInGrenadeBlast(point, entity.actionNonce, entity.ownerKind === 'player');
+  const afterVisual = performance.now();
+  if (entity.ownerKind === 'bot') {
+    const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
+    const damage = blocked ? 0 : botScaledDamage(grenadeDamage(player.position.distanceTo(point)));
+    lastBotGrenadeDamage = damage;
+    if (damage > 0 && player.alive) {
+      applyDamage(damage, entity.ownerId, 0);
+      const owner = bots.get(entity.ownerId);
+      if (owner && !player.alive) {
+        owner.kills += 1;
+        checkMatchEnd();
+      }
+    }
+    const finished = performance.now();
+    lastGrenadeExplosionProfile = {
+      presentationDetachMs: afterPresentationDetach - started,
+      audioMs: afterAudio - afterPresentationDetach,
+      visualMs: afterVisual - afterAudio,
+      targetDamageMs: finished - afterVisual,
+      selfDamageMs: 0,
+      totalSyncMs: finished - started,
+    };
+    return;
+  }
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
-    const damage = blocked ? 0 : grenadeDamage(bot.position.distanceTo(point));
+    const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), afterAudio);
     if (damage > 0) applyBotDamage(bot, damage, 'body');
   }
+  const blastNonce = entity.actionNonce;
   for (const remote of remotes.values()) {
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
-    const damage = grenadeDamage(target.distanceTo(point));
-    if (damage > 0) network.send({ type: 'hit', by: player.id, target: remote.snapshot.id, damage, nonce: randomNonce() });
+    const baseDamage = grenadeDamage(target.distanceTo(point));
+    if (baseDamage > 0) sendAuthoritativeHit({
+      type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, baseDamage), kind: 'explosive',
+      explosiveSource: 'grenade', origin: point.toArray(), actionNonce: blastNonce, nonce: randomNonce(),
+    });
   }
+  const afterTargets = performance.now();
   const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
   const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
   if (selfDamage > 0) applyDamage(selfDamage, player.id);
+  const finished = performance.now();
+  lastGrenadeExplosionProfile = {
+    presentationDetachMs: afterPresentationDetach - started,
+    audioMs: afterAudio - afterPresentationDetach,
+    visualMs: afterVisual - afterAudio,
+    targetDamageMs: afterTargets - afterVisual,
+    selfDamageMs: finished - afterTargets,
+    totalSyncMs: finished - started,
+  };
 }
 
 function updateGrenades(dt: number, now: number): void {
   for (let index = grenades.length - 1; index >= 0; index -= 1) {
     const grenade = grenades[index];
     grenade.velocity.y -= 18 * dt;
+    grenade.mesh.rotation.x += grenade.angularVelocity.x * dt;
+    grenade.mesh.rotation.y += grenade.angularVelocity.y * dt;
+    grenade.mesh.rotation.z += grenade.angularVelocity.z * dt;
     const start = grenade.mesh.position.clone();
     const delta = grenade.velocity.clone().multiplyScalar(dt);
     const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
@@ -1044,8 +4306,16 @@ function updateGrenades(dt: number, now: number): void {
     } else {
       grenade.mesh.position.add(delta);
     }
-    grenade.mesh.rotation.x += dt * 8;
-    grenade.mesh.rotation.z += dt * 11;
+    if (!pointInsideBounds(grenade.mesh.position, arena.bounds, 0.16)) {
+      const impact = clampPointToBounds(grenade.mesh.position, arena.bounds, 0.16);
+      grenade.mesh.position.set(impact.x, impact.y, impact.z);
+      spawnImpactFlash(grenade.mesh.position.clone());
+      audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
+      disposeGrenadePresentation(grenade.mesh);
+      releaseBotGrenadeOwner(grenade);
+      grenades.splice(index, 1);
+      continue;
+    }
     if (grenade.mesh.position.y < 0.18) {
       const impactSpeed = Math.abs(grenade.velocity.y);
       if (impactSpeed > 1.8 && now - grenade.lastBounceAt > 90) {
@@ -1064,53 +4334,55 @@ function updateGrenades(dt: number, now: number): void {
   }
 }
 
-function hitPracticeTarget(id: string): void {
+function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
-  target.active = false;
-  target.root.visible = false;
-  target.respawnAt = performance.now() + 3200;
+  const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
+  if (admittedDamage <= 0) return;
+  target.health = Math.max(0, target.health - admittedDamage);
   targetHits += 1;
-  showHitmarker();
-  audio.hit();
-  addFeed('+1 test mannequin', 'gold');
+  const headshot = selectedArena.id === 'gun-range' && zone === 'head';
+  showHitmarker(headshot);
+  audio.hit(headshot);
+  if (target.health > 0) {
+    if (selectedArena.id === 'gun-range') addFeed(`${headshot ? 'BULLSEYE · ' : ''}${Math.ceil(target.health)} / ${target.maxHealth} HP`, headshot ? 'gold' : undefined);
+    return;
+  }
+  target.active = false;
+  target.respawnAt = performance.now() + 2_200;
+  target.root.visible = false;
+  rangeScore = selectedArena.id === 'gun-range'
+    ? advanceRangeScore(rangeScore, target.scoreValue)
+    : rangeScore + 1;
+  addFeed(selectedArena.id === 'gun-range'
+    ? `${headshot ? 'BULLSEYE · ' : ''}+${target.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`
+    : '+1 test mannequin', 'gold');
 }
 
 function updateTargets(now: number): void {
   for (const target of arena.targets) {
-    if (gameMode === 'solo') {
+    if (gameMode === 'solo' && selectedArena.id !== 'gun-range') {
       target.root.visible = false;
       continue;
     }
     if (!target.active && now >= target.respawnAt) {
       target.active = true;
-      target.root.visible = true;
+      target.health = target.maxHealth;
     }
+    target.root.visible = target.active;
   }
 }
 
-function spawnImpactFlash(point: THREE.Vector3): void {
-  const material = new THREE.MeshBasicMaterial({ color: 0xffdda0, transparent: true, opacity: 0.9, depthWrite: false });
-  const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), material);
-  flash.position.copy(point);
-  flash.scale.set(1, 0.55, 1);
-  scene.add(flash);
-  window.setTimeout(() => {
-    scene.remove(flash);
-    flash.geometry.dispose();
-    material.dispose();
-  }, 72);
+function spawnImpactFlash(
+  point: THREE.Vector3,
+  surface: ImpactSurface = 'concrete',
+  normal = new THREE.Vector3(0, 1, 0),
+): void {
+  impactPresentation.impact(point, normal.normalize(), surface);
 }
 
-function spawnTracer(origin: THREE.Vector3, direction: THREE.Vector3, distance: number, color: number): void {
-  const geometry = new THREE.BufferGeometry().setFromPoints([origin.clone(), origin.clone().addScaledVector(direction, distance)]);
-  const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.72 }));
-  scene.add(line);
-  setTimeout(() => {
-    scene.remove(line);
-    geometry.dispose();
-    (line.material as THREE.Material).dispose();
-  }, 55);
+function spawnTracer(start: THREE.Vector3, end: THREE.Vector3, color: number): void {
+  tracerPool.emit(start, end, color);
 }
 
 function showHitmarker(headshot = false): void {
@@ -1120,10 +4392,18 @@ function showHitmarker(headshot = false): void {
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
-function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
+function addFeed(
+  text: string,
+  kind?: 'aqua' | 'coral' | 'gold',
+  details?: { damageDealt?: number; damageTaken?: number },
+): void {
   const feed = element<HTMLElement>('#killfeed');
   const row = document.createElement('div');
   row.textContent = text;
+  row.title = text;
+  row.setAttribute('aria-label', text);
+  if (details?.damageDealt !== undefined) row.dataset.damageDealt = String(details.damageDealt);
+  if (details?.damageTaken !== undefined) row.dataset.damageTaken = String(details.damageTaken);
   if (kind) row.classList.add(kind);
   feed.prepend(row);
   while (feed.children.length > 6) feed.lastElementChild?.remove();
@@ -1131,8 +4411,1009 @@ function addFeed(text: string, kind?: 'aqua' | 'coral' | 'gold'): void {
   setTimeout(() => row.remove(), 5000);
 }
 
+function updateFieldSupportHud(): void {
+  element<HTMLElement>('#support-streak').textContent = `STREAK ${fieldSupport.streak}`;
+  document.querySelectorAll<HTMLElement>('[data-support]').forEach((item) => {
+    const support = item.dataset.support as FieldSupportId;
+    const ready = fieldSupport.available[support] === true;
+    item.classList.toggle('ready', ready);
+    item.classList.toggle('controller-selected', support === gamepadSupportSelection);
+    const state = item.querySelector<HTMLElement>('.support-state');
+    if (state) state.textContent = ready ? 'READY' : 'LOCKED';
+  });
+}
+
+function overdriveStateMessage(now: number): OverdriveStateMessage {
+  return {
+    type: 'overdrive-state', by: player.id, holderId: overdriveState.holderId, available: overdriveState.available,
+    generation: overdriveState.generation,
+    activeRemainingMs: Math.min(OVERDRIVE_DURATION_MS, Math.max(0, overdriveState.activeUntil - now)),
+    nextSpawnInMs: Math.min(OVERDRIVE_SPAWN_INTERVAL_MS, Math.max(0, overdriveState.nextSpawnAt - now)),
+    nonce: randomNonce(),
+  };
+}
+
+function broadcastOverdriveState(now: number): void {
+  if (network.role === 'host') network.send(overdriveStateMessage(now));
+}
+
+function registerOverdrivePickup(holderId: string, now: number): void {
+  overdrivePickups += 1;
+  overdriveClaimGeneration = overdriveState.generation;
+  const holderName = holderId === player.id ? player.name : remotes.get(holderId)?.snapshot.name ?? 'Operator';
+  addFeed(`${holderName} secured 4× OVERDRIVE · 15 SECONDS`, 'gold');
+  if (holderId === player.id) {
+    audio.overdrivePickup();
+    showQuadDamageAnnouncement('QUAD DAMAGE', '4× DAMAGE · 15 SECONDS');
+  } else showQuadDamageAnnouncement(`${holderName} HAS QUAD DAMAGE`, 'DENY THE POWER HOLDER');
+  broadcastOverdriveState(now);
+}
+
+let quadAnnouncementTimer = 0;
+function showQuadDamageAnnouncement(title: string, subtitle: string): void {
+  const announcement = element<HTMLElement>('#power-announcement');
+  element<HTMLElement>('#power-announcement strong').textContent = title;
+  element<HTMLElement>('#power-announcement span').textContent = subtitle;
+  announcement.hidden = false;
+  announcement.classList.remove('announce');
+  void announcement.offsetWidth;
+  announcement.classList.add('announce');
+  window.clearTimeout(quadAnnouncementTimer);
+  quadAnnouncementTimer = window.setTimeout(() => {
+    announcement.hidden = true;
+    announcement.classList.remove('announce');
+  }, 3_500);
+}
+
+function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
+  if (network.role !== 'host' || message.generation !== overdriveState.generation || processedNonces.has(message.nonce)) return;
+  const remote = remotes.get(message.by);
+  if (!remote || remote.snapshot.hp <= 0 || !pointInsideBounds(remote.snapshot, arena.bounds, 0.44)) return;
+  const now = performance.now();
+  if (remote.claimRequiresCoreExit || !remoteCanClaimTimedPickup(now, remote.lastSeen, remote.claimEligibleAt)) return;
+  const claimedPosition = new THREE.Vector3(...message.position);
+  const authoritativePosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
+  if (claimedPosition.distanceTo(authoritativePosition) > 1.25) return;
+  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now);
+  if (!result.claimed) return;
+  processedNonces.add(message.nonce);
+  overdriveState = result.state;
+  registerOverdrivePickup(message.by, now);
+  trimNonceSet();
+}
+
+function acceptOverdriveState(message: OverdriveStateMessage): void {
+  if (network.role !== 'client' || message.by === player.id || !remotes.has(message.by) || message.generation < overdriveState.generation) return;
+  const now = performance.now();
+  const previousHolder = overdriveState.holderId;
+  const previousGeneration = overdriveState.generation;
+  overdriveState = {
+    generation: message.generation,
+    available: message.available,
+    holderId: message.holderId,
+    activeUntil: message.holderId ? now + message.activeRemainingMs : 0,
+    nextSpawnAt: now + message.nextSpawnInMs,
+  };
+  if (message.available && previousGeneration !== message.generation) {
+    overdriveSpawns += 1;
+    overdriveClaimGeneration = -1;
+  }
+  if (message.holderId && message.holderId !== previousHolder) registerOverdrivePickup(message.holderId, now);
+}
+
+function outgoingDamage(value: number, now = performance.now()): number {
+  return value * overdriveDamageMultiplier(overdriveState, player.id, now);
+}
+
+function updateOverdrive(now: number): void {
+  if (!selectedArena.overdrive) {
+    overdriveRoot.visible = false;
+    element<HTMLElement>('#overdrive-hud').hidden = true;
+    return;
+  }
+  const wasAvailable = overdriveState.available;
+  const previousHolder = overdriveState.holderId;
+  if (network.role !== 'client') overdriveState = advanceOverdrive(overdriveState, now);
+  if (!wasAvailable && overdriveState.available) {
+    overdriveSpawns += 1;
+    overdriveClaimGeneration = -1;
+    addFeed('QUAD DAMAGE ONLINE · VISIBLE MID-MAP ICON', 'gold');
+    showQuadDamageAnnouncement('QUAD DAMAGE ONLINE', 'CENTRE CORE · CLAIM 4× DAMAGE');
+    audio.overdriveAvailable();
+    broadcastOverdriveState(now);
+  }
+  if (previousHolder !== null && overdriveState.holderId === null) {
+    overdriveExpiries += 1;
+    if (previousHolder === player.id) audio.overdriveExpire();
+    broadcastOverdriveState(now);
+  }
+  const distance = Math.hypot(player.position.x - OVERDRIVE_POSITION.x, player.position.z - OVERDRIVE_POSITION.z);
+  if (gameStarted && matchState.phase === 'active' && player.alive && overdriveState.available && distance <= OVERDRIVE_PICKUP_RADIUS) {
+    if (network.role === 'client') {
+      if (overdriveClaimGeneration !== overdriveState.generation) {
+        overdriveClaimGeneration = overdriveState.generation;
+        network.send({ type: 'overdrive-claim', by: player.id, position: player.position.toArray(), generation: overdriveState.generation, nonce: randomNonce() });
+      }
+    } else {
+      const result = claimOverdrive(overdriveState, player.id, player.position, true, now);
+      if (result.claimed) {
+        overdriveState = result.state;
+        registerOverdrivePickup(player.id, now);
+      }
+    }
+  } else if (distance > OVERDRIVE_PICKUP_RADIUS + 0.5) overdriveClaimGeneration = -1;
+
+  overdriveRoot.visible = overdriveState.available && gameStarted && matchState.phase === 'active';
+  if (overdriveRoot.visible) {
+    overdriveRoot.position.y = OVERDRIVE_POSITION.y + Math.sin(now * 0.0032) * 0.14;
+    overdriveCore.rotation.y = now * 0.0017;
+    overdriveCore.rotation.x = Math.sin(now * 0.0011) * 0.32;
+    overdriveRings[0].rotation.z = now * 0.0013;
+    overdriveRings[1].rotation.y = -now * 0.0016;
+    quadWorldIcon.position.y = 1.75 + Math.sin(now * 0.004) * 0.12;
+    quadWorldIcon.material.rotation = Math.sin(now * 0.0014) * 0.025;
+  }
+  const localRemaining = overdriveRemainingMs(overdriveState, player.id, now);
+  const hud = element<HTMLElement>('#overdrive-hud');
+  hud.hidden = localRemaining <= 0;
+  if (localRemaining > 0) element<HTMLElement>('#overdrive-time').textContent = (localRemaining / 1_000).toFixed(1);
+  document.documentElement.dataset.overdrive = localRemaining > 0 ? 'active' : overdriveState.available ? 'available' : 'charging';
+}
+
+function awardSupportElimination(syncGlobalLeaderboard = true): void {
+  const before = fieldSupport.available;
+  fieldSupport = recordSupportElimination(fieldSupport);
+  bestStreakThisMatch = Math.max(bestStreakThisMatch, fieldSupport.streak);
+  for (const [id, label] of [
+    ['scout-sweep', 'SCOUT SWEEP'],
+    ['yardhawk', 'YARDHAWK'],
+    ['tri-pass', 'TRI-PASS STRIKE'],
+    ['hunter-swarm', 'HUNTER SWARM'],
+    ['nuke', 'NUKE'],
+  ] as const) {
+    if (!before[id] && fieldSupport.available[id]) addFeed(`${label} READY`, 'gold');
+  }
+  recordImmediateStreak(syncGlobalLeaderboard);
+  updateFieldSupportHud();
+}
+
+function supportTargetState(id: string): { point: THREE.Vector3; stance: Stance } | null {
+  const bot = bots.get(id);
+  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: 'stand' };
+  const remote = remotes.get(id);
+  if (remote && areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) {
+    return { point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: remote.snapshot.stance ?? 'stand' };
+  }
+  return null;
+}
+
+function supportTargetPosition(id: string): THREE.Vector3 | null {
+  return supportTargetState(id)?.point ?? null;
+}
+
+function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
+  const candidates: { id: string; point: THREE.Vector3 }[] = [];
+  for (const bot of bots.values()) if (bot.alive && bot.team !== player.team) candidates.push({ id: bot.id, point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)) });
+  for (const remote of remotes.values()) {
+    if (areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) candidates.push({ id: remote.snapshot.id, point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)) });
+  }
+  candidates.sort((a, b) => a.point.distanceToSquared(player.position) - b.point.distanceToSquared(player.position));
+  return candidates[0] ?? null;
+}
+
+function hunterTargetAssignments(): string[] {
+  const candidates = [
+    ...[...bots.values()].map((bot) => ({
+      id: bot.id,
+      team: bot.team,
+      alive: bot.alive,
+      distanceFromCentreSq: bot.position.x * bot.position.x + bot.position.z * bot.position.z,
+    })),
+    ...[...remotes.values()].map((remote) => ({
+      id: remote.snapshot.id,
+      team: remote.snapshot.team,
+      alive: remote.snapshot.hp > 0,
+      distanceFromCentreSq: remote.target.x * remote.target.x + remote.target.z * remote.target.z,
+    })),
+  ];
+  if (privateMatchMode === 'ffa' && gameMode !== 'solo') {
+    return candidates.filter((candidate) => candidate.alive && candidate.id !== player.id)
+      .sort((a, b) => a.distanceFromCentreSq - b.distanceFromCentreSq || a.id.localeCompare(b.id))
+      .slice(0, 5)
+      .map((candidate) => candidate.id);
+  }
+  return assignHunterSwarmTargets(candidates, player.team);
+}
+
+function makeHunterDrone(index: number): THREE.Group {
+  const root = new THREE.Group();
+  root.name = `hunter-swarm-drone-${index}`;
+  const shell = new THREE.MeshStandardMaterial({ color: 0x263139, roughness: 0.34, metalness: 0.82 });
+  const edge = new THREE.MeshStandardMaterial({ color: 0xe0a54e, emissive: 0x8a3517, emissiveIntensity: 1.4, roughness: 0.4, metalness: 0.52 });
+  const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xff563e, toneMapped: false });
+  const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), shell);
+  body.scale.set(1, 0.48, 1.55);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.075, 0.42), edge);
+  wing.position.z = 0.08;
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.72, 8), shell);
+  tail.rotation.x = Math.PI / 2;
+  tail.position.z = 0.9;
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 7), eyeMaterial);
+  eye.position.z = -0.58;
+  const trail = new THREE.Mesh(
+    new THREE.ConeGeometry(0.16, 1.35, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xff9d50, transparent: true, opacity: 0.54, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+  );
+  trail.rotation.x = -Math.PI / 2;
+  trail.position.z = 1.25;
+  root.add(body, wing, tail, eye, trail);
+  root.traverse((node) => {
+    node.userData.presentationOnly = true;
+    node.userData.blocksShots = false;
+    if (node instanceof THREE.Mesh) {
+      node.castShadow = !reducedRenderMode && index < 2;
+      node.receiveShadow = false;
+    }
+  });
+  return root;
+}
+
+function spawnHunterSwarm(now: number): string[] | null {
+  const assignments = hunterTargetAssignments();
+  if (assignments.length === 0) return null;
+  const centre = new THREE.Vector3(0, 13.5, 0);
+  assignments.forEach((targetId, index) => {
+    const angle = index / HUNTER_SWARM_COUNT * Math.PI * 2 - Math.PI / 2;
+    const root = makeHunterDrone(index);
+    root.position.set(centre.x + Math.cos(angle) * 4.2, centre.y + (index % 2) * 0.65, centre.z + Math.sin(angle) * 4.2);
+    root.rotation.y = -angle;
+    scene.add(root);
+    hunterDrones.push({
+      root,
+      targetId,
+      index,
+      spawnedAt: now,
+      diveAt: now + 850 + index * 120,
+      expiresAt: now + 8_000,
+    });
+    audio.hunterLaunch(index);
+  });
+  hunterSwarmLaunches += assignments.length;
+  addFeed('HUNTER SWARM · FIVE DRONES OVER MID-MAP', 'gold');
+  return assignments;
+}
+
+function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): void {
+  const started = performance.now();
+  const presentationProfile = supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0, 'hunter-swarm', false);
+  const afterPresentation = performance.now();
+  const blastNonce = randomNonce();
+  const supportNonce = localSupportNonces.get('hunter-swarm');
+  for (const bot of bots.values()) {
+    if (!bot.alive || bot.team === player.team) continue;
+    const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    const damage = outgoingDamage(hunterSwarmDamage(distance, 'stand'));
+    if (damage > 0) applyBotDamage(bot, damage, 'body');
+  }
+  for (const remote of remotes.values()) {
+    if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) || remote.snapshot.hp <= 0) continue;
+    const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    const baseDamage = hunterSwarmDamage(distance, remote.snapshot.stance ?? 'stand');
+    if (baseDamage > 0 && supportNonce !== undefined) {
+      sendAuthoritativeHit({
+        type: 'hit',
+        by: player.id,
+        target: remote.snapshot.id,
+        damage: Math.min(100, baseDamage),
+        kind: 'explosive',
+        explosiveSource: 'hunter-swarm',
+        origin: point.toArray(),
+        actionNonce: blastNonce,
+        supportNonce,
+        nonce: randomNonce(),
+      });
+    }
+  }
+  const finished = performance.now();
+  recordSupportExplosionProfile({
+    source: 'hunter-swarm',
+    audioMs: presentationProfile.audioMs,
+    visualMs: presentationProfile.visualMs,
+    targetDamageMs: finished - afterPresentation,
+    totalSyncMs: finished - started,
+  });
+  hunterSwarmImpacts += 1;
+  retireSupportRoot(drone.root);
+  const index = hunterDrones.indexOf(drone);
+  if (index >= 0) hunterDrones.splice(index, 1);
+}
+
+function beginNuke(now: number): void {
+  nukeShockwave.scale.setScalar(0.1);
+  (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
+  nukeShockwave.visible = false;
+  nukeSequence = {
+    startedAt: now,
+    detonateAt: now + NUKE_WARNING_MS,
+    finishedAt: now + NUKE_WARNING_MS + 3_500,
+    detonated: false,
+    shockwave: nukeShockwave,
+  };
+  const warning = element<HTMLElement>('#nuke-warning');
+  warning.hidden = false;
+  element<HTMLElement>('#nuke-warning b').textContent = '5';
+  audio.nukeWarning();
+  nukeLaunches += 1;
+  addFeed('NUKE ARMED · FIVE-SECOND ATOMIC WARNING', 'gold');
+}
+
+function detonateNuke(sequence: NukeSequence): void {
+  const started = performance.now();
+  sequence.detonated = true;
+  audio.nukeDetonation();
+  const afterAudio = performance.now();
+  sequence.shockwave.visible = true;
+  sequence.shockwave.scale.setScalar(0.1);
+  const flash = element<HTMLElement>('#nuke-flash');
+  flash.hidden = false;
+  flash.style.opacity = '1';
+  landingImpulse = Math.max(landingImpulse, 1);
+  nukeDetonations += 1;
+  const afterVisual = performance.now();
+  const blastNonce = randomNonce();
+  const supportNonce = localSupportNonces.get('nuke');
+  for (const remote of remotes.values()) {
+    const damage = nukeDamageForTarget(player.team, remote.snapshot.team, remote.snapshot.hp > 0);
+    if (damage <= 0 || supportNonce === undefined) continue;
+    sendAuthoritativeHit({
+      type: 'hit',
+      by: player.id,
+      target: remote.snapshot.id,
+      damage: Math.min(100, damage),
+      kind: 'explosive',
+      explosiveSource: 'nuke',
+      origin: [0, 1.5, 0],
+      actionNonce: blastNonce,
+      supportNonce,
+      nonce: randomNonce(),
+    });
+  }
+  for (const bot of [...bots.values()]) {
+    const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
+    if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body');
+  }
+  const finished = performance.now();
+  recordSupportExplosionProfile({
+    source: 'nuke',
+    audioMs: afterAudio - started,
+    visualMs: afterVisual - afterAudio,
+    targetDamageMs: finished - afterVisual,
+    totalSyncMs: finished - started,
+  });
+  addFeed('ATOMIC DETONATION · HOSTILE FIELD PURGED', 'gold');
+}
+
+function updateNuke(now: number): void {
+  const sequence = nukeSequence;
+  if (!sequence) return;
+  const warning = element<HTMLElement>('#nuke-warning');
+  if (!sequence.detonated) {
+    const remaining = Math.max(0, sequence.detonateAt - now);
+    element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
+    const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
+    if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
+    if (scene.fog) scene.fog.color.set(activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    if (now >= sequence.detonateAt) detonateNuke(sequence);
+    return;
+  }
+  warning.hidden = true;
+  const elapsed = now - sequence.detonateAt;
+  const blastProgress = THREE.MathUtils.clamp(elapsed / 2_600, 0, 1);
+  const flashStrength = Math.exp(-elapsed / 620);
+  sequence.shockwave.scale.setScalar(0.1 + blastProgress * 125);
+  (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
+  if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
+  if (scene.fog) scene.fog.color.set(activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
+  const flash = element<HTMLElement>('#nuke-flash');
+  flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
+  if (now < sequence.finishedAt) return;
+  sequence.shockwave.visible = false;
+  (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
+  if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
+  if (scene.fog) scene.fog.color.set(activeLighting.fogColor);
+  flash.hidden = true;
+  flash.style.opacity = '0';
+  nukeSequence = null;
+}
+
+const triPassMissileBodyGeometry = new THREE.CylinderGeometry(0.14, 0.18, 2.4, 10);
+const triPassMissileNoseGeometry = new THREE.ConeGeometry(0.18, 0.55, 10);
+const triPassMissileFinGeometry = new THREE.BoxGeometry(0.9, 0.08, 0.28);
+const triPassMissileBodyMaterial = new THREE.MeshBasicMaterial({ color: 0xd5bf76 });
+const triPassMissileNoseMaterial = new THREE.MeshBasicMaterial({ color: 0xff765f });
+const triPassMissileFinMaterial = new THREE.MeshBasicMaterial({ color: 0x29393d });
+const triPassMarkerGeometry = new THREE.RingGeometry(1.35, 1.75, 28);
+const triPassMarkerMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff684f,
+  transparent: true,
+  opacity: 0.7,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+  toneMapped: false,
+});
+
+function makeSkyMissile(): THREE.Group {
+  const root = new THREE.Group();
+  root.name = 'tri-pass-sky-missile';
+  root.userData.pooledSupportPresentation = true;
+  const body = new THREE.Mesh(triPassMissileBodyGeometry, triPassMissileBodyMaterial);
+  const nose = new THREE.Mesh(triPassMissileNoseGeometry, triPassMissileNoseMaterial);
+  nose.position.y = -1.45;
+  nose.rotation.z = Math.PI;
+  const fins = new THREE.Mesh(triPassMissileFinGeometry, triPassMissileFinMaterial);
+  fins.position.y = 0.92;
+  root.add(body, nose, fins);
+  return root;
+}
+
+function disposeSupportRoot(root: THREE.Object3D): void {
+  scene.remove(root);
+  // Shared Tri-Pass missile/marker GPU resources must not be disposed per impact.
+  if (root.userData.pooledSupportPresentation === true) {
+    root.visible = false;
+    return;
+  }
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    materials.forEach((material) => material.dispose());
+  });
+}
+
+function retireSupportRoot(root: THREE.Object3D): void {
+  scene.remove(root);
+  root.visible = false;
+  deferredSupportDisposals.push(root);
+}
+
+function supportBlast(
+  point: THREE.Vector3,
+  radius: number,
+  maximumDamage: number,
+  explosiveSource: OffensiveSupportSource,
+  recordProfile = true,
+): ExplosionSyncProfile {
+  const started = performance.now();
+  audio.explosion(started);
+  const afterAudio = performance.now();
+  supportExplosionPresentation.emit(point, radius, started);
+  const afterVisual = performance.now();
+  if (maximumDamage <= 0) {
+    const profile: ExplosionSyncProfile = {
+      source: explosiveSource,
+      audioMs: afterAudio - started,
+      visualMs: afterVisual - afterAudio,
+      targetDamageMs: 0,
+      totalSyncMs: afterVisual - started,
+    };
+    if (recordProfile) recordSupportExplosionProfile(profile);
+    return profile;
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    const damage = Math.min(400, outgoingDamage(Math.max(1, Math.round(maximumDamage * (1 - distance / radius)))));
+    applyBotDamage(bot, damage, 'body');
+  }
+  const blastNonce = randomNonce();
+  const supportNonce = localSupportNonces.get(explosiveSource);
+  for (const remote of remotes.values()) {
+    if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) || remote.snapshot.hp <= 0) continue;
+    if (supportNonce === undefined) {
+      supportNetworkHitTelemetry[explosiveSource].missingAuthorization += 1;
+      continue;
+    }
+    const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
+    const distance = target.distanceTo(point);
+    if (distance > radius) {
+      supportNetworkHitTelemetry[explosiveSource].outOfRange += 1;
+      continue;
+    }
+    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) {
+      supportNetworkHitTelemetry[explosiveSource].blocked += 1;
+      continue;
+    }
+    const baseDamage = Math.max(1, Math.round(maximumDamage * (1 - distance / radius)));
+    supportNetworkHitTelemetry[explosiveSource].sent += 1;
+    sendAuthoritativeHit({
+      type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, baseDamage),
+      kind: 'explosive', explosiveSource, origin: point.toArray(), actionNonce: blastNonce,
+      supportNonce, nonce: randomNonce(),
+    });
+  }
+  const finished = performance.now();
+  const profile: ExplosionSyncProfile = {
+    source: explosiveSource,
+    audioMs: afterAudio - started,
+    visualMs: afterVisual - afterAudio,
+    targetDamageMs: finished - afterVisual,
+    totalSyncMs: finished - started,
+  };
+  if (recordProfile) recordSupportExplosionProfile(profile);
+  return profile;
+}
+
+function currentTriPassHostiles(): Array<{ id: string; kind: 'bot' | 'remote'; x: number; z: number }> {
+  const freeForAll = gameMode !== 'solo' && privateMatchMode === 'ffa';
+  return selectTriPassHostiles([
+    ...[...bots.values()].map((bot) => ({
+      id: bot.id,
+      kind: 'bot' as const,
+      team: bot.team,
+      alive: bot.alive,
+      x: bot.position.x,
+      z: bot.position.z,
+    })),
+    ...[...remotes.values()]
+      .filter((remote) => remote.snapshot.id !== player.id)
+      .map((remote) => ({
+      id: remote.snapshot.id,
+      kind: 'remote' as const,
+      team: remote.snapshot.team,
+      alive: remote.snapshot.hp > 0,
+      x: remote.target.x,
+      z: remote.target.z,
+    })),
+  ], player.team, { freeForAll });
+}
+
+function drawStrikeMap(now = performance.now()): void {
+  const context = strikeMapContext;
+  const width = strikeMapCanvas.width;
+  const height = strikeMapCanvas.height;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = '#10232a';
+  context.fillRect(0, 0, width, height);
+  context.strokeStyle = 'rgba(181, 224, 222, 0.12)';
+  context.lineWidth = 1;
+  for (let line = 1; line < 8; line += 1) {
+    context.beginPath(); context.moveTo(line * width / 8, 0); context.lineTo(line * width / 8, height); context.stroke();
+    context.beginPath(); context.moveTo(0, line * height / 8); context.lineTo(width, line * height / 8); context.stroke();
+  }
+  // Road band is Atomic Acres-specific; other maps get a lighter centre guide only.
+  if (selectedArena.id === 'atomic-acres') {
+    const [roadLeft] = worldToMinimap(-9.5, 0, arena.bounds, width, height);
+    const [roadRight] = worldToMinimap(9.5, 0, arena.bounds, width, height);
+    context.fillStyle = 'rgba(88, 102, 105, 0.78)';
+    context.fillRect(roadLeft, 0, roadRight - roadLeft, height);
+  }
+  context.strokeStyle = '#e3bd5f';
+  context.setLineDash([10, 10]);
+  context.beginPath(); context.moveTo(width / 2, 0); context.lineTo(width / 2, height); context.stroke();
+  context.setLineDash([]);
+  for (const house of arena.houses) {
+    const [cx, cy] = worldToMinimap(house.origin.x, house.origin.z, arena.bounds, width, height);
+    const [minX] = worldToMinimap(house.origin.x - house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, minY] = worldToMinimap(house.origin.x, house.origin.z + house.dimensions.depth / 2, arena.bounds, width, height);
+    const [maxX] = worldToMinimap(house.origin.x + house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, maxY] = worldToMinimap(house.origin.x, house.origin.z - house.dimensions.depth / 2, arena.bounds, width, height);
+    context.fillStyle = house.team === 0 ? 'rgba(72, 185, 183, 0.58)' : 'rgba(214, 113, 91, 0.58)';
+    context.strokeStyle = house.team === 0 ? '#80f5f0' : '#ff9a7f';
+    context.lineWidth = 3;
+    context.fillRect(minX, minY, maxX - minX, maxY - minY);
+    context.strokeRect(minX, minY, maxX - minX, maxY - minY);
+    context.fillStyle = '#f6ead6'; context.font = '700 14px sans-serif'; context.textAlign = 'center';
+    context.fillText(house.label.toUpperCase(), cx, cy + 5);
+  }
+  // Yard cover / solid props for maps without houses (Rustworks) so you can aim bombs relative to structure.
+  if (arena.houses.length === 0) {
+    context.fillStyle = 'rgba(120, 112, 98, 0.55)';
+    context.strokeStyle = 'rgba(210, 190, 150, 0.35)';
+    context.lineWidth = 1;
+    let drawn = 0;
+    for (const box of arena.colliders) {
+      const sizeX = box.maxX - box.minX;
+      const sizeZ = box.maxZ - box.minZ;
+      if (sizeX < 1.2 || sizeZ < 1.2 || sizeX > 30 || sizeZ > 30) continue;
+      if ((box.maxY ?? 4) < 0.8) continue;
+      const [minX, minY] = worldToMinimap(box.minX, box.maxZ, arena.bounds, width, height);
+      const [maxX, maxY] = worldToMinimap(box.maxX, box.minZ, arena.bounds, width, height);
+      context.fillRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
+      context.strokeRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
+      drawn += 1;
+      if (drawn >= 48) break;
+    }
+  }
+  // Local player always drawn so you can orient bombs relative to yourself.
+  {
+    const [px, py] = worldToMinimap(player.position.x, player.position.z, arena.bounds, width, height);
+    context.fillStyle = 'rgba(120, 245, 237, 0.28)';
+    context.beginPath(); context.arc(px, py, 16, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#78f5ed';
+    context.beginPath(); context.arc(px, py, 9, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 2; context.stroke();
+    context.fillStyle = '#10232a'; context.font = '900 10px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText('YOU', px, py);
+    context.textBaseline = 'alphabetic';
+  }
+  const hostilePulse = 10 + Math.sin(now * 0.012) * 2;
+  triPassHostileMarkers = currentTriPassHostiles().map((hostile, index) => {
+    const [x, y] = worldToMinimap(hostile.x, hostile.z, arena.bounds, width, height);
+    context.fillStyle = 'rgba(255, 70, 49, 0.38)';
+    context.beginPath(); context.arc(x, y, hostilePulse + 10, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#ff4631';
+    context.beginPath(); context.arc(x, y, hostilePulse, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
+    context.fillStyle = '#fff4d9'; context.font = '900 11px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText(hostile.kind === 'bot' ? 'BOT' : 'P', x, y + 0.5);
+    context.textBaseline = 'alphabetic';
+    context.fillStyle = '#ffd2a8'; context.font = '800 11px sans-serif';
+    context.fillText(String(index + 1), x, y - hostilePulse - 8);
+    return { id: hostile.id, kind: hostile.kind, world: [hostile.x, hostile.z], canvas: [x, y] };
+  });
+  element<HTMLElement>('#strike-hostile-count').textContent = triPassHostileMarkers.length === 0
+    ? 'NO LIVE ENEMIES ON MAP'
+    : `ENEMIES LIVE · ${triPassHostileMarkers.length} (red = people/bots)`;
+  const points = triPassTargeting?.points ?? [];
+  points.forEach((point, index) => {
+    const [x, y] = worldToMinimap(point.x, point.z, arena.bounds, width, height);
+    context.fillStyle = '#ff684f';
+    context.beginPath(); context.arc(x, y, 16, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
+    context.fillStyle = '#10232a'; context.font = '900 18px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.fillText(String(index + 1), x, y + 1);
+  });
+  context.textBaseline = 'alphabetic';
+  context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
+  context.fillText('N', width / 2, 28);
+  element<HTMLElement>('#strike-target-count').textContent = `${points.length} / 3`;
+  lastStrikeMapDrawAt = now;
+}
+
+function beginTriPassTargeting(): void {
+  triPassTargeting = createTriPassTargeting();
+  tacticalMapOpen = true;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
+  const overlay = element<HTMLElement>('#strike-map-overlay');
+  overlay.hidden = false;
+  menu.classList.add('hidden');
+  clearGameplayInput();
+  drawStrikeMap();
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+}
+
+function cancelTriPassTargeting(refund: boolean, reacquirePointer = true): void {
+  const wasIncomplete = triPassTargeting !== null && !triPassTargeting.complete;
+  if (refund && wasIncomplete) {
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'tri-pass': true } };
+    addFeed('TRI-PASS TARGETING CANCELLED · REFUNDED', 'gold');
+  }
+  triPassTargeting = null;
+  tacticalMapOpen = false;
+  triPassHostileMarkers = [];
+  element<HTMLElement>('#strike-hostile-count').textContent = 'ENEMIES LIVE · 0';
+  element<HTMLElement>('#strike-map-overlay').hidden = true;
+  updateFieldSupportHud();
+  if (reacquirePointer && gameStarted && player.alive && !matchFinished) requestGamePointerLock();
+}
+
+function scheduleTriPassMissiles(points: readonly { x: number; z: number }[], confirmedAt: number): void {
+  const schedule = triPassSchedule(confirmedAt);
+  triPassLaunches += Math.min(3, points.length);
+  points.slice(0, 3).forEach((point, index) => {
+    const target = new THREE.Vector3(point.x, 0.2, point.z);
+    const missile = makeSkyMissile();
+    missile.position.set(target.x, 30 + index * 1.5, target.z);
+    scene.add(missile);
+    const marker = new THREE.Mesh(triPassMarkerGeometry, triPassMarkerMaterial);
+    marker.name = 'tri-pass-impact-marker';
+    marker.userData.pooledSupportPresentation = true;
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.copy(target);
+    scene.add(marker);
+    strikeMissiles.push({ missile, marker, target, startedAt: confirmedAt, impactAt: schedule[index], resolved: false });
+  });
+  addFeed('TRI-PASS · THREE MISSILES INBOUND · 1.0 SEC', 'gold');
+}
+
+function registerTriPassClick(clientX: number, clientY: number, confirmedAt = performance.now()): boolean {
+  if (!tacticalMapOpen || !triPassTargeting || triPassTargeting.complete) return false;
+  const rect = strikeMapCanvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
+  const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
+  // Prefer locking onto a live hostile when the click is near their blip.
+  let point = minimapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  let nearestDistance = 36;
+  for (const marker of triPassHostileMarkers) {
+    const dx = marker.canvas[0] - x;
+    const dy = marker.canvas[1] - y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      point = { x: marker.world[0], z: marker.world[1] };
+    }
+  }
+  const next = registerTriPassTarget(triPassTargeting, point, arena.bounds);
+  if (next === triPassTargeting) return false;
+  triPassTargeting = next;
+  drawStrikeMap();
+  if (next.complete) {
+    authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
+    scheduleTriPassMissiles(next.points, confirmedAt);
+    cancelTriPassTargeting(false);
+  }
+  return true;
+}
+
+strikeMapCanvas.addEventListener('click', (event) => {
+  registerTriPassClick(event.clientX, event.clientY);
+});
+
+function authorizeLocalOffensiveSupport(
+  source: OffensiveSupportSource,
+  effectOrigins: [number, number, number][] = [],
+  targetIds: string[] = [],
+): number {
+  const activationNonce = randomNonce();
+  localSupportNonces.set(source, activationNonce);
+  if (network.role !== 'offline') {
+    network.send({ type: 'support-activate', by: player.id, source, activationNonce, effectOrigins, targetIds, nonce: randomNonce() });
+  }
+  return activationNonce;
+}
+
+function activateFieldSupport(id: FieldSupportId): void {
+  if (!selectedArena.fieldSupport || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
+  const consumed = consumeFieldSupport(fieldSupport, id);
+  if (!consumed.activated) return;
+  const now = performance.now();
+  endSpawnProtectionOnOffense(now);
+  fieldSupport = consumed.state;
+  if (id === 'scout-sweep') {
+    scoutSweepUntil = now + 12_000;
+    addFeed('SCOUT SWEEP ACTIVE · 12 SEC', 'gold');
+  } else if (id === 'yardhawk') {
+    const target = nearestSupportTarget();
+    if (!target) {
+      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, yardhawk: true } };
+      updateFieldSupportHud();
+      return;
+    }
+    if (yardhawk) disposeSupportRoot(yardhawk.root);
+    const root = new THREE.Group(); root.name = 'yardhawk-hunter-killer';
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, 0.9), new THREE.MeshBasicMaterial({ color: 0x29393d }));
+    const wings = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.08, 0.32), new THREE.MeshBasicMaterial({ color: 0xe0bd68 }));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff765f })); eye.position.z = -0.48;
+    root.add(body, wings, eye);
+    const forward = camera.getWorldDirection(new THREE.Vector3()).normalize();
+    root.position.copy(camera.position).addScaledVector(forward, 0.85).add(new THREE.Vector3(0, -0.32, 0));
+    scene.add(root);
+    yardhawk = {
+      root,
+      targetId: target.id,
+      phase: 'thrown',
+      velocity: forward.multiplyScalar(10).add(new THREE.Vector3(0, 4.2, 0)),
+      spawnedAt: now,
+      armedAt: now + 450,
+      expiresAt: now + 6_500,
+    };
+    authorizeLocalOffensiveSupport('yardhawk', [], [target.id]);
+    addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
+  } else if (id === 'tri-pass') {
+    beginTriPassTargeting();
+  } else if (id === 'hunter-swarm') {
+    const assignments = spawnHunterSwarm(now);
+    if (!assignments) {
+      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'hunter-swarm': true } };
+      addFeed('HUNTER SWARM · NO HOSTILE TARGETS · REFUNDED', 'gold');
+    } else authorizeLocalOffensiveSupport('hunter-swarm', [], assignments);
+  } else {
+    authorizeLocalOffensiveSupport('nuke');
+    beginNuke(now);
+  }
+  updateFieldSupportHud();
+}
+
+function detonateYardhawk(point: THREE.Vector3, radius: number, maxDamage: number): void {
+  if (!yardhawk) return;
+  supportBlast(point, radius, maxDamage, 'yardhawk');
+  yardhawkExplosions += 1;
+  retireSupportRoot(yardhawk.root);
+  yardhawk = null;
+}
+
+function updateHunterDrones(dt: number, now: number): void {
+  for (let index = hunterDrones.length - 1; index >= 0; index -= 1) {
+    const drone = hunterDrones[index];
+    let target = supportTargetState(drone.targetId);
+    if (!target) {
+      const replacement = nearestSupportTarget();
+      if (replacement) {
+        drone.targetId = replacement.id;
+        target = supportTargetState(replacement.id);
+      }
+    }
+    if (now >= drone.expiresAt || !target) {
+      detonateHunterDrone(drone, drone.root.position.clone());
+      continue;
+    }
+    if (now < drone.diveAt) {
+      const angle = drone.index / HUNTER_SWARM_COUNT * Math.PI * 2 + (now - drone.spawnedAt) * 0.0014;
+      const formation = new THREE.Vector3(Math.cos(angle) * 4.2, 13.5 + Math.sin(now * 0.004 + drone.index) * 0.35, Math.sin(angle) * 4.2);
+      drone.root.position.lerp(formation, Math.min(1, dt * 4.5));
+      drone.root.lookAt(target.point);
+      continue;
+    }
+    const direction = target.point.clone().sub(drone.root.position);
+    const distance = direction.length();
+    if (distance <= 0.85) {
+      detonateHunterDrone(drone, target.point);
+      continue;
+    }
+    const step = direction.normalize().multiplyScalar(Math.min(distance, dt * (20 + drone.index * 0.85)));
+    const collision = sweepSphereAgainstBoxes(drone.root.position, step, arena.colliders, 0.24);
+    if (collision) {
+      const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+      const impact = drone.root.position.clone().addScaledVector(step, collision.time).addScaledVector(normal, 0.26);
+      detonateHunterDrone(drone, impact);
+      continue;
+    }
+    drone.root.position.add(step);
+    drone.root.lookAt(target.point);
+    drone.root.rotation.z = Math.sin(now * 0.012 + drone.index) * 0.2;
+  }
+}
+
+function updateFieldSupport(dt: number, now: number): void {
+  supportExplosionFrameSerial += 1;
+  supportExplosionPresentation.update(now);
+  if (tacticalMapOpen && now - lastStrikeMapDrawAt >= 100) drawStrikeMap(now);
+  if (yardhawk) {
+    if (now >= yardhawk.expiresAt) {
+      detonateYardhawk(yardhawk.root.position.clone(), 2.8, 150);
+    } else if (yardhawk.phase === 'thrown') {
+      yardhawk.velocity.y -= 9.5 * dt;
+      const start = yardhawk.root.position.clone();
+      const delta = yardhawk.velocity.clone().multiplyScalar(dt);
+      const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders, 0.24);
+      if (collision) {
+        const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+        const impact = start.clone().addScaledVector(delta, collision.time).addScaledVector(normal, 0.26);
+        detonateYardhawk(impact, 2.8, 150);
+      } else {
+        yardhawk.root.position.add(delta);
+      }
+      if (yardhawk) {
+        yardhawk.root.rotation.x += dt * 8;
+        yardhawk.root.rotation.z += dt * 11;
+        if (now >= yardhawk.armedAt) {
+          yardhawk.phase = 'homing';
+          yardhawk.velocity.set(0, 0, 0);
+          addFeed('YARDHAWK ARMED · TARGET LOCK', 'gold');
+        }
+      }
+    } else {
+      let target = supportTargetPosition(yardhawk.targetId);
+      if (!target) {
+        const replacement = nearestSupportTarget();
+        if (replacement) {
+          yardhawk.targetId = replacement.id;
+          target = replacement.point;
+        }
+      }
+      if (target) {
+        const direction = target.clone().sub(yardhawk.root.position);
+        const distance = direction.length();
+        if (distance <= 1.15) {
+          detonateYardhawk(target, 3.2, 200);
+        } else {
+          const step = direction.normalize().multiplyScalar(Math.min(distance, dt * 16));
+          const start = yardhawk.root.position.clone();
+          const collision = sweepSphereAgainstBoxes(start, step, arena.colliders, 0.24);
+          if (collision) {
+            const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+            const impact = start.clone().addScaledVector(step, collision.time).addScaledVector(normal, 0.26);
+            detonateYardhawk(impact, 2.8, 150);
+          } else {
+            yardhawk.root.position.add(step);
+            yardhawk.root.lookAt(target);
+          }
+        }
+      } else {
+        yardhawk.root.position.y += Math.sin(now * 0.009) * dt * 0.16;
+        yardhawk.root.rotation.y += dt * 2;
+      }
+    }
+  }
+  updateHunterDrones(dt, now);
+  for (let index = strikeMissiles.length - 1; index >= 0; index -= 1) {
+    const strike = strikeMissiles[index];
+    const progress = THREE.MathUtils.clamp((now - strike.startedAt) / Math.max(1, strike.impactAt - strike.startedAt), 0, 1);
+    strike.missile.position.y = THREE.MathUtils.lerp(30, 0.65, progress ** 1.35);
+    strike.missile.rotation.y += dt * 7;
+    (strike.marker.material as THREE.MeshBasicMaterial).opacity = 0.38 + Math.sin(now * 0.022) * 0.22;
+    strike.marker.scale.setScalar(0.88 + progress * 0.22);
+    if (!strike.resolved && now >= strike.impactAt) {
+      strike.resolved = true;
+      supportBlast(strike.target, TRI_PASS_BLAST_RADIUS, TRI_PASS_MAX_DAMAGE, 'tri-pass');
+      triPassImpacts += 1;
+      triPassLastImpactDelayMs = now - strike.startedAt;
+      retireSupportRoot(strike.missile);
+      retireSupportRoot(strike.marker);
+      strikeMissiles.splice(index, 1);
+    }
+  }
+  updateNuke(now);
+}
+
+function clearGrenades(): void {
+  for (const grenade of grenades) {
+    releaseBotGrenadeOwner(grenade);
+    disposeGrenadePresentation(grenade.mesh);
+  }
+  grenades.length = 0;
+}
+
+function clearFieldSupport(): void {
+  if (yardhawk) disposeSupportRoot(yardhawk.root);
+  yardhawk = null;
+  for (const strike of strikeMissiles) {
+    disposeSupportRoot(strike.missile);
+    disposeSupportRoot(strike.marker);
+  }
+  strikeMissiles.length = 0;
+  for (const drone of hunterDrones) disposeSupportRoot(drone.root);
+  hunterDrones.length = 0;
+  for (const root of deferredSupportDisposals) disposeSupportRoot(root);
+  deferredSupportDisposals.length = 0;
+  supportExplosionPresentation.clear();
+  if (nukeSequence) nukeSequence = null;
+  nukeShockwave.visible = false;
+  (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
+  if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
+  if (scene.fog) scene.fog.color.set(activeLighting.fogColor);
+  const nukeWarning = element<HTMLElement>('#nuke-warning');
+  const nukeFlash = element<HTMLElement>('#nuke-flash');
+  nukeWarning.hidden = true;
+  nukeFlash.hidden = true;
+  nukeFlash.style.opacity = '0';
+  cancelTriPassTargeting(false, false);
+  scoutSweepUntil = 0;
+  yardhawkExplosions = 0;
+  triPassLaunches = 0;
+  triPassImpacts = 0;
+  triPassLastImpactDelayMs = null;
+  hunterSwarmLaunches = 0;
+  hunterSwarmImpacts = 0;
+  nukeLaunches = 0;
+  nukeDetonations = 0;
+  fieldSupport = createFieldSupportState();
+  localSupportNonces.clear();
+  admittedRemoteShots.clear();
+  admittedRemoteMelees.clear();
+  admittedRemoteExplosions.clear();
+  for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
+  for (const id of remotes.keys()) remoteGrenadeAuthorities.set(id, createRemoteGrenadeAuthorityState());
+  for (const id of remotes.keys()) remoteHealthAuthorities.set(id, createRemoteHealthAuthorityState(true));
+  updateFieldSupportHud();
+}
+
+function clearTeamPings(): void {
+  for (const ping of activeTeamPings) removeTeamPing(ping);
+  activeTeamPings.length = 0;
+  remotePingAdmissions.clear();
+  localPingAdmission = createTeamPingAdmissionState();
+}
+
 function updatePhysics(dt: number): void {
-  if (!gameStarted || !player.alive || matchState.phase === 'ended' || !characterPhysics) return;
+  if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
@@ -1140,10 +5421,11 @@ function updatePhysics(dt: number): void {
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
-  const wantsSprint = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
-  if (wantsSprint && player.stance !== 'stand') requestStance('stand');
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
+  const wantsSprint = (keys.has('ShiftLeft') || gamepadSprint) && input.lengthSq() > 0 && playerGrounded;
+  const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
+  if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
@@ -1171,6 +5453,14 @@ function updatePhysics(dt: number): void {
   }
 
   const impactVelocity = player.velocity.y;
+  // Ocean buoyancy/drag when looking/falling outside the island pad.
+  const preWater = waterSystem.samplePhysics(player.position);
+  if (preWater.inWater) {
+    player.velocity.y += preWater.buoyancy * dt;
+    player.velocity.x *= Math.max(0.2, 1 - preWater.drag * dt);
+    player.velocity.z *= Math.max(0.2, 1 - preWater.drag * dt);
+    player.velocity.y *= Math.max(0.25, 1 - preWater.drag * 0.65 * dt);
+  }
   const movement = characterPhysics.move({
     x: player.velocity.x * dt,
     y: player.velocity.y * dt,
@@ -1178,21 +5468,34 @@ function updatePhysics(dt: number): void {
   }, dt);
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
+  const postWater = waterSystem.samplePhysics(player.position);
+  if (postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
+    // Soft float toward surface so OOB falls feel like water, not a void clip.
+    player.position.y = Math.min(postWater.surfaceY + 0.55, Math.max(player.position.y, postWater.surfaceY - 0.9));
+    characterPhysics.teleportEye(player.position);
+    if (player.velocity.y < 0.4) player.velocity.y = Math.max(player.velocity.y, 1.2);
+    playerGrounded = false;
+  }
   if (playerGrounded) lastGroundedAt = now;
   if (playerGrounded && !wasGrounded && impactVelocity < -5) {
     landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
     audio.land(Math.abs(impactVelocity));
   }
   wasGrounded = playerGrounded;
-  if (movement.blockedX) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
+  if (movement.blockedX && !movement.slopeAdjusted) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
   if (movement.blockedY && player.velocity.y < 0) player.velocity.y = 0;
-  if (movement.blockedZ) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
+  if (movement.blockedZ && !movement.slopeAdjusted) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
 
   const moving = input.lengthSq() > 0 && playerGrounded;
-  const footstepInterval = currentSprinting ? 300 : prone ? 760 : crouched ? 575 : 405;
-  if (moving && now - lastFootstepAt >= footstepInterval) {
-    lastFootstepAt = now;
-    audio.footstep(currentSprinting, crouched || prone);
+  const appliedHorizontalDistance = playerGrounded ? Math.hypot(movement.appliedDelta.x, movement.appliedDelta.z) : 0;
+  const footsteps = advanceFootsteps(
+    footstepAccumulator,
+    appliedHorizontalDistance,
+    strideLength(player.stance, currentSprinting),
+  );
+  footstepAccumulator = footsteps.state;
+  for (let index = 0; index < footsteps.emitted; index += 1) {
+    audio.footstep(classifyFootstepSurface(player.position), currentSprinting, crouched || prone);
   }
   weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
@@ -1201,7 +5504,7 @@ function updatePhysics(dt: number): void {
   cameraHeightOffset = damp(cameraHeightOffset, 0, prone ? 9 : 15, dt);
   const lateralSpeed = player.velocity.dot(right) / Math.max(1, profile.maxSpeed);
   cameraRoll = damp(cameraRoll, -lateralSpeed * (adsHeld ? 0.006 : 0.016), 11, dt);
-  weaponView.update({
+  const weaponActionEvents = weaponView.update({
     dt,
     moving,
     sprinting: currentSprinting,
@@ -1211,9 +5514,26 @@ function updatePhysics(dt: number): void {
     phase: weaponBob,
     landingImpulse,
     lateralSpeed,
+    reloadProgress: debugReloadProgress ?? gameplayReloadProgress(player.reloadState, performance.now()),
   });
-  camera.fov = damp(camera.fov, adsHeld ? Math.max(55, preferredFov - 20) : currentSprinting ? preferredFov + 4.5 : preferredFov, 10, dt);
+  for (const event of weaponActionEvents) {
+    audio.weaponAction(player.weapon, event);
+    weaponActionHistory.push(event);
+  }
+  if (weaponActionHistory.length > 16) weaponActionHistory.splice(0, weaponActionHistory.length - 16);
+  const aimingFov = player.weapon === 'sniper'
+    ? magnifiedFovDegrees(preferredFov, 3)
+    : Math.max(55, preferredFov - 20);
+  camera.fov = damp(camera.fov, adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov, player.weapon === 'sniper' ? 18 : 10, dt);
   camera.updateProjectionMatrix();
+  const sniperScopeActive = player.alive
+    && player.weapon === 'sniper'
+    && adsHeld
+    && weaponView.adsProgress() >= 0.9
+    && Math.abs(camera.fov - aimingFov) < 0.35;
+  sniperScopeOverlay.hidden = !sniperScopeActive;
+  hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
+  weaponView.root.visible = gameStarted && !sniperScopeActive;
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -1227,24 +5547,27 @@ function updateRemotes(dt: number, now: number): void {
       removeRemote(id, 'timed out');
       continue;
     }
-    const alpha = 1 - Math.exp(-13 * dt);
+    const alpha = remoteInterpolationAlpha(dt);
+    const remainingDistance = remote.root.position.distanceTo(remote.target);
     remote.root.position.lerp(remote.target, alpha);
     remote.root.rotation.y += shortestAngleDelta(remote.root.rotation.y, remote.targetYaw) * alpha;
     const stance = remote.snapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
-    operator.rotation.x = THREE.MathUtils.lerp(operator.rotation.x, stance === 'prone' ? -1.38 : 0, alpha);
-    const targetScaleY = stance === 'crouch' ? 0.76 : stance === 'prone' ? 0.9 : 1;
-    operator.scale.y = THREE.MathUtils.lerp(operator.scale.y, targetScaleY, alpha);
-    operator.position.y = THREE.MathUtils.lerp(operator.position.y, stance === 'prone' ? 0.28 : 0, alpha);
+    setOperatorWeapon(operator, remote.snapshot.weapon, flattenOperatorMaterials);
+    poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, alpha, remote.snapshot.pitch);
   }
 }
 
 function teamScores(): [number, number] {
+  if (gameMode !== 'solo' && privateLobbySnapshot) {
+    return teamTotals([...authoritativeScores.values()], privateLobbySnapshot.members);
+  }
   let aqua = player.team === 0 ? player.kills : 0;
   let coral = player.team === 1 ? player.kills : 0;
   for (const remote of remotes.values()) {
-    if (remote.snapshot.team === 0) aqua += remote.snapshot.kills;
-    else coral += remote.snapshot.kills;
+    const admittedKills = verifiedRemoteKills.get(remote.snapshot.id) ?? 0;
+    if (remote.snapshot.team === 0) aqua += admittedKills;
+    else coral += admittedKills;
   }
   for (const bot of bots.values()) {
     if (bot.team === 0) aqua += bot.kills;
@@ -1256,21 +5579,68 @@ function teamScores(): [number, number] {
 function updateMatchState(now: number): void {
   const previous = matchState.phase;
   const scores = teamScores();
-  matchState = advanceMatch(matchState, now, scores);
+  const rules = currentMatchRules();
+  const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
+  const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]);
+  matchState = ffa
+    ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
+    : advanceMatch(matchState, now, scores, rules);
+  let presentation = matchPresentationAt(matchState, now, scores, player.team, rules, arena.label);
+  if (ffa) {
+    const localRank = Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1);
+    const leaders = orderedFfa.length === 0 ? [] : orderedFfa.filter((entry) => entry.kills === orderedFfa[0].kills);
+    const winner = matchState.winnerPlayerId ? privateLobbySnapshot?.members.find((member) => member.id === matchState.winnerPlayerId) : undefined;
+    presentation = {
+      timer: presentation.timer,
+      headline: matchState.phase === 'warmup'
+        ? String(Math.max(1, Math.ceil((matchState.endsAt - now) / 1_000)))
+        : matchState.phase === 'ended'
+          ? winner ? `${winner.name.toUpperCase()} WINS` : 'STALEMATE'
+          : null,
+      subline: matchState.phase === 'ended'
+        ? `${leaders.map((entry) => privateLobbySnapshot?.members.find((member) => member.id === entry.id)?.name ?? entry.id).join(' · ')} · YOUR PLACE #${localRank}`
+        : `FREE FOR ALL · PLACE #${localRank}`,
+      objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
+    };
+  }
+  const countdown = element<HTMLElement>('#countdown');
+  if (matchState.phase === 'warmup') {
+    countdown.textContent = presentation.headline ?? '';
+    countdown.hidden = false;
+  } else {
+    countdown.hidden = true;
+  }
   if (previous === matchState.phase) return;
   const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
-    banner.innerHTML = '<strong>ENGAGE</strong><span>First squad to 25</span>';
+    if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
+    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
+    banner.innerHTML = `<strong>ENGAGE</strong><span>${privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel}</span>`;
     banner.hidden = false;
     window.setTimeout(() => { if (matchState.phase === 'active') banner.hidden = true; }, 900);
     return;
   }
   if (matchState.phase === 'ended') {
     matchFinished = true;
-    const won = matchState.winner === player.team;
-    const draw = matchState.winner === 'draw';
-    banner.innerHTML = `<strong>${draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT'}</strong><span>${scores[0]} — ${scores[1]} · CLICK BOT SKIRMISH FOR REMATCH</span>`;
+    if (network.role === 'host' && privateLobbySnapshot?.phase !== 'ended') broadcastHostLobby('ended');
+    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' };
+    recordCompletedMatch();
+    clearGrenades();
+    clearFieldSupport();
+    const privateMatch = gameMode !== 'solo';
+    const returnLabel = privateMatch ? network.role === 'host' ? 'RETURN EVERYONE TO LOBBY' : 'WAITING FOR HOST' : 'REMATCH';
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><div class="match-end-actions"><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
     banner.hidden = false;
+    const rematch = element<HTMLButtonElement>('#rematch');
+    if (!rematch.disabled) rematch.addEventListener('click', () => {
+      if (privateMatch && network.role === 'host') returnPrivateMatchToLobby(true);
+      else {
+        network.close();
+        resetForMode();
+        startGame('solo', false);
+      }
+    }, { once: true });
+    element<HTMLButtonElement>('#match-main-menu').addEventListener('click', returnToMainMenu, { once: true });
     document.exitPointerLock();
   }
 }
@@ -1279,63 +5649,244 @@ function checkMatchEnd(): void {
   updateMatchState(performance.now());
 }
 
+function drawMinimapLandmark(
+  context: CanvasRenderingContext2D,
+  id: string,
+  kind: MinimapLandmarkKind,
+  footprint: { x: number; y: number; width: number; height: number },
+): void {
+  const { x, y, width, height } = footprint;
+  const inset = Math.max(1.5, Math.min(width, height) * 0.12);
+  context.save();
+  context.lineWidth = 2.5;
+  context.strokeStyle = '#fff1bd';
+  context.fillStyle = id.startsWith('south-') ? 'rgba(255, 118, 95, .66)' : 'rgba(88, 227, 220, .62)';
+
+  if (kind === 'bus') {
+    context.fillRect(x, y, width, height);
+    context.strokeRect(x, y, width, height);
+    context.strokeStyle = 'rgba(7, 15, 18, .88)';
+    context.beginPath();
+    context.moveTo(x + width * 0.18, y + inset);
+    context.lineTo(x + width * 0.18, y + height - inset);
+    context.moveTo(x + width * 0.82, y + inset);
+    context.lineTo(x + width * 0.82, y + height - inset);
+    context.stroke();
+  } else if (kind === 'cargo-stack') {
+    context.fillStyle = 'rgba(225, 171, 52, .76)';
+    context.fillRect(x, y, width, height);
+    context.strokeRect(x, y, width, height);
+    context.strokeStyle = 'rgba(7, 15, 18, .78)';
+    context.beginPath();
+    context.moveTo(x + width / 3, y); context.lineTo(x + width / 3, y + height);
+    context.moveTo(x + width * 2 / 3, y); context.lineTo(x + width * 2 / 3, y + height);
+    context.moveTo(x, y + height / 2); context.lineTo(x + width, y + height / 2);
+    context.stroke();
+  } else if (kind === 'pipe-stack') {
+    context.fillStyle = 'rgba(173, 186, 188, .72)';
+    const radius = Math.max(2.5, Math.min(width / 6, height / 3.2));
+    const centres: Array<[number, number]> = [
+      [0.22, 0.66], [0.5, 0.66], [0.78, 0.66], [0.36, 0.30], [0.64, 0.30],
+    ];
+    for (const [px, py] of centres) {
+      context.beginPath();
+      context.arc(x + width * px, y + height * py, radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+  } else if (kind === 'service-skip') {
+    context.fillStyle = 'rgba(225, 171, 52, .78)';
+    context.beginPath();
+    context.moveTo(x + inset, y);
+    context.lineTo(x + width - inset, y);
+    context.lineTo(x + width, y + height);
+    context.lineTo(x, y + height);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.strokeStyle = 'rgba(7, 15, 18, .82)';
+    context.beginPath();
+    context.moveTo(x + inset, y + height * 0.34);
+    context.lineTo(x + width - inset, y + height * 0.34);
+    context.stroke();
+  } else {
+    context.fillStyle = 'rgba(232, 203, 92, .74)';
+    context.fillRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
+    context.strokeRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
+    context.fillStyle = '#10232a';
+    const wheelRadius = Math.max(2.3, Math.min(width, height) * 0.13);
+    for (const wheelX of [x + width * 0.24, x + width * 0.76]) {
+      context.beginPath();
+      context.arc(wheelX, y + height - inset * 0.45, wheelRadius, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  context.restore();
+}
+
 function updateMinimap(now: number): void {
+  minimapRenderCount += 1;
   const context = minimapContext;
   const width = minimapCanvas.width;
   const height = minimapCanvas.height;
   const bounds = arena.bounds;
   const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = 'rgba(7, 15, 18, .78)';
+  context.fillStyle = 'rgba(7, 15, 18, .86)';
   context.fillRect(0, 0, width, height);
-  context.strokeStyle = 'rgba(244, 196, 79, .5)';
-  context.lineWidth = 2;
-  context.strokeRect(2, 2, width - 4, height - 4);
+  context.strokeStyle = 'rgba(244, 196, 79, .62)';
+  context.lineWidth = 4;
+  context.strokeRect(4, 4, width - 8, height - 8);
 
-  const [roadLeft] = point(-10.25, 0);
-  const [roadRight] = point(10.25, 0);
-  context.fillStyle = 'rgba(126, 137, 132, .18)';
-  context.fillRect(roadLeft, 2, roadRight - roadLeft, height - 4);
-  for (const [x, z, team] of [[-11, -34, 0], [11, 34, 1]] as Array<[number, number, Team]>) {
-    const [cx, cy] = point(x, z);
-    const houseWidth = (16.4 / (bounds.maxX - bounds.minX)) * width;
-    const houseHeight = (15 / (bounds.maxZ - bounds.minZ)) * height;
-    context.fillStyle = team === 0 ? 'rgba(88, 227, 220, .2)' : 'rgba(255, 118, 95, .2)';
-    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+  const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.rotate(playerUpRotationRadians(player.yaw));
+  context.scale(playerUpScaleX(), 1);
+  context.translate(-worldPlayerX, -worldPlayerY);
+
+  const renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+  const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
+  if (selectedArena.id === 'atomic-acres') {
+    const [roadLeft] = point(-10.25, 0);
+    const [roadRight] = point(10.25, 0);
+    context.fillStyle = 'rgba(126, 137, 132, .23)';
+    context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
+    context.strokeStyle = 'rgba(244, 196, 79, .42)';
+    context.lineWidth = 2;
+    context.setLineDash([10, 10]);
+    context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
+    context.setLineDash([]);
+    for (const house of arena.houses) {
+      const [cx, cy] = point(house.origin.x, house.origin.z);
+      const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
+      const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
+      context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
+      context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
+      context.lineWidth = 2;
+      context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+      context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    }
+    for (const cover of arena.physicalCover) {
+      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
+      if (!kind) continue;
+      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
+      drawMinimapLandmark(context, cover.id, kind, footprint);
+      const label = minimapLandmarkLabel(kind);
+      const centre = context.getTransform().transformPoint(new DOMPoint(
+        footprint.x + footprint.width / 2,
+        footprint.y + footprint.height / 2,
+      ));
+      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
+      renderedLandmarks.push({ id: cover.id, kind, label });
+    }
+  } else {
+    context.lineWidth = 1.5;
+    context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
+    context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
+    for (const collider of arena.colliders) {
+      const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
+      context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
+      context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    }
+    for (const target of arena.targets) {
+      const [x, y] = point(target.root.position.x, target.root.position.z);
+      context.fillStyle = target.distanceBand === 'near' ? '#58e3dc' : target.distanceBand === 'mid' ? '#f4c44f' : '#ff765f';
+      context.beginPath(); context.arc(x, y, target.active ? 5 : 2.5, 0, Math.PI * 2); context.fill();
+    }
   }
+  minimapLandmarksRendered = renderedLandmarks;
   for (const remote of remotes.values()) {
-    const friendly = remote.snapshot.team === player.team;
-    if (!friendly && remote.target.distanceTo(player.position) > 15) continue;
+    const friendly = privateMatchMode === 'tdm' && remote.snapshot.team === player.team;
+    const scoutActive = now < scoutSweepUntil;
+    if (!friendly && !scoutActive && remote.target.distanceTo(player.position) > 15) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
-    context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    if (!bot.alive || now >= scoutSweepUntil && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
-    context.beginPath(); context.arc(x, y, 3.5, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
-  const [px, py] = point(player.position.x, player.position.z);
-  context.save();
-  context.translate(px, py);
-  context.rotate(-player.yaw);
-  context.fillStyle = player.team === 0 ? '#58e3dc' : '#ff765f';
-  context.beginPath(); context.moveTo(0, -7); context.lineTo(5, 6); context.lineTo(-5, 6); context.closePath(); context.fill();
+  if (selectedArena.overdrive && overdriveState.available) {
+    const [x, y] = point(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.z);
+    context.save();
+    context.translate(x, y);
+    const pulse = 15 + Math.sin(now * 0.006) * 2;
+    context.fillStyle = '#7864dc';
+    context.strokeStyle = '#79f3eb';
+    context.lineWidth = 4;
+    context.beginPath(); context.arc(0, 0, pulse, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#fff7ff';
+    context.font = '900 15px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('4×', 0, 1);
+    context.restore();
+    context.textBaseline = 'alphabetic';
+  }
   context.restore();
+  context.save();
+  context.font = '900 15px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'bottom';
+  context.lineJoin = 'round';
+  context.lineWidth = 4;
+  context.strokeStyle = 'rgba(7, 15, 18, .94)';
+  context.fillStyle = '#fff1bd';
+  for (const label of landmarkLabels) {
+    if (label.x < 18 || label.x > width - 18 || label.y < 22 || label.y > height - 8) continue;
+    context.strokeText(label.label, label.x, label.y);
+    context.fillText(label.label, label.x, label.y);
+  }
+  context.restore();
+  const px = width / 2;
+  const py = height / 2;
+  const facing = playerFacingGeometry(px, py, Math.PI);
+  context.fillStyle = player.team === 0 ? 'rgba(88, 227, 220, .18)' : 'rgba(255, 118, 95, .18)';
+  context.beginPath();
+  context.moveTo(px, py);
+  context.lineTo(...facing.coneLeft);
+  context.lineTo(...facing.coneRight);
+  context.closePath();
+  context.fill();
+  context.fillStyle = player.team === 0 ? '#58e3dc' : '#ff765f';
+  context.strokeStyle = '#fff7df';
+  context.lineWidth = 4;
+  context.beginPath();
+  context.moveTo(...facing.nose);
+  context.lineTo(...facing.right);
+  context.lineTo(...facing.tail);
+  context.lineTo(...facing.left);
+  context.closePath();
+  context.fill();
+  context.stroke();
+  context.strokeStyle = '#10232a';
+  context.lineWidth = 3;
+  context.beginPath(); context.moveTo(...facing.tail); context.lineTo(...facing.nose); context.stroke();
+  context.fillStyle = '#fff7df';
+  context.beginPath(); context.arc(px, py, 4.5, 0, Math.PI * 2); context.fill();
+  context.fillStyle = '#fff7df';
+  context.font = '900 22px sans-serif';
+  context.textAlign = 'center';
+  const [northX, northY] = northMarkerPosition(player.yaw, width, height);
+  context.fillText('N', northX, northY + 7);
+  element<HTMLElement>('#map-heading').textContent = `PLAYER UP · ${String(headingDegrees(player.yaw)).padStart(3, '0')}°`;
 }
 
 function updateHud(now: number): void {
-  // DOM reconstruction and 2D minimap drawing do not need to run at render rate.
-  // Keeping them at 10 Hz removes main-thread pressure without reducing simulation
-  // or WebGL frame cadence.
+  // DOM reconstruction can stay at 10 Hz. The rotating minimap is intentionally
+  // drawn from frame() so camera-relative direction remains smooth and accurate.
   if (now - lastHudAt < 100) return;
   lastHudAt = now;
   if (gameStarted) updateMatchState(now);
   const spec = WEAPONS[player.weapon];
   const speed = Math.hypot(player.velocity.x, player.velocity.z);
+  const adsSettled = adsHeld && weaponView.adsProgress() >= 0.9;
   const spread = computeSpread(spec, {
-    ads: adsHeld,
+    ads: adsSettled,
     moving: speed > 1.2,
     crouched: player.stance === 'crouch',
     prone: player.stance === 'prone',
@@ -1344,29 +5895,83 @@ function updateHud(now: number): void {
   const crosshairGap = THREE.MathUtils.clamp(5 + spread * 320, 5, 23);
   const crosshair = element<HTMLElement>('#crosshair');
   crosshair.style.setProperty('--spread', `${crosshairGap}px`);
-  crosshair.classList.toggle('ads', adsHeld);
+  crosshair.classList.toggle('ads', adsSettled);
   const [aqua, coral] = teamScores();
+  const scores: [number, number] = [aqua, coral];
+  const presentation = matchPresentationAt(matchState, now, scores, player.team, currentMatchRules(), arena.label);
+  const ffaHud = gameMode !== 'solo' && privateMatchMode === 'ffa';
+  const orderedFfa = ffaHud ? freeForAllLeaders([...authoritativeScores.values()]) : [];
+  const localFfaScore = authoritativeScores.get(player.id)?.kills ?? player.kills;
+  const leaderFfaScore = orderedFfa[0]?.kills ?? 0;
+  const arenaZone = classifyArenaZone(player.position.x, player.position.z);
+  element<HTMLElement>('#location-label').textContent = selectedArena.id === 'atomic-acres'
+    ? arenaZoneLabel(arenaZone)
+    : arena.label.toUpperCase();
+  audio.setArenaZone(arenaZone);
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
+  const localScore = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
+  element<HTMLElement>('#damage-dealt').textContent = String(localScore.damageDealt);
+  element<HTMLElement>('#damage-taken').textContent = String(localScore.damageTaken);
+  renderMatchNetworkStrip();
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
-  element<HTMLElement>('#reserve').textContent = String(player.reserve[player.weapon]);
-  element<HTMLElement>('#aqua-score').textContent = String(aqua);
-  element<HTMLElement>('#coral-score').textContent = String(coral);
-  const remainingMs = Math.max(0, matchState.endsAt - now);
-  const remaining = matchState.phase === 'warmup' ? Math.ceil(remainingMs / 1000) : Math.floor(remainingMs / 1000);
-  element<HTMLElement>('#timer').textContent = matchState.phase === 'warmup'
-    ? `00:0${Math.min(9, remaining)}`
-    : `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
-  element<HTMLElement>('#objective').textContent = matchState.phase === 'warmup' ? `MATCH STARTS IN ${remaining}` : 'ATOMIC ACRES · FIRST TO 25';
-  element<HTMLElement>('#reload-state').textContent = player.reloadState
+  element<HTMLElement>('#reserve').textContent = reserveHudValue(selectedArena.id, player.reserve[player.weapon]);
+  const aquaScore = element<HTMLElement>('#aqua-score');
+  const coralScore = element<HTMLElement>('#coral-score');
+  const hudScores: [number, number] = selectedArena.id === 'gun-range'
+    ? [rangeScore, targetHits]
+    : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
+  element<HTMLElement>('#match-mode-label').textContent = ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
+  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
+  aquaScore.textContent = String(hudScores[0]);
+  coralScore.textContent = String(hudScores[1]);
+  hudScores.forEach((score, team) => {
+    if (score === previousHudScores[team]) return;
+    const scoreElement = team === 0 ? aquaScore : coralScore;
+    scoreElement.classList.remove('score-pulse');
+    requestAnimationFrame(() => scoreElement.classList.add('score-pulse'));
+  });
+  previousHudScores = hudScores;
+  element<HTMLElement>('#timer').textContent = presentation.timer;
+  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+    ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
+    : ffaHud
+      ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
+      : presentation.objective;
+  if (!player.alive && respawnEndsAt > 0) {
+    element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
+  }
+  const reloadStateElement = element<HTMLElement>('#reload-state');
+  reloadStateElement.textContent = player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
-    : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
+    : selectedArena.id === 'gun-range'
+      ? `SCORE ${rangeScore} · ${targetHits} TARGETS HIT`
+      : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
+  reloadStateElement.classList.toggle('active', player.reloadState !== null);
   element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
   element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
+  updateFieldSupportHud();
   element<HTMLElement>('#health-block').classList.toggle('critical', player.hp <= 30);
-  updateMinimap(now);
   if (!element<HTMLElement>('#roster').hidden) updateRoster();
+}
+
+function renderMatchNetworkStrip(): void {
+  const strip = element<HTMLElement>('#network-strip');
+  if (gameMode === 'solo') {
+    strip.hidden = true;
+    strip.innerHTML = '';
+    return;
+  }
+  const members = privateLobbySnapshot?.members ?? [];
+  strip.hidden = members.length === 0;
+  strip.innerHTML = members.filter((member) => member.connected).map((member) => {
+    const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
+    const quality = latencyQuality(ping);
+    const label = ping === null ? '—' : `${Math.round(ping)} ms`;
+    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} latency: ${label}"><b>${escapeHtml(member.name)}</b> ${label}</span>`;
+  }).join('');
 }
 
 function updateRoster(): void {
@@ -1375,10 +5980,17 @@ function updateRoster(): void {
     ...[...remotes.values()].map((remote) => remote.snapshot),
     ...[...bots.values()].map((bot) => ({
       id: bot.id, name: bot.name, team: bot.team, x: bot.position.x, y: bot.position.y, z: bot.position.z,
-      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, weapon: 'carbine' as WeaponId, seq: 0,
+      yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: bot.weapon, weapon: bot.weapon, seq: 0,
     })),
   ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-  element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => `<div><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`).join('');
+  element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => {
+    const score = authoritativeScores.get(entry.id) ?? emptyPlayerScore(entry.id);
+    const member = privateLobbySnapshot?.members.find((candidate) => candidate.id === entry.id);
+    const ping = member?.id === player.id && network.role === 'client' ? localLobbyPingMs : member?.pingMs ?? null;
+    const latency = ping === null ? '—' : `${Math.round(ping)}ms`;
+    const title = `${entry.name}: ${entry.kills} kills, ${entry.deaths} deaths, ${score.damageDealt} damage dealt, ${score.damageTaken} damage taken, ${latency} ping`;
+    return `<div title="${escapeHtml(title)}"><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><strong>${score.damageDealt} / ${score.damageTaken} DMG</strong><small>${latency}</small><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`;
+  }).join('');
 }
 
 function escapeHtml(value: string): string {
@@ -1389,6 +6001,7 @@ function resize(): void {
   const width = window.innerWidth;
   const height = window.innerHeight;
   renderer.setSize(width, height, false);
+  atomicSignal.resize();
   camera.aspect = width / Math.max(1, height);
   camera.updateProjectionMatrix();
 }
@@ -1399,49 +6012,105 @@ const launchParams = new URLSearchParams(window.location.search);
 const invitedRoom = launchParams.get('room')?.trim() ?? '';
 if (invitedRoom) element<HTMLInputElement>('#room-input').value = invitedRoom;
 const invitedName = launchParams.get('name');
-if (invitedName) element<HTMLInputElement>('#player-name').value = sanitizeName(invitedName);
-if (launchParams.get('team') === '1') element<HTMLSelectElement>('#team').value = '1';
+const normalizedInvitedName = normalizeRequiredPlayerName(invitedName ?? '');
+if (normalizedInvitedName) element<HTMLInputElement>('#player-name').value = normalizedInvitedName;
+const teamSelect = element<HTMLSelectElement>('#team');
+const invitedTeam = launchParams.get('team');
+let teamSelectionTouched = invitedTeam === '0' || invitedTeam === '1';
+if (teamSelectionTouched) teamSelect.value = invitedTeam!;
+teamSelect.addEventListener('change', () => { teamSelectionTouched = true; });
 
 const sensitivityInput = element<HTMLInputElement>('#sensitivity');
+const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
 const fovInput = element<HTMLInputElement>('#field-of-view');
-sensitivity = Number(localStorage.getItem('atomic-acres-sensitivity') ?? sensitivityInput.value) || 1;
-preferredFov = Number(localStorage.getItem('atomic-acres-fov') ?? fovInput.value) || 82;
+const graphicsProfileInput = element<HTMLSelectElement>('#graphics-profile');
+const storedRange = (key: string, fallback: number, minimum: number, maximum: number): number => {
+  const parsed = Number(localStorage.getItem(key));
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
+};
+sensitivity = storedRange('atomic-acres-sensitivity', Number(sensitivityInput.value), 0.6, 2);
+controllerSensitivity = storedRange('atomic-acres-controller-sensitivity', Number(controllerSensitivityInput.value), 0.5, 1.8);
+preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
 sensitivityInput.value = String(sensitivity);
+controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
+// Compatibility remains query-only for diagnostic QA; players choose only
+// Performance or the fully Blender-authored environment presentation.
+graphicsProfileInput.value = renderProfile === 'blender' ? 'blender' : 'performance';
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
+});
+controllerSensitivityInput.addEventListener('input', () => {
+  controllerSensitivity = Number(controllerSensitivityInput.value);
+  localStorage.setItem('atomic-acres-controller-sensitivity', String(controllerSensitivity));
 });
 fovInput.addEventListener('input', () => {
   preferredFov = Number(fovInput.value);
   localStorage.setItem('atomic-acres-fov', String(preferredFov));
 });
+graphicsProfileInput.addEventListener('change', () => {
+  const value = graphicsProfileInput.value;
+  const selected: RenderProfile = value === 'blender' ? 'blender' : 'performance';
+  localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, selected);
+  const next = new URL(window.location.href);
+  if (selected === 'performance') next.searchParams.delete('render');
+  else next.searchParams.set('render', selected);
+  window.location.assign(next);
+});
+
+const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
+  'scout-sweep': 'SCOUT SWEEP',
+  yardhawk: 'YARDHAWK',
+  'tri-pass': 'TRI-PASS',
+  'hunter-swarm': 'HUNTER SWARM',
+  nuke: 'NUKE',
+};
+
+function selectGamepadSupport(direction: -1 | 1): void {
+  gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction);
+  addFeed(`PAD SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
+  updateFieldSupportHud();
+}
 
 function pollGamepad(dt: number): void {
   const pad = navigator.getGamepads?.().find((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected));
   if (!pad) {
     gamepadMove = { x: 0, y: 0 };
+    gamepadLookRate = { yaw: 0, pitch: 0 };
     gamepadSprint = false;
     previousGamepadButtons = [];
     triggerHeld = mouseTriggerHeld;
     adsHeld = debugAdsOverride ?? mouseAdsHeld;
     return;
   }
-  gamepadMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
+  const shapedMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
   const look = applyRadialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.1, 1.6);
   const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
   const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
-  gamepadSprint = Boolean(buttons[10]);
   const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
   const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
-  adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAds);
-  triggerHeld = mouseTriggerHeld || padTrigger;
-  if (gameStarted && player.alive && !menu.classList.contains('hidden')) {
-    // Do not steer the game behind a pause/menu overlay.
-  } else if (gameStarted && player.alive) {
-    const turnRate = adsHeld ? 1.92 : 3.66;
-    player.yaw -= look.x * turnRate * dt;
-    player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * turnRate * 0.82 * dt, -1.42, 1.42);
+  const canControlPlayer = gameplayInputEnabled();
+  if (!padTrigger) gamepadTriggerArmed = true;
+  else if (!canControlPlayer) gamepadTriggerArmed = false;
+  if (!padAds) gamepadAdsArmed = true;
+  else if (!canControlPlayer) gamepadAdsArmed = false;
+  const padTriggerActive = canControlPlayer && padTrigger && gamepadTriggerArmed;
+  const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
+  gamepadSprint = canControlPlayer && Boolean(buttons[10]);
+  adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAdsActive);
+  triggerHeld = mouseTriggerHeld || padTriggerActive;
+  gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
+  gamepadLookRate = integrateGamepadLookRate(
+    gamepadLookRate,
+    canControlPlayer ? look : { x: 0, y: 0 },
+    dt,
+    adsHeld,
+    controllerSensitivity,
+  );
+  if (canControlPlayer) {
+    player.yaw -= gamepadLookRate.yaw * dt;
+    player.pitch = THREE.MathUtils.clamp(player.pitch - gamepadLookRate.pitch * dt, -1.42, 1.42);
     if (pressed(0)) {
       if (player.stance !== 'stand') requestStance('stand');
       jumpQueuedAt = performance.now();
@@ -1449,15 +6118,24 @@ function pollGamepad(dt: number): void {
     if (pressed(1)) requestStance('toggle-crouch');
     if (pressed(13)) requestStance('toggle-prone');
     if (pressed(2)) reload();
-    if (pressed(3)) switchWeapon((WEAPON_ORDER.indexOf(player.weapon) + 1) % WEAPON_ORDER.length);
+    if (pressed(3)) switchWeapon(player.weapon === 'pistol' ? 0 : 1);
     if (pressed(4)) throwGrenade();
     if (pressed(5)) melee();
+    if (pressed(14)) selectGamepadSupport(-1);
+    if (pressed(15)) selectGamepadSupport(1);
+    if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
   }
   previousGamepadButtons = buttons;
 }
 
 window.addEventListener('keydown', (event) => {
-  keys.add(event.code);
+  if (tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
+    event.preventDefault();
+    cancelTriPassTargeting(true);
+    return;
+  }
+  if (gameplayInputEnabled()) keys.add(event.code);
+  else if (event.code !== 'Tab') return;
   if (event.code === 'Space' && !event.repeat) {
     if (player.stance !== 'stand') requestStance('stand');
     jumpQueuedAt = performance.now();
@@ -1466,10 +6144,19 @@ window.addEventListener('keydown', (event) => {
   if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
   if (event.code === 'Digit1') switchWeapon(0);
   if (event.code === 'Digit2') switchWeapon(1);
-  if (event.code === 'Digit3') switchWeapon(2);
+  if (event.code === 'Digit3' && !event.repeat) activateFieldSupport('scout-sweep');
+  if (event.code === 'Digit4' && !event.repeat) activateFieldSupport('yardhawk');
+  if (event.code === 'Digit5' && !event.repeat) activateFieldSupport('tri-pass');
+  if (event.code === 'Digit6' && !event.repeat) activateFieldSupport('hunter-swarm');
+  if (event.code === 'Digit7' && !event.repeat) activateFieldSupport('nuke');
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
+  if (event.code === 'KeyF' && !event.repeat) interactWithDeathDrop();
+  if (event.code === 'KeyT' && !event.repeat) sendTeamPing('enemy');
+  if (event.code === 'KeyY' && !event.repeat) sendTeamPing('regroup');
+  if (event.code === 'KeyU' && !event.repeat) sendTeamPing('push');
+  if (event.code === 'KeyI' && !event.repeat) sendTeamPing('nice');
   if (event.code === 'Tab') {
     event.preventDefault();
     updateRoster();
@@ -1481,11 +6168,7 @@ window.addEventListener('keyup', (event) => {
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
-  keys.clear();
-  mouseTriggerHeld = false;
-  mouseAdsHeld = false;
-  triggerHeld = false;
-  adsHeld = false;
+  clearGameplayInput();
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
@@ -1518,90 +6201,460 @@ window.addEventListener('mouseup', (event) => {
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
-    mouseTriggerHeld = false;
-    mouseAdsHeld = false;
-    triggerHeld = false;
-    adsHeld = false;
-    if (gameStarted && player.alive) {
-      element<HTMLButtonElement>('#resume').hidden = matchFinished;
+    clearGameplayInput();
+    if (tacticalMapOpen) {
+      menu.classList.add('hidden');
+      return;
+    }
+    if (gameStarted && player.alive && !matchFinished) {
+      element<HTMLButtonElement>('#resume').hidden = false;
+      element<HTMLButtonElement>('#main-menu').hidden = false;
       menu.classList.remove('hidden');
     }
   } else {
     element<HTMLButtonElement>('#resume').hidden = true;
+    element<HTMLButtonElement>('#main-menu').hidden = true;
     menu.classList.add('hidden');
   }
 });
 
+function syncArenaSelectionUi(): void {
+  const lobbyArenaLocked = network.role !== 'offline' || privateLobbySnapshot !== null;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
+    const selected = button.dataset.arenaId === selectedArena.id;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    button.disabled = !arenaSelectionReady || gameStarted || lobbyArenaLocked;
+  }
+  const soloButton = element<HTMLButtonElement>('#solo');
+  const hostButton = element<HTMLButtonElement>('#host');
+  const joinButton = element<HTMLButtonElement>('#join');
+  soloButton.textContent = selectedArena.id === 'gun-range' ? 'START RANGE' : selectedArena.id === 'rustworks-1v1' ? '1 BOT SKIRMISH' : 'BOT SKIRMISH';
+  hostButton.textContent = 'HOST LOBBY';
+  soloButton.disabled = !arenaSelectionReady;
+  hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
+  joinButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
+  element<HTMLInputElement>('#room-input').disabled = !selectedArena.multiplayer;
+  element<HTMLElement>('#arena-title').innerHTML = selectedArena.id === 'atomic-acres'
+    ? 'ATOMIC <span>ACRES</span>'
+    : selectedArena.id === 'rustworks-1v1'
+      ? 'RUST<span>WORKS</span>'
+      : 'GUN <span>RANGE</span>';
+  element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
+    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.'
+    : selectedArena.id === 'rustworks-1v1'
+      ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
+      : 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.';
+}
+
+function setArenaPresentationVisibility(): void {
+  const atomicVisible = selectedArena.id === 'atomic-acres';
+  const rustworksVisible = selectedArena.id === 'rustworks-1v1';
+  for (const candidate of Object.values(arenaById)) {
+    candidate.root.visible = candidate.id === selectedArena.id;
+    if (candidate === atomicArena) candidate.root.visible = proceduralArenaRootVisible(selectedArena.id, blenderArenaActive);
+  }
+  worldIdentityPresentation.root.visible = atomicVisible;
+  neighbourhoodLifeRoot.visible = atomicVisible;
+  // Rustworks' ocean needs a long view frustum so water, not void, meets the horizon.
+  const desiredFarPlane = rustworksVisible ? 1_400 : 180;
+  if (camera.far !== desiredFarPlane) {
+    camera.far = desiredFarPlane;
+    camera.updateProjectionMatrix();
+  }
+  atmosphereSystem.setArena(selectedArena.id);
+  atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
+  waterSystem.configure(selectedArena.id, renderProfile, {
+    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
+    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
+  }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -16.5 : -0.55 });
+  ensureRustworksStarfield(scene, selectedArena.id);
+  applyArenaFogProfile();
+  applyArenaLightingForSelection();
+  setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
+  if (rustworksVisible) {
+    if (renderProfile === 'blender' && rustworksBlenderTelemetry().status === 'ready') {
+      setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+    } else {
+      applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+      setRustworksProceduralPresentationVisible(rustworksArena.root, true);
+    }
+  }
+  grassSystem.root.visible = atomicVisible;
+  if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
+  overdriveRoot.visible = false;
+  if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
+  atomicSignal.invalidateValidation();
+}
+
+function applyArenaLightingForSelection(): void {
+  const lighting = rustworksLightingTint(activeLighting, renderProfile, selectedArena.id);
+  renderer.toneMappingExposure = lighting.exposure;
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(lighting.fogColor);
+  if (skyMaterial) {
+    skyMaterial.uniforms.top.value.setHex(lighting.skyTop);
+    skyMaterial.uniforms.horizon.value.setHex(lighting.skyHorizon);
+    skyMaterial.uniforms.bottom.value.setHex(lighting.skyBottom);
+    skyMaterial.uniforms.sunColor.value.setHex(lighting.skySun);
+    skyMaterial.uniforms.cloudColor.value.setHex(lighting.skyCloud);
+    skyMaterial.uniforms.cloudShadow.value.setHex(lighting.skyCloudShadow);
+    skyMaterial.uniforms.cloudLight.value.setHex(lighting.skyCloudLight);
+    skyMaterial.uniforms.rayStrength.value = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on'))
+      ? 0
+      : lighting.godRayStrength;
+    skyMaterial.uniforms.rayLobes.value = skyMaterial.uniforms.rayStrength.value > 0 ? lighting.godRayLobes : 0;
+  }
+  if (hemisphereLight) {
+    hemisphereLight.color.setHex(lighting.hemisphereSky);
+    hemisphereLight.groundColor.setHex(lighting.hemisphereGround);
+    hemisphereLight.intensity = lighting.hemisphereIntensity;
+  }
+  if (ambientLight) {
+    ambientLight.color.setHex(lighting.ambientColor);
+    ambientLight.intensity = lighting.ambientIntensity;
+  }
+  if (sunLight) {
+    sunLight.color.setHex(lighting.sunColor);
+    sunLight.intensity = lighting.sunIntensity;
+    sunLight.position.set(...lighting.sunPosition);
+  }
+  if (fillLight) {
+    fillLight.color.setHex(lighting.fillColor);
+    fillLight.intensity = lighting.fillIntensity;
+    fillLight.position.set(...lighting.fillPosition);
+  }
+}
+
+function setArenaMenuCamera(): void {
+  const centreX = (arena.bounds.minX + arena.bounds.maxX) / 2;
+  const centreZ = (arena.bounds.minZ + arena.bounds.maxZ) / 2;
+  if (selectedArena.id === 'gun-range') {
+    camera.position.set(12, 13.5, 8);
+    camera.lookAt(0, 1.2, -25);
+  } else if (selectedArena.id === 'rustworks-1v1') {
+    // Keep the tall tower on the unobstructed right side of the deployment panel.
+    camera.position.set(18, 20, -28);
+    camera.lookAt(centreX + 14, 5.8, centreZ);
+  } else {
+    camera.position.set(centreX, 31, centreZ - 22);
+    camera.lookAt(centreX, 0.8, centreZ);
+  }
+  camera.fov = 65;
+  camera.updateProjectionMatrix();
+}
+
+async function performArenaSelection(id: ArenaId): Promise<void> {
+  if (gameStarted || !arenaSelectionReady || id === selectedArena.id) return;
+  const nextSelection = arenaSelection(id);
+  const previousSelection = selectedArena;
+  const previousArena = arena;
+  const previousPhysics = characterPhysics;
+  let nextPhysics: CharacterPhysics | null = null;
+  arenaSelectionReady = false;
+  syncArenaSelectionUi();
+  setStatus(`Loading ${nextSelection.displayName} collision…`);
+  try {
+    const nextArena = arenaById[nextSelection.id];
+    if (localArenaSwitchQaDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
+    }
+    nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
+    characterPhysics = nextPhysics;
+    selectedArena = nextSelection;
+    arena = nextArena;
+    botNavigationColliders = navigationCollidersFor(arena);
+    document.documentElement.dataset.arenaId = selectedArena.id;
+    setArenaPresentationVisibility();
+    matchState = createMatch(performance.now(), selectedArena.matchRules);
+    lastPlayerSpawnIndex = -1;
+    lastPlayerSpawnAudit = null;
+    respawn(false);
+    setArenaMenuCamera();
+    try {
+      previousPhysics?.dispose();
+    } catch (disposeError) {
+      console.warn('[Atomic Acres previous map physics disposal failed]', disposeError);
+    }
+    setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
+    renderHighScores();
+  } catch (error) {
+    console.error('[Atomic Acres map selection failed]', error);
+    if (nextPhysics) nextPhysics.dispose();
+    characterPhysics = previousPhysics;
+    selectedArena = previousSelection;
+    arena = previousArena;
+    botNavigationColliders = navigationCollidersFor(arena);
+    document.documentElement.dataset.arenaId = selectedArena.id;
+    setArenaPresentationVisibility();
+    matchState = createMatch(performance.now(), selectedArena.matchRules);
+    lastPlayerSpawnIndex = -1;
+    lastPlayerSpawnAudit = null;
+    respawn(false);
+    setArenaMenuCamera();
+    setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
+  } finally {
+    arenaSelectionReady = true;
+    syncArenaSelectionUi();
+    if (network.role !== 'offline' || privateLobbySnapshot) renderPrivateLobby();
+  }
+}
+
+function activateArenaSelection(id: ArenaId): Promise<void> {
+  const queued = arenaSelectionTask
+    .catch(() => undefined)
+    .then(() => performArenaSelection(id));
+  arenaSelectionTask = queued;
+  return queued;
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
+  button.addEventListener('click', () => {
+    const id = button.dataset.arenaId as ArenaId | undefined;
+    if (id) void activateArenaSelection(id);
+  });
+}
+
 function resetForMode(): void {
+  interruptReload(true);
+  lastPrincipalShotAlignment = null;
   player.kills = 0;
   player.deaths = 0;
   player.hp = 100;
-  player.grenades = 1;
+  player.grenades = 2;
   player.reloadState = null;
   player.sustainedShots = 0;
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
   targetHits = 0;
+  rangeScore = 0;
+  rangeShotsFired = 0;
+  for (const target of arena.targets) {
+    target.active = true;
+    target.health = target.maxHealth;
+    target.respawnAt = 0;
+    target.root.visible = true;
+  }
+  previousHudScores = [0, 0];
+  respawnEndsAt = 0;
   clearBots();
-  for (const grenade of grenades) scene.remove(grenade.mesh);
-  grenades.length = 0;
+  clearGrenades();
+  clearGrenadeExplosionVisuals();
+  clearFieldSupport();
+  clearTeamPings();
+  clearDeathDrops();
+  resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
+  verifiedRemoteKills.clear();
   element<HTMLElement>('#banner').hidden = true;
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve };
+  element<HTMLElement>('#countdown').hidden = true;
+  element<HTMLElement>('#respawn').hidden = true;
+  player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+  player.weapon = player.primaryWeapon;
+  player.switchingUntil = 0;
+  weaponView.setWeapon(player.weapon, true);
+  renderFieldKitSelection();
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
+}
+
+function returnToMainMenu(): void {
+  if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id, voluntary: true });
+  network.close();
+  resetForMode();
+  resetPrivateLobbyState();
+  gameStarted = false;
+  matchFinished = false;
+  weaponView.root.visible = false;
+  hudRoot.hidden = true;
+  roomCard.hidden = true;
+  roomCodeEl.textContent = '';
+  element<HTMLElement>('#room-hud').textContent = '';
+  element<HTMLButtonElement>('#resume').hidden = true;
+  element<HTMLButtonElement>('#main-menu').hidden = true;
+  menu.classList.remove('hidden');
+  arenaSelectionReady = true;
+  syncArenaSelectionUi();
+  setArenaMenuCamera();
+  setStatus(`${selectedArena.displayName} ready · choose a map or deploy again.`);
+  if (document.pointerLockElement) void document.exitPointerLock();
 }
 
 element<HTMLButtonElement>('#resume').addEventListener('click', () => {
   if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
+element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainMenu);
+
+function setChangelogOpen(open: boolean): void {
+  const panel = element<HTMLElement>('#changelog-panel');
+  const backdrop = element<HTMLElement>('#changelog-backdrop');
+  const button = element<HTMLButtonElement>('#last-updated-btn');
+  panel.hidden = !open;
+  backdrop.hidden = !open;
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) element<HTMLButtonElement>('#changelog-close').focus();
+  else button.focus();
+}
+
+element<HTMLButtonElement>('#last-updated-btn').addEventListener('click', () => {
+  setChangelogOpen(true);
+});
+element<HTMLButtonElement>('#changelog-close').addEventListener('click', () => setChangelogOpen(false));
+element<HTMLElement>('#changelog-backdrop').addEventListener('click', () => setChangelogOpen(false));
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !element<HTMLElement>('#changelog-panel').hidden) {
+    event.preventDefault();
+    setChangelogOpen(false);
+  }
+});
+
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
+  if (!requirePlayerName()) return;
   network.close();
   resetForMode();
+  resetPrivateLobbyState();
   startGame('solo');
 });
 element<HTMLButtonElement>('#host').addEventListener('click', () => {
+  if (!requirePlayerName()) return;
   resetForMode();
-  network.host(() => {
-    roomCard.hidden = false;
-    roomCodeEl.textContent = network.roomCode;
-    startGame('host');
-  });
+  resetPrivateLobbyState();
+  player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
+  network.setCapacity(DEFAULT_PRIVATE_MATCH_CONFIG.capacity);
+  network.host(initializeHostLobby);
 });
 element<HTMLButtonElement>('#join').addEventListener('click', () => {
+  if (!requirePlayerName()) return;
+  if (!teamSelectionTouched) teamSelect.value = '1';
   resetForMode();
+  resetPrivateLobbyState();
+  player.team = Number(teamSelect.value) === 1 ? 1 : 0;
   const code = element<HTMLInputElement>('#room-input').value.trim();
-  network.join(code, () => startGame('client'));
+  restoreRoomIdentity(code);
+  element<HTMLElement>('#private-lobby').hidden = false;
+  network.join(code, sendLobbyJoin);
 });
 element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
-  const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(network.roomCode)}`;
+  const invitedTeam = player.team === 0 ? 1 : 0;
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(network.roomCode)}&team=${invitedTeam}`;
   try {
     await navigator.clipboard.writeText(inviteUrl);
     setStatus('Invite link copied', 'ok');
   } catch {
     element<HTMLInputElement>('#room-input').value = network.roomCode;
-    setStatus('Clipboard blocked — code placed in join field', 'warn');
+    setStatus('Clipboard blocked — room code placed in the join field', 'warn');
   }
+});
+element<HTMLButtonElement>('#lobby-ready').addEventListener('click', () => {
+  if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
+  const ready = !localLobbyReady;
+  if (network.role === 'host') updateHostReady({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
+  else if (network.role === 'client') network.send({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
+});
+element<HTMLButtonElement>('#lobby-start').addEventListener('click', hostStartPrivateMatch);
+element<HTMLButtonElement>('#lobby-leave').addEventListener('click', returnToMainMenu);
+element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
+  if (network.role !== 'host' || !privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
+  for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
+  broadcastHostLobby('waiting');
+});
+const updateLobbyConfigFromUi = (): void => {
+  if (network.role !== 'host') return;
+  const mode: MatchMode = element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
+  const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
+  applyHostLobbyConfig({
+    ...privateMatchConfig,
+    mode,
+    capacity,
+    autoBalance: mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
+  });
+};
+element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-capacity').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
+teamSelect.addEventListener('change', () => {
+  if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
+  const team: Team = teamSelect.value === '1' ? 1 : 0;
+  if (network.role === 'host') updateHostTeam({ type: 'lobby-team', by: player.id, team, nonce: randomNonce() });
+  else if (network.role === 'client') network.send({ type: 'lobby-team', by: player.id, team, nonce: randomNonce() });
 });
 
 if (invitedRoom && launchParams.get('autojoin') === '1') {
   window.setTimeout(() => element<HTMLButtonElement>('#join').click(), 100);
 }
 
-setInterval(() => {
-  if (gameStarted && network.role !== 'offline' && player.alive) network.send({ type: 'state', player: snapshot() });
-}, 60);
+function scheduleStateBroadcast(): void {
+  if (stateBroadcastTimer) clearTimeout(stateBroadcastTimer);
+  const delay = stateBroadcastIntervalMs(localLobbyPingMs);
+  stateBroadcastTimer = setTimeout(() => {
+    if (gameStarted && network.role !== 'offline' && player.alive) network.send({ type: 'state', player: snapshot() });
+    scheduleStateBroadcast();
+  }, delay);
+}
+scheduleStateBroadcast();
 window.addEventListener('beforeunload', () => {
-  if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id });
   network.close();
 });
 
+function refreshStaticShadowsForDynamicCasters(now: number): void {
+  const castsVisibleShadow = (root: THREE.Object3D): boolean => {
+    if (!root.visible) return false;
+    let casts = false;
+    root.traverse((node) => {
+      if (!casts && node.visible && node instanceof THREE.Mesh && node.castShadow) casts = true;
+    });
+    return casts;
+  };
+  const hasDynamicCasters = !botsFrozen && [...bots.values()].some((bot) => bot.alive && castsVisibleShadow(bot.root))
+    || [...remotes.values()].some((remote) => castsVisibleShadow(remote.root))
+    || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0 || hunterDrones.length > 0;
+  const admittedAt = admitStaticShadowDynamicRefresh({
+    shadowMode: activeRenderConfig.shadowMode,
+    shadowsEnabled: renderer.shadowMap.enabled,
+    contextLost: webglContextLost,
+    hasDynamicCasters,
+    now,
+    lastRefreshAt: lastStaticShadowRefreshAt,
+  });
+  if (admittedAt === null) return;
+  renderer.shadowMap.needsUpdate = true;
+  lastStaticShadowRefreshAt = admittedAt;
+  staticShadowDynamicRefreshes += 1;
+}
+
 function frame(now: number): void {
+  frameCount += 1;
   try {
-    const frameDt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
+    const rawFrameMs = Math.max(0, now - lastFrame);
+    // The HUD must report even pathologically slow software-rendered frames.
+    // Adaptive quality still receives the unclamped sample and independently
+    // rejects values above its 250 ms control window.
+    framePacing.record(Math.min(rawFrameMs, 1_000));
+    const adaptivePixelRatio = adaptiveQuality.record(
+      rawFrameMs,
+      gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
+    );
+    if (adaptivePixelRatio !== null) {
+      applyAdaptiveRenderBudget(adaptivePixelRatio);
+      grassSystem.setAdaptivePixelRatio(adaptivePixelRatio);
+      resize();
+    }
+    const pacing = framePacing.summary();
+    if (now - lastFpsHudAt >= 250) {
+      const fps = pacing.sampleCount >= 1 ? Math.max(1, Math.round(pacing.cadenceHz)) : null;
+      fpsCounterValue.textContent = fps === null ? '--' : String(fps);
+      fpsCounter.dataset.pacing = fps === null ? 'warming' : fps >= 55 ? 'smooth' : fps >= 40 ? 'strained' : 'slow';
+      lastFpsHudAt = now;
+    }
+    const refreshWarning = element<HTMLElement>('#refresh-warning');
+    refreshWarning.hidden = !(pacing.displayLimited && now < refreshWarningUntil);
+    if (pacing.displayLimited) {
+      refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
+    }
+    const frameDt = Math.min(0.05, rawFrameMs / 1000);
     lastFrame = now;
     pollGamepad(frameDt);
     accumulator += frameDt;
-    const step = 1 / 120;
+    const step = 1 / SIMULATION_HZ;
     let iterations = 0;
     while (accumulator >= step && iterations < 6) {
       updatePhysics(step);
@@ -1613,9 +6666,35 @@ function frame(now: number): void {
     updateTargets(now);
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
+    updateGrenadeExplosionVisuals(now);
+    updateFieldSupport(frameDt, now);
+    updateOverdrive(now);
+    updateTeamPings(now);
+    updateDeathDrops(now);
+    impactPresentation.update(frameDt);
+    tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
+    if (selectedArena.id === 'atomic-acres') {
+      if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
+      updateArenaArt(neighbourhoodLifeRoot, now);
+      atmosphereSystem.update(now / 1_000);
+      grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
+    } else if (selectedArena.id === 'rustworks-1v1') {
+      atmosphereSystem.update(now / 1_000);
+    }
+    waterSystem.update(now / 1_000);
+    if (gameStarted) updateMinimap(now);
     updateHud(now);
-    if (!debugRenderPaused) renderer.render(scene, camera);
+    if (debugCaptureCameraActive) {
+      camera.position.copy(debugCaptureCameraPosition);
+      camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
+      camera.updateMatrixWorld(true);
+    }
+    refreshStaticShadowsForDynamicCasters(now);
+    if (!debugRenderPaused && !webglContextLost) {
+      atomicSignal.render(scene, camera);
+      if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
+    }
     requestAnimationFrame(frame);
   } catch (error) {
     showFatalError(error);
@@ -1626,30 +6705,183 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown>;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
+    clearBots: () => void;
+    placeBotAhead: (distance?: number) => void;
+    placeBotRelative: (right: number, forward: number) => void;
+    showBotDamageDirection: () => number | null;
+    respawn: () => void;
+    aimAtBot: (zone?: HitZone) => void;
+    aimAtRemote: (zone?: HitZone) => void;
+    stageWindow: (index: number, distance?: number) => void;
+    detonateGrenadeAtWindow: (index: number) => number;
+    stageYardhawkWall: (team?: Team) => boolean;
+    stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
+    damageBot: (amount: number, zone?: HitZone) => void;
+    activateDormantReinforcement: () => { activated: boolean; syncMs: number };
+    stageHouseRamp: (kind: 'interior' | 'exterior', team?: Team) => {
+      kind: 'interior' | 'exterior';
+      start: number[];
+      foot: number[];
+      top: number[];
+      uphill: number[];
+      run: number;
+    } | null;
+    stageRustworksAccess: (route: 'ground-to-lower' | 'lower-to-upper', descending?: boolean) => {
+      route: 'ground-to-lower' | 'lower-to-upper';
+      descending: boolean;
+      start: number[];
+      target: number[];
+      direction: number[];
+      run: number;
+    } | null;
+    teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
+    setCaptureCameraPose: (x: number | null, y?: number, z?: number, yaw?: number, pitch?: number) => void;
+    collisionProbe: (x: number, z: number) => boolean;
+    segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
+    selectTriPassWorldTargets: (points: [number, number][]) => boolean;
+    captureShadowProbeFrame: (horizontalOffset: number) => string;
     setRenderPaused: (paused: boolean) => void;
+    openMenu: () => void;
     fireOnce: () => void;
     throwGrenade: () => void;
     switchWeapon: (index: number) => void;
+    equipKit: (id: FieldKitId) => void;
+    equipWeapon: (weapon: WeaponId) => void;
+    interactDrop: () => void;
+    setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
+    setGrenades: (count: number) => void;
     reload: () => void;
-    melee: () => void;
+    melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
+    setMovement: (forward: boolean, sprint?: boolean) => void;
+    setMeleeCaptureProgress: (progress: number | null) => void;
+    setFireCaptureAgeMs: (ageMs: number | null) => void;
+    setReloadCaptureProgress: (progress: number | null) => void;
+    setGrassTime: (timeSeconds: number | null) => void;
+    setGrassInteractionProbe: (x: number | null, z: number | null) => void;
+    sampleGrassBend: (index: number) => Record<string, number> | null;
+    renderAudit: () => Array<{ name: string; material: string; triangles: number }>;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
+    damageFromRemote: (amount: number) => void;
+    earnSupport: (eliminations: number) => void;
+    forceBotGrenade: (fuseMs?: number) => boolean;
+    activateSupport: (id: FieldSupportId) => void;
+    setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
+    sendPing: (kind: TeamPingKind) => void;
+    holdPings: (durationMs?: number) => void;
+    endMatch: () => void;
+    rematch: () => void;
+    returnToMainMenu: () => void;
+    selectArena: (id: ArenaId) => Promise<void>;
+    hitRangeTarget: (id: string, damage?: number, zone?: HitZone) => void;
+    spawnDeathDrop: (ageMs?: number) => string | null;
+    setKills: (kills: number) => void;
 
   };
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   snapshot: () => ({
     gameStarted,
+    frameCount,
     gameMode,
     matchPhase: matchState.phase,
+    matchEndReason: matchState.endReason ?? null,
+    privateMatch: privateLobbySnapshot ? {
+      mode: privateMatchMode,
+      arenaId: privateLobbySnapshot.config.arenaId,
+      phase: privateLobbySnapshot.phase,
+      revision: privateLobbySnapshot.revision,
+      capacity: privateLobbySnapshot.config.capacity,
+      autoBalance: privateLobbySnapshot.config.autoBalance,
+      members: privateLobbySnapshot.members.map((member) => ({ ...member })),
+      scores: [...authoritativeScores.values()].map((score) => ({ ...score })),
+      activeAtEpochMs: privateMatchActiveAtEpochMs,
+      hostClockOffsetMs,
+      localPingMs: localLobbyPingMs,
+    } : null,
+    scores: teamScores(),
+    arenaSelection: {
+      id: selectedArena.id,
+      label: arena.label,
+      rules: selectedArena.matchRules,
+      rulesLabel: selectedArena.rulesLabel,
+      multiplayer: selectedArena.multiplayer,
+      soloBotCount: selectedArena.soloBotCount,
+      rootVisible: arena.root.visible,
+      activeRoots: Object.values(arenaById).filter((entry) => entry.root.visible).map((entry) => entry.id),
+      bounds: { ...arena.bounds },
+      spawnCounts: [arena.spawns[0].length, arena.spawns[1].length],
+      colliders: arena.colliders.length,
+      physicsColliders: arena.physicsColliders.length,
+      physicsBoundaryWalls: worldBoundaryColliders(arena.bounds).length,
+      navigationColliders: botNavigationColliders.length,
+      navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
+      raycastMeshes: arena.raycastMeshes.length,
+      targets: arena.targets.length,
+    },
+    rangePractice: {
+      score: rangeScore,
+      hits: targetHits,
+      unlimitedAmmo: hasUnlimitedRangeAmmo(selectedArena.id),
+      reserveHud: reserveHudValue(selectedArena.id, player.reserve[player.weapon]),
+      firingLineZ: GUN_RANGE_FIRING_LINE_Z,
+      playerDownrange: selectedArena.id === 'gun-range' && player.position.z < GUN_RANGE_FIRING_LINE_Z,
+      activeTargets: arena.targets.filter((target) => target.active).length,
+      values: arena.targets.map((target) => target.scoreValue),
+      targets: arena.targets.map((target) => ({
+        id: target.id,
+        active: target.active,
+        health: target.health,
+        maxHealth: target.maxHealth,
+        visible: target.root.visible,
+        position: target.root.position.toArray(),
+        screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
+      })),
+    },
+    leaderboard: {
+      schemaVersion: HIGH_SCORE_SCHEMA_VERSION,
+      entries: highScores.map((entry) => ({ ...entry })),
+      uniquePlayerKeys: new Set(highScores.map((entry) => leaderboardNameKey(entry.name))).size,
+      renderedRows: element<HTMLOListElement>('#high-score-list').querySelectorAll('li:not(.empty)').length,
+    },
+    random: runtimeRandomTelemetry(),
+    aimAlignment: (() => {
+      const canvasBounds = canvas.getBoundingClientRect();
+      const activeReticle = sniperScopeOverlay.hidden
+        ? element<HTMLElement>('#crosshair')
+        : element<HTMLElement>('.scope-reticle');
+      const reticleBounds = activeReticle.getBoundingClientRect();
+      const direction = camera.getWorldDirection(new THREE.Vector3());
+      const rayNdc = camera.position.clone().addScaledVector(direction, 100).project(camera);
+      const canvasCentre = { x: canvasBounds.left + canvasBounds.width / 2, y: canvasBounds.top + canvasBounds.height / 2 };
+      const reticleCentre = { x: reticleBounds.left + reticleBounds.width / 2, y: reticleBounds.top + reticleBounds.height / 2 };
+      return {
+        canvas: { left: canvasBounds.left, top: canvasBounds.top, width: canvasBounds.width, height: canvasBounds.height },
+        reticleCentre,
+        rayNdc: [rayNdc.x, rayNdc.y],
+        errorCssPixels: Math.hypot(reticleCentre.x - canvasCentre.x, reticleCentre.y - canvasCentre.y),
+      };
+    })(),
+    lastPrincipalShotAlignment,
+    operatorAsset: {
+      ready: riggedOperatorAssetReady(),
+      error: riggedOperatorLoadError,
+      weaponError: importedWeaponLoadError,
+    },
     player: {
+      team: player.team,
       hp: player.hp,
+      alive: player.alive,
+      lastMeleeAt: player.lastMeleeAt,
       kills: player.kills,
       deaths: player.deaths,
       weapon: player.weapon,
+      primaryWeapon: player.primaryWeapon,
+      equippedWeapons: deployedWeapons(player.primaryWeapon),
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
+      reloading: player.reloadState !== null,
       stance: player.stance,
       crouched: player.stance === 'crouch',
       prone: player.stance === 'prone',
@@ -1657,33 +6889,759 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       grenades: player.grenades,
       position: player.position.toArray(),
     },
-    bots: [...bots.values()].map((bot) => ({ id: bot.id, hp: bot.hp, alive: bot.alive, kills: bot.kills, position: bot.position.toArray() })),
+    spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
+    bots: [...bots.values()].map((bot) => ({
+      id: bot.id,
+      hp: bot.hp,
+      alive: bot.alive,
+      kills: bot.kills,
+      weapon: bot.weapon,
+      nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
+      grenadeActive: bot.grenadeActive,
+      position: bot.position.toArray(),
+      waypoint: bot.waypoint,
+      blockedSince: bot.blockedSince,
+      hasLineOfSight: bot.hasLineOfSight,
+      rootVisible: bot.root.visible,
+      screenPosition: bot.root.localToWorld(new THREE.Vector3(0, 1.35, 0)).project(camera).toArray(),
+      visibleMeshCount: (() => {
+        let count = 0;
+        bot.root.traverse((node) => {
+          if (node instanceof THREE.Mesh && node.visible && node.userData.authoritativeProxy !== true) count += 1;
+        });
+        return count;
+      })(),
+      operatorModel: riggedOperatorTelemetry(bot.root),
+      neonHaze: bot.root.userData.neonBotHaze === true
+        && bot.root.getObjectByName('neon-purple-bot-haze') instanceof THREE.Sprite,
+      presentationReady: riggedOperatorTelemetry(bot.root) !== null || ['presentation-reaction-gear', 'field-radio-pack', 'asymmetric-shoulder-plate', 'team-radio-antenna']
+        .every((name) => bot.root.getObjectByName(name) !== undefined),
+      presentationWeaponSafe: (() => {
+        const weapon = bot.root.getObjectByName(`operator-${bot.root.userData.operatorRig?.weaponId ?? 'carbine'}`);
+        if (!weapon) return false;
+        let safe = true;
+        weapon.traverse((node) => {
+          if (node instanceof THREE.Mesh && node.userData.presentationOnly !== true) safe = false;
+        });
+        return safe;
+      })(),
+    })),
+    botEscalation: {
+      deaths: soloBotDeaths,
+      initialBots: selectedArena.soloBotCount,
+      targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
+      activeBots: bots.size,
+      dormantBots: dormantBots.size,
+      dormantBotsPrewarmed,
+      dynamicReinforcementLights: 0,
+      maximumBots: selectedArena.maximumSoloBots,
+      nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
+        ? (Math.floor(soloBotDeaths / 5) + 1) * 5
+        : null,
+      lastEliminationProfile: { ...lastBotEliminationProfile },
+    },
     remotes: remotes.size,
+    networkSync: {
+      stateIntervalMs: STATE_BROADCAST_INTERVAL_MS,
+      interpolationRate: REMOTE_INTERPOLATION_RATE,
+    },
+    networkLifecycle: network.diagnostics(),
+    remoteHitAdmission: { ...remoteHitAdmissionTelemetry },
     remotePlayers: [...remotes.values()].map((remote) => ({
       id: remote.snapshot.id,
+      hp: remote.snapshot.hp,
+      primary: remote.snapshot.primary,
+      weapon: remote.snapshot.weapon,
       stance: remote.snapshot.stance ?? 'stand',
       position: remote.target.toArray(),
+      visualPosition: remote.root.position.toArray(),
+      snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
+      interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
-    originalArtLoaded: scene.getObjectByName('original-arena-art') !== undefined,
+    botGrenades: {
+      active: activeBotGrenadeCount(),
+      maximumActiveObserved: botGrenadeMaxActive,
+      throws: botGrenadeThrows,
+      lastDamage: lastBotGrenadeDamage,
+      damageMultiplier: BOT_DAMAGE_MULTIPLIER,
+      ownerIds: grenades.filter((grenade) => grenade.ownerKind === 'bot').map((grenade) => grenade.ownerId),
+    },
+    grenadeVisual: {
+      ...grenadePresentationTelemetry(),
+      active: grenades.map((grenade) => ({
+        name: grenade.mesh.name,
+        authored: grenade.mesh.userData.authoredGrenade === true,
+        meshes: (() => {
+          let count = 0;
+          grenade.mesh.traverse((node) => { if (node instanceof THREE.Mesh) count += 1; });
+          return count;
+        })(),
+      })),
+    },
+    grenadeExplosion: {
+      total: grenadeExplosions,
+      activeVisuals: grenadeExplosionPresentation.telemetry().active,
+      poolCapacity: grenadeExplosionPresentation.telemetry().capacity,
+      dynamicLights: grenadeExplosionPresentation.telemetry().dynamicLights,
+      prewarmed: grenadeExplosionPresentation.telemetry().prewarmed,
+      lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
+      profile: { ...lastGrenadeExplosionProfile },
+    },
+    audio: audio.telemetry(),
+    fieldSupport: {
+      streak: fieldSupport.streak,
+      rewardCycle: fieldSupport.rewardCycle,
+      bestStreakThisMatch,
+      available: { ...fieldSupport.available },
+      scoutActive: performance.now() < scoutSweepUntil,
+      yardhawk: yardhawk ? {
+        active: true,
+        phase: yardhawk.phase,
+        targetId: yardhawk.targetId,
+        position: yardhawk.root.position.toArray(),
+        armedInMs: Math.max(0, yardhawk.armedAt - performance.now()),
+      } : { active: false, phase: null },
+      yardhawkExplosions,
+      tacticalMapOpen,
+      tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
+      tacticalHostiles: triPassHostileMarkers.map((marker) => ({
+        id: marker.id,
+        kind: marker.kind,
+        world: [...marker.world] as [number, number],
+        canvas: [...marker.canvas] as [number, number],
+      })),
+      explosionPresentation: supportExplosionPresentation.telemetry(),
+      explosionProfile: lastSupportExplosionProfile
+        ? { ...lastSupportExplosionProfile }
+        : { source: null, audioMs: 0, visualMs: 0, targetDamageMs: 0, totalSyncMs: 0 },
+      explosionFrameProfile: { ...lastSupportExplosionFrameProfile, sources: [...lastSupportExplosionFrameProfile.sources] },
+      retiredPresentationRoots: deferredSupportDisposals.length,
+      prewarmedNuke: {
+        shockwaveInScene: nukeShockwave.parent === scene,
+        prewarmed: nukePresentationPrewarmed,
+        dynamicLights: 0,
+      },
+      strikeMissiles: strikeMissiles.map((strike) => ({
+        target: strike.target.toArray(),
+        impactInMs: Math.max(0, strike.impactAt - performance.now()),
+        position: strike.missile.position.toArray(),
+      })),
+      triPassLaunches,
+      triPassImpacts,
+      triPassLastImpactDelayMs,
+      hunterDrones: hunterDrones.map((drone) => ({
+        targetId: drone.targetId,
+        index: drone.index,
+        position: drone.root.position.toArray(),
+        diveInMs: Math.max(0, drone.diveAt - performance.now()),
+        expiresInMs: Math.max(0, drone.expiresAt - performance.now()),
+      })),
+      hunterSwarmLaunches,
+      hunterSwarmImpacts,
+      gamepadSelection: gamepadSupportSelection,
+      nuke: nukeSequence ? {
+        active: true,
+        detonated: nukeSequence.detonated,
+        detonateInMs: Math.max(0, nukeSequence.detonateAt - performance.now()),
+        finishInMs: Math.max(0, nukeSequence.finishedAt - performance.now()),
+      } : { active: false, detonated: false, detonateInMs: 0, finishInMs: 0 },
+      nukeActivations: nukeLaunches,
+      nukeDetonations,
+      networkHits: Object.fromEntries(Object.entries(supportNetworkHitTelemetry).map(([source, telemetry]) => [source, { ...telemetry }])),
+    },
+    remoteSupportAuthority: [...remoteSupportAuthorities.entries()].map(([id, authority]) => ({
+      id,
+      streak: authority.progression.streak,
+      available: { ...authority.progression.available },
+      authorizations: Object.fromEntries(
+        Object.entries(authority.authorizations).map(([source, authorization]) => [source, authorization ? {
+          activationNonce: authorization.activationNonce,
+          expiresInMs: Math.max(0, authorization.expiresAt - performance.now()),
+          admittedOrigins: Object.keys(authorization.targetsByOrigin).length,
+        } : null]),
+      ),
+    })),
+    overdrive: {
+      ...overdriveState,
+      position: [OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z],
+      damageMultiplier: overdriveDamageMultiplier(overdriveState, player.id, performance.now()),
+      remainingMs: overdriveRemainingMs(overdriveState, player.id, performance.now()),
+      spawns: overdriveSpawns,
+      pickups: overdrivePickups,
+      expiries: overdriveExpiries,
+      visible: overdriveRoot.visible,
+      worldIconVisible: overdriveRoot.visible && quadWorldIcon.visible,
+      worldIconName: quadWorldIcon.name,
+      minimapSymbol: '4×',
+    },
+    deathDropPresentation: deathDropPresentationPool.telemetry(),
+    deathDrops: deathDrops.map((entity) => ({
+      id: entity.drop.id,
+      weapon: entity.drop.weapon,
+      ammoAvailable: deathDropAmmoAvailable(entity.drop, performance.now()),
+      weaponAvailable: deathDropWeaponAvailable(entity.drop, performance.now()),
+      position: [entity.drop.position.x, entity.drop.position.y, entity.drop.position.z],
+      expiresInMs: Math.max(0, entity.drop.expiresAt - performance.now()),
+    })),
+    breakableWindows: arena.breakableWindows.map((window) => ({
+      id: window.id,
+      broken: window.broken,
+      visible: window.mesh.visible,
+      position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
+    })),
+    physicalCover: arena.physicalCover.map((cover) => ({
+      id: cover.id,
+      bounds: { ...cover.bounds },
+      blocksMovement: cover.blocksMovement,
+      blocksShots: cover.blocksShots,
+      performanceVisualKind: cover.performanceVisualKind ?? null,
+      performanceVisualMeshes: cover.performanceVisualMeshes ?? 0,
+    })),
+    minimap: {
+      backingWidth: minimapCanvas.width,
+      cssWidth: minimapCanvas.getBoundingClientRect().width,
+      headingDegrees: headingDegrees(player.yaw),
+      landmarks: minimapLandmarksRendered.map((landmark) => ({ ...landmark })),
+    },
+    spawnSafety: ([0, 1] as Team[]).map((team) => ({
+      team,
+      authored: arena.spawns[team].length,
+      valid: arena.spawns[team].filter((point) => {
+        const bodyPoint = { x: point.x, y: 0, z: point.z };
+        return pointInsideBounds(bodyPoint, arena.bounds, 0.44) && !isBlocked(bodyPoint, arena.colliders, 0.44);
+      }).length,
+    })),
+    houseNavigation: arena.houses.map((house) => ({
+      id: house.id,
+      dimensions: { ...house.dimensions },
+      rampWidth: (() => {
+        const ramp = house.solids.find((solid) => solid.name === 'exterior-access-ramp');
+        return ramp ? Math.min(ramp.size[0], ramp.size[2]) : 0;
+      })(),
+      indoorRampWidth: (() => {
+        const ramp = house.solids.find((solid) => solid.name === 'interior-access-ramp');
+        return ramp ? Math.min(ramp.size[0], ramp.size[2]) : 0;
+      })(),
+      rampNames: house.solids.filter((solid) => solid.kind === 'ramp').map((solid) => solid.name),
+      floorSections: house.solids.filter((solid) => solid.kind === 'floor').map((solid) => solid.name),
+      routeAnchors: house.routes['ramp-room-flow'].length,
+      indoorRouteAnchors: house.routes['indoor-ramp-room-flow'].length,
+    })),
+    teamPings: activeTeamPings.map((ping) => ({
+      kind: ping.root.name.replace('team-ping-', ''),
+      expiresInMs: Math.max(0, ping.expiresAt - performance.now()),
+      position: ping.root.position.toArray(),
+    })),
+    activeImpactParticles: impactPresentation.activeParticles(),
+    activeImpactMarks: impactPresentation.activeMarks(),
+    activeTracers: tracerPool.activeCount(),
+    originalArtLoaded: blenderArenaActive || scene.getObjectByName('original-arena-art') !== undefined,
+    arenaZone: classifyArenaZone(player.position.x, player.position.z),
+    worldIdentity: routeIdentityTelemetry(),
+    worldIdentityPresentation: {
+      routeLights: worldIdentityPresentation.routeLights,
+      routeSigns: worldIdentityPresentation.routeSigns,
+      cueInstances: worldIdentityPresentation.cueInstances,
+      atmosphericParticles: worldIdentityPresentation.atmosphericParticles,
+      practicalLights: worldIdentityPresentation.practicalLights,
+      streetLights: worldIdentityPresentation.streetLights,
+      interiorLights: worldIdentityPresentation.interiorLights,
+      fixtureInstances: worldIdentityPresentation.fixtureInstances,
+      ceilingInstances: worldIdentityPresentation.ceilingInstances,
+    },
+    neighbourhoodLife: (() => {
+      const root = scene.getObjectByName('pass31-neighbourhood-life');
+      let floraInstances = 0;
+      let faunaInstances = 0;
+      let streetItems = 0;
+      root?.traverse((node) => {
+        if (node instanceof THREE.InstancedMesh && /flower/.test(node.name)) floraInstances += node.count;
+        if (node instanceof THREE.InstancedMesh && /butterfl|bird/.test(node.name)) faunaInstances += node.count;
+        if (/^(street-bench|street-recycling-bin|street-bicycle)$/.test(node.name)) streetItems += 1;
+        if (node.name === 'street-wayfinding-markers' && node instanceof THREE.InstancedMesh) streetItems += node.count;
+      });
+      const contract = root?.userData.neighbourhoodLife as {
+        flowerBeds?: number;
+        benches?: number;
+        bins?: number;
+        bicycles?: number;
+        markers?: number;
+      } | undefined;
+      return {
+        loaded: root !== undefined,
+        floraInstances,
+        faunaInstances,
+        streetItems,
+        flowerBeds: contract?.flowerBeds ?? 0,
+        benches: contract?.benches ?? 0,
+        bins: contract?.bins ?? 0,
+        bicycles: contract?.bicycles ?? 0,
+        genericMarkers: contract?.markers ?? 0,
+      };
+    })(),
+    arenaStoryReady: blenderArenaActive || ['route-marker-verdant-array', 'route-marker-civic-transit', 'route-marker-helio-service']
+      .every((name) => scene.getObjectByName(name) !== undefined),
+    interiorTelemetry: (() => {
+      const counts = { ...arena.houseTelemetry, furnishings: 0, fixtures: 0, visibleCollisionProxies: 0, visibleRamps: 0 };
+      const materialFamilies = new Set<string>();
+      const texturedMaterialFamilies = new Set<string>();
+      scene.traverse((node) => {
+        if (node instanceof THREE.Mesh && /^(upper-room-(bed|headboard|workbench|console)|performance-interior)/.test(node.name)) {
+          counts.furnishings += 1;
+          const family = typeof node.userData.interiorMaterialFamily === 'string'
+            ? node.userData.interiorMaterialFamily
+            : null;
+          if (family) {
+            materialFamilies.add(family);
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            if (materials.some((material) => material instanceof THREE.MeshStandardMaterial && material.map)) {
+              texturedMaterialFamilies.add(family);
+            }
+          }
+        }
+        if (/interior-ceiling-light|balcony-rail|house-gable-finish|house-gutter|house-chimney/.test(node.name)) counts.fixtures += 1;
+        if (node.userData.collisionProxy === true && node.visible) counts.visibleCollisionProxies += 1;
+        if (/^(exterior|interior)-access-ramp$/.test(node.name)
+          && (node.visible || node.userData.staticBatchRendered === true)) counts.visibleRamps += 1;
+      });
+      const semanticRoot = scene.getObjectByName('performance-interior-furnishing-sets');
+      const semantic = semanticRoot?.userData.semanticInterior as {
+        houses?: number;
+        sourcePieces?: number;
+        batches?: number;
+      } | undefined;
+      return {
+        ...counts,
+        furnishingSets: semantic?.houses ?? 0,
+        furnishingSourcePieces: semantic?.sourcePieces ?? 0,
+        furnishingBatches: semantic?.batches ?? 0,
+        furnishingMaterialFamilies: [...materialFamilies].sort(),
+        texturedFurnishingMaterialFamilies: [...texturedMaterialFamilies].sort(),
+      };
+    })(),
     weaponReady: weaponView.isReady(),
+    weaponPresentation: weaponView.presentationState(),
+    sniperScope: {
+      active: !sniperScopeOverlay.hidden,
+      magnification: 3,
+      baseFov: preferredFov,
+      cameraFov: camera.fov,
+      viewmodelVisible: weaponView.root.visible,
+    },
+    weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
+    menuCamera: {
+      position: camera.position.toArray(),
+      towerNdc: new THREE.Vector3(0, 6, 0).project(camera).toArray(),
+    },
     render: {
+      profile: renderProfile,
+      representation: activeRenderConfig.representation,
+      atomicSignal: atomicSignal.telemetry(),
+      materialCompatibility: { ...materialCompatibility },
+      fpsCounter: {
+        value: fpsCounterValue.textContent,
+        pacing: fpsCounter.dataset.pacing ?? 'warming',
+        visible: !hudRoot.hidden,
+        anchor: 'top-right',
+      },
+      pixelRatio: renderer.getPixelRatio(),
+      drawingBuffer: renderer.getDrawingBufferSize(new THREE.Vector2()).toArray(),
+      antialias: renderer.getContext().getContextAttributes()?.antialias ?? false,
+      webglVersion: renderer.getContext().getParameter(renderer.getContext().VERSION),
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       points: renderer.info.render.points,
       lines: renderer.info.render.lines,
       sceneObjects: scene.children.length,
       reducedMode: reducedRenderMode,
+      shadows: renderer.shadowMap.enabled,
+      shadowAutoUpdate: renderer.shadowMap.autoUpdate,
+      shadowNeedsUpdate: renderer.shadowMap.needsUpdate,
+      staticShadowDynamicRefreshes,
+      contextLifecycle: {
+        lost: webglContextLost,
+        losses: webglContextLosses,
+        restorations: webglContextRestorations,
+      },
+      authoredShadows: activeRenderConfig.shadows,
+      shadowMode: activeRenderConfig.shadowMode,
+      framePacing: framePacing.summary(),
+      minimapRenders: minimapRenderCount,
+      adaptive: adaptiveQuality.telemetry(),
+      lighting: {
+        ...activeLighting,
+        fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
+        fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
+      },
+      sky: {
+        pass: 30,
+        top: `#${activeLighting.skyTop.toString(16).padStart(6, '0')}`,
+        horizon: `#${activeLighting.skyHorizon.toString(16).padStart(6, '0')}`,
+        bottom: `#${activeLighting.skyBottom.toString(16).padStart(6, '0')}`,
+        cloudShadow: `#${activeLighting.skyCloudShadow.toString(16).padStart(6, '0')}`,
+        cloudLight: `#${activeLighting.skyCloudLight.toString(16).padStart(6, '0')}`,
+        cloudBands: skyCloudsEnabled ? 2 : 0,
+        fogColor: `#${activeLighting.fogColor.toString(16).padStart(6, '0')}`,
+        fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
+        fogFar: scene.fog instanceof THREE.Fog ? scene.fog.far : activeLighting.fogFar,
+        godRayStrength: actualGodRayStrength,
+        godRayLobes: actualGodRayLobes,
+        extraDraws: 0,
+        extraTextureSamples: 0,
+        linearHdr: true,
+      },
+      grass: grassSystem.telemetry(),
+      atmosphere: atmosphereSystem.telemetry(),
+      water: waterSystem.telemetry(),
+      blenderEnvironment: {
+        ...blenderArenaTelemetry(),
+        proceduralRootActuallyVisible: atomicArena.root.visible,
+        qualityArtRootVisible: blenderArenaActive && arenaArtRoot?.visible === true,
+        overlappingPrimaryArenaRoots: atomicArena.root.visible && blenderArenaActive && arenaArtRoot?.visible === true,
+      },
+      rustworksBlender: rustworksBlenderTelemetry(),
+      rustworksQuality: rustworksQualityTelemetry(renderProfile, selectedArena.id),
+      staticBatchPalette: scene.getObjectByName('Atomic Acres arena-render-batches')?.children.flatMap((node) => {
+        const sourcePalette = node.userData.sourcePalette;
+        if (Array.isArray(sourcePalette)) return sourcePalette.filter((color): color is string => typeof color === 'string');
+        const material = node instanceof THREE.Mesh ? node.material : null;
+        return !Array.isArray(material) && material && 'color' in material
+          ? [(material as THREE.MeshBasicMaterial).color.getHexString()]
+          : [];
+      }) ?? [],
     },
   }),
   startSolo: () => {
+    element<HTMLInputElement>('#player-name').value = 'QA Operator';
     network.close();
     resetForMode();
     startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  clearBots: () => clearBots(),
+  placeBotAhead: (distance = 5) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    const stagedDistance = THREE.MathUtils.clamp(distance, 2.5, 9);
+    const origin = player.position.clone();
+    let stagedPosition: THREE.Vector3 | null = null;
+    // QA combat staging must not place the target inside a house, bus or cover
+    // AABB. Try the requested forward ray first, then nearby clear bearings.
+    for (const yawOffset of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI]) {
+      const yaw = player.yaw + yawOffset;
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const candidate = new THREE.Vector3(player.position.x, 0, player.position.z)
+        .addScaledVector(forward, stagedDistance);
+      const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+      if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
+      const target = candidate.clone().add(new THREE.Vector3(0, 1.06, 0));
+      const ray = target.clone().sub(origin);
+      const targetDistance = ray.length();
+      const blocked = new THREE.Raycaster(origin, ray.normalize(), 0, targetDistance)
+        .intersectObjects(arena.raycastMeshes, false)
+        .some((hit) => hit.distance < targetDistance - 0.2);
+      if (blocked) continue;
+      stagedPosition = candidate;
+      break;
+    }
+    if (!stagedPosition) return;
+    bot.position.copy(stagedPosition);
+    bot.root.position.copy(bot.position);
+    bot.root.updateMatrixWorld(true);
+    bot.velocity.set(0, 0, 0);
+    bot.root.rotation.y = player.yaw;
+    bot.invulnerableUntil = 0;
+  },
+  placeBotRelative: (right = 0, forward = 5) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    const cameraForward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    const cameraRight = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+    bot.position.set(player.position.x, 0, player.position.z)
+      .addScaledVector(cameraRight, THREE.MathUtils.clamp(right, -9, 9))
+      .addScaledVector(cameraForward, THREE.MathUtils.clamp(forward, -9, 9));
+    bot.root.position.copy(bot.position);
+    bot.root.updateMatrixWorld(true);
+    bot.velocity.set(0, 0, 0);
+    bot.root.rotation.y = player.yaw;
+    bot.invulnerableUntil = 0;
+    bot.lastShotAt = performance.now();
+  },
+  showBotDamageDirection: () => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return null;
+    showDamageDirection(bot.id);
+    return sourceScreenAngle(player.position, player.yaw, bot.position);
+  },
+  respawn: () => respawn(false),
+  aimAtBot: (zone: HitZone = 'body') => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    const targetHeight = zone === 'head' ? 2.13 : zone === 'limb' ? 0.58 : 1.06;
+    const target = bot.position.clone().add(new THREE.Vector3(0, targetHeight, 0));
+    const delta = target.sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+  },
+  aimAtRemote: (zone: HitZone = 'body') => {
+    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    if (!remote) return;
+    const targetHeight = zone === 'head' ? 2.13 : zone === 'limb' ? 0.58 : 1.06;
+    const target = remote.target.clone().add(new THREE.Vector3(0, targetHeight, 0));
+    const delta = target.sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    remote.root.position.copy(remote.target);
+    remote.root.updateMatrixWorld(true);
+  },
+  stageWindow: (index: number, distance = 3) => {
+    const window = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
+    if (!window) return;
+    const target = window.mesh.getWorldPosition(new THREE.Vector3());
+    const house = arena.houses.reduce((nearest, candidate) => {
+      const currentDistance = Math.hypot(target.x - candidate.origin.x, target.z - candidate.origin.z);
+      const nearestDistance = Math.hypot(target.x - nearest.origin.x, target.z - nearest.origin.z);
+      return currentDistance < nearestDistance ? candidate : nearest;
+    }, arena.houses[0]);
+    const staged = selectPlayableWindowApproach(target, house.origin, arena.bounds, arena.colliders, distance);
+    if (!staged) return;
+    const eye = new THREE.Vector3(staged.x, staged.y, staged.z);
+    player.position.copy(eye);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    const delta = target.clone().sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
+    player.invulnerableUntil = 0;
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+  },
+  detonateGrenadeAtWindow: (index: number) => {
+    const pane = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
+    return pane ? breakWindowsInGrenadeBlast(pane.mesh.getWorldPosition(new THREE.Vector3()), randomNonce(), true) : 0;
+  },
+  stageYardhawkWall: (team: Team = 0) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    const house = arena.houses.find((candidate) => candidate.team === team);
+    const wall = house?.solids.find((solid) => solid.name === 'front-ground-centre');
+    if (!bot || !house || !wall) return false;
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, yardhawk: true } };
+    activateFieldSupport('yardhawk');
+    if (!yardhawk) return false;
+    const outward = house.origin.facing;
+    const start = new THREE.Vector3(wall.position[0], 1.15, wall.position[2] + outward * 1.2);
+    const target = new THREE.Vector3(wall.position[0], 0, wall.position[2] - outward * 1.4);
+    bot.position.copy(target);
+    bot.root.position.copy(target);
+    bot.root.updateMatrixWorld(true);
+    bot.hp = 100;
+    bot.alive = true;
+    bot.invulnerableUntil = 0;
+    yardhawk.root.position.copy(start);
+    yardhawk.phase = 'homing';
+    yardhawk.targetId = bot.id;
+    yardhawk.armedAt = 0;
+    yardhawk.expiresAt = performance.now() + 5_000;
+    return true;
+  },
+  stageBotAtIndoorRamp: (team: Team = 0, descending = false) => {
+    const house = arena.houses.find((candidate) => candidate.team === team);
+    const foot = house?.anchors.find((anchor) => anchor.id === 'indoor-ramp-foot');
+    const top = house?.anchors.find((anchor) => anchor.id === 'indoor-ramp-top');
+    const bot = [...bots.values()][0];
+    if (!house || !foot || !top || !bot) return false;
+    const playerAnchor = descending ? foot : top;
+    const botAnchor = descending ? top : foot;
+    player.position.set(playerAnchor.position[0], descending ? 1.7 : top.position[1], playerAnchor.position[2]);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    player.hp = 100;
+    player.alive = true;
+    player.invulnerableUntil = performance.now() + 30_000;
+    bot.position.set(botAnchor.position[0], descending ? 3.48 : 0, botAnchor.position[2]);
+    bot.root.position.copy(bot.position);
+    bot.velocity.set(0, 0, 0);
+    bot.hp = 100;
+    bot.alive = true;
+    bot.blockedSince = 0;
+    bot.hasLineOfSight = false;
+    bot.sightStartedAt = 0;
+    botsFrozen = false;
+    return true;
+  },
+  damageBot: (amount, zone = 'body') => {
+    const bot = [...bots.values()].find((candidate) => candidate.alive);
+    if (!bot || !Number.isFinite(amount) || amount <= 0) return;
+    bot.invulnerableUntil = 0;
+    applyBotDamage(bot, amount, zone);
+  },
+  activateDormantReinforcement: () => {
+    const started = performance.now();
+    const activated = activateDormantBot(bots.size);
+    return { activated, syncMs: performance.now() - started };
+  },
+  stageHouseRamp: (kind: 'interior' | 'exterior', team: Team = 0) => {
+    const house = arena.houses.find((candidate) => candidate.team === team);
+    const footId = kind === 'interior' ? 'indoor-ramp-foot' : 'ramp-foot';
+    const topId = kind === 'interior' ? 'indoor-ramp-top' : 'ramp-top';
+    const foot = house?.anchors.find((entry) => entry.id === footId);
+    const top = house?.anchors.find((entry) => entry.id === topId);
+    if (!house || !foot || !top) return null;
+    const uphill = new THREE.Vector3(
+      top.position[0] - foot.position[0],
+      0,
+      top.position[2] - foot.position[2],
+    );
+    const run = uphill.length();
+    if (run < 0.01) return null;
+    uphill.multiplyScalar(1 / run);
+    const start = new THREE.Vector3(foot.position[0], 1.7, foot.position[2]).addScaledVector(uphill, -0.65);
+    player.position.copy(start);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    playerGrounded = false;
+    wasGrounded = false;
+    player.yaw = Math.atan2(-uphill.x, -uphill.z);
+    player.pitch = 0;
+    player.invulnerableUntil = 0;
+    camera.position.copy(player.position);
+    camera.rotation.set(0, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      kind,
+      start: start.toArray(),
+      foot: [...foot.position],
+      top: [...top.position],
+      uphill: uphill.toArray(),
+      run,
+    };
+  },
+  stageRustworksAccess: (route: 'ground-to-lower' | 'lower-to-upper', descending = false) => {
+    if (selectedArena.id !== 'rustworks-1v1') return null;
+    const routes = arena.root.userData.rustworksRoutes as Record<string, Array<{
+      id: string;
+      position: [number, number, number];
+    }>> | undefined;
+    const anchors = routes?.[route];
+    if (!anchors || anchors.length < 2) return null;
+    const from = descending ? anchors[1] : anchors[0];
+    const to = descending ? anchors[0] : anchors[1];
+    const direction = new THREE.Vector3(
+      to.position[0] - from.position[0],
+      0,
+      to.position[2] - from.position[2],
+    );
+    const run = direction.length();
+    if (run < 0.01) return null;
+    direction.multiplyScalar(1 / run);
+    const start = new THREE.Vector3(...from.position);
+    player.position.copy(start);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    playerGrounded = false;
+    wasGrounded = false;
+    player.yaw = Math.atan2(-direction.x, -direction.z);
+    player.pitch = 0;
+    player.hp = 100;
+    player.alive = true;
+    player.invulnerableUntil = performance.now() + 30_000;
+    camera.position.copy(player.position);
+    camera.rotation.set(0, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      route,
+      descending,
+      start: start.toArray(),
+      target: [...to.position],
+      direction: direction.toArray(),
+      run,
+    };
+  },
+  teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
+    if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
+    player.position.set(x, y, z);
+    characterPhysics?.teleportEye(player.position);
+    player.velocity.set(0, 0, 0);
+    player.yaw = yaw;
+    player.pitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    player.invulnerableUntil = 0;
+  },
+  setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0) => {
+    debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
+    if (!debugCaptureCameraActive) return;
+    debugCaptureCameraPosition.set(x!, y, z);
+    debugCaptureCameraYaw = yaw;
+    debugCaptureCameraPitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
+  },
+  collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
+    ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
+    : true,
+  segmentBlocked: (x1, z1, x2, z2) => arena.colliders.some((box) => segmentIntersectsBox(
+    new THREE.Vector3(x1, 0.2, z1),
+    new THREE.Vector3(x2, 1.1, z2),
+    box,
+  )),
+  selectTriPassWorldTargets: (points) => {
+    if (!triPassTargeting || !tacticalMapOpen) return false;
+    let next = triPassTargeting;
+    for (const [x, z] of points.slice(0, 3)) next = registerTriPassTarget(next, { x, z }, arena.bounds);
+    triPassTargeting = next;
+    drawStrikeMap();
+    if (!next.complete) return false;
+    authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
+    scheduleTriPassMissiles(next.points, performance.now());
+    cancelTriPassTargeting(false);
+    return true;
+  },
+  captureShadowProbeFrame: (horizontalOffset) => {
+    if (!debugShadowProbe) {
+      debugShadowProbe = new THREE.Mesh(
+        new THREE.BoxGeometry(0.9, 2, 0.9),
+        new THREE.MeshStandardMaterial({ colorWrite: false, depthWrite: false }),
+      );
+      debugShadowProbe.name = 'pass25a-shadow-output-probe';
+      debugShadowProbe.castShadow = true;
+      debugShadowProbe.frustumCulled = false;
+      scene.add(debugShadowProbe);
+    }
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
+    forward.normalize();
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
+    debugShadowProbe.position.copy(camera.position)
+      .addScaledVector(forward, 6)
+      .addScaledVector(right, THREE.MathUtils.clamp(horizontalOffset, -3, 3));
+    debugShadowProbe.position.y = 1;
+    renderer.shadowMap.needsUpdate = true;
+    atomicSignal.render(scene, camera);
+    const gl = renderer.getContext();
+    const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+    gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let hash = 0x811c9dc5;
+    for (const byte of pixels) {
+      hash ^= byte;
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  },
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
+  openMenu: () => {
+    clearGameplayInput();
+    menu.classList.remove('hidden');
+  },
   fireOnce: () => {
     debugInputUnlocked = true;
     triggerHeld = true;
@@ -1693,9 +7651,81 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),
+  equipKit: (id: FieldKitId) => {
+    const kit = fieldKitById(id);
+    selectedFieldKit = kit.id;
+    localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
+    player.primaryWeapon = kit.weapon;
+    player.weapon = kit.weapon;
+    player.ammo[kit.weapon] = WEAPONS[kit.weapon].mag;
+    player.reserve[kit.weapon] = WEAPONS[kit.weapon].reserve;
+    player.nextShotAt = 0;
+    weaponView.setWeapon(player.weapon, true);
+    renderFieldKitSelection();
+  },
+  equipWeapon: (weapon: WeaponId) => {
+    if (weapon === 'carbine' || weapon === 'smg' || weapon === 'scattergun' || weapon === 'sniper') player.primaryWeapon = weapon;
+    player.weapon = weapon;
+    player.ammo[weapon] = WEAPONS[weapon].mag;
+    player.reserve[weapon] = WEAPONS[weapon].reserve;
+    player.nextShotAt = 0;
+    weaponView.setWeapon(weapon, true);
+  },
+  interactDrop: () => interactWithDeathDrop(),
+  setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
+    player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
+    player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
+  },
+  setGrenades: (count: number) => {
+    if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(2, Math.floor(count)));
+  },
   reload: () => reload(),
-  melee: () => melee(),
+  melee: () => {
+    const before = player.lastMeleeAt;
+    melee();
+    return { accepted: player.lastMeleeAt !== before, alive: player.alive, phase: matchState.phase, lastMeleeAt: player.lastMeleeAt };
+  },
   setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = held; },
+  setMovement: (forward: boolean, sprint = false) => {
+    keys.delete('KeyW');
+    keys.delete('ShiftLeft');
+    keys.delete('ShiftRight');
+    if (forward) keys.add('KeyW');
+    if (forward && sprint) keys.add('ShiftLeft');
+  },
+  setMeleeCaptureProgress: (progress: number | null) => weaponView.setMeleeCaptureProgress(progress),
+  setFireCaptureAgeMs: (ageMs: number | null) => weaponView.setFireCaptureAgeMs(ageMs),
+  setReloadCaptureProgress: (progress: number | null) => {
+    debugReloadProgress = progress === null ? null : THREE.MathUtils.clamp(progress, 0, 1);
+  },
+  setGrassTime: (timeSeconds: number | null) => grassSystem.setDebugTime(timeSeconds),
+  setGrassInteractionProbe: (x: number | null, z: number | null) => grassSystem.setDebugInteraction(x, z),
+  sampleGrassBend: (index: number) => grassSystem.sampleDebugBend(index),
+  renderAudit: () => {
+    scene.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    const projection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(projection);
+    const visible: Array<{ name: string; material: string; triangles: number }> = [];
+    scene.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.layers.test(camera.layers)) return;
+      let ancestor: THREE.Object3D | null = node;
+      while (ancestor) {
+        if (!ancestor.visible) return;
+        ancestor = ancestor.parent;
+      }
+      if (node.frustumCulled && !frustum.intersectsObject(node)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      const positionCount = node.geometry.getAttribute('position')?.count ?? 0;
+      const triangles = Math.floor((node.geometry.index?.count ?? positionCount) / 3);
+      visible.push({
+        name: node.name || node.parent?.name || '(unnamed)',
+        material: materials.map((material) => `${material.type}:${material.name || material.uuid.slice(0, 8)}`).join(','),
+        triangles,
+      });
+    });
+    return visible.sort((a, b) => a.name.localeCompare(b.name));
+  },
   setStance: (stance: Stance) => {
     if (stance === player.stance) return;
     if (stance === 'stand') requestStance('stand');
@@ -1706,22 +7736,71 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.invulnerableUntil = 0;
     applyDamage(amount, bots.keys().next().value ?? player.id);
   },
+  damageFromRemote: (amount: number) => {
+    const remoteId = remotes.keys().next().value as string | undefined;
+    if (!remoteId) return;
+    player.invulnerableUntil = 0;
+    applyDamage(amount, remoteId);
+  },
+  earnSupport: (eliminations: number) => {
+    for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
+  },
+  forceBotGrenade: (fuseMs = 1_100) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    return bot ? throwBotGrenade(bot, performance.now(), fuseMs) : false;
+  },
+  activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
+  setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
+    const now = performance.now();
+    if (mode === 'charging') overdriveState = createOverdriveState(now);
+    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: false, nextSpawnAt: now };
+    else if (mode === 'active') overdriveState = {
+      generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
+      holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,
+    };
+    else overdriveState = { ...overdriveState, available: false, holderId: null, activeUntil: 0, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS };
+    updateOverdrive(now);
+    broadcastOverdriveState(now);
+  },
+  sendPing: (kind: TeamPingKind) => sendTeamPing(kind),
+  holdPings: (durationMs = 30_000) => {
+    const expiresAt = performance.now() + Math.max(0, Math.min(60_000, durationMs));
+    for (const ping of activeTeamPings) ping.expiresAt = expiresAt;
+  },
+  endMatch: () => {
+    const now = performance.now();
+    matchState = {
+      phase: 'active',
+      phaseStartedAt: now - (selectedArena.matchRules.durationMs ?? 0),
+      endsAt: now,
+      winner: null,
+    };
+    if (selectedArena.matchRules.durationMs === null) {
+      matchState = { phase: 'ended', phaseStartedAt: now, endsAt: now, winner: 0, endReason: 'time' };
+      matchFinished = true;
+      return;
+    }
+    updateMatchState(now);
+  },
+  rematch: () => {
+    network.close();
+    resetForMode();
+    startGame('solo', false);
+  },
+  returnToMainMenu,
+  selectArena: async (id: ArenaId) => activateArenaSelection(id),
+  hitRangeTarget: (id, damage = 500, zone = 'body') => hitPracticeTarget(id, damage, zone),
+  spawnDeathDrop: (ageMs = 0) => spawnDeathDrop({
+    type: 'death',
+    killer: 'qa-drop-auditor',
+    victim: player.id,
+    nonce: randomNonce(),
+  }, performance.now() - THREE.MathUtils.clamp(ageMs, 0, 30_100))?.drop.id ?? null,
+  setKills: (kills: number) => {
+    if (Number.isFinite(kills)) player.kills = Math.max(0, Math.floor(kills));
+  },
 
 };
-
-function liftCrushedEnvironmentBlacks(root: THREE.Object3D, excluded: THREE.Object3D): void {
-  const adjusted = new Set<THREE.Material>();
-  root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh) || excluded.getObjectById(node.id)) return;
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    for (const material of materials) {
-      if (adjusted.has(material) || !(material instanceof THREE.MeshStandardMaterial)) continue;
-      adjusted.add(material);
-      const { r, g, b } = material.color;
-      if (Math.max(r, g, b) < 0.16) material.color.lerp(new THREE.Color(0x5b6664), 0.24);
-    }
-  });
-}
 
 async function bootstrap(): Promise<void> {
   const soloButton = element<HTMLButtonElement>('#solo');
@@ -1732,36 +7811,93 @@ async function bootstrap(): Promise<void> {
   joinButton.disabled = true;
   setStatus('Loading authored arena art, weapons and advanced collision…');
 
-  const physicsPromise = CharacterPhysics.create(arena.colliders, arena.bounds);
+  const physicsPromise = CharacterPhysics.create(arena.physicsColliders, arena.bounds);
   const weaponPromise = weaponView.load((loaded, total) => {
     setStatus(`Loading authored weapons ${loaded}/${total}…`);
   });
-  const artPromise = loadArenaArt(scene, (loaded, total) => {
-    setStatus(`Loading authored arena models ${loaded}/${total}…`);
-  }, reducedRenderMode);
-  const [physics, , art] = await Promise.all([physicsPromise, weaponPromise, artPromise]);
+  const artPromise = renderProfile === 'blender'
+    ? (async () => {
+        try {
+          const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            setStatus(`Loading Quality Graphics arena ${percent}%…`);
+          });
+          blenderArenaActive = true;
+          return art;
+        } catch (error) {
+          markBlenderArenaFallback(error);
+          console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
+          return loadArenaArt(scene, (loaded, total) => {
+            setStatus(`Quality Graphics fallback ${loaded}/${total}…`);
+          }, false);
+        }
+      })()
+    : loadArenaArt(scene, (loaded, total) => {
+        setStatus(`Loading authored arena models ${loaded}/${total}…`);
+      }, reducedWorldDetail);
+  const rustworksArtPromise = renderProfile === 'blender'
+    ? loadRustworksBlenderTower(rustworksArena.root).then((root) => {
+        // Authored kit is the Quality silhouette; keep only dirt ray-target + lights from procedural.
+        setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+        setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
+        return root;
+      }).catch((error) => {
+        markRustworksBlenderFallback(error);
+        console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+        applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        setRustworksProceduralPresentationVisible(rustworksArena.root, true);
+        return null;
+      })
+    : Promise.resolve(null).then((value) => {
+        applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+        setRustworksProceduralPresentationVisible(rustworksArena.root, true);
+        return value;
+      });
+  const grenadePromise = loadGrenadePresentation();
+  const choirPromise = audio.preloadSanctifiedFragChoir();
+  const [physics, , art] = await Promise.all([
+    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise, choirPromise,
+  ]);
   characterPhysics = physics;
-  const visibleMapMeshes = arena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
-  arena.raycastMeshes.splice(0, arena.raycastMeshes.length, ...visibleMapMeshes);
+  arenaArtRoot = art.root;
+  await grenadeExplosionPresentation.prewarm(renderer, camera);
+  await supportExplosionPresentation.prewarm(renderer, camera);
+  await deathDropPresentationPool.prewarm(renderer, camera);
+  await prewarmNukePresentation();
+  const visibleMapMeshes = atomicArena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
+  atomicArena.raycastMeshes.splice(0, atomicArena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {
-    if (node instanceof THREE.Mesh && node.userData.blocksShots === true) arena.raycastMeshes.push(node);
+    if (node instanceof THREE.Mesh && node.userData.blocksShots === true) atomicArena.raycastMeshes.push(node);
   });
+  materialCompatibility = tuneMaterialsForAtomicSignal(
+    scene,
+    weaponView.root,
+    renderProfile,
+    renderer.capabilities.getMaxAnisotropy(),
+  );
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
-  if (arenaRoot) batchStaticMeshes(arenaRoot, scene, () => '', reducedRenderMode);
-  batchStaticMeshes(art.root, scene, () => '', reducedRenderMode);
-  liftCrushedEnvironmentBlacks(scene, weaponView.root);
+  if (renderProfile !== 'blender') {
+    batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
+  } else {
+    enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
+  }
+  if (!blenderArenaActive) {
+    if (arenaRoot) batchStaticMeshes(arenaRoot, arenaRoot, () => '', staticMaterialMode);
+    const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+    batchStaticMeshes(art.root, art.root, () => '', decorativeMaterialMode);
+  }
+  const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+  batchStaticMeshes(neighbourhoodLifeRoot, neighbourhoodLifeRoot, () => '', lifeMaterialMode);
+  if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   weaponView.setWeapon(player.weapon, true);
+  setArenaPresentationVisibility();
   respawn();
   weaponView.root.visible = false;
-  camera.position.set(-32, 10.5, -17);
-  camera.lookAt(0, 2.8, 4);
-  camera.fov = 72;
-  camera.updateProjectionMatrix();
+  setArenaMenuCamera();
 
-  soloButton.disabled = false;
-  hostButton.disabled = !webRtcSupported;
-  joinButton.disabled = !webRtcSupported;
-  setStatus('Tactical Feel Pass 03 ready — prone physics, rebuilt ADS and authoritative cover active.', 'ok');
+  arenaSelectionReady = true;
+  syncArenaSelectionUi();
+  setStatus(`${selectedArena.displayName} ready · ${selectedArena.rulesLabel}.`);
   requestAnimationFrame(frame);
 }
 

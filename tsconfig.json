@@ -15,11 +15,13 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "Bundler",
+    "types": ["node"],
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true
   },
   "include": [
-    "src"
+    "src",
+    "shared"
   ]
 }

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOT_DAMAGE_MULTIPLIER,
+  admittedPlayerDamage,
+  botScaledDamage,
+  HEADSHOT_DAMAGE_MULTIPLIER,
   WEAPONS,
   advanceMatch,
+  advanceFreeForAllMatch,
   applyRadialDeadzone,
   beginReload,
   cancelReload,
@@ -11,21 +15,58 @@ import {
   computeRecoilImpulse,
   computeSpread,
   grenadeDamage,
+  integrateGamepadLookRate,
   integrateHorizontalVelocity,
+  isSingleShotLethalFromFullHp,
   meleeStrike,
   mouseSensitivityMultiplier,
   movementProfile,
   nextStance,
   recoverRecoilImpulse,
+  reloadProgress,
   sampleSpreadDisk,
+  sampleWeaponPellet,
+  shotsToDownFromFullHp,
   sprintEligible,
   type MatchState,
 } from './gameplay';
 
 describe('solo bot tuning', () => {
-  it('deals exactly half the equivalent player weapon damage', () => {
-    expect(BOT_DAMAGE_MULTIPLIER).toBe(0.5);
-    expect(computeDamage(WEAPONS.carbine, 10, 'body') * BOT_DAMAGE_MULTIPLIER).toBe(15.5);
+  it('deals exactly half the previous Pass 30 bot damage', () => {
+    expect(BOT_DAMAGE_MULTIPLIER).toBe(0.25);
+    expect(botScaledDamage(computeDamage(WEAPONS.carbine, 10, 'body'))).toBe(7.75);
+    expect(botScaledDamage(230)).toBe(57.5);
+    expect(admittedPlayerDamage(botScaledDamage(grenadeDamage(15)), 0)).toBe(0.25);
+    expect(botScaledDamage(Number.NaN)).toBe(0);
+  });
+});
+
+describe('headshot damage contract', () => {
+  it('uses exactly 1.5× head damage for every firearm', () => {
+    expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
+    for (const weapon of Object.values(WEAPONS)) {
+      expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
+    }
+  });
+
+  it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
+    expect(computeDamage(WEAPONS.smg, 8, 'body')).toBe(23);
+    expect(computeDamage(WEAPONS.smg, 8, 'head')).toBe(35);
+    expect(computeDamage(WEAPONS.smg, 8, 'head')).toBeLessThan(100);
+    expect(computeDamage(WEAPONS.smg, 8, 'head') / computeDamage(WEAPONS.smg, 8, 'body')).toBeCloseTo(1.5, 1);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.smg, 'head')).toBe(false);
+    expect(shotsToDownFromFullHp(WEAPONS.smg, 'head')).toBe(3); // 35+35+30
+    expect(shotsToDownFromFullHp(WEAPONS.smg, 'body')).toBe(5); // 23*4=92, +23
+  });
+
+  it('only sniper head and close scattergun are single-shot lethal without Overdrive', () => {
+    expect(isSingleShotLethalFromFullHp(WEAPONS.sniper, 'head')).toBe(true);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.sniper, 'body')).toBe(false);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.carbine, 'head')).toBe(false);
+    expect(isSingleShotLethalFromFullHp(WEAPONS.pistol, 'head')).toBe(false);
+    expect(isSingleShotLethalFromFullHp(WEAPONS['machine-pistol'], 'head')).toBe(false);
+    // Scattergun multi-pellet at point blank is intentionally lethal.
+    expect(isSingleShotLethalFromFullHp(WEAPONS.scattergun, 'body')).toBe(true);
   });
 });
 
@@ -87,9 +128,41 @@ describe('console-style movement integration', () => {
     expect(applyRadialDeadzone(0.05, -0.04)).toEqual({ x: 0, y: 0 });
     const full = applyRadialDeadzone(0.6, 0.8);
     expect(Math.hypot(full.x, full.y)).toBeCloseTo(1, 6);
+    const diagonal = applyRadialDeadzone(1, 1);
+    expect(Math.hypot(diagonal.x, diagonal.y)).toBeCloseTo(1, 6);
+    expect(diagonal.x).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(applyRadialDeadzone(Number.NaN, 0)).toEqual({ x: 0, y: 0 });
     const shaped = applyRadialDeadzone(0.4, 0);
     expect(shaped.x).toBeGreaterThan(0);
     expect(shaped.x).toBeLessThan(0.4);
+  });
+
+  it('applies the same acceleration budget to cardinal and diagonal movement', () => {
+    const profile = movementProfile({ crouched: false, ads: false, sprinting: false, grounded: true });
+    const cardinal = integrateHorizontalVelocity({ x: 0, z: 0 }, { x: 0, z: -1 }, profile, 1 / 60);
+    const diagonal = integrateHorizontalVelocity({ x: 0, z: 0 }, { x: 1, z: -1 }, profile, 1 / 60);
+    expect(Math.hypot(diagonal.x, diagonal.z)).toBeCloseTo(Math.hypot(cardinal.x, cardinal.z), 8);
+  });
+
+  it('accelerates gamepad look predictably, slows ADS, and releases without a long tail', () => {
+    const hip = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: -0.5 }, 1 / 60, false, 1);
+    const ads = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: -0.5 }, 1 / 60, true, 1);
+    expect(hip.yaw).toBeGreaterThan(0);
+    expect(hip.pitch).toBeLessThan(0);
+    expect(Math.abs(ads.yaw)).toBeLessThan(Math.abs(hip.yaw));
+    let released = hip;
+    for (let frame = 0; frame < 20; frame += 1) {
+      released = integrateGamepadLookRate(released, { x: 0, y: 0 }, 1 / 60, false, 1);
+    }
+    expect(released.yaw).toBe(0);
+    expect(released.pitch).toBe(0);
+  });
+
+  it('clamps unsafe gamepad sensitivity inputs', () => {
+    const normal = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: 0 }, 0.05, false, 1.8);
+    const excessive = integrateGamepadLookRate({ yaw: 0, pitch: 0 }, { x: 1, y: 0 }, 0.5, false, 99);
+    expect(excessive.yaw).toBeCloseTo(normal.yaw, 6);
+    expect(Number.isFinite(excessive.yaw)).toBe(true);
   });
 });
 
@@ -115,6 +188,17 @@ describe('weapon tuning', () => {
     expect(edge.y).toBeGreaterThan(0);
   });
 
+  it('keeps every weapon principal projectile exactly on the reticle ray', () => {
+    for (const weapon of Object.values(WEAPONS)) {
+      const principal = sampleWeaponPellet(weapon, 0, weapon.maximumSpread, 1, 0.37);
+      expect(principal, weapon.id).toEqual({ x: 0, y: 0 });
+      if (weapon.pellets === 1) {
+        expect(sampleWeaponPellet(weapon, 7, weapon.maximumSpread, 1, 0.37), weapon.id).toEqual({ x: 0, y: 0 });
+      }
+    }
+    expect(sampleWeaponPellet(WEAPONS.scattergun, 1, WEAPONS.scattergun.hipSpread, 1, 0.25).y).toBeGreaterThan(0);
+  });
+
   it('applies range falloff and head/body multipliers with a non-zero floor', () => {
     const weapon = WEAPONS.carbine;
     const closeBody = computeDamage(weapon, 5, 'body');
@@ -123,6 +207,55 @@ describe('weapon tuning', () => {
     expect(closeHead).toBeGreaterThan(closeBody);
     expect(farBody).toBeLessThan(closeBody);
     expect(farBody).toBeGreaterThanOrEqual(weapon.minimumDamage);
+  });
+
+  it('keeps the service pistol useful without replacing a primary weapon', () => {
+    const pistol = WEAPONS.pistol;
+    expect(pistol.automatic).toBe(false);
+    expect(pistol.mag).toBe(15);
+    expect(computeDamage(pistol, 10, 'body')).toBe(36);
+    expect(computeDamage(pistol, 10, 'head')).toBe(54);
+    expect(pistol.rpm).toBeLessThan(WEAPONS.carbine.rpm);
+    expect(pistol.switchSeconds).toBeLessThan(WEAPONS.smg.switchSeconds);
+  });
+
+  it('gives the marksman a bounded full-auto G18 sidearm', () => {
+    const auto = WEAPONS['machine-pistol'];
+    expect(auto.name).toBe('G18 AUTO');
+    expect(auto.automatic).toBe(true);
+    expect(auto.rpm).toBeGreaterThan(WEAPONS.smg.rpm);
+    expect(auto.damage).toBeLessThan(WEAPONS.pistol.damage);
+    expect(auto.mag).toBe(20);
+    expect(auto.reserve).toBe(80);
+    expect(sampleWeaponPellet(auto, 0, auto.maximumSpread, 1, 0.5)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('gives the Longline sniper an exact one-headshot two-body-shot lethality contract', () => {
+    const sniper = WEAPONS.sniper;
+    const body = computeDamage(sniper, 90, 'body');
+    const head = computeDamage(sniper, 90, 'head');
+    expect(sniper.automatic).toBe(false);
+    expect(sniper.mag).toBe(5);
+    expect(sniper.reserve).toBe(25);
+    expect(body).toBe(67);
+    expect(body).toBeLessThan(100);
+    expect(body * 2).toBeGreaterThanOrEqual(100);
+    expect(head).toBeGreaterThanOrEqual(100);
+    expect(head).toBe(Math.round(body * HEADSHOT_DAMAGE_MULTIPLIER));
+    expect(sniper.rpm).toBeLessThan(WEAPONS.scattergun.rpm);
+    expect(sniper.hipSpread).toBeGreaterThan(WEAPONS.carbine.hipSpread);
+    expect(sniper.hipSpread * sniper.adsSpreadMultiplier).toBeLessThan(
+      WEAPONS.carbine.hipSpread * WEAPONS.carbine.adsSpreadMultiplier,
+    );
+  });
+
+  it('applies the owner-approved close-range Model 12 damage increase without changing cadence or pellet count', () => {
+    const shotgun = WEAPONS.scattergun;
+    expect(shotgun.damage).toBe(17);
+    expect(shotgun.minimumDamage).toBe(7);
+    expect(shotgun.pellets).toBe(9);
+    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(153);
+    expect(shotgun.rpm).toBe(82);
   });
 
   it('builds bounded directional recoil and recovers it toward rest', () => {
@@ -143,6 +276,15 @@ describe('reload state', () => {
     expect(completeReload(state!, state!.endsAt, 7, 20)).toEqual({ ammo: 27, reserve: 0, completed: true });
   });
 
+  it('derives clamped presentation progress from the authoritative reload timeline', () => {
+    const state = beginReload(WEAPONS.pistol, 2, 15, 1_000)!;
+    expect(reloadProgress(null, 1_000)).toBeNull();
+    expect(reloadProgress(state, 900)).toBe(0);
+    expect(reloadProgress(state, 1_000)).toBe(0);
+    expect(reloadProgress(state, (state.startedAt + state.endsAt) / 2)).toBeCloseTo(0.5, 6);
+    expect(reloadProgress(state, state.endsAt + 1_000)).toBe(1);
+  });
+
   it('allows a reload to be cancelled before the magazine is seated', () => {
     const state = beginReload(WEAPONS.carbine, 3, 24, 500)!;
     expect(cancelReload(state, state.seatAt - 1)).toBe(true);
@@ -152,9 +294,9 @@ describe('reload state', () => {
 
 describe('equipment and melee', () => {
   it('uses bounded grenade blast falloff', () => {
-    expect(grenadeDamage(0)).toBe(115);
-    expect(grenadeDamage(4)).toBeGreaterThan(grenadeDamage(7));
-    expect(grenadeDamage(9)).toBe(0);
+    expect(grenadeDamage(0)).toBe(230);
+    expect(grenadeDamage(8)).toBeGreaterThan(grenadeDamage(14));
+    expect(grenadeDamage(16)).toBe(0);
   });
 
   it('requires melee range and cooldown', () => {
@@ -173,5 +315,35 @@ describe('match flow', () => {
     expect(state).toMatchObject({ phase: 'ended', winner: 0 });
     state = advanceMatch({ ...state, rematchRequested: true }, state.phaseStartedAt + 1, [12, 9]);
     expect(state).toMatchObject({ phase: 'warmup', winner: null });
+  });
+
+  it('keeps Atomic active above 25 kills and ends only at five minutes', () => {
+    const rules = { durationMs: 300_000, scoreLimit: null } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceMatch(state, 3_000, [0, 0], rules);
+    expect(state).toMatchObject({ phase: 'active', endsAt: 303_000 });
+    state = advanceMatch(state, 302_999, [80, 72], rules);
+    expect(state.phase).toBe('active');
+    state = advanceMatch(state, 303_000, [80, 72], rules);
+    expect(state).toMatchObject({ phase: 'ended', endReason: 'time', winner: 0 });
+  });
+
+  it('supports an untimed and uncapped practice session', () => {
+    const rules = { durationMs: null, scoreLimit: null } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceMatch(state, 3_000, [0, 0], rules);
+    expect(state.endsAt).toBe(Number.POSITIVE_INFINITY);
+    expect(advanceMatch(state, 99_000_000, [999, 0], rules).phase).toBe('active');
+  });
+
+  it('ends free-for-all with one player winner or a draw', () => {
+    const rules = { durationMs: 60_000, scoreLimit: null } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceFreeForAllMatch(state, 3_100, [{ id: 'a', kills: 0 }], rules);
+    expect(state).toMatchObject({ phase: 'active', phaseStartedAt: 3_000, endsAt: 63_000 });
+    const winner = advanceFreeForAllMatch(state, 63_000, [{ id: 'a', kills: 8 }, { id: 'b', kills: 7 }], rules);
+    expect(winner).toMatchObject({ phase: 'ended', winner: null, winnerPlayerId: 'a' });
+    const draw = advanceFreeForAllMatch(state, 63_000, [{ id: 'a', kills: 8 }, { id: 'b', kills: 8 }], rules);
+    expect(draw).toMatchObject({ phase: 'ended', winner: 'draw' });
   });
 });

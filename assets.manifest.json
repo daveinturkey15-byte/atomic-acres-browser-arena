@@ -1,17 +1,133 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "assets": [
     {
       "id": "atomic-acres-original-texture-set-2026-07-12",
       "kind": "project-generated-surface-textures",
       "creator": "Atomic Acres project",
-      "source": "scripts/generate-art-textures.py",
-      "generatedAsOf": "2026-07-12",
+      "source": "scripts/generate-art-textures.py + scripts/generate-pass31-pbr.py",
+      "generatedAsOf": "2026-07-18",
       "license": "Original project work",
       "files": "public/assets/original/textures/*.png",
-      "contactSheet": "public/assets/original/texture-contact-sheet.jpg",
-      "modifications": "Ten deterministic project-generated textures, including grass turf and roof shingles; tiled and colour-graded in the game runtime.",
+      "contactSheet": "docs/assets/texture-contact-sheet.jpg",
+      "modifications": "Thirty-four deterministic project-generated textures: twelve original albedo surfaces plus eleven tangent-normal and eleven roughness companions. Pass 31 adds plaster, timber, gunmetal and painted-metal maps generated locally from project-authored source pixels with no external imagery.",
       "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-sanctified-frag-2026-07-15",
+      "kind": "original-project-3d-model",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "scripts/blender/create-holy-hand-frag.py",
+      "generatedAsOf": "2026-07-15",
+      "license": "Original project work",
+      "files": "public/assets/original/models/holy-hand-frag.glb",
+      "sha256": "892a7e0fe08d24e3d743843b3642c2453715f69875af1bcad6a098c59fdba80c",
+      "sourceBlend": "source-assets/blender/holy-hand-frag.blend",
+      "sourceBlendSha256": "2312c8a20e7f9ec5227127dc3775f727bed263c157bc13e2bc48a8f592023e48",
+      "preview": "artifacts/holy-hand-frag/holy-hand-frag-preview.png",
+      "modifications": "Original ceremonial grenade authored from Blender primitives through the local Blender MCP socket. No commercial model, texture, or extracted game asset is used. Runtime loading preserves the existing gameplay collider, fuse, damage, networking, and explosion behavior.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-blender-render-arena-2026-07-17",
+      "kind": "original-project-complete-blender-environment",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "scripts/blender/create-atomic-acres-blender-arena.py",
+      "generatedAsOf": "2026-07-20",
+      "license": "Original project work",
+      "files": "public/assets/original/models/atomic-acres-blender-arena.glb",
+      "sha256": "1e14fcf7bc57104c88642d3aa89358b6961d0c8e3224963b52dc3f37da913686",
+      "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
+      "sourceBlendSha256": "94aae9e65089c1c523b14867b4420f9dd5485070e2fe9e21b16c8c339fcb2bcb",
+      "sourceSpec": "source-assets/blender/atomic-acres-arena-spec.json",
+      "sourceSpecSha256": "963dcfbe1b9eab8613c52413689e830c6ec2badaa634fa58868ec8d33a9643eb",
+      "sourceProvenance": "source-assets/blender/atomic-acres-blender-arena.provenance.json",
+      "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
+      "format": "glTF 2.0 binary, 33 meshes, 27 exported materials, 34336 triangles, 6 semantic breakable windows, 3 semantic route landmarks, 2 modeled transit buses, 4 authored large physical cover assets, 2 authored house furnishing sets, 35 embedded project-authored images, 57 texture bindings and 19 exported PBR materials",
+      "modifications": "Complete original near-future agricultural test-suburb environment authored deterministically in Blender 4.0.2 from project primitives, project-authored surface textures and the authoritative TypeScript arena/house specification. Pass 27 establishes distinct Verdant Array, Civic Transit and Helio Service route identities through overhead irrigation and grow rails, civil-defence signals and flush evacuation cues, photovoltaic/battery/coolant hardware, rooftop habitat sensors, distant agritech energy silhouettes and bounded contact-grime patches. Presentation hydroponic beds were lowered so they no longer imply false collision. Pass 37 removes residual coplanar and under-20-mm surface conflicts across house floors/walls/ramps, road overlays, bus trim, pipe stacks, boundary corners and beacon rings while retaining procedural gameplay authority. No Activision, Call of Duty, Black Ops, downloaded model, copied texture, logo, signage, map geometry, or extracted game asset is used. The GLB is presentation-only; TypeScript collision, raycasts, ramps, windows, networking, drops and bot navigation remain authoritative.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-sanctified-frag-choir-2026-07-16",
+      "kind": "original-project-audio",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "scripts/audio/create-sanctified-frag-choir.py",
+      "generatedAsOf": "2026-07-16",
+      "license": "Original project work",
+      "files": "public/assets/original/audio/sanctified-frag-hallelujah.wav",
+      "sha256": "cf8a0bcd12b56e43ac41fcaa28f3b737296fd88085a062fc15470e6c9fa0d3ee",
+      "sourceScript": "scripts/audio/create-sanctified-frag-choir.py",
+      "format": "PCM WAV, stereo, 16-bit, 22050 Hz, 3.55 seconds",
+      "externalSamples": 0,
+      "description": "Original four-syllable formant-synthesized choir sting singing Hal-le-lu-jah for the Sanctified Frag explosion. No sampled or commercial recording is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
+      "kind": "third-party-rigged-operator-and-derived-first-person-arms",
+      "creator": "Quaternius (@Quaternius)",
+      "source": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceFolder": "https://drive.google.com/drive/folders/1USAAquX2JJWuA2m6zol0KUkFe3UkZ8zX",
+      "sourcePath": "Individual Characters/glTF/Swat.gltf",
+      "retrieved": "2026-07-13",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "licenseFile": "public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/quaternius/ultimate-modular-males/README.md",
+      "modifications": "Swat.gltf is preserved as the reference source. Swat_FirstPersonArms.glb is a Blender 5.1.1 derivative retaining the original arm, hand, finger skin weights and skeleton while removing torso geometry at the authored shoulder seam. The derivative is bundled for continued calibration but is not selected by the current public first-person presentation because it failed the visual grip/framing gate.",
+      "attributionRequired": false,
+      "files": [
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt", "sha256": "579a64b783673647182ed18944026c27a48421fb1b1c2c9207f3c650fe4546f2" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/README.md", "sha256": "ad892fe9f10736999e164eb2d477180b7c704e690928ecf079eb61e6c41b3c4f" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf", "sha256": "622b3f36fcac90539ef8f7121ec1f11b5e1ae603a085019b3fa96eba20dddfd3" },
+        { "path": "public/assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb", "sha256": "f5ea36848878cc3d94a661716879f1cc56d04cdeaf00ca826eacacca9f5332a8" }
+      ]
+    },
+    {
+      "id": "quaternius-animated-guns-runtime-derivatives-2026-07-13",
+      "kind": "third-party-rigged-weapon-runtime-derivatives",
+      "creator": "Quaternius (@Quaternius)",
+      "source": "https://quaternius.com/packs/animatedguns.html",
+      "sourceFolder": "https://drive.google.com/drive/folders/1ICYTdMXQqhkhrh8Fzjx9D0ozJuONwtC4",
+      "retrieved": "2026-07-13",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "licenseFile": "public/assets/third-party/quaternius/animated-guns/LICENSE.txt",
+      "provenanceFile": "public/assets/third-party/quaternius/animated-guns/README.md",
+      "modifications": "Rifle, P90, Shotgun and Pistol source FBX files were converted with Blender 5.1.1 to glTF 2.0 binary with Y-up coordinates and authored animations retained. Runtime materials and presentation transforms are adapted in-engine; weapon balance and authoritative hitscan remain original Atomic Acres code.",
+      "attributionRequired": false,
+      "files": [
+        { "path": "public/assets/third-party/quaternius/animated-guns/LICENSE.txt", "sha256": "2b239ddcf1d40297e9b95d42ec98808a210494cf79f163770107abab50c8c43a" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/README.md", "sha256": "2642ce0942a83ce7c26d2be5c40c1dc39de4fd8d597d784d023a6eef610baa6b" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/Rifle.glb", "sha256": "fdc22ccbb4b6dd167538a45d13e06effd8bd8556533e68850ad4b05f6da5343d" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/P90.glb", "sha256": "8085a36074803026ec2b8bc58b1fc938c5c5c76c909ac5ce9a0703c69cdaf7b0" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/Shotgun.glb", "sha256": "116f8e4e124f67e539e5e7784cfa373f0c886d04a17c99835a7a8e3827aa6844" },
+        { "path": "public/assets/third-party/quaternius/animated-guns/Pistol.glb", "sha256": "2263a601a95e584bd9069f74f90b6418ee0f319f6b2800949dcc2e94902e5d4a" }
+      ]
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "id": "opengameart-para-cc0-fps-arms-pass19-2026-07-14",
+      "kind": "rejected-third-party-rigged-first-person-arms-with-project-generated-materials",
+      "creator": "para",
+      "source": "https://opengameart.org/content/fps-arms-rigged-only",
+      "sourceArchive": "https://opengameart.org/sites/default/files/fps%20arms.7z",
+      "retrieved": "2026-07-14",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "licenseFile": "third-party-candidates/opengameart/fps-arms/LICENSE.txt",
+      "provenanceFile": "third-party-candidates/opengameart/fps-arms/README.md",
+      "generator": "scripts/generate-pass19-viewmodel-textures.py",
+      "modifications": "Rejected after in-engine framing and deformation review. The original FBX and deterministic audit textures remain versioned outside public/ for provenance, but Vite must never copy them into a release.",
+      "attributionRequired": false,
+      "originalArchiveSha256": "31f6c7bd5caea8856c4aafca8461f38a3c8bfdd3d8f05c898e403b9475e54562",
+      "files": [
+        { "path": "third-party-candidates/opengameart/fps-arms/LICENSE.txt", "sha256": "7bd2521fd3fff35f7ef316c9e08e1a48117833c923a9a58c531344cfc981c001" },
+        { "path": "third-party-candidates/opengameart/fps-arms/README.md", "sha256": "497b691fb15de88804dc75e0f9ad2079dfbcd58b7d56522d899f91cc85397f26" },
+        { "path": "third-party-candidates/opengameart/fps-arms/FPS_ARMS_RIG_1.fbx", "sha256": "8aeb5a2e5ee6277ecc40e99a6dc5034b0fff321ef6d86f53e10b3461fdbae35b" },
+        { "path": "third-party-candidates/opengameart/fps-arms/source_diffuse.png", "sha256": "f7a67f1c8f72294dc54ddea96253522dabdee99838746d6fb695eeef46120b63" },
+        { "path": "third-party-candidates/opengameart/fps-arms/new_diff.png", "sha256": "1d566532cde531c7f4ef73e730ce74ae7e45fce524120a86b8a63dcae2dae88b" },
+        { "path": "third-party-candidates/opengameart/fps-arms/atomic_arms_roughness.png", "sha256": "2faf15e6271fd38de30d2211d62e707a328b1c9cb2b61337556fa9ad7900326e" },
+        { "path": "third-party-candidates/opengameart/fps-arms/atomic_arms_texture_contact_sheet.jpg", "sha256": "e993f221a8b5e5736123373153543e6c55f03437fa682430e1a304bdefa866f3" }
+      ]
     }
   ],
   "excludedLegacyAssets": [

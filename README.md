@@ -1,6 +1,6 @@
 # Atomic Acres
 
-A polished, original retro-future browser arena FPS with a compact two-house test-town layout, fast respawns, three weapons, practice targets and peer-to-peer multiplayer.
+A polished, original near-future agritech browser arena FPS with three readable combat routes, fast respawns, four field kits, repeatable field support, bot skirmishes and peer-to-peer multiplayer.
 
 > **Original fan project:** this repository does not include Activision branding, game code, textures, models, audio, or extracted map geometry. The layout and procedural art are original while pursuing the quick, close-quarters suburban-arena feel Dave requested.
 
@@ -9,10 +9,11 @@ A polished, original retro-future browser arena FPS with a compact two-house tes
 1. Open the deployed site in a desktop Chromium/Firefox browser.
 2. Enter a callsign and choose **Aqua** or **Coral**.
 3. Choose:
-   - **Train Solo** for an offline target drill.
-   - **Host Lobby** to generate a room code and invite link.
+   - **Bot Skirmish** for an offline match with bots.
+   - **Host Lobby** to open a human-only waiting room and generate a room code/invite link.
    - **Join** after opening an invite link or pasting a room code.
-4. Click the game view to capture the mouse.
+4. In a private lobby, the host chooses **Team Deathmatch** or **Free For All**, a four- or six-player capacity, and optional team auto-balance. Everyone marks ready; only the host can start.
+5. Click the game view to capture the mouse after the synchronized deployment countdown.
 
 ### Controls
 
@@ -21,23 +22,50 @@ A polished, original retro-future browser arena FPS with a compact two-house tes
 | WASD | Move |
 | Shift | Sprint |
 | Space | Jump |
-| Mouse | Aim/fire |
+| Mouse / RMB / LMB | Aim / ADS / fire |
 | R | Reload |
-| 1 / 2 / 3 | Carbine / SMG / scattergun |
+| C / Z or Ctrl | Crouch / prone |
+| V / G / F | Knife / frag / interact with weapon drop |
+| 1 / 2 | Field-kit primary / sidearm |
 | Tab | Field roster |
 | Esc | Release pointer / pause panel |
 
 ## Multiplayer architecture
 
-The host is a lightweight relay over PeerJS/WebRTC. Static files can therefore run on free hosting without a paid game server.
+The host browser is an authoritative lightweight relay over PeerJS/WebRTC. Static files can therefore run on free hosting without a paid game server.
 
-- Host and guests exchange validated, bounded protocol messages.
-- Player snapshots are interpolated on peers.
-- Shots, damage, deaths, respawns, team scores and disconnects are relayed through the host.
-- Invite links prefill the room code; `autojoin=1` is available for automated smoke testing.
-- The default public PeerJS signalling service is used. Strict corporate/mobile NATs may require a TURN-backed PeerJS deployment later.
+- Private multiplayer is human-only: four-player rooms reject a fifth connection, while six-player rooms support one host plus five guests. Bots remain exclusive to Bot Skirmish.
+- A reliable, ordered event lane carries lobby control, match start, combat, scores, pickups and world changes.
+- A separate unordered movement lane uses `maxRetransmits: 0`; snapshots run at a 50 ms/20 Hz baseline, adapt downward under latency, and are interpolated by peers.
+- Guests connect only to the host. The host binds messages to admitted player identities, owns lobby settings/readiness/start time and score replication, and suppresses a guest's own movement echo.
+- The synchronized match epoch is estimated from host clock probes, so every browser derives countdown and remaining time from the same host-owned timeline.
+- A 30-second reservation and browser-local resume token allow a reloaded guest to reclaim the same identity and recover an active match. Host loss still ends the session; host migration is intentionally out of scope.
+- Invite links prefill the room code; `autojoin=1` is available for automated smoke testing. Room codes are unlisted invitations, not account/password authentication.
+- The default public PeerJS service provides signalling, not TURN relay. Restrictive NATs, VPNs, firewalls, symmetric NAT or blocked UDP can still prevent a connection; add TURN only if real multi-household testing demonstrates that need.
 
-This is a friendly-session architecture, not cheat-resistant competitive netcode. Clients currently report hits; a future public-ranked version should use host-authoritative rewind validation.
+This remains a friendly-session architecture, not cheat-resistant ranked netcode. The host validates and owns match/lobby state, but clients still report some hit outcomes; a public-ranked version should use server-authoritative rewind validation.
+
+## Callsigns and persistent records
+
+- Deployment is blocked until the player enters a valid 1–16 character callsign.
+- The callsign and top 20 completed-match records use stable, versioned same-origin browser storage, so they survive asset-hashed build updates on the same site.
+- Records rank match kills first, then best streak, fewer deaths and victory.
+- Same-origin tabs update live through `BroadcastChannel`; active PeerJS players exchange bounded leaderboard snapshots on join and new records at match end.
+- This serverless leaderboard is durable per browser and peer-carried between players who meet. It is not a tamper-resistant global ladder; that would require a separately deployed authoritative HTTPS backend.
+
+## Rendering and performance
+
+Pass 28 adds **Atomic Signal**, one bounded full-screen post-process that keeps the authored scene in linear HDR, then applies the same ACES filmic response used by the direct renderer plus restrained contrast, route-aware shadow/highlight tint, dithering, a soft vignette, and optional five-tap sharpening in Quality Graphics.
+
+- **Performance:** one source sample, no sharpening, 0.75 initial pixel ratio, adaptive quality, no shadows.
+- **Quality Graphics:** five source samples, restrained sharpening, authored environment and static shadows. The internal `blender` profile ID remains supported for saved settings and old links.
+- **Compatibility:** bypasses Atomic Signal and uses the direct ACES renderer.
+- Detected software rasterizers such as SwiftShader, llvmpipe, WARP and Microsoft Basic Render Driver also use direct ACES by default so post-processing cannot collapse already-limited frame pacing. `?signal=on` is the explicit QA override; `?signal=off` is the deterministic direct-render baseline.
+- The render target and first output frame are validated; an incomplete framebuffer, shader-black output, or runtime post-process exception falls back to direct rendering.
+- Runtime material auditing keeps albedo/emissive maps in sRGB, data maps linear, anisotropy profile-bounded, dark non-protected surfaces readable, and PBR values within restrained limits.
+- The live FPS counter is always anchored in the top-right during gameplay. Its cadence, active profile, render-target dimensions, shader health, texture-sample count and material corrections are available in the debug snapshot.
+
+See `docs/PASS28_ATOMIC_SIGNAL_RENDER_SPEC_2026-07-17.md` for the exact color-space contract and verification evidence.
 
 ## Local development
 
@@ -55,13 +83,26 @@ npm run lint
 npm test
 npm run build
 npm run preview
+
+# Against a running preview and PeerServer:
+QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 npm run qa:multiplayer
+QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 QA_MULTIPLAYER_CYCLES=3 npm run qa:multiplayer:lifecycle
+QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 npm run qa:private-lobby
 ```
 
-The test suite covers collision sliding/bounds, framerate-independent interpolation, callsign sanitizing, protocol validation and malformed-message rejection. A real two-peer browser smoke test should also be run before each release:
+Current release and verification documentation:
 
-1. Host a room in one tab.
-2. Open the invite in another tab/profile.
-3. Confirm both roster entries, movement replication, firing, damage, death, respawn and disconnect cleanup.
+- [`docs/INDEX.md`](docs/INDEX.md) — canonical documentation map and historical-pass boundary.
+- [`docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md`](docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — current Pass 52 product contract.
+- [`docs/VERIFICATION_AND_RELEASE_HYGIENE.md`](docs/VERIFICATION_AND_RELEASE_HYGIENE.md) — local/CI gates, portability, provenance, and legal-distinction rules.
+
+The automated private-lobby gate uses isolated browser contexts and checks the initial four-player room, capacity-four overflow rejection, real six-player admission/start, TDM auto-balance, FFA settings, shared match epoch/timer, zero bots, event/state channel properties, ping samples, self-echo suppression and active-match reload recovery. This is strong local topology evidence, not a six-household WAN/NAT guarantee.
+
+Before release, also run a real multi-device or multi-household smoke test:
+
+1. Host a room on one device/network.
+2. Open the invite on the other devices/networks.
+3. Confirm roster/settings/readiness, synchronized start, movement, combat, disconnect grace and reload recovery.
 
 ## Free hosting
 
@@ -79,12 +120,13 @@ The first deployment enables **Settings → Pages → Deploy from a branch → `
 
 ## Design notes
 
-The arena uses only generated Three.js geometry and canvas textures:
+The arena combines deterministic original Blender-authored GLB assets with generated Three.js presentation and canvas textures:
 
 - two asymmetric retro houses with traversable ground-floor lanes;
 - central coach, moving truck and cover props;
-- fences, garages, backyards, mannequins, signage and sunset lighting;
-- three procedural weapons with distinct cadence, recoil, spread and audio;
+- `VERDANT ARRAY`, `CIVIC TRANSIT` and `HELIO SERVICE` route identities;
+- greenhouses, irrigation, solar/battery service hardware, fences, garages, backyards, operators, signage and authored sunset lighting;
+- four original field-kit primaries and issued sidearms with distinct cadence, recoil, spread and audio;
 - 5-minute team deathmatch, first team to 25 eliminations.
 
 No external runtime assets are required except optional Google Fonts; system fallbacks keep the game usable if font loading is blocked.

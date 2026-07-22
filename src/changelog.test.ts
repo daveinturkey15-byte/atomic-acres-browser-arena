@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CHANGELOG,
+  formatChangelogTimestamp,
+  formatChangelogTimestampDetail,
+  lastUpdatedButtonLabel,
+  latestChangelogEntry,
+} from './changelog';
+
+describe('changelog', () => {
+  it('keeps the current public release first with an explicit UK timezone', () => {
+    expect(CHANGELOG.length).toBeGreaterThan(0);
+    const latest = latestChangelogEntry();
+    expect(latest.id).toBe('pass52');
+    expect(latest.id).toBe(CHANGELOG[0]?.id);
+    expect(formatChangelogTimestamp('2026-07-21T19:47:24+01:00')).toBe('21 JUL 2026 · 19:47 BST');
+    expect(formatChangelogTimestampDetail('2026-07-21T19:47:24+01:00')).toBe(
+      '21 JUL 2026 · 19:47 BST · UTC+1 · 19:47:24',
+    );
+    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · 21 JUL 2026 · 19:47 BST');
+  });
+
+  it('uses the successful production promotion rather than implementation time', () => {
+    const pass51 = CHANGELOG.find((entry) => entry.id === 'pass51');
+    const pass49 = CHANGELOG.find((entry) => entry.id === 'pass49');
+    expect(pass51?.releasedAt).toBe('2026-07-21T19:17:57+01:00');
+    expect(pass49?.releasedAt).toBe('2026-07-21T17:55:17+01:00');
+  });
+
+  it('requires player-facing areas and highlights on every entry', () => {
+    for (const entry of CHANGELOG) {
+      expect(entry.pass.length).toBeGreaterThan(0);
+      expect(entry.title.length).toBeGreaterThan(0);
+      expect(entry.summary.length).toBeGreaterThan(0);
+      expect(entry.areas.length).toBeGreaterThan(0);
+      expect(entry.highlights.length).toBeGreaterThan(0);
+      expect(entry.releasedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/);
+    }
+  });
+
+  it('keeps entries in reverse public-release order', () => {
+    const timestamps = CHANGELOG.map((entry) => Date.parse(entry.releasedAt));
+    expect(timestamps.every(Number.isFinite)).toBe(true);
+    expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
+  });
+
+  it('falls back cleanly for malformed timestamps and non-UK offsets', () => {
+    expect(formatChangelogTimestamp('not-a-timestamp')).toBe('not-a-timestamp');
+    expect(formatChangelogTimestamp('2026-12-01T08:02:03Z')).toBe('1 DEC 2026 · 08:02 GMT');
+    expect(formatChangelogTimestampDetail('2026-12-01T08:02:03-05:30')).toBe(
+      '1 DEC 2026 · 08:02 UTC-05:30 · UTC-5:30 · 08:02:03',
+    );
+  });
+});

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Box2 } from './collision';
-import { CharacterPhysics } from './physics';
+import { CharacterPhysics, WORLD_BOUNDARY_MAX_Y, WORLD_BOUNDARY_MIN_Y, worldBoundaryColliders } from './physics';
 
 const bounds: Box2 = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
 let active: CharacterPhysics | undefined;
@@ -11,6 +11,16 @@ afterEach(() => {
 });
 
 describe('CharacterPhysics', () => {
+  it('builds four full-height physics-only walls exactly outside arena bounds', () => {
+    const walls = worldBoundaryColliders(bounds);
+    expect(walls).toHaveLength(4);
+    expect(walls.every((wall) => wall.minY === WORLD_BOUNDARY_MIN_Y && wall.maxY === WORLD_BOUNDARY_MAX_Y)).toBe(true);
+    expect(walls).toContainEqual(expect.objectContaining({ maxX: bounds.minX, minZ: bounds.minZ, maxZ: bounds.maxZ }));
+    expect(walls).toContainEqual(expect.objectContaining({ minX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ }));
+    expect(walls).toContainEqual(expect.objectContaining({ maxZ: bounds.minZ, minX: bounds.minX, maxX: bounds.maxX }));
+    expect(walls).toContainEqual(expect.objectContaining({ minZ: bounds.maxZ, minX: bounds.minX, maxX: bounds.maxX }));
+  });
+
   it('stands on the ground instead of falling through it', async () => {
     active = await CharacterPhysics.create([], bounds);
     active.teleportEye({ x: 0, y: 2.4, z: 0 });
@@ -36,6 +46,28 @@ describe('CharacterPhysics', () => {
     }
     expect(position.x).toBeLessThan(0.43);
     expect(position.z).toBeGreaterThan(-1);
+  });
+
+  it('cannot sprint, jump, crouch, or prone through any playable-bound edge', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    for (const stance of ['stand', 'crouch', 'prone'] as const) {
+      for (const direction of [
+        { x: 0.08, z: 0 }, { x: -0.08, z: 0 }, { x: 0, z: 0.08 }, { x: 0, z: -0.08 },
+      ]) {
+        active.teleportEye({ x: 0, y: 1.7, z: 0 });
+        expect(active.setStance(stance)).toBe(true);
+        let position = active.eyePosition();
+        for (let frame = 0; frame < 240; frame += 1) {
+          const vertical = frame < 20 ? 0.05 : -0.01;
+          position = active.move({ x: direction.x, y: vertical, z: direction.z }, 1 / 120).position;
+        }
+        expect(position.x).toBeGreaterThan(bounds.minX);
+        expect(position.x).toBeLessThan(bounds.maxX);
+        expect(position.z).toBeGreaterThan(bounds.minZ);
+        expect(position.z).toBeLessThan(bounds.maxZ);
+        expect(position.y).toBeGreaterThan(0.45);
+      }
+    }
   });
 
   it('automatically steps onto low authored collision', async () => {

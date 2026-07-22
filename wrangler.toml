@@ -1,0 +1,13 @@
+name = "atomic-acres-leaderboard"
+main = "worker/src/index.ts"
+compatibility_date = "2026-07-18"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "https://daveinturkey15-byte.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "atomic-acres-leaderboard"
+database_id = "850f36dc-6fa5-4afd-9116-af5776a6d607"
+migrations_dir = "worker/migrations"

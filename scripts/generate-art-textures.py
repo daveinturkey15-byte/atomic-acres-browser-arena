@@ -11,9 +11,21 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 OUT = Path(__file__).resolve().parents[1] / "public/assets/original/textures"
+CONTACT_SHEET = Path(__file__).resolve().parents[1] / "docs/assets/texture-contact-sheet.jpg"
 SIZE = 512
+PBR_SIZE = 256
 SEED = 860711
 random.seed(SEED)
+
+PBR_MATERIALS: dict[str, tuple[int, int, float]] = {
+    "asphalt-aged.png": (226, 22, 2.2),
+    "brick-warm.png": (218, 18, 2.0),
+    "concrete-poured.png": (210, 16, 1.5),
+    "grass-turf.png": (236, 14, 2.5),
+    "roof-shingles.png": (224, 18, 2.1),
+    "siding-aqua.png": (188, 16, 1.6),
+    "siding-coral.png": (192, 16, 1.6),
+}
 
 
 def noise_layer(base: tuple[int, int, int], amount: int = 14) -> Image.Image:
@@ -121,17 +133,18 @@ def weapon_finish() -> None:
 
 
 def lawn() -> None:
-    image = noise_layer((79, 111, 58), 22)
+    image = noise_layer((70, 98, 55), 18)
     draw = ImageDraw.Draw(image)
     for _ in range(3600):
         x, y = random.randrange(SIZE), random.randrange(SIZE)
         length = random.randint(2, 7)
-        tone = random.choice(((52, 88, 47), (102, 133, 69), (65, 103, 52), (124, 132, 67)))
+        tone = random.choice(((48, 77, 43), (91, 116, 64), (59, 91, 49), (102, 113, 65)))
         draw.line((x, y, x + random.choice((-1, 0, 1)), max(0, y - length)), fill=tone, width=1)
-    for _ in range(14):
-        x, y = random.randrange(SIZE), random.randrange(SIZE)
-        r = random.randint(10, 28)
-        draw.ellipse((x-r, y-r, x+r, y+r), outline=(58, 89, 48), width=2)
+    # Broad low-contrast mowing variation breaks uniformity without stamped
+    # circles or other obvious motifs that repeat across the large lawn UVs.
+    for offset in range(-SIZE, SIZE * 2, 96):
+        draw.line((offset, 0, offset + SIZE, SIZE), fill=(73, 101, 57), width=9)
+    image = image.filter(ImageFilter.GaussianBlur(0.18))
     image.save(OUT / "grass-turf.png", optimize=True)
 
 
@@ -148,6 +161,45 @@ def roof_shingles() -> None:
     image.save(OUT / "roof-shingles.png", optimize=True)
 
 
+def pbr_companions() -> None:
+    """Derive deterministic tangent-space normal and roughness maps from authored albedo detail."""
+    for stale in (*OUT.glob("*-normal.png"), *OUT.glob("*-roughness.png")):
+        stale.unlink()
+    for filename, (roughness_base, roughness_variation, normal_strength) in PBR_MATERIALS.items():
+        source = OUT / filename
+        if not source.is_file():
+            raise FileNotFoundError(f"missing authored PBR source {source}")
+        height = Image.open(source).convert("L").resize((PBR_SIZE, PBR_SIZE), Image.Resampling.LANCZOS).filter(ImageFilter.GaussianBlur(0.65))
+        rough_source = height.filter(ImageFilter.GaussianBlur(1.6))
+        src = height.load()
+        rough_src = rough_source.load()
+        assert src is not None
+        normal = Image.new("RGB", height.size)
+        normal_px = normal.load()
+        roughness = Image.new("L", height.size)
+        rough_px = roughness.load()
+        assert normal_px is not None and rough_px is not None and rough_src is not None
+        for y in range(PBR_SIZE):
+            up = (y - 1) % PBR_SIZE
+            down = (y + 1) % PBR_SIZE
+            for x in range(PBR_SIZE):
+                left = (x - 1) % PBR_SIZE
+                right = (x + 1) % PBR_SIZE
+                dx = (int(src[right, y]) - int(src[left, y])) / 255.0 * normal_strength
+                dy = (int(src[x, down]) - int(src[x, up])) / 255.0 * normal_strength
+                inv_length = 1.0 / math.sqrt(dx * dx + dy * dy + 1.0)
+                normal_px[x, y] = (
+                    round(((-dx * inv_length) * 0.5 + 0.5) * 255),
+                    round(((dy * inv_length) * 0.5 + 0.5) * 255),
+                    round(inv_length * 255),
+                )
+                broad = round((int(rough_src[x, y]) - 128) * (roughness_variation / 128))
+                rough_px[x, y] = max(24, min(248, roughness_base + broad))
+        stem = source.stem
+        normal.save(OUT / f"{stem}-normal.png", optimize=True)
+        roughness.filter(ImageFilter.GaussianBlur(0.25)).save(OUT / f"{stem}-roughness.png", optimize=True)
+
+
 def make_contact_sheet() -> None:
     paths = sorted(OUT.glob("*.png"))
     thumbs = []
@@ -160,14 +212,15 @@ def make_contact_sheet() -> None:
     sheet = Image.new("RGB", (220 * 4, 250 * math.ceil(len(thumbs) / 4)), (12, 17, 19))
     for index, thumb in enumerate(thumbs):
         sheet.paste(thumb, ((index % 4) * 220, (index // 4) * 250))
-    sheet.save(OUT.parent / "texture-contact-sheet.jpg", quality=90)
+    CONTACT_SHEET.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(CONTACT_SHEET, quality=90)
 
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     siding("siding-aqua.png", (71, 139, 137), (37, 82, 84))
     siding("siding-coral.png", (178, 89, 70), (111, 54, 47))
-    brick(); asphalt(); concrete(); wood(); painted_metal(); weapon_finish(); lawn(); roof_shingles(); make_contact_sheet()
+    brick(); asphalt(); concrete(); wood(); painted_metal(); weapon_finish(); lawn(); roof_shingles(); pbr_companions(); make_contact_sheet()
     print(f"generated {len(list(OUT.glob('*.png')))} textures in {OUT}")
 
 
