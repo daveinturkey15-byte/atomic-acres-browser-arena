@@ -95,6 +95,34 @@ function box(
   return mesh;
 }
 
+/** Presentation-only beam between two authored points. */
+function presentationBeam(
+  builder: Builder,
+  name: string,
+  start: [number, number, number],
+  end: [number, number, number],
+  width: number,
+  material: THREE.Material,
+  detail: 'performance' | 'quality' = 'performance',
+): THREE.Mesh {
+  const a = new THREE.Vector3(...start);
+  const b = new THREE.Vector3(...end);
+  const delta = b.clone().sub(a);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, width, delta.length()), material);
+  mesh.name = name;
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.copy(delta.clone().normalize().lengthSq() > 0
+    ? new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), delta.clone().normalize())
+    : new THREE.Quaternion());
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.impactSurface = 'metal';
+  mesh.userData.rustworksDetail = detail;
+  mesh.userData.presentationBatchCandidate = true;
+  builder.root.add(mesh);
+  return mesh;
+}
+
 type SingleMaterialMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
 
 type PresentationBatchTelemetry = Readonly<{
@@ -210,6 +238,10 @@ export const RUSTWORKS_TOWER = Object.freeze({
   landingOverlap: 0.06,
   maxLandingOverlap: 0.08,
   maxTransitionLip: 0.1,
+  undercroftPassageWidth: 3.1,
+  undercroftClearHeight: 2.75,
+  openContainerClearWidth: 2.32,
+  openContainerClearHeight: 2.46,
 });
 
 export function rustworksDeckTopY(centerY: number, thickness: number = RUSTWORKS_TOWER.deckThickness): number {
@@ -314,14 +346,45 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const upperTop = rustworksDeckTopY(upperDeckCenterY, deckThickness);
   const lowerHalf = lowerDeckSize / 2;
 
-  // Four-leg processing tower with denser structural silhouette.
+  // Four load-bearing legs remain authoritative. Armoured corner modules wrap
+  // their bases and turn the lower deck into two intersecting maintenance
+  // tunnels instead of a visually noisy open brace cage.
   for (const x of [-3.2, 3.2]) for (const z of [-3.2, 3.2]) {
     box(builder, 'rustworks-tower-leg', [x, 5.4, z], [0.58, 10.8, 0.58], steelBright);
     box(builder, 'rustworks-tower-leg-base', [x, 0.28, z], [0.95, 0.56, 0.95], concrete);
   }
-  // X-bracing stays outside the walkable deck cores so rotations stay open.
+  const undercroftModuleSize = 2.2;
+  const undercroftModuleOffset = (RUSTWORKS_TOWER.undercroftPassageWidth + undercroftModuleSize) / 2;
+  for (const x of [-undercroftModuleOffset, undercroftModuleOffset]) {
+    for (const z of [-undercroftModuleOffset, undercroftModuleOffset]) {
+      const module = box(
+        builder,
+        'rustworks-undercroft-module',
+        [x, RUSTWORKS_TOWER.undercroftClearHeight / 2, z],
+        [undercroftModuleSize, RUSTWORKS_TOWER.undercroftClearHeight, undercroftModuleSize],
+        rustDark,
+        { ballisticMaterial: 'structural-metal' },
+      );
+      module.userData.rustworksRouteRole = 'undercroft-corner-cover';
+      box(builder, 'rustworks-undercroft-module-cap', [x, RUSTWORKS_TOWER.undercroftClearHeight - 0.08, z], [2.45, 0.16, 2.45], hazardDark, {
+        solid: false,
+        shots: false,
+        detail: 'performance',
+      });
+    }
+  }
+  box(builder, 'rustworks-undercroft-floor-east-west', [0, 0.045, 0], [8.1, 0.05, 2.7], grate, { solid: false, cast: false, shots: false });
+  box(builder, 'rustworks-undercroft-floor-north-south', [0, 0.05, 0], [2.7, 0.05, 8.1], grate, { solid: false, cast: false, shots: false });
+  for (const [x, z, sx, sz] of [
+    [0, -4.0, 3.25, 0.12], [0, 4.0, 3.25, 0.12], [-4.0, 0, 0.12, 3.25], [4.0, 0, 0.12, 3.25],
+  ] as const) {
+    box(builder, 'rustworks-undercroft-portal-header', [x, 2.72, z], [sx, 0.18, sz], hazard, { solid: false, shots: false, detail: 'performance' });
+  }
+
+  // Sparse upper-bay X-bracing preserves the oil-rig read without blocking the
+  // undercroft portals or recreating the former cage silhouette.
   for (const z of [-3.35, 3.35]) {
-    for (const [y0, y1] of [[0.55, 3.1], [3.7, 7.85], [8.45, 11.1]] as const) {
+    for (const [y0, y1] of [[3.7, 7.85], [8.45, 11.1]] as const) {
       const midY = (y0 + y1) / 2;
       const rise = y1 - y0;
       const run = 6.4;
@@ -340,7 +403,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     }
   }
   for (const x of [-3.35, 3.35]) {
-    for (const [y0, y1] of [[0.55, 3.1], [3.7, 7.85], [8.45, 11.1]] as const) {
+    for (const [y0, y1] of [[3.7, 7.85], [8.45, 11.1]] as const) {
       const midY = (y0 + y1) / 2;
       const rise = y1 - y0;
       const run = 6.4;
@@ -531,50 +594,170 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     box(builder, 'rustworks-upper-deck-rail-post', [x, upperTop + 0.62, z], [0.12, 1.2, 0.12], hazard, { solid: false, detail: 'performance' });
   }
 
-  // Clean crown only. The old crane/cable/hook and decorative process runs
-  // produced disconnected silhouettes above the tower and are deliberately gone.
-  for (const x of [-2.7, 2.7]) for (const z of [-2.7, 2.7]) {
-    box(builder, 'rustworks-canopy-post', [x, 11.4, z], [0.18, 2.4, 0.18], steel, { solid: false, detail: 'quality' });
+  // A tapered derrick crown replaces the former flat canopy slab. Every member
+  // terminates at a supported ring, keeping the silhouette tall but coherent.
+  const derrickBaseY = upperTop + 0.15;
+  const derrickRingY = 11.35;
+  const derrickTopY = 14.35;
+  for (const x of [-2.75, 2.75]) for (const z of [-2.75, 2.75]) {
+    presentationBeam(
+      builder,
+      'rustworks-derrick-leg',
+      [x, derrickBaseY, z],
+      [Math.sign(x) * 0.78, derrickTopY, Math.sign(z) * 0.78],
+      0.22,
+      x === z ? rust : steelBright,
+      'performance',
+    );
   }
-  box(builder, 'rustworks-canopy-roof', [0, 12.65, 0], [6.9, 0.24, 6.9], rust, { solid: false, detail: 'quality' });
+  for (const y of [derrickRingY, derrickTopY] as const) {
+    const half = y === derrickRingY ? 1.9 : 0.84;
+    box(builder, 'rustworks-derrick-ring', [0, y, -half], [half * 2, 0.16, 0.16], steelBright, { solid: false, shots: false, detail: 'performance' });
+    box(builder, 'rustworks-derrick-ring', [0, y, half], [half * 2, 0.16, 0.16], steelBright, { solid: false, shots: false, detail: 'performance' });
+    box(builder, 'rustworks-derrick-ring', [-half, y, 0], [0.16, 0.16, half * 2], steelBright, { solid: false, shots: false, detail: 'performance' });
+    box(builder, 'rustworks-derrick-ring', [half, y, 0], [0.16, 0.16, half * 2], steelBright, { solid: false, shots: false, detail: 'performance' });
+  }
+  box(builder, 'rustworks-derrick-service-platform', [0, derrickRingY - 0.12, 0], [4.3, 0.18, 4.3], grate, { solid: false, shots: false, detail: 'quality' });
+  box(builder, 'rustworks-derrick-beacon-mast', [0, 15.05, 0], [0.16, 1.4, 0.16], hazard, { solid: false, shots: false, detail: 'quality' });
+  box(builder, 'rustworks-derrick-beacon', [0, 15.78, 0], [0.42, 0.18, 0.42], hazard, { solid: false, shots: false, detail: 'quality' });
 
-  // One disciplined perimeter ring: six equally counted, mirrored containers
-  // on every side. The wider centre gap preserves all four primary lanes and
-  // keeps team spawns clear, while the repeated finish order reads as an
-  // intentional layout instead of scattered prop dressing.
-  const perimeterSlots = [-19, -12, -5, 5, 12, 19] as const;
+  // West-side maintenance trench: a deck-level, grated service lane with low
+  // blast walls and repeated lateral exits. The continuous physics floor means
+  // the lane reads as recessed without introducing a cross-map floor-hole rule.
+  const trenchX = -13.8;
+  const trenchWallXs = [trenchX - 1.85, trenchX + 1.85] as const;
+  const trenchSegments = [-12, 0, 12] as const;
+  box(builder, 'rustworks-service-trench-floor', [trenchX, 0.045, 0], [3.4, 0.05, 34], grate, { solid: false, cast: false, shots: false });
+  for (const x of trenchWallXs) {
+    for (const z of trenchSegments) {
+      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark);
+      wall.userData.rustworksRouteRole = 'west-service-trench-cover';
+      box(builder, 'rustworks-service-trench-coping', [x, 1.34, z], [0.46, 0.08, 7.05], hazard, {
+        solid: false,
+        shots: false,
+        detail: 'performance',
+      });
+    }
+  }
+  for (const z of [-6, 6] as const) {
+    box(builder, 'rustworks-service-trench-crossover', [trenchX, 2.55, z], [4.35, 0.16, 1.2], steelBright, {
+      solid: false,
+      shots: false,
+      detail: 'quality',
+    });
+  }
+
+  // Four containers per side (16 total). Nine-metre centres leave 3.2 m clear
+  // between adjacent 5.8 m shells. One placement per side is open end-to-end.
+  const perimeterSlots = [-18, -9, 9, 18] as const;
+  const perimeterRow = 21.5;
   const containerRows = [
-    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -23 })),
-    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: 23 })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -23, z })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: 23, z })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -perimeterRow, open: slot === 1 })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: perimeterRow, open: slot === 2 })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -perimeterRow, z, open: slot === 1 })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: perimeterRow, z, open: slot === 2 })),
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
+  const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
   for (const [index, placement] of containerRows.entries()) {
     const alongX = placement.side === 'north' || placement.side === 'south';
     const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
-    const container = box(
-      builder,
-      'rustworks-shipping-container',
-      [placement.x, 1.3, placement.z],
-      containerSize,
-      containerPalette[placement.slot % containerPalette.length],
-    );
-    container.userData.rustworksContainerSide = placement.side;
+    const marker = new THREE.Group();
+    marker.name = 'rustworks-container-placement';
+    marker.position.set(placement.x, 0, placement.z);
+    marker.userData.rustworksContainerSide = placement.side;
+    marker.userData.rustworksContainerSlot = placement.slot;
+    marker.userData.rustworksContainerType = placement.open ? 'open' : 'closed';
+    root.add(marker);
 
-    // Presentation-only corrugation adds readable scale without extra collision clutter.
-    for (const offset of [-2.15, -1.1, 0, 1.1, 2.15]) {
-      const ribPosition: [number, number, number] = alongX
-        ? [placement.x + offset, 1.3, placement.z + (placement.side === 'north' ? -1.27 : 1.27)]
-        : [placement.x + (placement.side === 'west' ? -1.27 : 1.27), 1.3, placement.z + offset];
-      box(builder, `rustworks-container-rib-${index}`, ribPosition, alongX ? [0.08, 2.25, 0.05] : [0.05, 2.25, 0.08], steelBright, {
+    if (placement.open) {
+      const thickness = 0.14;
+      const material = containerPalette[placement.slot % containerPalette.length];
+      const shellParts = alongX
+        ? [
+          { suffix: 'wall-a', position: [placement.x, 1.3, placement.z - (containerSize[2] - thickness) / 2], size: [containerSize[0], containerSize[1], thickness] },
+          { suffix: 'wall-b', position: [placement.x, 1.3, placement.z + (containerSize[2] - thickness) / 2], size: [containerSize[0], containerSize[1], thickness] },
+          { suffix: 'roof', position: [placement.x, containerSize[1] - thickness / 2, placement.z], size: [containerSize[0], thickness, containerSize[2]] },
+        ]
+        : [
+          { suffix: 'wall-a', position: [placement.x - (containerSize[0] - thickness) / 2, 1.3, placement.z], size: [thickness, containerSize[1], containerSize[2]] },
+          { suffix: 'wall-b', position: [placement.x + (containerSize[0] - thickness) / 2, 1.3, placement.z], size: [thickness, containerSize[1], containerSize[2]] },
+          { suffix: 'roof', position: [placement.x, containerSize[1] - thickness / 2, placement.z], size: [containerSize[0], thickness, containerSize[2]] },
+        ];
+      for (const part of shellParts) {
+        const shell = box(
+          builder,
+          `rustworks-open-container-${part.suffix}`,
+          part.position as [number, number, number],
+          part.size as [number, number, number],
+          material,
+        );
+        shell.userData.rustworksContainerSide = placement.side;
+        shell.userData.rustworksContainerSlot = placement.slot;
+      }
+      box(builder, `rustworks-open-container-floor-${index}`, [placement.x, 0.045, placement.z], [containerSize[0], 0.05, containerSize[2]], grate, {
         solid: false,
         shots: false,
         cast: false,
         detail: 'performance',
       });
+      const halfLength = (alongX ? containerSize[0] : containerSize[2]) / 2;
+      openContainerRoutes.push({
+        id: `open-container-${placement.side}`,
+        side: placement.side,
+        axis: alongX ? 'x' : 'z',
+        anchors: alongX
+          ? [[placement.x - halfLength - 0.8, 1.7, placement.z], [placement.x, 1.7, placement.z], [placement.x + halfLength + 0.8, 1.7, placement.z]]
+          : [[placement.x, 1.7, placement.z - halfLength - 0.8], [placement.x, 1.7, placement.z], [placement.x, 1.7, placement.z + halfLength + 0.8]],
+      });
+    } else {
+      const container = box(
+        builder,
+        'rustworks-shipping-container',
+        [placement.x, 1.3, placement.z],
+        containerSize,
+        containerPalette[placement.slot % containerPalette.length],
+      );
+      container.userData.rustworksContainerSide = placement.side;
+      container.userData.rustworksContainerSlot = placement.slot;
+
+      // Three strong ribs read more cleanly than five thin stripes at combat distance.
+      for (const offset of [-1.45, 0, 1.45]) {
+        const ribPosition: [number, number, number] = alongX
+          ? [placement.x + offset, 1.3, placement.z + (placement.side === 'north' ? -1.27 : 1.27)]
+          : [placement.x + (placement.side === 'west' ? -1.27 : 1.27), 1.3, placement.z + offset];
+        box(builder, `rustworks-container-rib-${index}`, ribPosition, alongX ? [0.08, 2.2, 0.05] : [0.05, 2.2, 0.08], steelBright, {
+          solid: false,
+          shots: false,
+          cast: false,
+          detail: 'performance',
+        });
+      }
     }
   }
+
+  root.userData.rustworksContainerLayout = {
+    total: containerRows.length,
+    closed: containerRows.filter((placement) => !placement.open).length,
+    open: containerRows.filter((placement) => placement.open).length,
+    perSide: 4,
+    slots: [...perimeterSlots],
+    row: perimeterRow,
+    minimumEndGap: 9 - 5.8,
+  };
+  root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
+  root.userData.rustworksUndercroft = {
+    passageWidth: RUSTWORKS_TOWER.undercroftPassageWidth,
+    clearHeight: RUSTWORKS_TOWER.undercroftClearHeight,
+    portals: ['north', 'south', 'west', 'east'],
+  };
+  root.userData.rustworksTrench = {
+    side: 'west',
+    x: trenchX,
+    width: 3.4,
+    segmentCentres: [...trenchSegments],
+    lateralExitGaps: 4,
+  };
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });
   labelBoard.userData.label = 'RUSTWORKS';
@@ -595,6 +778,21 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       { id: 'ship-ladder-foot', position: [shipX, lowerTop + 1.7, shipLowerLandingCenterZ] },
       { id: 'ship-ladder-top', position: [shipX, upperTop + 1.7, upperOutboardCenterZ] },
       { id: 'upper-deck-center', position: [0.4, upperTop + 1.7, 0.2] },
+    ],
+    'undercroft-east-west': [
+      { id: 'undercroft-west-portal', position: [-5.2, 1.7, 0] },
+      { id: 'undercroft-centre-ew', position: [0, 1.7, 0] },
+      { id: 'undercroft-east-portal', position: [5.2, 1.7, 0] },
+    ],
+    'undercroft-north-south': [
+      { id: 'undercroft-north-portal', position: [0, 1.7, -5.2] },
+      { id: 'undercroft-centre-ns', position: [0, 1.7, 0] },
+      { id: 'undercroft-south-portal', position: [0, 1.7, 5.2] },
+    ],
+    'west-service-trench': [
+      { id: 'trench-north', position: [trenchX, 1.7, -17] },
+      { id: 'trench-centre', position: [trenchX, 1.7, 0] },
+      { id: 'trench-south', position: [trenchX, 1.7, 17] },
     ],
   };
   root.userData.rustworksAccess = {

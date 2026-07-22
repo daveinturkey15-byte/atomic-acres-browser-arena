@@ -56,12 +56,12 @@
       "generatedAsOf": "2026-07-22",
       "license": "Original project work",
       "files": "public/assets/original/models/rustworks-central-tower.glb",
-      "sha256": "864c78b47b11fe2b8e1e9c7b5d6f09dabdf0ba6cdf2a8e203815be99099e20ca",
+      "sha256": "aaae6c2d2bda5703555b6ae810b2b957205c95e37cb95eb7530192831775a61a",
       "sourceBlend": "source-assets/blender/rustworks-central-tower.blend",
-      "sourceBlendSha256": "e538541a8fa733c1968106821412c0c084ddb9a99bc38a6cad1f240925d75efe",
+      "sourceBlendSha256": "9e7316b483c68962754790c41b6328eefceacb14533e977b1f289d4a3a9df4e4",
       "sourceScript": "scripts/blender/create-rustworks-central-tower.py",
-      "sourceScriptSha256": "416dc737ec892c5db8246065ed26f59b3ab58b92c131978027f4ca47bbfb390e",
-      "modifications": "Original climbable Rustworks oil-rig environment authored from Blender primitives by the repository generator. Pass 54 aligns the authored ramps and decks with collision authority, removes obsolete tanks, pallets, loose crates, barriers and upper-deck utilities, opens the central lanes, constrains the deck surface to the safety rail so the ocean remains visible, and places six mirrored shipping containers on each of the four perimeter sides. The versioned .blend source and generator remain included for deterministic inspection and rebuilding.",
+      "sourceScriptSha256": "b0003ff018d180a407ac05efdf05e590f13985b7f754432f76f7be292a223a35",
+      "modifications": "Original climbable Rustworks oil-rig environment authored from Blender primitives by the repository generator. The Rustworks-owned tower overhaul replaces the slab canopy and dense lower cage with a tapered derrick and two-axis undercroft, adds a west deck-level service trench, and lays out sixteen spaced freight containers with one open walk-through container per side. TypeScript boxes remain the collision authority; the versioned .blend source and generator remain included for deterministic inspection and rebuilding.",
       "attributionRequired": false
     },
     {
