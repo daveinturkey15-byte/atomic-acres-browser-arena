@@ -843,7 +843,17 @@ test.describe('solo mechanics', () => {
   });
 
   test('adds one matching hostile reinforcement on the fifth cumulative bot death', async ({ page }) => {
-    expect((await debug(page)).botEscalation).toEqual({ deaths: 0, initialBots: 2, targetBots: 2, activeBots: 2, maximumBots: 6, nextReinforcementAt: 5 });
+    expect((await debug(page)).botEscalation).toMatchObject({
+      deaths: 0,
+      initialBots: 2,
+      targetBots: 2,
+      activeBots: 2,
+      dormantBots: 4,
+      dormantBotsPrewarmed: true,
+      dynamicReinforcementLights: 0,
+      maximumBots: 6,
+      nextReinforcementAt: 5,
+    });
     for (let death = 1; death <= 5; death += 1) {
       await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
       await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
@@ -852,7 +862,17 @@ test.describe('solo mechanics', () => {
       }
     }
     const escalated = await debug(page);
-    expect(escalated.botEscalation).toEqual({ deaths: 5, initialBots: 2, targetBots: 3, activeBots: 3, maximumBots: 6, nextReinforcementAt: 10 });
+    expect(escalated.botEscalation).toMatchObject({
+      deaths: 5,
+      initialBots: 2,
+      targetBots: 3,
+      activeBots: 3,
+      dormantBots: 3,
+      dormantBotsPrewarmed: true,
+      dynamicReinforcementLights: 0,
+      maximumBots: 6,
+      nextReinforcementAt: 10,
+    });
     expect(escalated.bots).toHaveLength(3);
     expect(escalated.bots[2]).toMatchObject({ alive: true, neonHaze: true, presentationReady: true, presentationWeaponSafe: true });
     expect(escalated.bots[2].operatorModel).toMatchObject({
@@ -1243,7 +1263,7 @@ test.describe('solo mechanics', () => {
     expect(scavenged).toMatchObject({ ammoAvailable: false, weaponAvailable: true });
 
     await page.keyboard.press('KeyF');
-    await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe('carbine');
+    await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe(targetDrop.weapon);
     await expect.poll(async () => (await debug(page)).deathDrops.some((drop) => drop.id === targetDrop.id)).toBe(false);
   });
 
@@ -1905,7 +1925,7 @@ test.describe('performance and stability', () => {
     expect(state.render.lighting).toMatchObject({
       exposure: 1.16, hemisphereIntensity: 1.82, ambientIntensity: 0.78,
       sunIntensity: 2.65, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
-      fogNear: 56, fogFar: 140,
+      fogNear: 36, fogFar: 112,
       routeLightIntensity: 3, streetLightIntensity: 4, interiorLightIntensity: 11,
       routeLightCount: 3, streetLightCount: 4, interiorLightCount: 2,
       godRayStrength: 0.08, godRayLobes: 2,

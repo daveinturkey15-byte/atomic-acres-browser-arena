@@ -393,7 +393,8 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const shipLength = shipRise / Math.sin(shipAngle);
   const shipThickness = 0.22;
   const shipWidth = 1.95;
-  const shipX = lowerHalf - 0.35;
+  // Keep the capsule clear of the upper-deck slab edge while preserving lower-deck overlap.
+  const shipX = lowerHalf - 0.1;
   const lowerShipLandingDepth = 1.25;
   const upperOutboardLandingDepth = 1.35;
   const shipRotation: [number, number, number] = [shipAngle, 0, 0];
@@ -567,13 +568,15 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   root.userData.rustworksRoutes = {
     'ground-to-lower': [
       { id: 'lower-ramp-foot', position: [0, 1.7, lowerRampCenterZ - Math.cos(lowerRampAngle) * (lowerRampLength / 2) - 0.35] },
-      { id: 'lower-ramp-top', position: [0, lowerTop + 1.55, lowerLandingCenterZ] },
-      { id: 'lower-deck-center', position: [0, lowerTop + 1.55, 0] },
+      { id: 'lower-ramp-top', position: [0, lowerTop + 1.7, lowerLandingCenterZ] },
+      { id: 'lower-deck-center', position: [0, lowerTop + 1.7, 0] },
     ],
     'lower-to-upper': [
-      { id: 'ship-ladder-foot', position: [shipX, lowerTop + 1.55, shipLowerLandingCenterZ] },
-      { id: 'ship-ladder-top', position: [shipX, upperTop + 1.55, upperOutboardCenterZ] },
-      { id: 'upper-deck-center', position: [0.4, upperTop + 1.55, 0.2] },
+      // Route anchors are eye positions. Keep the standing 1.7 m eye height so
+      // browser staging never begins with the capsule embedded in a landing.
+      { id: 'ship-ladder-foot', position: [shipX, lowerTop + 1.7, shipLowerLandingCenterZ] },
+      { id: 'ship-ladder-top', position: [shipX, upperTop + 1.7, upperOutboardCenterZ] },
+      { id: 'upper-deck-center', position: [0.4, upperTop + 1.7, 0.2] },
     ],
   };
   root.userData.rustworksAccess = {

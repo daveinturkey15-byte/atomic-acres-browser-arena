@@ -237,23 +237,26 @@ export class WeaponPresentation {
       wrist.position.z = -lowerLength;
       wrist.rotation.set(-0.12, 0, sign * 0.08);
       elbow.add(wrist);
-      const cuff = roundedBox(`${side}-glove-cuff`, [0.21, 0.15, 0.14], glove, 0.038, 3);
+      // Reduced profiles retain every articulated glove part while trimming only
+      // bevel subdivision; this preserves anatomy and rigging without spending
+      // the full Quality-profile viewmodel triangle budget.
+      const cuff = roundedBox(`${side}-glove-cuff`, [0.21, 0.15, 0.14], glove, 0.038, flattenMaterials ? 1 : 3);
       cuff.position.z = 0.045;
       wrist.add(cuff);
       const cuffAccent = roundedBox(`${side}-cuff-accent`, [0.178, 0.15, 0.032], sleeveTrim, 0.009, 2);
       cuffAccent.position.z = 0.098;
       wrist.add(cuffAccent);
-      const wristGuard = roundedBox(`${side}-wrist-guard`, [0.19, 0.075, 0.12], glove, 0.022, 3);
+      const wristGuard = roundedBox(`${side}-wrist-guard`, [0.19, 0.075, 0.12], glove, 0.022, flattenMaterials ? 1 : 3);
       wristGuard.position.set(0, -0.045, 0.018);
       wrist.add(wristGuard);
-      const hand = roundedBox(`${side}-palm`, [0.2, 0.13, 0.21], glovePalm, 0.048, 4);
+      const hand = roundedBox(`${side}-palm`, [0.2, 0.13, 0.21], glovePalm, 0.048, flattenMaterials ? 2 : 4);
       hand.position.set(sign * -0.014, -0.002, -0.035);
       wrist.add(hand);
       const palmHeel = roundedBox(`${side}-palm-heel`, [0.142, 0.032, 0.095], glove, 0.014, 2);
       palmHeel.position.set(sign * -0.014, 0.058, -0.012);
       palmHeel.rotation.x = -0.08;
       wrist.add(palmHeel);
-      const knucklePad = roundedBox(`${side}-knuckle-pad`, [0.158, 0.038, 0.09], glove, 0.016, 3);
+      const knucklePad = roundedBox(`${side}-knuckle-pad`, [0.158, 0.038, 0.09], glove, 0.016, flattenMaterials ? 1 : 3);
       knucklePad.position.set(sign * -0.014, -0.062, -0.085);
       wrist.add(knucklePad);
       const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.029, 0.088, 5, flattenMaterials ? 6 : 9), glove);

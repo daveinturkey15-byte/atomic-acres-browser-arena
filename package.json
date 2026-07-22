@@ -11,7 +11,7 @@
     "test:property": "vitest run src/gameplay-state-property.test.ts",
     "test:property:nightly": "PASS25_PROPERTY_RUNS=100000 vitest run src/gameplay-state-property.test.ts",
     "test:mutation": "PASS25_PROPERTY_RUNS=50 stryker run",
-    "test:e2e": "playwright test --project=chromium",
+    "test:e2e": "node scripts/qa/run-bounded-e2e.mjs",
     "test:e2e:bounded": "node scripts/qa/run-bounded-e2e.mjs",
     "qa:release": "node scripts/qa/capture-release.mjs",
     "qa:multiplayer": "node scripts/qa/verify-multiplayer.mjs",

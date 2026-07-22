@@ -146,12 +146,16 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(active.player.position[0]).toBeLessThanOrEqual(active.arenaSelection.bounds.maxX);
     await page.evaluate(() => document.dispatchEvent(new Event('pointerlockchange')));
     await expect(page.locator('#menu')).toBeVisible();
+    await expect(page.locator('#resume')).toBeVisible();
+    await expect(page.locator('#main-menu')).toBeVisible();
+    expect((await snapshot(page)).gameStarted).toBe(true);
+    await page.locator('#main-menu').click();
     await expect(page.locator('#main-menu')).toBeHidden();
     await expect(page.locator('.map-card[data-arena-id="gun-range"]')).toBeEnabled();
     expect((await snapshot(page)).gameStarted).toBe(false);
   });
 
-  test('Gun Range is untimed solo score practice with three target values', async ({ page }) => {
+  test('Gun Range is a two-minute solo score attack with three target values', async ({ page }) => {
     await page.goto(`/?${lightweight}&seed=3303&map=gun-range`);
     await waitReady(page);
     await expect(page.locator('.map-card[data-arena-id="gun-range"]')).toHaveAttribute('aria-pressed', 'true');
@@ -163,7 +167,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(state.arenaSelection).toMatchObject({
       id: 'gun-range',
       label: 'Acres Gun Range',
-      rules: { durationMs: null, scoreLimit: null },
+      rules: { durationMs: 120_000, scoreLimit: null },
       multiplayer: false,
       soloBotCount: 0,
       rootVisible: true,
@@ -175,7 +179,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(state.rangePractice.values.sort((a, b) => a - b)).toEqual([
       100, 100, 100, 200, 200, 200, 300, 300, 300,
     ]);
-    await expect(page.locator('#timer')).toHaveText('--:--');
+    await expect(page.locator('#timer')).toHaveText(/01:5[5-9]/);
     await expect(page.locator('#aqua-label')).toHaveText('SCORE');
     await expect(page.locator('#coral-label')).toHaveText('HITS');
     await page.evaluate(() => {
@@ -232,23 +236,34 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
       }, { routeName: route, down: descending });
       expect(staged, `${route}:${descending ? 'down' : 'up'}`).toBeTruthy();
       await page.evaluate(() => {
-        (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.setMovement(true, true);
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.setMovement(true, false);
       });
-      await page.waitForFunction(({ targetY, targetX, targetZ }) => {
+      const reached = await page.waitForFunction(({ startX, startZ, directionX, directionZ, run }) => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__;
         const pos = api.snapshot().player.position;
-        const horizontal = Math.hypot(pos[0] - targetX, pos[2] - targetZ);
-        const vertical = Math.abs(pos[1] - targetY);
-        return horizontal < 0.9 && vertical < 0.9;
+        const progress = (pos[0] - startX) * directionX + (pos[2] - startZ) * directionZ;
+        return progress >= run - 0.5;
       }, {
-        targetY: staged!.target[1],
-        targetX: staged!.target[0],
-        targetZ: staged!.target[2],
-      }, { timeout: 25_000 });
+        startX: staged!.start[0],
+        startZ: staged!.start[2],
+        directionX: staged!.direction[0],
+        directionZ: staged!.direction[2],
+        run: staged!.run,
+      }, { timeout: 25_000 }).then(
+        () => true,
+        (error: unknown) => {
+          if (!String(error).includes('Timeout')) throw error;
+          return false;
+        },
+      );
       await page.evaluate(() => {
         (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.setMovement(false, false);
       });
       const after = await snapshot(page);
+      expect(
+        reached,
+        `${route}:${descending ? 'down' : 'up'} final=${JSON.stringify(after.player.position)} target=${JSON.stringify(staged!.target)}`,
+      ).toBe(true);
       expect(Math.hypot(after.player.position[0] - staged!.target[0], after.player.position[2] - staged!.target[2])).toBeLessThan(0.95);
       expect(Math.abs(after.player.position[1] - staged!.target[1])).toBeLessThan(0.95);
       // Confirm the climb/descent actually changed elevation for vertical routes.

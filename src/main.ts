@@ -6705,6 +6705,7 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown>;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
+    clearBots: () => void;
     placeBotAhead: (distance?: number) => void;
     placeBotRelative: (right: number, forward: number) => void;
     showBotDamageDirection: () => number | null;
@@ -7319,6 +7320,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  clearBots: () => clearBots(),
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;

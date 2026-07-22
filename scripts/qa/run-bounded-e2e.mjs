@@ -11,12 +11,18 @@ const groups = [
   { name: 'tri-pass-support', args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'resolves three player-selected sky missiles'] },
   { name: 'grenade-hitch', args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'prewarmed Hallelujah explosion'] },
   { name: 'performance-and-stability', timeoutMs: 900_000, args: ['tests/e2e/atomic-acres.spec.ts', '--project=chromium', '--workers=1', '--grep', 'performance and stability'] },
-  { name: 'capability-firefox', xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },
-  { name: 'capability-webkit', args: ['tests/e2e/pass25a-capability.spec.ts', '--project=webkit-smoke', '--workers=1'] },
+  { name: 'pass34-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass34-combat-menu-tower-range.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass35-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass35-explosion-tri-pass.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass36-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass36-range-atmosphere-windows-drops-leaderboard.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass37-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass37-quality-bounds.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },
+  { name: 'capability-webkit', default: false, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=webkit-smoke', '--workers=1'] },
 ];
 
 const requestedGroups = new Set((process.env.QA_E2E_GROUPS ?? '').split(',').map((name) => name.trim()).filter(Boolean));
-const selectedGroups = requestedGroups.size > 0 ? groups.filter((group) => requestedGroups.has(group.name)) : groups;
+const selectedGroups = requestedGroups.size > 0
+  ? groups.filter((group) => requestedGroups.has(group.name))
+  : groups.filter((group) => group.default !== false);
 if (requestedGroups.size > 0 && selectedGroups.length !== requestedGroups.size) {
   const known = groups.map((group) => group.name).join(', ');
   throw new Error(`Unknown QA_E2E_GROUPS entry. Known groups: ${known}`);

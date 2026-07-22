@@ -36,3 +36,7 @@ Atomic Acres uses one cross-platform verification contract for local work and CI
 - Large runtime dependencies are split into explicit PeerJS/Three.js chunks. Rapier remains a separately emitted physics chunk; its size is visible in build output rather than hidden by a raised warning threshold.
 - Multiplayer lifecycle tests cover stale same-peer callbacks, peer-owner replacement, and clean invalid-room recovery.
 - Leaderboard streak keys are claimed before mutation; duplicate submissions do not replay writes, and failed leaderboard writes release the claim for retry.
+
+## Verification gotchas
+
+- **Symptom →** the Rustworks ship-ladder unit traversal passes, but a real browser descent walks across the upper deck and falls to ground. **Cause →** the player capsule can still contact the upper-deck slab edge when the ladder centreline is visually outside it, so the controller stays on the deck instead of settling onto the ramp. **Correction →** preserve capsule-radius clearance at the deck edge and stage route anchors at the standing 1.7 m eye height. **Verify →** run `npx vitest run src/additional-maps.test.ts` and the `pass34-contracts` bounded browser group in both directions.

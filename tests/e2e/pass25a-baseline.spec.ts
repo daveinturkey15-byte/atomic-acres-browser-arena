@@ -66,6 +66,7 @@ async function assertAimAlignment(page: Page): Promise<void> {
 
 test.describe('Pass 25A baseline and lifecycle', () => {
   test('stores a stable seeded menu visual baseline', async ({ page }) => {
+    test.skip(process.platform !== 'linux', 'The canonical pixel baseline is captured on Linux CI.');
     await ready(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
     expect((await snapshot(page)).random.seed).toBe('pass25a-browser-baseline');

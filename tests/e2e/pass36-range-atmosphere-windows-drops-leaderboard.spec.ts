@@ -37,6 +37,7 @@ type DebugApi = {
   snapshot(): Snapshot;
   startSolo(): void;
   setBotsFrozen(frozen: boolean): void;
+  clearBots(): void;
   placeBotAhead(distance?: number): void;
   forceBotGrenade(fuseMs?: number): boolean;
   setAmmo(weapon: 'carbine', ammo: number, reserve: number): void;
@@ -249,18 +250,27 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
       await waitReady(page);
       await deploySolo(page);
       await page.evaluate(() => {
+        // Isolate the authored window path from dynamic combatant occlusion.
+        api().clearBots();
         api().setBotsFrozen(true);
         api().equipWeapon('carbine');
         api().setAmmo('carbine', 30, 0);
       });
       for (let index = 0; index < 6; index += 1) {
+        // Reset the sustained-fire spread window between deliberate single
+        // taps. Stage and fire atomically because upper panes have no standing
+        // ledge and would otherwise fall before the authoritative raycast.
+        if (index > 0) await page.waitForTimeout(300);
         await page.evaluate((windowIndex) => {
           api().stageWindow(windowIndex, 4);
           api().fireOnce();
         }, index);
-        await page.waitForTimeout(110);
+        await page.waitForTimeout(75);
+        expect(
+          (await snapshot(page)).breakableWindows.filter((pane) => pane.broken).length,
+          `${profile} pane ${index} did not break from its staged playable side`,
+        ).toBe(index + 1);
       }
-      await expect.poll(async () => (await snapshot(page)).breakableWindows.filter((pane) => pane.broken).length).toBe(6);
       expect((await snapshot(page)).breakableWindows.every((pane) => pane.broken && !pane.visible)).toBe(true);
     }
     expect(errors).toEqual([]);
