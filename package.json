@@ -48,7 +48,11 @@
     "verify:pass25a:core": "npm run lint && npm run verify:gameplay-contract && npm run verify:provenance && npm test && npm run leaderboard:check && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies",
     "verify:pass25a": "node scripts/qa/run-pass25a-verification.mjs",
     "verify": "npm run lint && npm run verify:gameplay-contract && npm run verify:provenance && npm test && npm run leaderboard:check && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies && npm run test:e2e",
-    "deploy": "npm run build && gh-pages -d dist --add"
+    "pipeline:doctor": "node scripts/release/pipeline-guard.mjs doctor",
+    "pipeline:preflight": "node scripts/release/pipeline-guard.mjs contribute",
+    "pipeline:release-check": "node scripts/release/pipeline-guard.mjs release",
+    "deploy": "npm run build && gh-pages -d dist --add",
+    "deploy:ci": "gh-pages -d dist --add"
   },
   "overrides": {
     "typed-rest-client": {
