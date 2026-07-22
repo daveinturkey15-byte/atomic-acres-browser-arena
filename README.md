@@ -48,10 +48,11 @@ This remains a friendly-session architecture, not cheat-resistant ranked netcode
 ## Callsigns and persistent records
 
 - Deployment is blocked until the player enters a valid 1–16 character callsign.
-- The callsign and top 20 completed-match records use stable, versioned same-origin browser storage, so they survive asset-hashed build updates on the same site.
+- The callsign and top 20 completed-match records use stable, versioned same-origin browser storage, so they survive asset-hashed build updates on the same site and remain available if the network service is unavailable.
 - Records rank match kills first, then best streak, fewer deaths and victory.
 - Same-origin tabs update live through `BroadcastChannel`; active PeerJS players exchange bounded leaderboard snapshots on join and new records at match end.
-- This serverless leaderboard is durable per browser and peer-carried between players who meet. It is not a tamper-resistant global ladder; that would require a separately deployed authoritative HTTPS backend.
+- When `VITE_GLOBAL_LEADERBOARD_URL` is configured, season-scoped personal-best streaks are also read from and submitted to the separately deployed Cloudflare Worker/D1 service. The Worker validates origin, payload bounds, idempotency and rate limits; browser-local and peer-carried records remain the offline fallback.
+- The global service is shared and persistent, but it is not cheat-resistant ranked authority because the browser still reports its result. Competitive public play would require server-owned simulation and hit validation.
 
 ## Rendering and performance
 
@@ -93,7 +94,8 @@ QA_BASE_URL=http://127.0.0.1:4180/ QA_PEER_PORT=9000 npm run qa:private-lobby
 Current release and verification documentation:
 
 - [`docs/INDEX.md`](docs/INDEX.md) — canonical documentation map and historical-pass boundary.
-- [`docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md`](docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — current Pass 52 product contract.
+- [`src/changelog.ts`](src/changelog.ts) — player-facing production release ledger; exact public-promotion times are added only after successful deployment.
+- [`docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md`](docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — retained multiplayer and changelog foundation, superseded where newer scoped contracts and executable tests differ.
 - [`docs/VERIFICATION_AND_RELEASE_HYGIENE.md`](docs/VERIFICATION_AND_RELEASE_HYGIENE.md) — local/CI gates, portability, provenance, and legal-distinction rules.
 - [`docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md`](docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md) — mandatory multi-machine contribution, integration, and production-promotion contract.
 
