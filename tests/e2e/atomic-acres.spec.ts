@@ -961,11 +961,11 @@ test.describe('solo mechanics', () => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         placeBotAhead: (distance: number) => void;
         aimAtBot: (zone?: 'head' | 'body' | 'limb') => void;
-        setViewmodelHidden: (hidden: boolean) => void;
+        setCaptureViewmodelHidden: (hidden: boolean) => void;
       } }).__ATOMIC_ACRES_DEBUG__;
       api.placeBotAhead(4);
       api.aimAtBot('body');
-      api.setViewmodelHidden(true);
+      api.setCaptureViewmodelHidden(true);
     });
     const staged = await debug(page);
     const [botX, , botZ] = staged.bots[0].position;
