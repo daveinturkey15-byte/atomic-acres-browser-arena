@@ -27,6 +27,7 @@ import {
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
+import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -447,7 +448,7 @@ app.innerHTML = `
         <button id="host">HOST LOBBY</button>
       </div>
       <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off"><button id="join">JOIN</button></div>
-      <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button">COPY INVITE</button></div>
+      <div id="room-card" hidden><span>ROOM CODE</span><strong id="room-code"></strong><button id="copy-room" class="small-button" aria-label="Copy lobby code">COPY CODE</button></div>
       <section id="private-lobby" hidden aria-labelledby="private-lobby-title">
         <div class="private-lobby-heading"><span><small>PRIVATE MATCH</small><strong id="private-lobby-title">WAITING ROOM</strong></span><b id="lobby-capacity-label">1 / 4</b></div>
         <div class="lobby-settings">
@@ -1272,6 +1273,38 @@ function clearGameplayInput(): void {
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.textContent = text;
   statusEl.dataset.kind = kind;
+}
+
+function legacyClipboardCopy(text: string): boolean {
+  const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const input = document.createElement('textarea');
+  input.value = text;
+  input.readOnly = true;
+  input.setAttribute('aria-hidden', 'true');
+  input.style.position = 'fixed';
+  input.style.left = '-9999px';
+  input.style.top = '0';
+  document.body.append(input);
+  input.focus();
+  input.select();
+  input.setSelectionRange(0, input.value.length);
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    input.remove();
+    previouslyFocused?.focus();
+  }
+}
+
+function selectLobbyCodeForManualCopy(code: string): void {
+  const range = document.createRange();
+  range.selectNodeContents(roomCodeEl);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  element<HTMLInputElement>('#room-input').value = code;
 }
 
 function currentMatchRules() {
@@ -6591,15 +6624,22 @@ element<HTMLButtonElement>('#join').addEventListener('click', () => {
   network.join(code, sendLobbyJoin);
 });
 element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
-  const invitedTeam = player.team === 0 ? 1 : 0;
-  const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(network.roomCode)}&team=${invitedTeam}`;
-  try {
-    await navigator.clipboard.writeText(inviteUrl);
-    setStatus('Invite link copied', 'ok');
-  } catch {
-    element<HTMLInputElement>('#room-input').value = network.roomCode;
-    setStatus('Clipboard blocked — room code placed in the join field', 'warn');
+  const roomCode = network.roomCode.trim();
+  if (!roomCode) {
+    setStatus('Room code is not ready yet', 'warn');
+    return;
   }
+
+  const writeText = navigator.clipboard?.writeText
+    ? navigator.clipboard.writeText.bind(navigator.clipboard)
+    : undefined;
+  const result = await copyTextWithFallback(roomCode, writeText, legacyClipboardCopy);
+  if (result === 'failed') {
+    selectLobbyCodeForManualCopy(roomCode);
+    setStatus('Clipboard blocked — room code selected for manual copy', 'warn');
+    return;
+  }
+  setStatus('Lobby code copied', 'ok');
 });
 element<HTMLButtonElement>('#lobby-ready').addEventListener('click', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
