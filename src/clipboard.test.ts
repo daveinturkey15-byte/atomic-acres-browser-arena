@@ -2,35 +2,38 @@ import { describe, expect, it, vi } from 'vitest';
 import { copyTextWithFallback } from './clipboard';
 
 describe('copyTextWithFallback', () => {
-  it('uses the synchronous copy path while the click still owns user activation', async () => {
+  it('copies the lobby code with the modern Clipboard API', async () => {
     const writeText = vi.fn(async () => undefined);
+    const fallbackCopy = vi.fn(() => true);
+
+    await expect(copyTextWithFallback('ROOM-123', writeText, fallbackCopy)).resolves.toBe('clipboard');
+    expect(writeText).toHaveBeenCalledWith('ROOM-123');
+    expect(fallbackCopy).not.toHaveBeenCalled();
+  });
+
+  it('falls back when the Clipboard API is unavailable', async () => {
+    const fallbackCopy = vi.fn(() => true);
+
+    await expect(copyTextWithFallback('ROOM-123', undefined, fallbackCopy)).resolves.toBe('fallback');
+    expect(fallbackCopy).toHaveBeenCalledWith('ROOM-123');
+  });
+
+  it('falls back when the Clipboard API rejects the write', async () => {
+    const writeText = vi.fn(async () => {
+      throw new Error('clipboard denied');
+    });
     const fallbackCopy = vi.fn(() => true);
 
     await expect(copyTextWithFallback('ROOM-123', writeText, fallbackCopy)).resolves.toBe('fallback');
     expect(fallbackCopy).toHaveBeenCalledWith('ROOM-123');
-    expect(writeText).not.toHaveBeenCalled();
   });
 
-  it('uses the modern Clipboard API when synchronous copy is unavailable', async () => {
-    const writeText = vi.fn(async () => undefined);
-    const fallbackCopy = vi.fn(() => false);
-
-    await expect(copyTextWithFallback('ROOM-123', writeText, fallbackCopy)).resolves.toBe('clipboard');
-    expect(writeText).toHaveBeenCalledWith('ROOM-123');
-  });
-
-  it('reports failure when the available Clipboard API rejects', async () => {
-    const writeText = vi.fn(async () => {
-      throw new Error('clipboard denied');
-    });
-
-    await expect(copyTextWithFallback('ROOM-123', writeText, () => false)).resolves.toBe('failed');
-  });
-
-  it('times out a Clipboard API promise that never settles', async () => {
+  it('times out a Clipboard API promise that never settles and then falls back', async () => {
     const writeText = vi.fn(() => new Promise<void>(() => undefined));
+    const fallbackCopy = vi.fn(() => true);
 
-    await expect(copyTextWithFallback('ROOM-123', writeText, () => false, 5)).resolves.toBe('failed');
+    await expect(copyTextWithFallback('ROOM-123', writeText, fallbackCopy, 5)).resolves.toBe('fallback');
+    expect(fallbackCopy).toHaveBeenCalledWith('ROOM-123');
   });
 
   it('reports failure for empty text or when neither copy path exists', async () => {

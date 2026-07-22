@@ -1275,29 +1275,6 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.dataset.kind = kind;
 }
 
-function legacyClipboardCopy(text: string): boolean {
-  const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const input = document.createElement('textarea');
-  input.value = text;
-  input.readOnly = true;
-  input.setAttribute('aria-hidden', 'true');
-  input.style.position = 'fixed';
-  input.style.left = '-9999px';
-  input.style.top = '0';
-  document.body.append(input);
-  input.focus();
-  input.select();
-  input.setSelectionRange(0, input.value.length);
-  try {
-    return document.execCommand('copy');
-  } catch {
-    return false;
-  } finally {
-    input.remove();
-    previouslyFocused?.focus();
-  }
-}
-
 function selectLobbyCodeForManualCopy(code: string): void {
   const range = document.createRange();
   range.selectNodeContents(roomCodeEl);
@@ -6633,7 +6610,7 @@ element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
   const writeText = navigator.clipboard?.writeText
     ? navigator.clipboard.writeText.bind(navigator.clipboard)
     : undefined;
-  const result = await copyTextWithFallback(roomCode, writeText, legacyClipboardCopy);
+  const result = await copyTextWithFallback(roomCode, writeText, () => false);
   if (result === 'failed') {
     selectLobbyCodeForManualCopy(roomCode);
     setStatus('Clipboard blocked — room code selected for manual copy', 'warn');
