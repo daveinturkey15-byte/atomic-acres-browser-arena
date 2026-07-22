@@ -39,12 +39,13 @@
     "leaderboard:dev": "wrangler dev --local --port 8787 --var RATE_LIMIT_SALT:local-qa-not-secret",
     "leaderboard:deploy": "wrangler d1 migrations apply atomic-acres-leaderboard --remote && wrangler deploy",
     "qa:soak": "node scripts/qa/run-pass25a-soak.mjs",
+    "qa:asset-provenance": "node scripts/qa/verify-public-asset-provenance.mjs",
     "audit:dependencies": "npm audit --omit=dev",
     "verify:release-tree": "node scripts/qa/verify-release-tree.mjs",
     "lint": "tsc --noEmit",
-    "verify:pass25a:core": "npm run lint && npm run verify:gameplay-contract && npm test && npm run build && npm run verify:release-tree && npm run audit:dependencies",
+    "verify:pass25a:core": "npm run lint && npm run verify:gameplay-contract && npm test && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies",
     "verify:pass25a": "node scripts/qa/run-pass25a-verification.mjs",
-    "verify": "npm run lint && npm run verify:gameplay-contract && npm test && npm run build && npm run verify:release-tree && npm run audit:dependencies && npm run test:e2e",
+    "verify": "npm run lint && npm run verify:gameplay-contract && npm test && npm run qa:asset-provenance && npm run build && npm run verify:release-tree && npm run audit:dependencies && npm run test:e2e",
     "deploy": "npm run build && gh-pages -d dist --add"
   },
   "overrides": {

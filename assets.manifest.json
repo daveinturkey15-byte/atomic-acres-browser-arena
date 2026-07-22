@@ -48,6 +48,38 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-rustworks-central-tower-2026-07-20",
+      "kind": "original-project-3d-model",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "scripts/blender/create-rustworks-central-tower.py",
+      "generatedAsOf": "2026-07-20",
+      "license": "Original project work",
+      "files": "public/assets/original/models/rustworks-central-tower.glb",
+      "sha256": "800851f10d4d5119d8f7921d28e387438b06121be9f6ca364e459550bc57569b",
+      "sourceBlend": "source-assets/blender/rustworks-central-tower.blend",
+      "sourceBlendSha256": "1f78135bc78fc5bfcdf8d6a0adc980f1bc54d0a1bec1038754cdbbe31ffa8433",
+      "sourceScript": "scripts/blender/create-rustworks-central-tower.py",
+      "sourceScriptSha256": "51bca7aed70ffc283d7f3f1247c626f01662973057265cbcad40535e112cb05e",
+      "modifications": "Original climbable Rustworks tower environment authored from Blender primitives by the repository generator. The versioned .blend source and generator are included so another machine can inspect, modify, and rebuild the deployable GLB without recovering files from Jigglyclaw's machine.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-original-menu-squad-2026-07-22",
+      "kind": "original-project-generated-menu-art",
+      "creator": "Atomic Acres project / Jigglyclaw",
+      "source": "source-assets/menu/atomic-acres-menu-squad-original.provenance.json",
+      "generatedAsOf": "2026-07-22",
+      "license": "Original project work",
+      "files": "public/assets/original/menu/atomic-acres-menu-squad-joke.jpg",
+      "sha256": "65259d081de2671ca6f89ca2bf4ea2687d46096ad29ecbd07aadbc610ccf35e9",
+      "sourceImage": "source-assets/menu/atomic-acres-menu-squad-original.png",
+      "sourceImageSha256": "5e459f936c0812c4e1a531f6310e07de444b95062df35af6054c0edcda00b983",
+      "sourceProvenance": "source-assets/menu/atomic-acres-menu-squad-original.provenance.json",
+      "sourceProvenanceSha256": "1366eacb23d3d02c64c9dda5c1ea481a933dee8a29b01088ad0f3b1ae34b5cf2",
+      "modifications": "Original generated Atomic Acres squad illustration with four fictional characters and no input/reference image, real public figure, trademark, band merchandise, charity logo, or commercial-game UI. The versioned source PNG and full generation prompt/provenance are included.",
+      "attributionRequired": false
+    },
+    {
       "id": "atomic-acres-sanctified-frag-choir-2026-07-16",
       "kind": "original-project-audio",
       "creator": "Atomic Acres project / Jigglyclaw",
