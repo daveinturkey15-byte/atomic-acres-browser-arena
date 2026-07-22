@@ -1,10 +1,10 @@
 import { ARENA_BOUNDS, GARAGE_LAYOUT, HOUSE_LAYOUT } from './arena-layout';
 import type { Box2 } from './collision';
 
-export const GRASS_GROUND_LAYOUT_ID = 'split-road-verges-v2';
-export const GRASS_MAX_BLADES = 2_400;
+export const GRASS_GROUND_LAYOUT_ID = 'manicured-verges-v3';
+export const GRASS_MAX_BLADES = 720;
 export const GRASS_BLADES_PER_INSTANCE = 3;
-export const GRASS_MAX_HEIGHT = 0.58;
+export const GRASS_MAX_HEIGHT = 0.22;
 
 export type GrassGroundRegion = Readonly<{
   id: 'west-verge' | 'east-verge';
@@ -125,8 +125,8 @@ export function createGrassPlacements(colliders: readonly Box2[], maximum = GRAS
         x,
         z,
         yaw: unit(hash32(shape ^ 0x7e95761e)) * Math.PI,
-        width: 0.13 + unit(hash32(shape ^ 0x2c1b3c6d)) * 0.08,
-        height: 0.34 + unit(hash32(shape ^ 0x297a2d39)) * (GRASS_MAX_HEIGHT - 0.34),
+        width: 0.08 + unit(hash32(shape ^ 0x2c1b3c6d)) * 0.05,
+        height: 0.1 + unit(hash32(shape ^ 0x297a2d39)) * (GRASS_MAX_HEIGHT - 0.1),
         phase: unit(hash32(shape ^ 0x9e3779b9)) * Math.PI * 2,
         chunk: regionIndex * 2 + (z >= 0 ? 1 : 0),
       }));

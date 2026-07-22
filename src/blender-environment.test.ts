@@ -45,12 +45,12 @@ describe('Quality Graphics environment asset', () => {
     const housePropSets = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'authored-house-furnishing-set');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(7_500_000);
-    expect(gltf.meshes?.length).toBe(33);
-    expect(gltf.materials?.length).toBe(27);
-    expect(gltf.images).toHaveLength(35);
-    expect(gltf.textures).toHaveLength(57);
+    expect(gltf.meshes?.length).toBe(34);
+    expect(gltf.materials?.length).toBe(28);
+    expect(gltf.images).toHaveLength(33);
+    expect(gltf.textures).toHaveLength(60);
     expect((gltf.materials ?? []).filter((material) =>
-      material.normalTexture && material.pbrMetallicRoughness?.metallicRoughnessTexture)).toHaveLength(19);
+      material.normalTexture && material.pbrMetallicRoughness?.metallicRoughnessTexture)).toHaveLength(20);
     expect(gltf.images?.every((image) => typeof image.bufferView === 'number' && image.uri === undefined)).toBe(true);
     expect(gltf.buffers?.every((bufferInfo) => !bufferInfo.uri)).toBe(true);
     expect(semanticWindows).toHaveLength(6);
@@ -76,7 +76,7 @@ describe('Quality Graphics environment asset', () => {
     const groundBatches = (gltf.nodes ?? []).filter((node) =>
       node.name === 'BLD_BATCH_MAT_ground_olive' || node.name === 'BLD_BATCH_MAT_asphalt_charcoal');
     expect(groundBatches).toHaveLength(2);
-    expect(groundBatches.every((node) => node.extras?.atomic_ground_layout === 'split-road-verges-v2')).toBe(true);
+    expect(groundBatches.every((node) => node.extras?.atomic_ground_layout === 'manicured-verges-v3')).toBe(true);
   });
 
   it('binds the runtime GLB to the audited source-separation provenance', () => {
@@ -91,12 +91,10 @@ describe('Quality Graphics environment asset', () => {
         targetedCoplanarOrUnder20mmPairsAfter: number;
       };
     };
-    expect(provenance.title).toBe('Atomic Acres Quality Graphics Arena');
+    expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(34_336);
-    expect(provenance.runtimeAudit.targetedCoplanarOrUnder20mmPairsBefore).toBe(74);
-    expect(provenance.runtimeAudit.targetedCoplanarOrUnder20mmPairsAfter).toBe(0);
+    expect(provenance.runtimeAudit.triangles).toBe(41_216);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {

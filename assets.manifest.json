@@ -30,22 +30,22 @@
       "attributionRequired": false
     },
     {
-      "id": "atomic-acres-blender-render-arena-2026-07-17",
+      "id": "atomic-acres-aesthetic-overhaul-2026-07-22",
       "kind": "original-project-complete-blender-environment",
       "creator": "Atomic Acres project / Jigglyclaw",
       "source": "scripts/blender/create-atomic-acres-blender-arena.py",
-      "generatedAsOf": "2026-07-20",
+      "generatedAsOf": "2026-07-22",
       "license": "Original project work",
       "files": "public/assets/original/models/atomic-acres-blender-arena.glb",
-      "sha256": "1e14fcf7bc57104c88642d3aa89358b6961d0c8e3224963b52dc3f37da913686",
+      "sha256": "36d7ce91c199c924a8fd999f9fbb3da2baaaa684f28c2be3fe88df5be8d2c9bd",
       "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
-      "sourceBlendSha256": "94aae9e65089c1c523b14867b4420f9dd5485070e2fe9e21b16c8c339fcb2bcb",
+      "sourceBlendSha256": "65b0351b0a768e5bbcf788f374ccdfa874f336e038c428aefbcaf73722a7603e",
       "sourceSpec": "source-assets/blender/atomic-acres-arena-spec.json",
       "sourceSpecSha256": "963dcfbe1b9eab8613c52413689e830c6ec2badaa634fa58868ec8d33a9643eb",
       "sourceProvenance": "source-assets/blender/atomic-acres-blender-arena.provenance.json",
       "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-      "format": "glTF 2.0 binary, 33 meshes, 27 exported materials, 34336 triangles, 6 semantic breakable windows, 3 semantic route landmarks, 2 modeled transit buses, 4 authored large physical cover assets, 2 authored house furnishing sets, 35 embedded project-authored images, 57 texture bindings and 19 exported PBR materials",
-      "modifications": "Complete original near-future agricultural test-suburb environment authored deterministically in Blender 4.0.2 from project primitives, project-authored surface textures and the authoritative TypeScript arena/house specification. Pass 27 establishes distinct Verdant Array, Civic Transit and Helio Service route identities through overhead irrigation and grow rails, civil-defence signals and flush evacuation cues, photovoltaic/battery/coolant hardware, rooftop habitat sensors, distant agritech energy silhouettes and bounded contact-grime patches. Presentation hydroponic beds were lowered so they no longer imply false collision. Pass 37 removes residual coplanar and under-20-mm surface conflicts across house floors/walls/ramps, road overlays, bus trim, pipe stacks, boundary corners and beacon rings while retaining procedural gameplay authority. No Activision, Call of Duty, Black Ops, downloaded model, copied texture, logo, signage, map geometry, or extracted game asset is used. The GLB is presentation-only; TypeScript collision, raycasts, ramps, windows, networking, drops and bot navigation remain authoritative.",
+      "format": "glTF 2.0 binary, 34 meshes, 28 exported materials, 41216 triangles, 6 semantic breakable windows, 3 semantic route landmarks, 2 modeled transit buses, 4 authored large physical cover assets, 2 authored house furnishing sets, 33 embedded project-authored images, 60 texture bindings and 20 exported PBR materials",
+      "modifications": "Atomic Acres-owned complete environment, deterministically regenerated in Blender 5.1.2 from project primitives, project-authored textures and the checked-in TypeScript-derived arena specification. The 2026-07-22 aesthetic overhaul adds working team-tinted authored surfaces, asymmetric model-home facade trim, edge-aligned kitchen and living-room dressing, original civic-transit detailing, a smaller campus beacon, smoother vegetation, warm low perimeter architecture and original arid skyline banks. Runtime grass becomes a sparse manicured verge and Atomic Acres receives a scoped clear-day lighting and restrained atmosphere profile. No commercial model, downloaded model, copied texture, logo, signage, map geometry, audio or extracted game asset is used. The GLB and all additions are presentation-only. Collision and clearance must be revalidated after integration with the concurrent collision-authority and prone-capsule contribution.",
       "attributionRequired": false
     },
     {

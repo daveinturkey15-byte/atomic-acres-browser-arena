@@ -619,7 +619,11 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
 );
 const activeRenderConfig = renderProfileConfig(renderProfile);
-const activeLighting = arenaLightingProfile(renderProfile);
+const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
+let activeLighting = arenaLightingProfile(
+  renderProfile,
+  arenaSelection(new URLSearchParams(window.location.search).get('map')).id,
+);
 const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
 const staticMaterialMode = activeRenderConfig.staticMaterialMode;
@@ -840,7 +844,7 @@ let fillLight: THREE.DirectionalLight;
 buildSky();
 const worldIdentityPresentation = createWorldIdentityPresentation(
   scene,
-  activeLighting,
+  atomicLighting,
   softwareRenderer,
 );
 const atomicArena = buildArena(scene);
@@ -960,7 +964,7 @@ const grassSystem = new GrassSystem(
   // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
   // must never seed its permanent placements from their collision geometry.
   atomicArena.colliders,
-  activeLighting,
+  atomicLighting,
 );
 grassSystem.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
 renderer.domElement.addEventListener('webglcontextrestored', () => {
@@ -6634,6 +6638,7 @@ function setArenaPresentationVisibility(): void {
 }
 
 function applyArenaLightingForSelection(): void {
+  activeLighting = arenaLightingProfile(renderProfile, selectedArena.id);
   const lighting = rustworksLightingTint(activeLighting, renderProfile, selectedArena.id);
   renderer.toneMappingExposure = lighting.exposure;
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(lighting.fogColor);

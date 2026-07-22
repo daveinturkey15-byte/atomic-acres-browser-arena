@@ -7,22 +7,22 @@ import { grassBypassReason, grassProfileConfig, GrassSystem } from './grass-syst
 const source = readFileSync(new URL('./grass-system.ts', import.meta.url), 'utf8');
 const signalSource = readFileSync(new URL('./atomic-signal.ts', import.meta.url), 'utf8');
 
-describe('Pass 30 living-grass system', () => {
+describe('Atomic Acres manicured-verge system', () => {
   it('freezes explicit profile budgets and bypasses Compatibility, software renderers and query opt-out', () => {
     expect(grassProfileConfig('blender')).toMatchObject({
       enabled: true,
-      instanceLimit: 2_400,
-      bladeLimit: 7_200,
-      triangleLimit: 43_200,
+      instanceLimit: 720,
+      bladeLimit: 2_160,
+      triangleLimit: 12_960,
       chunkLimit: 4,
       maximumDistance: 54,
       interactionRadius: 2.65,
     });
     expect(grassProfileConfig('performance')).toMatchObject({
       enabled: true,
-      instanceLimit: 1_200,
-      bladeLimit: 3_600,
-      triangleLimit: 21_600,
+      instanceLimit: 480,
+      bladeLimit: 1_440,
+      triangleLimit: 8_640,
       chunkLimit: 4,
       maximumDistance: 38,
     });
@@ -49,11 +49,11 @@ describe('Pass 30 living-grass system', () => {
     expect(telemetry).toMatchObject({
       pass: 30,
       enabled: true,
-      instances: 2_400,
-      blades: 7_200,
+      instances: 720,
+      blades: 2_160,
       chunks: 4,
-      triangles: 43_200,
-      triangleLimit: 43_200,
+      triangles: 12_960,
+      triangleLimit: 12_960,
       perFrameAllocations: 0,
       authoritative: false,
     });

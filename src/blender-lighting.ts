@@ -36,6 +36,78 @@ export type ArenaLightingProfile = {
   godRayLobes: number;
 };
 
+const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
+  exposure: 1.04,
+  hemisphereIntensity: 1.58,
+  ambientIntensity: 0.64,
+  sunIntensity: 2.34,
+  shadowBias: -0.00028,
+  shadowNormalBias: 0.025,
+  softShadows: false,
+  fogColor: 0xaebdbd,
+  fogNear: 62,
+  fogFar: 152,
+  skyTop: 0x5588a8,
+  skyHorizon: 0xdba77f,
+  skyBottom: 0xe7bd88,
+  skySun: 0xffedc4,
+  skyCloud: 0xcbd5d1,
+  skyCloudShadow: 0x5e7187,
+  skyCloudLight: 0xf5dfc5,
+  hemisphereSky: 0xc9d8dc,
+  hemisphereGround: 0xb6aa8d,
+  ambientColor: 0xe4e8df,
+  sunColor: 0xffedc8,
+  sunPosition: [-48, 42, 30],
+  fillColor: 0xcce0ed,
+  fillIntensity: 0.48,
+  fillPosition: [54, 20, -42],
+  routeLightIntensity: 2.4,
+  streetLightIntensity: 3.2,
+  interiorLightIntensity: 8,
+  routeLightCount: 3,
+  streetLightCount: 4,
+  interiorLightCount: 2,
+  godRayStrength: 0.035,
+  godRayLobes: 2,
+};
+
+const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
+  exposure: 1.06,
+  hemisphereIntensity: 1.64,
+  ambientIntensity: 0.66,
+  sunIntensity: 2.42,
+  shadowBias: -0.00012,
+  shadowNormalBias: 0.04,
+  softShadows: false,
+  fogColor: 0xaebdbd,
+  fogNear: 58,
+  fogFar: 148,
+  skyTop: 0x4d83a5,
+  skyHorizon: 0xdda77d,
+  skyBottom: 0xe9bc84,
+  skySun: 0xffefc8,
+  skyCloud: 0xcbd6d2,
+  skyCloudShadow: 0x5e7187,
+  skyCloudLight: 0xf5dfc5,
+  hemisphereSky: 0xc9dbe2,
+  hemisphereGround: 0xb8ab8d,
+  ambientColor: 0xe6e9df,
+  sunColor: 0xfff0cb,
+  sunPosition: [-48, 42, 30],
+  fillColor: 0xc9dfef,
+  fillIntensity: 0.56,
+  fillPosition: [54, 20, -42],
+  routeLightIntensity: 3,
+  streetLightIntensity: 3.8,
+  interiorLightIntensity: 10,
+  routeLightCount: 3,
+  streetLightCount: 4,
+  interiorLightCount: 4,
+  godRayStrength: 0.05,
+  godRayLobes: 2,
+};
+
 const DEFAULT_LIGHTING: ArenaLightingProfile = {
   exposure: 1.16,
   hemisphereIntensity: 1.82,
@@ -125,7 +197,9 @@ const COMPAT_LIGHTING: ArenaLightingProfile = {
   godRayLobes: 0,
 };
 
-export function arenaLightingProfile(profile: RenderProfile): ArenaLightingProfile {
-  const source = profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
+export function arenaLightingProfile(profile: RenderProfile, arenaId?: string): ArenaLightingProfile {
+  const source = arenaId === 'atomic-acres' && profile !== 'compat'
+    ? profile === 'blender' ? ATOMIC_BLENDER_LIGHTING : ATOMIC_DEFAULT_LIGHTING
+    : profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
   return { ...source, sunPosition: [...source.sunPosition], fillPosition: [...source.fillPosition] };
 }
