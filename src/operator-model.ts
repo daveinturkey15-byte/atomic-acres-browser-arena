@@ -681,6 +681,9 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
     visibleSkinnedMeshes,
+    armBonesPresent: ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
+      .filter((name) => runtimeState.visual.getObjectByName(name) instanceof THREE.Bone).length,
+    meleeKnifeVisible: root.getObjectByName('operator-melee-knife')?.visible === true,
     mergedVertexLod: runtimeState.visual.getObjectByName('Swat_Merged_Vertex_LOD')?.visible === true,
     weaponChildren: runtimeState.weaponSocket.children.length,
     weaponSocketWorld: runtimeState.weaponSocket.getWorldPosition(new THREE.Vector3()).toArray(),

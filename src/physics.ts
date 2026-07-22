@@ -17,7 +17,7 @@ export const CHARACTER_PHYSICS_CONFIG = Object.freeze({
 export const STANCE_SHAPES: Readonly<Record<Stance, { halfHeight: number; radius: number; eyeFromCenter: number }>> = {
   stand: { halfHeight: CHARACTER_PHYSICS_CONFIG.playerHalfHeight, radius: CHARACTER_PHYSICS_CONFIG.playerRadius, eyeFromCenter: 0.79 },
   crouch: { halfHeight: 0.22, radius: 0.36, eyeFromCenter: 0.58 },
-  prone: { halfHeight: 0.04, radius: 0.31, eyeFromCenter: 0.15 },
+  prone: { halfHeight: 0.02, radius: 0.36, eyeFromCenter: 0.23 },
 };
 
 export const WORLD_BOUNDARY_THICKNESS = 0.5;

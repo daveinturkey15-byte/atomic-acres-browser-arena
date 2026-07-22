@@ -183,7 +183,10 @@ function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
     solid('front-upper-right', [(right + HALF_WIDTH) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [HALF_WIDTH - right, UPPER_HEIGHT, WALL], surface),
     solid('upper-window-sill-wall', [windowX, FLOOR_Y + WINDOW_SILL_TOP / 2, HALF_DEPTH], [windowWidth, WINDOW_SILL_TOP, WALL], surface),
     solid('upper-window-lintel-wall', [windowX, (openingTop + FLOOR_Y + UPPER_HEIGHT) / 2, HALF_DEPTH], [windowWidth, FLOOR_Y + UPPER_HEIGHT - openingTop, WALL], surface),
-    solid('upper-window-glass', [windowX, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.08], 'glass', false, 'glass'),
+    {
+      ...solid('upper-window-glass', [windowX, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.12], 'glass', true, 'glass'),
+      breakable: false,
+    },
   ];
 }
 
@@ -345,7 +348,7 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     { id: 'upper-ramp-entry', kind: 'ramp-entry', centre: [rampWallX, FLOOR_Y + 1.4, RAMP_ENTRY_Z], width: 2.6, height: 2.8, route: true },
     { id: 'front-ground-window', kind: 'window', centre: [4.8, WINDOW_CENTRE_Y, HALF_DEPTH], width: 2.8, height: WINDOW_OPENING_HEIGHT, route: true },
     { id: 'rear-ground-window', kind: 'window', centre: [-4.8, WINDOW_CENTRE_Y, -HALF_DEPTH], width: 2.8, height: WINDOW_OPENING_HEIGHT, route: true },
-    { id: 'upper-window', kind: 'window', centre: [0, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH], width: 3.2, height: WINDOW_OPENING_HEIGHT, route: true },
+    { id: 'upper-window', kind: 'window', centre: [0, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH], width: 3.2, height: WINDOW_OPENING_HEIGHT, route: false },
   ];
   const rampX = rampSide * (HALF_WIDTH + RAMP_SIDE_OUTSET);
   const indoorRampX = indoorRampSide * INDOOR_RAMP_X;

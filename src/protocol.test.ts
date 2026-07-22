@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
-import { isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type SupportActivateMessage } from './protocol';
+import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
+import { isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type LeaderboardSyncMessage, type SupportActivateMessage } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -93,10 +94,11 @@ describe('network protocol guards', () => {
       id: 'score:abc:one', name: 'Tester', kills: 12, deaths: 3,
       bestStreak: 8, won: true, recordedAt: Date.now(),
     };
-    const score = { type: 'high-score', by: 'abc', entry } as const;
-    const sync = { type: 'leaderboard-sync' as const, by: 'abc', entries: [entry] };
+    const score = { type: 'high-score', by: 'abc', season: LEADERBOARD_SEASON, entry } as const;
+    const sync: LeaderboardSyncMessage = { type: 'leaderboard-sync', by: 'abc', season: LEADERBOARD_SEASON, entries: [entry] };
     expect(isGameMessage(score)).toBe(true);
     expect(isGameMessage(sync)).toBe(true);
+    expect(isGameMessage({ ...score, season: 'legacy' })).toBe(false);
     expect(messageBelongsToPlayer(score, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ ...score, by: 'spoof' }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer(sync, 'abc')).toBe(true);

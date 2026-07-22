@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import worker, { admitRateLimit, allowedOrigin, leaderboardNameKey, validateStreakSubmission } from './index';
+import { LEADERBOARD_SEASON } from '../../shared/leaderboard-season';
 
 const valid = {
   name: 'Dave',
@@ -8,6 +9,7 @@ const valid = {
   deaths: 2,
   installId: 'install_123456789',
   buildId: 'pass30-local',
+  season: LEADERBOARD_SEASON,
   idempotencyKey: 'install_123456789:15',
 };
 

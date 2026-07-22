@@ -1,8 +1,8 @@
 import { normalizeRequiredPlayerName, leaderboardNameKey, type ScoreStorage } from './high-scores';
 import { rangeAccuracyPercent } from './gun-range-rules';
 
-export const GUN_RANGE_SCORE_STORAGE_KEY = 'atomic-acres:gun-range-scores:v1';
-export const GUN_RANGE_SCORE_SCHEMA_VERSION = 1;
+export const GUN_RANGE_SCORE_STORAGE_KEY = 'atomic-acres:gun-range-scores:v2';
+export const GUN_RANGE_SCORE_SCHEMA_VERSION = 2;
 export const MAX_GUN_RANGE_SCORE_ENTRIES = 20;
 export const MAX_GUN_RANGE_SCORE = 9_999_999;
 export const MAX_GUN_RANGE_HITS = 100_000;

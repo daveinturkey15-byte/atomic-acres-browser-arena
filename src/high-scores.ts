@@ -10,8 +10,8 @@ import {
 
 export { MAX_MATCH_DEATHS, MAX_MATCH_KILLS } from '../shared/leaderboard-policy';
 
-export const HIGH_SCORE_STORAGE_KEY = 'atomic-acres:high-scores:v1';
-export const HIGH_SCORE_SCHEMA_VERSION = 3;
+export const HIGH_SCORE_STORAGE_KEY = 'atomic-acres:high-scores:v2';
+export const HIGH_SCORE_SCHEMA_VERSION = 4;
 export const MAX_HIGH_SCORE_ENTRIES = 20;
 // Five-minute matches are uncapped, but valid local/peer records remain defensively
 // bounded against corrupted storage or hostile payloads. Pass 40 raises the shared
@@ -105,16 +105,15 @@ export function loadHighScores(storage: ScoreStorage, now = Date.now()): HighSco
     const raw = storage.getItem(HIGH_SCORE_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { version?: number; entries?: unknown[] };
-    if ((parsed.version !== 1 && parsed.version !== 2 && parsed.version !== HIGH_SCORE_SCHEMA_VERSION) || !Array.isArray(parsed.entries)) return [];
+    if (parsed.version !== HIGH_SCORE_SCHEMA_VERSION || !Array.isArray(parsed.entries)) return [];
     const migrated = parsed.entries.map((entry) => {
       if (!isHighScoreEntry(entry, now) || !entry.id.startsWith('global:')) return entry;
       const key = leaderboardNameKey(entry.name);
       return key ? { ...entry, id: `global:${key}` } : entry;
     });
     const merged = mergeHighScores([], migrated, now);
-    // Loading is also the migration point for legacy per-match/global rows.
-    // Rewrite the compact one-row-per-player document so the duplicate does
-    // not return on the next refresh or cross-tab sync.
+    // Rewrite the compact one-row-per-player document so cross-tab duplicates
+    // cannot return. Legacy generations intentionally remain isolated.
     saveHighScores(storage, merged);
     return merged;
   } catch {

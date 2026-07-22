@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 import { texturedMaterial } from './art-kit';
-import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, PATROL_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
+import {
+  ARENA_BOUNDS,
+  COVER_LAYOUT,
+  GARAGE_LAYOUT,
+  HOUSE_LAYOUT,
+  NEIGHBOURHOOD_BENCH_COLLIDER_SIZE,
+  NEIGHBOURHOOD_BENCH_LAYOUT,
+  NEIGHBOURHOOD_BIN_COLLIDER_SIZE,
+  NEIGHBOURHOOD_BIN_POSITIONS,
+  PATROL_LAYOUT,
+  SPAWN_LAYOUT,
+} from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
@@ -405,6 +416,41 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
 
   for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
+
+  // The authored street-life layer is presentation-only. These shared layout
+  // bounds make every player-sized bench and recycling bin physical without
+  // coupling gameplay authority to render-profile meshes.
+  for (const [index, [x, z, rotation]] of NEIGHBOURHOOD_BENCH_LAYOUT.entries()) {
+    const [width, height, depth] = NEIGHBOURHOOD_BENCH_COLLIDER_SIZE;
+    const rotated = Math.abs(Math.sin(rotation)) > 0.5;
+    const proxy = box(
+      `street-bench-collider-${index}`,
+      [x, height / 2, z],
+      [rotated ? depth : width, height, rotated ? width : depth],
+      palette.timber,
+      true,
+      false,
+      true,
+      'wood',
+    );
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  }
+  for (const [index, [x, z]] of NEIGHBOURHOOD_BIN_POSITIONS.entries()) {
+    const [width, height, depth] = NEIGHBOURHOOD_BIN_COLLIDER_SIZE;
+    const proxy = box(
+      `street-recycling-bin-collider-${index}`,
+      [x, height / 2, z],
+      [width, height, depth],
+      palette.dark,
+      true,
+      false,
+      true,
+      'thin-metal',
+    );
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  }
 
   // Two large transit anchors create unmistakable physical hard cover through
   // the centre while their detailed authored meshes live in the art layer.

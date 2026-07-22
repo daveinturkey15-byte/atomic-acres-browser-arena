@@ -9,6 +9,7 @@ import { objectLocalGeometryBounds, resolveSocketWorld } from './character-prese
 import type { Team, WeaponId } from './protocol';
 import { hitReactionAt } from './weapon-presentation-state';
 import { AUTHORITATIVE_HIT_PROXIES } from './hit-proxies';
+import { THIRD_PERSON_WEAPON_SCALE } from './player-feedback';
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
@@ -949,6 +950,7 @@ type OperatorRig = {
   rightShoulderBone?: THREE.Bone;
   rightElbowBone?: THREE.Bone;
   rightWristBone?: THREE.Bone;
+  meleeKnife?: THREE.Group;
   armPoseBeforeIk?: Array<{
     bone: THREE.Bone;
     position: THREE.Vector3;
@@ -966,7 +968,7 @@ function operatorRig(root: THREE.Group): OperatorRig | undefined {
 const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> = {
   carbine: [-0.035, -0.17, -0.21],
   smg: [-0.03, -0.16, -0.16],
-  lmg: [-0.04, -0.13, -0.26],
+  lmg: [-0.06, -0.13, -0.26],
   scattergun: [-0.03, -0.025, 0.29],
   sniper: [-0.035, -0.095, -0.21],
   pistol: [-0.06, -0.15, 0.03],
@@ -1120,16 +1122,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   optimizeAttachedWeapon(weapon, flattenMaterials ? 'palette-basic' : 'vertex-lit');
   weapon.name = `operator-${weaponId}`;
   weapon.userData.weaponId = weaponId;
-  const riggedScale: Record<WeaponId, number> = {
-    carbine: 0.58,
-    lmg: 0.5,
-    sniper: 0.55,
-    smg: 0.62,
-    scattergun: 0.56,
-    pistol: 0.66,
-    'machine-pistol': 0.66,
-  };
-  weapon.scale.setScalar(rig.rigged ? riggedScale[weaponId] : weaponId === 'smg' ? 0.72 : 0.68);
+  weapon.scale.setScalar(rig.rigged ? THIRD_PERSON_WEAPON_SCALE[weaponId] : weaponId === 'smg' ? 0.72 : 0.68);
   if (rig.rigged) {
     weapon.position.set(0, 0, 0);
     weapon.quaternion.identity();
@@ -1202,6 +1195,8 @@ export function poseOperator(
   const rig = operatorRig(root);
   if (!rig) return;
   if (rig.rigged) {
+    const meleeAge = performance.now() - Number(root.userData.operatorMeleeAt ?? -10_000);
+    const meleeActive = meleeAge >= 0 && meleeAge < 520;
     // Three's mixer only writes properties that exist in the active clip. Put
     // every arm bone back at the previous clean post-mixer pose first so IK
     // cannot accumulate on an unkeyed shoulder or wrist across frames/swaps.
@@ -1221,10 +1216,12 @@ export function poseOperator(
     }));
     root.updateWorldMatrix(true, true);
     if (rig.weapon) {
+      rig.weapon.visible = !meleeActive;
       // The mixer writes animated bones first; two-arm IK is the final
       // presentation layer so locomotion/fire clips cannot steer the muzzle.
-      root.userData.operatorGripTelemetry = applyRiggedWeaponGrip(rig, rig.weapon);
+      root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(rig, rig.weapon);
     }
+    if (rig.meleeKnife) rig.meleeKnife.visible = meleeActive;
     return;
   }
   const shotAge = performance.now() - Number(root.userData.operatorShotAt ?? -10_000);
@@ -1403,9 +1400,27 @@ export function buildOperator(
     const elbowR = root.getObjectByName('LowerArmR');
     const wristR = root.getObjectByName('WristR');
     if (shoulderR instanceof THREE.Bone && elbowR instanceof THREE.Bone && wristR instanceof THREE.Bone) {
-      (root.userData.operatorRig as OperatorRig & { rigged: true }).rightShoulderBone = shoulderR;
-      (root.userData.operatorRig as OperatorRig & { rigged: true }).rightElbowBone = elbowR;
-      (root.userData.operatorRig as OperatorRig & { rigged: true }).rightWristBone = wristR;
+      const runtimeRig = root.userData.operatorRig as OperatorRig & { rigged: true };
+      runtimeRig.rightShoulderBone = shoulderR;
+      runtimeRig.rightElbowBone = elbowR;
+      runtimeRig.rightWristBone = wristR;
+      const knife = new THREE.Group();
+      knife.name = 'operator-melee-knife';
+      knife.visible = false;
+      const handle = roundedBox('operator-knife-handle', [0.09, 0.25, 0.09], MAT.rubber(), 0.025, 2);
+      handle.position.y = -0.1;
+      const blade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.085, 0.48, 4),
+        new THREE.MeshStandardMaterial({ color: 0xc6d0d2, roughness: 0.22, metalness: 0.82 }),
+      );
+      blade.name = 'operator-knife-blade';
+      blade.position.y = -0.46;
+      blade.rotation.y = Math.PI / 4;
+      knife.add(handle, blade);
+      knife.position.set(0.04, -0.08, -0.02);
+      knife.rotation.set(0.14, 0, -0.16);
+      wristR.add(knife);
+      runtimeRig.meleeKnife = knife;
     }
     setOperatorWeapon(root, weaponId, flattenMaterials);
     root.traverse((node) => {

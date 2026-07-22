@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
 type DebugState = {
   gameStarted: boolean;
@@ -58,9 +59,11 @@ type DebugState = {
       activeClip: string;
       embeddedWeaponsSuppressed: number;
       visibleEmbeddedWeapons: number;
+      armBonesPresent: number;
+      meleeKnifeVisible: boolean;
       muzzleForwardDot: number;
       animationContract: { stance: 'stand' | 'crouch' | 'prone'; crouchBlend: number; proneBlend: number; pivotHeight: number; pivotPitch: number };
-      weaponMount: { modelId: string; finishId: string; forwardCorrection: string; directChild: boolean; finite: boolean };
+      weaponMount: { modelId: string; finishId: string; forwardCorrection: string; directChild: boolean; finite: boolean; localScale: number[] };
       supportGrip: { supportError: number; finite: boolean; torsoClear: boolean; torsoRelativeBendHint: boolean };
     } | null;
     neonHaze: boolean;
@@ -432,21 +435,21 @@ test.describe('boot and authored presentation', () => {
 
   test('loads versioned high scores and surfaces real-time same-origin updates', async ({ page }) => {
     const recordedAt = Date.UTC(2026, 6, 17, 12);
-    await page.addInitScript(({ recordedAt }) => {
-      localStorage.setItem('atomic-acres:high-scores:v1', JSON.stringify({
-        version: 1,
+    await page.addInitScript(({ recordedAt, storageKey, schemaVersion }) => {
+      localStorage.setItem(storageKey, JSON.stringify({
+        version: schemaVersion,
         entries: [{ id: 'score:dave:one', name: 'Dave', kills: 14, deaths: 4, bestStreak: 9, won: true, recordedAt }],
       }));
-    }, { recordedAt });
+    }, { recordedAt, storageKey: HIGH_SCORE_STORAGE_KEY, schemaVersion: HIGH_SCORE_SCHEMA_VERSION });
     await pageReady(page);
     await expect(page.locator('#high-score-list')).toContainText('Dave');
     await expect(page.locator('#high-score-list')).toContainText('14 KILLS');
 
-    await page.evaluate(({ recordedAt }) => {
-      const channel = new BroadcastChannel('atomic-acres:high-scores:v1');
+    await page.evaluate(({ recordedAt, channelName }) => {
+      const channel = new BroadcastChannel(channelName);
       channel.postMessage([{ id: 'score:ellis:one', name: 'Ellis', kills: 18, deaths: 2, bestStreak: 12, won: true, recordedAt }]);
       channel.close();
-    }, { recordedAt });
+    }, { recordedAt, channelName: HIGH_SCORE_STORAGE_KEY });
     await expect(page.locator('#high-score-list')).toContainText('Ellis');
     await expect(page.locator('#high-score-list')).toContainText('18 KILLS');
   });
@@ -461,10 +464,10 @@ test.describe('boot and authored presentation', () => {
       api.endMatch();
     });
     await expect.poll(async () => (await debug(page)).matchPhase).toBe('ended');
-    const entries = await page.evaluate(() => {
-      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+    const entries = await page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
       return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
-    });
+    }, HIGH_SCORE_STORAGE_KEY);
     expect(entries.find((entry) => entry.name === 'QA Operator')).toMatchObject({ name: 'QA Operator', kills: 30, bestStreak: 7, won: true });
   });
 
@@ -482,11 +485,11 @@ test.describe('boot and authored presentation', () => {
       api.earnSupport(8);
     });
     expect((await debug(page)).matchPhase).toBe('active');
-    await expect.poll(async () => page.evaluate(() => {
-      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+    await expect.poll(async () => page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
       const entries = raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
       return entries.find((entry) => entry.name === 'QA Operator');
-    })).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
+    }, HIGH_SCORE_STORAGE_KEY)).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
     await page.reload();
     await pageReady(page);
     const qaScore = page.locator('#high-score-list li').filter({ hasText: 'QA Operator' });
@@ -592,7 +595,7 @@ test.describe('boot and authored presentation', () => {
       },
       blenderEnvironment: {
         status: 'ready', meshCount: 33, materialCount: 27, texturedMaterials: 19, pbrMaterials: 19, textureCount: 35, triangleCount: 34_336,
-        semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
+        semanticWindows: 6, boundWindows: 4, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
     });
@@ -1006,6 +1009,8 @@ test.describe('solo mechanics', () => {
       expect.soft(operator.weaponMount, `${weapon}:mount`).toMatchObject({
         directChild: true, finite: true, forwardCorrection: 'stable-body-mount-minus-z',
       });
+      expect.soft(Math.max(...operator.weaponMount.localScale), `${weapon}:third-person scale`).toBeLessThanOrEqual(0.54);
+      expect.soft(operator.armBonesPresent, `${weapon}:complete arm chains`).toBe(6);
       expect.soft(operator.muzzleForwardDot, `${weapon}:forward`).toBeGreaterThan(0.82);
       expect.soft(operator.supportGrip.supportError, `${weapon}:supportError ${JSON.stringify(operator.supportGrip)}`).toBeLessThanOrEqual(0.025);
       expect.soft(operator.supportGrip, `${weapon}:supportGrip ${JSON.stringify(operator.supportGrip)}`).toMatchObject({
@@ -1110,6 +1115,95 @@ test.describe('solo mechanics', () => {
     expect(active.weaponPresentation.armsVisible).toBe(true);
     expect(active.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(2);
     await expect.poll(async () => (await debug(page)).weaponPresentation.knifeVisible, { timeout: 3_000 }).toBe(false);
+  });
+
+  test('keeps the rigged arms and knife complete during third-person melee', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        meleeBot: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(4);
+      api.meleeBot();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.meleeKnifeVisible).toBe(true);
+    const operator = (await debug(page)).bots[0].operatorModel!;
+    expect(operator.armBonesPresent).toBe(6);
+    expect(operator.weaponChildren).toBe(1);
+    await page.screenshot({ path: 'test-results/player-feedback-rigged-knife.png', animations: 'disabled' });
+    await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.meleeKnifeVisible, { timeout: 3_000 }).toBe(false);
+  });
+
+  test('blocks street props and the upper house facade at their authored positions', async ({ page }) => {
+    const collision = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        collisionProbe: (x: number, z: number) => boolean;
+        collisionProbeAt: (x: number, y: number, z: number) => boolean;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      return {
+        bins: [[-21.4, -33], [21.4, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34]]
+          .map(([x, z]) => api.collisionProbe(x, z)),
+        benches: [[-15.2, -7], [15.2, 7], [-15.2, 26], [15.2, -26]]
+          .map(([x, z]) => api.collisionProbe(x, z)),
+        upperFacade: api.collisionProbeAt(-9, 6, -19.78),
+        upperInteriorClear: api.collisionProbeAt(-9, 6, -20.5),
+      };
+    });
+    expect(collision.bins.every(Boolean)).toBe(true);
+    expect(collision.benches.every(Boolean)).toBe(true);
+    expect(collision.upperFacade).toBe(true);
+    expect(collision.upperInteriorClear).toBe(false);
+  });
+
+  test('shows critical damage, clears prone sprint intent on respawn, and surfaces round stats', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        respawn: () => void;
+        setBotsFrozen: (frozen: boolean) => void;
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'head') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.respawn();
+      api.setBotsFrozen(true);
+      api.placeBotAhead(4);
+      api.aimAtBot('head');
+      api.fireOnce();
+    });
+    await expect.poll(async () => page.locator('#damage-numbers').getAttribute('data-last-critical')).toBe('true');
+    expect(Number(await page.locator('#damage-numbers').getAttribute('data-last-damage'))).toBeGreaterThan(0);
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', /CRIT/);
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setStance: (stance: 'prone') => void;
+        setMovement: (forward: boolean, sprint: boolean) => void;
+        damage: (amount: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setStance('prone');
+      api.setMovement(true, true);
+      api.damage(999);
+    });
+    await expect.poll(async () => (await debug(page)).player.hp, { timeout: 6_000 }).toBe(100);
+    const respawned = (await debug(page)).player;
+    expect(respawned.stance).toBe('stand');
+    expect(respawned.sprinting).toBe(false);
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setMovement: (forward: boolean, sprint?: boolean) => void;
+        endMatch: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setMovement(false);
+      api.endMatch();
+    });
+    const roundStats = page.locator('.round-stats');
+    await expect(roundStats).toBeVisible();
+    await expect(roundStats).toContainText('K/D');
+    await expect(roundStats).toContainText('ACCURACY');
+    await expect(roundStats).toContainText('DAMAGE');
+    await expect(roundStats).toContainText('HEADSHOTS');
+    await page.screenshot({ path: 'test-results/player-feedback-round-stats.png', animations: 'disabled' });
   });
 
   test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {
@@ -1587,7 +1681,7 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).breakableWindows[1].broken).toBe(true);
   });
 
-  test('keeps the left Field Support lane readable and collision-free at every supported HUD size', async ({ page }) => {
+  test('keeps Field Support below the map and collision-free at every supported HUD size', async ({ page }) => {
     const viewports = [
       { width: 1280, height: 720 },
       { width: 960, height: 540 },
@@ -1625,10 +1719,7 @@ test.describe('solo mechanics', () => {
           supportHeight: supportBox.height,
           leftGap: supportBox.left,
           rightGap: window.innerWidth - supportBox.right,
-          minimapGap: Math.max(
-            supportBox.left - minimapBox.right,
-            supportBox.top - (visibleBox('#location-label')?.bottom ?? minimapBox.bottom),
-          ),
+          minimapGap: supportBox.top - (visibleBox('#location-label')?.bottom ?? minimapBox.bottom),
           leftAnchored: supportBox.left < window.innerWidth * 0.5,
           verticallyStacked: boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom),
           persistentOverlap: persistentRegions.some((region) => intersects(supportBox, region)),
@@ -1639,13 +1730,12 @@ test.describe('solo mechanics', () => {
       expect(metrics.ammoFont, JSON.stringify(viewport)).toBeGreaterThanOrEqual(viewport.width <= 700 ? 40 : 64);
       expect(metrics.cardCount, JSON.stringify(viewport)).toBe(5);
       expect(metrics.supportWidth, JSON.stringify(viewport)).toBeGreaterThanOrEqual(145);
-      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(200);
-      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(150);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(525);
+      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(55);
       expect(metrics.leftGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.rightGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.leftAnchored, JSON.stringify(viewport)).toBe(true);
-      expect(metrics.verticallyStacked, JSON.stringify(viewport)).toBe(true);
       expect(metrics.persistentOverlap, JSON.stringify(viewport)).toBe(false);
       expect(metrics.cardOverlap, JSON.stringify(viewport)).toBe(false);
       expect(metrics.overflow, JSON.stringify(viewport)).toBe(false);

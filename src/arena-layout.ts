@@ -32,3 +32,14 @@ export const PATROL_LAYOUT: ReadonlyArray<readonly [number, number]> = Object.fr
   [-22, -10], [-16, 13], [-4, 20], [7, 13],
   [19, 7], [17, -15], [2, -20], [-11, -15],
 ]);
+
+export const NEIGHBOURHOOD_BENCH_LAYOUT: ReadonlyArray<readonly [number, number, number]> = Object.freeze([
+  [-15.2, -7, 0], [15.2, 7, Math.PI], [-15.2, 26, 0], [15.2, -26, Math.PI],
+]);
+
+export const NEIGHBOURHOOD_BIN_POSITIONS: ReadonlyArray<readonly [number, number]> = Object.freeze([
+  [-21.4, -33], [21.4, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34],
+]);
+
+export const NEIGHBOURHOOD_BENCH_COLLIDER_SIZE = Object.freeze([2.5, 1.34, 0.72] as const);
+export const NEIGHBOURHOOD_BIN_COLLIDER_SIZE = Object.freeze([0.78, 1.08, 0.72] as const);

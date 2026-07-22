@@ -1,5 +1,6 @@
 import { presentationRandom } from './runtime-random';
 import { MAX_HIGH_SCORE_ENTRIES, isHighScoreEntry, type HighScoreEntry } from './high-scores';
+import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import {
   isLobbySnapshot,
   isPlayerScore,
@@ -116,8 +117,8 @@ export type TeamPingMessage = {
   position: [number, number, number];
   nonce: number;
 };
-export type HighScoreMessage = { type: 'high-score'; by: string; entry: HighScoreEntry };
-export type LeaderboardSyncMessage = { type: 'leaderboard-sync'; by: string; entries: HighScoreEntry[] };
+export type HighScoreMessage = { type: 'high-score'; by: string; season: typeof LEADERBOARD_SEASON; entry: HighScoreEntry };
+export type LeaderboardSyncMessage = { type: 'leaderboard-sync'; by: string; season: typeof LEADERBOARD_SEASON; entries: HighScoreEntry[] };
 export type OverdriveClaimMessage = {
   type: 'overdrive-claim';
   by: string;
@@ -260,9 +261,11 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.nonce);
     case 'high-score':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && msg.season === LEADERBOARD_SEASON
         && isHighScoreEntry(msg.entry);
     case 'leaderboard-sync':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && msg.season === LEADERBOARD_SEASON
         && Array.isArray(msg.entries) && msg.entries.length <= MAX_HIGH_SCORE_ENTRIES
         && msg.entries.every((entry) => isHighScoreEntry(entry));
     case 'overdrive-claim':
