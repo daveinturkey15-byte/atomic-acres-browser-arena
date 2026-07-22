@@ -11,6 +11,7 @@
 - [Pass 52 specification](PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — current multiplayer and changelog contract retained beneath Pass 54.
 - [Pass 52 release record](PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_RELEASE_2026-07-21.md) — release-facing implementation notes.
 - [Verification and release hygiene](VERIFICATION_AND_RELEASE_HYGIENE.md) — canonical local/CI gates, portability, provenance, and legal-distinction rules.
+- [Contribution and production pipeline](CONTRIBUTION_AND_RELEASE_PIPELINE.md) — canonical multi-machine, multi-harness contribution ledger and serialized Pages release process.
 - [QA release verification plan](QA-RELEASE-VERIFICATION-PLAN.md) — broader evidence and release-check strategy.
 
 ## Historical passes

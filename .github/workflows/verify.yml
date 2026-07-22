@@ -2,14 +2,19 @@ name: verify
 
 on:
   push:
-    branches: [main, "desky/**"]
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static-and-unit:
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -40,6 +45,7 @@ jobs:
   bounded-browser-windows:
     needs: static-and-unit
     runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,6 +62,7 @@ jobs:
   bounded-browser-linux:
     needs: static-and-unit
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

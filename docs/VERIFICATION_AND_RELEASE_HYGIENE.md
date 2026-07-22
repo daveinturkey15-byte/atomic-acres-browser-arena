@@ -2,6 +2,8 @@
 
 Atomic Acres uses one cross-platform verification contract for local work and CI. This document describes the current release gates rather than a historical implementation pass.
 
+Contribution ownership, branch identity, PR receipts, integration serialization, and production promotion are defined in [Contribution and production pipeline](CONTRIBUTION_AND_RELEASE_PIPELINE.md).
+
 ## Canonical gates
 
 - `npm run lint` — browser and Worker type checks.

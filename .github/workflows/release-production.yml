@@ -1,0 +1,86 @@
+name: release-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact full origin/main SHA already green in verify
+        required: true
+        type: string
+      release_pass:
+        description: Player-facing pass, for example PASS 58
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: atomic-acres-production-pages
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate immutable green main candidate
+        run: node scripts/release/pipeline-guard.mjs release --source-sha "${{ inputs.source_sha }}" --pass "${{ inputs.release_pass }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Reproduce static release gates
+        run: npm run verify:pass25a:core
+      - name: Build production bytes
+        run: npm run build
+      - name: Configure authenticated Pages remote
+        run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Publish exact dist while preserving review history
+        run: npm run deploy:ci -- -m "${{ inputs.release_pass }} from ${{ inputs.source_sha }}"
+      - name: Wait for exact Pages build and write receipt
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_PASS: ${{ inputs.release_pass }}
+        run: |
+          set -euo pipefail
+          pages_sha="$(git ls-remote origin refs/heads/gh-pages | cut -f1)"
+          status="queued"
+          build='{}'
+          for attempt in $(seq 1 30); do
+            build="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest")"
+            build_sha="$(jq -r '.commit // empty' <<<"$build")"
+            status="$(jq -r '.status // "unknown"' <<<"$build")"
+            if [[ "$build_sha" == "$pages_sha" && "$status" == "built" ]]; then break; fi
+            if [[ "$build_sha" == "$pages_sha" && "$status" == "errored" ]]; then exit 1; fi
+            sleep 10
+          done
+          [[ "$(jq -r '.commit // empty' <<<"$build")" == "$pages_sha" && "$status" == "built" ]]
+          mkdir -p artifacts/pipeline
+          jq -n \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg pagesSha "$pages_sha" \
+            --arg releasePass "$RELEASE_PASS" \
+            --arg pagesStatus "$status" \
+            --arg pagesCreatedAt "$(jq -r '.created_at' <<<"$build")" \
+            --arg pagesUpdatedAt "$(jq -r '.updated_at' <<<"$build")" \
+            --arg workflowRun "$GITHUB_RUN_ID" \
+            '{schemaVersion:1, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun}' \
+            > artifacts/pipeline/production-release-receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-release-receipt-${{ inputs.source_sha }}
+          path: artifacts/pipeline/*.json
+          if-no-files-found: error

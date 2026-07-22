@@ -95,6 +95,7 @@ Current release and verification documentation:
 - [`docs/INDEX.md`](docs/INDEX.md) — canonical documentation map and historical-pass boundary.
 - [`docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md`](docs/PASS52_RECONCILED_MULTIPLAYER_CHANGELOG_SPEC_2026-07-21.md) — current Pass 52 product contract.
 - [`docs/VERIFICATION_AND_RELEASE_HYGIENE.md`](docs/VERIFICATION_AND_RELEASE_HYGIENE.md) — local/CI gates, portability, provenance, and legal-distinction rules.
+- [`docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md`](docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md) — mandatory multi-machine contribution, integration, and production-promotion contract.
 
 The automated private-lobby gate uses isolated browser contexts and checks the initial four-player room, capacity-four overflow rejection, real six-player admission/start, TDM auto-balance, FFA settings, shared match epoch/timer, zero bots, event/state channel properties, ping samples, self-echo suppression and active-match reload recovery. This is strong local topology evidence, not a six-household WAN/NAT guarantee.
 
@@ -110,13 +111,11 @@ Before release, also run a real multi-device or multi-household smoke test:
 
 ### GitHub Pages
 
-This repository publishes the built `dist/` folder to a dedicated `gh-pages` branch, which avoids requiring GitHub Actions workflow-token permissions.
+This repository publishes the built `dist/` folder to a dedicated `gh-pages` branch. Normal production promotion is serialized through the `release-production` GitHub Actions workflow using an exact green `main` SHA.
 
-```bash
-npm run deploy
-```
+Direct `npm run deploy` is recovery-only. Contributors and ordinary agent tasks must not run it; follow `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md`.
 
-The first deployment enables **Settings → Pages → Deploy from a branch → `gh-pages` / root**. Later deployments only need the command above.
+GitHub Pages remains configured as **Deploy from a branch → `gh-pages` / root**. The production workflow is the only normal writer to that branch.
 
 ## Design notes
 
