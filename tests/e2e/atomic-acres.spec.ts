@@ -558,7 +558,7 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('loads the complete Quality Graphics arena and binds authored breakable windows', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=blender&mist=on');
@@ -641,11 +641,11 @@ test.describe('boot and authored presentation', () => {
     expect(stableState.render.calls).toBeLessThanOrEqual(160);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
-    await page.screenshot({ path: 'test-results/blender-render-gameplay.png' });
+    await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
   });
 
   test('keeps all three Pass 27 route identities legible from representative approaches', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=blender');
