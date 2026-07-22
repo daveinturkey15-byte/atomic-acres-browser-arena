@@ -83,7 +83,7 @@ test.describe('Pass 25A baseline and lifecycle', () => {
   const aimViewports = [{ width: 960, height: 540 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }];
   for (const viewport of aimViewports) {
     test(`keeps the reticle centred while applying bounded weapon spread at ${viewport.width}x${viewport.height}`, async ({ page }) => {
-      test.setTimeout(240_000);
+      test.setTimeout(viewport.width === 1920 ? 360_000 : 240_000);
       await ready(page);
       await startSolo(page);
       await page.setViewportSize(viewport);

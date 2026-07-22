@@ -1268,6 +1268,8 @@ let sensitivity = 1;
 let controllerSensitivity = 1;
 let preferredFov = 82;
 let botsFrozen = false;
+let debugBotStanceOverride: PlayerSnapshot['stance'] | null = null;
+let debugBotSpeedOverride = 0;
 let debugInputUnlocked = false;
 let debugAdsOverride: boolean | null = null;
 let debugReloadProgress: number | null = null;
@@ -3332,6 +3334,8 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   lastPlayerSpawnAudit = null;
   spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
+  debugBotStanceOverride = null;
+  debugBotSpeedOverride = 0;
   const matchStartedAt = performance.now();
   const matchRules = currentMatchRules();
   if (mode !== 'solo' && activeAtEpochMs !== undefined) {
@@ -4164,7 +4168,7 @@ function updateBots(dt: number, now: number): void {
       continue;
     }
     if (botsFrozen) {
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001);
       continue;
     }
     // A corrupted position can never become an out-of-arena damage source.
@@ -7015,6 +7019,7 @@ const debugWindow = window as Window & {
     ) => BallisticTrace;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
+    setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: PrimaryWeaponId) => void;
     clearBots: () => void;
     placeBotAhead: (distance?: number) => void;
     placeBotRelative: (right: number, forward: number) => void;
@@ -7668,6 +7673,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  setBotPresentation: (stance, speed = 0, weapon) => {
+    debugBotStanceOverride = stance;
+    debugBotSpeedOverride = Math.max(0, Number.isFinite(speed) ? speed : 0);
+    botsFrozen = stance !== null;
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (bot && weapon) {
+      bot.weapon = weapon;
+      setOperatorWeapon(bot.root, weapon, flattenOperatorMaterials);
+    }
+  },
   clearBots: () => clearBots(),
   placeBotAhead: (distance = 5) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
@@ -7697,9 +7712,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!stagedPosition) return;
     bot.position.copy(stagedPosition);
     bot.root.position.copy(bot.position);
-    bot.root.updateMatrixWorld(true);
     bot.velocity.set(0, 0, 0);
-    bot.root.rotation.y = player.yaw;
+    bot.root.rotation.y = operatorYawToward(bot.position, player.position);
+    bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
   },
   placeBotRelative: (right = 0, forward = 5) => {
@@ -7711,9 +7726,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       .addScaledVector(cameraRight, THREE.MathUtils.clamp(right, -9, 9))
       .addScaledVector(cameraForward, THREE.MathUtils.clamp(forward, -9, 9));
     bot.root.position.copy(bot.position);
-    bot.root.updateMatrixWorld(true);
     bot.velocity.set(0, 0, 0);
-    bot.root.rotation.y = player.yaw;
+    bot.root.rotation.y = operatorYawToward(bot.position, player.position);
+    bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
     bot.lastShotAt = performance.now();
   },

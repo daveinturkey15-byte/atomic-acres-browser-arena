@@ -498,7 +498,7 @@ export class WeaponPresentation {
       // person needs the authored PBR receiver, functional action parts and
       // calibrated sockets rather than a camera-close pickup mesh.
       const model = buildWeaponModel(id, this.flattenMaterials, false);
-      model.userData.firstPersonSource = 'authored-pbr-v6-seven-weapon';
+      model.userData.firstPersonSource = 'authored-pbr-v6-seven-unique-finishes';
       const firstPersonHidden: Record<WeaponId, Set<string>> = {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
@@ -735,6 +735,8 @@ export class WeaponPresentation {
       detailsReady,
       modelKind: importedModel ? 'licensed-imported' : 'original-authored',
       firstPersonSource: model?.userData.firstPersonSource ?? 'unknown',
+      weaponModelId: model?.userData.weaponModelId ?? null,
+      weaponFinishId: model?.userData.weaponFinishId ?? null,
       modelVisibleMeshCount,
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,

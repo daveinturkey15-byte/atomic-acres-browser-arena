@@ -4,6 +4,7 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
+import { solveTwoBoneElbow } from './ik';
 
 const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
 const FIRST_PERSON_ARMS_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb';
@@ -18,10 +19,30 @@ type RiggedOperatorRuntime = {
   actions: Map<string, THREE.AnimationAction>;
   currentBase: string;
   lastUpdatedAt: number;
+  stancePivot: THREE.Group;
   visual: THREE.Group;
   weaponSocket: THREE.Group;
   stance: 'stand' | 'crouch' | 'prone';
+  crouchBlend: number;
+  proneBlend: number;
   speed: number;
+  poseBones: {
+    hips?: THREE.Bone;
+    abdomen?: THREE.Bone;
+    torso?: THREE.Bone;
+    chest?: THREE.Bone;
+    upperLegLeft?: THREE.Bone;
+    upperLegRight?: THREE.Bone;
+    lowerLegLeft?: THREE.Bone;
+    lowerLegRight?: THREE.Bone;
+    footLeft?: THREE.Bone;
+    footRight?: THREE.Bone;
+  };
+  poseBeforeStance?: Array<{
+    bone: THREE.Bone;
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+  }>;
 };
 
 export type RiggedOperatorInstance = {
@@ -34,6 +55,153 @@ export type OperatorAppearance = 'team' | 'neon-purple';
 let operatorAsset: RiggedOperatorAsset | null = null;
 let firstPersonArmsAsset: THREE.Group | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
+
+const STANCE_PIVOT_HEIGHT = 0.84;
+const EMBEDDED_WEAPON_NAME = /(^|[\s_.-])(pistol|rifle|shotgun|smg|gun|weapon)([\s_.-]|$)/i;
+const PRONE_WEAPON_MOUNT: Record<string, { x: number; y: number; z: number }> = {
+  carbine: { x: 0.1, y: 0.425, z: -0.14 },
+  smg: { x: 0.09, y: 0.425, z: -0.14 },
+  lmg: { x: 0.1, y: 0.435, z: -0.11 },
+  scattergun: { x: 0.09, y: 0.425, z: -0.14 },
+  sniper: { x: 0.1, y: 0.425, z: -0.14 },
+  pistol: { x: 0.065, y: 0.45, z: -0.23 },
+  'machine-pistol': { x: 0.065, y: 0.45, z: -0.23 },
+};
+
+/** The character source includes its own skinned pistol. Runtime loadouts own all visible weapons. */
+export function isEmbeddedWeaponObjectName(name: string): boolean {
+  return EMBEDDED_WEAPON_NAME.test(name.trim());
+}
+
+export function suppressEmbeddedWeaponObjects(root: THREE.Object3D): number {
+  let suppressed = 0;
+  root.traverse((node) => {
+    if (!isEmbeddedWeaponObjectName(node.name)) return;
+    node.visible = false;
+    node.userData.embeddedWeaponSuppressed = true;
+    suppressed += 1;
+  });
+  return suppressed;
+}
+
+export function riggedStanceTarget(stance: RiggedOperatorRuntime['stance']): {
+  pivotHeight: number;
+  pivotPitch: number;
+  crouch: number;
+  prone: number;
+} {
+  if (stance === 'prone') return { pivotHeight: 0.43, pivotPitch: -1.42, crouch: 0, prone: 1 };
+  if (stance === 'crouch') return { pivotHeight: STANCE_PIVOT_HEIGHT, pivotPitch: 0, crouch: 1, prone: 0 };
+  return { pivotHeight: STANCE_PIVOT_HEIGHT, pivotPitch: 0, crouch: 0, prone: 0 };
+}
+
+function addLocalPose(bone: THREE.Bone | undefined, x: number, y: number, z: number, weight: number): void {
+  if (!bone || weight <= 0) return;
+  bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(x * weight, y * weight, z * weight, 'XYZ')));
+}
+
+function orientBoneTowardWorld(bone: THREE.Bone, child: THREE.Bone, targetWorld: THREE.Vector3): void {
+  bone.updateWorldMatrix(true, true);
+  const origin = bone.getWorldPosition(new THREE.Vector3());
+  const currentDirection = child.getWorldPosition(new THREE.Vector3()).sub(origin).normalize();
+  const desiredDirection = targetWorld.clone().sub(origin).normalize();
+  if (currentDirection.lengthSq() < 1e-6 || desiredDirection.lengthSq() < 1e-6) return;
+  const currentWorld = bone.getWorldQuaternion(new THREE.Quaternion());
+  const desiredWorld = new THREE.Quaternion().setFromUnitVectors(currentDirection, desiredDirection).multiply(currentWorld);
+  const parentWorld = bone.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+  bone.quaternion.copy(parentWorld.invert().multiply(desiredWorld));
+  bone.updateWorldMatrix(false, true);
+}
+
+function plantCrouchLeg(
+  upper: THREE.Bone | undefined,
+  lower: THREE.Bone | undefined,
+  foot: THREE.Bone | undefined,
+  footTarget: THREE.Vector3 | null,
+  bendHint: THREE.Vector3,
+): void {
+  if (!upper || !lower || !foot || !footTarget) return;
+  upper.updateWorldMatrix(true, true);
+  const hip = upper.getWorldPosition(new THREE.Vector3());
+  const knee = lower.getWorldPosition(new THREE.Vector3());
+  const ankle = foot.getWorldPosition(new THREE.Vector3());
+  const upperLength = hip.distanceTo(knee);
+  const lowerLength = knee.distanceTo(ankle);
+  const footWorldRotation = foot.getWorldQuaternion(new THREE.Quaternion());
+  const kneeTarget = solveTwoBoneElbow(hip, footTarget, upperLength, lowerLength, bendHint);
+  orientBoneTowardWorld(upper, lower, kneeTarget);
+  orientBoneTowardWorld(lower, foot, footTarget);
+  const parentWorld = foot.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+  foot.quaternion.copy(parentWorld.invert().multiply(footWorldRotation));
+  foot.updateWorldMatrix(false, true);
+}
+
+function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void {
+  const target = riggedStanceTarget(runtimeState.stance);
+  const alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
+  runtimeState.crouchBlend = THREE.MathUtils.lerp(runtimeState.crouchBlend, target.crouch, alpha);
+  runtimeState.proneBlend = THREE.MathUtils.lerp(runtimeState.proneBlend, target.prone, alpha);
+  runtimeState.stancePivot.position.y = THREE.MathUtils.lerp(
+    runtimeState.stancePivot.position.y,
+    target.pivotHeight,
+    alpha,
+  );
+  runtimeState.stancePivot.rotation.x = THREE.MathUtils.lerp(
+    runtimeState.stancePivot.rotation.x,
+    target.pivotPitch,
+    alpha,
+  );
+
+  // The visible loadout lives in body space rather than under an animated
+  // wrist. That keeps its muzzle authoritative while both arms are solved onto
+  // the weapon after the animation mixer has written the current pose.
+  const sprint = runtimeState.stance === 'stand'
+    ? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8)
+    : 0;
+  const weaponId = String(runtimeState.weaponSocket.children[0]?.userData.weaponId ?? 'carbine');
+  const proneMount = PRONE_WEAPON_MOUNT[weaponId] ?? PRONE_WEAPON_MOUNT.carbine;
+  const weaponX = runtimeState.stance === 'prone' ? proneMount.x : 0;
+  const weaponY = runtimeState.stance === 'prone' ? proneMount.y
+    : runtimeState.stance === 'crouch' ? 0.82
+      : THREE.MathUtils.lerp(1.31, 1.14, sprint);
+  const weaponZ = runtimeState.stance === 'prone' ? proneMount.z
+    : THREE.MathUtils.lerp(-0.18, -0.08, sprint);
+  runtimeState.weaponSocket.position.x = THREE.MathUtils.lerp(runtimeState.weaponSocket.position.x, weaponX, alpha);
+  runtimeState.weaponSocket.position.y = THREE.MathUtils.lerp(runtimeState.weaponSocket.position.y, weaponY, alpha);
+  runtimeState.weaponSocket.position.z = THREE.MathUtils.lerp(runtimeState.weaponSocket.position.z, weaponZ, alpha);
+  runtimeState.weaponSocket.rotation.x = THREE.MathUtils.lerp(runtimeState.weaponSocket.rotation.x, -0.2 * sprint, alpha);
+  runtimeState.weaponSocket.rotation.z = THREE.MathUtils.lerp(runtimeState.weaponSocket.rotation.z, -0.08 * sprint, alpha);
+
+  const crouch = runtimeState.crouchBlend;
+  const prone = runtimeState.proneBlend;
+  const bones = runtimeState.poseBones;
+  const leftFootTarget = crouch > 0.001 ? bones.footLeft?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  const rightFootTarget = crouch > 0.001 ? bones.footRight?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  if (bones.hips) bones.hips.position.y -= 0.44 * crouch;
+  addLocalPose(bones.hips, 0.05, 0, 0, crouch);
+  addLocalPose(bones.abdomen, 0.08, 0, 0, crouch);
+  addLocalPose(bones.torso, 0.12, 0, 0, crouch);
+  addLocalPose(bones.chest, -0.05, 0, 0, crouch);
+  if (crouch > 0.001) {
+    runtimeState.visual.updateWorldMatrix(true, true);
+    const bodyRotation = runtimeState.stancePivot.getWorldQuaternion(new THREE.Quaternion());
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(bodyRotation);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(bodyRotation);
+    plantCrouchLeg(
+      bones.upperLegLeft, bones.lowerLegLeft, bones.footLeft, leftFootTarget,
+      forward.clone().addScaledVector(right, -0.18),
+    );
+    plantCrouchLeg(
+      bones.upperLegRight, bones.lowerLegRight, bones.footRight, rightFootTarget,
+      forward.clone().addScaledVector(right, 0.18),
+    );
+  }
+
+  // The whole-pelvis pivot supplies the prone silhouette. Keep the authored
+  // idle legs intact: layering walk-knee offsets here produced a raised foot
+  // and twisted hip that read as a broken ragdoll.
+  addLocalPose(bones.chest, -0.025, 0, 0, prone);
+}
 
 function materialForTeam(
   material: THREE.Material,
@@ -290,6 +458,7 @@ export function createRiggedOperator(
   // existing operator convention. Correct it once at the visual root so AI,
   // network yaw and authoritative hit proxies keep their established axes.
   visual.rotation.y = Math.PI;
+  const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = !flattenMaterials;
@@ -304,37 +473,63 @@ export function createRiggedOperator(
         node.material = materials;
       }
     } else node.material = materialForTeam(node.material, team, flattenMaterials, appearance);
-    if (node.name === 'Pistol') node.visible = false;
   });
   if (flattenMaterials) mergeFlattenedOperatorMeshes(visual);
-  root.add(visual);
+  const stancePivot = new THREE.Group();
+  stancePivot.name = 'operator-stance-pivot';
+  stancePivot.position.y = STANCE_PIVOT_HEIGHT;
+  visual.position.y -= STANCE_PIVOT_HEIGHT;
+  stancePivot.add(visual);
+  root.add(stancePivot);
 
-  const wrist = visual.getObjectByName('WristR') ?? visual.getObjectByName('Wrist.R');
   const weaponSocket = new THREE.Group();
   weaponSocket.name = 'weapon-socket';
-  if (wrist) wrist.add(weaponSocket);
-  else visual.add(weaponSocket);
+  weaponSocket.position.set(0, 1.31, -0.18);
+  root.add(weaponSocket);
 
   const mixer = new THREE.AnimationMixer(visual);
   const actions = new Map<string, THREE.AnimationAction>();
   for (const clip of operatorAsset.clips) actions.set(clip.name, mixer.clipAction(clip));
   const base = actions.has('Idle_Gun_Pointing') ? 'Idle_Gun_Pointing' : actions.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
   actions.get(base)?.setLoop(THREE.LoopRepeat, Infinity).play();
+  const poseBone = (...names: string[]): THREE.Bone | undefined => {
+    for (const candidate of names) {
+      const node = visual.getObjectByName(candidate);
+      if (node instanceof THREE.Bone) return node;
+    }
+    return undefined;
+  };
   root.userData.riggedOperatorRuntime = {
     mixer,
     actions,
     currentBase: base,
     lastUpdatedAt: performance.now(),
+    stancePivot,
     visual,
     weaponSocket,
     stance: 'stand',
+    crouchBlend: 0,
+    proneBlend: 0,
     speed: 0,
+    poseBones: {
+      hips: poseBone('Hips'),
+      abdomen: poseBone('Abdomen'),
+      torso: poseBone('Torso'),
+      chest: poseBone('Chest'),
+      upperLegLeft: poseBone('UpperLegL', 'UpperLeg.L'),
+      upperLegRight: poseBone('UpperLegR', 'UpperLeg.R'),
+      lowerLegLeft: poseBone('LowerLegL', 'LowerLeg.L'),
+      lowerLegRight: poseBone('LowerLegR', 'LowerLeg.R'),
+      footLeft: poseBone('FootL', 'Foot.L'),
+      footRight: poseBone('FootR', 'Foot.R'),
+    },
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
     source: 'Quaternius Ultimate Modular Males / Swat.gltf',
     license: 'CC0-1.0',
     skinnedMeshes: 5,
     clips: operatorAsset.clips.length,
+    embeddedWeaponsSuppressed,
   };
   root.userData.operatorAppearance = appearance;
   return { root, weaponSocket };
@@ -348,15 +543,27 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
   runtimeState.lastUpdatedAt = now;
   runtimeState.stance = stance;
   runtimeState.speed = Math.max(0, Number.isFinite(speed) ? speed : 0);
+  for (const entry of runtimeState.poseBeforeStance ?? []) {
+    entry.bone.position.copy(entry.position);
+    entry.bone.quaternion.copy(entry.quaternion);
+  }
   if (runtimeState.currentBase === 'Death') {
     runtimeState.mixer.update(dt);
     return true;
   }
-  const next = speed > 3.2 ? 'Run_Shoot' : speed > 0.18 ? 'Walk' : 'Idle_Gun_Pointing';
+  const next = stance !== 'stand'
+    ? 'Idle_Gun_Pointing'
+    : speed > 3.2 ? 'Run_Shoot' : speed > 0.18 ? 'Walk' : 'Idle_Gun_Pointing';
   switchBaseAction(runtimeState, runtimeState.actions.has(next) ? next : speed > 0.18 ? 'Run' : 'Idle_Gun');
-  runtimeState.visual.position.y = stance === 'crouch' ? -0.34 : stance === 'prone' ? -0.78 : 0;
-  runtimeState.visual.rotation.x = stance === 'prone' ? -1.25 : 0;
   runtimeState.mixer.update(dt);
+  runtimeState.poseBeforeStance = Object.values(runtimeState.poseBones)
+    .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
+    .map((bone) => ({
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+    }));
+  applyStancePose(runtimeState, dt);
   return true;
 }
 
@@ -392,8 +599,14 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
     : runtimeState.actions.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
   runtimeState.actions.get(base)?.reset().setLoop(THREE.LoopRepeat, Infinity).play();
   runtimeState.currentBase = base;
-  runtimeState.visual.position.set(0, 0, 0);
-  runtimeState.visual.rotation.x = 0;
+  runtimeState.stance = 'stand';
+  runtimeState.crouchBlend = 0;
+  runtimeState.proneBlend = 0;
+  runtimeState.poseBeforeStance = undefined;
+  runtimeState.stancePivot.position.set(0, STANCE_PIVOT_HEIGHT, 0);
+  runtimeState.stancePivot.rotation.set(0, 0, 0);
+  runtimeState.weaponSocket.position.set(0, 1.31, -0.18);
+  runtimeState.weaponSocket.rotation.set(0, 0, 0);
   runtimeState.lastUpdatedAt = performance.now();
   return true;
 }
@@ -431,9 +644,21 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     }
   }
   const localMountBounds = weaponRoot ? objectLocalGeometryBounds(weaponRoot) : null;
+  let muzzleForwardDot: number | null = null;
+  if (weaponRoot) {
+    const grip = weaponRoot.getObjectByName('grip-socket-r');
+    const muzzle = weaponRoot.getObjectByName('muzzle-socket');
+    if (grip && muzzle) {
+      const aim = muzzle.getWorldPosition(new THREE.Vector3()).sub(grip.getWorldPosition(new THREE.Vector3()));
+      const operatorForward = new THREE.Vector3(0, 0, -1).applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion()));
+      if (aim.lengthSq() > 1e-8) muzzleForwardDot = aim.normalize().dot(operatorForward.normalize());
+    }
+  }
   let visibleSkinnedMeshes = 0;
+  let visibleEmbeddedWeapons = 0;
   runtimeState.visual.traverse((node) => {
     if (node instanceof THREE.SkinnedMesh && node.visible) visibleSkinnedMeshes += 1;
+    if (node.userData.embeddedWeaponSuppressed === true && node.visible) visibleEmbeddedWeapons += 1;
   });
   return {
     source: root.userData.operatorAsset?.source,
@@ -441,10 +666,16 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     license: root.userData.operatorAsset?.license,
     skinnedMeshes: root.userData.operatorAsset?.skinnedMeshes,
     clips: root.userData.operatorAsset?.clips,
+    embeddedWeaponsSuppressed: root.userData.operatorAsset?.embeddedWeaponsSuppressed,
+    visibleEmbeddedWeapons,
     activeClip: runtimeState.currentBase,
     animationContract: {
       base: runtimeState.currentBase,
       stance: runtimeState.stance,
+      crouchBlend: runtimeState.crouchBlend,
+      proneBlend: runtimeState.proneBlend,
+      pivotHeight: runtimeState.stancePivot.position.y,
+      pivotPitch: runtimeState.stancePivot.rotation.x,
       speed: runtimeState.speed,
       mixerBeforeSupportIk: true,
     },
@@ -455,7 +686,11 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     weaponSocketWorld: runtimeState.weaponSocket.getWorldPosition(new THREE.Vector3()).toArray(),
     weaponSocketQuaternion: runtimeState.weaponSocket.getWorldQuaternion(new THREE.Quaternion()).toArray(),
     weaponBounds,
+    muzzleForwardDot,
     weaponMount: weaponRoot ? {
+      modelId: weaponRoot.userData.weaponModelId ?? null,
+      finishId: weaponRoot.userData.weaponFinishId ?? null,
+      forwardCorrection: weaponRoot.userData.riggedForwardCorrection ?? null,
       directChild: weaponRoot.parent === runtimeState.weaponSocket,
       localPosition: weaponRoot.position.toArray(),
       localQuaternion: weaponRoot.quaternion.toArray(),

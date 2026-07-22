@@ -5,12 +5,13 @@
       "id": "atomic-acres-original-texture-set-2026-07-12",
       "kind": "project-generated-surface-textures",
       "creator": "Atomic Acres project",
-      "source": "scripts/generate-art-textures.py + scripts/generate-pass31-pbr.py",
-      "generatedAsOf": "2026-07-18",
+      "source": "scripts/generate-art-textures.py + scripts/generate-pass31-pbr.py + scripts/generate-weapon-finishes.py",
+      "generatedAsOf": "2026-07-22",
       "license": "Original project work",
       "files": "public/assets/original/textures/*.png",
       "contactSheet": "docs/assets/texture-contact-sheet.jpg",
-      "modifications": "Thirty-four deterministic project-generated textures: twelve original albedo surfaces plus eleven tangent-normal and eleven roughness companions. Pass 31 adds plaster, timber, gunmetal and painted-metal maps generated locally from project-authored source pixels with no external imagery.",
+      "weaponFinishContactSheet": "docs/assets/weapon-finish-contact-sheet.jpg",
+      "modifications": "Fifty-five deterministic project-generated textures: nineteen original albedo surfaces plus eighteen tangent-normal and eighteen roughness companions. Pass 31 adds plaster, timber, gunmetal and painted-metal maps; the 2026-07-22 weapon pass derives seven distinct restrained carbine, SMG, LMG, scattergun, sniper, pistol and machine-pistol PBR finish triplets from project-authored gunmetal pixels with no external imagery.",
       "attributionRequired": false
     },
     {
