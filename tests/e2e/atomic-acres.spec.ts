@@ -498,6 +498,9 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('defaults new players to Quality Graphics while retaining explicit slow-PC profiles', async ({ page }) => {
+    // This contract performs two complete WebGL boots. Hosted Windows uses
+    // SwiftShader, where the pair can legitimately exceed the 60 s default.
+    test.setTimeout(120_000);
     const shaderErrors: string[] = [];
     page.on('console', (message) => {
       if (message.type() === 'error' && /Atomic Signal|Shader Error|WebGLProgram/.test(message.text())) shaderErrors.push(message.text());
@@ -685,7 +688,9 @@ test.describe('boot and authored presentation', () => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } }).__ATOMIC_ACRES_DEBUG__;
         api.teleportPlayer(position[0], position[1], position[2], position[3], position[4]);
       }, sample);
-      await expect.poll(async () => (await debug(page)).arenaZone).toBe(sample.zone);
+      // Zone state advances on the render/physics loop. Keep the assertion
+      // exact while allowing a starved hosted software renderer to schedule it.
+      await expect.poll(async () => (await debug(page)).arenaZone, { timeout: 30_000 }).toBe(sample.zone);
       await expect(page.locator('#location-label')).toHaveText(sample.label);
       const state = await debug(page);
       expect(state.worldIdentityPresentation).toMatchObject({ routeLights: 0, routeSigns: 3, cueInstances: 0 });
