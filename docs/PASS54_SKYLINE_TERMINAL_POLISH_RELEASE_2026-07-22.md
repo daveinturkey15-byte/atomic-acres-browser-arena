@@ -1,7 +1,7 @@
 # Pass 54 — Skyline Terminal polish verification record
 
-**Date:** 2026-07-22  
-**Branch:** `desky/terminal-polish-20260722`  
+**Date:** 2026-07-22<br>
+**Branch:** `desky/terminal-polish-20260722`<br>
 **Base revision:** `ddebd10d8f6deedccec06924e93e8c97ec2ff442`
 
 ## Delivered

@@ -1,8 +1,8 @@
 # Pass 54 — Skyline Terminal authored-detail polish spec
 
-**Date:** 2026-07-22  
-**Target:** `skyline-terminal` on `desky/terminal-polish-20260722`  
-**Base:** `ddebd10d8f6deedccec06924e93e8c97ec2ff442`  
+**Date:** 2026-07-22<br>
+**Target:** `skyline-terminal` on `desky/terminal-polish-20260722`<br>
+**Base:** `ddebd10d8f6deedccec06924e93e8c97ec2ff442`<br>
 **Intent:** Bring Skyline Terminal to the authored visual standard of Atomic Acres while preserving the existing original airport layout and all gameplay authority.
 
 ## Evidence and state
