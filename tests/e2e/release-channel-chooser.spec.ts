@@ -14,7 +14,6 @@ test('chooses the latest build before the normal menu loads', async ({ page }) =
   await expect(page).toHaveURL(/release=latest/);
   await expect(page.locator('#release-channel-gate')).toHaveCount(0);
   await expect(page.locator('#menu')).toBeVisible();
-  await expect(page.locator('#release-channel-btn')).toBeVisible();
 });
 
 test('routes the stable choice to the pinned channel path', async ({ page }) => {

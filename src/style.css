@@ -176,11 +176,8 @@
 
 #last-updated-btn:hover{transform:translateY(-1px);border-color:var(--gold);background:linear-gradient(135deg,rgba(244,196,79,.16),rgba(12,21,25,.94))}
 #last-updated-btn:active{transform:translateY(0)}
-#release-channel-btn{position:fixed;z-index:22;top:clamp(62px,8vh,76px);right:clamp(12px,2vw,24px);padding:7px 10px;border:1px solid rgba(88,227,220,.38);background:rgba(12,21,25,.9);color:var(--aqua);font:800 9px/1 Inter,sans-serif;letter-spacing:.14em}#release-channel-btn:hover{border-color:var(--aqua);background:rgba(88,227,220,.1)}
 #menu.hidden ~ #last-updated-btn,
-#menu.private-lobby-active ~ #last-updated-btn,
-#menu.hidden ~ #release-channel-btn,
-#menu.private-lobby-active ~ #release-channel-btn{display:none!important}
+#menu.private-lobby-active ~ #last-updated-btn{display:none!important}
 #changelog-backdrop{position:fixed;inset:0;z-index:28;background:rgba(4,9,12,.72);backdrop-filter:blur(4px)}
 #changelog-panel{
   z-index:30;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -209,7 +206,6 @@
 #changelog-list>li>ul>li{color:#9eb5af;font:600 11px/1.4 Inter}
 @media(max-width:700px){
   #last-updated-btn{top:10px;right:10px;padding:8px 10px;max-width:calc(100vw - 20px);font-size:10px;letter-spacing:.08em}
-  #release-channel-btn{top:54px;right:10px}
   #changelog-panel{padding:18px 16px 14px}
   #changelog-panel .changelog-header strong{font-size:24px}
   .changelog-entry-head{display:grid;gap:6px}.changelog-entry-head time{text-align:left}

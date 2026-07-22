@@ -510,7 +510,6 @@ app.innerHTML = `
     <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
   </aside>
   <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
-  <button id="release-channel-btn" type="button">CHANGE BUILD</button>
   <div id="changelog-backdrop" hidden></div>
   <section id="changelog-panel" class="panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
     <header class="changelog-header">
@@ -6860,12 +6859,6 @@ function setChangelogOpen(open: boolean): void {
 
 element<HTMLButtonElement>('#last-updated-btn').addEventListener('click', () => {
   setChangelogOpen(true);
-});
-element<HTMLButtonElement>('#release-channel-btn').addEventListener('click', () => {
-  const next = new URL(window.location.href);
-  next.searchParams.delete('release');
-  next.hash = '';
-  window.location.assign(next);
 });
 element<HTMLButtonElement>('#changelog-close').addEventListener('click', () => setChangelogOpen(false));
 element<HTMLElement>('#changelog-backdrop').addEventListener('click', () => setChangelogOpen(false));
