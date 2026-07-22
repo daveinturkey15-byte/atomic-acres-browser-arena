@@ -2670,7 +2670,7 @@
         ]
       }
     },
-    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 33 deltas",
+    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 54 deltas",
     "combat": {
       "botDamageMultiplier": 0.25,
       "botGrenade": {
@@ -2747,9 +2747,11 @@
       "soloBotCount": 2,
       "weapons": [
         {
+          "adsRecoilMultiplier": 0.72,
           "adsSpreadMultiplier": 0.28,
           "automatic": true,
           "color": 16765286,
+          "crouchRecoilMultiplier": 0.84,
           "crouchSpreadMultiplier": 0.78,
           "damage": 31,
           "falloffEnd": 72,
@@ -2764,6 +2766,17 @@
           "movementSpreadMultiplier": 1.65,
           "name": "M86 Carbine",
           "pellets": 1,
+          "penetration": {
+            "caliber": "5.56 mm",
+            "energyFalloffEnd": 76,
+            "energyFalloffStart": 20,
+            "fmjMultiplier": 1.12,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.48,
+            "minimumWallDamageMultiplier": 0.34,
+            "penetrationPower": 5.8
+          },
+          "proneRecoilMultiplier": 0.65,
           "recoilPitch": 0.016,
           "recoilRecovery": 12,
           "recoilYaw": 0.006,
@@ -2774,9 +2787,11 @@
           "switchSeconds": 0.48
         },
         {
+          "adsRecoilMultiplier": 0.78,
           "adsSpreadMultiplier": 0.42,
           "automatic": true,
           "color": 6678527,
+          "crouchRecoilMultiplier": 0.88,
           "crouchSpreadMultiplier": 0.82,
           "damage": 23,
           "falloffEnd": 52,
@@ -2791,6 +2806,17 @@
           "movementSpreadMultiplier": 1.45,
           "name": "Vectorline SMG",
           "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 38,
+            "energyFalloffStart": 8,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.22,
+            "minimumWallDamageMultiplier": 0.22,
+            "penetrationPower": 3.05
+          },
+          "proneRecoilMultiplier": 0.72,
           "recoilPitch": 0.011,
           "recoilRecovery": 15,
           "recoilYaw": 0.009,
@@ -2801,9 +2827,51 @@
           "switchSeconds": 0.4
         },
         {
+          "adsRecoilMultiplier": 0.76,
+          "adsSpreadMultiplier": 0.34,
+          "automatic": true,
+          "color": 10476146,
+          "crouchRecoilMultiplier": 0.8,
+          "crouchSpreadMultiplier": 0.7,
+          "damage": 27,
+          "falloffEnd": 82,
+          "falloffStart": 30,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.022,
+          "id": "lmg",
+          "limbMultiplier": 0.82,
+          "mag": 62,
+          "maximumSpread": 0.064,
+          "minimumDamage": 18,
+          "movementSpreadMultiplier": 1.78,
+          "name": "Mastiff 63 LMG",
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 90,
+            "energyFalloffStart": 30,
+            "fmjMultiplier": 1.14,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.58,
+            "minimumWallDamageMultiplier": 0.4,
+            "penetrationPower": 6.9
+          },
+          "proneRecoilMultiplier": 0.6,
+          "recoilPitch": 0.019,
+          "recoilRecovery": 10,
+          "recoilYaw": 0.01,
+          "reload": 3.25,
+          "reserve": 186,
+          "rpm": 720,
+          "sustainedSpreadPerShot": 0.0025,
+          "switchSeconds": 0.78
+        },
+        {
+          "adsRecoilMultiplier": 0.84,
           "adsSpreadMultiplier": 0.72,
           "automatic": false,
           "color": 16747099,
+          "crouchRecoilMultiplier": 0.9,
           "crouchSpreadMultiplier": 0.88,
           "damage": 17,
           "falloffEnd": 30,
@@ -2818,6 +2886,17 @@
           "movementSpreadMultiplier": 1.22,
           "name": "Model 12 Scattergun",
           "pellets": 9,
+          "penetration": {
+            "caliber": "12 ga pellet",
+            "energyFalloffEnd": 20,
+            "energyFalloffStart": 4,
+            "fmjMultiplier": 1,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.16,
+            "minimumWallDamageMultiplier": 0.18,
+            "penetrationPower": 2.15
+          },
+          "proneRecoilMultiplier": 0.8,
           "recoilPitch": 0.052,
           "recoilRecovery": 8,
           "recoilYaw": 0.012,
@@ -2828,9 +2907,11 @@
           "switchSeconds": 0.62
         },
         {
+          "adsRecoilMultiplier": 0.6,
           "adsSpreadMultiplier": 0.05,
           "automatic": false,
           "color": 11134975,
+          "crouchRecoilMultiplier": 0.76,
           "crouchSpreadMultiplier": 0.72,
           "damage": 67,
           "falloffEnd": 120,
@@ -2845,6 +2926,17 @@
           "movementSpreadMultiplier": 1.8,
           "name": "Longline 86",
           "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 120,
+            "energyFalloffStart": 58,
+            "fmjMultiplier": 1.16,
+            "maxPenetratedSurfaces": 3,
+            "minimumEnergyRetention": 0.7,
+            "minimumWallDamageMultiplier": 0.48,
+            "penetrationPower": 9.4
+          },
+          "proneRecoilMultiplier": 0.52,
           "recoilPitch": 0.072,
           "recoilRecovery": 6.5,
           "recoilYaw": 0.016,
@@ -2855,9 +2947,11 @@
           "switchSeconds": 0.68
         },
         {
+          "adsRecoilMultiplier": 0.74,
           "adsSpreadMultiplier": 0.34,
           "automatic": false,
           "color": 15255419,
+          "crouchRecoilMultiplier": 0.86,
           "crouchSpreadMultiplier": 0.8,
           "damage": 36,
           "falloffEnd": 58,
@@ -2872,6 +2966,17 @@
           "movementSpreadMultiplier": 1.42,
           "name": "Aster 9 Service Pistol",
           "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 48,
+            "energyFalloffStart": 12,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.3,
+            "minimumWallDamageMultiplier": 0.26,
+            "penetrationPower": 3.65
+          },
+          "proneRecoilMultiplier": 0.7,
           "recoilPitch": 0.021,
           "recoilRecovery": 14,
           "recoilYaw": 0.008,
@@ -2882,9 +2987,11 @@
           "switchSeconds": 0.28
         },
         {
+          "adsRecoilMultiplier": 0.82,
           "adsSpreadMultiplier": 0.46,
           "automatic": true,
           "color": 16752451,
+          "crouchRecoilMultiplier": 0.9,
           "crouchSpreadMultiplier": 0.82,
           "damage": 18,
           "falloffEnd": 34,
@@ -2899,6 +3006,17 @@
           "movementSpreadMultiplier": 1.55,
           "name": "G18 AUTO",
           "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 30,
+            "energyFalloffStart": 6,
+            "fmjMultiplier": 1.06,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.18,
+            "minimumWallDamageMultiplier": 0.2,
+            "penetrationPower": 2.75
+          },
+          "proneRecoilMultiplier": 0.78,
           "recoilPitch": 0.014,
           "recoilRecovery": 13,
           "recoilYaw": 0.012,
@@ -3304,10 +3422,12 @@
       "pass30-double-tri-pass-radius-and-damage",
       "pass30-hunter-swarm-eight-streak",
       "pass30-nuke-fifteen-streak",
-      "pass30-stormfront-lighting"
+      "pass30-stormfront-lighting",
+      "pass54-wall-penetration",
+      "pass55-range-armory-lmg"
     ],
     "baseSourceRevision": "72c313c494853ed1ee4673f06a8f064330ac9efc",
-    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 30",
+    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 55",
     "dependencies": {
       "@dimforge/rapier3d-compat": "0.19.3",
       "peerjs": "1.5.5",

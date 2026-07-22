@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { WEAPONS } from './gameplay';
 import { GOLDEN_REPLAYS, runGameplayReplay, type ReplayCommand } from './gameplay-replay';
 import { createRandomStreams } from './deterministic-rng';
 
@@ -29,10 +30,11 @@ describe('Pass 25A golden gameplay replays', () => {
     }
   });
 
-  it('keeps every principal projectile exactly on the authoritative centre ray', () => {
+  it('keeps every principal projectile inside the broadest authored weapon cone', () => {
     const result = runGameplayReplay('pass25a:principal-ray', GOLDEN_REPLAYS.weaponCycle);
     expect(result.state.principalRayOffsets.length).toBeGreaterThan(0);
-    expect(result.state.principalRayOffsets.every(({ x, y }) => x === 0 && y === 0)).toBe(true);
+    const maximumOffset = Math.tan(Math.max(...Object.values(WEAPONS).map((weapon) => weapon.maximumSpread)));
+    expect(result.state.principalRayOffsets.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y) && Math.hypot(x, y) <= maximumOffset)).toBe(true);
   });
 
   it('uses the forked gameplay stream in production order and resets sustained fire after 260 ms', () => {

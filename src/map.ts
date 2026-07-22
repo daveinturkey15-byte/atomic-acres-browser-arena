@@ -3,6 +3,7 @@ import { texturedMaterial } from './art-kit';
 import { ARENA_BOUNDS, COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT, PATROL_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
+import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import { createHouseArchitecture, HouseSurface, solidBounds, type HouseArchitecture } from './house-navigation';
 import { Team } from './protocol';
 
@@ -24,6 +25,8 @@ export type ArenaMap = {
   colliders: Box2[];
   physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
+  /** Canonical shot authority shared by local fire, bots, and multiplayer verification. */
+  shotSurfaces: BallisticSurface[];
   spawns: Record<Team, THREE.Vector3[]>;
   patrolPoints: THREE.Vector3[];
   targets: PracticeTarget[];
@@ -57,6 +60,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const colliders: Box2[] = [];
   const physicsColliders: Box2[] = [];
   const raycastMeshes: THREE.Object3D[] = [];
+  const shotSurfaces: BallisticSurface[] = [];
+  let ballisticSurfaceSequence = 0;
   const targets: PracticeTarget[] = [];
   const houses: HouseArchitecture[] = [];
   const breakableWindows: BreakableWindow[] = [];
@@ -110,6 +115,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     solid = true,
     cast = true,
     blocksShots = solid,
+    ballisticMaterial?: BallisticMaterialId,
+    breakableWindowId?: string,
   ): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
     mesh.name = name;
@@ -121,16 +128,31 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     mesh.castShadow = cast;
     mesh.receiveShadow = true;
     world.add(mesh);
-    if (blocksShots) raycastMeshes.push(mesh);
+    const bounds = {
+      minX: position[0] - size[0] / 2,
+      maxX: position[0] + size[0] / 2,
+      minZ: position[2] - size[2] / 2,
+      maxZ: position[2] + size[2] / 2,
+      minY: position[1] - size[1] / 2,
+      maxY: position[1] + size[1] / 2,
+    };
+    if (blocksShots) {
+      raycastMeshes.push(mesh);
+      const surface = createBallisticSurface(
+        `atomic-acres:${ballisticSurfaceSequence}:${name}`,
+        name,
+        bounds,
+        {
+          impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface>,
+          material: ballisticMaterial,
+        },
+        breakableWindowId,
+      );
+      ballisticSurfaceSequence += 1;
+      shotSurfaces.push(surface);
+      mesh.userData.ballisticSurfaceId = surface.id;
+    }
     if (solid) {
-      const bounds = {
-        minX: position[0] - size[0] / 2,
-        maxX: position[0] + size[0] / 2,
-        minZ: position[2] - size[2] / 2,
-        maxZ: position[2] + size[2] / 2,
-        minY: position[1] - size[1] / 2,
-        maxY: position[1] + size[1] / 2,
-      };
       colliders.push(bounds);
       physicsColliders.push(bounds);
     }
@@ -256,6 +278,15 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   ground.userData.impactSurface = 'soil';
   world.add(ground);
   raycastMeshes.push(ground);
+  const groundSurface = createBallisticSurface(
+    `atomic-acres:${ballisticSurfaceSequence}:ground`,
+    'atomic-acres-ground',
+    { minX: -43, maxX: 43, minY: -8, maxY: 0, minZ: -49, maxZ: 49 },
+    { impactSurface: 'soil', material: 'earth' },
+  );
+  ballisticSurfaceSequence += 1;
+  shotSurfaces.push(groundSurface);
+  ground.userData.ballisticSurfaceId = groundSurface.id;
 
   const road = new THREE.Mesh(new THREE.PlaneGeometry(19, 88), palette.road);
   road.name = 'aged asphalt road';
@@ -265,6 +296,15 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   road.userData.impactSurface = 'concrete';
   world.add(road);
   raycastMeshes.push(road);
+  const roadSurface = createBallisticSurface(
+    `atomic-acres:${ballisticSurfaceSequence}:road`,
+    'atomic-acres-road',
+    { minX: -9.5, maxX: 9.5, minY: -0.25, maxY: 0.03, minZ: -44, maxZ: 44 },
+    { impactSurface: 'concrete', material: 'concrete' },
+  );
+  ballisticSurfaceSequence += 1;
+  shotSurfaces.push(roadSurface);
+  road.userData.ballisticSurfaceId = roadSurface.id;
   for (const x of [-10.25, 10.25]) box('curb', [x, 0.12, 0], [1.4, 0.24, 88], palette.concrete, false, false);
   for (const x of [-12.6, 12.6]) box('sidewalk', [x, 0.07, 0], [3.2, 0.14, 88], palette.concrete, false, false);
   for (let z = -38; z <= 38; z += 8) box('lane marker', [0, 0.055, z], [0.18, 0.03, 3.6], palette.mustard, false, false);
@@ -317,6 +357,19 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       }
       return surfaceMaterial[solid.surface];
     };
+    const wallBallistics: Record<HouseSurface, BallisticMaterialId> = {
+      aqua: 'interior-wall',
+      coral: 'interior-wall',
+      plaster: 'interior-wall',
+      brick: 'brick',
+      timber: 'wood',
+      concrete: 'concrete',
+      trim: 'wood',
+      glass: 'glass',
+      metal: 'thin-metal',
+      ceiling: 'interior-wall',
+      light: 'reinforced',
+    };
 
     for (const solid of architecture.solids) {
       const solidMaterial = wallMaterial(solid);
@@ -335,6 +388,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         solid.collidable,
         solid.kind !== 'glass',
         isBreakableGlass || solid.collidable,
+        wallBallistics[solid.surface],
+        isBreakableGlass ? solid.id : undefined,
       );
       if (solid.rotation) rendered.rotation.set(...solid.rotation);
       if (isBreakableGlass) {
@@ -381,8 +436,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const [northGarage, southGarage] = GARAGE_LAYOUT;
   box('north garage', [northGarage.x, 1.7, northGarage.z], [12, 3.4, 6.5], palette.cream);
   box('south garage', [southGarage.x, 1.7, southGarage.z], [12, 3.4, 6.5], palette.cream);
-  box('garage door', [northGarage.x, 1.55, northGarage.z + 3.3], [9, 2.7, 0.18], palette.chrome, false, false);
-  box('garage door', [southGarage.x, 1.55, southGarage.z - 3.3], [9, 2.7, 0.18], palette.chrome, false, false);
+  // These read as closed, opaque doors, so movement and projectile authority
+  // must match the facade instead of relying on the slightly recessed shell.
+  box('garage door', [northGarage.x, 1.55, northGarage.z + 3.3], [9, 2.7, 0.18], palette.chrome, true, false, true);
+  box('garage door', [southGarage.x, 1.55, southGarage.z - 3.3], [9, 2.7, 0.18], palette.chrome, true, false, true);
 
   // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
   box('atomic landmark plinth', [27, 0.38, -1.5], [5.8, 0.76, 5.8], palette.concrete);
@@ -436,6 +493,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
 
   function sign(text: string, x: number, y: number, z: number, rotationY = 0): void {
+    if (typeof document === 'undefined') return;
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 192;
@@ -486,7 +544,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   // Street lamps and a few decorative trees add depth without texture downloads.
   for (const [x, z] of [[-13, -16], [13, 16], [-13, 22], [13, -22]] as Array<[number, number]>) {
-    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, false);
+    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, true, true, true, 'structural-metal');
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffefb5, emissive: 0xffb84d, emissiveIntensity: 2.2 }));
     lamp.position.set(x, 5.55, z);
     world.add(lamp);
@@ -500,6 +558,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     colliders,
     physicsColliders,
     raycastMeshes,
+    shotSurfaces,
     patrolPoints: PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     targets,
     houses,

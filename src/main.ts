@@ -29,8 +29,17 @@ import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type 
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
+import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHitscanAgainstTarget, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import {
+  applyPenetrationDamage,
+  ballisticImpactSurface,
+  resolveBallisticHitscanAgainstTarget,
+  traceBallisticPath,
+  type BallisticSurface,
+  type BallisticTrace,
+} from './ballistics';
 import {
   BOT_DAMAGE_MULTIPLIER,
   GRENADE_RADIUS,
@@ -44,6 +53,7 @@ import {
   cancelReload,
   completeReload as completeReloadState,
   computeDamage,
+  computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
   botScaledDamage,
@@ -246,6 +256,7 @@ import {
   OverdriveStateMessage,
   PlayerSnapshot,
   PickupMessage,
+  PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
   ShotMessage,
   Team,
@@ -494,7 +505,7 @@ app.innerHTML = `
     </div>
   </section>
   <aside id="menu-showcase" aria-hidden="true">
-    <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg" alt="" decoding="async">
+    <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
   </aside>
   <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
   <div id="changelog-backdrop" hidden></div>
@@ -845,6 +856,20 @@ const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
 };
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 let arena: ArenaMap = arenaById[selectedArena.id];
+
+function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
+  const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+  return activeArena.shotSurfaces.filter((surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId));
+}
+
+function traceWeaponPath(
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  distance: number,
+  weapon: WeaponId,
+): BallisticTrace {
+  return traceBallisticPath(origin, direction, distance, WEAPONS[weapon].penetration, activeBallisticSurfaces());
+}
 for (const candidate of Object.values(arenaById)) candidate.root.visible = candidate === arena;
 document.documentElement.dataset.arenaId = selectedArena.id;
 function applyArenaFogProfile(): void {
@@ -1000,8 +1025,8 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -1028,7 +1053,17 @@ let botGrenadeMaxActive = 0;
 let lastBotGrenadeDamage = 0;
 let grenadeExplosions = 0;
 let lastGrenadeExplosionFrameAt = 0;
-let lastPrincipalShotAlignment: { weapon: WeaponId; angularError: number; sample: [number, number]; direction: [number, number, number]; cameraDirection: [number, number, number] } | null = null;
+let lastPrincipalShotAlignment: {
+  weapon: WeaponId;
+  angularError: number;
+  sample: [number, number];
+  direction: [number, number, number];
+  cameraDirection: [number, number, number];
+  spread: number;
+  ads: boolean;
+  stance: Stance;
+  moving: boolean;
+} | null = null;
 let lastGrenadeExplosionProfile = {
   presentationDetachMs: 0,
   audioMs: 0,
@@ -1163,11 +1198,14 @@ let triggerHeld = false;
 let targetHits = 0;
 let rangeScore = 0;
 let rangeShotsFired = 0;
+let rangePrimaryUnlocked = false;
 let accumulator = 0;
 let frameCount = 0;
 let recoilVisual = 0;
 let recoilCamera = { pitch: 0, yaw: 0 };
 let landingImpulse = 0;
+let lastFallDamage = 0;
+let lastFallImpactSpeed = 0;
 let weaponBob = 0;
 let cameraHeightOffset = 0;
 let cameraRoll = 0;
@@ -1180,6 +1218,7 @@ let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
 let footstepAccumulator: FootstepAccumulator = { distance: 0, side: 0 };
 let lastFrame = performance.now();
+let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
@@ -1206,6 +1245,7 @@ const debugCaptureCameraPosition = new THREE.Vector3();
 let debugCaptureCameraYaw = 0;
 let debugCaptureCameraPitch = 0;
 let debugCaptureCameraActive = false;
+let debugCaptureViewmodelHidden = false;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let respawnEndsAt = 0;
@@ -2033,6 +2073,7 @@ const weaponView = new WeaponPresentation(camera, reducedRenderMode);
 let selectedFieldKit: FieldKitId = parseFieldKitSelection(localStorage.getItem(FIELD_KIT_STORAGE_KEY));
 
 function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
+  if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
   document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
     const active = button.dataset.menuTab === tab;
     button.classList.toggle('active', active);
@@ -2046,6 +2087,14 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
 }
 
 function renderFieldKitSelection(): void {
+  const summary = element<HTMLElement>('#selected-kit-summary');
+  if (selectedArena.id === 'gun-range') {
+    summary.dataset.rangeArmory = 'true';
+    const equipped = rangePrimaryUnlocked ? WEAPONS[player.primaryWeapon].name : 'Service Pistol';
+    summary.innerHTML = `<span>RANGE ARMORY</span><strong>PICK UP YOUR WEAPON INSIDE</strong><b>${equipped} · PRESS F AT A BENCH</b>`;
+    return;
+  }
+  delete summary.dataset.rangeArmory;
   const kit = fieldKitById(selectedFieldKit);
   const queued = gameStarted && player.primaryWeapon !== kit.weapon;
   element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>`;
@@ -2465,7 +2514,12 @@ function onNetworkMessage(message: GameMessage): void {
           yaw: targetIsLocal ? player.yaw : remoteTarget!.snapshot.yaw,
           stance: targetStance,
         },
-        (origin, impact) => arena.colliders.some((box) => segmentIntersectsBox(origin, impact, box)),
+        (origin, impact, weapon) => {
+          const delta = impact.clone().sub(origin);
+          const distance = delta.length();
+          const trace = traceWeaponPath(origin, delta, distance, weapon);
+          return trace.reachedDistance ? trace.damageMultiplier : 0;
+        },
       );
       if (derivedDamage <= 0) { recordRemoteHitAdmission('shot-ray-miss'); return; }
       if (Math.abs(message.damage - derivedDamage) > 1e-6) {
@@ -2593,16 +2647,26 @@ function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
   const direction = new THREE.Vector3(...message.direction).normalize();
-  const end = origin.clone().addScaledVector(direction, 50);
-  const trace = resolveHitscanAgainstTarget(origin, direction, 50, end, 0, arena.colliders);
-  const visibleEnd = origin.clone().addScaledVector(direction, trace.tracerDistance);
+  const trace = traceWeaponPath(origin, direction, 50, message.weapon);
+  const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
   spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   if (remoteOperator) fireOperator(remoteOperator);
-  if (trace.blockedByCover) {
-    spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
-    audio.impact('concrete', visibleEnd.distanceTo(camera.position));
+  let impactAudioPlayed = false;
+  for (const impact of trace.impacts) {
+    const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+    const point = origin.clone().addScaledVector(direction, impactDistance);
+    const surface = ballisticImpactSurface(impact.surface.material);
+    spawnImpactFlash(point, surface, new THREE.Vector3(
+      impact.entryNormal.x,
+      impact.entryNormal.y,
+      impact.entryNormal.z,
+    ));
+    if (!impactAudioPlayed) {
+      impactAudioPlayed = true;
+      audio.impact(surface, point.distanceTo(camera.position));
+    }
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
@@ -2627,9 +2691,9 @@ function scheduleLocalRespawn(now = performance.now()): void {
   }, 1_900);
 }
 
-function applyDamage(damage: number, attacker: string, minimumDamage = 1): void {
+function applyDamage(damage: number, attacker: string, minimumDamage = 1, bypassSpawnProtection = false): void {
   const now = performance.now();
-  if (!player.alive || now < player.invulnerableUntil) return;
+  if (!player.alive || (!bypassSpawnProtection && now < player.invulnerableUntil)) return;
   const previousHp = player.hp;
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
@@ -2723,6 +2787,34 @@ function updateDeathDropPresentation(entity: DeathDropEntity, now = performance.
     ring.visible = ammoAvailable || weaponAvailable;
     ring.material.color.setHex(ammoAvailable ? 0x7cf3a0 : WEAPONS[entity.drop.weapon].color);
   }
+}
+
+function nearbyGunRangeWeaponStation(): GunRangeWeaponStation | null {
+  if (selectedArena.id !== 'gun-range' || !player.alive || matchState.phase !== 'active') return null;
+  return nearestGunRangeWeaponStation(player.position);
+}
+
+function interactWithGunRangeArmory(now = performance.now()): boolean {
+  const station = nearbyGunRangeWeaponStation();
+  if (!station) return false;
+  interruptReload(true, now);
+  const changedWeapon = !rangePrimaryUnlocked || player.primaryWeapon !== station.weapon;
+  player.primaryWeapon = station.weapon;
+  player.weapon = station.weapon;
+  player.ammo[station.weapon] = WEAPONS[station.weapon].mag;
+  player.reserve[station.weapon] = WEAPONS[station.weapon].reserve;
+  player.switchingUntil = now + 360;
+  player.sustainedShots = 0;
+  rangePrimaryUnlocked = true;
+  weaponView.setWeapon(station.weapon);
+  audio.weaponSwitch();
+  addFeed(`${WEAPONS[station.weapon].name.toUpperCase()} ${changedWeapon ? 'EQUIPPED' : 'REFILLED'}`, 'gold');
+  renderFieldKitSelection();
+  return true;
+}
+
+function interactWithWeaponPickup(now = performance.now()): boolean {
+  return interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
 }
 
 function interactWithDeathDrop(now = performance.now()): boolean {
@@ -2820,12 +2912,17 @@ function updateDeathDrops(now: number): void {
   const candidates = deathDrops
     .map((entity) => entity.drop)
     .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
-  const nearby = player.alive
+  const nearbyStation = nearbyGunRangeWeaponStation();
+  const nearby = player.alive && !nearbyStation
     ? nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon')
     : null;
   const prompt = element<HTMLElement>('#pickup-prompt');
-  prompt.hidden = !nearby;
-  if (nearby) {
+  prompt.hidden = !nearby && !nearbyStation;
+  if (nearbyStation) {
+    const replenish = rangePrimaryUnlocked && nearbyStation.weapon === player.primaryWeapon;
+    prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REFILL' : 'EQUIP';
+    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearbyStation.weapon].name.toUpperCase();
+  } else if (nearby) {
     const replenish = nearby.weapon === player.primaryWeapon;
     prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REPLENISH' : 'PICK UP';
     prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearby.weapon].name.toUpperCase();
@@ -2942,11 +3039,14 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const explosive = message.kind === 'explosive';
   const senderOriginLimit = explosive ? 36 : 2.8;
+  const shotDelta = centre.clone().sub(origin);
+  const shotTrace = explosive ? null : traceWeaponPath(origin, shotDelta, shotDelta.length(), remote.snapshot.weapon);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)
     || origin.distanceTo(sender) > senderOriginLimit
     || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
     || !explosive && origin.distanceTo(centre) > 110
-    || windowBreakPathBlocked(origin, centre, arena.colliders)) return;
+    || explosive && windowBreakPathBlocked(origin, centre, arena.colliders)
+    || !explosive && !shotTrace?.reachedDistance) return;
   if (explosive && !localMultiplayerQa) {
     const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
     if (!grenadeAuthority || !Number.isFinite(message.actionNonce)) return;
@@ -3158,6 +3258,8 @@ function respawn(requestLock = true): void {
   player.velocity.set(0, 0, 0);
   player.hp = 100;
   lastDamageAt = -10_000;
+  lastFallDamage = 0;
+  lastFallImpactSpeed = 0;
   player.grenades = 2;
   player.reloadState = null;
   player.alive = true;
@@ -3173,16 +3275,26 @@ function respawn(requestLock = true): void {
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
   footstepAccumulator = { distance: 0, side: 0 };
-  const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
-  player.primaryWeapon = deploymentWeapon;
-  for (const weapon of deployedWeapons(deploymentWeapon)) {
-    player.ammo[weapon] = WEAPONS[weapon].mag;
-    player.reserve[weapon] = WEAPONS[weapon].reserve;
-  }
-  if (player.weapon !== player.primaryWeapon) {
-    player.weapon = player.primaryWeapon;
+  if (selectedArena.id === 'gun-range') {
+    rangePrimaryUnlocked = false;
+    player.primaryWeapon = 'carbine';
+    player.weapon = 'pistol';
+    player.ammo.pistol = WEAPONS.pistol.mag;
+    player.reserve.pistol = WEAPONS.pistol.reserve;
     player.switchingUntil = 0;
-    weaponView.setWeapon(player.primaryWeapon, true);
+    weaponView.setWeapon('pistol', true);
+  } else {
+    const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
+    player.primaryWeapon = deploymentWeapon;
+    for (const weapon of deployedWeapons(deploymentWeapon)) {
+      player.ammo[weapon] = WEAPONS[weapon].mag;
+      player.reserve[weapon] = WEAPONS[weapon].reserve;
+    }
+    if (player.weapon !== player.primaryWeapon) {
+      player.weapon = player.primaryWeapon;
+      player.switchingUntil = 0;
+      weaponView.setWeapon(player.primaryWeapon, true);
+    }
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
@@ -3289,8 +3401,9 @@ function endSpawnProtectionOnOffense(now: number): void {
 }
 
 function switchWeapon(index: number): void {
-  const equippedWeapons = deployedWeapons(player.primaryWeapon);
-  const id = equippedWeapons[index];
+  const id = selectedArena.id === 'gun-range'
+    ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? 'pistol' : undefined
+    : deployedWeapons(player.primaryWeapon)[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -3384,7 +3497,11 @@ function tryFire(now: number): void {
   const ammoDisplay = element<HTMLElement>('#ammo');
   ammoDisplay.classList.remove('fired');
   requestAnimationFrame(() => ammoDisplay.classList.add('fired'));
-  const recoil = computeRecoilImpulse(spec, player.sustainedShots, gameplayRandom());
+  const recoil = computeRecoilImpulse(spec, player.sustainedShots, gameplayRandom(), {
+    ads: adsHeld && weaponView.adsProgress() >= 0.9,
+    crouched: player.stance === 'crouch',
+    prone: player.stance === 'prone',
+  });
   recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
   recoilCamera.yaw = THREE.MathUtils.clamp(recoilCamera.yaw + recoil.yaw, -0.075, 0.075);
   recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
@@ -3405,6 +3522,7 @@ function tryFire(now: number): void {
   const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
   const pelletDirections: [number, number, number][] = [];
   let impactAudioPlayed = false;
+  const presentedSurfaceIds = new Set<string>();
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
@@ -3421,18 +3539,40 @@ function tryFire(now: number): void {
         sample: [sample.x, sample.y],
         direction: direction.toArray(),
         cameraDirection: baseDirection.toArray(),
+        spread,
+        ads: adsSettled,
+        stance: player.stance,
+        moving,
       };
     }
-    const result = castShot(origin, direction);
+    const result = castShot(origin, direction, player.weapon, true);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     spawnTracer(visualStart, authoritativeEnd, spec.color);
+    for (const impact of result.ballisticTrace?.impacts ?? []) {
+      if (presentedSurfaceIds.has(impact.surface.id)) continue;
+      presentedSurfaceIds.add(impact.surface.id);
+      const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+      const point = origin.clone().addScaledVector(direction, impactDistance);
+      const normal = new THREE.Vector3(impact.entryNormal.x, impact.entryNormal.y, impact.entryNormal.z);
+      if (impact.surface.breakableWindowId) {
+        if (breakHouseWindow(impact.surface.breakableWindowId, point, normal, true, origin)) impactAudioPlayed = true;
+        continue;
+      }
+      const surface = ballisticImpactSurface(impact.surface.material);
+      spawnImpactFlash(point, surface, normal);
+      if (!impactAudioPlayed) {
+        impactAudioPlayed = true;
+        audio.impact(surface, point.distanceTo(camera.position));
+      }
+    }
     if (result.windowId) {
       const point = result.impactPoint ?? authoritativeEnd;
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
       if (breakHouseWindow(result.windowId, point, normal, true, origin)) impactAudioPlayed = true;
     }
-    if (!result.playerId && !result.targetId && !result.windowId && result.distance < 89) {
+    if (!result.playerId && !result.targetId && !result.windowId && result.distance < 89
+      && (result.ballisticTrace?.impacts.length ?? 0) === 0) {
       const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
       const surface = result.impactSurface ?? 'concrete';
@@ -3444,13 +3584,17 @@ function tryFire(now: number): void {
     }
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
-      const damage = computeDamage(spec, result.distance, zone);
+      const damage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
       const prior = hitDamage.get(result.playerId);
       hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
     }
     if (result.targetId) {
       const zone = result.hitZone ?? 'body';
-      hitPracticeTarget(result.targetId, computeDamage(spec, result.distance, zone), zone);
+      hitPracticeTarget(
+        result.targetId,
+        applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier),
+        zone,
+      );
     }
   }
   const shot: ShotMessage = {
@@ -3492,6 +3636,7 @@ function tryFire(now: number): void {
 
 type ShotCastResult = {
   distance: number;
+  damageMultiplier: number;
   playerId?: string;
   targetId?: string;
   windowId?: string;
@@ -3499,22 +3644,50 @@ type ShotCastResult = {
   impactPoint?: THREE.Vector3;
   impactNormal?: THREE.Vector3;
   impactSurface?: ImpactSurface;
+  ballisticTrace?: BallisticTrace;
 };
 
-function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResult {
+function castShot(
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  weapon: WeaponId = player.weapon,
+  allowPenetration = true,
+): ShotCastResult {
   const ray = new THREE.Raycaster(origin, direction, 0.1, 110);
   ray.camera = camera;
   const remoteObjects = [...remotes.values()].filter((remote) => remote.root.visible).map((remote) => remote.root);
   const botObjects = [...bots.values()].filter((bot) => bot.alive && bot.root.visible).map((bot) => bot.root);
   const activeTargets = arena.targets.filter((target) => target.active).map((target) => target.root);
-  const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
-  const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
-    const windowId = object.userData.breakableWindowId;
-    return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
-  });
-  const intersections = ray.intersectObjects([...activeWorldMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true);
-  const first = intersections[0];
-  if (!first) return { distance: 90 };
+  let first: THREE.Intersection<THREE.Object3D> | undefined;
+  let ballisticTrace: BallisticTrace | undefined;
+  if (allowPenetration) {
+    first = ray.intersectObjects([...remoteObjects, ...botObjects, ...activeTargets], true)[0];
+    const requestedDistance = first?.distance ?? 90;
+    ballisticTrace = traceWeaponPath(origin, direction, requestedDistance, weapon);
+    if (!ballisticTrace.reachedDistance) {
+      const stoppedImpact = ballisticTrace.impacts.at(-1);
+      const impactPoint = origin.clone().addScaledVector(direction, ballisticTrace.travelDistance);
+      return {
+        distance: ballisticTrace.travelDistance,
+        damageMultiplier: 0,
+        impactPoint,
+        impactNormal: stoppedImpact
+          ? new THREE.Vector3(stoppedImpact.entryNormal.x, stoppedImpact.entryNormal.y, stoppedImpact.entryNormal.z)
+          : direction.clone().multiplyScalar(-1),
+        impactSurface: ballisticTrace.stoppedBy ? ballisticImpactSurface(ballisticTrace.stoppedBy.material) : 'concrete',
+        ballisticTrace,
+      };
+    }
+    if (!first) return { distance: 90, damageMultiplier: 1, ballisticTrace };
+  } else {
+    const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+    const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
+      const windowId = object.userData.breakableWindowId;
+      return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
+    });
+    first = ray.intersectObjects([...activeWorldMeshes, ...remoteObjects, ...botObjects, ...activeTargets], true)[0];
+    if (!first) return { distance: 90, damageMultiplier: 1 };
+  }
   let node: THREE.Object3D | null = first.object;
   let playerId: string | undefined;
   let targetId: string | undefined;
@@ -3541,6 +3714,7 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
     ?? direction.clone().multiplyScalar(-1);
   return {
     distance: Math.min(first.distance, 110),
+    damageMultiplier: ballisticTrace?.damageMultiplier ?? 1,
     playerId,
     targetId,
     windowId,
@@ -3548,6 +3722,7 @@ function castShot(origin: THREE.Vector3, direction: THREE.Vector3): ShotCastResu
     impactPoint: first.point.clone(),
     impactNormal,
     impactSurface: classifyImpactSurface({ hint: surfaceHint, name: names.join(' '), metalness }),
+    ballisticTrace,
   };
 }
 
@@ -4117,20 +4292,43 @@ function updateBots(dt: number, now: number): void {
       direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
       const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
-      const resolution = resolveHitscanAgainstTarget(origin, direction, shotLength, player.position, targetRadius, arena.colliders);
+      const botWeapon = WEAPONS[bot.weapon];
+      const resolution = resolveBallisticHitscanAgainstTarget(
+        origin,
+        direction,
+        shotLength,
+        player.position,
+        targetRadius,
+        botWeapon.penetration,
+        activeBallisticSurfaces(),
+      );
       const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
       const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-      const botWeapon = WEAPONS[bot.weapon];
       spawnTracer(botMuzzle ?? origin, visibleEnd, botWeapon.color);
-      if (resolution.blockedByCover) {
-        spawnImpactFlash(visibleEnd, 'concrete', direction.clone().multiplyScalar(-1));
-        audio.impact('concrete', visibleEnd.distanceTo(player.position));
-      } else if (!resolution.hitTarget) {
+      let impactAudioPlayed = false;
+      for (const impact of resolution.trace.impacts) {
+        const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+        const point = origin.clone().addScaledVector(direction, impactDistance);
+        const surface = ballisticImpactSurface(impact.surface.material);
+        spawnImpactFlash(point, surface, new THREE.Vector3(
+          impact.entryNormal.x,
+          impact.entryNormal.y,
+          impact.entryNormal.z,
+        ));
+        if (!impactAudioPlayed) {
+          impactAudioPlayed = true;
+          audio.impact(surface, point.distanceTo(player.position));
+        }
+      }
+      if (!resolution.hitTarget && resolution.trace.impacts.length === 0) {
         audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
       audio.shot(bot.weapon, true);
       if (resolution.hitTarget) {
-        const damage = botScaledDamage(computeDamage(botWeapon, distance, 'body'));
+        const damage = botScaledDamage(applyPenetrationDamage(
+          computeDamage(botWeapon, distance, 'body'),
+          resolution.damageMultiplier,
+        ));
         applyDamage(damage, bot.id);
         if (!player.alive) {
           bot.kills += 1;
@@ -4156,7 +4354,7 @@ function melee(): void {
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const meleeNonce = randomNonce();
   network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: meleeNonce });
-  const hit = castShot(origin, direction);
+  const hit = castShot(origin, direction, player.weapon, false);
   if (hit.windowId) {
     const strike = meleeStrike(hit.distance, now, previousMeleeAt);
     if (strike.hit) {
@@ -5508,8 +5706,12 @@ function updatePhysics(dt: number): void {
   }
   if (playerGrounded) lastGroundedAt = now;
   if (playerGrounded && !wasGrounded && impactVelocity < -5) {
-    landingImpulse = Math.min(1, Math.abs(impactVelocity) / 14);
-    audio.land(Math.abs(impactVelocity));
+    const impactSpeed = Math.abs(impactVelocity);
+    landingImpulse = Math.min(1, impactSpeed / 14);
+    audio.land(impactSpeed);
+    lastFallImpactSpeed = impactSpeed;
+    lastFallDamage = computeFallDamage(impactSpeed);
+    if (lastFallDamage > 0) applyDamage(lastFallDamage, player.id, 0, true);
   }
   wasGrounded = playerGrounded;
   if (movement.blockedX && !movement.slopeAdjusted) player.velocity.x = movement.appliedDelta.x / Math.max(dt, 0.001);
@@ -5554,7 +5756,8 @@ function updatePhysics(dt: number): void {
   const aimingFov = player.weapon === 'sniper'
     ? magnifiedFovDegrees(preferredFov, 3)
     : Math.max(55, preferredFov - 20);
-  camera.fov = damp(camera.fov, adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov, player.weapon === 'sniper' ? 18 : 10, dt);
+  const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
+  camera.fov = player.weapon === 'sniper' ? targetFov : damp(camera.fov, targetFov, 10, dt);
   camera.updateProjectionMatrix();
   const sniperScopeActive = player.alive
     && player.weapon === 'sniper'
@@ -5563,7 +5766,7 @@ function updatePhysics(dt: number): void {
     && Math.abs(camera.fov - aimingFov) < 0.35;
   sniperScopeOverlay.hidden = !sniperScopeActive;
   hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
-  weaponView.root.visible = gameStarted && !sniperScopeActive;
+  weaponView.root.visible = gameStarted && !sniperScopeActive && !debugCaptureViewmodelHidden;
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -6211,7 +6414,7 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
-  if (event.code === 'KeyF' && !event.repeat) interactWithDeathDrop();
+  if (event.code === 'KeyF' && !event.repeat) interactWithWeaponPickup();
   if (event.code === 'KeyT' && !event.repeat) sendTeamPing('enemy');
   if (event.code === 'KeyY' && !event.repeat) sendTeamPing('regroup');
   if (event.code === 'KeyU' && !event.repeat) sendTeamPing('push');
@@ -6227,7 +6430,11 @@ window.addEventListener('keyup', (event) => {
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
+  lastWindowBlurAt = performance.now();
   clearGameplayInput();
+});
+window.addEventListener('focus', () => {
+  if (gameStarted && player.alive && !matchFinished) menu.classList.add('hidden');
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive) return;
@@ -6266,6 +6473,13 @@ document.addEventListener('pointerlockchange', () => {
       return;
     }
     if (gameStarted && player.alive && !matchFinished) {
+      const focusTransition = !document.hasFocus() || performance.now() - lastWindowBlurAt < 300;
+      if (focusTransition) {
+        // Losing pointer lock because another tab/app took focus must not pause
+        // a host or guest. The canvas click handler recaptures controls on return.
+        menu.classList.add('hidden');
+        return;
+      }
       element<HTMLButtonElement>('#resume').hidden = false;
       element<HTMLButtonElement>('#main-menu').hidden = false;
       menu.classList.remove('hidden');
@@ -6279,6 +6493,11 @@ document.addEventListener('pointerlockchange', () => {
 
 function syncArenaSelectionUi(): void {
   const lobbyArenaLocked = network.role !== 'offline' || privateLobbySnapshot !== null;
+  const rangeArmoryMode = selectedArena.id === 'gun-range';
+  const fieldKitTab = element<HTMLButtonElement>('[data-menu-tab="kit"]');
+  fieldKitTab.hidden = rangeArmoryMode;
+  fieldKitTab.disabled = rangeArmoryMode;
+  if (rangeArmoryMode && fieldKitTab.classList.contains('active')) setMenuTab('deploy');
   for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
     const selected = button.dataset.arenaId === selectedArena.id;
     button.classList.toggle('selected', selected);
@@ -6306,8 +6525,9 @@ function syncArenaSelectionUi(): void {
     : selectedArena.id === 'rustworks-1v1'
       ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
       : selectedArena.id === 'gun-range'
-        ? 'Step to the firing line, wear down 500 HP score plates, and use the centre bullseye for headshot damage.'
+        ? 'Explore the indoor armory, pick a weapon from a bench, then work the 100 / 200 / 300 point lanes.'
         : 'Fight through an original airport concourse and jetliner apron with security chokes, a narrow gangway, and open tarmac sightlines.';
+  renderFieldKitSelection();
 }
 
 function setArenaPresentationVisibility(): void {
@@ -6393,8 +6613,8 @@ function setArenaMenuCamera(): void {
   const centreX = (arena.bounds.minX + arena.bounds.maxX) / 2;
   const centreZ = (arena.bounds.minZ + arena.bounds.maxZ) / 2;
   if (selectedArena.id === 'gun-range') {
-    camera.position.set(12, 13.5, 8);
-    camera.lookAt(0, 1.2, -25);
+    camera.position.set(17, 5.35, 17.5);
+    camera.lookAt(0, 1.65, -28);
   } else if (selectedArena.id === 'rustworks-1v1') {
     // Keep the tall tower on the unobstructed right side of the deployment panel.
     camera.position.set(18, 20, -28);
@@ -6515,13 +6735,14 @@ function resetForMode(): void {
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
-  player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
-  player.weapon = player.primaryWeapon;
+  rangePrimaryUnlocked = false;
+  player.primaryWeapon = selectedArena.id === 'gun-range' ? 'carbine' : fieldKitById(selectedFieldKit).weapon;
+  player.weapon = selectedArena.id === 'gun-range' ? 'pistol' : player.primaryWeapon;
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
 }
 
 function returnToMainMenu(): void {
@@ -6695,18 +6916,18 @@ function refreshStaticShadowsForDynamicCasters(now: number): void {
   staticShadowDynamicRefreshes += 1;
 }
 
-function frame(now: number): void {
+function frame(now: number, scheduleNext = true): void {
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
     // The HUD must report even pathologically slow software-rendered frames.
     // Adaptive quality still receives the unclamped sample and independently
     // rejects values above its 250 ms control window.
-    framePacing.record(Math.min(rawFrameMs, 1_000));
-    const adaptivePixelRatio = adaptiveQuality.record(
+    if (scheduleNext) framePacing.record(Math.min(rawFrameMs, 1_000));
+    const adaptivePixelRatio = scheduleNext ? adaptiveQuality.record(
       rawFrameMs,
       gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
-    );
+    ) : null;
     if (adaptivePixelRatio !== null) {
       applyAdaptiveRenderBudget(adaptivePixelRatio);
       grassSystem.setAdaptivePixelRatio(adaptivePixelRatio);
@@ -6765,18 +6986,32 @@ function frame(now: number): void {
       camera.updateMatrixWorld(true);
     }
     refreshStaticShadowsForDynamicCasters(now);
-    if (!debugRenderPaused && !webglContextLost) {
+    if (!debugRenderPaused && !webglContextLost && document.visibilityState === 'visible') {
       atomicSignal.render(scene, camera);
       if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
     }
-    requestAnimationFrame(frame);
+    if (scheduleNext) requestAnimationFrame(frame);
   } catch (error) {
     showFatalError(error);
   }
 }
+
+// requestAnimationFrame is suspended by background tabs. Keep a bounded,
+// no-render heartbeat so host/guest simulation, clocks, AI and network state do
+// not turn a tab switch into an implicit multiplayer pause.
+window.setInterval(() => {
+  if (document.visibilityState === 'hidden' && gameStarted && !matchFinished) frame(performance.now(), false);
+}, 50);
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown>;
+    traceBallistics: (
+      weapon: WeaponId,
+      origin: [number, number, number],
+      direction: [number, number, number],
+      distance: number,
+      arenaId?: ArenaId,
+    ) => BallisticTrace;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     clearBots: () => void;
@@ -6810,6 +7045,8 @@ const debugWindow = window as Window & {
     } | null;
     teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
     setCaptureCameraPose: (x: number | null, y?: number, z?: number, yaw?: number, pitch?: number) => void;
+    setCaptureViewmodelHidden: (hidden: boolean) => void;
+    stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
@@ -6894,9 +7131,27 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       raycastMeshes: arena.raycastMeshes.length,
       targets: arena.targets.length,
     },
+    ballistics: {
+      activeSurfaces: activeBallisticSurfaces().length,
+      weaponProfiles: Object.fromEntries(Object.entries(WEAPONS).map(([id, weapon]) => [id, { ...weapon.penetration }])),
+      arenas: Object.fromEntries(Object.entries(arenaById).map(([id, entry]) => [id, {
+        raycastMeshes: entry.raycastMeshes.length,
+        shotSurfaces: entry.shotSurfaces.length,
+        fallbackSurfaces: entry.shotSurfaces.filter((surface) => surface.classification === 'fallback').map((surface) => surface.name),
+      }])),
+    },
     rangePractice: {
       score: rangeScore,
       hits: targetHits,
+      armoryOnly: selectedArena.id === 'gun-range',
+      primaryUnlocked: rangePrimaryUnlocked,
+      stations: GUN_RANGE_WEAPON_STATIONS.map((station) => ({
+        id: station.id,
+        weapon: station.weapon,
+        label: station.label,
+        position: [station.position.x, station.position.y, station.position.z],
+        visible: arena.root.getObjectByName(`gun-range-weapon-station-${station.weapon}`)?.visible ?? false,
+      })),
       unlimitedAmmo: hasUnlimitedRangeAmmo(selectedArena.id),
       reserveHud: reserveHudValue(selectedArena.id, player.reserve[player.weapon]),
       firingLineZ: GUN_RANGE_FIRING_LINE_Z,
@@ -6952,7 +7207,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       deaths: player.deaths,
       weapon: player.weapon,
       primaryWeapon: player.primaryWeapon,
-      equippedWeapons: deployedWeapons(player.primaryWeapon),
+      equippedWeapons: selectedArena.id === 'gun-range'
+        ? [rangePrimaryUnlocked ? player.primaryWeapon : null, 'pistol']
+        : deployedWeapons(player.primaryWeapon),
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
       reloading: player.reloadState !== null,
@@ -6961,6 +7218,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       prone: player.stance === 'prone',
       sprinting: currentSprinting,
       grenades: player.grenades,
+      lastFallDamage,
+      lastFallImpactSpeed,
       position: player.position.toArray(),
     },
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
@@ -7387,6 +7646,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
+    const traceArena = arenaById[arenaId];
+    const brokenWindowIds = new Set(traceArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+    const surfaces = traceArena.shotSurfaces.filter(
+      (surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId),
+    );
+    return traceBallisticPath(
+      new THREE.Vector3(...origin),
+      new THREE.Vector3(...direction),
+      distance,
+      WEAPONS[weapon].penetration,
+      surfaces,
+    );
+  },
   startSolo: () => {
     element<HTMLInputElement>('#player-name').value = 'QA Operator';
     network.close();
@@ -7659,6 +7932,50 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugCaptureCameraYaw = yaw;
     debugCaptureCameraPitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
   },
+  setCaptureViewmodelHidden: (hidden) => { debugCaptureViewmodelHidden = hidden; },
+  stageLoadingCaptureSquad: () => {
+    if (selectedArena.id !== 'atomic-acres' || gameMode !== 'solo' || !gameStarted) {
+      return { staged: false, characters: 0, positions: [] };
+    }
+    while (bots.size < 3 && activateDormantBot(bots.size)) {
+      // Capture three genuine runtime operators without changing live match defaults.
+    }
+    const captureCamera = new THREE.Vector3(0, 0, 18);
+    const placements = [
+      new THREE.Vector3(0.75, 0, 12.25),
+      new THREE.Vector3(3.35, 0, 10.3),
+      new THREE.Vector3(5.55, 0, 8.4),
+    ].map((position) => ({ position, yaw: operatorYawToward(position, captureCamera) }));
+    const stagedBots = [...bots.values()].slice(0, placements.length);
+    const now = performance.now();
+    for (let index = 0; index < stagedBots.length; index += 1) {
+      const bot = stagedBots[index];
+      const placement = placements[index];
+      bot.position.copy(placement.position);
+      bot.velocity.set(0, 0, 0);
+      bot.hp = 100;
+      bot.alive = true;
+      bot.hasLineOfSight = false;
+      bot.sightStartedAt = 0;
+      bot.burstShots = 0;
+      bot.invulnerableUntil = now + 60_000;
+      bot.root.position.copy(bot.position);
+      bot.root.rotation.set(0, placement.yaw, 0);
+      bot.root.scale.setScalar(1);
+      bot.root.visible = true;
+      const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+      if (haze) haze.visible = false;
+      resetOperator(bot.root);
+      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      bot.root.updateMatrixWorld(true);
+    }
+    botsFrozen = true;
+    return {
+      staged: stagedBots.length === placements.length,
+      characters: stagedBots.length,
+      positions: stagedBots.map((bot) => bot.position.toArray()),
+    };
+  },
   collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
     ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
     : true,
@@ -7738,14 +8055,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     renderFieldKitSelection();
   },
   equipWeapon: (weapon: WeaponId) => {
-    if (weapon === 'carbine' || weapon === 'smg' || weapon === 'scattergun' || weapon === 'sniper') player.primaryWeapon = weapon;
+    if (PRIMARY_WEAPON_IDS.includes(weapon as PrimaryWeaponId)) {
+      player.primaryWeapon = weapon as PrimaryWeaponId;
+      if (selectedArena.id === 'gun-range') rangePrimaryUnlocked = true;
+    }
     player.weapon = weapon;
     player.ammo[weapon] = WEAPONS[weapon].mag;
     player.reserve[weapon] = WEAPONS[weapon].reserve;
     player.nextShotAt = 0;
     weaponView.setWeapon(weapon, true);
   },
-  interactDrop: () => interactWithDeathDrop(),
+  interactDrop: () => interactWithWeaponPickup(),
   setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
     player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
@@ -7952,6 +8272,7 @@ async function bootstrap(): Promise<void> {
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (renderProfile !== 'blender') {
     batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
+    batchStaticMeshes(gunRangeArena.root, gunRangeArena.root, () => '', staticMaterialMode);
   } else {
     enhanceRustworksQualityMaterials(rustworksArena.root, renderProfile);
   }

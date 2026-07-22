@@ -15,6 +15,7 @@ describe('Rustworks Quality Graphics parity', () => {
   it('applies night oil-rig lighting only for Rustworks', () => {
     const base = arenaLightingProfile('blender');
     const rust = rustworksLightingTint(base, 'blender', 'rustworks-1v1');
+    const range = rustworksLightingTint(base, 'blender', 'gun-range');
     const atomic = rustworksLightingTint(base, 'blender', 'atomic-acres');
     expect(atomic.fogColor).toBe(base.fogColor);
     expect(rust.fogColor).not.toBe(base.fogColor);
@@ -22,6 +23,9 @@ describe('Rustworks Quality Graphics parity', () => {
     expect(rust.skyTop).toBeLessThan(base.skyTop);
     expect(rust.fillIntensity).toBeGreaterThanOrEqual(base.fillIntensity);
     expect(rust.sunIntensity).toBeLessThan(base.sunIntensity);
+    expect(range.fogColor).not.toBe(base.fogColor);
+    expect(range.fillIntensity).toBeGreaterThan(range.sunIntensity);
+    expect(range.godRayStrength).toBe(0);
   });
 
   it('adds flood lights, starfield, and richer materials for the night rig', () => {

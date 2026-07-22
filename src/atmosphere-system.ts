@@ -86,7 +86,7 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
     count: quality ? 96 : 40, minX: -28, maxX: 28, minZ: -30, maxZ: 30, color: 0xc2a07a, opacity: quality ? 0.24 : 0.14,
   };
   if (arenaId === 'skyline-terminal') return {
-    count: quality ? 80 : 48, minX: -34, maxX: 34, minZ: -34, maxZ: 34, color: 0xd2dbe0, opacity: quality ? 0.20 : 0.15,
+    count: quality ? 80 : 48, minX: -34, maxX: 34, minZ: -34, maxZ: 34, color: 0xe2d6c3, opacity: quality ? 0.17 : 0.12,
   };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
@@ -97,7 +97,7 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   if (profile === 'compat') return { near: 56, far: 140 };
   if (arenaId === 'atomic-acres') return profile === 'blender' ? { near: 32, far: 104 } : { near: 36, far: 112 };
   if (arenaId === 'rustworks-1v1') return profile === 'blender' ? { near: 26, far: 90 } : { near: 30, far: 94 };
-  if (arenaId === 'skyline-terminal') return profile === 'blender' ? { near: 34, far: 108 } : { near: 38, far: 116 };
+  if (arenaId === 'skyline-terminal') return profile === 'blender' ? { near: 40, far: 122 } : { near: 44, far: 130 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 
@@ -105,7 +105,7 @@ function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{
   const quality = profile === 'blender';
   if (arenaId === 'atomic-acres') return quality ? { mist: 0.24, smoke: 0.13 } : { mist: 0.18, smoke: 0.09 };
   if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.22, smoke: 0.12 } : { mist: 0.14, smoke: 0.08 };
-  if (arenaId === 'skyline-terminal') return quality ? { mist: 0.20, smoke: 0.10 } : { mist: 0.15, smoke: 0.07 };
+  if (arenaId === 'skyline-terminal') return quality ? { mist: 0.15, smoke: 0.08 } : { mist: 0.11, smoke: 0.06 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 
@@ -417,7 +417,9 @@ export class AtmosphereSystem {
       ? { shadow: 0x725f87, light: 0xe9a57b, smoke: 0x84909a, warm: 0xc3a58d }
       : arenaId === 'rustworks-1v1'
         ? { shadow: 0x665f5c, light: 0xc08b68, smoke: 0x756d66, warm: 0xb97d58 }
-        : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
+        : arenaId === 'skyline-terminal'
+          ? { shadow: 0x485868, light: 0xe8ad86, smoke: 0x59666c, warm: 0xd49b6a }
+          : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);
     (this.smokeMaterial.uniforms.uSmokeColor.value as THREE.Color).setHex(palette.smoke);

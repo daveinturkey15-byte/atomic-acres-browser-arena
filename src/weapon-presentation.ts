@@ -5,7 +5,7 @@ import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial 
 import type { FirstPersonArmChain } from './operator-model';
 import { solveTwoBoneElbow } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
-import { advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
+import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import { fireImportedWeapon, importedWeaponTelemetry, reloadImportedWeapon, updateImportedWeapon } from './weapon-model';
 import { WEAPONS } from './gameplay';
@@ -48,6 +48,7 @@ type HandRotationSet = { left: [number, number, number]; right: [number, number,
 const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   carbine: { left: [-0.32, 0.12, -0.22], right: [-0.22, -0.06, 0.26] },
   smg: { left: [-0.36, 0.14, -0.22], right: [-0.18, -0.02, 0.16] },
+  lmg: { left: [-0.31, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
   sniper: { left: [-0.3, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
@@ -57,6 +58,7 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
 const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   carbine: { left: [-0.06, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
   smg: { left: [-0.055, -0.02, 0.02], right: [0.08, -0.025, 0.015] },
+  lmg: { left: [-0.06, -0.025, 0.02], right: [0.08, -0.025, 0.015] },
   scattergun: { left: [-0.055, -0.025, 0.015], right: [0.08, -0.025, 0.015] },
   sniper: { left: [-0.055, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
   pistol: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
@@ -66,6 +68,7 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
 const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   carbine: [-0.72, 0.32, -0.5],
   smg: [-0.82, 0.38, -0.58],
+  lmg: [-0.78, 0.35, -0.54],
   scattergun: [-0.58, 0.18, -0.42],
   sniper: [-0.76, 0.34, -0.52],
   pistol: [-0.92, 0.42, -0.68],
@@ -495,10 +498,11 @@ export class WeaponPresentation {
       // person needs the authored PBR receiver, functional action parts and
       // calibrated sockets rather than a camera-close pickup mesh.
       const model = buildWeaponModel(id, this.flattenMaterials, false);
-      model.userData.firstPersonSource = 'authored-pbr-v5-six-weapon';
+      model.userData.firstPersonSource = 'authored-pbr-v6-seven-weapon';
       const firstPersonHidden: Record<WeaponId, Set<string>> = {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
+        lmg: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         scattergun: new Set(['stock', 'stock-cheek-panel']),
         sniper: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         pistol: new Set(),
@@ -668,6 +672,8 @@ export class WeaponPresentation {
       ? 'optic-reticle'
       : this.active === 'sniper'
         ? 'sniper-scope'
+      : this.active === 'lmg'
+        ? 'rear-sight'
       : this.active === 'smg'
         ? 'smg-aperture'
         : this.active === 'pistol' || this.active === 'machine-pistol'
@@ -880,7 +886,7 @@ export class WeaponPresentation {
     this.switchBlend = THREE.MathUtils.lerp(this.switchBlend, 1, smoothing(10));
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
-    this.adsBlend = THREE.MathUtils.lerp(this.adsBlend, pose.ads ? 1 : 0, smoothing(pose.ads ? 18 : 15));
+    this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
@@ -998,6 +1004,8 @@ export class WeaponPresentation {
     const reloadPose = reloadPoseAt(this.active, reloadProgress);
     const magazineName = this.active === 'carbine'
       ? 'curved-magazine'
+      : this.active === 'lmg'
+        ? 'lmg-box-magazine'
       : this.active === 'pistol' || this.active === 'machine-pistol'
         ? 'pistol-magazine'
         : 'straight-magazine';

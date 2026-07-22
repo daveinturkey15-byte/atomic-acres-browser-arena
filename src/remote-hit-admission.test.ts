@@ -28,6 +28,19 @@ describe('remote hit admission', () => {
     expect(deriveRemoteShotBaseDamage('scattergun', [0, 1.38, 4], pellets, target)).toBeGreaterThan(0);
   });
 
+  it('derives reduced wallbang damage instead of trusting a sender multiplier', () => {
+    const target = { x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
+    const halfEnergy = deriveRemoteShotBaseDamage(
+      'smg',
+      [0, 1.38, 6],
+      [[0, 0, -1]],
+      target,
+      () => 0.5,
+    );
+    expect(halfEnergy).toBe(12);
+    expect(deriveRemoteShotBaseDamage('smg', [0, 1.38, 6], [[0, 0, -1]], target, () => true)).toBe(0);
+  });
+
   it('rejects sender-prepowered gun damage and applies Overdrive once at the receiver', () => {
     const maximum = maximumRemoteShotBaseDamage('carbine');
     expect(maximum).toBe(47);

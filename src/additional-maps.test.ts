@@ -138,7 +138,7 @@ describe('additional authored maps', () => {
     expect(canopy?.visible).toBe(true);
   });
 
-  it('exposes Pass 51 clean access, bracing, process gear and shipping cover', () => {
+  it('exposes clean access, bracing, and four-container perimeter rows', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const required = [
       'rustworks-lower-ramp',
@@ -151,11 +151,8 @@ describe('additional authored maps', () => {
       'rustworks-ship-ladder-rail-west',
       'rustworks-ship-ladder-rung-0',
       'rustworks-structural-brace',
-      'rustworks-process-manifold',
       'rustworks-tower-hardstand',
-      'rustworks-freight-crate',
       'rustworks-shipping-container',
-      'rustworks-pallet-stack',
       'rustworks-barrier-low',
       'rustworks-rig-deck-top',
       'rustworks-rig-leg',
@@ -166,9 +163,9 @@ describe('additional authored maps', () => {
     }
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
-    expect(namedCount(map.root, 'rustworks-freight-crate')).toBeGreaterThanOrEqual(4);
-    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(4);
-    expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(4);
+    expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(16);
+    expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(0);
     expect(namedCount(map.root, 'rustworks-process-riser')).toBe(0);
     expect(namedCount(map.root, 'rustworks-process-pipe-run')).toBe(0);
     expect(namedCount(map.root, 'rustworks-rig-leg')).toBeGreaterThanOrEqual(8);
@@ -186,15 +183,18 @@ describe('additional authored maps', () => {
     expect(map.root.userData.rustworksRoutes?.['lower-to-upper']).toBeTruthy();
   });
 
-  it('gives every shipping container and pallet stack full player, physics, and shot authority', () => {
+  it('gives all sixteen shipping containers full player, physics, and shot authority', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const cover: THREE.Mesh[] = [];
     map.root.traverse((node) => {
-      if (node instanceof THREE.Mesh && (node.name === 'rustworks-shipping-container' || node.name === 'rustworks-pallet-stack')) {
+      if (node instanceof THREE.Mesh && node.name === 'rustworks-shipping-container') {
         cover.push(node);
       }
     });
-    expect(cover).toHaveLength(8);
+    expect(cover).toHaveLength(16);
+    for (const side of ['north', 'south', 'west', 'east']) {
+      expect(cover.filter((mesh) => mesh.userData.rustworksContainerSide === side), `${side} container row`).toHaveLength(4);
+    }
     for (const mesh of cover) {
       const geometry = mesh.geometry as THREE.BoxGeometry;
       const { width, height, depth } = geometry.parameters;
@@ -244,7 +244,10 @@ describe('additional authored maps', () => {
     };
     expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
     expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
-    expect(access.shipLadderAngleDegrees).toBeGreaterThan(40);
+    expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(18);
+    expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(38);
+    expect(access.lowerRamp.size[0]).toBeGreaterThanOrEqual(4.8);
+    expect(access.shipLadder.size[0]).toBeGreaterThanOrEqual(2.6);
 
     const lowerAngle = Math.abs(access.lowerRamp.rotation[0]);
     const lowerHalfRun = Math.cos(lowerAngle) * access.lowerRamp.size[2] / 2;
@@ -347,7 +350,7 @@ describe('additional authored maps', () => {
           && box.min.y < corridor.maxY - 0.05
           && box.max.z > corridor.minZ + 0.05
           && box.min.z < corridor.maxZ - 0.05;
-        expect(overlaps, `${mesh.name} blocks access corridor`).toBe(false);
+        expect(overlaps, `${mesh.name}@${mesh.position.toArray().join(',')} blocks access corridor`).toBe(false);
       }
     }
   });
@@ -355,7 +358,7 @@ describe('additional authored maps', () => {
   it('builds an untimed three-distance score range with reusable targets', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
-    expect(map.label).toBe('Acres Gun Range');
+    expect(map.label).toBe('Acres Indoor Gun Range');
     expect(map.targets).toHaveLength(9);
     expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(3);
     expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(3);
@@ -374,6 +377,20 @@ describe('additional authored maps', () => {
     expect(map.raycastMeshes.some((mesh) => mesh.name === 'gun-range-firing-line')).toBe(false);
     expect(GUN_RANGE_FIRING_LINE_BARRIER.maxY).toBeGreaterThan(5);
     expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-ceiling')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-left-wall')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-right-wall')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-control-room')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
+    expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
+    const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
+    expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
+    expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);
+    const stations = map.root.children.filter((child) => child.name.startsWith('gun-range-weapon-station-'));
+    expect(stations).toHaveLength(5);
+    expect(stations.map((station) => station.userData.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+    expect(map.bounds.maxX - map.bounds.minX).toBeGreaterThanOrEqual(40);
+    expect(map.bounds.maxZ - map.bounds.minZ).toBeGreaterThanOrEqual(67);
     expectGunRangeSpawnContract(map);
   });
 
@@ -418,7 +435,7 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('skyline-jetliner-fuselage-top')).toBeTruthy();
   });
 
-  it('exposes detailed terminal signage, baggage carousel, fuel trailer, and presentation batching', () => {
+  it('exposes coherent terminal-story clusters and presentation batching', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
     expect(mainSign).toBeTruthy();
@@ -433,13 +450,52 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('skyline-fuel-trailer-tank')).toBeTruthy();
     expect(map.root.getObjectByName('skyline-jetliner-cockpit-partition')).toBeTruthy();
 
+    const clusterIds = [
+      'floor-language',
+      'wall-structure',
+      'escalator-detail',
+      'window-frame',
+      'aircraft-skin',
+      'apron-marking',
+      'terminal-story',
+    ];
+    expect(map.root.userData.skylineDetailClusters).toEqual(clusterIds);
+    for (const clusterId of clusterIds) {
+      let semanticNodes = 0;
+      map.root.traverse((node) => {
+        if (node.userData.skylineCluster === clusterId) semanticNodes += 1;
+      });
+      expect(semanticNodes, clusterId).toBeGreaterThan(0);
+    }
+
     const batches = map.root.userData.skylinePresentationBatches as {
       sourceMeshes: number;
       batches: number;
       savedDrawCalls: number;
     };
-    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(10);
+    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(30);
     expect(batches.batches).toBeGreaterThan(0);
+    expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+  });
+
+  it('keeps six breakable facade panes independent from the added mullion frames', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.breakableWindows.map((window) => window.id)).toEqual([
+      'skyline-window--22',
+      'skyline-window--14',
+      'skyline-window--6',
+      'skyline-window-6',
+      'skyline-window-14',
+      'skyline-window-22',
+    ]);
+    for (const window of map.breakableWindows) {
+      expect(window.mesh.userData.dynamic).toBe(true);
+      expect(window.mesh.userData.breakableWindowId).toBe(window.id);
+    }
+    for (const winX of [-22, -14, -6, 6, 14, 22]) {
+      expect(map.root.getObjectByName(`skyline-window-frame-top-${winX}`)?.userData.breakableWindowId).toBeUndefined();
+      expect(map.root.getObjectByName(`skyline-window-mullion-${winX}`)?.userData.breakableWindowId).toBeUndefined();
+    }
   });
 
   it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
@@ -460,14 +516,22 @@ describe('additional authored maps', () => {
 
   it('applies the Performance/Quality split to Skyline instead of rendering Quality props on low-spec profiles', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
+    const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
     const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
+    const qualityNacelles = map.root.getObjectByName('skyline-aircraft-engine-nacelles');
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
+    expect(performanceSign).toBeTruthy();
     expect(qualityBoard).toBeTruthy();
+    expect(qualityNacelles).toBeTruthy();
     applyAdditionalMapPresentationProfile(map.root, 'performance');
+    expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(false);
+    expect(qualityNacelles?.visible).toBe(false);
     expect(coreFloor?.visible).not.toBe(false);
     applyAdditionalMapPresentationProfile(map.root, 'blender');
+    expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(true);
+    expect(qualityNacelles?.visible).toBe(true);
   });
 
   it('walks every Skyline route in both directions with Rapier-backed collision', async () => {

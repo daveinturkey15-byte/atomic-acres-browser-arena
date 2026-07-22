@@ -192,6 +192,8 @@ export class ArenaAudio {
       ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
       : weapon === 'sniper'
         ? { body: 62, bodyEnd: 24, duration: 0.26, crack: 2920, noise: 0.3, lowpass: 2400, tail: 330, tailDuration: 0.42 }
+      : weapon === 'lmg'
+        ? { body: 88, bodyEnd: 34, duration: 0.17, crack: 1540, noise: 0.29, lowpass: 2500, tail: 440, tailDuration: 0.26 }
       : weapon === 'smg'
         ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
         : weapon === 'machine-pistol'

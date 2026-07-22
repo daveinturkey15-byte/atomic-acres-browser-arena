@@ -102,6 +102,17 @@ describe('palette static batching', () => {
 });
 
 describe('attached weapon draw-call batching', () => {
+  it('builds the Mastiff LMG with a distinct heavy support-weapon silhouette', () => {
+    const lmg = buildWeaponModel('lmg', false, false);
+    expect(lmg.name).toBe('lmg-original-weapon');
+    for (const detail of ['lmg-heavy-receiver', 'lmg-box-magazine', 'lmg-carry-handle', 'lmg-bipod', 'lmg-heat-shield', 'bolt-or-slide']) {
+      expect(lmg.getObjectByName(detail), detail).toBeDefined();
+    }
+    expect(lmg.getObjectByName('curved-magazine')?.visible).toBe(false);
+    expect(lmg.getObjectsByProperty('name', 'reload-socket-l')).toHaveLength(1);
+    expect(lmg.getObjectByName('muzzle-socket')?.position.z).toBeLessThan(-1.8);
+  });
+
   it('keeps the machine pistol recognisably richer than the service pistol after bounded batching', () => {
     const pistol = buildWeaponModel('pistol', true, false);
     const machinePistol = buildWeaponModel('machine-pistol', true, false);

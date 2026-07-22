@@ -8,6 +8,7 @@ import {
 } from './field-support';
 import { AUTHORITATIVE_HIT_PROXIES } from './hit-proxies';
 import type { ExplosiveSource, WeaponId } from './protocol';
+import { applyPenetrationDamage } from './ballistics';
 
 type ShotTarget = Readonly<{
   x: number;
@@ -54,15 +55,17 @@ export function deriveRemoteShotBaseDamage(
   origin: readonly [number, number, number],
   pelletDirections: readonly (readonly [number, number, number])[],
   target: ShotTarget,
-  blocked: (origin: THREE.Vector3, impact: THREE.Vector3) => boolean = () => false,
+  penetration: (origin: THREE.Vector3, impact: THREE.Vector3, weapon: WeaponId) => boolean | number = () => 1,
 ): number {
   const spec = WEAPONS[weapon];
   if (pelletDirections.length !== spec.pellets) return 0;
   let damage = 0;
   for (const direction of pelletDirections) {
     const hit = firstProxyHit(origin, direction, target);
-    if (!hit || blocked(new THREE.Vector3(...origin), hit.point)) continue;
-    damage += computeDamage(spec, hit.distance, hit.zone);
+    if (!hit) continue;
+    const result = penetration(new THREE.Vector3(...origin), hit.point, weapon);
+    const multiplier = typeof result === 'boolean' ? (result ? 0 : 1) : Math.max(0, Math.min(1, result));
+    damage += applyPenetrationDamage(computeDamage(spec, hit.distance, hit.zone), multiplier);
   }
   return Math.min(100, damage);
 }
