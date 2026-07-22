@@ -17,6 +17,35 @@ export type ChangelogEntry = Readonly<{
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass56',
+    pass: 'PASS 56',
+    title: 'Operator rigs, weapon finishes & HUD spacing',
+    releasedAt: '2026-07-22T15:06:07+01:00',
+    areas: Object.freeze(['OPERATORS', 'WEAPONS', 'HUD']),
+    summary: 'Operators hold their weapons cleanly through every stance, all seven guns have distinct authored finishes, and the combat HUD has more breathing room.',
+    highlights: Object.freeze([
+      'Standing, sprinting, crouched, and prone operators keep a forward-facing weapon with both hands connected',
+      'Duplicate embedded weapons are suppressed and crouched feet stay planted instead of folding through the floor',
+      'Carbine, SMG, scattergun, sniper, pistol, machine pistol, and LMG each use a distinct authored material finish',
+      'Weapon, equipment, and match HUD groups have cleaner spacing without hiding combat information',
+    ]),
+  }),
+  Object.freeze({
+    id: 'pass55',
+    pass: 'PASS 55',
+    title: 'Multiplayer combat, wall penetration & indoor range',
+    releasedAt: '2026-07-22T13:14:45+01:00',
+    areas: Object.freeze(['MULTIPLAYER', 'COMBAT', 'GUN RANGE', 'SKYLINE']),
+    summary: 'The reconciled combat release improves private matches, adds material-aware penetration, polishes Skyline, and turns Gun Range into a full indoor armory.',
+    highlights: Object.freeze([
+      'Host-selected maps, lobby state, respawns, and combat telemetry stay synchronized through private matches',
+      'Bullets can penetrate supported thin surfaces with weapon, material, angle, and distance-aware damage loss',
+      'Skyline Terminal gains refined routes, authored detail, lighting, collision, and multiplayer navigation',
+      'Gun Range is now an indoor score-attack space with walk-up weapon pickups and the Mastiff 63 LMG',
+      'Focus loss no longer pauses an active solo or multiplayer match or replaces play with the menu',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass53',
     pass: 'PASS 53',
     title: 'Skyline Terminal, repeatable streaks & lobby copy',
