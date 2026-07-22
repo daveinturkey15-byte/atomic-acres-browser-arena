@@ -14,4 +14,11 @@ describe('production release workflow', () => {
     expect(workflow).toContain('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
     expect(workflow).not.toContain('git config --global');
   });
+
+  it('allows the external Pages deployment queue to drain without weakening exact-SHA verification', () => {
+    expect(workflow).toContain('for attempt in $(seq 1 120); do');
+    expect(workflow).toContain('if [[ "$build_sha" == "$pages_sha" && "$status" == "built" ]]');
+    expect(workflow).toContain('if [[ "$build_sha" == "$pages_sha" && "$status" == "errored" ]]; then exit 1; fi');
+    expect(workflow).toContain('sleep 10');
+  });
 });
