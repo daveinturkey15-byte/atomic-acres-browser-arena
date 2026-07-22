@@ -1,5 +1,9 @@
 # Documentation index
 
+## Current development
+
+- [Pass 54 wall penetration specification](PASS54_WALL_PENETRATION_SPEC_2026-07-22.md) - canonical FMJ-like material, weapon, distance, angle, multiplayer-authority, and future-asset coverage rule.
+
 ## Current release
 
 - [README](../README.md) — product overview, controls, setup, and current Pass 52 summary.

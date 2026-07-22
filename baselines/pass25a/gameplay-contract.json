@@ -2670,7 +2670,7 @@
         ]
       }
     },
-    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 33 deltas",
+    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 54 deltas",
     "combat": {
       "botDamageMultiplier": 0.25,
       "botGrenade": {
@@ -2764,6 +2764,16 @@
           "movementSpreadMultiplier": 1.65,
           "name": "M86 Carbine",
           "pellets": 1,
+          "penetration": {
+            "caliber": "5.56 mm",
+            "energyFalloffEnd": 76,
+            "energyFalloffStart": 20,
+            "fmjMultiplier": 1.12,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.48,
+            "minimumWallDamageMultiplier": 0.34,
+            "penetrationPower": 5.8
+          },
           "recoilPitch": 0.016,
           "recoilRecovery": 12,
           "recoilYaw": 0.006,
@@ -2791,6 +2801,16 @@
           "movementSpreadMultiplier": 1.45,
           "name": "Vectorline SMG",
           "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 38,
+            "energyFalloffStart": 8,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.22,
+            "minimumWallDamageMultiplier": 0.22,
+            "penetrationPower": 3.05
+          },
           "recoilPitch": 0.011,
           "recoilRecovery": 15,
           "recoilYaw": 0.009,
@@ -2818,6 +2838,16 @@
           "movementSpreadMultiplier": 1.22,
           "name": "Model 12 Scattergun",
           "pellets": 9,
+          "penetration": {
+            "caliber": "12 ga pellet",
+            "energyFalloffEnd": 20,
+            "energyFalloffStart": 4,
+            "fmjMultiplier": 1,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.16,
+            "minimumWallDamageMultiplier": 0.18,
+            "penetrationPower": 2.15
+          },
           "recoilPitch": 0.052,
           "recoilRecovery": 8,
           "recoilYaw": 0.012,
@@ -2845,6 +2875,16 @@
           "movementSpreadMultiplier": 1.8,
           "name": "Longline 86",
           "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 120,
+            "energyFalloffStart": 58,
+            "fmjMultiplier": 1.16,
+            "maxPenetratedSurfaces": 3,
+            "minimumEnergyRetention": 0.7,
+            "minimumWallDamageMultiplier": 0.48,
+            "penetrationPower": 9.4
+          },
           "recoilPitch": 0.072,
           "recoilRecovery": 6.5,
           "recoilYaw": 0.016,
@@ -2872,6 +2912,16 @@
           "movementSpreadMultiplier": 1.42,
           "name": "Aster 9 Service Pistol",
           "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 48,
+            "energyFalloffStart": 12,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.3,
+            "minimumWallDamageMultiplier": 0.26,
+            "penetrationPower": 3.65
+          },
           "recoilPitch": 0.021,
           "recoilRecovery": 14,
           "recoilYaw": 0.008,
@@ -2899,6 +2949,16 @@
           "movementSpreadMultiplier": 1.55,
           "name": "G18 AUTO",
           "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 30,
+            "energyFalloffStart": 6,
+            "fmjMultiplier": 1.06,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.18,
+            "minimumWallDamageMultiplier": 0.2,
+            "penetrationPower": 2.75
+          },
           "recoilPitch": 0.014,
           "recoilRecovery": 13,
           "recoilYaw": 0.012,
@@ -3304,10 +3364,11 @@
       "pass30-double-tri-pass-radius-and-damage",
       "pass30-hunter-swarm-eight-streak",
       "pass30-nuke-fifteen-streak",
-      "pass30-stormfront-lighting"
+      "pass30-stormfront-lighting",
+      "pass54-wall-penetration"
     ],
     "baseSourceRevision": "72c313c494853ed1ee4673f06a8f064330ac9efc",
-    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 30",
+    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 54",
     "dependencies": {
       "@dimforge/rapier3d-compat": "0.19.3",
       "peerjs": "1.5.5",

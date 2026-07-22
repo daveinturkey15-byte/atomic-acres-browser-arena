@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { classifyImpactSurface } from './combat-feedback';
+import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
 import type { Team } from './protocol';
@@ -10,6 +11,8 @@ type Builder = {
   colliders: Box2[];
   physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
+  shotSurfaces: BallisticSurface[];
+  ballisticSurfaceSequence: number;
 };
 
 export const GUN_RANGE_FIRING_LINE_Z = 1.2;
@@ -36,6 +39,8 @@ function box(
     shots?: boolean;
     rotation?: [number, number, number];
     cast?: boolean;
+    ballisticMaterial?: BallisticMaterialId;
+    breakableWindowId?: string;
     /** core = always; performance = performance+quality; quality = Quality Graphics only */
     detail?: 'core' | 'performance' | 'quality';
   } = {},
@@ -55,17 +60,32 @@ function box(
   const solid = options.solid !== false;
   const shots = options.shots ?? solid;
   mesh.userData.presentationBatchCandidate = !solid && !shots;
-  if (shots) builder.raycastMeshes.push(mesh);
+  const bounds: Box2 = {
+    minX: position[0] - size[0] / 2,
+    maxX: position[0] + size[0] / 2,
+    minZ: position[2] - size[2] / 2,
+    maxZ: position[2] + size[2] / 2,
+    minY: position[1] - size[1] / 2,
+    maxY: position[1] + size[1] / 2,
+    rotation: options.rotation,
+  };
+  if (shots) {
+    builder.raycastMeshes.push(mesh);
+    const surface = createBallisticSurface(
+      `${builder.root.name}:${builder.ballisticSurfaceSequence}:${name}`,
+      name,
+      bounds,
+      {
+        impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface>,
+        material: options.ballisticMaterial,
+      },
+      options.breakableWindowId,
+    );
+    builder.ballisticSurfaceSequence += 1;
+    builder.shotSurfaces.push(surface);
+    mesh.userData.ballisticSurfaceId = surface.id;
+  }
   if (solid) {
-    const bounds: Box2 = {
-      minX: position[0] - size[0] / 2,
-      maxX: position[0] + size[0] / 2,
-      minZ: position[2] - size[2] / 2,
-      maxZ: position[2] + size[2] / 2,
-      minY: position[1] - size[1] / 2,
-      maxY: position[1] + size[1] / 2,
-      rotation: options.rotation,
-    };
     builder.colliders.push(bounds);
     builder.physicsColliders.push(bounds);
   }
@@ -202,7 +222,9 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Rustworks arena';
   scene.add(root);
-  const builder: Builder = { root, colliders: [], physicsColliders: [], raycastMeshes: [] };
+  const builder: Builder = {
+    root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
+  };
   const sand = standard(0x8a5f42, 1, 0);
   const packed = standard(0x6e5a48, 0.98, 0.02);
   const rust = standard(0x7a3924, 0.82, 0.42);
@@ -226,6 +248,15 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   ground.userData.impactSurface = 'metal';
   root.add(ground);
   builder.raycastMeshes.push(ground);
+  const groundSurface = createBallisticSurface(
+    `${root.name}:${builder.ballisticSurfaceSequence}:deck`,
+    ground.name,
+    { minX: -27, maxX: 27, minY: -1.6, maxY: 0, minZ: -29, maxZ: 29 },
+    { impactSurface: 'metal', material: 'structural-metal' },
+  );
+  builder.ballisticSurfaceSequence += 1;
+  builder.shotSurfaces.push(groundSurface);
+  ground.userData.ballisticSurfaceId = groundSurface.id;
   // Thick deck plate + edge lip so the drop to water reads when looking over.
   box(builder, 'rustworks-rig-deck-slab', [0, -0.85, 0], [54.5, 1.6, 58.5], rustDark, { solid: false, cast: true, shots: false });
   box(builder, 'rustworks-rig-deck-edge', [0, -0.08, 0], [55.2, 0.22, 59.2], hazardDark, { solid: false, cast: false, shots: false });
@@ -612,6 +643,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
+    shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
         [-22, 21], [-14, 25], [-4, 20], [-25, 8], [-17, 2], [-9, 14],
@@ -757,7 +789,9 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Acres Gun Range arena';
   scene.add(root);
-  const builder: Builder = { root, colliders: [], physicsColliders: [], raycastMeshes: [] };
+  const builder: Builder = {
+    root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
+  };
   const concrete = standard(0x6d7472, 0.98, 0.02);
   const dark = standard(0x1f292c, 0.78, 0.44);
   const timber = standard(0x6f4b30, 0.94, 0.02);
@@ -772,6 +806,15 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   floor.userData.impactSurface = 'concrete';
   root.add(floor);
   builder.raycastMeshes.push(floor);
+  const floorSurface = createBallisticSurface(
+    `${root.name}:${builder.ballisticSurfaceSequence}:floor`,
+    floor.name,
+    { minX: -16, maxX: 16, minY: -1.2, maxY: 0, minZ: -44, maxZ: 10 },
+    { impactSurface: 'concrete', material: 'concrete' },
+  );
+  builder.ballisticSurfaceSequence += 1;
+  builder.shotSurfaces.push(floorSurface);
+  floor.userData.ballisticSurfaceId = floorSurface.id;
 
   box(builder, 'gun-range-backstop', [0, 3.5, -43], [32, 7, 1.2], dark);
   box(builder, 'gun-range-left-berm', [-15.5, 2.1, -17], [1.0, 4.2, 53], timber);
@@ -805,6 +848,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
+    shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [[2.5, 7], [-7.5, 7], [7.5, 7]],
       [[2.5, 7], [-7.5, 7], [7.5, 7]],
@@ -823,7 +867,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Skyline Terminal arena';
   scene.add(root);
-  const builder: Builder = { root, colliders: [], physicsColliders: [], raycastMeshes: [] };
+  const builder: Builder = {
+    root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
+  };
 
   const tarmacMat = standard(0x404547, 0.96, 0.04);
   const floorMat = standard(0xd0d8d5, 0.45, 0.08);
@@ -855,6 +901,15 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   tarmac.userData.impactSurface = 'concrete';
   root.add(tarmac);
   builder.raycastMeshes.push(tarmac);
+  const tarmacSurface = createBallisticSurface(
+    `${root.name}:${builder.ballisticSurfaceSequence}:tarmac`,
+    tarmac.name,
+    { minX: -36, maxX: 36, minY: -2, maxY: 0, minZ: -36, maxZ: 36 },
+    { impactSurface: 'concrete', material: 'concrete' },
+  );
+  builder.ballisticSurfaceSequence += 1;
+  builder.shotSurfaces.push(tarmacSurface);
+  tarmac.userData.ballisticSurfaceId = tarmacSurface.id;
 
   for (let z = -10; z <= 30; z += 10) {
     box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
@@ -909,10 +964,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
 
   const breakableWindows: BreakableWindow[] = [];
   for (const winX of [-22, -14, -6, 6, 14, 22]) {
-    const winMesh = box(builder, `skyline-facade-window-${winX}`, [winX, 2.5, -12], [6.8, 5.0, 0.2], glassMat, { solid: false, shots: true });
-    winMesh.userData.breakableWindowId = `skyline-window-${winX}`;
+    const windowId = `skyline-window-${winX}`;
+    const winMesh = box(builder, `skyline-facade-window-${winX}`, [winX, 2.5, -12], [6.8, 5.0, 0.2], glassMat, {
+      solid: false, shots: true, ballisticMaterial: 'glass', breakableWindowId: windowId,
+    });
+    winMesh.userData.breakableWindowId = windowId;
     winMesh.userData.dynamic = true;
-    breakableWindows.push({ id: `skyline-window-${winX}`, mesh: winMesh, broken: false });
+    breakableWindows.push({ id: windowId, mesh: winMesh, broken: false });
   }
 
   box(builder, 'skyline-jetbridge-bellows', [0, 4.3, -11.8], [4.1, 2.6, 0.5], jetbridgeMat, { solid: false, shots: false, detail: 'quality' });
@@ -1058,6 +1116,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
+    shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
         [-24, -30], [-16, -30], [-8, -30], [8, -30], [16, -30], [24, -30],

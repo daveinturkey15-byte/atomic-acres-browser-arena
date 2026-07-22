@@ -62,7 +62,7 @@ export function buildGameplayContract(): Record<string, unknown> {
   const houses = HOUSE_LAYOUT.map((entry) => createHouseArchitecture(entry.team, entry.x, entry.z, entry.facing));
   return {
     schemaVersion: 3,
-    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 33 deltas',
+    authority: 'Pass 24 gameplay feel with owner-approved Pass 25A through Pass 54 deltas',
     simulation: {
       hz: SIMULATION_HZ,
       maximumFrameDtSeconds: 0.05,

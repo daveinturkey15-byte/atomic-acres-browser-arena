@@ -1,4 +1,5 @@
 import type { WeaponId } from './protocol';
+import type { WeaponPenetrationProfile } from './ballistics';
 
 export type HitZone = 'head' | 'body' | 'limb';
 export type Stance = 'stand' | 'crouch' | 'prone';
@@ -54,6 +55,7 @@ export type WeaponSpec = {
   switchSeconds: number;
   automatic: boolean;
   color: number;
+  penetration: WeaponPenetrationProfile;
 };
 
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
@@ -65,6 +67,11 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     crouchSpreadMultiplier: 0.78, sustainedSpreadPerShot: 0.0016, maximumSpread: 0.045,
     pellets: 1, recoilPitch: 0.016, recoilYaw: 0.006, recoilRecovery: 12,
     switchSeconds: 0.48, automatic: true, color: 0xffd166,
+    penetration: {
+      caliber: '5.56 mm', penetrationPower: 5.8, fmjMultiplier: 1.12,
+      energyFalloffStart: 20, energyFalloffEnd: 76, minimumEnergyRetention: 0.48,
+      minimumWallDamageMultiplier: 0.34, maxPenetratedSurfaces: 2,
+    },
   },
   smg: {
     id: 'smg', name: 'Vectorline SMG', damage: 23, minimumDamage: 14,
@@ -74,6 +81,11 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0021, maximumSpread: 0.058,
     pellets: 1, recoilPitch: 0.011, recoilYaw: 0.009, recoilRecovery: 15,
     switchSeconds: 0.4, automatic: true, color: 0x65e7ff,
+    penetration: {
+      caliber: '9 mm', penetrationPower: 3.05, fmjMultiplier: 1.08,
+      energyFalloffStart: 8, energyFalloffEnd: 38, minimumEnergyRetention: 0.22,
+      minimumWallDamageMultiplier: 0.22, maxPenetratedSurfaces: 1,
+    },
   },
   scattergun: {
     id: 'scattergun', name: 'Model 12 Scattergun', damage: 17, minimumDamage: 7,
@@ -83,6 +95,11 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     crouchSpreadMultiplier: 0.88, sustainedSpreadPerShot: 0.002, maximumSpread: 0.09,
     pellets: 9, recoilPitch: 0.052, recoilYaw: 0.012, recoilRecovery: 8,
     switchSeconds: 0.62, automatic: false, color: 0xff8a5b,
+    penetration: {
+      caliber: '12 ga pellet', penetrationPower: 2.15, fmjMultiplier: 1,
+      energyFalloffStart: 4, energyFalloffEnd: 20, minimumEnergyRetention: 0.16,
+      minimumWallDamageMultiplier: 0.18, maxPenetratedSurfaces: 1,
+    },
   },
   sniper: {
     id: 'sniper', name: 'Longline 86', damage: 67, minimumDamage: 67,
@@ -92,6 +109,11 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,
     pellets: 1, recoilPitch: 0.072, recoilYaw: 0.016, recoilRecovery: 6.5,
     switchSeconds: 0.68, automatic: false, color: 0xa9e7ff,
+    penetration: {
+      caliber: '7.62 mm', penetrationPower: 9.4, fmjMultiplier: 1.16,
+      energyFalloffStart: 58, energyFalloffEnd: 120, minimumEnergyRetention: 0.7,
+      minimumWallDamageMultiplier: 0.48, maxPenetratedSurfaces: 3,
+    },
   },
   pistol: {
     id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
@@ -101,6 +123,11 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.0024, maximumSpread: 0.052,
     pellets: 1, recoilPitch: 0.021, recoilYaw: 0.008, recoilRecovery: 14,
     switchSeconds: 0.28, automatic: false, color: 0xe8c77b,
+    penetration: {
+      caliber: '9 mm', penetrationPower: 3.65, fmjMultiplier: 1.08,
+      energyFalloffStart: 12, energyFalloffEnd: 48, minimumEnergyRetention: 0.3,
+      minimumWallDamageMultiplier: 0.26, maxPenetratedSurfaces: 1,
+    },
   },
   'machine-pistol': {
     id: 'machine-pistol', name: 'G18 AUTO', damage: 18, minimumDamage: 11,
@@ -110,6 +137,11 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     crouchSpreadMultiplier: 0.82, sustainedSpreadPerShot: 0.0032, maximumSpread: 0.072,
     pellets: 1, recoilPitch: 0.014, recoilYaw: 0.012, recoilRecovery: 13,
     switchSeconds: 0.3, automatic: true, color: 0xff9f43,
+    penetration: {
+      caliber: '9 mm', penetrationPower: 2.75, fmjMultiplier: 1.06,
+      energyFalloffStart: 6, energyFalloffEnd: 30, minimumEnergyRetention: 0.18,
+      minimumWallDamageMultiplier: 0.2, maxPenetratedSurfaces: 1,
+    },
   },
 };
 
