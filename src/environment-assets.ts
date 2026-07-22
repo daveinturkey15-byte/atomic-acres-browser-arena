@@ -1,13 +1,21 @@
 import * as THREE from 'three';
 import {
+  COVER_LAYOUT,
+  GARAGE_LAYOUT,
+  HOUSE_LAYOUT,
+  NEIGHBOURHOOD_BENCH_LAYOUT,
+  NEIGHBOURHOOD_BIN_POSITIONS,
+} from './arena-layout';
+import {
   batchStaticMeshes,
   buildRetroCoach,
   buildRetroShuttleBus,
   roundedBox,
   texturedMaterial,
 } from './art-kit';
-import { COVER_LAYOUT, GARAGE_LAYOUT, HOUSE_LAYOUT } from './arena-layout';
 import { arenaAnimationAt } from './arena-storytelling';
+
+export { NEIGHBOURHOOD_BIN_POSITIONS } from './arena-layout';
 
 export type ArenaArtResult = {
   root: THREE.Group;
@@ -142,10 +150,6 @@ export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]>
   [21.2, 29], [13.8, 18.2], [27.8, -18],
 ]);
 
-export const NEIGHBOURHOOD_BIN_POSITIONS: ReadonlyArray<readonly [number, number]> = Object.freeze([
-  [-21.4, -33], [21.4, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34],
-]);
-
 export const NEIGHBOURHOOD_BICYCLE_POSITIONS: ReadonlyArray<readonly [number, number, number]> = Object.freeze([
   [-24.5, -35, 0.12], [24.5, 35, Math.PI + 0.12], [29.4, 14, Math.PI / 2],
 ]);
@@ -206,7 +210,7 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     mesh.name = name;
     return mesh;
   };
-  for (const [x, z, rotation] of [[-15.2, -7, 0], [15.2, 7, Math.PI], [-15.2, 26, 0], [15.2, -26, Math.PI]] as Array<[number, number, number]>) {
+  for (const [x, z, rotation] of NEIGHBOURHOOD_BENCH_LAYOUT) {
     const bench = new THREE.Group(); bench.name = 'street-bench'; bench.position.set(x, 0, z); bench.rotation.y = rotation;
     const seat = streetBox('bench-seat', [2.5, 0.16, 0.62], timber); seat.position.y = 0.72;
     const back = streetBox('bench-back', [2.5, 0.92, 0.14], timber); back.position.set(0, 1.22, 0.29); back.rotation.x = -0.1;

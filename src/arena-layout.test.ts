@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_BOUNDS, HOUSE_LAYOUT, PATROL_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
+import {
+  ARENA_BOUNDS,
+  HOUSE_LAYOUT,
+  NEIGHBOURHOOD_BENCH_COLLIDER_SIZE,
+  NEIGHBOURHOOD_BENCH_LAYOUT,
+  NEIGHBOURHOOD_BIN_COLLIDER_SIZE,
+  NEIGHBOURHOOD_BIN_POSITIONS,
+  PATROL_LAYOUT,
+  SPAWN_LAYOUT,
+} from './arena-layout';
 import { circleIntersectsBox, segmentIntersectsBox } from './collision';
 
 const inside = ([x, z]: readonly [number, number], margin = 0) =>
@@ -47,5 +56,14 @@ describe('compact original arena layout', () => {
       { x: b[0], y: 1.7, z: b[1] },
       { minX: -6.5, maxX: -1.1, minY: 0, maxY: 3.5, minZ: 0, maxZ: 14 },
     )).toBe(true);
+  });
+
+  it('owns collision layouts for every player-sized street prop', () => {
+    expect(NEIGHBOURHOOD_BENCH_LAYOUT).toHaveLength(4);
+    expect(NEIGHBOURHOOD_BIN_POSITIONS).toHaveLength(6);
+    expect(NEIGHBOURHOOD_BENCH_LAYOUT.every(([x, z]) => inside([x, z], 0.5))).toBe(true);
+    expect(NEIGHBOURHOOD_BIN_POSITIONS.every((point) => inside(point, 0.4))).toBe(true);
+    expect(NEIGHBOURHOOD_BENCH_COLLIDER_SIZE).toEqual([2.5, 1.34, 0.72]);
+    expect(NEIGHBOURHOOD_BIN_COLLIDER_SIZE).toEqual([0.78, 1.08, 0.72]);
   });
 });

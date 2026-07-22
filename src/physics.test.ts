@@ -87,7 +87,7 @@ describe('CharacterPhysics', () => {
     active = await CharacterPhysics.create([ceiling], bounds);
     active.teleportEye({ x: 2, y: 1.7, z: 0 });
     expect(active.setStance('prone')).toBe(true);
-    expect(active.eyePosition().y).toBeCloseTo(0.5, 2);
+    expect(active.eyePosition().y).toBeCloseTo(0.61, 2);
     for (let frame = 0; frame < 70; frame += 1) {
       active.move({ x: -0.035, y: -0.01, z: 0 }, 1 / 120);
     }

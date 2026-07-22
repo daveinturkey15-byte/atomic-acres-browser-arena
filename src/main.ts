@@ -83,6 +83,8 @@ import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNav
 import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
+import { damageNumberPresentation, roundStatSummary } from './player-feedback';
+import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { createWorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
@@ -545,6 +547,7 @@ app.innerHTML = `
     <div id="fps-counter" aria-label="Frame rate"><b>--</b><span>FPS</span></div>
     <div id="network-strip" aria-label="Live player latency"></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
+    <div id="damage-numbers" aria-live="polite" aria-label="Damage dealt"></div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope">
       <div class="scope-ring"></div>
       <div class="scope-reticle"><i></i><b></b><span></span><em></em></div>
@@ -1099,7 +1102,7 @@ const localArenaSwitchQaDelayMs = localMultiplayerQa
   ? Math.min(1_000, Math.max(0, Number(new URLSearchParams(window.location.search).get('arenaSwitchQaDelayMs')) || 0))
   : 0;
 let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
-const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v1') : null;
+const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v2') : null;
 let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
@@ -1198,6 +1201,10 @@ let triggerHeld = false;
 let targetHits = 0;
 let rangeScore = 0;
 let rangeShotsFired = 0;
+let roundShotsFired = 0;
+let roundHitShots = 0;
+let roundHeadshots = 0;
+let roundDamageDealt = 0;
 let rangePrimaryUnlocked = false;
 let accumulator = 0;
 let frameCount = 0;
@@ -1413,7 +1420,7 @@ function persistMergedHighScores(incoming: readonly unknown[], notifyTabs = true
 }
 
 function sendLeaderboardSync(): void {
-  if (network.role !== 'offline') network.send({ type: 'leaderboard-sync', by: player.id, entries: highScores });
+  if (network.role !== 'offline') network.send({ type: 'leaderboard-sync', by: player.id, season: LEADERBOARD_SEASON, entries: highScores });
 }
 
 async function refreshGlobalLeaderboard(): Promise<void> {
@@ -1446,7 +1453,7 @@ function recordImmediateStreak(syncGlobal = true): void {
   );
   if (!entry) return;
   persistMergedHighScores([entry]);
-  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, entry });
+  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, season: LEADERBOARD_SEASON, entry });
   if (!syncGlobal || localMultiplayerQa) return;
   const nameKey = entry.id.replace(/^global:/, '');
   void submitGlobalStreak({
@@ -1457,6 +1464,7 @@ function recordImmediateStreak(syncGlobal = true): void {
     installId: leaderboardInstallation,
     buildId: LEADERBOARD_BUILD_ID,
     idempotencyKey: `${leaderboardInstallation}:${nameKey}:${entry.bestStreak}`.slice(0, 120),
+    season: LEADERBOARD_SEASON,
   }).then((accepted) => {
     globalLeaderboardState = accepted ? 'saved' : 'cached';
     renderHighScores();
@@ -1487,7 +1495,7 @@ function recordCompletedMatch(): void {
     recordedAt,
   };
   persistMergedHighScores([entry]);
-  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, entry });
+  if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, season: LEADERBOARD_SEASON, entry });
 }
 
 function requirePlayerName(): string | null {
@@ -3253,11 +3261,18 @@ function respawn(requestLock = true): void {
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
   interruptReload(true);
+  clearGameplayInput();
   player.stance = 'stand';
   characterPhysics?.setStance('stand');
   player.position.copy(spawnPoint());
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
+  currentSprinting = false;
+  playerGrounded = false;
+  wasGrounded = false;
+  lastGroundedAt = -10_000;
+  gamepadTriggerArmed = false;
+  gamepadAdsArmed = false;
   player.hp = 100;
   lastDamageAt = -10_000;
   lastFallDamage = 0;
@@ -3321,6 +3336,10 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   targetHits = 0;
   rangeScore = 0;
   rangeShotsFired = 0;
+  roundShotsFired = 0;
+  roundHitShots = 0;
+  roundHeadshots = 0;
+  roundDamageDealt = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -3491,6 +3510,7 @@ function tryFire(now: number): void {
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
+  roundShotsFired += 1;
   if (isGunRange(selectedArena.id)) rangeShotsFired += 1;
   if (player.ammo[player.weapon] === 0) {
     const emptiedWeapon = player.weapon;
@@ -3612,10 +3632,17 @@ function tryFire(now: number): void {
   };
   // Reliable channels preserve this admission event ahead of its correlated hit claims.
   network.send(shot);
+  if (hitDamage.size > 0) {
+    roundHitShots += 1;
+    roundHeadshots += [...hitDamage.values()].filter((hit) => hit.zone === 'head').length;
+  }
   for (const [target, hit] of hitDamage) {
     const poweredDamage = outgoingDamage(hit.damage, now);
     const bot = bots.get(target);
-    if (bot) applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+    if (bot) {
+      const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+      showDamageNumber(dealt, hit.zone);
+    }
     else {
       const remote = remotes.get(target);
       if (remote && areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team)) {
@@ -3629,6 +3656,7 @@ function tryFire(now: number): void {
           actionNonce: shot.nonce, nonce,
         });
         showHitmarker(hit.zone === 'head');
+        showDamageNumber(powered, hit.zone);
         audio.hit(hit.zone === 'head');
         const zoneTag = hit.zone === 'head' ? 'HEADSHOT' : hit.zone === 'limb' ? 'LIMB' : 'BODY';
         const overdriveTag = powered > dealt + 0.5 ? ` · OD×${Math.round(powered / Math.max(1, dealt))}` : '';
@@ -4025,11 +4053,12 @@ function selectBotTacticalWaypoint(bot: BotPlayer): number {
   }), bot.waypoint, bot.deaths + bot.kills);
 }
 
-function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
+function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): number {
   const now = performance.now();
-  if (!bot.alive || now < bot.invulnerableUntil) return;
+  if (!bot.alive || now < bot.invulnerableUntil) return 0;
   reactOperator(bot.root, zone);
   const dealt = Math.min(bot.hp, Math.max(0, damage));
+  roundDamageDealt += dealt;
   bot.hp = Math.max(0, bot.hp - damage);
   showHitmarker(zone === 'head');
   audio.hit(zone === 'head');
@@ -4037,7 +4066,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
     if (zone === 'head') {
       addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
     }
-    return;
+    return dealt;
   }
   const eliminationStarted = performance.now();
   bot.alive = false;
@@ -4064,6 +4093,7 @@ function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): void {
     totalSyncMs: afterReinforcement - eliminationStarted,
   };
   checkMatchEnd();
+  return dealt;
 }
 
 function respawnBot(bot: BotPlayer, now: number): void {
@@ -4622,6 +4652,23 @@ function showHitmarker(headshot = false): void {
   marker.classList.remove('show', 'headshot');
   if (headshot) marker.classList.add('headshot');
   requestAnimationFrame(() => marker.classList.add('show'));
+}
+
+function showDamageNumber(damage: number, zone: HitZone): void {
+  const presentation = damageNumberPresentation(damage, zone);
+  if (!presentation) return;
+  const root = element<HTMLElement>('#damage-numbers');
+  root.dataset.lastDamage = String(presentation.amount);
+  root.dataset.lastCritical = String(presentation.critical);
+  root.dataset.lastLabel = presentation.label;
+  const row = document.createElement('strong');
+  row.textContent = presentation.label;
+  row.dataset.damage = String(presentation.amount);
+  row.classList.toggle('critical', presentation.critical);
+  row.style.setProperty('--damage-lane', String((root.childElementCount % 5) - 2));
+  root.append(row);
+  while (root.childElementCount > 8) root.firstElementChild?.remove();
+  window.setTimeout(() => row.remove(), presentation.durationMs);
 }
 
 function addFeed(
@@ -5866,8 +5913,18 @@ function updateMatchState(now: number): void {
     clearGrenades();
     clearFieldSupport();
     const privateMatch = gameMode !== 'solo';
+    const authoritativeLocal = authoritativeScores.get(player.id);
+    const summary = roundStatSummary({
+      kills: authoritativeLocal?.kills ?? player.kills,
+      deaths: authoritativeLocal?.deaths ?? player.deaths,
+      shotsFired: roundShotsFired,
+      hitShots: roundHitShots,
+      damageDealt: Math.max(roundDamageDealt, authoritativeLocal?.damageDealt ?? 0),
+      headshots: roundHeadshots,
+    });
+    const statsMarkup = `<div class="round-stats" aria-label="Round statistics"><b><small>KILLS</small>${summary.kills}</b><b><small>DEATHS</small>${summary.deaths}</b><b><small>K/D</small>${summary.kd}</b><b><small>ACCURACY</small>${summary.accuracy}</b><b><small>DAMAGE</small>${summary.damageDealt}</b><b><small>HEADSHOTS</small>${summary.headshots}</b></div>`;
     const returnLabel = privateMatch ? network.role === 'host' ? 'RETURN EVERYONE TO LOBBY' : 'WAITING FOR HOST' : 'REMATCH';
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span><div class="match-end-actions"><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
     banner.hidden = false;
     const rematch = element<HTMLButtonElement>('#rematch');
     if (!rematch.disabled) rematch.addEventListener('click', () => {
@@ -6720,6 +6777,10 @@ function resetForMode(): void {
   targetHits = 0;
   rangeScore = 0;
   rangeShotsFired = 0;
+  roundShotsFired = 0;
+  roundHitShots = 0;
+  roundHeadshots = 0;
+  roundDamageDealt = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -7032,6 +7093,7 @@ const debugWindow = window as Window & {
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
+    meleeBot: () => void;
     activateDormantReinforcement: () => { activated: boolean; syncMs: number };
     stageHouseRamp: (kind: 'interior' | 'exterior', team?: Team) => {
       kind: 'interior' | 'exterior';
@@ -7054,6 +7116,7 @@ const debugWindow = window as Window & {
     setCaptureViewmodelHidden: (hidden: boolean) => void;
     stageLoadingCaptureSquad: () => { staged: boolean; characters: number; positions: number[][] };
     collisionProbe: (x: number, z: number) => boolean;
+    collisionProbeAt: (x: number, y: number, z: number) => boolean;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
@@ -7847,6 +7910,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.invulnerableUntil = 0;
     applyBotDamage(bot, amount, zone);
   },
+  meleeBot: () => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (bot) meleeOperator(bot.root);
+  },
   activateDormantReinforcement: () => {
     const started = performance.now();
     const activated = activateDormantBot(bots.size);
@@ -7994,6 +8061,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
     ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
+    : true,
+  collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
+    ? isBlocked({ x, y, z }, arena.colliders, 0.36)
     : true,
   segmentBlocked: (x1, z1, x2, z2) => arena.colliders.some((box) => segmentIntersectsBox(
     new THREE.Vector3(x1, 0.2, z1),

@@ -3,6 +3,7 @@ import {
   isValidKillsForStreak,
   isValidSubmittedStreak,
 } from '../../shared/leaderboard-policy';
+import { LEADERBOARD_SEASON } from '../../shared/leaderboard-season';
 
 export interface Env {
   DB: D1Database;
@@ -18,6 +19,7 @@ export type StreakSubmission = Readonly<{
   installId: string;
   buildId: string;
   idempotencyKey: string;
+  season: typeof LEADERBOARD_SEASON;
 }>;
 
 const MAX_BODY_BYTES = 2_048;
@@ -65,7 +67,7 @@ function normalizedName(value: string): string {
 export function validateStreakSubmission(value: unknown): { submission: StreakSubmission | null; error: string | null } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { submission: null, error: 'body must be an object' };
   const item = value as Record<string, unknown>;
-  const expectedKeys = ['buildId', 'deaths', 'idempotencyKey', 'installId', 'kills', 'name', 'streak'];
+  const expectedKeys = ['buildId', 'deaths', 'idempotencyKey', 'installId', 'kills', 'name', 'season', 'streak'];
   if (Object.keys(item).sort().join(',') !== expectedKeys.sort().join(',')) return { submission: null, error: 'unexpected fields' };
   if (typeof item.name !== 'string' || normalizedName(item.name) !== item.name || !NAME_PATTERN.test(item.name)) return { submission: null, error: 'invalid name' };
   if (!isValidSubmittedStreak(item.streak)) return { submission: null, error: 'invalid streak' };
@@ -74,6 +76,7 @@ export function validateStreakSubmission(value: unknown): { submission: StreakSu
   if (typeof item.installId !== 'string' || !INSTALL_PATTERN.test(item.installId)) return { submission: null, error: 'invalid installId' };
   if (typeof item.buildId !== 'string' || !BUILD_PATTERN.test(item.buildId)) return { submission: null, error: 'invalid buildId' };
   if (typeof item.idempotencyKey !== 'string' || !IDEMPOTENCY_PATTERN.test(item.idempotencyKey)) return { submission: null, error: 'invalid idempotencyKey' };
+  if (item.season !== LEADERBOARD_SEASON) return { submission: null, error: 'invalid season' };
   return { submission: item as unknown as StreakSubmission, error: null };
 }
 
@@ -106,14 +109,17 @@ export function leaderboardNameKey(name: string): string {
 }
 
 async function listLeaderboard(request: Request, env: Env, origin: string | null): Promise<Response> {
+  const requestedSeason = new URL(request.url).searchParams.get('season');
+  if (requestedSeason !== LEADERBOARD_SEASON) return json({ error: 'invalid season' }, 400, origin, env);
   const limitValue = Number(new URL(request.url).searchParams.get('limit') ?? 20);
   const limit = Number.isSafeInteger(limitValue) ? Math.max(1, Math.min(20, limitValue)) : 20;
   const rows = await env.DB.prepare(`
     SELECT name_key, name, best_streak, kills, deaths, updated_at
     FROM leaderboard
+    WHERE season = ?
     ORDER BY best_streak DESC, kills DESC, deaths ASC, updated_at ASC, name_key ASC
     LIMIT ?
-  `).bind(limit).all<{
+  `).bind(LEADERBOARD_SEASON, limit).all<{
     name_key: string;
     name: string;
     best_streak: number;
@@ -130,7 +136,7 @@ async function listLeaderboard(request: Request, env: Env, origin: string | null
     won: false,
     recordedAt: row.updated_at,
   }));
-  const response = json({ entries }, 200, origin, env);
+  const response = json({ season: LEADERBOARD_SEASON, entries }, 200, origin, env);
   response.headers.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
   return response;
 }
@@ -166,9 +172,9 @@ async function submitStreak(request: Request, env: Env, origin: string, context:
   const nameKey = leaderboardNameKey(submission.name);
   try {
     const result = await env.DB.prepare(`
-      INSERT INTO leaderboard (name_key, name, best_streak, kills, deaths, updated_at, build_id, install_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(name_key) DO UPDATE SET
+      INSERT INTO leaderboard (season, name_key, name, best_streak, kills, deaths, updated_at, build_id, install_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(season, name_key) DO UPDATE SET
         name = excluded.name,
         best_streak = excluded.best_streak,
         kills = excluded.kills,
@@ -179,7 +185,7 @@ async function submitStreak(request: Request, env: Env, origin: string, context:
       WHERE excluded.best_streak > leaderboard.best_streak
          OR (excluded.best_streak = leaderboard.best_streak AND excluded.kills > leaderboard.kills)
          OR (excluded.best_streak = leaderboard.best_streak AND excluded.kills = leaderboard.kills AND excluded.deaths < leaderboard.deaths)
-    `).bind(nameKey, submission.name, submission.streak, submission.kills, submission.deaths, now, submission.buildId, installHash).run();
+    `).bind(submission.season, nameKey, submission.name, submission.streak, submission.kills, submission.deaths, now, submission.buildId, installHash).run();
     context.waitUntil(Promise.all([
       env.DB.prepare('DELETE FROM streak_claims WHERE received_at < ?').bind(now - 7 * 24 * 60 * 60_000).run(),
       env.DB.prepare('DELETE FROM rate_limits WHERE updated_at < ?').bind(now - 2 * 60 * 60_000).run(),

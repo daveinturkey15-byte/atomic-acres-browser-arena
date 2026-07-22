@@ -277,13 +277,16 @@ describe('simplified two-floor house architecture', () => {
     }
   });
 
-  it('declares stable breakable IDs for every house glass pane', () => {
+  it('keeps ground windows breakable while sealing the dark upper facade panel', () => {
     for (const team of [0, 1] as Team[]) {
       const architecture = createHouseArchitecture(team, 0, 0, team === 0 ? 1 : -1);
       const glass = architecture.solids.filter((entry) => entry.kind === 'glass');
       expect(glass).toHaveLength(3);
       expect(new Set(glass.map((entry) => entry.id)).size).toBe(3);
-      expect(glass.every((entry) => entry.breakable === true)).toBe(true);
+      expect(glass.filter((entry) => entry.breakable)).toHaveLength(2);
+      const upper = glass.find((entry) => entry.name === 'upper-window-glass');
+      expect(upper).toMatchObject({ collidable: true, breakable: false });
+      expect(architecture.openings.find((entry) => entry.id === 'upper-window')?.route).toBe(false);
     }
   });
 

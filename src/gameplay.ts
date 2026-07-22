@@ -197,7 +197,7 @@ export function movementProfile(context: MovementContext): MovementProfile {
     acceleration: context.grounded ? groundAcceleration : 10.5,
     deceleration: context.grounded ? (prone ? 25 : context.crouched ? 42 : 62) : 2.4,
     friction: context.grounded ? 0 : 0.25,
-    eyeHeight: prone ? 0.5 : context.crouched ? 1.16 : 1.7,
+    eyeHeight: prone ? 0.61 : context.crouched ? 1.16 : 1.7,
     jumpVelocity: 6.35,
   };
 }

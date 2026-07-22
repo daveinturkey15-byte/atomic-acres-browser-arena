@@ -1,6 +1,7 @@
 import type { HighScoreEntry, ScoreStorage } from './high-scores';
+import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 
-export const LEADERBOARD_INSTALL_STORAGE_KEY = 'atomic-acres:leaderboard-install:v1';
+export const LEADERBOARD_INSTALL_STORAGE_KEY = 'atomic-acres:leaderboard-install:v2';
 export const GLOBAL_LEADERBOARD_ENDPOINT = (import.meta.env.VITE_GLOBAL_LEADERBOARD_URL ?? '').trim().replace(/\/$/, '');
 export const GLOBAL_LEADERBOARD_TIMEOUT_MS = 4_000;
 
@@ -12,6 +13,7 @@ export type GlobalStreakSubmission = Readonly<{
   installId: string;
   buildId: string;
   idempotencyKey: string;
+  season: typeof LEADERBOARD_SEASON;
 }>;
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -46,14 +48,14 @@ export async function fetchGlobalLeaderboard(
   if (!endpoint) return [];
   const { signal, cancel } = requestSignal(timeoutMs);
   try {
-    const response = await fetcher(`${endpoint}/v1/leaderboard?limit=20`, {
+    const response = await fetcher(`${endpoint}/v1/leaderboard?limit=20&season=${encodeURIComponent(LEADERBOARD_SEASON)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       signal,
     });
     if (!response.ok) throw new Error(`Global leaderboard HTTP ${response.status}`);
-    const body = await response.json() as { entries?: unknown };
-    return Array.isArray(body.entries) ? body.entries as HighScoreEntry[] : [];
+    const body = await response.json() as { entries?: unknown; season?: unknown };
+    return body.season === LEADERBOARD_SEASON && Array.isArray(body.entries) ? body.entries as HighScoreEntry[] : [];
   } finally {
     cancel();
   }

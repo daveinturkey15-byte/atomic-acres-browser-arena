@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   HIGH_SCORE_STORAGE_KEY,
+  HIGH_SCORE_SCHEMA_VERSION,
   immediateStreakEntry,
   isHighScoreEntry,
   leaderboardNameKey,
@@ -59,7 +60,7 @@ describe('persistent high scores', () => {
   it('survives reloads through a versioned stable-origin storage key', () => {
     const storage = new MemoryStorage();
     saveHighScores(storage, [entry()]);
-    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":3');
+    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain(`"version":${HIGH_SCORE_SCHEMA_VERSION}`);
     expect(loadHighScores(storage, now)).toEqual([entry()]);
   });
 
@@ -110,14 +111,13 @@ describe('persistent high scores', () => {
     expect(new Set(['A B', 'A_B', 'A-B'].map((name) => leaderboardNameKey(name))).size).toBe(3);
   });
 
-  it('migrates version-one global ids to the collision-free key without losing records', () => {
+  it('does not revive version-one records after the requested reset', () => {
     const storage = new MemoryStorage();
     storage.setItem(HIGH_SCORE_STORAGE_KEY, JSON.stringify({
       version: 1,
       entries: [entry({ id: 'global:a_b', name: 'A B' })],
     }));
-    expect(loadHighScores(storage, now)[0]?.id).toBe('global:a_20b');
-    expect(storage.getItem(HIGH_SCORE_STORAGE_KEY)).toContain('"version":3');
+    expect(loadHighScores(storage, now)).toEqual([]);
   });
 
   it('collapses immediate, completed-match, peer and global ids to one best row per callsign', () => {
@@ -140,7 +140,7 @@ describe('persistent high scores', () => {
     expect(peerOwnedHighScores('DAVE', [own, forged])).toEqual([own]);
   });
 
-  it('rewrites existing duplicate version-two storage to one version-three row', () => {
+  it('does not revive version-two records after the requested reset', () => {
     const storage = new MemoryStorage();
     storage.setItem(HIGH_SCORE_STORAGE_KEY, JSON.stringify({
       version: 2,
@@ -149,9 +149,6 @@ describe('persistent high scores', () => {
         entry({ id: 'score:player:later', kills: 14, bestStreak: 8 }),
       ],
     }));
-    expect(loadHighScores(storage, now)).toEqual([entry({ id: 'score:player:later', kills: 14, bestStreak: 8 })]);
-    const rewritten = JSON.parse(storage.getItem(HIGH_SCORE_STORAGE_KEY)!) as { version: number; entries: HighScoreEntry[] };
-    expect(rewritten.version).toBe(3);
-    expect(rewritten.entries).toHaveLength(1);
+    expect(loadHighScores(storage, now)).toEqual([]);
   });
 });

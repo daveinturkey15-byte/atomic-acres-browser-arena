@@ -356,7 +356,7 @@
               "height": 1.9699999999999998,
               "id": "upper-window",
               "kind": "window",
-              "route": true,
+              "route": false,
               "width": 3.2
             }
           ],
@@ -925,7 +925,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "aqua-irrigation-workshop:upper-window-glass",
               "kind": "glass",
               "position": [
@@ -936,7 +936,7 @@
               "size": [
                 3.2,
                 1.9699999999999998,
-                0.08
+                0.12
               ]
             },
             {
@@ -1581,7 +1581,7 @@
               "height": 1.9699999999999998,
               "id": "upper-window",
               "kind": "window",
-              "route": true,
+              "route": false,
               "width": 3.2
             }
           ],
@@ -2150,7 +2150,7 @@
               ]
             },
             {
-              "collidable": false,
+              "collidable": true,
               "id": "coral-orchard-conservatory:upper-window-glass",
               "kind": "glass",
               "position": [
@@ -2161,7 +2161,7 @@
               "size": [
                 3.2,
                 1.9699999999999998,
-                0.08
+                0.12
               ]
             },
             {
@@ -3170,7 +3170,7 @@
       "prone": {
         "acceleration": 17,
         "deceleration": 25,
-        "eyeHeight": 0.5,
+        "eyeHeight": 0.61,
         "friction": 0,
         "jumpVelocity": 6.35,
         "maxSpeed": 1.55
@@ -3215,9 +3215,9 @@
           "radius": 0.36
         },
         "prone": {
-          "eyeFromCenter": 0.15,
-          "halfHeight": 0.04,
-          "radius": 0.31
+          "eyeFromCenter": 0.23,
+          "halfHeight": 0.02,
+          "radius": 0.36
         },
         "stand": {
           "eyeFromCenter": 0.79,
