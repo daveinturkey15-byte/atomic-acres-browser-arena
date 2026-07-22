@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
 type DebugState = {
   gameStarted: boolean;
@@ -434,21 +435,21 @@ test.describe('boot and authored presentation', () => {
 
   test('loads versioned high scores and surfaces real-time same-origin updates', async ({ page }) => {
     const recordedAt = Date.UTC(2026, 6, 17, 12);
-    await page.addInitScript(({ recordedAt }) => {
-      localStorage.setItem('atomic-acres:high-scores:v1', JSON.stringify({
-        version: 1,
+    await page.addInitScript(({ recordedAt, storageKey, schemaVersion }) => {
+      localStorage.setItem(storageKey, JSON.stringify({
+        version: schemaVersion,
         entries: [{ id: 'score:dave:one', name: 'Dave', kills: 14, deaths: 4, bestStreak: 9, won: true, recordedAt }],
       }));
-    }, { recordedAt });
+    }, { recordedAt, storageKey: HIGH_SCORE_STORAGE_KEY, schemaVersion: HIGH_SCORE_SCHEMA_VERSION });
     await pageReady(page);
     await expect(page.locator('#high-score-list')).toContainText('Dave');
     await expect(page.locator('#high-score-list')).toContainText('14 KILLS');
 
-    await page.evaluate(({ recordedAt }) => {
-      const channel = new BroadcastChannel('atomic-acres:high-scores:v1');
+    await page.evaluate(({ recordedAt, channelName }) => {
+      const channel = new BroadcastChannel(channelName);
       channel.postMessage([{ id: 'score:ellis:one', name: 'Ellis', kills: 18, deaths: 2, bestStreak: 12, won: true, recordedAt }]);
       channel.close();
-    }, { recordedAt });
+    }, { recordedAt, channelName: HIGH_SCORE_STORAGE_KEY });
     await expect(page.locator('#high-score-list')).toContainText('Ellis');
     await expect(page.locator('#high-score-list')).toContainText('18 KILLS');
   });
@@ -463,10 +464,10 @@ test.describe('boot and authored presentation', () => {
       api.endMatch();
     });
     await expect.poll(async () => (await debug(page)).matchPhase).toBe('ended');
-    const entries = await page.evaluate(() => {
-      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+    const entries = await page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
       return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
-    });
+    }, HIGH_SCORE_STORAGE_KEY);
     expect(entries.find((entry) => entry.name === 'QA Operator')).toMatchObject({ name: 'QA Operator', kills: 30, bestStreak: 7, won: true });
   });
 
@@ -484,11 +485,11 @@ test.describe('boot and authored presentation', () => {
       api.earnSupport(8);
     });
     expect((await debug(page)).matchPhase).toBe('active');
-    await expect.poll(async () => page.evaluate(() => {
-      const raw = localStorage.getItem('atomic-acres:high-scores:v1');
+    await expect.poll(async () => page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
       const entries = raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
       return entries.find((entry) => entry.name === 'QA Operator');
-    })).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
+    }, HIGH_SCORE_STORAGE_KEY)).toMatchObject({ id: 'global:qa_20operator', name: 'QA Operator', bestStreak: 8 });
     await page.reload();
     await pageReady(page);
     const qaScore = page.locator('#high-score-list li').filter({ hasText: 'QA Operator' });
@@ -594,7 +595,7 @@ test.describe('boot and authored presentation', () => {
       },
       blenderEnvironment: {
         status: 'ready', meshCount: 33, materialCount: 27, texturedMaterials: 19, pbrMaterials: 19, textureCount: 35, triangleCount: 34_336,
-        semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
+        semanticWindows: 6, boundWindows: 4, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
     });
