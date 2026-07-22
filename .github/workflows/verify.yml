@@ -2,7 +2,7 @@ name: verify
 
 on:
   push:
-    branches: [main, "desky/**"]
+    branches: [main]
   pull_request:
 
 permissions:
