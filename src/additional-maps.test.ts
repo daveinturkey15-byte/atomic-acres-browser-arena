@@ -418,7 +418,7 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('skyline-jetliner-fuselage-top')).toBeTruthy();
   });
 
-  it('exposes detailed terminal signage, baggage carousel, fuel trailer, and presentation batching', () => {
+  it('exposes coherent terminal-story clusters and presentation batching', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
     expect(mainSign).toBeTruthy();
@@ -433,13 +433,52 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('skyline-fuel-trailer-tank')).toBeTruthy();
     expect(map.root.getObjectByName('skyline-jetliner-cockpit-partition')).toBeTruthy();
 
+    const clusterIds = [
+      'floor-language',
+      'wall-structure',
+      'escalator-detail',
+      'window-frame',
+      'aircraft-skin',
+      'apron-marking',
+      'terminal-story',
+    ];
+    expect(map.root.userData.skylineDetailClusters).toEqual(clusterIds);
+    for (const clusterId of clusterIds) {
+      let semanticNodes = 0;
+      map.root.traverse((node) => {
+        if (node.userData.skylineCluster === clusterId) semanticNodes += 1;
+      });
+      expect(semanticNodes, clusterId).toBeGreaterThan(0);
+    }
+
     const batches = map.root.userData.skylinePresentationBatches as {
       sourceMeshes: number;
       batches: number;
       savedDrawCalls: number;
     };
-    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(10);
+    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(30);
     expect(batches.batches).toBeGreaterThan(0);
+    expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+  });
+
+  it('keeps six breakable facade panes independent from the added mullion frames', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.breakableWindows.map((window) => window.id)).toEqual([
+      'skyline-window--22',
+      'skyline-window--14',
+      'skyline-window--6',
+      'skyline-window-6',
+      'skyline-window-14',
+      'skyline-window-22',
+    ]);
+    for (const window of map.breakableWindows) {
+      expect(window.mesh.userData.dynamic).toBe(true);
+      expect(window.mesh.userData.breakableWindowId).toBe(window.id);
+    }
+    for (const winX of [-22, -14, -6, 6, 14, 22]) {
+      expect(map.root.getObjectByName(`skyline-window-frame-top-${winX}`)?.userData.breakableWindowId).toBeUndefined();
+      expect(map.root.getObjectByName(`skyline-window-mullion-${winX}`)?.userData.breakableWindowId).toBeUndefined();
+    }
   });
 
   it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
@@ -460,14 +499,22 @@ describe('additional authored maps', () => {
 
   it('applies the Performance/Quality split to Skyline instead of rendering Quality props on low-spec profiles', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
+    const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
     const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
+    const qualityNacelles = map.root.getObjectByName('skyline-aircraft-engine-nacelles');
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
+    expect(performanceSign).toBeTruthy();
     expect(qualityBoard).toBeTruthy();
+    expect(qualityNacelles).toBeTruthy();
     applyAdditionalMapPresentationProfile(map.root, 'performance');
+    expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(false);
+    expect(qualityNacelles?.visible).toBe(false);
     expect(coreFloor?.visible).not.toBe(false);
     applyAdditionalMapPresentationProfile(map.root, 'blender');
+    expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(true);
+    expect(qualityNacelles?.visible).toBe(true);
   });
 
   it('walks every Skyline route in both directions with Rapier-backed collision', async () => {

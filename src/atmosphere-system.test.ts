@@ -40,12 +40,16 @@ describe('Pass 30 atmosphere budget', () => {
     expect(system.telemetry()).toMatchObject({ arenaId: 'rustworks-1v1', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30, perFrameAllocations: 0 });
     system.setArena('gun-range');
     expect(system.telemetry()).toMatchObject({ arenaId: 'gun-range', mistCards: 4, smokeCards: 2, dustMotes: 24, triangles: 12, perFrameAllocations: 0 });
+    system.setArena('skyline-terminal');
+    expect(system.telemetry()).toMatchObject({ arenaId: 'skyline-terminal', mistCards: 6, smokeCards: 3, dustMotes: 48, triangles: 18, perFrameAllocations: 0 });
   });
 
   it('brings restrained distance fog into the playable depth of every non-compat arena', () => {
     expect(atmosphereFogRange('performance', 'atomic-acres')).toEqual({ near: 36, far: 112 });
     expect(atmosphereFogRange('performance', 'rustworks-1v1')).toEqual({ near: 30, far: 94 });
     expect(atmosphereFogRange('performance', 'gun-range')).toEqual({ near: 42, far: 105 });
+    expect(atmosphereFogRange('performance', 'skyline-terminal')).toEqual({ near: 44, far: 130 });
+    expect(atmosphereFogRange('blender', 'skyline-terminal')).toEqual({ near: 40, far: 122 });
     expect(atmosphereFogRange('compat', 'atomic-acres')).toEqual({ near: 56, far: 140 });
   });
 });
