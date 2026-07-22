@@ -862,6 +862,33 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   };
 }
 
+function terminalWayfindingMaterial(title: string, subtitle: string, accent: string): THREE.Material {
+  if (typeof document === 'undefined') {
+    return new THREE.MeshStandardMaterial({ color: 0x172126, roughness: 0.48, metalness: 0.36 });
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 192;
+  const context = canvas.getContext('2d');
+  if (!context) return standard(0x172126, 0.48, 0.36);
+  context.fillStyle = '#111a1f';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = accent;
+  context.fillRect(0, 0, 28, canvas.height);
+  context.fillRect(0, canvas.height - 12, canvas.width, 12);
+  context.fillStyle = '#f4ead2';
+  context.font = '900 66px sans-serif';
+  context.textAlign = 'left';
+  context.textBaseline = 'middle';
+  context.fillText(title, 62, 76);
+  context.fillStyle = '#b8c8c8';
+  context.font = '700 30px sans-serif';
+  context.fillText(subtitle, 64, 142);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+}
+
 export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const root = new THREE.Group();
   root.name = 'Skyline Terminal arena';
@@ -870,27 +897,74 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
 
-  const tarmacMat = standard(0x404547, 0.96, 0.04);
-  const floorMat = standard(0xd0d8d5, 0.45, 0.08);
-  const wallMat = standard(0x2d373c, 0.82, 0.18);
-  const trimMat = standard(0x38b2a5, 0.5, 0.2);
+  const tarmacMat = standard(0x30383a, 0.95, 0.05);
+  const floorMat = standard(0x9ca6a2, 0.52, 0.1);
+  const wallMat = standard(0x263238, 0.86, 0.22);
+  const trimMat = standard(0x46575c, 0.52, 0.48);
   // Avoid transmission/refraction on the low-spec path: alpha glass is much
   // cheaper under software WebGL and still reads clearly as breakable glazing.
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x78bad0,
-    roughness: 0.24,
-    metalness: 0.05,
+    color: 0x6babb7,
+    roughness: 0.2,
+    metalness: 0.08,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.34,
     depthWrite: false,
   });
-  const planeHullMat = standard(0xebf2f5, 0.4, 0.28);
-  const planeWingMat = standard(0x829096, 0.45, 0.55);
-  const engineMat = standard(0x384146, 0.35, 0.72);
-  const jetbridgeMat = standard(0x525c61, 0.6, 0.45);
-  const kioskMat = standard(0x6b4c33, 0.9, 0.04);
-  const cargoMat = standard(0xd4772c, 0.7, 0.3);
-  const hazardMat = standard(0xd99f2e, 0.65, 0.35);
+  const planeHullMat = standard(0xe5e8e4, 0.32, 0.35);
+  const planeWingMat = standard(0x7a8587, 0.44, 0.6);
+  const engineMat = standard(0x222a2e, 0.3, 0.78);
+  const jetbridgeMat = standard(0x566267, 0.58, 0.52);
+  const kioskMat = standard(0x574738, 0.86, 0.1);
+  const cargoMat = standard(0xb9602e, 0.72, 0.28);
+  const hazardMat = standard(0xd69a2d, 0.58, 0.28);
+  const floorBorderMat = standard(0x252c30, 0.48, 0.16);
+  const floorInsetMat = standard(0x4a5555, 0.58, 0.12);
+  const wallLowerMat = standard(0x455157, 0.8, 0.18);
+  const structureMat = standard(0x222b30, 0.5, 0.68);
+  const rubberMat = standard(0x171c1f, 0.92, 0.04);
+  const cockpitMat = standard(0x111c25, 0.18, 0.72);
+  const planeStripeMat = standard(0x31464c, 0.46, 0.42);
+  const stainMat = standard(0x242a28, 1.0, 0.0);
+  const practicalMat = new THREE.MeshStandardMaterial({
+    color: 0xffd9a0,
+    roughness: 0.34,
+    metalness: 0.08,
+    emissive: 0xffa94d,
+    emissiveIntensity: 0.72,
+  });
+
+  const skylineClusterIds = [
+    'floor-language',
+    'wall-structure',
+    'escalator-detail',
+    'window-frame',
+    'aircraft-skin',
+    'apron-marking',
+    'terminal-story',
+  ] as const;
+  type SkylineClusterId = typeof skylineClusterIds[number];
+  const detailBox = (
+    cluster: SkylineClusterId,
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    detail: 'performance' | 'quality' = 'performance',
+    rotation?: [number, number, number],
+    cast = false,
+  ): THREE.Mesh => {
+    const mesh = box(builder, name, position, size, material, {
+      solid: false,
+      shots: false,
+      detail,
+      rotation,
+      cast,
+    });
+    mesh.userData.skylineCluster = cluster;
+    return mesh;
+  };
+  root.userData.skylineDetailClusters = [...skylineClusterIds];
 
   const tarmac = new THREE.Mesh(new THREE.PlaneGeometry(76, 76), tarmacMat);
   tarmac.name = 'skyline-tarmac-apron';
@@ -914,13 +988,48 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
   }
 
+  // A repeated apron grid and stand envelope give the large exterior plane
+  // authored scale while remaining one static batch per shared material.
+  for (let seamX = -28; seamX <= 28; seamX += 7) {
+    detailBox('apron-marking', `skyline-apron-seam-x-${seamX}`, [seamX, 0.023, 8], [0.035, 0.018, 54], stainMat);
+  }
+  for (let seamZ = -16; seamZ <= 32; seamZ += 8) {
+    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.024, seamZ], [68, 0.018, 0.035], stainMat);
+  }
+  for (const [name, x, z, width, depth] of [
+    ['north', 0, -0.15, 43, 0.16],
+    ['south', 0, 4.15, 43, 0.16],
+    ['west', -21.4, 2, 0.16, 4.45],
+    ['east', 21.4, 2, 0.16, 4.45],
+  ] as const) {
+    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, 0.036, z], [width, 0.025, depth], hazardMat);
+  }
+  detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], floorBorderMat);
+  detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], hazardMat);
+  for (const [z, rotationY] of [[12, 0.08], [-8, -0.08]] as const) {
+    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.031, z], [3.4, 0.022, 5.2], stainMat, 'performance', [0, rotationY, 0]);
+  }
+
   box(builder, 'skyline-concourse-floor', [0, 0.02, -23], [60, 0.08, 22], floorMat, { solid: false });
+  detailBox('floor-language', 'skyline-floor-dark-runner', [0, 0.073, -22.5], [5.2, 0.025, 20.5], floorInsetMat);
+  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.074, -12.55], [59.2, 0.028, 0.52], floorBorderMat);
+  detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderMat);
+  for (let tileX = -27; tileX <= 27; tileX += 6) {
+    detailBox('floor-language', `skyline-floor-joint-x-${tileX}`, [tileX, 0.076, -23], [0.025, 0.018, 20.2], floorBorderMat);
+  }
+  for (let tileZ = -31; tileZ <= -15; tileZ += 4) {
+    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.077, tileZ], [58.5, 0.018, 0.025], floorBorderMat);
+  }
   // Split the mezzanine around both escalators. A monolithic slab creates a
   // low underside above each ramp and physically stops the character halfway.
   box(builder, 'skyline-concourse-mezzanine', [0, 3.2, -31.25], [52, 0.28, 5.5], floorMat);
   box(builder, 'skyline-mezzanine-front-center', [0, 3.2, -25.25], [36.4, 0.28, 6.5], floorMat);
   box(builder, 'skyline-mezzanine-front-west', [-23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
   box(builder, 'skyline-mezzanine-front-east', [23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
+  detailBox('floor-language', 'skyline-mezzanine-front-edge', [0, 3.36, -22.12], [52, 0.12, 0.34], floorBorderMat);
+  for (const x of [-23.5, -16, -8, 0, 8, 16, 23.5]) {
+    detailBox('floor-language', `skyline-mezzanine-inlay-${x}`, [x, 3.355, -27.1], [0.035, 0.025, 12.8], floorBorderMat);
+  }
   // Split the front rail around the central gate connector so the route does
   // not visually pass through a barrier.
   box(builder, 'skyline-mezzanine-rail', [-14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
@@ -929,11 +1038,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-gate-connector-rail-left', [-1.75, 4.15, -17], [0.12, 1.7, 10], trimMat, { solid: false, detail: 'performance' });
   box(builder, 'skyline-gate-connector-rail-right', [1.75, 4.15, -17], [0.12, 1.7, 10], trimMat, { solid: false, detail: 'performance' });
 
-  const mainSign = box(builder, 'skyline-terminal-main-sign', [0, 6.2, -33.8], [14.0, 1.2, 0.2], hazardMat, { solid: false, shots: false, detail: 'performance' });
+  const mainSign = box(builder, 'skyline-terminal-main-sign', [0, 6.2, -33.8], [14.0, 1.2, 0.2], terminalWayfindingMaterial('SKYLINE TERMINAL', 'GATES 01—12  •  CONCOURSE A', '#d69a2d'), { solid: false, shots: false, detail: 'performance' });
   mainSign.userData.label = 'SKYLINE TERMINAL - GATES 1-12';
+  mainSign.userData.skylineCluster = 'terminal-story';
 
-  const flightDisplay = box(builder, 'skyline-flight-display-board', [0, 4.8, -27.8], [6.5, 1.4, 0.25], wallMat, { solid: false, shots: false, detail: 'quality' });
+  const flightDisplay = box(builder, 'skyline-flight-display-board', [0, 4.8, -27.8], [6.5, 1.4, 0.25], terminalWayfindingMaterial('DEPARTURES', 'AERO 86  •  BOARDING', '#4d9b98'), { solid: false, shots: false, detail: 'quality' });
   flightDisplay.userData.label = 'DEPARTURES - FLIGHT AERO 86';
+  flightDisplay.userData.skylineCluster = 'terminal-story';
 
   const rampAngle = (22 * Math.PI) / 180;
   const rampLen = 3.2 / Math.sin(rampAngle);
@@ -943,21 +1054,65 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       // mezzanine. Gemini's negative sign inverted the physical route.
       rotation: [rampAngle, 0, 0],
     });
+    for (const railX of [sideX - 1.48, sideX + 1.48]) {
+      detailBox('escalator-detail', `skyline-escalator-side-${railX}`, [railX, 1.82, -24.5], [0.14, 0.44, rampLen + 0.35], wallLowerMat, 'performance', [rampAngle, 0, 0], true);
+      detailBox('escalator-detail', `skyline-escalator-rail-${railX}`, [railX, 2.45, -24.5], [0.09, 0.09, rampLen + 0.3], structureMat, 'performance', [rampAngle, 0, 0]);
+    }
+    for (let tread = -3.6; tread <= 3.6; tread += 0.72) {
+      const y = 1.6 - tread * Math.sin(rampAngle) + 0.17;
+      const z = -24.5 + tread * Math.cos(rampAngle);
+      detailBox('escalator-detail', `skyline-escalator-tread-${sideX}-${tread.toFixed(2)}`, [sideX, y, z], [2.85, 0.055, 0.18], rubberMat, 'performance', [rampAngle, 0, 0]);
+    }
+    detailBox('escalator-detail', `skyline-escalator-comb-foot-${sideX}`, [sideX, 0.095, -20.45], [3.05, 0.04, 0.5], hazardMat);
+    detailBox('escalator-detail', `skyline-escalator-comb-top-${sideX}`, [sideX, 3.375, -28.45], [3.05, 0.04, 0.5], hazardMat);
+    detailBox('escalator-detail', `skyline-escalator-underlight-${sideX}`, [sideX, 1.38, -24.5], [2.3, 0.06, rampLen - 0.45], practicalMat, 'performance', [rampAngle, 0, 0]);
   }
 
   box(builder, 'skyline-terminal-backwall', [0, 3.5, -34.1], [62, 7.0, 0.4], wallMat);
   box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
   box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
+  detailBox('wall-structure', 'skyline-backwall-wainscot', [0, 1.05, -33.84], [60.8, 2.1, 0.14], wallLowerMat);
+  for (const columnX of [-28, -21, -14, -7, 0, 7, 14, 21, 28]) {
+    detailBox('wall-structure', `skyline-backwall-column-${columnX}`, [columnX, 3.5, -33.69], [0.34, 7, 0.26], structureMat, 'performance', undefined, true);
+  }
+  for (const sideX of [-30.84, 30.84]) {
+    detailBox('wall-structure', `skyline-sidewall-wainscot-${sideX}`, [sideX, 1.05, -23], [0.14, 2.1, 21.8], wallLowerMat);
+    for (const columnZ of [-32, -27, -22, -17, -12.5]) {
+      detailBox('wall-structure', `skyline-sidewall-column-${sideX}-${columnZ}`, [sideX, 3.5, columnZ], [0.26, 7, 0.34], structureMat, 'performance', undefined, true);
+    }
+  }
+  for (const ribZ of [-32.5, -28.5, -24.5, -20.5, -16.5, -12.7]) {
+    detailBox('wall-structure', `skyline-ceiling-rib-${ribZ}`, [0, 6.78, ribZ], [60.5, 0.2, 0.28], structureMat, 'performance', undefined, true);
+    for (const lightX of [-20, -10, 0, 10, 20]) {
+      detailBox('terminal-story', `skyline-ceiling-practical-${ribZ}-${lightX}`, [lightX, 6.64, ribZ + 0.18], [6.4, 0.055, 0.1], practicalMat);
+    }
+  }
 
   for (const archX of [-6, 6]) {
     box(builder, 'skyline-security-scanner', [archX, 1.35, -20], [0.35, 2.7, 1.8], trimMat);
+    detailBox('terminal-story', `skyline-security-crown-${archX}`, [archX, 2.64, -20], [2.1, 0.18, 1.85], structureMat);
+    detailBox('terminal-story', `skyline-security-lamp-${archX}`, [archX, 2.51, -20.82], [1.25, 0.08, 0.08], practicalMat);
   }
   box(builder, 'skyline-security-belt', [0, 0.55, -20], [8.0, 1.1, 1.4], wallMat);
+  detailBox('terminal-story', 'skyline-security-belt-top', [0, 1.13, -20], [8.15, 0.12, 1.52], rubberMat);
 
   box(builder, 'skyline-cafe-counter', [-14, 0.55, -28], [5.5, 1.1, 2.8], kioskMat);
   box(builder, 'skyline-dutyfree-kiosk', [14, 0.55, -28], [5.5, 1.1, 2.8], kioskMat);
+  for (const x of [-14, 14]) {
+    detailBox('terminal-story', `skyline-kiosk-countertop-${x}`, [x, 1.14, -28], [5.8, 0.14, 3.05], structureMat);
+    detailBox('terminal-story', `skyline-kiosk-front-band-${x}`, [x, 0.58, -26.54], [4.6, 0.36, 0.12], hazardMat);
+    detailBox('terminal-story', `skyline-kiosk-canopy-${x}`, [x, 2.65, -28], [5.9, 0.22, 3.1], floorBorderMat, 'performance', undefined, true);
+    for (const postX of [x - 2.55, x + 2.55]) {
+      detailBox('terminal-story', `skyline-kiosk-post-${postX}`, [postX, 1.88, -28], [0.12, 1.45, 0.12], structureMat);
+    }
+  }
 
   box(builder, 'skyline-baggage-claim-carousel', [0, 0.4, -31], [9.5, 0.8, 4.2], kioskMat);
+  detailBox('terminal-story', 'skyline-baggage-rubber-belt', [0, 0.84, -31], [8.8, 0.12, 3.55], rubberMat);
+  detailBox('terminal-story', 'skyline-baggage-bumper-north', [0, 0.9, -29.1], [9.4, 0.18, 0.16], structureMat);
+  detailBox('terminal-story', 'skyline-baggage-bumper-south', [0, 0.9, -32.9], [9.4, 0.18, 0.16], structureMat);
+  detailBox('terminal-story', 'skyline-baggage-bumper-west', [-4.6, 0.9, -31], [0.16, 0.18, 3.65], structureMat);
+  detailBox('terminal-story', 'skyline-baggage-bumper-east', [4.6, 0.9, -31], [0.16, 0.18, 3.65], structureMat);
   box(builder, 'skyline-baggage-item-1', [-2.5, 0.9, -31], [1.1, 0.5, 0.7], cargoMat, { solid: false, detail: 'quality' });
   box(builder, 'skyline-baggage-item-2', [2.2, 0.9, -31], [0.9, 0.45, 0.65], hazardMat, { solid: false, detail: 'quality' });
 
@@ -970,6 +1125,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     winMesh.userData.breakableWindowId = windowId;
     winMesh.userData.dynamic = true;
     breakableWindows.push({ id: windowId, mesh: winMesh, broken: false });
+    detailBox('window-frame', `skyline-window-frame-top-${winX}`, [winX, 5.04, -11.86], [7.15, 0.18, 0.24], structureMat, 'performance', undefined, true);
+    detailBox('window-frame', `skyline-window-frame-bottom-${winX}`, [winX, 0.14, -11.86], [7.15, 0.2, 0.24], structureMat);
+    detailBox('window-frame', `skyline-window-frame-left-${winX}`, [winX - 3.48, 2.58, -11.86], [0.18, 5.1, 0.24], structureMat, 'performance', undefined, true);
+    detailBox('window-frame', `skyline-window-frame-right-${winX}`, [winX + 3.48, 2.58, -11.86], [0.18, 5.1, 0.24], structureMat, 'performance', undefined, true);
+    detailBox('window-frame', `skyline-window-mullion-${winX}`, [winX, 2.58, -11.84], [0.11, 4.95, 0.2], structureMat);
   }
 
   box(builder, 'skyline-jetbridge-bellows', [0, 4.3, -11.8], [4.1, 2.6, 0.5], jetbridgeMat, { solid: false, shots: false, detail: 'quality' });
@@ -985,6 +1145,14 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   for (const legZ of [-10, -2]) {
     box(builder, 'skyline-jetbridge-leg', [0, 1.5, legZ], [0.4, 3.0, 0.4], jetbridgeMat, { solid: false });
   }
+  for (const ribZ of [-10.8, -8.8, -6.8, -4.8, -2.8]) {
+    detailBox('wall-structure', `skyline-jetbridge-rib-left-${ribZ}`, [-1.86, 4.4, ribZ], [0.16, 2.45, 0.2], structureMat);
+    detailBox('wall-structure', `skyline-jetbridge-rib-right-${ribZ}`, [1.86, 4.4, ribZ], [0.16, 2.45, 0.2], structureMat);
+    detailBox('wall-structure', `skyline-jetbridge-rib-roof-${ribZ}`, [0, 5.47, ribZ], [3.9, 0.16, 0.2], structureMat);
+  }
+  detailBox('floor-language', 'skyline-gate-threshold-terminal', [0, 3.35, -11.65], [3.35, 0.04, 0.42], hazardMat);
+  detailBox('floor-language', 'skyline-gate-threshold-aircraft', [0, 2.69, -0.18], [3.35, 0.04, 0.42], hazardMat);
+  detailBox('terminal-story', 'skyline-jetbridge-light-spine', [0, 5.38, -6.2], [0.24, 0.06, 10.2], practicalMat);
 
   box(builder, 'skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
   box(builder, 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
@@ -996,18 +1164,68 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-jetliner-nose', [-19.0, 3.75, 2.0], [2.2, 2.4, 3.8], trimMat);
   box(builder, 'skyline-jetliner-cockpit-partition', [-16.8, 3.75, 2.0], [0.15, 2.4, 3.6], wallMat, { solid: false, detail: 'quality' });
   box(builder, 'skyline-jetliner-tail', [19.0, 6.3, 2.0], [2.2, 3.0, 0.4], trimMat, { solid: false, shots: false });
+  detailBox('aircraft-skin', 'skyline-aircraft-belly-north', [0, 3.12, 0.06], [34.2, 0.58, 0.08], planeStripeMat);
+  detailBox('aircraft-skin', 'skyline-aircraft-belly-south', [0, 3.12, 3.94], [34.2, 0.58, 0.08], planeStripeMat);
+  detailBox('aircraft-skin', 'skyline-aircraft-roof-spine', [0, 6.43, 2], [33.8, 0.12, 0.54], planeStripeMat, 'quality');
+  for (const windowX of [-13.5, -10.5, -7.5, -4.5, 4.5, 7.5, 10.5, 13.5]) {
+    detailBox('aircraft-skin', `skyline-cabin-window-north-${windowX}`, [windowX, 4.28, 0.055], [1.28, 0.5, 0.08], cockpitMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-south-${windowX}`, [windowX, 4.28, 3.945], [1.28, 0.5, 0.08], cockpitMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-cap-north-${windowX}`, [windowX, 4.58, 0.04], [1.42, 0.055, 0.1], planeStripeMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-cap-south-${windowX}`, [windowX, 4.58, 3.96], [1.42, 0.055, 0.1], planeStripeMat);
+  }
+  detailBox('aircraft-skin', 'skyline-cockpit-glass-front', [-20.12, 4.3, 2], [0.08, 0.7, 2.15], cockpitMat);
+  detailBox('aircraft-skin', 'skyline-cockpit-glass-north', [-19.2, 4.35, 0.045], [1.55, 0.72, 0.08], cockpitMat, 'performance', [0, 0.12, 0]);
+  detailBox('aircraft-skin', 'skyline-cockpit-glass-south', [-19.2, 4.35, 3.955], [1.55, 0.72, 0.08], cockpitMat, 'performance', [0, -0.12, 0]);
+  detailBox('aircraft-skin', 'skyline-tail-slate-panel', [19.02, 6.42, 2.22], [1.86, 2.55, 0.06], planeStripeMat);
+  detailBox('aircraft-skin', 'skyline-tail-amber-mark', [19.02, 6.55, 2.27], [1.35, 0.28, 0.07], hazardMat);
 
   for (const seatX of [-12, -8, -4, 4, 8, 12]) {
     box(builder, `skyline-cabin-seat-left-${seatX}`, [seatX, 3.1, 1.1], [1.1, 1.1, 1.0], wallMat);
     box(builder, `skyline-cabin-seat-right-${seatX}`, [seatX, 3.1, 2.9], [1.1, 1.1, 1.0], wallMat);
     box(builder, `skyline-cabin-overhead-bin-left-${seatX}`, [seatX, 4.5, 0.65], [1.8, 0.45, 0.65], planeHullMat, { solid: false, shots: false });
     box(builder, `skyline-cabin-overhead-bin-right-${seatX}`, [seatX, 4.5, 3.35], [1.8, 0.45, 0.65], planeHullMat, { solid: false, shots: false });
+    detailBox('terminal-story', `skyline-seat-headrest-left-${seatX}`, [seatX, 3.48, 1.1], [0.78, 0.28, 0.82], planeStripeMat);
+    detailBox('terminal-story', `skyline-seat-headrest-right-${seatX}`, [seatX, 3.48, 2.9], [0.78, 0.28, 0.82], planeStripeMat);
+    detailBox('terminal-story', `skyline-bin-latch-left-${seatX}`, [seatX, 4.3, 1.0], [0.44, 0.06, 0.05], hazardMat);
+    detailBox('terminal-story', `skyline-bin-latch-right-${seatX}`, [seatX, 4.3, 3.0], [0.44, 0.06, 0.05], hazardMat);
   }
+  detailBox('floor-language', 'skyline-cabin-aisle-runner', [-0.25, 2.77, 2], [31.8, 0.035, 0.72], floorInsetMat);
+  detailBox('terminal-story', 'skyline-cabin-light-north', [-0.5, 5.47, 1.12], [31, 0.07, 0.11], practicalMat);
+  detailBox('terminal-story', 'skyline-cabin-light-south', [-0.5, 5.47, 2.88], [31, 0.07, 0.11], practicalMat);
+  for (const windowX of [-13.5, -10.5, -7.5, -4.5, 4.5, 7.5, 10.5, 13.5]) {
+    detailBox('aircraft-skin', `skyline-cabin-window-inner-north-${windowX}`, [windowX, 4.05, 0.415], [1.26, 0.48, 0.055], cockpitMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-inner-south-${windowX}`, [windowX, 4.05, 3.585], [1.26, 0.48, 0.055], cockpitMat);
+  }
+  for (const ribX of [-14, -11, -8, -5, -2, 1, 4, 7, 10, 13, 16]) {
+    detailBox('wall-structure', `skyline-cabin-ceiling-rib-${ribX}`, [ribX, 5.42, 2], [0.11, 0.08, 3.15], structureMat);
+  }
+  detailBox('terminal-story', 'skyline-cockpit-door-panel', [-16.71, 4.2, 2], [0.055, 1.95, 1.65], structureMat);
+  detailBox('terminal-story', 'skyline-cockpit-door-mark', [-16.67, 4.65, 2], [0.04, 0.25, 0.92], hazardMat);
+  detailBox('terminal-story', 'skyline-cabin-exit-sign', [15.9, 4.95, 2], [0.1, 0.32, 1.25], practicalMat);
 
   box(builder, 'skyline-jetliner-wing-port', [0, 2.8, 11.0], [5.0, 0.3, 15.0], planeWingMat);
   box(builder, 'skyline-jetliner-wing-starboard', [0, 2.8, -7.0], [5.0, 0.3, 15.0], planeWingMat);
   box(builder, 'skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
   box(builder, 'skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
+  detailBox('aircraft-skin', 'skyline-wingtip-port', [0, 2.99, 18.42], [5.1, 0.08, 0.14], planeStripeMat);
+  detailBox('aircraft-skin', 'skyline-wingtip-starboard', [0, 2.99, -14.42], [5.1, 0.08, 0.14], planeStripeMat);
+  detailBox('aircraft-skin', 'skyline-wing-navigation-port', [-2.35, 3.06, 18.48], [0.42, 0.16, 0.16], practicalMat);
+  detailBox('aircraft-skin', 'skyline-wing-navigation-starboard', [-2.35, 3.06, -14.48], [0.42, 0.16, 0.16], practicalMat);
+  const engineNacelles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.95, 0.78, 4.1, 20), planeStripeMat, 2);
+  engineNacelles.name = 'skyline-aircraft-engine-nacelles';
+  engineNacelles.castShadow = true;
+  engineNacelles.receiveShadow = true;
+  engineNacelles.userData.presentationOnly = true;
+  engineNacelles.userData.rustworksDetail = 'quality';
+  engineNacelles.userData.skylineCluster = 'aircraft-skin';
+  const nacelleMatrix = new THREE.Matrix4();
+  const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
+  for (const [index, z] of [12, -8].entries()) {
+    nacelleMatrix.compose(new THREE.Vector3(0, 1.6, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
+    engineNacelles.setMatrixAt(index, nacelleMatrix);
+  }
+  engineNacelles.instanceMatrix.needsUpdate = true;
+  root.add(engineNacelles);
 
   const stairAngle = (32 * Math.PI) / 180;
   const stairLen = 2.4 / Math.sin(stairAngle);
@@ -1016,6 +1234,17 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-airstair', [19.4, 1.2, 2.0], [stairLen, 0.2, 2.2], trimMat, {
     rotation: [0, 0, -stairAngle],
   });
+  for (const railZ of [0.95, 3.05]) {
+    detailBox('escalator-detail', `skyline-airstair-side-${railZ}`, [19.4, 1.42, railZ], [stairLen + 0.2, 0.38, 0.12], wallLowerMat, 'performance', [0, 0, -stairAngle], true);
+    detailBox('escalator-detail', `skyline-airstair-rail-${railZ}`, [19.4, 2.05, railZ], [stairLen + 0.1, 0.08, 0.08], structureMat, 'performance', [0, 0, -stairAngle]);
+  }
+  for (let tread = -1.8; tread <= 1.8; tread += 0.45) {
+    const x = 19.4 + tread * Math.cos(stairAngle);
+    const y = 1.2 - tread * Math.sin(stairAngle) + 0.15;
+    detailBox('escalator-detail', `skyline-airstair-tread-${tread.toFixed(2)}`, [x, y, 2], [0.18, 0.05, 1.94], rubberMat, 'performance', [0, 0, -stairAngle]);
+  }
+  detailBox('floor-language', 'skyline-airstair-comb-foot', [21.35, 0.08, 2], [0.5, 0.04, 2.15], hazardMat);
+  detailBox('floor-language', 'skyline-airstair-comb-top', [17.45, 2.7, 2], [0.5, 0.04, 2.15], hazardMat);
 
   box(builder, 'skyline-fuel-trailer', [-10, 1.2, 18], [5.8, 2.4, 2.6], hazardMat);
   const fuelTank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 14), cargoMat);
@@ -1040,6 +1269,19 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
 
   for (const [x, z] of [[-8, 14], [8, 14], [-22, 26], [22, 26]] as const) {
     box(builder, 'skyline-luggage-cart', [x, 0.6, z], [2.4, 1.2, 1.6], hazardMat);
+    detailBox('terminal-story', `skyline-cart-rubber-top-${x}-${z}`, [x, 1.24, z], [2.2, 0.12, 1.38], rubberMat);
+    detailBox('terminal-story', `skyline-cart-rail-north-${x}-${z}`, [x, 1.58, z - 0.69], [2.35, 0.08, 0.08], structureMat);
+    detailBox('terminal-story', `skyline-cart-rail-south-${x}-${z}`, [x, 1.58, z + 0.69], [2.35, 0.08, 0.08], structureMat);
+    for (const wheelX of [x - 0.82, x + 0.82]) {
+      detailBox('terminal-story', `skyline-cart-wheel-${wheelX}-${z}`, [wheelX, 0.22, z - 0.68], [0.42, 0.42, 0.18], rubberMat);
+      detailBox('terminal-story', `skyline-cart-wheel-${wheelX}-${z}-south`, [wheelX, 0.22, z + 0.68], [0.42, 0.42, 0.18], rubberMat);
+    }
+  }
+  for (const [x, z] of [[-2.1, 11.5], [2.1, 11.5], [-2.1, -7.5], [2.1, -7.5]] as const) {
+    detailBox('apron-marking', `skyline-wheel-chock-${x}-${z}`, [x, 0.18, z], [0.58, 0.34, 0.42], hazardMat, 'performance', [0, Math.PI / 4, 0]);
+  }
+  for (const bandX of [-12.2, -10, -7.8]) {
+    detailBox('terminal-story', `skyline-fuel-tank-band-${bandX}`, [bandX, 1.5, 18], [0.12, 2.3, 2.72], structureMat);
   }
 
   box(builder, 'skyline-fence-north', [0, 1.5, -35.8], [72, 3.0, 0.4], jetbridgeMat);
