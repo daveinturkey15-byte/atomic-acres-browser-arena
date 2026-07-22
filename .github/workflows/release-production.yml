@@ -63,7 +63,10 @@ jobs:
           pages_sha="$(git ls-remote origin refs/heads/gh-pages | cut -f1)"
           status="queued"
           build='{}'
-          for attempt in $(seq 1 30); do
+          # Pages deployment can sit in GitHub's environment queue for more than
+          # five minutes even after its build succeeds. Keep the exact-SHA guard,
+          # but allow up to 20 minutes for that external queue to drain.
+          for attempt in $(seq 1 120); do
             build="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest")"
             build_sha="$(jq -r '.commit // empty' <<<"$build")"
             status="$(jq -r '.status // "unknown"' <<<"$build")"

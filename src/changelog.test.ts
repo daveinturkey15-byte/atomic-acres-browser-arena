@@ -11,21 +11,23 @@ describe('changelog', () => {
   it('keeps the current public release first with an explicit UK timezone', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass57');
+    expect(latest.id).toBe('pass58');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
       '22 JUL 2026 · 15:43 BST · UTC+1 · 15:43:16',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · 22 JUL 2026 · 15:43 BST');
+    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · 22 JUL 2026 · 21:25 BST');
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
+    const pass58 = CHANGELOG.find((entry) => entry.id === 'pass58');
     const pass57 = CHANGELOG.find((entry) => entry.id === 'pass57');
     const pass56 = CHANGELOG.find((entry) => entry.id === 'pass56');
     const pass55 = CHANGELOG.find((entry) => entry.id === 'pass55');
     const pass51 = CHANGELOG.find((entry) => entry.id === 'pass51');
     const pass49 = CHANGELOG.find((entry) => entry.id === 'pass49');
+    expect(pass58?.releasedAt).toBe('2026-07-22T21:25:35+01:00');
     expect(pass57?.releasedAt).toBe('2026-07-22T15:43:16+01:00');
     expect(pass56?.releasedAt).toBe('2026-07-22T15:06:07+01:00');
     expect(pass55?.releasedAt).toBe('2026-07-22T13:14:45+01:00');

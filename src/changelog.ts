@@ -17,6 +17,22 @@ export type ChangelogEntry = Readonly<{
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass58',
+    pass: 'PASS 58',
+    title: 'Three arena overhauls & combat polish',
+    releasedAt: '2026-07-22T21:25:35+01:00',
+    areas: Object.freeze(['COMBAT', 'ATOMIC ACRES', 'SKYLINE', 'RUSTWORKS', 'LEADERBOARD']),
+    summary: 'Combat feels clearer and more physical, three arenas receive major authored overhauls, and the global streak board starts a clean season.',
+    highlights: Object.freeze([
+      'Weapon and operator presentation now stays coherent through standing, crouching, prone movement, knife use, death, and respawn',
+      'Damage feedback, headshot callouts, round statistics, collision authority, and score-reset handling are clearer and more reliable',
+      'Atomic Acres gains a rebuilt model home, furnished interiors, denser garden life, richer materials, grass, and tuned lighting',
+      'Skyline Terminal gains a more readable concourse, active aircraft cabin route, improved doors and aisles, apron detail, cover, and airport identity',
+      'Rustworks gains a 15.8-metre derrick, two-axis undercroft, four-exit service trench, and 16-container cargo ring with four walk-through routes',
+      'The global leaderboard now uses the new season-aware Worker and a clean reset board while retaining browser-local fallback records',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass57',
     pass: 'PASS 57',
     title: 'Rustworks rolling ocean & symmetric cargo ring',
