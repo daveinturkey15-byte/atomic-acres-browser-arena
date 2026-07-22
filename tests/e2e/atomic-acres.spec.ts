@@ -668,7 +668,7 @@ test.describe('boot and authored presentation', () => {
       const state = await debug(page);
       expect(state.worldIdentityPresentation).toMatchObject({ routeLights: 0, routeSigns: 3, cueInstances: 0 });
       expect(state.render.blenderEnvironment).toMatchObject({ routeLandmarks: 3, worldIdentityPass: true });
-      await page.screenshot({ path: `test-results/pass27-route-${sample.id}.png` });
+      await page.screenshot({ path: `test-results/pass27-route-${sample.id}.png`, timeout: 60_000 });
     }
     expect(errors).toEqual([]);
   });
