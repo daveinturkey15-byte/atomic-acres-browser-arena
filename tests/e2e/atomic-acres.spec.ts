@@ -47,7 +47,22 @@ type DebugState = {
     screenPosition: number[];
     presentationReady: boolean;
     presentationWeaponSafe: boolean;
-    operatorModel: { source: string; appearance: string; skinnedMeshes: number; visibleSkinnedMeshes: number; mergedVertexLod: boolean; clips: number; weaponChildren: number; activeClip: string } | null;
+    operatorModel: {
+      source: string;
+      appearance: string;
+      skinnedMeshes: number;
+      visibleSkinnedMeshes: number;
+      mergedVertexLod: boolean;
+      clips: number;
+      weaponChildren: number;
+      activeClip: string;
+      embeddedWeaponsSuppressed: number;
+      visibleEmbeddedWeapons: number;
+      muzzleForwardDot: number;
+      animationContract: { stance: 'stand' | 'crouch' | 'prone'; crouchBlend: number; proneBlend: number; pivotHeight: number; pivotPitch: number };
+      weaponMount: { modelId: string; finishId: string; forwardCorrection: string; directChild: boolean; finite: boolean };
+      supportGrip: { supportError: number; finite: boolean; torsoClear: boolean; torsoRelativeBendHint: boolean };
+    } | null;
     neonHaze: boolean;
   }>;
   botEscalation: { deaths: number; initialBots: number; targetBots: number; activeBots: number; nextReinforcementAt: number };
@@ -208,6 +223,8 @@ type DebugState = {
     detailsReady: boolean;
     modelKind: 'licensed-imported' | 'original-authored';
     firstPersonSource: string;
+    weaponModelId: string;
+    weaponFinishId: string;
     modelVisibleMeshCount: number;
     adsProgress: number;
     sightOffset: [number, number] | null;
@@ -880,7 +897,7 @@ test.describe('solo mechanics', () => {
     });
   });
 
-  test('renders six distinct authored first-person weapons with connected two-hand grips and a readable hostile operator', async ({ page }) => {
+  test('renders seven distinct authored first-person weapons with connected two-hand grips and a readable hostile operator', async ({ page }) => {
     test.setTimeout(180_000);
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotAhead: (distance: number) => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -889,6 +906,7 @@ test.describe('solo mechanics', () => {
     await page.waitForTimeout(150);
     const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
     const sourceMeshCounts = new Map<string, number>();
+    const finishIds = new Set<string>();
     for (const weapon of weapons) {
       await page.evaluate((selected) => {
         (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } }).__ATOMIC_ACRES_DEBUG__.equipWeapon(selected);
@@ -898,7 +916,9 @@ test.describe('solo mechanics', () => {
       expect(weaponState.armsVisible, `${weapon}:armsVisible`).toBe(true);
       expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(6);
       expect(weaponState.modelKind, `${weapon}:modelKind`).toBe('original-authored');
-      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('authored-pbr-v6-seven-weapon');
+      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('authored-pbr-v6-seven-unique-finishes');
+      expect(weaponState.weaponModelId, `${weapon}:modelId`).toBe(`${weapon}-authored-v6`);
+      expect(typeof weaponState.weaponFinishId, `${weapon}:finishId`).toBe('string');
       expect(weaponState.importedModel, `${weapon}:importedModel`).toBeNull();
       expect(weaponState.detailsReady, `${weapon}:detailsReady`).toBe(true);
       expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeGreaterThanOrEqual(8);
@@ -908,6 +928,7 @@ test.describe('solo mechanics', () => {
       expect(weaponState.riggedArms.every((arm: { finite: boolean; bindOffsetsPreserved: boolean; contactError: number }) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02), `${weapon}:handContact`).toBe(true);
       expect(weaponState.sightOffset?.every(Number.isFinite), `${weapon}:sightOffset`).toBe(true);
       sourceMeshCounts.set(weapon, weaponState.attachedWeaponBatchStats.sourceMeshes);
+      finishIds.add(weaponState.weaponFinishId);
       await page.evaluate(() => (
         window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
       ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
@@ -922,6 +943,7 @@ test.describe('solo mechanics', () => {
     // Performance batching should preserve the machine pistol's extra authored
     // compensator/control geometry without rewarding it for extra draw calls.
     expect(sourceMeshCounts.get('machine-pistol')).toBeGreaterThan(sourceMeshCounts.get('pistol') ?? 0);
+    expect(finishIds.size).toBe(7);
     const state = await debug(page);
     expect(state.bots[0].rootVisible).toBe(true);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(9);
@@ -931,6 +953,120 @@ test.describe('solo mechanics', () => {
     });
     expect(Math.abs(state.bots[0].screenPosition[0])).toBeLessThan(0.5);
     expect(Math.abs(state.bots[0].screenPosition[1])).toBeLessThan(0.8);
+  });
+
+  test('holds one forward-facing weapon through smooth sprint, crouch and prone operator poses', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone?: 'head' | 'body' | 'limb') => void;
+        setCaptureViewmodelHidden: (hidden: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(4);
+      api.aimAtBot('body');
+      api.setCaptureViewmodelHidden(true);
+    });
+    const staged = await debug(page);
+    const [botX, , botZ] = staged.bots[0].position;
+    const [playerX, , playerZ] = staged.player.position;
+    const towardPlayerX = playerX - botX;
+    const towardPlayerZ = playerZ - botZ;
+    const towardPlayerLength = Math.hypot(towardPlayerX, towardPlayerZ) || 1;
+    const forwardX = towardPlayerX / towardPlayerLength;
+    const forwardZ = towardPlayerZ / towardPlayerLength;
+    const diagonalX = forwardX + forwardZ * 0.85;
+    const diagonalZ = forwardZ - forwardX * 0.85;
+    const diagonalLength = Math.hypot(diagonalX, diagonalZ) || 1;
+    const cameraX = botX + diagonalX / diagonalLength * 2.35;
+    const cameraZ = botZ + diagonalZ / diagonalLength * 2.35;
+    const cameraYaw = Math.atan2(-(botX - cameraX), -(botZ - cameraZ));
+    await page.evaluate(({ x, z, yaw }) => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setCaptureCameraPose: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(x, 0.9, z, yaw, 0);
+    }, { x: cameraX, z: cameraZ, yaw: cameraYaw });
+
+    const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
+    const modelIds = new Set<string>();
+    const finishIds = new Set<string>();
+    for (const weapon of weapons) {
+      await page.evaluate((selected) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          setBotPresentation: (stance: 'stand', speed: number, weapon: typeof selected) => void;
+        } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation('stand', 0, selected);
+      }, weapon);
+      await page.waitForTimeout(180);
+      const operator = (await debug(page)).bots[0].operatorModel!;
+      expect.soft(operator.embeddedWeaponsSuppressed, `${weapon}:suppressed`).toBeGreaterThanOrEqual(1);
+      expect.soft(operator.visibleEmbeddedWeapons, `${weapon}:spareWeapon`).toBe(0);
+      expect.soft(operator.weaponChildren, `${weapon}:socketChildren`).toBe(1);
+      expect.soft(operator.weaponMount, `${weapon}:mount`).toMatchObject({
+        directChild: true, finite: true, forwardCorrection: 'stable-body-mount-minus-z',
+      });
+      expect.soft(operator.muzzleForwardDot, `${weapon}:forward`).toBeGreaterThan(0.82);
+      expect.soft(operator.supportGrip.supportError, `${weapon}:supportError ${JSON.stringify(operator.supportGrip)}`).toBeLessThanOrEqual(0.025);
+      expect.soft(operator.supportGrip, `${weapon}:supportGrip ${JSON.stringify(operator.supportGrip)}`).toMatchObject({
+        finite: true, torsoClear: true, torsoRelativeBendHint: true, bothHandsConnected: true,
+        dominantGrip: { finite: true, torsoClear: true },
+      });
+      modelIds.add(operator.weaponMount.modelId);
+      finishIds.add(operator.weaponMount.finishId);
+      await page.screenshot({ path: `test-results/refined-operator-${weapon}.png`, animations: 'disabled' });
+    }
+    expect(modelIds.size).toBe(7);
+    expect(finishIds.size).toBe(7);
+
+    const poses = [
+      { name: 'idle', stance: 'stand' as const, speed: 0 },
+      { name: 'sprint', stance: 'stand' as const, speed: 7 },
+      { name: 'crouch', stance: 'crouch' as const, speed: 1.2 },
+      { name: 'prone', stance: 'prone' as const, speed: 0.8 },
+    ];
+    for (const pose of poses) {
+      await page.evaluate(({ stance, speed }) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          setBotPresentation: (stance: 'stand' | 'crouch' | 'prone', speed: number, weapon: 'carbine') => void;
+        } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation(stance, speed, 'carbine');
+      }, pose);
+      await page.waitForTimeout(520);
+      const operator = (await debug(page)).bots[0].operatorModel!;
+      expect.soft(operator.animationContract.stance, pose.name).toBe(pose.stance);
+      expect.soft(operator.visibleEmbeddedWeapons, pose.name).toBe(0);
+      expect.soft(operator.muzzleForwardDot, pose.name).toBeGreaterThan(0.82);
+      const gripEvidence = `${pose.name}:${JSON.stringify(operator.supportGrip)}`;
+      expect.soft(operator.supportGrip.finite, gripEvidence).toBe(true);
+      expect.soft(operator.supportGrip.torsoClear, gripEvidence).toBe(true);
+      expect.soft(operator.supportGrip.bothHandsConnected, gripEvidence).toBe(true);
+      expect.soft(operator.supportGrip.dominantGrip.torsoClear, gripEvidence).toBe(true);
+      if (pose.stance === 'crouch') expect.soft(operator.animationContract.crouchBlend, pose.name).toBeGreaterThan(0.98);
+      if (pose.stance === 'prone') {
+        expect.soft(operator.animationContract.proneBlend, pose.name).toBeGreaterThan(0.98);
+        expect.soft(operator.animationContract.pivotHeight, pose.name).toBeGreaterThan(0.35);
+        expect.soft(operator.animationContract.pivotHeight, pose.name).toBeLessThan(0.55);
+      }
+      await page.screenshot({ path: `test-results/refined-operator-pose-${pose.name}.png`, animations: 'disabled' });
+      for (const poseWeapon of weapons) {
+        if (poseWeapon === 'carbine') continue;
+        await page.evaluate(({ stance, speed, weapon }) => {
+          (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+            setBotPresentation: (
+              stance: 'stand' | 'crouch' | 'prone', speed: number, weapon: typeof weapon,
+            ) => void;
+          } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation(stance, speed, weapon);
+        }, { stance: pose.stance, speed: pose.speed, weapon: poseWeapon });
+        await page.waitForTimeout(140);
+        const weaponPose = (await debug(page)).bots[0].operatorModel!;
+        const weaponPoseEvidence = `${pose.name}/${poseWeapon}:${JSON.stringify(weaponPose.supportGrip)}`;
+        expect.soft(weaponPose.muzzleForwardDot, weaponPoseEvidence).toBeGreaterThan(0.82);
+        expect.soft(weaponPose.supportGrip, weaponPoseEvidence).toMatchObject({
+          finite: true,
+          torsoClear: true,
+          bothHandsConnected: true,
+          dominantGrip: { finite: true, torsoClear: true },
+        });
+      }
+    }
   });
 
   test('plays a bounded rigged death animation before a clean respawn', async ({ page }) => {
@@ -1449,44 +1585,69 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).breakableWindows[1].broken).toBe(true);
   });
 
-  test('keeps all five Field Support cards readable and collision-free', async ({ page }) => {
-    const metrics = await page.evaluate(() => {
-      const ammo = document.querySelector<HTMLElement>('#ammo')!;
-      const weapon = document.querySelector<HTMLElement>('#weapon-block')!;
-      const support = document.querySelector<HTMLElement>('#support-block')!;
-      const cards = [...document.querySelectorAll<HTMLElement>('[data-support]')];
-      const supportBox = support.getBoundingClientRect();
-      const weaponBox = weapon.getBoundingClientRect();
-      const boxes = cards.map((card) => card.getBoundingClientRect());
-      const overlap = boxes.some((box, index) => boxes.slice(index + 1).some((other) => !(
-        box.right <= other.left || other.right <= box.left || box.bottom <= other.top || other.bottom <= box.top
-      )));
-      const overflow = cards.some((card) => [...card.querySelectorAll<HTMLElement>('*')].some((child) => (
-        child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1
-      )));
-      return {
-        ammoFont: Number.parseFloat(getComputedStyle(ammo).fontSize),
-        cardCount: cards.length,
-        supportWidth: supportBox.width,
-        supportHeight: supportBox.height,
-        rightGap: window.innerWidth - supportBox.right,
-        verticalGap: weaponBox.top - supportBox.bottom,
-        verticallyStacked: boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom),
-        overlap,
-        overflow,
-      };
-    });
-    expect(metrics.ammoFont).toBeGreaterThanOrEqual(64);
-    expect(metrics.cardCount).toBe(5);
-    expect(metrics.supportWidth).toBeGreaterThanOrEqual(145);
-    expect(metrics.supportWidth).toBeLessThanOrEqual(200);
-    expect(metrics.supportHeight).toBeGreaterThan(metrics.supportWidth);
-    expect(metrics.rightGap).toBeGreaterThanOrEqual(8);
-    expect(metrics.rightGap).toBeLessThanOrEqual(28);
-    expect(metrics.verticalGap).toBeGreaterThanOrEqual(6);
-    expect(metrics.verticallyStacked).toBe(true);
-    expect(metrics.overlap).toBe(false);
-    expect(metrics.overflow).toBe(false);
+  test('keeps the left Field Support lane readable and collision-free at every supported HUD size', async ({ page }) => {
+    const viewports = [
+      { width: 1280, height: 720 },
+      { width: 960, height: 540 },
+      { width: 700, height: 700 },
+      { width: 390, height: 844 },
+    ];
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      const metrics = await page.evaluate(() => {
+        const visibleBox = (selector: string) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          return element && getComputedStyle(element).display !== 'none' ? element.getBoundingClientRect() : null;
+        };
+        const intersects = (a: DOMRect, b: DOMRect) => !(
+          a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top
+        );
+        const ammo = document.querySelector<HTMLElement>('#ammo')!;
+        const support = document.querySelector<HTMLElement>('#support-block')!;
+        const cards = [...document.querySelectorAll<HTMLElement>('[data-support]')];
+        const supportBox = support.getBoundingClientRect();
+        const minimapBox = visibleBox('#minimap')!;
+        const boxes = cards.map((card) => card.getBoundingClientRect());
+        const persistentRegions = [
+          '#matchbar', '#objective', '#network-strip', '#killfeed', '#location-label',
+          '#equipment-block', '#health-block', '#combat-stats', '#weapon-block', '#ping-block',
+        ].map(visibleBox).filter((box): box is DOMRect => box !== null && box.width > 0 && box.height > 0);
+        const cardOverlap = boxes.some((box, index) => boxes.slice(index + 1).some((other) => intersects(box, other)));
+        const overflow = cards.some((card) => [...card.querySelectorAll<HTMLElement>('*')].some((child) => (
+          child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1
+        )));
+        return {
+          ammoFont: Number.parseFloat(getComputedStyle(ammo).fontSize),
+          cardCount: cards.length,
+          supportWidth: supportBox.width,
+          supportHeight: supportBox.height,
+          leftGap: supportBox.left,
+          rightGap: window.innerWidth - supportBox.right,
+          minimapGap: Math.max(
+            supportBox.left - minimapBox.right,
+            supportBox.top - (visibleBox('#location-label')?.bottom ?? minimapBox.bottom),
+          ),
+          leftAnchored: supportBox.left < window.innerWidth * 0.5,
+          verticallyStacked: boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom),
+          persistentOverlap: persistentRegions.some((region) => intersects(supportBox, region)),
+          cardOverlap,
+          overflow,
+        };
+      });
+      expect(metrics.ammoFont, JSON.stringify(viewport)).toBeGreaterThanOrEqual(viewport.width <= 700 ? 40 : 64);
+      expect(metrics.cardCount, JSON.stringify(viewport)).toBe(5);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeGreaterThanOrEqual(145);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(200);
+      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(150);
+      expect(metrics.leftGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
+      expect(metrics.rightGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
+      expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
+      expect(metrics.leftAnchored, JSON.stringify(viewport)).toBe(true);
+      expect(metrics.verticallyStacked, JSON.stringify(viewport)).toBe(true);
+      expect(metrics.persistentOverlap, JSON.stringify(viewport)).toBe(false);
+      expect(metrics.cardOverlap, JSON.stringify(viewport)).toBe(false);
+      expect(metrics.overflow, JSON.stringify(viewport)).toBe(false);
+    }
   });
 
   test('spawns and awards the contested centre Overdrive Core for exactly 4× damage', async ({ page }) => {
