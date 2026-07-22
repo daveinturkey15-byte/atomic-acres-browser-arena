@@ -1,4 +1,4 @@
-# Pass 58 — Skyline Terminal gameplay and art overhaul
+# Skyline Terminal gameplay and art overhaul
 
 **Date:** 2026-07-22  
 **Branch:** `agent/skyline-terminal-overhaul-20260722`  

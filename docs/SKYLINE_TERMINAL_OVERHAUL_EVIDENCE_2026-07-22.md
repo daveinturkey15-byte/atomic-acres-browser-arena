@@ -1,4 +1,4 @@
-# Pass 58 - Skyline Terminal overhaul evidence
+# Skyline Terminal overhaul evidence
 
 **Date:** 2026-07-22  
 **Branch:** `agent/skyline-terminal-overhaul-20260722`  

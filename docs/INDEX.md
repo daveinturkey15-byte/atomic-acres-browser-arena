@@ -2,8 +2,8 @@
 
 ## Current development and release
 
-- [Pass 58 Skyline Terminal overhaul specification](PASS58_SKYLINE_TERMINAL_OVERHAUL_SPEC_2026-07-22.md) - active traversal, cover, asset, material, preview, and verification contract for the original airport arena.
-- [Pass 58 Skyline Terminal overhaul evidence](PASS58_SKYLINE_TERMINAL_OVERHAUL_EVIDENCE_2026-07-22.md) - browser, clearance, performance, provenance, and integration evidence for the isolated Terminal branch.
+- [Skyline Terminal overhaul specification](SKYLINE_TERMINAL_OVERHAUL_SPEC_2026-07-22.md) - active traversal, cover, asset, material, preview, and verification contract for the original airport arena.
+- [Skyline Terminal overhaul evidence](SKYLINE_TERMINAL_OVERHAUL_EVIDENCE_2026-07-22.md) - browser, clearance, performance, provenance, and integration evidence for the isolated Terminal branch.
 - [Pass 55 indoor range and walk-up armory specification](PASS55_INDOOR_RANGE_ARMORY_SPEC_2026-07-22.md) - expanded indoor Gun Range, walk-up weapon pickups, Mastiff 63 LMG, and instant sniper ADS.
 - [Pass 54 wall penetration specification](PASS54_WALL_PENETRATION_SPEC_2026-07-22.md) - canonical FMJ-like material, weapon, distance, angle, multiplayer-authority, and future-asset coverage rule.
 
