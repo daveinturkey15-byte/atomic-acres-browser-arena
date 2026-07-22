@@ -947,7 +947,7 @@ const waterSystem = new WaterSystem(scene);
 waterSystem.configure(selectedArena.id, renderProfile, {
   halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
   halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-}, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -16.5 : -0.55 });
+}, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
 ensureRustworksStarfield(scene, selectedArena.id);
 const grassSystem = new GrassSystem(
   scene,
@@ -5685,6 +5685,7 @@ function updatePhysics(dt: number): void {
   const preWater = waterSystem.samplePhysics(player.position);
   if (preWater.inWater) {
     player.velocity.y += preWater.buoyancy * dt;
+    player.velocity.y += (preWater.surfaceVelocityY - player.velocity.y) * Math.min(1, 1.8 * dt);
     player.velocity.x *= Math.max(0.2, 1 - preWater.drag * dt);
     player.velocity.z *= Math.max(0.2, 1 - preWater.drag * dt);
     player.velocity.y *= Math.max(0.25, 1 - preWater.drag * 0.65 * dt);
@@ -6550,7 +6551,7 @@ function setArenaPresentationVisibility(): void {
   waterSystem.configure(selectedArena.id, renderProfile, {
     halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
     halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-  }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -16.5 : -0.55 });
+  }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
   ensureRustworksStarfield(scene, selectedArena.id);
   applyArenaFogProfile();
   applyArenaLightingForSelection();

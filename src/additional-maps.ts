@@ -538,14 +538,18 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   }
   box(builder, 'rustworks-canopy-roof', [0, 12.65, 0], [6.9, 0.24, 6.9], rust, { solid: false, detail: 'quality' });
 
-  // Sparse corner cover only — open cross-lanes for smooth player/bot pathing.
-  // Keep a clear ~12m apron around the tower and open ±X / ±Z corridors.
+  // One disciplined perimeter ring: six equally counted, mirrored containers
+  // on every side. The wider centre gap preserves all four primary lanes and
+  // keeps team spawns clear, while the repeated finish order reads as an
+  // intentional layout instead of scattered prop dressing.
+  const perimeterSlots = [-19, -12, -5, 5, 12, 19] as const;
   const containerRows = [
-    ...[-19, -6.3, 6.3, 19].map((x) => ({ side: 'north', x, z: -23 })),
-    ...[-19, -6.3, 6.3, 19].map((x) => ({ side: 'south', x, z: 23 })),
-    ...[-18, -6, 6, 18].map((z) => ({ side: 'west', x: -23, z })),
-    ...[-18, -6, 6, 18].map((z) => ({ side: 'east', x: 23, z })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -23 })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: 23 })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -23, z })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: 23, z })),
   ] as const;
+  const containerPalette = [hazardDark, rustDark, tarp] as const;
   for (const [index, placement] of containerRows.entries()) {
     const alongX = placement.side === 'north' || placement.side === 'south';
     const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
@@ -554,7 +558,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       'rustworks-shipping-container',
       [placement.x, 1.3, placement.z],
       containerSize,
-      [hazardDark, rustDark, tarp][index % 3],
+      containerPalette[placement.slot % containerPalette.length],
     );
     container.userData.rustworksContainerSide = placement.side;
 
@@ -570,25 +574,6 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         detail: 'performance',
       });
     }
-  }
-
-  // One process tank per long side, pulled to the rail so mid-lanes stay clear.
-  for (const [x, z] of [[-22, 0], [22, 0]] as const) {
-    box(builder, 'rustworks-tank-collider', [x, 1.4, z], [2.6, 2.8, 4.2], steel);
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 4.0, 14), rust);
-    tank.name = 'rustworks-horizontal-process-tank';
-    tank.rotation.x = Math.PI / 2;
-    tank.position.set(x, 1.5, z);
-    tank.castShadow = true;
-    tank.receiveShadow = true;
-    tank.userData.presentationOnly = true;
-    tank.userData.rustworksDetail = 'quality';
-    tank.userData.impactSurface = 'metal';
-    root.add(tank);
-  }
-  // Two low hazard barriers as soft mid-range cover (not L-traps).
-  for (const [x, z] of [[-12, 18], [12, -18]] as const) {
-    box(builder, 'rustworks-barrier-low', [x, 0.45, z], [2.4, 0.9, 0.35], hazard);
   }
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });
@@ -637,7 +622,8 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     },
   };
 
-  // Six spawns per side for private lobbies up to 6, staggered outside cover and tower apron.
+  // Six spawns per side for private lobbies up to 6. Keep them just inside the
+  // container ring so deployment never starts in a narrow exterior service gap.
   return {
     id: 'rustworks-1v1',
     label: 'Rustworks',
@@ -648,10 +634,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [0, 26], [-13, 26], [13, 26], [-26, 11], [-26, 0], [-13, 14],
+        [0, 19], [-13, 19], [13, 19], [-19, 11], [-19, 0], [-13, 14],
       ],
       [
-        [0, -26], [13, -26], [-13, -26], [26, -11], [26, 0], [13, -14],
+        [0, -19], [13, -19], [-13, -19], [19, -11], [19, 0], [13, -14],
       ],
     ),
     patrolPoints: [

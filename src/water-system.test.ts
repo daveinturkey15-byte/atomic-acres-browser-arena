@@ -6,12 +6,12 @@ describe('WaterSystem', () => {
   it('builds deep ocean under a raised Rustworks oil-rig deck', () => {
     const scene = new THREE.Scene();
     const water = new WaterSystem(scene);
-    water.configure('rustworks-1v1', 'blender', { halfX: 27, halfZ: 29 }, { night: true, waterLevel: -16.5 });
+    water.configure('rustworks-1v1', 'blender', { halfX: 27, halfZ: 29 }, { night: true, waterLevel: -19.5 });
     expect(water.telemetry()).toMatchObject({
       enabled: true,
       arenaId: 'rustworks-1v1',
       physicsActive: true,
-      waterLevel: -16.5,
+      waterLevel: -19.5,
     });
     expect(water.telemetry().waveAmp).toBeGreaterThan(1);
     expect(water.telemetry().nearSize).toBe(960);
@@ -24,10 +24,11 @@ describe('WaterSystem', () => {
     water.update(1.25);
     const onDeck = water.samplePhysics(new THREE.Vector3(0, 1.5, 0));
     expect(onDeck.inWater).toBe(false);
-    const inOcean = water.samplePhysics(new THREE.Vector3(40, -17, 0), 12.5);
+    const inOcean = water.samplePhysics(new THREE.Vector3(40, -21, 0), 12.5);
     expect(inOcean.inWater).toBe(true);
     expect(inOcean.buoyancy).toBeGreaterThan(0);
     expect(inOcean.drag).toBeGreaterThan(0.5);
+    expect(Number.isFinite(inOcean.surfaceVelocityY)).toBe(true);
   });
 
   it('uses the same deterministic multi-direction wave field for rendering and physics', () => {
@@ -40,6 +41,7 @@ describe('WaterSystem', () => {
     expect(elsewhere.height).not.toBeCloseTo(first.height, 4);
     expect(first.normal.length()).toBeCloseTo(1, 6);
     expect(first.normal.y).toBeGreaterThan(0.9);
+    expect(Number.isFinite(first.verticalVelocity)).toBe(true);
   });
 
   it('stays off for gun range', () => {

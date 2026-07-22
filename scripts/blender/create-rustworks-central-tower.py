@@ -16,7 +16,7 @@ GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-centr
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
 PREVIEW_PATH = ROOT / "artifacts" / "pass44" / "rustworks-quality-plant-preview.png"
 
-ASSET_VERSION = "pass51-v1"
+ASSET_VERSION = "pass54-v2"
 AUTHORED_HEIGHT_M = 15.2
 
 LOADED: dict[str, bpy.types.Image] = {}
@@ -205,7 +205,6 @@ def main():
     M_hazard = mat("RW_Mat_Hazard", "rustworks-hazard.png", metallic=0.32, roughness=0.52, tile=1.3,
                    emission=(0.55, 0.3, 0.05), emission_strength=0.16)
     M_oxide = mat("RW_Mat_Oxide", "rustworks-oxide.png", metallic=0.5, roughness=0.76, tile=2.0)
-    M_tank = mat("RW_Mat_Tank", "rustworks-tank-paint.png", metallic=0.58, roughness=0.46, tile=2.4)
     M_asphalt = mat("RW_Mat_Asphalt", "rustworks-asphalt.png", metallic=0.02, roughness=0.94, tile=4.0)
     M_sign = mat("RW_Mat_Signage", "rustworks-signage.png", metallic=0.2, roughness=0.55, tile=1.0,
                  emission=(0.4, 0.08, 0.04), emission_strength=0.1)
@@ -217,31 +216,18 @@ def main():
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
     root["access_scheme"] = "lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "pass51-clean-tower-cover"
-    root["material_count_target"] = 11
+    root["quality_pass"] = "pass54-rustworks-water-layout-rig"
+    root["material_count_target"] = 10
 
     # ========== GROUND ==========
-    cube("RW_asphalt_pad", (0, 0, 0.02), (62, 62, 0.05), M_asphalt, "ground-asphalt", do_bevel=False)
-    cube("RW_hardstand", (0, 0, 0.06), (20, 20, 0.1), M_concrete, "ground-hardstand")
-    cube("RW_service_lane", (0, 18, 0.07), (10, 22, 0.08), M_concrete, "ground-lane")
-    # Stained apron rings so the yard floor isn't a single flat grey read.
-    for i, r in enumerate((11.5, 14.5, 17.5)):
-        bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=0.35, major_segments=48, minor_segments=8, location=(0, 0, 0.09))
-        ring = bpy.context.object
-        ring.name = f"RW_apron_ring_{i}"
-        smart_uv(ring)
-        assign(ring, M_hazard if i == 1 else M_oxide)
-        tag(ring, "ground-marking")
-        CREATED.append(ring)
-    for i, z in enumerate((-26, -20, -14, 14, 20, 26)):
+    # Match the actual 54x58 metre oil-rig deck. Keeping the authored surface
+    # inside the safety rail lets the lowered ocean remain visible over every edge.
+    cube("RW_rig_deck_top", (0, 0, 0.02), (54, 58, 0.05), M_plate, "ground-rig-deck", do_bevel=False)
+    cube("RW_hardstand", (0, 0, 0.06), (16, 16, 0.1), M_asphalt, "ground-hardstand")
+    cube("RW_service_lane_z", (0, 0, 0.07), (5.5, 48, 0.08), M_concrete, "ground-lane")
+    cube("RW_service_lane_x", (0, 0, 0.075), (48, 5.5, 0.08), M_concrete, "ground-lane")
+    for i, z in enumerate((-20, 20)):
         cube(f"RW_chevron_{i}", (0, -z, 0.09), (4.2, 0.7, 0.05), M_hazard, "ground-marking", do_bevel=False)
-    for i, (x, z) in enumerate(((-8, -8), (8, 8), (-8, 8), (8, -8), (0, 12), (0, -12))):
-        cube(f"RW_oil_stain_{i}", (x, -z, 0.08), (3.2, 2.4, 0.03), M_oxide, "ground-detail", do_bevel=False)
-    # Drain gutters
-    for z in (-9.5, 9.5):
-        cube(f"RW_gutter_z_{z}", (0, -z, 0.08), (18, 0.35, 0.12), M_oxide, "ground-detail", do_bevel=False)
-    for x in (-9.5, 9.5):
-        cube(f"RW_gutter_x_{x}", (x, 0, 0.08), (0.35, 18, 0.12), M_oxide, "ground-detail", do_bevel=False)
 
     # ========== TOWER LEGS (I-style) ==========
     for x in (-3.35, 3.35):
@@ -257,13 +243,14 @@ def main():
                 cylinder(f"RW_anchor_{x}_{z}_{ox}_{oz}", (x + ox, -(z + oz), 0.95), 0.06, 0.18, M_hazard, vertices=8, kind="leg-base")
             cube(f"RW_leg_cap_{x}_{z}", (x, -z, 11.2), (0.85, 0.85, 0.32), M_rust, "leg-cap")
 
-    # Cross bracing — denser lattice
+    # Three clean structural bays per face; enough silhouette without the old
+    # cage of twenty criss-crossing braces around the central fight space.
     for z in (-3.55, 3.55):
-        for y0, y1 in ((0.6, 2.9), (2.9, 5.2), (5.2, 7.5), (7.5, 9.8), (9.8, 11.2)):
+        for y0, y1 in ((0.55, 3.1), (3.7, 7.85), (8.45, 11.1)):
             beam(f"RW_brace_a_{z}_{y0}", (-3.35, -z, y0), (3.35, -z, y1), 0.12, M_rust)
             beam(f"RW_brace_b_{z}_{y0}", (3.35, -z, y0), (-3.35, -z, y1), 0.12, M_rust)
     for x in (-3.55, 3.55):
-        for y0, y1 in ((0.6, 2.9), (2.9, 5.2), (5.2, 7.5), (7.5, 9.8), (9.8, 11.2)):
+        for y0, y1 in ((0.55, 3.1), (3.7, 7.85), (8.45, 11.1)):
             beam(f"RW_brace_c_{x}_{y0}", (x, 3.35, y0), (x, -3.35, y1), 0.12, M_plate)
             beam(f"RW_brace_d_{x}_{y0}", (x, -3.35, y0), (x, 3.35, y1), 0.12, M_plate)
 
@@ -278,25 +265,17 @@ def main():
             beam(f"RW_ring_{y}_{x1}_{z1}", (x1, -z1, y), (x2, -z2, y), 0.14, M_plate, "ring-beam")
 
     # ========== DECKS ==========
-    cube("RW_lower_deck", (0, 0, 3.35), (8.8, 8.8, 0.36), M_grate, "lower-deck")
-    cube("RW_lower_deck_skin", (0, 0, 3.12), (8.5, 8.5, 0.12), M_plate, "lower-deck")
-    cube("RW_upper_deck", (0, 0, 8.15), (7.1, 7.1, 0.36), M_diamond, "upper-deck")
-    cube("RW_upper_deck_skin", (0, 0, 7.92), (6.8, 6.8, 0.12), M_rust, "upper-deck")
-    cube("RW_upper_walk_ring", (0, 0, 8.38), (5.1, 5.1, 0.05), M_hazard, "upper-walk-ring", do_bevel=False)
+    cube("RW_lower_deck", (0, 0, 3.35), (8.4, 8.4, 0.34), M_grate, "lower-deck")
+    cube("RW_lower_deck_skin", (0, 0, 3.12), (8.1, 8.1, 0.12), M_plate, "lower-deck")
+    cube("RW_upper_deck", (0, 0, 8.15), (6.8, 6.8, 0.34), M_diamond, "upper-deck")
+    cube("RW_upper_deck_skin", (0, 0, 7.92), (6.5, 6.5, 0.12), M_rust, "upper-deck")
+    cube("RW_upper_walk_ring", (0, 0, 8.38), (5.0, 5.0, 0.05), M_hazard, "upper-walk-ring", do_bevel=False)
     # Deck edge kickplates
     for three_z in (-4.3, 4.3):
         cube(f"RW_lower_kick_z_{three_z}", (0, -three_z, 3.55), (8.6, 0.08, 0.18), M_hazard, "lower-handrail", do_bevel=False)
     for three_x in (-4.3, 4.3):
         cube(f"RW_lower_kick_x_{three_x}", (three_x, 0, 3.55), (0.08, 8.6, 0.18), M_hazard, "lower-handrail", do_bevel=False)
 
-    # Corner-only utilities — open centre
-    # Corner-only hut/manifold — keep upper centre open for fights (aligned with TS colliders).
-    cube("RW_control_hut_shell", (-2.25, 2.25, 9.35), (1.45, 1.45, 2.0), M_corr, "control-hut")
-    cube("RW_control_hut_door", (-2.25, 1.45, 9.05), (0.8, 0.08, 1.45), M_plate, "control-hut")
-    cube("RW_control_hut_window", (-1.5, 2.25, 9.55), (0.08, 0.55, 0.45), M_sign, "control-hut")
-    cube("RW_control_hut_awning", (-2.25, 1.55, 10.5), (1.7, 0.9, 0.12), M_hazard, "control-hut")
-    cube("RW_process_manifold", (2.3, -2.3, 9.1), (0.85, 0.85, 1.35), M_plate, "process-equipment")
-    cylinder("RW_manifold_stack", (2.3, -2.3, 10.0), 0.2, 0.75, M_rust, kind="process-equipment")
     # ========== CLEAN CROWN ==========
     # Keep one supported canopy only. The old gantry/trolley/cable/hook/pulley
     # and loose process runs created disconnected pieces floating above the rig.
@@ -307,16 +286,16 @@ def main():
 
     # ========== ACCESS — ramp + ship ladder (TS-aligned) ==========
     landing_overlap = 0.06
-    deck_thickness = 0.36
+    deck_thickness = 0.34
     lower_top = 3.35 + deck_thickness / 2
     upper_top = 8.15 + deck_thickness / 2
-    lower_half = 8.8 / 2
-    upper_half = 7.1 / 2
+    lower_half = 8.4 / 2
+    upper_half = 6.8 / 2
 
-    lower_angle = math.radians(22.0)
-    lower_width = 4.0
-    lower_thick = 0.3
-    lower_landing_depth = 1.6
+    lower_angle = math.radians(18.0)
+    lower_width = 4.8
+    lower_thick = 0.28
+    lower_landing_depth = 1.55
     lower_ramp_len = (lower_top - 0.12) / math.sin(lower_angle)
     lower_landing_center_z = -lower_half - lower_landing_depth / 2 + landing_overlap
     lower_ramp_top_z = lower_landing_center_z - lower_landing_depth / 2 + landing_overlap
@@ -345,16 +324,16 @@ def main():
                    (0.07, lower_ramp_len, 0.07), M_plate, "lower-ramp-rail", do_bevel=False)
         mid.rotation_euler = (-lower_angle, 0.0, 0.0)
 
-    ship_angle = math.radians(48.0)
+    ship_angle = math.radians(38.0)
     ship_rise = upper_top - lower_top
     ship_run = ship_rise / math.tan(ship_angle)
     ship_len = ship_rise / math.sin(ship_angle)
-    ship_width = 1.95
-    ship_thick = 0.24
-    ship_x = lower_half - 0.4
-    ship_lower_landing_depth = 1.35
-    ship_upper_landing_depth = 1.45
-    ship_low_z = lower_half - 0.25
+    ship_width = 2.6
+    ship_thick = 0.22
+    ship_x = lower_half - 0.1
+    ship_lower_landing_depth = 1.25
+    ship_upper_landing_depth = 1.35
+    ship_low_z = lower_half - 0.2
     ship_lower_landing_center_z = ship_low_z + ship_lower_landing_depth / 2 - landing_overlap
     ship_low_surface_z = ship_lower_landing_center_z - ship_lower_landing_depth / 2 + landing_overlap
     ship_high_surface_z = ship_low_surface_z - ship_run
@@ -407,37 +386,23 @@ def main():
     cube("RW_lower_handrail_w", (-4.3, -0.2, lower_rail_y), (0.12, 7.6, 1.15), M_hazard, "lower-handrail")
     cube("RW_lower_handrail_e", (4.3, 0.45, lower_rail_y), (0.12, 5.8, 1.15), M_hazard, "lower-handrail")
 
-    # ========== YARD (sparse oil-rig deck — open lanes, corner cover only) ==========
-    # Four corner crates aligned with TS colliders.
-    for i, (x, z, sx, sy, sz) in enumerate((
-        (-20, -20, 3.2, 2.1, 3.2), (20, 20, 3.2, 2.1, 3.2),
-        (-20, 20, 3.0, 2.0, 3.0), (20, -20, 3.0, 2.0, 3.0),
-    )):
-        cube(f"RW_crate_{i}", (x, -z, sy / 2), (sx, sz, sy), M_rust if i % 2 == 0 else M_oxide, "yard-crate")
-        cube(f"RW_crate_lid_{i}", (x, -z, sy + 0.1), (sx + 0.15, sz + 0.15, 0.14), M_plate, "yard-crate")
-
-    # Full-collision shipping cover is authoritative in TypeScript; these
-    # presentation meshes match those exact footprints in Quality Graphics.
-    for i, (x, z, sx, sy, sz) in enumerate((
-        (-20, -12, 5.8, 2.6, 2.5), (20, 12, 5.8, 2.6, 2.5),
-        (-12, -20, 2.5, 2.6, 5.8), (12, 20, 2.5, 2.6, 5.8),
-    )):
-        cube(f"RW_shipping_container_{i}", (x, -z, sy / 2), (sx, sz, sy),
-             M_corr if i % 2 else M_rust, "yard-container")
-        pallet_x = x + (4.2 if x < 0 else -4.2)
-        cube(f"RW_pallet_stack_{i}", (pallet_x, -z, 0.55), (2.2, 1.8, 1.1),
-             M_oxide, "yard-pallet")
-        for layer, height in enumerate((0.12, 0.42, 0.72, 1.02)):
-            cube(f"RW_pallet_slat_{i}_{layer}", (pallet_x, -z, height), (2.35, 1.95, 0.08),
-                 M_plate, "yard-pallet", do_bevel=False)
-
-    # Side process tanks on ±X rail only.
-    for i, (x, z) in enumerate(((-22, 0), (22, 0))):
-        cylinder(f"RW_tank_{i}", (x, -z, 1.5), 1.35, 4.0, M_tank, rotation=(math.pi / 2, 0, 0), vertices=20, kind="yard-tank")
-
-    # Low barriers matching TS soft cover.
-    for i, (x, z) in enumerate(((-12, 18), (12, -18))):
-        cube(f"RW_barrier_{i}", (x, -z, 0.45), (2.4, 0.35, 0.9), M_hazard, "yard-cover")
+    # ========== YARD (one symmetric container ring, no loose prop clusters) ==========
+    perimeter_slots = (-19.0, -12.0, -5.0, 5.0, 12.0, 19.0)
+    container_materials = (M_hazard, M_rust, M_corr)
+    container_index = 0
+    for side in ("north", "south", "west", "east"):
+        for slot, offset in enumerate(perimeter_slots):
+            if side in ("north", "south"):
+                x, z, sx, sz = offset, (-23.0 if side == "north" else 23.0), 5.8, 2.5
+            else:
+                x, z, sx, sz = (-23.0 if side == "west" else 23.0), offset, 2.5, 5.8
+            container = cube(
+                f"RW_shipping_container_{side}_{slot}", (x, -z, 1.3), (sx, sz, 2.6),
+                container_materials[slot % len(container_materials)], "yard-container"
+            )
+            container["rustworks_side"] = side
+            container["rustworks_slot"] = slot
+            container_index += 1
 
     # Open safety rail (not solid walls).
     posts = []
@@ -480,7 +445,7 @@ def main():
 
     # Smooth a few hero pieces
     for obj in CREATED:
-        if obj.type == "MESH" and any(k in obj.name for k in ("RW_leg_sleeve", "RW_silo_", "RW_tank_")):
+        if obj.type == "MESH" and any(k in obj.name for k in ("RW_leg_sleeve", "RW_silo_")):
             bpy.context.view_layer.objects.active = obj
             obj.select_set(True)
             bpy.ops.object.shade_smooth()
