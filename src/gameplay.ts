@@ -101,6 +101,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     hipSpread: 0.022, adsSpreadMultiplier: 0.34, movementSpreadMultiplier: 1.78,
     crouchSpreadMultiplier: 0.7, sustainedSpreadPerShot: 0.0025, maximumSpread: 0.064,
     pellets: 1, recoilPitch: 0.019, recoilYaw: 0.01, recoilRecovery: 10,
+    adsRecoilMultiplier: 0.76, crouchRecoilMultiplier: 0.8, proneRecoilMultiplier: 0.6,
     switchSeconds: 0.78, automatic: true, color: 0x9fda72,
     penetration: {
       caliber: '7.62 mm', penetrationPower: 6.9, fmjMultiplier: 1.14,

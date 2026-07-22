@@ -2827,9 +2827,11 @@
           "switchSeconds": 0.4
         },
         {
+          "adsRecoilMultiplier": 0.76,
           "adsSpreadMultiplier": 0.34,
           "automatic": true,
           "color": 10476146,
+          "crouchRecoilMultiplier": 0.8,
           "crouchSpreadMultiplier": 0.7,
           "damage": 27,
           "falloffEnd": 82,
@@ -2854,6 +2856,7 @@
             "minimumWallDamageMultiplier": 0.4,
             "penetrationPower": 6.9
           },
+          "proneRecoilMultiplier": 0.6,
           "recoilPitch": 0.019,
           "recoilRecovery": 10,
           "recoilYaw": 0.01,
