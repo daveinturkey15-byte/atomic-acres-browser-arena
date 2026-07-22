@@ -65,6 +65,14 @@ def safe_tag(value: str) -> str:
     return tag[:80]
 
 
+def native_path(path: Path) -> Path:
+    """Translate an MSYS `/c/...` argument for a native Windows Python process."""
+    value = str(path)
+    if os.name == "nt" and re.match(r"^/[a-zA-Z]/", value):
+        value = f"{value[1].upper()}:{value[2:]}"
+    return Path(value)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prompt", type=Path, required=True, help="Task prompt markdown file")
@@ -95,9 +103,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    repo = args.repo.resolve()
-    prompt_path = args.prompt.resolve()
-    agy = args.agy.resolve()
+    repo = native_path(args.repo).resolve()
+    prompt_path = native_path(args.prompt).resolve()
+    agy = native_path(args.agy).resolve()
 
     if not agy.is_file():
         raise SystemExit(f"AGY executable not found: {agy}")
@@ -142,7 +150,7 @@ End with a `MODEL RECEIPT` section stating model `{MODEL}`, fallback `none`, fil
 
     started = datetime.now(timezone.utc)
     run_id = f"{started.strftime('%Y%m%dT%H%M%SZ')}-{args.tag}-{uuid.uuid4().hex[:8]}"
-    run_dir = args.cache_root.resolve() / run_id
+    run_dir = native_path(args.cache_root).resolve() / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
 
     frozen_prompt = run_dir / "prompt.md"
