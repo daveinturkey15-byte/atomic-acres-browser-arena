@@ -755,7 +755,10 @@ test.describe('boot and authored presentation', () => {
     test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=blender');
+    // The cache-busted authored GLB is intentionally larger after the collision
+    // and house fixes. A shared Windows CI worker can need more than 30 seconds
+    // to decode it after the preceding Quality-profile tests.
+    await pageReadyAt(page, '/?render=blender', 90_000);
     await startSolo(page);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
 

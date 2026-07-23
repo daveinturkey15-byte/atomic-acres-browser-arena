@@ -14,7 +14,7 @@ This is the authoritative scope for PR 24. A code change is not `VERIFIED` until
 
 | Area | Required result | Current evidence | State |
 |---|---|---|---|
-| Atomic Acres collision | Every player-sized authored object blocks people and shots; only grass, decals, particles, wall art, tiny screens and overhead dressing remain presentation-only | Shared authority covers earth banks, mounds, irrigation vessel, buses, four large cover assets, trees, terminals, lamps, hydro beds, tank, posts and house furniture; Performance/Quality collision parity E2E is green | VERIFIED - served E2E |
+| Atomic Acres collision | Every player-sized authored object blocks people and shots; only grass, decals, particles, wall art, tiny screens and overhead dressing remain presentation-only | Shared authority covers earth banks, mounds, irrigation vessel, buses, four large cover assets, trees, terminals, lamps, hydro beds, tank, posts and house furniture; Performance/Quality collision parity and 12/12 safe spawns per team are green | VERIFIED - served E2E |
 | Acres floating/house defects | Ground pipe stack and furniture; remove dark upper slab/black doorway; upper windows break | Regenerated cache-busted GLB; served screenshots cover both houses, hollow grounded pipes and grounded furniture; six semantic breakable panes are bound | VERIFIED - visual and asset contract |
 | Near-wall/floor clipping | No weapon or arm holes when prone/crouched/standing near surfaces | Viewmodel renders on a depth-separated layer after world depth is cleared; served prone-near-wall capture is clean | VERIFIED - visual and focused test |
 | Prone crash/stand failure | Prone is safe and standing checks do not collide with the supporting floor | Clearance probe starts above floor contact; stance and multiplayer recovery proof cover prone -> stand | VERIFIED - focused and two-browser QA |
@@ -48,6 +48,7 @@ This is the authoritative scope for PR 24. A code change is not `VERIFIED` until
 - The supplied 2026-07-23 recording contains usable AAC speech. Its commentary corroborates the reported Quad pickup, missed-hit, prone/disconnect and rejoin failures; it is not treated as a source of implementation instructions beyond the user's stated requests.
 - The missed-hit bug was concrete: rewind telemetry was calculated but discarded, current pose was used for validation, and harmless client/host damage differences were rejected by exact equality.
 - The lobby timeout was concrete: an optional unordered movement channel was treated as mandatory even when the reliable event channel was healthy.
+- The first exact-SHA Windows gate found two spawn/collider conflicts introduced by making the earth banks solid. The affected spawn on each team moved into the adjacent verified-clear lane; collision was not weakened to hide the conflict.
 - The earlier Pass 60 preview failure was partly a release/QA error: unversioned GLBs could remain cached after the JS changed, and the first map sweep used a physics teleport as a visual camera on Rustworks. Assets are now cache-busted and fixed-camera visual probes are separate from playable collision probes.
 - If a reproduced Quad freeze has a normal recorded next-frame spawn time, shader/layout first-use is falsified and the next trace must isolate networking, audio and garbage collection.
 
