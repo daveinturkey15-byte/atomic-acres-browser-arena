@@ -624,6 +624,44 @@ describe('additional authored maps', () => {
     expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(24);
   });
 
+  it('ships the Pass 60 white-silver terminal reskin as an obvious authored environment', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.root.userData.skylineReskin).toEqual({
+      version: 'pass-60-total-overhaul',
+      palette: 'white-silver-cyan-magenta',
+      routeGeometryChanged: false,
+      authoritativeCeiling: true,
+    });
+
+    for (const name of [
+      'skyline-terminal-silver-ceiling',
+      'skyline-floor-cyan-runner-west',
+      'skyline-floor-magenta-crossing',
+      'skyline-mezzanine-coffer-0',
+      'skyline-mezzanine-coffer-light-0',
+      'skyline-overhead-gate-sign--18',
+      'skyline-overhead-gate-sign-18',
+      'skyline-airside-roof-crown',
+      'skyline-airside-identity--18',
+      'skyline-airside-identity-18',
+      'skyline-roof-sculptural-fin-0',
+      'skyline-apron-cyan-guidance-west',
+      'skyline-apron-magenta-guidance-east',
+      'skyline-aircraft-livery-cyan-north',
+      'skyline-aircraft-livery-magenta-south',
+    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
+
+    const ceiling = map.root.getObjectByName('skyline-terminal-silver-ceiling') as THREE.Mesh;
+    expect(map.raycastMeshes).toContain(ceiling);
+    expect(ceiling.userData.ballisticSurfaceId).toEqual(expect.any(String));
+    expect((ceiling.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xf2f5f1);
+
+    const cyan = map.root.getObjectByName('skyline-floor-cyan-runner-west') as THREE.Mesh;
+    const magenta = map.root.getObjectByName('skyline-floor-magenta-crossing') as THREE.Mesh;
+    expect((cyan.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
+    expect((magenta.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
+  });
+
   it('keeps six breakable facade panes independent from the added mullion frames', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     expect(map.breakableWindows.map((window) => window.id)).toEqual([
