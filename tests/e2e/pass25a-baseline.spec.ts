@@ -73,6 +73,11 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     test.skip(process.platform !== 'linux', 'The canonical pixel baseline is captured on Linux CI.');
     await ready(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+    // Release metadata is asserted by changelog/unit and authored-menu tests. Normalize its
+    // timestamp here so this pixel contract measures menu geometry rather than release text churn.
+    await page.locator('#last-updated-btn').evaluate((element) => {
+      element.textContent = 'LAST RELEASE · 22 JUL 2026 · 21:25 BST';
+    });
     expect((await snapshot(page)).random.seed).toBe('pass25a-browser-baseline');
     await expect(page).toHaveScreenshot('pass25a-performance-menu.png', {
       animations: 'disabled',
