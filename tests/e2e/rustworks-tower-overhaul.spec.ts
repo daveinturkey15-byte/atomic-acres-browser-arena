@@ -20,6 +20,12 @@ type DebugSnapshot = {
       semanticParts: number;
       texturedMaterials: number;
       pbrMaterials: number;
+      containerTotal: number;
+      containerClosed: number;
+      containerOpenBothEnds: number;
+      containerOpenOneEnd: number;
+      forbiddenFloatingParts: number;
+      oversizedHandrailSlabs: number;
     };
   };
 };
@@ -72,6 +78,7 @@ test('Rustworks tower overhaul renders the undercroft, west trench, and open fre
 
   const poses = [
     { name: 'tower-hero', position: [24.5, 4.2, 0], yaw: Math.PI / 2, pitch: -0.24 },
+    { name: 'welsh-flag', position: [25.5, 10.5, 0], yaw: Math.PI / 2, pitch: -0.14 },
     { name: 'undercroft-north', position: [0, 1.7, -7], yaw: Math.PI, pitch: -0.06 },
     { name: 'west-service-trench', position: [-13.8, 2.2, -18], yaw: Math.PI, pitch: -0.07 },
     { name: 'north-open-container', position: [-13.2, 1.7, -21.5], yaw: -Math.PI / 2, pitch: 0 },
@@ -95,13 +102,21 @@ test('Rustworks tower overhaul renders the undercroft, west trench, and open fre
   expect(state.arenaSelection.raycastMeshes).toBeGreaterThanOrEqual(state.arenaSelection.colliders);
   expect(state.render.rustworksBlender).toMatchObject({
     status: 'ready',
-    assetVersion: 'rustworks-tower-overhaul-v1',
+    assetVersion: 'rustworks-pass60-feedback-v3',
   });
   expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(15.8);
   expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(250);
   expect(state.render.rustworksBlender.meshCount).toBeGreaterThanOrEqual(250);
   expect(state.render.rustworksBlender.texturedMaterials).toBeGreaterThanOrEqual(8);
   expect(state.render.rustworksBlender.pbrMaterials).toBeGreaterThanOrEqual(8);
+  expect(state.render.rustworksBlender).toMatchObject({
+    containerTotal: 24,
+    containerClosed: 18,
+    containerOpenBothEnds: 3,
+    containerOpenOneEnd: 3,
+    forbiddenFloatingParts: 0,
+    oversizedHandrailSlabs: 0,
+  });
   expect(pageErrors).toEqual([]);
   expect(consoleEntries.filter((entry) => entry.type === 'error')).toEqual([]);
 });

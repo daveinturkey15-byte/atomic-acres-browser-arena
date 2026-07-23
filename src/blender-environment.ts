@@ -4,7 +4,7 @@ import type { ArenaMap } from './map';
 import type { ArenaId } from './map-selection';
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
-export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb';
+export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass60-20260723-3';
 
 export type BlenderArenaTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';

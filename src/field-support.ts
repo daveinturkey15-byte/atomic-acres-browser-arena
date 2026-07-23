@@ -29,6 +29,9 @@ export const HUNTER_SWARM_SPLASH_DAMAGE = 100;
 export const HUNTER_SWARM_PRONE_MULTIPLIER = 0.09;
 export const NUKE_WARNING_MS = 5_000;
 export const NUKE_DAMAGE = 1_000;
+export const SCOUT_SWEEP_DURATION_MS = 12_000;
+export const SCOUT_SWEEP_PULSE_INTERVAL_MS = 3_000;
+export const SCOUT_SWEEP_PULSE_VISIBLE_MS = 1_500;
 export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
 
 export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {
@@ -37,6 +40,13 @@ export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): num
   if (source === 'hunter-swarm') return HUNTER_SWARM_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'nuke') return Number.POSITIVE_INFINITY;
   return 6.2;
+}
+
+export function scoutSweepPulseVisible(now: number, activeUntil: number): boolean {
+  if (!Number.isFinite(now) || !Number.isFinite(activeUntil) || now >= activeUntil) return false;
+  const startedAt = activeUntil - SCOUT_SWEEP_DURATION_MS;
+  const elapsed = Math.max(0, now - startedAt);
+  return elapsed % SCOUT_SWEEP_PULSE_INTERVAL_MS < SCOUT_SWEEP_PULSE_VISIBLE_MS;
 }
 
 export function cycleFieldSupportSelection(current: FieldSupportId, direction: -1 | 1): FieldSupportId {

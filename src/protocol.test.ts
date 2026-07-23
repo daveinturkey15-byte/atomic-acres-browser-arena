@@ -76,6 +76,15 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'match-score', by: 'host', scores: [...scores, score('overflow')], nonce: 23 })).toBe(false);
   });
 
+  it('validates bounded real-time Gun Range score claims', () => {
+    const claim = { type: 'range-score-claim' as const, by: 'abc', score: 1_250, hits: 7, shots: 12, nonce: 24 };
+    expect(isGameMessage(claim)).toBe(true);
+    expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
+    expect(isHostAuthorityMessage(claim)).toBe(false);
+    expect(isGameMessage({ ...claim, score: -1 })).toBe(false);
+    expect(isGameMessage({ ...claim, shots: 100_001 })).toBe(false);
+  });
+
   it('validates replicated pickup and breakable-window messages', () => {
     const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', mode: 'weapon', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;
@@ -97,12 +106,12 @@ describe('network protocol guards', () => {
 
   it('validates bounded host-authoritative Overdrive claims and state', () => {
     const claim = { type: 'overdrive-claim' as const, by: 'abc', position: [0, 1.7, 0] as [number, number, number], generation: 2, nonce: 90 };
-    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, activeRemainingMs: 15_000, nextSpawnInMs: 120_000, nonce: 91 };
+    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };
     expect(isGameMessage(claim)).toBe(true);
     expect(isGameMessage(state)).toBe(true);
     expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
     expect(isGameMessage({ ...claim, position: [Infinity, 1.7, 0] })).toBe(false);
-    expect(isGameMessage({ ...state, activeRemainingMs: 15_001 })).toBe(false);
+    expect(isGameMessage({ ...state, activeRemainingMs: 30_001 })).toBe(false);
     expect(isGameMessage({ ...state, nextSpawnInMs: 120_001 })).toBe(false);
   });
 
@@ -153,7 +162,7 @@ describe('network protocol guards', () => {
         hostId: 'host',
         phase: 'waiting' as const,
         config: { mode: 'tdm' as const, capacity: 4 as const, hostedBotCount: 0 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
-        members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0 }],
+        members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0, dhv: 10 as const }],
         scores: [{ id: 'host', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 }],
         activeAtEpochMs: null,
       },
@@ -163,6 +172,8 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(join, 'abc')).toBe(true);
     expect(isGameMessage({ ...join, resumeToken: 'short' })).toBe(false);
     expect(isGameMessage(lobbyState)).toBe(true);
+    expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 'X', nonce: 3 })).toBe(true);
+    expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 9, nonce: 3 })).toBe(false);
     expect(isHostAuthorityMessage(lobbyState)).toBe(true);
     expect(isStateTrafficMessage({ type: 'state', player })).toBe(true);
     expect(isStateTrafficMessage(lobbyState)).toBe(false);

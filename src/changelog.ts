@@ -38,6 +38,32 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass60',
+    pass: 'PASS 60',
+    title: 'Fast-feedback combat, HUD & diagnostics pass',
+    releasedAt: PENDING_PRODUCTION_RELEASE,
+    areas: Object.freeze(['COMBAT', 'MULTIPLAYER', 'HUD', 'DIAGNOSTICS', 'MAPS', 'GUN RANGE']),
+    summary: 'Pass 60 prioritises fast player-visible feedback: larger HUD presentation, authoritative per-player handicaps, actionable reports, and screenshot-driven arena rebuilds while preserving Pass 59 as the exact stable fallback.',
+    highlights: Object.freeze([
+      'Sniper headshots deal 3x damage and scoped players retain the full HUD and match status',
+      'Damage activity sits lower without duplicate hit notifications, while Field Support is 25% larger in the same compact format',
+      'Every completed match exposes a human per-player scoreboard and timestamped damage timeline plus a separate large agent-readable diagnostics ledger',
+      'Both upstairs house windows now break; Quality and Performance share collision for all substantial Atomic Acres terrain and authored props',
+      'Gun Range is a bot-free six-player FFA with real wallbang player damage, plus a 100 HP flying black cat worth 500 points that respawns after 30 seconds',
+      'Player and bot hitboxes now follow the visible head in every stance instead of admitting critical hits above the model',
+      'Gun Range gains a textured white-silver shell, slowly cycling neon light and a dedicated right-side target-damage feed',
+      'Atomic Acres duplicate floating house shells are removed, while Rustworks gains centre cover and an open-tread ship ladder without coplanar deck flicker',
+      'Quad Damage is a reliable 2× pickup for 30 seconds; eliminating its holder steals the remaining power time',
+      'Bounded target rewind improves moving-player hit registration, while degraded movement channels fall back reliably and active players can rejoin',
+      'Inbound supports have clearer warnings, and bounded browser exception history is included in technical reports',
+      'Desktop gameplay HUD presentation is 35% larger, while Scout Sweep now uses an exact 3 second scan cadence and 1.5 second reveal window',
+      'Hosted lobbies expose each player’s DHV 10/8/6/4/2/X handicap; X is one-hit vulnerable and receives a headshot-only Verdict Magnum',
+      'Atomic Acres interiors no longer expose blue exterior siding or black upper apertures, and furniture is kept clear of the playable doorway routes',
+      'Rustworks is rebuilt around exactly 24 containers—18 closed, three open at both ends and three open at one end—with unsupported debris removed and an animated Welsh flag above the tower',
+      'Skyline Terminal receives a visible white-silver, cyan and magenta architectural reskin with new ceilings, lighting, gate signage, apron markings and aircraft treatment',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass59',
     pass: 'PASS 59',
     title: 'Fairer private matches, safer spawns & arena repairs',

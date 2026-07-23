@@ -1,6 +1,6 @@
 export const OVERDRIVE_SPAWN_INTERVAL_MS = 120_000;
-export const OVERDRIVE_DURATION_MS = 15_000;
-export const OVERDRIVE_DAMAGE_MULTIPLIER = 4;
+export const OVERDRIVE_DURATION_MS = 30_000;
+export const OVERDRIVE_DAMAGE_MULTIPLIER = 2;
 export const OVERDRIVE_PICKUP_RADIUS = 1.65;
 export const OVERDRIVE_POSITION = Object.freeze({ x: 0, y: 0.82, z: 0 });
 
@@ -72,4 +72,19 @@ export function overdriveDamageMultiplier(state: OverdriveState, playerId: strin
 
 export function overdriveRemainingMs(state: OverdriveState, playerId: string, now: number): number {
   return state.holderId === playerId ? Math.max(0, Math.ceil(state.activeUntil - now)) : 0;
+}
+
+export function transferOverdriveOnElimination(
+  state: OverdriveState,
+  victimId: string,
+  killerId: string,
+  now: number,
+): { state: OverdriveState; transferred: boolean } {
+  if (!killerId || killerId === victimId || state.holderId !== victimId || !Number.isFinite(now) || now >= state.activeUntil) {
+    return { state, transferred: false };
+  }
+  return {
+    transferred: true,
+    state: { ...state, generation: state.generation + 1, holderId: killerId },
+  };
 }

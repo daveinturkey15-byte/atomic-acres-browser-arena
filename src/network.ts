@@ -34,6 +34,8 @@ type NetworkDiagnostics = Record<string, unknown> & {
   stateMessagesRelayed: number;
   selfStateEchoesSuppressed: number;
   reconnectAttempts: number;
+  stateFallbackActive: boolean;
+  stateFallbackMessages: number;
 };
 
 const STATE_LABEL = 'atomic-acres-state-v1';
@@ -73,6 +75,10 @@ export function guestMessageEndsSession(message: GameMessage): boolean {
 
 export function joinTimeoutAction(reconnecting: boolean): 'retry' | 'offline' {
   return reconnecting ? 'retry' : 'offline';
+}
+
+export function stateTrafficUsesFallback(stateOpen: boolean, eventOpen: boolean): boolean {
+  return !stateOpen && eventOpen;
 }
 
 export function replaceGuestPeerOwner(
@@ -141,6 +147,7 @@ export class ArenaNetwork {
   private stateMessagesSent = 0;
   private stateMessagesRelayed = 0;
   private selfStateEchoesSuppressed = 0;
+  private stateFallbackMessages = 0;
 
   constructor(onMessage: MessageHandler, onStatus: StatusHandler) {
     this.onMessage = onMessage;
@@ -195,10 +202,14 @@ export class ArenaNetwork {
     if (this.role === 'host') {
       this.broadcast(message, exceptPlayerId);
     } else if (this.role === 'client') {
-      const connection = isStateTrafficMessage(message) ? this.hostStateConnection : this.hostEventConnection;
+      const stateFallback = isStateTrafficMessage(message) && !this.hostStateConnection?.open;
+      const connection = isStateTrafficMessage(message)
+        ? this.hostStateConnection?.open ? this.hostStateConnection : this.hostEventConnection
+        : this.hostEventConnection;
       if (connection?.open) {
         connection.send(message);
         if (isStateTrafficMessage(message)) this.stateMessagesSent += 1;
+        if (stateFallback) this.stateFallbackMessages += 1;
       }
     }
   }
@@ -206,10 +217,14 @@ export class ArenaNetwork {
   sendToPlayer(playerId: string, message: GameMessage): boolean {
     if (this.role !== 'host' || !isGameMessage(message)) return false;
     const bundle = this.guestBundles.get(playerId);
-    const connection = isStateTrafficMessage(message) ? bundle?.state : bundle?.events;
+    const stateFallback = isStateTrafficMessage(message) && !bundle?.state?.open;
+    const connection = isStateTrafficMessage(message)
+      ? bundle?.state?.open ? bundle.state : bundle?.events
+      : bundle?.events;
     if (!connection?.open) return false;
     connection.send(message);
     if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
+    if (stateFallback) this.stateFallbackMessages += 1;
     return true;
   }
 
@@ -224,6 +239,15 @@ export class ArenaNetwork {
     try { bundle.events.close(); } catch { /* no-op */ }
     try { bundle.state?.close(); } catch { /* no-op */ }
     this.dropGuest(playerId, bundle.events);
+  }
+
+  degradeStateChannelForQa(): boolean {
+    if (this.role !== 'client' || !this.hostStateConnection) return false;
+    const connection = this.hostStateConnection;
+    this.hostStateConnection = null;
+    try { connection.close(); } catch { /* The reliable lane remains authoritative. */ }
+    this.onStatus('Movement channel degraded; using reliable fallback', 'warn');
+    return true;
   }
 
   diagnostics(): NetworkDiagnostics {
@@ -261,6 +285,10 @@ export class ArenaNetwork {
       selfStateEchoesSuppressed: this.selfStateEchoesSuppressed,
       reconnectAttempts: this.reconnectAttempts,
       pendingStateChannels: this.pendingStateConnections.size,
+      stateFallbackActive: this.role === 'client'
+        ? stateTrafficUsesFallback(Boolean(this.hostStateConnection?.open), Boolean(this.hostEventConnection?.open))
+        : [...this.guestBundles.values()].some((bundle) => stateTrafficUsesFallback(Boolean(bundle.state?.open), bundle.events.open)),
+      stateFallbackMessages: this.stateFallbackMessages,
     };
   }
 
@@ -318,11 +346,16 @@ export class ArenaNetwork {
         reliable: true,
         serialization: 'json',
       });
-      const state = connectLossyStateChannel(peer, this.roomCode);
       this.hostEventConnection = events;
-      this.hostStateConnection = state;
       this.wireHostChannel(events, 'events');
-      this.wireHostChannel(state, 'state');
+      try {
+        const state = connectLossyStateChannel(peer, this.roomCode);
+        this.hostStateConnection = state;
+        this.wireHostChannel(state, 'state');
+      } catch {
+        this.hostStateConnection = null;
+        this.onStatus('Movement channel degraded; using reliable fallback', 'warn');
+      }
     });
     peer.on('error', (error) => this.onStatus(this.describeError(error), 'error'));
     peer.on('disconnected', () => {
@@ -375,7 +408,13 @@ export class ArenaNetwork {
         return;
       }
       if (isHostAuthorityMessage(payload) || !messageBelongsToPlayer(payload, playerId)) return;
-      if (payload.type === 'state') return;
+      if (payload.type === 'state') {
+        // The sender selects exactly one lane. Always admit state arriving on
+        // the reliable lane so a remotely closed transient channel cannot
+        // leave the host believing the stale channel is still usable.
+        this.onMessage(payload);
+        return;
+      }
       if (payload.type === 'overdrive-state' || payload.type === 'death') return;
       if (guestMessageEndsSession(payload)) {
         this.dropGuest(playerId, connection);
@@ -385,7 +424,7 @@ export class ArenaNetwork {
       if (payload.type === 'overdrive-claim' || payload.type === 'hit'
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
-        || payload.type === 'lobby-ready' || payload.type === 'lobby-team'
+        || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
         || payload.type === 'lobby-balance' || payload.type === 'clock-ping') {
         this.onMessage(payload);
         return;
@@ -434,13 +473,15 @@ export class ArenaNetwork {
     connection.on('data', (payload) => {
       if (!isGameMessage(payload)) return;
       if (kind === 'state' && !isStateTrafficMessage(payload)) return;
-      if (kind === 'events' && isStateTrafficMessage(payload)) return;
       this.onMessage(payload);
     });
     connection.on('close', () => {
       if (this.manualClose || this.role !== 'client') return;
       if (kind === 'events') this.scheduleReconnect('Host connection closed');
-      else this.onStatus('Movement channel closed; attempting recovery', 'warn');
+      else {
+        if (this.hostStateConnection === connection) this.hostStateConnection = null;
+        this.onStatus('Movement channel degraded; using reliable fallback', 'warn');
+      }
     });
     connection.on('error', () => {
       if (kind === 'events') this.onStatus('Could not establish peer event channel', 'error');
@@ -457,7 +498,7 @@ export class ArenaNetwork {
   }
 
   private channelsReady(): boolean {
-    return Boolean(this.hostEventConnection?.open && this.hostStateConnection?.open);
+    return Boolean(this.hostEventConnection?.open);
   }
 
   private scheduleReconnect(reason: string): void {
@@ -523,10 +564,14 @@ export class ArenaNetwork {
         continue;
       }
       if (!shouldRelayMessageToTeam(message, bundle.team)) continue;
-      const connection = isStateTrafficMessage(message) ? bundle.state : bundle.events;
+      const stateFallback = isStateTrafficMessage(message) && !bundle.state?.open;
+      const connection = isStateTrafficMessage(message)
+        ? bundle.state?.open ? bundle.state : bundle.events
+        : bundle.events;
       if (!connection?.open) continue;
       connection.send(message);
       if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
+      if (stateFallback) this.stateFallbackMessages += 1;
     }
   }
 

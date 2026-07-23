@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   HUNTER_SWARM_COUNT,
   NUKE_DAMAGE,
+  SCOUT_SWEEP_PULSE_INTERVAL_MS,
+  SCOUT_SWEEP_PULSE_VISIBLE_MS,
   TRI_PASS_BLAST_RADIUS,
   TRI_PASS_MAX_DAMAGE,
   assignHunterSwarmTargets,
@@ -15,11 +17,25 @@ import {
   recordSupportDeath,
   recordSupportElimination,
   remoteExplosiveHitMaximumDistance,
+  scoutSweepPulseVisible,
   selectTriPassHostiles,
   triPassSchedule,
 } from './field-support';
 
 describe('field support rewards', () => {
+  it('reveals hostiles only during bounded Scout Sweep radar pulses', () => {
+    const until = 12_000;
+    expect(SCOUT_SWEEP_PULSE_INTERVAL_MS).toBe(3_000);
+    expect(SCOUT_SWEEP_PULSE_VISIBLE_MS).toBe(1_500);
+    expect(scoutSweepPulseVisible(100, until)).toBe(true);
+    expect(scoutSweepPulseVisible(1_499, until)).toBe(true);
+    expect(scoutSweepPulseVisible(1_500, until)).toBe(false);
+    expect(scoutSweepPulseVisible(2_999, until)).toBe(false);
+    expect(scoutSweepPulseVisible(3_000, until)).toBe(true);
+    expect(scoutSweepPulseVisible(4_499, until)).toBe(true);
+    expect(scoutSweepPulseVisible(4_500, until)).toBe(false);
+    expect(scoutSweepPulseVisible(until, until)).toBe(false);
+  });
   it('unlocks the three original rewards at bounded elimination thresholds', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);

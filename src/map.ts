@@ -23,10 +23,13 @@ export type PracticeTarget = {
   root: THREE.Group;
   active: boolean;
   respawnAt: number;
+  respawnDelayMs?: number;
   scoreValue: number;
   distanceBand: 'near' | 'mid' | 'far';
   maxHealth: number;
   health: number;
+  alwaysCritical?: boolean;
+  kind?: 'plate' | 'flying-cat';
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
 export type ArenaMap = {
@@ -177,6 +180,19 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // replaces it with the rounded authored route art in environment-assets.
     proxy.visible = true;
     proxy.userData.collisionProxy = true;
+  }
+
+  function authoredCollisionProxy(
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    ballisticMaterial: BallisticMaterialId = 'structural-metal',
+  ): THREE.Mesh {
+    const proxy = box(name, position, size, palette.dark, true, false, true, ballisticMaterial);
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+    proxy.userData.authoredCollisionAuthority = true;
+    return proxy;
   }
 
   function performanceCoverBox(
@@ -512,6 +528,35 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     world.add(mound);
     moundAudit.push({ id, collider: colliderName, bottomY: -0.44 });
   }
+  // The large Quality-profile earth banks overlap the playable side of the
+  // boundary. Mirror their silhouettes in Performance and approximate each
+  // ellipsoid with tiered authority boxes so both render profiles have exactly
+  // the same movement and shot physics without blocking empty corner space.
+  const qualityEarthBankAudit: Array<{ id: string; colliders: string[] }> = [];
+  for (const bank of [
+    { id: 'north-west', position: [-45, -0.8, -34] as const, scale: [20, 5.5, 13] as const, slices: [[-33, 2, 21, 3.2], [-30, 4, 17, 2.5], [-27, 2, 9, 1.4]] as const },
+    { id: 'north-east', position: [46, -0.8, -26] as const, scale: [17, 4.6, 15] as const, slices: [[33, 2, 19, 3], [30, 4, 10, 1.5]] as const },
+    { id: 'south-west', position: [-42, -0.8, 34] as const, scale: [16, 4.2, 12] as const, slices: [[-33, 2, 20, 2.8], [-30, 4, 15, 2.1], [-27, 2, 7, 1.1]] as const },
+    { id: 'south-east', position: [44, -0.8, 39] as const, scale: [21, 5.2, 11] as const, slices: [[33, 2, 19, 3.1], [29, 6, 14, 2.3], [25, 2, 7, 1.1]] as const },
+  ]) {
+    const visual = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), palette.grass);
+    visual.name = `quality-earth-bank-${bank.id}`;
+    visual.position.set(bank.position[0], bank.position[1], bank.position[2]);
+    visual.scale.set(bank.scale[0], bank.scale[1], bank.scale[2]);
+    visual.castShadow = true;
+    visual.receiveShadow = true;
+    visual.userData.impactSurface = 'soil';
+    visual.userData.performanceMirrorFor = `P33_SKYLINE_earth_bank_${qualityEarthBankAudit.length}`;
+    world.add(visual);
+    const bankColliders = bank.slices.map(([x, width, depth, height], index) => {
+      const name = `quality-earth-bank-${bank.id}-collider-${index}`;
+      const proxy = authoredCollisionProxy(name, [x, height / 2, bank.position[2]], [width, height, depth], 'earth');
+      proxy.userData.collisionAuthorityFor = visual.name;
+      return name;
+    });
+    visual.userData.collisionAuthorities = bankColliders;
+    qualityEarthBankAudit.push({ id: bank.id, colliders: bankColliders });
+  }
   const vesselCollider = box('east-irrigation-vessel-collider', [27, 1.65, 28], [3.8, 3.3, 3.8], palette.chrome, true, false, true, 'structural-metal');
   vesselCollider.visible = false;
   vesselCollider.userData.collisionAuthorityFor = 'east-irrigation-vessel';
@@ -525,6 +570,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   world.add(irrigationVessel);
   world.userData.atomicCollisionAudit = {
     terrainMounds: moundAudit,
+    qualityEarthBanks: qualityEarthBankAudit,
     largeCylinder: { id: irrigationVessel.name, collider: vesselCollider.name, bottomY: 0 },
   };
   // Lane cover interrupts ordinary combat rays every 12–18 metres. The four
@@ -564,6 +610,46 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   collisionProxy('service wall west', [22.5, 0.75, 9], [0.7, 1.5, 10]);
   collisionProxy('service wall east', [28.5, 0.75, 9], [0.7, 1.5, 10]);
   for (const x of [22.5, 29.5]) for (const z of [-20, -12]) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);
+
+  // Player-sized authored objects need one shared authority contract even when
+  // Quality replaces the procedural presentation with its Blender scene.
+  const substantialPropColliders: string[] = [];
+  const substantial = (name: string, position: [number, number, number], size: [number, number, number], material?: BallisticMaterialId) => {
+    substantialPropColliders.push(authoredCollisionProxy(name, position, size, material).name);
+  };
+  for (const [index, [x, z, scale]] of [
+    [-31, -30, 1], [31, 30, 1.1], [-31, 28, 0.9], [31, -27, 1], [-18, 34, 0.85], [18, -34, 0.9],
+  ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [0.68 * scale, 4 * scale, 0.68 * scale], 'wood');
+  for (const [index, [x, z]] of [[-18, 10], [20, -12], [-22, -24], [22, 25]].entries()) {
+    substantial(`authored-terminal-collider-${index}`, [x, 0.85, z], [1.25, 1.7, 0.8]);
+  }
+  for (const [index, [x, z]] of [[-29, 4], [29, -4]].entries()) {
+    substantial(`authored-extra-lamp-collider-${index}`, [x, 2.8, z], [0.3, 5.6, 0.3]);
+  }
+  for (const [index, x] of [-28, -25.5, -23].entries()) substantial(`authored-hydro-bed-collider-${index}`, [x, 0.35, 16], [1.1, 0.7, 6.2], 'concrete');
+  substantial('authored-reclamation-tank-collider', [-31, 3.05, 4], [2.7, 5.6, 2.7]);
+  for (const [index, x] of [-11.3, 11.3].entries()) substantial(`authored-civic-post-collider-${index}`, [x, 3.25, 0], [0.32, 6.5, 0.32]);
+  for (const [houseIndex, house] of HOUSE_LAYOUT.entries()) {
+    const { x, z, facing } = house;
+    const tableX = x - 3;
+    const tableZ = z - facing * 2.7;
+    substantial(`authored-house-${houseIndex}-dining-collider`, [tableX, 0.62, tableZ], [2.8, 1.24, 1.45], 'wood');
+    for (const [chairIndex, [chairX, chairZ]] of [
+      [tableX - 1.72, tableZ], [tableX + 1.72, tableZ], [tableX, tableZ - 1.05], [tableX, tableZ + 1.05],
+    ].entries()) substantial(`authored-house-${houseIndex}-chair-collider-${chairIndex}`, [chairX, 0.6, chairZ], [0.72, 1.2, 0.72], 'wood');
+    const sofaX = x + 3.7;
+    const sofaZ = z + facing * 2.7;
+    substantial(`authored-house-${houseIndex}-sofa-collider`, [sofaX, 0.85, sofaZ], [3.25, 1.7, 1.3], 'wood');
+    substantial(`authored-house-${houseIndex}-kitchen-collider`, [x - 3.75, 1.15, z - facing * 5.25], [6.5, 2.3, 0.85], 'wood');
+    substantial(`authored-house-${houseIndex}-coffee-table-collider`, [sofaX - 0.3, 0.36, sofaZ - facing * 1.5], [1.9, 0.72, 0.9], 'wood');
+    substantial(`authored-house-${houseIndex}-media-collider`, [x + 3.7, 1.1, z - facing * 3.1], [2.6, 2.2, 0.82]);
+    // Keep the bed out of the upper partition sightline. Its old x + 3.6
+    // placement made the dark headboard fill the opening and read as a sealed
+    // black door even though the route was physically open.
+    substantial(`authored-house-${houseIndex}-upper-bed-collider`, [x + 6.1, 4.05, z - facing * 2.5], [3.2, 1.45, 2.2], 'wood');
+    substantial(`authored-house-${houseIndex}-upper-desk-collider`, [x - 3.2, 4.25, z + facing * 2.8], [2.7, 1.65, 0.92], 'wood');
+  }
+  world.userData.atomicCollisionAudit.substantialProps = substantialPropColliders;
 
   // Boundary fencing, with substantial visual posts rather than invisible walls.
   box('west fence', [-34.3, 1.5, 0], [0.6, 3, 88], palette.timber);

@@ -283,9 +283,9 @@ describe('simplified two-floor house architecture', () => {
       const glass = architecture.solids.filter((entry) => entry.kind === 'glass');
       expect(glass).toHaveLength(3);
       expect(new Set(glass.map((entry) => entry.id)).size).toBe(3);
-      expect(glass.filter((entry) => entry.breakable)).toHaveLength(2);
+      expect(glass.filter((entry) => entry.breakable)).toHaveLength(3);
       const upper = glass.find((entry) => entry.name === 'upper-window-glass');
-      expect(upper).toMatchObject({ collidable: true, breakable: false });
+      expect(upper).toMatchObject({ collidable: false, breakable: true });
       expect(architecture.openings.find((entry) => entry.id === 'upper-window')?.route).toBe(false);
     }
   });

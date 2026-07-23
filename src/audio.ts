@@ -198,6 +198,8 @@ export class ArenaAudio {
         ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
         : weapon === 'machine-pistol'
           ? { body: 168, bodyEnd: 72, duration: 0.078, crack: 2280, noise: 0.14, lowpass: 3900, tail: 720, tailDuration: 0.1 }
+          : weapon === 'magnum'
+            ? { body: 64, bodyEnd: 22, duration: 0.24, crack: 2840, noise: 0.32, lowpass: 2500, tail: 340, tailDuration: 0.38 }
           : weapon === 'pistol'
             ? { body: 182, bodyEnd: 76, duration: 0.105, crack: 2380, noise: 0.18, lowpass: 4100, tail: 690, tailDuration: 0.14 }
             : { body: 116, bodyEnd: 46, duration: 0.13, crack: 1750, noise: 0.23, lowpass: 2900, tail: 560, tailDuration: 0.19 };
@@ -394,6 +396,32 @@ export class ArenaAudio {
     return true;
   }
 
+  scoutSweep(): void {
+    this.unlock();
+    for (let pulse = 0; pulse < 5; pulse += 1) {
+      const delay = pulse * 2.4;
+      this.sweep(420, 1_080, 0.18, 0.045, 'triangle', this.feedback, delay);
+      this.tone(1_320, 0.07, 0.028, 'sine', this.feedback, delay + 0.12);
+    }
+  }
+
+  supportInbound(source: 'yardhawk' | 'tri-pass' | 'hunter-swarm'): void {
+    this.unlock();
+    if (source === 'tri-pass') {
+      for (let index = 0; index < 3; index += 1) {
+        this.sweep(1_450 + index * 90, 180, 0.72, 0.055, 'sawtooth', this.feedback, index * 0.12);
+      }
+      this.noise({ duration: 0.62, volume: 0.055, filter: 'bandpass', frequency: 2_100, q: 1.1 }, this.ambience);
+      return;
+    }
+    if (source === 'hunter-swarm') {
+      for (let index = 0; index < 5; index += 1) this.sweep(980 + index * 65, 260, 0.44, 0.04, 'square', this.feedback, index * 0.07);
+      return;
+    }
+    this.tone(1_180, 0.09, 0.055, 'square', this.feedback);
+    this.sweep(1_600, 240, 0.5, 0.065, 'sawtooth', this.ambience, 0.08);
+  }
+
   hunterLaunch(index: number): void {
     this.unlock();
     const offset = Math.max(0, Math.min(4, Math.floor(index))) * 0.045;
@@ -440,6 +468,8 @@ export class ArenaAudio {
     this.noise({ duration: 1.05, volume: 0.46, filter: 'lowpass', frequency: 1_250, q: 0.45 }, this.weapons);
     this.noise({ duration: 0.34, volume: 0.2, filter: 'highpass', frequency: 3_600, q: 0.35, delay: 0.028 }, this.feedback);
     this.noise({ duration: 1.05, volume: 0.16, filter: 'bandpass', frequency: 280, q: 0.52, delay: 0.9 }, this.ambience);
+    this.noise({ duration: 2.4, volume: 0.22, filter: 'lowpass', frequency: 520, q: 0.7, delay: 0.18 }, this.weapons);
+    this.sweep(160, 18, 3.4, 0.18, 'sawtooth', this.ambience, 0.32);
   }
 
   telemetry(): {

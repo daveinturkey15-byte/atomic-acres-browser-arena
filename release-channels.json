@@ -8,8 +8,8 @@
   "stable": {
     "label": "RECENT STABLE",
     "description": "The exact version that was live immediately before the new build.",
-    "pass": "PASS 57",
-    "pagesSha": "cf26f26ee65c3cdd9a7faffaa29418937db9e0af",
+    "pass": "PASS 59",
+    "pagesSha": "b29d44f1f45a6ade65e72738fc4adb58235f6f26",
     "path": "channels/recent-stable"
   }
 }

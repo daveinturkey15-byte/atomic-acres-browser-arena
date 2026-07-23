@@ -44,8 +44,14 @@ describe('Rustworks Blender Quality plant asset', () => {
     expect(authored.length).toBeGreaterThanOrEqual(150);
     expect(root?.name).toBe('RUSTWORKS_AUTHORED_CENTRAL_TOWER');
     expect(root?.extras?.asset_version).toBe(RUSTWORKS_BLENDER_EXPECTED_VERSION);
-    expect(root?.extras?.quality_pass).toBe('rustworks-tower-overhaul');
-    expect(root?.extras?.container_layout).toBe('four-per-side-one-open-per-side');
+    expect(root?.extras?.quality_pass).toBe('rustworks-pass60-feedback');
+    expect(root?.extras).toMatchObject({
+      container_layout: '24-total-18-closed-3-open-both-3-open-one',
+      container_total: 24,
+      container_closed: 18,
+      container_open_both_ends: 3,
+      container_open_one_end: 3,
+    });
     expect(root?.extras?.service_trench).toBe('west-deck-level');
     expect(Number(root?.extras?.authored_height_metres)).toBeGreaterThanOrEqual(15.8);
 
@@ -53,29 +59,34 @@ describe('Rustworks Blender Quality plant asset', () => {
       'ship-ladder', 'ship-ladder-rung', 'lower-ramp', 'upper-access',
       'upper-deck', 'rig-leg', 'rig-deck', 'perimeter', 'tower-undercroft',
       'derrick-crown', 'derrick-service-platform', 'derrick-beacon',
-      'service-trench', 'service-trench-crossover', 'yard-container',
-      'yard-open-container', 'yard-container-placement',
+      'service-trench', 'yard-container', 'yard-open-container',
+      'yard-open-container-closed-end', 'yard-container-placement',
     ] as const) {
       expect(authored.some((node) => node.extras?.rustworks_semantic === semantic), semantic).toBe(true);
     }
 
-    for (const forbidden of ['crane', 'pulley', 'hook', 'cable_tray', 'process_riser', 'RW_pipe', 'control_hut', 'manifold', 'RW_tank_', 'RW_crate_', 'RW_pallet_', 'RW_barrier_']) {
+    for (const forbidden of ['crane', 'pulley', 'hook', 'cable_tray', 'process_riser', 'RW_pipe', 'control_hut', 'manifold', 'RW_tank_', 'RW_crate_', 'RW_pallet_', 'RW_barrier_', 'RW_centre_cover_', 'RW_service_trench_crossover_']) {
       expect((gltf.nodes ?? []).some((node) => node.name?.toLowerCase().includes(forbidden.toLowerCase())), forbidden).toBe(false);
     }
     const placements = (gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_container_placement_'));
     const closedContainers = (gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_shipping_container_'));
     const openShells = (gltf.nodes ?? []).filter((node) => node.extras?.rustworks_semantic === 'yard-open-container');
-    expect(placements).toHaveLength(16);
-    expect(closedContainers).toHaveLength(12);
-    expect(openShells.length).toBeGreaterThanOrEqual(16);
+    expect(placements).toHaveLength(24);
+    expect(closedContainers).toHaveLength(18);
+    expect(openShells.length).toBeGreaterThanOrEqual(24);
+    expect(placements.filter((node) => node.extras?.rustworks_opening === 'closed')).toHaveLength(18);
+    expect(placements.filter((node) => node.extras?.rustworks_opening === 'open-both')).toHaveLength(3);
+    expect(placements.filter((node) => node.extras?.rustworks_opening === 'open-one')).toHaveLength(3);
     for (const side of ['north', 'south', 'west', 'east']) {
       const row = placements.filter((node) => node.extras?.rustworks_side === side);
-      expect(row, `${side} authored row`).toHaveLength(4);
-      expect(row.filter((node) => node.extras?.rustworks_open === true), `${side} authored pass-through`).toHaveLength(1);
+      expect(row, `${side} authored row`).toHaveLength(6);
     }
     expect((gltf.nodes ?? []).some((node) => node.name === 'RW_canopy_roof')).toBe(false);
     expect((gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_undercroft_portal_'))).toHaveLength(4);
     expect((gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_service_trench_wall_'))).toHaveLength(6);
+    expect((gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_centre_cover_'))).toHaveLength(0);
+    expect((gltf.nodes ?? []).filter((node) => node.name?.startsWith('RW_service_trench_crossover_'))).toHaveLength(0);
+    expect((gltf.nodes ?? []).some((node) => node.name === 'RW_ship_ladder_slab')).toBe(false);
 
     const upperLanding = (gltf.nodes ?? []).find((node) => node.name === 'RW_ship_ladder_upper_landing');
     const upperLandingZ = upperLanding?.translation?.[2] ?? 0;

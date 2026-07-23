@@ -44,6 +44,15 @@ export function advanceWeaponHeat(current: number, fired: boolean, dt: number, w
   return clamp01(cooled + (fired ? perShot : 0));
 }
 
+/** Pulls camera-attached arms behind nearby world geometry without changing aim rays. */
+export function viewmodelSurfaceRetreat(nearestSurfaceMeters: number | null, prone: boolean): number {
+  const distance = nearestSurfaceMeters === null || !Number.isFinite(nearestSurfaceMeters)
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, nearestSurfaceMeters);
+  const obstruction = distance >= 1.2 ? 0 : (1 - distance / 1.2) * 0.52;
+  return Math.min(0.56, Math.max(0, obstruction + (prone ? 0.045 : 0)));
+}
+
 /** Deterministic visual fire-cycle envelope. Gameplay recoil and hit rays remain authoritative elsewhere. */
 export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): FireCycleState {
   const ageMs = Math.max(0, finite(rawAgeMs));
@@ -52,7 +61,7 @@ export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): F
   const flashDuration = weapon === 'scattergun' ? 82 : weapon === 'sniper' ? 78 : weapon === 'lmg' ? 62 : fastAuto ? 36 : 52;
   const flashProgress = clamp01(ageMs / flashDuration);
   const flash = (1 - flashProgress) ** 2;
-  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'sniper' ? 310 : weapon === 'lmg' ? 105 : fastAuto ? 50 : weapon === 'pistol' ? 58 : 62;
+  const kickDuration = weapon === 'scattergun' ? 170 : weapon === 'sniper' ? 310 : weapon === 'magnum' ? 150 : weapon === 'lmg' ? 105 : fastAuto ? 50 : weapon === 'pistol' ? 58 : 62;
   const kickProgress = clamp01(ageMs / kickDuration);
   const kick = kickProgress >= 1 ? 0 : (1 - kickProgress) ** 1.35;
   const actionAge = weapon === 'scattergun' ? Math.max(0, ageMs - 180) : weapon === 'sniper' ? Math.max(0, ageMs - 130) : ageMs;

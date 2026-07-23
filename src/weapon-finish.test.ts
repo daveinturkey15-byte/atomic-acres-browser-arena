@@ -7,15 +7,15 @@ import type { WeaponId } from './protocol';
 
 const weapons = Object.keys(WEAPON_FINISH_PROFILES) as WeaponId[];
 
-describe('seven-weapon authored asset contract', () => {
+describe('eight-weapon authored asset contract', () => {
   it('assigns every weapon a unique deterministic PBR finish triplet', () => {
-    expect(weapons).toHaveLength(7);
-    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].id)).size).toBe(7);
-    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].albedo)).size).toBe(7);
+    expect(weapons).toHaveLength(8);
+    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].id)).size).toBe(8);
+    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].albedo)).size).toBe(8);
     expect(new Set(weapons.flatMap((weapon) => {
       const profile = WEAPON_FINISH_PROFILES[weapon];
       return [profile.albedo, profile.normal, profile.roughness];
-    })).size).toBe(21);
+    })).size).toBe(24);
   });
 
   it.each(weapons)('%s has one proportional authored model and calibrated hand/aim sockets', (weapon) => {

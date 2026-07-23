@@ -6,7 +6,7 @@ import {
   TRI_PASS_MAX_DAMAGE,
   hunterSwarmDamage,
 } from './field-support';
-import { AUTHORITATIVE_HIT_PROXIES } from './hit-proxies';
+import { AUTHORITATIVE_HIT_PROXIES, hitProxyRootTransform } from './hit-proxies';
 import type { ExplosiveSource, WeaponId } from './protocol';
 import { applyPenetrationDamage } from './ballistics';
 
@@ -32,10 +32,11 @@ function firstProxyHit(
   const origin = new THREE.Vector3(...originTuple);
   const direction = new THREE.Vector3(...directionTuple).normalize();
   const worldRay = new THREE.Ray(origin, direction);
+  const stanceTransform = hitProxyRootTransform(target.stance);
   const base = new THREE.Matrix4().makeTranslation(target.x, target.y - stanceEyeHeight(target.stance), target.z)
     .multiply(new THREE.Matrix4().makeRotationY(target.yaw))
-    .multiply(new THREE.Matrix4().makeTranslation(0, target.stance === 'prone' ? 0.52 : target.stance === 'crouch' ? -0.28 : 0, 0))
-    .multiply(new THREE.Matrix4().makeRotationX(target.stance === 'prone' ? -Math.PI / 2 : 0));
+    .multiply(new THREE.Matrix4().makeTranslation(...stanceTransform.position))
+    .multiply(new THREE.Matrix4().makeRotationX(stanceTransform.rotationX));
   let first: { zone: HitZone; distance: number; point: THREE.Vector3 } | null = null;
   for (const proxy of HIT_PROXIES) {
     const matrix = base.clone().multiply(new THREE.Matrix4().makeTranslation(...proxy.position));
@@ -101,6 +102,6 @@ export function admitRemoteBaseDamage(claimed: number, maximum: number): boolean
 /** Incoming wire damage is always unpowered; the receiver applies the host-authored multiplier once. */
 export function resolveRemotePoweredDamage(baseDamage: number, multiplier: number): number {
   const boundedBase = Math.max(0, Math.min(100, Number.isFinite(baseDamage) ? baseDamage : 0));
-  const boundedMultiplier = multiplier === 4 ? 4 : 1;
+  const boundedMultiplier = multiplier === 2 ? 2 : 1;
   return Math.min(100, boundedBase * boundedMultiplier);
 }

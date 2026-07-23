@@ -37,6 +37,10 @@ export const WEAPON_FINISH_PROFILES: Record<WeaponId, WeaponFinishProfile> = {
     id: 'aster9-satin-service-v1', albedo: path('pistol'), normal: path('pistol', '-normal'),
     roughness: path('pistol', '-roughness'), metalness: 0.66, normalScale: 0.25, textureRepeat: 2,
   },
+  magnum: {
+    id: 'verdict-magnum-brushed-brass-v1', albedo: path('magnum'), normal: path('magnum', '-normal'),
+    roughness: path('magnum', '-roughness'), metalness: 0.82, normalScale: 0.3, textureRepeat: 2,
+  },
   'machine-pistol': {
     id: 'aster18-ported-graphite-v1', albedo: path('machine-pistol'), normal: path('machine-pistol', '-normal'),
     roughness: path('machine-pistol', '-roughness'), metalness: 0.6, normalScale: 0.3, textureRepeat: 2,

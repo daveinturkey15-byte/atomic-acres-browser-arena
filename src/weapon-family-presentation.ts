@@ -31,7 +31,7 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     sightHeight: 0.215, adsX: -0.36, adsY: 0.251, adsZ: -0.02, projectionCorrection: 0,
     flashScale: 1.14, recoilTranslation: 0.155, recoilRotation: 0.205,
     actionTravel: 0.105, smokeBase: 1.6,
-    requiredDetails: ['lmg-heavy-receiver', 'lmg-box-magazine', 'lmg-carry-handle', 'lmg-bipod', 'lmg-heat-shield', 'rear-sight', 'front-sight', 'bolt-or-slide'],
+    requiredDetails: ['lmg-heavy-receiver', 'lmg-box-magazine', 'lmg-carry-handle', 'lmg-bipod', 'lmg-heat-shield', 'lmg-aperture', 'lmg-front-sight-dot', 'rear-sight', 'front-sight', 'bolt-or-slide'],
   },
   scattergun: {
     sightHeight: 0.2, adsX: -0.36, adsY: 0.159, adsZ: 0.015, projectionCorrection: 0.101,
@@ -50,6 +50,12 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     flashScale: 0.7, recoilTranslation: 0.11, recoilRotation: 0.2,
     actionTravel: 0.1, smokeBase: 1,
     requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard', 'pistol-ejection-port', 'pistol-frame-rail'],
+  },
+  magnum: {
+    sightHeight: 0.18, adsX: -0.36, adsY: 0.278, adsZ: -0.075, projectionCorrection: 0,
+    flashScale: 1.12, recoilTranslation: 0.17, recoilRotation: 0.29,
+    actionTravel: 0.13, smokeBase: 1.8,
+    requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard', 'magnum-heavy-barrel', 'magnum-cylinder'],
   },
   'machine-pistol': {
     sightHeight: 0.17, adsX: -0.36, adsY: 0.278, adsZ: -0.08, projectionCorrection: 0,

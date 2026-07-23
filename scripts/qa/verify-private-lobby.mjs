@@ -61,6 +61,19 @@ try {
   });
   const startBlockedBeforeReady = await host.locator('#lobby-start').isDisabled();
 
+  await host.selectOption('[data-lobby-dhv]', 'X');
+  await guests[0].selectOption('[data-lobby-dhv]', '8');
+  await guests[1].selectOption('[data-lobby-dhv]', '6');
+  await guests[2].selectOption('[data-lobby-dhv]', '2');
+  await host.waitForFunction(() => {
+    const members = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? [];
+    const values = Object.fromEntries(members.map((member) => [member.name, member.dhv]));
+    return values['Host Four'] === 'X' && values['Guest One'] === 8 && values['Guest Two'] === 6 && values['Guest Three'] === 2;
+  }, undefined, { timeout: 30_000 });
+  const dhvReplicated = await host.evaluate(() => Object.fromEntries(
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.map((member) => [member.name, member.dhv]),
+  ));
+
   const overflow = await openPlayer('Overflow Five');
   await overflow.fill('#room-input', roomCode);
   await overflow.click('#join');
@@ -149,6 +162,7 @@ try {
     balancedTeams,
     hostTeamSynchronized,
     startBlockedBeforeReady,
+    dhvReplicated,
     overflowRejected,
     sixCapacityReplicated,
     sixPlayersAdmitted,
@@ -159,6 +173,7 @@ try {
     timers,
     activeAtValues,
     modes: states.map((state) => state.gameMode),
+    dhvLoadouts: states.map((state) => ({ dhv: state.player.dhv, equippedWeapons: state.player.equippedWeapons })),
     remotes: states.map((state) => state.remotes),
     bots: states.map((state) => state.bots.length),
     eventChannels: states.map((state) => state.networkLifecycle.eventChannels),
@@ -179,10 +194,15 @@ try {
     && roomCode.length === 36
     && balancedTeams[0] === 2 && balancedTeams[1] === 2
     && hostTeamSynchronized
-    && startBlockedBeforeReady && overflowRejected && sixCapacityReplicated && sixPlayersAdmitted && allReady
+    && startBlockedBeforeReady
+    && dhvReplicated['Host Four'] === 'X' && dhvReplicated['Guest One'] === 8
+    && dhvReplicated['Guest Two'] === 6 && dhvReplicated['Guest Three'] === 2
+    && overflowRejected && sixCapacityReplicated && sixPlayersAdmitted && allReady
     && ffaTeamControlsDisabled.every(Boolean)
     && pingSamples.slice(1).every((ping) => Number.isFinite(ping))
     && new Set(activeAtValues).size === 1
+    && states[0].player.dhv === 'X' && states[0].player.equippedWeapons.includes('magnum')
+    && states[1].player.dhv === 8 && !states[1].player.equippedWeapons.includes('magnum')
     && states.every((state, index) => state.privateMatch.mode === 'ffa' && state.privateMatch.capacity === 6
       && state.matchPhase === 'active' && state.remotes === 5 && state.bots.length === 0
       && state.networkLifecycle.eventChannels === (index === 0 ? 5 : 1)

@@ -8,6 +8,7 @@ import { WEAPONS } from './gameplay';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
 import type { Team } from './protocol';
+import { createRustworksWelshFlag } from './rustworks-flag';
 
 type Builder = {
   root: THREE.Group;
@@ -512,7 +513,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [shipWidth + 0.55, deckThickness, lowerShipLandingDepth],
     grate,
   );
-  box(
+  const shipLadderAuthority = box(
     builder,
     'rustworks-ship-ladder',
     [shipX, shipPosY, shipCenterZ],
@@ -520,6 +521,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     steelBright,
     { rotation: shipRotation },
   );
+  const invisibleAuthorityMaterial = steelBright.clone();
+  invisibleAuthorityMaterial.name = 'rustworks-ship-ladder-collision-authority';
+  invisibleAuthorityMaterial.visible = false;
+  shipLadderAuthority.material = invisibleAuthorityMaterial;
+  shipLadderAuthority.userData.collisionOnly = true;
   box(
     builder,
     'rustworks-ship-ladder-upper-landing',
@@ -551,7 +557,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     const y = lowerTop + shipRise * t + 0.04;
     box(builder, `rustworks-ship-ladder-rung-${index}`, [shipX, y, z], [shipWidth - 0.12, 0.08, 0.1], hazard, {
       solid: false,
-      detail: 'quality',
+      detail: 'performance',
     });
   }
   for (const side of [-1, 1] as const) {
@@ -561,7 +567,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       [shipX + side * (shipWidth / 2 + 0.02), shipPosY - 0.08, shipCenterZ],
       [0.08, 0.18, shipLength + 0.08],
       oxide,
-      { solid: false, rotation: shipRotation, detail: 'quality' },
+      { solid: false, rotation: shipRotation, detail: 'performance' },
     );
   }
 
@@ -639,60 +645,36 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       });
     }
   }
-  for (const z of [-6, 6] as const) {
-    box(builder, 'rustworks-service-trench-crossover', [trenchX, 2.55, z], [4.35, 0.16, 1.2], steelBright, {
-      solid: false,
-      shots: false,
-      detail: 'quality',
-    });
-  }
-
-  // Four deliberately different centre-cover rhythms pull exterior freight language
-  // toward the tower without forming another repetitive perimeter row.
-  const centreCover = (
-    name: string,
-    position: [number, number, number],
-    size: [number, number, number],
-    material: THREE.Material,
-    style: 'stacked' | 'staggered' | 'l-corner' | 'low-flank',
-    rotation?: [number, number, number],
-    supportedBy: 'deck' | string = 'deck',
-  ): THREE.Mesh => {
-    const ballisticMaterial: BallisticMaterialId = material === concrete || material === concreteDark
-      ? 'concrete'
-      : material === tarp
-        ? 'container'
-        : 'structural-metal';
-    const mesh = box(builder, name, position, size, material, { rotation, ballisticMaterial });
-    mesh.userData.rustworksCentreCoverStyle = style;
-    mesh.userData.supportedBy = supportedBy;
-    mesh.userData.authoredBottomY = position[1] - size[1] / 2;
-    return mesh;
-  };
-  centreCover('rustworks-centre-stack-base', [9.2, 0.6, -9.4], [3.2, 1.2, 2.2], rustDark, 'stacked');
-  centreCover('rustworks-centre-stack-top', [9.7, 1.65, -9.4], [1.8, 0.9, 1.8], hazardDark, 'stacked', undefined, 'rustworks-centre-stack-base');
-  centreCover('rustworks-centre-stagger-long', [-9.4, 0.62, -8.5], [3.4, 1.24, 1.0], tarp, 'staggered', [0, 0.28, 0]);
-  centreCover('rustworks-centre-stagger-short', [-8.15, 0.45, -5.9], [1.0, 0.9, 2.4], steel, 'staggered', [0, -0.22, 0]);
-  centreCover('rustworks-centre-corner-long', [9.4, 0.55, 8.2], [3.6, 1.1, 0.9], concreteDark, 'l-corner');
-  centreCover('rustworks-centre-corner-high', [8.1, 0.8, 9.45], [0.9, 1.6, 3.4], oxide, 'l-corner');
-  centreCover('rustworks-centre-low-flank-a', [-9.8, 0.42, 8.6], [2.8, 0.84, 1.2], concrete, 'low-flank', [0, -0.18, 0]);
-  centreCover('rustworks-centre-low-flank-b', [-7.7, 0.42, 10.0], [1.8, 0.84, 1.2], hazardDark, 'low-flank', [0, 0.36, 0]);
+  // The former mixed crate/pallet/low-wall clusters read as random floating
+  // debris. Keep the service cross completely clean and use only the authored
+  // freight-container vocabulary for yard cover.
   root.userData.rustworksCentreCoverAudit = {
-    styles: ['stacked', 'staggered', 'l-corner', 'low-flank'],
-    count: 8,
+    styles: [],
+    count: 0,
     deckGroundY: 0,
-    minimumTowerDistance: 7.7,
+    minimumTowerDistance: null,
+    removedMixedCover: true,
     lanesPreserved: ['north-south-service', 'east-west-service', 'west-trench', 'tower-undercroft'],
   };
-  // Four containers per side (16 total). Nine-metre centres leave 3.2 m clear
-  // between adjacent 5.8 m shells. One placement per side is open end-to-end.
-  const perimeterSlots = [-18, -9, 9, 18] as const;
+  // Twenty-four containers: 18 closed + 6 open (75/25). Three open at both
+  // ends and three at one end, exactly matching the requested freight mix.
+  const perimeterSlots = [-18, -10.8, -3.6, 3.6, 10.8, 18] as const;
   const perimeterRow = 21.5;
+  type ContainerOpening = 'closed' | 'open-both' | 'open-one';
+  const openingFor = (side: 'north' | 'south' | 'west' | 'east', slot: number): ContainerOpening => {
+    if (side === 'north' && slot === 1) return 'open-both';
+    if (side === 'south' && slot === 2) return 'open-both';
+    if (side === 'east' && slot === 4) return 'open-both';
+    if (side === 'north' && slot === 4) return 'open-one';
+    if (side === 'south' && slot === 5) return 'open-one';
+    if (side === 'west' && slot === 1) return 'open-one';
+    return 'closed';
+  };
   const containerRows = [
-    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -perimeterRow, open: slot === 1 })),
-    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: perimeterRow, open: slot === 2 })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -perimeterRow, z, open: slot === 1 })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: perimeterRow, z, open: slot === 2 })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'north' as const, slot, x, z: -perimeterRow, opening: openingFor('north', slot) })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'south' as const, slot, x, z: perimeterRow, opening: openingFor('south', slot) })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'west' as const, slot, x: -perimeterRow, z, opening: openingFor('west', slot) })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'east' as const, slot, x: perimeterRow, z, opening: openingFor('east', slot) })),
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
   const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
@@ -704,10 +686,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     marker.position.set(placement.x, 0, placement.z);
     marker.userData.rustworksContainerSide = placement.side;
     marker.userData.rustworksContainerSlot = placement.slot;
-    marker.userData.rustworksContainerType = placement.open ? 'open' : 'closed';
+    marker.userData.rustworksContainerType = placement.opening;
     root.add(marker);
 
-    if (placement.open) {
+    if (placement.opening !== 'closed') {
       const thickness = 0.14;
       const material = containerPalette[placement.slot % containerPalette.length];
       const shellParts = alongX
@@ -738,15 +720,30 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         cast: false,
         detail: 'performance',
       });
-      const halfLength = (alongX ? containerSize[0] : containerSize[2]) / 2;
-      openContainerRoutes.push({
-        id: `open-container-${placement.side}`,
-        side: placement.side,
-        axis: alongX ? 'x' : 'z',
-        anchors: alongX
-          ? [[placement.x - halfLength - 0.8, 1.7, placement.z], [placement.x, 1.7, placement.z], [placement.x + halfLength + 0.8, 1.7, placement.z]]
-          : [[placement.x, 1.7, placement.z - halfLength - 0.8], [placement.x, 1.7, placement.z], [placement.x, 1.7, placement.z + halfLength + 0.8]],
-      });
+      if (placement.opening === 'open-one') {
+        const endThickness = 0.16;
+        const closesPositiveEnd = (placement.side === 'north' || placement.side === 'west');
+        const direction = closesPositiveEnd ? 1 : -1;
+        const endPosition: [number, number, number] = alongX
+          ? [placement.x + direction * (containerSize[0] - endThickness) / 2, 1.3, placement.z]
+          : [placement.x, 1.3, placement.z + direction * (containerSize[2] - endThickness) / 2];
+        const endSize: [number, number, number] = alongX
+          ? [endThickness, containerSize[1], containerSize[2]]
+          : [containerSize[0], containerSize[1], endThickness];
+        const end = box(builder, 'rustworks-open-one-container-closed-end', endPosition, endSize, material);
+        end.userData.rustworksContainerSide = placement.side;
+        end.userData.rustworksContainerSlot = placement.slot;
+      } else {
+        const halfLength = (alongX ? containerSize[0] : containerSize[2]) / 2;
+        openContainerRoutes.push({
+          id: `open-container-${placement.side}-${placement.slot}`,
+          side: placement.side,
+          axis: alongX ? 'x' : 'z',
+          anchors: alongX
+            ? [[placement.x - halfLength - 0.5, 1.7, placement.z], [placement.x, 1.7, placement.z], [placement.x + halfLength + 0.5, 1.7, placement.z]]
+            : [[placement.x, 1.7, placement.z - halfLength - 0.5], [placement.x, 1.7, placement.z], [placement.x, 1.7, placement.z + halfLength + 0.5]],
+        });
+      }
     } else {
       const container = box(
         builder,
@@ -775,12 +772,17 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
 
   root.userData.rustworksContainerLayout = {
     total: containerRows.length,
-    closed: containerRows.filter((placement) => !placement.open).length,
-    open: containerRows.filter((placement) => placement.open).length,
-    perSide: 4,
+    closed: containerRows.filter((placement) => placement.opening === 'closed').length,
+    open: containerRows.filter((placement) => placement.opening !== 'closed').length,
+    openBothEnds: containerRows.filter((placement) => placement.opening === 'open-both').length,
+    openOneEnd: containerRows.filter((placement) => placement.opening === 'open-one').length,
+    closedPercent: 75,
+    openPercent: 25,
+    perSide: 6,
     slots: [...perimeterSlots],
     row: perimeterRow,
-    minimumEndGap: 9 - 5.8,
+    minimumEndGap: 7.2 - 5.8,
+    onlyShippingContainers: true,
   };
   root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
   root.userData.rustworksUndercroft = {
@@ -798,6 +800,9 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });
   labelBoard.userData.label = 'RUSTWORKS';
+  const welshFlag = createRustworksWelshFlag();
+  root.add(welshFlag);
+  root.userData.rustworksFlagAudit = welshFlag.userData.rustworksFlagAudit;
 
   root.userData.rustworksPresentationBatches = batchPresentationOnlyBoxes(root);
   // Default to full presentation for tests/tools; runtime re-applies the active render profile.
@@ -951,54 +956,91 @@ export function applyRustworksPresentationProfile(
   return applyAdditionalMapPresentationProfile(root, profile);
 }
 
+type FittedCanvasText = Readonly<{
+  fontSize: number;
+  measuredWidth: number;
+  availableWidth: number;
+}>;
+
+export function fitCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  preferredSize: number,
+  availableWidth: number,
+  minimumSize = 18,
+): FittedCanvasText {
+  let fontSize = Math.max(minimumSize, Math.floor(preferredSize));
+  const family = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+  context.font = `900 ${fontSize}px ${family}`;
+  while (fontSize > minimumSize && context.measureText(text).width > availableWidth) {
+    fontSize -= 2;
+    context.font = `900 ${fontSize}px ${family}`;
+  }
+  return { fontSize, measuredWidth: context.measureText(text).width, availableWidth };
+}
+
 function scoreTexture(value: number): THREE.CanvasTexture | null {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
+  canvas.width = 512;
+  canvas.height = 256;
   const context = canvas.getContext('2d');
   if (!context) return null;
+  const text = `${value} PTS`;
   context.fillStyle = '#10171b';
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.strokeStyle = '#f4c44f';
-  context.lineWidth = 10;
-  context.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.lineWidth = 18;
+  context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
   context.fillStyle = '#f8f0d2';
-  context.font = '900 62px sans-serif';
+  const layout = fitCanvasText(context, text, 118, canvas.width - 88, 54);
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(`${value} PTS`, canvas.width / 2, canvas.height / 2 + 4);
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + 6);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
+  texture.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height };
   return texture;
 }
 
-function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Sprite | null {
+function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Mesh | null {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
-  canvas.height = 128;
+  const aspect = THREE.MathUtils.clamp(scale[0] / Math.max(0.1, scale[1]), 3.2, 12);
+  canvas.height = Math.round(THREE.MathUtils.clamp(canvas.width / aspect, 128, 320));
   const context = canvas.getContext('2d');
   if (!context) return null;
+  const border = Math.max(8, Math.round(canvas.height * 0.055));
+  const inset = Math.max(7, Math.round(border * 0.7));
   context.fillStyle = 'rgba(10, 17, 20, 0.94)';
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.strokeStyle = `#${accent.toString(16).padStart(6, '0')}`;
-  context.lineWidth = 10;
-  context.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.lineWidth = border;
+  context.strokeRect(inset, inset, canvas.width - inset * 2, canvas.height - inset * 2);
   context.fillStyle = '#f8f0d2';
-  context.font = '900 58px sans-serif';
+  const horizontalPadding = Math.max(50, Math.round(canvas.width * 0.055));
+  const layout = fitCanvasText(context, text, canvas.height * 0.48, canvas.width - horizontalPadding * 2, 30);
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2 + 3);
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + Math.round(canvas.height * 0.025));
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, toneMapped: false }));
-  sprite.name = name;
-  sprite.scale.set(scale[0], scale[1], 1);
-  sprite.userData.presentationOnly = true;
-  return sprite;
+  // World signs must stay attached to their boards. A Sprite billboard grows
+  // across the viewport when the player walks close or looks away from the
+  // board, which caused the giant clipped PICK UP text at range spawn.
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(scale[0], scale[1]),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  sign.name = name;
+  sign.renderOrder = 8;
+  sign.userData.presentationOnly = true;
+  sign.userData.text = text;
+  sign.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height, worldAspect: scale[0] / scale[1], boardAnchored: true };
+  return sign;
 }
 
 function rangeTarget(
@@ -1044,7 +1086,90 @@ function rangeTarget(
     child.userData.impactSurface = 'metal';
   });
   builder.root.add(root);
-  targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500 });
+  targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500, kind: 'plate' });
+}
+
+function fivePointStarGeometry(outerRadius = 0.16, innerRadius = 0.065): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  for (let point = 0; point < 10; point += 1) {
+    const angle = -Math.PI / 2 + point * Math.PI / 5;
+    const radius = point % 2 === 0 ? outerRadius : innerRadius;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (point === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
+function flyingBlackCat(targets: PracticeTarget[], root: THREE.Group): void {
+  const cat = new THREE.Group();
+  cat.name = 'gun-range-flying-black-cat';
+  cat.userData.targetId = 'flying-black-cat';
+  cat.userData.scoreValue = 500;
+  cat.userData.flyingCat = true;
+  cat.position.set(10.5, 3.8, -18);
+
+  const fur = new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 0.78, metalness: 0.02 });
+  const eyes = new THREE.MeshBasicMaterial({ color: 0xf4c44f, toneMapped: false });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 10), fur);
+  body.name = 'flying-black-cat-body';
+  body.scale.set(1.45, 0.72, 0.78);
+  body.userData.hitZone = 'head';
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 10), fur);
+  head.name = 'flying-black-cat-head';
+  head.position.set(0, 0.18, -0.52);
+  head.userData.hitZone = 'head';
+  const earGeometry = new THREE.ConeGeometry(0.13, 0.3, 4);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(earGeometry, fur);
+    ear.name = 'flying-black-cat-ear';
+    ear.position.set(side * 0.19, 0.47, -0.54);
+    ear.rotation.y = Math.PI / 4;
+    ear.userData.hitZone = 'head';
+    cat.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), eyes);
+    eye.name = 'flying-black-cat-eye';
+    eye.position.set(side * 0.12, 0.23, -0.82);
+    eye.userData.hitZone = 'head';
+    cat.add(eye);
+  }
+  const tail = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.07, 8, 20, Math.PI * 1.35), fur);
+  tail.name = 'flying-black-cat-tail';
+  tail.position.set(0.46, 0.06, 0.38);
+  tail.rotation.set(Math.PI / 2, 0.35, 0.3);
+  tail.userData.hitZone = 'head';
+  cat.add(body, head, tail);
+
+  const starMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, transparent: true, opacity: 0.9, toneMapped: false });
+  const starGeometry = fivePointStarGeometry();
+  const trail: THREE.Mesh[] = [];
+  for (let index = 0; index < 8; index += 1) {
+    const star = new THREE.Mesh(starGeometry, starMaterial.clone());
+    star.name = 'flying-black-cat-trail-star';
+    star.position.set(Math.sin(index * 1.7) * 0.18, Math.cos(index * 1.3) * 0.14, 0.65 + index * 0.34);
+    star.scale.setScalar(1 - index * 0.075);
+    star.userData.presentationOnly = true;
+    star.userData.blocksShots = false;
+    star.raycast = () => undefined;
+    cat.add(star);
+    trail.push(star);
+  }
+  cat.userData.starTrail = trail;
+  cat.traverse((child) => {
+    if (child.userData.presentationOnly === true) return;
+    child.userData.targetRoot = cat;
+    child.userData.targetId = 'flying-black-cat';
+    child.userData.hitZone = 'head';
+    child.userData.impactSurface = 'organic';
+  });
+  root.add(cat);
+  targets.push({
+    id: 'flying-black-cat', root: cat, active: true, respawnAt: 0, respawnDelayMs: 30_000,
+    scoreValue: 500, distanceBand: 'mid', maxHealth: 100, health: 100,
+    alwaysCritical: true, kind: 'flying-cat',
+  });
 }
 
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
@@ -1055,7 +1180,12 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
   const concrete = standard(0x444b4e, 0.98, 0.02);
-  const wall = standard(0x242d32, 0.88, 0.22);
+  const wall = terminalSurfaceMaterial('panel', 0xb8c1c4, '#69777d', 0.5, 0.38, [7, 4]);
+  wall.name = 'GunRange_SilverWall_PanelTexture';
+  wall.userData.gunRangeShell = 'white-silver-wall';
+  const ceiling = terminalSurfaceMaterial('panel', 0xd7dbdc, '#8e9a9e', 0.42, 0.46, [8, 10]);
+  ceiling.name = 'GunRange_SilverCeiling_PanelTexture';
+  ceiling.userData.gunRangeShell = 'white-silver-ceiling';
   const dark = standard(0x11191d, 0.7, 0.62);
   const acoustic = standard(0x303b3f, 0.96, 0.08);
   const timber = standard(0x765136, 0.91, 0.04);
@@ -1082,13 +1212,13 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   builder.shotSurfaces.push(floorSurface);
   floor.userData.ballisticSurfaceId = floorSurface.id;
 
-  // Full indoor shell: deep charcoal walls and ceiling keep attention on the
-  // warm armory, cool lane lighting and bright target faces.
+  // A pale textured shell keeps player and target silhouettes readable. Dark
+  // acoustic/ballistic inserts preserve contrast without turning the room black.
   box(builder, 'gun-range-backstop', [0, 3.6, -49], [42, 7.2, 1.2], dark);
   box(builder, 'gun-range-left-wall', [-20.5, 3.6, -14.5], [1, 7.2, 70], wall);
   box(builder, 'gun-range-right-wall', [20.5, 3.6, -14.5], [1, 7.2, 70], wall);
   box(builder, 'gun-range-rear-wall', [0, 3.6, 20], [42, 7.2, 1], wall);
-  box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], dark, { solid: false, shots: true });
+  box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], ceiling, { solid: false, shots: true });
 
   // Suspended acoustic baffles and side ventilation sell the large industrial
   // interior while leaving the floor plan broad and readable.
@@ -1111,6 +1241,35 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     light.userData.presentationOnly = true;
     root.add(light);
   }
+  const ambient = new THREE.HemisphereLight(0xe8f5f5, 0x253137, 0.68);
+  ambient.name = 'gun-range-moderate-ambient';
+  ambient.userData.presentationOnly = true;
+  root.add(ambient);
+  const neonMaterials: THREE.MeshStandardMaterial[] = [];
+  const neonLights: THREE.PointLight[] = [];
+  for (const [index, z] of [-37, -21, -5, 11].entries()) {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x56e7df,
+      emissive: 0x56e7df,
+      emissiveIntensity: 1.55,
+      roughness: 0.22,
+      metalness: 0.28,
+    });
+    material.name = `GunRange_CyclingNeon_${index}`;
+    neonMaterials.push(material);
+    for (const side of [-1, 1] as const) {
+      box(builder, 'gun-range-cycling-neon-strip', [side * 19.88, 4.65, z], [0.08, 0.16, 7.2], material, { solid: false, shots: false, cast: false });
+    }
+    const light = new THREE.PointLight(0x56e7df, 2.8, 13, 2.2);
+    light.name = 'gun-range-cycling-neon-light';
+    light.position.set(index % 2 === 0 ? -12 : 12, 4.8, z);
+    light.userData.presentationOnly = true;
+    light.userData.neonIndex = index;
+    neonLights.push(light);
+    root.add(light);
+  }
+  root.userData.gunRangeNeonMaterials = neonMaterials;
+  root.userData.gunRangeNeonLights = neonLights;
 
   box(builder, 'gun-range-control-room', [-16.5, 2.1, 15.5], [6.2, 4.2, 6.2], wall, { ballisticMaterial: 'interior-wall' });
   box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: false });
@@ -1137,6 +1296,37 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   ] as const) {
     for (const x of [-7, 0, 7]) rangeTarget(builder, targets, `${band}-${x}`, x, z, score, band);
   }
+
+  // Subtle live wall-penetration lab: four isolated lanes use explicit material
+  // and thickness contracts, with a scored plate behind every panel.
+  const wallbangGlass = new THREE.MeshStandardMaterial({ color: 0x8ccbd2, transparent: true, opacity: 0.34, roughness: 0.16, metalness: 0.04 });
+  const wallbangPanels = [
+    { x: -17.1, label: 'GLASS 8 CM', material: 'glass' as const, thickness: 0.08, render: wallbangGlass },
+    { x: -14.7, label: 'WOOD 24 CM', material: 'wood' as const, thickness: 0.24, render: timber },
+    { x: -12.3, label: 'PLASTER 42 CM', material: 'interior-wall' as const, thickness: 0.42, render: wall },
+    { x: -9.9, label: 'BRICK 70 CM', material: 'brick' as const, thickness: 0.7, render: standard(0x744838, 0.93, 0.04) },
+  ];
+  for (const [index, panel] of wallbangPanels.entries()) {
+    box(builder, `gun-range-wallbang-panel-${panel.material}`, [panel.x, 1.45, -7.6], [2.05, 2.9, panel.thickness], panel.render, {
+      solid: false,
+      shots: true,
+      ballisticMaterial: panel.material,
+    });
+    rangeTarget(builder, targets, `wallbang-${panel.material}`, panel.x, -12.4, 50, 'near');
+    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [2.05, 0.55]);
+    if (label) {
+      label.position.set(panel.x, 3.35, -7.5);
+      root.add(label);
+    }
+  }
+  box(builder, 'gun-range-wallbang-lab-left', [-18.45, 1.6, -8.8], [0.18, 3.2, 9.8], dark, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-wallbang-lab-right', [-8.55, 1.6, -8.8], [0.18, 3.2, 9.8], dark, { ballisticMaterial: 'structural-metal' });
+  const wallbangHeader = rangeSign('WALLBANG TEST · MATERIAL / THICKNESS', 0xe0aa37, 'gun-range-wallbang-header', [8.8, 0.72]);
+  if (wallbangHeader) {
+    wallbangHeader.position.set(-13.5, 4.45, -5.25);
+    root.add(wallbangHeader);
+  }
+  flyingBlackCat(targets, root);
   for (const station of GUN_RANGE_WEAPON_STATIONS) {
     const accent = new THREE.MeshStandardMaterial({
       color: WEAPONS[station.weapon].color,
@@ -1175,18 +1365,19 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     root.add(stationRoot);
   }
 
-  box(builder, 'gun-range-armory-header', [0, 3.8, 12.2], [32, 1.15, 0.25], dark, { solid: false, shots: false });
+  box(builder, 'gun-range-armory-header', [0, 3.8, 9.45], [32, 1.15, 0.25], dark, { solid: false, shots: false });
   box(builder, 'gun-range-live-fire-sign', [0, 4.45, 1.0], [12, 0.75, 0.22], redSafety, { solid: false, shots: false });
   root.getObjectByName('gun-range-armory-header')!.userData.label = 'CHOOSE A WEAPON · PRESS F';
   root.getObjectByName('gun-range-live-fire-sign')!.userData.label = 'LIVE FIRE · EYES AND EARS';
-  const armorySign = rangeSign('ARMORY · PICK UP WITH F', 0x58e3dc, 'gun-range-armory-sign-text', [18, 1.25]);
+  const armorySign = rangeSign('ARMORY · PICK UP WITH F', 0x58e3dc, 'gun-range-armory-sign-text', [13.5, 0.95]);
   if (armorySign) {
-    armorySign.position.set(0, 3.8, 12.02);
+    // Text must sit on the player-facing side of its backing board.
+    armorySign.position.set(0, 3.8, 9.59);
     root.add(armorySign);
   }
   const liveFireSign = rangeSign('LIVE FIRE · EYES AND EARS', 0xff765f, 'gun-range-live-fire-sign-text', [10.5, 0.82]);
   if (liveFireSign) {
-    liveFireSign.position.set(0, 4.45, 0.86);
+    liveFireSign.position.set(0, 4.45, 1.13);
     root.add(liveFireSign);
   }
 
@@ -1212,26 +1403,45 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   };
 }
 
+/** Slow colour motion adds life without strobing or changing gameplay light authority. */
+export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number): void {
+  const materials = root.userData.gunRangeNeonMaterials as THREE.MeshStandardMaterial[] | undefined;
+  const lights = root.userData.gunRangeNeonLights as THREE.PointLight[] | undefined;
+  if (!materials || !lights) return;
+  materials.forEach((material, index) => {
+    const hue = (nowMs / 18_000 + index * 0.17) % 1;
+    material.color.setHSL(hue, 0.68, 0.58);
+    material.emissive.copy(material.color);
+  });
+  lights.forEach((light, index) => {
+    light.color.copy(materials[index % materials.length].color);
+  });
+}
+
 function terminalWayfindingMaterial(title: string, subtitle: string, accent: string): THREE.Material {
   if (typeof document === 'undefined') {
-    return new THREE.MeshStandardMaterial({ color: 0x172126, roughness: 0.48, metalness: 0.36 });
+    return new THREE.MeshStandardMaterial({ color: 0x062a3d, roughness: 0.32, metalness: 0.52 });
   }
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
   canvas.height = 192;
   const context = canvas.getContext('2d');
   if (!context) return standard(0x172126, 0.48, 0.36);
-  context.fillStyle = '#111a1f';
+  const gradient = context.createLinearGradient(0, 0, canvas.width, 0);
+  gradient.addColorStop(0, '#031d31');
+  gradient.addColorStop(0.62, '#083f54');
+  gradient.addColorStop(1, '#071523');
+  context.fillStyle = gradient;
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = accent;
-  context.fillRect(0, 0, 28, canvas.height);
-  context.fillRect(0, canvas.height - 12, canvas.width, 12);
-  context.fillStyle = '#f4ead2';
+  context.fillRect(0, 0, 34, canvas.height);
+  context.fillRect(0, canvas.height - 16, canvas.width, 16);
+  context.fillStyle = '#f4fdff';
   context.font = '900 66px sans-serif';
   context.textAlign = 'left';
   context.textBaseline = 'middle';
   context.fillText(title, 62, 76);
-  context.fillStyle = '#b8c8c8';
+  context.fillStyle = '#a9f4ff';
   context.font = '700 30px sans-serif';
   context.fillText(subtitle, 64, 142);
   const texture = new THREE.CanvasTexture(canvas);
@@ -1387,52 +1597,63 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
 
-  const tarmacMat = terminalSurfaceMaterial('asphalt', 0x30383a, '#6f7777', 0.95, 0.05, [5, 5]);
-  const floorMat = terminalSurfaceMaterial('terrazzo', 0x9ca6a2, '#3f5457', 0.52, 0.1, [5, 5]);
-  const wallMat = terminalSurfaceMaterial('panel', 0x263238, '#718083', 0.82, 0.24, [6, 3]);
-  const trimMat = standard(0x46575c, 0.52, 0.48);
+  // Pass 60 reskin: a bright white/silver terminal with a cyan wayfinding
+  // language.  The previous mid-grey palette collapsed every authored shape
+  // into the same blockout value, especially under the mezzanine.
+  const tarmacMat = terminalSurfaceMaterial('asphalt', 0x17232d, '#5b7380', 0.9, 0.08, [5, 5]);
+  const floorMat = terminalSurfaceMaterial('terrazzo', 0xdce8e9, '#4f8791', 0.34, 0.2, [5, 5]);
+  const wallMat = terminalSurfaceMaterial('panel', 0xe4ecec, '#7899a1', 0.4, 0.42, [6, 3]);
+  const trimMat = standard(0x8eabb1, 0.3, 0.7);
   // Avoid transmission/refraction on the low-spec path: alpha glass is much
   // cheaper under software WebGL and still reads clearly as breakable glazing.
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x6babb7,
+    color: 0x78d9e6,
     roughness: 0.2,
     metalness: 0.08,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.46,
     depthWrite: false,
   });
-  const planeHullMat = terminalSurfaceMaterial('aircraft', 0xe5e8e4, '#8a9898', 0.32, 0.35, [8, 2]);
-  const planeWingMat = terminalSurfaceMaterial('panel', 0x7a8587, '#303b3d', 0.44, 0.6, [4, 2]);
-  const engineMat = standard(0x222a2e, 0.3, 0.78);
-  const jetbridgeMat = terminalSurfaceMaterial('panel', 0x566267, '#1f292d', 0.58, 0.52, [5, 2]);
-  const kioskMat = standard(0x574738, 0.86, 0.1);
-  const cargoMat = terminalSurfaceMaterial('cargo', 0xb9602e, '#542817', 0.72, 0.28, [3, 2]);
-  const hazardMat = standard(0xd69a2d, 0.58, 0.28);
-  const floorBorderMat = standard(0x252c30, 0.48, 0.16);
+  const planeHullMat = terminalSurfaceMaterial('aircraft', 0xf1f6f4, '#7697a0', 0.24, 0.46, [8, 2]);
+  const planeWingMat = terminalSurfaceMaterial('panel', 0xc8d6d8, '#55717a', 0.3, 0.68, [4, 2]);
+  const engineMat = standard(0x163342, 0.24, 0.78);
+  const jetbridgeMat = terminalSurfaceMaterial('panel', 0xb9d0d3, '#3f7781', 0.34, 0.62, [5, 2]);
+  const kioskMat = standard(0x087b8d, 0.42, 0.36);
+  const cargoMat = terminalSurfaceMaterial('cargo', 0x546f82, '#b8dce1', 0.6, 0.38, [3, 2]);
+  const hazardMat = standard(0xe69b32, 0.42, 0.36);
+  const floorBorderMat = standard(0x183b4a, 0.34, 0.46);
   const floorInsetMat = new THREE.MeshStandardMaterial({
-    color: 0x62706f,
-    roughness: 0.58,
-    metalness: 0.12,
-    emissive: 0x263332,
-    emissiveIntensity: 0.14,
+    color: 0x166979,
+    roughness: 0.38,
+    metalness: 0.38,
+    emissive: 0x063a47,
+    emissiveIntensity: 0.52,
   });
-  const wallLowerMat = standard(0x455157, 0.8, 0.18);
-  const structureMat = standard(0x222b30, 0.5, 0.68);
+  const wallLowerMat = standard(0xacc3c7, 0.46, 0.4);
+  const structureMat = standard(0x486b75, 0.3, 0.72);
   const rubberMat = terminalSurfaceMaterial('rubber', 0x171c1f, '#536063', 0.92, 0.04, [4, 4]);
-  const seatMat = terminalSurfaceMaterial('fabric', 0x48636b, '#9ab0ad', 0.86, 0.02, [4, 4]);
-  const cockpitMat = standard(0x111c25, 0.18, 0.72);
-  const planeStripeMat = standard(0x31464c, 0.46, 0.42);
-  const stainMat = standard(0x242a28, 1.0, 0.0);
+  const seatMat = terminalSurfaceMaterial('fabric', 0x087a86, '#8ef2f0', 0.7, 0.08, [4, 4]);
+  const cockpitMat = standard(0x051a2b, 0.12, 0.8);
+  const planeStripeMat = standard(0x0a8999, 0.32, 0.52);
+  const stainMat = standard(0x101b23, 1.0, 0.0);
   const practicalMat = new THREE.MeshStandardMaterial({
-    color: 0xffd9a0,
-    roughness: 0.34,
+    color: 0xd9fcff,
+    roughness: 0.24,
     metalness: 0.08,
-    emissive: 0xffa94d,
-    emissiveIntensity: 0.72,
+    emissive: 0x4cdbea,
+    emissiveIntensity: 1.9,
   });
+  const magentaPracticalMat = new THREE.MeshStandardMaterial({
+    color: 0xffd4f3,
+    roughness: 0.26,
+    metalness: 0.1,
+    emissive: 0xe23a9a,
+    emissiveIntensity: 1.45,
+  });
+  const ivoryPanelMat = terminalSurfaceMaterial('panel', 0xf2f5f1, '#9bb1b4', 0.28, 0.42, [8, 4]);
   // An unlit pale underside prevents the deep connector/mezzanine overhangs
   // from collapsing into featureless black on the low-ratio quality path.
-  const soffitMat = new THREE.MeshBasicMaterial({ color: 0x9da49c });
+  const soffitMat = new THREE.MeshBasicMaterial({ color: 0xe6efee });
 
   const skylineClusterIds = [
     'floor-language',
@@ -1509,7 +1730,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     retained: ['terminal-shell', 'mezzanine-routes', 'breakable-facade', 'jetbridge', 'airstair', 'apron-boundaries'],
     adjusted: ['team-aqua-spawns', 'cabin-seat-clearance', 'jetbridge-lighting', 'concourse-cover'],
     qualityReplaced: ['fuselage-roof', 'aircraft-nose', 'wing-boxes', 'engine-boxes', 'cargo-boxes', 'fuel-trailer-box'],
-    generatedOriginal: ['runtime-surface-patterns', 'curved-aircraft-shell', 'airport-uld-shells'],
+    generatedOriginal: ['runtime-surface-patterns', 'curved-aircraft-shell', 'airport-uld-shells', 'luminous-terminal-canopy', 'gate-portal-wayfinding'],
+  };
+  root.userData.skylineReskin = {
+    version: 'pass-60-total-overhaul',
+    palette: 'white-silver-cyan-magenta',
+    routeGeometryChanged: false,
+    authoritativeCeiling: true,
   };
 
   const tarmac = new THREE.Mesh(new THREE.PlaneGeometry(76, 76), tarmacMat);
@@ -1552,12 +1779,30 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], floorBorderMat);
   detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], hazardMat);
+  detailBox('apron-marking', 'skyline-apron-cyan-guidance-west', [-6.5, 0.051, 11], [0.11, 0.024, 46], practicalMat);
+  detailBox('apron-marking', 'skyline-apron-magenta-guidance-east', [6.5, 0.051, 11], [0.11, 0.024, 46], magentaPracticalMat);
+  for (const z of [-8, 2, 12, 22, 32]) {
+    detailBox('apron-marking', `skyline-apron-gate-chevron-${z}`, [0, 0.054, z], [8.6, 0.022, 0.12], z === 12 ? magentaPracticalMat : practicalMat);
+  }
   for (const [z, rotationY] of [[12, 0.08], [-8, -0.08]] as const) {
     detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.031, z], [3.4, 0.022, 5.2], stainMat, 'performance', [0, rotationY, 0]);
   }
 
   box(builder, 'skyline-concourse-floor', [0, 0.02, -23], [60, 0.08, 22], floorMat, { solid: false });
   detailBox('floor-language', 'skyline-floor-dark-runner', [0, 0.073, -22.5], [5.2, 0.025, 20.5], floorInsetMat);
+  // A real roof and luminous ceiling make the terminal read as an interior,
+  // not an outdoor grey blockout. It is above every route but remains
+  // collision and shot authoritative for debug/fly-camera probes.
+  box(builder, 'skyline-terminal-silver-ceiling', [0, 7.05, -23], [62, 0.24, 22.6], ivoryPanelMat);
+  for (const z of [-31.5, -28.5, -25.5, -22.5, -19.5, -16.5, -13.5]) {
+    detailBox('wall-structure', `skyline-ceiling-white-baffle-${z}`, [0, 6.86, z], [60.2, 0.13, 0.72], ivoryPanelMat, 'performance', undefined, true);
+    detailBox('terminal-story', `skyline-ceiling-cyan-spine-${z}`, [0, 6.76, z], [38, 0.055, 0.12], practicalMat);
+  }
+  // The long runner is repeated in inset cyan and magenta so it is legible
+  // from either spawn and through the glass facade.
+  detailBox('floor-language', 'skyline-floor-cyan-runner-west', [-2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
+  detailBox('floor-language', 'skyline-floor-cyan-runner-east', [2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
+  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.093, -20.4], [24, 0.024, 0.16], magentaPracticalMat);
   detailBox('floor-language', 'skyline-floor-window-border', [0, 0.074, -12.55], [59.2, 0.028, 0.52], floorBorderMat);
   detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderMat);
   for (let tileX = -27; tileX <= 27; tileX += 6) {
@@ -1578,6 +1823,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('wall-structure', 'skyline-mezzanine-soffit-center', [0, 3.035, -25.25], [35.9, 0.035, 5.95], soffitMat);
   detailBox('wall-structure', 'skyline-mezzanine-soffit-west', [-23.8, 3.035, -25.25], [4.0, 0.035, 5.95], soffitMat);
   detailBox('wall-structure', 'skyline-mezzanine-soffit-east', [23.8, 3.035, -25.25], [4.0, 0.035, 5.95], soffitMat);
+  // Overlay the formerly monolithic grey underside with a coffered silver
+  // ceiling. These shallow panels do not alter the mezzanine collider.
+  for (const x of [-21, -14, -7, 0, 7, 14, 21]) {
+    detailBox('wall-structure', `skyline-mezzanine-coffer-${x}`, [x, 3.002, -30.3], [5.65, 0.025, 3.9], ivoryPanelMat);
+    detailBox('terminal-story', `skyline-mezzanine-coffer-light-${x}`, [x, 2.982, -30.25], [3.8, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
+  }
+  for (const x of [-16, -8, 0, 8, 16]) {
+    detailBox('wall-structure', `skyline-mezzanine-front-coffer-${x}`, [x, 3.001, -25.3], [6.5, 0.024, 4.9], ivoryPanelMat);
+    detailBox('terminal-story', `skyline-mezzanine-front-coffer-light-${x}`, [x, 2.981, -25.2], [4.6, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
+  }
   for (const lightX of [-18, -10, 0, 10, 18]) {
     detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.005, -29.8], [5.4, 0.025, 0.11], practicalMat);
     detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.005, -24.3], [5.4, 0.025, 0.11], practicalMat);
@@ -1636,6 +1891,20 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   flightDisplay.userData.label = 'DEPARTURES - FLIGHT AERO 86';
   flightDisplay.userData.skylineCluster = 'terminal-story';
 
+  // Suspended portal signs establish an unmistakable terminal identity at the
+  // player-height sightline, without adding route obstructions.
+  for (const [x, title, subtitle, accent] of [
+    [-18, 'GATES 01—06', 'SECURITY  •  LOUNGE', '#4ce5ec'],
+    [18, 'GATES 07—12', 'BOARDING  •  AIRSIDE', '#ee62bd'],
+  ] as const) {
+    const portalSign = box(builder, `skyline-overhead-gate-sign-${x}`, [x, 5.55, -16.2], [11.5, 1.28, 0.16], terminalWayfindingMaterial(title, subtitle, accent), { solid: false, shots: false, detail: 'performance' });
+    portalSign.userData.skylineCluster = 'terminal-story';
+    detailBox('terminal-story', `skyline-gate-sign-crown-${x}`, [x, 6.27, -16.2], [12.2, 0.12, 0.22], x < 0 ? practicalMat : magentaPracticalMat);
+    for (const postX of [x - 5.65, x + 5.65]) {
+      detailBox('wall-structure', `skyline-gate-sign-drop-${postX}`, [postX, 6.42, -16.2], [0.12, 1.1, 0.12], structureMat);
+    }
+  }
+
   const rampAngle = (22 * Math.PI) / 180;
   const rampLen = 3.2 / Math.sin(rampAngle);
   for (const sideX of [-20, 20]) {
@@ -1662,6 +1931,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
   box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
   detailBox('wall-structure', 'skyline-backwall-wainscot', [0, 1.05, -33.84], [60.8, 2.1, 0.14], wallLowerMat);
+  detailBox('terminal-story', 'skyline-backwall-luminous-crown-cyan', [-15.5, 6.72, -33.68], [30.4, 0.16, 0.14], practicalMat);
+  detailBox('terminal-story', 'skyline-backwall-luminous-crown-magenta', [15.5, 6.72, -33.68], [30.4, 0.16, 0.14], magentaPracticalMat);
   for (const columnX of [-28, -21, -14, -7, 0, 7, 14, 21, 28]) {
     detailBox('wall-structure', `skyline-backwall-column-${columnX}`, [columnX, 3.5, -33.69], [0.34, 7, 0.26], structureMat, 'performance', undefined, true);
   }
@@ -1669,6 +1940,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('wall-structure', `skyline-sidewall-wainscot-${sideX}`, [sideX, 1.05, -23], [0.14, 2.1, 21.8], wallLowerMat);
     for (const columnZ of [-32, -27, -22, -17, -12.5]) {
       detailBox('wall-structure', `skyline-sidewall-column-${sideX}-${columnZ}`, [sideX, 3.5, columnZ], [0.26, 7, 0.34], structureMat, 'performance', undefined, true);
+    }
+  }
+  for (const sideX of [-30.7, 30.7]) {
+    for (const z of [-31, -27, -23, -19, -15]) {
+      detailBox('terminal-story', `skyline-sidewall-light-fin-${sideX}-${z}`, [sideX, 3.6, z], [0.08, 4.6, 0.16], z === -23 ? magentaPracticalMat : practicalMat);
     }
   }
   for (const ribZ of [-32.5, -28.5, -24.5, -20.5, -16.5, -12.7]) {
@@ -1722,7 +1998,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('boarding-route', 'skyline-terminal-gate-header', [0, 5.2, -11.86], [3.86, 0.18, 0.28], trimMat, 'performance', undefined, true);
   detailBox('boarding-route', 'skyline-terminal-gate-threshold', [0, 3.34, -11.84], [3.55, 0.08, 0.34], rubberMat);
   for (const [id, x] of [['west', -22], ['east', 22]] as const) {
-    detailBox('terminal-story', 'skyline-staff-door-' + id, [x, 1.25, -33.66], [2.25, 2.5, 0.12], wallLowerMat, 'performance');
+    detailBox('terminal-story', 'skyline-staff-door-' + id, [x, 1.25, -33.66], [2.25, 2.5, 0.12], glassMat, 'performance');
     detailBox('terminal-story', 'skyline-staff-door-' + id + '-header', [x, 2.62, -33.61], [2.55, 0.18, 0.2], structureMat, 'performance', undefined, true);
     for (const side of [-1, 1]) detailBox('terminal-story', 'skyline-staff-door-' + id + '-jamb-' + side, [x + side * 1.22, 1.35, -33.61], [0.18, 2.7, 0.2], structureMat, 'performance', undefined, true);
     detailBox('terminal-story', 'skyline-staff-door-' + id + '-handle', [x + 0.7, 1.25, -33.52], [0.08, 0.36, 0.1], hazardMat);
@@ -1733,6 +2009,22 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     { id: 'staff-west', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall', clearWidth: 0 },
     { id: 'staff-east', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall', clearWidth: 0 },
   ];
+
+  // Pass 60 concourse densification: repeated lounge furniture, information
+  // screens and baggage carts replace broad empty floor without changing routes.
+  for (const [row, z] of [-21.5, -25.2].entries()) {
+    for (const x of [-24, -18, 18, 24]) {
+      detailBox('terminal-story', `skyline-lounge-seat-${row}-${x}`, [x, 0.48, z], [4.2, 0.22, 1.25], seatMat, 'performance');
+      detailBox('terminal-story', `skyline-lounge-seat-back-${row}-${x}`, [x, 0.9, z + 0.52], [4.2, 0.72, 0.15], seatMat, 'performance');
+      for (const leg of [-1.65, 1.65]) detailBox('terminal-story', `skyline-lounge-leg-${row}-${x}-${leg}`, [x + leg, 0.24, z], [0.12, 0.48, 0.85], structureMat, 'performance');
+    }
+  }
+  for (const x of [-29, -10, 10, 29]) {
+    detailBox('terminal-story', `skyline-flight-screen-post-${x}`, [x, 1.8, -20], [0.16, 3.6, 0.16], structureMat, 'performance');
+    detailBox('terminal-story', `skyline-flight-screen-${x}`, [x, 3.25, -20], [3.6, 1.5, 0.18], cockpitMat, 'performance');
+    detailBox('terminal-story', `skyline-baggage-cart-basket-${x}`, [x, 0.62, -30.5], [1.65, 0.72, 0.82], structureMat, 'performance');
+    detailBox('terminal-story', `skyline-baggage-cart-handle-${x}`, [x, 1.15, -30.88], [1.65, 0.08, 0.08], trimMat, 'performance');
+  }
   const breakableWindows: BreakableWindow[] = [];
   for (const winX of [-22, -14, -6, 6, 14, 22]) {
     const windowId = `skyline-window-${winX}`;
@@ -1747,6 +2039,24 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('window-frame', `skyline-window-frame-left-${winX}`, [winX - 3.48, 2.58, -11.86], [0.18, 5.1, 0.24], structureMat, 'performance', undefined, true);
     detailBox('window-frame', `skyline-window-frame-right-${winX}`, [winX + 3.48, 2.58, -11.86], [0.18, 5.1, 0.24], structureMat, 'performance', undefined, true);
     detailBox('window-frame', `skyline-window-mullion-${winX}`, [winX, 2.58, -11.84], [0.11, 4.95, 0.2], structureMat);
+  }
+
+  // Exterior roofline and two large airside identities are visible from every
+  // Coral spawn. They transform the facade silhouette without changing its
+  // apertures or window collision.
+  detailBox('wall-structure', 'skyline-airside-roof-crown', [0, 7.24, -12], [63, 0.42, 1.05], structureMat, 'performance', undefined, true);
+  detailBox('terminal-story', 'skyline-airside-roof-cyan-line', [-15.5, 7.02, -11.43], [31, 0.14, 0.12], practicalMat);
+  detailBox('terminal-story', 'skyline-airside-roof-magenta-line', [15.5, 7.02, -11.43], [31, 0.14, 0.12], magentaPracticalMat);
+  for (const x of [-24, -12, 0, 12, 24]) {
+    detailBox('wall-structure', `skyline-roof-sculptural-fin-${x}`, [x, 8.45, -12.2], [0.22, 2.5, 1.45], ivoryPanelMat, 'performance', [0, 0, x * 0.006], true);
+    detailBox('terminal-story', `skyline-roof-sculptural-fin-light-${x}`, [x, 8.45, -11.43], [0.09, 2.1, 0.08], x === 0 ? magentaPracticalMat : practicalMat);
+  }
+  for (const [x, title, subtitle, accent] of [
+    [-18, 'SKYLINE', 'INTERNATIONAL TERMINAL', '#4ce5ec'],
+    [18, 'GATE 07', 'AERO 86  •  BOARDING', '#ee62bd'],
+  ] as const) {
+    const airsideSign = box(builder, `skyline-airside-identity-${x}`, [x, 6.25, -11.51], [12.2, 1.05, 0.12], terminalWayfindingMaterial(title, subtitle, accent), { solid: false, shots: false, detail: 'performance' });
+    airsideSign.userData.skylineCluster = 'terminal-story';
   }
 
   box(builder, 'skyline-jetbridge-bellows', [0, 4.3, -11.8], [4.1, 2.6, 0.5], jetbridgeMat, { solid: false, shots: false, detail: 'quality' });
@@ -1832,6 +2142,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   qualityTail.userData.assetOwner = 'skyline-terminal';
   detailBox('aircraft-skin', 'skyline-aircraft-belly-north', [0, 3.12, 0.06], [34.2, 0.58, 0.08], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-aircraft-belly-south', [0, 3.12, 3.94], [34.2, 0.58, 0.08], planeStripeMat);
+  detailBox('aircraft-skin', 'skyline-aircraft-livery-cyan-north', [0, 3.7, 0.045], [32.8, 0.18, 0.06], practicalMat);
+  detailBox('aircraft-skin', 'skyline-aircraft-livery-cyan-south', [0, 3.7, 3.955], [32.8, 0.18, 0.06], practicalMat);
+  detailBox('aircraft-skin', 'skyline-aircraft-livery-magenta-north', [9.8, 3.98, 0.038], [12.5, 0.1, 0.05], magentaPracticalMat);
+  detailBox('aircraft-skin', 'skyline-aircraft-livery-magenta-south', [9.8, 3.98, 3.962], [12.5, 0.1, 0.05], magentaPracticalMat);
   detailBox('aircraft-skin', 'skyline-aircraft-roof-spine', [0, 6.43, 2], [33.8, 0.12, 0.54], planeStripeMat, 'quality');
   for (const windowX of [-13.5, -10.5, -7.5, -4.5, 4.5, 7.5, 10.5, 13.5]) {
     detailBox('aircraft-skin', `skyline-cabin-window-north-${windowX}`, [windowX, 4.28, 0.055], [1.28, 0.5, 0.08], cockpitMat);

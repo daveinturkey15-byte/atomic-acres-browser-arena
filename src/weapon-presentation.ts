@@ -22,6 +22,8 @@ export type WeaponPose = {
   phase: number;
   landingImpulse: number;
   lateralSpeed: number;
+  /** Presentation-only camera-space retreat from nearby walls/floor. */
+  surfaceRetreat?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
   reloadProgress: number | null;
 };
@@ -52,6 +54,7 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
   sniper: { left: [-0.3, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+  magnum: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
   'machine-pistol': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
 };
 
@@ -62,6 +65,7 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   scattergun: { left: [-0.055, -0.025, 0.015], right: [0.08, -0.025, 0.015] },
   sniper: { left: [-0.055, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
   pistol: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
+  magnum: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
   'machine-pistol': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
 };
 
@@ -72,6 +76,7 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   scattergun: [-0.58, 0.18, -0.42],
   sniper: [-0.76, 0.34, -0.52],
   pistol: [-0.92, 0.42, -0.68],
+  magnum: [-0.92, 0.42, -0.68],
   'machine-pistol': [-0.92, 0.42, -0.68],
 };
 
@@ -117,6 +122,7 @@ export class WeaponPresentation {
   private sprintBlend = 0;
   private weaponHeat = 0;
   private shotsPresented = 0;
+  private surfaceRetreat = 0;
   private actionContract: CharacterActionContract = characterActionContract({
     weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
   });
@@ -506,6 +512,7 @@ export class WeaponPresentation {
         scattergun: new Set(['stock', 'stock-cheek-panel']),
         sniper: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         pistol: new Set(),
+        magnum: new Set(),
         'machine-pistol': new Set(),
       };
       model.traverse((node) => {
@@ -673,10 +680,10 @@ export class WeaponPresentation {
       : this.active === 'sniper'
         ? 'sniper-scope'
       : this.active === 'lmg'
-        ? 'rear-sight-socket'
+        ? 'lmg-aperture'
       : this.active === 'smg'
         ? 'smg-aperture'
-        : this.active === 'pistol' || this.active === 'machine-pistol'
+        : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
           ? 'pistol-rear-sight'
           : 'ghost-ring';
     return model?.getObjectByName(sightName);
@@ -753,6 +760,7 @@ export class WeaponPresentation {
         : null,
       weaponFraming: model?.visible ? measureCameraFraming(model, this.camera) : null,
       actionContract: this.actionContract,
+      surfaceRetreat: this.surfaceRetreat,
       riggedArms: this.riggedArmDiagnostics,
       knifeVisible: this.meleeRig.visible,
       importedModel,
@@ -1008,7 +1016,7 @@ export class WeaponPresentation {
       ? 'curved-magazine'
       : this.active === 'lmg'
         ? 'lmg-box-magazine'
-      : this.active === 'pistol' || this.active === 'machine-pistol'
+      : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
         ? 'pistol-magazine'
         : 'straight-magazine';
     const magazine = activeModel?.getObjectByName(magazineName);
@@ -1071,8 +1079,9 @@ export class WeaponPresentation {
     const targetPosition = new THREE.Vector3(
       0.28 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
       -0.34 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
-      -0.88 + adsZ + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
+      -0.88 + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
     );
+    this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(

@@ -5,7 +5,7 @@ import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrame
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
-import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
+import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
@@ -28,6 +28,7 @@ import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type 
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
+import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -77,14 +78,15 @@ import {
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
 import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap, type MinimapLandmarkKind } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
+import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { createWorldIdentityPresentation } from './world-identity-presentation';
+import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
@@ -136,12 +138,14 @@ import {
   createOverdriveState,
   overdriveDamageMultiplier,
   overdriveRemainingMs,
+  transferOverdriveOnElimination,
   type OverdriveState,
 } from './overdrive';
 import {
   HUNTER_SWARM_BLAST_RADIUS,
   HUNTER_SWARM_COUNT,
   NUKE_WARNING_MS,
+  SCOUT_SWEEP_DURATION_MS,
   TRI_PASS_BLAST_RADIUS,
   TRI_PASS_MAX_DAMAGE,
   assignHunterSwarmTargets,
@@ -155,6 +159,7 @@ import {
   recordSupportElimination,
   remoteExplosiveHitMaximumDistance,
   registerTriPassTarget,
+  scoutSweepPulseVisible,
   selectTriPassHostiles,
   triPassSchedule,
   type FieldSupportId,
@@ -229,9 +234,16 @@ import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSuppor
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
 import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
+import { recordCombatantPose, rewindCombatantPose, type CombatantPoseSample } from './lag-compensation';
+import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
 import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
+import {
+  createHumanMatchReport,
+  type HumanDamageEventInput,
+  type MatchParticipantReportInput,
+} from './match-report';
 import { scoreSpawnCandidates, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
@@ -239,7 +251,7 @@ import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
-import { magnifiedFovDegrees } from './weapon-presentation-state';
+import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
@@ -254,11 +266,13 @@ import {
   LobbyBalanceMessage,
   LobbyConfigMessage,
   LobbyJoinMessage,
+  LobbyHandicapMessage,
   LobbyReadyMessage,
   LobbyStartMessage,
   LobbyStateMessage,
   LobbyTeamMessage,
   MatchScoreMessage,
+  RangeScoreClaimMessage,
   MeleeMessage,
   OffensiveSupportSource,
   OverdriveClaimMessage,
@@ -277,11 +291,24 @@ import {
 
 configureRuntimeRandom(runtimeSeed(window.location.search));
 
+function clientSessionStorage(): Storage | undefined {
+  try { return window.sessionStorage; } catch { return undefined; }
+}
+
 window.addEventListener('error', (event) => {
+  appendClientRuntimeLog({
+    kind: 'error', message: event.message || 'unknown error', source: event.filename,
+    line: event.lineno, column: event.colno, stack: event.error?.stack,
+  }, clientSessionStorage());
   console.error('[Atomic Acres runtime error]', event.message || 'unknown error', event.error?.stack || '');
 });
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason instanceof Error ? `${event.reason.message}\n${event.reason.stack ?? ''}` : String(event.reason);
+  appendClientRuntimeLog({
+    kind: 'unhandled-rejection',
+    message: event.reason instanceof Error ? event.reason.message : String(event.reason),
+    stack: event.reason instanceof Error ? event.reason.stack : undefined,
+  }, clientSessionStorage());
   console.error('[Atomic Acres unhandled rejection]', reason);
 });
 
@@ -293,6 +320,7 @@ type RemotePlayer = {
   lastSeen: number;
   claimEligibleAt: number;
   claimRequiresCoreExit: boolean;
+  positionHistory: CombatantPoseSample[];
 };
 
 type AdmittedRemoteShot = {
@@ -396,6 +424,7 @@ type NukeSequence = {
   finishedAt: number;
   detonated: boolean;
   shockwave: THREE.Mesh;
+  authoritativeDamage: boolean;
 };
 
 type TriPassHostileMarker = {
@@ -450,7 +479,7 @@ app.innerHTML = `
   <section id="menu" class="panel">
     <div class="eyebrow">FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
-    <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.</p>
+    <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Quad Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -496,6 +525,11 @@ app.innerHTML = `
         <p id="lobby-guidance">Choose teams, ready up, then the host starts one synchronized countdown.</p>
       </section>
       <div id="network-status" data-kind="ok">Ready for deployment.</div>
+      <section id="last-match-reports" hidden aria-label="Last match reports">
+        <span><small>LAST MATCH</small><strong>DOWNLOAD REPORTS</strong></span>
+        <button id="menu-download-match-summary" type="button">HUMAN SUMMARY JSON</button>
+        <button id="menu-download-match-technical" type="button">TECHNICAL DEBUG JSON</button>
+      </section>
       <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak">
         <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
         <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
@@ -598,8 +632,8 @@ app.innerHTML = `
       </div>
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </div>
-    <div id="overdrive-hud" hidden><small>4× DAMAGE</small><strong id="overdrive-time">15.0</strong><span>OVERDRIVE</span></div>
-    <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>QUAD DAMAGE</strong><span>4× DAMAGE · 15 SECONDS</span></div>
+    <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
+    <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>QUAD DAMAGE</strong><span>2× DAMAGE · 30 SECONDS</span></div>
     <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
@@ -708,6 +742,8 @@ scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activ
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
+const VIEWMODEL_RENDER_LAYER = 2;
+camera.layers.enable(VIEWMODEL_RENDER_LAYER);
 let skyMaterial: THREE.ShaderMaterial | null = null;
 
 let riggedOperatorLoadError: string | null = null;
@@ -948,7 +984,7 @@ quadIconContext.strokeRect(12, 16, 232, 96);
 quadIconContext.fillStyle = '#f7edff';
 quadIconContext.font = '900 58px sans-serif';
 quadIconContext.textAlign = 'center';
-quadIconContext.fillText('4×', 128, 76);
+quadIconContext.fillText('2×', 128, 76);
 quadIconContext.fillStyle = '#a892ff';
 quadIconContext.font = '900 20px sans-serif';
 quadIconContext.fillText('QUAD DAMAGE', 128, 103);
@@ -970,6 +1006,11 @@ quadGlow.position.y = 0.55;
 overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
+// Compile the Quad presentation during initial loading, not on the 120-second
+// spawn transition where a first-use shader hitch looks like a game freeze.
+overdriveRoot.visible = true;
+renderer.compile(overdriveRoot, camera);
+overdriveRoot.visible = false;
 const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id);
 const waterSystem = new WaterSystem(scene);
 waterSystem.configure(selectedArena.id, renderProfile, {
@@ -1053,8 +1094,8 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -1111,6 +1152,7 @@ let lastBotEliminationProfile = {
 let fieldSupport = createFieldSupportState();
 let overdriveState: OverdriveState = createOverdriveState(0);
 let overdriveClaimGeneration = -1;
+let overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
 let overdriveSpawns = 0;
 let overdrivePickups = 0;
 let overdriveExpiries = 0;
@@ -1122,8 +1164,8 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
-const PASS59_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass59-candidate';
-const PASS59_DIAGNOSTIC_SOURCE_ID = 'baseline-f55529f1-plus-local-pass59';
+const PASS60_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass60-feedback';
+const PASS60_DIAGNOSTIC_SOURCE_ID = 'baseline-31591b2-pass59-live';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 const localArenaSwitchQaDelayMs = localMultiplayerQa
@@ -1188,6 +1230,8 @@ const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
 const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
 const peerTimingStates = new Map<string, PeerTimingState>();
+const incomingCombatRewindMs = new Map<number, number>();
+const localPositionHistory: CombatantPoseSample[] = [];
 let localCombatEventSeq = 0;
 const combatAdmissionTelemetry: Record<string, number> = {};
 const localSupportNonces = new Map<OffensiveSupportSource, number>();
@@ -1220,6 +1264,7 @@ let privateMatchActiveAtEpochMs: number | null = null;
 let hostClockOffsetMs = 0;
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
+let localDhv: Dhv = 10;
 let localResumeToken = '';
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1230,6 +1275,25 @@ const hostLobbyMembers = new Map<string, LobbyMember>();
 const hostLobbyTokens = new Map<string, string>();
 const hostDisconnectedAt = new Map<string, number>();
 const authoritativeScores = new Map<string, PlayerScore>();
+
+function memberDhv(id: string): Dhv {
+  return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
+    ?? hostLobbyMembers.get(id)?.dhv
+    ?? (id === player.id ? localDhv : 10);
+}
+
+function handicapSidearm(primary: PrimaryWeaponId, dhv = localDhv): WeaponId {
+  return dhv === 'X' ? 'magnum' : deployedWeapons(primary)[1];
+}
+
+function handicapLoadout(primary: PrimaryWeaponId, dhv = localDhv): readonly [PrimaryWeaponId, WeaponId] {
+  return [primary, handicapSidearm(primary, dhv)];
+}
+
+function handicapOutgoingDamage(attackerId: string, damage: number, weapon?: WeaponId): number {
+  const dhv = memberDhv(attackerId);
+  return applyDhvWeaponOutgoingDamage(damage, dhv, weapon === 'magnum');
+}
 let triggerHeld = false;
 let targetHits = 0;
 let rangeScore = 0;
@@ -1238,6 +1302,7 @@ let roundShotsFired = 0;
 let roundHitShots = 0;
 let roundHeadshots = 0;
 let roundDamageDealt = 0;
+let roundDamageTaken = 0;
 let rangePrimaryUnlocked = false;
 let accumulator = 0;
 let frameCount = 0;
@@ -1295,8 +1360,13 @@ let debugCaptureViewmodelHidden = false;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let matchDiagnostics: MatchDiagnostics | null = null;
+type DownloadableJson = Readonly<{ filename: string; json: string }>;
+let lastMatchDownloads: Readonly<{ summary: DownloadableJson; technical: DownloadableJson }> | null = null;
 let matchDiagnosticsStartedAt = performance.now();
 let matchDiagnosticSequence = 0;
+const humanDamageTimeline: HumanDamageEventInput[] = [];
+let droppedHumanDamageEvents = 0;
+const MAX_HUMAN_DAMAGE_EVENTS = 8_192;
 type MatchDiagnosticDetails = Partial<Omit<MatchDiagnosticInput, 'monotonicMs' | 'localEpochMs' | 'eventId' | 'eventType' | 'admission'>>;
 
 function recordMatchDiagnostic(eventType: string, admission: DiagnosticAdmission, details: MatchDiagnosticDetails = {}, correlationId?: string): void {
@@ -1315,22 +1385,109 @@ function recordMatchDiagnostic(eventType: string, admission: DiagnosticAdmission
 }
 
 function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: number): void {
+  lastMatchDownloads = null;
+  syncMatchReportDownloads();
+  humanDamageTimeline.length = 0;
+  droppedHumanDamageEvents = 0;
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
   matchDiagnostics = new MatchDiagnostics({
-    buildId: PASS59_DIAGNOSTIC_BUILD_ID,
-    sourceId: PASS59_DIAGNOSTIC_SOURCE_ID,
+    buildId: PASS60_DIAGNOSTIC_BUILD_ID,
+    sourceId: PASS60_DIAGNOSTIC_SOURCE_ID,
     sessionId: `${player.id}:${Date.now()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
     arena: selectedArena.id,
     mode: mode === 'solo' ? 'solo' : privateMatchMode,
+    technicalContext: {
+      renderProfile,
+      renderer: rendererLabel,
+      viewport: { width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio },
+      browser: { userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency },
+      matchRules: selectedArena.matchRules,
+      weaponBalance: Object.fromEntries(Object.values(WEAPONS).map((weapon) => [weapon.id, {
+        damage: weapon.damage,
+        minimumDamage: weapon.minimumDamage,
+        rpm: weapon.rpm,
+        falloffStart: weapon.falloffStart,
+        falloffEnd: weapon.falloffEnd,
+        recoilPitch: weapon.recoilPitch,
+        recoilYaw: weapon.recoilYaw,
+        headMultiplier: weapon.headMultiplier,
+        penetration: weapon.penetration,
+      }])),
+    },
   });
   recordMatchDiagnostic('match-start', 'observed', { actorId: player.id, reason: 'local match diagnostics initialized' });
 }
 
-function downloadMatchDiagnostics(): void {
-  if (!matchDiagnostics) return;
-  const exported = matchDiagnostics.export();
+function combatantLabel(id: string): { name: string; kind: string } {
+  if (id === player.id) return { name: player.name, kind: 'player' };
+  const remote = remotes.get(id);
+  if (remote) return { name: remote.snapshot.name, kind: 'player' };
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === id);
+  if (member) return { name: member.name, kind: 'player' };
+  const bot = bots.get(id) ?? dormantBots.get(id);
+  if (bot) return { name: bot.name, kind: id.startsWith('host-bot-') ? 'hosted-bot' : 'solo-bot' };
+  const target = arena.targets.find((entry) => entry.id === id);
+  if (target) return {
+    name: target.kind === 'flying-cat' ? 'Flying Black Cat' : `${target.scoreValue}-point range target`,
+    kind: target.kind === 'flying-cat' ? 'flying-target' : 'practice-target',
+  };
+  if (id === 'environment') return { name: 'Environment', kind: 'environment' };
+  return { name: 'Unknown combatant', kind: 'unknown' };
+}
+
+type DamageRecord = Readonly<{
+  actorId: string;
+  targetId: string;
+  weaponOrEffect: string;
+  healthBefore: number;
+  healthAfter: number;
+  damageRequested: number;
+  damageApplied: number;
+  reason: string;
+  hitZone?: string;
+  critical?: boolean;
+  wallbang?: boolean;
+  penetrationMultiplier?: number;
+  distanceMeters?: number;
+}>;
+
+function recordDamageEvent(details: DamageRecord): void {
+  const actor = combatantLabel(details.actorId);
+  const target = combatantLabel(details.targetId);
+  recordMatchDiagnostic('damage-applied', details.damageApplied > 0 ? 'accepted' : 'rejected', {
+    ...details,
+    actorKind: actor.kind,
+    targetKind: target.kind,
+  });
+  if (details.damageApplied <= 0) return;
+  const now = performance.now();
+  const event: HumanDamageEventInput = {
+    elapsedMs: Math.max(0, now - matchDiagnosticsStartedAt),
+    timestamp: new Date().toISOString(),
+    from: actor.name,
+    fromKind: actor.kind,
+    to: target.name,
+    toKind: target.kind,
+    damage: details.damageApplied,
+    healthBefore: details.healthBefore,
+    healthAfter: details.healthAfter,
+    source: details.weaponOrEffect,
+    hitZone: details.hitZone,
+    critical: details.critical,
+    wallbang: details.wallbang,
+    penetrationMultiplier: details.penetrationMultiplier,
+    distanceMeters: details.distanceMeters,
+  };
+  if (humanDamageTimeline.length >= MAX_HUMAN_DAMAGE_EVENTS) {
+    humanDamageTimeline.shift();
+    droppedHumanDamageEvents += 1;
+  }
+  humanDamageTimeline.push(event);
+}
+
+function downloadJsonFile(exported: DownloadableJson): void {
   const url = URL.createObjectURL(new Blob([exported.json], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
@@ -1340,6 +1497,20 @@ function downloadMatchDiagnostics(): void {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function downloadMatchDiagnostics(): void {
+  const exported = lastMatchDownloads?.technical ?? matchDiagnostics?.export();
+  if (exported) downloadJsonFile(exported);
+}
+
+function downloadMatchSummary(): void {
+  if (lastMatchDownloads) downloadJsonFile(lastMatchDownloads.summary);
+}
+
+function syncMatchReportDownloads(): void {
+  const reports = document.querySelector<HTMLElement>('#last-match-reports');
+  if (reports) reports.hidden = !lastMatchDownloads;
 }
 let respawnEndsAt = 0;
 let respawnTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1663,6 +1834,7 @@ function resetPrivateLobbyState(): void {
   peerTimingStates.clear();
   localLobbyPingMs = null;
   localLobbyReady = false;
+  localDhv = 10;
   localResumeToken = '';
   lobbyArenaSyncPromise = Promise.resolve();
   hostLobbyMembers.clear();
@@ -1703,7 +1875,9 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
 }
 
 function initializeHostLobby(): void {
-  privateMatchConfig = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id === 'gun-range' ? 'atomic-acres' : selectedArena.id };
+  privateMatchConfig = selectedArena.id === 'gun-range'
+    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
+    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
   privateMatchMode = privateMatchConfig.mode;
   localResumeToken = randomLobbyCredential();
   hostLobbyTokens.set(player.id, localResumeToken);
@@ -1714,6 +1888,7 @@ function initializeHostLobby(): void {
     ready: false,
     connected: true,
     pingMs: 0,
+    dhv: localDhv,
   });
   authoritativeScores.set(player.id, emptyPlayerScore(player.id));
   roomCard.hidden = false;
@@ -1773,6 +1948,7 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
       ready: false,
       connected: true,
       pingMs: null,
+      dhv: 10,
     });
     authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
   }
@@ -1805,6 +1981,15 @@ function updateHostTeam(message: LobbyTeamMessage): void {
   if (privateMatchConfig.autoBalance) {
     for (const balanced of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(balanced.id, { ...balanced, ready: false });
   }
+  broadcastHostLobby('waiting');
+}
+
+function updateHostHandicap(message: LobbyHandicapMessage): void {
+  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected) return;
+  hostLobbyMembers.set(message.by, { ...member, dhv: message.dhv, ready: false });
+  if (message.by === player.id) localDhv = message.dhv;
   broadcastHostLobby('waiting');
 }
 
@@ -1873,6 +2058,28 @@ function sendAuthoritativeScores(targetPlayerId?: string): void {
   const message: MatchScoreMessage = { type: 'match-score', by: player.id, scores, nonce: randomNonce() };
   if (targetPlayerId) network.sendToPlayer(targetPlayerId, message);
   else network.send(message);
+}
+
+function publishRangeScore(): void {
+  if (selectedArena.id !== 'gun-range' || network.role === 'offline') return;
+  const claim: RangeScoreClaimMessage = {
+    type: 'range-score-claim', by: player.id, score: rangeScore, hits: targetHits, shots: rangeShotsFired, nonce: randomNonce(),
+  };
+  if (network.role === 'host') {
+    const current = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
+    authoritativeScores.set(player.id, { ...current, rangeScore, rangeHits: targetHits, rangeShots: rangeShotsFired });
+    sendAuthoritativeScores();
+  } else {
+    network.send(claim);
+  }
+}
+
+function acceptRangeScoreClaim(message: RangeScoreClaimMessage): void {
+  if (network.role !== 'host' || selectedArena.id !== 'gun-range' || !hostLobbyMembers.has(message.by)) return;
+  const current = authoritativeScores.get(message.by) ?? emptyPlayerScore(message.by);
+  if (message.score < (current.rangeScore ?? 0) || message.hits < (current.rangeHits ?? 0) || message.shots < (current.rangeShots ?? 0)) return;
+  authoritativeScores.set(message.by, { ...current, rangeScore: message.score, rangeHits: message.hits, rangeShots: message.shots });
+  sendAuthoritativeScores();
 }
 
 function presentLocalDamageDelta(previous: PlayerScore | undefined, next: PlayerScore | undefined): void {
@@ -1990,6 +2197,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   if (localMember) {
     player.team = localMember.team;
     localLobbyReady = localMember.ready;
+    localDhv = localMember.dhv;
     element<HTMLSelectElement>('#team').value = String(localMember.team);
   }
   if (returningToLobby) {
@@ -2013,6 +2221,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-team') {
     updateHostTeam(message);
+    return true;
+  }
+  if (message.type === 'lobby-handicap') {
+    updateHostHandicap(message);
     return true;
   }
   if (message.type === 'lobby-state') {
@@ -2069,6 +2281,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     acceptAuthoritativeScores(message);
     return true;
   }
+  if (message.type === 'range-score-claim') {
+    acceptRangeScoreClaim(message);
+    return true;
+  }
   if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
   if (message.type === 'leave' && privateLobbySnapshot) {
     removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected');
@@ -2117,11 +2333,12 @@ function renderPrivateLobby(): void {
   capacityInput.value = String(capacity);
   botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
   balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
-  modeInput.disabled = !hostControls;
+  const rangeLobby = (snapshot?.config.arenaId ?? privateMatchConfig.arenaId) === 'gun-range';
+  modeInput.disabled = !hostControls || rangeLobby;
   capacityInput.disabled = !hostControls;
-  botInput.disabled = !hostControls;
-  balanceInput.disabled = !hostControls || modeInput.value === 'ffa';
-  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa';
+  botInput.disabled = !hostControls || rangeLobby;
+  balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
+  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   const localMember = members.find((member) => member.id === player.id);
   const lobbyArenaSynchronized = !snapshot
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
@@ -2141,7 +2358,10 @@ function renderPrivateLobby(): void {
     const quality = latencyQuality(ping);
     const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
     const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
-    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b><em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
+    const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
+      ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
+      : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
+    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
   }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
   const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
@@ -2239,10 +2459,28 @@ renderFieldKitSelection();
 
 const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
 viewFill.position.set(0, 0.4, 0.2);
+viewFill.layers.enable(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
 function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
-  return stance === 'prone' ? 0.5 : stance === 'crouch' ? 1.16 : 1.7;
+  return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
+}
+
+function currentViewmodelSurfaceRetreat(): number {
+  const direction = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')).normalize();
+  let nearest: number | null = null;
+  for (let distance = 0.2; distance <= 1.2; distance += 0.1) {
+    const sample = player.position.clone().addScaledVector(direction, distance);
+    if (!isBlocked(sample, arena.colliders, 0.09)) continue;
+    nearest = distance;
+    break;
+  }
+  if (direction.y < -0.04) {
+    const floorY = player.position.y - stanceEyeHeight(player.stance);
+    const floorDistance = (player.position.y - floorY) / -direction.y;
+    if (floorDistance >= 0 && floorDistance <= 1.2) nearest = nearest === null ? floorDistance : Math.min(nearest, floorDistance);
+  }
+  return viewmodelSurfaceRetreat(nearest, player.stance === 'prone');
 }
 
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
@@ -2292,6 +2530,10 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
     lastSeen: now,
     claimEligibleAt: now + 1_500,
     claimRequiresCoreExit: false,
+    positionHistory: [{
+      at: now, x: snapshot.x, y: snapshot.y, z: snapshot.z, yaw: snapshot.yaw,
+      stance: snapshot.stance ?? 'stand',
+    }],
   };
 }
 
@@ -2433,6 +2675,10 @@ function admitIncomingCombatTiming(message: GameMessage): boolean {
     modifiers: [`age:${Math.round(admission.sampleAgeMs)}`, `rewind:${Math.round(admission.rewindMs)}`],
   }, `combat-seq-${message.timing.eventSeq}`);
   if (admission.accepted) peerTimingStates.set(message.by, admission.state);
+  if (admission.accepted) {
+    incomingCombatRewindMs.set(message.nonce, admission.rewindMs);
+    if (incomingCombatRewindMs.size > 512) incomingCombatRewindMs.clear();
+  }
   return admission.accepted;
 }
 function onNetworkMessage(message: GameMessage): void {
@@ -2476,6 +2722,7 @@ function onNetworkMessage(message: GameMessage): void {
     const claimedIncoming = message.player;
     const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
     if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
+    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') return;
     const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
     const incoming = network.role === 'host' && lobbyMember
       ? {
@@ -2557,6 +2804,10 @@ function onNetworkMessage(message: GameMessage): void {
         remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
       }
       remote.snapshot = admittedIncoming;
+      recordCombatantPose(remote.positionHistory, {
+        at: now, x: admittedIncoming.x, y: admittedIncoming.y, z: admittedIncoming.z,
+        yaw: admittedIncoming.yaw, stance: admittedIncoming.stance ?? 'stand',
+      });
       remote.target.set(admittedIncoming.x, admittedIncoming.y - stanceEyeHeight(admittedIncoming.stance), admittedIncoming.z);
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
@@ -2666,15 +2917,25 @@ function onNetworkMessage(message: GameMessage): void {
     const targetId = targetIsLocal ? player.id : remoteTarget?.snapshot.id ?? botTarget!.id;
     const targetTeam = targetIsLocal ? player.team : remoteTarget?.snapshot.team ?? botTarget!.team;
     if (!areCombatantsHostile(message.by, attacker.snapshot.team, targetId, targetTeam)) return;
-    const targetStance = targetIsLocal ? player.stance : remoteTarget?.snapshot.stance ?? 'stand';
+    const now = performance.now();
+    const rewindMs = incomingCombatRewindMs.get(message.nonce) ?? 0;
+    incomingCombatRewindMs.delete(message.nonce);
+    const rewoundPose = rewindCombatantPose(
+      targetIsLocal ? localPositionHistory : remoteTarget?.positionHistory ?? [],
+      now - rewindMs,
+    );
+    const targetStance = rewoundPose?.stance ?? (targetIsLocal ? player.stance : remoteTarget?.snapshot.stance ?? 'stand');
     const shotTargetPosition = targetIsLocal
-      ? player.position.clone()
+      ? rewoundPose
+        ? new THREE.Vector3(rewoundPose.x, rewoundPose.y, rewoundPose.z)
+        : player.position.clone()
       : remoteTarget
-        ? new THREE.Vector3(remoteTarget.snapshot.x, remoteTarget.snapshot.y, remoteTarget.snapshot.z)
+        ? rewoundPose
+          ? new THREE.Vector3(rewoundPose.x, rewoundPose.y, rewoundPose.z)
+          : new THREE.Vector3(remoteTarget.snapshot.x, remoteTarget.snapshot.y, remoteTarget.snapshot.z)
         : botTarget!.position.clone().add(new THREE.Vector3(0, 1.7, 0));
     const blastTargetPosition = shotTargetPosition.clone();
     blastTargetPosition.y += 1.1 - stanceEyeHeight(targetStance);
-    const now = performance.now();
     let admittedDamage = 0;
 
     if (message.kind === 'shot') {
@@ -2691,7 +2952,7 @@ function onNetworkMessage(message: GameMessage): void {
           x: shotTargetPosition.x,
           y: shotTargetPosition.y,
           z: shotTargetPosition.z,
-          yaw: targetIsLocal ? player.yaw : remoteTarget?.snapshot.yaw ?? botTarget!.root.rotation.y,
+          yaw: rewoundPose?.yaw ?? (targetIsLocal ? player.yaw : remoteTarget?.snapshot.yaw ?? botTarget!.root.rotation.y),
           stance: targetStance,
         },
         (origin, impact, weapon) => {
@@ -2702,16 +2963,12 @@ function onNetworkMessage(message: GameMessage): void {
         },
       );
       if (derivedDamage <= 0) { recordRemoteHitAdmission('shot-ray-miss'); return; }
-      if (Math.abs(message.damage - derivedDamage) > 1e-6) {
-        recordRemoteHitAdmission('shot-damage-mismatch');
-        return;
-      }
       action.targets.add(message.target);
       recordRemoteHitAdmission('shot-admitted');
-      admittedDamage = resolveRemotePoweredDamage(
-        derivedDamage,
+      admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(
+        Math.min(derivedDamage, message.damage),
         overdriveDamageMultiplier(overdriveState, message.by, now),
-      );
+      ), action.message.weapon);
     } else if (message.kind === 'melee') {
       const action = admittedRemoteMelees.get(message.by)?.get(message.actionNonce);
       if (!action || now - action.receivedAt > 1_000 || action.targets.has(message.target)) return;
@@ -2719,7 +2976,7 @@ function onNetworkMessage(message: GameMessage): void {
         || !meleeActionHitsPoint(action.message, blastTargetPosition)
         || arena.colliders.some((box) => segmentIntersectsBox(new THREE.Vector3(...action.message.origin), blastTargetPosition, box))) return;
       action.targets.add(message.target);
-      admittedDamage = resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now));
+      admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now)));
     } else {
       const source = message.explosiveSource;
       const originTuple = message.origin;
@@ -2769,10 +3026,10 @@ function onNetworkMessage(message: GameMessage): void {
         actions.set(message.actionNonce, { source, origin: validationOrigin, receivedAt: now, targets: new Set([message.target]) });
       }
       admittedRemoteExplosions.set(message.by, actions);
-      admittedDamage = resolveRemotePoweredDamage(
+      admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(
         message.damage,
         overdriveDamageMultiplier(overdriveState, message.by, now),
-      );
+      ));
     }
 
     processedNonces.add(message.nonce);
@@ -2796,7 +3053,10 @@ function trimNonceSet(): void {
   if (processedNonces.size > 512) processedNonces.clear();
 }
 
-function sendAuthoritativeHit(message: HitMessage): void {
+function sendAuthoritativeHit(
+  message: HitMessage,
+  evidence?: Readonly<{ hitZone?: HitZone; wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
+): void {
   const timedMessage: HitMessage = message.timing ? message : { ...message, timing: nextCombatTiming() };
   if (network.role !== 'host') {
     network.send(timedMessage);
@@ -2806,17 +3066,20 @@ function sendAuthoritativeHit(message: HitMessage): void {
   const health = remoteHealthAuthorities.get(timedMessage.target);
   if (!remote || !health) return;
   const now = performance.now();
-  const finalDamage = resolveRemotePoweredDamage(
+  const attackerWeapon = remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon;
+  const poweredDamage = resolveRemotePoweredDamage(
     timedMessage.damage,
     overdriveDamageMultiplier(overdriveState, timedMessage.by, now),
   );
+  const outgoingHandicapped = handicapOutgoingDamage(timedMessage.by, poweredDamage, timedMessage.kind === 'shot' ? attackerWeapon : undefined);
+  const finalDamage = applyDhvIncomingDamage(outgoingHandicapped, health.hp, memberDhv(timedMessage.target));
   const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
   if (!result.applied) return;
   const appliedDamage = Math.max(0, health.hp - result.state.hp);
   remoteHealthAuthorities.set(timedMessage.target, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordMatchDiagnostic('damage-applied', 'accepted', {
+  recordDamageEvent({
     actorId: timedMessage.by,
     targetId: timedMessage.target,
     weaponOrEffect: timedMessage.kind === 'shot' ? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon : timedMessage.explosiveSource ?? timedMessage.kind,
@@ -2824,6 +3087,11 @@ function sendAuthoritativeHit(message: HitMessage): void {
     healthAfter: result.state.hp,
     damageRequested: finalDamage,
     damageApplied: appliedDamage,
+    hitZone: evidence?.hitZone,
+    critical: evidence?.hitZone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
     reason: 'host-remote-health-authority',
   });
   recordAuthoritativeDamage(timedMessage.by, timedMessage.target, appliedDamage);
@@ -2894,13 +3162,16 @@ function applyDamage(
   minimumDamage = 1,
   bypassSpawnProtection = false,
   cause: KillCause = { kind: 'environment' },
+  damageAlreadyHandicapped = false,
 ): void {
   const now = performance.now();
   if (!player.alive || (!bypassSpawnProtection && now < player.invulnerableUntil)) return;
   const previousHp = player.hp;
-  player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
+  const handicappedDamage = damageAlreadyHandicapped ? damage : applyDhvIncomingDamage(damage, player.hp, localDhv);
+  player.hp = Math.max(0, player.hp - admittedPlayerDamage(handicappedDamage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
-  recordMatchDiagnostic('damage-applied', appliedDamage > 0 ? 'accepted' : 'rejected', {
+  roundDamageTaken += appliedDamage;
+  recordDamageEvent({
     actorId: attacker,
     targetId: player.id,
     weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
@@ -3337,6 +3608,15 @@ function processDeath(message: DeathMessage): void {
       sendAuthoritativeScores();
     }
   }
+  if (network.role !== 'client' && message.killer !== message.victim
+    && (message.killer === player.id || remotes.has(message.killer))) {
+    const transfer = transferOverdriveOnElimination(overdriveState, message.victim, message.killer, performance.now());
+    if (transfer.transferred) {
+      overdriveState = transfer.state;
+      registerOverdrivePickup(message.killer, performance.now());
+      addFeed('QUAD STOLEN · KILL THE HOLDER TO TAKE ITS REMAINING TIME', 'gold');
+    }
+  }
   if (message.killer === player.id && message.victim !== player.id) {
     if (gameMode === 'solo') player.kills += 1;
     if (isKillstreakEligible(message.cause)) awardSupportElimination();
@@ -3513,7 +3793,9 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
     return false;
   }
   const after = characterPhysics.eyePosition();
-  cameraHeightOffset += before.y - after.y;
+  // Keep the rendered camera inside the newly authoritative capsule. A large
+  // cosmetic eye-height lag could leave the camera in ceilings/walls on prone.
+  cameraHeightOffset = THREE.MathUtils.clamp(cameraHeightOffset + before.y - after.y, -0.12, 0.12);
   player.position.set(after.x, after.y, after.z);
   player.stance = target;
   stanceRecoveryUntil = performance.now() + (target === 'prone' ? 260 : previous === 'prone' ? 290 : 135);
@@ -3559,15 +3841,16 @@ function respawn(requestLock = true): void {
   if (selectedArena.id === 'gun-range') {
     rangePrimaryUnlocked = false;
     player.primaryWeapon = 'carbine';
-    player.weapon = 'pistol';
-    player.ammo.pistol = WEAPONS.pistol.mag;
-    player.reserve.pistol = WEAPONS.pistol.reserve;
+    const sidearm = handicapSidearm(player.primaryWeapon);
+    player.weapon = sidearm;
+    player.ammo[sidearm] = WEAPONS[sidearm].mag;
+    player.reserve[sidearm] = WEAPONS[sidearm].reserve;
     player.switchingUntil = 0;
-    weaponView.setWeapon('pistol', true);
+    weaponView.setWeapon(sidearm, true);
   } else {
     const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
     player.primaryWeapon = deploymentWeapon;
-    for (const weapon of deployedWeapons(deploymentWeapon)) {
+    for (const weapon of handicapLoadout(deploymentWeapon)) {
       player.ammo[weapon] = WEAPONS[weapon].mag;
       player.reserve[weapon] = WEAPONS[weapon].reserve;
     }
@@ -3604,6 +3887,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   roundHitShots = 0;
   roundHeadshots = 0;
   roundDamageDealt = 0;
+  roundDamageTaken = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -3648,6 +3932,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
     ? matchStartedAt
     : localPerformanceAtHostEpoch(activeAtEpochMs, mode === 'host' ? 0 : hostClockOffsetMs, Date.now(), matchStartedAt));
   overdriveClaimGeneration = -1;
+  overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
   overdriveSpawns = 0;
   overdrivePickups = 0;
   overdriveExpiries = 0;
@@ -3661,7 +3946,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   menu.classList.add('hidden');
   hudRoot.hidden = false;
   element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
-    ? 'SOLO RANGE'
+    ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
     : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
   element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTWORKS DUEL' : 'RUSTWORKS MATCH') : 'TEAM DEATHMATCH';
   element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
@@ -3693,8 +3978,8 @@ function endSpawnProtectionOnOffense(now: number): void {
 
 function switchWeapon(index: number): void {
   const id = selectedArena.id === 'gun-range'
-    ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? 'pistol' : undefined
-    : deployedWeapons(player.primaryWeapon)[index];
+    ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? handicapSidearm(player.primaryWeapon) : undefined
+    : handicapLoadout(player.primaryWeapon)[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -3779,7 +4064,10 @@ function tryFire(now: number): void {
   player.lastShotAt = now;
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
   roundShotsFired += 1;
-  if (isGunRange(selectedArena.id)) rangeShotsFired += 1;
+  if (isGunRange(selectedArena.id)) {
+    rangeShotsFired += 1;
+    publishRangeScore();
+  }
   if (player.ammo[player.weapon] === 0) {
     const emptiedWeapon = player.weapon;
     window.setTimeout(() => {
@@ -3811,7 +4099,13 @@ function tryFire(now: number): void {
     prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
-  const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
+  const hitDamage = new Map<string, {
+    damage: number;
+    zone: HitZone;
+    wallbang: boolean;
+    penetrationMultiplier: number;
+    distanceMeters: number;
+  }>();
   const pelletDirections: [number, number, number][] = [];
   let impactAudioPlayed = false;
   const presentedSurfaceIds = new Set<string>();
@@ -3877,16 +4171,31 @@ function tryFire(now: number): void {
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
       const damage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
-      const prior = hitDamage.get(result.playerId);
-      hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
+      if (damage > 0) {
+        const prior = hitDamage.get(result.playerId);
+        hitDamage.set(result.playerId, {
+          damage: (prior?.damage ?? 0) + damage,
+          zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone,
+          wallbang: Boolean(prior?.wallbang) || result.damageMultiplier < 0.999,
+          penetrationMultiplier: Math.min(prior?.penetrationMultiplier ?? 1, result.damageMultiplier),
+          distanceMeters: Math.max(prior?.distanceMeters ?? 0, result.distance),
+        });
+      }
     }
     if (result.targetId) {
-      const zone = result.hitZone ?? 'body';
-      hitPracticeTarget(
-        result.targetId,
-        applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier),
-        zone,
-      );
+      const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
+      const zone = practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body';
+      const targetDamage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
+      if (targetDamage > 0) hitPracticeTarget(
+          result.targetId,
+          targetDamage,
+          zone,
+          {
+            wallbang: result.damageMultiplier < 0.999,
+            penetrationMultiplier: result.damageMultiplier,
+            distanceMeters: result.distance,
+          },
+        );
     }
   }
   const shot: ShotMessage = {
@@ -3914,11 +4223,11 @@ function tryFire(now: number): void {
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target: bot.id, damage: requested, kind: 'shot',
           actionNonce: shot.nonce, nonce: randomNonce(),
-        });
+        }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
         showDamageNumber(Math.min(100, poweredDamage), hit.zone);
       } else {
-        const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+        const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone, undefined, player.id, hit);
         showDamageNumber(dealt, hit.zone);
       }
     }
@@ -3930,16 +4239,14 @@ function tryFire(now: number): void {
         const nonce = randomNonce();
         const dealt = Math.min(100, hit.damage);
         const powered = Math.min(100, poweredDamage);
+        const targetAdjusted = Math.min(remote.snapshot.hp, applyDhvIncomingDamage(powered, remote.snapshot.hp, memberDhv(target)));
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
           actionNonce: shot.nonce, nonce,
-        });
+        }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
-        showDamageNumber(powered, hit.zone);
+        showDamageNumber(targetAdjusted, hit.zone);
         audio.hit(hit.zone === 'head');
-        const zoneTag = hit.zone === 'head' ? 'HEADSHOT' : hit.zone === 'limb' ? 'LIMB' : 'BODY';
-        const overdriveTag = powered > dealt + 0.5 ? ` · OD×${Math.round(powered / Math.max(1, dealt))}` : '';
-        addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · ${zoneTag} · ${dealt} DMG${overdriveTag}`, hit.zone === 'head' ? 'gold' : undefined);
       }
     }
   }
@@ -4429,13 +4736,14 @@ function applyBotDamage(
   zone: HitZone,
   cause: KillCause = { kind: 'gun', weapon: player.weapon },
   attackerId = player.id,
+  evidence?: Readonly<{ wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
   reactOperator(bot.root, zone);
   const healthBefore = bot.hp;
   const dealt = Math.min(bot.hp, Math.max(0, damage));
-  recordMatchDiagnostic('bot-damage-applied', dealt > 0 ? 'accepted' : 'rejected', {
+  recordDamageEvent({
     actorId: attackerId,
     targetId: bot.id,
     weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
@@ -4443,6 +4751,11 @@ function applyBotDamage(
     healthAfter: Math.max(0, healthBefore - dealt),
     damageRequested: damage,
     damageApplied: dealt,
+    hitZone: zone,
+    critical: zone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
     reason: bot.id.startsWith('host-bot-') ? 'hosted-bot-authority' : 'solo-bot-authority',
   });
   if (attackerId === player.id) roundDamageDealt += dealt;
@@ -4454,9 +4767,6 @@ function applyBotDamage(
     audio.hit(zone === 'head');
   }
   if (bot.hp > 0) {
-    if (zone === 'head' && attackerId === player.id) {
-      addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
-    }
     if (network.role === 'host') broadcastHostedBotState();
     return dealt;
   }
@@ -4626,14 +4936,15 @@ function applyHostedBotDamageToRemote(
   const health = remoteHealthAuthorities.get(target.id);
   const remote = remotes.get(target.id);
   if (!health || !remote) return;
-  const result = applyAuthoritativeRemoteDamage(health, damage, now);
+  const handicappedDamage = applyDhvIncomingDamage(damage, health.hp, memberDhv(target.id));
+  const result = applyAuthoritativeRemoteDamage(health, handicappedDamage, now);
   if (!result.applied) return;
   const damageApplied = Math.max(0, health.hp - result.state.hp);
   if (damageApplied <= 0) return;
   remoteHealthAuthorities.set(target.id, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordMatchDiagnostic('bot-damage-applied', 'accepted', {
+  recordDamageEvent({
     actorId: bot.id,
     targetId: target.id,
     weaponOrEffect: bot.weapon,
@@ -4683,7 +4994,7 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
   if (message.target === player.id) {
     const canonicalDamage = Math.max(0, player.hp - message.healthAfter);
     if (canonicalDamage > 0) {
-      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon });
+      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon }, true);
     }
     // Hosted matches use the host's remote-health ledger as the canonical value.
     // Reconcile upward as well as downward so prior client-side drift cannot persist.
@@ -5144,31 +5455,61 @@ function updateGrenades(dt: number, now: number): void {
   }
 }
 
-function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): void {
+function hitPracticeTarget(
+  id: string,
+  damage: number,
+  zone: HitZone = 'body',
+  evidence?: Readonly<{ wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
+): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
+  if (target.alwaysCritical) zone = 'head';
   const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
   if (admittedDamage <= 0) return;
   const healthBefore = target.health;
   target.health = Math.max(0, target.health - admittedDamage);
   const appliedDamage = healthBefore - target.health;
+  recordDamageEvent({
+    actorId: player.id,
+    targetId: target.id,
+    weaponOrEffect: player.weapon,
+    healthBefore,
+    healthAfter: target.health,
+    damageRequested: admittedDamage,
+    damageApplied: appliedDamage,
+    hitZone: zone,
+    critical: zone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
+    reason: 'gun-range-practice-target',
+  });
   targetHits += 1;
   const headshot = selectedArena.id === 'gun-range' && zone === 'head';
   showHitmarker(headshot);
   showDamageNumber(appliedDamage, zone);
   audio.hit(headshot);
+  if (selectedArena.id === 'gun-range') {
+    addFeed(
+      `${headshot ? 'CRITICAL · ' : ''}${target.id.toUpperCase()} · +${Math.round(appliedDamage)} DMG · ${Math.ceil(target.health)} / ${target.maxHealth} HP`,
+      headshot ? 'gold' : 'aqua',
+      { damageDealt: appliedDamage },
+    );
+  }
   if (target.health > 0) {
-    if (selectedArena.id === 'gun-range') addFeed(`${headshot ? 'BULLSEYE · ' : ''}${Math.ceil(target.health)} / ${target.maxHealth} HP`, headshot ? 'gold' : undefined);
     return;
   }
   target.active = false;
-  target.respawnAt = performance.now() + 2_200;
+  target.respawnAt = performance.now() + (target.respawnDelayMs ?? 2_200);
   target.root.visible = false;
   rangeScore = selectedArena.id === 'gun-range'
     ? advanceRangeScore(rangeScore, target.scoreValue)
     : rangeScore + 1;
+  publishRangeScore();
   addFeed(selectedArena.id === 'gun-range'
-    ? `${headshot ? 'BULLSEYE · ' : ''}+${target.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`
+    ? target.kind === 'flying-cat'
+      ? `BLACK CAT CRIT · +500 PTS · ${rangeScore} TOTAL · BACK IN 30 SEC`
+      : `${headshot ? 'BULLSEYE · ' : ''}+${target.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`
     : '+1 test mannequin', 'gold');
 }
 
@@ -5183,6 +5524,22 @@ function updateTargets(now: number): void {
       target.health = target.maxHealth;
     }
     target.root.visible = target.active;
+    if (target.active && target.kind === 'flying-cat') {
+      const phase = now * 0.00055;
+      const x = Math.cos(phase) * 10.5;
+      const z = -22 + Math.sin(phase * 1.35) * 12;
+      const y = 3.65 + Math.sin(phase * 2.4) * 0.72;
+      const nextX = Math.cos(phase + 0.01) * 10.5;
+      const nextZ = -22 + Math.sin((phase + 0.01) * 1.35) * 12;
+      target.root.position.set(x, y, z);
+      target.root.rotation.y = Math.atan2(nextX - x, nextZ - z);
+      const trail = target.root.userData.starTrail as THREE.Mesh[] | undefined;
+      trail?.forEach((star, index) => {
+        star.rotation.z = now * (0.0018 + index * 0.00008) + index;
+        const pulse = 0.72 + Math.sin(now * 0.006 - index * 0.9) * 0.18;
+        star.scale.setScalar(Math.max(0.2, pulse * (1 - index * 0.075)));
+      });
+    }
   }
 }
 
@@ -5280,10 +5637,11 @@ function registerOverdrivePickup(holderId: string, now: number): void {
   });
   overdriveClaimGeneration = overdriveState.generation;
   const holderName = holderId === player.id ? player.name : remotes.get(holderId)?.snapshot.name ?? 'Operator';
-  addFeed(`${holderName} secured 4× OVERDRIVE · 15 SECONDS`, 'gold');
+  const seconds = Math.max(1, Math.ceil(overdriveRemainingMs(overdriveState, holderId, now) / 1_000));
+  addFeed(`${holderName} secured 2× OVERDRIVE · ${seconds} SECONDS`, 'gold');
   if (holderId === player.id) {
     audio.overdrivePickup();
-    showQuadDamageAnnouncement('QUAD DAMAGE', '4× DAMAGE · 15 SECONDS');
+    showQuadDamageAnnouncement('QUAD DAMAGE', `2× DAMAGE · ${seconds} SECONDS`);
   } else showQuadDamageAnnouncement(`${holderName} HAS QUAD DAMAGE`, 'DENY THE POWER HOLDER');
   broadcastOverdriveState(now);
 }
@@ -5295,8 +5653,7 @@ function showQuadDamageAnnouncement(title: string, subtitle: string): void {
   element<HTMLElement>('#power-announcement span').textContent = subtitle;
   announcement.hidden = false;
   announcement.classList.remove('announce');
-  void announcement.offsetWidth;
-  announcement.classList.add('announce');
+  requestAnimationFrame(() => requestAnimationFrame(() => announcement.classList.add('announce')));
   window.clearTimeout(quadAnnouncementTimer);
   quadAnnouncementTimer = window.setTimeout(() => {
     announcement.hidden = true;
@@ -5336,12 +5693,14 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
   if (message.available && previousGeneration !== message.generation) {
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
+    overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
   }
   if (message.holderId && message.holderId !== previousHolder) registerOverdrivePickup(message.holderId, now);
 }
 
 function outgoingDamage(value: number, now = performance.now()): number {
-  return value * overdriveDamageMultiplier(overdriveState, player.id, now);
+  const powered = value * overdriveDamageMultiplier(overdriveState, player.id, now);
+  return handicapOutgoingDamage(player.id, powered, player.weapon);
 }
 
 function updateOverdrive(now: number): void {
@@ -5354,12 +5713,21 @@ function updateOverdrive(now: number): void {
   const previousHolder = overdriveState.holderId;
   if (network.role !== 'client') overdriveState = advanceOverdrive(overdriveState, now);
   if (!wasAvailable && overdriveState.available) {
+    const spawnWorkStarted = performance.now();
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
     addFeed('QUAD DAMAGE ONLINE · VISIBLE MID-MAP ICON', 'gold');
-    showQuadDamageAnnouncement('QUAD DAMAGE ONLINE', 'CENTRE CORE · CLAIM 4× DAMAGE');
+    showQuadDamageAnnouncement('QUAD DAMAGE ONLINE', 'CENTRE CORE · CLAIM 2× DAMAGE');
     audio.overdriveAvailable();
     broadcastOverdriveState(now);
+    requestAnimationFrame((frameAt) => recordMatchDiagnostic('overdrive-spawn-frame', 'observed', {
+      weaponOrEffect: 'overdrive',
+      reason: 'first visible Quad spawn transition',
+      modifiers: [
+        `sync-work-ms:${Math.round((performance.now() - spawnWorkStarted) * 10) / 10}`,
+        `next-frame-ms:${Math.round((frameAt - spawnWorkStarted) * 10) / 10}`,
+      ],
+    }));
   }
   if (previousHolder !== null && overdriveState.holderId === null) {
     overdriveExpiries += 1;
@@ -5369,8 +5737,9 @@ function updateOverdrive(now: number): void {
   const distance = Math.hypot(player.position.x - OVERDRIVE_POSITION.x, player.position.z - OVERDRIVE_POSITION.z);
   if (gameStarted && matchState.phase === 'active' && player.alive && overdriveState.available && distance <= OVERDRIVE_PICKUP_RADIUS) {
     if (network.role === 'client') {
-      if (overdriveClaimGeneration !== overdriveState.generation) {
+      if (overdriveClaimGeneration !== overdriveState.generation || now - overdriveClaimLastSentAt >= 250) {
         overdriveClaimGeneration = overdriveState.generation;
+        overdriveClaimLastSentAt = now;
         network.send({ type: 'overdrive-claim', by: player.id, position: player.position.toArray(), generation: overdriveState.generation, nonce: randomNonce() });
       }
     } else {
@@ -5380,7 +5749,10 @@ function updateOverdrive(now: number): void {
         registerOverdrivePickup(player.id, now);
       }
     }
-  } else if (distance > OVERDRIVE_PICKUP_RADIUS + 0.5) overdriveClaimGeneration = -1;
+  } else if (distance > OVERDRIVE_PICKUP_RADIUS + 0.5) {
+    overdriveClaimGeneration = -1;
+    overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
+  }
 
   overdriveRoot.visible = overdriveState.available && gameStarted && matchState.phase === 'active';
   if (overdriveRoot.visible) {
@@ -5571,16 +5943,17 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
   if (index >= 0) hunterDrones.splice(index, 1);
 }
 
-function beginNuke(now: number): void {
+function beginNuke(now: number, authoritativeDamage = true): void {
   nukeShockwave.scale.setScalar(0.1);
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   nukeShockwave.visible = false;
   nukeSequence = {
     startedAt: now,
     detonateAt: now + NUKE_WARNING_MS,
-    finishedAt: now + NUKE_WARNING_MS + 3_500,
+    finishedAt: now + NUKE_WARNING_MS + 4_500,
     detonated: false,
     shockwave: nukeShockwave,
+    authoritativeDamage,
   };
   const warning = element<HTMLElement>('#nuke-warning');
   warning.hidden = false;
@@ -5605,25 +5978,27 @@ function detonateNuke(sequence: NukeSequence): void {
   const afterVisual = performance.now();
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get('nuke');
-  for (const remote of remotes.values()) {
-    const damage = nukeDamageForTarget(player.team, remote.snapshot.team, remote.snapshot.hp > 0);
-    if (damage <= 0 || supportNonce === undefined) continue;
-    sendAuthoritativeHit({
-      type: 'hit',
-      by: player.id,
-      target: remote.snapshot.id,
-      damage: Math.min(100, damage),
-      kind: 'explosive',
-      explosiveSource: 'nuke',
-      origin: [0, 1.5, 0],
-      actionNonce: blastNonce,
-      supportNonce,
-      nonce: randomNonce(),
-    });
-  }
-  for (const bot of [...bots.values()]) {
-    const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
-    if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body', { kind: 'killstreak', effect: 'nuke' });
+  if (sequence.authoritativeDamage) {
+    for (const remote of remotes.values()) {
+      const damage = nukeDamageForTarget(player.team, remote.snapshot.team, remote.snapshot.hp > 0);
+      if (damage <= 0 || supportNonce === undefined) continue;
+      sendAuthoritativeHit({
+        type: 'hit',
+        by: player.id,
+        target: remote.snapshot.id,
+        damage: Math.min(100, damage),
+        kind: 'explosive',
+        explosiveSource: 'nuke',
+        origin: [0, 1.5, 0],
+        actionNonce: blastNonce,
+        supportNonce,
+        nonce: randomNonce(),
+      });
+    }
+    for (const bot of [...bots.values()]) {
+      const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
+      if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body', { kind: 'killstreak', effect: 'nuke' });
+    }
   }
   const finished = performance.now();
   recordSupportExplosionProfile({
@@ -5633,7 +6008,7 @@ function detonateNuke(sequence: NukeSequence): void {
     targetDamageMs: finished - afterVisual,
     totalSyncMs: finished - started,
   });
-  addFeed('ATOMIC DETONATION · HOSTILE FIELD PURGED', 'gold');
+  addFeed(sequence.authoritativeDamage ? 'ATOMIC DETONATION · HOSTILE FIELD PURGED' : 'HOSTILE ATOMIC DETONATION', sequence.authoritativeDamage ? 'gold' : 'coral');
 }
 
 function updateNuke(now: number): void {
@@ -5653,7 +6028,7 @@ function updateNuke(now: number): void {
   const elapsed = now - sequence.detonateAt;
   const blastProgress = THREE.MathUtils.clamp(elapsed / 2_600, 0, 1);
   const flashStrength = Math.exp(-elapsed / 620);
-  sequence.shockwave.scale.setScalar(0.1 + blastProgress * 125);
+  sequence.shockwave.scale.setScalar(0.1 + blastProgress * 180);
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
   if (scene.fog) scene.fog.color.set(activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
@@ -5828,8 +6203,8 @@ function drawStrikeMap(now = performance.now()): void {
   }
   // Road band is Atomic Acres-specific; other maps get a lighter centre guide only.
   if (selectedArena.id === 'atomic-acres') {
-    const [roadLeft] = worldToMinimap(-9.5, 0, arena.bounds, width, height);
-    const [roadRight] = worldToMinimap(9.5, 0, arena.bounds, width, height);
+    const [roadRight] = worldToTacticalMap(-9.5, 0, arena.bounds, width, height);
+    const [roadLeft] = worldToTacticalMap(9.5, 0, arena.bounds, width, height);
     context.fillStyle = 'rgba(88, 102, 105, 0.78)';
     context.fillRect(roadLeft, 0, roadRight - roadLeft, height);
   }
@@ -5838,11 +6213,11 @@ function drawStrikeMap(now = performance.now()): void {
   context.beginPath(); context.moveTo(width / 2, 0); context.lineTo(width / 2, height); context.stroke();
   context.setLineDash([]);
   for (const house of arena.houses) {
-    const [cx, cy] = worldToMinimap(house.origin.x, house.origin.z, arena.bounds, width, height);
-    const [minX] = worldToMinimap(house.origin.x - house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
-    const [, minY] = worldToMinimap(house.origin.x, house.origin.z + house.dimensions.depth / 2, arena.bounds, width, height);
-    const [maxX] = worldToMinimap(house.origin.x + house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
-    const [, maxY] = worldToMinimap(house.origin.x, house.origin.z - house.dimensions.depth / 2, arena.bounds, width, height);
+    const [cx, cy] = worldToTacticalMap(house.origin.x, house.origin.z, arena.bounds, width, height);
+    const [maxX] = worldToTacticalMap(house.origin.x - house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, minY] = worldToTacticalMap(house.origin.x, house.origin.z + house.dimensions.depth / 2, arena.bounds, width, height);
+    const [minX] = worldToTacticalMap(house.origin.x + house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, maxY] = worldToTacticalMap(house.origin.x, house.origin.z - house.dimensions.depth / 2, arena.bounds, width, height);
     context.fillStyle = house.team === 0 ? 'rgba(72, 185, 183, 0.58)' : 'rgba(214, 113, 91, 0.58)';
     context.strokeStyle = house.team === 0 ? '#80f5f0' : '#ff9a7f';
     context.lineWidth = 3;
@@ -5862,8 +6237,8 @@ function drawStrikeMap(now = performance.now()): void {
       const sizeZ = box.maxZ - box.minZ;
       if (sizeX < 1.2 || sizeZ < 1.2 || sizeX > 30 || sizeZ > 30) continue;
       if ((box.maxY ?? 4) < 0.8) continue;
-      const [minX, minY] = worldToMinimap(box.minX, box.maxZ, arena.bounds, width, height);
-      const [maxX, maxY] = worldToMinimap(box.maxX, box.minZ, arena.bounds, width, height);
+      const [maxX, minY] = worldToTacticalMap(box.minX, box.maxZ, arena.bounds, width, height);
+      const [minX, maxY] = worldToTacticalMap(box.maxX, box.minZ, arena.bounds, width, height);
       context.fillRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
       context.strokeRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
       drawn += 1;
@@ -5872,7 +6247,7 @@ function drawStrikeMap(now = performance.now()): void {
   }
   // Local player always drawn so you can orient bombs relative to yourself.
   {
-    const [px, py] = worldToMinimap(player.position.x, player.position.z, arena.bounds, width, height);
+    const [px, py] = worldToTacticalMap(player.position.x, player.position.z, arena.bounds, width, height);
     context.fillStyle = 'rgba(120, 245, 237, 0.28)';
     context.beginPath(); context.arc(px, py, 16, 0, Math.PI * 2); context.fill();
     context.fillStyle = '#78f5ed';
@@ -5884,7 +6259,7 @@ function drawStrikeMap(now = performance.now()): void {
   }
   const hostilePulse = 10 + Math.sin(now * 0.012) * 2;
   triPassHostileMarkers = currentTriPassHostiles().map((hostile, index) => {
-    const [x, y] = worldToMinimap(hostile.x, hostile.z, arena.bounds, width, height);
+    const [x, y] = worldToTacticalMap(hostile.x, hostile.z, arena.bounds, width, height);
     context.fillStyle = 'rgba(255, 70, 49, 0.38)';
     context.beginPath(); context.arc(x, y, hostilePulse + 10, 0, Math.PI * 2); context.fill();
     context.fillStyle = '#ff4631';
@@ -5902,7 +6277,7 @@ function drawStrikeMap(now = performance.now()): void {
     : `ENEMIES LIVE · ${triPassHostileMarkers.length} (red = people/bots)`;
   const points = triPassTargeting?.points ?? [];
   points.forEach((point, index) => {
-    const [x, y] = worldToMinimap(point.x, point.z, arena.bounds, width, height);
+    const [x, y] = worldToTacticalMap(point.x, point.z, arena.bounds, width, height);
     context.fillStyle = '#ff684f';
     context.beginPath(); context.arc(x, y, 16, 0, Math.PI * 2); context.fill();
     context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
@@ -5959,6 +6334,7 @@ function scheduleTriPassMissiles(points: readonly { x: number; z: number }[], co
     scene.add(marker);
     strikeMissiles.push({ missile, marker, target, startedAt: confirmedAt, impactAt: schedule[index], resolved: false });
   });
+  audio.supportInbound('tri-pass');
   addFeed('TRI-PASS · THREE MISSILES INBOUND · 1.0 SEC', 'gold');
 }
 
@@ -5968,7 +6344,7 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
   const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
   const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
   // Prefer locking onto a live hostile when the click is near their blip.
-  let point = minimapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  let point = tacticalMapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
   let nearestDistance = 36;
   for (const marker of triPassHostileMarkers) {
     const dx = marker.canvas[0] - x;
@@ -6016,8 +6392,9 @@ function activateFieldSupport(id: FieldSupportId): void {
   endSpawnProtectionOnOffense(now);
   fieldSupport = consumed.state;
   if (id === 'scout-sweep') {
-    scoutSweepUntil = now + 12_000;
-    addFeed('SCOUT SWEEP ACTIVE · 12 SEC', 'gold');
+    scoutSweepUntil = now + SCOUT_SWEEP_DURATION_MS;
+    audio.scoutSweep();
+    addFeed('SCOUT SWEEP · PULSE 1.5 SEC / 3 SEC · 12 SEC', 'gold');
   } else if (id === 'yardhawk') {
     const target = nearestSupportTarget();
     if (!target) {
@@ -6043,6 +6420,7 @@ function activateFieldSupport(id: FieldSupportId): void {
       armedAt: now + 450,
       expiresAt: now + 6_500,
     };
+    audio.supportInbound('yardhawk');
     authorizeLocalOffensiveSupport('yardhawk', [], [target.id]);
     addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
   } else if (id === 'tri-pass') {
@@ -6118,6 +6496,12 @@ function remoteSupportTargetPoints(message: Extract<GameMessage, { type: 'suppor
 
 function presentRemoteSupportActivation(message: Extract<GameMessage, { type: 'support-activate' }>, sender: PlayerSnapshot): void {
   const now = performance.now();
+  if (message.source === 'nuke') {
+    if (!nukeSequence) beginNuke(now, false);
+    addFeed('HOSTILE NUKE INBOUND · FULL-FIELD WARNING', 'coral');
+    return;
+  }
+  audio.supportInbound(message.source);
   const points = remoteSupportTargetPoints(message, sender).slice(0, 5);
   const roots = points.map((target, index) => {
     const root = new THREE.Group();
@@ -6131,14 +6515,19 @@ function presentRemoteSupportActivation(message: Extract<GameMessage, { type: 's
       new THREE.MeshBasicMaterial({ color: 0xffd06b, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
     );
     ring.rotation.x = -Math.PI / 2;
-    root.add(core, ring);
+    const trail = new THREE.Mesh(
+      new THREE.ConeGeometry(message.source === 'hunter-swarm' ? 0.32 : 0.22, message.source === 'tri-pass' ? 4.8 : 2.8, 10, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffb45d, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+    );
+    trail.position.y = 1.8;
+    root.add(core, ring, trail);
     root.position.copy(target).add(new THREE.Vector3(0, 10, 0));
     root.userData.presentationOnly = true;
     root.traverse((node) => { node.userData.blocksShots = false; });
     scene.add(root);
     return { root, target: target.clone() };
   });
-  const delay = message.source === 'nuke' ? NUKE_WARNING_MS : 900;
+  const delay = 900;
   remoteSupportPresentations.push({ source: message.source, roots, startedAt: now, detonateAt: now + delay, expiresAt: now + delay + 1_800, detonated: false });
   addFeed('REMOTE ' + message.source.toUpperCase().replaceAll('-', ' ') + ' ACTIVATED', 'coral');
 }
@@ -6412,6 +6801,7 @@ function updatePhysics(dt: number): void {
     landingImpulse,
     lateralSpeed,
     reloadProgress: debugReloadProgress ?? gameplayReloadProgress(player.reloadState, performance.now()),
+    surfaceRetreat: currentViewmodelSurfaceRetreat(),
   });
   for (const event of weaponActionEvents) {
     audio.weaponAction(player.weapon, event);
@@ -6440,6 +6830,10 @@ function updatePhysics(dt: number): void {
 }
 
 function updateRemotes(dt: number, now: number): void {
+  recordCombatantPose(localPositionHistory, {
+    at: now, x: player.position.x, y: player.position.y, z: player.position.z,
+    yaw: player.yaw, stance: player.stance,
+  });
   for (const [id, remote] of remotes) {
     if (now - remote.lastSeen > 12_000) {
       removeRemote(id, 'timed out');
@@ -6472,6 +6866,77 @@ function teamScores(): [number, number] {
     else coral += bot.kills;
   }
   return [aqua, coral];
+}
+
+function matchParticipantReports(): Array<{ id: string; report: MatchParticipantReportInput }> {
+  const reports: Array<{ id: string; report: MatchParticipantReportInput }> = [];
+  const timelineDamage = (name: string, direction: 'from' | 'to') => Math.round(humanDamageTimeline.reduce(
+    (total, event) => total + (event[direction] === name ? event.damage : 0),
+    0,
+  ));
+  const scoreFor = (id: string): PlayerScore | undefined => authoritativeScores.get(id) ?? privateLobbySnapshot?.scores.find((score) => score.id === id);
+  if (gameMode !== 'solo' && privateLobbySnapshot) {
+    for (const member of privateLobbySnapshot.members) {
+      const score = scoreFor(member.id) ?? emptyPlayerScore(member.id);
+      const remote = remotes.get(member.id);
+      const isLocal = member.id === player.id;
+      reports.push({
+        id: member.id,
+        report: {
+          name: member.name,
+          kind: 'player',
+          team: privateMatchMode === 'ffa' ? 'free-for-all' : `team-${member.team + 1}`,
+          kills: score.kills,
+          deaths: score.deaths,
+          damageDealt: score.damageDealt,
+          damageTaken: score.damageTaken,
+          finalHealth: isLocal ? player.hp : remote?.snapshot.hp,
+          ...(selectedArena.id === 'gun-range' ? {
+            score: score.rangeScore ?? (isLocal ? rangeScore : 0),
+            hits: score.rangeHits ?? (isLocal ? targetHits : 0),
+            shots: score.rangeShots ?? (isLocal ? rangeShotsFired : 0),
+          } : isLocal ? { hits: roundHitShots, shots: roundShotsFired } : {}),
+        },
+      });
+    }
+  } else {
+    reports.push({
+      id: player.id,
+      report: {
+        name: player.name,
+        kind: 'player',
+        team: `team-${player.team + 1}`,
+        kills: player.kills,
+        deaths: player.deaths,
+        damageDealt: Math.round(roundDamageDealt),
+        damageTaken: Math.round(roundDamageTaken),
+        finalHealth: player.hp,
+        ...(selectedArena.id === 'gun-range'
+          ? { score: rangeScore, hits: targetHits, shots: rangeShotsFired }
+          : { hits: roundHitShots, shots: roundShotsFired }),
+      },
+    });
+  }
+  const seen = new Set(reports.map((entry) => entry.id));
+  for (const bot of [...bots.values(), ...dormantBots.values()]) {
+    if (seen.has(bot.id)) continue;
+    seen.add(bot.id);
+    const score = scoreFor(bot.id);
+    reports.push({
+      id: bot.id,
+      report: {
+        name: bot.name,
+        kind: bot.id.startsWith('host-bot-') ? 'hosted-bot' : 'solo-bot',
+        team: privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'free-for-all' : `team-${bot.team + 1}`,
+        kills: score?.kills ?? bot.kills,
+        deaths: score?.deaths ?? bot.deaths,
+        damageDealt: score?.damageDealt ?? timelineDamage(bot.name, 'from'),
+        damageTaken: score?.damageTaken ?? timelineDamage(bot.name, 'to'),
+        finalHealth: bot.hp,
+      },
+    });
+  }
+  return reports;
 }
 
 function updateMatchState(now: number): void {
@@ -6542,9 +7007,51 @@ function updateMatchState(now: number): void {
       reason: presentation.headline ?? 'match-ended',
       modifiers: [`kills:${summary.kills}`, `deaths:${summary.deaths}`, `damage:${summary.damageDealt}`],
     });
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-diagnostics" type="button">DOWNLOAD DIAGNOSTICS</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
+    const completedAt = new Date().toISOString();
+    const participants = matchParticipantReports();
+    matchDiagnostics?.setFinalState({
+      completedAt,
+      result: presentation.headline ?? 'MATCH COMPLETE',
+      durationMs: Math.max(0, performance.now() - matchDiagnosticsStartedAt),
+      participants: participants.map(({ id, report }) => ({
+        participantId: matchDiagnostics?.participantKey(id),
+        ...report,
+      })),
+      damageLedgerEventCount: humanDamageTimeline.length,
+      droppedHumanDamageEvents,
+      clientRuntimeLog: readClientRuntimeLog(clientSessionStorage()),
+    });
+    const technical = matchDiagnostics?.export();
+    if (technical) {
+      lastMatchDownloads = {
+        technical,
+        summary: createHumanMatchReport({
+          build: latestChangelogEntry().pass,
+          arena: selectedArena.displayName,
+          mode: gameMode === 'solo' ? 'solo' : privateMatchMode,
+          role: network.role === 'client' ? 'guest' : network.role,
+          result: presentation.headline ?? 'MATCH COMPLETE',
+          durationMs: performance.now() - matchDiagnosticsStartedAt,
+          kills: summary.kills,
+          deaths: summary.deaths,
+          shotsFired: roundShotsFired,
+          hitShots: roundHitShots,
+          damageDealt: summary.damageDealt,
+          damageTaken: Math.max(roundDamageTaken, authoritativeLocal?.damageTaken ?? 0),
+          headshots: summary.headshots,
+          bestKillstreak: bestStreakThisMatch,
+          completedAt,
+          participants: participants.map((entry) => entry.report),
+          damageTimeline: humanDamageTimeline,
+          droppedDamageEvents: droppedHumanDamageEvents,
+        }),
+      };
+      syncMatchReportDownloads();
+    }
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-summary" type="button">HUMAN SUMMARY JSON</button><button id="download-match-diagnostics" type="button">TECHNICAL DEBUG JSON</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
     banner.hidden = false;
-    element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics, { once: true });
+    element<HTMLButtonElement>('#download-match-summary').addEventListener('click', downloadMatchSummary);
+    element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics);
     const rematch = element<HTMLButtonElement>('#rematch');
     if (!rematch.disabled) rematch.addEventListener('click', () => {
       if (privateMatch && network.role === 'host') returnPrivateMatchToLobby(true);
@@ -6741,14 +7248,14 @@ function updateMinimap(now: number): void {
   minimapLandmarksRendered = renderedLandmarks;
   for (const remote of remotes.values()) {
     const friendly = privateMatchMode === 'tdm' && remote.snapshot.team === player.team;
-    const scoutActive = now < scoutSweepUntil;
+    const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
     if (!friendly && !scoutActive && remote.target.distanceTo(player.position) > 15) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || now >= scoutSweepUntil && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    if (!bot.alive || !scoutSweepPulseVisible(now, scoutSweepUntil) && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
@@ -6766,7 +7273,7 @@ function updateMinimap(now: number): void {
     context.font = '900 15px sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText('4×', 0, 1);
+    context.fillText('2×', 0, 1);
     context.restore();
     context.textBaseline = 'alphabetic';
   }
@@ -6854,8 +7361,8 @@ function updateHud(now: number): void {
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
   const localScore = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
-  element<HTMLElement>('#damage-dealt').textContent = String(localScore.damageDealt);
-  element<HTMLElement>('#damage-taken').textContent = String(localScore.damageTaken);
+  element<HTMLElement>('#damage-dealt').textContent = String(gameMode === 'solo' ? Math.round(roundDamageDealt) : localScore.damageDealt);
+  element<HTMLElement>('#damage-taken').textContent = String(gameMode === 'solo' ? Math.round(roundDamageTaken) : localScore.damageTaken);
   renderMatchNetworkStrip();
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
@@ -6913,7 +7420,11 @@ function renderMatchNetworkStrip(): void {
     const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
     const quality = latencyQuality(ping);
     const label = ping === null ? '—' : `${Math.round(ping)} ms`;
-    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} latency: ${label}"><b>${escapeHtml(member.name)}</b> ${label}</span>`;
+    const score = authoritativeScores.get(member.id);
+    const range = selectedArena.id === 'gun-range'
+      ? ` · ${score?.rangeScore ?? 0} PTS · ${rangeAccuracyPercent(score?.rangeHits ?? 0, score?.rangeShots ?? 0)}%`
+      : '';
+    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} · DHV ${member.dhv} · latency ${label}${range}"><b>${escapeHtml(member.name)}</b>${range || ` · DHV ${member.dhv} · ${label}`}</span>`;
   }).join('');
 }
 
@@ -6925,12 +7436,22 @@ function updateRoster(): void {
       id: bot.id, name: bot.name, team: bot.team, x: bot.position.x, y: bot.position.y, z: bot.position.z,
       yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: bot.weapon, weapon: bot.weapon, seq: 0,
     })),
-  ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  ].sort((a, b) => selectedArena.id === 'gun-range'
+    ? (authoritativeScores.get(b.id)?.rangeScore ?? (b.id === player.id ? rangeScore : 0))
+      - (authoritativeScores.get(a.id)?.rangeScore ?? (a.id === player.id ? rangeScore : 0))
+    : b.kills - a.kills || a.deaths - b.deaths);
   element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => {
     const score = authoritativeScores.get(entry.id) ?? emptyPlayerScore(entry.id);
     const member = privateLobbySnapshot?.members.find((candidate) => candidate.id === entry.id);
     const ping = member?.id === player.id && network.role === 'client' ? localLobbyPingMs : member?.pingMs ?? null;
     const latency = ping === null ? '—' : `${Math.round(ping)}ms`;
+    if (selectedArena.id === 'gun-range') {
+      const points = score.rangeScore ?? (entry.id === player.id ? rangeScore : 0);
+      const hits = score.rangeHits ?? (entry.id === player.id ? targetHits : 0);
+      const shots = score.rangeShots ?? (entry.id === player.id ? rangeShotsFired : 0);
+      const title = `${entry.name}: ${points} points, ${hits} hits, ${rangeAccuracyPercent(hits, shots)}% accuracy, ${shots} shots`;
+      return `<div title="${escapeHtml(title)}"><span class="aqua">${escapeHtml(entry.name)}</span><b>${points}</b><i>${hits}</i><strong>${rangeAccuracyPercent(hits, shots)}% ACC</strong><small>${shots} SHOTS</small><em>${latency}</em></div>`;
+    }
     const title = `${entry.name}: ${entry.kills} kills, ${entry.deaths} deaths, ${score.damageDealt} damage dealt, ${score.damageTaken} damage taken, ${latency} ping`;
     return `<div title="${escapeHtml(title)}"><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><strong>${score.damageDealt} / ${score.damageTaken} DMG</strong><small>${latency}</small><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`;
   }).join('');
@@ -7061,7 +7582,7 @@ function pollGamepad(dt: number): void {
     if (pressed(1)) requestStance('toggle-crouch');
     if (pressed(13)) requestStance('toggle-prone');
     if (pressed(2)) reload();
-    if (pressed(3)) switchWeapon(player.weapon === 'pistol' ? 0 : 1);
+    if (pressed(3)) switchWeapon(player.weapon === player.primaryWeapon ? 1 : 0);
     if (pressed(4)) throwGrenade();
     if (pressed(5)) melee();
     if (pressed(14)) selectGamepadSupport(-1);
@@ -7202,7 +7723,7 @@ function syncArenaSelectionUi(): void {
         ? 'GUN <span>RANGE</span>'
         : 'SKYLINE <span>TERMINAL</span>';
   element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
-    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 4× Quad Damage Core.'
+    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Quad Damage Core.'
     : selectedArena.id === 'rustworks-1v1'
       ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
       : selectedArena.id === 'gun-range'
@@ -7219,6 +7740,7 @@ function setArenaPresentationVisibility(): void {
     if (candidate === atomicArena) candidate.root.visible = proceduralArenaRootVisible(selectedArena.id, blenderArenaActive);
   }
   worldIdentityPresentation.root.visible = atomicVisible;
+  setWorldIdentityHouseShellPresentation(worldIdentityPresentation.root, atomicVisible && !blenderArenaActive);
   neighbourhoodLifeRoot.visible = atomicVisible;
   // Rustworks' ocean needs a long view frustum so water, not void, meets the horizon.
   const desiredFarPlane = rustworksVisible ? 1_400 : 180;
@@ -7408,6 +7930,7 @@ function resetForMode(): void {
   roundHitShots = 0;
   roundHeadshots = 0;
   roundDamageDealt = 0;
+  roundDamageTaken = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -7436,8 +7959,8 @@ function resetForMode(): void {
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
 }
 
 function returnToMainMenu(): void {
@@ -7455,6 +7978,7 @@ function returnToMainMenu(): void {
   element<HTMLButtonElement>('#resume').hidden = true;
   element<HTMLButtonElement>('#main-menu').hidden = true;
   menu.classList.remove('hidden');
+  syncMatchReportDownloads();
   arenaSelectionReady = true;
   syncArenaSelectionUi();
   setArenaMenuCamera();
@@ -7466,6 +7990,8 @@ element<HTMLButtonElement>('#resume').addEventListener('click', () => {
   if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
 element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainMenu);
+element<HTMLButtonElement>('#menu-download-match-summary').addEventListener('click', downloadMatchSummary);
+element<HTMLButtonElement>('#menu-download-match-technical').addEventListener('click', downloadMatchDiagnostics);
 
 function setChangelogOpen(open: boolean): void {
   const panel = element<HTMLElement>('#changelog-panel');
@@ -7540,6 +8066,16 @@ element<HTMLButtonElement>('#lobby-ready').addEventListener('click', () => {
   if (network.role === 'host') updateHostReady({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
   else if (network.role === 'client') network.send({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
 });
+element<HTMLElement>('#lobby-roster').addEventListener('change', (event) => {
+  const select = event.target instanceof HTMLSelectElement && event.target.matches('[data-lobby-dhv]') ? event.target : null;
+  if (!select || !privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
+  const parsed: unknown = select.value === 'X' ? 'X' : Number(select.value);
+  if (!isDhv(parsed)) return;
+  localDhv = parsed;
+  const message: LobbyHandicapMessage = { type: 'lobby-handicap', by: player.id, dhv: parsed, nonce: randomNonce() };
+  if (network.role === 'host') updateHostHandicap(message);
+  else if (network.role === 'client') network.send(message);
+});
 element<HTMLButtonElement>('#lobby-start').addEventListener('click', hostStartPrivateMatch);
 element<HTMLButtonElement>('#lobby-leave').addEventListener('click', returnToMainMenu);
 element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
@@ -7549,16 +8085,17 @@ element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
 });
 const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
-  const mode: MatchMode = element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
+  const rangeLobby = privateMatchConfig.arenaId === 'gun-range';
+  const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
   const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
-  const hostedBotCount: HostedBotCount = isHostedBotCount(requestedBots) ? requestedBots : 0;
+  const hostedBotCount: HostedBotCount = rangeLobby ? 0 : isHostedBotCount(requestedBots) ? requestedBots : 0;
   applyHostLobbyConfig({
     ...privateMatchConfig,
     mode,
     capacity,
     hostedBotCount,
-    autoBalance: mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
+    autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
   });
 };
 element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobbyConfigFromUi);
@@ -7678,6 +8215,8 @@ function frame(now: number, scheduleNext = true): void {
       grassSystem.update(now / 1_000, camera.position, player.position, gameStarted);
     } else if (selectedArena.id === 'rustworks-1v1') {
       atmosphereSystem.update(now / 1_000);
+    } else if (selectedArena.id === 'gun-range') {
+      updateGunRangePresentation(gunRangeArena.root, now);
     }
     waterSystem.update(now / 1_000);
     if (gameStarted) updateMinimap(now);
@@ -7689,7 +8228,7 @@ function frame(now: number, scheduleNext = true): void {
     }
     refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !webglContextLost && document.visibilityState === 'visible') {
-      atomicSignal.render(scene, camera);
+      atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
       if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = false;
     }
     if (scheduleNext) requestAnimationFrame(frame);
@@ -7786,6 +8325,7 @@ const debugWindow = window as Window & {
     forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
+    degradeStateChannel: () => boolean;
     sendPing: (kind: TeamPingKind) => void;
     holdPings: (durationMs?: number) => void;
     endMatch: () => void;
@@ -7877,9 +8417,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       values: arena.targets.map((target) => target.scoreValue),
       targets: arena.targets.map((target) => ({
         id: target.id,
+        kind: target.kind ?? 'plate',
+        alwaysCritical: target.alwaysCritical === true,
         active: target.active,
         health: target.health,
         maxHealth: target.maxHealth,
+        respawnDelayMs: target.respawnDelayMs ?? 2_200,
+        respawnInMs: target.active ? 0 : Math.max(0, target.respawnAt - performance.now()),
         visible: target.root.visible,
         position: target.root.position.toArray(),
         screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),
@@ -7925,8 +8469,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       weapon: player.weapon,
       primaryWeapon: player.primaryWeapon,
       equippedWeapons: selectedArena.id === 'gun-range'
-        ? [rangePrimaryUnlocked ? player.primaryWeapon : null, 'pistol']
-        : deployedWeapons(player.primaryWeapon),
+        ? [rangePrimaryUnlocked ? player.primaryWeapon : null, handicapSidearm(player.primaryWeapon)]
+        : handicapLoadout(player.primaryWeapon),
+      dhv: localDhv,
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
       reloading: player.reloadState !== null,
@@ -7938,6 +8483,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastFallDamage,
       lastFallImpactSpeed,
       position: player.position.toArray(),
+      seq: player.seq,
     },
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
     bots: [...bots.values()].map((bot) => ({
@@ -8003,6 +8549,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       primary: remote.snapshot.primary,
       weapon: remote.snapshot.weapon,
       stance: remote.snapshot.stance ?? 'stand',
+      seq: remote.snapshot.seq,
       position: remote.target.toArray(),
       visualPosition: remote.root.position.toArray(),
       snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
@@ -8051,6 +8598,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       bestStreakThisMatch,
       available: { ...fieldSupport.available },
       scoutActive: performance.now() < scoutSweepUntil,
+      scoutPulseVisible: scoutSweepPulseVisible(performance.now(), scoutSweepUntil),
       yardhawk: yardhawk ? {
         active: true,
         phase: yardhawk.phase,
@@ -8129,7 +8677,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       visible: overdriveRoot.visible,
       worldIconVisible: overdriveRoot.visible && quadWorldIcon.visible,
       worldIconName: quadWorldIcon.name,
-      minimapSymbol: '4×',
+      minimapSymbol: '2×',
     },
     deathDropPresentation: deathDropPresentationPool.telemetry(),
     deathDrops: deathDrops.map((entity) => ({
@@ -8277,7 +8825,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       };
     })(),
     weaponReady: weaponView.isReady(),
-    weaponPresentation: weaponView.presentationState(),
+    weaponPresentation: {
+      ...weaponView.presentationState(),
+      depthSeparatedFromWorld: true,
+    },
     sniperScope: {
       active: !sniperScopeOverlay.hidden,
       magnification: 3,
@@ -8459,20 +9010,29 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     let stagedPosition: THREE.Vector3 | null = null;
     // QA combat staging must not place the target inside a house, bus or cover
     // AABB. Try the requested forward ray first, then nearby clear bearings.
-    for (const yawOffset of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI]) {
+    const stagedYawOffsets = Array.from({ length: 16 }, (_, index) => {
+      if (index === 0) return 0;
+      const step = Math.ceil(index / 2);
+      return step * (Math.PI / 8) * (index % 2 === 1 ? 1 : -1);
+    });
+    for (const yawOffset of stagedYawOffsets) {
       const yaw = player.yaw + yawOffset;
       const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
       const candidate = new THREE.Vector3(player.position.x, 0, player.position.z)
         .addScaledVector(forward, stagedDistance);
       const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
       if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
-      const target = candidate.clone().add(new THREE.Vector3(0, 1.06, 0));
-      const ray = target.clone().sub(origin);
-      const targetDistance = ray.length();
-      const blocked = new THREE.Raycaster(origin, ray.normalize(), 0, targetDistance)
-        .intersectObjects(arena.raycastMeshes, false)
-        .some((hit) => hit.distance < targetDistance - 0.2);
-      if (blocked) continue;
+      const clearAtHeight = (height: number) => {
+        const target = candidate.clone().add(new THREE.Vector3(0, height, 0));
+        const ray = target.clone().sub(origin);
+        const targetDistance = ray.length();
+        return !new THREE.Raycaster(origin, ray.normalize(), 0, targetDistance)
+          .intersectObjects(arena.raycastMeshes, false)
+          .some((hit) => hit.distance < targetDistance - 0.2);
+      };
+      // The old probe only cleared a torso ray, so a tree/awning could still
+      // mask the visible skull and make the headshot acceptance intermittent.
+      if (!clearAtHeight(1.06) || !clearAtHeight(1.58)) continue;
       stagedPosition = candidate;
       break;
     }
@@ -8481,6 +9041,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
     bot.root.rotation.y = operatorYawToward(bot.position, player.position);
+    poseOperator(bot.root, 'stand', 0, performance.now() * 0.001);
     bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
   },
@@ -8509,8 +9070,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   aimAtBot: (zone: HitZone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;
-    const targetHeight = zone === 'head' ? 2.13 : zone === 'limb' ? 0.58 : 1.06;
-    const target = bot.position.clone().add(new THREE.Vector3(0, targetHeight, 0));
+    const targetOffset = hitProxyZoneCentre(zone, bot.root.userData.operatorStance ?? 'stand');
+    const target = bot.position.clone().add(new THREE.Vector3(...targetOffset));
     const delta = target.sub(player.position);
     player.yaw = Math.atan2(-delta.x, -delta.z);
     player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
@@ -8521,8 +9082,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   aimAtRemote: (zone: HitZone = 'body') => {
     const remote = remotes.values().next().value as RemotePlayer | undefined;
     if (!remote) return;
-    const targetHeight = zone === 'head' ? 2.13 : zone === 'limb' ? 0.58 : 1.06;
-    const target = remote.target.clone().add(new THREE.Vector3(0, targetHeight, 0));
+    const targetOffset = hitProxyZoneCentre(zone, remote.snapshot.stance ?? 'stand');
+    const target = remote.target.clone().add(new THREE.Vector3(...targetOffset));
     const delta = target.sub(player.position);
     player.yaw = Math.atan2(-delta.x, -delta.z);
     player.pitch = Math.atan2(delta.y, Math.hypot(delta.x, delta.z));
@@ -8963,6 +9524,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateOverdrive(now);
     broadcastOverdriveState(now);
   },
+  degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
   sendPing: (kind: TeamPingKind) => sendTeamPing(kind),
   holdPings: (durationMs = 30_000) => {
     const expiresAt = performance.now() + Math.max(0, Math.min(60_000, durationMs));
@@ -9062,6 +9624,10 @@ async function bootstrap(): Promise<void> {
   ]);
   characterPhysics = physics;
   arenaArtRoot = art.root;
+  // First-person geometry is composited after world depth is cleared. Contact
+  // retreat still keeps it visually tucked near walls, while floor/wall depth
+  // can no longer cut holes through hands and weapons in prone/crouch poses.
+  weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
   await grenadeExplosionPresentation.prewarm(renderer, camera);
   await supportExplosionPresentation.prewarm(renderer, camera);
   await deathDropPresentationPool.prewarm(renderer, camera);

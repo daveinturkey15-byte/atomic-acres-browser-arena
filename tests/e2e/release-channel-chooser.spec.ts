@@ -6,9 +6,9 @@ test('chooses the latest build before the normal menu loads', async ({ page }) =
   await expect(page.locator('#release-channel-gate')).toBeVisible();
   await expect(page.locator('#menu')).toHaveCount(0);
   await expect(page.locator('[data-release-choice="stable"]')).toContainText('RECENT STABLE');
-  await expect(page.locator('[data-release-choice="stable"]')).toContainText('PASS 57');
+  await expect(page.locator('[data-release-choice="stable"]')).toContainText('PASS 59');
   await expect(page.locator('[data-release-choice="latest"]')).toContainText('LATEST APPROVED');
-  await expect(page.locator('[data-release-choice="latest"]')).not.toContainText('PASS 57');
+  await expect(page.locator('[data-release-choice="latest"]')).not.toContainText('PASS 59');
 
   await page.locator('[data-release-choice="latest"]').click();
 

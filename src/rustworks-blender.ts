@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb';
-export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'rustworks-tower-overhaul-v1';
+export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb?v=pass60-20260723-3';
+export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'rustworks-pass60-feedback-v3';
 
 type RustworksBlenderTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';
@@ -16,6 +16,12 @@ type RustworksBlenderTelemetry = {
   triangleCount: number;
   semanticParts: number;
   authoredHeight: number;
+  containerTotal: number;
+  containerClosed: number;
+  containerOpenBothEnds: number;
+  containerOpenOneEnd: number;
+  forbiddenFloatingParts: number;
+  oversizedHandrailSlabs: number;
   error: string | null;
 };
 
@@ -31,6 +37,12 @@ const telemetry: RustworksBlenderTelemetry = {
   triangleCount: 0,
   semanticParts: 0,
   authoredHeight: 0,
+  containerTotal: 0,
+  containerClosed: 0,
+  containerOpenBothEnds: 0,
+  containerOpenOneEnd: 0,
+  forbiddenFloatingParts: 0,
+  oversizedHandrailSlabs: 0,
   error: null,
 };
 
@@ -88,6 +100,12 @@ export async function loadRustworksBlenderTower(arenaRoot: THREE.Group): Promise
   let triangleCount = 0;
   let semanticParts = 0;
   let authoredHeight = 0;
+  let containerTotal = 0;
+  let containerClosed = 0;
+  let containerOpenBothEnds = 0;
+  let containerOpenOneEnd = 0;
+  let forbiddenFloatingParts = 0;
+  let oversizedHandrailSlabs = 0;
   let assetVersion: string | null = null;
   const materials = new Set<THREE.Material>();
   const texturedMaterials = new Set<THREE.Material>();
@@ -101,12 +119,24 @@ export async function loadRustworksBlenderTower(arenaRoot: THREE.Group): Promise
     if (node.userData.rustworks_asset_class === 'authored-central-tower') semanticParts += 1;
     if (typeof node.userData.asset_version === 'string') assetVersion = node.userData.asset_version;
     if (typeof node.userData.authored_height_metres === 'number') authoredHeight = node.userData.authored_height_metres;
+    if (/centre_cover|service_trench_crossover|pallet|freight_crate/i.test(node.name)) forbiddenFloatingParts += 1;
+    if (node.userData.rustworks_semantic === 'yard-container-placement') {
+      containerTotal += 1;
+      if (node.userData.rustworks_opening === 'closed') containerClosed += 1;
+      if (node.userData.rustworks_opening === 'open-both') containerOpenBothEnds += 1;
+      if (node.userData.rustworks_opening === 'open-one') containerOpenOneEnd += 1;
+    }
     if (!(node instanceof THREE.Mesh)) return;
     meshCount += 1;
     node.castShadow = true;
     node.receiveShadow = true;
     node.raycast = () => undefined;
     const geometry = node.geometry;
+    if (/RW_(upper|lower)_handrail/i.test(node.name)) {
+      geometry.computeBoundingBox();
+      const dimensions = geometry.boundingBox?.getSize(new THREE.Vector3()).toArray().sort((a: number, b: number) => b - a) ?? [];
+      if ((dimensions[1] ?? 0) > 0.5) oversizedHandrailSlabs += 1;
+    }
     triangleCount += geometry.index ? geometry.index.count / 3 : (geometry.getAttribute('position')?.count ?? 0) / 3;
     const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
     nodeMaterials.forEach((material) => {
@@ -140,5 +170,11 @@ export async function loadRustworksBlenderTower(arenaRoot: THREE.Group): Promise
   telemetry.triangleCount = Math.round(triangleCount);
   telemetry.semanticParts = semanticParts;
   telemetry.authoredHeight = authoredHeight;
+  telemetry.containerTotal = containerTotal;
+  telemetry.containerClosed = containerClosed;
+  telemetry.containerOpenBothEnds = containerOpenBothEnds;
+  telemetry.containerOpenOneEnd = containerOpenOneEnd;
+  telemetry.forbiddenFloatingParts = forbiddenFloatingParts;
+  telemetry.oversizedHandrailSlabs = oversizedHandrailSlabs;
   return root;
 }

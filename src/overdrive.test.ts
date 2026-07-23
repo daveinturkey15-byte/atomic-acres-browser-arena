@@ -8,6 +8,7 @@ import {
   claimOverdrive,
   createOverdriveState,
   overdriveDamageMultiplier,
+  transferOverdriveOnElimination,
 } from './overdrive';
 
 describe('Overdrive Core authority', () => {
@@ -19,15 +20,15 @@ describe('Overdrive Core authority', () => {
     expect(advanceOverdrive(spawned, 999_999).available).toBe(true);
   });
 
-  it('admits one living player inside the centre radius for exactly fifteen seconds', () => {
+  it('admits one living player inside the centre radius for exactly thirty seconds', () => {
     const now = OVERDRIVE_SPAWN_INTERVAL_MS;
     const spawned = advanceOverdrive(createOverdriveState(0), now);
     const result = claimOverdrive(spawned, 'player-a', OVERDRIVE_POSITION, true, now);
     expect(result.claimed).toBe(true);
     expect(result.state.activeUntil).toBe(now + OVERDRIVE_DURATION_MS);
     expect(result.state.nextSpawnAt).toBe(now + OVERDRIVE_SPAWN_INTERVAL_MS);
-    expect(overdriveDamageMultiplier(result.state, 'player-a', now + 14_999)).toBe(OVERDRIVE_DAMAGE_MULTIPLIER);
-    expect(overdriveDamageMultiplier(result.state, 'player-a', now + 15_000)).toBe(1);
+    expect(overdriveDamageMultiplier(result.state, 'player-a', now + 29_999)).toBe(OVERDRIVE_DAMAGE_MULTIPLIER);
+    expect(overdriveDamageMultiplier(result.state, 'player-a', now + 30_000)).toBe(1);
   });
 
   it('rejects dead, distant and duplicate claims', () => {
@@ -45,5 +46,14 @@ describe('Overdrive Core authority', () => {
     const expired = advanceOverdrive(claimed, now + OVERDRIVE_DURATION_MS);
     expect(expired).toMatchObject({ available: false, holderId: null, activeUntil: 0 });
     expect(advanceOverdrive(expired, now + OVERDRIVE_SPAWN_INTERVAL_MS).available).toBe(true);
+  });
+
+  it('hands the remaining power time to the player who eliminates its holder', () => {
+    const now = OVERDRIVE_SPAWN_INTERVAL_MS;
+    const held = claimOverdrive(advanceOverdrive(createOverdriveState(0), now), 'holder', OVERDRIVE_POSITION, true, now).state;
+    const result = transferOverdriveOnElimination(held, 'holder', 'killer', now + 8_000);
+    expect(result.transferred).toBe(true);
+    expect(result.state).toMatchObject({ holderId: 'killer', activeUntil: now + OVERDRIVE_DURATION_MS });
+    expect(transferOverdriveOnElimination(held, 'other', 'killer', now).transferred).toBe(false);
   });
 });

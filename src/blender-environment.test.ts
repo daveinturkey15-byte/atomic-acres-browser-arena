@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { BLENDER_ARENA_ASSET, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
 
-const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
+const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.split('?')[0].replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
 const provenancePath = new URL('../source-assets/blender/atomic-acres-blender-arena.provenance.json', import.meta.url);
 
@@ -109,7 +109,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(41_216);
+    expect(provenance.runtimeAudit.triangles).toBe(44_812);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {

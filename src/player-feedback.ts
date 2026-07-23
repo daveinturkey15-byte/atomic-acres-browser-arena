@@ -8,6 +8,7 @@ export const THIRD_PERSON_WEAPON_SCALE: Readonly<Record<WeaponId, number>> = Obj
   smg: 0.51,
   scattergun: 0.46,
   pistol: 0.54,
+  magnum: 0.54,
   'machine-pistol': 0.54,
 });
 

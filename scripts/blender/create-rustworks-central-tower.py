@@ -16,7 +16,7 @@ GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-centr
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
 PREVIEW_PATH = ROOT / "artifacts" / "rustworks-tower-overhaul" / "rustworks-tower-overhaul-preview.png"
 
-ASSET_VERSION = "rustworks-tower-overhaul-v1"
+ASSET_VERSION = "rustworks-pass60-feedback-v3"
 AUTHORED_HEIGHT_M = 15.87
 
 LOADED: dict[str, bpy.types.Image] = {}
@@ -226,20 +226,24 @@ def main():
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
     root["access_scheme"] = "undercroft-cross-plus-lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "rustworks-tower-overhaul"
-    root["container_layout"] = "four-per-side-one-open-per-side"
+    root["quality_pass"] = "rustworks-pass60-feedback"
+    root["container_layout"] = "24-total-18-closed-3-open-both-3-open-one"
+    root["container_total"] = 24
+    root["container_closed"] = 18
+    root["container_open_both_ends"] = 3
+    root["container_open_one_end"] = 3
     root["service_trench"] = "west-deck-level"
     root["material_count_target"] = 10
 
     # ========== GROUND ==========
     # Match the actual 54x58 metre oil-rig deck. Keeping the authored surface
     # inside the safety rail lets the lowered ocean remain visible over every edge.
-    cube("RW_rig_deck_top", (0, 0, 0.02), (54, 58, 0.05), M_plate, "ground-rig-deck", do_bevel=False)
-    cube("RW_hardstand", (0, 0, 0.06), (16, 16, 0.1), M_asphalt, "ground-hardstand")
-    cube("RW_service_lane_z", (0, 0, 0.07), (5.5, 48, 0.08), M_concrete, "ground-lane")
-    cube("RW_service_lane_x", (0, 0, 0.075), (48, 5.5, 0.08), M_concrete, "ground-lane")
+    cube("RW_rig_deck_top", (0, 0, 0.025), (54, 58, 0.05), M_plate, "ground-rig-deck", do_bevel=False)
+    cube("RW_hardstand", (0, 0, 0.075), (16, 16, 0.05), M_asphalt, "ground-hardstand", do_bevel=False)
+    cube("RW_service_lane_z", (0, 0, 0.125), (5.5, 48, 0.04), M_concrete, "ground-lane", do_bevel=False)
+    cube("RW_service_lane_x", (0, 0, 0.125), (48, 5.5, 0.04), M_concrete, "ground-lane", do_bevel=False)
     for i, z in enumerate((-20, 20)):
-        cube(f"RW_chevron_{i}", (0, -z, 0.09), (4.2, 0.7, 0.05), M_hazard, "ground-marking", do_bevel=False)
+        cube(f"RW_chevron_{i}", (0, -z, 0.16), (4.2, 0.7, 0.02), M_hazard, "ground-marking", do_bevel=False)
 
     # ========== TOWER LEGS (I-style) ==========
     for x in (-3.35, 3.35):
@@ -399,9 +403,8 @@ def main():
          (ship_width + 0.55, ship_upper_landing_depth, 0.14), M_diamond, "ship-ladder-landing")
     cube("RW_upper_access_bridge", (ship_bridge_center_x, -ship_upper_landing_center_z, upper_top),
          (abs(ship_x - (upper_half - 0.35)) + 0.6, ship_upper_landing_depth, 0.14), M_grate, "upper-access")
-    slab = cube("RW_ship_ladder_slab", (ship_x, -ship_center_z, ship_center_y + 0.02),
-                (ship_width, ship_len, ship_thick), M_diamond, "ship-ladder", do_bevel=False)
-    slab.rotation_euler = (ship_angle, 0.0, 0.0)
+    ladder_marker = empty("RW_ship_ladder_route", (ship_x, -ship_center_z, ship_center_y), "ship-ladder")
+    ladder_marker["rustworks_collision_authority"] = "typescript-hidden-ramp"
     for side, label in ((-1, "west"), (1, "east")):
         rail = cube(f"RW_ship_ladder_rail_{label}", (ship_x + side * (ship_width / 2 + 0.1), -ship_center_z, ship_center_y + 0.65),
                     (0.1, ship_len, 0.1), M_hazard, "ship-ladder-rail", do_bevel=False)
@@ -416,13 +419,14 @@ def main():
         cube(f"RW_ship_ladder_rung_{index}", (ship_x, -three_z, three_y),
              (ship_width - 0.16, 0.12, 0.1), M_hazard, "ship-ladder-rung", do_bevel=False)
 
-    # Handrails — split openings
-    upper_rail_y = upper_top + 0.65
+    # Actual rails plus supported posts. The former 1.2 m-tall horizontal
+    # hazard slabs were the apparent floating planks around the access ramp.
+    upper_rail_y = upper_top + 1.2
     for three_z in (-3.45, 3.45):
-        cube(f"RW_upper_handrail_z_{three_z}", (-0.1, -three_z, upper_rail_y), (6.2, 0.12, 1.2), M_hazard, "upper-handrail")
-    cube("RW_upper_handrail_x_neg", (-3.45, 0.15, upper_rail_y), (0.12, 6.1, 1.2), M_hazard, "upper-handrail")
-    cube("RW_upper_handrail_x_pos_south", (3.45, 2.65, upper_rail_y), (0.12, 1.6, 1.2), M_hazard, "upper-handrail")
-    cube("RW_upper_handrail_x_pos_north", (3.45, -1.95, upper_rail_y), (0.12, 3.0, 1.2), M_hazard, "upper-handrail")
+        cube(f"RW_upper_handrail_z_{three_z}", (-0.1, -three_z, upper_rail_y), (6.2, 0.12, 0.12), M_hazard, "upper-handrail", do_bevel=False)
+    cube("RW_upper_handrail_x_neg", (-3.45, 0.15, upper_rail_y), (0.12, 6.1, 0.12), M_hazard, "upper-handrail", do_bevel=False)
+    cube("RW_upper_handrail_x_pos_south", (3.45, 2.65, upper_rail_y), (0.12, 1.6, 0.12), M_hazard, "upper-handrail", do_bevel=False)
+    cube("RW_upper_handrail_x_pos_north", (3.45, -1.95, upper_rail_y), (0.12, 3.0, 0.12), M_hazard, "upper-handrail", do_bevel=False)
     for three_x, three_z in (
         (-3.45, -3.45), (2.75, -3.45), (-3.45, 3.45), (2.75, 3.45),
         (3.45, -3.45), (3.45, -2.45), (3.45, 0.4), (3.45, 3.45),
@@ -430,12 +434,24 @@ def main():
         cube(f"RW_upper_rail_post_{three_x}_{three_z}", (three_x, -three_z, upper_top + 0.65),
              (0.12, 0.12, 1.25), M_hazard, "upper-handrail")
 
-    lower_rail_y = lower_top + 0.65
-    cube("RW_lower_handrail_n", (-0.7, -4.3, lower_rail_y), (6.6, 0.12, 1.15), M_hazard, "lower-handrail")
-    cube("RW_lower_handrail_s_w", (-3.5, 4.3, lower_rail_y), (1.8, 0.12, 1.15), M_hazard, "lower-handrail")
-    cube("RW_lower_handrail_s_e", (3.5, 4.3, lower_rail_y), (1.8, 0.12, 1.15), M_hazard, "lower-handrail")
-    cube("RW_lower_handrail_w", (-4.3, -0.2, lower_rail_y), (0.12, 7.6, 1.15), M_hazard, "lower-handrail")
-    cube("RW_lower_handrail_e", (4.3, 0.45, lower_rail_y), (0.12, 5.8, 1.15), M_hazard, "lower-handrail")
+    lower_rail_y = lower_top + 1.2
+    cube("RW_lower_handrail_n", (-0.7, -4.3, lower_rail_y), (6.6, 0.12, 0.12), M_hazard, "lower-handrail", do_bevel=False)
+    cube("RW_lower_handrail_s_w", (-3.5, 4.3, lower_rail_y), (1.8, 0.12, 0.12), M_hazard, "lower-handrail", do_bevel=False)
+    cube("RW_lower_handrail_s_e", (3.5, 4.3, lower_rail_y), (1.8, 0.12, 0.12), M_hazard, "lower-handrail", do_bevel=False)
+    cube("RW_lower_handrail_w", (-4.3, -0.2, lower_rail_y), (0.12, 7.6, 0.12), M_hazard, "lower-handrail", do_bevel=False)
+    cube("RW_lower_handrail_e", (4.3, 0.45, lower_rail_y), (0.12, 5.8, 0.12), M_hazard, "lower-handrail", do_bevel=False)
+    for index, (three_x, three_z) in enumerate((
+        (-4.3, -4.3), (-1.8, -4.3), (2.6, -4.3), (4.3, -4.3),
+        (-4.3, 4.3), (-2.6, 4.3), (2.6, 4.3), (4.3, 4.3),
+    )):
+        cube(
+            f"RW_lower_rail_post_{index}",
+            (three_x, -three_z, lower_top + 0.6),
+            (0.12, 0.12, 1.2),
+            M_hazard,
+            "lower-handrail",
+            do_bevel=False,
+        )
 
     # ========== WEST SERVICE TRENCH ==========
     trench_x = -13.8
@@ -447,26 +463,28 @@ def main():
             wall = cube(f"RW_service_trench_wall_{x}_{z}", (x, -z, 0.65), (0.32, 7.0, 1.3), M_concrete, "service-trench")
             wall["rustworks_route_role"] = "west-service-trench-cover"
             cube(f"RW_service_trench_coping_{x}_{z}", (x, -z, 1.34), (0.46, 7.05, 0.08), M_hazard, "service-trench")
-    for z in (-6.0, 6.0):
-        cube(f"RW_service_trench_crossover_{z}", (trench_x, -z, 2.55), (4.35, 1.2, 0.16), M_plate, "service-trench-crossover")
+    # No unsupported trench crossovers and no mixed centre crates/pallets.
 
-    # ========== YARD (four containers per side; one pass-through per side) ==========
-    perimeter_slots = (-18.0, -9.0, 9.0, 18.0)
+    # ========== YARD (24 containers; exact 75/25 closed/open distribution) ==========
+    perimeter_slots = (-18.0, -10.8, -3.6, 3.6, 10.8, 18.0)
     perimeter_row = 21.5
     container_materials = (M_hazard, M_rust, M_corr)
     container_index = 0
+    open_both = {("north", 1), ("south", 2), ("east", 4)}
+    open_one = {("north", 4), ("south", 5), ("west", 1)}
     for side in ("north", "south", "west", "east"):
         for slot, offset in enumerate(perimeter_slots):
             if side in ("north", "south"):
                 x, z, sx, sy = offset, (-perimeter_row if side == "north" else perimeter_row), 5.8, 2.5
-                is_open = slot == (1 if side == "north" else 2)
             else:
                 x, z, sx, sy = (-perimeter_row if side == "west" else perimeter_row), offset, 2.5, 5.8
-                is_open = slot == (1 if side == "west" else 2)
+            opening = "open-both" if (side, slot) in open_both else "open-one" if (side, slot) in open_one else "closed"
+            is_open = opening != "closed"
             marker = empty(f"RW_container_placement_{side}_{slot}", (x, -z, 0), "yard-container-placement")
             marker["rustworks_side"] = side
             marker["rustworks_slot"] = slot
             marker["rustworks_open"] = is_open
+            marker["rustworks_opening"] = opening
             marker["rustworks_axis"] = "x" if side in ("north", "south") else "z"
 
             material = container_materials[slot % len(container_materials)]
@@ -488,7 +506,26 @@ def main():
                     shell = cube(f"RW_open_container_{side}_{slot}_{suffix}", loc, scale, material, "yard-open-container")
                     shell["rustworks_side"] = side
                     shell["rustworks_slot"] = slot
+                    shell["rustworks_opening"] = opening
                 cube(f"RW_open_container_{side}_{slot}_floor", (x, -z, 0.045), (sx, sy, 0.05), M_grate, "yard-open-container", do_bevel=False)
+                if opening == "open-one":
+                    direction = 1 if side in ("north", "west") else -1
+                    if side in ("north", "south"):
+                        end_loc = (x + direction * (sx - thickness) / 2, -z, 1.3)
+                        end_size = (thickness, sy, 2.6)
+                    else:
+                        end_loc = (x, -z - direction * (sy - thickness) / 2, 1.3)
+                        end_size = (sx, thickness, 2.6)
+                    closed_end = cube(
+                        f"RW_open_container_{side}_{slot}_closed_end",
+                        end_loc,
+                        end_size,
+                        material,
+                        "yard-open-container-closed-end",
+                    )
+                    closed_end["rustworks_side"] = side
+                    closed_end["rustworks_slot"] = slot
+                    closed_end["rustworks_opening"] = opening
                 for end in (-1, 1):
                     if side in ("north", "south"):
                         end_axis = x + end * (sx / 2 - 0.07)
@@ -523,6 +560,7 @@ def main():
                 )
                 container["rustworks_side"] = side
                 container["rustworks_slot"] = slot
+                container["rustworks_opening"] = opening
             container_index += 1
 
     # Open safety rail (not solid walls).

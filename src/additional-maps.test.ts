@@ -11,7 +11,9 @@ import {
   buildGunRange,
   buildRustworks1v1,
   buildSkylineTerminal,
+  fitCanvasText,
   rustworksDeckTopY,
+  updateGunRangePresentation,
 } from './additional-maps';
 import type { ArenaMap } from './map';
 import type { Stance } from './gameplay';
@@ -113,6 +115,21 @@ async function traverseRoute(
 }
 
 describe('additional authored maps', () => {
+  it('shrinks long world-sign copy until it fits the drawable panel width', () => {
+    let currentFont = '';
+    const context = {
+      get font() { return currentFont; },
+      set font(value: string) { currentFont = value; },
+      measureText(text: string) {
+        const size = Number.parseInt(currentFont.match(/900 (\d+)px/)?.[1] ?? '0', 10);
+        return { width: text.length * size * 0.58 };
+      },
+    } as unknown as CanvasRenderingContext2D;
+    const layout = fitCanvasText(context, 'WALLBANG TEST · MATERIAL / THICKNESS', 120, 620, 18);
+    expect(layout.measuredWidth).toBeLessThanOrEqual(layout.availableWidth);
+    expect(layout.fontSize).toBeLessThan(120);
+  });
+
   it('builds an original compact collision-backed industrial 1v1 arena', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     expect(map.id).toBe('rustworks-1v1');
@@ -184,9 +201,9 @@ describe('additional authored maps', () => {
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
-    expect(namedCount(map.root, 'rustworks-container-placement')).toBe(16);
-    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(12);
-    expect(namedCount(map.root, 'rustworks-open-container-wall-a')).toBe(4);
+    expect(namedCount(map.root, 'rustworks-container-placement')).toBe(24);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(18);
+    expect(namedCount(map.root, 'rustworks-open-container-wall-a')).toBe(6);
     expect(namedCount(map.root, 'rustworks-barrier-low')).toBe(0);
     expect(namedCount(map.root, 'rustworks-tank-collider')).toBe(0);
     expect(namedCount(map.root, 'rustworks-horizontal-process-tank')).toBe(0);
@@ -211,33 +228,38 @@ describe('additional authored maps', () => {
     expect(map.root.userData.rustworksRoutes?.['west-service-trench']).toBeTruthy();
   });
 
-  it('gives sixteen widely spaced container placements, including four authoritative pass-throughs', async () => {
+  it('uses only shipping-container yard cover at the exact 75/25 and open-end distributions', async () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const placements: THREE.Group[] = [];
     const closed: THREE.Mesh[] = [];
     const openShells: THREE.Mesh[] = [];
+    const oneEndWalls: THREE.Mesh[] = [];
     map.root.traverse((node) => {
       if (node instanceof THREE.Group && node.name === 'rustworks-container-placement') placements.push(node);
       if (node instanceof THREE.Mesh && node.name === 'rustworks-shipping-container') closed.push(node);
       if (node instanceof THREE.Mesh && node.name.startsWith('rustworks-open-container-') && !node.name.includes('-floor-')) openShells.push(node);
+      if (node instanceof THREE.Mesh && node.name === 'rustworks-open-one-container-closed-end') oneEndWalls.push(node);
     });
-    expect(placements).toHaveLength(16);
-    expect(closed).toHaveLength(12);
-    expect(openShells).toHaveLength(12);
+    expect(placements).toHaveLength(24);
+    expect(closed).toHaveLength(18);
+    expect(openShells).toHaveLength(18);
+    expect(oneEndWalls).toHaveLength(3);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'closed')).toHaveLength(18);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-both')).toHaveLength(3);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-one')).toHaveLength(3);
     for (const side of ['north', 'south', 'west', 'east']) {
       const row = placements.filter((placement) => placement.userData.rustworksContainerSide === side);
-      expect(row, `${side} container row`).toHaveLength(4);
-      expect(row.filter((placement) => placement.userData.rustworksContainerType === 'open'), `${side} open container`).toHaveLength(1);
+      expect(row, `${side} container row`).toHaveLength(6);
       const offsets = row
         .map((placement) => side === 'north' || side === 'south' ? placement.position.x : placement.position.z)
         .sort((a, b) => a - b);
-      expect(offsets).toEqual([-18, -9, 9, 18]);
+      expect(offsets).toEqual([-18, -10.8, -3.6, 3.6, 10.8, 18]);
       for (let index = 1; index < offsets.length; index += 1) {
-        expect(offsets[index] - offsets[index - 1] - 5.8).toBeGreaterThanOrEqual(3.2 - 1e-6);
+        expect(offsets[index] - offsets[index - 1] - 5.8).toBeGreaterThanOrEqual(1.4 - 1e-6);
       }
     }
 
-    const authoritativeMeshes = [...closed, ...openShells];
+    const authoritativeMeshes = [...closed, ...openShells, ...oneEndWalls];
     for (const mesh of authoritativeMeshes) {
       const geometry = mesh.geometry as THREE.BoxGeometry;
       const { width, height, depth } = geometry.parameters;
@@ -262,16 +284,35 @@ describe('additional authored maps', () => {
     }
 
     const layout = map.root.userData.rustworksContainerLayout as {
-      total: number; closed: number; open: number; perSide: number; minimumEndGap: number;
+      total: number;
+      closed: number;
+      open: number;
+      openBothEnds: number;
+      openOneEnd: number;
+      closedPercent: number;
+      openPercent: number;
+      perSide: number;
+      minimumEndGap: number;
+      onlyShippingContainers: boolean;
     };
-    expect(layout).toMatchObject({ total: 16, closed: 12, open: 4, perSide: 4 });
-    expect(layout.minimumEndGap).toBeCloseTo(3.2);
+    expect(layout).toMatchObject({
+      total: 24,
+      closed: 18,
+      open: 6,
+      openBothEnds: 3,
+      openOneEnd: 3,
+      closedPercent: 75,
+      openPercent: 25,
+      perSide: 6,
+      onlyShippingContainers: true,
+    });
+    expect(layout.minimumEndGap).toBeCloseTo(1.4);
     expect(RUSTWORKS_TOWER.openContainerClearWidth).toBeGreaterThan(0.38 * 2 + 1.4);
     expect(RUSTWORKS_TOWER.openContainerClearHeight).toBeGreaterThan(1.82 + 0.5);
     const openRoutes = map.root.userData.rustworksOpenContainerRoutes as Array<{
       id: string; anchors: [number, number, number][];
     }>;
-    expect(openRoutes).toHaveLength(4);
+    expect(openRoutes).toHaveLength(3);
     for (const route of openRoutes) {
       for (const [x, y, z] of route.anchors) {
         expect(isBlocked({ x, y, z }, map.colliders, 0.38), `${route.id}@${x},${z}`).toBe(false);
@@ -463,17 +504,21 @@ describe('additional authored maps', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Acres Indoor Gun Range');
-    expect(map.targets).toHaveLength(9);
-    expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(3);
-    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(3);
+    expect(map.targets).toHaveLength(14);
+    expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
     expect(map.targets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
     expect(map.targets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
-      100, 100, 100, 200, 200, 200, 300, 300, 300,
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
-    expect(map.targets.every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
-    expect(map.targets.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
-    expect(map.targets.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    const cat = map.targets.find((target) => target.id === 'flying-black-cat');
+    expect(cat).toMatchObject({ kind: 'flying-cat', maxHealth: 100, health: 100, scoreValue: 500, respawnDelayMs: 30_000, alwaysCritical: true });
+    expect(map.root.getObjectByName('gun-range-flying-black-cat')).toBeTruthy();
+    expect(map.root.children.find((child) => child.name === 'gun-range-flying-black-cat')?.children.filter((child) => child.name === 'flying-black-cat-trail-star')).toHaveLength(8);
     expect(map.root.getObjectByName('gun-range-firing-line')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-firing-line')?.position.z).toBe(GUN_RANGE_FIRING_LINE_Z);
     expect(map.physicsColliders).toContainEqual(GUN_RANGE_FIRING_LINE_BARRIER);
@@ -486,7 +531,24 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('gun-range-right-wall')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-control-room')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-wallbang-panel-glass')).toBeTruthy();
+    const wallbangSurfaces = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
+    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual(['glass', 'wood', 'interior-wall', 'brick']);
+    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.24, 0.42, 0.7]);
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(map.root.getObjectByName('gun-range-moderate-ambient')).toBeInstanceOf(THREE.HemisphereLight);
+    const wallMaterial = (map.root.getObjectByName('gun-range-left-wall') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const ceilingMaterial = (map.root.getObjectByName('gun-range-ceiling') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(wallMaterial.userData.gunRangeShell).toBe('white-silver-wall');
+    expect(ceilingMaterial.userData.gunRangeShell).toBe('white-silver-ceiling');
+    expect(wallMaterial.color.getHex()).toBe(0xb8c1c4);
+    expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
+    const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
+    const before = neon.color.getHex();
+    updateGunRangePresentation(map.root, 9_000);
+    expect(neon.color.getHex()).not.toBe(before);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
     expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);
@@ -584,6 +646,44 @@ describe('additional authored maps', () => {
     expect(batches.sourceMeshes).toBeGreaterThanOrEqual(30);
     expect(batches.batches).toBeGreaterThan(0);
     expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+  });
+
+  it('ships the Pass 60 white-silver terminal reskin as an obvious authored environment', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.root.userData.skylineReskin).toEqual({
+      version: 'pass-60-total-overhaul',
+      palette: 'white-silver-cyan-magenta',
+      routeGeometryChanged: false,
+      authoritativeCeiling: true,
+    });
+
+    for (const name of [
+      'skyline-terminal-silver-ceiling',
+      'skyline-floor-cyan-runner-west',
+      'skyline-floor-magenta-crossing',
+      'skyline-mezzanine-coffer-0',
+      'skyline-mezzanine-coffer-light-0',
+      'skyline-overhead-gate-sign--18',
+      'skyline-overhead-gate-sign-18',
+      'skyline-airside-roof-crown',
+      'skyline-airside-identity--18',
+      'skyline-airside-identity-18',
+      'skyline-roof-sculptural-fin-0',
+      'skyline-apron-cyan-guidance-west',
+      'skyline-apron-magenta-guidance-east',
+      'skyline-aircraft-livery-cyan-north',
+      'skyline-aircraft-livery-magenta-south',
+    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
+
+    const ceiling = map.root.getObjectByName('skyline-terminal-silver-ceiling') as THREE.Mesh;
+    expect(map.raycastMeshes).toContain(ceiling);
+    expect(ceiling.userData.ballisticSurfaceId).toEqual(expect.any(String));
+    expect((ceiling.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xf2f5f1);
+
+    const cyan = map.root.getObjectByName('skyline-floor-cyan-runner-west') as THREE.Mesh;
+    const magenta = map.root.getObjectByName('skyline-floor-magenta-crossing') as THREE.Mesh;
+    expect((cyan.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
+    expect((magenta.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
   });
 
   it('keeps six breakable facade panes independent from the added mullion frames', () => {
@@ -714,48 +814,53 @@ describe('additional authored maps', () => {
 });
 
 describe('Pass 59 map mechanical audits', () => {
-  it('grounds four distinct Rustworks centre-cover rhythms with collision authority', () => {
+  it('removes the mixed Rustworks centre debris and retains only grounded container yard cover', () => {
     const map = buildRustworks1v1(new THREE.Scene());
-    const audit = map.root.userData.rustworksCentreCoverAudit as { styles: string[]; count: number; minimumTowerDistance: number };
-    expect(audit.styles).toEqual(['stacked', 'staggered', 'l-corner', 'low-flank']);
-    expect(audit.count).toBe(8);
-    expect(audit.minimumTowerDistance).toBeGreaterThan(7);
-    const covers: THREE.Mesh[] = [];
-    map.root.traverse((node) => {
-      if (node instanceof THREE.Mesh && typeof node.userData.rustworksCentreCoverStyle === 'string') covers.push(node);
+    const audit = map.root.userData.rustworksCentreCoverAudit as {
+      styles: string[];
+      count: number;
+      minimumTowerDistance: null;
+      removedMixedCover: boolean;
+    };
+    expect(audit).toMatchObject({
+      styles: [],
+      count: 0,
+      minimumTowerDistance: null,
+      removedMixedCover: true,
     });
-    expect(covers).toHaveLength(8);
-    for (const cover of covers) {
-      expect(map.colliders.some((box) => cover.position.x >= box.minX && cover.position.x <= box.maxX && cover.position.z >= box.minZ && cover.position.z <= box.maxZ), cover.name).toBe(true);
-      expect(cover.userData.authoredBottomY, cover.name).toBeGreaterThanOrEqual(0);
-    }
-    const base = map.root.getObjectByName('rustworks-centre-stack-base') as THREE.Mesh;
-    const top = map.root.getObjectByName('rustworks-centre-stack-top') as THREE.Mesh;
-    expect(top.position.y - 0.45).toBeCloseTo(base.position.y + 0.6);
+    const forbidden: THREE.Object3D[] = [];
+    map.root.traverse((node) => {
+      if (/centre-cover|freight-crate|pallet-stack|service-trench-crossover/i.test(node.name)) forbidden.push(node);
+    });
+    expect(forbidden).toEqual([]);
+    expect(map.root.getObjectByName('rustworks-quality-welsh-flag')).toBeTruthy();
+    expect(map.root.userData.rustworksFlagAudit).toMatchObject({
+      nation: 'Wales',
+      animated: true,
+      width: 6,
+      height: 3.6,
+    });
   });
 
-  it('blocks Rustworks centre-cover penetration in Rapier while preserving adjacent lanes', async () => {
+  it('keeps the former centre-cover quadrants open in Rapier', async () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     try {
       physics.teleportEye({ x: 9.2, y: 1.7, z: -13.2 });
-      const blocked = await walkToward(physics, { x: 9.2, y: 1.7, z: -9.4 }, 500);
-      expect(blocked.z).toBeLessThan(-10.75);
-      physics.teleportEye({ x: 5.5, y: 1.7, z: -13.2 });
-      const lane = await walkToward(physics, { x: 5.5, y: 1.7, z: -5.5 }, 800);
-      expect(Math.abs(lane.z + 5.5)).toBeLessThan(0.55);
+      const lane = await walkToward(physics, { x: 9.2, y: 1.7, z: -9.4 }, 500);
+      expect(Math.abs(lane.z + 9.4)).toBeLessThan(0.55);
     } finally {
       physics.dispose();
     }
   });
-  it('preserves centre-cover collision semantics across Compatibility, Performance, and Quality', () => {
+  it('preserves container collision and Welsh flag visibility across all profiles', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const colliderCount = map.colliders.length;
     for (const profile of ['compat', 'performance', 'blender'] as const) {
       applyRustworksPresentationProfile(map.root, profile);
       expect(map.colliders).toHaveLength(colliderCount);
-      expect(map.root.getObjectByName('rustworks-centre-stack-base')?.visible).toBe(true);
-      expect(isBlocked({ x: 9.2, y: 1.7, z: -9.4 }, map.colliders, 0.44)).toBe(true);
+      expect(map.root.getObjectByName('rustworks-quality-welsh-flag-cloth')?.visible).toBe(true);
+      expect(isBlocked({ x: -18, y: 1.7, z: -21.5 }, map.colliders, 0.44)).toBe(true);
     }
   });
   it('labels Skyline open passages and mechanically closed staff doors coherently', () => {

@@ -18,6 +18,7 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - Do not clean, reset, stash, move, or delete another task's worktree. Reconcile it read-only and preserve uncertain state.
 - Record observations, inferences, assumptions, unknowns, and falsifiers separately when they affect release decisions.
 - Do not weaken a timeout, threshold, screenshot tolerance, or assertion inside a feature fix merely to obtain green CI. A contract change needs explicit evidence and review.
+- Desky (`dave-gaming-pc`) is the active development machine and can exercise both Performance and Quality Graphics. Treat both as presentations over one authoritative physics world: every substantial player-reachable visible object must have matching movement and shot authority in both profiles. Tiny grass, decals, particles, and overhead dressing may remain non-solid. Never add profile-only collision or hide a collider mismatch behind a render-profile switch; test affected geometry in both profiles.
 
 ## Integration and production
 

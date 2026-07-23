@@ -31,6 +31,7 @@ type RiggedOperatorRuntime = {
     abdomen?: THREE.Bone;
     torso?: THREE.Bone;
     chest?: THREE.Bone;
+    head?: THREE.Bone;
     upperLegLeft?: THREE.Bone;
     upperLegRight?: THREE.Bone;
     lowerLegLeft?: THREE.Bone;
@@ -516,6 +517,7 @@ export function createRiggedOperator(
       abdomen: poseBone('Abdomen'),
       torso: poseBone('Torso'),
       chest: poseBone('Chest'),
+      head: poseBone('Head'),
       upperLegLeft: poseBone('UpperLegL', 'UpperLeg.L'),
       upperLegRight: poseBone('UpperLegR', 'UpperLeg.R'),
       lowerLegLeft: poseBone('LowerLegL', 'LowerLeg.L'),
@@ -660,6 +662,11 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     if (node instanceof THREE.SkinnedMesh && node.visible) visibleSkinnedMeshes += 1;
     if (node.userData.embeddedWeaponSuppressed === true && node.visible) visibleEmbeddedWeapons += 1;
   });
+  const headBoneWorld = runtimeState.poseBones.head?.getWorldPosition(new THREE.Vector3()) ?? null;
+  const headProxy = root.getObjectByName('authoritative-hit-proxies')?.children.find(
+    (node) => node.userData.authoritativeProxy === true && node.userData.hitZone === 'head',
+  );
+  const hitProxyHeadWorld = headProxy?.getWorldPosition(new THREE.Vector3()) ?? null;
   return {
     source: root.userData.operatorAsset?.source,
     appearance: root.userData.operatorAppearance,
@@ -681,6 +688,9 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
     },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
     visibleSkinnedMeshes,
+    headBoneWorld: headBoneWorld?.toArray() ?? null,
+    hitProxyHeadWorld: hitProxyHeadWorld?.toArray() ?? null,
+    hitProxyHeadDelta: headBoneWorld && hitProxyHeadWorld ? headBoneWorld.distanceTo(hitProxyHeadWorld) : null,
     armBonesPresent: ['UpperArmL', 'LowerArmL', 'WristL', 'UpperArmR', 'LowerArmR', 'WristR']
       .filter((name) => runtimeState.visual.getObjectByName(name) instanceof THREE.Bone).length,
     meleeKnifeVisible: root.getObjectByName('operator-melee-knife')?.visible === true,

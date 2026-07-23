@@ -13,7 +13,7 @@ describe('bounded host fairness timing', () => {
     const base = { ...createPeerTimingState(), lastEventSeq: 10 };
     expect(admitCombatTiming(base, { eventSeq: 10, sentAtEpochMs: 1_000 }, 1_010).reason).toBe('duplicate');
     expect(admitCombatTiming(base, { eventSeq: 1_000, sentAtEpochMs: 1_000 }, 1_010).reason).toBe('sequence-gap');
-    expect(admitCombatTiming(base, { eventSeq: 11, sentAtEpochMs: 1_000 }, 1_500).reason).toBe('stale');
+    expect(admitCombatTiming(base, { eventSeq: 11, sentAtEpochMs: 1_000 }, 1_700).reason).toBe('stale');
     expect(admitCombatTiming(base, { eventSeq: 11, sentAtEpochMs: 1_200 }, 1_000).reason).toBe('future');
   });
 

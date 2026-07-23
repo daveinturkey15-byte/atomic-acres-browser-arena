@@ -55,9 +55,9 @@ export function viewmodelReloadStageAt(weapon: WeaponId, rawProgress: number): V
   const progress = clamp01(rawProgress);
   const out = smoothstep(0.08, 0.28, progress) * (1 - smoothstep(0.44, 0.58, progress));
   const insert = smoothstep(0.48, 0.68, progress) * (1 - smoothstep(0.84, 0.96, progress));
-  const pistolScale = weapon === 'pistol' ? 0.82 : 1;
+  const pistolScale = weapon === 'pistol' || weapon === 'magnum' ? 0.82 : 1;
   return {
-    lateral: -0.22 * out * (weapon === 'pistol' ? 1.15 : 1),
+    lateral: -0.22 * out * (weapon === 'pistol' || weapon === 'magnum' ? 1.15 : 1),
     lift: 0.14 * out + 0.12 * insert,
     pitch: (0.07 * out - 0.045 * insert) * pistolScale,
     roll: 0.46 * out * pistolScale,
@@ -92,7 +92,7 @@ export function reloadPoseAt(weapon: WeaponId, rawProgress: number): ReloadPose 
   const removal = smoothstep(0.1, 0.34, progress);
   const insertion = smoothstep(0.56, 0.81, progress);
   const holdOut = removal * (1 - insertion);
-  const pistol = weapon === 'pistol';
+  const pistol = weapon === 'pistol' || weapon === 'magnum';
   return {
     magazineDrop: holdOut * (pistol ? 0.2 : 0.36) + insertion * (1 - smoothstep(0.78, 0.84, progress)) * (pistol ? 0.018 : 0.035),
     magazineTwist: holdOut * (pistol ? 0.12 : 0.24),

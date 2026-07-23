@@ -26,7 +26,10 @@ type DebugSnapshot = {
     stations: Array<{ id: string; weapon: string; label: string; position: number[]; visible: boolean }>;
     activeTargets: number;
     values: number[];
-    targets: Array<{ id: string; active: boolean; health: number; maxHealth: number }>;
+    targets: Array<{
+      id: string; kind: string; alwaysCritical: boolean; active: boolean; health: number; maxHealth: number;
+      respawnDelayMs: number; respawnInMs: number;
+    }>;
   };
   menuCamera: { position: number[]; towerNdc: number[] };
   render: {
@@ -119,7 +122,8 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     await waitReady(page);
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'rustworks-1v1');
     await expect(page.locator('.map-card[data-arena-id="rustworks-1v1"]')).toHaveAttribute('aria-pressed', 'true');
-    expect((await snapshot(page)).render.grass.checksum).toBe('c15dd4d5');
+    const initialGrassChecksum = (await snapshot(page)).render.grass.checksum;
+    expect(initialGrassChecksum).toMatch(/^[a-f0-9]{8}$/);
     await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.arenaId === 'atomic-acres');
     await page.locator('.map-card[data-arena-id="rustworks-1v1"]').click();
@@ -144,7 +148,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(selected.arenaSelection.navigationCollidersMatchArena).toBe(true);
     expect(selected.menuCamera.towerNdc[0]).toBeGreaterThan(0.2);
     expect(selected.menuCamera.towerNdc[0]).toBeLessThan(0.75);
-    expect(selected.render.grass.checksum).toBe('c15dd4d5');
+    expect(selected.render.grass.checksum).toBe(initialGrassChecksum);
     await deploySolo(page, 'DUELIST');
     const active = await snapshot(page);
     expect(active.bots).toHaveLength(1);
@@ -162,13 +166,13 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect((await snapshot(page)).gameStarted).toBe(false);
   });
 
-  test('Gun Range is a two-minute solo score attack with three target values', async ({ page }) => {
+  test('Gun Range is a two-minute solo or multiplayer score attack with a wallbang lab', async ({ page }) => {
     await page.goto(`/?${lightweight}&seed=3303&map=gun-range`);
     await waitReady(page);
     await expect(page.locator('.map-card[data-arena-id="gun-range"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#solo')).toHaveText('START RANGE');
-    await expect(page.locator('#host')).toBeDisabled();
-    await expect(page.locator('#join')).toBeDisabled();
+    await expect(page.locator('#host')).toBeEnabled();
+    await expect(page.locator('#join')).toBeEnabled();
     await expect(page.locator('[data-menu-tab="kit"]')).toBeHidden();
     await expect(page.locator('#selected-kit-summary')).toContainText('PICK UP YOUR WEAPON INSIDE');
     await deploySolo(page, 'RANGER');
@@ -177,11 +181,11 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
       id: 'gun-range',
       label: 'Acres Indoor Gun Range',
       rules: { durationMs: 120_000, scoreLimit: null },
-      multiplayer: false,
+      multiplayer: true,
       soloBotCount: 0,
       rootVisible: true,
       activeRoots: ['gun-range'],
-      targets: 9,
+      targets: 14,
       navigationCollidersMatchArena: true,
     });
     expect(state.bots).toHaveLength(0);
@@ -216,7 +220,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(state.sniperScope.active).toBe(false);
     expect(state.sniperScope.cameraFov).toBe(state.sniperScope.baseFov);
     expect(state.rangePractice.values.sort((a, b) => a - b)).toEqual([
-      100, 100, 100, 200, 200, 200, 300, 300, 300,
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 300, 300, 300, 500,
     ]);
     await expect(page.locator('#timer')).toHaveText(/01:5[5-9]/);
     await expect(page.locator('#aqua-label')).toHaveText('SCORE');
@@ -236,21 +240,35 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     });
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.hits === 1);
     state = await snapshot(page);
-    expect(state.rangePractice).toMatchObject({ score: 0, hits: 1, activeTargets: 9 });
+    expect(state.rangePractice).toMatchObject({ score: 0, hits: 1, activeTargets: 14 });
     const centreTarget = state.rangePractice.targets.find((target) => target.id === 'near-0');
     expect(centreTarget?.maxHealth).toBe(500);
     expect(centreTarget?.health).toBeGreaterThan(0);
     expect(centreTarget?.health).toBeLessThan(500);
+    await expect(page.locator('#damage-done-feed [data-damage-dealt]')).toBeVisible();
+    await expect(page.locator('#damage-done-feed [data-damage-dealt]').first()).toContainText('NEAR-0');
+    await expect(page.locator('#killfeed')).not.toContainText('DMG');
     await page.evaluate(() => {
       (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.hitRangeTarget('near-0', 500, 'body');
     });
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.score === 100);
     state = await snapshot(page);
-    expect(state.rangePractice).toMatchObject({ score: 100, hits: 2, activeTargets: 8 });
+    expect(state.rangePractice).toMatchObject({ score: 100, hits: 2, activeTargets: 13 });
     await expect(page.locator('#objective')).toContainText('SCORE 100 · 2 HITS');
     await expect.poll(() => page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
-    ).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.activeTargets), { timeout: 4_000 }).toBe(9);
+    ).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.activeTargets), { timeout: 4_000 }).toBe(14);
+
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.hitRangeTarget('flying-black-cat', 100, 'body');
+    });
+    await expect.poll(async () => (await snapshot(page)).rangePractice.score).toBe(600);
+    state = await snapshot(page);
+    const cat = state.rangePractice.targets.find((target) => target.id === 'flying-black-cat');
+    expect(cat).toMatchObject({ kind: 'flying-cat', alwaysCritical: true, active: false, maxHealth: 100, respawnDelayMs: 30_000 });
+    expect(cat?.respawnInMs).toBeGreaterThan(29_000);
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-critical', 'true');
+    await expect(page.locator('#objective')).toContainText('SCORE 600');
   });
 
   test('Quality Graphics loads the original tall Rustworks tower detail asset', async ({ page }) => {

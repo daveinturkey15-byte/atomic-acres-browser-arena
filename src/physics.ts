@@ -168,8 +168,12 @@ export class CharacterPhysics {
 
     if (nextExtent > currentExtent) {
       let blocked = false;
+      // Test just above the supporting surface so normal floor contact is not
+      // mistaken for overhead cover. The committed pose still preserves the
+      // exact foot position below.
+      const clearanceCandidate = { ...candidate, y: candidate.y + 0.015 };
       this.world.intersectionsWithShape(
-        candidate,
+        clearanceCandidate,
         { x: 0, y: 0, z: 0, w: 1 },
         shape,
         () => { blocked = true; return false; },
