@@ -109,7 +109,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(44_444);
+    expect(provenance.runtimeAudit.triangles).toBe(44_812);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {

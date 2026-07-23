@@ -6394,7 +6394,7 @@ function activateFieldSupport(id: FieldSupportId): void {
   if (id === 'scout-sweep') {
     scoutSweepUntil = now + SCOUT_SWEEP_DURATION_MS;
     audio.scoutSweep();
-    addFeed('SCOUT SWEEP · FIVE RADAR PULSES · 12 SEC', 'gold');
+    addFeed('SCOUT SWEEP · PULSE 1.5 SEC / 3 SEC · 12 SEC', 'gold');
   } else if (id === 'yardhawk') {
     const target = nearestSupportTarget();
     if (!target) {

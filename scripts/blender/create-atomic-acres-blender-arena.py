@@ -399,6 +399,33 @@ for house_index, house in enumerate(spec["houses"]):
     # Give the upper rooms a light, continuous soffit. Exposing the dark roof
     # shingle underside made every internal doorway read as a black rectangle.
     add_box(f"BLD_HOUSE_{prefix}_upper_ceiling_soffit", [x, 6.92, z], [width - 0.24, 0.04, depth - 0.24], M["plaster"], 0)
+    # Upper-storey exterior walls keep their team colour outside, but a pale
+    # interior lining prevents the siding texture from reading as blue/green
+    # timber floating above the open ground floor.
+    upper_wall_solids = [solid for solid in house["solids"] if (
+        solid["surface"] in ("aqua", "coral")
+        and (solid["name"].startswith("upper-") or solid["name"].startswith("front-upper"))
+    )]
+    for lining_index, solid in enumerate(upper_wall_solids):
+        lining_position = list(solid["position"])
+        lining_size = list(solid["size"])
+        if lining_size[0] < lining_size[2]:
+            lining_position[0] += 0.235 if lining_position[0] < x else -0.235
+            lining_size[0] = 0.035
+        else:
+            lining_position[2] += 0.235 if lining_position[2] < z else -0.235
+            lining_size[2] = 0.035
+        add_box(
+            f"BLD_HOUSE_{prefix}_upper_interior_lining_{lining_index:02d}_{solid['name']}",
+            lining_position, lining_size, M["plaster"], 0,
+        )
+    # Both upper rooms get an unmistakable warm ceiling panel. This makes an
+    # open route read as a lit room rather than a black door leaf from outside.
+    for room_index, room_z in enumerate((z - facing * 3.2, z + facing * 3.2)):
+        add_box(
+            f"BLD_HOUSE_{prefix}_upper_room_light_{room_index}",
+            [x, 6.875, room_z], [4.8, 0.025, 1.1], M["emissive_amber"], 0.02,
+        )
     # Deliberately asymmetric model-home trim preserves every structural opening.
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_corner_{side}", [x + side * (width / 2 + 0.06), 3.55, z], [0.18, 7.1, depth + 0.25], M["metal"], 0.02)
@@ -484,11 +511,13 @@ for house_index, house in enumerate(spec["houses"]):
     for side in (-1, 1):
         add_cylinder(f"P32_FURN_{prefix}_speaker_{side}", [console_x + side * 0.83, 0.62, console_z + facing * 0.35], 0.18, 0.06, M["rubber"], 16, rotation=(math.pi / 2, 0, 0))
 
-    bed_x, bed_z = x + 3.6, z - facing * 2.5
+    # Clear the upper-room doorway sightline. The old headboard placement sat
+    # directly behind the aperture and looked exactly like an opaque black door.
+    bed_x, bed_z = x + 6.1, z - facing * 2.5
     add_box(f"P32_FURN_{prefix}_upper_bed_frame", [bed_x, 3.82, bed_z], [3.0, 0.32, 2.1], M["timber"], 0.08)
     add_box(f"P32_FURN_{prefix}_upper_mattress", [bed_x, 4.12, bed_z], [2.82, 0.36, 1.96], M["fabric_neutral"], 0.12)
     add_box(f"P32_FURN_{prefix}_upper_blanket", [bed_x, 4.34, bed_z + facing * 0.32], [2.7, 0.14, 1.22], fabric, 0.08)
-    add_box(f"P32_FURN_{prefix}_upper_headboard", [bed_x, 4.72, bed_z - facing * 1.02], [3.08, 1.72, 0.2], M["timber"], 0.07)
+    add_box(f"P32_FURN_{prefix}_upper_headboard", [bed_x, 4.72, bed_z - facing * 1.02], [3.08, 1.72, 0.2], M["fabric_neutral"], 0.07)
     for side in (-1, 1):
         add_box(f"P32_FURN_{prefix}_upper_pillow_{side}", [bed_x + side * 0.68, 4.37, bed_z - facing * 0.55], [1.05, 0.2, 0.55], M["fabric_neutral"], 0.12)
 

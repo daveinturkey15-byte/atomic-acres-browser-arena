@@ -400,6 +400,28 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('boot and authored presentation', () => {
+  test('keeps the desktop gameplay HUD legible at a 1.35 scale', async ({ page }) => {
+    await pageReady(page);
+    await startSolo(page);
+    const layout = await page.evaluate(() => {
+      const minimap = document.querySelector<HTMLElement>('#minimap');
+      const support = document.querySelector<HTMLElement>('#support-block');
+      const weapon = document.querySelector<HTMLElement>('#weapon-block');
+      if (!minimap || !support || !weapon) throw new Error('Gameplay HUD is incomplete');
+      return {
+        minimapZoom: getComputedStyle(minimap).zoom,
+        minimapWidth: minimap.getBoundingClientRect().width,
+        supportWidth: support.getBoundingClientRect().width,
+        weaponRight: weapon.getBoundingClientRect().right,
+        viewportWidth: window.innerWidth,
+      };
+    });
+    expect(layout.minimapZoom).toBe('1.35');
+    expect(layout.minimapWidth).toBeGreaterThanOrEqual(400);
+    expect(layout.supportWidth).toBeGreaterThanOrEqual(320);
+    expect(layout.weaponRight).toBeLessThanOrEqual(layout.viewportWidth);
+  });
+
   test('boots without runtime errors and loads original art/weapons', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));

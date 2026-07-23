@@ -728,7 +728,7 @@
           "size": [
             3.2,
             1.9699999999999998,
-            0.08
+            0.12
           ],
           "surface": "glass",
           "collidable": false,
@@ -1265,7 +1265,7 @@
           ],
           "width": 3.2,
           "height": 1.9699999999999998,
-          "route": true
+          "route": false
         }
       ],
       "anchors": [
@@ -2185,7 +2185,7 @@
           "size": [
             3.2,
             1.9699999999999998,
-            0.08
+            0.12
           ],
           "surface": "glass",
           "collidable": false,
@@ -2722,7 +2722,7 @@
           ],
           "width": 3.2,
           "height": 1.9699999999999998,
-          "route": true
+          "route": false
         }
       ],
       "anchors": [

@@ -30,8 +30,8 @@ export const HUNTER_SWARM_PRONE_MULTIPLIER = 0.09;
 export const NUKE_WARNING_MS = 5_000;
 export const NUKE_DAMAGE = 1_000;
 export const SCOUT_SWEEP_DURATION_MS = 12_000;
-export const SCOUT_SWEEP_PULSE_INTERVAL_MS = 2_400;
-export const SCOUT_SWEEP_PULSE_VISIBLE_MS = 700;
+export const SCOUT_SWEEP_PULSE_INTERVAL_MS = 3_000;
+export const SCOUT_SWEEP_PULSE_VISIBLE_MS = 1_500;
 export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
 
 export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {

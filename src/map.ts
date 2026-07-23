@@ -643,7 +643,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     substantial(`authored-house-${houseIndex}-kitchen-collider`, [x - 3.75, 1.15, z - facing * 5.25], [6.5, 2.3, 0.85], 'wood');
     substantial(`authored-house-${houseIndex}-coffee-table-collider`, [sofaX - 0.3, 0.36, sofaZ - facing * 1.5], [1.9, 0.72, 0.9], 'wood');
     substantial(`authored-house-${houseIndex}-media-collider`, [x + 3.7, 1.1, z - facing * 3.1], [2.6, 2.2, 0.82]);
-    substantial(`authored-house-${houseIndex}-upper-bed-collider`, [x + 3.6, 4.05, z - facing * 2.5], [3.2, 1.45, 2.2], 'wood');
+    // Keep the bed out of the upper partition sightline. Its old x + 3.6
+    // placement made the dark headboard fill the opening and read as a sealed
+    // black door even though the route was physically open.
+    substantial(`authored-house-${houseIndex}-upper-bed-collider`, [x + 6.1, 4.05, z - facing * 2.5], [3.2, 1.45, 2.2], 'wood');
     substantial(`authored-house-${houseIndex}-upper-desk-collider`, [x - 3.2, 4.25, z + facing * 2.8], [2.7, 1.65, 0.92], 'wood');
   }
   world.userData.atomicCollisionAudit.substantialProps = substantialPropColliders;

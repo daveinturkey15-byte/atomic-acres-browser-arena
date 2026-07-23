@@ -243,3 +243,13 @@
 @media(max-width:700px){#damage-feeds{right:12px;top:190px;width:min(250px,52vw);gap:7px}.damage-feed>div div{min-width:150px;font-size:14px}.damage-feed>b{font-size:9px}#support-block{width:190px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}}
 @media(max-height:600px) and (min-width:701px){#support-block{width:238px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}.support-list b{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:1fr}.support-state{display:block}}
 @media(max-height:600px) and (min-width:850px){#health-block{left:calc(50% - 80px)}#combat-stats{left:24px}#ping-block{left:180px;transform:none}}
+
+/* Desktop gameplay telemetry must remain readable at 1080p and ultrawide
+   resolutions. Zoom preserves each panel's own edge/centre anchor, unlike a
+   transform on the HUD root which would pull right-side panels off screen. */
+@media(min-width:701px){
+  #matchbar,#fps-counter,#network-strip,#killfeed,#objective,#minimap,#map-heading,
+  #location-label,#support-block,#health-block,#combat-stats,#equipment-block,
+  #ping-block,#weapon-block,#damage-feeds,#room-hud,#pause-hint{zoom:1.35}
+  #support-block{transform:none}
+}
