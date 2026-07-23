@@ -8,6 +8,7 @@ import { WEAPONS } from './gameplay';
 import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
 import type { Team } from './protocol';
+import { createRustworksWelshFlag } from './rustworks-flag';
 
 type Builder = {
   root: THREE.Group;
@@ -644,60 +645,36 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       });
     }
   }
-  for (const z of [-6, 6] as const) {
-    box(builder, 'rustworks-service-trench-crossover', [trenchX, 2.55, z], [4.35, 0.16, 1.2], steelBright, {
-      solid: false,
-      shots: false,
-      detail: 'quality',
-    });
-  }
-
-  // Four deliberately different centre-cover rhythms pull exterior freight language
-  // toward the tower without forming another repetitive perimeter row.
-  const centreCover = (
-    name: string,
-    position: [number, number, number],
-    size: [number, number, number],
-    material: THREE.Material,
-    style: 'stacked' | 'staggered' | 'l-corner' | 'low-flank',
-    rotation?: [number, number, number],
-    supportedBy: 'deck' | string = 'deck',
-  ): THREE.Mesh => {
-    const ballisticMaterial: BallisticMaterialId = material === concrete || material === concreteDark
-      ? 'concrete'
-      : material === tarp
-        ? 'container'
-        : 'structural-metal';
-    const mesh = box(builder, name, position, size, material, { rotation, ballisticMaterial });
-    mesh.userData.rustworksCentreCoverStyle = style;
-    mesh.userData.supportedBy = supportedBy;
-    mesh.userData.authoredBottomY = position[1] - size[1] / 2;
-    return mesh;
-  };
-  centreCover('rustworks-centre-stack-base', [9.2, 0.6, -9.4], [3.2, 1.2, 2.2], rustDark, 'stacked');
-  centreCover('rustworks-centre-stack-top', [9.7, 1.65, -9.4], [1.8, 0.9, 1.8], hazardDark, 'stacked', undefined, 'rustworks-centre-stack-base');
-  centreCover('rustworks-centre-stagger-long', [-9.4, 0.62, -8.5], [3.4, 1.24, 1.0], tarp, 'staggered', [0, 0.28, 0]);
-  centreCover('rustworks-centre-stagger-short', [-8.15, 0.45, -5.9], [1.0, 0.9, 2.4], steel, 'staggered', [0, -0.22, 0]);
-  centreCover('rustworks-centre-corner-long', [9.4, 0.55, 8.2], [3.6, 1.1, 0.9], concreteDark, 'l-corner');
-  centreCover('rustworks-centre-corner-high', [8.1, 0.8, 9.45], [0.9, 1.6, 3.4], oxide, 'l-corner');
-  centreCover('rustworks-centre-low-flank-a', [-9.8, 0.42, 8.6], [2.8, 0.84, 1.2], concrete, 'low-flank', [0, -0.18, 0]);
-  centreCover('rustworks-centre-low-flank-b', [-7.7, 0.42, 10.0], [1.8, 0.84, 1.2], hazardDark, 'low-flank', [0, 0.36, 0]);
+  // The former mixed crate/pallet/low-wall clusters read as random floating
+  // debris. Keep the service cross completely clean and use only the authored
+  // freight-container vocabulary for yard cover.
   root.userData.rustworksCentreCoverAudit = {
-    styles: ['stacked', 'staggered', 'l-corner', 'low-flank'],
-    count: 8,
+    styles: [],
+    count: 0,
     deckGroundY: 0,
-    minimumTowerDistance: 7.7,
+    minimumTowerDistance: null,
+    removedMixedCover: true,
     lanesPreserved: ['north-south-service', 'east-west-service', 'west-trench', 'tower-undercroft'],
   };
-  // Five containers per side (20 total). Nine-metre centres leave 3.2 m clear
-  // between adjacent 5.8 m shells. One placement per side is open end-to-end.
-  const perimeterSlots = [-18, -9, 0, 9, 18] as const;
+  // Twenty-four containers: 18 closed + 6 open (75/25). Three open at both
+  // ends and three at one end, exactly matching the requested freight mix.
+  const perimeterSlots = [-18, -10.8, -3.6, 3.6, 10.8, 18] as const;
   const perimeterRow = 21.5;
+  type ContainerOpening = 'closed' | 'open-both' | 'open-one';
+  const openingFor = (side: 'north' | 'south' | 'west' | 'east', slot: number): ContainerOpening => {
+    if (side === 'north' && slot === 1) return 'open-both';
+    if (side === 'south' && slot === 2) return 'open-both';
+    if (side === 'east' && slot === 4) return 'open-both';
+    if (side === 'north' && slot === 4) return 'open-one';
+    if (side === 'south' && slot === 5) return 'open-one';
+    if (side === 'west' && slot === 1) return 'open-one';
+    return 'closed';
+  };
   const containerRows = [
-    ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -perimeterRow, open: slot === 1 })),
-    ...perimeterSlots.map((x, slot) => ({ side: 'south', slot, x, z: perimeterRow, open: slot === 2 })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'west', slot, x: -perimeterRow, z, open: slot === 1 })),
-    ...perimeterSlots.map((z, slot) => ({ side: 'east', slot, x: perimeterRow, z, open: slot === 2 })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'north' as const, slot, x, z: -perimeterRow, opening: openingFor('north', slot) })),
+    ...perimeterSlots.map((x, slot) => ({ side: 'south' as const, slot, x, z: perimeterRow, opening: openingFor('south', slot) })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'west' as const, slot, x: -perimeterRow, z, opening: openingFor('west', slot) })),
+    ...perimeterSlots.map((z, slot) => ({ side: 'east' as const, slot, x: perimeterRow, z, opening: openingFor('east', slot) })),
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
   const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
@@ -709,10 +686,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     marker.position.set(placement.x, 0, placement.z);
     marker.userData.rustworksContainerSide = placement.side;
     marker.userData.rustworksContainerSlot = placement.slot;
-    marker.userData.rustworksContainerType = placement.open ? 'open' : 'closed';
+    marker.userData.rustworksContainerType = placement.opening;
     root.add(marker);
 
-    if (placement.open) {
+    if (placement.opening !== 'closed') {
       const thickness = 0.14;
       const material = containerPalette[placement.slot % containerPalette.length];
       const shellParts = alongX
@@ -743,15 +720,30 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         cast: false,
         detail: 'performance',
       });
-      const halfLength = (alongX ? containerSize[0] : containerSize[2]) / 2;
-      openContainerRoutes.push({
-        id: `open-container-${placement.side}`,
-        side: placement.side,
-        axis: alongX ? 'x' : 'z',
-        anchors: alongX
-          ? [[placement.x - halfLength - 0.8, 1.7, placement.z], [placement.x, 1.7, placement.z], [placement.x + halfLength + 0.8, 1.7, placement.z]]
-          : [[placement.x, 1.7, placement.z - halfLength - 0.8], [placement.x, 1.7, placement.z], [placement.x, 1.7, placement.z + halfLength + 0.8]],
-      });
+      if (placement.opening === 'open-one') {
+        const endThickness = 0.16;
+        const closesPositiveEnd = (placement.side === 'north' || placement.side === 'west');
+        const direction = closesPositiveEnd ? 1 : -1;
+        const endPosition: [number, number, number] = alongX
+          ? [placement.x + direction * (containerSize[0] - endThickness) / 2, 1.3, placement.z]
+          : [placement.x, 1.3, placement.z + direction * (containerSize[2] - endThickness) / 2];
+        const endSize: [number, number, number] = alongX
+          ? [endThickness, containerSize[1], containerSize[2]]
+          : [containerSize[0], containerSize[1], endThickness];
+        const end = box(builder, 'rustworks-open-one-container-closed-end', endPosition, endSize, material);
+        end.userData.rustworksContainerSide = placement.side;
+        end.userData.rustworksContainerSlot = placement.slot;
+      } else {
+        const halfLength = (alongX ? containerSize[0] : containerSize[2]) / 2;
+        openContainerRoutes.push({
+          id: `open-container-${placement.side}-${placement.slot}`,
+          side: placement.side,
+          axis: alongX ? 'x' : 'z',
+          anchors: alongX
+            ? [[placement.x - halfLength - 0.5, 1.7, placement.z], [placement.x, 1.7, placement.z], [placement.x + halfLength + 0.5, 1.7, placement.z]]
+            : [[placement.x, 1.7, placement.z - halfLength - 0.5], [placement.x, 1.7, placement.z], [placement.x, 1.7, placement.z + halfLength + 0.5]],
+        });
+      }
     } else {
       const container = box(
         builder,
@@ -780,12 +772,17 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
 
   root.userData.rustworksContainerLayout = {
     total: containerRows.length,
-    closed: containerRows.filter((placement) => !placement.open).length,
-    open: containerRows.filter((placement) => placement.open).length,
-    perSide: 5,
+    closed: containerRows.filter((placement) => placement.opening === 'closed').length,
+    open: containerRows.filter((placement) => placement.opening !== 'closed').length,
+    openBothEnds: containerRows.filter((placement) => placement.opening === 'open-both').length,
+    openOneEnd: containerRows.filter((placement) => placement.opening === 'open-one').length,
+    closedPercent: 75,
+    openPercent: 25,
+    perSide: 6,
     slots: [...perimeterSlots],
     row: perimeterRow,
-    minimumEndGap: 9 - 5.8,
+    minimumEndGap: 7.2 - 5.8,
+    onlyShippingContainers: true,
   };
   root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
   root.userData.rustworksUndercroft = {
@@ -803,6 +800,9 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });
   labelBoard.userData.label = 'RUSTWORKS';
+  const welshFlag = createRustworksWelshFlag();
+  root.add(welshFlag);
+  root.userData.rustworksFlagAudit = welshFlag.userData.rustworksFlagAudit;
 
   root.userData.rustworksPresentationBatches = batchPresentationOnlyBoxes(root);
   // Default to full presentation for tests/tools; runtime re-applies the active render profile.

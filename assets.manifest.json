@@ -56,12 +56,12 @@
       "generatedAsOf": "2026-07-23",
       "license": "Original project work",
       "files": "public/assets/original/models/rustworks-central-tower.glb",
-      "sha256": "cbc586f07281c7e72ff58e5d1f4490595daef090a3b8f20ed8ed6af9a4027590",
+      "sha256": "272278efe67b1aa0215a36fd7ad3678970c04dc8efff8863234474bcc6172a5f",
       "sourceBlend": "source-assets/blender/rustworks-central-tower.blend",
-      "sourceBlendSha256": "9209b71f8f37c403e3c77b665139207ca9952f9088c5aee6e9311efaef834018",
+      "sourceBlendSha256": "271337c132aac4169265c43b3396274ccdfc8e0d288e10c9bd6906319452e6c1",
       "sourceScript": "scripts/blender/create-rustworks-central-tower.py",
-      "sourceScriptSha256": "b554b77b232543dfa623e85aa465c58e01ac65c5e5c6f43615724e844453efab",
-      "modifications": "Original climbable Rustworks oil-rig environment authored from Blender primitives by the repository generator. The Pass 60 overhaul keeps the tapered derrick and two-axis undercroft, adds the west deck-level service trench and eight centre-cover groups, separates deck surfaces, replaces the misleading solid ladder slab with an open-tread ship ladder, and lays out twenty perimeter positions with one open walk-through container per side. TypeScript boxes remain the collision and ballistic authority; the versioned .blend source and generator remain included for deterministic inspection and rebuilding.",
+      "sourceScriptSha256": "641a42b386a6cae546a0c9bc9b27b76dd63d7adac21bf6a4700101970b1a283d",
+      "modifications": "Original climbable Rustworks oil-rig environment authored from Blender primitives by the repository generator. The Pass 60 v3 repair removes eight mixed centre-cover blocks and two unsupported trench crossovers, corrects the former 1.2 metre handrail slabs into supported rails, and authors exactly twenty-four shipping containers: eighteen closed, three open at both ends, and three open at one end. TypeScript boxes remain the collision and ballistic authority; a runtime-authored animated Welsh flag flies above the tower in every graphics profile; the versioned .blend source and generator remain included for deterministic inspection and rebuilding.",
       "attributionRequired": false
     },
     {
