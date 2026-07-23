@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { HOUSE_LAYOUT } from './arena-layout';
 import {
   NEIGHBOURHOOD_BICYCLE_POSITIONS,
   NEIGHBOURHOOD_BIN_POSITIONS,
   NEIGHBOURHOOD_FLOWER_BEDS,
+  addSemanticHouseInteriors,
 } from './environment-assets';
 import { createHouseArchitecture } from './house-navigation';
 
@@ -32,6 +34,25 @@ describe('Pass 32 neighbourhood placement', () => {
     }
     for (const [x, z] of NEIGHBOURHOOD_BICYCLE_POSITIONS) {
       for (const house of houses) expect(clearOfHouse(x, z, 1, house), `bicycle ${x},${z} overlaps ${house.id}`).toBe(true);
+    }
+  });
+});
+
+describe('Pass 59 interior grounding audit', () => {
+  it('supports every elevated timber table and bed frame with grounded legs', () => {
+    const root = new THREE.Group();
+    addSemanticHouseInteriors(root);
+    for (const houseIndex of [0, 1]) {
+      for (const furniture of ['dining-table', 'bed-frame']) {
+        const piece = root.getObjectByName(`performance-interior-${houseIndex}-${furniture}`)!;
+        const supports = piece.userData.supportedBy as string[];
+        expect(supports).toHaveLength(4);
+        for (const supportName of supports) {
+          const support = root.getObjectByName(supportName)!;
+          expect(support, supportName).toBeTruthy();
+          expect(support.userData.groundedAtY).toBe(furniture === 'dining-table' ? 0 : 3.48);
+        }
+      }
     }
   });
 });

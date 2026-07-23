@@ -67,6 +67,10 @@ export function isCurrentGuestEventConnection(
   return current === closing;
 }
 
+export function guestMessageEndsSession(message: GameMessage): boolean {
+  return message.type === 'leave';
+}
+
 export function joinTimeoutAction(reconnecting: boolean): 'retry' | 'offline' {
   return reconnecting ? 'retry' : 'offline';
 }
@@ -373,6 +377,11 @@ export class ArenaNetwork {
       if (isHostAuthorityMessage(payload) || !messageBelongsToPlayer(payload, playerId)) return;
       if (payload.type === 'state') return;
       if (payload.type === 'overdrive-state' || payload.type === 'death') return;
+      if (guestMessageEndsSession(payload)) {
+        this.dropGuest(playerId, connection);
+        try { connection.close(); } catch { /* no-op */ }
+        return;
+      }
       if (payload.type === 'overdrive-claim' || payload.type === 'hit'
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
@@ -424,8 +433,8 @@ export class ArenaNetwork {
     connection.on('open', () => this.maybeClientReady());
     connection.on('data', (payload) => {
       if (!isGameMessage(payload)) return;
-      if (kind === 'state' && payload.type !== 'state') return;
-      if (kind === 'events' && payload.type === 'state') return;
+      if (kind === 'state' && !isStateTrafficMessage(payload)) return;
+      if (kind === 'events' && isStateTrafficMessage(payload)) return;
       this.onMessage(payload);
     });
     connection.on('close', () => {

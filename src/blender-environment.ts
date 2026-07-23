@@ -22,6 +22,7 @@ export type BlenderArenaTelemetry = {
   modeledBuses: number;
   largeCoverAssets: number;
   housePropSets: number;
+  collisionAuditVisuals: number;
   surfaceSeparationPass: boolean;
   worldIdentityPass: boolean;
   proceduralWorldHidden: boolean;
@@ -44,6 +45,7 @@ const telemetry: BlenderArenaTelemetry = {
   modeledBuses: 0,
   largeCoverAssets: 0,
   housePropSets: 0,
+  collisionAuditVisuals: 0,
   surfaceSeparationPass: false,
   worldIdentityPass: false,
   proceduralWorldHidden: false,
@@ -66,6 +68,20 @@ export function markBlenderArenaFallback(error: unknown): void {
   telemetry.surfaceSeparationPass = false;
 }
 
+export function mirrorAtomicCollisionAuditVisuals(proceduralWorld: THREE.Object3D, qualityRoot: THREE.Group): number {
+  const names = ['terrain-mound-west-verge', 'terrain-mound-east-verge', 'east-irrigation-vessel'];
+  let mirrored = 0;
+  for (const name of names) {
+    const source = proceduralWorld.getObjectByName(name);
+    if (!source) continue;
+    const clone = source.clone(true);
+    clone.name = name;
+    clone.userData = { ...source.userData, qualityProfileMirror: true };
+    qualityRoot.add(clone);
+    mirrored += 1;
+  }
+  return mirrored;
+}
 export async function loadBlenderArena(
   scene: THREE.Scene,
   arena: ArenaMap,
@@ -161,6 +177,8 @@ export async function loadBlenderArena(
   // authoritative ray targets. Raycast/collision authority never comes from GLB art.
   const proceduralWorld = scene.getObjectByName('Atomic Acres arena');
   if (!proceduralWorld) throw new Error('Authoritative procedural arena root is unavailable');
+  const collisionAuditVisuals = mirrorAtomicCollisionAuditVisuals(proceduralWorld, root);
+  if (collisionAuditVisuals !== 3) throw new Error('Atomic collision-audit visual mirror failed: ' + collisionAuditVisuals + '/3');
   for (const pane of arena.breakableWindows) {
     const authored = windows.get(pane.id)!;
     authored.visible = !pane.broken;
@@ -183,6 +201,7 @@ export async function loadBlenderArena(
   telemetry.modeledBuses = modeledBuses;
   telemetry.largeCoverAssets = largeCoverAssets;
   telemetry.housePropSets = housePropSets;
+  telemetry.collisionAuditVisuals = collisionAuditVisuals;
   telemetry.surfaceSeparationPass = true;
   telemetry.worldIdentityPass = routeLandmarks.size === ARENA_ROUTE_IDENTITIES.length;
   telemetry.proceduralWorldHidden = true;

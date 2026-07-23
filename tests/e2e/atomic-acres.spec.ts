@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
@@ -414,6 +415,49 @@ test.describe('boot and authored presentation', () => {
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
 
+  test('aligns the LMG ADS and renders readable white damage text in Shooting Range', async ({ page }) => {
+    await pageReadyAt(page, '/?render=performance&map=gun-range');
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        equipWeapon: (weapon: 'lmg') => void;
+        setAds: (held: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon('lmg');
+      api.setAds(true);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+    await expect.poll(async () => {
+      const offset = (await debug(page)).weaponPresentation.sightOffset;
+      return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
+    }).toBeLessThan(0.006);
+    const damageStyle = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        snapshot: () => { rangePractice: { targets: Array<{ id: string }> } };
+        hitRangeTarget: (id: string, damage: number, zone: 'body') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.hitRangeTarget(api.snapshot().rangePractice.targets[0].id, 31, 'body');
+      const container = document.querySelector<HTMLElement>('#damage-numbers');
+      const node = container?.querySelector<HTMLElement>('strong:last-of-type');
+      if (!container || !node) return null;
+      const style = getComputedStyle(node);
+      return {
+        dataLastDamage: container.dataset.lastDamage,
+        visible: node.getClientRects().length > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+        color: style.color,
+        fontWeight: style.fontWeight,
+      };
+    });
+    expect(damageStyle).not.toBeNull();
+    expect(damageStyle).toMatchObject({ dataLastDamage: '31', visible: true });
+    if (!damageStyle) throw new Error('Damage text was not created');
+    expect(damageStyle.color).toBe('rgb(255, 255, 255)');
+    const numericWeight = damageStyle.fontWeight === 'normal' ? 400 : Number.parseInt(damageStyle.fontWeight, 10);
+    expect(Number.isFinite(numericWeight), `computed font weight: ${damageStyle.fontWeight}`).toBe(true);
+    expect(numericWeight).toBeLessThanOrEqual(600);
+    await page.screenshot({ path: 'test-results/pass59-range-lmg-damage.png', animations: 'disabled' });
+  });
+
   test('requires an intentional callsign before any deployment and remembers it across builds', async ({ page }) => {
     test.setTimeout(180_000);
     await pageReady(page);
@@ -581,7 +625,10 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('loads the complete Quality Graphics arena and binds authored breakable windows', async ({ page }) => {
-    test.setTimeout(180_000);
+    // Hosted Windows exercises Quality through SwiftShader and can cross the
+    // prior three-minute limit while loading and disposing the full GLB scene.
+    // Keep the assertions unchanged but retain a finite five-minute bound.
+    test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=blender&mist=on', 60_000);
@@ -652,10 +699,11 @@ test.describe('boot and authored presentation', () => {
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
     // Quality keeps authored PBR receiver/arm silhouettes plus Pass 32 mist,
     // grounded signage and large-cover batches. The measured worst staged view
-    // remains bounded at the measured 177-call worst staged view; one live
-    // impact/fragment draw may still be present in this transient sample. The
-    // stricter settled-scene budget is enforced below.
-    expect(activeState.render.calls).toBeLessThanOrEqual(177);
+    // remains bounded at 180 calls after Pass 59 adds three explicitly audited
+    // collision-mirror meshes; one live impact/fragment draw may still be
+    // present in this transient sample. The stricter settled-scene budget is
+    // enforced below.
+    expect(activeState.render.calls).toBeLessThanOrEqual(180);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -663,7 +711,7 @@ test.describe('boot and authored presentation', () => {
     }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_100);
     const stableState = await debug(page);
-    expect(stableState.render.calls).toBeLessThanOrEqual(160);
+    expect(stableState.render.calls).toBeLessThanOrEqual(163);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
@@ -868,6 +916,25 @@ test.describe('solo mechanics', () => {
     expect(after.bots.every((bot) => Number.isInteger(bot.waypoint) && bot.waypoint >= 0 && bot.waypoint < 8
       && Number.isFinite(bot.blockedSince))).toBe(true);
     expect(after.bots.every((bot) => bot.presentationReady && bot.presentationWeaponSafe)).toBe(true);
+  });
+
+  test('only gun provenance progresses the vertical killstreak column', async ({ page }) => {
+    const streaks = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        damageBotWithCause: (cause: 'gun' | 'grenade' | 'melee' | 'environment' | 'killstreak') => void;
+        snapshot: () => { fieldSupport: { streak: number } };
+      } }).__ATOMIC_ACRES_DEBUG__;
+      const values: number[] = [];
+      for (const cause of ['grenade', 'melee', 'environment', 'killstreak', 'gun', 'killstreak'] as const) {
+        api.damageBotWithCause(cause);
+        values.push(api.snapshot().fieldSupport.streak);
+      }
+      return values;
+    });
+    expect(streaks).toEqual([0, 0, 0, 0, 1, 1]);
+    const supportCards = await page.locator('.support-list [data-support]').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().top));
+    expect(supportCards.slice(1).every((top, index) => top >= supportCards[index])).toBe(true);
+    await page.screenshot({ path: 'test-results/pass59-kill-provenance-support-column.png', animations: 'disabled' });
   });
 
   test('adds one matching hostile reinforcement on the fifth cumulative bot death', async ({ page }) => {
@@ -1179,6 +1246,8 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => page.locator('#damage-numbers').getAttribute('data-last-critical')).toBe('true');
     expect(Number(await page.locator('#damage-numbers').getAttribute('data-last-damage'))).toBeGreaterThan(0);
     await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', /CRIT/);
+    await expect(page.locator('#damage-done-feed [data-damage-dealt]')).toBeVisible();
+    await expect(page.locator('#damage-done-label')).toContainText('OUTGOING');
 
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -1190,6 +1259,8 @@ test.describe('solo mechanics', () => {
       api.setMovement(true, true);
       api.damage(999);
     });
+    await expect(page.locator('#damage-taken-feed [data-damage-taken]')).toBeVisible();
+    await expect(page.locator('#damage-taken-label')).toContainText('INCOMING');
     await expect.poll(async () => (await debug(page)).player.hp, { timeout: 6_000 }).toBe(100);
     const respawned = (await debug(page)).player;
     expect(respawned.stance).toBe('stand');
@@ -1210,6 +1281,16 @@ test.describe('solo mechanics', () => {
     await expect(roundStats).toContainText('DAMAGE');
     await expect(roundStats).toContainText('HEADSHOTS');
     await page.screenshot({ path: 'test-results/player-feedback-round-stats.png', animations: 'disabled' });
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#download-match-diagnostics').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^atomic-acres-match-atomic-acres-p-[a-f0-9]{8}\.json$/);
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const diagnostics = JSON.parse(await readFile(downloadPath!, 'utf8')) as { schemaVersion: number; context: { role: string }; events: Array<{ eventType: string }> };
+    expect(diagnostics.schemaVersion).toBe(1);
+    expect(diagnostics.context.role).toBe('offline');
+    expect(diagnostics.events.some((event) => event.eventType === 'match-end')).toBe(true);
   });
 
   test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {
@@ -1742,6 +1823,7 @@ test.describe('solo mechanics', () => {
       expect(metrics.rightGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.leftAnchored, JSON.stringify(viewport)).toBe(true);
+      expect(metrics.verticallyStacked, JSON.stringify(viewport)).toBe(true);
       expect(metrics.persistentOverlap, JSON.stringify(viewport)).toBe(false);
       expect(metrics.cardOverlap, JSON.stringify(viewport)).toBe(false);
       expect(metrics.overflow, JSON.stringify(viewport)).toBe(false);

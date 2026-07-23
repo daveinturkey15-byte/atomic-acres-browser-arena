@@ -210,3 +210,22 @@
   #changelog-panel .changelog-header strong{font-size:24px}
   .changelog-entry-head{display:grid;gap:6px}.changelog-entry-head time{text-align:left}
 }
+
+/* Pass 59: readable combat telemetry and one deterministic support column. */
+#damage-feeds{position:absolute;right:24px;top:178px;width:min(330px,42vw);display:grid;gap:11px;pointer-events:none}
+.damage-feed{display:grid;gap:4px;justify-items:end}
+.damage-feed>b{display:flex;align-items:center;gap:8px;padding:4px 8px;font:900 11px/1 Inter;letter-spacing:.16em;background:rgba(5,12,15,.82);border-right:3px solid currentColor}
+.damage-feed>b span{font:700 8px/1 Inter;letter-spacing:.12em;opacity:.72}
+.damage-feed.done>b{color:#72f2e9}.damage-feed.taken>b{color:#ff806e}
+.damage-feed>div{width:100%;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.damage-feed>div div{max-width:100%;min-width:190px;padding:7px 10px;text-align:right;background:linear-gradient(90deg,transparent,rgba(6,13,16,.88));border-right:3px solid currentColor;font:800 17px/1.05 'Barlow Condensed';letter-spacing:.045em;animation:feedIn .18s ease-out}
+.damage-feed.done>div div{color:#8cfff4}.damage-feed.taken>div div{color:#ff9a88}
+.damage-feed>div div.gold{color:#ffd76b}.damage-feed>div div.coral{color:#ff9a88}.damage-feed>div div.aqua{color:#8cfff4}
+.damage-feed>div div.fade{opacity:.24;transition:opacity .7s}
+#damage-numbers strong{left:calc(var(--damage-lane) * 30px);font-weight:600;letter-spacing:.025em;animation-duration:1.1s}
+#damage-numbers strong.critical{font-weight:700;animation-duration:1.25s}
+#support-block{width:238px}
+.support-list{grid-template-columns:1fr}
+.support-list b[data-support=nuke]{grid-column:auto}
+@media(max-width:700px){#damage-feeds{right:12px;top:150px;width:min(250px,52vw);gap:7px}.damage-feed>div div{min-width:150px;font-size:14px}.damage-feed>b{font-size:9px}#support-block{width:190px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}}
+@media(max-height:600px) and (min-width:701px){#support-block{width:238px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}.support-list b{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto}.support-state{display:block}}

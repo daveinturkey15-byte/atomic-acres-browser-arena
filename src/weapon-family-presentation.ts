@@ -28,10 +28,10 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     requiredDetails: ['smg-aperture', 'smg-front-post', 'magazine-witness', 'muzzle-brake', 'charging-tab', 'smg-foregrip'],
   },
   lmg: {
-    sightHeight: 0.25, adsX: -0.36, adsY: 0.23, adsZ: -0.02, projectionCorrection: 0,
+    sightHeight: 0.215, adsX: -0.36, adsY: 0.251, adsZ: -0.02, projectionCorrection: 0,
     flashScale: 1.14, recoilTranslation: 0.155, recoilRotation: 0.205,
     actionTravel: 0.105, smokeBase: 1.6,
-    requiredDetails: ['lmg-heavy-receiver', 'lmg-box-magazine', 'lmg-carry-handle', 'lmg-bipod', 'lmg-heat-shield', 'bolt-or-slide'],
+    requiredDetails: ['lmg-heavy-receiver', 'lmg-box-magazine', 'lmg-carry-handle', 'lmg-bipod', 'lmg-heat-shield', 'rear-sight', 'front-sight', 'bolt-or-slide'],
   },
   scattergun: {
     sightHeight: 0.2, adsX: -0.36, adsY: 0.159, adsZ: 0.015, projectionCorrection: 0.101,

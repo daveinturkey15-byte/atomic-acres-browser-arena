@@ -1,6 +1,9 @@
 import { presentationRandom } from './runtime-random';
 import { MAX_HIGH_SCORE_ENTRIES, isHighScoreEntry, type HighScoreEntry } from './high-scores';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
+import { isHostedBotSnapshot, type HostedBotSnapshot } from './hosted-bots';
+import type { KillCause } from './kill-provenance';
+import type { CombatTiming } from './network-fairness';
 import {
   isLobbySnapshot,
   isPlayerScore,
@@ -17,6 +20,7 @@ export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
 export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol']);
+export const MAX_MATCH_SCORE_ENTRIES = 10;
 
 export type PlayerSnapshot = {
   id: string;
@@ -46,6 +50,7 @@ export type ShotMessage = {
   direction: [number, number, number];
   /** Every authoritative pellet ray; one entry for single-projectile weapons. */
   pelletDirections: [number, number, number][];
+  timing?: CombatTiming;
   nonce: number;
 };
 export type MeleeMessage = {
@@ -53,6 +58,7 @@ export type MeleeMessage = {
   by: string;
   origin: [number, number, number];
   direction: [number, number, number];
+  timing?: CombatTiming;
   nonce: number;
 };
 export type GrenadeThrowMessage = {
@@ -61,6 +67,7 @@ export type GrenadeThrowMessage = {
   origin: [number, number, number];
   velocity: [number, number, number];
   actionNonce: number;
+  timing?: CombatTiming;
   nonce: number;
 };
 export type ExplosiveSource = 'grenade' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
@@ -77,6 +84,7 @@ export type HitMessage = {
   actionNonce: number;
   /** Host-verified earned-support activation; required for non-grenade explosives. */
   supportNonce?: number;
+  timing?: CombatTiming;
   nonce: number;
 };
 export type SupportActivateMessage = {
@@ -86,9 +94,16 @@ export type SupportActivateMessage = {
   activationNonce: number;
   effectOrigins: [number, number, number][];
   targetIds: string[];
+  timing?: CombatTiming;
   nonce: number;
 };
-export type DeathMessage = { type: 'death'; killer: string; victim: string; nonce: number };
+export type DeathMessage = { type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number };
+export type BotStateMessage = { type: 'bot-state'; by: string; seq: number; bots: HostedBotSnapshot[]; nonce: number };
+export type BotDamageMessage = {
+  type: 'bot-damage'; by: string; botId: string; target: string; weapon: PrimaryWeaponId;
+  origin: [number, number, number]; direction: [number, number, number];
+  damageApplied: number; healthBefore: number; healthAfter: number; nonce: number;
+};
 export type PickupMessage = {
   type: 'pickup';
   by: string;
@@ -156,7 +171,7 @@ export type ClockPingMessage = { type: 'clock-ping'; by: string; sentAtEpochMs: 
 export type ClockPongMessage = { type: 'clock-pong'; by: string; forPlayerId: string; sentAtEpochMs: number; hostEpochMs: number; nonce: number };
 export type MatchScoreMessage = { type: 'match-score'; by: string; scores: PlayerScore[]; nonce: number };
 
-export type GameMessage = JoinMessage | StateMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
@@ -179,6 +194,14 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol'));
 }
 
+function isOptionalCombatTiming(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object') return false;
+  const timing = value as Record<string, unknown>;
+  return Number.isSafeInteger(timing.eventSeq) && Number(timing.eventSeq) >= 0
+    && Number.isFinite(timing.sentAtEpochMs) && Number(timing.sentAtEpochMs) > 0;
+}
+
 export function isGameMessage(value: unknown): value is GameMessage {
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
@@ -192,17 +215,20 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
         && Array.isArray(msg.pelletDirections) && msg.pelletDirections.length >= 1 && msg.pelletDirections.length <= 12
         && msg.pelletDirections.every((direction) => Array.isArray(direction) && direction.length === 3 && direction.every(Number.isFinite))
+        && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'melee':
       return typeof msg.by === 'string'
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
+        && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'grenade-throw':
       return typeof msg.by === 'string'
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Array.isArray(msg.velocity) && msg.velocity.length === 3 && msg.velocity.every(Number.isFinite)
         && Number.isFinite(msg.actionNonce)
+        && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'hit':
       return typeof msg.by === 'string' && typeof msg.target === 'string'
@@ -220,6 +246,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.kind === 'explosive' && msg.explosiveSource !== 'grenade'
           ? Number.isFinite(msg.supportNonce)
           : msg.supportNonce === undefined)
+        && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'support-activate':
       return typeof msg.by === 'string'
@@ -233,9 +260,36 @@ export function isGameMessage(value: unknown): value is GameMessage {
           : msg.source === 'yardhawk' ? msg.effectOrigins.length === 0 && msg.targetIds.length === 1
             : msg.source === 'hunter-swarm' ? msg.effectOrigins.length === 0 && msg.targetIds.length >= 1
               : msg.effectOrigins.length === 0 && msg.targetIds.length === 0)
+        && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'death':
-      return typeof msg.killer === 'string' && typeof msg.victim === 'string' && Number.isFinite(msg.nonce);
+      return typeof msg.killer === 'string' && typeof msg.victim === 'string'
+        && Boolean(msg.cause) && typeof msg.cause === 'object'
+        && ((msg.cause as { kind?: unknown }).kind === 'gun' && weapons.has((msg.cause as { weapon?: WeaponId }).weapon as WeaponId)
+          || (msg.cause as { kind?: unknown }).kind === 'grenade'
+          || (msg.cause as { kind?: unknown }).kind === 'melee'
+          || (msg.cause as { kind?: unknown }).kind === 'environment'
+          || (msg.cause as { kind?: unknown; effect?: unknown }).kind === 'killstreak'
+            && offensiveSupportSources.has((msg.cause as { effect?: OffensiveSupportSource }).effect as OffensiveSupportSource))
+        && Number.isFinite(msg.nonce);
+    case 'bot-damage':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.botId === 'string' && /^host-bot-[0-3]$/.test(msg.botId)
+        && typeof msg.target === 'string' && msg.target.length > 0 && msg.target.length <= 80
+        && primaryWeapons.has(msg.weapon as PrimaryWeaponId)
+        && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
+        && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
+        && Number.isFinite(msg.damageApplied) && Number(msg.damageApplied) > 0 && Number(msg.damageApplied) <= 100
+        && Number.isFinite(msg.healthBefore) && Number(msg.healthBefore) >= 0 && Number(msg.healthBefore) <= 100
+        && Number.isFinite(msg.healthAfter) && Number(msg.healthAfter) >= 0 && Number(msg.healthAfter) <= Number(msg.healthBefore)
+        && Math.abs(Number(msg.healthBefore) - Number(msg.healthAfter) - Number(msg.damageApplied)) < 1e-6
+        && Number.isFinite(msg.nonce);
+    case 'bot-state':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Number.isSafeInteger(msg.seq) && Number(msg.seq) >= 0
+        && Array.isArray(msg.bots) && msg.bots.length <= 4 && msg.bots.every(isHostedBotSnapshot)
+        && new Set(msg.bots.map((bot) => bot.id)).size === msg.bots.length
+        && Number.isFinite(msg.nonce);
     case 'pickup':
       return typeof msg.by === 'string'
         && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
@@ -324,7 +378,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.nonce);
     case 'match-score':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
-        && Array.isArray(msg.scores) && msg.scores.length <= 6 && msg.scores.every(isPlayerScore)
+        && Array.isArray(msg.scores) && msg.scores.length <= MAX_MATCH_SCORE_ENTRIES && msg.scores.every(isPlayerScore)
         && new Set(msg.scores.map((score) => score.id)).size === msg.scores.length
         && Number.isFinite(msg.nonce);
     default:
@@ -338,6 +392,9 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'join':
     case 'state':
       return message.player.id === playerId;
+    case 'bot-state':
+    case 'bot-damage':
+      return message.by === playerId;
     case 'lobby-join':
       return message.playerId === playerId;
     case 'shot':
@@ -377,11 +434,13 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
     || message.type === 'clock-pong'
-    || message.type === 'match-score';
+    || message.type === 'match-score'
+    || message.type === 'bot-state'
+    || message.type === 'bot-damage';
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage {
-  return message.type === 'state';
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage {
+  return message.type === 'state' || message.type === 'bot-state';
 }
 
 export function sanitizeName(value: string): string {

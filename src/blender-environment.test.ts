@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BLENDER_ARENA_ASSET, proceduralArenaRootVisible } from './blender-environment';
+import * as THREE from 'three';
+import { BLENDER_ARENA_ASSET, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
 
 const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
@@ -24,6 +25,20 @@ describe('Quality Graphics environment asset', () => {
     expect(proceduralArenaRootVisible('gun-range', false)).toBe(false);
   });
 
+  it('mirrors collision-audit visuals into Quality without changing authority', () => {
+    const procedural = new THREE.Group();
+    for (const name of ['terrain-mound-west-verge', 'terrain-mound-east-verge', 'east-irrigation-vessel']) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
+      mesh.name = name;
+      mesh.userData.collisionAuthority = name + '-collider';
+      procedural.add(mesh);
+    }
+    const quality = new THREE.Group();
+    expect(mirrorAtomicCollisionAuditVisuals(procedural, quality)).toBe(3);
+    expect(quality.children).toHaveLength(3);
+    expect(quality.children.every((child) => child.userData.qualityProfileMirror === true)).toBe(true);
+    expect(procedural.children).toHaveLength(3);
+  });
   it('ships a self-contained, bounded original arena GLB with semantic windows', () => {
     const buffer = readFileSync(assetPath);
     const gltf = glbJson(buffer) as {

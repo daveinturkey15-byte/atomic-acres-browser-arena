@@ -53,6 +53,29 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(grenadeThrow, 'a')).toBe(true);
   });
 
+  it('validates combat timing and bounded host-bot authority messages', () => {
+    const timing = { eventSeq: 7, sentAtEpochMs: 1_700_000_000_000 };
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing, nonce: 3 })).toBe(true);
+    expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing: { ...timing, eventSeq: -1 }, nonce: 3 })).toBe(false);
+    const bot = { id: 'host-bot-0', name: 'Hosted Rival 1', team: 1 as const, weapon: 'lmg' as const, x: 1, y: 0, z: 2, yaw: 0, hp: 100, kills: 0, deaths: 0, alive: true, seq: 2 };
+    const botState = { type: 'bot-state' as const, by: 'host', seq: 2, bots: [bot], nonce: 20 };
+    const botDamage = { type: 'bot-damage' as const, by: 'host', botId: bot.id, target: 'abc', weapon: bot.weapon, origin: [1, 1.4, 2] as [number, number, number], direction: [0, 0, -1] as [number, number, number], damageApplied: 14, healthBefore: 100, healthAfter: 86, nonce: 21 };
+    expect(isGameMessage(botState)).toBe(true);
+    expect(isHostAuthorityMessage(botState)).toBe(true);
+    expect(isStateTrafficMessage(botState)).toBe(true);
+    expect(isGameMessage(botDamage)).toBe(true);
+    expect(isHostAuthorityMessage(botDamage)).toBe(true);
+    expect(isGameMessage({ ...botDamage, healthAfter: 85 })).toBe(false);
+    expect(isGameMessage({ ...botState, bots: [bot, bot] })).toBe(false);
+  });
+
+  it('admits score snapshots for the maximum six-player/four-bot lobby', () => {
+    const score = (id: string) => ({ id, kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 });
+    const scores = Array.from({ length: 10 }, (_, index) => score(`player-${index}`));
+    expect(isGameMessage({ type: 'match-score', by: 'host', scores, nonce: 22 })).toBe(true);
+    expect(isGameMessage({ type: 'match-score', by: 'host', scores: [...scores, score('overflow')], nonce: 23 })).toBe(false);
+  });
+
   it('validates replicated pickup and breakable-window messages', () => {
     const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', mode: 'weapon', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;
@@ -116,8 +139,8 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ type: 'melee', by: 'spoof', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'ping', by: 'abc', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'ping', by: 'spoof', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(false);
-    expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', nonce: 2 }, 'abc')).toBe(true);
-    expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', nonce: 2 }, 'abc')).toBe(false);
+    expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', cause: { kind: 'gun', weapon: 'carbine' }, nonce: 2 }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', cause: { kind: 'gun', weapon: 'carbine' }, nonce: 2 }, 'abc')).toBe(false);
   });
 
   it('validates bounded lobby control traffic and identifies host authority', () => {
@@ -129,7 +152,7 @@ describe('network protocol guards', () => {
         revision: 2,
         hostId: 'host',
         phase: 'waiting' as const,
-        config: { mode: 'tdm' as const, capacity: 4 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
+        config: { mode: 'tdm' as const, capacity: 4 as const, hostedBotCount: 0 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
         members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0 }],
         scores: [{ id: 'host', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 }],
         activeAtEpochMs: null,

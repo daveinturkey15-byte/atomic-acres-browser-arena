@@ -26,7 +26,7 @@ export function damageNumberPresentation(damage: number, zone: HitZone): DamageN
     amount,
     critical,
     label: critical ? `CRIT ${amount}` : String(amount),
-    durationMs: critical ? 920 : 760,
+    durationMs: critical ? 1_250 : 1_100,
   };
 }
 

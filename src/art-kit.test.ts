@@ -111,6 +111,8 @@ describe('attached weapon draw-call batching', () => {
     expect(lmg.getObjectByName('curved-magazine')?.visible).toBe(false);
     expect(lmg.getObjectsByProperty('name', 'reload-socket-l')).toHaveLength(1);
     expect(lmg.getObjectByName('muzzle-socket')?.position.z).toBeLessThan(-1.8);
+    expect(lmg.getObjectByName('rear-sight-socket')?.position.y).toBeCloseTo(0.215, 3);
+    expect(lmg.getObjectByName('front-sight-socket')?.position.y).toBeCloseTo(0.215, 3);
   });
 
   it('keeps the machine pistol recognisably richer than the service pistol after bounded batching', () => {

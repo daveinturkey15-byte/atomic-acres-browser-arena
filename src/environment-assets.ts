@@ -551,7 +551,7 @@ function addRouteArchitecture(root: THREE.Group): void {
   });
 }
 
-function addSemanticHouseInteriors(root: THREE.Group): void {
+export function addSemanticHouseInteriors(root: THREE.Group): void {
   const interiors = new THREE.Group();
   interiors.name = 'performance-interior-furnishing-sets';
   const fabric = texturedMaterial('./assets/original/textures/fabric-weave.png', {
@@ -620,7 +620,13 @@ function addSemanticHouseInteriors(root: THREE.Group): void {
   HOUSE_LAYOUT.forEach((house, houseIndex) => {
     const safeSide = house.team === 0 ? -1 : 1;
     const safeX = safeSide * 5.8;
-    addPiece(houseIndex, house, 'dining-table', [safeX, 0.86, 3.9], [2.7, 0.18, 1.25], timber, 'timber');
+    const diningTable = addPiece(houseIndex, house, 'dining-table', [safeX, 0.86, 3.9], [2.7, 0.18, 1.25], timber, 'timber');
+    diningTable.userData.supportedBy = [];
+    for (const legX of [-0.95, 0.95]) for (const legZ of [-0.4, 0.4]) {
+      const leg = addPiece(houseIndex, house, 'dining-table-leg-' + legX + '-' + legZ, [safeX + legX, 0.385, 3.9 + legZ], [0.14, 0.77, 0.14], timber, 'timber');
+      leg.userData.groundedAtY = 0;
+      diningTable.userData.supportedBy.push(leg.name);
+    }
     for (const side of [-1, 1]) {
       addPiece(houseIndex, house, `dining-chair-${side}`, [safeX + side * 1.65, 0.52, 3.9], [0.62, 1.04, 0.62], timber, 'timber');
     }
@@ -633,7 +639,13 @@ function addSemanticHouseInteriors(root: THREE.Group): void {
     addPiece(houseIndex, house, 'media-console', [-safeX, 0.52, -4.45], [2.5, 0.88, 0.56], darkEquipment, 'dark-equipment');
     addPiece(houseIndex, house, 'media-screen', [-safeX, 1.55, -4.65], [2.15, 1.25, 0.14], darkEquipment, 'dark-equipment');
 
-    addPiece(houseIndex, house, 'bed-frame', [safeX, 3.78, 3.7], [3.25, 0.28, 2.3], timber, 'timber');
+    const bedFrame = addPiece(houseIndex, house, 'bed-frame', [safeX, 3.78, 3.7], [3.25, 0.28, 2.3], timber, 'timber');
+    bedFrame.userData.supportedBy = [];
+    for (const legX of [-1.35, 1.35]) for (const legZ of [-0.92, 0.92]) {
+      const leg = addPiece(houseIndex, house, 'bed-leg-' + legX + '-' + legZ, [safeX + legX, 3.56, 3.7 + legZ], [0.14, 0.16, 0.14], timber, 'timber');
+      leg.userData.groundedAtY = 3.48;
+      bedFrame.userData.supportedBy.push(leg.name);
+    }
     addPiece(houseIndex, house, 'bed-mattress', [safeX, 4.08, 3.7], [3.05, 0.4, 2.1], fabric, 'fabric');
     addPiece(houseIndex, house, 'bed-pillow', [safeX, 4.42, 4.35], [1.55, 0.24, 0.62], fabric, 'fabric');
 

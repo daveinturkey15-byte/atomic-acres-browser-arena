@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DataConnection } from 'peerjs';
-import { isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner } from './network';
+import { guestMessageEndsSession, isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner } from './network';
 
 describe('guest event connection lifecycle', () => {
   it('does not let a stale same-peer close callback evict the replacement session', () => {
@@ -28,5 +28,12 @@ describe('guest event connection lifecycle', () => {
     const owners = new Map([['peer-stable', 'player-1']]);
     replaceGuestPeerOwner(owners, 'player-1', 'peer-stable', 'peer-stable');
     expect([...owners.entries()]).toEqual([['peer-stable', 'player-1']]);
+  });
+
+  it('terminates a bound guest session when that guest emits leave', () => {
+    expect(guestMessageEndsSession({ type: 'leave', playerId: 'player-1', voluntary: true })).toBe(true);
+    expect(guestMessageEndsSession({
+      type: 'ping', by: 'player-1', team: 0, kind: 'enemy', position: [0, 0, 0], nonce: 1,
+    })).toBe(false);
   });
 });

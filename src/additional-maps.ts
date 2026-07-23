@@ -647,6 +647,43 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     });
   }
 
+  // Four deliberately different centre-cover rhythms pull exterior freight language
+  // toward the tower without forming another repetitive perimeter row.
+  const centreCover = (
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    style: 'stacked' | 'staggered' | 'l-corner' | 'low-flank',
+    rotation?: [number, number, number],
+    supportedBy: 'deck' | string = 'deck',
+  ): THREE.Mesh => {
+    const ballisticMaterial: BallisticMaterialId = material === concrete || material === concreteDark
+      ? 'concrete'
+      : material === tarp
+        ? 'container'
+        : 'structural-metal';
+    const mesh = box(builder, name, position, size, material, { rotation, ballisticMaterial });
+    mesh.userData.rustworksCentreCoverStyle = style;
+    mesh.userData.supportedBy = supportedBy;
+    mesh.userData.authoredBottomY = position[1] - size[1] / 2;
+    return mesh;
+  };
+  centreCover('rustworks-centre-stack-base', [9.2, 0.6, -9.4], [3.2, 1.2, 2.2], rustDark, 'stacked');
+  centreCover('rustworks-centre-stack-top', [9.7, 1.65, -9.4], [1.8, 0.9, 1.8], hazardDark, 'stacked', undefined, 'rustworks-centre-stack-base');
+  centreCover('rustworks-centre-stagger-long', [-9.4, 0.62, -8.5], [3.4, 1.24, 1.0], tarp, 'staggered', [0, 0.28, 0]);
+  centreCover('rustworks-centre-stagger-short', [-8.15, 0.45, -5.9], [1.0, 0.9, 2.4], steel, 'staggered', [0, -0.22, 0]);
+  centreCover('rustworks-centre-corner-long', [9.4, 0.55, 8.2], [3.6, 1.1, 0.9], concreteDark, 'l-corner');
+  centreCover('rustworks-centre-corner-high', [8.1, 0.8, 9.45], [0.9, 1.6, 3.4], oxide, 'l-corner');
+  centreCover('rustworks-centre-low-flank-a', [-9.8, 0.42, 8.6], [2.8, 0.84, 1.2], concrete, 'low-flank', [0, -0.18, 0]);
+  centreCover('rustworks-centre-low-flank-b', [-7.7, 0.42, 10.0], [1.8, 0.84, 1.2], hazardDark, 'low-flank', [0, 0.36, 0]);
+  root.userData.rustworksCentreCoverAudit = {
+    styles: ['stacked', 'staggered', 'l-corner', 'low-flank'],
+    count: 8,
+    deckGroundY: 0,
+    minimumTowerDistance: 7.7,
+    lanesPreserved: ['north-south-service', 'east-west-service', 'west-trench', 'tower-undercroft'],
+  };
   // Four containers per side (16 total). Nine-metre centres leave 3.2 m clear
   // between adjacent 5.8 m shells. One placement per side is open end-to-end.
   const perimeterSlots = [-18, -9, 9, 18] as const;
@@ -1678,6 +1715,24 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-baggage-item-1', [-2.5, 0.9, -31], [1.1, 0.5, 0.7], cargoMat, { solid: false, detail: 'quality' });
   box(builder, 'skyline-baggage-item-2', [2.2, 0.9, -31], [0.9, 0.45, 0.65], hazardMat, { solid: false, detail: 'quality' });
 
+  // Door audit: the central terminal and aircraft apertures are deliberately open;
+  // the two staff doors are visibly closed against the authoritative back wall.
+  detailBox('boarding-route', 'skyline-terminal-gate-jamb-left', [-1.84, 4.15, -11.86], [0.18, 2.2, 0.28], trimMat, 'performance', undefined, true);
+  detailBox('boarding-route', 'skyline-terminal-gate-jamb-right', [1.84, 4.15, -11.86], [0.18, 2.2, 0.28], trimMat, 'performance', undefined, true);
+  detailBox('boarding-route', 'skyline-terminal-gate-header', [0, 5.2, -11.86], [3.86, 0.18, 0.28], trimMat, 'performance', undefined, true);
+  detailBox('boarding-route', 'skyline-terminal-gate-threshold', [0, 3.34, -11.84], [3.55, 0.08, 0.34], rubberMat);
+  for (const [id, x] of [['west', -22], ['east', 22]] as const) {
+    detailBox('terminal-story', 'skyline-staff-door-' + id, [x, 1.25, -33.66], [2.25, 2.5, 0.12], wallLowerMat, 'performance');
+    detailBox('terminal-story', 'skyline-staff-door-' + id + '-header', [x, 2.62, -33.61], [2.55, 0.18, 0.2], structureMat, 'performance', undefined, true);
+    for (const side of [-1, 1]) detailBox('terminal-story', 'skyline-staff-door-' + id + '-jamb-' + side, [x + side * 1.22, 1.35, -33.61], [0.18, 2.7, 0.2], structureMat, 'performance', undefined, true);
+    detailBox('terminal-story', 'skyline-staff-door-' + id + '-handle', [x + 0.7, 1.25, -33.52], [0.08, 0.36, 0.1], hazardMat);
+  }
+  root.userData.skylineDoorAudit = [
+    { id: 'terminal-gate', state: 'open', mechanicalAuthority: 'open-facade-gap', clearWidth: 3.5 },
+    { id: 'aircraft-boarding', state: 'open', mechanicalAuthority: 'split-fuselage-wall', clearWidth: 2.68 },
+    { id: 'staff-west', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall', clearWidth: 0 },
+    { id: 'staff-east', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall', clearWidth: 0 },
+  ];
   const breakableWindows: BreakableWindow[] = [];
   for (const winX of [-22, -14, -6, 6, 14, 22]) {
     const windowId = `skyline-window-${winX}`;

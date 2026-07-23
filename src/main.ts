@@ -21,7 +21,6 @@ import {
   operatorYawToward,
   respawnBotState,
   shouldBotThrowGrenade,
-  selectFarthestSpawnCandidate,
   shouldFlipSpawnSide,
   type SpawnFlipHysteresis,
 } from './bot-ai';
@@ -229,6 +228,12 @@ import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosi
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
+import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
+import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
+import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
+import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
+import { scoreSpawnCandidates, type SpawnMode } from './spawn-safety';
+import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
 import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
@@ -240,6 +245,8 @@ import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, 
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
 import {
+  BotDamageMessage,
+  BotStateMessage,
   DeathMessage,
   ExplosiveSource,
   GameMessage,
@@ -342,7 +349,7 @@ type GrenadeEntity = {
   explodeAt: number;
   lastBounceAt: number;
   actionNonce: number;
-  ownerKind: 'player' | 'bot';
+  ownerKind: 'player' | 'bot' | 'remote';
   ownerId: string;
 };
 
@@ -372,6 +379,15 @@ type HunterDroneEntity = {
   spawnedAt: number;
   diveAt: number;
   expiresAt: number;
+};
+
+type RemoteSupportPresentation = {
+  source: OffensiveSupportSource;
+  roots: { root: THREE.Group; target: THREE.Vector3 }[];
+  startedAt: number;
+  detonateAt: number;
+  expiresAt: number;
+  detonated: boolean;
 };
 
 type NukeSequence = {
@@ -467,6 +483,7 @@ app.innerHTML = `
         <div class="lobby-settings">
           <label>MODE<select id="lobby-mode"><option value="tdm">TEAM DEATHMATCH</option><option value="ffa">FREE FOR ALL</option></select></label>
           <label>CAPACITY<select id="lobby-capacity"><option value="4">4 PLAYERS</option><option value="6">6 PLAYERS</option></select></label>
+          <label>HOSTED BOTS<select id="lobby-bots"><option value="0">NO BOTS</option><option value="2">2 BOTS</option><option value="4">4 BOTS</option></select></label>
           <label class="lobby-check"><input id="lobby-auto-balance" type="checkbox" checked> AUTO BALANCE</label>
           <button id="lobby-balance" type="button">BALANCE TEAMS</button>
         </div>
@@ -553,7 +570,11 @@ app.innerHTML = `
       <div class="scope-reticle"><i></i><b></b><span></span><em></em></div>
       <small>3×</small>
     </div>
-    <div id="killfeed"></div>
+    <div id="killfeed" aria-live="polite" aria-label="Match events"></div>
+    <div id="damage-feeds" aria-label="Damage activity">
+      <section class="damage-feed done" aria-labelledby="damage-done-label"><b id="damage-done-label">DAMAGE DONE <span>OUTGOING</span></b><div id="damage-done-feed" aria-live="polite"></div></section>
+      <section class="damage-feed taken" aria-labelledby="damage-taken-label"><b id="damage-taken-label">DAMAGE TAKEN <span>INCOMING</span></b><div id="damage-taken-feed" aria-live="assertive"></div></section>
+    </div>
     <div id="objective">ATOMIC ACRES · FIVE MINUTES · MOST KILLS WINS</div>
     <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
     <div id="map-heading">N · 000°</div>
@@ -1054,6 +1075,7 @@ const dormantBots = new Map<string, BotPlayer>();
 let dormantBotsPrewarmed = false;
 let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
+const remoteSupportPresentations: RemoteSupportPresentation[] = [];
 let botWeaponAssignments: PrimaryWeaponId[] = [];
 let botGrenadeThrows = 0;
 let botGrenadeMaxActive = 0;
@@ -1100,6 +1122,8 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
+const PASS59_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass59-candidate';
+const PASS59_DIAGNOSTIC_SOURCE_ID = 'baseline-f55529f1-plus-local-pass59';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 const localArenaSwitchQaDelayMs = localMultiplayerQa
@@ -1163,6 +1187,9 @@ const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplo
 const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
 const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const peerTimingStates = new Map<string, PeerTimingState>();
+let localCombatEventSeq = 0;
+const combatAdmissionTelemetry: Record<string, number> = {};
 const localSupportNonces = new Map<OffensiveSupportSource, number>();
 const remoteHitAdmissionTelemetry: Record<string, number> = {};
 function recordRemoteHitAdmission(label: string): void {
@@ -1197,6 +1224,8 @@ let localResumeToken = '';
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
 let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+let hostedBotStateSeq = 0;
+let lastHostedBotStateSeq = -1;
 const hostLobbyMembers = new Map<string, LobbyMember>();
 const hostLobbyTokens = new Map<string, string>();
 const hostDisconnectedAt = new Map<string, number>();
@@ -1237,6 +1266,8 @@ let minimapRenderCount = 0;
 let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
+const recentDeathPositions: Array<{ point: THREE.Vector3; at: number }> = [];
+const lastBotSpawnAudit = new Map<Team, { selectedIndex: number; score: number; reason: string }>();
 let spawnFlipHysteresis: [SpawnFlipHysteresis, SpawnFlipHysteresis] = [
   createSpawnFlipHysteresis(),
   createSpawnFlipHysteresis(),
@@ -1249,6 +1280,10 @@ let lastPlayerSpawnAudit: {
   safeTierCount: number;
   selectedSide: Team;
   flipped: boolean;
+  score: number;
+  reason: string;
+  mode: SpawnMode;
+  population: number;
 } | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
 let debugShadowProbe: THREE.Mesh | null = null;
@@ -1259,6 +1294,53 @@ let debugCaptureCameraActive = false;
 let debugCaptureViewmodelHidden = false;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
+let matchDiagnostics: MatchDiagnostics | null = null;
+let matchDiagnosticsStartedAt = performance.now();
+let matchDiagnosticSequence = 0;
+type MatchDiagnosticDetails = Partial<Omit<MatchDiagnosticInput, 'monotonicMs' | 'localEpochMs' | 'eventId' | 'eventType' | 'admission'>>;
+
+function recordMatchDiagnostic(eventType: string, admission: DiagnosticAdmission, details: MatchDiagnosticDetails = {}, correlationId?: string): void {
+  if (!matchDiagnostics) return;
+  const now = performance.now();
+  matchDiagnostics.record({
+    ...details,
+    monotonicMs: Math.round(now * 10) / 10,
+    localEpochMs: Date.now(),
+    matchTimeMs: Math.max(0, Math.round((now - matchDiagnosticsStartedAt) * 10) / 10),
+    eventId: correlationId ?? `${eventType}-${matchDiagnosticSequence}`,
+    eventType,
+    admission,
+  });
+  matchDiagnosticSequence += 1;
+}
+
+function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: number): void {
+  matchDiagnosticsStartedAt = startedAt;
+  matchDiagnosticSequence = 0;
+  matchDiagnostics = new MatchDiagnostics({
+    buildId: PASS59_DIAGNOSTIC_BUILD_ID,
+    sourceId: PASS59_DIAGNOSTIC_SOURCE_ID,
+    sessionId: `${player.id}:${Date.now()}`,
+    role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
+    arena: selectedArena.id,
+    mode: mode === 'solo' ? 'solo' : privateMatchMode,
+  });
+  recordMatchDiagnostic('match-start', 'observed', { actorId: player.id, reason: 'local match diagnostics initialized' });
+}
+
+function downloadMatchDiagnostics(): void {
+  if (!matchDiagnostics) return;
+  const exported = matchDiagnostics.export();
+  const url = URL.createObjectURL(new Blob([exported.json], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = exported.filename;
+  link.rel = 'noopener';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 let respawnEndsAt = 0;
 let respawnTimer: ReturnType<typeof setTimeout> | null = null;
 let previousHudScores: [number, number] = [0, 0];
@@ -1577,6 +1659,8 @@ function resetPrivateLobbyState(): void {
   privateMatchMode = 'tdm';
   privateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
   hostClockOffsetMs = 0;
+  localCombatEventSeq = 0;
+  peerTimingStates.clear();
   localLobbyPingMs = null;
   localLobbyReady = false;
   localResumeToken = '';
@@ -1619,7 +1703,7 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
 }
 
 function initializeHostLobby(): void {
-  privateMatchConfig = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id === 'rustworks-1v1' ? 'rustworks-1v1' : 'atomic-acres' };
+  privateMatchConfig = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id === 'gun-range' ? 'atomic-acres' : selectedArena.id };
   privateMatchMode = privateMatchConfig.mode;
   localResumeToken = randomLobbyCredential();
   hostLobbyTokens.set(player.id, localResumeToken);
@@ -1755,6 +1839,9 @@ function markLobbyDisconnected(playerId: string): void {
     hostLobbyMembers.delete(playerId);
     hostLobbyTokens.delete(playerId);
     authoritativeScores.delete(playerId);
+    remoteSupportAuthorities.delete(playerId);
+    remoteGrenadeAuthorities.delete(playerId);
+    remoteHealthAuthorities.delete(playerId);
     broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   }, REJOIN_GRACE_MS + 50);
 }
@@ -1782,7 +1869,7 @@ function acceptClockPong(message: Extract<GameMessage, { type: 'clock-pong' }>):
 
 function sendAuthoritativeScores(targetPlayerId?: string): void {
   if (network.role !== 'host') return;
-  const scores = [...authoritativeScores.values()].slice(0, privateMatchConfig.capacity);
+  const scores = [...authoritativeScores.values()].slice(0, privateMatchConfig.capacity + privateMatchConfig.hostedBotCount);
   const message: MatchScoreMessage = { type: 'match-score', by: player.id, scores, nonce: randomNonce() };
   if (targetPlayerId) network.sendToPlayer(targetPlayerId, message);
   else network.send(message);
@@ -1958,6 +2045,13 @@ function handleLobbyMessage(message: GameMessage): boolean {
   if (message.type === 'clock-ping') {
     if (network.role === 'host') {
       const member = hostLobbyMembers.get(message.by);
+      const receivedAtEpochMs = Date.now();
+      const reportedRttMs = message.reportedRttMs ?? peerTimingStates.get(message.by)?.rttMs ?? 0;
+      const priorTiming = peerTimingStates.get(message.by) ?? createPeerTimingState();
+      peerTimingStates.set(message.by, updatePeerTiming(priorTiming, {
+        clockOffsetMs: receivedAtEpochMs - message.sentAtEpochMs - reportedRttMs / 2,
+        rttMs: reportedRttMs,
+      }));
       if (member && message.reportedRttMs !== null) hostLobbyMembers.set(message.by, { ...member, pingMs: Math.round(message.reportedRttMs) });
       network.sendToPlayer(message.by, {
         type: 'clock-pong', by: player.id, forPlayerId: message.by,
@@ -2017,12 +2111,15 @@ function renderPrivateLobby(): void {
   const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
   const modeInput = element<HTMLSelectElement>('#lobby-mode');
   const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
+  const botInput = element<HTMLSelectElement>('#lobby-bots');
   const balanceInput = element<HTMLInputElement>('#lobby-auto-balance');
   modeInput.value = snapshot?.config.mode ?? privateMatchConfig.mode;
   capacityInput.value = String(capacity);
+  botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
   balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
   modeInput.disabled = !hostControls;
   capacityInput.disabled = !hostControls;
+  botInput.disabled = !hostControls;
   balanceInput.disabled = !hostControls || modeInput.value === 'ffa';
   element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa';
   const localMember = members.find((member) => member.id === player.id);
@@ -2300,9 +2397,56 @@ function updateTeamPings(now: number): void {
   }
 }
 
+function nextCombatTiming(): CombatTiming {
+  const timing = { eventSeq: localCombatEventSeq, sentAtEpochMs: Date.now() };
+  recordMatchDiagnostic('combat-send', 'observed', {
+    actorId: player.id,
+    reason: 'local-input-to-network-event',
+    rttMs: localLobbyPingMs ?? undefined,
+    clockOffsetMs: network.role === 'client' ? hostClockOffsetMs : 0,
+  }, `combat-seq-${timing.eventSeq}`);
+  localCombatEventSeq += 1;
+  return timing;
+}
+
+function isTimedCombatMessage(message: GameMessage): message is ShotMessage | MeleeMessage | Extract<GameMessage, { type: 'grenade-throw' | 'hit' | 'support-activate' }> {
+  return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit' || message.type === 'support-activate';
+}
+
+function admitIncomingCombatTiming(message: GameMessage): boolean {
+  if (network.role !== 'host' || message.type === 'bot-damage' || message.type === 'bot-state' || !isTimedCombatMessage(message)) return true;
+  if (message.by === player.id) return true;
+  if (!remotes.has(message.by) || !message.timing) {
+    recordMatchDiagnostic('combat-timing', 'rejected', { actorId: message.by, weaponOrEffect: message.type, reason: !message.timing ? 'missing-timing' : 'unknown-peer' });
+    return false;
+  }
+  const prior = peerTimingStates.get(message.by) ?? createPeerTimingState();
+  const admission = admitCombatTiming(prior, message.timing, Date.now());
+  combatAdmissionTelemetry[admission.reason] = (combatAdmissionTelemetry[admission.reason] ?? 0) + 1;
+  recordMatchDiagnostic('combat-timing', admission.accepted ? 'accepted' : 'rejected', {
+    actorId: message.by,
+    weaponOrEffect: message.type,
+    reason: admission.reason,
+    rttMs: prior.rttMs,
+    jitterMs: prior.jitterMs,
+    clockOffsetMs: prior.clockOffsetMs,
+    modifiers: [`age:${Math.round(admission.sampleAgeMs)}`, `rewind:${Math.round(admission.rewindMs)}`],
+  }, `combat-seq-${message.timing.eventSeq}`);
+  if (admission.accepted) peerTimingStates.set(message.by, admission.state);
+  return admission.accepted;
+}
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
+  if (!admitIncomingCombatTiming(message)) return;
+  if (message.type === 'bot-damage') {
+    acceptHostedBotDamage(message);
+    return;
+  }
+  if (message.type === 'bot-state') {
+    acceptHostedBotState(message);
+    return;
+  }
   if (message.type === 'overdrive-claim') {
     acceptOverdriveClaim(message);
     return;
@@ -2345,16 +2489,19 @@ function onNetworkMessage(message: GameMessage): void {
     if (incoming.id === player.id || !pointInsideBounds(incoming, arena.bounds, 0.44)) return;
     let remote = remotes.get(incoming.id);
     if (!remote) {
-      remote = createRemote(incoming);
+      const retainedHealth = network.role === 'host' ? remoteHealthAuthorities.get(incoming.id) : undefined;
+      const initialHealth = retainedHealth ?? createRemoteHealthAuthorityState(incoming.hp > 0);
+      const initialIncoming = network.role === 'host' ? { ...incoming, hp: initialHealth.hp } : incoming;
+      remote = createRemote(initialIncoming);
       remotes.set(incoming.id, remote);
-      remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
-      remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
-      remoteHealthAuthorities.set(incoming.id, createRemoteHealthAuthorityState(incoming.hp > 0));
-      if (network.role === 'host') network.send({ type: 'join', player: { ...incoming, hp: incoming.hp > 0 ? 100 : 0 } });
-      addFeed(`${incoming.name} entered the test block`, incoming.team === 0 ? 'aqua' : 'coral');
+      if (!remoteSupportAuthorities.has(incoming.id)) remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+      if (!remoteGrenadeAuthorities.has(incoming.id)) remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+      if (!retainedHealth) remoteHealthAuthorities.set(incoming.id, initialHealth);
+      if (network.role === 'host') network.send({ type: 'join', player: initialIncoming });
+      addFeed(`${initialIncoming.name} entered the test block`, initialIncoming.team === 0 ? 'aqua' : 'coral');
+      sendLeaderboardSync();
       if (message.type === 'join') {
         network.send({ type: 'state', player: snapshot() });
-        sendLeaderboardSync();
         broadcastOverdriveState(performance.now());
       }
     }
@@ -2382,7 +2529,21 @@ function onNetworkMessage(message: GameMessage): void {
         remote.claimEligibleAt,
         respawned,
       );
-      if (!movement.accepted) return;
+      if (!movement.accepted) {
+        recordMatchDiagnostic('state-reconciliation', 'rejected', {
+          actorId: admittedIncoming.id,
+          position: [admittedIncoming.x, admittedIncoming.y, admittedIncoming.z],
+          reason: 'movement-envelope-rejected',
+          modifiers: [`seq:${admittedIncoming.seq}`],
+        });
+        return;
+      }
+      recordMatchDiagnostic('state-reconciliation', 'accepted', {
+        actorId: admittedIncoming.id,
+        position: [admittedIncoming.x, admittedIncoming.y, admittedIncoming.z],
+        reason: movement.resynchronized ? 'bounded-resynchronization' : 'interpolation-snapshot',
+        modifiers: [`seq:${admittedIncoming.seq}`, respawned ? 'respawn' : 'continuous'],
+      });
       const pickup = authorizedRemotePickups.get(admittedIncoming.id);
       const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
       if (admittedIncoming.team !== remote.snapshot.team) return;
@@ -2439,6 +2600,7 @@ function onNetworkMessage(message: GameMessage): void {
     const admission = admitRemoteSupportActivation(state, message, performance.now());
     if (admission.accepted) {
       remoteSupportAuthorities.set(message.by, admission.state);
+      presentRemoteSupportActivation(message, sender.snapshot);
       if (network.role === 'host') network.send(message);
     }
     return;
@@ -2450,6 +2612,7 @@ function onNetworkMessage(message: GameMessage): void {
     const admission = admitRemoteGrenadeThrow(state, message, sender.snapshot, performance.now());
     if (!admission.accepted) return;
     remoteGrenadeAuthorities.set(message.by, admission.state);
+    presentRemoteGrenade(message);
     if (network.role === 'host') network.send(message);
     return;
   }
@@ -2489,7 +2652,7 @@ function onNetworkMessage(message: GameMessage): void {
     if (network.role !== 'client' && player.alive && areCombatantsHostile(message.by, sender.snapshot.team, player.id, player.team)
       && meleeActionHitsPoint(message, player.position)
       && !arena.colliders.some((box) => segmentIntersectsBox(origin, player.position, box))) {
-      applyDamage(100 * overdriveDamageMultiplier(overdriveState, message.by, now), message.by);
+      applyDamage(100 * overdriveDamageMultiplier(overdriveState, message.by, now), message.by, 1, false, { kind: 'melee' });
     }
     return;
   }
@@ -2498,14 +2661,17 @@ function onNetworkMessage(message: GameMessage): void {
     if (!attacker || !pointInsideBounds(attacker.snapshot, arena.bounds, 0.44)) return;
     const targetIsLocal = message.target === player.id;
     const remoteTarget = targetIsLocal ? undefined : remotes.get(message.target);
-    if (!targetIsLocal && (network.role !== 'host' || !remoteTarget)) return;
-    const targetId = targetIsLocal ? player.id : remoteTarget!.snapshot.id;
-    const targetTeam = targetIsLocal ? player.team : remoteTarget!.snapshot.team;
+    const botTarget = targetIsLocal ? undefined : bots.get(message.target);
+    if (!targetIsLocal && (network.role !== 'host' || !remoteTarget && !botTarget)) return;
+    const targetId = targetIsLocal ? player.id : remoteTarget?.snapshot.id ?? botTarget!.id;
+    const targetTeam = targetIsLocal ? player.team : remoteTarget?.snapshot.team ?? botTarget!.team;
     if (!areCombatantsHostile(message.by, attacker.snapshot.team, targetId, targetTeam)) return;
-    const targetStance = targetIsLocal ? player.stance : remoteTarget!.snapshot.stance ?? 'stand';
+    const targetStance = targetIsLocal ? player.stance : remoteTarget?.snapshot.stance ?? 'stand';
     const shotTargetPosition = targetIsLocal
       ? player.position.clone()
-      : new THREE.Vector3(remoteTarget!.snapshot.x, remoteTarget!.snapshot.y, remoteTarget!.snapshot.z);
+      : remoteTarget
+        ? new THREE.Vector3(remoteTarget.snapshot.x, remoteTarget.snapshot.y, remoteTarget.snapshot.z)
+        : botTarget!.position.clone().add(new THREE.Vector3(0, 1.7, 0));
     const blastTargetPosition = shotTargetPosition.clone();
     blastTargetPosition.y += 1.1 - stanceEyeHeight(targetStance);
     const now = performance.now();
@@ -2525,7 +2691,7 @@ function onNetworkMessage(message: GameMessage): void {
           x: shotTargetPosition.x,
           y: shotTargetPosition.y,
           z: shotTargetPosition.z,
-          yaw: targetIsLocal ? player.yaw : remoteTarget!.snapshot.yaw,
+          yaw: targetIsLocal ? player.yaw : remoteTarget?.snapshot.yaw ?? botTarget!.root.rotation.y,
           stance: targetStance,
         },
         (origin, impact, weapon) => {
@@ -2610,7 +2776,9 @@ function onNetworkMessage(message: GameMessage): void {
     }
 
     processedNonces.add(message.nonce);
-    if (targetIsLocal) applyDamage(admittedDamage, message.by);
+    const cause = killCauseFromHit(message, attacker.snapshot.weapon);
+    if (targetIsLocal) applyDamage(admittedDamage, message.by, 1, false, cause);
+    else if (botTarget) applyBotDamage(botTarget, admittedDamage, 'body', cause, message.by);
     else sendAuthoritativeHit(message);
     trimNonceSet();
     return;
@@ -2629,28 +2797,43 @@ function trimNonceSet(): void {
 }
 
 function sendAuthoritativeHit(message: HitMessage): void {
+  const timedMessage: HitMessage = message.timing ? message : { ...message, timing: nextCombatTiming() };
   if (network.role !== 'host') {
-    network.send(message);
+    network.send(timedMessage);
     return;
   }
-  const remote = remotes.get(message.target);
-  const health = remoteHealthAuthorities.get(message.target);
+  const remote = remotes.get(timedMessage.target);
+  const health = remoteHealthAuthorities.get(timedMessage.target);
   if (!remote || !health) return;
   const now = performance.now();
   const finalDamage = resolveRemotePoweredDamage(
-    message.damage,
-    overdriveDamageMultiplier(overdriveState, message.by, now),
+    timedMessage.damage,
+    overdriveDamageMultiplier(overdriveState, timedMessage.by, now),
   );
   const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
   if (!result.applied) return;
   const appliedDamage = Math.max(0, health.hp - result.state.hp);
-  remoteHealthAuthorities.set(message.target, result.state);
+  remoteHealthAuthorities.set(timedMessage.target, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordAuthoritativeDamage(message.by, message.target, appliedDamage);
-  network.send(message);
+  recordMatchDiagnostic('damage-applied', 'accepted', {
+    actorId: timedMessage.by,
+    targetId: timedMessage.target,
+    weaponOrEffect: timedMessage.kind === 'shot' ? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon : timedMessage.explosiveSource ?? timedMessage.kind,
+    healthBefore: health.hp,
+    healthAfter: result.state.hp,
+    damageRequested: finalDamage,
+    damageApplied: appliedDamage,
+    reason: 'host-remote-health-authority',
+  });
+  recordAuthoritativeDamage(timedMessage.by, timedMessage.target, appliedDamage);
+  network.send(timedMessage);
   if (result.died) {
-    const death: DeathMessage = { type: 'death', killer: message.by, victim: message.target, nonce: randomNonce() };
+    const death: DeathMessage = {
+      type: 'death', killer: timedMessage.by, victim: timedMessage.target,
+      cause: killCauseFromHit(timedMessage, remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon),
+      nonce: randomNonce(),
+    };
     processedNonces.add(death.nonce);
     network.send(death);
     processDeath(death);
@@ -2705,13 +2888,30 @@ function scheduleLocalRespawn(now = performance.now()): void {
   }, 1_900);
 }
 
-function applyDamage(damage: number, attacker: string, minimumDamage = 1, bypassSpawnProtection = false): void {
+function applyDamage(
+  damage: number,
+  attacker: string,
+  minimumDamage = 1,
+  bypassSpawnProtection = false,
+  cause: KillCause = { kind: 'environment' },
+): void {
   const now = performance.now();
   if (!player.alive || (!bypassSpawnProtection && now < player.invulnerableUntil)) return;
   const previousHp = player.hp;
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
+  recordMatchDiagnostic('damage-applied', appliedDamage > 0 ? 'accepted' : 'rejected', {
+    actorId: attacker,
+    targetId: player.id,
+    weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
+    healthBefore: previousHp,
+    healthAfter: player.hp,
+    damageRequested: damage,
+    damageApplied: appliedDamage,
+    reason: appliedDamage > 0 ? 'local-health-authority' : 'zero-applied',
+  });
   if (network.role === 'host') recordAuthoritativeDamage(attacker, player.id, appliedDamage);
+  else if (network.role === 'offline' || attacker === player.id) addFeed('DAMAGE TAKEN +' + Math.round(appliedDamage), 'coral', { damageTaken: appliedDamage });
   lastDamageAt = now;
   audio.damage();
   showDamageDirection(attacker);
@@ -2723,7 +2923,7 @@ function applyDamage(damage: number, attacker: string, minimumDamage = 1, bypass
     player.deaths += 1;
     fieldSupport = recordSupportDeath(fieldSupport);
     updateFieldSupportHud();
-    const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, nonce: randomNonce() };
+    const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, cause, nonce: randomNonce() };
     if (network.role !== 'client') {
       network.send(death);
       processDeath(death);
@@ -2866,6 +3066,12 @@ function interactWithDeathDrop(now = performance.now()): boolean {
     nonce: randomNonce(),
   };
   network.send(pickup);
+  recordMatchDiagnostic('weapon-pickup', network.role === 'client' ? 'observed' : 'accepted', {
+    actorId: player.id,
+    weaponOrEffect: drop.weapon,
+    position: player.position.toArray(),
+    reason: result.mode ?? 'unknown',
+  });
   addFeed(result.mode === 'replenish' ? `${WEAPONS[drop.weapon].name.toUpperCase()} AMMO REPLENISHED` : `${WEAPONS[drop.weapon].name.toUpperCase()} PICKED UP`, 'gold');
   if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
   else removeDeathDrop(entity);
@@ -2901,6 +3107,12 @@ function autoScavengeDeathDrop(now: number): boolean {
     nonce: randomNonce(),
   };
   network.send(pickup);
+  recordMatchDiagnostic('scavenge-pickup', network.role === 'client' ? 'observed' : 'accepted', {
+    actorId: player.id,
+    weaponOrEffect: activeWeapon,
+    position: player.position.toArray(),
+    reason: `ammo:${result.ammoGranted};grenade:${result.grenadeGranted}`,
+  });
   const gains = [result.ammoGranted > 0 ? `+${result.ammoGranted} ${WEAPONS[activeWeapon].name.toUpperCase()} AMMO` : '', result.grenadeGranted > 0 ? '+1 FRAG' : ''].filter(Boolean).join(' · ');
   addFeed(`SCAVENGED ${gains}`, 'gold');
   if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
@@ -3086,6 +3298,8 @@ function resetBreakableWindows(): void {
 }
 
 function processDeath(message: DeathMessage): void {
+  const victimPoint = message.victim === player.id ? player.position : remotes.get(message.victim)?.target ?? bots.get(message.victim)?.position;
+  if (victimPoint) recordSpawnDeath(victimPoint);
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   spawnDeathDrop(message);
@@ -3100,7 +3314,7 @@ function processDeath(message: DeathMessage): void {
     document.exitPointerLock();
   }
   if (message.victim === player.id) scheduleLocalRespawn();
-  if (message.killer !== message.victim) {
+  if (message.killer !== message.victim && isKillstreakEligible(message.cause)) {
     const killerAuthority = remoteSupportAuthorities.get(message.killer);
     if (killerAuthority) remoteSupportAuthorities.set(message.killer, recordRemoteSupportElimination(killerAuthority));
   }
@@ -3108,8 +3322,8 @@ function processDeath(message: DeathMessage): void {
   if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
   if (remoteGrenadeAuthorities.has(message.victim)) remoteGrenadeAuthorities.set(message.victim, resetRemoteGrenadeAuthorityState());
   if (network.role === 'host' && message.killer !== message.victim) {
-    const killerMember = hostLobbyMembers.get(message.killer);
-    const victimMember = hostLobbyMembers.get(message.victim);
+    const killerMember = hostLobbyMembers.get(message.killer) ?? bots.get(message.killer);
+    const victimMember = hostLobbyMembers.get(message.victim) ?? bots.get(message.victim);
     if (killerMember && victimMember && areCombatantsHostile(killerMember.id, killerMember.team, victimMember.id, victimMember.team)) {
       const killerScore = authoritativeScores.get(message.killer) ?? emptyPlayerScore(message.killer);
       const victimScore = authoritativeScores.get(message.victim) ?? emptyPlayerScore(message.victim);
@@ -3125,7 +3339,7 @@ function processDeath(message: DeathMessage): void {
   }
   if (message.killer === player.id && message.victim !== player.id) {
     if (gameMode === 'solo') player.kills += 1;
-    awardSupportElimination();
+    if (isKillstreakEligible(message.cause)) awardSupportElimination();
     audio.kill();
   } else if (message.victim === player.id && message.killer !== player.id) {
     const remoteKiller = remotes.get(message.killer);
@@ -3154,15 +3368,36 @@ function removeRemote(id: string, reason: string): void {
   admittedRemoteShots.delete(id);
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
-  remoteSupportAuthorities.delete(id);
-  remoteGrenadeAuthorities.delete(id);
-  remoteHealthAuthorities.delete(id);
+  const retainCombatAuthority = shouldRetainRemoteCombatAuthority(
+    network.role,
+    privateLobbySnapshot?.phase ?? null,
+    hostLobbyMembers.has(id),
+  );
+  if (!retainCombatAuthority) {
+    remoteSupportAuthorities.delete(id);
+    remoteGrenadeAuthorities.delete(id);
+    remoteHealthAuthorities.delete(id);
+  }
+  peerTimingStates.delete(id);
   remoteMeleeAdmissions.delete(id);
   remotePingAdmissions.delete(id);
   authorizedRemotePickups.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
+function activeSpawnMode(): SpawnMode {
+  return gameMode === 'solo' ? 'solo' : privateMatchMode;
+}
+
+function recentSpawnDeathPoints(now = performance.now()): THREE.Vector3[] {
+  while (recentDeathPositions.length > 0 && now - recentDeathPositions[0].at > 12_000) recentDeathPositions.shift();
+  return recentDeathPositions.map((entry) => entry.point);
+}
+
+function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
+  recentDeathPositions.push({ point: point.clone(), at: now });
+  if (recentDeathPositions.length > 16) recentDeathPositions.shift();
+}
 function spawnPoint(): THREE.Vector3 {
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
@@ -3209,13 +3444,27 @@ function spawnPoint(): THREE.Vector3 {
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
   const candidates = selectable.map(({ point, index }) => ({
     index,
+    point,
     nearestPlayerDistanceSq: otherPlayers.length === 0
       ? Number.POSITIVE_INFINITY
       : Math.min(...otherPlayers.map((other) => other.distanceToSquared(point))),
     visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
   }));
   const previousIndex = lastPlayerSpawnIndex;
-  const selectedIndex = selectFarthestSpawnCandidate(candidates, gameplayRandom(), 3, previousIndex);
+  const population = otherPlayers.length + 1;
+  const spawnMode = activeSpawnMode();
+  const selection = scoreSpawnCandidates({
+    arenaId: selectedArena.id,
+    mode: spawnMode,
+    population,
+    candidates: candidates.map(({ index, point }) => ({ index, point })),
+    threats,
+    occupants: otherPlayers,
+    recentDeaths: recentSpawnDeathPoints(),
+    colliders: arena.colliders,
+    previousIndex,
+  });
+  const selectedIndex = selection.index;
   const minimumVisibleThreats = Math.min(...candidates.map((candidate) => candidate.visibleThreats));
   const selected = candidates.find((candidate) => candidate.index === selectedIndex)!;
   const selectedSpawn = valid.find(({ index }) => index === selectedIndex)!;
@@ -3227,7 +3476,18 @@ function spawnPoint(): THREE.Vector3 {
     safeTierCount: candidates.filter((candidate) => candidate.visibleThreats === minimumVisibleThreats).length,
     selectedSide: selectedSpawn.side,
     flipped,
+    score: selection.score,
+    reason: selection.reason,
+    mode: spawnMode,
+    population,
   };
+  recordMatchDiagnostic('spawn-selection', 'accepted', {
+    actorId: player.id,
+    position: [selectedSpawn.point.x, selectedSpawn.point.y, selectedSpawn.point.z],
+    spawnScore: selection.score,
+    spawnReason: selection.reason,
+    modifiers: [spawnMode, `population:${population}`, flipped ? 'spawn-flipped' : 'home-side'],
+  });
   lastPlayerSpawnIndex = selectedIndex;
   return selectedSpawn.point.clone();
 }
@@ -3355,11 +3615,14 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   gameMode = mode;
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
+  recentDeathPositions.length = 0;
+  lastBotSpawnAudit.clear();
   spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
   debugBotStanceOverride = null;
   debugBotSpeedOverride = 0;
   const matchStartedAt = performance.now();
+  beginMatchDiagnostics(mode, matchStartedAt);
   const matchRules = currentMatchRules();
   if (mode !== 'solo' && activeAtEpochMs !== undefined) {
     const activeAt = localPerformanceAtHostEpoch(activeAtEpochMs, mode === 'host' ? 0 : hostClockOffsetMs, Date.now(), matchStartedAt);
@@ -3409,6 +3672,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
   respawn(requestLock);
   if (mode === 'solo') spawnBots();
+  else if (mode === 'host') spawnBots(privateMatchConfig.hostedBotCount);
   audio.unlock();
   addFeed(`Welcome to ${arena.label}`, 'gold');
   if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
@@ -3632,6 +3896,7 @@ function tryFire(now: number): void {
     origin: origin.toArray() as [number, number, number],
     direction: baseDirection.toArray() as [number, number, number],
     pelletDirections,
+    timing: nextCombatTiming(),
     nonce: randomNonce(),
   };
   // Reliable channels preserve this admission event ahead of its correlated hit claims.
@@ -3644,8 +3909,18 @@ function tryFire(now: number): void {
     const poweredDamage = outgoingDamage(hit.damage, now);
     const bot = bots.get(target);
     if (bot) {
-      const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
-      showDamageNumber(dealt, hit.zone);
+      if (gameMode === 'client' && bot.id.startsWith('host-bot-')) {
+        const requested = Math.min(100, hit.damage);
+        sendAuthoritativeHit({
+          type: 'hit', by: player.id, target: bot.id, damage: requested, kind: 'shot',
+          actionNonce: shot.nonce, nonce: randomNonce(),
+        });
+        showHitmarker(hit.zone === 'head');
+        showDamageNumber(Math.min(100, poweredDamage), hit.zone);
+      } else {
+        const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+        showDamageNumber(dealt, hit.zone);
+      }
     }
     else {
       const remote = remotes.get(target);
@@ -3802,14 +4077,20 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
   const valid = flipDecision.flip ? opposite : home;
   const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < 20));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
-  const selectedIndex = selectFarthestSpawnCandidate(selectable.map(({ candidate, index }) => ({
-    index,
-    nearestPlayerDistanceSq: otherPlayers.length === 0
-      ? Number.POSITIVE_INFINITY
-      : Math.min(...otherPlayers.map((other) => other.distanceToSquared(candidate))),
-    visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
-  })), gameplayRandom(), 3, lastBotSpawnIndices.get(team) ?? -1);
+  const selection = scoreSpawnCandidates({
+    arenaId: selectedArena.id,
+    mode: activeSpawnMode(),
+    population: otherPlayers.length + 1,
+    candidates: selectable.map(({ candidate, index }) => ({ index, point: candidate })),
+    threats,
+    occupants: otherPlayers,
+    recentDeaths: recentSpawnDeathPoints(),
+    colliders: arena.colliders,
+    previousIndex: lastBotSpawnIndices.get(team) ?? -1,
+  });
+  const selectedIndex = selection.index;
   lastBotSpawnIndices.set(team, selectedIndex);
+  lastBotSpawnAudit.set(team, { selectedIndex, score: selection.score, reason: selection.reason });
   return valid.find(({ index }) => index === selectedIndex)!.candidate;
 }
 
@@ -3859,10 +4140,10 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
 
 const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
 
-function spawnBot(index: number): void {
+function spawnBot(index: number, hosted = false): void {
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
-  const id = `bot-${index}`;
+  const id = hosted ? `host-bot-${index}` : `bot-${index}`;
   const weapon = botWeaponAssignments[index] ?? assignBotWeapons(1, gameplayRandom)[0];
   const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
@@ -3952,15 +4233,23 @@ function activateDormantBot(index: number): boolean {
   return true;
 }
 
-function spawnBots(): void {
+function spawnBots(hostedCount?: HostedBotCount): void {
   clearBots();
-  botWeaponAssignments = assignBotWeapons(selectedArena.maximumSoloBots, gameplayRandom);
+  const activeCount = hostedCount ?? selectedArena.soloBotCount;
+  const maximumCount = hostedCount === undefined ? selectedArena.maximumSoloBots : activeCount;
+  botWeaponAssignments = assignBotWeapons(maximumCount, gameplayRandom);
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
   lastBotGrenadeDamage = 0;
   soloBotDeaths = 0;
   dormantBotsPrewarmed = false;
-  for (let index = 0; index < selectedArena.soloBotCount; index += 1) spawnBot(index);
+  for (let index = 0; index < activeCount; index += 1) spawnBot(index, hostedCount !== undefined);
+  if (hostedCount !== undefined) {
+    for (const bot of bots.values()) authoritativeScores.set(bot.id, emptyPlayerScore(bot.id));
+    if (activeCount > 0) addFeed(String(activeCount) + ' HOST-AUTHORITATIVE BOTS DEPLOYED', 'coral');
+    broadcastHostedBotState();
+    return;
+  }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
   for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index);
@@ -3979,6 +4268,7 @@ function spawnBots(): void {
 }
 
 function spawnEarnedBotReinforcement(): void {
+  if (gameMode !== 'solo') return;
   const target = activeSoloBotTarget(selectedArena, soloBotDeaths);
   if (bots.size >= target) return;
   const index = bots.size;
@@ -3997,9 +4287,75 @@ function clearBots(): void {
   botWeaponAssignments = [];
 }
 
-function botHasLineOfSight(bot: BotPlayer): boolean {
+function hostedBotSnapshot(bot: BotPlayer, seq: number): HostedBotSnapshot {
+  return {
+    id: bot.id,
+    name: bot.name,
+    team: bot.team,
+    weapon: bot.weapon,
+    x: bot.position.x,
+    y: bot.position.y,
+    z: bot.position.z,
+    yaw: bot.root.rotation.y,
+    hp: bot.hp,
+    kills: bot.kills,
+    deaths: bot.deaths,
+    alive: bot.alive,
+    seq,
+  };
+}
+
+function broadcastHostedBotState(): void {
+  if (network.role !== 'host') return;
+  hostedBotStateSeq += 1;
+  const message: BotStateMessage = {
+    type: 'bot-state',
+    by: player.id,
+    seq: hostedBotStateSeq,
+    bots: [...bots.values()].filter((bot) => bot.id.startsWith('host-bot-')).map((bot) => hostedBotSnapshot(bot, hostedBotStateSeq)),
+    nonce: randomNonce(),
+  };
+  network.send(message);
+}
+
+function acceptHostedBotState(message: BotStateMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.seq <= lastHostedBotStateSeq) return;
+  if (message.bots.length !== privateMatchConfig.hostedBotCount) return;
+  lastHostedBotStateSeq = message.seq;
+  const incomingIds = new Set(message.bots.map((snapshot) => snapshot.id));
+  for (const snapshot of message.bots) {
+    let bot = bots.get(snapshot.id);
+    if (!bot) {
+      const index = Number(snapshot.id.slice('host-bot-'.length));
+      if (!Number.isSafeInteger(index) || index < 0 || index > 3) continue;
+      if (botWeaponAssignments.length <= index) botWeaponAssignments = assignBotWeapons(privateMatchConfig.hostedBotCount, gameplayRandom);
+      spawnBot(index, true);
+      bot = bots.get(snapshot.id);
+    }
+    if (!bot || snapshot.seq <= Number(bot.root.userData.networkSeq ?? -1)) continue;
+    bot.root.userData.networkSeq = snapshot.seq;
+    bot.name = snapshot.name;
+    bot.team = snapshot.team;
+    bot.weapon = snapshot.weapon;
+    bot.position.set(snapshot.x, snapshot.y, snapshot.z);
+    bot.root.position.copy(bot.position);
+    bot.root.rotation.y = snapshot.yaw;
+    bot.hp = snapshot.hp;
+    bot.kills = snapshot.kills;
+    bot.deaths = snapshot.deaths;
+    bot.alive = snapshot.alive;
+    bot.root.visible = snapshot.alive;
+    setOperatorWeapon(bot.root, snapshot.weapon, flattenOperatorMaterials);
+  }
+  for (const [id, bot] of bots) {
+    if (!id.startsWith('host-bot-') || incomingIds.has(id)) continue;
+    scene.remove(bot.root);
+    bots.delete(id);
+  }
+}
+function botHasLineOfSight(bot: BotPlayer, targetPosition = player.position): boolean {
   const origin = { x: bot.position.x, y: bot.position.y + 1.42, z: bot.position.z };
-  const target = { x: player.position.x, y: player.position.y, z: player.position.z };
+  const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
   return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
 }
 
@@ -4013,10 +4369,16 @@ function releaseBotGrenadeOwner(entity: GrenadeEntity): void {
   if (owner) owner.grenadeActive = false;
 }
 
-function throwBotGrenade(bot: BotPlayer, now: number, fuseMs = 2_300, target = player.position): boolean {
+function throwBotGrenade(
+  bot: BotPlayer,
+  now: number,
+  fuseMs = 2_300,
+  target = player.position,
+  targetStance: Stance = player.stance,
+): boolean {
   if (!bot.alive || bot.grenadeActive || activeBotGrenadeCount() > 0) return false;
   const origin = bot.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-  const targetGroundY = Math.max(0.18, target.y - stanceEyeHeight(player.stance) + 0.18);
+  const targetGroundY = Math.max(0.18, target.y - stanceEyeHeight(targetStance) + 0.18);
   const targetGround = new THREE.Vector3(target.x, targetGroundY, target.z);
   const horizontalDistance = Math.hypot(targetGround.x - origin.x, targetGround.z - origin.z);
   const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
@@ -4044,48 +4406,84 @@ function throwBotGrenade(bot: BotPlayer, now: number, fuseMs = 2_300, target = p
   return true;
 }
 
-function selectBotTacticalWaypoint(bot: BotPlayer): number {
-  const target = { x: player.position.x, y: player.position.y, z: player.position.z };
+function selectBotTacticalWaypoint(
+  bot: BotPlayer,
+  targetPosition = player.position,
+  targetAlive = player.alive,
+): number {
+  const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
   return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
     const eye = { x: point.x, y: 1.42, z: point.z };
     return {
       index,
       distanceFromBot: point.distanceTo(bot.position),
-      distanceFromPlayer: point.distanceTo(player.position),
-      seesPlayer: player.alive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
+      distanceFromPlayer: point.distanceTo(targetPosition),
+      seesPlayer: targetAlive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
     };
   }), bot.waypoint, bot.deaths + bot.kills);
 }
 
-function applyBotDamage(bot: BotPlayer, damage: number, zone: HitZone): number {
+function applyBotDamage(
+  bot: BotPlayer,
+  damage: number,
+  zone: HitZone,
+  cause: KillCause = { kind: 'gun', weapon: player.weapon },
+  attackerId = player.id,
+): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
   reactOperator(bot.root, zone);
+  const healthBefore = bot.hp;
   const dealt = Math.min(bot.hp, Math.max(0, damage));
-  roundDamageDealt += dealt;
+  recordMatchDiagnostic('bot-damage-applied', dealt > 0 ? 'accepted' : 'rejected', {
+    actorId: attackerId,
+    targetId: bot.id,
+    weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
+    healthBefore,
+    healthAfter: Math.max(0, healthBefore - dealt),
+    damageRequested: damage,
+    damageApplied: dealt,
+    reason: bot.id.startsWith('host-bot-') ? 'hosted-bot-authority' : 'solo-bot-authority',
+  });
+  if (attackerId === player.id) roundDamageDealt += dealt;
+  if (network.role === 'host') recordAuthoritativeDamage(attackerId, bot.id, dealt);
+  else if (attackerId === player.id) addFeed('DAMAGE DONE +' + Math.round(dealt), 'gold', { damageDealt: dealt });
   bot.hp = Math.max(0, bot.hp - damage);
-  showHitmarker(zone === 'head');
-  audio.hit(zone === 'head');
+  if (attackerId === player.id) {
+    showHitmarker(zone === 'head');
+    audio.hit(zone === 'head');
+  }
   if (bot.hp > 0) {
-    if (zone === 'head') {
+    if (zone === 'head' && attackerId === player.id) {
       addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
     }
+    if (network.role === 'host') broadcastHostedBotState();
     return dealt;
   }
   const eliminationStarted = performance.now();
   bot.alive = false;
   bot.deaths += 1;
   soloBotDeaths += 1;
-  spawnDeathDrop({ type: 'death', killer: player.id, victim: bot.id, nonce: randomNonce() }, now);
+  const death: DeathMessage = { type: 'death', killer: attackerId, victim: bot.id, cause, nonce: randomNonce() };
+  if (network.role === 'host') {
+    processedNonces.add(death.nonce);
+    network.send(death);
+    processDeath(death);
+    broadcastHostedBotState();
+  } else {
+    spawnDeathDrop(death, now);
+  }
   const afterDeathDrop = performance.now();
   bot.respawnAt = now + 2_200;
   bot.deathVisibleUntil = now + 1_050;
   deathOperator(bot.root);
   const afterDeathPose = performance.now();
-  player.kills += 1;
-  awardSupportElimination();
-  audio.kill();
-  addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
+  if (gameMode === 'solo' && attackerId === player.id) {
+    player.kills += 1;
+    if (isKillstreakEligible(cause)) awardSupportElimination();
+    audio.kill();
+    addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
+  }
   const afterRewardAndFeed = performance.now();
   spawnEarnedBotReinforcement();
   const afterReinforcement = performance.now();
@@ -4126,18 +4524,18 @@ function houseContainsXZ(house: ArenaMap['houses'][number], point: THREE.Vector3
     && Math.abs(point.z - house.origin.z) <= house.dimensions.depth / 2 + margin;
 }
 
-function botVerticalRouteTarget(bot: BotPlayer): THREE.Vector3 | null {
+function botVerticalRouteTarget(bot: BotPlayer, targetPosition = player.position): THREE.Vector3 | null {
   const authored = authoredVerticalRouteTarget(
     arena.root.userData.verticalNavigation as ArenaVerticalNavigation | undefined,
     bot.position,
-    player.position,
+    targetPosition,
   );
   if (authored) return new THREE.Vector3(authored.x, authored.y, authored.z);
-  const playerUpper = player.position.y > 3;
+  const playerUpper = targetPosition.y > 3;
   const botOnGround = bot.position.y <= 0.1;
   const botOnUpper = bot.position.y >= 3.2;
   if (playerUpper && botOnUpper || !playerUpper && botOnGround) return null;
-  const house = arena.houses.find((candidate) => houseContainsXZ(candidate, playerUpper ? player.position : bot.position, 2));
+  const house = arena.houses.find((candidate) => houseContainsXZ(candidate, playerUpper ? targetPosition : bot.position, 2));
   if (!house) return null;
   const foot = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-foot');
   const top = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-top');
@@ -4184,8 +4582,120 @@ function navigationCollidersFor(activeArena: ArenaMap): ArenaMap['colliders'] {
 
 let botNavigationColliders = navigationCollidersFor(arena);
 
+type BotCombatTarget = Readonly<{
+  id: string;
+  team: Team;
+  position: THREE.Vector3;
+  stance: Stance;
+  kind: 'local' | 'remote';
+}>;
+
+function nearestBotCombatTarget(bot: BotPlayer): BotCombatTarget | null {
+  const candidates: BotCombatTarget[] = [];
+  if (player.alive && areCombatantsHostile(bot.id, bot.team, player.id, player.team)) {
+    candidates.push({ id: player.id, team: player.team, position: player.position.clone(), stance: player.stance, kind: 'local' });
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0 || !areCombatantsHostile(bot.id, bot.team, remote.snapshot.id, remote.snapshot.team)) continue;
+    const stance = remote.snapshot.stance ?? 'stand';
+    candidates.push({
+      id: remote.snapshot.id,
+      team: remote.snapshot.team,
+      position: new THREE.Vector3(
+        remote.snapshot.x,
+        remote.snapshot.y + stanceEyeHeight(stance),
+        remote.snapshot.z,
+      ),
+      stance,
+      kind: 'remote',
+    });
+  }
+  candidates.sort((a, b) => a.position.distanceToSquared(bot.position) - b.position.distanceToSquared(bot.position) || a.id.localeCompare(b.id));
+  return candidates[0] ?? null;
+}
+
+function applyHostedBotDamageToRemote(
+  bot: BotPlayer,
+  target: BotCombatTarget,
+  damage: number,
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  now: number,
+): void {
+  if (network.role !== 'host' || target.kind !== 'remote') return;
+  const health = remoteHealthAuthorities.get(target.id);
+  const remote = remotes.get(target.id);
+  if (!health || !remote) return;
+  const result = applyAuthoritativeRemoteDamage(health, damage, now);
+  if (!result.applied) return;
+  const damageApplied = Math.max(0, health.hp - result.state.hp);
+  if (damageApplied <= 0) return;
+  remoteHealthAuthorities.set(target.id, result.state);
+  remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
+  remote.root.visible = result.state.alive;
+  recordMatchDiagnostic('bot-damage-applied', 'accepted', {
+    actorId: bot.id,
+    targetId: target.id,
+    weaponOrEffect: bot.weapon,
+    healthBefore: health.hp,
+    healthAfter: result.state.hp,
+    damageRequested: damage,
+    damageApplied,
+    reason: 'hosted-bot-remote-health-authority',
+  });
+  recordAuthoritativeDamage(bot.id, target.id, damageApplied);
+  const message: BotDamageMessage = {
+    type: 'bot-damage',
+    by: player.id,
+    botId: bot.id,
+    target: target.id,
+    weapon: bot.weapon,
+    origin: origin.toArray(),
+    direction: direction.toArray(),
+    damageApplied,
+    healthBefore: health.hp,
+    healthAfter: result.state.hp,
+    nonce: randomNonce(),
+  };
+  network.send(message);
+  if (result.died) {
+    bot.kills += 1;
+    const death: DeathMessage = {
+      type: 'death', killer: bot.id, victim: target.id,
+      cause: { kind: 'gun', weapon: bot.weapon }, nonce: randomNonce(),
+    };
+    processedNonces.add(death.nonce);
+    network.send(death);
+    processDeath(death);
+  }
+  broadcastHostedBotState();
+}
+
+function acceptHostedBotDamage(message: BotDamageMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || processedNonces.has(message.nonce)) return;
+  const bot = bots.get(message.botId);
+  if (!bot || bot.weapon !== message.weapon) return;
+  processedNonces.add(message.nonce);
+  const origin = new THREE.Vector3(...message.origin);
+  const direction = new THREE.Vector3(...message.direction).normalize();
+  spawnTracer(bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3()) ?? origin, origin.clone().addScaledVector(direction, 55), WEAPONS[message.weapon].color);
+  audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+  if (message.target === player.id) {
+    const canonicalDamage = Math.max(0, player.hp - message.healthAfter);
+    if (canonicalDamage > 0) {
+      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon });
+    }
+    // Hosted matches use the host's remote-health ledger as the canonical value.
+    // Reconcile upward as well as downward so prior client-side drift cannot persist.
+    if (player.alive) player.hp = message.healthAfter;
+  } else {
+    const remote = remotes.get(message.target);
+    if (remote) reactOperator(remote.root, 'body');
+  }
+  trimNonceSet();
+}
 function updateBots(dt: number, now: number): void {
-  if (gameMode !== 'solo' || matchState.phase !== 'active') return;
+  if ((gameMode !== 'solo' && gameMode !== 'host') || matchState.phase !== 'active') return;
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
@@ -4218,16 +4728,18 @@ function updateBots(dt: number, now: number): void {
       continue;
     }
 
-    const toPlayer = player.position.clone().setY(0).sub(bot.position.clone().setY(0));
+    const combatTarget = nearestBotCombatTarget(bot);
+    const targetPosition = combatTarget?.position ?? player.position;
+    const toPlayer = targetPosition.clone().setY(0).sub(bot.position.clone().setY(0));
     const distance = toPlayer.length();
     const sightInterval = 120 + botIndex * 19;
     if (now - bot.lastSightAt >= sightInterval) {
       bot.lastSightAt = now;
       const previousSight = bot.hasLineOfSight;
-      bot.hasLineOfSight = player.alive && botHasLineOfSight(bot);
+      bot.hasLineOfSight = combatTarget !== null && botHasLineOfSight(bot, targetPosition);
       if (bot.hasLineOfSight && !previousSight) bot.sightStartedAt = now;
       if (!bot.hasLineOfSight) {
-        if (previousSight) bot.waypoint = selectBotTacticalWaypoint(bot);
+        if (previousSight) bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
         bot.sightStartedAt = 0;
         bot.burstShots = 0;
       }
@@ -4245,7 +4757,7 @@ function updateBots(dt: number, now: number): void {
     if (waypointReached) {
       bot.waypoint = lineOfSight
         ? (bot.waypoint + 1 + botIndex) % arena.patrolPoints.length
-        : selectBotTacticalWaypoint(bot);
+        : selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
     }
     const intent = chooseBotIntent({
       alive: bot.alive,
@@ -4261,11 +4773,13 @@ function updateBots(dt: number, now: number): void {
       burstShotsRemaining: bot.burstShots,
       fireIntervalMs: botWeaponFireInterval(bot.weapon, bot.burstShots > 0),
     });
-    if (intent.changeWaypoint && !waypointReached) bot.waypoint = selectBotTacticalWaypoint(bot);
+    if (intent.changeWaypoint && !waypointReached) {
+      bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
+    }
     patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
     toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
-    const verticalRouteTarget = botVerticalRouteTarget(bot);
+    const verticalRouteTarget = botVerticalRouteTarget(bot, targetPosition);
     const pursuit = verticalRouteTarget
       ? verticalRouteTarget.clone().sub(bot.position).setY(0)
       : lineOfSight ? toPlayer : toPatrol;
@@ -4288,7 +4802,7 @@ function updateBots(dt: number, now: number): void {
       if (detourStalled) {
         if (bot.blockedSince === 0) bot.blockedSince = now;
         else if (now - bot.blockedSince >= 400) {
-          bot.waypoint = selectBotTacticalWaypoint(bot);
+          bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
           bot.blockedSince = 0;
         }
       } else {
@@ -4300,7 +4814,7 @@ function updateBots(dt: number, now: number): void {
     const resolvedPosition = new THREE.Vector3(resolved.x, bot.position.y, resolved.z);
     bot.position.set(resolved.x, botElevationAt(resolvedPosition, bot.position.y), resolved.z);
     bot.root.position.copy(bot.position);
-    const lookTarget = lineOfSight ? player.position : verticalRouteTarget ?? patrolTarget;
+    const lookTarget = lineOfSight ? targetPosition : verticalRouteTarget ?? patrolTarget;
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
@@ -4314,28 +4828,28 @@ function updateBots(dt: number, now: number): void {
       botGrenadeActive: bot.grenadeActive,
       activeBotGrenades: activeBotGrenadeCount(),
       random: gameplayRandom(),
-    }) && throwBotGrenade(bot, now);
+    }) && combatTarget !== null && throwBotGrenade(bot, now, 2_300, targetPosition, combatTarget.stance);
 
-    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
+    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && combatTarget !== null) {
       if (bot.burstShots <= 0) bot.burstShots = botWeaponBurstSize(bot.weapon, botIndex);
       bot.burstShots -= 1;
       bot.lastShotAt = now;
       fireOperator(bot.root);
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
-      const direction = player.position.clone().sub(origin).normalize();
+      const direction = targetPosition.clone().sub(origin).normalize();
       const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
       direction.x += (gameplayRandom() - 0.5) * jitter;
       direction.y += (gameplayRandom() - 0.5) * jitter;
       direction.z += (gameplayRandom() - 0.5) * jitter;
       direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
-      const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
+      const targetRadius = combatTarget.stance === 'prone' ? 0.38 : combatTarget.stance === 'crouch' ? 0.48 : 0.55;
       const botWeapon = WEAPONS[bot.weapon];
       const resolution = resolveBallisticHitscanAgainstTarget(
         origin,
         direction,
         shotLength,
-        player.position,
+        targetPosition,
         targetRadius,
         botWeapon.penetration,
         activeBallisticSurfaces(),
@@ -4358,7 +4872,7 @@ function updateBots(dt: number, now: number): void {
           audio.impact(surface, point.distanceTo(player.position));
         }
       }
-      if (!resolution.hitTarget && resolution.trace.impacts.length === 0) {
+      if (combatTarget.kind === 'local' && !resolution.hitTarget && resolution.trace.impacts.length === 0) {
         audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
       audio.shot(bot.weapon, true);
@@ -4367,10 +4881,14 @@ function updateBots(dt: number, now: number): void {
           computeDamage(botWeapon, distance, 'body'),
           resolution.damageMultiplier,
         ));
-        applyDamage(damage, bot.id);
-        if (!player.alive) {
-          bot.kills += 1;
-          checkMatchEnd();
+        if (combatTarget.kind === 'remote') {
+          applyHostedBotDamageToRemote(bot, combatTarget, damage, origin, direction, now);
+        } else {
+          applyDamage(damage, bot.id, 1, false, { kind: 'gun', weapon: bot.weapon });
+          if (!player.alive) {
+            bot.kills += 1;
+            checkMatchEnd();
+          }
         }
       }
     }
@@ -4391,7 +4909,7 @@ function melee(): void {
   const origin = camera.getWorldPosition(new THREE.Vector3());
   const direction = camera.getWorldDirection(new THREE.Vector3());
   const meleeNonce = randomNonce();
-  network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), nonce: meleeNonce });
+  network.send({ type: 'melee', by: player.id, origin: origin.toArray(), direction: direction.toArray(), timing: nextCombatTiming(), nonce: meleeNonce });
   const hit = castShot(origin, direction, player.weapon, false);
   if (hit.windowId) {
     const strike = meleeStrike(hit.distance, now, previousMeleeAt);
@@ -4410,8 +4928,14 @@ function melee(): void {
   const strike = meleeStrike(hit.distance, now, previousMeleeAt);
   if (!strike.hit) return;
   const bot = bots.get(hit.playerId);
-  if (bot) applyBotDamage(bot, outgoingDamage(strike.damage, now), hit.hitZone ?? 'body');
-  else if (remotes.has(hit.playerId)) sendAuthoritativeHit({
+  if (bot) {
+    if (gameMode === 'client' && bot.id.startsWith('host-bot-')) {
+      sendAuthoritativeHit({
+        type: 'hit', by: player.id, target: bot.id, damage: strike.damage, kind: 'melee',
+        actionNonce: meleeNonce, nonce: randomNonce(),
+      });
+    } else applyBotDamage(bot, outgoingDamage(strike.damage, now), hit.hitZone ?? 'body', { kind: 'melee' });
+  } else if (remotes.has(hit.playerId)) sendAuthoritativeHit({
     type: 'hit', by: player.id, target: hit.playerId, damage: strike.damage, kind: 'melee',
     actionNonce: meleeNonce, nonce: randomNonce(),
   });
@@ -4435,6 +4959,7 @@ function throwGrenade(): void {
     origin: origin.toArray() as [number, number, number],
     velocity: velocity.toArray() as [number, number, number],
     actionNonce,
+    timing: nextCombatTiming(),
     nonce: randomNonce(),
   });
   const mesh = createGrenadePresentation();
@@ -4450,6 +4975,23 @@ function throwGrenade(): void {
     actionNonce,
     ownerKind: 'player',
     ownerId: player.id,
+  });
+}
+
+function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>): void {
+  const mesh = createGrenadePresentation();
+  mesh.position.fromArray(message.origin);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  grenades.push({
+    mesh,
+    velocity: new THREE.Vector3(...message.velocity),
+    angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
+    explodeAt: performance.now() + 2_300,
+    lastBounceAt: 0,
+    actionNonce: message.actionNonce,
+    ownerKind: 'remote',
+    ownerId: message.by,
   });
 }
 
@@ -4493,14 +5035,16 @@ function explodeGrenade(entity: GrenadeEntity): void {
   else audio.sanctifiedFragExplosion();
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
-  breakWindowsInGrenadeBlast(point, entity.actionNonce, entity.ownerKind === 'player');
+  if (entity.ownerKind !== 'remote') breakWindowsInGrenadeBlast(point, entity.actionNonce, entity.ownerKind === 'player');
   const afterVisual = performance.now();
+  // Remote grenades are presentation-only. Authoritative hit/window events are the sole mutation path.
+  if (entity.ownerKind === 'remote') return;
   if (entity.ownerKind === 'bot') {
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
     const damage = blocked ? 0 : botScaledDamage(grenadeDamage(player.position.distanceTo(point)));
     lastBotGrenadeDamage = damage;
     if (damage > 0 && player.alive) {
-      applyDamage(damage, entity.ownerId, 0);
+      applyDamage(damage, entity.ownerId, 0, false, { kind: 'grenade' });
       const owner = bots.get(entity.ownerId);
       if (owner && !player.alive) {
         owner.kills += 1;
@@ -4522,7 +5066,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
     const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), afterAudio);
-    if (damage > 0) applyBotDamage(bot, damage, 'body');
+    if (damage > 0) applyBotDamage(bot, damage, 'body', { kind: 'grenade' });
   }
   const blastNonce = entity.actionNonce;
   for (const remote of remotes.values()) {
@@ -4537,7 +5081,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const afterTargets = performance.now();
   const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
   const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
-  if (selfDamage > 0) applyDamage(selfDamage, player.id);
+  if (selfDamage > 0) applyDamage(selfDamage, player.id, 1, false, { kind: 'grenade' });
   const finished = performance.now();
   lastGrenadeExplosionProfile = {
     presentationDetachMs: afterPresentationDetach - started,
@@ -4605,10 +5149,13 @@ function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): 
   if (!target || !target.active) return;
   const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
   if (admittedDamage <= 0) return;
+  const healthBefore = target.health;
   target.health = Math.max(0, target.health - admittedDamage);
+  const appliedDamage = healthBefore - target.health;
   targetHits += 1;
   const headshot = selectedArena.id === 'gun-range' && zone === 'head';
   showHitmarker(headshot);
+  showDamageNumber(appliedDamage, zone);
   audio.hit(headshot);
   if (target.health > 0) {
     if (selectedArena.id === 'gun-range') addFeed(`${headshot ? 'BULLSEYE · ' : ''}${Math.ceil(target.health)} / ${target.maxHealth} HP`, headshot ? 'gold' : undefined);
@@ -4669,7 +5216,7 @@ function showDamageNumber(damage: number, zone: HitZone): void {
   row.textContent = presentation.label;
   row.dataset.damage = String(presentation.amount);
   row.classList.toggle('critical', presentation.critical);
-  row.style.setProperty('--damage-lane', String((root.childElementCount % 5) - 2));
+  row.style.setProperty('--damage-lane', String((root.childElementCount % 7) - 3));
   root.append(row);
   while (root.childElementCount > 8) root.firstElementChild?.remove();
   window.setTimeout(() => row.remove(), presentation.durationMs);
@@ -4680,20 +5227,23 @@ function addFeed(
   kind?: 'aqua' | 'coral' | 'gold',
   details?: { damageDealt?: number; damageTaken?: number },
 ): void {
-  const feed = element<HTMLElement>('#killfeed');
+  const destination = feedDestination(details);
+  const feed = element<HTMLElement>(destination === 'damage-done' ? '#damage-done-feed' : destination === 'damage-taken' ? '#damage-taken-feed' : '#killfeed');
   const row = document.createElement('div');
   row.textContent = text;
   row.title = text;
-  row.setAttribute('aria-label', text);
+  row.setAttribute('aria-label', accessibleFeedLabel(destination, text));
+  row.dataset.feedDestination = destination;
   if (details?.damageDealt !== undefined) row.dataset.damageDealt = String(details.damageDealt);
   if (details?.damageTaken !== undefined) row.dataset.damageTaken = String(details.damageTaken);
   if (kind) row.classList.add(kind);
   feed.prepend(row);
-  while (feed.children.length > 6) feed.lastElementChild?.remove();
-  setTimeout(() => row.classList.add('fade'), 4200);
-  setTimeout(() => row.remove(), 5000);
+  const limit = destination === 'events' ? EVENT_FEED_LIMIT : DAMAGE_FEED_LIMIT;
+  while (feed.children.length > limit) feed.lastElementChild?.remove();
+  const visibleMs = destination === 'events' ? 5_000 : DAMAGE_FEED_VISIBLE_MS;
+  setTimeout(() => row.classList.add('fade'), visibleMs - 800);
+  setTimeout(() => row.remove(), visibleMs);
 }
-
 function updateFieldSupportHud(): void {
   element<HTMLElement>('#support-streak').textContent = `STREAK ${fieldSupport.streak}`;
   document.querySelectorAll<HTMLElement>('[data-support]').forEach((item) => {
@@ -4722,6 +5272,12 @@ function broadcastOverdriveState(now: number): void {
 
 function registerOverdrivePickup(holderId: string, now: number): void {
   overdrivePickups += 1;
+  recordMatchDiagnostic('effect-pickup', network.role === 'client' ? 'observed' : 'accepted', {
+    actorId: holderId,
+    weaponOrEffect: 'overdrive',
+    position: [OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z],
+    reason: network.role === 'client' ? 'host-replicated-state' : 'authoritative-claim',
+  });
   overdriveClaimGeneration = overdriveState.generation;
   const holderName = holderId === player.id ? player.name : remotes.get(holderId)?.snapshot.name ?? 'Operator';
   addFeed(`${holderName} secured 4× OVERDRIVE · 15 SECONDS`, 'gold');
@@ -4978,7 +5534,7 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
     const distance = target.distanceTo(point);
     if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
     const damage = outgoingDamage(hunterSwarmDamage(distance, 'stand'));
-    if (damage > 0) applyBotDamage(bot, damage, 'body');
+    if (damage > 0) applyBotDamage(bot, damage, 'body', { kind: 'killstreak', effect: 'hunter-swarm' });
   }
   for (const remote of remotes.values()) {
     if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) || remote.snapshot.hp <= 0) continue;
@@ -5067,7 +5623,7 @@ function detonateNuke(sequence: NukeSequence): void {
   }
   for (const bot of [...bots.values()]) {
     const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
-    if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body');
+    if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body', { kind: 'killstreak', effect: 'nuke' });
   }
   const finished = performance.now();
   recordSupportExplosionProfile({
@@ -5193,7 +5749,7 @@ function supportBlast(
     const distance = target.distanceTo(point);
     if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
     const damage = Math.min(400, outgoingDamage(Math.max(1, Math.round(maximumDamage * (1 - distance / radius)))));
-    applyBotDamage(bot, damage, 'body');
+    applyBotDamage(bot, damage, 'body', { kind: 'killstreak', effect: explosiveSource });
   }
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get(explosiveSource);
@@ -5447,7 +6003,7 @@ function authorizeLocalOffensiveSupport(
   const activationNonce = randomNonce();
   localSupportNonces.set(source, activationNonce);
   if (network.role !== 'offline') {
-    network.send({ type: 'support-activate', by: player.id, source, activationNonce, effectOrigins, targetIds, nonce: randomNonce() });
+    network.send({ type: 'support-activate', by: player.id, source, activationNonce, effectOrigins, targetIds, timing: nextCombatTiming(), nonce: randomNonce() });
   }
   return activationNonce;
 }
@@ -5554,6 +6110,56 @@ function updateHunterDrones(dt: number, now: number): void {
   }
 }
 
+function remoteSupportTargetPoints(message: Extract<GameMessage, { type: 'support-activate' }>, sender: PlayerSnapshot): THREE.Vector3[] {
+  if (message.effectOrigins.length > 0) return message.effectOrigins.map((point) => new THREE.Vector3(...point));
+  const targets = message.targetIds.map((id) => id === player.id ? player.position.clone() : supportTargetPosition(id)).filter((point): point is THREE.Vector3 => point !== null);
+  return targets.length > 0 ? targets : [new THREE.Vector3(sender.x, sender.y, sender.z)];
+}
+
+function presentRemoteSupportActivation(message: Extract<GameMessage, { type: 'support-activate' }>, sender: PlayerSnapshot): void {
+  const now = performance.now();
+  const points = remoteSupportTargetPoints(message, sender).slice(0, 5);
+  const roots = points.map((target, index) => {
+    const root = new THREE.Group();
+    root.name = 'remote-' + message.source + '-presentation-' + index;
+    const core = new THREE.Mesh(
+      new THREE.OctahedronGeometry(message.source === 'nuke' ? 0.72 : 0.34, 0),
+      new THREE.MeshBasicMaterial({ color: 0xff8a55, transparent: true, opacity: 0.78, depthWrite: false, toneMapped: false }),
+    );
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 0.75, 20),
+      new THREE.MeshBasicMaterial({ color: 0xffd06b, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    root.add(core, ring);
+    root.position.copy(target).add(new THREE.Vector3(0, 10, 0));
+    root.userData.presentationOnly = true;
+    root.traverse((node) => { node.userData.blocksShots = false; });
+    scene.add(root);
+    return { root, target: target.clone() };
+  });
+  const delay = message.source === 'nuke' ? NUKE_WARNING_MS : 900;
+  remoteSupportPresentations.push({ source: message.source, roots, startedAt: now, detonateAt: now + delay, expiresAt: now + delay + 1_800, detonated: false });
+  addFeed('REMOTE ' + message.source.toUpperCase().replaceAll('-', ' ') + ' ACTIVATED', 'coral');
+}
+
+function updateRemoteSupportPresentations(now: number): void {
+  for (let index = remoteSupportPresentations.length - 1; index >= 0; index -= 1) {
+    const effect = remoteSupportPresentations[index];
+    const progress = THREE.MathUtils.clamp((now - effect.startedAt) / Math.max(1, effect.detonateAt - effect.startedAt), 0, 1);
+    for (const { root, target } of effect.roots) {
+      root.position.y = THREE.MathUtils.lerp(target.y + (10), target.y + 0.35, progress);
+      root.rotation.y = now * 0.004;
+      root.scale.setScalar(0.9 + Math.sin(now * 0.012) * 0.12);
+    }
+    if (!effect.detonated && now >= effect.detonateAt) {
+      effect.detonated = true;
+      for (const { target } of effect.roots) supportBlast(target, effect.source === 'nuke' ? 14 : 3.2, 0, effect.source, false);
+      for (const { root } of effect.roots) retireSupportRoot(root);
+    }
+    if (now >= effect.expiresAt) remoteSupportPresentations.splice(index, 1);
+  }
+}
 function updateFieldSupport(dt: number, now: number): void {
   supportExplosionFrameSerial += 1;
   supportExplosionPresentation.update(now);
@@ -5616,6 +6222,7 @@ function updateFieldSupport(dt: number, now: number): void {
     }
   }
   updateHunterDrones(dt, now);
+  updateRemoteSupportPresentations(now);
   for (let index = strikeMissiles.length - 1; index >= 0; index -= 1) {
     const strike = strikeMissiles[index];
     const progress = THREE.MathUtils.clamp((now - strike.startedAt) / Math.max(1, strike.impactAt - strike.startedAt), 0, 1);
@@ -5654,6 +6261,8 @@ function clearFieldSupport(): void {
   strikeMissiles.length = 0;
   for (const drone of hunterDrones) disposeSupportRoot(drone.root);
   hunterDrones.length = 0;
+  for (const effect of remoteSupportPresentations) for (const { root } of effect.roots) disposeSupportRoot(root);
+  remoteSupportPresentations.length = 0;
   for (const root of deferredSupportDisposals) disposeSupportRoot(root);
   deferredSupportDisposals.length = 0;
   supportExplosionPresentation.clear();
@@ -5928,8 +6537,14 @@ function updateMatchState(now: number): void {
     });
     const statsMarkup = `<div class="round-stats" aria-label="Round statistics"><b><small>KILLS</small>${summary.kills}</b><b><small>DEATHS</small>${summary.deaths}</b><b><small>K/D</small>${summary.kd}</b><b><small>ACCURACY</small>${summary.accuracy}</b><b><small>DAMAGE</small>${summary.damageDealt}</b><b><small>HEADSHOTS</small>${summary.headshots}</b></div>`;
     const returnLabel = privateMatch ? network.role === 'host' ? 'RETURN EVERYONE TO LOBBY' : 'WAITING FOR HOST' : 'REMATCH';
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
+    recordMatchDiagnostic('match-end', 'observed', {
+      actorId: player.id,
+      reason: presentation.headline ?? 'match-ended',
+      modifiers: [`kills:${summary.kills}`, `deaths:${summary.deaths}`, `damage:${summary.damageDealt}`],
+    });
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-diagnostics" type="button">DOWNLOAD DIAGNOSTICS</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
     banner.hidden = false;
+    element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics, { once: true });
     const rematch = element<HTMLButtonElement>('#rematch');
     if (!rematch.disabled) rematch.addEventListener('click', () => {
       if (privateMatch && network.role === 'host') returnPrivateMatchToLobby(true);
@@ -6725,6 +7340,8 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
+    recentDeathPositions.length = 0;
+    lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
     try {
@@ -6746,6 +7363,8 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
+    recentDeathPositions.length = 0;
+    lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
     setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
@@ -6798,6 +7417,8 @@ function resetForMode(): void {
   previousHudScores = [0, 0];
   respawnEndsAt = 0;
   clearBots();
+  hostedBotStateSeq = 0;
+  lastHostedBotStateSeq = -1;
   clearGrenades();
   clearGrenadeExplosionVisuals();
   clearFieldSupport();
@@ -6930,15 +7551,19 @@ const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
   const mode: MatchMode = element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
+  const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
+  const hostedBotCount: HostedBotCount = isHostedBotCount(requestedBots) ? requestedBots : 0;
   applyHostLobbyConfig({
     ...privateMatchConfig,
     mode,
     capacity,
+    hostedBotCount,
     autoBalance: mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
   });
 };
 element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-capacity').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
 teamSelect.addEventListener('change', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
@@ -6955,7 +7580,10 @@ function scheduleStateBroadcast(): void {
   if (stateBroadcastTimer) clearTimeout(stateBroadcastTimer);
   const delay = stateBroadcastIntervalMs(localLobbyPingMs);
   stateBroadcastTimer = setTimeout(() => {
-    if (gameStarted && network.role !== 'offline' && player.alive) network.send({ type: 'state', player: snapshot() });
+    if (gameStarted && network.role !== 'offline' && player.alive) {
+      network.send({ type: 'state', player: snapshot() });
+      if (network.role === 'host' && privateMatchConfig.hostedBotCount > 0) broadcastHostedBotState();
+    }
     scheduleStateBroadcast();
   }, delay);
 }
@@ -7088,6 +7716,7 @@ const debugWindow = window as Window & {
     ) => BallisticTrace;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
+    stageHostedBotAgainstRemote: () => { botId: string; targetId: string } | null;
     setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: PrimaryWeaponId) => void;
     clearBots: () => void;
     placeBotAhead: (distance?: number) => void;
@@ -7101,6 +7730,7 @@ const debugWindow = window as Window & {
     stageYardhawkWall: (team?: Team) => boolean;
     stageBotAtIndoorRamp: (team?: Team, descending?: boolean) => boolean;
     damageBot: (amount: number, zone?: HitZone) => void;
+    damageBotWithCause: (cause: KillCause['kind']) => void;
     meleeBot: () => void;
     activateDormantReinforcement: () => { activated: boolean; syncMs: number };
     stageHouseRamp: (kind: 'interior' | 'exterior', team?: Team) => {
@@ -7151,7 +7781,7 @@ const debugWindow = window as Window & {
     renderAudit: () => Array<{ name: string; material: string; triangles: number }>;
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
-    damageFromRemote: (amount: number) => void;
+    damageFromRemote: (amount: number, cause?: KillCause['kind']) => void;
     earnSupport: (eliminations: number) => void;
     forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
@@ -7181,6 +7811,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       phase: privateLobbySnapshot.phase,
       revision: privateLobbySnapshot.revision,
       capacity: privateLobbySnapshot.config.capacity,
+      hostedBotCount: privateLobbySnapshot.config.hostedBotCount,
       autoBalance: privateLobbySnapshot.config.autoBalance,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
       scores: [...authoritativeScores.values()].map((score) => ({ ...score })),
@@ -7209,6 +7840,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       targets: arena.targets.length,
       skylineAssetAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineAssetAudit : null,
       skylineCabinClearance: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineCabinClearance : null,
+      pass59GeometryAudit: selectedArena.id === 'atomic-acres'
+        ? arena.root.userData.atomicCollisionAudit
+        : selectedArena.id === 'rustworks-1v1'
+          ? arena.root.userData.rustworksCentreCoverAudit
+          : selectedArena.id === 'skyline-terminal'
+            ? arena.root.userData.skylineDoorAudit
+            : null,
     },
     ballistics: {
       activeSurfaces: activeBallisticSurfaces().length,
@@ -7371,6 +8009,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       interpolationError: remote.root.position.distanceTo(remote.target),
     })),
     grenades: grenades.length,
+    remotePresentation: {
+      grenades: grenades.filter((grenade) => grenade.ownerKind === 'remote').length,
+      supportEffects: remoteSupportPresentations.length,
+      supportRoots: remoteSupportPresentations.reduce((count, effect) => count + effect.roots.length, 0),
+      presentationOnly: remoteSupportPresentations.every((effect) => effect.roots.every(({ root }) => root.userData.presentationOnly === true)),
+    },
     botGrenades: {
       active: activeBotGrenadeCount(),
       maximumActiveObserved: botGrenadeMaxActive,
@@ -7746,6 +8390,56 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  stageHostedBotAgainstRemote: () => {
+    if (network.role !== 'host') return null;
+    const remote = [...remotes.values()].find((candidate) => candidate.snapshot.hp > 0);
+    if (!remote) return null;
+    const bot = [...bots.values()].find((candidate) => candidate.id.startsWith('host-bot-'));
+    if (!bot) return null;
+    // This debug-only stage isolates the bot→guest authority adapter even when
+    // the surrounding QA lobby is TDM and its default hosted bots share the guest team.
+    if (!areCombatantsHostile(bot.id, bot.team, remote.snapshot.id, remote.snapshot.team)) {
+      bot.team = remote.snapshot.team === 0 ? 1 : 0;
+    }
+    const remoteStance = remote.snapshot.stance ?? 'stand';
+    const target = remote.target.clone();
+    target.y += stanceEyeHeight(remoteStance);
+    let staged: THREE.Vector3 | null = null;
+    for (const radius of [3, 5, 7, 9, 12]) {
+      for (let index = 0; index < 16; index += 1) {
+        const angle = index * Math.PI / 8;
+        const candidate = new THREE.Vector3(
+          target.x + Math.cos(angle) * radius,
+          0,
+          target.z + Math.sin(angle) * radius,
+        );
+        const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+        if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
+        bot.position.copy(candidate);
+        if (botHasLineOfSight(bot, target)) {
+          staged = candidate;
+          break;
+        }
+      }
+      if (staged) break;
+    }
+    if (!staged) return null;
+    const now = performance.now();
+    bot.position.copy(staged);
+    bot.root.position.copy(staged);
+    bot.root.rotation.y = operatorYawToward(bot.position, target);
+    bot.root.updateMatrixWorld(true);
+    bot.lastSightAt = 0;
+    bot.hasLineOfSight = false;
+    bot.sightStartedAt = now - BOT_REACTION_DELAY;
+    bot.lastShotAt = 0;
+    bot.burstShots = 0;
+    bot.nextDecisionAt = 0;
+    bot.nextGrenadeAt = now + 60_000;
+    bot.invulnerableUntil = 0;
+    botsFrozen = false;
+    return { botId: bot.id, targetId: remote.snapshot.id };
+  },
   setBotPresentation: (stance, speed = 0, weapon) => {
     debugBotStanceOverride = stance;
     debugBotSpeedOverride = Math.max(0, Number.isFinite(speed) ? speed : 0);
@@ -7919,6 +8613,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!bot || !Number.isFinite(amount) || amount <= 0) return;
     bot.invulnerableUntil = 0;
     applyBotDamage(bot, amount, zone);
+  },
+  damageBotWithCause: (kind) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return;
+    if (!bot.alive) respawnBot(bot, performance.now());
+    bot.invulnerableUntil = 0;
+    const cause: KillCause = kind === 'gun' ? { kind: 'gun', weapon: player.weapon }
+      : kind === 'killstreak' ? { kind: 'killstreak', effect: 'tri-pass' }
+        : kind === 'grenade' ? { kind: 'grenade' }
+          : kind === 'melee' ? { kind: 'melee' }
+            : { kind: 'environment' };
+    applyBotDamage(bot, 999, 'body', cause);
   },
   meleeBot: () => {
     const bot = bots.values().next().value as BotPlayer | undefined;
@@ -8226,11 +8932,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.invulnerableUntil = 0;
     applyDamage(amount, bots.keys().next().value ?? player.id);
   },
-  damageFromRemote: (amount: number) => {
-    const remoteId = remotes.keys().next().value as string | undefined;
-    if (!remoteId) return;
+  damageFromRemote: (amount: number, kind = 'gun') => {
+    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    if (!remote) return;
     player.invulnerableUntil = 0;
-    applyDamage(amount, remoteId);
+    const cause: KillCause = kind === 'gun' ? { kind: 'gun', weapon: remote.snapshot.weapon }
+      : kind === 'killstreak' ? { kind: 'killstreak', effect: 'tri-pass' }
+        : kind === 'grenade' ? { kind: 'grenade' }
+          : kind === 'melee' ? { kind: 'melee' }
+            : { kind: 'environment' };
+    applyDamage(amount, remote.snapshot.id, 1, false, cause);
   },
   earnSupport: (eliminations: number) => {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
@@ -8284,6 +8995,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     type: 'death',
     killer: 'qa-drop-auditor',
     victim: player.id,
+    cause: { kind: 'environment' },
     nonce: randomNonce(),
   }, performance.now() - THREE.MathUtils.clamp(ageMs, 0, 30_100))?.drop.id ?? null,
   setKills: (kills: number) => {

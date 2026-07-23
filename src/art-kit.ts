@@ -408,6 +408,14 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     const longBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.038, 0.88, 14), dark);
     longBarrel.name = 'lmg-long-barrel';
     part(root, longBarrel, [0, 0.005, -1.48], [Math.PI / 2, 0, 0]);
+    for (const sightName of ['rear-sight', 'front-sight']) {
+      const sight = root.getObjectByName(sightName);
+      if (sight) sight.position.y = 0.215;
+    }
+    const rearSightSocket = root.getObjectByName('rear-sight-socket');
+    if (rearSightSocket) rearSightSocket.position.y = 0.215;
+    const frontSightSocket = root.getObjectByName('front-sight-socket');
+    if (frontSightSocket) frontSightSocket.position.y = 0.215;
     const muzzleSocket = root.getObjectByName('muzzle-socket');
     if (muzzleSocket) muzzleSocket.position.set(0, 0.005, -1.92);
     const muzzle = root.children.find((node) => node.userData.muzzle === true);
@@ -636,6 +644,8 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     reticle.position.set(0, 0.215, 0.033); root.add(reticle);
     part(root, roundedBox('rear-sight', [0.105, 0.07, 0.045], dark, 0.01), [0, 0.19, 0.18]);
     part(root, roundedBox('front-sight', [0.035, 0.105, 0.035], dark, 0.006), [0, 0.17, -0.78]);
+    addSocket('rear-sight-socket', [0, 0.19, 0.18]);
+    addSocket('front-sight-socket', [0, 0.17, -0.78]);
     part(root, roundedBox('charging-handle', [0.19, 0.035, 0.07], accent, 0.008), [0, 0.13, 0.1]);
     const bolt = part(root, roundedBox('bolt-or-slide', [0.052, 0.06, 0.18], MAT.brass(), 0.01), [0.112, 0.035, -0.045]);
     bolt.userData.restZ = bolt.position.z;
