@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { releaseChannelDecision, stableReleaseUrl } from './release-channel';
 
@@ -31,5 +32,11 @@ describe('release channel entry routing', () => {
 
   it('rejects paths that could escape the deployed root', () => {
     expect(() => stableReleaseUrl('https://example.test/game/', '../old')).toThrow(/safe relative path/);
+  });
+
+  it('declares an inline favicon so repository Pages does not probe the origin root', () => {
+    const entryHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    expect(entryHtml).toContain('<link rel="icon" href="data:image/svg+xml,');
+    expect(entryHtml).not.toMatch(/href=["']\/favicon\.ico/);
   });
 });
