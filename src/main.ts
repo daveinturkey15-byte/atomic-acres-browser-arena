@@ -4455,7 +4455,7 @@ function applyBotDamage(
   }
   if (bot.hp > 0) {
     if (zone === 'head' && attackerId === player.id) {
-      addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} Â· HEADSHOT Â· ${Math.round(dealt)} DMG`, 'gold');
+      addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
     }
     if (network.role === 'host') broadcastHostedBotState();
     return dealt;
@@ -4482,7 +4482,7 @@ function applyBotDamage(
     player.kills += 1;
     if (isKillstreakEligible(cause)) awardSupportElimination();
     audio.kill();
-    addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' Â· HEADSHOT' : ''} Â· ${Math.round(damage)} DMG`, 'gold');
+    addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
   }
   const afterRewardAndFeed = performance.now();
   spawnEarnedBotReinforcement();
