@@ -6,7 +6,7 @@ export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
 export type MatchMode = 'tdm' | 'ffa';
 export type LobbyPhase = 'waiting' | 'countdown' | 'active' | 'ended';
-export type MultiplayerArenaId = Exclude<ArenaId, 'gun-range'>;
+export type MultiplayerArenaId = ArenaId;
 
 export type PrivateMatchConfig = Readonly<{
   arenaId: MultiplayerArenaId;
@@ -32,6 +32,9 @@ export type PlayerScore = Readonly<{
   deaths: number;
   damageDealt: number;
   damageTaken: number;
+  rangeScore?: number;
+  rangeHits?: number;
+  rangeShots?: number;
 }>;
 
 export type LobbySnapshot = Readonly<{
@@ -69,14 +72,15 @@ export function isMatchMode(value: unknown): value is MatchMode {
 export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
-  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1' || config.arenaId === 'skyline-terminal')
+  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1' || config.arenaId === 'gun-range' || config.arenaId === 'skyline-terminal')
     && isMatchMode(config.mode)
     && isRoomCapacity(config.capacity)
     && isHostedBotCount(config.hostedBotCount)
     && typeof config.autoBalance === 'boolean'
     && Number.isSafeInteger(config.durationMs)
     && Number(config.durationMs) >= 60_000
-    && Number(config.durationMs) <= 900_000;
+    && Number(config.durationMs) <= 900_000
+    && (config.arenaId !== 'gun-range' || config.mode === 'ffa' && config.hostedBotCount === 0 && config.autoBalance === false);
 }
 
 export function isLobbyMember(value: unknown): value is LobbyMember {
@@ -97,7 +101,10 @@ export function isPlayerScore(value: unknown): value is PlayerScore {
     && Number.isSafeInteger(score.kills) && Number(score.kills) >= 0 && Number(score.kills) <= 500
     && Number.isSafeInteger(score.deaths) && Number(score.deaths) >= 0 && Number(score.deaths) <= 500
     && Number.isSafeInteger(score.damageDealt) && Number(score.damageDealt) >= 0 && Number(score.damageDealt) <= 1_000_000
-    && Number.isSafeInteger(score.damageTaken) && Number(score.damageTaken) >= 0 && Number(score.damageTaken) <= 1_000_000;
+    && Number.isSafeInteger(score.damageTaken) && Number(score.damageTaken) >= 0 && Number(score.damageTaken) <= 1_000_000
+    && (score.rangeScore === undefined || Number.isSafeInteger(score.rangeScore) && Number(score.rangeScore) >= 0 && Number(score.rangeScore) <= 10_000_000)
+    && (score.rangeHits === undefined || Number.isSafeInteger(score.rangeHits) && Number(score.rangeHits) >= 0 && Number(score.rangeHits) <= 100_000)
+    && (score.rangeShots === undefined || Number.isSafeInteger(score.rangeShots) && Number(score.rangeShots) >= 0 && Number(score.rangeShots) <= 100_000);
 }
 
 export function emptyPlayerScore(id: string): PlayerScore {

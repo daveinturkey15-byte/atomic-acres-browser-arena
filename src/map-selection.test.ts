@@ -35,9 +35,9 @@ describe('opening arena selection', () => {
     expect(arenaSelection('gun-range')).toMatchObject({
       soloBotCount: 0,
       maximumSoloBots: 0,
-      multiplayer: false,
+      multiplayer: true,
       matchRules: { durationMs: 120_000, scoreLimit: null },
-      rulesLabel: '2 MIN · NO GRENADES · SCORE ATTACK',
+      rulesLabel: '2 MIN · 6P FFA · NO BOTS',
     });
     expect(arenaSelection('skyline-terminal')).toMatchObject({
       id: 'skyline-terminal',

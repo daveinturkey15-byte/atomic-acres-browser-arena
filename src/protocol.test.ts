@@ -76,6 +76,15 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'match-score', by: 'host', scores: [...scores, score('overflow')], nonce: 23 })).toBe(false);
   });
 
+  it('validates bounded real-time Gun Range score claims', () => {
+    const claim = { type: 'range-score-claim' as const, by: 'abc', score: 1_250, hits: 7, shots: 12, nonce: 24 };
+    expect(isGameMessage(claim)).toBe(true);
+    expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
+    expect(isHostAuthorityMessage(claim)).toBe(false);
+    expect(isGameMessage({ ...claim, score: -1 })).toBe(false);
+    expect(isGameMessage({ ...claim, shots: 100_001 })).toBe(false);
+  });
+
   it('validates replicated pickup and breakable-window messages', () => {
     const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', mode: 'weapon', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;

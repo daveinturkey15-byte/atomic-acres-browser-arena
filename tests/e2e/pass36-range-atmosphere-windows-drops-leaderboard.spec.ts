@@ -85,8 +85,8 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
   test('deduplicates Dave to one best leaderboard row and rewrites legacy storage', async ({ page }) => {
     await page.addInitScript(() => {
       const base = { name: 'Dave', deaths: 4, won: false, recordedAt: Date.now() };
-      localStorage.setItem('atomic-acres:high-scores:v1', JSON.stringify({
-        version: 2,
+      localStorage.setItem('atomic-acres:high-scores:v2', JSON.stringify({
+        version: 4,
         entries: [
           { ...base, id: 'global:dave', kills: 12, bestStreak: 8 },
           { ...base, id: 'score:local:completed', name: 'dave', kills: 14, bestStreak: 10 },
@@ -96,14 +96,14 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     await page.goto(`/?${light}&mist=off&seed=3601`);
     await waitReady(page);
     const state = await snapshot(page);
-    expect(state.leaderboard).toMatchObject({ schemaVersion: 3, uniquePlayerKeys: 1, renderedRows: 1 });
+    expect(state.leaderboard).toMatchObject({ schemaVersion: 4, uniquePlayerKeys: 1, renderedRows: 1 });
     expect(state.leaderboard.entries).toEqual([
       expect.objectContaining({ id: 'score:local:completed', kills: 14, bestStreak: 10 }),
     ]);
     await expect(page.locator('#high-score-list li:not(.empty)')).toHaveCount(1);
     await expect(page.locator('#high-score-list')).toContainText('dave');
-    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres:high-scores:v1')!));
-    expect(persisted.version).toBe(3);
+    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres:high-scores:v2')!));
+    expect(persisted.version).toBe(4);
     expect(persisted.entries).toHaveLength(1);
   });
 
@@ -171,8 +171,8 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     await page.goto(`/?${light}&mist=on&seed=3603`);
     await waitReady(page);
     expect((await snapshot(page)).render).toMatchObject({
-      lighting: { fogNear: 36, fogFar: 112 },
-      atmosphere: { enabled: true, arenaId: 'atomic-acres', mistCards: 10, smokeCards: 5, dustMotes: 64, triangles: 30, perFrameAllocations: 0 },
+      lighting: { fogNear: 56, fogFar: 148 },
+      atmosphere: { enabled: true, arenaId: 'atomic-acres', mistCards: 10, smokeCards: 5, dustMotes: 40, triangles: 30, perFrameAllocations: 0 },
     });
     await page.evaluate(() => api().selectArena('rustworks-1v1'));
     await expect.poll(async () => (await snapshot(page)).arenaSelection.id).toBe('rustworks-1v1');

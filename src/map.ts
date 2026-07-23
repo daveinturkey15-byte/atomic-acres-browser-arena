@@ -23,10 +23,13 @@ export type PracticeTarget = {
   root: THREE.Group;
   active: boolean;
   respawnAt: number;
+  respawnDelayMs?: number;
   scoreValue: number;
   distanceBand: 'near' | 'mid' | 'far';
   maxHealth: number;
   health: number;
+  alwaysCritical?: boolean;
+  kind?: 'plate' | 'flying-cat';
 };
 export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean };
 export type ArenaMap = {

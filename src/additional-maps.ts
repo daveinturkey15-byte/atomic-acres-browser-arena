@@ -684,9 +684,9 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     minimumTowerDistance: 7.7,
     lanesPreserved: ['north-south-service', 'east-west-service', 'west-trench', 'tower-undercroft'],
   };
-  // Four containers per side (16 total). Nine-metre centres leave 3.2 m clear
+  // Five containers per side (20 total). Nine-metre centres leave 3.2 m clear
   // between adjacent 5.8 m shells. One placement per side is open end-to-end.
-  const perimeterSlots = [-18, -9, 9, 18] as const;
+  const perimeterSlots = [-18, -9, 0, 9, 18] as const;
   const perimeterRow = 21.5;
   const containerRows = [
     ...perimeterSlots.map((x, slot) => ({ side: 'north', slot, x, z: -perimeterRow, open: slot === 1 })),
@@ -777,7 +777,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     total: containerRows.length,
     closed: containerRows.filter((placement) => !placement.open).length,
     open: containerRows.filter((placement) => placement.open).length,
-    perSide: 4,
+    perSide: 5,
     slots: [...perimeterSlots],
     row: perimeterRow,
     minimumEndGap: 9 - 5.8,
@@ -1044,7 +1044,90 @@ function rangeTarget(
     child.userData.impactSurface = 'metal';
   });
   builder.root.add(root);
-  targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500 });
+  targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500, kind: 'plate' });
+}
+
+function fivePointStarGeometry(outerRadius = 0.16, innerRadius = 0.065): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  for (let point = 0; point < 10; point += 1) {
+    const angle = -Math.PI / 2 + point * Math.PI / 5;
+    const radius = point % 2 === 0 ? outerRadius : innerRadius;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (point === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
+function flyingBlackCat(targets: PracticeTarget[], root: THREE.Group): void {
+  const cat = new THREE.Group();
+  cat.name = 'gun-range-flying-black-cat';
+  cat.userData.targetId = 'flying-black-cat';
+  cat.userData.scoreValue = 500;
+  cat.userData.flyingCat = true;
+  cat.position.set(10.5, 3.8, -18);
+
+  const fur = new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 0.78, metalness: 0.02 });
+  const eyes = new THREE.MeshBasicMaterial({ color: 0xf4c44f, toneMapped: false });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 10), fur);
+  body.name = 'flying-black-cat-body';
+  body.scale.set(1.45, 0.72, 0.78);
+  body.userData.hitZone = 'head';
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 10), fur);
+  head.name = 'flying-black-cat-head';
+  head.position.set(0, 0.18, -0.52);
+  head.userData.hitZone = 'head';
+  const earGeometry = new THREE.ConeGeometry(0.13, 0.3, 4);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(earGeometry, fur);
+    ear.name = 'flying-black-cat-ear';
+    ear.position.set(side * 0.19, 0.47, -0.54);
+    ear.rotation.y = Math.PI / 4;
+    ear.userData.hitZone = 'head';
+    cat.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), eyes);
+    eye.name = 'flying-black-cat-eye';
+    eye.position.set(side * 0.12, 0.23, -0.82);
+    eye.userData.hitZone = 'head';
+    cat.add(eye);
+  }
+  const tail = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.07, 8, 20, Math.PI * 1.35), fur);
+  tail.name = 'flying-black-cat-tail';
+  tail.position.set(0.46, 0.06, 0.38);
+  tail.rotation.set(Math.PI / 2, 0.35, 0.3);
+  tail.userData.hitZone = 'head';
+  cat.add(body, head, tail);
+
+  const starMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, transparent: true, opacity: 0.9, toneMapped: false });
+  const starGeometry = fivePointStarGeometry();
+  const trail: THREE.Mesh[] = [];
+  for (let index = 0; index < 8; index += 1) {
+    const star = new THREE.Mesh(starGeometry, starMaterial.clone());
+    star.name = 'flying-black-cat-trail-star';
+    star.position.set(Math.sin(index * 1.7) * 0.18, Math.cos(index * 1.3) * 0.14, 0.65 + index * 0.34);
+    star.scale.setScalar(1 - index * 0.075);
+    star.userData.presentationOnly = true;
+    star.userData.blocksShots = false;
+    star.raycast = () => undefined;
+    cat.add(star);
+    trail.push(star);
+  }
+  cat.userData.starTrail = trail;
+  cat.traverse((child) => {
+    if (child.userData.presentationOnly === true) return;
+    child.userData.targetRoot = cat;
+    child.userData.targetId = 'flying-black-cat';
+    child.userData.hitZone = 'head';
+    child.userData.impactSurface = 'organic';
+  });
+  root.add(cat);
+  targets.push({
+    id: 'flying-black-cat', root: cat, active: true, respawnAt: 0, respawnDelayMs: 30_000,
+    scoreValue: 500, distanceBand: 'mid', maxHealth: 100, health: 100,
+    alwaysCritical: true, kind: 'flying-cat',
+  });
 }
 
 export function buildGunRange(scene: THREE.Scene): ArenaMap {
@@ -1137,6 +1220,37 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   ] as const) {
     for (const x of [-7, 0, 7]) rangeTarget(builder, targets, `${band}-${x}`, x, z, score, band);
   }
+
+  // Subtle live wall-penetration lab: four isolated lanes use explicit material
+  // and thickness contracts, with a scored plate behind every panel.
+  const wallbangGlass = new THREE.MeshStandardMaterial({ color: 0x8ccbd2, transparent: true, opacity: 0.34, roughness: 0.16, metalness: 0.04 });
+  const wallbangPanels = [
+    { x: -17.1, label: 'GLASS 8 CM', material: 'glass' as const, thickness: 0.08, render: wallbangGlass },
+    { x: -14.7, label: 'WOOD 24 CM', material: 'wood' as const, thickness: 0.24, render: timber },
+    { x: -12.3, label: 'PLASTER 42 CM', material: 'interior-wall' as const, thickness: 0.42, render: wall },
+    { x: -9.9, label: 'BRICK 70 CM', material: 'brick' as const, thickness: 0.7, render: standard(0x744838, 0.93, 0.04) },
+  ];
+  for (const [index, panel] of wallbangPanels.entries()) {
+    box(builder, `gun-range-wallbang-panel-${panel.material}`, [panel.x, 1.45, -7.6], [2.05, 2.9, panel.thickness], panel.render, {
+      solid: false,
+      shots: true,
+      ballisticMaterial: panel.material,
+    });
+    rangeTarget(builder, targets, `wallbang-${panel.material}`, panel.x, -12.4, 50, 'near');
+    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [2.1, 0.5]);
+    if (label) {
+      label.position.set(panel.x, 3.35, -7.5);
+      root.add(label);
+    }
+  }
+  box(builder, 'gun-range-wallbang-lab-left', [-18.45, 1.6, -8.8], [0.18, 3.2, 9.8], dark, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'gun-range-wallbang-lab-right', [-8.55, 1.6, -8.8], [0.18, 3.2, 9.8], dark, { ballisticMaterial: 'structural-metal' });
+  const wallbangHeader = rangeSign('WALLBANG LAB · MATERIAL / THICKNESS', 0xe0aa37, 'gun-range-wallbang-header', [9.5, 0.75]);
+  if (wallbangHeader) {
+    wallbangHeader.position.set(-13.5, 4.15, -5.4);
+    root.add(wallbangHeader);
+  }
+  flyingBlackCat(targets, root);
   for (const station of GUN_RANGE_WEAPON_STATIONS) {
     const accent = new THREE.MeshStandardMaterial({
       color: WEAPONS[station.weapon].color,
@@ -1722,7 +1836,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('boarding-route', 'skyline-terminal-gate-header', [0, 5.2, -11.86], [3.86, 0.18, 0.28], trimMat, 'performance', undefined, true);
   detailBox('boarding-route', 'skyline-terminal-gate-threshold', [0, 3.34, -11.84], [3.55, 0.08, 0.34], rubberMat);
   for (const [id, x] of [['west', -22], ['east', 22]] as const) {
-    detailBox('terminal-story', 'skyline-staff-door-' + id, [x, 1.25, -33.66], [2.25, 2.5, 0.12], wallLowerMat, 'performance');
+    detailBox('terminal-story', 'skyline-staff-door-' + id, [x, 1.25, -33.66], [2.25, 2.5, 0.12], glassMat, 'performance');
     detailBox('terminal-story', 'skyline-staff-door-' + id + '-header', [x, 2.62, -33.61], [2.55, 0.18, 0.2], structureMat, 'performance', undefined, true);
     for (const side of [-1, 1]) detailBox('terminal-story', 'skyline-staff-door-' + id + '-jamb-' + side, [x + side * 1.22, 1.35, -33.61], [0.18, 2.7, 0.2], structureMat, 'performance', undefined, true);
     detailBox('terminal-story', 'skyline-staff-door-' + id + '-handle', [x + 0.7, 1.25, -33.52], [0.08, 0.36, 0.1], hazardMat);
@@ -1733,6 +1847,22 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     { id: 'staff-west', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall', clearWidth: 0 },
     { id: 'staff-east', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall', clearWidth: 0 },
   ];
+
+  // Pass 60 concourse densification: repeated lounge furniture, information
+  // screens and baggage carts replace broad empty floor without changing routes.
+  for (const [row, z] of [-21.5, -25.2].entries()) {
+    for (const x of [-24, -18, 18, 24]) {
+      detailBox('terminal-story', `skyline-lounge-seat-${row}-${x}`, [x, 0.48, z], [4.2, 0.22, 1.25], seatMat, 'performance');
+      detailBox('terminal-story', `skyline-lounge-seat-back-${row}-${x}`, [x, 0.9, z + 0.52], [4.2, 0.72, 0.15], seatMat, 'performance');
+      for (const leg of [-1.65, 1.65]) detailBox('terminal-story', `skyline-lounge-leg-${row}-${x}-${leg}`, [x + leg, 0.24, z], [0.12, 0.48, 0.85], structureMat, 'performance');
+    }
+  }
+  for (const x of [-29, -10, 10, 29]) {
+    detailBox('terminal-story', `skyline-flight-screen-post-${x}`, [x, 1.8, -20], [0.16, 3.6, 0.16], structureMat, 'performance');
+    detailBox('terminal-story', `skyline-flight-screen-${x}`, [x, 3.25, -20], [3.6, 1.5, 0.18], cockpitMat, 'performance');
+    detailBox('terminal-story', `skyline-baggage-cart-basket-${x}`, [x, 0.62, -30.5], [1.65, 0.72, 0.82], structureMat, 'performance');
+    detailBox('terminal-story', `skyline-baggage-cart-handle-${x}`, [x, 1.15, -30.88], [1.65, 0.08, 0.08], trimMat, 'performance');
+  }
   const breakableWindows: BreakableWindow[] = [];
   for (const winX of [-22, -14, -6, 6, 14, 22]) {
     const windowId = `skyline-window-${winX}`;

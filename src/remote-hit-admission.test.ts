@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import { buildGunRange } from './additional-maps';
+import { traceBallisticPath } from './ballistics';
+import { WEAPONS } from './gameplay';
 import {
   admitRemoteBaseDamage,
   deriveRemoteShotBaseDamage,
@@ -39,6 +43,20 @@ describe('remote hit admission', () => {
     );
     expect(halfEnergy).toBe(12);
     expect(deriveRemoteShotBaseDamage('smg', [0, 1.38, 6], [[0, 0, -1]], target, () => true)).toBe(0);
+  });
+
+  it('admits multiplayer player damage through the real Gun Range wallbang lanes', () => {
+    const map = buildGunRange(new THREE.Scene());
+    const origin: [number, number, number] = [-14.7, 1.38, -4];
+    const target = { x: -14.7, y: 1.7, z: -12.4, yaw: 0, stance: 'stand' as const };
+    const unobstructed = deriveRemoteShotBaseDamage('carbine', origin, [[0, 0, -1]], target);
+    const throughWood = deriveRemoteShotBaseDamage('carbine', origin, [[0, 0, -1]], target, (shotOrigin, impact) => {
+      const delta = impact.clone().sub(shotOrigin);
+      const trace = traceBallisticPath(shotOrigin, delta, delta.length(), WEAPONS.carbine.penetration, map.shotSurfaces);
+      return trace.reachedDistance ? trace.damageMultiplier : 0;
+    });
+    expect(throughWood).toBeGreaterThan(0);
+    expect(throughWood).toBeLessThan(unobstructed);
   });
 
   it('rejects sender-prepowered gun damage and applies Overdrive once at the receiver', () => {

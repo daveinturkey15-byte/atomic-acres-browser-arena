@@ -170,9 +170,10 @@ export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReas
 export type ClockPingMessage = { type: 'clock-ping'; by: string; sentAtEpochMs: number; reportedRttMs: number | null; nonce: number };
 export type ClockPongMessage = { type: 'clock-pong'; by: string; forPlayerId: string; sentAtEpochMs: number; hostEpochMs: number; nonce: number };
 export type MatchScoreMessage = { type: 'match-score'; by: string; scores: PlayerScore[]; nonce: number };
+export type RangeScoreClaimMessage = { type: 'range-score-claim'; by: string; score: number; hits: number; shots: number; nonce: number };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage;
+  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -381,6 +382,12 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.scores) && msg.scores.length <= MAX_MATCH_SCORE_ENTRIES && msg.scores.every(isPlayerScore)
         && new Set(msg.scores.map((score) => score.id)).size === msg.scores.length
         && Number.isFinite(msg.nonce);
+    case 'range-score-claim':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Number.isSafeInteger(msg.score) && Number(msg.score) >= 0 && Number(msg.score) <= 10_000_000
+        && Number.isSafeInteger(msg.hits) && Number(msg.hits) >= 0 && Number(msg.hits) <= 100_000
+        && Number.isSafeInteger(msg.shots) && Number(msg.shots) >= 0 && Number(msg.shots) <= 100_000
+        && Number.isFinite(msg.nonce);
     default:
       return false;
   }
@@ -418,6 +425,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'clock-ping':
     case 'clock-pong':
     case 'match-score':
+    case 'range-score-claim':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerRelativeMinimapOffset, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerRelativeMinimapOffset, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap } from './minimap';
 
 const bounds = { minX: -40, maxX: 40, minZ: -50, maxZ: 50 };
 
@@ -17,6 +17,12 @@ describe('worldToMinimap', () => {
   it('round-trips map clicks back into bounded world positions', () => {
     expect(minimapToWorld(180, 0, bounds, 360, 360)).toEqual({ x: 0, z: 50 });
     expect(minimapToWorld(-50, 900, bounds, 360, 360)).toEqual({ x: -40, z: -50 });
+  });
+
+  it('keeps Tri-Pass handedness aligned with the horizontally reflected HUD map', () => {
+    expect(worldToTacticalMap(40, 50, bounds, 180, 180)).toEqual([0, 0]);
+    expect(worldToTacticalMap(-40, -50, bounds, 180, 180)).toEqual([180, 180]);
+    expect(tacticalMapToWorld(0, 0, bounds, 180, 180)).toEqual({ x: 40, z: 50 });
   });
 });
 

@@ -416,6 +416,12 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     if (rearSightSocket) rearSightSocket.position.y = 0.215;
     const frontSightSocket = root.getObjectByName('front-sight-socket');
     if (frontSightSocket) frontSightSocket.position.y = 0.215;
+    const sightGlow = new THREE.MeshStandardMaterial({ color: 0xe8fff0, emissive: 0x86ffae, emissiveIntensity: 1.4, roughness: 0.28, metalness: 0.18 });
+    const aperture = new THREE.Mesh(new THREE.TorusGeometry(0.047, 0.008, 8, 20), sightGlow);
+    aperture.name = 'lmg-aperture';
+    aperture.position.set(0, 0.235, 0.12);
+    root.add(aperture);
+    part(root, roundedBox('lmg-front-sight-dot', [0.018, 0.035, 0.018], sightGlow, 0.006, 2), [0, 0.235, -1.43]);
     const muzzleSocket = root.getObjectByName('muzzle-socket');
     if (muzzleSocket) muzzleSocket.position.set(0, 0.005, -1.92);
     const muzzle = root.children.find((node) => node.userData.muzzle === true);

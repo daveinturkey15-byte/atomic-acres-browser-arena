@@ -184,8 +184,8 @@ describe('additional authored maps', () => {
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
-    expect(namedCount(map.root, 'rustworks-container-placement')).toBe(16);
-    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(12);
+    expect(namedCount(map.root, 'rustworks-container-placement')).toBe(20);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(16);
     expect(namedCount(map.root, 'rustworks-open-container-wall-a')).toBe(4);
     expect(namedCount(map.root, 'rustworks-barrier-low')).toBe(0);
     expect(namedCount(map.root, 'rustworks-tank-collider')).toBe(0);
@@ -211,7 +211,7 @@ describe('additional authored maps', () => {
     expect(map.root.userData.rustworksRoutes?.['west-service-trench']).toBeTruthy();
   });
 
-  it('gives sixteen widely spaced container placements, including four authoritative pass-throughs', async () => {
+  it('gives twenty widely spaced container placements, including four authoritative pass-throughs', async () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const placements: THREE.Group[] = [];
     const closed: THREE.Mesh[] = [];
@@ -221,17 +221,17 @@ describe('additional authored maps', () => {
       if (node instanceof THREE.Mesh && node.name === 'rustworks-shipping-container') closed.push(node);
       if (node instanceof THREE.Mesh && node.name.startsWith('rustworks-open-container-') && !node.name.includes('-floor-')) openShells.push(node);
     });
-    expect(placements).toHaveLength(16);
-    expect(closed).toHaveLength(12);
+    expect(placements).toHaveLength(20);
+    expect(closed).toHaveLength(16);
     expect(openShells).toHaveLength(12);
     for (const side of ['north', 'south', 'west', 'east']) {
       const row = placements.filter((placement) => placement.userData.rustworksContainerSide === side);
-      expect(row, `${side} container row`).toHaveLength(4);
+      expect(row, `${side} container row`).toHaveLength(5);
       expect(row.filter((placement) => placement.userData.rustworksContainerType === 'open'), `${side} open container`).toHaveLength(1);
       const offsets = row
         .map((placement) => side === 'north' || side === 'south' ? placement.position.x : placement.position.z)
         .sort((a, b) => a - b);
-      expect(offsets).toEqual([-18, -9, 9, 18]);
+      expect(offsets).toEqual([-18, -9, 0, 9, 18]);
       for (let index = 1; index < offsets.length; index += 1) {
         expect(offsets[index] - offsets[index - 1] - 5.8).toBeGreaterThanOrEqual(3.2 - 1e-6);
       }
@@ -264,7 +264,7 @@ describe('additional authored maps', () => {
     const layout = map.root.userData.rustworksContainerLayout as {
       total: number; closed: number; open: number; perSide: number; minimumEndGap: number;
     };
-    expect(layout).toMatchObject({ total: 16, closed: 12, open: 4, perSide: 4 });
+    expect(layout).toMatchObject({ total: 20, closed: 16, open: 4, perSide: 5 });
     expect(layout.minimumEndGap).toBeCloseTo(3.2);
     expect(RUSTWORKS_TOWER.openContainerClearWidth).toBeGreaterThan(0.38 * 2 + 1.4);
     expect(RUSTWORKS_TOWER.openContainerClearHeight).toBeGreaterThan(1.82 + 0.5);
@@ -463,17 +463,21 @@ describe('additional authored maps', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Acres Indoor Gun Range');
-    expect(map.targets).toHaveLength(9);
-    expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(3);
-    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(3);
+    expect(map.targets).toHaveLength(14);
+    expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
     expect(map.targets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
     expect(map.targets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
-      100, 100, 100, 200, 200, 200, 300, 300, 300,
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
-    expect(map.targets.every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
-    expect(map.targets.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
-    expect(map.targets.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    const cat = map.targets.find((target) => target.id === 'flying-black-cat');
+    expect(cat).toMatchObject({ kind: 'flying-cat', maxHealth: 100, health: 100, scoreValue: 500, respawnDelayMs: 30_000, alwaysCritical: true });
+    expect(map.root.getObjectByName('gun-range-flying-black-cat')).toBeTruthy();
+    expect(map.root.children.find((child) => child.name === 'gun-range-flying-black-cat')?.children.filter((child) => child.name === 'flying-black-cat-trail-star')).toHaveLength(8);
     expect(map.root.getObjectByName('gun-range-firing-line')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-firing-line')?.position.z).toBe(GUN_RANGE_FIRING_LINE_Z);
     expect(map.physicsColliders).toContainEqual(GUN_RANGE_FIRING_LINE_BARRIER);
@@ -486,6 +490,10 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('gun-range-right-wall')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-control-room')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-wallbang-panel-glass')).toBeTruthy();
+    const wallbangSurfaces = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
+    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual(['glass', 'wood', 'interior-wall', 'brick']);
+    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.24, 0.42, 0.7]);
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);

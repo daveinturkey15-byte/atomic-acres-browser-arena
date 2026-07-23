@@ -409,7 +409,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 59');
+    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 60');
     expect(state.networkSync).toEqual({ stateIntervalMs: 50, interpolationRate: 24 });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -1285,6 +1285,19 @@ test.describe('solo mechanics', () => {
     await expect(roundStats).toContainText('DAMAGE');
     await expect(roundStats).toContainText('HEADSHOTS');
     await page.screenshot({ path: 'test-results/player-feedback-round-stats.png', animations: 'disabled' });
+    const summaryDownloadPromise = page.waitForEvent('download');
+    await page.locator('#download-match-summary').click();
+    const summaryDownload = await summaryDownloadPromise;
+    expect(summaryDownload.suggestedFilename()).toMatch(/^atomic-acres-match-summary-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
+    const summaryPath = await summaryDownload.path();
+    expect(summaryPath).not.toBeNull();
+    const summary = JSON.parse(await readFile(summaryPath!, 'utf8')) as {
+      schemaVersion: number;
+      reportType: string;
+      stats: { accuracyPercent: number };
+    };
+    expect(summary).toMatchObject({ schemaVersion: 1, reportType: 'human-readable-match-summary' });
+    expect(summary.stats.accuracyPercent).toBeGreaterThanOrEqual(0);
     const downloadPromise = page.waitForEvent('download');
     await page.locator('#download-match-diagnostics').click();
     const download = await downloadPromise;
@@ -1295,6 +1308,10 @@ test.describe('solo mechanics', () => {
     expect(diagnostics.schemaVersion).toBe(1);
     expect(diagnostics.context.role).toBe('offline');
     expect(diagnostics.events.some((event) => event.eventType === 'match-end')).toBe(true);
+    await page.locator('#match-main-menu').click();
+    await expect(page.locator('#last-match-reports')).toBeVisible();
+    await expect(page.locator('#menu-download-match-summary')).toHaveText('HUMAN SUMMARY JSON');
+    await expect(page.locator('#menu-download-match-technical')).toHaveText('TECHNICAL DEBUG JSON');
   });
 
   test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {

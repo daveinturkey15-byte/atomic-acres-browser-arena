@@ -28,6 +28,7 @@ export const MELEE_COOLDOWN_MS = 650;
 export const MELEE_RANGE = 1.75;
 export const MELEE_DAMAGE = 100;
 export const HEADSHOT_DAMAGE_MULTIPLIER = 1.5;
+export const SNIPER_HEADSHOT_DAMAGE_MULTIPLIER = 3;
 export const FALL_DAMAGE_SAFE_SPEED = 9.5;
 export const FALL_DAMAGE_LETHAL_SPEED = 22;
 
@@ -126,7 +127,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   },
   sniper: {
     id: 'sniper', name: 'Longline 86', damage: 67, minimumDamage: 67,
-    falloffStart: 96, falloffEnd: 120, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.9,
+    falloffStart: 96, falloffEnd: 120, headMultiplier: SNIPER_HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.9,
     rpm: 55, mag: 5, reserve: 25, reload: 2.6,
     hipSpread: 0.052, adsSpreadMultiplier: 0.05, movementSpreadMultiplier: 1.8,
     crouchSpreadMultiplier: 0.72, sustainedSpreadPerShot: 0.004, maximumSpread: 0.07,

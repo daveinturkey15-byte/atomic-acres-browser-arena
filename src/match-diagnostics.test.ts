@@ -32,6 +32,16 @@ describe('bounded downloadable match diagnostics', () => {
     expect(sanitizeDiagnosticValue({ roomCode: 'ABC123', token: 'secret', ok: true })).toEqual({ ok: true });
   });
 
+  it('includes sanitized game and runtime context for technical debugging', () => {
+    const diagnostics = new MatchDiagnostics({
+      buildId: 'pass-60', sourceId: 'source', sessionId: 'session', role: 'offline', arena: 'gun-range', mode: 'solo',
+      technicalContext: { renderProfile: 'performance', weaponBalance: { sniper: { damage: 67, rpm: 55 } }, roomCode: 'private' },
+    });
+    const context = JSON.parse(diagnostics.export().json).context;
+    expect(context.technicalContext).toMatchObject({ renderProfile: 'performance', weaponBalance: { sniper: { damage: 67, rpm: 55 } } });
+    expect(context.technicalContext.roomCode).toBeUndefined();
+  });
+
   it('keeps a shared network event id correlatable across scrubbed host and guest exports', () => {
     const host = new MatchDiagnostics({
       buildId: 'pass-59', sourceId: 'same-source', sessionId: 'host-private-session',

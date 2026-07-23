@@ -43,8 +43,8 @@ describe('Atomic Acres Pass 59 collision audit', () => {
   it('keeps every intended house window breakable and uniquely bound', () => {
     const map = buildArena(new THREE.Scene());
     expect(map.houseTelemetry.windows).toBe(6);
-    expect(map.breakableWindows).toHaveLength(4);
-    expect(new Set(map.breakableWindows.map((window) => window.id)).size).toBe(4);
+    expect(map.breakableWindows).toHaveLength(6);
+    expect(new Set(map.breakableWindows.map((window) => window.id)).size).toBe(6);
     for (const window of map.breakableWindows) {
       expect(window.mesh.userData.breakableWindowId).toBe(window.id);
       expect(window.mesh.userData.dynamic).toBe(true);

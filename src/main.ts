@@ -77,7 +77,7 @@ import {
 } from './gameplay';
 import { ArenaMap, buildArena } from './map';
 import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapToWorld, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, worldToMinimap, type MinimapLandmarkKind } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
@@ -232,6 +232,7 @@ import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-p
 import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
+import { createHumanMatchReport } from './match-report';
 import { scoreSpawnCandidates, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
@@ -259,6 +260,7 @@ import {
   LobbyStateMessage,
   LobbyTeamMessage,
   MatchScoreMessage,
+  RangeScoreClaimMessage,
   MeleeMessage,
   OffensiveSupportSource,
   OverdriveClaimMessage,
@@ -496,6 +498,11 @@ app.innerHTML = `
         <p id="lobby-guidance">Choose teams, ready up, then the host starts one synchronized countdown.</p>
       </section>
       <div id="network-status" data-kind="ok">Ready for deployment.</div>
+      <section id="last-match-reports" hidden aria-label="Last match reports">
+        <span><small>LAST MATCH</small><strong>DOWNLOAD REPORTS</strong></span>
+        <button id="menu-download-match-summary" type="button">HUMAN SUMMARY JSON</button>
+        <button id="menu-download-match-technical" type="button">TECHNICAL DEBUG JSON</button>
+      </section>
       <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak">
         <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
         <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
@@ -970,6 +977,11 @@ quadGlow.position.y = 0.55;
 overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
+// Compile the Quad presentation during initial loading, not on the 120-second
+// spawn transition where a first-use shader hitch looks like a game freeze.
+overdriveRoot.visible = true;
+renderer.compile(overdriveRoot, camera);
+overdriveRoot.visible = false;
 const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id);
 const waterSystem = new WaterSystem(scene);
 waterSystem.configure(selectedArena.id, renderProfile, {
@@ -1122,8 +1134,8 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
-const PASS59_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass59-candidate';
-const PASS59_DIAGNOSTIC_SOURCE_ID = 'baseline-f55529f1-plus-local-pass59';
+const PASS60_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass60-feedback';
+const PASS60_DIAGNOSTIC_SOURCE_ID = 'baseline-31591b2-pass59-live';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 const localArenaSwitchQaDelayMs = localMultiplayerQa
@@ -1238,6 +1250,7 @@ let roundShotsFired = 0;
 let roundHitShots = 0;
 let roundHeadshots = 0;
 let roundDamageDealt = 0;
+let roundDamageTaken = 0;
 let rangePrimaryUnlocked = false;
 let accumulator = 0;
 let frameCount = 0;
@@ -1295,6 +1308,8 @@ let debugCaptureViewmodelHidden = false;
 let matchState: MatchState = createMatch(performance.now(), selectedArena.matchRules);
 let matchFinished = false;
 let matchDiagnostics: MatchDiagnostics | null = null;
+type DownloadableJson = Readonly<{ filename: string; json: string }>;
+let lastMatchDownloads: Readonly<{ summary: DownloadableJson; technical: DownloadableJson }> | null = null;
 let matchDiagnosticsStartedAt = performance.now();
 let matchDiagnosticSequence = 0;
 type MatchDiagnosticDetails = Partial<Omit<MatchDiagnosticInput, 'monotonicMs' | 'localEpochMs' | 'eventId' | 'eventType' | 'admission'>>;
@@ -1315,22 +1330,40 @@ function recordMatchDiagnostic(eventType: string, admission: DiagnosticAdmission
 }
 
 function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: number): void {
+  lastMatchDownloads = null;
+  syncMatchReportDownloads();
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
   matchDiagnostics = new MatchDiagnostics({
-    buildId: PASS59_DIAGNOSTIC_BUILD_ID,
-    sourceId: PASS59_DIAGNOSTIC_SOURCE_ID,
+    buildId: PASS60_DIAGNOSTIC_BUILD_ID,
+    sourceId: PASS60_DIAGNOSTIC_SOURCE_ID,
     sessionId: `${player.id}:${Date.now()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
     arena: selectedArena.id,
     mode: mode === 'solo' ? 'solo' : privateMatchMode,
+    technicalContext: {
+      renderProfile,
+      renderer: rendererLabel,
+      viewport: { width: window.innerWidth, height: window.innerHeight, devicePixelRatio: window.devicePixelRatio },
+      browser: { userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency },
+      matchRules: selectedArena.matchRules,
+      weaponBalance: Object.fromEntries(Object.values(WEAPONS).map((weapon) => [weapon.id, {
+        damage: weapon.damage,
+        minimumDamage: weapon.minimumDamage,
+        rpm: weapon.rpm,
+        falloffStart: weapon.falloffStart,
+        falloffEnd: weapon.falloffEnd,
+        recoilPitch: weapon.recoilPitch,
+        recoilYaw: weapon.recoilYaw,
+        headMultiplier: weapon.headMultiplier,
+        penetration: weapon.penetration,
+      }])),
+    },
   });
   recordMatchDiagnostic('match-start', 'observed', { actorId: player.id, reason: 'local match diagnostics initialized' });
 }
 
-function downloadMatchDiagnostics(): void {
-  if (!matchDiagnostics) return;
-  const exported = matchDiagnostics.export();
+function downloadJsonFile(exported: DownloadableJson): void {
   const url = URL.createObjectURL(new Blob([exported.json], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
@@ -1340,6 +1373,20 @@ function downloadMatchDiagnostics(): void {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function downloadMatchDiagnostics(): void {
+  const exported = lastMatchDownloads?.technical ?? matchDiagnostics?.export();
+  if (exported) downloadJsonFile(exported);
+}
+
+function downloadMatchSummary(): void {
+  if (lastMatchDownloads) downloadJsonFile(lastMatchDownloads.summary);
+}
+
+function syncMatchReportDownloads(): void {
+  const reports = document.querySelector<HTMLElement>('#last-match-reports');
+  if (reports) reports.hidden = !lastMatchDownloads;
 }
 let respawnEndsAt = 0;
 let respawnTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1703,7 +1750,9 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
 }
 
 function initializeHostLobby(): void {
-  privateMatchConfig = { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id === 'gun-range' ? 'atomic-acres' : selectedArena.id };
+  privateMatchConfig = selectedArena.id === 'gun-range'
+    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
+    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
   privateMatchMode = privateMatchConfig.mode;
   localResumeToken = randomLobbyCredential();
   hostLobbyTokens.set(player.id, localResumeToken);
@@ -1873,6 +1922,28 @@ function sendAuthoritativeScores(targetPlayerId?: string): void {
   const message: MatchScoreMessage = { type: 'match-score', by: player.id, scores, nonce: randomNonce() };
   if (targetPlayerId) network.sendToPlayer(targetPlayerId, message);
   else network.send(message);
+}
+
+function publishRangeScore(): void {
+  if (selectedArena.id !== 'gun-range' || network.role === 'offline') return;
+  const claim: RangeScoreClaimMessage = {
+    type: 'range-score-claim', by: player.id, score: rangeScore, hits: targetHits, shots: rangeShotsFired, nonce: randomNonce(),
+  };
+  if (network.role === 'host') {
+    const current = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
+    authoritativeScores.set(player.id, { ...current, rangeScore, rangeHits: targetHits, rangeShots: rangeShotsFired });
+    sendAuthoritativeScores();
+  } else {
+    network.send(claim);
+  }
+}
+
+function acceptRangeScoreClaim(message: RangeScoreClaimMessage): void {
+  if (network.role !== 'host' || selectedArena.id !== 'gun-range' || !hostLobbyMembers.has(message.by)) return;
+  const current = authoritativeScores.get(message.by) ?? emptyPlayerScore(message.by);
+  if (message.score < (current.rangeScore ?? 0) || message.hits < (current.rangeHits ?? 0) || message.shots < (current.rangeShots ?? 0)) return;
+  authoritativeScores.set(message.by, { ...current, rangeScore: message.score, rangeHits: message.hits, rangeShots: message.shots });
+  sendAuthoritativeScores();
 }
 
 function presentLocalDamageDelta(previous: PlayerScore | undefined, next: PlayerScore | undefined): void {
@@ -2069,6 +2140,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     acceptAuthoritativeScores(message);
     return true;
   }
+  if (message.type === 'range-score-claim') {
+    acceptRangeScoreClaim(message);
+    return true;
+  }
   if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
   if (message.type === 'leave' && privateLobbySnapshot) {
     removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected');
@@ -2117,11 +2192,12 @@ function renderPrivateLobby(): void {
   capacityInput.value = String(capacity);
   botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
   balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
-  modeInput.disabled = !hostControls;
+  const rangeLobby = (snapshot?.config.arenaId ?? privateMatchConfig.arenaId) === 'gun-range';
+  modeInput.disabled = !hostControls || rangeLobby;
   capacityInput.disabled = !hostControls;
-  botInput.disabled = !hostControls;
-  balanceInput.disabled = !hostControls || modeInput.value === 'ffa';
-  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa';
+  botInput.disabled = !hostControls || rangeLobby;
+  balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
+  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
   const localMember = members.find((member) => member.id === player.id);
   const lobbyArenaSynchronized = !snapshot
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
@@ -2242,7 +2318,7 @@ viewFill.position.set(0, 0.4, 0.2);
 camera.add(viewFill);
 
 function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
-  return stance === 'prone' ? 0.5 : stance === 'crouch' ? 1.16 : 1.7;
+  return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
 }
 
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
@@ -2900,6 +2976,7 @@ function applyDamage(
   const previousHp = player.hp;
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
+  roundDamageTaken += appliedDamage;
   recordMatchDiagnostic('damage-applied', appliedDamage > 0 ? 'accepted' : 'rejected', {
     actorId: attacker,
     targetId: player.id,
@@ -3513,7 +3590,9 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
     return false;
   }
   const after = characterPhysics.eyePosition();
-  cameraHeightOffset += before.y - after.y;
+  // Keep the rendered camera inside the newly authoritative capsule. A large
+  // cosmetic eye-height lag could leave the camera in ceilings/walls on prone.
+  cameraHeightOffset = THREE.MathUtils.clamp(cameraHeightOffset + before.y - after.y, -0.12, 0.12);
   player.position.set(after.x, after.y, after.z);
   player.stance = target;
   stanceRecoveryUntil = performance.now() + (target === 'prone' ? 260 : previous === 'prone' ? 290 : 135);
@@ -3604,6 +3683,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   roundHitShots = 0;
   roundHeadshots = 0;
   roundDamageDealt = 0;
+  roundDamageTaken = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -3661,7 +3741,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   menu.classList.add('hidden');
   hudRoot.hidden = false;
   element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
-    ? 'SOLO RANGE'
+    ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
     : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
   element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTWORKS DUEL' : 'RUSTWORKS MATCH') : 'TEAM DEATHMATCH';
   element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
@@ -3779,7 +3859,10 @@ function tryFire(now: number): void {
   player.lastShotAt = now;
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
   roundShotsFired += 1;
-  if (isGunRange(selectedArena.id)) rangeShotsFired += 1;
+  if (isGunRange(selectedArena.id)) {
+    rangeShotsFired += 1;
+    publishRangeScore();
+  }
   if (player.ammo[player.weapon] === 0) {
     const emptiedWeapon = player.weapon;
     window.setTimeout(() => {
@@ -3881,7 +3964,8 @@ function tryFire(now: number): void {
       hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
     }
     if (result.targetId) {
-      const zone = result.hitZone ?? 'body';
+      const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
+      const zone = practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body';
       hitPracticeTarget(
         result.targetId,
         applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier),
@@ -3937,9 +4021,6 @@ function tryFire(now: number): void {
         showHitmarker(hit.zone === 'head');
         showDamageNumber(powered, hit.zone);
         audio.hit(hit.zone === 'head');
-        const zoneTag = hit.zone === 'head' ? 'HEADSHOT' : hit.zone === 'limb' ? 'LIMB' : 'BODY';
-        const overdriveTag = powered > dealt + 0.5 ? ` · OD×${Math.round(powered / Math.max(1, dealt))}` : '';
-        addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · ${zoneTag} · ${dealt} DMG${overdriveTag}`, hit.zone === 'head' ? 'gold' : undefined);
       }
     }
   }
@@ -4454,9 +4535,6 @@ function applyBotDamage(
     audio.hit(zone === 'head');
   }
   if (bot.hp > 0) {
-    if (zone === 'head' && attackerId === player.id) {
-      addFeed(`${WEAPONS[player.weapon].name.toUpperCase()} · HEADSHOT · ${Math.round(dealt)} DMG`, 'gold');
-    }
     if (network.role === 'host') broadcastHostedBotState();
     return dealt;
   }
@@ -5147,6 +5225,7 @@ function updateGrenades(dt: number, now: number): void {
 function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
+  if (target.alwaysCritical) zone = 'head';
   const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
   if (admittedDamage <= 0) return;
   const healthBefore = target.health;
@@ -5162,13 +5241,16 @@ function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): 
     return;
   }
   target.active = false;
-  target.respawnAt = performance.now() + 2_200;
+  target.respawnAt = performance.now() + (target.respawnDelayMs ?? 2_200);
   target.root.visible = false;
   rangeScore = selectedArena.id === 'gun-range'
     ? advanceRangeScore(rangeScore, target.scoreValue)
     : rangeScore + 1;
+  publishRangeScore();
   addFeed(selectedArena.id === 'gun-range'
-    ? `${headshot ? 'BULLSEYE · ' : ''}+${target.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`
+    ? target.kind === 'flying-cat'
+      ? `BLACK CAT CRIT · +500 PTS · ${rangeScore} TOTAL · BACK IN 30 SEC`
+      : `${headshot ? 'BULLSEYE · ' : ''}+${target.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`
     : '+1 test mannequin', 'gold');
 }
 
@@ -5183,6 +5265,22 @@ function updateTargets(now: number): void {
       target.health = target.maxHealth;
     }
     target.root.visible = target.active;
+    if (target.active && target.kind === 'flying-cat') {
+      const phase = now * 0.00055;
+      const x = Math.cos(phase) * 10.5;
+      const z = -22 + Math.sin(phase * 1.35) * 12;
+      const y = 3.65 + Math.sin(phase * 2.4) * 0.72;
+      const nextX = Math.cos(phase + 0.01) * 10.5;
+      const nextZ = -22 + Math.sin((phase + 0.01) * 1.35) * 12;
+      target.root.position.set(x, y, z);
+      target.root.rotation.y = Math.atan2(nextX - x, nextZ - z);
+      const trail = target.root.userData.starTrail as THREE.Mesh[] | undefined;
+      trail?.forEach((star, index) => {
+        star.rotation.z = now * (0.0018 + index * 0.00008) + index;
+        const pulse = 0.72 + Math.sin(now * 0.006 - index * 0.9) * 0.18;
+        star.scale.setScalar(Math.max(0.2, pulse * (1 - index * 0.075)));
+      });
+    }
   }
 }
 
@@ -5295,8 +5393,7 @@ function showQuadDamageAnnouncement(title: string, subtitle: string): void {
   element<HTMLElement>('#power-announcement span').textContent = subtitle;
   announcement.hidden = false;
   announcement.classList.remove('announce');
-  void announcement.offsetWidth;
-  announcement.classList.add('announce');
+  requestAnimationFrame(() => requestAnimationFrame(() => announcement.classList.add('announce')));
   window.clearTimeout(quadAnnouncementTimer);
   quadAnnouncementTimer = window.setTimeout(() => {
     announcement.hidden = true;
@@ -5354,12 +5451,21 @@ function updateOverdrive(now: number): void {
   const previousHolder = overdriveState.holderId;
   if (network.role !== 'client') overdriveState = advanceOverdrive(overdriveState, now);
   if (!wasAvailable && overdriveState.available) {
+    const spawnWorkStarted = performance.now();
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
     addFeed('QUAD DAMAGE ONLINE · VISIBLE MID-MAP ICON', 'gold');
     showQuadDamageAnnouncement('QUAD DAMAGE ONLINE', 'CENTRE CORE · CLAIM 4× DAMAGE');
     audio.overdriveAvailable();
     broadcastOverdriveState(now);
+    requestAnimationFrame((frameAt) => recordMatchDiagnostic('overdrive-spawn-frame', 'observed', {
+      weaponOrEffect: 'overdrive',
+      reason: 'first visible Quad spawn transition',
+      modifiers: [
+        `sync-work-ms:${Math.round((performance.now() - spawnWorkStarted) * 10) / 10}`,
+        `next-frame-ms:${Math.round((frameAt - spawnWorkStarted) * 10) / 10}`,
+      ],
+    }));
   }
   if (previousHolder !== null && overdriveState.holderId === null) {
     overdriveExpiries += 1;
@@ -5828,8 +5934,8 @@ function drawStrikeMap(now = performance.now()): void {
   }
   // Road band is Atomic Acres-specific; other maps get a lighter centre guide only.
   if (selectedArena.id === 'atomic-acres') {
-    const [roadLeft] = worldToMinimap(-9.5, 0, arena.bounds, width, height);
-    const [roadRight] = worldToMinimap(9.5, 0, arena.bounds, width, height);
+    const [roadRight] = worldToTacticalMap(-9.5, 0, arena.bounds, width, height);
+    const [roadLeft] = worldToTacticalMap(9.5, 0, arena.bounds, width, height);
     context.fillStyle = 'rgba(88, 102, 105, 0.78)';
     context.fillRect(roadLeft, 0, roadRight - roadLeft, height);
   }
@@ -5838,11 +5944,11 @@ function drawStrikeMap(now = performance.now()): void {
   context.beginPath(); context.moveTo(width / 2, 0); context.lineTo(width / 2, height); context.stroke();
   context.setLineDash([]);
   for (const house of arena.houses) {
-    const [cx, cy] = worldToMinimap(house.origin.x, house.origin.z, arena.bounds, width, height);
-    const [minX] = worldToMinimap(house.origin.x - house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
-    const [, minY] = worldToMinimap(house.origin.x, house.origin.z + house.dimensions.depth / 2, arena.bounds, width, height);
-    const [maxX] = worldToMinimap(house.origin.x + house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
-    const [, maxY] = worldToMinimap(house.origin.x, house.origin.z - house.dimensions.depth / 2, arena.bounds, width, height);
+    const [cx, cy] = worldToTacticalMap(house.origin.x, house.origin.z, arena.bounds, width, height);
+    const [maxX] = worldToTacticalMap(house.origin.x - house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, minY] = worldToTacticalMap(house.origin.x, house.origin.z + house.dimensions.depth / 2, arena.bounds, width, height);
+    const [minX] = worldToTacticalMap(house.origin.x + house.dimensions.width / 2, house.origin.z, arena.bounds, width, height);
+    const [, maxY] = worldToTacticalMap(house.origin.x, house.origin.z - house.dimensions.depth / 2, arena.bounds, width, height);
     context.fillStyle = house.team === 0 ? 'rgba(72, 185, 183, 0.58)' : 'rgba(214, 113, 91, 0.58)';
     context.strokeStyle = house.team === 0 ? '#80f5f0' : '#ff9a7f';
     context.lineWidth = 3;
@@ -5862,8 +5968,8 @@ function drawStrikeMap(now = performance.now()): void {
       const sizeZ = box.maxZ - box.minZ;
       if (sizeX < 1.2 || sizeZ < 1.2 || sizeX > 30 || sizeZ > 30) continue;
       if ((box.maxY ?? 4) < 0.8) continue;
-      const [minX, minY] = worldToMinimap(box.minX, box.maxZ, arena.bounds, width, height);
-      const [maxX, maxY] = worldToMinimap(box.maxX, box.minZ, arena.bounds, width, height);
+      const [maxX, minY] = worldToTacticalMap(box.minX, box.maxZ, arena.bounds, width, height);
+      const [minX, maxY] = worldToTacticalMap(box.maxX, box.minZ, arena.bounds, width, height);
       context.fillRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
       context.strokeRect(minX, minY, Math.max(2, maxX - minX), Math.max(2, maxY - minY));
       drawn += 1;
@@ -5872,7 +5978,7 @@ function drawStrikeMap(now = performance.now()): void {
   }
   // Local player always drawn so you can orient bombs relative to yourself.
   {
-    const [px, py] = worldToMinimap(player.position.x, player.position.z, arena.bounds, width, height);
+    const [px, py] = worldToTacticalMap(player.position.x, player.position.z, arena.bounds, width, height);
     context.fillStyle = 'rgba(120, 245, 237, 0.28)';
     context.beginPath(); context.arc(px, py, 16, 0, Math.PI * 2); context.fill();
     context.fillStyle = '#78f5ed';
@@ -5884,7 +5990,7 @@ function drawStrikeMap(now = performance.now()): void {
   }
   const hostilePulse = 10 + Math.sin(now * 0.012) * 2;
   triPassHostileMarkers = currentTriPassHostiles().map((hostile, index) => {
-    const [x, y] = worldToMinimap(hostile.x, hostile.z, arena.bounds, width, height);
+    const [x, y] = worldToTacticalMap(hostile.x, hostile.z, arena.bounds, width, height);
     context.fillStyle = 'rgba(255, 70, 49, 0.38)';
     context.beginPath(); context.arc(x, y, hostilePulse + 10, 0, Math.PI * 2); context.fill();
     context.fillStyle = '#ff4631';
@@ -5902,7 +6008,7 @@ function drawStrikeMap(now = performance.now()): void {
     : `ENEMIES LIVE · ${triPassHostileMarkers.length} (red = people/bots)`;
   const points = triPassTargeting?.points ?? [];
   points.forEach((point, index) => {
-    const [x, y] = worldToMinimap(point.x, point.z, arena.bounds, width, height);
+    const [x, y] = worldToTacticalMap(point.x, point.z, arena.bounds, width, height);
     context.fillStyle = '#ff684f';
     context.beginPath(); context.arc(x, y, 16, 0, Math.PI * 2); context.fill();
     context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
@@ -5968,7 +6074,7 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
   const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
   const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
   // Prefer locking onto a live hostile when the click is near their blip.
-  let point = minimapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  let point = tacticalMapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
   let nearestDistance = 36;
   for (const marker of triPassHostileMarkers) {
     const dx = marker.canvas[0] - x;
@@ -6542,9 +6648,33 @@ function updateMatchState(now: number): void {
       reason: presentation.headline ?? 'match-ended',
       modifiers: [`kills:${summary.kills}`, `deaths:${summary.deaths}`, `damage:${summary.damageDealt}`],
     });
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-diagnostics" type="button">DOWNLOAD DIAGNOSTICS</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
+    const technical = matchDiagnostics?.export();
+    if (technical) {
+      lastMatchDownloads = {
+        technical,
+        summary: createHumanMatchReport({
+          build: latestChangelogEntry().pass,
+          arena: selectedArena.displayName,
+          mode: gameMode === 'solo' ? 'solo' : privateMatchMode,
+          result: presentation.headline ?? 'MATCH COMPLETE',
+          durationMs: performance.now() - matchDiagnosticsStartedAt,
+          kills: summary.kills,
+          deaths: summary.deaths,
+          shotsFired: roundShotsFired,
+          hitShots: roundHitShots,
+          damageDealt: summary.damageDealt,
+          damageTaken: Math.max(roundDamageTaken, authoritativeLocal?.damageTaken ?? 0),
+          headshots: summary.headshots,
+          bestKillstreak: bestStreakThisMatch,
+          completedAt: new Date().toISOString(),
+        }),
+      };
+      syncMatchReportDownloads();
+    }
+    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-summary" type="button">HUMAN SUMMARY JSON</button><button id="download-match-diagnostics" type="button">TECHNICAL DEBUG JSON</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
     banner.hidden = false;
-    element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics, { once: true });
+    element<HTMLButtonElement>('#download-match-summary').addEventListener('click', downloadMatchSummary);
+    element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics);
     const rematch = element<HTMLButtonElement>('#rematch');
     if (!rematch.disabled) rematch.addEventListener('click', () => {
       if (privateMatch && network.role === 'host') returnPrivateMatchToLobby(true);
@@ -6854,8 +6984,8 @@ function updateHud(now: number): void {
   element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
   element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
   const localScore = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
-  element<HTMLElement>('#damage-dealt').textContent = String(localScore.damageDealt);
-  element<HTMLElement>('#damage-taken').textContent = String(localScore.damageTaken);
+  element<HTMLElement>('#damage-dealt').textContent = String(gameMode === 'solo' ? Math.round(roundDamageDealt) : localScore.damageDealt);
+  element<HTMLElement>('#damage-taken').textContent = String(gameMode === 'solo' ? Math.round(roundDamageTaken) : localScore.damageTaken);
   renderMatchNetworkStrip();
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
@@ -6913,7 +7043,11 @@ function renderMatchNetworkStrip(): void {
     const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
     const quality = latencyQuality(ping);
     const label = ping === null ? '—' : `${Math.round(ping)} ms`;
-    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} latency: ${label}"><b>${escapeHtml(member.name)}</b> ${label}</span>`;
+    const score = authoritativeScores.get(member.id);
+    const range = selectedArena.id === 'gun-range'
+      ? ` · ${score?.rangeScore ?? 0} PTS · ${rangeAccuracyPercent(score?.rangeHits ?? 0, score?.rangeShots ?? 0)}%`
+      : '';
+    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} latency: ${label}${range}"><b>${escapeHtml(member.name)}</b>${range || ` ${label}`}</span>`;
   }).join('');
 }
 
@@ -6925,12 +7059,22 @@ function updateRoster(): void {
       id: bot.id, name: bot.name, team: bot.team, x: bot.position.x, y: bot.position.y, z: bot.position.z,
       yaw: bot.root.rotation.y, pitch: 0, hp: bot.hp, kills: bot.kills, deaths: bot.deaths, primary: bot.weapon, weapon: bot.weapon, seq: 0,
     })),
-  ].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  ].sort((a, b) => selectedArena.id === 'gun-range'
+    ? (authoritativeScores.get(b.id)?.rangeScore ?? (b.id === player.id ? rangeScore : 0))
+      - (authoritativeScores.get(a.id)?.rangeScore ?? (a.id === player.id ? rangeScore : 0))
+    : b.kills - a.kills || a.deaths - b.deaths);
   element<HTMLElement>('#roster-list').innerHTML = entries.map((entry) => {
     const score = authoritativeScores.get(entry.id) ?? emptyPlayerScore(entry.id);
     const member = privateLobbySnapshot?.members.find((candidate) => candidate.id === entry.id);
     const ping = member?.id === player.id && network.role === 'client' ? localLobbyPingMs : member?.pingMs ?? null;
     const latency = ping === null ? '—' : `${Math.round(ping)}ms`;
+    if (selectedArena.id === 'gun-range') {
+      const points = score.rangeScore ?? (entry.id === player.id ? rangeScore : 0);
+      const hits = score.rangeHits ?? (entry.id === player.id ? targetHits : 0);
+      const shots = score.rangeShots ?? (entry.id === player.id ? rangeShotsFired : 0);
+      const title = `${entry.name}: ${points} points, ${hits} hits, ${rangeAccuracyPercent(hits, shots)}% accuracy, ${shots} shots`;
+      return `<div title="${escapeHtml(title)}"><span class="aqua">${escapeHtml(entry.name)}</span><b>${points}</b><i>${hits}</i><strong>${rangeAccuracyPercent(hits, shots)}% ACC</strong><small>${shots} SHOTS</small><em>${latency}</em></div>`;
+    }
     const title = `${entry.name}: ${entry.kills} kills, ${entry.deaths} deaths, ${score.damageDealt} damage dealt, ${score.damageTaken} damage taken, ${latency} ping`;
     return `<div title="${escapeHtml(title)}"><span class="${entry.team === 0 ? 'aqua' : 'coral'}">${escapeHtml(entry.name)}</span><b>${entry.kills}</b><i>${entry.deaths}</i><strong>${score.damageDealt} / ${score.damageTaken} DMG</strong><small>${latency}</small><em>${entry.hp > 0 ? Math.ceil(entry.hp) + ' HP' : 'DOWN'}</em></div>`;
   }).join('');
@@ -7408,6 +7552,7 @@ function resetForMode(): void {
   roundHitShots = 0;
   roundHeadshots = 0;
   roundDamageDealt = 0;
+  roundDamageTaken = 0;
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -7455,6 +7600,7 @@ function returnToMainMenu(): void {
   element<HTMLButtonElement>('#resume').hidden = true;
   element<HTMLButtonElement>('#main-menu').hidden = true;
   menu.classList.remove('hidden');
+  syncMatchReportDownloads();
   arenaSelectionReady = true;
   syncArenaSelectionUi();
   setArenaMenuCamera();
@@ -7466,6 +7612,8 @@ element<HTMLButtonElement>('#resume').addEventListener('click', () => {
   if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
 });
 element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainMenu);
+element<HTMLButtonElement>('#menu-download-match-summary').addEventListener('click', downloadMatchSummary);
+element<HTMLButtonElement>('#menu-download-match-technical').addEventListener('click', downloadMatchDiagnostics);
 
 function setChangelogOpen(open: boolean): void {
   const panel = element<HTMLElement>('#changelog-panel');
@@ -7549,16 +7697,17 @@ element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
 });
 const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
-  const mode: MatchMode = element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
+  const rangeLobby = privateMatchConfig.arenaId === 'gun-range';
+  const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
   const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
-  const hostedBotCount: HostedBotCount = isHostedBotCount(requestedBots) ? requestedBots : 0;
+  const hostedBotCount: HostedBotCount = rangeLobby ? 0 : isHostedBotCount(requestedBots) ? requestedBots : 0;
   applyHostLobbyConfig({
     ...privateMatchConfig,
     mode,
     capacity,
     hostedBotCount,
-    autoBalance: mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
+    autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
   });
 };
 element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobbyConfigFromUi);
@@ -7877,9 +8026,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       values: arena.targets.map((target) => target.scoreValue),
       targets: arena.targets.map((target) => ({
         id: target.id,
+        kind: target.kind ?? 'plate',
+        alwaysCritical: target.alwaysCritical === true,
         active: target.active,
         health: target.health,
         maxHealth: target.maxHealth,
+        respawnDelayMs: target.respawnDelayMs ?? 2_200,
+        respawnInMs: target.active ? 0 : Math.max(0, target.respawnAt - performance.now()),
         visible: target.root.visible,
         position: target.root.position.toArray(),
         screenPosition: target.root.localToWorld(new THREE.Vector3(0, 1.65, 0)).project(camera).toArray(),

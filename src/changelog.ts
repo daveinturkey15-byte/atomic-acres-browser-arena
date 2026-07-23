@@ -38,6 +38,21 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass60',
+    pass: 'PASS 60',
+    title: 'Fast-feedback combat, HUD & diagnostics pass',
+    releasedAt: PENDING_PRODUCTION_RELEASE,
+    areas: Object.freeze(['COMBAT', 'HUD', 'DIAGNOSTICS', 'MAPS', 'GUN RANGE']),
+    summary: 'The first Pass 60 feedback slice prioritises player-visible combat and interface fixes, actionable post-match reports, and targeted arena repairs while preserving Pass 59 as the exact stable fallback.',
+    highlights: Object.freeze([
+      'Sniper headshots deal 3x damage and scoped players retain the full HUD and match status',
+      'Damage activity sits lower without duplicate hit notifications, while Field Support is 25% larger in the same compact format',
+      'Every completed match exposes a human-readable statistics JSON and a separate bounded technical diagnostics JSON from the result screen and main menu',
+      'Both upstairs house windows now break, with additional reported collision and arena-density repairs tracked by explicit tests',
+      'Gun Range is a bot-free six-player FFA with real wallbang player damage, plus a 100 HP flying black cat worth 500 points that respawns after 30 seconds',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass59',
     pass: 'PASS 59',
     title: 'Fairer private matches, safer spawns & arena repairs',

@@ -34,10 +34,11 @@ export type MatchDiagnosticContext = Readonly<{
   role: DiagnosticRole;
   arena: string;
   mode: string;
+  technicalContext?: Readonly<Record<string, unknown>>;
 }>;
 type ExportEvent = Omit<MatchDiagnosticInput, 'actorId' | 'targetId'> & { actorId?: string; targetId?: string };
 
-const SECRET_KEYS = /room|code|token|secret|credential|password|cookie|authorization|ip|address/i;
+const SECRET_KEYS = /room.*code|access.*code|auth.*code|token|secret|credential|password|cookie|authorization|(?:^|[_-])ip(?:$|[_-])|address/i;
 const PRIVATE_IP = /\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/g;
 
 function stablePseudonym(value: string, salt: string): string {
@@ -84,6 +85,7 @@ export class MatchDiagnostics {
       sessionId: stablePseudonym(context.sessionId, context.sourceId),
       arena: scrubText(context.arena).slice(0, 40),
       mode: scrubText(context.mode).slice(0, 40),
+      ...(context.technicalContext ? { technicalContext: sanitizeDiagnosticValue(context.technicalContext) as Record<string, unknown> } : {}),
     };
   }
 

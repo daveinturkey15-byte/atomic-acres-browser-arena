@@ -79,7 +79,8 @@
 /* Pass 22 scope correction: true camera magnification with a clear circular sight picture. */
 #sniper-scope{position:absolute;inset:0;z-index:12;pointer-events:none;background:radial-gradient(circle at 50% 50%,rgba(20,70,72,.035) 0 min(37vh,28vw),rgba(2,6,8,.96) calc(min(37vh,28vw) + 5px),#010304 100%)}
 #sniper-scope[hidden]{display:none}
-#hud.sniper-scope-active>:not(#sniper-scope):not(#hitmarker){opacity:0!important}
+#hud.sniper-scope-active>:not(#sniper-scope):not(#crosshair){opacity:1!important;z-index:13}
+#hud.sniper-scope-active>#crosshair{opacity:0!important}
 #sniper-scope .scope-ring{position:absolute;left:50%;top:50%;width:min(74vh,56vw);aspect-ratio:1;transform:translate(-50%,-50%);border:6px solid #11191b;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(142,232,238,.2),inset 0 0 38px rgba(4,15,18,.34),0 0 0 2px #000}
 #sniper-scope .scope-reticle{position:absolute;left:50%;top:50%;width:min(70vh,53vw);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;overflow:hidden;filter:drop-shadow(0 0 1px rgba(255,255,255,.55))}
 #sniper-scope .scope-reticle::before,#sniper-scope .scope-reticle::after{content:'';position:absolute;left:50%;top:50%;background:rgba(9,20,20,.9);transform:translate(-50%,-50%)}
@@ -148,9 +149,11 @@
 
 /* Pass 34: explicit pause-to-menu affordance and two-choice end-of-match flow. */
 .menu-actions #main-menu{grid-column:1/-1;background:#17272c;border-color:rgba(244,196,79,.62);color:var(--gold)}
+#last-match-reports{display:grid;grid-template-columns:minmax(120px,1fr) auto auto;align-items:center;gap:8px;margin-top:10px;padding:9px 10px;border:1px solid rgba(101,231,255,.28);border-left:3px solid var(--aqua);background:rgba(20,45,49,.72)}#last-match-reports[hidden]{display:none}#last-match-reports span{display:grid;gap:2px}#last-match-reports small{font:800 7px/1 Inter;letter-spacing:.16em;color:#83aaa9}#last-match-reports strong{font:900 13px/1 'Barlow Condensed';letter-spacing:.08em;color:#f4fbf8}#last-match-reports button{padding:8px 9px;border:1px solid rgba(255,255,255,.22);background:#263a40;color:#e9f4ef;font:800 9px/1 'Barlow Condensed';letter-spacing:.06em}
 #pause-hint{position:absolute;left:max(18px,env(safe-area-inset-left));top:max(16px,env(safe-area-inset-top));z-index:4;padding:7px 10px;border-left:2px solid var(--gold);background:linear-gradient(90deg,rgba(7,15,18,.8),transparent);font:800 9px/1 Inter,sans-serif;letter-spacing:.16em;color:#d7c77f}
 .match-end-actions{display:flex;justify-content:center;gap:10px;margin-top:10px}.match-end-actions button{min-width:130px}
 @media(max-width:700px){#pause-hint{left:10px;top:12px;font-size:7px}.match-end-actions{flex-direction:column}}
+@media(max-width:700px){#last-match-reports{grid-template-columns:1fr 1fr}#last-match-reports span{grid-column:1/-1}}
 
 /* Pass 38: private human-match waiting room. */
 #private-lobby{margin-top:12px;padding:12px;border:1px solid rgba(88,227,220,.28);border-left:3px solid var(--aqua);background:linear-gradient(145deg,rgba(7,20,25,.94),rgba(17,28,31,.92));box-shadow:0 14px 32px rgba(0,0,0,.24)}
@@ -212,7 +215,7 @@
 }
 
 /* Pass 59: readable combat telemetry and one deterministic support column. */
-#damage-feeds{position:absolute;right:24px;top:178px;width:min(330px,42vw);display:grid;gap:11px;pointer-events:none}
+#damage-feeds{position:absolute;right:24px;top:218px;width:min(330px,42vw);display:grid;gap:11px;pointer-events:none}
 .damage-feed{display:grid;gap:4px;justify-items:end}
 .damage-feed>b{display:flex;align-items:center;gap:8px;padding:4px 8px;font:900 11px/1 Inter;letter-spacing:.16em;background:rgba(5,12,15,.82);border-right:3px solid currentColor}
 .damage-feed>b span{font:700 8px/1 Inter;letter-spacing:.12em;opacity:.72}
@@ -224,8 +227,8 @@
 .damage-feed>div div.fade{opacity:.24;transition:opacity .7s}
 #damage-numbers strong{left:calc(var(--damage-lane) * 30px);font-weight:600;letter-spacing:.025em;animation-duration:1.1s}
 #damage-numbers strong.critical{font-weight:700;animation-duration:1.25s}
-#support-block{width:238px}
+#support-block{width:238px;transform:scale(1.25);transform-origin:top left}
 .support-list{grid-template-columns:1fr}
 .support-list b[data-support=nuke]{grid-column:auto}
-@media(max-width:700px){#damage-feeds{right:12px;top:150px;width:min(250px,52vw);gap:7px}.damage-feed>div div{min-width:150px;font-size:14px}.damage-feed>b{font-size:9px}#support-block{width:190px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}}
+@media(max-width:700px){#damage-feeds{right:12px;top:190px;width:min(250px,52vw);gap:7px}.damage-feed>div div{min-width:150px;font-size:14px}.damage-feed>b{font-size:9px}#support-block{width:190px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}}
 @media(max-height:600px) and (min-width:701px){#support-block{width:238px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}.support-list b{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto}.support-state{display:block}}

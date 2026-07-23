@@ -4,6 +4,7 @@ import {
   admittedPlayerDamage,
   botScaledDamage,
   HEADSHOT_DAMAGE_MULTIPLIER,
+  SNIPER_HEADSHOT_DAMAGE_MULTIPLIER,
   WEAPONS,
   advanceMatch,
   advanceFreeForAllMatch,
@@ -45,9 +46,11 @@ describe('solo bot tuning', () => {
 describe('headshot damage contract', () => {
   it('uses exactly 1.5× head damage for every firearm', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
-    for (const weapon of Object.values(WEAPONS)) {
+    expect(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
+    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper')) {
       expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
     }
+    expect(WEAPONS.sniper.headMultiplier).toBe(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER);
   });
 
   it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
@@ -244,7 +247,7 @@ describe('weapon tuning', () => {
     expect(body).toBeLessThan(100);
     expect(body * 2).toBeGreaterThanOrEqual(100);
     expect(head).toBeGreaterThanOrEqual(100);
-    expect(head).toBe(Math.round(body * HEADSHOT_DAMAGE_MULTIPLIER));
+    expect(head).toBe(Math.round(body * SNIPER_HEADSHOT_DAMAGE_MULTIPLIER));
     expect(sniper.rpm).toBeLessThan(WEAPONS.scattergun.rpm);
     expect(sniper.hipSpread).toBeGreaterThan(WEAPONS.carbine.hipSpread);
     expect(sniper.hipSpread * sniper.adsSpreadMultiplier).toBeLessThan(

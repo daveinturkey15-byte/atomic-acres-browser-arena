@@ -55,6 +55,15 @@ describe('private match lobby', () => {
     expect(playersAreHostile('ffa', members[0], members[0])).toBe(false);
   });
 
+  it('keeps every distinct player hostile in the bot-free Gun Range FFA', () => {
+    const range = snapshot({
+      config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 },
+    });
+    expect(isLobbySnapshot(range)).toBe(true);
+    expect(range.config.hostedBotCount).toBe(0);
+    expect(playersAreHostile(range.config.mode, { ...members[0], team: 0 }, { ...members[1], team: 0 })).toBe(true);
+  });
+
   it('derives team totals and stable FFA leaders from authoritative scores', () => {
     const balanced = balanceLobbyTeams(members);
     const scores = [
@@ -85,7 +94,8 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot())).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'rustworks-1v1' } }))).toBe(true);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'skyline-terminal' } }))).toBe(true);
-    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range' as 'atomic-acres' } }))).toBe(false);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: 120_000 } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', hostedBotCount: 2 } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: [...members, ...members, members[0]] }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, capacity: 5 as 4 } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, pingMs: 6_000 })) }))).toBe(false);

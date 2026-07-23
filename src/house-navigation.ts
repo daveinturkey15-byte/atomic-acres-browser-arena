@@ -183,10 +183,7 @@ function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
     solid('front-upper-right', [(right + HALF_WIDTH) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [HALF_WIDTH - right, UPPER_HEIGHT, WALL], surface),
     solid('upper-window-sill-wall', [windowX, FLOOR_Y + WINDOW_SILL_TOP / 2, HALF_DEPTH], [windowWidth, WINDOW_SILL_TOP, WALL], surface),
     solid('upper-window-lintel-wall', [windowX, (openingTop + FLOOR_Y + UPPER_HEIGHT) / 2, HALF_DEPTH], [windowWidth, FLOOR_Y + UPPER_HEIGHT - openingTop, WALL], surface),
-    {
-      ...solid('upper-window-glass', [windowX, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.12], 'glass', true, 'glass'),
-      breakable: false,
-    },
+    solid('upper-window-glass', [windowX, FLOOR_Y + WINDOW_CENTRE_Y, HALF_DEPTH + 0.02], [windowWidth, WINDOW_OPENING_HEIGHT, 0.12], 'glass', false, 'glass'),
   ];
 }
 

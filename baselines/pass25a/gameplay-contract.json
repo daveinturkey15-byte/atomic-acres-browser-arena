@@ -925,7 +925,7 @@
               ]
             },
             {
-              "collidable": true,
+              "collidable": false,
               "id": "aqua-irrigation-workshop:upper-window-glass",
               "kind": "glass",
               "position": [
@@ -2150,7 +2150,7 @@
               ]
             },
             {
-              "collidable": true,
+              "collidable": false,
               "id": "coral-orchard-conservatory:upper-window-glass",
               "kind": "glass",
               "position": [
@@ -2712,7 +2712,7 @@
             "durationMs": 120000,
             "id": "gun-range",
             "maximumSoloBots": 0,
-            "multiplayer": false,
+            "multiplayer": true,
             "scoreLimit": null,
             "soloBotCount": 0
           },
@@ -2916,7 +2916,7 @@
           "damage": 67,
           "falloffEnd": 120,
           "falloffStart": 96,
-          "headMultiplier": 1.5,
+          "headMultiplier": 3,
           "hipSpread": 0.052,
           "id": "sniper",
           "limbMultiplier": 0.9,

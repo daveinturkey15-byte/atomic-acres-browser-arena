@@ -92,6 +92,28 @@ export function minimapToWorld(
   };
 }
 
+/** Tri-Pass uses the same left/right handedness as the player HUD minimap. */
+export function worldToTacticalMap(
+  x: number,
+  z: number,
+  bounds: MinimapBounds,
+  width: number,
+  height: number,
+): [number, number] {
+  const [mapX, mapY] = worldToMinimap(x, z, bounds, width, height);
+  return [width - mapX, mapY];
+}
+
+export function tacticalMapToWorld(
+  x: number,
+  y: number,
+  bounds: MinimapBounds,
+  width: number,
+  height: number,
+): { x: number; z: number } {
+  return minimapToWorld(width - x, y, bounds, width, height);
+}
+
 export type FacingGeometry = {
   nose: [number, number];
   tail: [number, number];
