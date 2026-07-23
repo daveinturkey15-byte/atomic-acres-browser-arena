@@ -21,4 +21,19 @@ describe('production release workflow', () => {
     expect(workflow).toContain('if [[ "$build_sha" == "$pages_sha" && "$status" == "errored" ]]; then exit 1; fi');
     expect(workflow).toContain('sleep 10');
   });
+
+  it('injects one production timestamp before building and records it in the receipt', () => {
+    const timestampStep = workflow.indexOf('Capture immutable production build timestamp');
+    const buildStep = workflow.indexOf('Build production bytes');
+    const verifyStep = workflow.indexOf('Verify exact production bytes');
+    expect(timestampStep).toBeGreaterThan(-1);
+    expect(buildStep).toBeGreaterThan(timestampStep);
+    expect(verifyStep).toBeGreaterThan(buildStep);
+    expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
+    expect(workflow).toContain('--arg releaseBuiltAt "$RELEASE_BUILT_AT"');
+  });
+
+  it('does not use a blocking GitHub Actions watcher inside the workflow', () => {
+    expect(workflow).not.toContain('gh run watch');
+  });
 });

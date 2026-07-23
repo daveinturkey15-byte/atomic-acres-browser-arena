@@ -40,8 +40,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: Reproduce static release gates
         run: npm run verify:pass25a:core
+      - name: Capture immutable production build timestamp
+        shell: bash
+        run: |
+          released_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "VITE_RELEASED_AT=$released_at" >> "$GITHUB_ENV"
+          echo "RELEASE_BUILT_AT=$released_at" >> "$GITHUB_ENV"
       - name: Build production bytes
         run: npm run build
+      - name: Verify exact production bytes
+        run: npm run verify:release-tree
       - name: Stage exact pinned recent-stable channel
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
@@ -84,11 +92,12 @@ jobs:
             --arg sourceSha "$SOURCE_SHA" \
             --arg pagesSha "$pages_sha" \
             --arg releasePass "$RELEASE_PASS" \
+            --arg releaseBuiltAt "$RELEASE_BUILT_AT" \
             --arg pagesStatus "$status" \
             --arg pagesCreatedAt "$(jq -r '.created_at' <<<"$build")" \
             --arg pagesUpdatedAt "$(jq -r '.updated_at' <<<"$build")" \
             --arg workflowRun "$GITHUB_RUN_ID" \
-            '{schemaVersion:1, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun}' \
+            '{schemaVersion:1, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, releaseBuiltAt:$releaseBuiltAt, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun}' \
             > artifacts/pipeline/production-release-receipt.json
       - uses: actions/upload-artifact@v4
         with:

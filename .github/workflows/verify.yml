@@ -13,7 +13,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  classify-change:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.impact.outputs.mode }}
+      reason: ${{ steps.impact.outputs.reason }}
+      windows_groups: ${{ steps.impact.outputs.windows_groups }}
+      linux_groups: ${{ steps.impact.outputs.linux_groups }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Classify verification impact
+        id: impact
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/release/change-impact.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
+
   static-and-unit:
+    needs: classify-change
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -43,34 +62,49 @@ jobs:
         run: npm run audit:dependencies
 
   bounded-browser-windows:
-    needs: static-and-unit
+    needs: [classify-change, static-and-unit]
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
+      - name: Record browser gate decision
+        run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"
       - uses: actions/checkout@v4
+        if: needs.classify-change.outputs.mode != 'none'
       - uses: actions/setup-node@v4
+        if: needs.classify-change.outputs.mode != 'none'
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npx playwright install chromium
-      - run: npm run build
-      - run: npm run test:e2e:bounded
+      - if: needs.classify-change.outputs.mode != 'none'
+        run: npm ci --ignore-scripts
+      - if: needs.classify-change.outputs.mode != 'none'
+        run: npx playwright install chromium
+      - if: needs.classify-change.outputs.mode != 'none'
+        run: npm run build
+      - if: needs.classify-change.outputs.mode != 'none'
         env:
-          QA_E2E_GROUPS: pass25a-capability-chromium,boot-and-authored
+          QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_groups }}
+        run: npm run test:e2e:bounded
 
   bounded-browser-linux:
-    needs: static-and-unit
+    needs: [classify-change, static-and-unit]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      - name: Record browser gate decision
+        run: echo "mode=${{ needs.classify-change.outputs.mode }} reason=${{ needs.classify-change.outputs.reason }}"
       - uses: actions/checkout@v4
+        if: needs.classify-change.outputs.mode != 'none'
       - uses: actions/setup-node@v4
+        if: needs.classify-change.outputs.mode != 'none'
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e:bounded
+      - if: needs.classify-change.outputs.mode != 'none'
+        run: npm ci --ignore-scripts
+      - if: needs.classify-change.outputs.mode != 'none'
+        run: npx playwright install --with-deps chromium
+      - if: needs.classify-change.outputs.mode != 'none'
         env:
-          QA_E2E_GROUPS: pass25a-baseline,pass25a-capability-chromium
+          QA_E2E_GROUPS: ${{ needs.classify-change.outputs.linux_groups }}
+        run: npm run test:e2e:bounded
