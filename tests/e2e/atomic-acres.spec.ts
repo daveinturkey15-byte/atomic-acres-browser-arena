@@ -431,20 +431,26 @@ test.describe('boot and authored presentation', () => {
       const offset = (await debug(page)).weaponPresentation.sightOffset;
       return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
     }).toBeLessThan(0.006);
-    await page.evaluate(() => {
+    const damageStyle = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         snapshot: () => { rangePractice: { targets: Array<{ id: string }> } };
         hitRangeTarget: (id: string, damage: number, zone: 'body') => void;
       } }).__ATOMIC_ACRES_DEBUG__;
       api.hitRangeTarget(api.snapshot().rangePractice.targets[0].id, 31, 'body');
-    });
-    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-damage', '31');
-    const damageText = page.locator('#damage-numbers strong').last();
-    await expect(damageText).toBeVisible();
-    const damageStyle = await damageText.evaluate((node) => {
+      const container = document.querySelector<HTMLElement>('#damage-numbers');
+      const node = container?.querySelector<HTMLElement>('strong:last-of-type');
+      if (!container || !node) return null;
       const style = getComputedStyle(node);
-      return { color: style.color, fontWeight: style.fontWeight };
+      return {
+        dataLastDamage: container.dataset.lastDamage,
+        visible: node.getClientRects().length > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+        color: style.color,
+        fontWeight: style.fontWeight,
+      };
     });
+    expect(damageStyle).not.toBeNull();
+    expect(damageStyle).toMatchObject({ dataLastDamage: '31', visible: true });
+    if (!damageStyle) throw new Error('Damage text was not created');
     expect(damageStyle.color).toBe('rgb(255, 255, 255)');
     const numericWeight = damageStyle.fontWeight === 'normal' ? 400 : Number.parseInt(damageStyle.fontWeight, 10);
     expect(Number.isFinite(numericWeight), `computed font weight: ${damageStyle.fontWeight}`).toBe(true);
@@ -693,10 +699,11 @@ test.describe('boot and authored presentation', () => {
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
     // Quality keeps authored PBR receiver/arm silhouettes plus Pass 32 mist,
     // grounded signage and large-cover batches. The measured worst staged view
-    // remains bounded at the measured 177-call worst staged view; one live
-    // impact/fragment draw may still be present in this transient sample. The
-    // stricter settled-scene budget is enforced below.
-    expect(activeState.render.calls).toBeLessThanOrEqual(177);
+    // remains bounded at 180 calls after Pass 59 adds three explicitly audited
+    // collision-mirror meshes; one live impact/fragment draw may still be
+    // present in this transient sample. The stricter settled-scene budget is
+    // enforced below.
+    expect(activeState.render.calls).toBeLessThanOrEqual(180);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -704,7 +711,7 @@ test.describe('boot and authored presentation', () => {
     }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_100);
     const stableState = await debug(page);
-    expect(stableState.render.calls).toBeLessThanOrEqual(160);
+    expect(stableState.render.calls).toBeLessThanOrEqual(163);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
