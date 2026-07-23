@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees } from './weapon-presentation-state';
+import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt, hitReactionAt, magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 
 describe('weapon presentation state', () => {
   it('accumulates and cools bounded weapon heat', () => {
@@ -47,5 +47,13 @@ describe('weapon presentation state', () => {
     expect(hitReactionAt(140, 'head').envelope).toBeGreaterThan(0.5);
     expect(hitReactionAt(400, 'limb')).toEqual({ envelope: 0, pitch: 0, roll: 0 });
     for (const value of Object.values(hitReactionAt(Number.NaN, 'body'))) expect(Number.isFinite(value)).toBe(true);
+  });
+
+  it('pulls the viewmodel back near walls and floors while leaving open space unchanged', () => {
+    expect(viewmodelSurfaceRetreat(null, false)).toBe(0);
+    expect(viewmodelSurfaceRetreat(2, false)).toBe(0);
+    expect(viewmodelSurfaceRetreat(0.5, false)).toBeGreaterThan(0.25);
+    expect(viewmodelSurfaceRetreat(0, true)).toBeLessThanOrEqual(0.56);
+    expect(viewmodelSurfaceRetreat(2, true)).toBeCloseTo(0.045);
   });
 });

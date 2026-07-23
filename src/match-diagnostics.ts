@@ -1,6 +1,7 @@
-export const MATCH_DIAGNOSTICS_SCHEMA_VERSION = 1;
-export const MAX_DIAGNOSTIC_EVENTS = 1_024;
-export const MAX_DIAGNOSTIC_EXPORT_BYTES = 512 * 1_024;
+export const MATCH_DIAGNOSTICS_SCHEMA_VERSION = 2;
+export const MAX_DIAGNOSTIC_EVENTS = 2_048;
+export const MAX_DAMAGE_LEDGER_EVENTS = 8_192;
+export const MAX_DIAGNOSTIC_EXPORT_BYTES = 4 * 1_024 * 1_024;
 
 export type DiagnosticRole = 'offline' | 'host' | 'guest';
 export type DiagnosticAdmission = 'accepted' | 'rejected' | 'observed';
@@ -11,8 +12,15 @@ export type MatchDiagnosticInput = Readonly<{
   eventId: string;
   eventType: string;
   actorId?: string;
+  actorKind?: string;
   targetId?: string;
+  targetKind?: string;
   weaponOrEffect?: string;
+  hitZone?: string;
+  critical?: boolean;
+  wallbang?: boolean;
+  penetrationMultiplier?: number;
+  distanceMeters?: number;
   position?: readonly [number, number, number];
   admission: DiagnosticAdmission;
   reason?: string;
@@ -62,20 +70,27 @@ export function sanitizeDiagnosticValue(value: unknown, key = ''): unknown {
   if (typeof value === 'string') return scrubText(value).slice(0, 160);
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'boolean' || value === null) return value;
-  if (Array.isArray(value)) return value.slice(0, 32).map((entry) => sanitizeDiagnosticValue(entry));
+  if (Array.isArray(value)) return value.slice(0, 8_192).map((entry) => sanitizeDiagnosticValue(entry));
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value as Record<string, unknown>)
       .filter(([entryKey]) => !SECRET_KEYS.test(entryKey))
-      .slice(0, 48)
+      .slice(0, 64)
       .map(([entryKey, entryValue]) => [entryKey, sanitizeDiagnosticValue(entryValue, entryKey)]));
   }
   return undefined;
 }
 
+function isDamageEvent(event: ExportEvent): boolean {
+  return event.damageApplied !== undefined || event.eventType.includes('damage');
+}
+
 export class MatchDiagnostics {
   readonly context: MatchDiagnosticContext;
   private readonly events: ExportEvent[] = [];
+  private readonly damageLedger: ExportEvent[] = [];
   private droppedEvents = 0;
+  private droppedDamageEvents = 0;
+  private finalState: unknown = undefined;
 
   constructor(context: MatchDiagnosticContext) {
     this.context = {
@@ -89,14 +104,25 @@ export class MatchDiagnostics {
     };
   }
 
+  participantKey(id: string): string {
+    return stablePseudonym(id, this.context.sessionId);
+  }
+
+  setFinalState(value: unknown): void {
+    this.finalState = sanitizeDiagnosticValue(value);
+  }
+
   record(input: MatchDiagnosticInput): void {
     const event: ExportEvent = {
       ...input,
       eventId: scrubText(input.eventId).slice(0, 80),
       eventType: scrubText(input.eventType).slice(0, 60),
-      ...(input.actorId ? { actorId: stablePseudonym(input.actorId, this.context.sessionId) } : {}),
-      ...(input.targetId ? { targetId: stablePseudonym(input.targetId, this.context.sessionId) } : {}),
+      ...(input.actorId ? { actorId: this.participantKey(input.actorId) } : {}),
+      ...(input.targetId ? { targetId: this.participantKey(input.targetId) } : {}),
+      ...(input.actorKind ? { actorKind: scrubText(input.actorKind).slice(0, 24) } : {}),
+      ...(input.targetKind ? { targetKind: scrubText(input.targetKind).slice(0, 24) } : {}),
       ...(input.weaponOrEffect ? { weaponOrEffect: scrubText(input.weaponOrEffect).slice(0, 40) } : {}),
+      ...(input.hitZone ? { hitZone: scrubText(input.hitZone).slice(0, 20) } : {}),
       ...(input.reason ? { reason: scrubText(input.reason).slice(0, 100) } : {}),
       ...(input.spawnReason ? { spawnReason: scrubText(input.spawnReason).slice(0, 100) } : {}),
       modifiers: input.modifiers?.slice(0, 8).map((modifier) => scrubText(modifier).slice(0, 40)),
@@ -107,15 +133,35 @@ export class MatchDiagnostics {
       this.events.shift();
       this.droppedEvents += 1;
     }
+    if (isDamageEvent(event)) {
+      this.damageLedger.push(event);
+      if (this.damageLedger.length > MAX_DAMAGE_LEDGER_EVENTS) {
+        this.damageLedger.shift();
+        this.droppedDamageEvents += 1;
+      }
+    }
   }
 
   export(): { filename: string; json: string } {
-    const envelope = { schemaVersion: MATCH_DIAGNOSTICS_SCHEMA_VERSION, context: this.context, droppedEvents: this.droppedEvents, events: this.events };
-    let json = JSON.stringify(sanitizeDiagnosticValue(envelope), null, 2);
+    const makeEnvelope = () => ({
+      schemaVersion: MATCH_DIAGNOSTICS_SCHEMA_VERSION,
+      context: this.context,
+      droppedEvents: this.droppedEvents,
+      droppedDamageEvents: this.droppedDamageEvents,
+      events: this.events,
+      damageLedger: this.damageLedger,
+      ...(this.finalState === undefined ? {} : { finalState: this.finalState }),
+    });
+    let json = JSON.stringify(makeEnvelope(), null, 2);
     while (new TextEncoder().encode(json).byteLength > MAX_DIAGNOSTIC_EXPORT_BYTES && this.events.length > 1) {
       this.events.shift();
       this.droppedEvents += 1;
-      json = JSON.stringify(sanitizeDiagnosticValue({ ...envelope, droppedEvents: this.droppedEvents, events: this.events }), null, 2);
+      json = JSON.stringify(makeEnvelope(), null, 2);
+    }
+    while (new TextEncoder().encode(json).byteLength > MAX_DIAGNOSTIC_EXPORT_BYTES && this.damageLedger.length > 1) {
+      this.damageLedger.shift();
+      this.droppedDamageEvents += 1;
+      json = JSON.stringify(makeEnvelope(), null, 2);
     }
     const safeArena = this.context.arena.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'arena';
     return { filename: `atomic-acres-match-${safeArena}-${this.context.sessionId}.json`, json };

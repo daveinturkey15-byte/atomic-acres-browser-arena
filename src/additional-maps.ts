@@ -951,26 +951,51 @@ export function applyRustworksPresentationProfile(
   return applyAdditionalMapPresentationProfile(root, profile);
 }
 
+type FittedCanvasText = Readonly<{
+  fontSize: number;
+  measuredWidth: number;
+  availableWidth: number;
+}>;
+
+export function fitCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  preferredSize: number,
+  availableWidth: number,
+  minimumSize = 18,
+): FittedCanvasText {
+  let fontSize = Math.max(minimumSize, Math.floor(preferredSize));
+  const family = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+  context.font = `900 ${fontSize}px ${family}`;
+  while (fontSize > minimumSize && context.measureText(text).width > availableWidth) {
+    fontSize -= 2;
+    context.font = `900 ${fontSize}px ${family}`;
+  }
+  return { fontSize, measuredWidth: context.measureText(text).width, availableWidth };
+}
+
 function scoreTexture(value: number): THREE.CanvasTexture | null {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
+  canvas.width = 512;
+  canvas.height = 256;
   const context = canvas.getContext('2d');
   if (!context) return null;
+  const text = `${value} PTS`;
   context.fillStyle = '#10171b';
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.strokeStyle = '#f4c44f';
-  context.lineWidth = 10;
-  context.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.lineWidth = 18;
+  context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
   context.fillStyle = '#f8f0d2';
-  context.font = '900 62px sans-serif';
+  const layout = fitCanvasText(context, text, 118, canvas.width - 88, 54);
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(`${value} PTS`, canvas.width / 2, canvas.height / 2 + 4);
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + 6);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
+  texture.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height };
   return texture;
 }
 
@@ -978,26 +1003,33 @@ function rangeSign(text: string, accent: number, name: string, scale: [number, n
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
-  canvas.height = 128;
+  const aspect = THREE.MathUtils.clamp(scale[0] / Math.max(0.1, scale[1]), 3.2, 12);
+  canvas.height = Math.round(THREE.MathUtils.clamp(canvas.width / aspect, 128, 320));
   const context = canvas.getContext('2d');
   if (!context) return null;
+  const border = Math.max(8, Math.round(canvas.height * 0.055));
+  const inset = Math.max(7, Math.round(border * 0.7));
   context.fillStyle = 'rgba(10, 17, 20, 0.94)';
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.strokeStyle = `#${accent.toString(16).padStart(6, '0')}`;
-  context.lineWidth = 10;
-  context.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+  context.lineWidth = border;
+  context.strokeRect(inset, inset, canvas.width - inset * 2, canvas.height - inset * 2);
   context.fillStyle = '#f8f0d2';
-  context.font = '900 58px sans-serif';
+  const horizontalPadding = Math.max(50, Math.round(canvas.width * 0.055));
+  const layout = fitCanvasText(context, text, canvas.height * 0.48, canvas.width - horizontalPadding * 2, 30);
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2 + 3);
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + Math.round(canvas.height * 0.025));
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, toneMapped: false }));
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false, toneMapped: false }));
   sprite.name = name;
   sprite.scale.set(scale[0], scale[1], 1);
+  sprite.renderOrder = 8;
   sprite.userData.presentationOnly = true;
+  sprite.userData.text = text;
+  sprite.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height, worldAspect: scale[0] / scale[1] };
   return sprite;
 }
 
@@ -1237,7 +1269,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
       ballisticMaterial: panel.material,
     });
     rangeTarget(builder, targets, `wallbang-${panel.material}`, panel.x, -12.4, 50, 'near');
-    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [2.1, 0.5]);
+    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [2.05, 0.55]);
     if (label) {
       label.position.set(panel.x, 3.35, -7.5);
       root.add(label);
@@ -1245,9 +1277,9 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   }
   box(builder, 'gun-range-wallbang-lab-left', [-18.45, 1.6, -8.8], [0.18, 3.2, 9.8], dark, { ballisticMaterial: 'structural-metal' });
   box(builder, 'gun-range-wallbang-lab-right', [-8.55, 1.6, -8.8], [0.18, 3.2, 9.8], dark, { ballisticMaterial: 'structural-metal' });
-  const wallbangHeader = rangeSign('WALLBANG LAB · MATERIAL / THICKNESS', 0xe0aa37, 'gun-range-wallbang-header', [9.5, 0.75]);
+  const wallbangHeader = rangeSign('WALLBANG TEST · MATERIAL / THICKNESS', 0xe0aa37, 'gun-range-wallbang-header', [8.8, 0.72]);
   if (wallbangHeader) {
-    wallbangHeader.position.set(-13.5, 4.15, -5.4);
+    wallbangHeader.position.set(-13.5, 4.45, -5.25);
     root.add(wallbangHeader);
   }
   flyingBlackCat(targets, root);
@@ -1295,12 +1327,13 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   root.getObjectByName('gun-range-live-fire-sign')!.userData.label = 'LIVE FIRE · EYES AND EARS';
   const armorySign = rangeSign('ARMORY · PICK UP WITH F', 0x58e3dc, 'gun-range-armory-sign-text', [18, 1.25]);
   if (armorySign) {
-    armorySign.position.set(0, 3.8, 12.02);
+    // Text must sit on the player-facing side of its backing board.
+    armorySign.position.set(0, 3.8, 12.36);
     root.add(armorySign);
   }
   const liveFireSign = rangeSign('LIVE FIRE · EYES AND EARS', 0xff765f, 'gun-range-live-fire-sign-text', [10.5, 0.82]);
   if (liveFireSign) {
-    liveFireSign.position.set(0, 4.45, 0.86);
+    liveFireSign.position.set(0, 4.45, 1.13);
     root.add(liveFireSign);
   }
 

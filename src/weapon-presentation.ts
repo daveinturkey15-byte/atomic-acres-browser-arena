@@ -22,6 +22,8 @@ export type WeaponPose = {
   phase: number;
   landingImpulse: number;
   lateralSpeed: number;
+  /** Presentation-only camera-space retreat from nearby walls/floor. */
+  surfaceRetreat?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
   reloadProgress: number | null;
 };
@@ -117,6 +119,7 @@ export class WeaponPresentation {
   private sprintBlend = 0;
   private weaponHeat = 0;
   private shotsPresented = 0;
+  private surfaceRetreat = 0;
   private actionContract: CharacterActionContract = characterActionContract({
     weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
   });
@@ -753,6 +756,7 @@ export class WeaponPresentation {
         : null,
       weaponFraming: model?.visible ? measureCameraFraming(model, this.camera) : null,
       actionContract: this.actionContract,
+      surfaceRetreat: this.surfaceRetreat,
       riggedArms: this.riggedArmDiagnostics,
       knifeVisible: this.meleeRig.visible,
       importedModel,
@@ -1071,8 +1075,9 @@ export class WeaponPresentation {
     const targetPosition = new THREE.Vector3(
       0.28 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
       -0.34 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
-      -0.88 + adsZ + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
+      -0.88 + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
     );
+    this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));
     this.root.rotation.x = THREE.MathUtils.lerp(this.root.rotation.x, presentationKick * profile.recoilRotation * 1.15 - this.swayY - grenadeArc * 0.42 + reloadStage.pitch, smoothing(22));
     this.root.rotation.y = THREE.MathUtils.lerp(

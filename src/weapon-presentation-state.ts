@@ -44,6 +44,15 @@ export function advanceWeaponHeat(current: number, fired: boolean, dt: number, w
   return clamp01(cooled + (fired ? perShot : 0));
 }
 
+/** Pulls camera-attached arms behind nearby world geometry without changing aim rays. */
+export function viewmodelSurfaceRetreat(nearestSurfaceMeters: number | null, prone: boolean): number {
+  const distance = nearestSurfaceMeters === null || !Number.isFinite(nearestSurfaceMeters)
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, nearestSurfaceMeters);
+  const obstruction = distance >= 1.2 ? 0 : (1 - distance / 1.2) * 0.52;
+  return Math.min(0.56, Math.max(0, obstruction + (prone ? 0.045 : 0)));
+}
+
 /** Deterministic visual fire-cycle envelope. Gameplay recoil and hit rays remain authoritative elsewhere. */
 export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): FireCycleState {
   const ageMs = Math.max(0, finite(rawAgeMs));

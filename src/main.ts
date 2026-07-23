@@ -232,7 +232,11 @@ import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-p
 import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
-import { createHumanMatchReport } from './match-report';
+import {
+  createHumanMatchReport,
+  type HumanDamageEventInput,
+  type MatchParticipantReportInput,
+} from './match-report';
 import { scoreSpawnCandidates, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
@@ -240,7 +244,7 @@ import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
-import { magnifiedFovDegrees } from './weapon-presentation-state';
+import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
@@ -1312,6 +1316,9 @@ type DownloadableJson = Readonly<{ filename: string; json: string }>;
 let lastMatchDownloads: Readonly<{ summary: DownloadableJson; technical: DownloadableJson }> | null = null;
 let matchDiagnosticsStartedAt = performance.now();
 let matchDiagnosticSequence = 0;
+const humanDamageTimeline: HumanDamageEventInput[] = [];
+let droppedHumanDamageEvents = 0;
+const MAX_HUMAN_DAMAGE_EVENTS = 8_192;
 type MatchDiagnosticDetails = Partial<Omit<MatchDiagnosticInput, 'monotonicMs' | 'localEpochMs' | 'eventId' | 'eventType' | 'admission'>>;
 
 function recordMatchDiagnostic(eventType: string, admission: DiagnosticAdmission, details: MatchDiagnosticDetails = {}, correlationId?: string): void {
@@ -1332,6 +1339,8 @@ function recordMatchDiagnostic(eventType: string, admission: DiagnosticAdmission
 function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: number): void {
   lastMatchDownloads = null;
   syncMatchReportDownloads();
+  humanDamageTimeline.length = 0;
+  droppedHumanDamageEvents = 0;
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
   matchDiagnostics = new MatchDiagnostics({
@@ -1361,6 +1370,73 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
     },
   });
   recordMatchDiagnostic('match-start', 'observed', { actorId: player.id, reason: 'local match diagnostics initialized' });
+}
+
+function combatantLabel(id: string): { name: string; kind: string } {
+  if (id === player.id) return { name: player.name, kind: 'player' };
+  const remote = remotes.get(id);
+  if (remote) return { name: remote.snapshot.name, kind: 'player' };
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === id);
+  if (member) return { name: member.name, kind: 'player' };
+  const bot = bots.get(id) ?? dormantBots.get(id);
+  if (bot) return { name: bot.name, kind: id.startsWith('host-bot-') ? 'hosted-bot' : 'solo-bot' };
+  const target = arena.targets.find((entry) => entry.id === id);
+  if (target) return {
+    name: target.kind === 'flying-cat' ? 'Flying Black Cat' : `${target.scoreValue}-point range target`,
+    kind: target.kind === 'flying-cat' ? 'flying-target' : 'practice-target',
+  };
+  if (id === 'environment') return { name: 'Environment', kind: 'environment' };
+  return { name: 'Unknown combatant', kind: 'unknown' };
+}
+
+type DamageRecord = Readonly<{
+  actorId: string;
+  targetId: string;
+  weaponOrEffect: string;
+  healthBefore: number;
+  healthAfter: number;
+  damageRequested: number;
+  damageApplied: number;
+  reason: string;
+  hitZone?: string;
+  critical?: boolean;
+  wallbang?: boolean;
+  penetrationMultiplier?: number;
+  distanceMeters?: number;
+}>;
+
+function recordDamageEvent(details: DamageRecord): void {
+  const actor = combatantLabel(details.actorId);
+  const target = combatantLabel(details.targetId);
+  recordMatchDiagnostic('damage-applied', details.damageApplied > 0 ? 'accepted' : 'rejected', {
+    ...details,
+    actorKind: actor.kind,
+    targetKind: target.kind,
+  });
+  if (details.damageApplied <= 0) return;
+  const now = performance.now();
+  const event: HumanDamageEventInput = {
+    elapsedMs: Math.max(0, now - matchDiagnosticsStartedAt),
+    timestamp: new Date().toISOString(),
+    from: actor.name,
+    fromKind: actor.kind,
+    to: target.name,
+    toKind: target.kind,
+    damage: details.damageApplied,
+    healthBefore: details.healthBefore,
+    healthAfter: details.healthAfter,
+    source: details.weaponOrEffect,
+    hitZone: details.hitZone,
+    critical: details.critical,
+    wallbang: details.wallbang,
+    penetrationMultiplier: details.penetrationMultiplier,
+    distanceMeters: details.distanceMeters,
+  };
+  if (humanDamageTimeline.length >= MAX_HUMAN_DAMAGE_EVENTS) {
+    humanDamageTimeline.shift();
+    droppedHumanDamageEvents += 1;
+  }
+  humanDamageTimeline.push(event);
 }
 
 function downloadJsonFile(exported: DownloadableJson): void {
@@ -2321,6 +2397,23 @@ function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
   return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
 }
 
+function currentViewmodelSurfaceRetreat(): number {
+  const direction = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')).normalize();
+  let nearest: number | null = null;
+  for (let distance = 0.2; distance <= 1.2; distance += 0.1) {
+    const sample = player.position.clone().addScaledVector(direction, distance);
+    if (!isBlocked(sample, arena.colliders, 0.09)) continue;
+    nearest = distance;
+    break;
+  }
+  if (direction.y < -0.04) {
+    const floorY = player.position.y - stanceEyeHeight(player.stance);
+    const floorDistance = (player.position.y - floorY) / -direction.y;
+    if (floorDistance >= 0 && floorDistance <= 1.2) nearest = nearest === null ? floorDistance : Math.min(nearest, floorDistance);
+  }
+  return viewmodelSurfaceRetreat(nearest, player.stance === 'prone');
+}
+
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const root = new THREE.Group();
   root.name = 'remote-player-world';
@@ -2872,7 +2965,10 @@ function trimNonceSet(): void {
   if (processedNonces.size > 512) processedNonces.clear();
 }
 
-function sendAuthoritativeHit(message: HitMessage): void {
+function sendAuthoritativeHit(
+  message: HitMessage,
+  evidence?: Readonly<{ hitZone?: HitZone; wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
+): void {
   const timedMessage: HitMessage = message.timing ? message : { ...message, timing: nextCombatTiming() };
   if (network.role !== 'host') {
     network.send(timedMessage);
@@ -2892,7 +2988,7 @@ function sendAuthoritativeHit(message: HitMessage): void {
   remoteHealthAuthorities.set(timedMessage.target, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordMatchDiagnostic('damage-applied', 'accepted', {
+  recordDamageEvent({
     actorId: timedMessage.by,
     targetId: timedMessage.target,
     weaponOrEffect: timedMessage.kind === 'shot' ? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon : timedMessage.explosiveSource ?? timedMessage.kind,
@@ -2900,6 +2996,11 @@ function sendAuthoritativeHit(message: HitMessage): void {
     healthAfter: result.state.hp,
     damageRequested: finalDamage,
     damageApplied: appliedDamage,
+    hitZone: evidence?.hitZone,
+    critical: evidence?.hitZone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
     reason: 'host-remote-health-authority',
   });
   recordAuthoritativeDamage(timedMessage.by, timedMessage.target, appliedDamage);
@@ -2977,7 +3078,7 @@ function applyDamage(
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
   roundDamageTaken += appliedDamage;
-  recordMatchDiagnostic('damage-applied', appliedDamage > 0 ? 'accepted' : 'rejected', {
+  recordDamageEvent({
     actorId: attacker,
     targetId: player.id,
     weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
@@ -3894,7 +3995,13 @@ function tryFire(now: number): void {
     prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
-  const hitDamage = new Map<string, { damage: number; zone: HitZone }>();
+  const hitDamage = new Map<string, {
+    damage: number;
+    zone: HitZone;
+    wallbang: boolean;
+    penetrationMultiplier: number;
+    distanceMeters: number;
+  }>();
   const pelletDirections: [number, number, number][] = [];
   let impactAudioPlayed = false;
   const presentedSurfaceIds = new Set<string>();
@@ -3961,7 +4068,13 @@ function tryFire(now: number): void {
       const zone = result.hitZone ?? 'body';
       const damage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
       const prior = hitDamage.get(result.playerId);
-      hitDamage.set(result.playerId, { damage: (prior?.damage ?? 0) + damage, zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone });
+      hitDamage.set(result.playerId, {
+        damage: (prior?.damage ?? 0) + damage,
+        zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone,
+        wallbang: Boolean(prior?.wallbang) || result.damageMultiplier < 0.999,
+        penetrationMultiplier: Math.min(prior?.penetrationMultiplier ?? 1, result.damageMultiplier),
+        distanceMeters: Math.max(prior?.distanceMeters ?? 0, result.distance),
+      });
     }
     if (result.targetId) {
       const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
@@ -3970,6 +4083,11 @@ function tryFire(now: number): void {
         result.targetId,
         applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier),
         zone,
+        {
+          wallbang: result.damageMultiplier < 0.999,
+          penetrationMultiplier: result.damageMultiplier,
+          distanceMeters: result.distance,
+        },
       );
     }
   }
@@ -3998,11 +4116,11 @@ function tryFire(now: number): void {
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target: bot.id, damage: requested, kind: 'shot',
           actionNonce: shot.nonce, nonce: randomNonce(),
-        });
+        }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
         showDamageNumber(Math.min(100, poweredDamage), hit.zone);
       } else {
-        const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone);
+        const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone, undefined, player.id, hit);
         showDamageNumber(dealt, hit.zone);
       }
     }
@@ -4017,7 +4135,7 @@ function tryFire(now: number): void {
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
           actionNonce: shot.nonce, nonce,
-        });
+        }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
         showDamageNumber(powered, hit.zone);
         audio.hit(hit.zone === 'head');
@@ -4510,13 +4628,14 @@ function applyBotDamage(
   zone: HitZone,
   cause: KillCause = { kind: 'gun', weapon: player.weapon },
   attackerId = player.id,
+  evidence?: Readonly<{ wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
   reactOperator(bot.root, zone);
   const healthBefore = bot.hp;
   const dealt = Math.min(bot.hp, Math.max(0, damage));
-  recordMatchDiagnostic('bot-damage-applied', dealt > 0 ? 'accepted' : 'rejected', {
+  recordDamageEvent({
     actorId: attackerId,
     targetId: bot.id,
     weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
@@ -4524,6 +4643,11 @@ function applyBotDamage(
     healthAfter: Math.max(0, healthBefore - dealt),
     damageRequested: damage,
     damageApplied: dealt,
+    hitZone: zone,
+    critical: zone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
     reason: bot.id.startsWith('host-bot-') ? 'hosted-bot-authority' : 'solo-bot-authority',
   });
   if (attackerId === player.id) roundDamageDealt += dealt;
@@ -4711,7 +4835,7 @@ function applyHostedBotDamageToRemote(
   remoteHealthAuthorities.set(target.id, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
-  recordMatchDiagnostic('bot-damage-applied', 'accepted', {
+  recordDamageEvent({
     actorId: bot.id,
     targetId: target.id,
     weaponOrEffect: bot.weapon,
@@ -5222,7 +5346,12 @@ function updateGrenades(dt: number, now: number): void {
   }
 }
 
-function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): void {
+function hitPracticeTarget(
+  id: string,
+  damage: number,
+  zone: HitZone = 'body',
+  evidence?: Readonly<{ wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
+): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
   if (target.alwaysCritical) zone = 'head';
@@ -5231,6 +5360,21 @@ function hitPracticeTarget(id: string, damage: number, zone: HitZone = 'body'): 
   const healthBefore = target.health;
   target.health = Math.max(0, target.health - admittedDamage);
   const appliedDamage = healthBefore - target.health;
+  recordDamageEvent({
+    actorId: player.id,
+    targetId: target.id,
+    weaponOrEffect: player.weapon,
+    healthBefore,
+    healthAfter: target.health,
+    damageRequested: admittedDamage,
+    damageApplied: appliedDamage,
+    hitZone: zone,
+    critical: zone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
+    reason: 'gun-range-practice-target',
+  });
   targetHits += 1;
   const headshot = selectedArena.id === 'gun-range' && zone === 'head';
   showHitmarker(headshot);
@@ -6518,6 +6662,7 @@ function updatePhysics(dt: number): void {
     landingImpulse,
     lateralSpeed,
     reloadProgress: debugReloadProgress ?? gameplayReloadProgress(player.reloadState, performance.now()),
+    surfaceRetreat: currentViewmodelSurfaceRetreat(),
   });
   for (const event of weaponActionEvents) {
     audio.weaponAction(player.weapon, event);
@@ -6578,6 +6723,77 @@ function teamScores(): [number, number] {
     else coral += bot.kills;
   }
   return [aqua, coral];
+}
+
+function matchParticipantReports(): Array<{ id: string; report: MatchParticipantReportInput }> {
+  const reports: Array<{ id: string; report: MatchParticipantReportInput }> = [];
+  const timelineDamage = (name: string, direction: 'from' | 'to') => Math.round(humanDamageTimeline.reduce(
+    (total, event) => total + (event[direction] === name ? event.damage : 0),
+    0,
+  ));
+  const scoreFor = (id: string): PlayerScore | undefined => authoritativeScores.get(id) ?? privateLobbySnapshot?.scores.find((score) => score.id === id);
+  if (gameMode !== 'solo' && privateLobbySnapshot) {
+    for (const member of privateLobbySnapshot.members) {
+      const score = scoreFor(member.id) ?? emptyPlayerScore(member.id);
+      const remote = remotes.get(member.id);
+      const isLocal = member.id === player.id;
+      reports.push({
+        id: member.id,
+        report: {
+          name: member.name,
+          kind: 'player',
+          team: privateMatchMode === 'ffa' ? 'free-for-all' : `team-${member.team + 1}`,
+          kills: score.kills,
+          deaths: score.deaths,
+          damageDealt: score.damageDealt,
+          damageTaken: score.damageTaken,
+          finalHealth: isLocal ? player.hp : remote?.snapshot.hp,
+          ...(selectedArena.id === 'gun-range' ? {
+            score: score.rangeScore ?? (isLocal ? rangeScore : 0),
+            hits: score.rangeHits ?? (isLocal ? targetHits : 0),
+            shots: score.rangeShots ?? (isLocal ? rangeShotsFired : 0),
+          } : isLocal ? { hits: roundHitShots, shots: roundShotsFired } : {}),
+        },
+      });
+    }
+  } else {
+    reports.push({
+      id: player.id,
+      report: {
+        name: player.name,
+        kind: 'player',
+        team: `team-${player.team + 1}`,
+        kills: player.kills,
+        deaths: player.deaths,
+        damageDealt: Math.round(roundDamageDealt),
+        damageTaken: Math.round(roundDamageTaken),
+        finalHealth: player.hp,
+        ...(selectedArena.id === 'gun-range'
+          ? { score: rangeScore, hits: targetHits, shots: rangeShotsFired }
+          : { hits: roundHitShots, shots: roundShotsFired }),
+      },
+    });
+  }
+  const seen = new Set(reports.map((entry) => entry.id));
+  for (const bot of [...bots.values(), ...dormantBots.values()]) {
+    if (seen.has(bot.id)) continue;
+    seen.add(bot.id);
+    const score = scoreFor(bot.id);
+    reports.push({
+      id: bot.id,
+      report: {
+        name: bot.name,
+        kind: bot.id.startsWith('host-bot-') ? 'hosted-bot' : 'solo-bot',
+        team: privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'free-for-all' : `team-${bot.team + 1}`,
+        kills: score?.kills ?? bot.kills,
+        deaths: score?.deaths ?? bot.deaths,
+        damageDealt: score?.damageDealt ?? timelineDamage(bot.name, 'from'),
+        damageTaken: score?.damageTaken ?? timelineDamage(bot.name, 'to'),
+        finalHealth: bot.hp,
+      },
+    });
+  }
+  return reports;
 }
 
 function updateMatchState(now: number): void {
@@ -6648,6 +6864,19 @@ function updateMatchState(now: number): void {
       reason: presentation.headline ?? 'match-ended',
       modifiers: [`kills:${summary.kills}`, `deaths:${summary.deaths}`, `damage:${summary.damageDealt}`],
     });
+    const completedAt = new Date().toISOString();
+    const participants = matchParticipantReports();
+    matchDiagnostics?.setFinalState({
+      completedAt,
+      result: presentation.headline ?? 'MATCH COMPLETE',
+      durationMs: Math.max(0, performance.now() - matchDiagnosticsStartedAt),
+      participants: participants.map(({ id, report }) => ({
+        participantId: matchDiagnostics?.participantKey(id),
+        ...report,
+      })),
+      damageLedgerEventCount: humanDamageTimeline.length,
+      droppedHumanDamageEvents,
+    });
     const technical = matchDiagnostics?.export();
     if (technical) {
       lastMatchDownloads = {
@@ -6656,6 +6885,7 @@ function updateMatchState(now: number): void {
           build: latestChangelogEntry().pass,
           arena: selectedArena.displayName,
           mode: gameMode === 'solo' ? 'solo' : privateMatchMode,
+          role: network.role === 'client' ? 'guest' : network.role,
           result: presentation.headline ?? 'MATCH COMPLETE',
           durationMs: performance.now() - matchDiagnosticsStartedAt,
           kills: summary.kills,
@@ -6666,7 +6896,10 @@ function updateMatchState(now: number): void {
           damageTaken: Math.max(roundDamageTaken, authoritativeLocal?.damageTaken ?? 0),
           headshots: summary.headshots,
           bestKillstreak: bestStreakThisMatch,
-          completedAt: new Date().toISOString(),
+          completedAt,
+          participants: participants.map((entry) => entry.report),
+          damageTimeline: humanDamageTimeline,
+          droppedDamageEvents: droppedHumanDamageEvents,
         }),
       };
       syncMatchReportDownloads();

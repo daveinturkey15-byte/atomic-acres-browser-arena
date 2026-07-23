@@ -11,6 +11,7 @@ import {
   buildGunRange,
   buildRustworks1v1,
   buildSkylineTerminal,
+  fitCanvasText,
   rustworksDeckTopY,
 } from './additional-maps';
 import type { ArenaMap } from './map';
@@ -113,6 +114,21 @@ async function traverseRoute(
 }
 
 describe('additional authored maps', () => {
+  it('shrinks long world-sign copy until it fits the drawable panel width', () => {
+    let currentFont = '';
+    const context = {
+      get font() { return currentFont; },
+      set font(value: string) { currentFont = value; },
+      measureText(text: string) {
+        const size = Number.parseInt(currentFont.match(/900 (\d+)px/)?.[1] ?? '0', 10);
+        return { width: text.length * size * 0.58 };
+      },
+    } as unknown as CanvasRenderingContext2D;
+    const layout = fitCanvasText(context, 'WALLBANG TEST · MATERIAL / THICKNESS', 120, 620, 18);
+    expect(layout.measuredWidth).toBeLessThanOrEqual(layout.availableWidth);
+    expect(layout.fontSize).toBeLessThan(120);
+  });
+
   it('builds an original compact collision-backed industrial 1v1 arena', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     expect(map.id).toBe('rustworks-1v1');

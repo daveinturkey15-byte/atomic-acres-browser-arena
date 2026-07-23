@@ -13,7 +13,7 @@
 - Sniper ADS keeps the complete HUD/status visible.
 - Damage feeds sit lower and per-hit event-feed duplication is removed.
 - Field Support UI is 25% larger without changing its format.
-- Completed matches expose two separate JSON files: a human summary (accuracy, K/D, shots, hits, damage, headshots and streak) and a bounded technical log (events, renderer/browser context and the exact weapon/penetration table). Both remain downloadable after returning to the main menu, until a new match begins.
+- Completed matches expose two separate JSON files: a human summary (per-participant scoreboard, accuracy, K/D, shots, hits, damage, headshots, streak and a named/timestamped damage timeline) and a bounded technical log (a dedicated 8,192-event damage ledger, general events, final per-participant state, renderer/browser context and the exact weapon/penetration table). Both remain downloadable after returning to the main menu, until a new match begins.
 - Both upstairs house windows are breakable. Prone camera smoothing is bounded inside the authoritative capsule.
 - Quad presentation shaders are prewarmed; synchronous layout forcing at spawn is removed; the next-frame spawn cost is recorded in technical diagnostics.
 - Tri-Pass uses the same left/right handedness as the HUD minimap.
@@ -22,6 +22,8 @@
 - LMG ADS uses a dedicated high-contrast aperture and front dot.
 - Gun Range has a four-lane material/thickness wallbang lab and private multiplayer with no bots, FFA-only configuration, live per-player points/hits/accuracy and host-authoritative score snapshots. Distinct players remain hostile even when their presentation colour matches, and host-side shot admission derives reduced player damage through the real lab surfaces.
 - A flying 100 HP black cat loops through the range with an animated black-star trail. Every hit is critical, a kill awards 500 points, and its respawn delay is exactly 30 seconds.
+- Gun Range world-space signs measure and fit their copy to the drawable panel and render on the player-facing side of backing boards.
+- Atomic Acres now binds the four large Quality earth banks plus 40 substantial authored props (trees, terminals, house furniture, hydroponic beds, tanks, lamps and structural posts) to shared movement/projectile authority. Performance mirrors the large banks so both profiles present the same physics. Near-wall/floor viewmodel retreat keeps camera-attached arms and weapons out of world surfaces.
 
 ## Confirmed existing balance contracts
 
@@ -41,4 +43,4 @@ Every firearm has explicit damage, minimum damage, RPM, falloff, hip/ADS/movemen
 1. Browser-viewable match-history screen using the scoreboard-style presentation and local retained reports.
 2. A deeper authored Terminal asset/texture reskin after feedback on the denser first slice.
 3. A named reproduction or screenshot for the ambiguous Rustworks opposite-ramp object, followed by a surgical geometry correction.
-4. Further Atomic Acres prop collider additions only when a visible prop can be paired with an exact authority box and traversal test; no speculative blanket collision volumes.
+4. Fine-grained collision for tiny dressing remains intentionally excluded: grass tufts, decals, particles, wall art, small screens and overhead details do not become movement blockers.

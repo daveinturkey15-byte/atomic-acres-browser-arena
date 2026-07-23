@@ -231,6 +231,7 @@ type DebugState = {
     weaponFinishId: string;
     modelVisibleMeshCount: number;
     adsProgress: number;
+    surfaceRetreat: number;
     sightOffset: [number, number] | null;
     armsVisible: boolean;
     armMeshCount: number;
@@ -719,6 +720,32 @@ test.describe('boot and authored presentation', () => {
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
+  });
+
+  test('keeps substantial Atomic Acres collision identical in Performance and Quality', async ({ page }) => {
+    test.setTimeout(180_000);
+    const probes = [
+      [-27, 0.7, -34], // north-west earth bank inner tier
+      [30, 0.7, -26], // north-east earth bank inner tier
+      [-31, 2, -30], // authored tree trunk
+      [-18, 0.85, 10], // authored terminal
+      [-31, 3.05, 4], // reclamation tank
+      [-12, 0.62, -30.7], // Aqua dining table
+      [12.7, 0.85, 25.3], // Coral sofa
+    ] as const;
+    const profiles: Array<'performance' | 'blender'> = ['performance', 'blender'];
+    const results: boolean[][] = [];
+    for (const profile of profiles) {
+      await pageReadyAt(page, `/?render=${profile}&signal=off`, 90_000);
+      const state = await debug(page);
+      expect(state.render.profile).toBe(profile);
+      results.push(await page.evaluate((points) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { collisionProbeAt: (x: number, y: number, z: number) => boolean } }).__ATOMIC_ACRES_DEBUG__;
+        return points.map(([x, y, z]) => api.collisionProbeAt(x, y, z));
+      }, probes));
+    }
+    expect(results[0]).toEqual(results[1]);
+    expect(results[0].every(Boolean)).toBe(true);
   });
 
   test('keeps all three Pass 27 route identities legible from representative approaches', async ({ page }) => {
@@ -1295,23 +1322,46 @@ test.describe('solo mechanics', () => {
       schemaVersion: number;
       reportType: string;
       stats: { accuracyPercent: number };
+      participants: Array<{ name: string }>;
+      damageTimeline: Array<{ timestamp: string; from: string; to: string }>;
     };
-    expect(summary).toMatchObject({ schemaVersion: 1, reportType: 'human-readable-match-summary' });
+    expect(summary).toMatchObject({ schemaVersion: 2, reportType: 'human-readable-match-summary' });
     expect(summary.stats.accuracyPercent).toBeGreaterThanOrEqual(0);
+    expect(summary.participants.length).toBeGreaterThan(1);
+    expect(summary.damageTimeline.length).toBeGreaterThan(0);
     const downloadPromise = page.waitForEvent('download');
     await page.locator('#download-match-diagnostics').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^atomic-acres-match-atomic-acres-p-[a-f0-9]{8}\.json$/);
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
-    const diagnostics = JSON.parse(await readFile(downloadPath!, 'utf8')) as { schemaVersion: number; context: { role: string }; events: Array<{ eventType: string }> };
-    expect(diagnostics.schemaVersion).toBe(1);
+    const diagnostics = JSON.parse(await readFile(downloadPath!, 'utf8')) as { schemaVersion: number; context: { role: string }; events: Array<{ eventType: string }>; damageLedger: unknown[]; finalState: { participants: unknown[] } };
+    expect(diagnostics.schemaVersion).toBe(2);
     expect(diagnostics.context.role).toBe('offline');
     expect(diagnostics.events.some((event) => event.eventType === 'match-end')).toBe(true);
+    expect(diagnostics.damageLedger.length).toBeGreaterThan(0);
+    expect(diagnostics.finalState.participants.length).toBeGreaterThan(1);
     await page.locator('#match-main-menu').click();
     await expect(page.locator('#last-match-reports')).toBeVisible();
     await expect(page.locator('#menu-download-match-summary')).toHaveText('HUMAN SUMMARY JSON');
     await expect(page.locator('#menu-download-match-technical')).toHaveText('TECHNICAL DEBUG JSON');
+  });
+
+  test('retreats the first-person weapon and arms before they intersect a nearby wall', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.teleportPlayer(12, 1.7, -32.55, 0, 0);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeGreaterThan(0.15);
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } })
+        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 1.7, 0, Math.PI / 2, 0);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBe(0);
   });
 
   test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {

@@ -140,6 +140,8 @@ When other people join, enable a required reviewer on the `production` environme
 
 Hermes, Codex, Gemini/AGY, and future harnesses all read `AGENTS.md` and this document. Hermes uses the local `atomic-acres-release-coordination` skill to route work through the same preflight and PR boundary.
 
+Desky (`dave-gaming-pc`) is the current development host and supports local validation of both Performance and Quality Graphics. Those profiles share one physics contract. A runtime PR that adds or changes substantial player-reachable geometry must prove matching movement and projectile authority in both presentations; profile-specific invisible blockers are a release failure.
+
 Harnesses may implement and verify in isolated worktrees. They may not silently merge, publish Pages, weaken a gate, reuse another task's preview server, or treat session text as provenance. The exact Git diff, checks, workflow receipt, and live site are the evidence.
 
 ## Recovery and reconciliation

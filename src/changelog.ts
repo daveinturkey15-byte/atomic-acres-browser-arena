@@ -47,8 +47,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     highlights: Object.freeze([
       'Sniper headshots deal 3x damage and scoped players retain the full HUD and match status',
       'Damage activity sits lower without duplicate hit notifications, while Field Support is 25% larger in the same compact format',
-      'Every completed match exposes a human-readable statistics JSON and a separate bounded technical diagnostics JSON from the result screen and main menu',
-      'Both upstairs house windows now break, with additional reported collision and arena-density repairs tracked by explicit tests',
+      'Every completed match exposes a human per-player scoreboard and timestamped damage timeline plus a separate large agent-readable diagnostics ledger',
+      'Both upstairs house windows now break; Quality and Performance share collision for all substantial Atomic Acres terrain and authored props',
       'Gun Range is a bot-free six-player FFA with real wallbang player damage, plus a 100 HP flying black cat worth 500 points that respawns after 30 seconds',
     ]),
   }),

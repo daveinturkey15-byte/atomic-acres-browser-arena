@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MATCH_DIAGNOSTICS_SCHEMA_VERSION,
   MAX_DIAGNOSTIC_EVENTS,
+  MAX_DAMAGE_LEDGER_EVENTS,
   MAX_DIAGNOSTIC_EXPORT_BYTES,
   MatchDiagnostics,
   sanitizeDiagnosticValue,
@@ -79,5 +80,29 @@ describe('bounded downloadable match diagnostics', () => {
     expect(diagnostics.size()).toBeLessThanOrEqual(MAX_DIAGNOSTIC_EVENTS);
     expect(parsed.droppedEvents).toBeGreaterThanOrEqual(200);
     expect(new TextEncoder().encode(exported.json).byteLength).toBeLessThanOrEqual(MAX_DIAGNOSTIC_EXPORT_BYTES);
+  });
+
+  it('preserves a dedicated damage ledger and a sanitized final per-participant state', () => {
+    const diagnostics = logger();
+    diagnostics.record({
+      monotonicMs: 10, localEpochMs: 20, matchTimeMs: 8, eventId: 'damage-1', eventType: 'damage-applied',
+      actorId: 'real-attacker', actorKind: 'player', targetId: 'real-target', targetKind: 'practice-target',
+      admission: 'accepted', damageApplied: 42, healthBefore: 100, healthAfter: 58, hitZone: 'head',
+      critical: true, wallbang: true, penetrationMultiplier: 0.72, distanceMeters: 18.4,
+    });
+    for (let index = 0; index < MAX_DIAGNOSTIC_EVENTS + 10; index += 1) diagnostics.record({
+      monotonicMs: index, localEpochMs: index, eventId: `noise-${index}`, eventType: 'state-reconciliation', admission: 'observed',
+    });
+    diagnostics.setFinalState({
+      participants: [{ participantId: diagnostics.participantKey('real-attacker'), kills: 3 }],
+      roomCode: 'must-not-export',
+    });
+    const parsed = JSON.parse(diagnostics.export().json);
+    expect(parsed.damageLedger).toHaveLength(1);
+    expect(parsed.damageLedger[0]).toMatchObject({ damageApplied: 42, hitZone: 'head', critical: true, wallbang: true });
+    expect(parsed.finalState.participants[0]).toMatchObject({ kills: 3 });
+    expect(parsed.finalState.roomCode).toBeUndefined();
+    expect(JSON.stringify(parsed)).not.toContain('real-attacker');
+    expect(MAX_DAMAGE_LEDGER_EVENTS).toBeGreaterThan(MAX_DIAGNOSTIC_EVENTS);
   });
 });
