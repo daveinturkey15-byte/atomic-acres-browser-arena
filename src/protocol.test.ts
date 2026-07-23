@@ -68,6 +68,14 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...botDamage, healthAfter: 85 })).toBe(false);
     expect(isGameMessage({ ...botState, bots: [bot, bot] })).toBe(false);
   });
+
+  it('admits score snapshots for the maximum six-player/four-bot lobby', () => {
+    const score = (id: string) => ({ id, kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 });
+    const scores = Array.from({ length: 10 }, (_, index) => score(`player-${index}`));
+    expect(isGameMessage({ type: 'match-score', by: 'host', scores, nonce: 22 })).toBe(true);
+    expect(isGameMessage({ type: 'match-score', by: 'host', scores: [...scores, score('overflow')], nonce: 23 })).toBe(false);
+  });
+
   it('validates replicated pickup and breakable-window messages', () => {
     const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', mode: 'weapon', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;

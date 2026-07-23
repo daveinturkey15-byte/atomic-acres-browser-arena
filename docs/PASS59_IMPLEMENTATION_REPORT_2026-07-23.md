@@ -34,7 +34,7 @@ No screenshot is classified as captured unless the corresponding Playwright comm
 7. Atomic Acres uses six authored transparent windows: four are deliberately breakable gameplay panes and two upper transparent panes are deliberately non-breakable. Pass 59 preserves that authored distinction.
 8. The Codex sandbox could not create the shared worktree `index.lock`, so it handed the unstaged working tree to Hermes Desktop rather than bypassing the boundary. The integrator environment can stage and commit normally.
 9. The Codex sandbox could not spawn Chromium workers. Hermes Desktop reran the browser work outside that sandbox: the bounded Pass 59 visual suite, targeted gameplay assertions, and same-machine two-peer multiplayer QA all completed successfully and produced the named evidence files.
-10. Independent multiplayer QA and review exposed and corrected four integration defects before handoff: hosted-bot weapon presentation was applied to the wrong scene node, leaderboard synchronization raced first remote creation, the multiplayer QA high-score fixture still used an obsolete storage schema, and a guest-owned `leave` packet could remove the host's remote actor without terminating the bound transport. The leave path now closes the bound guest session, retains host combat authority through the active-match rejoin grace window, and expires that authority with the slot.
+10. Independent multiplayer QA and review exposed and corrected eight integration defects before handoff: hosted-bot weapon presentation was applied to the wrong scene node, leaderboard synchronization raced first remote creation, the multiplayer QA high-score fixture still used an obsolete storage schema, a guest-owned `leave` packet could remove the host's remote actor without terminating the bound transport, maximum player-plus-bot score snapshots exceeded the protocol's old six-row limit, hosted-bot targeting ignored eligible remote humans, replicated bot damage only reconciled health downward, and grenade/support QA stopped before effect cleanup. The leave path now closes the bound guest session, retains host combat authority through the active-match rejoin grace window, and expires that authority with the slot. Score snapshots admit the bounded six-player/four-bot maximum, hosted bots choose the nearest eligible local or remote enemy, guests reconcile to canonical host health, and QA requires bot-to-guest damage plus grenade/support lifecycle completion.
 
 ## Inferences
 
@@ -71,12 +71,12 @@ No screenshot is classified as captured unless the corresponding Playwright comm
 Hermes Desktop independently reran the following after the Codex handoff and after correcting the integration defects above:
 
 - gameplay contract: 15/15 checks passed;
-- Vitest: 94 files and 515 tests passed;
+- Vitest: 94 files and 516 tests passed;
 - the exact `gemini-3.6-flash-high` AGY sidecar ran as a bounded read-only critic with structural no-fallback arguments and a receipt; after a permission-denied repository-read attempt was preserved as failed, a no-tools evidence-inline retry exited 0 with non-empty output, found no high/medium flaw in the death-authority path, and correctly falsified a separate reviewer's guest-forged-death claim against `network.ts` transport filtering;
 - lint/type checking, production build, leaderboard contract, provenance, release-tree, and dependency audit passed;
 - bounded Pass 59 Chromium visual suite passed;
 - targeted LMG/HUD, kill provenance, critical-damage, and rigged-model Chromium checks passed; the ephemeral LMG style assertion also passed three consecutive executions;
-- same-machine host/guest multiplayer QA passed with two hosted bots, grenade/support presentation, canonical damage, leaderboard convergence, synchronization windows, kill/death propagation, and zero unexpected captured page errors;
+- same-machine host/guest multiplayer QA passed with two hosted bots, explicit host-authoritative bot-to-guest damage convergence, grenade detonation cleanup, support-effect cleanup, canonical damage, leaderboard convergence, synchronization windows, kill/death propagation, and zero unexpected captured page errors;
 - visual inspection of the captured Atomic Acres, Rustworks, Skyline Terminal, and Shooting Range evidence found no obvious seam, floating/intersection, doorway, clipping, or HUD-overlap defect in the exercised views.
 
 The contribution preflight is intentionally rerun only after the candidate is committed because it requires a clean tree and commit-bound receipt.

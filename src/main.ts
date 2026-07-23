@@ -4369,10 +4369,16 @@ function releaseBotGrenadeOwner(entity: GrenadeEntity): void {
   if (owner) owner.grenadeActive = false;
 }
 
-function throwBotGrenade(bot: BotPlayer, now: number, fuseMs = 2_300, target = player.position): boolean {
+function throwBotGrenade(
+  bot: BotPlayer,
+  now: number,
+  fuseMs = 2_300,
+  target = player.position,
+  targetStance: Stance = player.stance,
+): boolean {
   if (!bot.alive || bot.grenadeActive || activeBotGrenadeCount() > 0) return false;
   const origin = bot.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-  const targetGroundY = Math.max(0.18, target.y - stanceEyeHeight(player.stance) + 0.18);
+  const targetGroundY = Math.max(0.18, target.y - stanceEyeHeight(targetStance) + 0.18);
   const targetGround = new THREE.Vector3(target.x, targetGroundY, target.z);
   const horizontalDistance = Math.hypot(targetGround.x - origin.x, targetGround.z - origin.z);
   const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
@@ -4400,15 +4406,19 @@ function throwBotGrenade(bot: BotPlayer, now: number, fuseMs = 2_300, target = p
   return true;
 }
 
-function selectBotTacticalWaypoint(bot: BotPlayer): number {
-  const target = { x: player.position.x, y: player.position.y, z: player.position.z };
+function selectBotTacticalWaypoint(
+  bot: BotPlayer,
+  targetPosition = player.position,
+  targetAlive = player.alive,
+): number {
+  const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
   return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
     const eye = { x: point.x, y: 1.42, z: point.z };
     return {
       index,
       distanceFromBot: point.distanceTo(bot.position),
-      distanceFromPlayer: point.distanceTo(player.position),
-      seesPlayer: player.alive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
+      distanceFromPlayer: point.distanceTo(targetPosition),
+      seesPlayer: targetAlive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
     };
   }), bot.waypoint, bot.deaths + bot.kills);
 }
@@ -4514,18 +4524,18 @@ function houseContainsXZ(house: ArenaMap['houses'][number], point: THREE.Vector3
     && Math.abs(point.z - house.origin.z) <= house.dimensions.depth / 2 + margin;
 }
 
-function botVerticalRouteTarget(bot: BotPlayer): THREE.Vector3 | null {
+function botVerticalRouteTarget(bot: BotPlayer, targetPosition = player.position): THREE.Vector3 | null {
   const authored = authoredVerticalRouteTarget(
     arena.root.userData.verticalNavigation as ArenaVerticalNavigation | undefined,
     bot.position,
-    player.position,
+    targetPosition,
   );
   if (authored) return new THREE.Vector3(authored.x, authored.y, authored.z);
-  const playerUpper = player.position.y > 3;
+  const playerUpper = targetPosition.y > 3;
   const botOnGround = bot.position.y <= 0.1;
   const botOnUpper = bot.position.y >= 3.2;
   if (playerUpper && botOnUpper || !playerUpper && botOnGround) return null;
-  const house = arena.houses.find((candidate) => houseContainsXZ(candidate, playerUpper ? player.position : bot.position, 2));
+  const house = arena.houses.find((candidate) => houseContainsXZ(candidate, playerUpper ? targetPosition : bot.position, 2));
   if (!house) return null;
   const foot = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-foot');
   const top = house.anchors.find((anchor) => anchor.id === 'indoor-ramp-top');
@@ -4587,11 +4597,16 @@ function nearestBotCombatTarget(bot: BotPlayer): BotCombatTarget | null {
   }
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0 || !areCombatantsHostile(bot.id, bot.team, remote.snapshot.id, remote.snapshot.team)) continue;
+    const stance = remote.snapshot.stance ?? 'stand';
     candidates.push({
       id: remote.snapshot.id,
       team: remote.snapshot.team,
-      position: new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z),
-      stance: remote.snapshot.stance ?? 'stand',
+      position: new THREE.Vector3(
+        remote.snapshot.x,
+        remote.snapshot.y + stanceEyeHeight(stance),
+        remote.snapshot.z,
+      ),
+      stance,
       kind: 'remote',
     });
   }
@@ -4667,7 +4682,12 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
   if (message.target === player.id) {
     const canonicalDamage = Math.max(0, player.hp - message.healthAfter);
-    if (canonicalDamage > 0) applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon });
+    if (canonicalDamage > 0) {
+      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon });
+    }
+    // Hosted matches use the host's remote-health ledger as the canonical value.
+    // Reconcile upward as well as downward so prior client-side drift cannot persist.
+    if (player.alive) player.hp = message.healthAfter;
   } else {
     const remote = remotes.get(message.target);
     if (remote) reactOperator(remote.root, 'body');
@@ -4708,16 +4728,18 @@ function updateBots(dt: number, now: number): void {
       continue;
     }
 
-    const toPlayer = player.position.clone().setY(0).sub(bot.position.clone().setY(0));
+    const combatTarget = nearestBotCombatTarget(bot);
+    const targetPosition = combatTarget?.position ?? player.position;
+    const toPlayer = targetPosition.clone().setY(0).sub(bot.position.clone().setY(0));
     const distance = toPlayer.length();
     const sightInterval = 120 + botIndex * 19;
     if (now - bot.lastSightAt >= sightInterval) {
       bot.lastSightAt = now;
       const previousSight = bot.hasLineOfSight;
-      bot.hasLineOfSight = player.alive && botHasLineOfSight(bot);
+      bot.hasLineOfSight = combatTarget !== null && botHasLineOfSight(bot, targetPosition);
       if (bot.hasLineOfSight && !previousSight) bot.sightStartedAt = now;
       if (!bot.hasLineOfSight) {
-        if (previousSight) bot.waypoint = selectBotTacticalWaypoint(bot);
+        if (previousSight) bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
         bot.sightStartedAt = 0;
         bot.burstShots = 0;
       }
@@ -4735,7 +4757,7 @@ function updateBots(dt: number, now: number): void {
     if (waypointReached) {
       bot.waypoint = lineOfSight
         ? (bot.waypoint + 1 + botIndex) % arena.patrolPoints.length
-        : selectBotTacticalWaypoint(bot);
+        : selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
     }
     const intent = chooseBotIntent({
       alive: bot.alive,
@@ -4751,11 +4773,13 @@ function updateBots(dt: number, now: number): void {
       burstShotsRemaining: bot.burstShots,
       fireIntervalMs: botWeaponFireInterval(bot.weapon, bot.burstShots > 0),
     });
-    if (intent.changeWaypoint && !waypointReached) bot.waypoint = selectBotTacticalWaypoint(bot);
+    if (intent.changeWaypoint && !waypointReached) {
+      bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
+    }
     patrolTarget = arena.patrolPoints[bot.waypoint % arena.patrolPoints.length];
     toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
-    const verticalRouteTarget = botVerticalRouteTarget(bot);
+    const verticalRouteTarget = botVerticalRouteTarget(bot, targetPosition);
     const pursuit = verticalRouteTarget
       ? verticalRouteTarget.clone().sub(bot.position).setY(0)
       : lineOfSight ? toPlayer : toPatrol;
@@ -4778,7 +4802,7 @@ function updateBots(dt: number, now: number): void {
       if (detourStalled) {
         if (bot.blockedSince === 0) bot.blockedSince = now;
         else if (now - bot.blockedSince >= 400) {
-          bot.waypoint = selectBotTacticalWaypoint(bot);
+          bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
           bot.blockedSince = 0;
         }
       } else {
@@ -4790,7 +4814,7 @@ function updateBots(dt: number, now: number): void {
     const resolvedPosition = new THREE.Vector3(resolved.x, bot.position.y, resolved.z);
     bot.position.set(resolved.x, botElevationAt(resolvedPosition, bot.position.y), resolved.z);
     bot.root.position.copy(bot.position);
-    const lookTarget = lineOfSight ? player.position : verticalRouteTarget ?? patrolTarget;
+    const lookTarget = lineOfSight ? targetPosition : verticalRouteTarget ?? patrolTarget;
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
 
@@ -4804,28 +4828,28 @@ function updateBots(dt: number, now: number): void {
       botGrenadeActive: bot.grenadeActive,
       activeBotGrenades: activeBotGrenadeCount(),
       random: gameplayRandom(),
-    }) && throwBotGrenade(bot, now);
+    }) && combatTarget !== null && throwBotGrenade(bot, now, 2_300, targetPosition, combatTarget.stance);
 
-    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && player.alive) {
+    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && combatTarget !== null) {
       if (bot.burstShots <= 0) bot.burstShots = botWeaponBurstSize(bot.weapon, botIndex);
       bot.burstShots -= 1;
       bot.lastShotAt = now;
       fireOperator(bot.root);
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
-      const direction = player.position.clone().sub(origin).normalize();
+      const direction = targetPosition.clone().sub(origin).normalize();
       const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
       direction.x += (gameplayRandom() - 0.5) * jitter;
       direction.y += (gameplayRandom() - 0.5) * jitter;
       direction.z += (gameplayRandom() - 0.5) * jitter;
       direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
-      const targetRadius = player.stance === 'prone' ? 0.38 : player.stance === 'crouch' ? 0.48 : 0.55;
+      const targetRadius = combatTarget.stance === 'prone' ? 0.38 : combatTarget.stance === 'crouch' ? 0.48 : 0.55;
       const botWeapon = WEAPONS[bot.weapon];
       const resolution = resolveBallisticHitscanAgainstTarget(
         origin,
         direction,
         shotLength,
-        player.position,
+        targetPosition,
         targetRadius,
         botWeapon.penetration,
         activeBallisticSurfaces(),
@@ -4848,7 +4872,7 @@ function updateBots(dt: number, now: number): void {
           audio.impact(surface, point.distanceTo(player.position));
         }
       }
-      if (!resolution.hitTarget && resolution.trace.impacts.length === 0) {
+      if (combatTarget.kind === 'local' && !resolution.hitTarget && resolution.trace.impacts.length === 0) {
         audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
       audio.shot(bot.weapon, true);
@@ -4857,10 +4881,14 @@ function updateBots(dt: number, now: number): void {
           computeDamage(botWeapon, distance, 'body'),
           resolution.damageMultiplier,
         ));
-        applyDamage(damage, bot.id, 1, false, { kind: 'gun', weapon: bot.weapon });
-        if (!player.alive) {
-          bot.kills += 1;
-          checkMatchEnd();
+        if (combatTarget.kind === 'remote') {
+          applyHostedBotDamageToRemote(bot, combatTarget, damage, origin, direction, now);
+        } else {
+          applyDamage(damage, bot.id, 1, false, { kind: 'gun', weapon: bot.weapon });
+          if (!player.alive) {
+            bot.kills += 1;
+            checkMatchEnd();
+          }
         }
       }
     }
@@ -7688,6 +7716,7 @@ const debugWindow = window as Window & {
     ) => BallisticTrace;
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
+    stageHostedBotAgainstRemote: () => { botId: string; targetId: string } | null;
     setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: PrimaryWeaponId) => void;
     clearBots: () => void;
     placeBotAhead: (distance?: number) => void;
@@ -8361,6 +8390,56 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
+  stageHostedBotAgainstRemote: () => {
+    if (network.role !== 'host') return null;
+    const remote = [...remotes.values()].find((candidate) => candidate.snapshot.hp > 0);
+    if (!remote) return null;
+    const bot = [...bots.values()].find((candidate) => candidate.id.startsWith('host-bot-'));
+    if (!bot) return null;
+    // This debug-only stage isolates the bot→guest authority adapter even when
+    // the surrounding QA lobby is TDM and its default hosted bots share the guest team.
+    if (!areCombatantsHostile(bot.id, bot.team, remote.snapshot.id, remote.snapshot.team)) {
+      bot.team = remote.snapshot.team === 0 ? 1 : 0;
+    }
+    const remoteStance = remote.snapshot.stance ?? 'stand';
+    const target = remote.target.clone();
+    target.y += stanceEyeHeight(remoteStance);
+    let staged: THREE.Vector3 | null = null;
+    for (const radius of [3, 5, 7, 9, 12]) {
+      for (let index = 0; index < 16; index += 1) {
+        const angle = index * Math.PI / 8;
+        const candidate = new THREE.Vector3(
+          target.x + Math.cos(angle) * radius,
+          0,
+          target.z + Math.sin(angle) * radius,
+        );
+        const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
+        if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
+        bot.position.copy(candidate);
+        if (botHasLineOfSight(bot, target)) {
+          staged = candidate;
+          break;
+        }
+      }
+      if (staged) break;
+    }
+    if (!staged) return null;
+    const now = performance.now();
+    bot.position.copy(staged);
+    bot.root.position.copy(staged);
+    bot.root.rotation.y = operatorYawToward(bot.position, target);
+    bot.root.updateMatrixWorld(true);
+    bot.lastSightAt = 0;
+    bot.hasLineOfSight = false;
+    bot.sightStartedAt = now - BOT_REACTION_DELAY;
+    bot.lastShotAt = 0;
+    bot.burstShots = 0;
+    bot.nextDecisionAt = 0;
+    bot.nextGrenadeAt = now + 60_000;
+    bot.invulnerableUntil = 0;
+    botsFrozen = false;
+    return { botId: bot.id, targetId: remote.snapshot.id };
+  },
   setBotPresentation: (stance, speed = 0, weapon) => {
     debugBotStanceOverride = stance;
     debugBotSpeedOverride = Math.max(0, Number.isFinite(speed) ? speed : 0);

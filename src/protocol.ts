@@ -20,6 +20,7 @@ export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
 export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol']);
+export const MAX_MATCH_SCORE_ENTRIES = 10;
 
 export type PlayerSnapshot = {
   id: string;
@@ -377,7 +378,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.nonce);
     case 'match-score':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
-        && Array.isArray(msg.scores) && msg.scores.length <= 6 && msg.scores.every(isPlayerScore)
+        && Array.isArray(msg.scores) && msg.scores.length <= MAX_MATCH_SCORE_ENTRIES && msg.scores.every(isPlayerScore)
         && new Set(msg.scores.map((score) => score.id)).size === msg.scores.length
         && Number.isFinite(msg.nonce);
     default:
