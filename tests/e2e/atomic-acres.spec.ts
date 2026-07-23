@@ -667,7 +667,7 @@ test.describe('boot and authored presentation', () => {
         godRayStrength: 0.05, godRayLobes: 2,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 34, materialCount: 28, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_444,
+        status: 'ready', meshCount: 34, materialCount: 28, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_812,
         semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
