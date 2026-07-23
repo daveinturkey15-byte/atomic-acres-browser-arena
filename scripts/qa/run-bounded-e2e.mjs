@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const groups = [
+  { name: 'release-shell', args: ['tests/e2e/release-channel-chooser.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass25a-baseline', timeoutMs: 1_080_000, args: ['tests/e2e/pass25a-baseline.spec.ts', '--project=chromium', '--workers=1', '--grep-invert', 'neutralizes input on focus loss'] },
   { name: 'pointer-lock-headed', xvfb: true, args: ['tests/e2e/pass25a-baseline.spec.ts', '--project=chromium', '--workers=1', '--headed', '--grep', 'neutralizes input on focus loss'] },
   { name: 'pass25a-capability-chromium', args: ['tests/e2e/pass25a-capability.spec.ts', '--project=chromium', '--workers=1'] },

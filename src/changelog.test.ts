@@ -5,6 +5,8 @@ import {
   formatChangelogTimestampDetail,
   lastUpdatedButtonLabel,
   latestChangelogEntry,
+  PENDING_PRODUCTION_RELEASE,
+  resolveProductionReleasedAt,
 } from './changelog';
 
 describe('changelog', () => {
@@ -37,19 +39,32 @@ describe('changelog', () => {
     expect(pass49?.releasedAt).toBe('2026-07-21T17:55:17+01:00');
   });
 
+  it('resolves a pending top-entry timestamp once during the protected production build', () => {
+    const releasedAt = '2026-07-23T13:30:00Z';
+    expect(resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE, releasedAt)).toBe(releasedAt);
+    expect(resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE, '')).toBe(PENDING_PRODUCTION_RELEASE);
+    expect(resolveProductionReleasedAt('2026-07-22T21:25:35+01:00', releasedAt))
+      .toBe('2026-07-22T21:25:35+01:00');
+    expect(() => resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE, 'not-a-time'))
+      .toThrow('Invalid VITE_RELEASED_AT');
+  });
+
   it('requires player-facing areas and highlights on every entry', () => {
-    for (const entry of CHANGELOG) {
+    for (const [index, entry] of CHANGELOG.entries()) {
       expect(entry.pass.length).toBeGreaterThan(0);
       expect(entry.title.length).toBeGreaterThan(0);
       expect(entry.summary.length).toBeGreaterThan(0);
       expect(entry.areas.length).toBeGreaterThan(0);
       expect(entry.highlights.length).toBeGreaterThan(0);
+      if (index === 0 && entry.releasedAt === PENDING_PRODUCTION_RELEASE) continue;
       expect(entry.releasedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/);
     }
   });
 
   it('keeps entries in reverse public-release order', () => {
-    const timestamps = CHANGELOG.map((entry) => Date.parse(entry.releasedAt));
+    const timestamps = CHANGELOG
+      .filter((entry) => entry.releasedAt !== PENDING_PRODUCTION_RELEASE)
+      .map((entry) => Date.parse(entry.releasedAt));
     expect(timestamps.every(Number.isFinite)).toBe(true);
     expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
   });

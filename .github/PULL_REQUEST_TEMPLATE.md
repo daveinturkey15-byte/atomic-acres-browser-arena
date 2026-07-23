@@ -12,6 +12,8 @@
 - Branch: `contrib/<machine>/<harness>/<slug>`
 - Related task/issue: `required or none`
 - Release-note impact: `player-facing / internal-only`
+- Change impact: `process-only / release-shell / runtime`
+- Planned browser gate: `none / release-shell / full`
 
 ## Changed paths
 
@@ -27,6 +29,7 @@
 - [ ] `npm test`
 - [ ] `npm run build`
 - [ ] Browser/visual evidence supplied when user-visible rendering changed
+- [ ] Any timeout, threshold, baseline, or assertion change is separately justified with evidence
 - [ ] Worktree is clean and the PR contains current `origin/main`
 
 ## Claim states

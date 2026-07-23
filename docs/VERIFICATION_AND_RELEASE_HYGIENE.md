@@ -18,6 +18,14 @@ Contribution ownership, branch identity, PR receipts, integration serialization,
 
 `npm run verify` composes the full local gate. GitHub Actions runs static and unit gates on Windows and Linux, then the representative bounded browser groups on Windows.
 
+CI selects browser work from the exact changed paths with `scripts/release/change-impact.mjs`:
+
+- `process-only`: retain both cross-platform static/unit jobs; skip Chromium installation and execution.
+- `release-shell`: run only the chooser/release-shell browser smoke on Windows and Linux.
+- `runtime`: run the full representative browser groups and any focused evidence required by the changed surface.
+
+Unknown or unresolvable diffs select `runtime`. This classification changes cost, not product standards: the integrator may always escalate a class, and may not downgrade one by relabelling the PR.
+
 ## Portability contract
 
 - Tracked text uses LF through `.gitattributes`; generated gameplay baselines and manifest verification normalize only CRLF checkout differences.

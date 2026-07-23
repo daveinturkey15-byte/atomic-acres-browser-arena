@@ -4,16 +4,37 @@ export type ChangelogEntry = Readonly<{
   id: string;
   pass: string;
   title: string;
-  releasedAt: string; // First successful public production promotion, with UTC offset.
+  releasedAt: string; // Protected production-build timestamp, with UTC offset, or the pending sentinel.
   areas: readonly string[];
   summary: string;
   highlights: readonly string[];
 }>;
 
+export const PENDING_PRODUCTION_RELEASE = 'PENDING_PRODUCTION';
+
+/**
+ * A new top entry may use PENDING_PRODUCTION in source. The protected release
+ * workflow injects one immutable build timestamp into the production bundle,
+ * avoiding a second metadata PR and a second deployment of identical gameplay.
+ * The next substantive pass freezes the previous receipt timestamp in source.
+ */
+export function resolveProductionReleasedAt(
+  sourceReleasedAt: string,
+  injectedReleasedAt = import.meta.env.VITE_RELEASED_AT?.trim(),
+): string {
+  if (sourceReleasedAt !== PENDING_PRODUCTION_RELEASE) return sourceReleasedAt;
+  if (!injectedReleasedAt) return sourceReleasedAt;
+  if (Number.isNaN(Date.parse(injectedReleasedAt))) {
+    throw new Error(`Invalid VITE_RELEASED_AT: ${injectedReleasedAt}`);
+  }
+  return injectedReleasedAt;
+}
+
 /**
  * Newest first. Keep this player-facing rather than turning it into an internal
- * commit log. `releasedAt` is the first successful public production promotion,
- * not the earlier implementation or review-build time.
+ * commit log. Historical `releasedAt` values come from protected production
+ * receipts, not implementation or review-build time. A new top entry can use
+ * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({

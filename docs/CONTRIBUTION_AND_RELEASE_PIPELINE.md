@@ -48,6 +48,18 @@ The machine name identifies where the bytes originated; the harness identifies w
 6. Commit intentionally, rerun the preflight, push only the contribution branch, and open a PR with the repository template.
 7. Stop at handoff. The contributor does not merge or deploy.
 
+Before implementation, declare one mechanically conservative impact class:
+
+| Class | Typical paths | Required browser work |
+|---|---|---|
+| `process-only` | documentation, agent contract, PR template, release scripts/workflows | no Playwright; both static/unit jobs still run |
+| `release-shell` | chooser, changelog, root HTML, favicon/manifest, release-channel config | focused `release-shell` Chromium smoke on Windows and Linux |
+| `runtime` | gameplay, networking, rendering, assets, dependencies, unknown paths | full representative Windows/Linux browser groups plus affected focused evidence |
+
+`scripts/release/change-impact.mjs` is the executable classifier. It fails safe: an empty, unknown, or mixed runtime diff selects `runtime`. The two required browser job names always complete; for `process-only` changes they record the skip decision and succeed without installing Chromium.
+
+Do not change a test contract merely because CI failed. A timeout, performance budget, screenshot baseline/tolerance, or assertion change must identify the observed failure, explain why the old contract is wrong, retain the original product invariant elsewhere, and receive explicit integrator review. If that work is not required for the user outcome, move it to a separate maintenance PR.
+
 The preflight writes a scrubbed JSON receipt under ignored `artifacts/pipeline/`. Attach its contents or the equivalent fields to the PR; never attach credentials, room codes, private paths, or chat logs.
 
 ## Integrator flow
@@ -70,7 +82,11 @@ One integrator owns the queue at a time.
 Only the `release-production` GitHub Actions workflow may publish production.
 
 1. Wait for the merge commit's four required checks to succeed.
-2. Confirm the player-facing changelog is truthful. Use a metadata-only follow-up PR if the first successful production timestamp is not yet known; do not invent it.
+2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
+
+   ```ts
+   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)
+   ```
 3. Dispatch `release-production` with the exact full `main` SHA and release pass.
 4. The workflow refuses a non-tip SHA, requires successful checks, builds from a clean checkout, serializes Pages publication, preserves the historical review tree, and records source/Pages identities.
 5. Wait for the workflow receipt and Pages build to succeed.
@@ -81,6 +97,16 @@ Only the `release-production` GitHub Actions workflow may publish production.
    - affected gameplay path;
    - zero warning/error browser logs.
 7. Only then mark the release live and close the central tracker.
+
+The first successful exact-SHA receipt plus cache-busted live smoke is the terminal condition. Send the completion report immediately. A non-blocking favicon, copy, baseline, documentation, or CI-hygiene defect becomes a separate queued task and must not keep the release turn open. Only a load failure, security/data-loss risk, broken affected gameplay path, incorrect release identity, or unexpected runtime error that invalidates the live claim reopens the release as a hotfix.
+
+### Agent communication and waiting
+
+- Before an external wait longer than two minutes, tell Dave exactly which run/SHA is pending and what success means.
+- Use one-shot `gh run view`/Pages status reads. Never launch duplicate or unbounded `gh run watch` processes from a conversational turn.
+- Report only material transitions: queued, running, failed with the failing gate, or complete with receipt identities.
+- A wait timeout means "re-read authoritative state," not "rerun, rewrite a test, or republish."
+- After live proof, stop the release task. Do not start a cleanup PR without a new bounded task.
 
 `npm run deploy` remains available for recovery archaeology but is prohibited for normal contribution and release tasks.
 

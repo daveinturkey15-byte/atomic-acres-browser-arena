@@ -13,9 +13,11 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 
 - Fetch `origin/main`, create a clean isolated worktree, and use `contrib/<machine>/<harness>/<slug>` for new work.
 - One worktree has one owner and one bounded outcome. Never let two agents write the same worktree.
+- Declare the change impact before implementation: `process-only`, `release-shell`, or `runtime`. Unknown paths are `runtime`.
 - Run `npm run pipeline:preflight -- --machine <machine> --harness <harness>` before implementation and again before handoff.
 - Do not clean, reset, stash, move, or delete another task's worktree. Reconcile it read-only and preserve uncertain state.
 - Record observations, inferences, assumptions, unknowns, and falsifiers separately when they affect release decisions.
+- Do not weaken a timeout, threshold, screenshot tolerance, or assertion inside a feature fix merely to obtain green CI. A contract change needs explicit evidence and review.
 
 ## Integration and production
 
@@ -24,6 +26,8 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - A separate integrator reviews the actual diff and checks. The PR must contain current `origin/main` before merge.
 - Production promotion is serialized by `.github/workflows/release-production.yml`. Supply the exact green `main` SHA and release pass; never deploy from a feature branch or local dirty tree.
 - Do not describe a change as live until the workflow receipt names the source SHA and Pages SHA and the canonical HTTPS site is checked.
+- The first successful receipt plus cache-busted live smoke is terminal for that release task. Report success immediately; route non-blocking hygiene to a later PR instead of silently extending the release.
+- Do not run synchronous or duplicate `gh run watch` processes from an agent turn. Use one-shot status reads, report material state changes, and keep waits bounded.
 
 ## Durable gotcha
 
