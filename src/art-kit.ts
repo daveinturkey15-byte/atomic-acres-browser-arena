@@ -26,6 +26,7 @@ const textureBatchColors: Record<string, number> = {
   'weapon-scattergun.png': 0x393230,
   'weapon-sniper.png': 0x444f3e,
   'weapon-pistol.png': 0x2f3030,
+  'weapon-magnum.png': 0x51422a,
   'weapon-machine-pistol.png': 0x363330,
   'wood-deck.png': 0x78513b,
   'roof-shingles.png': 0x595e63,
@@ -544,12 +545,12 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   root.name = `${id}-original-weapon`;
   root.userData.weaponModelId = `${id}-authored-v6`;
   root.userData.weaponFinishId = weaponFinishProfile(id).id;
-  const pistolFamily = id === 'pistol' || id === 'machine-pistol';
+  const pistolFamily = id === 'pistol' || id === 'machine-pistol' || id === 'magnum';
   const metal = MAT.gunmetal(id);
   const dark = MAT.dark();
   const rubber = MAT.rubber();
   const accent = new THREE.MeshStandardMaterial({
-    color: id === 'carbine' ? 0xd6a944 : id === 'smg' ? 0x48b9b7 : id === 'machine-pistol' ? 0xff8f3d : id === 'pistol' ? 0xe0bd68 : 0xb75d45,
+    color: id === 'carbine' ? 0xd6a944 : id === 'smg' ? 0x48b9b7 : id === 'machine-pistol' ? 0xff8f3d : id === 'magnum' ? 0xffc85a : id === 'pistol' ? 0xe0bd68 : 0xb75d45,
     roughness: 0.45,
     metalness: 0.35,
   });
@@ -741,6 +742,12 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     part(root, roundedBox('pistol-trigger-guard', [0.19, 0.04, 0.2], dark, 0.012, 2), [0, -0.13, -0.1]);
     part(root, roundedBox('pistol-trigger', [0.028, 0.095, 0.028], accent, 0.007, 1), [0, -0.1, -0.08], [0.24, 0, 0]);
     addBarrel(0.43, -0.35, 0.028);
+    if (id === 'magnum') {
+      part(root, roundedBox('magnum-heavy-barrel', [0.22, 0.19, 0.46], metal, 0.04, 4), [0, 0.075, -0.5]);
+      const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.2, 12), accent);
+      cylinder.name = 'magnum-cylinder';
+      part(root, cylinder, [0, 0.005, -0.24], [0, 0, Math.PI / 2]);
+    }
     if (id === 'machine-pistol') {
       const compensator = roundedBox('machine-pistol-compensator', [0.225, 0.185, 0.2], metal, 0.035, 4);
       part(root, compensator, [0, 0.075, -0.53]);
@@ -762,7 +769,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     part(rearSight, roundedBox('pistol-rear-sight-left', [0.045, 0.06, 0.04], accent, 0.008, 2), [-0.062, 0, 0]);
     part(rearSight, roundedBox('pistol-rear-sight-right', [0.045, 0.06, 0.04], accent, 0.008, 2), [0.062, 0, 0]);
     part(root, roundedBox('pistol-front-sight', [0.032, 0.07, 0.032], accent, 0.007, 2), [0, 0.205, -0.39]);
-    addSocket('muzzle-socket', [0, 0.105, id === 'machine-pistol' ? -0.66 : -0.58]);
+    addSocket('muzzle-socket', [0, 0.105, id === 'machine-pistol' ? -0.66 : id === 'magnum' ? -0.76 : -0.58]);
     addSocket('eject-socket', [0.125, 0.13, -0.08]);
     addSocket('grip-socket-r', [0.03, -0.2, 0.08]);
     addSocket('support-socket-l', [-0.09, -0.1, -0.12]);
@@ -988,6 +995,7 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   scattergun: [-0.03, -0.025, 0.29],
   sniper: [-0.035, -0.095, -0.21],
   pistol: [-0.06, -0.15, 0.03],
+  magnum: [-0.06, -0.15, 0.03],
   'machine-pistol': [-0.06, -0.15, 0.03],
 };
 

@@ -3,7 +3,7 @@ import { damageNumberPresentation, roundStatSummary, THIRD_PERSON_WEAPON_SCALE }
 
 describe('player feedback presentation', () => {
   it('keeps every third-person weapon within the reduced silhouette envelope', () => {
-    expect(Object.values(THIRD_PERSON_WEAPON_SCALE)).toHaveLength(7);
+    expect(Object.values(THIRD_PERSON_WEAPON_SCALE)).toHaveLength(8);
     expect(Math.max(...Object.values(THIRD_PERSON_WEAPON_SCALE))).toBeLessThanOrEqual(0.54);
     expect(Math.min(...Object.values(THIRD_PERSON_WEAPON_SCALE))).toBeGreaterThanOrEqual(0.4);
   });

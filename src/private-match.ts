@@ -1,6 +1,7 @@
 import type { Team } from './protocol';
 import type { ArenaId } from './map-selection';
 import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
+import { isDhv, type Dhv } from './handicap';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -24,6 +25,7 @@ export type LobbyMember = Readonly<{
   ready: boolean;
   connected: boolean;
   pingMs: number | null;
+  dhv: Dhv;
 }>;
 
 export type PlayerScore = Readonly<{
@@ -91,6 +93,7 @@ export function isLobbyMember(value: unknown): value is LobbyMember {
     && (member.team === 0 || member.team === 1)
     && typeof member.ready === 'boolean'
     && typeof member.connected === 'boolean'
+    && isDhv(member.dhv)
     && (member.pingMs === null || Number.isFinite(member.pingMs) && Number(member.pingMs) >= 0 && Number(member.pingMs) <= MAX_CLOCK_RTT_MS);
 }
 

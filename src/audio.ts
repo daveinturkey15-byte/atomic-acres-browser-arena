@@ -198,6 +198,8 @@ export class ArenaAudio {
         ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
         : weapon === 'machine-pistol'
           ? { body: 168, bodyEnd: 72, duration: 0.078, crack: 2280, noise: 0.14, lowpass: 3900, tail: 720, tailDuration: 0.1 }
+          : weapon === 'magnum'
+            ? { body: 64, bodyEnd: 22, duration: 0.24, crack: 2840, noise: 0.32, lowpass: 2500, tail: 340, tailDuration: 0.38 }
           : weapon === 'pistol'
             ? { body: 182, bodyEnd: 76, duration: 0.105, crack: 2380, noise: 0.18, lowpass: 4100, tail: 690, tailDuration: 0.14 }
             : { body: 116, bodyEnd: 46, duration: 0.13, crack: 1750, noise: 0.23, lowpass: 2900, tail: 560, tailDuration: 0.19 };

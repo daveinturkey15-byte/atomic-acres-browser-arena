@@ -4,6 +4,7 @@ import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { isHostedBotSnapshot, type HostedBotSnapshot } from './hosted-bots';
 import type { KillCause } from './kill-provenance';
 import type { CombatTiming } from './network-fairness';
+import { isDhv, type Dhv } from './handicap';
 import {
   isLobbySnapshot,
   isPlayerScore,
@@ -15,11 +16,11 @@ import {
 
 export type Team = 0 | 1;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
-export type SidearmWeaponId = 'pistol' | 'machine-pistol';
+export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
-export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol']);
+export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol', 'magnum']);
 export const MAX_MATCH_SCORE_ENTRIES = 10;
 
 export type PlayerSnapshot = {
@@ -161,6 +162,7 @@ export type LobbyJoinMessage = {
 };
 export type LobbyReadyMessage = { type: 'lobby-ready'; by: string; ready: boolean; nonce: number };
 export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; nonce: number };
+export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dhv; nonce: number };
 export type LobbyConfigMessage = { type: 'lobby-config'; by: string; config: PrivateMatchConfig; nonce: number };
 export type LobbyBalanceMessage = { type: 'lobby-balance'; by: string; nonce: number };
 export type LobbyStateMessage = { type: 'lobby-state'; by: string; snapshot: LobbySnapshot; nonce: number };
@@ -173,7 +175,7 @@ export type MatchScoreMessage = { type: 'match-score'; by: string; scores: Playe
 export type RangeScoreClaimMessage = { type: 'range-score-claim'; by: string; score: number; hits: number; shots: number; nonce: number };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
+  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -192,7 +194,7 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
     && weapons.has(p.weapon as WeaponId)
-    && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol'));
+    && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol') || p.weapon === 'magnum');
 }
 
 function isOptionalCombatTiming(value: unknown): boolean {
@@ -349,6 +351,9 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-team':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && (msg.team === 0 || msg.team === 1) && Number.isFinite(msg.nonce);
+    case 'lobby-handicap':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isDhv(msg.dhv) && Number.isFinite(msg.nonce);
     case 'lobby-config':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isPrivateMatchConfig(msg.config) && Number.isFinite(msg.nonce);
@@ -418,6 +423,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'overdrive-state':
     case 'lobby-ready':
     case 'lobby-team':
+    case 'lobby-handicap':
     case 'lobby-config':
     case 'lobby-balance':
     case 'lobby-state':

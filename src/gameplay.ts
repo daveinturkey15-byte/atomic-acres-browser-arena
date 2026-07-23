@@ -155,6 +155,21 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
       minimumWallDamageMultiplier: 0.26, maxPenetratedSurfaces: 1,
     },
   },
+  magnum: {
+    id: 'magnum', name: 'DHV X Verdict Magnum', damage: 100, minimumDamage: 100,
+    falloffStart: 120, falloffEnd: 120, headMultiplier: 1, limbMultiplier: 0,
+    rpm: 180, mag: 6, reserve: 30, reload: 1.75,
+    hipSpread: 0.026, adsSpreadMultiplier: 0.3, movementSpreadMultiplier: 1.5,
+    crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.006, maximumSpread: 0.06,
+    pellets: 1, recoilPitch: 0.05, recoilYaw: 0.012, recoilRecovery: 8,
+    adsRecoilMultiplier: 0.74, crouchRecoilMultiplier: 0.84, proneRecoilMultiplier: 0.68,
+    switchSeconds: 0.34, automatic: false, color: 0xffd36a,
+    penetration: {
+      caliber: '.44 magnum', penetrationPower: 4.7, fmjMultiplier: 1.08,
+      energyFalloffStart: 30, energyFalloffEnd: 82, minimumEnergyRetention: 0.4,
+      minimumWallDamageMultiplier: 0.3, maxPenetratedSurfaces: 1,
+    },
+  },
   'machine-pistol': {
     id: 'machine-pistol', name: 'G18 AUTO', damage: 18, minimumDamage: 11,
     falloffStart: 11, falloffEnd: 34, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.8,
@@ -334,6 +349,7 @@ export function sampleWeaponPellet(
 }
 
 export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZone): number {
+  if (weapon.id === 'magnum') return zone === 'head' ? 100 : 0;
   const clampedDistance = Math.max(0, distance);
   const falloff = clampedDistance <= weapon.falloffStart
     ? 0

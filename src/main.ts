@@ -28,6 +28,7 @@ import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type 
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
+import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -265,6 +266,7 @@ import {
   LobbyBalanceMessage,
   LobbyConfigMessage,
   LobbyJoinMessage,
+  LobbyHandicapMessage,
   LobbyReadyMessage,
   LobbyStartMessage,
   LobbyStateMessage,
@@ -1092,8 +1094,8 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -1262,6 +1264,7 @@ let privateMatchActiveAtEpochMs: number | null = null;
 let hostClockOffsetMs = 0;
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
+let localDhv: Dhv = 10;
 let localResumeToken = '';
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1272,6 +1275,25 @@ const hostLobbyMembers = new Map<string, LobbyMember>();
 const hostLobbyTokens = new Map<string, string>();
 const hostDisconnectedAt = new Map<string, number>();
 const authoritativeScores = new Map<string, PlayerScore>();
+
+function memberDhv(id: string): Dhv {
+  return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
+    ?? hostLobbyMembers.get(id)?.dhv
+    ?? (id === player.id ? localDhv : 10);
+}
+
+function handicapSidearm(primary: PrimaryWeaponId, dhv = localDhv): WeaponId {
+  return dhv === 'X' ? 'magnum' : deployedWeapons(primary)[1];
+}
+
+function handicapLoadout(primary: PrimaryWeaponId, dhv = localDhv): readonly [PrimaryWeaponId, WeaponId] {
+  return [primary, handicapSidearm(primary, dhv)];
+}
+
+function handicapOutgoingDamage(attackerId: string, damage: number, weapon?: WeaponId): number {
+  const dhv = memberDhv(attackerId);
+  return applyDhvWeaponOutgoingDamage(damage, dhv, weapon === 'magnum');
+}
 let triggerHeld = false;
 let targetHits = 0;
 let rangeScore = 0;
@@ -1812,6 +1834,7 @@ function resetPrivateLobbyState(): void {
   peerTimingStates.clear();
   localLobbyPingMs = null;
   localLobbyReady = false;
+  localDhv = 10;
   localResumeToken = '';
   lobbyArenaSyncPromise = Promise.resolve();
   hostLobbyMembers.clear();
@@ -1865,6 +1888,7 @@ function initializeHostLobby(): void {
     ready: false,
     connected: true,
     pingMs: 0,
+    dhv: localDhv,
   });
   authoritativeScores.set(player.id, emptyPlayerScore(player.id));
   roomCard.hidden = false;
@@ -1924,6 +1948,7 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
       ready: false,
       connected: true,
       pingMs: null,
+      dhv: 10,
     });
     authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
   }
@@ -1956,6 +1981,15 @@ function updateHostTeam(message: LobbyTeamMessage): void {
   if (privateMatchConfig.autoBalance) {
     for (const balanced of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(balanced.id, { ...balanced, ready: false });
   }
+  broadcastHostLobby('waiting');
+}
+
+function updateHostHandicap(message: LobbyHandicapMessage): void {
+  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected) return;
+  hostLobbyMembers.set(message.by, { ...member, dhv: message.dhv, ready: false });
+  if (message.by === player.id) localDhv = message.dhv;
   broadcastHostLobby('waiting');
 }
 
@@ -2163,6 +2197,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   if (localMember) {
     player.team = localMember.team;
     localLobbyReady = localMember.ready;
+    localDhv = localMember.dhv;
     element<HTMLSelectElement>('#team').value = String(localMember.team);
   }
   if (returningToLobby) {
@@ -2186,6 +2221,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-team') {
     updateHostTeam(message);
+    return true;
+  }
+  if (message.type === 'lobby-handicap') {
+    updateHostHandicap(message);
     return true;
   }
   if (message.type === 'lobby-state') {
@@ -2319,7 +2358,10 @@ function renderPrivateLobby(): void {
     const quality = latencyQuality(ping);
     const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
     const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
-    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b><em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
+    const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
+      ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
+      : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
+    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
   }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
   const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
@@ -2680,6 +2722,7 @@ function onNetworkMessage(message: GameMessage): void {
     const claimedIncoming = message.player;
     const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
     if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
+    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') return;
     const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
     const incoming = network.role === 'host' && lobbyMember
       ? {
@@ -2922,10 +2965,10 @@ function onNetworkMessage(message: GameMessage): void {
       if (derivedDamage <= 0) { recordRemoteHitAdmission('shot-ray-miss'); return; }
       action.targets.add(message.target);
       recordRemoteHitAdmission('shot-admitted');
-      admittedDamage = resolveRemotePoweredDamage(
+      admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(
         Math.min(derivedDamage, message.damage),
         overdriveDamageMultiplier(overdriveState, message.by, now),
-      );
+      ), action.message.weapon);
     } else if (message.kind === 'melee') {
       const action = admittedRemoteMelees.get(message.by)?.get(message.actionNonce);
       if (!action || now - action.receivedAt > 1_000 || action.targets.has(message.target)) return;
@@ -2933,7 +2976,7 @@ function onNetworkMessage(message: GameMessage): void {
         || !meleeActionHitsPoint(action.message, blastTargetPosition)
         || arena.colliders.some((box) => segmentIntersectsBox(new THREE.Vector3(...action.message.origin), blastTargetPosition, box))) return;
       action.targets.add(message.target);
-      admittedDamage = resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now));
+      admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now)));
     } else {
       const source = message.explosiveSource;
       const originTuple = message.origin;
@@ -2983,10 +3026,10 @@ function onNetworkMessage(message: GameMessage): void {
         actions.set(message.actionNonce, { source, origin: validationOrigin, receivedAt: now, targets: new Set([message.target]) });
       }
       admittedRemoteExplosions.set(message.by, actions);
-      admittedDamage = resolveRemotePoweredDamage(
+      admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(
         message.damage,
         overdriveDamageMultiplier(overdriveState, message.by, now),
-      );
+      ));
     }
 
     processedNonces.add(message.nonce);
@@ -3023,10 +3066,13 @@ function sendAuthoritativeHit(
   const health = remoteHealthAuthorities.get(timedMessage.target);
   if (!remote || !health) return;
   const now = performance.now();
-  const finalDamage = resolveRemotePoweredDamage(
+  const attackerWeapon = remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon;
+  const poweredDamage = resolveRemotePoweredDamage(
     timedMessage.damage,
     overdriveDamageMultiplier(overdriveState, timedMessage.by, now),
   );
+  const outgoingHandicapped = handicapOutgoingDamage(timedMessage.by, poweredDamage, timedMessage.kind === 'shot' ? attackerWeapon : undefined);
+  const finalDamage = applyDhvIncomingDamage(outgoingHandicapped, health.hp, memberDhv(timedMessage.target));
   const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
   if (!result.applied) return;
   const appliedDamage = Math.max(0, health.hp - result.state.hp);
@@ -3116,11 +3162,13 @@ function applyDamage(
   minimumDamage = 1,
   bypassSpawnProtection = false,
   cause: KillCause = { kind: 'environment' },
+  damageAlreadyHandicapped = false,
 ): void {
   const now = performance.now();
   if (!player.alive || (!bypassSpawnProtection && now < player.invulnerableUntil)) return;
   const previousHp = player.hp;
-  player.hp = Math.max(0, player.hp - admittedPlayerDamage(damage, minimumDamage));
+  const handicappedDamage = damageAlreadyHandicapped ? damage : applyDhvIncomingDamage(damage, player.hp, localDhv);
+  player.hp = Math.max(0, player.hp - admittedPlayerDamage(handicappedDamage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
   roundDamageTaken += appliedDamage;
   recordDamageEvent({
@@ -3793,15 +3841,16 @@ function respawn(requestLock = true): void {
   if (selectedArena.id === 'gun-range') {
     rangePrimaryUnlocked = false;
     player.primaryWeapon = 'carbine';
-    player.weapon = 'pistol';
-    player.ammo.pistol = WEAPONS.pistol.mag;
-    player.reserve.pistol = WEAPONS.pistol.reserve;
+    const sidearm = handicapSidearm(player.primaryWeapon);
+    player.weapon = sidearm;
+    player.ammo[sidearm] = WEAPONS[sidearm].mag;
+    player.reserve[sidearm] = WEAPONS[sidearm].reserve;
     player.switchingUntil = 0;
-    weaponView.setWeapon('pistol', true);
+    weaponView.setWeapon(sidearm, true);
   } else {
     const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
     player.primaryWeapon = deploymentWeapon;
-    for (const weapon of deployedWeapons(deploymentWeapon)) {
+    for (const weapon of handicapLoadout(deploymentWeapon)) {
       player.ammo[weapon] = WEAPONS[weapon].mag;
       player.reserve[weapon] = WEAPONS[weapon].reserve;
     }
@@ -3929,8 +3978,8 @@ function endSpawnProtectionOnOffense(now: number): void {
 
 function switchWeapon(index: number): void {
   const id = selectedArena.id === 'gun-range'
-    ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? 'pistol' : undefined
-    : deployedWeapons(player.primaryWeapon)[index];
+    ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? handicapSidearm(player.primaryWeapon) : undefined
+    : handicapLoadout(player.primaryWeapon)[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -4122,28 +4171,31 @@ function tryFire(now: number): void {
     if (result.playerId) {
       const zone = result.hitZone ?? 'body';
       const damage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
-      const prior = hitDamage.get(result.playerId);
-      hitDamage.set(result.playerId, {
-        damage: (prior?.damage ?? 0) + damage,
-        zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone,
-        wallbang: Boolean(prior?.wallbang) || result.damageMultiplier < 0.999,
-        penetrationMultiplier: Math.min(prior?.penetrationMultiplier ?? 1, result.damageMultiplier),
-        distanceMeters: Math.max(prior?.distanceMeters ?? 0, result.distance),
-      });
+      if (damage > 0) {
+        const prior = hitDamage.get(result.playerId);
+        hitDamage.set(result.playerId, {
+          damage: (prior?.damage ?? 0) + damage,
+          zone: prior?.zone === 'head' || zone === 'head' ? 'head' : zone,
+          wallbang: Boolean(prior?.wallbang) || result.damageMultiplier < 0.999,
+          penetrationMultiplier: Math.min(prior?.penetrationMultiplier ?? 1, result.damageMultiplier),
+          distanceMeters: Math.max(prior?.distanceMeters ?? 0, result.distance),
+        });
+      }
     }
     if (result.targetId) {
       const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
       const zone = practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body';
-      hitPracticeTarget(
-        result.targetId,
-        applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier),
-        zone,
-        {
-          wallbang: result.damageMultiplier < 0.999,
-          penetrationMultiplier: result.damageMultiplier,
-          distanceMeters: result.distance,
-        },
-      );
+      const targetDamage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
+      if (targetDamage > 0) hitPracticeTarget(
+          result.targetId,
+          targetDamage,
+          zone,
+          {
+            wallbang: result.damageMultiplier < 0.999,
+            penetrationMultiplier: result.damageMultiplier,
+            distanceMeters: result.distance,
+          },
+        );
     }
   }
   const shot: ShotMessage = {
@@ -4187,12 +4239,13 @@ function tryFire(now: number): void {
         const nonce = randomNonce();
         const dealt = Math.min(100, hit.damage);
         const powered = Math.min(100, poweredDamage);
+        const targetAdjusted = Math.min(remote.snapshot.hp, applyDhvIncomingDamage(powered, remote.snapshot.hp, memberDhv(target)));
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
           actionNonce: shot.nonce, nonce,
         }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
-        showDamageNumber(powered, hit.zone);
+        showDamageNumber(targetAdjusted, hit.zone);
         audio.hit(hit.zone === 'head');
       }
     }
@@ -4883,7 +4936,8 @@ function applyHostedBotDamageToRemote(
   const health = remoteHealthAuthorities.get(target.id);
   const remote = remotes.get(target.id);
   if (!health || !remote) return;
-  const result = applyAuthoritativeRemoteDamage(health, damage, now);
+  const handicappedDamage = applyDhvIncomingDamage(damage, health.hp, memberDhv(target.id));
+  const result = applyAuthoritativeRemoteDamage(health, handicappedDamage, now);
   if (!result.applied) return;
   const damageApplied = Math.max(0, health.hp - result.state.hp);
   if (damageApplied <= 0) return;
@@ -4940,7 +4994,7 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
   if (message.target === player.id) {
     const canonicalDamage = Math.max(0, player.hp - message.healthAfter);
     if (canonicalDamage > 0) {
-      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon });
+      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon }, true);
     }
     // Hosted matches use the host's remote-health ledger as the canonical value.
     // Reconcile upward as well as downward so prior client-side drift cannot persist.
@@ -5645,7 +5699,8 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
 }
 
 function outgoingDamage(value: number, now = performance.now()): number {
-  return value * overdriveDamageMultiplier(overdriveState, player.id, now);
+  const powered = value * overdriveDamageMultiplier(overdriveState, player.id, now);
+  return handicapOutgoingDamage(player.id, powered, player.weapon);
 }
 
 function updateOverdrive(now: number): void {
@@ -7369,7 +7424,7 @@ function renderMatchNetworkStrip(): void {
     const range = selectedArena.id === 'gun-range'
       ? ` · ${score?.rangeScore ?? 0} PTS · ${rangeAccuracyPercent(score?.rangeHits ?? 0, score?.rangeShots ?? 0)}%`
       : '';
-    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} latency: ${label}${range}"><b>${escapeHtml(member.name)}</b>${range || ` ${label}`}</span>`;
+    return `<span class="latency-${quality}" title="${escapeHtml(member.name)} · DHV ${member.dhv} · latency ${label}${range}"><b>${escapeHtml(member.name)}</b>${range || ` · DHV ${member.dhv} · ${label}`}</span>`;
   }).join('');
 }
 
@@ -7527,7 +7582,7 @@ function pollGamepad(dt: number): void {
     if (pressed(1)) requestStance('toggle-crouch');
     if (pressed(13)) requestStance('toggle-prone');
     if (pressed(2)) reload();
-    if (pressed(3)) switchWeapon(player.weapon === 'pistol' ? 0 : 1);
+    if (pressed(3)) switchWeapon(player.weapon === player.primaryWeapon ? 1 : 0);
     if (pressed(4)) throwGrenade();
     if (pressed(5)) melee();
     if (pressed(14)) selectGamepadSupport(-1);
@@ -7904,8 +7959,8 @@ function resetForMode(): void {
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
 }
 
 function returnToMainMenu(): void {
@@ -8010,6 +8065,16 @@ element<HTMLButtonElement>('#lobby-ready').addEventListener('click', () => {
   const ready = !localLobbyReady;
   if (network.role === 'host') updateHostReady({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
   else if (network.role === 'client') network.send({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
+});
+element<HTMLElement>('#lobby-roster').addEventListener('change', (event) => {
+  const select = event.target instanceof HTMLSelectElement && event.target.matches('[data-lobby-dhv]') ? event.target : null;
+  if (!select || !privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
+  const parsed: unknown = select.value === 'X' ? 'X' : Number(select.value);
+  if (!isDhv(parsed)) return;
+  localDhv = parsed;
+  const message: LobbyHandicapMessage = { type: 'lobby-handicap', by: player.id, dhv: parsed, nonce: randomNonce() };
+  if (network.role === 'host') updateHostHandicap(message);
+  else if (network.role === 'client') network.send(message);
 });
 element<HTMLButtonElement>('#lobby-start').addEventListener('click', hostStartPrivateMatch);
 element<HTMLButtonElement>('#lobby-leave').addEventListener('click', returnToMainMenu);
@@ -8404,8 +8469,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       weapon: player.weapon,
       primaryWeapon: player.primaryWeapon,
       equippedWeapons: selectedArena.id === 'gun-range'
-        ? [rangePrimaryUnlocked ? player.primaryWeapon : null, 'pistol']
-        : deployedWeapons(player.primaryWeapon),
+        ? [rangePrimaryUnlocked ? player.primaryWeapon : null, handicapSidearm(player.primaryWeapon)]
+        : handicapLoadout(player.primaryWeapon),
+      dhv: localDhv,
       ammo: player.ammo[player.weapon],
       reserve: player.reserve[player.weapon],
       reloading: player.reloadState !== null,

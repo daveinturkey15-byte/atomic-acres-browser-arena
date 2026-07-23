@@ -162,7 +162,7 @@ describe('network protocol guards', () => {
         hostId: 'host',
         phase: 'waiting' as const,
         config: { mode: 'tdm' as const, capacity: 4 as const, hostedBotCount: 0 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
-        members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0 }],
+        members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0, dhv: 10 as const }],
         scores: [{ id: 'host', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 }],
         activeAtEpochMs: null,
       },
@@ -172,6 +172,8 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(join, 'abc')).toBe(true);
     expect(isGameMessage({ ...join, resumeToken: 'short' })).toBe(false);
     expect(isGameMessage(lobbyState)).toBe(true);
+    expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 'X', nonce: 3 })).toBe(true);
+    expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 9, nonce: 3 })).toBe(false);
     expect(isHostAuthorityMessage(lobbyState)).toBe(true);
     expect(isStateTrafficMessage({ type: 'state', player })).toBe(true);
     expect(isStateTrafficMessage(lobbyState)).toBe(false);

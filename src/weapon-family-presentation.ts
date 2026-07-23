@@ -51,6 +51,12 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     actionTravel: 0.1, smokeBase: 1,
     requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard', 'pistol-ejection-port', 'pistol-frame-rail'],
   },
+  magnum: {
+    sightHeight: 0.18, adsX: -0.36, adsY: 0.278, adsZ: -0.075, projectionCorrection: 0,
+    flashScale: 1.12, recoilTranslation: 0.17, recoilRotation: 0.29,
+    actionTravel: 0.13, smokeBase: 1.8,
+    requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard', 'magnum-heavy-barrel', 'magnum-cylinder'],
+  },
   'machine-pistol': {
     sightHeight: 0.17, adsX: -0.36, adsY: 0.278, adsZ: -0.08, projectionCorrection: 0,
     flashScale: 0.76, recoilTranslation: 0.12, recoilRotation: 0.22,

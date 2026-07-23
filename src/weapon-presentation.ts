@@ -54,6 +54,7 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   scattergun: { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
   sniper: { left: [-0.3, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+  magnum: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
   'machine-pistol': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
 };
 
@@ -64,6 +65,7 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   scattergun: { left: [-0.055, -0.025, 0.015], right: [0.08, -0.025, 0.015] },
   sniper: { left: [-0.055, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
   pistol: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
+  magnum: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
   'machine-pistol': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
 };
 
@@ -74,6 +76,7 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   scattergun: [-0.58, 0.18, -0.42],
   sniper: [-0.76, 0.34, -0.52],
   pistol: [-0.92, 0.42, -0.68],
+  magnum: [-0.92, 0.42, -0.68],
   'machine-pistol': [-0.92, 0.42, -0.68],
 };
 
@@ -509,6 +512,7 @@ export class WeaponPresentation {
         scattergun: new Set(['stock', 'stock-cheek-panel']),
         sniper: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         pistol: new Set(),
+        magnum: new Set(),
         'machine-pistol': new Set(),
       };
       model.traverse((node) => {
@@ -679,7 +683,7 @@ export class WeaponPresentation {
         ? 'lmg-aperture'
       : this.active === 'smg'
         ? 'smg-aperture'
-        : this.active === 'pistol' || this.active === 'machine-pistol'
+        : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
           ? 'pistol-rear-sight'
           : 'ghost-ring';
     return model?.getObjectByName(sightName);
@@ -1012,7 +1016,7 @@ export class WeaponPresentation {
       ? 'curved-magazine'
       : this.active === 'lmg'
         ? 'lmg-box-magazine'
-      : this.active === 'pistol' || this.active === 'machine-pistol'
+      : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
         ? 'pistol-magazine'
         : 'straight-magazine';
     const magazine = activeModel?.getObjectByName(magazineName);

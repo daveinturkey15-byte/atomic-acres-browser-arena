@@ -44,10 +44,15 @@ describe('solo bot tuning', () => {
 });
 
 describe('headshot damage contract', () => {
+  it('keeps the DHV X magnum binary: lethal head, zero body or limb', () => {
+    expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(100);
+    expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(0);
+    expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(0);
+  });
   it('uses exactly 1.5× head damage for every firearm', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
     expect(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
-    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper')) {
+    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper' && entry.id !== 'magnum')) {
       expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
     }
     expect(WEAPONS.sniper.headMultiplier).toBe(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER);

@@ -424,7 +424,7 @@ export class ArenaNetwork {
       if (payload.type === 'overdrive-claim' || payload.type === 'hit'
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
-        || payload.type === 'lobby-ready' || payload.type === 'lobby-team'
+        || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
         || payload.type === 'lobby-balance' || payload.type === 'clock-ping') {
         this.onMessage(payload);
         return;
