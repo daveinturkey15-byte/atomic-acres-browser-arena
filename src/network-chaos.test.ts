@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NETWORK_IMPAIRMENT_PROFILES, impairNetworkEvents, type NetworkEvent } from './network-chaos';
 import { admitRemoteShot, createRemoteShotAdmissionState } from './remote-shot-admission';
+import { admitCombatTiming, createPeerTimingState, updatePeerTiming } from './network-fairness';
 import type { PlayerSnapshot, ShotMessage } from './protocol';
 
 const sender: PlayerSnapshot = {
@@ -47,6 +48,24 @@ describe('deterministic network impairment', () => {
     expect(admitted.size).toBeLessThanOrEqual(200);
   });
 
+  it('produces symmetric bounded admission for host and guest under the same chaos schedule', () => {
+    const profile = { ...NETWORK_IMPAIRMENT_PROFILES.normal, duplicateRate: 0.2, reorderRate: 0.15, lossRate: 0.03 };
+    const events = Array.from({ length: 80 }, (_, eventSeq) => ({ id: 'combat-' + eventSeq, sentAt: eventSeq * 90, payload: { eventSeq, sentAtEpochMs: 10_000 + eventSeq * 90 } }));
+    const deliveries = impairNetworkEvents(events, profile, 'symmetric-combat');
+    const run = (clockOffsetMs: number) => {
+      let state = updatePeerTiming(createPeerTimingState(), { clockOffsetMs, rttMs: 80 });
+      const accepted: number[] = [];
+      for (const delivery of deliveries) {
+        const admission = admitCombatTiming(state, delivery.payload, 10_000 + clockOffsetMs + delivery.arrivesAt);
+        if (!admission.accepted) continue;
+        state = admission.state;
+        accepted.push(delivery.payload.eventSeq);
+      }
+      return accepted;
+    };
+    expect(run(0)).toEqual(run(37));
+    expect(run(0).length).toBeGreaterThan(50);
+  });
   it('models the declared two-second adverse outage without manufacturing deliveries', () => {
     const deliveries = impairNetworkEvents(shotEvents(80), NETWORK_IMPAIRMENT_PROFILES.adverse, 'outage-seed');
     expect(deliveries.some((delivery) => delivery.sentAt >= 2_000 && delivery.sentAt < 4_000)).toBe(false);

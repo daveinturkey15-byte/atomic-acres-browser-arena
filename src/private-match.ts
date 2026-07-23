@@ -1,5 +1,6 @@
 import type { Team } from './protocol';
 import type { ArenaId } from './map-selection';
+import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -11,6 +12,7 @@ export type PrivateMatchConfig = Readonly<{
   arenaId: MultiplayerArenaId;
   mode: MatchMode;
   capacity: RoomCapacity;
+  hostedBotCount: HostedBotCount;
   autoBalance: boolean;
   durationMs: number;
 }>;
@@ -46,6 +48,7 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   arenaId: 'atomic-acres',
   mode: 'tdm',
   capacity: 4,
+  hostedBotCount: 0,
   autoBalance: true,
   durationMs: 300_000,
 });
@@ -69,6 +72,7 @@ export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfi
   return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1' || config.arenaId === 'skyline-terminal')
     && isMatchMode(config.mode)
     && isRoomCapacity(config.capacity)
+    && isHostedBotCount(config.hostedBotCount)
     && typeof config.autoBalance === 'boolean'
     && Number.isSafeInteger(config.durationMs)
     && Number(config.durationMs) >= 60_000
@@ -126,7 +130,7 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
   if (!Array.isArray(snapshot.members) || snapshot.members.length < 1 || snapshot.members.length > 6 || !snapshot.members.every(isLobbyMember)) return false;
   if (new Set(snapshot.members.map((member) => member.id)).size !== snapshot.members.length) return false;
   if (!snapshot.members.some((member) => member.id === snapshot.hostId)) return false;
-  if (!Array.isArray(snapshot.scores) || snapshot.scores.length > 6 || !snapshot.scores.every(isPlayerScore)) return false;
+  if (!Array.isArray(snapshot.scores) || snapshot.scores.length > 10 || !snapshot.scores.every(isPlayerScore)) return false;
   if (new Set(snapshot.scores.map((score) => score.id)).size !== snapshot.scores.length) return false;
   return snapshot.activeAtEpochMs === null
     || Number.isFinite(snapshot.activeAtEpochMs) && Number(snapshot.activeAtEpochMs) >= 0 && Number(snapshot.activeAtEpochMs) <= 10_000_000_000_000;
@@ -153,6 +157,10 @@ export function canHostStart(snapshot: LobbySnapshot): boolean {
     && connected.length >= 2
     && connected.length <= snapshot.config.capacity
     && connected.every((member) => member.ready);
+}
+
+export function canGuestModifyHostedBots(role: 'host' | 'guest'): boolean {
+  return role === 'host';
 }
 
 export function playersAreHostile(

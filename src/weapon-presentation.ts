@@ -673,7 +673,7 @@ export class WeaponPresentation {
       : this.active === 'sniper'
         ? 'sniper-scope'
       : this.active === 'lmg'
-        ? 'rear-sight'
+        ? 'rear-sight-socket'
       : this.active === 'smg'
         ? 'smg-aperture'
         : this.active === 'pistol' || this.active === 'machine-pistol'

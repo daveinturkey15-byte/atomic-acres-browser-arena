@@ -490,6 +490,43 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
   box('atomic landmark plinth', [27, 0.38, -1.5], [5.8, 0.76, 5.8], palette.concrete);
 
+  // Pass 59 collision audit objects: visible soft terrain keeps conservative AABB
+  // movement/ballistic authority, and the irrigation vessel has matching hard cover.
+  const moundAudit: Array<{ id: string; collider: string; bottomY: number }> = [];
+  for (const [id, x, z, sx, sz] of [
+    ['west-verge', -28, 10, 4.6, 3.4],
+    ['east-verge', 28, 18, 4.2, 3.8],
+  ] as const) {
+    const colliderName = `terrain-mound-${id}-collider`;
+    const authority = box(colliderName, [x, 0.55, z], [sx, 1.1, sz], palette.grass, true, false, true, 'earth');
+    authority.visible = false;
+    authority.userData.collisionAuthorityFor = `terrain-mound-${id}`;
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 10), palette.grass);
+    mound.name = `terrain-mound-${id}`;
+    mound.position.set(x, 0.28, z);
+    mound.scale.set(sx / 2, 0.72, sz / 2);
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    mound.userData.impactSurface = 'soil';
+    mound.userData.collisionAuthority = colliderName;
+    world.add(mound);
+    moundAudit.push({ id, collider: colliderName, bottomY: -0.44 });
+  }
+  const vesselCollider = box('east-irrigation-vessel-collider', [27, 1.65, 28], [3.8, 3.3, 3.8], palette.chrome, true, false, true, 'structural-metal');
+  vesselCollider.visible = false;
+  vesselCollider.userData.collisionAuthorityFor = 'east-irrigation-vessel';
+  const irrigationVessel = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 3.3, 20), palette.chrome);
+  irrigationVessel.name = 'east-irrigation-vessel';
+  irrigationVessel.position.set(27, 1.65, 28);
+  irrigationVessel.castShadow = true;
+  irrigationVessel.receiveShadow = true;
+  irrigationVessel.userData.impactSurface = 'metal';
+  irrigationVessel.userData.collisionAuthority = vesselCollider.name;
+  world.add(irrigationVessel);
+  world.userData.atomicCollisionAudit = {
+    terrainMounds: moundAudit,
+    largeCylinder: { id: irrigationVessel.name, collider: vesselCollider.name, bottomY: 0 },
+  };
   // Lane cover interrupts ordinary combat rays every 12–18 metres. The four
   // outer anchors receive taller collision aligned to recognisable authored
   // cargo/utility assets in the Blender and fallback art layers.

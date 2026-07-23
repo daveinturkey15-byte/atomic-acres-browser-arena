@@ -3,6 +3,7 @@ import {
   DEFAULT_PRIVATE_MATCH_CONFIG,
   balanceLobbyTeams,
   canHostStart,
+  canGuestModifyHostedBots,
   estimateHostClockOffset,
   freeForAllLeaders,
   isLobbySnapshot,
@@ -90,6 +91,14 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, pingMs: 6_000 })) }))).toBe(false);
   });
 
+  it('restricts hosted bots to host-owned exact 0, 2, or 4 settings', () => {
+    expect(canGuestModifyHostedBots('host')).toBe(true);
+    expect(canGuestModifyHostedBots('guest')).toBe(false);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 2 } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 4 } }))).toBe(true);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 1 as 0 } }))).toBe(false);
+    expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 6 as 0 } }))).toBe(false);
+  });
   it('classifies lobby latency conservatively', () => {
     expect(latencyQuality(null)).toBe('unknown');
     expect(latencyQuality(70)).toBe('good');

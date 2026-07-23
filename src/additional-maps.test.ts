@@ -712,3 +712,66 @@ describe('additional authored maps', () => {
     expect(routes['cabin-through-aisle']).toHaveLength(3);
   });
 });
+
+describe('Pass 59 map mechanical audits', () => {
+  it('grounds four distinct Rustworks centre-cover rhythms with collision authority', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const audit = map.root.userData.rustworksCentreCoverAudit as { styles: string[]; count: number; minimumTowerDistance: number };
+    expect(audit.styles).toEqual(['stacked', 'staggered', 'l-corner', 'low-flank']);
+    expect(audit.count).toBe(8);
+    expect(audit.minimumTowerDistance).toBeGreaterThan(7);
+    const covers: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && typeof node.userData.rustworksCentreCoverStyle === 'string') covers.push(node);
+    });
+    expect(covers).toHaveLength(8);
+    for (const cover of covers) {
+      expect(map.colliders.some((box) => cover.position.x >= box.minX && cover.position.x <= box.maxX && cover.position.z >= box.minZ && cover.position.z <= box.maxZ), cover.name).toBe(true);
+      expect(cover.userData.authoredBottomY, cover.name).toBeGreaterThanOrEqual(0);
+    }
+    const base = map.root.getObjectByName('rustworks-centre-stack-base') as THREE.Mesh;
+    const top = map.root.getObjectByName('rustworks-centre-stack-top') as THREE.Mesh;
+    expect(top.position.y - 0.45).toBeCloseTo(base.position.y + 0.6);
+  });
+
+  it('blocks Rustworks centre-cover penetration in Rapier while preserving adjacent lanes', async () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    try {
+      physics.teleportEye({ x: 9.2, y: 1.7, z: -13.2 });
+      const blocked = await walkToward(physics, { x: 9.2, y: 1.7, z: -9.4 }, 500);
+      expect(blocked.z).toBeLessThan(-10.75);
+      physics.teleportEye({ x: 5.5, y: 1.7, z: -13.2 });
+      const lane = await walkToward(physics, { x: 5.5, y: 1.7, z: -5.5 }, 800);
+      expect(Math.abs(lane.z + 5.5)).toBeLessThan(0.55);
+    } finally {
+      physics.dispose();
+    }
+  });
+  it('preserves centre-cover collision semantics across Compatibility, Performance, and Quality', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const colliderCount = map.colliders.length;
+    for (const profile of ['compat', 'performance', 'blender'] as const) {
+      applyRustworksPresentationProfile(map.root, profile);
+      expect(map.colliders).toHaveLength(colliderCount);
+      expect(map.root.getObjectByName('rustworks-centre-stack-base')?.visible).toBe(true);
+      expect(isBlocked({ x: 9.2, y: 1.7, z: -9.4 }, map.colliders, 0.44)).toBe(true);
+    }
+  });
+  it('labels Skyline open passages and mechanically closed staff doors coherently', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineDoorAudit as Array<{ id: string; state: string; mechanicalAuthority: string; clearWidth: number }>;
+    expect(audit).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'terminal-gate', state: 'open', clearWidth: 3.5 }),
+      expect.objectContaining({ id: 'aircraft-boarding', state: 'open', clearWidth: 2.68 }),
+      expect.objectContaining({ id: 'staff-west', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall' }),
+      expect.objectContaining({ id: 'staff-east', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall' }),
+    ]));
+    for (const name of ['skyline-terminal-gate-jamb-left', 'skyline-terminal-gate-jamb-right', 'skyline-terminal-gate-header', 'skyline-staff-door-west', 'skyline-staff-door-east']) {
+      expect(map.root.getObjectByName(name), name).toBeTruthy();
+    }
+    expect(isBlocked({ x: 0, y: 5.02, z: -11.8 }, map.colliders, 0.35)).toBe(false);
+    expect(isBlocked({ x: -22, y: 1.25, z: -34 }, map.colliders, 0.35)).toBe(true);
+    expect(isBlocked({ x: 22, y: 1.25, z: -34 }, map.colliders, 0.35)).toBe(true);
+  });
+});
