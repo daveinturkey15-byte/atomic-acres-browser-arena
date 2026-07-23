@@ -17,6 +17,21 @@ export type ChangelogEntry = Readonly<{
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass59',
+    pass: 'PASS 59',
+    title: 'Fairer private matches, safer spawns & arena repairs',
+    releasedAt: '2026-07-23T11:17:26+01:00',
+    areas: Object.freeze(['MULTIPLAYER', 'HOSTED BOTS', 'MAPS', 'HUD', 'DIAGNOSTICS']),
+    summary: 'Private matches gain host-owned bots and tighter combat authority, while all four arenas receive safer spawns, targeted collision and layout repairs, and clearer combat feedback.',
+    highlights: Object.freeze([
+      'Hosts can add exactly two or four authoritative bots whose movement, combat, health, score, deaths, and restarts stay synchronized for guests',
+      'Quad Damage, grenades, support effects, damage, kill credit, and gun-only streak progress now follow explicit replicated authority and provenance rules',
+      'Bounded timestamp and sequence admission improves host-versus-guest fairness while rejecting stale, future, duplicate, and excessive-gap combat events',
+      'Atomic Acres, Rustworks, and Skyline Terminal receive targeted collision, floating-prop, doorway, cover, and central-layout repairs without changing profile gameplay semantics',
+      'Map-aware spawn scoring, corrected LMG sights, separate damage feeds, a single-column support HUD, and private post-match diagnostic downloads improve play and troubleshooting',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass58',
     pass: 'PASS 58',
     title: 'Three arena overhauls & combat polish',
