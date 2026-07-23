@@ -12,15 +12,23 @@ import {
 } from './remote-hit-admission';
 
 describe('remote hit admission', () => {
-  it('derives SMG head as 35 (1.5× body) and never one-shots from full HP without OD', () => {
+  it('hits the visible standing skull and rejects the former empty-air crit point', () => {
     const target = { x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
-    const body = deriveRemoteShotBaseDamage('smg', [0, 1.38, 6], [[0, 0, -1]], target);
-    const head = deriveRemoteShotBaseDamage('smg', [0, 2.2, 6], [[0, 0, -1]], target);
+    const body = deriveRemoteShotBaseDamage('smg', [0, 1.0, 6], [[0, 0, -1]], target);
+    const head = deriveRemoteShotBaseDamage('smg', [0, 1.58, 6], [[0, 0, -1]], target);
     expect(body).toBe(23);
     expect(head).toBe(35);
+    expect(deriveRemoteShotBaseDamage('smg', [0, 2.2, 6], [[0, 0, -1]], target)).toBe(0);
     expect(head).toBeLessThan(100);
     expect(resolveRemotePoweredDamage(head, 1)).toBe(35);
-    expect(resolveRemotePoweredDamage(head, 4)).toBe(100); // OD×4 can finish
+    expect(resolveRemotePoweredDamage(head, 2)).toBe(70); // OD×2 preserves the authoritative base hit
+  });
+
+  it('admits visual headshots for crouched and prone remote players', () => {
+    const crouched = { x: 0, y: 1.16, z: 0, yaw: 0, stance: 'crouch' as const };
+    expect(deriveRemoteShotBaseDamage('smg', [0, 1.16, 6], [[0, 0, -1]], crouched)).toBe(35);
+    const prone = { x: 0, y: 0.5, z: 0, yaw: 0, stance: 'prone' as const };
+    expect(deriveRemoteShotBaseDamage('smg', [0, 0.54, -6], [[0, 0, 1]], prone)).toBe(35);
   });
 
   it('requires every authored scattergun pellet and derives only intersecting rays', () => {
@@ -64,7 +72,7 @@ describe('remote hit admission', () => {
     expect(maximum).toBe(47);
     expect(admitRemoteBaseDamage(100, maximum)).toBe(false);
     expect(admitRemoteBaseDamage(31, maximum)).toBe(true);
-    expect(resolveRemotePoweredDamage(31, 4)).toBe(100);
+    expect(resolveRemotePoweredDamage(31, 2)).toBe(62);
     expect(resolveRemotePoweredDamage(31, 1)).toBe(31);
   });
 

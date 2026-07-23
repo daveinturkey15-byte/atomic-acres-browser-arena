@@ -13,6 +13,7 @@ import {
   buildSkylineTerminal,
   fitCanvasText,
   rustworksDeckTopY,
+  updateGunRangePresentation,
 } from './additional-maps';
 import type { ArenaMap } from './map';
 import type { Stance } from './gameplay';
@@ -511,6 +512,19 @@ describe('additional authored maps', () => {
     expect(wallbangSurfaces.map((surface) => surface.material)).toEqual(['glass', 'wood', 'interior-wall', 'brick']);
     expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.24, 0.42, 0.7]);
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(map.root.getObjectByName('gun-range-moderate-ambient')).toBeInstanceOf(THREE.HemisphereLight);
+    const wallMaterial = (map.root.getObjectByName('gun-range-left-wall') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const ceilingMaterial = (map.root.getObjectByName('gun-range-ceiling') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(wallMaterial.userData.gunRangeShell).toBe('white-silver-wall');
+    expect(ceilingMaterial.userData.gunRangeShell).toBe('white-silver-ceiling');
+    expect(wallMaterial.color.getHex()).toBe(0xb8c1c4);
+    expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
+    const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
+    const before = neon.color.getHex();
+    updateGunRangePresentation(map.root, 9_000);
+    expect(neon.color.getHex()).not.toBe(before);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
     expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);

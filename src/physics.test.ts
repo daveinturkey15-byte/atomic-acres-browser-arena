@@ -95,4 +95,13 @@ describe('CharacterPhysics', () => {
     expect(active.setStance('stand')).toBe(false);
     expect(active.currentStance()).toBe('prone');
   });
+
+  it('returns from prone to standing on an unobstructed floor', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    active.teleportEye({ x: 0, y: 1.7, z: 0 });
+    expect(active.setStance('prone')).toBe(true);
+    expect(active.setStance('stand')).toBe(true);
+    expect(active.currentStance()).toBe('stand');
+    expect(active.eyePosition().y).toBeCloseTo(1.7, 2);
+  });
 });

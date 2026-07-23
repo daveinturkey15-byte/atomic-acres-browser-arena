@@ -2,6 +2,19 @@ import * as THREE from 'three';
 import { HOUSE_LAYOUT } from './arena-layout';
 import type { ArenaLightingProfile } from './blender-lighting';
 import { createHouseArchitecture } from './house-navigation';
+
+const PROCEDURAL_HOUSE_SHELL_PRESENTATION_NAMES = Object.freeze([
+  'pass29-interior-ceiling-panels',
+  'pass29-structural-room-ceilings',
+]);
+
+/** Quality already owns its house shell. Keep only lights/signage from this root. */
+export function setWorldIdentityHouseShellPresentation(root: THREE.Object3D, visible: boolean): void {
+  for (const name of PROCEDURAL_HOUSE_SHELL_PRESENTATION_NAMES) {
+    const object = root.getObjectByName(name);
+    if (object) object.visible = visible;
+  }
+}
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
 export type WorldIdentityPresentation = {
@@ -192,6 +205,45 @@ export function createWorldIdentityPresentation(
   }
 
   const houses = HOUSE_LAYOUT.map((entry) => createHouseArchitecture(entry.team, entry.x, entry.z, entry.facing));
+  const upperDoorFinishes = new THREE.Group();
+  upperDoorFinishes.name = 'pass60-upper-room-door-finishes';
+  upperDoorFinishes.userData.presentationOnly = true;
+  upperDoorFinishes.userData.blocksShots = false;
+  const jambMaterial = new THREE.MeshStandardMaterial({ color: 0xd9d1bc, roughness: 0.78, metalness: 0.04 });
+  const routeMaterials = [
+    new THREE.MeshBasicMaterial({ color: 0x6df4ed, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: 0xffa17e, toneMapped: false }),
+  ];
+  for (const house of houses) {
+    const opening = house.openings.find((entry) => entry.id === 'upper-room-opening');
+    if (!opening) continue;
+    const doorway = new THREE.Group();
+    doorway.name = `${house.id}-upper-room-door-finish`;
+    doorway.position.set(...opening.centre);
+    const jamb = (name: string, size: [number, number, number], position: [number, number, number]) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), jambMaterial);
+      mesh.name = `${doorway.name}-${name}`;
+      mesh.position.set(...position);
+      doorway.add(mesh);
+    };
+    jamb('jamb-left', [0.16, opening.height + 0.12, 0.18], [-opening.width / 2 - 0.08, 0, 0]);
+    jamb('jamb-right', [0.16, opening.height + 0.12, 0.18], [opening.width / 2 + 0.08, 0, 0]);
+    jamb('jamb-head', [opening.width + 0.32, 0.16, 0.18], [0, opening.height / 2 + 0.08, 0]);
+    const threshold = new THREE.Mesh(
+      new THREE.BoxGeometry(opening.width + 0.24, 0.055, 0.26),
+      routeMaterials[house.team],
+    );
+    threshold.name = `${doorway.name}-lit-threshold`;
+    threshold.position.set(0, -opening.height / 2 + 0.035, 0);
+    doorway.add(threshold);
+    doorway.traverse((node) => {
+      node.userData.presentationOnly = true;
+      node.userData.blocksShots = false;
+      if (node instanceof THREE.Mesh) node.raycast = () => undefined;
+    });
+    upperDoorFinishes.add(doorway);
+  }
+  root.add(upperDoorFinishes);
   const fixtureGeometry = new THREE.BoxGeometry(2.2, 0.06, 0.72);
   const fixtureMaterial = new THREE.MeshBasicMaterial({ color: 0xffdca0, toneMapped: false });
   const fixtureCount = houses.reduce((total, house) => total + house.rooms.length, 0);

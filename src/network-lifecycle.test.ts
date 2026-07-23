@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DataConnection } from 'peerjs';
-import { guestMessageEndsSession, isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner } from './network';
+import { guestMessageEndsSession, isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner, stateTrafficUsesFallback } from './network';
 
 describe('guest event connection lifecycle', () => {
   it('does not let a stale same-peer close callback evict the replacement session', () => {
@@ -13,6 +13,12 @@ describe('guest event connection lifecycle', () => {
   it('fails an initial bad room cleanly while retaining bounded retry for a dropped session', () => {
     expect(joinTimeoutAction(false)).toBe('offline');
     expect(joinTimeoutAction(true)).toBe('retry');
+  });
+
+  it('keeps movement flowing over the reliable event lane when the transient lane degrades', () => {
+    expect(stateTrafficUsesFallback(false, true)).toBe(true);
+    expect(stateTrafficUsesFallback(true, true)).toBe(false);
+    expect(stateTrafficUsesFallback(false, false)).toBe(false);
   });
 
   it('removes the previous peer owner when a player reconnects with a new peer ID', () => {

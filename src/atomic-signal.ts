@@ -305,11 +305,31 @@ export class AtomicSignalPass {
     this.outputValidated = false;
   }
 
-  private renderDirect(scene: THREE.Scene, camera: THREE.Camera): void {
+  private renderScene(scene: THREE.Scene, camera: THREE.Camera, overlayLayer: number | null): void {
+    if (overlayLayer === null) {
+      this.renderer.render(scene, camera);
+      return;
+    }
+    const previousLayerMask = camera.layers.mask;
+    const previousAutoClear = this.renderer.autoClear;
+    try {
+      camera.layers.disable(overlayLayer);
+      this.renderer.render(scene, camera);
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      camera.layers.set(overlayLayer);
+      this.renderer.render(scene, camera);
+    } finally {
+      camera.layers.mask = previousLayerMask;
+      this.renderer.autoClear = previousAutoClear;
+    }
+  }
+
+  private renderDirect(scene: THREE.Scene, camera: THREE.Camera, overlayLayer: number | null): void {
     const previousToneMapping = this.renderer.toneMapping;
     this.renderer.toneMapping = this.screenToneMapping;
     this.renderer.setRenderTarget(null);
-    this.renderer.render(scene, camera);
+    this.renderScene(scene, camera, overlayLayer);
     this.renderer.toneMapping = previousToneMapping;
   }
 
@@ -347,10 +367,10 @@ export class AtomicSignalPass {
     throw new Error('Atomic Signal produced an all-black validation frame');
   }
 
-  render(scene: THREE.Scene, camera: THREE.Camera): void {
+  render(scene: THREE.Scene, camera: THREE.Camera, overlayLayer: number | null = null): void {
     this.renderer.info.reset();
     if (!this.target || !this.material || this.fallbackReason) {
-      this.renderDirect(scene, camera);
+      this.renderDirect(scene, camera, overlayLayer);
       return;
     }
 
@@ -359,7 +379,7 @@ export class AtomicSignalPass {
       this.renderer.setRenderTarget(this.target);
       this.validateBoundTarget();
       this.renderer.clear();
-      this.renderer.render(scene, camera);
+      this.renderScene(scene, camera, overlayLayer);
       this.renderer.setRenderTarget(null);
       const passStarted = performance.now();
       this.renderer.render(this.quadScene, this.quadCamera);
@@ -373,7 +393,7 @@ export class AtomicSignalPass {
       const message = error instanceof Error ? error.message : String(error);
       this.fallbackReason = message || 'post-processing render failed';
       this.onFallback?.(this.fallbackReason);
-      this.renderDirect(scene, camera);
+      this.renderDirect(scene, camera, overlayLayer);
     }
   }
 

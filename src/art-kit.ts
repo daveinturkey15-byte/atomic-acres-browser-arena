@@ -8,7 +8,7 @@ import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
 import type { Team, WeaponId } from './protocol';
 import { hitReactionAt } from './weapon-presentation-state';
-import { AUTHORITATIVE_HIT_PROXIES } from './hit-proxies';
+import { AUTHORITATIVE_HIT_PROXIES, hitProxyRootTransform } from './hit-proxies';
 import { THIRD_PERSON_WEAPON_SCALE } from './player-feedback';
 
 const textureLoader = new THREE.TextureLoader();
@@ -1210,6 +1210,10 @@ export function poseOperator(
 ): void {
   const rig = operatorRig(root);
   if (!rig) return;
+  root.userData.operatorStance = stance;
+  const proxyTransform = hitProxyRootTransform(stance);
+  rig.hitProxyRoot.position.set(...proxyTransform.position);
+  rig.hitProxyRoot.rotation.set(proxyTransform.rotationX, 0, 0);
   if (rig.rigged) {
     const meleeAge = performance.now() - Number(root.userData.operatorMeleeAt ?? -10_000);
     const meleeActive = meleeAge >= 0 && meleeAge < 520;
@@ -1274,8 +1278,6 @@ export function poseOperator(
   const lerp = (from: number, to: number) => THREE.MathUtils.lerp(from, to, blend);
   // Authoritative hit proxies follow replicated stance only. They never inherit
   // gait, weapon kick, gear reaction or cosmetic limb animation.
-  rig.hitProxyRoot.position.y = prone ? 0.52 : crouched ? -0.28 : 0;
-  rig.hitProxyRoot.rotation.x = prone ? -Math.PI / 2 : 0;
   rig.pelvis.position.y = lerp(rig.pelvis.position.y, prone ? 0.38 : crouched ? 0.67 : 0.9);
   rig.pelvis.rotation.x = lerp(rig.pelvis.rotation.x, prone ? -1.08 : 0);
   rig.spine.rotation.x = lerp(rig.spine.rotation.x, prone ? -0.24 : crouched ? 0.13 : aimPitch * 0.28);

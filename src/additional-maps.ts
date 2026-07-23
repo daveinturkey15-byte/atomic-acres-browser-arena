@@ -512,7 +512,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [shipWidth + 0.55, deckThickness, lowerShipLandingDepth],
     grate,
   );
-  box(
+  const shipLadderAuthority = box(
     builder,
     'rustworks-ship-ladder',
     [shipX, shipPosY, shipCenterZ],
@@ -520,6 +520,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     steelBright,
     { rotation: shipRotation },
   );
+  const invisibleAuthorityMaterial = steelBright.clone();
+  invisibleAuthorityMaterial.name = 'rustworks-ship-ladder-collision-authority';
+  invisibleAuthorityMaterial.visible = false;
+  shipLadderAuthority.material = invisibleAuthorityMaterial;
+  shipLadderAuthority.userData.collisionOnly = true;
   box(
     builder,
     'rustworks-ship-ladder-upper-landing',
@@ -551,7 +556,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     const y = lowerTop + shipRise * t + 0.04;
     box(builder, `rustworks-ship-ladder-rung-${index}`, [shipX, y, z], [shipWidth - 0.12, 0.08, 0.1], hazard, {
       solid: false,
-      detail: 'quality',
+      detail: 'performance',
     });
   }
   for (const side of [-1, 1] as const) {
@@ -561,7 +566,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       [shipX + side * (shipWidth / 2 + 0.02), shipPosY - 0.08, shipCenterZ],
       [0.08, 0.18, shipLength + 0.08],
       oxide,
-      { solid: false, rotation: shipRotation, detail: 'quality' },
+      { solid: false, rotation: shipRotation, detail: 'performance' },
     );
   }
 
@@ -999,7 +1004,7 @@ function scoreTexture(value: number): THREE.CanvasTexture | null {
   return texture;
 }
 
-function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Sprite | null {
+function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Mesh | null {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -1023,14 +1028,19 @@ function rangeSign(text: string, accent: number, name: string, scale: [number, n
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false, toneMapped: false }));
-  sprite.name = name;
-  sprite.scale.set(scale[0], scale[1], 1);
-  sprite.renderOrder = 8;
-  sprite.userData.presentationOnly = true;
-  sprite.userData.text = text;
-  sprite.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height, worldAspect: scale[0] / scale[1] };
-  return sprite;
+  // World signs must stay attached to their boards. A Sprite billboard grows
+  // across the viewport when the player walks close or looks away from the
+  // board, which caused the giant clipped PICK UP text at range spawn.
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(scale[0], scale[1]),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
+  );
+  sign.name = name;
+  sign.renderOrder = 8;
+  sign.userData.presentationOnly = true;
+  sign.userData.text = text;
+  sign.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height, worldAspect: scale[0] / scale[1], boardAnchored: true };
+  return sign;
 }
 
 function rangeTarget(
@@ -1170,7 +1180,12 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
   const concrete = standard(0x444b4e, 0.98, 0.02);
-  const wall = standard(0x242d32, 0.88, 0.22);
+  const wall = terminalSurfaceMaterial('panel', 0xb8c1c4, '#69777d', 0.5, 0.38, [7, 4]);
+  wall.name = 'GunRange_SilverWall_PanelTexture';
+  wall.userData.gunRangeShell = 'white-silver-wall';
+  const ceiling = terminalSurfaceMaterial('panel', 0xd7dbdc, '#8e9a9e', 0.42, 0.46, [8, 10]);
+  ceiling.name = 'GunRange_SilverCeiling_PanelTexture';
+  ceiling.userData.gunRangeShell = 'white-silver-ceiling';
   const dark = standard(0x11191d, 0.7, 0.62);
   const acoustic = standard(0x303b3f, 0.96, 0.08);
   const timber = standard(0x765136, 0.91, 0.04);
@@ -1197,13 +1212,13 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   builder.shotSurfaces.push(floorSurface);
   floor.userData.ballisticSurfaceId = floorSurface.id;
 
-  // Full indoor shell: deep charcoal walls and ceiling keep attention on the
-  // warm armory, cool lane lighting and bright target faces.
+  // A pale textured shell keeps player and target silhouettes readable. Dark
+  // acoustic/ballistic inserts preserve contrast without turning the room black.
   box(builder, 'gun-range-backstop', [0, 3.6, -49], [42, 7.2, 1.2], dark);
   box(builder, 'gun-range-left-wall', [-20.5, 3.6, -14.5], [1, 7.2, 70], wall);
   box(builder, 'gun-range-right-wall', [20.5, 3.6, -14.5], [1, 7.2, 70], wall);
   box(builder, 'gun-range-rear-wall', [0, 3.6, 20], [42, 7.2, 1], wall);
-  box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], dark, { solid: false, shots: true });
+  box(builder, 'gun-range-ceiling', [0, 7.1, -14.5], [42, 0.45, 70], ceiling, { solid: false, shots: true });
 
   // Suspended acoustic baffles and side ventilation sell the large industrial
   // interior while leaving the floor plan broad and readable.
@@ -1226,6 +1241,35 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     light.userData.presentationOnly = true;
     root.add(light);
   }
+  const ambient = new THREE.HemisphereLight(0xe8f5f5, 0x253137, 0.68);
+  ambient.name = 'gun-range-moderate-ambient';
+  ambient.userData.presentationOnly = true;
+  root.add(ambient);
+  const neonMaterials: THREE.MeshStandardMaterial[] = [];
+  const neonLights: THREE.PointLight[] = [];
+  for (const [index, z] of [-37, -21, -5, 11].entries()) {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x56e7df,
+      emissive: 0x56e7df,
+      emissiveIntensity: 1.55,
+      roughness: 0.22,
+      metalness: 0.28,
+    });
+    material.name = `GunRange_CyclingNeon_${index}`;
+    neonMaterials.push(material);
+    for (const side of [-1, 1] as const) {
+      box(builder, 'gun-range-cycling-neon-strip', [side * 19.88, 4.65, z], [0.08, 0.16, 7.2], material, { solid: false, shots: false, cast: false });
+    }
+    const light = new THREE.PointLight(0x56e7df, 2.8, 13, 2.2);
+    light.name = 'gun-range-cycling-neon-light';
+    light.position.set(index % 2 === 0 ? -12 : 12, 4.8, z);
+    light.userData.presentationOnly = true;
+    light.userData.neonIndex = index;
+    neonLights.push(light);
+    root.add(light);
+  }
+  root.userData.gunRangeNeonMaterials = neonMaterials;
+  root.userData.gunRangeNeonLights = neonLights;
 
   box(builder, 'gun-range-control-room', [-16.5, 2.1, 15.5], [6.2, 4.2, 6.2], wall, { ballisticMaterial: 'interior-wall' });
   box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: false });
@@ -1321,14 +1365,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     root.add(stationRoot);
   }
 
-  box(builder, 'gun-range-armory-header', [0, 3.8, 12.2], [32, 1.15, 0.25], dark, { solid: false, shots: false });
+  box(builder, 'gun-range-armory-header', [0, 3.8, 9.45], [32, 1.15, 0.25], dark, { solid: false, shots: false });
   box(builder, 'gun-range-live-fire-sign', [0, 4.45, 1.0], [12, 0.75, 0.22], redSafety, { solid: false, shots: false });
   root.getObjectByName('gun-range-armory-header')!.userData.label = 'CHOOSE A WEAPON · PRESS F';
   root.getObjectByName('gun-range-live-fire-sign')!.userData.label = 'LIVE FIRE · EYES AND EARS';
-  const armorySign = rangeSign('ARMORY · PICK UP WITH F', 0x58e3dc, 'gun-range-armory-sign-text', [18, 1.25]);
+  const armorySign = rangeSign('ARMORY · PICK UP WITH F', 0x58e3dc, 'gun-range-armory-sign-text', [13.5, 0.95]);
   if (armorySign) {
     // Text must sit on the player-facing side of its backing board.
-    armorySign.position.set(0, 3.8, 12.36);
+    armorySign.position.set(0, 3.8, 9.59);
     root.add(armorySign);
   }
   const liveFireSign = rangeSign('LIVE FIRE · EYES AND EARS', 0xff765f, 'gun-range-live-fire-sign-text', [10.5, 0.82]);
@@ -1357,6 +1401,21 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     bounds: { minX: -20, maxX: 20, minZ: -48, maxZ: 19.5 },
     houseTelemetry: emptyTelemetry(),
   };
+}
+
+/** Slow colour motion adds life without strobing or changing gameplay light authority. */
+export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number): void {
+  const materials = root.userData.gunRangeNeonMaterials as THREE.MeshStandardMaterial[] | undefined;
+  const lights = root.userData.gunRangeNeonLights as THREE.PointLight[] | undefined;
+  if (!materials || !lights) return;
+  materials.forEach((material, index) => {
+    const hue = (nowMs / 18_000 + index * 0.17) % 1;
+    material.color.setHSL(hue, 0.68, 0.58);
+    material.emissive.copy(material.color);
+  });
+  lights.forEach((light, index) => {
+    light.color.copy(materials[index % materials.length].color);
+  });
 }
 
 function terminalWayfindingMaterial(title: string, subtitle: string, accent: string): THREE.Material {
@@ -1536,8 +1595,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
 
   const tarmacMat = terminalSurfaceMaterial('asphalt', 0x30383a, '#6f7777', 0.95, 0.05, [5, 5]);
   const floorMat = terminalSurfaceMaterial('terrazzo', 0x9ca6a2, '#3f5457', 0.52, 0.1, [5, 5]);
-  const wallMat = terminalSurfaceMaterial('panel', 0x263238, '#718083', 0.82, 0.24, [6, 3]);
-  const trimMat = standard(0x46575c, 0.52, 0.48);
+  const wallMat = terminalSurfaceMaterial('panel', 0x68777b, '#a7b5b6', 0.7, 0.3, [6, 3]);
+  const trimMat = standard(0x71868a, 0.48, 0.48);
   // Avoid transmission/refraction on the low-spec path: alpha glass is much
   // cheaper under software WebGL and still reads clearly as breakable glazing.
   const glassMat = new THREE.MeshStandardMaterial({
@@ -1549,13 +1608,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     depthWrite: false,
   });
   const planeHullMat = terminalSurfaceMaterial('aircraft', 0xe5e8e4, '#8a9898', 0.32, 0.35, [8, 2]);
-  const planeWingMat = terminalSurfaceMaterial('panel', 0x7a8587, '#303b3d', 0.44, 0.6, [4, 2]);
-  const engineMat = standard(0x222a2e, 0.3, 0.78);
-  const jetbridgeMat = terminalSurfaceMaterial('panel', 0x566267, '#1f292d', 0.58, 0.52, [5, 2]);
-  const kioskMat = standard(0x574738, 0.86, 0.1);
+  const planeWingMat = terminalSurfaceMaterial('panel', 0xa7b2b4, '#526063', 0.4, 0.58, [4, 2]);
+  const engineMat = standard(0x3c4b50, 0.3, 0.72);
+  const jetbridgeMat = terminalSurfaceMaterial('panel', 0x718084, '#39494e', 0.5, 0.48, [5, 2]);
+  const kioskMat = standard(0x866d51, 0.76, 0.12);
   const cargoMat = terminalSurfaceMaterial('cargo', 0xb9602e, '#542817', 0.72, 0.28, [3, 2]);
   const hazardMat = standard(0xd69a2d, 0.58, 0.28);
-  const floorBorderMat = standard(0x252c30, 0.48, 0.16);
+  const floorBorderMat = standard(0x465459, 0.48, 0.18);
   const floorInsetMat = new THREE.MeshStandardMaterial({
     color: 0x62706f,
     roughness: 0.58,
@@ -1563,8 +1622,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     emissive: 0x263332,
     emissiveIntensity: 0.14,
   });
-  const wallLowerMat = standard(0x455157, 0.8, 0.18);
-  const structureMat = standard(0x222b30, 0.5, 0.68);
+  const wallLowerMat = standard(0x607075, 0.74, 0.2);
+  const structureMat = standard(0x526267, 0.46, 0.62);
   const rubberMat = terminalSurfaceMaterial('rubber', 0x171c1f, '#536063', 0.92, 0.04, [4, 4]);
   const seatMat = terminalSurfaceMaterial('fabric', 0x48636b, '#9ab0ad', 0.86, 0.02, [4, 4]);
   const cockpitMat = standard(0x111c25, 0.18, 0.72);

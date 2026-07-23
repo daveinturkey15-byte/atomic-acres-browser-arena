@@ -245,6 +245,9 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(centreTarget?.maxHealth).toBe(500);
     expect(centreTarget?.health).toBeGreaterThan(0);
     expect(centreTarget?.health).toBeLessThan(500);
+    await expect(page.locator('#damage-done-feed [data-damage-dealt]')).toBeVisible();
+    await expect(page.locator('#damage-done-feed [data-damage-dealt]').first()).toContainText('NEAR-0');
+    await expect(page.locator('#killfeed')).not.toContainText('DMG');
     await page.evaluate(() => {
       (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.hitRangeTarget('near-0', 500, 'body');
     });

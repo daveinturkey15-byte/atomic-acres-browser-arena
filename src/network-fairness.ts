@@ -1,7 +1,7 @@
-export const MAX_COMBAT_EVENT_AGE_MS = 350;
-export const MAX_COMBAT_EVENT_FUTURE_MS = 80;
+export const MAX_COMBAT_EVENT_AGE_MS = 650;
+export const MAX_COMBAT_EVENT_FUTURE_MS = 120;
 export const MAX_COMBAT_SEQUENCE_GAP = 512;
-export const MAX_LAG_COMPENSATION_MS = 180;
+export const MAX_LAG_COMPENSATION_MS = 250;
 
 export type CombatTiming = Readonly<{ eventSeq: number; sentAtEpochMs: number }>;
 export type PeerTimingState = Readonly<{ lastEventSeq: number; clockOffsetMs: number; rttMs: number; jitterMs: number }>;
@@ -40,7 +40,9 @@ export function admitCombatTiming(state: PeerTimingState, timing: CombatTiming, 
     accepted: true,
     reason: 'accepted',
     sampleAgeMs,
-    rewindMs: Math.min(MAX_LAG_COMPENSATION_MS, Math.max(0, sampleAgeMs - state.rttMs / 2)),
+    // Rewind one inbound trip for the action plus the outbound trip represented
+    // by the remote pose the shooter saw. Jitter is bounded by the same cap.
+    rewindMs: Math.min(MAX_LAG_COMPENSATION_MS, Math.max(0, sampleAgeMs + state.rttMs / 2 + state.jitterMs)),
     state: { ...state, lastEventSeq: timing.eventSeq },
   };
 }

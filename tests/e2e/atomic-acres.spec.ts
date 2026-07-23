@@ -616,7 +616,7 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('falls back to the authored procedural arena if the default Blender asset cannot load', async ({ page }) => {
-    await page.route('**/atomic-acres-blender-arena.glb', (route) => route.abort('failed'));
+    await page.route('**/atomic-acres-blender-arena.glb*', (route) => route.abort('failed'));
     await pageReadyAt(page, '/');
     await expect.poll(async () => (await debug(page)).render.blenderEnvironment.status).toBe('fallback');
     const state = await debug(page);
@@ -645,8 +645,8 @@ test.describe('boot and authored presentation', () => {
         godRayStrength: 0.05, godRayLobes: 2,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 34, materialCount: 28, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 41_216,
-        semanticWindows: 6, boundWindows: 4, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
+        status: 'ready', meshCount: 34, materialCount: 28, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_444,
+        semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
     });
@@ -708,7 +708,10 @@ test.describe('boot and authored presentation', () => {
     // collision-mirror meshes; one live impact/fragment draw may still be
     // present in this transient sample. The stricter settled-scene budget is
     // enforced below.
-    expect(activeState.render.calls).toBeLessThanOrEqual(180);
+    // Pass 60 renders the viewmodel after a depth clear so walls/floors cannot
+    // punch holes through the weapon. That intentional overlay pass adds one
+    // draw call to the transient combat sample.
+    expect(activeState.render.calls).toBeLessThanOrEqual(182);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -1144,6 +1147,9 @@ test.describe('solo mechanics', () => {
       const operator = (await debug(page)).bots[0].operatorModel!;
       expect.soft(operator.animationContract.stance, pose.name).toBe(pose.stance);
       expect.soft(operator.visibleEmbeddedWeapons, pose.name).toBe(0);
+      expect.soft(operator.headBoneWorld, `${pose.name}: head bone`).not.toBeNull();
+      expect.soft(operator.hitProxyHeadWorld, `${pose.name}: head proxy`).not.toBeNull();
+      expect.soft(operator.hitProxyHeadDelta, `${pose.name}: proxy must cover the visible skull`).toBeLessThan(0.3);
       expect.soft(operator.muzzleForwardDot, pose.name).toBeGreaterThan(0.82);
       const gripEvidence = `${pose.name}:${JSON.stringify(operator.supportGrip)}`;
       expect.soft(operator.supportGrip.finite, gripEvidence).toBe(true);
@@ -1592,7 +1598,7 @@ test.describe('solo mechanics', () => {
     });
     // The animated centre-mass ray can reach the torso (67) or foreground arm
     // (67 × 0.9) depending on the pinned SWAT pose. Both are valid accepted
-    // non-head zones; the explicit head sample below is the 1.5× one-shot gate.
+    // non-head zones; the explicit head sample below is the 3× one-shot gate.
     await expect.poll(async () => (await debug(page)).bots[0].hp).toBeLessThan(100);
     let state = await debug(page);
     expect(state.bots[0].hp).toBeGreaterThanOrEqual(33);
@@ -1651,6 +1657,17 @@ test.describe('solo mechanics', () => {
     expect(state.player.grenades).toBe(2);
     const scavenged = state.deathDrops.find((drop) => drop.id === targetDrop.id);
     expect(scavenged).toMatchObject({ ammoAvailable: false, weaponAvailable: true });
+
+    // A same-weapon drop is intentionally not consumed after its ammunition
+    // was already scavenged. Equip a different primary so this assertion
+    // always exercises the independent F weapon-pickup path.
+    if (state.player.primaryWeapon === targetDrop.weapon) {
+      const replacement = targetDrop.weapon === 'carbine' ? 'smg' : 'carbine';
+      await page.evaluate((weapon) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (id: 'carbine' | 'smg') => void } })
+          .__ATOMIC_ACRES_DEBUG__.equipWeapon(weapon);
+      }, replacement);
+    }
 
     await page.keyboard.press('KeyF');
     await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe(targetDrop.weapon);
@@ -1865,7 +1882,8 @@ test.describe('solo mechanics', () => {
         const persistentRegions = [
           '#matchbar', '#objective', '#network-strip', '#killfeed', '#location-label',
           '#equipment-block', '#health-block', '#combat-stats', '#weapon-block', '#ping-block',
-        ].map(visibleBox).filter((box): box is DOMRect => box !== null && box.width > 0 && box.height > 0);
+        ].map((selector) => ({ selector, box: visibleBox(selector) }))
+          .filter((entry): entry is { selector: string; box: DOMRect } => entry.box !== null && entry.box.width > 0 && entry.box.height > 0);
         const cardOverlap = boxes.some((box, index) => boxes.slice(index + 1).some((other) => intersects(box, other)));
         const overflow = cards.some((card) => [...card.querySelectorAll<HTMLElement>('*')].some((child) => (
           child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1
@@ -1880,7 +1898,8 @@ test.describe('solo mechanics', () => {
           minimapGap: supportBox.top - (visibleBox('#location-label')?.bottom ?? minimapBox.bottom),
           leftAnchored: supportBox.left < window.innerWidth * 0.5,
           verticallyStacked: boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom),
-          persistentOverlap: persistentRegions.some((region) => intersects(supportBox, region)),
+          persistentOverlap: persistentRegions.some((region) => intersects(supportBox, region.box)),
+          overlapSelectors: persistentRegions.filter((region) => intersects(supportBox, region.box)).map((region) => region.selector),
           cardOverlap,
           overflow,
         };
@@ -1895,13 +1914,13 @@ test.describe('solo mechanics', () => {
       expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.leftAnchored, JSON.stringify(viewport)).toBe(true);
       expect(metrics.verticallyStacked, JSON.stringify(viewport)).toBe(true);
-      expect(metrics.persistentOverlap, JSON.stringify(viewport)).toBe(false);
+      expect(metrics.persistentOverlap, JSON.stringify({ viewport, metrics })).toBe(false);
       expect(metrics.cardOverlap, JSON.stringify(viewport)).toBe(false);
       expect(metrics.overflow, JSON.stringify(viewport)).toBe(false);
     }
   });
 
-  test('spawns and awards the contested centre Overdrive Core for exactly 4× damage', async ({ page }) => {
+  test('spawns and awards the contested centre Overdrive Core for exactly 2× damage', async ({ page }) => {
     const initialSpawnInMs = await page.evaluate(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
       return state.overdrive.nextSpawnAt - performance.now();
@@ -1922,7 +1941,7 @@ test.describe('solo mechanics', () => {
     expect(spawnAnnouncement.text).toContain('QUAD DAMAGE ONLINE');
     await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
     expect((await debug(page)).overdrive).toMatchObject({
-      available: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '4×',
+      available: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
     });
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -1932,7 +1951,7 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => {
       active = (await debug(page)).overdrive;
       return active.damageMultiplier;
-    }).toBe(4);
+    }).toBe(2);
     expect(active).not.toBeNull();
     const observedActive = active as unknown as {
       available: boolean;
@@ -1942,9 +1961,9 @@ test.describe('solo mechanics', () => {
     expect(observedActive.available).toBe(false);
     expect(observedActive.pickups).toBe(1);
     expect(observedActive.remainingMs).toBeGreaterThan(12_000);
-    expect(observedActive.remainingMs).toBeLessThanOrEqual(15_000);
+    expect(observedActive.remainingMs).toBeLessThanOrEqual(30_000);
     await expect(page.locator('#overdrive-hud')).toBeVisible();
-    await expect(page.locator('#overdrive-hud')).toContainText('4× DAMAGE');
+    await expect(page.locator('#overdrive-hud')).toContainText('2× DAMAGE');
     await expect(page.locator('#power-announcement')).toContainText('QUAD DAMAGE');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setOverdrive: (mode: 'expired') => void } }).__ATOMIC_ACRES_DEBUG__.setOverdrive('expired'));
     await expect(page.locator('#overdrive-hud')).toBeHidden();

@@ -2734,8 +2734,8 @@
         "range": 1.75
       },
       "overdrive": {
-        "damageMultiplier": 4,
-        "durationMs": 15000,
+        "damageMultiplier": 2,
+        "durationMs": 30000,
         "pickupRadius": 1.65,
         "position": [
           0,
@@ -3424,10 +3424,13 @@
       "pass30-nuke-fifteen-streak",
       "pass30-stormfront-lighting",
       "pass54-wall-penetration",
-      "pass55-range-armory-lmg"
+      "pass55-range-armory-lmg",
+      "pass60-sniper-headshot-three-times",
+      "pass60-overdrive-two-times-thirty-seconds",
+      "pass60-atomic-acres-collision-completion"
     ],
     "baseSourceRevision": "72c313c494853ed1ee4673f06a8f064330ac9efc",
-    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 55",
+    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 60",
     "dependencies": {
       "@dimforge/rapier3d-compat": "0.19.3",
       "peerjs": "1.5.5",

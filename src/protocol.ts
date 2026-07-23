@@ -333,7 +333,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.holderId === null || typeof msg.holderId === 'string' && msg.holderId.length > 0 && msg.holderId.length <= 80)
         && typeof msg.available === 'boolean'
         && Number.isSafeInteger(msg.generation) && Number(msg.generation) >= 0 && Number(msg.generation) <= 10_000
-        && Number.isFinite(msg.activeRemainingMs) && Number(msg.activeRemainingMs) >= 0 && Number(msg.activeRemainingMs) <= 15_000
+        && Number.isFinite(msg.activeRemainingMs) && Number(msg.activeRemainingMs) >= 0 && Number(msg.activeRemainingMs) <= 30_000
         && Number.isFinite(msg.nextSpawnInMs) && Number(msg.nextSpawnInMs) >= 0 && Number(msg.nextSpawnInMs) <= 120_000
         && Number.isFinite(msg.nonce);
     case 'lobby-join':

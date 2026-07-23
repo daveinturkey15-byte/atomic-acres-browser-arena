@@ -50,6 +50,12 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       'Every completed match exposes a human per-player scoreboard and timestamped damage timeline plus a separate large agent-readable diagnostics ledger',
       'Both upstairs house windows now break; Quality and Performance share collision for all substantial Atomic Acres terrain and authored props',
       'Gun Range is a bot-free six-player FFA with real wallbang player damage, plus a 100 HP flying black cat worth 500 points that respawns after 30 seconds',
+      'Player and bot hitboxes now follow the visible head in every stance instead of admitting critical hits above the model',
+      'Gun Range gains a textured white-silver shell, slowly cycling neon light and a dedicated right-side target-damage feed',
+      'Atomic Acres duplicate floating house shells are removed, while Rustworks gains centre cover and an open-tread ship ladder without coplanar deck flicker',
+      'Quad Damage is a reliable 2× pickup for 30 seconds; eliminating its holder steals the remaining power time',
+      'Bounded target rewind improves moving-player hit registration, while degraded movement channels fall back reliably and active players can rejoin',
+      'Scout Sweep now pulses, inbound supports have clearer warnings, and bounded browser exception history is included in technical reports',
     ]),
   }),
   Object.freeze({

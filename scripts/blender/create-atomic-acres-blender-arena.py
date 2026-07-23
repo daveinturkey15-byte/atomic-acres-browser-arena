@@ -367,6 +367,12 @@ for house_index, house in enumerate(spec["houses"]):
         semantic = solid["id"] if solid["kind"] == "glass" and solid["breakable"] else None
         rotation = tuple(solid.get("rotation") or (0, 0, 0))
         solid_material = surface_material[solid["surface"]]
+        # The upper slab needs two readable faces: a pale ceiling below and a
+        # timber walking surface above. Rendering the whole 32 cm slab as dark
+        # timber made it read as a huge floating roof from the ground floor.
+        upper_floor = solid["name"].startswith("upper-floor-")
+        if upper_floor:
+            solid_material = M["plaster"]
         if solid["surface"] in ("aqua", "coral"):
             if "upper" in solid["name"]:
                 solid_material = M["aqua_upper"] if house["team"] == 0 else M["coral_upper"]
@@ -377,11 +383,22 @@ for house_index, house in enumerate(spec["houses"]):
             solid_material, 0.025 if solid["kind"] != "glass" else 0,
             rotation=rotation, semantic=semantic,
         )
+        if upper_floor:
+            position = list(solid["position"])
+            size = list(solid["size"])
+            position[1] += size[1] / 2 + 0.012
+            add_box(
+                f"BLD_HOUSE_{prefix}_{solid_index:03d}_{solid['name']}_timber_wear_surface",
+                position, [size[0], 0.024, size[2]], M["timber"], 0,
+            )
     x, z = house["origin"]["x"], house["origin"]["z"]
     facing = house["origin"]["facing"]
     width, depth = house["dimensions"]["width"], house["dimensions"]["depth"]
     accent = M["aqua"] if house["team"] == 0 else M["coral"]
     add_box(f"BLD_HOUSE_{prefix}_roof", [x, 7.18, z], [width + 0.8, 0.48, depth + 0.8], M["roof"], 0.08)
+    # Give the upper rooms a light, continuous soffit. Exposing the dark roof
+    # shingle underside made every internal doorway read as a black rectangle.
+    add_box(f"BLD_HOUSE_{prefix}_upper_ceiling_soffit", [x, 6.92, z], [width - 0.24, 0.04, depth - 0.24], M["plaster"], 0)
     # Deliberately asymmetric model-home trim preserves every structural opening.
     for side in (-1, 1):
         add_box(f"BLD_HOUSE_{prefix}_corner_{side}", [x + side * (width / 2 + 0.06), 3.55, z], [0.18, 7.1, depth + 0.25], M["metal"], 0.02)
@@ -433,12 +450,12 @@ for house_index, house in enumerate(spec["houses"]):
                 add_box(f"P32_FURN_{prefix}_chair_leg_{chair_index}_{ox}_{oz}", [cx + ox, 0.27, cz + oz], [0.08, 0.54, 0.08], M["metal"], 0.018)
 
     sofa_x, sofa_z = x + 3.7, z + facing * 2.7
-    add_box(f"P32_FURN_{prefix}_sofa_base", [sofa_x, 0.43, sofa_z], [3.0, 0.62, 1.15], M["timber"], 0.13)
+    add_box(f"P32_FURN_{prefix}_sofa_base", [sofa_x, 0.32, sofa_z], [3.0, 0.62, 1.15], M["timber"], 0.13)
     for cushion in (-0.95, 0, 0.95):
-        add_box(f"P32_FURN_{prefix}_sofa_cushion_{cushion}", [sofa_x + cushion, 0.79, sofa_z - facing * 0.08], [0.86, 0.22, 0.9], fabric, 0.13)
-        add_box(f"P32_FURN_{prefix}_sofa_back_{cushion}", [sofa_x + cushion, 1.25, sofa_z + facing * 0.48], [0.88, 0.82, 0.24], fabric, 0.12)
+        add_box(f"P32_FURN_{prefix}_sofa_cushion_{cushion}", [sofa_x + cushion, 0.68, sofa_z - facing * 0.08], [0.86, 0.22, 0.9], fabric, 0.13)
+        add_box(f"P32_FURN_{prefix}_sofa_back_{cushion}", [sofa_x + cushion, 1.14, sofa_z + facing * 0.48], [0.88, 0.82, 0.24], fabric, 0.12)
     for side in (-1, 1):
-        add_box(f"P32_FURN_{prefix}_sofa_arm_{side}", [sofa_x + side * 1.48, 0.85, sofa_z], [0.22, 0.72, 1.08], fabric, 0.1)
+        add_box(f"P32_FURN_{prefix}_sofa_arm_{side}", [sofa_x + side * 1.48, 0.74, sofa_z], [0.22, 0.72, 1.08], fabric, 0.1)
 
     # Edge-aligned galley, rug and decor make this a staged model home without
     # filling the central traversal envelope with implied cover.
@@ -450,11 +467,18 @@ for house_index, house in enumerate(spec["houses"]):
     add_box(f"P32_FURN_{prefix}_kitchen_fridge", [x - 6.45, 1.12, kitchen_z], [1.05, 2.15, 0.72], M["metal_light"], 0.06)
     add_box(f"P32_FURN_{prefix}_living_rug", [sofa_x - 0.3, 0.095, sofa_z - facing * 1.5], [4.0, 0.035, 2.2], fabric, 0.025)
     add_box(f"P32_FURN_{prefix}_coffee_table", [sofa_x - 0.3, 0.42, sofa_z - facing * 1.5], [1.8, 0.22, 0.82], M["timber"], 0.08)
+    for leg_x in (-0.7, 0.7):
+        for leg_z in (-0.29, 0.29):
+            add_box(
+                f"P32_FURN_{prefix}_coffee_table_leg_{leg_x}_{leg_z}",
+                [sofa_x - 0.3 + leg_x, 0.2, sofa_z - facing * 1.5 + leg_z],
+                [0.1, 0.4, 0.1], M["metal"], 0.018,
+            )
     for art_index, art_x in enumerate((x + 1.8, x + 3.2)):
         add_box(f"P32_FURN_{prefix}_wall_art_{art_index}", [art_x, 1.85, z + facing * 5.28], [1.05, 0.78, 0.06], accent, 0.025)
 
     console_x, console_z = x + 3.7, z - facing * 3.1
-    add_box(f"P32_FURN_{prefix}_media_cabinet", [console_x, 0.58, console_z], [2.45, 0.9, 0.62], M["timber"], 0.08)
+    add_box(f"P32_FURN_{prefix}_media_cabinet", [console_x, 0.46, console_z], [2.45, 0.9, 0.62], M["timber"], 0.08)
     add_box(f"P32_FURN_{prefix}_media_screen_frame", [console_x, 1.55, console_z + facing * 0.18], [2.2, 1.25, 0.14], M["metal"], 0.06)
     add_box(f"P32_FURN_{prefix}_media_screen", [console_x, 1.56, console_z + facing * 0.27], [1.88, 0.95, 0.04], M["emissive_aqua"], 0.025)
     for side in (-1, 1):
@@ -509,8 +533,25 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
             for band in (-0.42, 0.42):
                 add_box(f"P32_LARGE_COVER_cargo_strap_{crate_index}_{band}", [x + ox + band, oy, z], [0.1, sy + 0.04, 1.82], M["yellow"], 0.02)
     elif index == 5:
-        for pipe_index, (oz, oy) in enumerate(((-0.9, 0.62), (0, 0.62), (0.9, 0.62), (-0.45, 1.48), (0.45, 1.48))):
-            add_cylinder(f"P32_LARGE_COVER_concrete_pipe_{pipe_index}", [x, oy, z + oz], 0.43, width - 0.3, M["concrete"], 18, rotation=(0, math.pi / 2, 0))
+        # Ground the stack exactly and leave both pipe ends open. The previous
+        # capped cylinders floated 19 cm above grade and looked like boulders.
+        pipe_length = width - 0.3
+        for pipe_index, (oz, oy) in enumerate(((-0.9, 0.46), (0, 0.46), (0.9, 0.46), (-0.45, 1.32), (0.45, 1.32))):
+            bpy.ops.mesh.primitive_cylinder_add(
+                vertices=24, radius=0.43, depth=pipe_length, end_fill_type="NOTHING",
+                location=game_location([x, oy, z + oz]), rotation=(0, math.pi / 2, 0),
+            )
+            pipe = bpy.context.object
+            pipe.name = f"P32_LARGE_COVER_concrete_pipe_{pipe_index}"
+            scale_existing_uvs(pipe, M["concrete"])
+            pipe.data.materials.append(M["concrete"])
+            pipe["atomic_environment"] = True
+            link_only_env(pipe)
+            for end_index, end_x in enumerate((x - pipe_length / 2, x + pipe_length / 2)):
+                add_torus(
+                    f"P32_LARGE_COVER_concrete_pipe_{pipe_index}_rim_{end_index}",
+                    [end_x, oy, z + oz], 0.36, 0.07, M["concrete"], rotation=(0, math.pi / 2, 0),
+                )
     elif index == 6:
         add_box("P32_LARGE_COVER_service_skip_body", [x, 0.98, z], [width - 0.12, 1.86, depth - 0.18], M["coral"], 0.16)
         for side in (-1, 1):

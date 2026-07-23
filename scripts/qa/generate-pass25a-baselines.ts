@@ -21,7 +21,7 @@ const dependencies = Object.fromEntries(dependencyNames.map((name) => [name, pac
 const contract = {
   metadata: {
     schemaVersion: 3,
-    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through Pass 55',
+    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through Pass 60',
     baseSourceRevision: '72c313c494853ed1ee4673f06a8f064330ac9efc',
     approvedDeltas: [
       'scattergun-strength',
@@ -35,6 +35,9 @@ const contract = {
       'pass30-stormfront-lighting',
       'pass54-wall-penetration',
       'pass55-range-armory-lmg',
+      'pass60-sniper-headshot-three-times',
+      'pass60-overdrive-two-times-thirty-seconds',
+      'pass60-atomic-acres-collision-completion',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,
@@ -44,7 +47,7 @@ const contract = {
 const replays = {
   metadata: {
     schemaVersion: 3,
-    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through Pass 55 range armory LMG',
+    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through Pass 60',
     baseSourceRevision: '3a1ead06bfdede4b3d6c96f9ecde228520c04ccf',
     fixedSeedPrefix: 'pass25a:',
   },

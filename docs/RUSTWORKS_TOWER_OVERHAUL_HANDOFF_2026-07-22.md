@@ -64,12 +64,12 @@ Generator command:
 
 `C:\Program Files\Blender Foundation\Blender 5.1\blender.exe --background --factory-startup --python scripts/blender/create-rustworks-central-tower.py`
 
-Observed authoring result: Blender 5.1.2, 309 created objects, 10 materials,
-asset version `rustworks-tower-overhaul-v1`. Every exported authored node carries
+Observed authoring result: Blender 5.1.2, 326 exported nodes, 304 meshes, 10 materials,
+asset version `rustworks-pass60-feedback-v2`. Every exported authored node carries
 `rustworks_asset_owner=Rustworks`,
 `rustworks_asset_class=authored-central-tower`, and
 `collision_authority=typescript-rustworks-boxes`; authored names use the `RW_`
-prefix. The root identifies the undercroft, four-per-side container layout, west
+prefix. The root identifies the undercroft, five-per-side container layout, west
 service trench, and 15.87 m authored height.
 
 Final artifacts:

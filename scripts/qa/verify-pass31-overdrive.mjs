@@ -1,7 +1,8 @@
 import { chromium, firefox } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4173/';
-const timeout = 30_000;
+const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
+const timeout = 45_000;
 const errors = [];
 const browser = process.env.QA_BROWSER === 'firefox'
   ? await firefox.launch({ headless: true })
@@ -39,6 +40,7 @@ try {
     const url = new URL(baseUrl);
     url.searchParams.set('render', 'compatibility');
     url.searchParams.set('multiplayerQa', '1');
+    if (peerPort > 0) url.searchParams.set('peerQaPort', String(peerPort));
     await page.goto(url.toString());
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout });
     await page.fill('#player-name', label === 'host' ? 'Core Host' : 'Core Guest');
@@ -60,8 +62,16 @@ try {
   })));
   await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   try {
-    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout });
-    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout });
+    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch.members.length === 2, undefined, { timeout });
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch.members.length === 2, undefined, { timeout });
+    await host.click('#lobby-ready');
+    await guest.click('#lobby-ready');
+    await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout });
+    await host.click('#lobby-start');
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.matchPhase === 'active' && state.remotes === 1;
+    }, undefined, { timeout })));
   } catch (error) {
     console.error('host diagnostics', await host.evaluate(() => ({ state: window.__ATOMIC_ACRES_DEBUG__?.snapshot(), status: document.querySelector('#status')?.textContent })));
     console.error('guest diagnostics', await guest.evaluate(() => ({ state: window.__ATOMIC_ACRES_DEBUG__?.snapshot(), status: document.querySelector('#status')?.textContent })));
@@ -88,7 +98,7 @@ try {
   await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().overdrive.available === true, undefined, { timeout });
   await movePlausibly(guest, 0, 0.02, 0);
   console.log('stage: guest-paced-to-core');
-  await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().overdrive.damageMultiplier === 4, undefined, { timeout });
+  await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().overdrive.damageMultiplier === 2, undefined, { timeout });
   await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().overdrive.holderId !== null, undefined, { timeout });
   console.log('stage: claim-admitted');
 
@@ -100,7 +110,7 @@ try {
   if (hostState.pickups !== beforeSecondClaim.pickups || hostState.damageMultiplier !== 1) {
     throw new Error('Overdrive admitted a second claimant while the guest held the core');
   }
-  if (guestState.damageMultiplier !== 4 || guestState.available || guestState.visible) {
+  if (guestState.damageMultiplier !== 2 || guestState.available || guestState.visible) {
     throw new Error('Guest did not receive the single host-authoritative Overdrive state');
   }
 

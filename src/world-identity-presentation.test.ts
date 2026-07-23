@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { arenaLightingProfile } from './blender-lighting';
-import { createWorldIdentityPresentation } from './world-identity-presentation';
+import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation } from './world-identity-presentation';
 
 describe('Pass 29 practical and interior presentation', () => {
   it('creates three route beacons, four sourced street lights, four interior lights and one eight-panel fixture draw in Blender', () => {
@@ -28,6 +28,22 @@ describe('Pass 29 practical and interior presentation', () => {
     const ceilings = presentation.root.getObjectByName('pass29-structural-room-ceilings');
     expect(ceilings).toBeInstanceOf(THREE.InstancedMesh);
     expect((ceilings as THREE.InstancedMesh).count).toBe(10);
+    const doorFinishes = presentation.root.getObjectByName('pass60-upper-room-door-finishes');
+    expect(doorFinishes?.children).toHaveLength(2);
+    expect(doorFinishes?.getObjectByName('aqua-irrigation-workshop-upper-room-door-finish-lit-threshold')).toBeInstanceOf(THREE.Mesh);
+    expect(doorFinishes?.getObjectByName('coral-orchard-conservatory-upper-room-door-finish-lit-threshold')).toBeInstanceOf(THREE.Mesh);
+    expect(doorFinishes?.getObjectByName('aqua-irrigation-workshop-upper-room-door-finish-open-leaf')).toBeUndefined();
+    doorFinishes?.traverse((node) => expect(node.userData.blocksShots).toBe(false));
+  });
+
+  it('hides duplicate procedural house shell meshes while Quality art owns the shell', () => {
+    const presentation = createWorldIdentityPresentation(new THREE.Scene(), arenaLightingProfile('blender'));
+    setWorldIdentityHouseShellPresentation(presentation.root, false);
+    expect(presentation.root.getObjectByName('pass29-interior-ceiling-panels')?.visible).toBe(false);
+    expect(presentation.root.getObjectByName('pass29-structural-room-ceilings')?.visible).toBe(false);
+    expect(presentation.root.getObjectByName('pass60-upper-room-door-finishes')?.visible).toBe(true);
+    setWorldIdentityHouseShellPresentation(presentation.root, true);
+    expect(presentation.root.getObjectByName('pass29-structural-room-ceilings')?.visible).toBe(true);
   });
 
   it('uses two house lights in Performance and zero local lights on software/Compatibility', () => {

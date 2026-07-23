@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb';
-export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'rustworks-tower-overhaul-v1';
+export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb?v=pass60-20260723-2';
+export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'rustworks-pass60-feedback-v2';
 
 type RustworksBlenderTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';

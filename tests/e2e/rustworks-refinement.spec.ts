@@ -52,7 +52,7 @@ test('renders the lowered dynamic ocean and symmetric authored Rustworks layout'
   expect(telemetry.water.waveAmp).toBeCloseTo(1.55);
   expect(telemetry.rustworksBlender).toMatchObject({
     status: 'ready',
-    assetVersion: 'pass54-v2',
+    assetVersion: 'rustworks-pass60-feedback-v2',
   });
   await page.waitForTimeout(250);
   await page.screenshot({ path: 'test-results/rustworks-symmetric-container-ring.png', animations: 'disabled' });

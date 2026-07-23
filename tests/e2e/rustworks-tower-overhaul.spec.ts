@@ -95,7 +95,7 @@ test('Rustworks tower overhaul renders the undercroft, west trench, and open fre
   expect(state.arenaSelection.raycastMeshes).toBeGreaterThanOrEqual(state.arenaSelection.colliders);
   expect(state.render.rustworksBlender).toMatchObject({
     status: 'ready',
-    assetVersion: 'rustworks-tower-overhaul-v1',
+    assetVersion: 'rustworks-pass60-feedback-v2',
   });
   expect(state.render.rustworksBlender.authoredHeight).toBeGreaterThanOrEqual(15.8);
   expect(state.render.rustworksBlender.semanticParts).toBeGreaterThanOrEqual(250);

@@ -16,7 +16,7 @@ GLB_PATH = ROOT / "public" / "assets" / "original" / "models" / "rustworks-centr
 TEXTURE_ROOT = ROOT / "public" / "assets" / "original" / "textures"
 PREVIEW_PATH = ROOT / "artifacts" / "rustworks-tower-overhaul" / "rustworks-tower-overhaul-preview.png"
 
-ASSET_VERSION = "rustworks-tower-overhaul-v1"
+ASSET_VERSION = "rustworks-pass60-feedback-v2"
 AUTHORED_HEIGHT_M = 15.87
 
 LOADED: dict[str, bpy.types.Image] = {}
@@ -226,20 +226,20 @@ def main():
     root["asset_version"] = ASSET_VERSION
     root["authored_height_metres"] = AUTHORED_HEIGHT_M
     root["access_scheme"] = "undercroft-cross-plus-lower-ramp-plus-ship-ladder"
-    root["quality_pass"] = "rustworks-tower-overhaul"
-    root["container_layout"] = "four-per-side-one-open-per-side"
+    root["quality_pass"] = "rustworks-pass60-feedback"
+    root["container_layout"] = "five-per-side-one-open-per-side"
     root["service_trench"] = "west-deck-level"
     root["material_count_target"] = 10
 
     # ========== GROUND ==========
     # Match the actual 54x58 metre oil-rig deck. Keeping the authored surface
     # inside the safety rail lets the lowered ocean remain visible over every edge.
-    cube("RW_rig_deck_top", (0, 0, 0.02), (54, 58, 0.05), M_plate, "ground-rig-deck", do_bevel=False)
-    cube("RW_hardstand", (0, 0, 0.06), (16, 16, 0.1), M_asphalt, "ground-hardstand")
-    cube("RW_service_lane_z", (0, 0, 0.07), (5.5, 48, 0.08), M_concrete, "ground-lane")
-    cube("RW_service_lane_x", (0, 0, 0.075), (48, 5.5, 0.08), M_concrete, "ground-lane")
+    cube("RW_rig_deck_top", (0, 0, 0.025), (54, 58, 0.05), M_plate, "ground-rig-deck", do_bevel=False)
+    cube("RW_hardstand", (0, 0, 0.075), (16, 16, 0.05), M_asphalt, "ground-hardstand", do_bevel=False)
+    cube("RW_service_lane_z", (0, 0, 0.125), (5.5, 48, 0.04), M_concrete, "ground-lane", do_bevel=False)
+    cube("RW_service_lane_x", (0, 0, 0.125), (48, 5.5, 0.04), M_concrete, "ground-lane", do_bevel=False)
     for i, z in enumerate((-20, 20)):
-        cube(f"RW_chevron_{i}", (0, -z, 0.09), (4.2, 0.7, 0.05), M_hazard, "ground-marking", do_bevel=False)
+        cube(f"RW_chevron_{i}", (0, -z, 0.16), (4.2, 0.7, 0.02), M_hazard, "ground-marking", do_bevel=False)
 
     # ========== TOWER LEGS (I-style) ==========
     for x in (-3.35, 3.35):
@@ -399,9 +399,8 @@ def main():
          (ship_width + 0.55, ship_upper_landing_depth, 0.14), M_diamond, "ship-ladder-landing")
     cube("RW_upper_access_bridge", (ship_bridge_center_x, -ship_upper_landing_center_z, upper_top),
          (abs(ship_x - (upper_half - 0.35)) + 0.6, ship_upper_landing_depth, 0.14), M_grate, "upper-access")
-    slab = cube("RW_ship_ladder_slab", (ship_x, -ship_center_z, ship_center_y + 0.02),
-                (ship_width, ship_len, ship_thick), M_diamond, "ship-ladder", do_bevel=False)
-    slab.rotation_euler = (ship_angle, 0.0, 0.0)
+    ladder_marker = empty("RW_ship_ladder_route", (ship_x, -ship_center_z, ship_center_y), "ship-ladder")
+    ladder_marker["rustworks_collision_authority"] = "typescript-hidden-ramp"
     for side, label in ((-1, "west"), (1, "east")):
         rail = cube(f"RW_ship_ladder_rail_{label}", (ship_x + side * (ship_width / 2 + 0.1), -ship_center_z, ship_center_y + 0.65),
                     (0.1, ship_len, 0.1), M_hazard, "ship-ladder-rail", do_bevel=False)
@@ -450,8 +449,24 @@ def main():
     for z in (-6.0, 6.0):
         cube(f"RW_service_trench_crossover_{z}", (trench_x, -z, 2.55), (4.35, 1.2, 0.16), M_plate, "service-trench-crossover")
 
-    # ========== YARD (four containers per side; one pass-through per side) ==========
-    perimeter_slots = (-18.0, -9.0, 9.0, 18.0)
+    # Eight low/medium cover pieces break the previously empty central quadrants
+    # without closing either service cross or the west trench route.
+    centre_cover_specs = (
+        ("stack_base", (9.2, -9.4, 0.6), (3.2, 2.2, 1.2), M_rust),
+        ("stack_top", (9.7, -9.4, 1.65), (1.8, 1.8, 0.9), M_hazard),
+        ("stagger_long", (-9.4, -8.5, 0.62), (3.4, 1.0, 1.24), M_corr),
+        ("stagger_short", (-8.15, -5.9, 0.45), (1.0, 2.4, 0.9), M_plate),
+        ("corner_long", (9.4, 8.2, 0.55), (3.6, 0.9, 1.1), M_concrete),
+        ("corner_high", (8.1, 9.45, 0.8), (0.9, 3.4, 1.6), M_oxide),
+        ("low_flank_a", (-9.8, 8.6, 0.42), (2.8, 1.2, 0.84), M_concrete),
+        ("low_flank_b", (-7.7, 10.0, 0.42), (1.8, 1.2, 0.84), M_hazard),
+    )
+    for label, (x, z, y), size, material in centre_cover_specs:
+        cover = cube(f"RW_centre_cover_{label}", (x, -z, y), size, material, "yard-centre-cover")
+        cover["rustworks_cover_role"] = label
+
+    # ========== YARD (five containers per side; one pass-through per side) ==========
+    perimeter_slots = (-18.0, -9.0, 0.0, 9.0, 18.0)
     perimeter_row = 21.5
     container_materials = (M_hazard, M_rust, M_corr)
     container_index = 0
