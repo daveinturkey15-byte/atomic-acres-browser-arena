@@ -694,6 +694,10 @@ test.describe('boot and authored presentation', () => {
     await page.waitForTimeout(150);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows[0]?.broken === true, undefined, { timeout: 10_000 });
+    // The tracer pool is a separate transient draw batch whose exact lifetime is
+    // renderer-scheduling dependent. Sample the breakable-window budget after
+    // that batch drains while impact/fragment presentation may still be active.
+    await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().activeTracers === 0, undefined, { timeout: 30_000 });
     const activeState = await debug(page);
     expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
