@@ -211,6 +211,10 @@ test.describe('Pass 25A baseline and lifecycle', () => {
   });
 
   test('refreshes Blender static shadows at a bounded rate for moving casters', async ({ page }) => {
+    // The Linux hosted runner executes this after the 20-cycle rematch stress
+    // case under SwiftShader. Preserve the exact shadow assertions while giving
+    // the final Blender startup a finite allowance for cumulative GPU starvation.
+    test.setTimeout(180_000);
     await ready(page, 'blender');
     await startSolo(page);
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
