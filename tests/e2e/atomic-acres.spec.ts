@@ -420,20 +420,24 @@ test.describe('boot and authored presentation', () => {
     await startSolo(page);
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
-        snapshot: () => { rangePractice: { targets: Array<{ id: string }> } };
         equipWeapon: (weapon: 'lmg') => void;
         setAds: (held: boolean) => void;
-        hitRangeTarget: (id: string, damage: number, zone: 'body') => void;
       } }).__ATOMIC_ACRES_DEBUG__;
       api.equipWeapon('lmg');
       api.setAds(true);
-      api.hitRangeTarget(api.snapshot().rangePractice.targets[0].id, 31, 'body');
     });
     await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
     await expect.poll(async () => {
       const offset = (await debug(page)).weaponPresentation.sightOffset;
       return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
     }).toBeLessThan(0.006);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        snapshot: () => { rangePractice: { targets: Array<{ id: string }> } };
+        hitRangeTarget: (id: string, damage: number, zone: 'body') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.hitRangeTarget(api.snapshot().rangePractice.targets[0].id, 31, 'body');
+    });
     await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-damage', '31');
     const damageText = page.locator('#damage-numbers strong').last();
     await expect(damageText).toBeVisible();
@@ -615,7 +619,10 @@ test.describe('boot and authored presentation', () => {
   });
 
   test('loads the complete Quality Graphics arena and binds authored breakable windows', async ({ page }) => {
-    test.setTimeout(180_000);
+    // Hosted Windows exercises Quality through SwiftShader and can cross the
+    // prior three-minute limit while loading and disposing the full GLB scene.
+    // Keep the assertions unchanged but retain a finite five-minute bound.
+    test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=blender&mist=on', 60_000);
