@@ -41,7 +41,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     id: 'pass60',
     pass: 'PASS 60',
     title: 'Fast-feedback combat, HUD & diagnostics pass',
-    releasedAt: PENDING_PRODUCTION_RELEASE,
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
     areas: Object.freeze(['COMBAT', 'MULTIPLAYER', 'HUD', 'DIAGNOSTICS', 'MAPS', 'GUN RANGE']),
     summary: 'Pass 60 prioritises fast player-visible feedback: larger HUD presentation, authoritative per-player handicaps, actionable reports, and screenshot-driven arena rebuilds while preserving Pass 59 as the exact stable fallback.',
     highlights: Object.freeze([
@@ -279,34 +279,39 @@ type ParsedReleaseTimestamp = Readonly<{
   hour: string;
   minute: string;
   second: string;
-  offset: string;
+  zone: string;
+  offsetLabel: string;
 }>;
 
+const UK_RELEASE_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/London',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+  timeZoneName: 'short',
+});
+
 function parseReleaseTimestamp(isoTimestamp: string): ParsedReleaseTimestamp | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:\d{2})$/.exec(isoTimestamp);
-  if (!match) return null;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(isoTimestamp)) return null;
+  const instant = new Date(isoTimestamp);
+  if (Number.isNaN(instant.getTime())) return null;
+  const parts = new Map(UK_RELEASE_TIMESTAMP_FORMATTER.formatToParts(instant).map((part) => [part.type, part.value]));
+  const zone = parts.get('timeZoneName');
+  if (!zone) return null;
   return {
-    year: match[1],
-    month: match[2],
-    day: match[3],
-    hour: match[4],
-    minute: match[5],
-    second: match[6],
-    offset: match[7],
+    year: parts.get('year') ?? '',
+    month: parts.get('month') ?? '',
+    day: parts.get('day') ?? '',
+    hour: parts.get('hour') ?? '',
+    minute: parts.get('minute') ?? '',
+    second: parts.get('second') ?? '',
+    zone,
+    offsetLabel: zone === 'BST' ? 'UTC+1' : 'UTC',
   };
-}
-
-function releaseZoneLabel(offset: string): string {
-  if (offset === '+01:00') return 'BST';
-  if (offset === 'Z' || offset === '+00:00') return 'GMT';
-  return `UTC${offset}`;
-}
-
-function compactOffsetLabel(offset: string): string {
-  if (offset === 'Z' || offset === '+00:00') return 'UTC';
-  const sign = offset.startsWith('-') ? '-' : '+';
-  const [hours, minutes] = offset.slice(1).split(':');
-  return minutes === '00' ? `UTC${sign}${Number(hours)}` : `UTC${sign}${Number(hours)}:${minutes}`;
 }
 
 export function formatChangelogTimestamp(isoTimestamp: string): string {
@@ -314,13 +319,13 @@ export function formatChangelogTimestamp(isoTimestamp: string): string {
   if (!parsed) return isoTimestamp;
   const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const month = months[Number(parsed.month) - 1] ?? parsed.month;
-  return `${Number(parsed.day)} ${month} ${parsed.year} · ${parsed.hour}:${parsed.minute} ${releaseZoneLabel(parsed.offset)}`;
+  return `${Number(parsed.day)} ${month} ${parsed.year} · ${parsed.hour}:${parsed.minute} ${parsed.zone}`;
 }
 
 export function formatChangelogTimestampDetail(isoTimestamp: string): string {
   const parsed = parseReleaseTimestamp(isoTimestamp);
   if (!parsed) return isoTimestamp;
-  return `${formatChangelogTimestamp(isoTimestamp)} · ${compactOffsetLabel(parsed.offset)} · ${parsed.hour}:${parsed.minute}:${parsed.second}`;
+  return `${formatChangelogTimestamp(isoTimestamp)} · ${parsed.offsetLabel} · ${parsed.hour}:${parsed.minute}:${parsed.second}`;
 }
 
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {

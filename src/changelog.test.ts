@@ -19,6 +19,10 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
       '22 JUL 2026 · 15:43 BST · UTC+1 · 15:43:16',
     );
+    expect(formatChangelogTimestamp('2026-07-23T22:51:43Z')).toBe('23 JUL 2026 · 23:51 BST');
+    expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
+      '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
+    );
     expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · PENDING_PRODUCTION');
   });
 
@@ -69,11 +73,11 @@ describe('changelog', () => {
     expect(timestamps).toEqual([...timestamps].sort((a, b) => b - a));
   });
 
-  it('falls back cleanly for malformed timestamps and non-UK offsets', () => {
+  it('falls back cleanly for malformed timestamps and converts other offsets to UK time', () => {
     expect(formatChangelogTimestamp('not-a-timestamp')).toBe('not-a-timestamp');
     expect(formatChangelogTimestamp('2026-12-01T08:02:03Z')).toBe('1 DEC 2026 · 08:02 GMT');
     expect(formatChangelogTimestampDetail('2026-12-01T08:02:03-05:30')).toBe(
-      '1 DEC 2026 · 08:02 UTC-05:30 · UTC-5:30 · 08:02:03',
+      '1 DEC 2026 · 13:32 GMT · UTC · 13:32:03',
     );
   });
 });
