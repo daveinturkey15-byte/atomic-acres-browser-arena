@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 62",
+  "feedbackReceivedAt": "2026-07-24T11:51:00Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-30-416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+    "sourceSha": "416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+    "createdAt": "2026-07-24T14:53:24Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-07-24T15:03:04Z",
+    "evidence": "After the exact preview existed, Dave instructed Codex: push 62 live first; it is fine, then work on 63."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Host-authoritative immutable bullet timelines and bounded adaptive netcode",
+      "expected": "Every bullet keeps one authored fire and target-view timeline; the host resolves it exactly once without clamping across life or connection boundaries, while interpolation stays in the cadence-specific bands.",
+      "falsifier": "Any accepted shot changes its authored time, applies damage twice, crosses a life or connection boundary, exceeds the rewind ceiling, or fails to confirm a host-resolved hit to the guest.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/authoritative-shot.test.ts",
+          "command": "npx vitest run src/authoritative-shot.test.ts src/authored-shot-resolution.test.ts src/lag-compensation.test.ts src/network-sync.test.ts",
+          "note": "Covers immutable timing, automatic-fire bunching, duplicate suppression, strict history admission, continuity, and adaptive delay bounds."
+        },
+        {
+          "kind": "trace",
+          "ref": "scripts/qa/verify-pass61-authoritative-netcode.mjs",
+          "command": "npm run qa:pass61:netcode",
+          "note": "Two consecutive impaired-network runs produced seven authored shots, seven host resolutions, and seven guest confirmations."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Smaller right-biased first-person weapons with preserved ADS and wall retreat",
+      "expected": "Hip-fire weapons are materially smaller and held to the right, ADS remains physically centred, and arms or guns do not visibly enter nearby walls or floors.",
+      "falsifier": "A representative weapon is still oversized and central, its sight leaves the centre ray, or the model visibly clips a nearby surface.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --grep \"physical sights|near walls\"",
+          "note": "Served-browser probes assert ADS centring and depth-aware near-surface retreat."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-30-416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+          "note": "The accepted immutable preview contains the final first-person presentation."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Atomic Acres house artifacts, apertures, lighting leaks, and collision",
+      "expected": "The upper entrance is traversable without a black leaf; obsolete floating blue timber and wall debris are absent; opaque surfaces occlude lights; authored substantial geometry keeps matching authority.",
+      "falsifier": "Any reported black doorway slab or floating interior piece remains, a light is visible through an opaque wall, or a substantial Acres prop can be walked through.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --grep \"authored arena geometry|house\"",
+          "note": "Served Quality and Performance routes exercise house openings, geometry authority, breakable windows, and map bounds."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-30-416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+          "note": "The accepted exact preview is the visual artifact for the rebuilt house materials and openings."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Rustworks central rig, replacement ramp, clean yard, and authoritative container layout",
+      "expected": "Legacy rig debris and duplicate ramps are hidden; one walkable replacement ramp reaches the rig; sixteen yard containers are evenly clustered as eight closed, four open-both, and four open-one with matching movement and projectile authority.",
+      "falsifier": "Any legacy strip floats near the ramp, the ramp cannot be climbed, a container shell lacks collision, an opening is blocked incorrectly, or the 8/4/4 distribution changes.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/additional-maps.test.ts",
+          "command": "npx vitest run src/additional-maps.test.ts src/rustworks-blender.test.ts src/rustworks-quality.test.ts",
+          "note": "Asserts a single ramp authority, four balanced clusters, the exact 8/4/4 container distribution, openings, and collider parity."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/rustworks-refinement.spec.ts",
+          "command": "npx playwright test tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1",
+          "note": "Exercises the served Rustworks composition and authored/procedural ownership."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-30-416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+          "note": "The accepted immutable preview contains the cleaned rig and final container yard."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Skyline Terminal doors, cockpit, cabin glass, and material readability",
+      "expected": "Boarding, upper-platform, cabin, and cockpit routes contain no opaque black door leaf; true glass remains transparent while flight displays remain opaque and emissive.",
+      "falsifier": "A black slab blocks a terminal route, cockpit glass renders opaque, a flight display becomes transparent, or a visible route prop lacks matching collision.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/blender-environment.test.ts",
+          "command": "npx vitest run src/blender-environment.test.ts src/environment-assets.test.ts src/additional-maps.test.ts",
+          "note": "Checks semantic glass handling, non-glass opacity, asset bounds, and terminal map authority."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --grep \"authored arena geometry\"",
+          "note": "Loads the served terminal and traverses representative authored geometry in both profiles."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-30-416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+          "note": "The accepted exact preview contains the final terminal transparency and material response."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "2x Damage Core naming, duration, death drop, and replication",
+      "expected": "The pickup is named 2x Damage, doubles damage for thirty seconds, drops at its holder's death position with the remaining duration, and can be reclaimed without resetting its original respawn schedule.",
+      "falsifier": "Any UI still calls it Quad, a killer receives it automatically, its dropped position disagrees between peers, or reclaiming extends the scheduled next spawn.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/overdrive.test.ts",
+          "command": "npx vitest run src/overdrive.test.ts src/protocol.test.ts",
+          "note": "Covers timed activation, holder-only death drops, expiry, reclaim, respawn timing, and wire validation."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --grep \"damage core|corpse and redeploy\"",
+          "note": "Served runtime verifies the visible pickup and elimination lifecycle."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "Readable player elimination with bounded corpse persistence",
+      "expected": "An eliminated human or bot leaves a non-authoritative visual corpse for 7.5 seconds while the live player can respawn elsewhere; corpses never block movement, shots, or raycasts.",
+      "falsifier": "A death has no readable body, the corpse disappears immediately, persists indefinitely, moves with the respawned player, or affects gameplay authority.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --grep \"corpse and redeploy\"",
+          "note": "Asserts a separate corpse clone, 7.5-second lifetime, respawn independence, and cleanup."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "DHV X Magnum cadence and head-only lethality",
+      "expected": "DHV X still dies to one shot and uses the special Magnum, but the Magnum fires at half its former rate, deals zero body damage, and can kill only with a headshot.",
+      "falsifier": "The X Magnum fires above 90 RPM, damages a body hit, fails its headshot contract, or replaces the sidearm for a non-X player.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/gameplay.test.ts",
+          "command": "npx vitest run src/gameplay.test.ts src/handicap.test.ts",
+          "note": "Asserts 90 RPM and the DHV X outgoing, incoming, weapon-selection, body-zero, and headshot behavior."
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "summary": "Explicit immediate field-kit redeploy",
+      "expected": "Selecting a different field kit exposes a clear redeploy action; clicking it requests a host-authoritative self-elimination and applies the selected loadout on respawn.",
+      "falsifier": "A selected kit silently waits for an unrelated death, applies without host authority, or the redeploy control is missing or ambiguous.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --grep \"field kit\"",
+          "note": "Served UI selects a kit, exposes the explicit redeploy button, and exercises the respawn application path."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/protocol.test.ts",
+          "command": "npx vitest run src/protocol.test.ts src/private-match.test.ts",
+          "note": "Validates the new host-authoritative self-elimination request and lobby ownership rules."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "Restored contrast with selective graphics refinement and profile-safe degradation",
+      "expected": "Atomic Acres retains its accepted lighting; Rustworks and Gun Range keep intentional dark zones; terminal remains readable; PMREM, selective bloom, contact shading, fog, shadows, materials, decals, particles, compression, and streaming degrade by effect without changing physics.",
+      "falsifier": "Lighting is broadly flat, bloom appears through opaque walls, a compressed material is black or missing, Quality and Performance disagree on authority, or overload only reduces resolution and shadows.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/graphics-refinement.test.ts",
+          "command": "npx vitest run src/graphics-refinement.test.ts src/blender-lighting.test.ts src/arena-contrast-lighting.test.ts src/adaptive-quality.test.ts",
+          "note": "Covers arena-scaled image lighting, depth-aware effects, shadow volumes, material caps, and the effect-specific quality ladder."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass62-graphics-refinement.spec.ts",
+          "command": "npx playwright test tests/e2e/pass62-graphics-refinement.spec.ts --project=chromium --workers=1",
+          "note": "Served WebGL checks lazy compressed streaming and bounded refinement telemetry."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-30-416ec05ec1ba9a8575f5298ebd164b5536bd832c",
+          "note": "The accepted immutable preview is the final visual target across the four arenas."
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "summary": "Private-lobby recovery and shared authoritative state",
+      "expected": "Up to six humans can host, join, select DHV, ready, play, disconnect, and rejoin within the bounded grace window while damage, movement, drops, and scores remain host-authored.",
+      "falsifier": "A valid guest cannot rejoin, a stale identity takes a slot permanently, DHV differs between peers, or host and guest disagree on an authoritative combat event.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "trace",
+          "ref": "scripts/qa/verify-private-lobby.mjs",
+          "command": "npm run qa:private-lobby",
+          "note": "Six-player lobby, DHV synchronization, overflow rejection, and identity-preserving rejoin passed."
+        },
+        {
+          "kind": "trace",
+          "ref": "scripts/qa/verify-multiplayer-lifecycle.mjs",
+          "command": "npm run qa:multiplayer:lifecycle",
+          "note": "All five leave, reconnect, and grace-window lifecycle scenarios passed."
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "summary": "Two-channel release topology with Pass 62 live and Pass 60 stable",
+      "expected": "The root chooser exposes exactly Pass 62 Live Experimental New Netcode and byte-exact Pass 60 Stable New Netcode; Pass 59 and the retired moving new-netcode tree are absent; legacy and room links enter Pass 62.",
+      "falsifier": "Pass 59 remains reachable from the chooser, Pass 60 differs from its pinned 143-file tree, a third channel appears, or a latest, normal, or room route lands anywhere except Pass 62.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/release-topology.test.ts",
+          "command": "npx vitest run src/release-topology.test.ts src/release-channel.test.ts src/release-pipeline.test.ts",
+          "note": "Asserts schema 3, immutable Pass 60 provenance, Pass 59 removal, and the protected production sequence."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-release-topology-browser.mjs",
+          "command": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The exact 416ec05 candidate passed both chooser actions and all latest, normal, and room redirects with zero browser failures."
+        }
+      ]
+    }
+  ]
+}
