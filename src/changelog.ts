@@ -45,7 +45,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     areas: Object.freeze(['GAMEPLAY', 'HUD', 'MAPS', 'NETCODE', 'RENDERING', 'PERFORMANCE']),
     summary: 'Pass 62 combines the new graphics pipeline with a targeted gameplay, HUD, lobby and arena-quality repair pass.',
     highlights: Object.freeze([
-      'Procedural PMREM image-based lighting gives metals, glass and authored PBR surfaces a consistent reflection response without a premium HDR asset',
+      'Arena-scaled PMREM gives metals and glass a reflection response while authored sun, moon and practical lights remain the dominant source of shape and contrast',
+      'Arena-specific key-to-fill tuning preserves dark zones; extra bounded spotlights are limited to Atomic and Skyline while Rustworks and Gun Range retain their authored practical-light pools',
       'Quality Graphics adds restrained depth-buffer contact shading, low-altitude depth fog and bloom isolated to tagged emissive objects',
       'Each arena fits its own directional shadow volume instead of sharing one oversized global projection',
       'Adaptive quality now sheds contact shading, bloom resolution, fog, reflections, particles and decal persistence independently before relying on resolution alone',

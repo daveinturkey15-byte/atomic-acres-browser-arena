@@ -3,6 +3,7 @@ import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
+import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
@@ -722,7 +723,7 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = activeRenderConfig.shadows;
-renderer.shadowMap.type = activeLighting.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
 renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -927,6 +928,7 @@ function buildSky(): void {
   sunLight.shadow.camera.far = 150;
   sunLight.shadow.bias = activeLighting.shadowBias;
   sunLight.shadow.normalBias = activeLighting.shadowNormalBias;
+  sunLight.shadow.radius = activeLighting.softShadows ? 2.2 : 1;
   scene.add(sunLight);
   fillLight = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity);
   fillLight.name = 'shadow-side-arena-fill';
@@ -960,6 +962,8 @@ const arenaById: Readonly<Record<ArenaId, ArenaMap>> = {
 };
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 let arena: ArenaMap = arenaById[selectedArena.id];
+const arenaContrastLighting = new ArenaContrastLighting(scene, renderProfile, softwareRenderer);
+arenaContrastLighting.setArena(selectedArena.id);
 
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
@@ -8234,9 +8238,14 @@ function setArenaPresentationVisibility(): void {
 }
 
 function applyArenaLightingForSelection(): void {
-  activeLighting = arenaLightingProfile(renderProfile, selectedArena.id);
-  const lighting = rustworksLightingTint(activeLighting, renderProfile, selectedArena.id);
+  activeLighting = rustworksLightingTint(
+    arenaLightingProfile(renderProfile, selectedArena.id),
+    renderProfile,
+    selectedArena.id,
+  );
+  const lighting = activeLighting;
   renderer.toneMappingExposure = lighting.exposure;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(lighting.fogColor);
   if (skyMaterial) {
     skyMaterial.uniforms.top.value.setHex(lighting.skyTop);
@@ -8246,6 +8255,7 @@ function applyArenaLightingForSelection(): void {
     skyMaterial.uniforms.cloudColor.value.setHex(lighting.skyCloud);
     skyMaterial.uniforms.cloudShadow.value.setHex(lighting.skyCloudShadow);
     skyMaterial.uniforms.cloudLight.value.setHex(lighting.skyCloudLight);
+    skyMaterial.uniforms.sunDirection.value.set(...lighting.sunPosition).normalize();
     skyMaterial.uniforms.rayStrength.value = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on'))
       ? 0
       : lighting.godRayStrength;
@@ -8264,6 +8274,7 @@ function applyArenaLightingForSelection(): void {
     sunLight.color.setHex(lighting.sunColor);
     sunLight.intensity = lighting.sunIntensity;
     sunLight.position.set(...lighting.sunPosition);
+    sunLight.shadow.radius = lighting.softShadows ? 2.2 : 1;
     graphicsRefinement.applyArena(
       selectedArena.id,
       arena.bounds,
@@ -8277,6 +8288,8 @@ function applyArenaLightingForSelection(): void {
     fillLight.intensity = lighting.fillIntensity;
     fillLight.position.set(...lighting.fillPosition);
   }
+  arenaContrastLighting.setArena(selectedArena.id);
+  if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
 }
 
 function setArenaMenuCamera(): void {
@@ -9369,6 +9382,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       minimapRenders: minimapRenderCount,
       adaptive: adaptiveQuality.telemetry(),
       graphicsRefinement: graphicsRefinement.telemetry(),
+      arenaContrastLighting: arenaContrastLighting.telemetry(),
       qualityAssetStreaming: { ...qualityAssetStreaming },
       lighting: {
         ...activeLighting,

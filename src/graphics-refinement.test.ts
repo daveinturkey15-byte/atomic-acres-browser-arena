@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { arenaShadowVolume, graphicsEffectsBudget, SELECTIVE_BLOOM_LAYER } from './graphics-refinement';
+import {
+  arenaEnvironmentScale,
+  arenaShadowVolume,
+  graphicsEffectsBudget,
+  SELECTIVE_BLOOM_LAYER,
+} from './graphics-refinement';
 
 describe('Pass 62 graphics refinement budgets', () => {
   it('degrades individual effects before exhausting resolution tiers', () => {
@@ -31,5 +36,14 @@ describe('Pass 62 graphics refinement budgets', () => {
     const layers = new THREE.Layers();
     layers.enable(SELECTIVE_BLOOM_LAYER);
     expect(layers.isEnabled(SELECTIVE_BLOOM_LAYER)).toBe(true);
+  });
+
+  it('keeps neutral IBL subordinate to authored key lights in every arena', () => {
+    for (const arenaId of ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const) {
+      expect(arenaEnvironmentScale(arenaId)).toBeGreaterThanOrEqual(0.1);
+      expect(arenaEnvironmentScale(arenaId)).toBeLessThanOrEqual(0.3);
+    }
+    expect(arenaEnvironmentScale('rustworks-1v1')).toBeLessThan(arenaEnvironmentScale('atomic-acres'));
+    expect(arenaEnvironmentScale('gun-range')).toBeLessThan(arenaEnvironmentScale('rustworks-1v1'));
   });
 });

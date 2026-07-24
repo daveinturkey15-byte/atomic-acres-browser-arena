@@ -31,6 +31,20 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   'skyline-terminal': Object.freeze({ halfWidth: 49, halfHeight: 56, near: 4, far: 182 }),
 });
 
+// RoomEnvironment is deliberately only a reflection/indirect-light accent.
+// The authored directional and practical lights must remain the dominant
+// modelling source or roofs, weapons and interiors lose their shadow shape.
+const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freeze({
+  'atomic-acres': 0.24,
+  'rustworks-1v1': 0.14,
+  'gun-range': 0.1,
+  'skyline-terminal': 0.22,
+});
+
+export function arenaEnvironmentScale(arenaId: ArenaId): number {
+  return ARENA_ENVIRONMENT_SCALES[arenaId];
+}
+
 export function arenaShadowVolume(arenaId: ArenaId): ArenaShadowVolume {
   return { ...SHADOW_VOLUMES[arenaId] };
 }
@@ -152,7 +166,7 @@ export class GraphicsRefinementSystem {
       });
       pmrem.dispose();
       scene.environment = this.environmentTarget.texture;
-      scene.environmentIntensity = this.budget.environmentIntensity;
+      this.applyEnvironmentIntensity();
     } catch (error) {
       this.environmentFailure = error instanceof Error ? error.message : String(error);
       scene.environment = null;
@@ -161,7 +175,12 @@ export class GraphicsRefinementSystem {
 
   setBudget(budget: GraphicsEffectsBudget): void {
     this.budget = budget;
-    if (this.scene.environment) this.scene.environmentIntensity = budget.environmentIntensity;
+    this.applyEnvironmentIntensity();
+  }
+
+  private applyEnvironmentIntensity(): void {
+    if (!this.scene.environment) return;
+    this.scene.environmentIntensity = this.budget.environmentIntensity * arenaEnvironmentScale(this.arenaId);
   }
 
   refine(root: THREE.Object3D, maximumAnisotropy: number): void {
@@ -174,10 +193,10 @@ export class GraphicsRefinementSystem {
         material.roughness = THREE.MathUtils.clamp(material.roughness, material.transparent ? 0.04 : 0.12, 1);
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0, 1);
         material.envMapIntensity = material.transparent
-          ? Math.max(material.envMapIntensity, 0.82)
+          ? Math.max(material.envMapIntensity, 0.48)
           : material.metalness >= 0.45
-            ? Math.max(material.envMapIntensity, 1.08)
-            : Math.max(material.envMapIntensity, 0.58);
+            ? Math.max(material.envMapIntensity, 0.82)
+            : Math.max(material.envMapIntensity, 0.3);
         material.dithering = this.profile === 'blender';
         const record = material as THREE.MeshStandardMaterial & Record<string, THREE.Texture | null | unknown>;
         for (const key of TEXTURE_KEYS) {
@@ -218,6 +237,7 @@ export class GraphicsRefinementSystem {
     shadowMapSize: number,
   ): void {
     this.arenaId = arenaId;
+    this.applyEnvironmentIntensity();
     this.shadowVolume = arenaShadowVolume(arenaId);
     const centreX = (bounds.minX + bounds.maxX) / 2;
     const centreZ = (bounds.minZ + bounds.maxZ) / 2;
