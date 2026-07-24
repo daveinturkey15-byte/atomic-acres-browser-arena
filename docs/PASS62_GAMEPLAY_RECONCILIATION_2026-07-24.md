@@ -13,9 +13,27 @@ Date: 2026-07-24
 - Gameplay worktree: `atomic-acres-pass62-gameplay-20260724`.
 - Gameplay branch: `contrib/dave-gaming-pc/codex/pass62-gameplay-reconciliation`.
 
-The graphics worktree was dirty and uncommitted at the start of this pass. This
-branch therefore contains no edits copied from it. Final validation must apply
-both patches to one clean tree and run the full release gates.
+The graphics worktree was dirty and uncommitted at the start of this pass, so
+gameplay work proceeded independently until both sides had a reviewable
+checkpoint. Graphics was then committed as
+`edd1276` (`feat: prepare Pass 62 graphics refinement HITL build`) and merged
+deliberately into gameplay checkpoint `4a1f181`
+(`feat: reconcile Pass 62 gameplay HUD and arena fixes`). The resulting tree is
+the single Pass 62 integration candidate; no production deployment is
+authorized from this contributor branch.
+
+## Reconciliation result
+
+- Gameplay, HUD, map, netcode, and lobby changes share one branch with the
+  WebGL/shader, selective-bloom, adaptive-effects, and compressed-asset work.
+- `src/main.ts` keeps the graphics refinement bootstrap and streaming path while
+  prewarming Overdrive only after the final scene materials are installed.
+- The Pass 62 changelog is one combined gameplay-and-graphics entry.
+- Atomic Acres' regenerated `.blend` and runtime GLB have exact committed
+  digests in the manifest and provenance record.
+- Blender 5.1.2 produces semantically stable geometry/material/image counts but
+  not byte-identical `.blend`/GLB output across clean authoring runs. Provenance
+  therefore records exact committed hashes and does not claim byte determinism.
 
 ## Requirement ledger
 
@@ -60,3 +78,24 @@ both patches to one clean tree and run the full release gates.
 - Rustworks containers still form a continuous perimeter row or block a spawn.
 - Skyline boarding/cockpit routes contain a visible door slab.
 - Any substantial prop is visible without matching movement and shot authority.
+
+## Integrated QA receipt
+
+- Core release gate: TypeScript lint passed; gameplay baselines matched; 24
+  asset digests matched; 106 unit files / 580 tests passed; leaderboard 27/27
+  passed; public asset coverage 109/109 passed; release build passed; release
+  tree contained 118 accepted files with no rejected or oversized candidates;
+  production dependency audit reported zero vulnerabilities.
+- Long combined gameplay browser run: 52/56 passed on the first serial run. The
+  four failures were then resolved and passed individually: Quality/Performance
+  profile sampling, headed field-kit persistence, third-person melee
+  presentation, and the deliberately open upper-house entrance.
+- Focused graphics/map browser gate: Pass 37 Quality authority and bounds 2/2
+  passed; Pass 62 lazy compressed-arena streaming and bounded effect telemetry
+  passed after allowing 30 seconds for a cold SwiftShader map transition.
+- Live local PeerJS lobby gate passed for a ready solo host with zero bots, a
+  ready solo host with four hosted bots, and the existing six-player/rejoin
+  lifecycle.
+- Fourteen final visual captures were inspected across Atomic Acres houses,
+  Rustworks routes/flag, and Skyline concourse/apron/kiosks/aircraft. The
+  capture completed with no page errors.

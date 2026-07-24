@@ -63,7 +63,7 @@ describe('Quality Graphics environment asset', () => {
     expect(gltf.meshes?.length).toBe(35);
     expect(gltf.materials?.length).toBe(29);
     expect(gltf.images).toHaveLength(33);
-    expect(gltf.textures).toHaveLength(60);
+    expect(gltf.textures).toHaveLength(33);
     expect((gltf.materials ?? []).filter((material) =>
       material.normalTexture && material.pbrMetallicRoughness?.metallicRoughnessTexture)).toHaveLength(20);
     expect(gltf.images?.every((image) => typeof image.bufferView === 'number' && image.uri === undefined)).toBe(true);

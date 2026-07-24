@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
-export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb?v=pass60-20260723-3';
+export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb?v=pass62-20260724-1';
 export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'rustworks-pass60-feedback-v3';
 
 type RustworksBlenderTelemetry = {
@@ -88,7 +89,7 @@ export function rustworksBlenderRoot(): THREE.Group | null {
 export async function loadRustworksBlenderTower(arenaRoot: THREE.Group): Promise<THREE.Group> {
   telemetry.status = 'loading';
   telemetry.error = null;
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const gltf = await loader.loadAsync(RUSTWORKS_BLENDER_ASSET);
   const root = gltf.scene;
   root.name = 'Rustworks Blender central tower';

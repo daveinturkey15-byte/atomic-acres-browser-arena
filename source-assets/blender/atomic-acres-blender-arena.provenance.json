@@ -14,11 +14,11 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "5463c6cc8610fb283559d4da8a9c0ef2abdbb2ef47abb7886365f46a5f855042",
-  "sourceBlendSha256": "bb1ee46a53ecd1f9ab1234af1039159dd2209ace265b83d73c462d27d781c723",
+  "runtimeGlbSha256": "1325f32d8bf15c15d83972e27adbf4ce918b960f94ff4f300a852db8b175e5b0",
+  "sourceBlendSha256": "abd40ff013c1d6b3b209ec5376d6187e3ed27aa62a7124bc7f84982614def0d3",
   "sourceSpecSha256": "c36653f2102893c5ac01e19d2e73605d3e185679d209150077ea751c0c23866f",
   "runtimeAudit": {
-    "bytes": 7086432,
+    "bytes": 3489428,
     "meshNodes": 35,
     "materials": 29,
     "triangles": 44196,
@@ -28,16 +28,24 @@
     "authoredLargePhysicalCoverAssets": 4,
     "authoredHouseFurnishingSets": 2,
     "images": 33,
-    "textureBindings": 60,
+    "textureBindings": 33,
     "pbrMaterials": 20,
     "groundLayout": "manicured-verges-v3",
     "externalUris": 0
   },
+  "runtimeCompression": {
+    "command": "npm run assets:compress:quality",
+    "geometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
+    "textures": "lossless EXT_texture_webp",
+    "uncompressedBytes": 7086432,
+    "compressedBytes": 3489428,
+    "reductionPercent": 50.8
+  },
   "determinism": {
-    "command": "npm run author:blender-arena",
+    "command": "npm run author:blender-arena && npm run assets:compress:quality",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0,
-    "twoConsecutiveGlbBuildsByteIdentical": true,
-    "note": "The self-contained GLB is the reproducibility target. The editable .blend is checksum-tracked for this revision but Blender source binaries are not assumed portable across Blender releases."
+    "twoConsecutiveGlbBuildsByteIdentical": false,
+    "note": "Two clean Blender 5.1.2 authoring and pinned compression runs on 2026-07-24 produced identical semantic counts and a 3489428-byte runtime artifact but different GLB and .blend hashes. The committed runtime GLB, editable .blend and deterministic JSON specification are checksum-tracked exactly; reproducibility is semantic rather than byte-identical across Blender authoring runs."
   }
 }

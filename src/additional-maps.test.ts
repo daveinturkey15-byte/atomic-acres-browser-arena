@@ -752,14 +752,12 @@ describe('additional authored maps', () => {
 
   it('authors an open boarding walkway and cabin aisle without opaque door panels', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
-    for (const name of [
+    for (const removed of [
       'skyline-aircraft-door-jamb-left',
       'skyline-aircraft-door-jamb-right',
       'skyline-aircraft-door-header',
       'skyline-aircraft-door-threshold-seal',
       'skyline-aircraft-boarding-sign',
-    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
-    for (const removed of [
       'skyline-aircraft-open-door-leaf',
       'skyline-aircraft-door-handle',
       'skyline-cockpit-door-panel',

@@ -224,7 +224,7 @@
 .damage-feed>div div.fade{opacity:.24;transition:opacity .7s}
 #damage-numbers strong{left:calc(var(--damage-lane) * 30px);font-weight:600;letter-spacing:.025em;animation-duration:1.1s}
 #damage-numbers strong.critical{font-weight:700;animation-duration:1.25s}
-#support-block{top:500px;width:160px;padding:7px 8px 6px;transform:none}
+#support-block{top:432px;width:160px;padding:7px 8px 6px;transform:none}
 .support-heading{display:grid;grid-template-columns:1fr;gap:2px;min-height:27px;margin-bottom:4px}
 .support-heading span{font-size:9px;line-height:1}
 .support-heading strong{justify-self:start;font-size:13px;line-height:1}
@@ -238,8 +238,9 @@
 .support-name{grid-column:2;grid-row:1;font-size:12px;line-height:.95;white-space:normal}
 .support-state{grid-column:2;grid-row:2;align-self:center;font-size:7px}
 @media(max-width:700px){#damage-feeds{right:12px;top:190px;width:min(250px,52vw);gap:7px}.damage-feed>div div{min-width:150px;font-size:14px}#support-block{width:190px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}}
-@media(max-height:600px) and (min-width:701px){#support-block{top:350px;width:160px}.support-list{grid-template-columns:1fr}.support-list b[data-support=nuke]{grid-column:auto}.support-state{display:block}}
-@media(max-height:600px) and (min-width:850px){#health-block{left:calc(50% - 80px)}#combat-stats{left:24px}}
+@media(min-width:481px) and (max-width:700px){#support-block{left:270px}}
+@media(max-height:600px) and (min-width:701px){#support-block{top:370px;width:160px;min-height:152px;padding:4px 6px}.support-heading{min-height:20px;margin-bottom:2px}.support-heading span{font-size:8px}.support-heading strong{font-size:11px}.support-list{grid-template-columns:1fr;gap:2px}.support-list b{min-height:21px;padding:1px 3px}.support-list b[data-support=nuke]{grid-column:auto}.support-list kbd{width:15px;height:15px;flex-basis:15px;font-size:9px}.support-name{font-size:10px}.support-state{display:block;font-size:6px}}
+@media(max-height:600px) and (min-width:850px){#health-block{left:calc(50% - 80px)}#combat-stats{left:200px}}
 
 /* Desktop gameplay telemetry must remain readable at 1080p and ultrawide
    resolutions. Zoom preserves each panel's own edge/centre anchor, unlike a

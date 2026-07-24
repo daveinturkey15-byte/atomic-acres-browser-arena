@@ -400,7 +400,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('boot and authored presentation', () => {
-  test('keeps the desktop gameplay HUD legible at a 1.35 scale', async ({ page }) => {
+  test('keeps the reduced desktop gameplay HUD and tall Field Support column legible', async ({ page }) => {
     await pageReady(page);
     await startSolo(page);
     const layout = await page.evaluate(() => {
@@ -412,13 +412,15 @@ test.describe('boot and authored presentation', () => {
         minimapZoom: getComputedStyle(minimap).zoom,
         minimapWidth: minimap.getBoundingClientRect().width,
         supportWidth: support.getBoundingClientRect().width,
+        supportHeight: support.getBoundingClientRect().height,
         weaponRight: weapon.getBoundingClientRect().right,
         viewportWidth: window.innerWidth,
       };
     });
-    expect(layout.minimapZoom).toBe('1.35');
-    expect(layout.minimapWidth).toBeGreaterThanOrEqual(400);
-    expect(layout.supportWidth).toBeGreaterThanOrEqual(320);
+    expect(layout.minimapZoom).toBe('1');
+    expect(layout.minimapWidth).toBe(300);
+    expect(layout.supportWidth).toBeLessThanOrEqual(180);
+    expect(layout.supportHeight).toBeGreaterThanOrEqual(150);
     expect(layout.weaponRight).toBeLessThanOrEqual(layout.viewportWidth);
   });
 
@@ -432,7 +434,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 61');
+    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 62');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({
@@ -589,8 +591,9 @@ test.describe('boot and authored presentation', () => {
     expect(defaultState.render).toMatchObject({
       profile: 'blender',
       representation: 'blender',
-      atomicSignal: { enabled: true, fallbackReason: null, textureSamples: 5 },
+      atomicSignal: { enabled: true, fallbackReason: null },
     });
+    expect(defaultState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(5);
     expect(defaultState.render.materialCompatibility.materials).toBeGreaterThan(0);
     expect(defaultState.render.atomicSignal.targetValidated).toBe(true);
     expect(defaultState.render.atomicSignal.outputValidated).toBe(true);
@@ -600,11 +603,16 @@ test.describe('boot and authored presentation', () => {
     ]);
     await expect(page.locator('#graphics-profile')).toHaveValue('blender');
     await pageReadyAt(page, '/?render=performance&signal=on');
-    expect((await debug(page)).render).toMatchObject({
+    const performanceState = await debug(page);
+    expect(performanceState.render).toMatchObject({
       profile: 'performance',
       representation: 'responsive',
-      atomicSignal: { enabled: true, fallbackReason: null, textureSamples: 1 },
+      atomicSignal: { enabled: true, fallbackReason: null },
     });
+    expect(performanceState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(1);
+    expect(performanceState.render.atomicSignal.textureSamples).toBeLessThan(
+      defaultState.render.atomicSignal.textureSamples,
+    );
     expect(shaderErrors).toEqual([]);
   });
 
@@ -679,7 +687,7 @@ test.describe('boot and authored presentation', () => {
         godRayStrength: 0.05, godRayLobes: 2,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 34, materialCount: 28, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_812,
+        status: 'ready', meshCount: 35, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_196,
         semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
@@ -1281,7 +1289,7 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.meleeKnifeVisible, { timeout: 3_000 }).toBe(false);
   });
 
-  test('blocks street props and the upper house facade at their authored positions', async ({ page }) => {
+  test('blocks street props while keeping the upper house entrance open', async ({ page }) => {
     const collision = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         collisionProbe: (x: number, z: number) => boolean;
@@ -1298,7 +1306,7 @@ test.describe('solo mechanics', () => {
     });
     expect(collision.bins.every(Boolean)).toBe(true);
     expect(collision.benches.every(Boolean)).toBe(true);
-    expect(collision.upperFacade).toBe(true);
+    expect(collision.upperFacade).toBe(false);
     expect(collision.upperInteriorClear).toBe(false);
   });
 

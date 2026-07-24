@@ -1,8 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
-const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4182/';
-const output = 'artifacts/pass60-visual-acceptance';
+const baseUrl = process.argv[2] ?? process.env.QA_BASE_URL ?? 'http://127.0.0.1:4182/';
+const output = 'artifacts/pass62-visual-acceptance';
 await mkdir(output, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
@@ -69,7 +69,7 @@ try {
   if (process.env.QA_ONLY_ATOMIC !== '1') {
     await switchArena('rustworks-1v1');
     await captureCamera('07-rustworks-centre', [24.5, 4.2, 0, Math.PI / 2, -0.24]);
-    await captureCamera('08-rustworks-open-yard', [24, 1.7, 24, Math.PI / 4, 0]);
+    await captureCamera('08-rustworks-open-yard', [0, 3, 27, 0, -0.05]);
     await captureCamera('08b-rustworks-welsh-flag', [10, 18, 6, 1.03, 0.05]);
 
     await switchArena('gun-range');
@@ -80,6 +80,7 @@ try {
     await captureCamera('11-terminal-apron', [28, 3.2, 29, 0.78, -0.1]);
     await captureCamera('12-terminal-upper-kiosks', [0, 5.04, -23, 0, -0.02]);
     await captureCamera('13-terminal-open-aircraft-walkway', [0, 4.25, -4, Math.PI, 0]);
+    await captureCamera('14-terminal-open-cabin-aisle', [-14, 4.25, 2, -Math.PI / 2, 0]);
   }
 
   const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());

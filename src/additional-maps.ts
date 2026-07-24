@@ -1743,7 +1743,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     retained: ['terminal-shell', 'mezzanine-routes', 'breakable-facade', 'jetbridge', 'airstair', 'apron-boundaries'],
     adjusted: ['team-aqua-spawns', 'cabin-seat-clearance', 'jetbridge-lighting', 'concourse-cover', 'open-aircraft-walkways'],
     qualityReplaced: ['fuselage-roof', 'aircraft-nose', 'wing-boxes', 'engine-boxes', 'cargo-boxes', 'fuel-trailer-box'],
-    generatedOriginal: ['runtime-surface-patterns', 'curved-aircraft-shell', 'airport-uld-shells', 'luminous-terminal-canopy', 'gate-portal-wayfinding', 'stacked-wood-pallets', 'upper-kiosks'],
+    generatedOriginal: ['runtime-surface-patterns', 'curved-aircraft-shell', 'airport-uld-shells', 'luminous-terminal-canopy', 'stacked-wood-pallets', 'upper-kiosks'],
   };
   root.userData.skylineReskin = {
     version: 'pass-60-total-overhaul',
@@ -2133,14 +2133,9 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('floor-language', 'skyline-gate-threshold-aircraft', [0, 2.69, -0.18], [3.35, 0.04, 0.42], hazardMat);
   detailBox('terminal-story', 'skyline-jetbridge-light-spine', [0, 5.38, -6.2], [0.24, 0.06, 10.2], practicalMat);
 
-  // Boarding portal: the mechanical wall gap already exists, but these pieces
-  // make the aperture read as an open aircraft door instead of missing geometry.
-  detailBox('boarding-route', 'skyline-aircraft-door-jamb-left', [-1.67, 3.88, 0.075], [0.18, 2.55, 0.28], trimMat, 'performance', undefined, true);
-  detailBox('boarding-route', 'skyline-aircraft-door-jamb-right', [1.67, 3.88, 0.075], [0.18, 2.55, 0.28], trimMat, 'performance', undefined, true);
-  detailBox('boarding-route', 'skyline-aircraft-door-header', [0, 5.12, 0.075], [3.52, 0.18, 0.28], trimMat, 'performance', undefined, true);
-  detailBox('boarding-route', 'skyline-aircraft-door-threshold-seal', [0, 2.69, 0.08], [3.28, 0.09, 0.32], rubberMat);
-  const boardingSign = box(builder, 'skyline-aircraft-boarding-sign', [0, 5.42, -0.12], [3.35, 0.52, 0.08], terminalWayfindingMaterial('GATE 07', 'BOARDING BRIDGE', '#d69a2d'), { solid: false, shots: false, detail: 'performance' });
-  boardingSign.userData.skylineCluster = 'boarding-route';
+  // The bridge meets the split fuselage wall directly. No decorative door
+  // leaf, frame, header, threshold or sign may make this route read as an
+  // opaque portal.
 
   qualityPlaceholderBox('skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
   box(builder, 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
