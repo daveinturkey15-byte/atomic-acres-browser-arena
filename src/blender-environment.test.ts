@@ -64,6 +64,7 @@ describe('Quality Graphics environment asset', () => {
       buffers?: Array<{ uri?: string }>;
     };
     const semanticWindows = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'breakable-window');
+    const auditedApertures = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'aperture-audit');
     const routeLandmarks = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'route-landmark');
     const modeledBuses = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'physical-transit-bus');
     const largeCoverAssets = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'authored-large-physical-cover');
@@ -80,6 +81,12 @@ describe('Quality Graphics environment asset', () => {
     expect(gltf.buffers?.every((bufferInfo) => !bufferInfo.uri)).toBe(true);
     expect(semanticWindows).toHaveLength(6);
     expect(new Set(semanticWindows.map((node) => node.extras?.atomic_window_id)).size).toBe(6);
+    expect(auditedApertures).toHaveLength(16);
+    expect(new Set(auditedApertures.map((node) => node.extras?.atomic_aperture_id)).size).toBe(16);
+    expect(auditedApertures.every((node) => node.extras?.atomic_aperture_clear === true)).toBe(true);
+    expect(auditedApertures.every((node) => node.extras?.atomic_aperture_samples === 9)).toBe(true);
+    expect(auditedApertures.filter((node) => node.extras?.atomic_aperture_transparent === true)).toHaveLength(6);
+    expect(auditedApertures.filter((node) => node.extras?.atomic_aperture_transparent === false)).toHaveLength(10);
     expect(routeLandmarks).toHaveLength(3);
     expect(modeledBuses).toHaveLength(2);
     expect(largeCoverAssets).toHaveLength(4);
@@ -113,6 +120,8 @@ describe('Quality Graphics environment asset', () => {
       runtimeAudit: {
         bytes: number;
         triangles: number;
+        auditedHouseApertures: number;
+        apertureAuditSamples: number;
         targetedCoplanarOrUnder20mmPairsBefore: number;
         targetedCoplanarOrUnder20mmPairsAfter: number;
       };
@@ -120,7 +129,9 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(44_196);
+    expect(provenance.runtimeAudit.triangles).toBe(44_372);
+    expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
+    expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {
@@ -140,5 +151,20 @@ describe('Quality Graphics environment asset', () => {
       .sort();
     expect(spec.schema).toBe('atomic-acres-blender-arena-v1');
     expect(actual).toEqual(expected);
+  });
+
+  it('carries a nine-ray clear-aperture receipt for every house door, passage and window', () => {
+    const buffer = readFileSync(assetPath);
+    const gltf = glbJson(buffer) as { nodes?: Array<{ extras?: Record<string, unknown> }> };
+    const spec = JSON.parse(readFileSync(specPath, 'utf8')) as {
+      houses: Array<{ id: string; openings: Array<{ id: string; kind: string }> }>;
+    };
+    const expected = spec.houses
+      .flatMap((house) => house.openings.map((opening) => `${house.id}:${opening.id}`))
+      .sort();
+    const markers = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'aperture-audit');
+    const actual = markers.map((node) => node.extras?.atomic_aperture_id).sort();
+    expect(actual).toEqual(expected);
+    expect(markers.reduce((total, node) => total + Number(node.extras?.atomic_aperture_samples ?? 0), 0)).toBe(144);
   });
 });

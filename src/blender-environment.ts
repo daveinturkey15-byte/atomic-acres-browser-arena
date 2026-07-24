@@ -5,7 +5,7 @@ import type { ArenaMap } from './map';
 import type { ArenaId } from './map-selection';
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
-export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass62-20260724-reconciled1';
+export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass63-20260724-apertures1';
 
 export type BlenderArenaTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';
@@ -19,6 +19,10 @@ export type BlenderArenaTelemetry = {
   semanticWindows: number;
   boundWindows: number;
   transparentUpperWindows: number;
+  auditedApertures: number;
+  auditedOpenApertures: number;
+  auditedWindowApertures: number;
+  apertureAuditSamples: number;
   routeLandmarks: number;
   modeledBuses: number;
   largeCoverAssets: number;
@@ -42,6 +46,10 @@ const telemetry: BlenderArenaTelemetry = {
   semanticWindows: 0,
   boundWindows: 0,
   transparentUpperWindows: 0,
+  auditedApertures: 0,
+  auditedOpenApertures: 0,
+  auditedWindowApertures: 0,
+  apertureAuditSamples: 0,
   routeLandmarks: 0,
   modeledBuses: 0,
   largeCoverAssets: 0,
@@ -112,6 +120,7 @@ export async function loadBlenderArena(
   const texturedMaterials = new Set<THREE.Material>();
   const pbrMaterials = new Set<THREE.Material>();
   const windows = new Map<string, THREE.Mesh>();
+  const auditedApertures = new Map<string, { kind: string; samples: number; transparent: boolean }>();
   const routeLandmarks = new Set<string>();
   let modeledBuses = 0;
   let largeCoverAssets = 0;
@@ -121,6 +130,19 @@ export async function loadBlenderArena(
   let triangleCount = 0;
   root.traverse((node) => {
     node.userData.blenderAuthoredEnvironment = true;
+    if (node.userData.atomic_semantic === 'aperture-audit') {
+      const apertureId = typeof node.userData.atomic_aperture_id === 'string' ? node.userData.atomic_aperture_id : null;
+      const kind = typeof node.userData.atomic_aperture_kind === 'string' ? node.userData.atomic_aperture_kind : null;
+      const samples = Number(node.userData.atomic_aperture_samples);
+      if (!apertureId || !kind || node.userData.atomic_aperture_clear !== true || !Number.isInteger(samples) || samples < 1) {
+        throw new Error(`Invalid Atomic aperture audit marker: ${node.name || '<unnamed>'}`);
+      }
+      auditedApertures.set(apertureId, {
+        kind,
+        samples,
+        transparent: node.userData.atomic_aperture_transparent === true,
+      });
+    }
     if (node.userData.atomic_asset_class === 'physical-transit-bus') modeledBuses += 1;
     if (node.userData.atomic_asset_class === 'authored-large-physical-cover') largeCoverAssets += 1;
     if (node.userData.atomic_asset_class === 'authored-house-furnishing-set') housePropSets += 1;
@@ -189,6 +211,22 @@ export async function loadBlenderArena(
   if (modeledBuses !== 2 || largeCoverAssets !== 4 || housePropSets !== 2) {
     throw new Error(`Blender arena asset contract failed: buses=${modeledBuses}, largeCoverAssets=${largeCoverAssets}, housePropSets=${housePropSets}`);
   }
+  const expectedApertures = arena.houses.flatMap((house) => house.openings.map((opening) => ({
+    id: `${house.id}:${opening.id}`,
+    kind: opening.kind,
+  })));
+  const missingApertures = expectedApertures.filter((opening) => !auditedApertures.has(opening.id));
+  const unexpectedApertures = [...auditedApertures.keys()].filter((id) => !expectedApertures.some((opening) => opening.id === id));
+  if (missingApertures.length > 0 || unexpectedApertures.length > 0) {
+    throw new Error(`Blender arena aperture audit mismatch: missing=${missingApertures.map((opening) => opening.id).join(',') || 'none'} unexpected=${unexpectedApertures.join(',') || 'none'}`);
+  }
+  for (const opening of expectedApertures) {
+    const audit = auditedApertures.get(opening.id)!;
+    const transparent = opening.kind === 'window';
+    if (audit.kind !== opening.kind || audit.transparent !== transparent) {
+      throw new Error(`Blender arena aperture audit class mismatch: ${opening.id}`);
+    }
+  }
 
   // Retain the original visual meshes underneath as invisible presentation and
   // authoritative ray targets. Raycast/collision authority never comes from GLB art.
@@ -214,6 +252,10 @@ export async function loadBlenderArena(
   telemetry.semanticWindows = windows.size;
   telemetry.boundWindows = arena.breakableWindows.length;
   telemetry.transparentUpperWindows = transparentUpperWindows;
+  telemetry.auditedApertures = auditedApertures.size;
+  telemetry.auditedOpenApertures = [...auditedApertures.values()].filter((audit) => !audit.transparent).length;
+  telemetry.auditedWindowApertures = [...auditedApertures.values()].filter((audit) => audit.transparent).length;
+  telemetry.apertureAuditSamples = [...auditedApertures.values()].reduce((total, audit) => total + audit.samples, 0);
   telemetry.routeLandmarks = routeLandmarks.size;
   telemetry.modeledBuses = modeledBuses;
   telemetry.largeCoverAssets = largeCoverAssets;

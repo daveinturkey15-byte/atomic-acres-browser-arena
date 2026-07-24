@@ -57,5 +57,8 @@ describe('Atomic Signal profile contract', () => {
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('contactOcclusion');
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('selectiveBloom');
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('worldPositionFromDepth');
+    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('float sceneSampleDepth = texture2D(tDepth, uv).x');
+    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('step(bloomDepth, sceneSampleDepth + 0.0025)');
+    expect(ATOMIC_SIGNAL_FRAGMENT).not.toContain('step(bloomDepth, centreDepth + 0.0025)');
   });
 });
