@@ -28,7 +28,9 @@ import {
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { nextShotDeadline } from './combat-timing';
-import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
+import { latestChangelogEntry } from './changelog';
+import { bindReleaseHistoryDialog, releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './ui/release-history-dialog';
+import { bindProjectMapDialog, projectMapButtonMarkup, projectMapDialogMarkup } from './ui/project-map-dialog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
@@ -600,32 +602,9 @@ app.innerHTML = `
   <aside id="menu-showcase" aria-hidden="true">
     <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
   </aside>
-  <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
-  <div id="changelog-backdrop" hidden></div>
-  <section id="changelog-panel" class="panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
-    <header class="changelog-header">
-      <div>
-        <small>PUBLIC RELEASE HISTORY</small>
-        <strong id="changelog-title">RECENT CHANGES</strong>
-      </div>
-      <button id="changelog-close" type="button" aria-label="Close changelog">CLOSE</button>
-    </header>
-    <p class="changelog-lede">Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.</p>
-    <ol id="changelog-list">
-      ${CHANGELOG.map((entry, index) => `
-        <li data-changelog-id="${entry.id}">
-          <div class="changelog-entry-head">
-            <div class="changelog-entry-pass"><span>${entry.pass}</span>${index === 0 ? '<b>CURRENT LIVE</b>' : ''}</div>
-            <time datetime="${entry.releasedAt}"><small>PUBLISHED</small>${formatChangelogTimestampDetail(entry.releasedAt)}</time>
-          </div>
-          <strong>${entry.title}</strong>
-          <div class="changelog-areas">${entry.areas.map((area) => `<span>${area}</span>`).join('')}</div>
-          <p>${entry.summary}</p>
-          <ul>${entry.highlights.map((line) => `<li>${line}</li>`).join('')}</ul>
-        </li>
-      `).join('')}
-    </ol>
-  </section>
+  <div id="menu-meta-actions">${releaseHistoryButtonMarkup()}${projectMapButtonMarkup()}</div>
+  ${releaseHistoryDialogMarkup()}
+  ${projectMapDialogMarkup()}
   <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
   <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
     <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
@@ -8747,28 +8726,8 @@ element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainM
 element<HTMLButtonElement>('#menu-download-match-summary').addEventListener('click', downloadMatchSummary);
 element<HTMLButtonElement>('#menu-download-match-technical').addEventListener('click', downloadMatchDiagnostics);
 
-function setChangelogOpen(open: boolean): void {
-  const panel = element<HTMLElement>('#changelog-panel');
-  const backdrop = element<HTMLElement>('#changelog-backdrop');
-  const button = element<HTMLButtonElement>('#last-updated-btn');
-  panel.hidden = !open;
-  backdrop.hidden = !open;
-  button.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (open) element<HTMLButtonElement>('#changelog-close').focus();
-  else button.focus();
-}
-
-element<HTMLButtonElement>('#last-updated-btn').addEventListener('click', () => {
-  setChangelogOpen(true);
-});
-element<HTMLButtonElement>('#changelog-close').addEventListener('click', () => setChangelogOpen(false));
-element<HTMLElement>('#changelog-backdrop').addEventListener('click', () => setChangelogOpen(false));
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !element<HTMLElement>('#changelog-panel').hidden) {
-    event.preventDefault();
-    setChangelogOpen(false);
-  }
-});
+bindReleaseHistoryDialog();
+bindProjectMapDialog();
 
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (!requirePlayerName()) return;
