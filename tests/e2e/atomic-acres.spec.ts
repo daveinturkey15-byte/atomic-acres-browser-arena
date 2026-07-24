@@ -432,8 +432,20 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 60');
-    expect(state.networkSync).toEqual({ stateIntervalMs: 50, interpolationRate: 24 });
+    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 61');
+    expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
+    expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
+    expect(state.networkSync.hostTime).toMatchObject({
+      sampleCount: 0,
+      rejectedOutliers: 0,
+    });
+    expect(state.networkSync).toMatchObject({
+      localContinuity: 1,
+      receiverSequenceGaps: 0,
+      receiverReordered: 0,
+      outboundFeedbackSequenceGaps: 0,
+      outboundFeedbackReordered: 0,
+    });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
   });
@@ -1643,8 +1655,13 @@ test.describe('solo mechanics', () => {
 
     await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 4_000 }).toBe(true);
     // Respect the bot's authored post-respawn protection before proving the
-    // follow-up headshot; the first life already verifies raw sniper damage.
+    // follow-up ADS headshot; the first life already verifies raw sniper damage.
     await page.waitForTimeout(1_100);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(true);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         placeBotAhead: (distance: number) => void;

@@ -112,14 +112,15 @@ The first successful exact-SHA receipt plus cache-busted live smoke is the termi
 
 ## Player release channels
 
-The canonical root presents two explicit choices before loading the game:
+The canonical root is a chooser, not a gameplay build. It presents three explicit choices:
 
-- **New build** loads the newest production source promoted by the protected workflow.
-- **Recent stable** loads an immutable copy of the exact Pages commit pinned in `release-channels.json`.
+- **New Netcode** loads the immutable normal channel pinned to Pass 60.
+- **Recent Stable** loads the immutable stable channel pinned to Pass 59.
+- **Experimental Netcode Pass** loads the source SHA being promoted as Pass 61.
 
-The stable channel is a Git commit identity, not a moving branch or a manually copied folder. During every production promotion, `scripts/release/stage-stable-channel.mjs` reconstructs only that commit's root `index.html` and `assets/` beneath the configured channel path. Room invitation URLs bypass the chooser and continue into the newest multiplayer client so a shared lobby cannot split across incompatible releases.
+Normal and stable channels are Git commit identities, not moving branches or manually copied folders. During promotion, `scripts/release/stage-release-topology.mjs` reconstructs each archived channel only from the source and Pages commits pinned in `release-channels.json`, builds the experimental candidate from the exact promoted source, replaces the root with the chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived file to its pinned Git blob before deployment. Room invitation URLs bypass the chooser into the normal Pass 60 channel so the experimental protocol is always an explicit choice.
 
-Changing the pinned stable SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test both the root chooser and the direct stable URL before promotion. Never infer "stable" from a pass number, branch name, local build, or chat claim.
+Changing either pinned archived SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test the root chooser plus every direct channel URL before promotion. Never infer "stable" or "normal" from a pass number, branch name, local build, or chat claim.
 
 ## Multi-machine setup
 

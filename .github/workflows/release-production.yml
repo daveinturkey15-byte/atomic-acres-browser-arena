@@ -50,10 +50,15 @@ jobs:
         run: npm run build
       - name: Verify exact production bytes
         run: npm run verify:release-tree
-      - name: Stage exact pinned recent-stable channel
+      - name: Stage isolated three-channel release topology
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
-          npm run stage:stable-channel
+          npm run stage:release-topology
+          npm run verify:release-topology
+          node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_PASS: ${{ inputs.release_pass }}
       - name: Configure release commit identity
         run: |
           git config user.name "github-actions[bot]"
@@ -62,7 +67,7 @@ jobs:
         run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Publish exact dist while preserving review history
+      - name: Publish complete exact dist snapshot
         run: npm run deploy:ci -- -m "${{ inputs.release_pass }} from ${{ inputs.source_sha }}"
       - name: Wait for exact Pages build and write receipt
         shell: bash
@@ -89,6 +94,7 @@ jobs:
           [[ "$(jq -r '.commit // empty' <<<"$build")" == "$pages_sha" && "$status" == "built" ]]
           mkdir -p artifacts/pipeline
           jq -n \
+            --slurpfile topology artifacts/pipeline/release-topology.json \
             --arg sourceSha "$SOURCE_SHA" \
             --arg pagesSha "$pages_sha" \
             --arg releasePass "$RELEASE_PASS" \
@@ -97,7 +103,7 @@ jobs:
             --arg pagesCreatedAt "$(jq -r '.created_at' <<<"$build")" \
             --arg pagesUpdatedAt "$(jq -r '.updated_at' <<<"$build")" \
             --arg workflowRun "$GITHUB_RUN_ID" \
-            '{schemaVersion:1, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, releaseBuiltAt:$releaseBuiltAt, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun}' \
+            '{schemaVersion:2, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, releaseBuiltAt:$releaseBuiltAt, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun, topology:$topology[0]}' \
             > artifacts/pipeline/production-release-receipt.json
       - uses: actions/upload-artifact@v4
         with:

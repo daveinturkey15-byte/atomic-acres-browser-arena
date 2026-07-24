@@ -15,6 +15,7 @@ import {
 } from './private-match';
 
 export type Team = 0 | 1;
+export const MULTIPLAYER_PROTOCOL_VERSION = 2;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
@@ -42,7 +43,13 @@ export type PlayerSnapshot = {
 };
 
 export type JoinMessage = { type: 'join'; player: PlayerSnapshot };
-export type StateMessage = { type: 'state'; player: PlayerSnapshot };
+export type StateMessage = {
+  type: 'state';
+  player: PlayerSnapshot;
+  hostTimeMs: number;
+  continuity: number;
+  rateHz: 20 | 30 | 40;
+};
 export type ShotMessage = {
   type: 'shot';
   by: string;
@@ -52,6 +59,57 @@ export type ShotMessage = {
   /** Every authoritative pellet ray; one entry for single-projectile weapons. */
   pelletDirections: [number, number, number][];
   timing?: CombatTiming;
+  nonce: number;
+};
+export type ShotRejectReason = 'none' | 'protocol-mismatch' | 'unknown-sender' | 'duplicate' | 'sequence-gap'
+  | 'weapon-mismatch' | 'cadence' | 'stale' | 'future' | 'invalid-direction' | 'invalid-pellets'
+  | 'bad-origin' | 'missing-history' | 'continuity-mismatch' | 'obstructed' | 'malformed';
+export type ShotRequestMessage = {
+  type: 'shot-request';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  shotId: string;
+  shotSeq: number;
+  fireSeq: number;
+  weapon: WeaponId;
+  renderedHostTimeMs: number;
+  continuity: number;
+  origin: [number, number, number];
+  direction: [number, number, number];
+  pelletDirections: [number, number, number][];
+  nonce: number;
+};
+export type ShotOutcome = {
+  target: string;
+  pelletHits: number;
+  damage: number;
+  resultingHealth: number;
+  died: boolean;
+  hitZone: 'head' | 'body' | 'limb';
+  wallbang: boolean;
+  penetrationMultiplier: number;
+};
+export type ShotResultMessage = {
+  type: 'shot-result';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  shotId: string;
+  shotSeq: number;
+  status: 'accepted-hit' | 'accepted-miss' | 'rejected';
+  reason: ShotRejectReason;
+  acceptedHostTimeMs: number | null;
+  appliedRewindMs: number;
+  outcomes: ShotOutcome[];
+  nonce: number;
+};
+export type StateFeedbackMessage = {
+  type: 'state-feedback';
+  by: string;
+  forPlayerId: string;
+  sequenceGaps: number;
+  reordered: number;
+  bufferedPressure: number;
   nonce: number;
 };
 export type MeleeMessage = {
@@ -154,6 +212,7 @@ export type OverdriveStateMessage = {
 };
 export type LobbyJoinMessage = {
   type: 'lobby-join';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   playerId: string;
   name: string;
   requestedTeam: Team;
@@ -166,15 +225,25 @@ export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dh
 export type LobbyConfigMessage = { type: 'lobby-config'; by: string; config: PrivateMatchConfig; nonce: number };
 export type LobbyBalanceMessage = { type: 'lobby-balance'; by: string; nonce: number };
 export type LobbyStateMessage = { type: 'lobby-state'; by: string; snapshot: LobbySnapshot; nonce: number };
-export type LobbyStartMessage = { type: 'lobby-start'; by: string; activeAtEpochMs: number; revision: number; nonce: number };
-export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config';
+export type LobbyStartMessage = {
+  type: 'lobby-start'; by: string; activeAtHostTimeMs: number; activeAtEpochMs: number;
+  hostSentTimeMs: number; revision: number; nonce: number;
+};
+export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch';
 export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReason; nonce: number };
-export type ClockPingMessage = { type: 'clock-ping'; by: string; sentAtEpochMs: number; reportedRttMs: number | null; nonce: number };
-export type ClockPongMessage = { type: 'clock-pong'; by: string; forPlayerId: string; sentAtEpochMs: number; hostEpochMs: number; nonce: number };
+export type ClockPingMessage = {
+  type: 'clock-ping'; by: string; guestSentMonoMs: number;
+  reportedOffsetMs: number | null; reportedRttMs: number | null; reportedJitterMs: number | null;
+  reportedUncertaintyMs: number | null; nonce: number;
+};
+export type ClockPongMessage = {
+  type: 'clock-pong'; by: string; forPlayerId: string; guestSentMonoMs: number;
+  hostReceivedMonoMs: number; hostSentMonoMs: number; nonce: number;
+};
 export type MatchScoreMessage = { type: 'match-score'; by: string; scores: PlayerScore[]; nonce: number };
 export type RangeScoreClaimMessage = { type: 'range-score-claim'; by: string; score: number; hits: number; shots: number; nonce: number };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
@@ -202,16 +271,32 @@ function isOptionalCombatTiming(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const timing = value as Record<string, unknown>;
   return Number.isSafeInteger(timing.eventSeq) && Number(timing.eventSeq) >= 0
-    && Number.isFinite(timing.sentAtEpochMs) && Number(timing.sentAtEpochMs) > 0;
+    && Number.isFinite(timing.sentAtHostTimeMs) && Number(timing.sentAtHostTimeMs) >= 0;
 }
+
+function isNormalizedDirection(value: unknown): value is [number, number, number] {
+  if (!Array.isArray(value) || value.length !== 3 || !value.every(Number.isFinite)) return false;
+  const magnitude = Math.hypot(Number(value[0]), Number(value[1]), Number(value[2]));
+  return magnitude >= 0.96 && magnitude <= 1.04;
+}
+
+const shotRejectReasons = new Set<ShotRejectReason>([
+  'none', 'protocol-mismatch', 'unknown-sender', 'duplicate', 'sequence-gap', 'weapon-mismatch', 'cadence',
+  'stale', 'future', 'invalid-direction', 'invalid-pellets', 'bad-origin', 'missing-history',
+  'continuity-mismatch', 'obstructed', 'malformed',
+]);
 
 export function isGameMessage(value: unknown): value is GameMessage {
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
     case 'join':
-    case 'state':
       return isPlayerSnapshot(msg.player);
+    case 'state':
+      return isPlayerSnapshot(msg.player)
+        && Number.isFinite(msg.hostTimeMs) && Number(msg.hostTimeMs) >= 0
+        && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
+        && (msg.rateHz === 20 || msg.rateHz === 30 || msg.rateHz === 40);
     case 'shot':
       return typeof msg.by === 'string' && weapons.has(msg.weapon as WeaponId)
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
@@ -219,6 +304,50 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.pelletDirections) && msg.pelletDirections.length >= 1 && msg.pelletDirections.length <= 12
         && msg.pelletDirections.every((direction) => Array.isArray(direction) && direction.length === 3 && direction.every(Number.isFinite))
         && isOptionalCombatTiming(msg.timing)
+        && Number.isFinite(msg.nonce);
+    case 'shot-request':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.shotId === 'string' && msg.shotId.length >= 8 && msg.shotId.length <= 128
+        && Number.isSafeInteger(msg.shotSeq) && Number(msg.shotSeq) >= 0
+        && Number.isSafeInteger(msg.fireSeq) && Number(msg.fireSeq) >= 0
+        && weapons.has(msg.weapon as WeaponId)
+        && Number.isFinite(msg.renderedHostTimeMs) && Number(msg.renderedHostTimeMs) >= 0
+        && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
+        && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
+        && isNormalizedDirection(msg.direction)
+        && Array.isArray(msg.pelletDirections) && msg.pelletDirections.length >= 1 && msg.pelletDirections.length <= 12
+        && msg.pelletDirections.every(isNormalizedDirection)
+        && Number.isFinite(msg.nonce);
+    case 'shot-result':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && typeof msg.shotId === 'string' && msg.shotId.length >= 8 && msg.shotId.length <= 128
+        && Number.isSafeInteger(msg.shotSeq) && Number(msg.shotSeq) >= 0
+        && (msg.status === 'accepted-hit' || msg.status === 'accepted-miss' || msg.status === 'rejected')
+        && shotRejectReasons.has(msg.reason as ShotRejectReason)
+        && (msg.acceptedHostTimeMs === null || Number.isFinite(msg.acceptedHostTimeMs) && Number(msg.acceptedHostTimeMs) >= 0)
+        && Number.isFinite(msg.appliedRewindMs) && Number(msg.appliedRewindMs) >= 0 && Number(msg.appliedRewindMs) <= 250
+        && Array.isArray(msg.outcomes) && msg.outcomes.length <= 6
+        && msg.outcomes.every((outcome) => {
+          if (!outcome || typeof outcome !== 'object') return false;
+          const item = outcome as Record<string, unknown>;
+          return typeof item.target === 'string' && item.target.length > 0 && item.target.length <= 80
+            && Number.isSafeInteger(item.pelletHits) && Number(item.pelletHits) >= 1 && Number(item.pelletHits) <= 12
+            && Number.isFinite(item.damage) && Number(item.damage) >= 0 && Number(item.damage) <= 400
+            && Number.isFinite(item.resultingHealth) && Number(item.resultingHealth) >= 0 && Number(item.resultingHealth) <= 100
+            && typeof item.died === 'boolean' && (item.hitZone === 'head' || item.hitZone === 'body' || item.hitZone === 'limb')
+            && typeof item.wallbang === 'boolean'
+            && Number.isFinite(item.penetrationMultiplier) && Number(item.penetrationMultiplier) >= 0 && Number(item.penetrationMultiplier) <= 1;
+        })
+        && Number.isFinite(msg.nonce);
+    case 'state-feedback':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && Number.isSafeInteger(msg.sequenceGaps) && Number(msg.sequenceGaps) >= 0 && Number(msg.sequenceGaps) <= 1_000
+        && Number.isSafeInteger(msg.reordered) && Number(msg.reordered) >= 0 && Number(msg.reordered) <= 1_000
+        && Number.isFinite(msg.bufferedPressure) && Number(msg.bufferedPressure) >= 0 && Number(msg.bufferedPressure) <= 1
         && Number.isFinite(msg.nonce);
     case 'melee':
       return typeof msg.by === 'string'
@@ -339,7 +468,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.nextSpawnInMs) && Number(msg.nextSpawnInMs) >= 0 && Number(msg.nextSpawnInMs) <= 120_000
         && Number.isFinite(msg.nonce);
     case 'lobby-join':
-      return typeof msg.playerId === 'string' && msg.playerId.length > 0 && msg.playerId.length <= 80
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.playerId === 'string' && msg.playerId.length > 0 && msg.playerId.length <= 80
         && typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 20
         && (msg.requestedTeam === 0 || msg.requestedTeam === 1)
         && typeof msg.resumeToken === 'string' && msg.resumeToken.length >= 24 && msg.resumeToken.length <= 128
@@ -364,23 +494,29 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && isLobbySnapshot(msg.snapshot) && Number.isFinite(msg.nonce);
     case 'lobby-start':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && Number.isFinite(msg.activeAtHostTimeMs) && Number(msg.activeAtHostTimeMs) >= 0
         && Number.isFinite(msg.activeAtEpochMs) && Number(msg.activeAtEpochMs) >= 0 && Number(msg.activeAtEpochMs) <= 10_000_000_000_000
+        && Number.isFinite(msg.hostSentTimeMs) && Number(msg.hostSentTimeMs) >= 0
         && Number.isSafeInteger(msg.revision) && Number(msg.revision) >= 0
         && Number.isFinite(msg.nonce);
     case 'lobby-reject':
       return (msg.reason === 'room-full' || msg.reason === 'identity-in-use' || msg.reason === 'rejoin-denied'
-        || msg.reason === 'match-active' || msg.reason === 'invalid-config')
+        || msg.reason === 'match-active' || msg.reason === 'invalid-config' || msg.reason === 'protocol-mismatch')
         && Number.isFinite(msg.nonce);
     case 'clock-ping':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
-        && Number.isFinite(msg.sentAtEpochMs) && Number(msg.sentAtEpochMs) >= 0 && Number(msg.sentAtEpochMs) <= 10_000_000_000_000
+        && Number.isFinite(msg.guestSentMonoMs) && Number(msg.guestSentMonoMs) >= 0
+        && (msg.reportedOffsetMs === null || Number.isFinite(msg.reportedOffsetMs) && Math.abs(Number(msg.reportedOffsetMs)) <= 10_000_000_000)
         && (msg.reportedRttMs === null || Number.isFinite(msg.reportedRttMs) && Number(msg.reportedRttMs) >= 0 && Number(msg.reportedRttMs) <= 5_000)
+        && (msg.reportedJitterMs === null || Number.isFinite(msg.reportedJitterMs) && Number(msg.reportedJitterMs) >= 0 && Number(msg.reportedJitterMs) <= 5_000)
+        && (msg.reportedUncertaintyMs === null || Number.isFinite(msg.reportedUncertaintyMs) && Number(msg.reportedUncertaintyMs) >= 0 && Number(msg.reportedUncertaintyMs) <= 5_000)
         && Number.isFinite(msg.nonce);
     case 'clock-pong':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
-        && Number.isFinite(msg.sentAtEpochMs) && Number(msg.sentAtEpochMs) >= 0 && Number(msg.sentAtEpochMs) <= 10_000_000_000_000
-        && Number.isFinite(msg.hostEpochMs) && Number(msg.hostEpochMs) >= 0 && Number(msg.hostEpochMs) <= 10_000_000_000_000
+        && Number.isFinite(msg.guestSentMonoMs) && Number(msg.guestSentMonoMs) >= 0
+        && Number.isFinite(msg.hostReceivedMonoMs) && Number(msg.hostReceivedMonoMs) >= 0
+        && Number.isFinite(msg.hostSentMonoMs) && Number(msg.hostSentMonoMs) >= Number(msg.hostReceivedMonoMs)
         && Number.isFinite(msg.nonce);
     case 'match-score':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -410,6 +546,9 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-join':
       return message.playerId === playerId;
     case 'shot':
+    case 'shot-request':
+    case 'shot-result':
+    case 'state-feedback':
     case 'melee':
     case 'grenade-throw':
     case 'hit':
@@ -448,6 +587,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
     || message.type === 'clock-pong'
+    || message.type === 'shot-result'
     || message.type === 'match-score'
     || message.type === 'bot-state'
     || message.type === 'bot-damage';

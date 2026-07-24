@@ -50,13 +50,13 @@ describe('deterministic network impairment', () => {
 
   it('produces symmetric bounded admission for host and guest under the same chaos schedule', () => {
     const profile = { ...NETWORK_IMPAIRMENT_PROFILES.normal, duplicateRate: 0.2, reorderRate: 0.15, lossRate: 0.03 };
-    const events = Array.from({ length: 80 }, (_, eventSeq) => ({ id: 'combat-' + eventSeq, sentAt: eventSeq * 90, payload: { eventSeq, sentAtEpochMs: 10_000 + eventSeq * 90 } }));
+    const events = Array.from({ length: 80 }, (_, eventSeq) => ({ id: 'combat-' + eventSeq, sentAt: eventSeq * 90, payload: { eventSeq, sentAtHostTimeMs: 10_000 + eventSeq * 90 } }));
     const deliveries = impairNetworkEvents(events, profile, 'symmetric-combat');
     const run = (clockOffsetMs: number) => {
       let state = updatePeerTiming(createPeerTimingState(), { clockOffsetMs, rttMs: 80 });
       const accepted: number[] = [];
       for (const delivery of deliveries) {
-        const admission = admitCombatTiming(state, delivery.payload, 10_000 + clockOffsetMs + delivery.arrivesAt);
+        const admission = admitCombatTiming(state, delivery.payload, 10_000 + delivery.arrivesAt);
         if (!admission.accepted) continue;
         state = admission.state;
         accepted.push(delivery.payload.eventSeq);

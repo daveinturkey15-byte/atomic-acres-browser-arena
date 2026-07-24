@@ -30,6 +30,7 @@
     "qa:pass53:changelog": "npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass53-changelog.mjs",
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
     "qa:network-chaos:soak": "tsx scripts/qa/run-network-chaos-soak.ts",
+    "qa:pass61:netcode": "node scripts/qa/verify-pass61-authoritative-netcode.mjs",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
     "qa:pass29:luminance": "python3 scripts/qa/measure-pass29-luminance.py",
@@ -51,9 +52,11 @@
     "pipeline:doctor": "node scripts/release/pipeline-guard.mjs doctor",
     "pipeline:preflight": "node scripts/release/pipeline-guard.mjs contribute",
     "pipeline:release-check": "node scripts/release/pipeline-guard.mjs release",
-    "stage:stable-channel": "node scripts/release/stage-stable-channel.mjs",
+    "stage:release-topology": "node scripts/release/stage-release-topology.mjs",
+    "verify:release-topology": "node scripts/qa/verify-release-topology.mjs",
+    "qa:release-topology": "node scripts/qa/verify-release-topology-browser.mjs",
     "deploy": "npm run build && gh-pages -d dist --add",
-    "deploy:ci": "gh-pages -d dist --add"
+    "deploy:ci": "gh-pages -d dist"
   },
   "overrides": {
     "typed-rest-client": {

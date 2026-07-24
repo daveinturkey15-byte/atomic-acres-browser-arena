@@ -204,19 +204,34 @@ import {
   submitGlobalStreak,
 } from './global-leaderboard';
 import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
-import { REMOTE_INTERPOLATION_RATE, STATE_BROADCAST_INTERVAL_MS, remoteInterpolationAlpha, stateBroadcastIntervalMs } from './network-sync';
+import {
+  SNAPSHOT_INTERPOLATION_DELAY_MS,
+  SnapshotInterpolationBuffer,
+  createSnapshotRateState,
+  snapshotIntervalMs,
+  updateSnapshotRate,
+  shortestYaw,
+  type SnapshotRateState,
+} from './network-sync';
+import {
+  createHostTimeMapping,
+  hostTimeDiagnostics,
+  hostTimeToGuestMono,
+  monotonicMappedHostNow,
+  observeHostClock,
+  type HostTimeMapping,
+} from './host-time';
 import {
   CLOCK_PING_INTERVAL_MS,
   DEFAULT_PRIVATE_MATCH_CONFIG,
   LOBBY_START_LEAD_MS,
   REJOIN_GRACE_MS,
+  rejoinReservationExpired,
   balanceLobbyTeams,
   canHostStart,
   emptyPlayerScore,
-  estimateHostClockOffset,
   freeForAllLeaders,
   latencyQuality,
-  localPerformanceAtHostEpoch,
   playersAreHostile,
   recordPlayerDamage,
   teamTotals,
@@ -229,12 +244,18 @@ import {
 import { admitRemoteShot, createRemoteShotAdmissionState, type RemoteShotAdmissionState } from './remote-shot-admission';
 import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint, type RemoteMeleeAdmissionState } from './remote-melee-admission';
 import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
-import { admitRemoteBaseDamage, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
+import { admitRemoteBaseDamage, deriveAuthoritativeShotOutcomes, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
+import {
+  admitAuthoritativeShot,
+  createAuthoritativeShotAdmissionState,
+  validateShotOrigin,
+  type AuthoritativeShotAdmissionState,
+} from './authoritative-shot';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
 import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
-import { recordCombatantPose, rewindCombatantPose, type CombatantPoseSample } from './lag-compensation';
+import { recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
 import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
 import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
@@ -282,6 +303,10 @@ import {
   PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
   ShotMessage,
+  ShotRequestMessage,
+  ShotResultMessage,
+  StateMessage,
+  MULTIPLAYER_PROTOCOL_VERSION,
   Team,
   TeamPingKind,
   TeamPingMessage,
@@ -321,6 +346,13 @@ type RemotePlayer = {
   claimEligibleAt: number;
   claimRequiresCoreExit: boolean;
   positionHistory: CombatantPoseSample[];
+  interpolation: SnapshotInterpolationBuffer<PlayerSnapshot>;
+  renderedHostTimeMs: number;
+  renderedWorldAgeMs: number;
+  continuity: number;
+  feedbackSequenceGaps: number;
+  feedbackReordered: number;
+  lastFeedbackAt: number;
 };
 
 type AdmittedRemoteShot = {
@@ -368,6 +400,8 @@ type BotPlayer = {
   weapon: PrimaryWeaponId;
   nextGrenadeAt: number;
   grenadeActive: boolean;
+  positionHistory: CombatantPoseSample[];
+  continuity: number;
 };
 
 type GrenadeEntity = {
@@ -1164,8 +1198,8 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
-const PASS60_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass60-feedback';
-const PASS60_DIAGNOSTIC_SOURCE_ID = 'baseline-31591b2-pass59-live';
+const PASS61_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass61-experimental-netcode';
+const PASS61_DIAGNOSTIC_SOURCE_ID = 'parent-b1af49b-pass60-live';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 const localArenaSwitchQaDelayMs = localMultiplayerQa
@@ -1223,6 +1257,7 @@ function recordSupportExplosionProfile(profile: ExplosionSyncProfile): void {
 }
 const processedNonces = new Set<number>();
 const remoteShotAdmissions = new Map<string, RemoteShotAdmissionState>();
+const authoritativeShotAdmissions = new Map<string, AuthoritativeShotAdmissionState>();
 const admittedRemoteShots = new Map<string, Map<number, AdmittedRemoteShot>>();
 const admittedRemoteMelees = new Map<string, Map<number, AdmittedRemoteMelee>>();
 const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplosion>>();
@@ -1233,6 +1268,22 @@ const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
 let localCombatEventSeq = 0;
+let localContinuity = 1;
+let localSnapshotRateState: SnapshotRateState = createSnapshotRateState(performance.now());
+let receiverSequenceGaps = 0;
+let receiverReordered = 0;
+let outboundFeedbackSequenceGaps = 0;
+let outboundFeedbackReordered = 0;
+let outboundFeedbackPressure = 0;
+let localShotSeq = 0;
+let localFireSeq = 0;
+const shotSessionId = crypto.randomUUID();
+const resolvedShotRequests = new Map<string, ShotResultMessage>();
+const presentedShotResults = new Set<string>();
+const shotProtocolTelemetry: Record<string, number> = {};
+function recordShotProtocol(label: string): void {
+  shotProtocolTelemetry[label] = (shotProtocolTelemetry[label] ?? 0) + 1;
+}
 const combatAdmissionTelemetry: Record<string, number> = {};
 const localSupportNonces = new Map<OffensiveSupportSource, number>();
 const remoteHitAdmissionTelemetry: Record<string, number> = {};
@@ -1260,8 +1311,9 @@ let privateMatchMode: MatchMode = 'tdm';
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
 let privateLobbyRevision = 0;
+let privateMatchActiveAtHostTimeMs: number | null = null;
 let privateMatchActiveAtEpochMs: number | null = null;
-let hostClockOffsetMs = 0;
+let hostTimeMapping: HostTimeMapping = createHostTimeMapping();
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localDhv: Dhv = 10;
@@ -1392,8 +1444,8 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
   matchDiagnostics = new MatchDiagnostics({
-    buildId: PASS60_DIAGNOSTIC_BUILD_ID,
-    sourceId: PASS60_DIAGNOSTIC_SOURCE_ID,
+    buildId: PASS61_DIAGNOSTIC_BUILD_ID,
+    sourceId: PASS61_DIAGNOSTIC_SOURCE_ID,
     sessionId: `${player.id}:${Date.now()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
     arena: selectedArena.id,
@@ -1826,10 +1878,11 @@ function resetPrivateLobbyState(): void {
   lobbyClockTimer = null;
   privateLobbySnapshot = null;
   privateLobbyRevision = 0;
+  privateMatchActiveAtHostTimeMs = null;
   privateMatchActiveAtEpochMs = null;
   privateMatchMode = 'tdm';
   privateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
-  hostClockOffsetMs = 0;
+  hostTimeMapping = createHostTimeMapping();
   localCombatEventSeq = 0;
   peerTimingStates.clear();
   localLobbyPingMs = null;
@@ -1854,6 +1907,8 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
     config: privateMatchConfig,
     members,
     scores,
+    snapshotHostTimeMs: performance.now(),
+    activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
     activeAtEpochMs: privateMatchActiveAtEpochMs,
   };
 }
@@ -1902,6 +1957,7 @@ function sendLobbyJoin(): void {
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   const message: LobbyJoinMessage = {
     type: 'lobby-join',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     playerId: player.id,
     name: player.name,
     requestedTeam: player.team,
@@ -1956,9 +2012,10 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
     for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
   }
   broadcastHostLobby(currentPhase);
-  if (privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
+  if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
     network.sendToPlayer(message.playerId, {
-      type: 'lobby-start', by: player.id, activeAtEpochMs: privateMatchActiveAtEpochMs,
+      type: 'lobby-start', by: player.id, activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
+      activeAtEpochMs: privateMatchActiveAtEpochMs, hostSentTimeMs: performance.now(),
       revision: privateLobbyRevision, nonce: randomNonce(),
     });
     sendAuthoritativeScores(message.playerId);
@@ -2014,12 +2071,12 @@ function markLobbyDisconnected(playerId: string): void {
   const member = hostLobbyMembers.get(playerId);
   if (!member || playerId === player.id) return;
   hostLobbyMembers.set(playerId, { ...member, connected: false, ready: false, pingMs: null });
-  hostDisconnectedAt.set(playerId, Date.now());
+  hostDisconnectedAt.set(playerId, performance.now());
   broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   window.setTimeout(() => {
     const disconnectedAt = hostDisconnectedAt.get(playerId);
     const current = hostLobbyMembers.get(playerId);
-    if (!disconnectedAt || !current || current.connected || Date.now() - disconnectedAt < REJOIN_GRACE_MS) return;
+    if (!disconnectedAt || !current || current.connected || !rejoinReservationExpired(disconnectedAt, performance.now())) return;
     hostDisconnectedAt.delete(playerId);
     hostLobbyMembers.delete(playerId);
     hostLobbyTokens.delete(playerId);
@@ -2031,13 +2088,36 @@ function markLobbyDisconnected(playerId: string): void {
   }, REJOIN_GRACE_MS + 50);
 }
 
+function currentHostTimeMs(): number {
+  const now = performance.now();
+  if (network.role !== 'client') return now;
+  hostTimeMapping = monotonicMappedHostNow(hostTimeMapping, now);
+  return hostTimeMapping.lastHostTimeMs;
+}
+
+function createStateMessage(playerSnapshot = snapshot()): StateMessage {
+  return {
+    type: 'state',
+    player: playerSnapshot,
+    hostTimeMs: currentHostTimeMs(),
+    continuity: localContinuity,
+    rateHz: localSnapshotRateState.rateHz,
+  };
+}
+
 function scheduleClockPing(delay = CLOCK_PING_INTERVAL_MS): void {
   if (lobbyClockTimer) clearTimeout(lobbyClockTimer);
   if (network.role !== 'client') return;
   lobbyClockTimer = setTimeout(() => {
     if (network.role !== 'client') return;
+    const mappingReady = hostTimeMapping.sampleCount > 0;
     network.send({
-      type: 'clock-ping', by: player.id, sentAtEpochMs: Date.now(), reportedRttMs: localLobbyPingMs, nonce: randomNonce(),
+      type: 'clock-ping', by: player.id, guestSentMonoMs: performance.now(),
+      reportedOffsetMs: mappingReady ? hostTimeMapping.offsetMs : null,
+      reportedRttMs: mappingReady ? hostTimeMapping.rttMs : null,
+      reportedJitterMs: mappingReady ? hostTimeMapping.jitterMs : null,
+      reportedUncertaintyMs: mappingReady ? hostTimeMapping.uncertaintyMs : null,
+      nonce: randomNonce(),
     });
     scheduleClockPing();
   }, delay);
@@ -2045,10 +2125,15 @@ function scheduleClockPing(delay = CLOCK_PING_INTERVAL_MS): void {
 
 function acceptClockPong(message: Extract<GameMessage, { type: 'clock-pong' }>): void {
   if (network.role !== 'client' || message.forPlayerId !== player.id || message.by !== privateLobbySnapshot?.hostId) return;
-  const estimate = estimateHostClockOffset(message.sentAtEpochMs, Date.now(), message.hostEpochMs);
-  if (!estimate.accepted) return;
-  hostClockOffsetMs = localLobbyPingMs === null ? estimate.offsetMs : hostClockOffsetMs * 0.75 + estimate.offsetMs * 0.25;
-  localLobbyPingMs = localLobbyPingMs === null ? estimate.rttMs : Math.round(localLobbyPingMs * 0.7 + estimate.rttMs * 0.3);
+  const observation = observeHostClock(hostTimeMapping, {
+    guestSentMonoMs: message.guestSentMonoMs,
+    hostReceivedMonoMs: message.hostReceivedMonoMs,
+    hostSentMonoMs: message.hostSentMonoMs,
+    guestReceivedMonoMs: performance.now(),
+  });
+  hostTimeMapping = observation.mapping;
+  if (!observation.accepted) return;
+  localLobbyPingMs = Math.round(hostTimeMapping.rttMs);
   renderPrivateLobby();
 }
 
@@ -2122,7 +2207,12 @@ async function synchronizeLobbyArena(): Promise<void> {
   if (selectedArena.id !== arenaId) await activateArenaSelection(arenaId);
 }
 
-async function beginPrivateMatch(mode: 'host' | 'client', activeAtEpochMs: number): Promise<void> {
+async function beginPrivateMatch(
+  mode: 'host' | 'client',
+  activeAtHostTimeMs: number,
+  activeAtEpochMs: number,
+  observedHostTimeMs: number,
+): Promise<void> {
   await lobbyArenaSyncPromise;
   await synchronizeLobbyArena();
   if (gameStarted) return;
@@ -2131,9 +2221,14 @@ async function beginPrivateMatch(mode: 'host' | 'client', activeAtEpochMs: numbe
     setStatus(`Could not synchronize ${arenaSelection(arenaId).displayName}; deployment stopped.`, 'error');
     return;
   }
+  privateMatchActiveAtHostTimeMs = activeAtHostTimeMs;
   privateMatchActiveAtEpochMs = activeAtEpochMs;
   privateMatchMode = privateLobbySnapshot?.config.mode ?? privateMatchConfig.mode;
-  startGame(mode, false, activeAtEpochMs);
+  const observedGuestMonoMs = performance.now();
+  const activeAtLocalMonoMs = mode === 'host'
+    ? activeAtHostTimeMs
+    : hostTimeToGuestMono(hostTimeMapping, activeAtHostTimeMs, observedGuestMonoMs, observedHostTimeMs);
+  startGame(mode, false, activeAtLocalMonoMs);
 }
 
 function hostStartPrivateMatch(): void {
@@ -2143,16 +2238,18 @@ function hostStartPrivateMatch(): void {
     setStatus('Every connected player must be ready before the host starts.', 'warn');
     return;
   }
+  privateMatchActiveAtHostTimeMs = performance.now() + LOBBY_START_LEAD_MS;
   privateMatchActiveAtEpochMs = Date.now() + LOBBY_START_LEAD_MS;
   privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot('countdown');
   network.send({ type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() });
   network.send({
-    type: 'lobby-start', by: player.id, activeAtEpochMs: privateMatchActiveAtEpochMs,
+    type: 'lobby-start', by: player.id, activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
+    activeAtEpochMs: privateMatchActiveAtEpochMs, hostSentTimeMs: performance.now(),
     revision: privateLobbyRevision, nonce: randomNonce(),
   });
   renderPrivateLobby();
-  void beginPrivateMatch('host', privateMatchActiveAtEpochMs);
+  void beginPrivateMatch('host', privateMatchActiveAtHostTimeMs, privateMatchActiveAtEpochMs, performance.now());
 }
 
 function returnPrivateMatchToLobby(asHost: boolean): void {
@@ -2205,8 +2302,9 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     return;
   }
   renderPrivateLobby();
-  if (message.snapshot.activeAtEpochMs !== null && message.snapshot.phase !== 'waiting' && !gameStarted) {
-    void beginPrivateMatch('client', message.snapshot.activeAtEpochMs);
+  if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
+    && message.snapshot.phase !== 'waiting' && !gameStarted) {
+    void beginPrivateMatch('client', message.snapshot.activeAtHostTimeMs, message.snapshot.activeAtEpochMs, message.snapshot.snapshotHostTimeMs);
   }
 }
 
@@ -2233,9 +2331,16 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-start') {
     if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId && message.revision >= (privateLobbySnapshot?.revision ?? 0)) {
+      privateMatchActiveAtHostTimeMs = message.activeAtHostTimeMs;
       privateMatchActiveAtEpochMs = message.activeAtEpochMs;
-      if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'countdown', activeAtEpochMs: message.activeAtEpochMs };
-      if (!gameStarted) void beginPrivateMatch('client', message.activeAtEpochMs);
+      if (privateLobbySnapshot) privateLobbySnapshot = {
+        ...privateLobbySnapshot,
+        phase: 'countdown',
+        snapshotHostTimeMs: message.hostSentTimeMs,
+        activeAtHostTimeMs: message.activeAtHostTimeMs,
+        activeAtEpochMs: message.activeAtEpochMs,
+      };
+      if (!gameStarted) void beginPrivateMatch('client', message.activeAtHostTimeMs, message.activeAtEpochMs, message.hostSentTimeMs);
     }
     return true;
   }
@@ -2246,6 +2351,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
       'rejoin-denied': 'Rejoin token rejected; open a fresh invite.',
       'match-active': 'Match already active; only reconnecting players may enter.',
       'invalid-config': 'Host settings were rejected.',
+      'protocol-mismatch': 'This lobby uses a newer multiplayer protocol. Reload the game and rejoin.',
     } as const;
     setStatus(labels[message.reason], 'error');
     network.close();
@@ -2257,17 +2363,20 @@ function handleLobbyMessage(message: GameMessage): boolean {
   if (message.type === 'clock-ping') {
     if (network.role === 'host') {
       const member = hostLobbyMembers.get(message.by);
-      const receivedAtEpochMs = Date.now();
+      const hostReceivedMonoMs = performance.now();
       const reportedRttMs = message.reportedRttMs ?? peerTimingStates.get(message.by)?.rttMs ?? 0;
       const priorTiming = peerTimingStates.get(message.by) ?? createPeerTimingState();
-      peerTimingStates.set(message.by, updatePeerTiming(priorTiming, {
-        clockOffsetMs: receivedAtEpochMs - message.sentAtEpochMs - reportedRttMs / 2,
+      if (message.reportedOffsetMs !== null) peerTimingStates.set(message.by, updatePeerTiming(priorTiming, {
+        clockOffsetMs: message.reportedOffsetMs,
         rttMs: reportedRttMs,
+        jitterMs: message.reportedJitterMs ?? undefined,
+        uncertaintyMs: message.reportedUncertaintyMs ?? undefined,
       }));
       if (member && message.reportedRttMs !== null) hostLobbyMembers.set(message.by, { ...member, pingMs: Math.round(message.reportedRttMs) });
+      const hostSentMonoMs = performance.now();
       network.sendToPlayer(message.by, {
         type: 'clock-pong', by: player.id, forPlayerId: message.by,
-        sentAtEpochMs: message.sentAtEpochMs, hostEpochMs: Date.now(), nonce: randomNonce(),
+        guestSentMonoMs: message.guestSentMonoMs, hostReceivedMonoMs, hostSentMonoMs, nonce: randomNonce(),
       });
       if (member && message.reportedRttMs !== null) broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
     }
@@ -2367,7 +2476,7 @@ function renderPrivateLobby(): void {
   element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
     ? `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
     : snapshot?.phase === 'active'
-    ? 'Match active · disconnected players have a 30 second rejoin slot.'
+    ? 'Match active · disconnected players have a 90 second rejoin slot.'
     : snapshot?.phase === 'countdown'
       ? 'Synchronized deployment countdown started.'
       : network.role === 'host'
@@ -2483,6 +2592,18 @@ function currentViewmodelSurfaceRetreat(): number {
   return viewmodelSurfaceRetreat(nearest, player.stance === 'prone');
 }
 
+function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot, alpha: number): PlayerSnapshot {
+  return {
+    ...after,
+    x: before.x + (after.x - before.x) * alpha,
+    y: before.y + (after.y - before.y) * alpha,
+    z: before.z + (after.z - before.z) * alpha,
+    yaw: shortestYaw(before.yaw, after.yaw, alpha),
+    pitch: before.pitch + (after.pitch - before.pitch) * alpha,
+    stance: alpha < 0.5 ? before.stance : after.stance,
+  };
+}
+
 function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const root = new THREE.Group();
   root.name = 'remote-player-world';
@@ -2522,6 +2643,8 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.position.set(snapshot.x, snapshot.y - stanceEyeHeight(snapshot.stance), snapshot.z);
   scene.add(root);
   const now = performance.now();
+  const interpolation = new SnapshotInterpolationBuffer<PlayerSnapshot>(interpolatePlayerSnapshot);
+  interpolation.push({ seq: snapshot.seq, hostTimeMs: currentHostTimeMs(), continuity: 1, value: snapshot });
   return {
     root,
     snapshot,
@@ -2532,8 +2655,15 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
     claimRequiresCoreExit: false,
     positionHistory: [{
       at: now, x: snapshot.x, y: snapshot.y, z: snapshot.z, yaw: snapshot.yaw,
-      stance: snapshot.stance ?? 'stand',
+      stance: snapshot.stance ?? 'stand', continuity: 1,
     }],
+    interpolation,
+    renderedHostTimeMs: currentHostTimeMs(),
+    renderedWorldAgeMs: 0,
+    continuity: 1,
+    feedbackSequenceGaps: 0,
+    feedbackReordered: 0,
+    lastFeedbackAt: Number.NEGATIVE_INFINITY,
   };
 }
 
@@ -2640,12 +2770,12 @@ function updateTeamPings(now: number): void {
 }
 
 function nextCombatTiming(): CombatTiming {
-  const timing = { eventSeq: localCombatEventSeq, sentAtEpochMs: Date.now() };
+  const timing = { eventSeq: localCombatEventSeq, sentAtHostTimeMs: currentHostTimeMs() };
   recordMatchDiagnostic('combat-send', 'observed', {
     actorId: player.id,
     reason: 'local-input-to-network-event',
     rttMs: localLobbyPingMs ?? undefined,
-    clockOffsetMs: network.role === 'client' ? hostClockOffsetMs : 0,
+    clockOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
   }, `combat-seq-${timing.eventSeq}`);
   localCombatEventSeq += 1;
   return timing;
@@ -2663,7 +2793,7 @@ function admitIncomingCombatTiming(message: GameMessage): boolean {
     return false;
   }
   const prior = peerTimingStates.get(message.by) ?? createPeerTimingState();
-  const admission = admitCombatTiming(prior, message.timing, Date.now());
+  const admission = admitCombatTiming(prior, message.timing, performance.now());
   combatAdmissionTelemetry[admission.reason] = (combatAdmissionTelemetry[admission.reason] ?? 0) + 1;
   recordMatchDiagnostic('combat-timing', admission.accepted ? 'accepted' : 'rejected', {
     actorId: message.by,
@@ -2684,6 +2814,26 @@ function admitIncomingCombatTiming(message: GameMessage): boolean {
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
+  if (message.type === 'shot-result') {
+    acceptAuthoritativeShotResult(message);
+    return;
+  }
+  if (message.type === 'shot-request') {
+    if (network.role === 'host') resolveAuthoritativeShot(message);
+    else if (message.by !== player.id) renderRemoteShot({
+      type: 'shot', by: message.by, weapon: message.weapon, origin: message.origin,
+      direction: message.direction, pelletDirections: message.pelletDirections, nonce: message.nonce,
+    });
+    return;
+  }
+  if (message.type === 'state-feedback') {
+    if (network.role === 'client' && message.forPlayerId === player.id && message.by === privateLobbySnapshot?.hostId) {
+      outboundFeedbackSequenceGaps = message.sequenceGaps;
+      outboundFeedbackReordered = message.reordered;
+      outboundFeedbackPressure = message.bufferedPressure;
+    }
+    return;
+  }
   if (!admitIncomingCombatTiming(message)) return;
   if (message.type === 'bot-damage') {
     acceptHostedBotDamage(message);
@@ -2748,7 +2898,7 @@ function onNetworkMessage(message: GameMessage): void {
       addFeed(`${initialIncoming.name} entered the test block`, initialIncoming.team === 0 ? 'aqua' : 'coral');
       sendLeaderboardSync();
       if (message.type === 'join') {
-        network.send({ type: 'state', player: snapshot() });
+        network.send(createStateMessage());
         broadcastOverdriveState(performance.now());
       }
     }
@@ -2803,16 +2953,61 @@ function onNetworkMessage(message: GameMessage): void {
         remote.claimRequiresCoreExit = false;
         remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
       }
+      const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
+      const admittedContinuity = network.role === 'host'
+        ? respawned
+          ? Math.max(remote.continuity + 1, claimedContinuity)
+          : remote.positionHistory.length <= 1 && claimedContinuity >= remote.continuity
+            ? claimedContinuity
+            : remote.continuity
+        : claimedContinuity;
+      const admittedHostTimeMs = message.type === 'state'
+        ? network.role === 'host' ? Math.max(now - 250, Math.min(now + 50, message.hostTimeMs)) : message.hostTimeMs
+        : currentHostTimeMs();
       remote.snapshot = admittedIncoming;
+      if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
+      remote.continuity = admittedContinuity;
+      const priorBufferStats = remote.interpolation.stats;
+      remote.interpolation.push({
+        seq: admittedIncoming.seq,
+        hostTimeMs: admittedHostTimeMs,
+        continuity: admittedContinuity,
+        value: admittedIncoming,
+      });
+      const nextBufferStats = remote.interpolation.stats;
+      const gapDelta = nextBufferStats.sequenceGaps - priorBufferStats.sequenceGaps;
+      const reorderDelta = nextBufferStats.reordered - priorBufferStats.reordered;
+      receiverSequenceGaps += gapDelta;
+      receiverReordered += reorderDelta;
+      remote.feedbackSequenceGaps += gapDelta;
+      remote.feedbackReordered += reorderDelta;
       recordCombatantPose(remote.positionHistory, {
-        at: now, x: admittedIncoming.x, y: admittedIncoming.y, z: admittedIncoming.z,
-        yaw: admittedIncoming.yaw, stance: admittedIncoming.stance ?? 'stand',
+        at: admittedHostTimeMs, x: admittedIncoming.x, y: admittedIncoming.y, z: admittedIncoming.z,
+        yaw: admittedIncoming.yaw, stance: admittedIncoming.stance ?? 'stand', continuity: admittedContinuity,
       });
       remote.target.set(admittedIncoming.x, admittedIncoming.y - stanceEyeHeight(admittedIncoming.stance), admittedIncoming.z);
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
       remote.root.visible = admittedIncoming.hp > 0;
-      if (network.role === 'host') network.send({ type: 'state', player: admittedIncoming }, admittedIncoming.id);
+      if (network.role === 'host') {
+        network.send({
+          type: 'state', player: admittedIncoming,
+          hostTimeMs: admittedHostTimeMs,
+          continuity: admittedContinuity,
+          rateHz: message.type === 'state' ? message.rateHz : 40,
+        }, admittedIncoming.id);
+        if (now - remote.lastFeedbackAt >= 1_000) {
+          network.sendToPlayer(admittedIncoming.id, {
+            type: 'state-feedback', by: player.id, forPlayerId: admittedIncoming.id,
+            sequenceGaps: Math.min(1_000, remote.feedbackSequenceGaps),
+            reordered: Math.min(1_000, remote.feedbackReordered),
+            bufferedPressure: network.stateBufferedPressure(admittedIncoming.id), nonce: randomNonce(),
+          });
+          remote.feedbackSequenceGaps = 0;
+          remote.feedbackReordered = 0;
+          remote.lastFeedbackAt = now;
+        }
+      }
     }
     return;
   }
@@ -3106,6 +3301,204 @@ function sendAuthoritativeHit(
     network.send(death);
     processDeath(death);
   }
+}
+
+function makeShotResult(
+  request: ShotRequestMessage,
+  status: ShotResultMessage['status'],
+  reason: ShotResultMessage['reason'],
+  acceptedHostTimeMs: number | null,
+  appliedRewindMs: number,
+  outcomes: ShotResultMessage['outcomes'] = [],
+): ShotResultMessage {
+  return {
+    type: 'shot-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id, forPlayerId: request.by,
+    shotId: request.shotId, shotSeq: request.shotSeq, status, reason, acceptedHostTimeMs,
+    appliedRewindMs, outcomes, nonce: randomNonce(),
+  };
+}
+
+function resolveAuthoritativeShot(request: ShotRequestMessage): void {
+  if (network.role !== 'host' || request.by === player.id) return;
+  const cacheKey = `${request.by}:${request.shotId}`;
+  const cached = resolvedShotRequests.get(cacheKey);
+  if (cached) {
+    recordShotProtocol('duplicate-request');
+    network.sendToPlayer(request.by, cached);
+    return;
+  }
+  recordShotProtocol('received');
+  const sender = remotes.get(request.by);
+  const prior = authoritativeShotAdmissions.get(request.by) ?? createAuthoritativeShotAdmissionState();
+  const receivedAt = performance.now();
+  const admission = admitAuthoritativeShot(request, sender?.snapshot, receivedAt, prior);
+  if (!admission.accepted || !sender) {
+    const rejected = makeShotResult(request, 'rejected', admission.reason, null, 0);
+    resolvedShotRequests.set(cacheKey, rejected);
+    recordShotProtocol(`rejected-${admission.reason}`);
+    network.sendToPlayer(request.by, rejected);
+    return;
+  }
+  authoritativeShotAdmissions.set(request.by, admission.state);
+  const visualShot: ShotMessage = {
+    type: 'shot', by: request.by, weapon: request.weapon, origin: request.origin,
+    direction: request.direction, pelletDirections: request.pelletDirections, nonce: request.nonce,
+  };
+  renderRemoteShot(visualShot);
+  network.send(request, request.by);
+  const shooterRewind = rewindCombatantPoseStrict(sender.positionHistory, request.renderedHostTimeMs, request.continuity);
+  if (!shooterRewind.pose) {
+    const reason = shooterRewind.reason === 'continuity-mismatch' ? 'continuity-mismatch' : 'missing-history';
+    const rejected = makeShotResult(request, 'rejected', reason, null, 0);
+    resolvedShotRequests.set(cacheKey, rejected);
+    recordShotProtocol(`rejected-shooter-${shooterRewind.reason}`);
+    network.sendToPlayer(request.by, rejected);
+    return;
+  }
+  if (!validateShotOrigin(request, shooterRewind.pose)) {
+    const rejected = makeShotResult(request, 'rejected', 'bad-origin', request.renderedHostTimeMs, admission.appliedRewindMs);
+    resolvedShotRequests.set(cacheKey, rejected);
+    recordShotProtocol('rejected-bad-origin');
+    network.sendToPlayer(request.by, rejected);
+    return;
+  }
+
+  const targetPoses: Array<{ id: string; x: number; y: number; z: number; yaw: number; stance: Stance }> = [];
+  if (player.alive && areCombatantsHostile(request.by, sender.snapshot.team, player.id, player.team)) {
+    const target = rewindCombatantPoseStrict(localPositionHistory, request.renderedHostTimeMs, localContinuity);
+    if (!target.pose) {
+      const reason = target.reason === 'continuity-mismatch' ? 'continuity-mismatch' : 'missing-history';
+      const rejected = makeShotResult(request, 'rejected', reason, null, 0);
+      resolvedShotRequests.set(cacheKey, rejected);
+      recordShotProtocol(`rejected-host-target-${target.reason}`);
+      network.sendToPlayer(request.by, rejected);
+      return;
+    }
+    targetPoses.push({ id: player.id, ...target.pose });
+  }
+  for (const [targetId, targetRemote] of remotes) {
+    if (targetId === request.by || targetRemote.snapshot.hp <= 0
+      || !areCombatantsHostile(request.by, sender.snapshot.team, targetId, targetRemote.snapshot.team)) continue;
+    const target = rewindCombatantPoseStrict(targetRemote.positionHistory, request.renderedHostTimeMs, targetRemote.continuity);
+    if (!target.pose) continue;
+    targetPoses.push({ id: targetId, ...target.pose });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive || !areCombatantsHostile(request.by, sender.snapshot.team, bot.id, bot.team)) continue;
+    const target = rewindCombatantPoseStrict(bot.positionHistory, request.renderedHostTimeMs, bot.continuity);
+    if (!target.pose) continue;
+    targetPoses.push({ id: bot.id, ...target.pose });
+  }
+
+  const derived = deriveAuthoritativeShotOutcomes(
+    request.weapon,
+    request.origin,
+    request.pelletDirections,
+    targetPoses,
+    (origin, impact, weapon) => {
+      const delta = impact.clone().sub(origin);
+      const distance = delta.length();
+      const trace = traceWeaponPath(origin, delta, distance, weapon);
+      return trace.reachedDistance ? trace.damageMultiplier : 0;
+    },
+  );
+  const outcomes: ShotResultMessage['outcomes'] = [];
+  for (const [targetId, hit] of derived) {
+    const powered = resolveRemotePoweredDamage(hit.damage, overdriveDamageMultiplier(overdriveState, request.by, receivedAt));
+    const outgoing = handicapOutgoingDamage(request.by, powered, request.weapon);
+    let appliedDamage = 0;
+    let resultingHealth = 0;
+    let died = false;
+    if (targetId === player.id) {
+      const healthBefore = player.hp;
+      const finalDamage = applyDhvIncomingDamage(outgoing, player.hp, localDhv);
+      applyDamage(finalDamage, request.by, 1, false, { kind: 'gun', weapon: request.weapon }, true);
+      appliedDamage = Math.max(0, healthBefore - player.hp);
+      resultingHealth = player.hp;
+      died = healthBefore > 0 && player.hp <= 0;
+    } else if (bots.has(targetId)) {
+      const bot = bots.get(targetId)!;
+      appliedDamage = applyBotDamage(bot, outgoing, hit.hitZone, { kind: 'gun', weapon: request.weapon }, request.by, hit);
+      resultingHealth = bot.hp;
+      died = !bot.alive;
+    } else {
+      const remote = remotes.get(targetId);
+      const health = remoteHealthAuthorities.get(targetId);
+      if (!remote || !health) continue;
+      const finalDamage = applyDhvIncomingDamage(outgoing, health.hp, memberDhv(targetId));
+      const applied = applyAuthoritativeRemoteDamage(health, finalDamage, receivedAt);
+      if (!applied.applied) continue;
+      appliedDamage = Math.max(0, health.hp - applied.state.hp);
+      resultingHealth = applied.state.hp;
+      died = applied.died;
+      remoteHealthAuthorities.set(targetId, applied.state);
+      remote.snapshot = { ...remote.snapshot, hp: applied.state.hp };
+      remote.root.visible = applied.state.alive;
+      recordDamageEvent({
+        actorId: request.by, targetId, weaponOrEffect: request.weapon,
+        healthBefore: health.hp, healthAfter: applied.state.hp,
+        damageRequested: finalDamage, damageApplied: appliedDamage,
+        hitZone: hit.hitZone, critical: hit.hitZone === 'head', wallbang: hit.wallbang,
+        penetrationMultiplier: hit.penetrationMultiplier, reason: 'host-shot-request-authority',
+      });
+      recordAuthoritativeDamage(request.by, targetId, appliedDamage);
+      if (died) {
+        const death: DeathMessage = {
+          type: 'death', killer: request.by, victim: targetId,
+          cause: { kind: 'gun', weapon: request.weapon }, nonce: randomNonce(),
+        };
+        processedNonces.add(death.nonce);
+        network.send(death);
+        processDeath(death);
+      }
+    }
+    if (appliedDamage > 0) outcomes.push({
+      target: targetId, pelletHits: hit.pelletHits, damage: appliedDamage,
+      resultingHealth, died, hitZone: hit.hitZone, wallbang: hit.wallbang,
+      penetrationMultiplier: hit.penetrationMultiplier,
+    });
+  }
+  const result = makeShotResult(
+    request,
+    outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss',
+    'none',
+    request.renderedHostTimeMs,
+    admission.appliedRewindMs,
+    outcomes,
+  );
+  resolvedShotRequests.set(cacheKey, result);
+  while (resolvedShotRequests.size > 256) resolvedShotRequests.delete(resolvedShotRequests.keys().next().value!);
+  recordShotProtocol(outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss');
+  network.send(result);
+}
+
+function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
+  for (const outcome of message.outcomes) {
+    if (outcome.target !== player.id || !player.alive) continue;
+    const canonicalDamage = Math.max(0, player.hp - outcome.resultingHealth);
+    if (canonicalDamage > 0) applyDamage(canonicalDamage, message.forPlayerId, 0, false, { kind: 'gun', weapon: remotes.get(message.forPlayerId)?.snapshot.weapon ?? 'carbine' }, true);
+    if (player.alive) player.hp = outcome.resultingHealth;
+  }
+  if (message.forPlayerId !== player.id || presentedShotResults.has(message.shotId)) return;
+  presentedShotResults.add(message.shotId);
+  if (message.status === 'rejected') {
+    recordShotProtocol(`result-rejected-${message.reason}`);
+    return;
+  }
+  if (message.status === 'accepted-miss') {
+    recordShotProtocol('result-miss');
+    return;
+  }
+  const headshot = message.outcomes.some((outcome) => outcome.hitZone === 'head');
+  const totalDamage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
+  showHitmarker(headshot);
+  showDamageNumber(totalDamage, headshot ? 'head' : 'body');
+  audio.hit(headshot);
+  roundHitShots += 1;
+  roundHeadshots += message.outcomes.filter((outcome) => outcome.hitZone === 'head').length;
+  roundDamageDealt += totalDamage;
+  recordShotProtocol('result-hit-presented');
 }
 
 function renderRemoteShot(message: ShotMessage): void {
@@ -3804,6 +4197,10 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
 }
 
 function respawn(requestLock = true): void {
+  if (!player.alive) {
+    localContinuity += 1;
+    localPositionHistory.length = 0;
+  }
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
   interruptReload(true);
@@ -3863,10 +4260,10 @@ function respawn(requestLock = true): void {
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
   if (gameStarted && requestLock) requestGamePointerLock();
-  network.send({ type: 'state', player: snapshot() });
+  network.send(createStateMessage());
 }
 
-function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtEpochMs?: number): void {
+function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtLocalMonoMs?: number): void {
   if (mode !== 'solo' && !selectedArena.multiplayer) {
     setStatus(`${selectedArena.displayName} is solo-only.`, 'warn');
     return;
@@ -3888,6 +4285,15 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   roundHeadshots = 0;
   roundDamageDealt = 0;
   roundDamageTaken = 0;
+  localContinuity += 1;
+  localPositionHistory.length = 0;
+  localShotSeq = 0;
+  localFireSeq = 0;
+  resolvedShotRequests.clear();
+  presentedShotResults.clear();
+  authoritativeShotAdmissions.clear();
+  for (const key of Object.keys(shotProtocolTelemetry)) delete shotProtocolTelemetry[key];
+  localSnapshotRateState = createSnapshotRateState(performance.now());
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -3908,8 +4314,8 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   const matchStartedAt = performance.now();
   beginMatchDiagnostics(mode, matchStartedAt);
   const matchRules = currentMatchRules();
-  if (mode !== 'solo' && activeAtEpochMs !== undefined) {
-    const activeAt = localPerformanceAtHostEpoch(activeAtEpochMs, mode === 'host' ? 0 : hostClockOffsetMs, Date.now(), matchStartedAt);
+  if (mode !== 'solo' && activeAtLocalMonoMs !== undefined) {
+    const activeAt = activeAtLocalMonoMs;
     if (matchStartedAt < activeAt) {
       matchState = {
         phase: 'warmup',
@@ -3928,9 +4334,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   } else {
     matchState = createMatch(matchStartedAt, matchRules);
   }
-  overdriveState = createOverdriveState(activeAtEpochMs === undefined
-    ? matchStartedAt
-    : localPerformanceAtHostEpoch(activeAtEpochMs, mode === 'host' ? 0 : hostClockOffsetMs, Date.now(), matchStartedAt));
+  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
   overdriveClaimGeneration = -1;
   overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
   overdriveSpawns = 0;
@@ -4208,7 +4612,26 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: randomNonce(),
   };
-  // Reliable channels preserve this admission event ahead of its correlated hit claims.
+  if (network.role === 'client') {
+    const renderedTargetTimes = [...hitDamage.keys()]
+      .map((targetId) => remotes.get(targetId)?.renderedHostTimeMs)
+      .filter((value): value is number => Number.isFinite(value));
+    const renderedHostTimeMs = renderedTargetTimes.length > 0
+      ? Math.min(...renderedTargetTimes)
+      : Math.max(0, currentHostTimeMs() - SNAPSHOT_INTERPOLATION_DELAY_MS);
+    const request: ShotRequestMessage = {
+      type: 'shot-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
+      shotId: `${shotSessionId}:${localShotSeq}`, shotSeq: localShotSeq, fireSeq: localFireSeq,
+      weapon: player.weapon, renderedHostTimeMs, continuity: localContinuity,
+      origin: shot.origin, direction: shot.direction, pelletDirections: shot.pelletDirections,
+      nonce: shot.nonce,
+    };
+    localShotSeq += 1;
+    localFireSeq += 1;
+    network.send(request);
+    recordShotProtocol('created-sent');
+    return;
+  }
   network.send(shot);
   if (hitDamage.size > 0) {
     roundHitShots += 1;
@@ -4488,6 +4911,11 @@ function spawnBot(index: number, hosted = false): void {
     sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
     invulnerableUntil: spawnedAt + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
     weapon, nextGrenadeAt: spawnedAt + 5_000 + gameplayRandom() * 3_000, grenadeActive: false,
+    positionHistory: [{
+      at: currentHostTimeMs(), x: position.x, y: position.y + 1.7, z: position.z,
+      yaw: root.rotation.y, stance: 'stand', continuity: 1,
+    }],
+    continuity: 1,
   });
 }
 
@@ -4813,6 +5241,8 @@ function respawnBot(bot: BotPlayer, now: number): void {
   const spawn = selectSafeBotSpawn(bot.team);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
+  bot.continuity += 1;
+  bot.positionHistory.length = 0;
   bot.hp = state.health;
   bot.alive = state.alive;
   bot.invulnerableUntil = state.invulnerableUntil;
@@ -5022,6 +5452,10 @@ function updateBots(dt: number, now: number): void {
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
       continue;
     }
+    recordCombatantPose(bot.positionHistory, {
+      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
+      yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+    });
     if (botsFrozen) {
       poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001);
       continue;
@@ -6830,23 +7264,34 @@ function updatePhysics(dt: number): void {
 }
 
 function updateRemotes(dt: number, now: number): void {
+  const hostNow = currentHostTimeMs();
   recordCombatantPose(localPositionHistory, {
-    at: now, x: player.position.x, y: player.position.y, z: player.position.z,
-    yaw: player.yaw, stance: player.stance,
+    at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
+    yaw: player.yaw, stance: player.stance, continuity: localContinuity,
   });
   for (const [id, remote] of remotes) {
     if (now - remote.lastSeen > 12_000) {
       removeRemote(id, 'timed out');
       continue;
     }
-    const alpha = remoteInterpolationAlpha(dt);
-    const remainingDistance = remote.root.position.distanceTo(remote.target);
-    remote.root.position.lerp(remote.target, alpha);
-    remote.root.rotation.y += shortestAngleDelta(remote.root.rotation.y, remote.targetYaw) * alpha;
-    const stance = remote.snapshot.stance ?? 'stand';
+    const rendered = remote.interpolation.sample(hostNow, SNAPSHOT_INTERPOLATION_DELAY_MS);
+    const renderedSnapshot = rendered?.value ?? remote.snapshot;
+    const renderedTarget = new THREE.Vector3(
+      renderedSnapshot.x,
+      renderedSnapshot.y - stanceEyeHeight(renderedSnapshot.stance),
+      renderedSnapshot.z,
+    );
+    const remainingDistance = remote.root.position.distanceTo(renderedTarget);
+    remote.root.position.copy(renderedTarget);
+    remote.root.rotation.y = renderedSnapshot.yaw;
+    remote.target.copy(renderedTarget);
+    remote.targetYaw = renderedSnapshot.yaw;
+    remote.renderedHostTimeMs = rendered?.renderedHostTimeMs ?? hostNow;
+    remote.renderedWorldAgeMs = rendered?.renderedWorldAgeMs ?? 0;
+    const stance = renderedSnapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
-    setOperatorWeapon(operator, remote.snapshot.weapon, flattenOperatorMaterials);
-    poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, alpha, remote.snapshot.pitch);
+    setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials);
+    poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch);
   }
 }
 
@@ -7020,6 +7465,22 @@ function updateMatchState(now: number): void {
       damageLedgerEventCount: humanDamageTimeline.length,
       droppedHumanDamageEvents,
       clientRuntimeLog: readClientRuntimeLog(clientSessionStorage()),
+      experimentalNetcode: {
+        protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+        hostTime: hostTimeDiagnostics(hostTimeMapping),
+        selectedRateHz: localSnapshotRateState.rateHz,
+        stateIntervalMs: snapshotIntervalMs(localSnapshotRateState.rateHz),
+        receiverSequenceGaps,
+        receiverReordered,
+        bufferedPressure: network.stateBufferedPressure(),
+        shotLifecycle: { ...shotProtocolTelemetry },
+        remoteInterpolation: [...remotes.values()].map((remote) => ({
+          playerId: matchDiagnostics?.participantKey(remote.snapshot.id),
+          renderedWorldAgeMs: remote.renderedWorldAgeMs,
+          bufferDepth: remote.interpolation.depth,
+          ...remote.interpolation.stats,
+        })),
+      },
     });
     const technical = matchDiagnostics?.export();
     if (technical) {
@@ -8115,10 +8576,18 @@ if (invitedRoom && launchParams.get('autojoin') === '1') {
 
 function scheduleStateBroadcast(): void {
   if (stateBroadcastTimer) clearTimeout(stateBroadcastTimer);
-  const delay = stateBroadcastIntervalMs(localLobbyPingMs);
+  const delay = snapshotIntervalMs(localSnapshotRateState.rateHz);
   stateBroadcastTimer = setTimeout(() => {
     if (gameStarted && network.role !== 'offline' && player.alive) {
-      network.send({ type: 'state', player: snapshot() });
+      const now = performance.now();
+      localSnapshotRateState = updateSnapshotRate(localSnapshotRateState, {
+        rttMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.rttMs : localLobbyPingMs ?? 20,
+        jitterMs: hostTimeMapping.sampleCount > 0 ? hostTimeMapping.jitterMs : 0,
+        sequenceGaps: outboundFeedbackSequenceGaps,
+        reordered: outboundFeedbackReordered,
+        bufferedPressure: Math.max(outboundFeedbackPressure, network.stateBufferedPressure()),
+      }, now);
+      network.send(createStateMessage());
       if (network.role === 'host' && privateMatchConfig.hostedBotCount > 0) broadcastHostedBotState();
     }
     scheduleStateBroadcast();
@@ -8355,8 +8824,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       autoBalance: privateLobbySnapshot.config.autoBalance,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
       scores: [...authoritativeScores.values()].map((score) => ({ ...score })),
+      activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
       activeAtEpochMs: privateMatchActiveAtEpochMs,
-      hostClockOffsetMs,
+      hostTimeOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
       localPingMs: localLobbyPingMs,
     } : null,
     scores: teamScores(),
@@ -8538,8 +9008,24 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     remotes: remotes.size,
     networkSync: {
-      stateIntervalMs: STATE_BROADCAST_INTERVAL_MS,
-      interpolationRate: REMOTE_INTERPOLATION_RATE,
+      selectedRateHz: localSnapshotRateState.rateHz,
+      stateIntervalMs: snapshotIntervalMs(localSnapshotRateState.rateHz),
+      rateTransitions: localSnapshotRateState.transitions,
+      receiverSequenceGaps,
+      receiverReordered,
+      outboundFeedbackSequenceGaps,
+      outboundFeedbackReordered,
+      outboundFeedbackPressure,
+      hostTime: hostTimeDiagnostics(hostTimeMapping),
+      shotProtocol: { ...shotProtocolTelemetry },
+      localContinuity,
+      localHistory: {
+        count: localPositionHistory.length,
+        first: localPositionHistory[0]?.at ?? null,
+        latest: localPositionHistory.at(-1)?.at ?? null,
+        firstContinuity: localPositionHistory[0]?.continuity ?? null,
+        latestContinuity: localPositionHistory.at(-1)?.continuity ?? null,
+      },
     },
     networkLifecycle: network.diagnostics(),
     remoteHitAdmission: { ...remoteHitAdmissionTelemetry },
@@ -8551,6 +9037,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       stance: remote.snapshot.stance ?? 'stand',
       seq: remote.snapshot.seq,
       position: remote.target.toArray(),
+      renderedHostTimeMs: remote.renderedHostTimeMs,
+      renderedWorldAgeMs: remote.renderedWorldAgeMs,
+      snapshotBufferDepth: remote.interpolation.depth,
+      snapshotBuffer: remote.interpolation.stats,
+      continuity: remote.continuity,
+      historyFirst: remote.positionHistory[0]?.at ?? null,
+      historyLatest: remote.positionHistory.at(-1)?.at ?? null,
       visualPosition: remote.root.position.toArray(),
       snapshotAgeMs: Math.max(0, performance.now() - remote.lastSeen),
       interpolationError: remote.root.position.distanceTo(remote.target),

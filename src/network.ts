@@ -36,12 +36,14 @@ type NetworkDiagnostics = Record<string, unknown> & {
   reconnectAttempts: number;
   stateFallbackActive: boolean;
   stateFallbackMessages: number;
+  qaEventDelayMs: number;
+  qaEventJitterMs: number;
 };
 
 const STATE_LABEL = 'atomic-acres-state-v1';
 const EVENT_LABEL = 'atomic-acres-events-v1';
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_DELAYS_MS = [500, 1_500, 3_000] as const;
+const RECONNECT_WINDOW_MS = 90_000;
+const RECONNECT_DELAYS_MS = [500, 1_500, 3_000, 5_000] as const;
 
 function createArenaPeer(): Peer {
   const params = new URLSearchParams(window.location.search);
@@ -56,6 +58,15 @@ function createArenaPeer(): Peer {
     });
   }
   return new Peer();
+}
+
+function qaEventImpairment(): Readonly<{ delayMs: number; jitterMs: number }> {
+  const params = new URLSearchParams(window.location.search);
+  const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+  if (!localQa) return { delayMs: 0, jitterMs: 0 };
+  const delayMs = Math.max(0, Math.min(250, Number(params.get('eventDelayQaMs')) || 0));
+  const jitterMs = Math.max(0, Math.min(100, Number(params.get('eventJitterQaMs')) || 0));
+  return { delayMs, jitterMs };
 }
 
 function channelKind(connection: DataConnection): ChannelKind {
@@ -144,10 +155,13 @@ export class ArenaNetwork {
   private maximumPlayers = 4;
   private manualClose = false;
   private reconnectAttempts = 0;
+  private reconnectDeadlineMonoMs: number | null = null;
   private stateMessagesSent = 0;
   private stateMessagesRelayed = 0;
   private selfStateEchoesSuppressed = 0;
   private stateFallbackMessages = 0;
+  private qaEventSendSequence = 0;
+  private qaEventLastDue = new WeakMap<DataConnection, number>();
 
   constructor(onMessage: MessageHandler, onStatus: StatusHandler) {
     this.onMessage = onMessage;
@@ -207,7 +221,7 @@ export class ArenaNetwork {
         ? this.hostStateConnection?.open ? this.hostStateConnection : this.hostEventConnection
         : this.hostEventConnection;
       if (connection?.open) {
-        connection.send(message);
+        this.transmit(connection, message, isStateTrafficMessage(message));
         if (isStateTrafficMessage(message)) this.stateMessagesSent += 1;
         if (stateFallback) this.stateFallbackMessages += 1;
       }
@@ -222,7 +236,7 @@ export class ArenaNetwork {
       ? bundle?.state?.open ? bundle.state : bundle?.events
       : bundle?.events;
     if (!connection?.open) return false;
-    connection.send(message);
+    this.transmit(connection, message, isStateTrafficMessage(message));
     if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
     if (stateFallback) this.stateFallbackMessages += 1;
     return true;
@@ -230,6 +244,17 @@ export class ArenaNetwork {
 
   connectedPlayerIds(): string[] {
     return [...this.guestBundles.keys()];
+  }
+
+  stateBufferedPressure(playerId?: string): number {
+    const amount = this.role === 'client'
+      ? this.hostStateConnection?.dataChannel?.bufferedAmount ?? this.hostEventConnection?.dataChannel?.bufferedAmount ?? 0
+      : playerId
+        ? this.guestBundles.get(playerId)?.state?.dataChannel?.bufferedAmount
+          ?? this.guestBundles.get(playerId)?.events.dataChannel?.bufferedAmount ?? 0
+        : Math.max(0, ...[...this.guestBundles.values()].map((bundle) =>
+          bundle.state?.dataChannel?.bufferedAmount ?? bundle.events.dataChannel?.bufferedAmount ?? 0));
+    return Math.max(0, Math.min(1, amount / 65_536));
   }
 
   disconnectPlayer(playerId: string): void {
@@ -251,6 +276,7 @@ export class ArenaNetwork {
   }
 
   diagnostics(): NetworkDiagnostics {
+    const qaImpairment = qaEventImpairment();
     const eventChannels = this.role === 'host'
       ? [...this.guestBundles.values()].filter((bundle) => bundle.events.open).length
       : Number(this.hostEventConnection?.open ?? false);
@@ -289,6 +315,8 @@ export class ArenaNetwork {
         ? stateTrafficUsesFallback(Boolean(this.hostStateConnection?.open), Boolean(this.hostEventConnection?.open))
         : [...this.guestBundles.values()].some((bundle) => stateTrafficUsesFallback(Boolean(bundle.state?.open), bundle.events.open)),
       stateFallbackMessages: this.stateFallbackMessages,
+      qaEventDelayMs: qaImpairment.delayMs,
+      qaEventJitterMs: qaImpairment.jitterMs,
     };
   }
 
@@ -318,12 +346,13 @@ export class ArenaNetwork {
     this.roomCode = '';
     this.role = 'offline';
     this.onReady = null;
+    this.reconnectDeadlineMonoMs = null;
   }
 
   private connectClient(reconnecting: boolean): void {
     if (this.manualClose || this.role !== 'client') return;
     this.clearJoinDeadline();
-    this.onStatus(reconnecting ? `Reconnecting to host (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})…` : 'Connecting to peer lobby…', reconnecting ? 'warn' : undefined);
+    this.onStatus(reconnecting ? `Reconnecting to host (attempt ${this.reconnectAttempts})…` : 'Connecting to peer lobby…', reconnecting ? 'warn' : undefined);
     this.joinDeadline = setTimeout(() => {
       if (this.role !== 'client' || this.channelsReady()) return;
       this.destroyClientTransport();
@@ -378,7 +407,12 @@ export class ArenaNetwork {
   private wireGuestEvents(connection: DataConnection): void {
     let playerId = '';
     connection.on('data', (payload) => {
-      if (!isGameMessage(payload)) return;
+      if (!isGameMessage(payload)) {
+        if (!playerId && payload && typeof payload === 'object' && (payload as { type?: unknown }).type === 'lobby-join') {
+          this.rejectConnection(connection, 'protocol-mismatch');
+        }
+        return;
+      }
       if (!playerId) {
         if (payload.type !== 'lobby-join' && payload.type !== 'join') return;
         const requestedId = payload.type === 'lobby-join' ? payload.playerId : payload.player.id;
@@ -422,7 +456,7 @@ export class ArenaNetwork {
         return;
       }
       if (payload.type === 'overdrive-claim' || payload.type === 'hit'
-        || payload.type === 'join' || payload.type === 'shot' || payload.type === 'melee'
+        || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'state-feedback' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
         || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
         || payload.type === 'lobby-balance' || payload.type === 'clock-ping') {
@@ -493,6 +527,7 @@ export class ArenaNetwork {
     if (!this.channelsReady()) return;
     this.clearJoinDeadline();
     this.reconnectAttempts = 0;
+    this.reconnectDeadlineMonoMs = null;
     this.onStatus('Connected to host', 'ok');
     this.onReady?.();
   }
@@ -504,7 +539,9 @@ export class ArenaNetwork {
   private scheduleReconnect(reason: string): void {
     if (this.manualClose || this.role !== 'client' || this.reconnectTimer) return;
     this.destroyClientTransport();
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    const now = performance.now();
+    this.reconnectDeadlineMonoMs ??= now + RECONNECT_WINDOW_MS;
+    if (now >= this.reconnectDeadlineMonoMs) {
       this.role = 'offline';
       this.roomCode = '';
       this.onReady = null;
@@ -513,7 +550,7 @@ export class ArenaNetwork {
     }
     const delay = RECONNECT_DELAYS_MS[this.reconnectAttempts] ?? RECONNECT_DELAYS_MS.at(-1)!;
     this.reconnectAttempts += 1;
-    this.onStatus(`${reason}; retrying…`, 'warn');
+    this.onStatus(`${reason}; retrying within the 90-second rejoin window`, 'warn');
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connectClient(true);
@@ -549,11 +586,11 @@ export class ArenaNetwork {
     const leave: GameMessage = { type: 'leave', playerId };
     this.onMessage(leave);
     this.broadcast(leave, playerId);
-    this.onStatus('A guest disconnected; rejoin slot held briefly', 'warn');
+    this.onStatus('A guest disconnected; rejoin slot held for 90 seconds', 'warn');
   }
 
-  private rejectConnection(connection: DataConnection, reason: 'room-full' | 'identity-in-use'): void {
-    if (connection.open) connection.send({ type: 'lobby-reject', reason, nonce: Date.now() } satisfies GameMessage);
+  private rejectConnection(connection: DataConnection, reason: 'room-full' | 'identity-in-use' | 'protocol-mismatch'): void {
+    if (connection.open) this.transmit(connection, { type: 'lobby-reject', reason, nonce: Date.now() } satisfies GameMessage, false);
     window.setTimeout(() => connection.close(), 50);
   }
 
@@ -569,7 +606,7 @@ export class ArenaNetwork {
         ? bundle.state?.open ? bundle.state : bundle.events
         : bundle.events;
       if (!connection?.open) continue;
-      connection.send(message);
+      this.transmit(connection, message, isStateTrafficMessage(message));
       if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
       if (stateFallback) this.stateFallbackMessages += 1;
     }
@@ -578,6 +615,22 @@ export class ArenaNetwork {
   private clearJoinDeadline(): void {
     if (this.joinDeadline) clearTimeout(this.joinDeadline);
     this.joinDeadline = null;
+  }
+
+  private transmit(connection: DataConnection, message: GameMessage, stateTraffic: boolean): void {
+    const impairment = qaEventImpairment();
+    if (stateTraffic || impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
+      connection.send(message);
+      return;
+    }
+    const phase = (this.qaEventSendSequence % 5) - 2;
+    this.qaEventSendSequence += 1;
+    const requestedDue = performance.now() + impairment.delayMs + phase * impairment.jitterMs / 2;
+    const due = Math.max(requestedDue, (this.qaEventLastDue.get(connection) ?? 0) + 0.1);
+    this.qaEventLastDue.set(connection, due);
+    window.setTimeout(() => {
+      if (connection.open) connection.send(message);
+    }, Math.max(0, due - performance.now()));
   }
 
   private describeError(error: unknown): string {
