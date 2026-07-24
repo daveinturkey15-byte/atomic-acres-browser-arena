@@ -46,7 +46,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     summary: 'Pass 62 is a local human-inspection build that deepens material, lighting and atmosphere quality without changing Pass 61 gameplay, physics or netcode.',
     highlights: Object.freeze([
       'Arena-scaled PMREM gives metals and glass a reflection response while authored sun, moon and practical lights remain the dominant source of shape and contrast',
-      'All four arenas use a stronger key-to-fill hierarchy; Quality adds two bounded practical spotlights per arena with one focused moving-caster shadow',
+      'Arena-specific key-to-fill tuning preserves dark zones; extra bounded spotlights are limited to Atomic and Skyline while Rustworks and Gun Range retain their authored practical-light pools',
       'Quality Graphics adds restrained depth-buffer contact shading, low-altitude depth fog and bloom isolated to tagged emissive objects',
       'Each arena fits its own directional shadow volume instead of sharing one oversized global projection',
       'Adaptive quality now sheds contact shading, bloom resolution, fog, reflections, particles and decal persistence independently before relying on resolution alone',

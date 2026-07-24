@@ -36,8 +36,8 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
 // modelling source or roofs, weapons and interiors lose their shadow shape.
 const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freeze({
   'atomic-acres': 0.24,
-  'rustworks-1v1': 0.3,
-  'gun-range': 0.18,
+  'rustworks-1v1': 0.14,
+  'gun-range': 0.1,
   'skyline-terminal': 0.22,
 });
 

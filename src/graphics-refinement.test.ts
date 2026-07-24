@@ -40,9 +40,10 @@ describe('Pass 62 graphics refinement budgets', () => {
 
   it('keeps neutral IBL subordinate to authored key lights in every arena', () => {
     for (const arenaId of ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const) {
-      expect(arenaEnvironmentScale(arenaId)).toBeGreaterThanOrEqual(0.15);
+      expect(arenaEnvironmentScale(arenaId)).toBeGreaterThanOrEqual(0.1);
       expect(arenaEnvironmentScale(arenaId)).toBeLessThanOrEqual(0.3);
     }
-    expect(arenaEnvironmentScale('rustworks-1v1')).toBeGreaterThan(arenaEnvironmentScale('gun-range'));
+    expect(arenaEnvironmentScale('rustworks-1v1')).toBeLessThan(arenaEnvironmentScale('atomic-acres'));
+    expect(arenaEnvironmentScale('gun-range')).toBeLessThan(arenaEnvironmentScale('rustworks-1v1'));
   });
 });

@@ -16,14 +16,11 @@ const KEY_LIGHTS = {
     { position: [-26, 11, 12], target: [-18, 1.8, 2], color: 0xffc981, intensity: 13, distance: 32, angle: 0.62 },
     { position: [26, 10, -12], target: [18, 1.8, -2], color: 0xa9d8ff, intensity: 11, distance: 31, angle: 0.6 },
   ],
-  'rustworks-1v1': [
-    { position: [-22, 17, -18], target: [-3, 2.5, -2], color: 0xffb45d, intensity: 24, distance: 48, angle: 0.56 },
-    { position: [22, 16, 18], target: [3, 2.5, 2], color: 0xb8d4ff, intensity: 21, distance: 46, angle: 0.56 },
-  ],
-  'gun-range': [
-    { position: [-10, 6.65, 9], target: [-5, 0.5, -15], color: 0xffd29a, intensity: 24, distance: 42, angle: 0.48 },
-    { position: [10, 6.65, -7], target: [5, 0.5, -33], color: 0xc7ecff, intensity: 22, distance: 42, angle: 0.48 },
-  ],
+  // Rustworks already has sixteen authored industrial floods and Gun Range has
+  // ceiling, neon and armory practicals. Arena-wide keys on either map erase
+  // their intentionally dark zones instead of adding useful modelling.
+  'rustworks-1v1': [],
+  'gun-range': [],
   'skyline-terminal': [
     { position: [-20, 6.7, -30], target: [-8, 0.8, -19], color: 0xbcecff, intensity: 20, distance: 34, angle: 0.62 },
     { position: [20, 6.7, -24], target: [8, 0.8, -17], color: 0xffc68a, intensity: 17, distance: 34, angle: 0.62 },
