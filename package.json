@@ -32,7 +32,7 @@
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
     "qa:network-chaos:soak": "tsx scripts/qa/run-network-chaos-soak.ts",
     "qa:pass61:netcode": "node scripts/qa/verify-pass61-authoritative-netcode.mjs",
-    "qa:pass63": "playwright test tests/e2e/pass63-project-map.spec.ts tests/e2e/pass63-atomic-visuals.spec.ts tests/e2e/pass63-skyline-terminal-openings.spec.ts tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
+    "qa:pass63": "playwright test tests/e2e/pass63-project-map.spec.ts tests/e2e/pass63-atomic-visuals.spec.ts tests/e2e/pass63-skyline-terminal-openings.spec.ts tests/e2e/pass63-text-chat.spec.ts tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass63:text-chat": "playwright test tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
