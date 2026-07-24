@@ -14,6 +14,8 @@
 - Release-note impact: `player-facing / internal-only`
 - Change impact: `process-only / release-shell / runtime`
 - Planned browser gate: `none / release-shell / full`
+- Release pass: `PASS <number> / not applicable`
+- Acceptance manifest: `acceptance/pass-<number>.json / process-only exemption`
 
 ## Changed paths
 
@@ -29,6 +31,9 @@
 - [ ] `npm test`
 - [ ] `npm run build`
 - [ ] Browser/visual evidence supplied when user-visible rendering changed
+- [ ] Every feedback requirement is mapped to an expected result, falsifier, and concrete evidence in the pass acceptance manifest
+- [ ] Dave approved the immutable `pr-preview-<pr>-<source-sha>` candidate; the manifest records that exact preview SHA and timestamp
+- [ ] No runtime or release-shell path changed after the approved preview SHA
 - [ ] Any timeout, threshold, baseline, or assertion change is separately justified with evidence
 - [ ] Worktree is clean and the PR contains current `origin/main`
 

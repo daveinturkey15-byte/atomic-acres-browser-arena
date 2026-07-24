@@ -1,13 +1,22 @@
 import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
+import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 
 const isWindows = process.platform === 'win32';
 const port = process.env.QA_PORT ?? '4180';
+const portNumber = Number(port);
+if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65_535) throw new Error(`Invalid QA_PORT: ${port}`);
 const baseUrl = `http://127.0.0.1:${port}/`;
 const command = process.argv[2];
 const args = process.argv.slice(3);
 if (!command) throw new Error('Expected a command to run after the preview server starts.');
+
+await new Promise((resolveAvailable, rejectUnavailable) => {
+  const probe = createServer();
+  probe.once('error', (error) => rejectUnavailable(new Error(`QA port ${port} is unavailable; choose an unused QA_PORT. ${error.message}`)));
+  probe.listen({ host: '127.0.0.1', port: portNumber, exclusive: true }, () => probe.close(resolveAvailable));
+});
 
 const viteBin = resolve('node_modules/vite/bin/vite.js');
 const server = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', port, '--strictPort'], {

@@ -15,6 +15,7 @@ Contribution ownership, branch identity, PR receipts, integration serialization,
 - `npm run verify:release-tree` — forbidden and untracked release-tree checks.
 - `npm run audit:dependencies` — production dependency audit.
 - `npm run test:e2e:bounded` — serialized Chromium groups with Windows/Linux command selection.
+- `node scripts/release/acceptance-gate.mjs` — Pass 62+ requirement coverage, evidence, immutable preview, and exact-SHA human approval.
 
 `npm run verify` composes the full local gate. GitHub Actions runs static and unit gates on Windows and Linux, then the representative bounded browser groups on Windows.
 
@@ -25,6 +26,12 @@ CI selects browser work from the exact changed paths with `scripts/release/chang
 - `runtime`: run the full representative browser groups and any focused evidence required by the changed surface.
 
 Unknown or unresolvable diffs select `runtime`. This classification changes cost, not product standards: the integrator may always escalate a class, and may not downgrade one by relabelling the PR.
+
+For `runtime` and `release-shell` PRs, the Linux static job also uploads the built `dist/` tree with a SHA-256 tree receipt as `pr-preview-<pr>-<head-sha>`. The `requirements-acceptance` job deliberately remains red until the Pass 62+ manifest records Dave's approval of that immutable candidate. Only manifest/process paths may change after the approved preview; otherwise the gate demands a new preview and approval.
+
+The final production gate runs after GitHub Pages reports the exact published SHA as built. It exercises the public chooser, all three release channels, room-link routing, pass labels, HTTP failures, request failures, page exceptions, and application warnings/errors. Its JSON and screenshots are embedded in the production receipt.
+
+The non-product `pipeline-metrics` job measures workflow wall time, job start delay, execution time, acceptance coverage, feedback-to-preview, and preview-to-approval. This supplies comparable build-to-build data without weakening any required check.
 
 ## Portability contract
 
@@ -49,4 +56,5 @@ Unknown or unresolvable diffs select `runtime`. This classification changes cost
 
 ## Verification gotchas
 
+- **Symptom →** a local browser gate times out against the wrong build while Vite reports that port 4180 is already in use. **Cause →** the preview wrapper accepted an unrelated listener as its own readiness signal before its child process finished failing. **Correction →** the wrapper now proves its requested port is free before spawning; concurrent tasks must set a unique `QA_PORT`. **Verify →** an occupied port fails immediately with `QA port ... is unavailable`, while an unused port starts, tests, and tears down only its own process tree.
 - **Symptom →** the Rustworks ship-ladder unit traversal passes, but a real browser descent walks across the upper deck and falls to ground. **Cause →** the player capsule can still contact the upper-deck slab edge when the ladder centreline is visually outside it, so the controller stays on the deck instead of settling onto the ramp. **Correction →** preserve capsule-radius clearance at the deck edge and stage route anchors at the standing 1.7 m eye height. **Verify →** run `npx vitest run src/additional-maps.test.ts` and the `pass34-contracts` bounded browser group in both directions.

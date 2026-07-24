@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 62",
+  "feedbackReceivedAt": "2026-07-24T08:00:00Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-123-0123456789abcdef0123456789abcdef01234567",
+    "sourceSha": "0123456789abcdef0123456789abcdef01234567",
+    "createdAt": "2026-07-24T09:00:00Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-07-24T09:15:00Z",
+    "evidence": "Dave tested the immutable PR preview and approved this exact candidate."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Example mechanical requirement",
+      "expected": "The exact player-visible or system outcome.",
+      "falsifier": "A concrete observation that proves the outcome is still wrong.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/example.test.ts",
+          "command": "npx vitest run src/example.test.ts",
+          "note": "The negative fixture fails on the old behaviour and passes on the candidate."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Example visual requirement",
+      "expected": "The served composition matches the accepted target at representative viewports.",
+      "falsifier": "Any representative capture still shows the reported defect.",
+      "acceptance": "visual",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/example.spec.ts",
+          "command": "npx playwright test tests/e2e/example.spec.ts --project=chromium --workers=1",
+          "note": "Exercises the served route and asserts the affected surface."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pass-62-visual-evidence/example.png",
+          "note": "Representative served-build capture reviewed by Dave."
+        }
+      ]
+    }
+  ]
+}
