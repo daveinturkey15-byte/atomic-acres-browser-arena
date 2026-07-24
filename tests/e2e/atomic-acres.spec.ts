@@ -447,6 +447,11 @@ test.describe('boot and authored presentation', () => {
       receiverReordered: 0,
       outboundFeedbackSequenceGaps: 0,
       outboundFeedbackReordered: 0,
+      interpolationDelay: {
+        delayMs: 60,
+        sourceSnapshotRateHz: 40,
+        targetViewRewindHeadroomMs: 190,
+      },
     });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });

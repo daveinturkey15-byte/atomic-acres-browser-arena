@@ -15,6 +15,7 @@ describe('remote health authority', () => {
     const lethal = applyAuthoritativeRemoteDamage(first.state, 40, 200);
     expect(lethal.died).toBe(true);
     expect(lethal.state.alive).toBe(false);
+    expect(lethal.state.diedAtHostTimeMs).toBe(200);
     expect(applyAuthoritativeRemoteDamage(lethal.state, 100, 300).applied).toBe(false);
   });
 
@@ -22,6 +23,8 @@ describe('remote health authority', () => {
     const dead = applyAuthoritativeRemoteDamage(createRemoteHealthAuthorityState(), 100, 1_000).state;
     expect(admitAuthoritativeRemoteRespawn(dead, 100, 1_000 + REMOTE_RESPAWN_MIN_MS - 1).respawned).toBe(false);
     expect(admitAuthoritativeRemoteRespawn(dead, 0, 1_000 + REMOTE_RESPAWN_MIN_MS).respawned).toBe(false);
-    expect(admitAuthoritativeRemoteRespawn(dead, 100, 1_000 + REMOTE_RESPAWN_MIN_MS).respawned).toBe(true);
+    const respawned = admitAuthoritativeRemoteRespawn(dead, 100, 1_000 + REMOTE_RESPAWN_MIN_MS);
+    expect(respawned.respawned).toBe(true);
+    expect(respawned.state.diedAtHostTimeMs).toBeNull();
   });
 });

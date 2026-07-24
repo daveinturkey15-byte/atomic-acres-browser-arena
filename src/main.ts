@@ -207,13 +207,15 @@ import {
   submitGlobalStreak,
 } from './global-leaderboard';
 import {
-  SNAPSHOT_INTERPOLATION_DELAY_MS,
   SnapshotInterpolationBuffer,
+  createInterpolationDelayState,
   createSnapshotRateState,
   snapshotIntervalMs,
   stateBroadcastWakeIntervalMs,
+  updateInterpolationDelay,
   updateSnapshotRate,
   shortestYaw,
+  type InterpolationDelayState,
   type SnapshotRateState,
 } from './network-sync';
 import {
@@ -249,16 +251,22 @@ import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint
 import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
 import { admitRemoteBaseDamage, deriveAuthoritativeShotOutcomes, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
 import {
+  MAX_AUTHORITATIVE_REWIND_MS,
+  MAX_SHOT_FIRE_AGE_MS,
   admitAuthoritativeShot,
   createAuthoritativeShotAdmissionState,
+  freezeAuthoredBulletRecord,
+  freezeAuthoredShotTimeline,
   validateShotOrigin,
+  type AuthoredShotTimeline,
   type AuthoritativeShotAdmissionState,
 } from './authoritative-shot';
+import { ShotTimingTelemetry } from './shot-timing-telemetry';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
 import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
-import { recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
+import { reconstructShooterPoseAtFireTime, recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
 import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
 import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
@@ -348,6 +356,7 @@ type RemotePlayer = {
   claimRequiresCoreExit: boolean;
   positionHistory: CombatantPoseSample[];
   interpolation: SnapshotInterpolationBuffer<PlayerSnapshot>;
+  snapshotRateHz: 20 | 30 | 40;
   renderedHostTimeMs: number;
   renderedWorldAgeMs: number;
   continuity: number;
@@ -1369,17 +1378,47 @@ const localPositionHistory: CombatantPoseSample[] = [];
 let localCombatEventSeq = 0;
 let localContinuity = 1;
 let localSnapshotRateState: SnapshotRateState = createSnapshotRateState(performance.now());
+let interpolationDelayState: InterpolationDelayState = createInterpolationDelayState(performance.now());
+let lastObservedInterpolationUnderruns = 0;
 let receiverSequenceGaps = 0;
 let receiverReordered = 0;
 let outboundFeedbackSequenceGaps = 0;
 let outboundFeedbackReordered = 0;
 let outboundFeedbackPressure = 0;
 let localShotSeq = 0;
-let localFireSeq = 0;
-const shotSessionId = crypto.randomUUID();
+const localWeaponSequences = new Map<WeaponId, number>();
+let localConnectionEpoch: string = crypto.randomUUID();
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
 const presentedShotResults = new Set<string>();
+const processedShotResults = new Set<string>();
 const shotProtocolTelemetry: Record<string, number> = {};
+const shotTimingTelemetry = new ShotTimingTelemetry();
+let lastAuthoredShotTimeline: AuthoredShotTimeline | null = null;
+let lastResolvedShotTimeline: Readonly<{
+  fireTimeMs: number;
+  targetViewTimeMs: number;
+  receivedHostTimeMs: number;
+  resolvedAtHostTimeMs: number;
+  appliedRewindMs: number;
+}> | null = null;
+type ShotResolutionTrace = Readonly<{
+  shotSeq: number;
+  weaponSequence: number;
+  lifeId: number;
+  fireTimeMs: number;
+  targetViewTimeMs: number;
+  receivedHostTimeMs: number;
+  resolvedAtHostTimeMs: number;
+  appliedRewindMs: number;
+  shooterHistoryFirstMs: number | null;
+  shooterHistoryLatestMs: number | null;
+  outcome: string;
+}>;
+const recentShotResolutionTraces: ShotResolutionTrace[] = [];
+function recordShotResolutionTrace(trace: ShotResolutionTrace): void {
+  recentShotResolutionTraces.push(trace);
+  while (recentShotResolutionTraces.length > 16) recentShotResolutionTraces.shift();
+}
 function recordShotProtocol(label: string): void {
   shotProtocolTelemetry[label] = (shotProtocolTelemetry[label] ?? 0) + 1;
 }
@@ -1421,6 +1460,7 @@ let hostedBotStateSeq = 0;
 let lastHostedBotStateSeq = -1;
 const hostLobbyMembers = new Map<string, LobbyMember>();
 const hostLobbyTokens = new Map<string, string>();
+const hostLobbyConnectionEpochs = new Map<string, string>();
 const hostDisconnectedAt = new Map<string, number>();
 const authoritativeScores = new Map<string, PlayerScore>();
 
@@ -1979,15 +2019,19 @@ function resetPrivateLobbyState(): void {
   privateMatchMode = 'tdm';
   privateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
   hostTimeMapping = createHostTimeMapping();
+  interpolationDelayState = createInterpolationDelayState(performance.now());
+  lastObservedInterpolationUnderruns = 0;
   localCombatEventSeq = 0;
   peerTimingStates.clear();
   localLobbyPingMs = null;
   localLobbyReady = false;
   localDhv = 10;
   localResumeToken = '';
+  localConnectionEpoch = randomLobbyCredential();
   lobbyArenaSyncPromise = Promise.resolve();
   hostLobbyMembers.clear();
   hostLobbyTokens.clear();
+  hostLobbyConnectionEpochs.clear();
   hostDisconnectedAt.clear();
   authoritativeScores.clear();
   hidePrivateLobbyPresentation();
@@ -2032,6 +2076,7 @@ function initializeHostLobby(): void {
   privateMatchMode = privateMatchConfig.mode;
   localResumeToken = randomLobbyCredential();
   hostLobbyTokens.set(player.id, localResumeToken);
+  hostLobbyConnectionEpochs.set(player.id, localConnectionEpoch);
   hostLobbyMembers.set(player.id, {
     id: player.id,
     name: player.name,
@@ -2051,10 +2096,12 @@ function initializeHostLobby(): void {
 function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
+  localConnectionEpoch = randomLobbyCredential();
   const message: LobbyJoinMessage = {
     type: 'lobby-join',
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     playerId: player.id,
+    connectionEpoch: localConnectionEpoch,
     name: player.name,
     requestedTeam: player.team,
     resumeToken: localResumeToken,
@@ -2080,6 +2127,9 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
       return;
     }
     hostDisconnectedAt.delete(message.playerId);
+    const priorConnectionEpoch = hostLobbyConnectionEpochs.get(message.playerId);
+    hostLobbyConnectionEpochs.set(message.playerId, message.connectionEpoch);
+    if (priorConnectionEpoch !== message.connectionEpoch) authoritativeShotAdmissions.delete(message.playerId);
     const restored = { ...existing, name: message.name, connected: true, pingMs: message.playerId === player.id ? 0 : existing.pingMs };
     hostLobbyMembers.set(message.playerId, restored);
     network.setPlayerTeam(message.playerId, restored.team);
@@ -2093,6 +2143,8 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
       return;
     }
     hostLobbyTokens.set(message.playerId, message.resumeToken);
+    hostLobbyConnectionEpochs.set(message.playerId, message.connectionEpoch);
+    authoritativeShotAdmissions.delete(message.playerId);
     hostLobbyMembers.set(message.playerId, {
       id: message.playerId,
       name: message.name,
@@ -2176,6 +2228,8 @@ function markLobbyDisconnected(playerId: string): void {
     hostDisconnectedAt.delete(playerId);
     hostLobbyMembers.delete(playerId);
     hostLobbyTokens.delete(playerId);
+    hostLobbyConnectionEpochs.delete(playerId);
+    authoritativeShotAdmissions.delete(playerId);
     authoritativeScores.delete(playerId);
     remoteSupportAuthorities.delete(playerId);
     remoteGrenadeAuthorities.delete(playerId);
@@ -2497,6 +2551,8 @@ function handleLobbyMessage(message: GameMessage): boolean {
       if (message.voluntary) {
         hostLobbyMembers.delete(message.playerId);
         hostLobbyTokens.delete(message.playerId);
+        hostLobbyConnectionEpochs.delete(message.playerId);
+        authoritativeShotAdmissions.delete(message.playerId);
         hostDisconnectedAt.delete(message.playerId);
         authoritativeScores.delete(message.playerId);
         broadcastHostLobby(privateLobbySnapshot.phase);
@@ -2754,6 +2810,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
       stance: snapshot.stance ?? 'stand', continuity: 1,
     }],
     interpolation,
+    snapshotRateHz: 40,
     renderedHostTimeMs: currentHostTimeMs(),
     renderedWorldAgeMs: 0,
     continuity: 1,
@@ -2969,7 +3026,7 @@ function onNetworkMessage(message: GameMessage): void {
       }
       const claimedContinuity = message.type === 'state' ? message.continuity : remote.continuity;
       const admittedContinuity = network.role === 'host'
-        ? respawned
+        ? respawned || movement.resynchronized
           ? Math.max(remote.continuity + 1, claimedContinuity)
           : remote.positionHistory.length <= 1 && claimedContinuity >= remote.continuity
             ? claimedContinuity
@@ -2979,6 +3036,7 @@ function onNetworkMessage(message: GameMessage): void {
         ? network.role === 'host' ? Math.max(now - 250, Math.min(now + 50, message.hostTimeMs)) : message.hostTimeMs
         : currentHostTimeMs();
       remote.snapshot = admittedIncoming;
+      if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
       remote.continuity = admittedContinuity;
       const priorBufferStats = remote.interpolation.stats;
@@ -3314,13 +3372,16 @@ function makeShotResult(
   request: ShotRequestMessage,
   status: ShotResultMessage['status'],
   reason: ShotResultMessage['reason'],
-  acceptedHostTimeMs: number | null,
+  receivedAtHostTimeMs: number | null,
+  resolvedAtHostTimeMs: number | null,
   appliedRewindMs: number,
   outcomes: ShotResultMessage['outcomes'] = [],
 ): ShotResultMessage {
   return {
     type: 'shot-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id, forPlayerId: request.by,
-    shotId: request.shotId, shotSeq: request.shotSeq, status, reason, acceptedHostTimeMs,
+    shotId: request.shotId, shotSeq: request.shotSeq, status, reason,
+    fireTimeMs: request.fireTimeMs, targetViewTimeMs: request.targetViewTimeMs,
+    receivedAtHostTimeMs, resolvedAtHostTimeMs,
     appliedRewindMs, outcomes, nonce: randomNonce(),
   };
 }
@@ -3338,12 +3399,59 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   const sender = remotes.get(request.by);
   const prior = authoritativeShotAdmissions.get(request.by) ?? createAuthoritativeShotAdmissionState();
   const receivedAt = performance.now();
-  const admission = admitAuthoritativeShot(request, sender?.snapshot, receivedAt, prior);
+  const shooterHealth = remoteHealthAuthorities.get(request.by);
+  const admission = admitAuthoritativeShot(request, sender?.snapshot, receivedAt, prior, {
+    expectedConnectionEpoch: hostLobbyConnectionEpochs.get(request.by) ?? '',
+    expectedLifeId: sender?.continuity ?? -1,
+    clockUncertaintyMs: peerTimingStates.get(request.by)?.uncertaintyMs ?? 0,
+    shooterDiedAtHostTimeMs: shooterHealth?.diedAtHostTimeMs ?? null,
+  });
+  const resolutionTrace = (outcome: string, resolvedAtHostTimeMs: number, appliedRewindMs: number): ShotResolutionTrace => ({
+    shotSeq: request.shotSeq,
+    weaponSequence: request.weaponSequence,
+    lifeId: request.lifeId,
+    fireTimeMs: request.fireTimeMs,
+    targetViewTimeMs: request.targetViewTimeMs,
+    receivedHostTimeMs: receivedAt,
+    resolvedAtHostTimeMs,
+    appliedRewindMs,
+    shooterHistoryFirstMs: sender?.positionHistory[0]?.at ?? null,
+    shooterHistoryLatestMs: sender?.positionHistory.at(-1)?.at ?? null,
+    outcome,
+  });
+  const finish = (
+    status: ShotResultMessage['status'],
+    reason: ShotResultMessage['reason'],
+    appliedRewindMs: number,
+    outcomes: ShotResultMessage['outcomes'] = [],
+  ): ShotResultMessage => {
+    const resolvedAtHostTimeMs = performance.now();
+    const result = makeShotResult(request, status, reason, receivedAt, resolvedAtHostTimeMs, appliedRewindMs, outcomes);
+    resolvedShotRequests.set(cacheKey, result);
+    while (resolvedShotRequests.size > 256) resolvedShotRequests.delete(resolvedShotRequests.keys().next().value!);
+    lastResolvedShotTimeline = {
+      fireTimeMs: request.fireTimeMs,
+      targetViewTimeMs: request.targetViewTimeMs,
+      receivedHostTimeMs: receivedAt,
+      resolvedAtHostTimeMs,
+      appliedRewindMs,
+    };
+    recordShotResolutionTrace(resolutionTrace(status === 'rejected' ? `rejected-${reason}` : status, resolvedAtHostTimeMs, appliedRewindMs));
+    shotTimingTelemetry.recordHostResolution({
+      fireTimeMs: request.fireTimeMs,
+      receivedAtHostTimeMs: receivedAt,
+      resolvedAtHostTimeMs,
+      appliedRewindMs,
+      rejected: status === 'rejected',
+      eventLaneBufferedBytes: network.eventBufferedAmount(request.by),
+    });
+    recordShotProtocol(status === 'rejected' ? `rejected-${reason}` : status);
+    if (status === 'rejected') network.sendToPlayer(request.by, result);
+    else network.send(result);
+    return result;
+  };
   if (!admission.accepted || !sender) {
-    const rejected = makeShotResult(request, 'rejected', admission.reason, null, 0);
-    resolvedShotRequests.set(cacheKey, rejected);
-    recordShotProtocol(`rejected-${admission.reason}`);
-    network.sendToPlayer(request.by, rejected);
+    finish('rejected', admission.reason, 0);
     return;
   }
   authoritativeShotAdmissions.set(request.by, admission.state);
@@ -3353,32 +3461,25 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   };
   renderRemoteShot(visualShot);
   network.send(request, request.by);
-  const shooterRewind = rewindCombatantPoseStrict(sender.positionHistory, request.renderedHostTimeMs, request.continuity);
+  const shooterRewind = reconstructShooterPoseAtFireTime(sender.positionHistory, request.fireTimeMs, request.lifeId);
   if (!shooterRewind.pose) {
     const reason = shooterRewind.reason === 'continuity-mismatch' ? 'continuity-mismatch' : 'missing-history';
-    const rejected = makeShotResult(request, 'rejected', reason, null, 0);
-    resolvedShotRequests.set(cacheKey, rejected);
     recordShotProtocol(`rejected-shooter-${shooterRewind.reason}`);
-    network.sendToPlayer(request.by, rejected);
+    finish('rejected', reason, admission.appliedRewindMs);
     return;
   }
   if (!validateShotOrigin(request, shooterRewind.pose)) {
-    const rejected = makeShotResult(request, 'rejected', 'bad-origin', request.renderedHostTimeMs, admission.appliedRewindMs);
-    resolvedShotRequests.set(cacheKey, rejected);
-    recordShotProtocol('rejected-bad-origin');
-    network.sendToPlayer(request.by, rejected);
+    finish('rejected', 'bad-origin', admission.appliedRewindMs);
     return;
   }
 
   const targetPoses: Array<{ id: string; x: number; y: number; z: number; yaw: number; stance: Stance }> = [];
   if (player.alive && areCombatantsHostile(request.by, sender.snapshot.team, player.id, player.team)) {
-    const target = rewindCombatantPoseStrict(localPositionHistory, request.renderedHostTimeMs, localContinuity);
+    const target = rewindCombatantPoseStrict(localPositionHistory, request.targetViewTimeMs, localContinuity);
     if (!target.pose) {
       const reason = target.reason === 'continuity-mismatch' ? 'continuity-mismatch' : 'missing-history';
-      const rejected = makeShotResult(request, 'rejected', reason, null, 0);
-      resolvedShotRequests.set(cacheKey, rejected);
       recordShotProtocol(`rejected-host-target-${target.reason}`);
-      network.sendToPlayer(request.by, rejected);
+      finish('rejected', reason, admission.appliedRewindMs);
       return;
     }
     targetPoses.push({ id: player.id, ...target.pose });
@@ -3386,13 +3487,13 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   for (const [targetId, targetRemote] of remotes) {
     if (targetId === request.by || targetRemote.snapshot.hp <= 0
       || !areCombatantsHostile(request.by, sender.snapshot.team, targetId, targetRemote.snapshot.team)) continue;
-    const target = rewindCombatantPoseStrict(targetRemote.positionHistory, request.renderedHostTimeMs, targetRemote.continuity);
+    const target = rewindCombatantPoseStrict(targetRemote.positionHistory, request.targetViewTimeMs, targetRemote.continuity);
     if (!target.pose) continue;
     targetPoses.push({ id: targetId, ...target.pose });
   }
   for (const bot of bots.values()) {
     if (!bot.alive || !areCombatantsHostile(request.by, sender.snapshot.team, bot.id, bot.team)) continue;
-    const target = rewindCombatantPoseStrict(bot.positionHistory, request.renderedHostTimeMs, bot.continuity);
+    const target = rewindCombatantPoseStrict(bot.positionHistory, request.targetViewTimeMs, bot.continuity);
     if (!target.pose) continue;
     targetPoses.push({ id: bot.id, ...target.pose });
   }
@@ -3467,22 +3568,19 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       penetrationMultiplier: hit.penetrationMultiplier,
     });
   }
-  const result = makeShotResult(
-    request,
-    outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss',
-    'none',
-    request.renderedHostTimeMs,
-    admission.appliedRewindMs,
-    outcomes,
-  );
-  resolvedShotRequests.set(cacheKey, result);
-  while (resolvedShotRequests.size > 256) resolvedShotRequests.delete(resolvedShotRequests.keys().next().value!);
-  recordShotProtocol(outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss');
-  network.send(result);
+  finish(outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss', 'none', admission.appliedRewindMs, outcomes);
 }
 
 function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
+  shotTimingTelemetry.recordResultDelivery(performance.now());
+  const resultKey = `${message.by}:${message.forPlayerId}:${message.shotId}`;
+  if (processedShotResults.has(resultKey)) {
+    recordShotProtocol('duplicate-result');
+    return;
+  }
+  processedShotResults.add(resultKey);
+  while (processedShotResults.size > 512) processedShotResults.delete(processedShotResults.values().next().value!);
   for (const outcome of message.outcomes) {
     if (outcome.target !== player.id || !player.alive) continue;
     const canonicalDamage = Math.max(0, player.hp - outcome.resultingHealth);
@@ -4298,12 +4396,19 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   localContinuity += 1;
   localPositionHistory.length = 0;
   localShotSeq = 0;
-  localFireSeq = 0;
+  localWeaponSequences.clear();
   resolvedShotRequests.clear();
   presentedShotResults.clear();
+  processedShotResults.clear();
   authoritativeShotAdmissions.clear();
   for (const key of Object.keys(shotProtocolTelemetry)) delete shotProtocolTelemetry[key];
   localSnapshotRateState = createSnapshotRateState(performance.now());
+  interpolationDelayState = createInterpolationDelayState(performance.now());
+  lastObservedInterpolationUnderruns = 0;
+  lastAuthoredShotTimeline = null;
+  lastResolvedShotTimeline = null;
+  recentShotResolutionTraces.length = 0;
+  shotTimingTelemetry.reset();
   for (const target of arena.targets) {
     target.active = true;
     target.health = target.maxHealth;
@@ -4511,6 +4616,14 @@ function tryFire(now: number): void {
     prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
+  const shotTimeline = network.role === 'client'
+    ? freezeAuthoredShotTimeline(
+        currentHostTimeMs(),
+        interpolationDelayState.delayMs,
+        [...remotes.values()].map((remote) => remote.renderedHostTimeMs),
+      )
+    : null;
+  if (shotTimeline) lastAuthoredShotTimeline = shotTimeline;
   const hitDamage = new Map<string, {
     damage: number;
     zone: HitZone;
@@ -4621,21 +4734,22 @@ function tryFire(now: number): void {
     nonce: randomNonce(),
   };
   if (network.role === 'client') {
-    const renderedTargetTimes = [...hitDamage.keys()]
-      .map((targetId) => remotes.get(targetId)?.renderedHostTimeMs)
-      .filter((value): value is number => Number.isFinite(value));
-    const renderedHostTimeMs = renderedTargetTimes.length > 0
-      ? Math.min(...renderedTargetTimes)
-      : Math.max(0, currentHostTimeMs() - SNAPSHOT_INTERPOLATION_DELAY_MS);
-    const request: ShotRequestMessage = {
+    const weaponSequence = localWeaponSequences.get(player.weapon) ?? 0;
+    const request = freezeAuthoredBulletRecord({
       type: 'shot-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
-      shotId: `${shotSessionId}:${localShotSeq}`, shotSeq: localShotSeq, fireSeq: localFireSeq,
-      weapon: player.weapon, renderedHostTimeMs, continuity: localContinuity,
+      shotId: `${localConnectionEpoch}:${localShotSeq}`,
+      connectionEpoch: localConnectionEpoch,
+      lifeId: localContinuity,
+      shotSeq: localShotSeq,
+      weaponSequence,
+      weapon: player.weapon,
+      fireTimeMs: shotTimeline!.fireTimeMs,
+      targetViewTimeMs: shotTimeline!.targetViewTimeMs,
       origin: shot.origin, direction: shot.direction, pelletDirections: shot.pelletDirections,
       nonce: shot.nonce,
-    };
+    });
     localShotSeq += 1;
-    localFireSeq += 1;
+    localWeaponSequences.set(player.weapon, weaponSequence + 1);
     network.send(request);
     recordShotProtocol('created-sent');
     return;
@@ -7266,21 +7380,42 @@ function updatePhysics(dt: number): void {
   camera.rotation.z = cameraRoll;
 }
 
+function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
+  return remotes.size > 0
+    ? Math.min(...[...remotes.values()].map((remote) => remote.snapshotRateHz)) as 20 | 30 | 40
+    : 40;
+}
+
 function updateRemotes(dt: number, now: number): void {
   if (remotes.size === 0) return;
   const hostNow = currentHostTimeMs();
-  if (network.role === 'host') {
-    recordCombatantPose(localPositionHistory, {
-      at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
-      yaw: player.yaw, stance: player.stance, continuity: localContinuity,
-    });
-  }
+  recordCombatantPose(localPositionHistory, {
+    at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
+    yaw: player.yaw, stance: player.stance, continuity: localContinuity,
+  });
+  const observedUnderruns = [...remotes.values()].reduce(
+    (total, remote) => total + remote.interpolation.stats.underruns,
+    0,
+  );
+  const newUnderruns = observedUnderruns >= lastObservedInterpolationUnderruns
+    ? observedUnderruns - lastObservedInterpolationUnderruns
+    : 0;
+  lastObservedInterpolationUnderruns = observedUnderruns;
+  const slowestSnapshotRate = interpolationSourceSnapshotRateHz();
+  const measuredJitterMs = network.role === 'client'
+    ? hostTimeMapping.jitterMs
+    : Math.max(0, ...[...peerTimingStates.values()].map((timing) => timing.jitterMs));
+  interpolationDelayState = updateInterpolationDelay(interpolationDelayState, {
+    snapshotRateHz: slowestSnapshotRate,
+    jitterMs: measuredJitterMs,
+    underruns: newUnderruns,
+  }, now);
   for (const [id, remote] of remotes) {
     if (now - remote.lastSeen > 12_000) {
       removeRemote(id, 'timed out');
       continue;
     }
-    const rendered = remote.interpolation.sample(hostNow, SNAPSHOT_INTERPOLATION_DELAY_MS);
+    const rendered = remote.interpolation.sample(hostNow, interpolationDelayState.delayMs);
     const renderedSnapshot = rendered?.value ?? remote.snapshot;
     const renderedTarget = new THREE.Vector3(
       renderedSnapshot.x,
@@ -7480,6 +7615,19 @@ function updateMatchState(now: number): void {
         receiverReordered,
         bufferedPressure: network.stateBufferedPressure(),
         shotLifecycle: { ...shotProtocolTelemetry },
+        shotTimeline: {
+          authored: lastAuthoredShotTimeline,
+          resolved: lastResolvedShotTimeline,
+          recentResolutions: [...recentShotResolutionTraces],
+          rewindCeilingMs: MAX_AUTHORITATIVE_REWIND_MS,
+          maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+          timing: shotTimingTelemetry.snapshot(),
+        },
+        interpolationDelay: {
+          ...interpolationDelayState,
+          sourceSnapshotRateHz: interpolationSourceSnapshotRateHz(),
+          targetViewRewindHeadroomMs: Math.max(0, MAX_AUTHORITATIVE_REWIND_MS - interpolationDelayState.delayMs),
+        },
         remoteInterpolation: [...remotes.values()].map((remote) => ({
           playerId: matchDiagnostics?.participantKey(remote.snapshot.id),
           renderedWorldAgeMs: remote.renderedWorldAgeMs,
@@ -9033,6 +9181,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       outboundFeedbackPressure,
       hostTime: hostTimeDiagnostics(hostTimeMapping),
       shotProtocol: { ...shotProtocolTelemetry },
+      shotTimeline: {
+        authored: lastAuthoredShotTimeline,
+        resolved: lastResolvedShotTimeline,
+        recentResolutions: [...recentShotResolutionTraces],
+        rewindCeilingMs: MAX_AUTHORITATIVE_REWIND_MS,
+        maximumFireAgeMs: MAX_SHOT_FIRE_AGE_MS,
+        timing: shotTimingTelemetry.snapshot(),
+      },
+      interpolationDelay: {
+        ...interpolationDelayState,
+        sourceSnapshotRateHz: interpolationSourceSnapshotRateHz(),
+        targetViewRewindHeadroomMs: Math.max(0, MAX_AUTHORITATIVE_REWIND_MS - interpolationDelayState.delayMs),
+      },
       localContinuity,
       localHistory: {
         count: localPositionHistory.length,
@@ -9056,6 +9217,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       renderedWorldAgeMs: remote.renderedWorldAgeMs,
       snapshotBufferDepth: remote.interpolation.depth,
       snapshotBuffer: remote.interpolation.stats,
+      snapshotRateHz: remote.snapshotRateHz,
       continuity: remote.continuity,
       historyFirst: remote.positionHistory[0]?.at ?? null,
       historyLatest: remote.positionHistory.at(-1)?.at ?? null,
@@ -9782,6 +9944,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
+    localContinuity += 1;
+    localPositionHistory.length = 0;
     player.position.set(x, y, z);
     characterPhysics?.teleportEye(player.position);
     player.velocity.set(0, 0, 0);

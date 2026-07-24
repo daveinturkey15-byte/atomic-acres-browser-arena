@@ -26,6 +26,9 @@ type GuestBundle = {
 type NetworkDiagnostics = Record<string, unknown> & {
   role: NetworkRole;
   eventChannels: number;
+  eventChannelOrdered: boolean | null;
+  eventLaneBufferedBytes: number;
+  eventLaneBufferedPressure: number;
   stateChannels: number;
   stateChannelReliable: boolean | null;
   stateChannelOrdered: boolean | null;
@@ -160,6 +163,7 @@ export class ArenaNetwork {
   private stateMessagesRelayed = 0;
   private selfStateEchoesSuppressed = 0;
   private stateFallbackMessages = 0;
+  private clientReadyNotified = false;
   private qaEventSendSequence = 0;
   private qaEventLastDue = new WeakMap<DataConnection, number>();
 
@@ -257,6 +261,15 @@ export class ArenaNetwork {
     return Math.max(0, Math.min(1, amount / 65_536));
   }
 
+  eventBufferedAmount(playerId?: string): number {
+    const amount = this.role === 'client'
+      ? this.hostEventConnection?.dataChannel?.bufferedAmount ?? 0
+      : playerId
+        ? this.guestBundles.get(playerId)?.events.dataChannel?.bufferedAmount ?? 0
+        : Math.max(0, ...[...this.guestBundles.values()].map((bundle) => bundle.events.dataChannel?.bufferedAmount ?? 0));
+    return Math.max(0, amount);
+  }
+
   disconnectPlayer(playerId: string): void {
     if (this.role !== 'host') return;
     const bundle = this.guestBundles.get(playerId);
@@ -287,6 +300,10 @@ export class ArenaNetwork {
     const hostStateConnection = [...this.guestBundles.values()].find((bundle) => bundle.state)?.state ?? null;
     const hostStateReliability = hostStateConnection?.reliable;
     const stateDataChannel = this.hostStateConnection?.dataChannel ?? hostStateConnection?.dataChannel ?? null;
+    const eventDataChannel = this.hostEventConnection?.dataChannel
+      ?? [...this.guestBundles.values()].find((bundle) => bundle.events.dataChannel)?.events.dataChannel
+      ?? null;
+    const eventLaneBufferedBytes = this.eventBufferedAmount();
     return {
       role: this.role,
       roomCodeLength: this.roomCode.length,
@@ -302,6 +319,9 @@ export class ArenaNetwork {
       joinDeadlineActive: this.joinDeadline !== null,
       capacity: this.maximumPlayers,
       eventChannels,
+      eventChannelOrdered: eventDataChannel?.ordered ?? null,
+      eventLaneBufferedBytes,
+      eventLaneBufferedPressure: Math.max(0, Math.min(1, eventLaneBufferedBytes / 65_536)),
       stateChannels,
       stateChannelReliable: clientStateReliable ?? hostStateReliability ?? null,
       stateChannelOrdered: stateDataChannel?.ordered ?? null,
@@ -351,6 +371,7 @@ export class ArenaNetwork {
 
   private connectClient(reconnecting: boolean): void {
     if (this.manualClose || this.role !== 'client') return;
+    this.clientReadyNotified = false;
     this.clearJoinDeadline();
     this.onStatus(reconnecting ? `Reconnecting to host (attempt ${this.reconnectAttempts})…` : 'Connecting to peer lobby…', reconnecting ? 'warn' : undefined);
     this.joinDeadline = setTimeout(() => {
@@ -524,7 +545,8 @@ export class ArenaNetwork {
   }
 
   private maybeClientReady(): void {
-    if (!this.channelsReady()) return;
+    if (!this.channelsReady() || this.clientReadyNotified) return;
+    this.clientReadyNotified = true;
     this.clearJoinDeadline();
     this.reconnectAttempts = 0;
     this.reconnectDeadlineMonoMs = null;

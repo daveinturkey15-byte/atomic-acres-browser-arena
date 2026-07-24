@@ -44,11 +44,13 @@ describe('network protocol guards', () => {
       protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'abc',
       shotId: 'session:abc:7',
+      connectionEpoch: 'connection_epoch_abc',
+      lifeId: 3,
       shotSeq: 7,
-      fireSeq: 11,
+      weaponSequence: 11,
       weapon: 'carbine' as const,
-      renderedHostTimeMs: 2_500,
-      continuity: 3,
+      fireTimeMs: 2_500,
+      targetViewTimeMs: 2_420,
       origin: [0, 1.6, 2] as [number, number, number],
       direction: [0, 0, -1] as [number, number, number],
       pelletDirections: [[0, 0, -1]] as [number, number, number][],
@@ -63,8 +65,11 @@ describe('network protocol guards', () => {
       shotSeq: request.shotSeq,
       status: 'accepted-hit' as const,
       reason: 'none' as const,
-      acceptedHostTimeMs: 2_520,
-      appliedRewindMs: 20,
+      fireTimeMs: request.fireTimeMs,
+      targetViewTimeMs: request.targetViewTimeMs,
+      receivedAtHostTimeMs: 2_520,
+      resolvedAtHostTimeMs: 2_521,
+      appliedRewindMs: 80,
       outcomes: [{
         target: 'host', pelletHits: 1, damage: 31.4, rawDamage: 31.4, resultingHealth: 68.6,
         died: false, hitZone: 'body' as const, wallbang: false, penetrationMultiplier: 1,
@@ -74,6 +79,7 @@ describe('network protocol guards', () => {
     expect(isGameMessage(request)).toBe(true);
     expect(isGameMessage(result)).toBe(true);
     expect(isGameMessage({ ...request, protocolVersion: 1 })).toBe(false);
+    expect(isGameMessage({ ...request, targetViewTimeMs: request.fireTimeMs + 1 })).toBe(false);
     expect(isGameMessage({ ...request, direction: [0, 0, -0.5] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], damage: 401 }] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], rawDamage: 30 }] })).toBe(false);
@@ -195,7 +201,7 @@ describe('network protocol guards', () => {
   });
 
   it('validates bounded lobby control traffic and identifies host authority', () => {
-    const join = { type: 'lobby-join' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION as 2, playerId: 'abc', name: 'Tester', requestedTeam: 0 as const, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 };
+    const join = { type: 'lobby-join', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, playerId: 'abc', connectionEpoch: 'connection_epoch_abc', name: 'Tester', requestedTeam: 0, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 } as const;
     const lobbyState = {
       type: 'lobby-state' as const,
       by: 'host',

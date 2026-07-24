@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   SnapshotInterpolationBuffer,
+  createInterpolationDelayState,
   createSnapshotRateState,
+  desiredInterpolationDelayMs,
   desiredSnapshotRate,
   shortestYaw,
   snapshotIntervalMs,
   stateBroadcastWakeIntervalMs,
+  updateInterpolationDelay,
   updateSnapshotRate,
 } from './network-sync';
 
@@ -52,6 +55,38 @@ describe('adaptive 20/30/40 Hz replication', () => {
   });
 });
 
+describe('bounded adaptive interpolation delay', () => {
+  it('derives smooth targets inside the measured 20/30/40 Hz starting bands', () => {
+    expect(desiredInterpolationDelayMs(40, 0)).toBe(50);
+    expect(desiredInterpolationDelayMs(40, 100)).toBe(70);
+    expect(desiredInterpolationDelayMs(30, 5)).toBeCloseTo(74.167, 2);
+    expect(desiredInterpolationDelayMs(20, 0)).toBe(100);
+    expect(desiredInterpolationDelayMs(20, 100)).toBe(120);
+  });
+
+  it('increases only after repeated underruns and reduces after sustained stability', () => {
+    let state = createInterpolationDelayState(0);
+    state = updateInterpolationDelay(state, { snapshotRateHz: 40, jitterMs: 0, underruns: 1 }, 250);
+    state = updateInterpolationDelay(state, { snapshotRateHz: 40, jitterMs: 0, underruns: 1 }, 500);
+    expect(state.delayMs).toBe(60);
+    state = updateInterpolationDelay(state, { snapshotRateHz: 40, jitterMs: 0, underruns: 1 }, 750);
+    expect(state.delayMs).toBe(65);
+    for (let index = 1; index <= 20; index += 1) {
+      state = updateInterpolationDelay(state, { snapshotRateHz: 40, jitterMs: 0, underruns: 0 }, 750 + index * 250);
+    }
+    expect(state.delayMs).toBe(60);
+    expect(state).toMatchObject({ increases: 1, decreases: 1, targetMs: 50 });
+  });
+
+  it('moves across cadence bands in five-millisecond steps instead of jumping time', () => {
+    let state = createInterpolationDelayState(0);
+    for (let index = 1; index <= 4; index += 1) {
+      state = updateInterpolationDelay(state, { snapshotRateHz: 20, jitterMs: 0, underruns: 0 }, index * 250);
+    }
+    expect(state).toMatchObject({ delayMs: 65, targetMs: 100 });
+  });
+});
+
 describe('timestamped snapshot interpolation', () => {
   const buffer = () => new SnapshotInterpolationBuffer<{ x: number; yaw: number }>(
     (before, after, alpha) => ({
@@ -90,5 +125,8 @@ describe('timestamped snapshot interpolation', () => {
     const rendered = snapshots.sample(1_150, 100)!;
     expect(Math.abs(rendered.value.yaw - Math.PI)).toBeLessThan(0.01);
     expect(snapshots.sample(2_000, 100)?.mode).toBe('held-latest');
+    expect(snapshots.stats.underruns).toBe(1);
+    expect(snapshots.sample(1_000, 100)?.mode).toBe('held-oldest');
+    expect(snapshots.stats.overruns).toBe(1);
   });
 });

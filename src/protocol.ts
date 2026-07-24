@@ -15,7 +15,7 @@ import {
 } from './private-match';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 2;
+export const MULTIPLAYER_PROTOCOL_VERSION = 3;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
@@ -63,17 +63,22 @@ export type ShotMessage = {
 };
 export type ShotRejectReason = 'none' | 'protocol-mismatch' | 'unknown-sender' | 'duplicate' | 'sequence-gap'
   | 'weapon-mismatch' | 'cadence' | 'stale' | 'future' | 'invalid-direction' | 'invalid-pellets'
-  | 'bad-origin' | 'missing-history' | 'continuity-mismatch' | 'obstructed' | 'malformed';
+  | 'bad-origin' | 'missing-history' | 'continuity-mismatch' | 'connection-epoch-mismatch'
+  | 'life-mismatch' | 'shooter-dead' | 'invalid-timeline' | 'obstructed' | 'malformed';
 export type ShotRequestMessage = {
   type: 'shot-request';
   protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
   shotId: string;
+  connectionEpoch: string;
+  lifeId: number;
   shotSeq: number;
-  fireSeq: number;
+  weaponSequence: number;
   weapon: WeaponId;
-  renderedHostTimeMs: number;
-  continuity: number;
+  /** Trigger time in the host monotonic domain. */
+  fireTimeMs: number;
+  /** Host-world time represented by remote target presentation when the trigger fired. */
+  targetViewTimeMs: number;
   origin: [number, number, number];
   direction: [number, number, number];
   pelletDirections: [number, number, number][];
@@ -99,7 +104,10 @@ export type ShotResultMessage = {
   shotSeq: number;
   status: 'accepted-hit' | 'accepted-miss' | 'rejected';
   reason: ShotRejectReason;
-  acceptedHostTimeMs: number | null;
+  fireTimeMs: number;
+  targetViewTimeMs: number;
+  receivedAtHostTimeMs: number | null;
+  resolvedAtHostTimeMs: number | null;
   appliedRewindMs: number;
   outcomes: ShotOutcome[];
   nonce: number;
@@ -215,6 +223,7 @@ export type LobbyJoinMessage = {
   type: 'lobby-join';
   protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   playerId: string;
+  connectionEpoch: string;
   name: string;
   requestedTeam: Team;
   resumeToken: string;
@@ -284,7 +293,8 @@ function isNormalizedDirection(value: unknown): value is [number, number, number
 const shotRejectReasons = new Set<ShotRejectReason>([
   'none', 'protocol-mismatch', 'unknown-sender', 'duplicate', 'sequence-gap', 'weapon-mismatch', 'cadence',
   'stale', 'future', 'invalid-direction', 'invalid-pellets', 'bad-origin', 'missing-history',
-  'continuity-mismatch', 'obstructed', 'malformed',
+  'continuity-mismatch', 'connection-epoch-mismatch', 'life-mismatch', 'shooter-dead',
+  'invalid-timeline', 'obstructed', 'malformed',
 ]);
 
 export function isGameMessage(value: unknown): value is GameMessage {
@@ -310,11 +320,15 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.shotId === 'string' && msg.shotId.length >= 8 && msg.shotId.length <= 128
+        && typeof msg.connectionEpoch === 'string' && msg.connectionEpoch.length >= 8 && msg.connectionEpoch.length <= 128
+        && /^[a-zA-Z0-9_-]+$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.shotSeq) && Number(msg.shotSeq) >= 0
-        && Number.isSafeInteger(msg.fireSeq) && Number(msg.fireSeq) >= 0
+        && Number.isSafeInteger(msg.weaponSequence) && Number(msg.weaponSequence) >= 0
         && weapons.has(msg.weapon as WeaponId)
-        && Number.isFinite(msg.renderedHostTimeMs) && Number(msg.renderedHostTimeMs) >= 0
-        && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
+        && Number.isFinite(msg.fireTimeMs) && Number(msg.fireTimeMs) >= 0
+        && Number.isFinite(msg.targetViewTimeMs) && Number(msg.targetViewTimeMs) >= 0
+        && Number(msg.targetViewTimeMs) <= Number(msg.fireTimeMs)
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && isNormalizedDirection(msg.direction)
         && Array.isArray(msg.pelletDirections) && msg.pelletDirections.length >= 1 && msg.pelletDirections.length <= 12
@@ -328,7 +342,13 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isSafeInteger(msg.shotSeq) && Number(msg.shotSeq) >= 0
         && (msg.status === 'accepted-hit' || msg.status === 'accepted-miss' || msg.status === 'rejected')
         && shotRejectReasons.has(msg.reason as ShotRejectReason)
-        && (msg.acceptedHostTimeMs === null || Number.isFinite(msg.acceptedHostTimeMs) && Number(msg.acceptedHostTimeMs) >= 0)
+        && Number.isFinite(msg.fireTimeMs) && Number(msg.fireTimeMs) >= 0
+        && Number.isFinite(msg.targetViewTimeMs) && Number(msg.targetViewTimeMs) >= 0
+        && Number(msg.targetViewTimeMs) <= Number(msg.fireTimeMs)
+        && (msg.receivedAtHostTimeMs === null || Number.isFinite(msg.receivedAtHostTimeMs) && Number(msg.receivedAtHostTimeMs) >= 0)
+        && (msg.resolvedAtHostTimeMs === null || Number.isFinite(msg.resolvedAtHostTimeMs) && Number(msg.resolvedAtHostTimeMs) >= 0)
+        && (msg.receivedAtHostTimeMs === null || msg.resolvedAtHostTimeMs === null
+          || Number(msg.resolvedAtHostTimeMs) >= Number(msg.receivedAtHostTimeMs))
         && Number.isFinite(msg.appliedRewindMs) && Number(msg.appliedRewindMs) >= 0 && Number(msg.appliedRewindMs) <= 250
         && Array.isArray(msg.outcomes) && msg.outcomes.length <= 6
         && msg.outcomes.every((outcome) => {
@@ -472,6 +492,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-join':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.playerId === 'string' && msg.playerId.length > 0 && msg.playerId.length <= 80
+        && typeof msg.connectionEpoch === 'string' && msg.connectionEpoch.length >= 8 && msg.connectionEpoch.length <= 128
+        && /^[a-zA-Z0-9_-]+$/.test(msg.connectionEpoch)
         && typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 20
         && (msg.requestedTeam === 0 || msg.requestedTeam === 1)
         && typeof msg.resumeToken === 'string' && msg.resumeToken.length >= 24 && msg.resumeToken.length <= 128
