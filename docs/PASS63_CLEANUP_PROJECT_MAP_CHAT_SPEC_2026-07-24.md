@@ -54,11 +54,12 @@ gameplay-contract code feed deterministic baseline generation, while
 network-chaos feeds the matrix and soak runners. Calling those files "dead"
 would weaken QA rather than simplify production.
 
-`npm audit --omit=dev` reports zero production vulnerabilities. The full
-development tree reports seven high advisories through the asset-authoring and
-Worker toolchains. Broad downgrade/major-version fixes are not mixed into this
-gameplay candidate; they remain a measured maintenance follow-up with the
-production boundary already clean.
+The refreshed registry audit identified one production-scoped high advisory in
+Vite's locked PostCSS 8.5.16 dependency. Pass 63 applies only the compatible
+8.5.23 transitive override and returns `npm audit --omit=dev` to zero. The full
+development tree still reports seven high advisories through asset-authoring
+and Worker toolchains. Broad downgrade/major-version fixes are not mixed into
+this gameplay candidate; they remain a measured maintenance follow-up.
 
 ## Requirements
 

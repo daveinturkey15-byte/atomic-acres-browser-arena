@@ -51,6 +51,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       'Skyline Terminal door, boarding and cockpit openings now match their movement and projectile authority in Performance and Quality',
       'Release-history and project-documentation dialogs move behind reusable UI controllers, reducing duplicate shell wiring while preserving gameplay authority',
       'Measured dead imports and locals are removed; larger domain moves remain bounded follow-up work instead of a risky tree-wide rename',
+      'A narrow PostCSS patch override closes the current production dependency advisory without changing the Vite or gameplay stack',
       'The accepted Rustworks rebuild and Pass 62 host-authoritative gameplay, physics, netcode and release topology remain unchanged',
     ]),
   }),
