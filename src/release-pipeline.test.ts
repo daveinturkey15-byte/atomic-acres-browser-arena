@@ -15,12 +15,14 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages pinned Pass 60 and Pass 59 beside isolated Pass 61 before a complete publish', () => {
+  it('stages pinned stable Pass 60 beside live Pass 62 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
     expect(workflow).not.toContain('stage:stable-channel');
+    expect(workflow).toContain('Stage live Pass 62 and byte-exact stable Pass 60');
+    expect(workflow).not.toContain('three-channel');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
@@ -41,6 +43,11 @@ describe('production release workflow', () => {
     expect(verifyStep).toBeGreaterThan(buildStep);
     expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
     expect(workflow).toContain('--arg releaseBuiltAt "$RELEASE_BUILT_AT"');
+  });
+
+  it('records the schema 3 two-channel topology in the production receipt', () => {
+    expect(workflow).toContain("'{schemaVersion:3");
+    expect(workflow).toContain('topology:$topology[0]');
   });
 
   it('does not use a blocking GitHub Actions watcher inside the workflow', () => {

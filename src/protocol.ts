@@ -15,7 +15,7 @@ import {
 } from './private-match';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 3;
+export const MULTIPLAYER_PROTOCOL_VERSION = 4;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
@@ -215,6 +215,7 @@ export type OverdriveStateMessage = {
   holderId: string | null;
   available: boolean;
   generation: number;
+  position: [number, number, number];
   activeRemainingMs: number;
   nextSpawnInMs: number;
   nonce: number;
@@ -232,6 +233,7 @@ export type LobbyJoinMessage = {
 export type LobbyReadyMessage = { type: 'lobby-ready'; by: string; ready: boolean; nonce: number };
 export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; nonce: number };
 export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dhv; nonce: number };
+export type RedeployRequestMessage = { type: 'redeploy-request'; by: string; nonce: number };
 export type LobbyConfigMessage = { type: 'lobby-config'; by: string; config: PrivateMatchConfig; nonce: number };
 export type LobbyBalanceMessage = { type: 'lobby-balance'; by: string; nonce: number };
 export type LobbyStateMessage = { type: 'lobby-state'; by: string; snapshot: LobbySnapshot; nonce: number };
@@ -254,7 +256,7 @@ export type MatchScoreMessage = { type: 'match-score'; by: string; scores: Playe
 export type RangeScoreClaimMessage = { type: 'range-score-claim'; by: string; score: number; hits: number; shots: number; nonce: number };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
+  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -486,6 +488,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.holderId === null || typeof msg.holderId === 'string' && msg.holderId.length > 0 && msg.holderId.length <= 80)
         && typeof msg.available === 'boolean'
         && Number.isSafeInteger(msg.generation) && Number(msg.generation) >= 0 && Number(msg.generation) <= 10_000
+        && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.activeRemainingMs) && Number(msg.activeRemainingMs) >= 0 && Number(msg.activeRemainingMs) <= 30_000
         && Number.isFinite(msg.nextSpawnInMs) && Number(msg.nextSpawnInMs) >= 0 && Number(msg.nextSpawnInMs) <= 120_000
         && Number.isFinite(msg.nonce);
@@ -508,6 +511,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-handicap':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isDhv(msg.dhv) && Number.isFinite(msg.nonce);
+    case 'redeploy-request':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80 && Number.isFinite(msg.nonce);
     case 'lobby-config':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isPrivateMatchConfig(msg.config) && Number.isFinite(msg.nonce);
@@ -587,6 +592,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-ready':
     case 'lobby-team':
     case 'lobby-handicap':
+    case 'redeploy-request':
     case 'lobby-config':
     case 'lobby-balance':
     case 'lobby-state':

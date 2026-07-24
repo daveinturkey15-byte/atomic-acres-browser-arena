@@ -480,7 +480,7 @@ export class ArenaNetwork {
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'state-feedback' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
         || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
-        || payload.type === 'lobby-balance' || payload.type === 'clock-ping') {
+        || payload.type === 'lobby-balance' || payload.type === 'redeploy-request' || payload.type === 'clock-ping') {
         this.onMessage(payload);
         return;
       }

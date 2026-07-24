@@ -1,29 +1,22 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "EXPERIMENTAL NETCODE PASS",
-    "description": "The isolated Pass 61 experimental networking client."
-  },
-  "normal": {
-    "label": "NEW NETCODE",
-    "description": "The normal live Pass 60 build.",
-    "pass": "PASS 60",
-    "sourceSha": "b1af49be064610126a80c2ee538af334389f8f43",
-    "pagesSha": "fb06eeeefc42f35d591e9ee340a3adab62916883",
-    "path": "channels/new-netcode"
+    "label": "EXPERIMENTAL NEW NETCODE",
+    "description": "The live Pass 62 gameplay, graphics, and experimental networking build."
   },
   "experimental": {
-    "label": "EXPERIMENTAL NETCODE PASS",
-    "description": "Pass 61 host-time, adaptive movement and host-authoritative firearm results.",
-    "pass": "PASS 61",
+    "label": "EXPERIMENTAL NEW NETCODE",
+    "description": "Pass 62 live with the immutable host-resolved bullet timeline and adaptive networking.",
+    "pass": "PASS 62",
     "path": "channels/experimental-netcode-pass"
   },
   "stable": {
-    "label": "RECENT STABLE",
-    "description": "The exact version that was live immediately before the new build.",
-    "pass": "PASS 59",
-    "pagesSha": "b29d44f1f45a6ade65e72738fc4adb58235f6f26",
+    "label": "NEW NETCODE",
+    "description": "The byte-exact Pass 60 release preserved as the stable fallback.",
+    "pass": "PASS 60",
+    "sourceSha": "b1af49be064610126a80c2ee538af334389f8f43",
+    "pagesSha": "fb06eeeefc42f35d591e9ee340a3adab62916883",
     "path": "channels/recent-stable"
   }
 }

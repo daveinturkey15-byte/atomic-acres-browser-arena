@@ -14,20 +14,22 @@ describe('release channel entry routing', () => {
     expect(releaseChannelDecision('?release=choose', 'localhost', canonical)).toBe('choose');
   });
 
-  it('honours explicit latest and stable routes', () => {
+  it('routes latest, normal and experimental aliases to live Pass 62', () => {
     expect(releaseChannelDecision('?release=latest', canonical, canonical)).toBe('latest');
+    expect(releaseChannelDecision('?release=normal', canonical, canonical)).toBe('latest');
+    expect(releaseChannelDecision('?release=experimental', canonical, canonical)).toBe('latest');
     expect(releaseChannelDecision('?release=stable', canonical, canonical)).toBe('stable');
   });
 
-  it('keeps room invitations on the current multiplayer client', () => {
+  it('keeps room invitations on the live Pass 62 multiplayer client', () => {
     expect(releaseChannelDecision('?room=abc&autojoin=1&release=choose', canonical, canonical)).toBe('latest');
   });
 
-  it('resolves the pinned stable tree beneath the repository Pages root', () => {
+  it('resolves the pinned Pass 60 tree beneath the repository Pages root and bypasses its archived chooser', () => {
     expect(stableReleaseUrl(
       'https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/',
       'channels/recent-stable',
-    )).toBe('https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/recent-stable/');
+    )).toBe('https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/recent-stable/?release=latest');
   });
 
   it('rejects paths that could escape the deployed root', () => {

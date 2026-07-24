@@ -139,9 +139,9 @@ import {
   advanceOverdrive,
   claimOverdrive,
   createOverdriveState,
+  dropOverdriveOnElimination,
   overdriveDamageMultiplier,
   overdriveRemainingMs,
-  transferOverdriveOnElimination,
   type OverdriveState,
 } from './overdrive';
 import {
@@ -518,7 +518,7 @@ app.innerHTML = `
   <section id="menu" class="panel">
     <div class="eyebrow">FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
     <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
-    <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Quad Damage Core.</p>
+    <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
     <nav class="menu-tabs" aria-label="Deployment menu">
       <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
       <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
@@ -538,6 +538,7 @@ app.innerHTML = `
         </div>
       </section>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
+      <button id="field-kit-redeploy" type="button" hidden>REDEPLOY NOW WITH SELECTED FIELD KIT</button>
       <div class="menu-actions">
         <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
         <button id="main-menu" hidden>MAIN MENU · CHANGE MAP</button>
@@ -672,7 +673,7 @@ app.innerHTML = `
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </div>
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
-    <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>QUAD DAMAGE</strong><span>2× DAMAGE · 30 SECONDS</span></div>
+    <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="room-hud"></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
@@ -1028,7 +1029,7 @@ const quadIconCanvas = document.createElement('canvas');
 quadIconCanvas.width = 256;
 quadIconCanvas.height = 128;
 const quadIconContext = quadIconCanvas.getContext('2d');
-if (!quadIconContext) throw new Error('Canvas2D unavailable for Quad Damage world icon');
+if (!quadIconContext) throw new Error('Canvas2D unavailable for 2× Damage world icon');
 quadIconContext.fillStyle = 'rgba(10, 17, 32, .88)';
 quadIconContext.fillRect(12, 16, 232, 96);
 quadIconContext.strokeStyle = '#78f5ed';
@@ -1040,7 +1041,7 @@ quadIconContext.textAlign = 'center';
 quadIconContext.fillText('2×', 128, 76);
 quadIconContext.fillStyle = '#a892ff';
 quadIconContext.font = '900 20px sans-serif';
-quadIconContext.fillText('QUAD DAMAGE', 128, 103);
+quadIconContext.fillText('2× DAMAGE', 128, 103);
 const quadIconTexture = new THREE.CanvasTexture(quadIconCanvas);
 quadIconTexture.colorSpace = THREE.SRGBColorSpace;
 const quadWorldIcon = new THREE.Sprite(new THREE.SpriteMaterial({ map: quadIconTexture, transparent: true, depthWrite: false, toneMapped: false }));
@@ -1067,7 +1068,7 @@ async function prewarmOverdrivePresentation(): Promise<void> {
   try {
     // Compile against the actual scene and post-processing material state. A
     // root-only compile missed scene lighting variants and deferred the hitch
-    // until Quad first became visible at the two-minute spawn.
+    // until the 2× Damage Core first became visible at the two-minute spawn.
     await renderer.compileAsync(scene, camera);
     renderer.render(scene, camera);
     overdrivePresentationPrewarmed = true;
@@ -1199,7 +1200,7 @@ async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null>
   if (rustworksQualityLoadPromise) return rustworksQualityLoadPromise;
   qualityAssetStreaming.rustworks = 'loading';
   rustworksQualityLoadPromise = loadRustworksBlenderTower(rustworksArena.root).then(async (root) => {
-    setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+    setRustworksProceduralPresentationVisible(rustworksArena.root, true);
     setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
     qualityAssetStreaming.rustworks = 'ready';
     graphicsRefinement.refine(root, renderer.capabilities.getMaxAnisotropy());
@@ -2475,6 +2476,30 @@ function handleLobbyMessage(message: GameMessage): boolean {
     updateHostHandicap(message);
     return true;
   }
+  if (message.type === 'redeploy-request') {
+    if (network.role === 'host' && gameStarted && matchState.phase === 'active' && !processedNonces.has(message.nonce)) {
+      const member = hostLobbyMembers.get(message.by);
+      const remote = remotes.get(message.by);
+      const health = remoteHealthAuthorities.get(message.by);
+      if (member && remote && health?.alive) {
+        const result = applyAuthoritativeRemoteDamage(health, health.hp, performance.now());
+        if (result.applied && result.died) {
+          processedNonces.add(message.nonce);
+          remoteHealthAuthorities.set(message.by, result.state);
+          remote.snapshot = { ...remote.snapshot, hp: 0 };
+          const death: DeathMessage = {
+            type: 'death', killer: message.by, victim: message.by,
+            cause: { kind: 'environment' }, nonce: message.nonce,
+          };
+          network.send(death);
+          processDeath(death);
+          recordMatchDiagnostic('field-kit-redeploy', 'accepted', { actorId: message.by, reason: 'player-requested-redeploy' });
+          trimNonceSet();
+        }
+      }
+    }
+    return true;
+  }
   if (message.type === 'lobby-state') {
     acceptLobbyState(message);
     return true;
@@ -2680,7 +2705,10 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
 
 function renderFieldKitSelection(): void {
   const summary = element<HTMLElement>('#selected-kit-summary');
+  const redeploy = element<HTMLButtonElement>('#field-kit-redeploy');
+  redeploy.textContent = 'REDEPLOY NOW WITH SELECTED FIELD KIT';
   if (selectedArena.id === 'gun-range') {
+    redeploy.hidden = true;
     summary.dataset.rangeArmory = 'true';
     const equipped = rangePrimaryUnlocked ? WEAPONS[player.primaryWeapon].name : 'Service Pistol';
     summary.innerHTML = `<span>RANGE ARMORY</span><strong>PICK UP YOUR WEAPON INSIDE</strong><b>${equipped} · PRESS F AT A BENCH</b>`;
@@ -2689,6 +2717,8 @@ function renderFieldKitSelection(): void {
   delete summary.dataset.rangeArmory;
   const kit = fieldKitById(selectedFieldKit);
   const queued = gameStarted && player.primaryWeapon !== kit.weapon;
+  redeploy.hidden = !queued || !player.alive || matchFinished;
+  redeploy.disabled = !queued || !player.alive || matchFinished;
   element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>`;
   document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
     const selected = card.dataset.kitId === selectedFieldKit;
@@ -2713,6 +2743,23 @@ document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button)
 });
 document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) => {
   button.addEventListener('click', () => chooseFieldKit(button.dataset.kitId ?? 'balanced'));
+});
+element<HTMLButtonElement>('#field-kit-redeploy').addEventListener('click', () => {
+  const kit = fieldKitById(selectedFieldKit);
+  if (!gameStarted || !player.alive || matchFinished || selectedArena.id === 'gun-range' || player.primaryWeapon === kit.weapon) return;
+  const message = { type: 'redeploy-request' as const, by: player.id, nonce: randomNonce() };
+  if (network.role === 'client') {
+    network.send(message);
+    const button = element<HTMLButtonElement>('#field-kit-redeploy');
+    button.disabled = true;
+    button.textContent = 'REDEPLOY REQUESTED';
+    setStatus('Redeploy requested from host.', 'ok');
+    return;
+  }
+  if (network.role === 'host') processedNonces.add(message.nonce);
+  const death: DeathMessage = { type: 'death', killer: player.id, victim: player.id, cause: { kind: 'environment' }, nonce: message.nonce };
+  if (network.role === 'host') network.send(death);
+  processDeath(death);
 });
 player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
 player.weapon = player.primaryWeapon;
@@ -3018,7 +3065,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
       remote.claimEligibleAt = movement.claimEligibleAt;
-      const coreDistance = Math.hypot(admittedIncoming.x - OVERDRIVE_POSITION.x, admittedIncoming.z - OVERDRIVE_POSITION.z);
+      const coreDistance = Math.hypot(admittedIncoming.x - overdriveState.position.x, admittedIncoming.z - overdriveState.position.z);
       if (movement.resynchronized && coreDistance <= OVERDRIVE_PICKUP_RADIUS + 3) remote.claimRequiresCoreExit = true;
       else if (remote.claimRequiresCoreExit && !movement.resynchronized && coreDistance > OVERDRIVE_PICKUP_RADIUS + 3) {
         remote.claimRequiresCoreExit = false;
@@ -4074,11 +4121,81 @@ function resetBreakableWindows(): void {
   }
 }
 
+const CORPSE_LIFETIME_MS = 7_500;
+const MAX_CORPSE_PRESENTATIONS = 12;
+const corpsePresentations: Array<{ root: THREE.Group; expiresAt: number }> = [];
+
+function disposeCorpsePresentation(root: THREE.Group): void {
+  scene.remove(root);
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    materials.forEach((material) => material.dispose());
+  });
+}
+
+function clearCorpsePresentations(): void {
+  while (corpsePresentations.length > 0) disposeCorpsePresentation(corpsePresentations.pop()!.root);
+}
+
+function updateCorpsePresentations(now: number): void {
+  for (let index = corpsePresentations.length - 1; index >= 0; index -= 1) {
+    if (now < corpsePresentations[index].expiresAt) continue;
+    disposeCorpsePresentation(corpsePresentations[index].root);
+    corpsePresentations.splice(index, 1);
+  }
+}
+
+function corpseSource(victimId: string): { team: Team; weapon: WeaponId; position: THREE.Vector3; yaw: number } | null {
+  if (victimId === player.id) return {
+    team: player.team,
+    weapon: player.weapon,
+    position: new THREE.Vector3(player.position.x, player.position.y - stanceEyeHeight(player.stance), player.position.z),
+    yaw: player.yaw,
+  };
+  const remote = remotes.get(victimId);
+  if (remote) return { team: remote.snapshot.team, weapon: remote.snapshot.weapon, position: remote.target.clone(), yaw: remote.targetYaw };
+  const bot = bots.get(victimId);
+  if (bot) return { team: bot.team, weapon: bot.weapon, position: bot.position.clone(), yaw: bot.root.rotation.y };
+  return null;
+}
+
+function spawnCorpsePresentation(victimId: string, now = performance.now()): void {
+  const source = corpseSource(victimId);
+  if (!source) return;
+  const root = buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon, false);
+  root.position.copy(source.position);
+  root.position.y += 0.08;
+  root.rotation.y = source.yaw;
+  root.rotation.z = [...victimId].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 2 === 0 ? 1.38 : -1.38;
+  root.userData.presentationOnly = true;
+  root.userData.blocksShots = false;
+  root.traverse((node) => {
+    node.userData.presentationOnly = true;
+    node.userData.blocksShots = false;
+    if (node instanceof THREE.Mesh) {
+      node.castShadow = false;
+      node.raycast = () => undefined;
+    }
+  });
+  scene.add(root);
+  deathOperator(root);
+  corpsePresentations.push({ root, expiresAt: now + CORPSE_LIFETIME_MS });
+  if (corpsePresentations.length > MAX_CORPSE_PRESENTATIONS) disposeCorpsePresentation(corpsePresentations.shift()!.root);
+}
+
+function overdriveDropPosition(victimId: string): THREE.Vector3 | null {
+  const source = corpseSource(victimId);
+  return source ? source.position.clone().setY(source.position.y + OVERDRIVE_POSITION.y) : null;
+}
+
 function processDeath(message: DeathMessage): void {
   const victimPoint = message.victim === player.id ? player.position : remotes.get(message.victim)?.target ?? bots.get(message.victim)?.position;
   if (victimPoint) recordSpawnDeath(victimPoint);
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
+  spawnCorpsePresentation(message.victim);
   spawnDeathDrop(message);
   if (message.victim === player.id && player.alive) {
     const now = performance.now();
@@ -4088,6 +4205,7 @@ function processDeath(message: DeathMessage): void {
     if (gameMode === 'solo') player.deaths += 1;
     fieldSupport = recordSupportDeath(fieldSupport);
     updateFieldSupportHud();
+    renderFieldKitSelection();
     document.exitPointerLock();
   }
   if (message.victim === player.id) scheduleLocalRespawn();
@@ -4114,13 +4232,14 @@ function processDeath(message: DeathMessage): void {
       sendAuthoritativeScores();
     }
   }
-  if (network.role !== 'client' && message.killer !== message.victim
-    && (message.killer === player.id || remotes.has(message.killer))) {
-    const transfer = transferOverdriveOnElimination(overdriveState, message.victim, message.killer, performance.now());
-    if (transfer.transferred) {
-      overdriveState = transfer.state;
-      registerOverdrivePickup(message.killer, performance.now());
-      addFeed('QUAD STOLEN · KILL THE HOLDER TO TAKE ITS REMAINING TIME', 'gold');
+  if (network.role !== 'client') {
+    const now = performance.now();
+    const dropPosition = overdriveDropPosition(message.victim);
+    const drop = dropPosition ? dropOverdriveOnElimination(overdriveState, message.victim, dropPosition, now) : null;
+    if (drop?.dropped) {
+      overdriveState = drop.state;
+      addFeed('2× DAMAGE CORE DROPPED · CLAIM ITS REMAINING TIME', 'gold');
+      broadcastOverdriveState(now);
     }
   }
   if (message.killer === player.id && message.victim !== player.id) {
@@ -5334,6 +5453,7 @@ function applyBotDamage(
     processDeath(death);
     broadcastHostedBotState();
   } else {
+    spawnCorpsePresentation(bot.id, now);
     spawnDeathDrop(death, now);
   }
   const afterDeathDrop = performance.now();
@@ -6179,6 +6299,7 @@ function overdriveStateMessage(now: number): OverdriveStateMessage {
   return {
     type: 'overdrive-state', by: player.id, holderId: overdriveState.holderId, available: overdriveState.available,
     generation: overdriveState.generation,
+    position: [overdriveState.position.x, overdriveState.position.y, overdriveState.position.z],
     activeRemainingMs: Math.min(OVERDRIVE_DURATION_MS, Math.max(0, overdriveState.activeUntil - now)),
     nextSpawnInMs: Math.min(OVERDRIVE_SPAWN_INTERVAL_MS, Math.max(0, overdriveState.nextSpawnAt - now)),
     nonce: randomNonce(),
@@ -6194,7 +6315,7 @@ function registerOverdrivePickup(holderId: string, now: number): void {
   recordMatchDiagnostic('effect-pickup', network.role === 'client' ? 'observed' : 'accepted', {
     actorId: holderId,
     weaponOrEffect: 'overdrive',
-    position: [OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z],
+    position: [overdriveState.position.x, overdriveState.position.y, overdriveState.position.z],
     reason: network.role === 'client' ? 'host-replicated-state' : 'authoritative-claim',
   });
   overdriveClaimGeneration = overdriveState.generation;
@@ -6203,8 +6324,8 @@ function registerOverdrivePickup(holderId: string, now: number): void {
   addFeed(`${holderName} secured 2× OVERDRIVE · ${seconds} SECONDS`, 'gold');
   if (holderId === player.id) {
     audio.overdrivePickup();
-    showQuadDamageAnnouncement('QUAD DAMAGE', `2× DAMAGE · ${seconds} SECONDS`);
-  } else showQuadDamageAnnouncement(`${holderName} HAS QUAD DAMAGE`, 'DENY THE POWER HOLDER');
+    showQuadDamageAnnouncement('2× DAMAGE', `${seconds} SECONDS REMAINING`);
+  } else showQuadDamageAnnouncement(`${holderName} HAS 2× DAMAGE`, 'DENY THE POWER HOLDER');
   broadcastOverdriveState(now);
 }
 
@@ -6249,10 +6370,11 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
     generation: message.generation,
     available: message.available,
     holderId: message.holderId,
-    activeUntil: message.holderId ? now + message.activeRemainingMs : 0,
+    activeUntil: message.activeRemainingMs > 0 ? now + message.activeRemainingMs : 0,
     nextSpawnAt: now + message.nextSpawnInMs,
+    position: { x: message.position[0], y: message.position[1], z: message.position[2] },
   };
-  if (message.available && previousGeneration !== message.generation) {
+  if (message.available && message.activeRemainingMs === 0 && previousGeneration !== message.generation) {
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
     overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
@@ -6278,13 +6400,13 @@ function updateOverdrive(now: number): void {
     const spawnWorkStarted = performance.now();
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
-    addFeed('QUAD DAMAGE ONLINE · VISIBLE MID-MAP ICON', 'gold');
-    showQuadDamageAnnouncement('QUAD DAMAGE ONLINE', 'CENTRE CORE · CLAIM 2× DAMAGE');
+    addFeed('2× DAMAGE CORE ONLINE · VISIBLE MID-MAP ICON', 'gold');
+    showQuadDamageAnnouncement('2× DAMAGE ONLINE', 'CENTRE CORE · CLAIM IT');
     audio.overdriveAvailable();
     broadcastOverdriveState(now);
     requestAnimationFrame((frameAt) => recordMatchDiagnostic('overdrive-spawn-frame', 'observed', {
       weaponOrEffect: 'overdrive',
-      reason: 'first visible Quad spawn transition',
+      reason: 'first visible 2× Damage spawn transition',
       modifiers: [
         `sync-work-ms:${Math.round((performance.now() - spawnWorkStarted) * 10) / 10}`,
         `next-frame-ms:${Math.round((frameAt - spawnWorkStarted) * 10) / 10}`,
@@ -6296,7 +6418,7 @@ function updateOverdrive(now: number): void {
     if (previousHolder === player.id) audio.overdriveExpire();
     broadcastOverdriveState(now);
   }
-  const distance = Math.hypot(player.position.x - OVERDRIVE_POSITION.x, player.position.z - OVERDRIVE_POSITION.z);
+  const distance = Math.hypot(player.position.x - overdriveState.position.x, player.position.z - overdriveState.position.z);
   if (gameStarted && matchState.phase === 'active' && player.alive && overdriveState.available && distance <= OVERDRIVE_PICKUP_RADIUS) {
     if (network.role === 'client') {
       if (overdriveClaimGeneration !== overdriveState.generation || now - overdriveClaimLastSentAt >= 250) {
@@ -6318,7 +6440,11 @@ function updateOverdrive(now: number): void {
 
   overdriveRoot.visible = overdriveState.available && gameStarted && matchState.phase === 'active';
   if (overdriveRoot.visible) {
-    overdriveRoot.position.y = OVERDRIVE_POSITION.y + Math.sin(now * 0.0032) * 0.14;
+    overdriveRoot.position.set(
+      overdriveState.position.x,
+      overdriveState.position.y + Math.sin(now * 0.0032) * 0.14,
+      overdriveState.position.z,
+    );
     overdriveCore.rotation.y = now * 0.0017;
     overdriveCore.rotation.x = Math.sin(now * 0.0011) * 0.32;
     overdriveRings[0].rotation.z = now * 0.0013;
@@ -7880,7 +8006,7 @@ function updateMinimap(now: number): void {
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   if (selectedArena.overdrive && overdriveState.available) {
-    const [x, y] = point(OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.z);
+    const [x, y] = point(overdriveState.position.x, overdriveState.position.z);
     context.save();
     context.translate(x, y);
     const pulse = 15 + Math.sin(now * 0.006) * 2;
@@ -8338,7 +8464,7 @@ function syncArenaSelectionUi(): void {
         ? 'GUN <span>RANGE</span>'
         : 'SKYLINE <span>TERMINAL</span>';
   element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
-    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Quad Damage Core.'
+    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.'
     : selectedArena.id === 'rustworks-1v1'
       ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
       : selectedArena.id === 'gun-range'
@@ -8375,12 +8501,8 @@ function setArenaPresentationVisibility(): void {
   setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
   applyAdditionalMapPresentationProfile(skylineTerminalArena.root, renderProfile);
   if (rustworksVisible) {
-    if (renderProfile === 'blender' && rustworksBlenderTelemetry().status === 'ready') {
-      setRustworksProceduralPresentationVisible(rustworksArena.root, false);
-    } else {
-      applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
-      setRustworksProceduralPresentationVisible(rustworksArena.root, true);
-    }
+    applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+    setRustworksProceduralPresentationVisible(rustworksArena.root, true);
   }
   grassSystem.root.visible = atomicVisible;
   if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
@@ -8578,6 +8700,7 @@ function resetForMode(): void {
   clearGrenadeExplosionVisuals();
   clearFieldSupport();
   clearDeathDrops();
+  clearCorpsePresentations();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   verifiedRemoteKills.clear();
@@ -8843,6 +8966,7 @@ function frame(now: number, scheduleNext = true): void {
     updateFieldSupport(frameDt, now);
     updateOverdrive(now);
     updateDeathDrops(now);
+    updateCorpsePresentations(now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
@@ -9244,6 +9368,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       damageMultiplier: BOT_DAMAGE_MULTIPLIER,
       ownerIds: grenades.filter((grenade) => grenade.ownerKind === 'bot').map((grenade) => grenade.ownerId),
     },
+    corpses: {
+      active: corpsePresentations.length,
+      lifetimeMs: CORPSE_LIFETIME_MS,
+      remainingMs: corpsePresentations.map((corpse) => Math.max(0, Math.round(corpse.expiresAt - performance.now()))),
+    },
     grenadeVisual: {
       ...grenadePresentationTelemetry(),
       active: grenades.map((grenade) => ({
@@ -9342,7 +9471,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     })),
     overdrive: {
       ...overdriveState,
-      position: [OVERDRIVE_POSITION.x, OVERDRIVE_POSITION.y, OVERDRIVE_POSITION.z],
+      position: [overdriveState.position.x, overdriveState.position.y, overdriveState.position.z],
       damageMultiplier: overdriveDamageMultiplier(overdriveState, player.id, performance.now()),
       remainingMs: overdriveRemainingMs(overdriveState, player.id, performance.now()),
       spawns: overdriveSpawns,
@@ -10194,6 +10323,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     else if (mode === 'active') overdriveState = {
       generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
       holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,
+      position: OVERDRIVE_POSITION,
     };
     else overdriveState = { ...overdriveState, available: false, holderId: null, activeUntil: 0, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS };
     updateOverdrive(now);
@@ -10274,8 +10404,8 @@ async function bootstrap(): Promise<void> {
       }, reducedWorldDetail);
   const rustworksArtPromise = renderProfile === 'blender' && selectedArena.id === 'rustworks-1v1'
     ? (qualityAssetStreaming.eagerQualityGlbs += 1, loadRustworksBlenderTower(rustworksArena.root)).then((root) => {
-        // Authored kit is the Quality silhouette; keep only dirt ray-target + lights from procedural.
-        setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+        // The retired GLB remains hidden; procedural geometry owns visibility and collision.
+        setRustworksProceduralPresentationVisible(rustworksArena.root, true);
         setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
         qualityAssetStreaming.rustworks = 'ready';
         return root;

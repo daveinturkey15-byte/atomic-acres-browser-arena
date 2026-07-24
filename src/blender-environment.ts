@@ -83,6 +83,17 @@ export function mirrorAtomicCollisionAuditVisuals(proceduralWorld: THREE.Object3
   }
   return mirrored;
 }
+
+export function enforceAtomicMaterialDepthContract(material: THREE.Material, transparentSurface: boolean): THREE.Material {
+  if (transparentSurface) return material;
+  material.transparent = false;
+  material.opacity = 1;
+  material.depthWrite = true;
+  material.alphaTest = 0;
+  material.needsUpdate = true;
+  return material;
+}
+
 export async function loadBlenderArena(
   scene: THREE.Scene,
   arena: ArenaMap,
@@ -118,6 +129,12 @@ export async function loadBlenderArena(
     if (!(node instanceof THREE.Mesh)) return;
     node.userData.blocksShots = false;
     meshCount += 1;
+    const windowId = typeof node.userData.atomic_window_id === 'string' ? node.userData.atomic_window_id : null;
+    const loadedMaterials = Array.isArray(node.material) ? node.material : [node.material];
+    loadedMaterials.forEach((material) => enforceAtomicMaterialDepthContract(
+      material,
+      windowId !== null || /glass/i.test(material.name),
+    ));
     node.castShadow = node.material instanceof THREE.MeshStandardMaterial && !node.material.transparent;
     node.receiveShadow = true;
     const geometry = node.geometry;
@@ -135,7 +152,6 @@ export async function loadBlenderArena(
         if (material.normalMap && material.roughnessMap) pbrMaterials.add(material);
       }
     });
-    const windowId = typeof node.userData.atomic_window_id === 'string' ? node.userData.atomic_window_id : null;
     if (windowId) {
       if (windowId.includes('upper-window')) {
         transparentUpperWindows += 1;

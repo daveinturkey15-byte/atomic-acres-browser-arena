@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       release_pass:
-        description: Player-facing pass, for example PASS 58
+        description: Live experimental pass; this topology requires PASS 62
         required: true
         type: string
 
@@ -52,7 +52,7 @@ jobs:
         run: npm run verify:release-tree
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Stage isolated three-channel release topology
+      - name: Stage live Pass 62 and byte-exact stable Pass 60
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           npm run stage:release-topology
@@ -105,7 +105,7 @@ jobs:
             --arg pagesCreatedAt "$(jq -r '.created_at' <<<"$build")" \
             --arg pagesUpdatedAt "$(jq -r '.updated_at' <<<"$build")" \
             --arg workflowRun "$GITHUB_RUN_ID" \
-            '{schemaVersion:2, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, releaseBuiltAt:$releaseBuiltAt, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun, topology:$topology[0]}' \
+            '{schemaVersion:3, sourceSha:$sourceSha, pagesSha:$pagesSha, releasePass:$releasePass, releaseBuiltAt:$releaseBuiltAt, pagesStatus:$pagesStatus, pagesCreatedAt:$pagesCreatedAt, pagesUpdatedAt:$pagesUpdatedAt, workflowRun:$workflowRun, topology:$topology[0]}' \
             > artifacts/pipeline/production-release-receipt.json
       - uses: actions/upload-artifact@v4
         with:

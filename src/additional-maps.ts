@@ -472,17 +472,6 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [lowerRampWidth + 0.45, deckThickness, lowerLandingDepth],
     grate,
   );
-  for (const side of [-1, 1] as const) {
-    box(
-      builder,
-      'rustworks-lower-ramp-rail',
-      [side * (lowerRampWidth / 2 + 0.12), lowerRampPosY + 0.55, lowerRampCenterZ],
-      [0.1, 0.1, lowerRampLength],
-      hazard,
-      { solid: false, rotation: [-lowerRampAngle, 0, 0], detail: 'performance' },
-    );
-  }
-
   // Ship-ladder on +X rim: continuous climb, wider bridge, open upper landing.
   const shipAngle = (shipLadderAngleDegrees * Math.PI) / 180;
   const shipRise = upperTop - lowerTop;
@@ -663,19 +652,19 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     { cluster: 'north-west', side: 'north', slot: 0, axis: 'x', x: -8, z: -13, opening: 'open-both' },
     { cluster: 'north-west', side: 'west', slot: 1, axis: 'z', x: -18, z: -8, opening: 'closed' },
     { cluster: 'north-west', side: 'north', slot: 2, axis: 'x', x: -19, z: -17, opening: 'closed' },
-    { cluster: 'north-west', side: 'west', slot: 3, axis: 'z', x: -7, z: -19, opening: 'closed' },
+    { cluster: 'north-west', side: 'west', slot: 3, axis: 'z', x: -7, z: -19, opening: 'open-one' },
     { cluster: 'north-east', side: 'north', slot: 0, axis: 'x', x: 8, z: -13, opening: 'open-one' },
     { cluster: 'north-east', side: 'east', slot: 1, axis: 'z', x: 18, z: -8, opening: 'closed' },
-    { cluster: 'north-east', side: 'north', slot: 2, axis: 'x', x: 19, z: -17, opening: 'closed' },
+    { cluster: 'north-east', side: 'north', slot: 2, axis: 'x', x: 19, z: -17, opening: 'open-both' },
     { cluster: 'north-east', side: 'east', slot: 3, axis: 'z', x: 7, z: -19, opening: 'closed' },
     { cluster: 'south-west', side: 'south', slot: 0, axis: 'x', x: -8, z: 13, opening: 'closed' },
     { cluster: 'south-west', side: 'west', slot: 1, axis: 'z', x: -18, z: 8, opening: 'open-one' },
-    { cluster: 'south-west', side: 'south', slot: 2, axis: 'x', x: -19, z: 17, opening: 'closed' },
+    { cluster: 'south-west', side: 'south', slot: 2, axis: 'x', x: -19, z: 17, opening: 'open-both' },
     { cluster: 'south-west', side: 'west', slot: 3, axis: 'z', x: -7, z: 19, opening: 'closed' },
     { cluster: 'south-east', side: 'south', slot: 0, axis: 'x', x: 8, z: 13, opening: 'closed' },
     { cluster: 'south-east', side: 'east', slot: 1, axis: 'z', x: 18, z: 8, opening: 'open-both' },
     { cluster: 'south-east', side: 'south', slot: 2, axis: 'x', x: 19, z: 17, opening: 'closed' },
-    { cluster: 'south-east', side: 'east', slot: 3, axis: 'z', x: 7, z: 19, opening: 'closed' },
+    { cluster: 'south-east', side: 'east', slot: 3, axis: 'z', x: 7, z: 19, opening: 'open-one' },
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
   const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
@@ -778,8 +767,8 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     open: containerRows.filter((placement) => placement.opening !== 'closed').length,
     openBothEnds: containerRows.filter((placement) => placement.opening === 'open-both').length,
     openOneEnd: containerRows.filter((placement) => placement.opening === 'open-one').length,
-    closedPercent: 75,
-    openPercent: 25,
+    closedPercent: 50,
+    openPercent: 50,
     clusters: 4,
     perCluster: 4,
     perimeterWall: false,
@@ -918,11 +907,9 @@ export function applyAdditionalMapPresentationProfile(
     }
     const detail = node.userData.rustworksDetail as string | undefined;
     if (node.userData.blenderAuthoredEnvironment) {
-      const visible = allowQuality;
-      if (node.visible !== visible) {
-        node.visible = visible;
-        if (visible) shown += 1;
-        else hidden += 1;
+      if (node.visible) {
+        node.visible = false;
+        hidden += 1;
       }
       return;
     }
@@ -1646,7 +1633,24 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const structureMat = standard(0x486b75, 0.3, 0.72);
   const rubberMat = terminalSurfaceMaterial('rubber', 0x171c1f, '#536063', 0.92, 0.04, [4, 4]);
   const seatMat = terminalSurfaceMaterial('fabric', 0x087a86, '#8ef2f0', 0.7, 0.08, [4, 4]);
-  const cockpitMat = standard(0x051a2b, 0.12, 0.8);
+  const cockpitGlassMat = new THREE.MeshStandardMaterial({
+    color: 0x68c6d4,
+    roughness: 0.14,
+    metalness: 0.16,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  cockpitGlassMat.name = 'skyline-cockpit-glass-material';
+  const flightScreenMat = new THREE.MeshStandardMaterial({
+    color: 0x123d4b,
+    roughness: 0.34,
+    metalness: 0.24,
+    emissive: 0x0e7587,
+    emissiveIntensity: 0.8,
+  });
+  flightScreenMat.name = 'skyline-flight-screen-material';
   const planeStripeMat = standard(0x0a8999, 0.32, 0.52);
   const stainMat = standard(0x101b23, 1.0, 0.0);
   const practicalMat = new THREE.MeshStandardMaterial({
@@ -2073,7 +2077,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   for (const x of [-29, -10, 10, 29]) {
     detailBox('terminal-story', `skyline-flight-screen-post-${x}`, [x, 1.8, -20], [0.16, 3.6, 0.16], structureMat, 'performance');
-    detailBox('terminal-story', `skyline-flight-screen-${x}`, [x, 3.25, -20], [3.6, 1.5, 0.18], cockpitMat, 'performance');
+    detailBox('terminal-story', `skyline-flight-screen-${x}`, [x, 3.25, -20], [3.6, 1.5, 0.18], flightScreenMat, 'performance');
     detailBox('terminal-story', `skyline-baggage-cart-basket-${x}`, [x, 0.62, -30.5], [1.65, 0.72, 0.82], structureMat, 'performance');
     detailBox('terminal-story', `skyline-baggage-cart-handle-${x}`, [x, 1.15, -30.88], [1.65, 0.08, 0.08], trimMat, 'performance');
   }
@@ -2119,7 +2123,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-jetbridge-roof', [0, 5.5, -6], [3.6, 0.15, 12], jetbridgeMat, { solid: false, shots: false });
   for (const sideX of [-1.66, 1.66]) {
     detailBox('boarding-route', `skyline-jetbridge-inner-panel-${sideX}`, [sideX, 3.8, -6], [0.035, 0.7, 11.4], soffitMat);
-    detailBox('boarding-route', `skyline-jetbridge-window-band-${sideX}`, [sideX, 4.68, -6], [0.028, 0.72, 10.8], cockpitMat, 'quality');
+    detailBox('boarding-route', `skyline-jetbridge-window-band-${sideX}`, [sideX, 4.68, -6], [0.028, 0.72, 10.8], cockpitGlassMat, 'quality');
   }
   for (const lightZ of [-10, -7, -4, -1.8]) {
     detailBox('boarding-route', `skyline-jetbridge-practical-${lightZ}`, [0, 5.36, lightZ], [2.55, 0.045, 0.13], practicalMat);
@@ -2192,14 +2196,14 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('aircraft-skin', 'skyline-aircraft-livery-magenta-south', [9.8, 3.98, 3.962], [12.5, 0.1, 0.05], magentaPracticalMat);
   detailBox('aircraft-skin', 'skyline-aircraft-roof-spine', [0, 6.43, 2], [33.8, 0.12, 0.54], planeStripeMat, 'quality');
   for (const windowX of [-13.5, -10.5, -7.5, -4.5, 4.5, 7.5, 10.5, 13.5]) {
-    detailBox('aircraft-skin', `skyline-cabin-window-north-${windowX}`, [windowX, 4.28, 0.055], [1.28, 0.5, 0.08], cockpitMat);
-    detailBox('aircraft-skin', `skyline-cabin-window-south-${windowX}`, [windowX, 4.28, 3.945], [1.28, 0.5, 0.08], cockpitMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-north-${windowX}`, [windowX, 4.28, 0.055], [1.28, 0.5, 0.08], cockpitGlassMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-south-${windowX}`, [windowX, 4.28, 3.945], [1.28, 0.5, 0.08], cockpitGlassMat);
     detailBox('aircraft-skin', `skyline-cabin-window-cap-north-${windowX}`, [windowX, 4.58, 0.04], [1.42, 0.055, 0.1], planeStripeMat);
     detailBox('aircraft-skin', `skyline-cabin-window-cap-south-${windowX}`, [windowX, 4.58, 3.96], [1.42, 0.055, 0.1], planeStripeMat);
   }
-  detailBox('aircraft-skin', 'skyline-cockpit-glass-front', [-20.12, 4.3, 2], [0.08, 0.7, 2.15], cockpitMat);
-  detailBox('aircraft-skin', 'skyline-cockpit-glass-north', [-19.2, 4.35, 0.045], [1.55, 0.72, 0.08], cockpitMat, 'performance', [0, 0.12, 0]);
-  detailBox('aircraft-skin', 'skyline-cockpit-glass-south', [-19.2, 4.35, 3.955], [1.55, 0.72, 0.08], cockpitMat, 'performance', [0, -0.12, 0]);
+  detailBox('aircraft-skin', 'skyline-cockpit-glass-front', [-20.12, 4.3, 2], [0.08, 0.7, 2.15], cockpitGlassMat);
+  detailBox('aircraft-skin', 'skyline-cockpit-glass-north', [-19.2, 4.35, 0.045], [1.55, 0.72, 0.08], cockpitGlassMat, 'performance', [0, 0.12, 0]);
+  detailBox('aircraft-skin', 'skyline-cockpit-glass-south', [-19.2, 4.35, 3.955], [1.55, 0.72, 0.08], cockpitGlassMat, 'performance', [0, -0.12, 0]);
   detailBox('aircraft-skin', 'skyline-tail-slate-panel', [19.02, 6.42, 2.22], [1.86, 2.55, 0.06], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-tail-amber-mark', [19.02, 6.55, 2.27], [1.35, 0.28, 0.07], hazardMat);
 
@@ -2228,8 +2232,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   detailBox('terminal-story', 'skyline-cabin-light-north', [-0.5, 5.47, 1.12], [31, 0.07, 0.11], practicalMat);
   detailBox('terminal-story', 'skyline-cabin-light-south', [-0.5, 5.47, 2.88], [31, 0.07, 0.11], practicalMat);
   for (const windowX of [-13.5, -10.5, -7.5, -4.5, 4.5, 7.5, 10.5, 13.5]) {
-    detailBox('aircraft-skin', `skyline-cabin-window-inner-north-${windowX}`, [windowX, 4.05, 0.415], [1.26, 0.48, 0.055], cockpitMat);
-    detailBox('aircraft-skin', `skyline-cabin-window-inner-south-${windowX}`, [windowX, 4.05, 3.585], [1.26, 0.48, 0.055], cockpitMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-inner-north-${windowX}`, [windowX, 4.05, 0.415], [1.26, 0.48, 0.055], cockpitGlassMat);
+    detailBox('aircraft-skin', `skyline-cabin-window-inner-south-${windowX}`, [windowX, 4.05, 3.585], [1.26, 0.48, 0.055], cockpitGlassMat);
   }
   for (const ribX of [-14, -11, -8, -5, -2, 1, 4, 7, 10, 13, 16]) {
     detailBox('wall-structure', `skyline-cabin-ceiling-rib-${ribX}`, [ribX, 5.42, 2], [0.11, 0.08, 3.15], structureMat);

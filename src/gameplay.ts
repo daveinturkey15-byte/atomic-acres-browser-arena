@@ -158,7 +158,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   magnum: {
     id: 'magnum', name: 'DHV X Verdict Magnum', damage: 100, minimumDamage: 100,
     falloffStart: 120, falloffEnd: 120, headMultiplier: 1, limbMultiplier: 0,
-    rpm: 180, mag: 6, reserve: 30, reload: 1.75,
+    rpm: 90, mag: 6, reserve: 30, reload: 1.75,
     hipSpread: 0.026, adsSpreadMultiplier: 0.3, movementSpreadMultiplier: 1.5,
     crouchSpreadMultiplier: 0.8, sustainedSpreadPerShot: 0.006, maximumSpread: 0.06,
     pellets: 1, recoilPitch: 0.05, recoilYaw: 0.012, recoilRecovery: 8,

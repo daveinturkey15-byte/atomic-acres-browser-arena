@@ -202,8 +202,10 @@ describe('additional authored maps', () => {
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
     expect(namedCount(map.root, 'rustworks-container-placement')).toBe(16);
-    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(12);
-    expect(namedCount(map.root, 'rustworks-open-container-wall-a')).toBe(4);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(8);
+    expect(namedCount(map.root, 'rustworks-open-container-wall-a')).toBe(8);
+    expect(namedCount(map.root, 'rustworks-lower-ramp')).toBe(1);
+    expect(namedCount(map.root, 'rustworks-lower-ramp-rail')).toBe(0);
     expect(namedCount(map.root, 'rustworks-barrier-low')).toBe(0);
     expect(namedCount(map.root, 'rustworks-tank-collider')).toBe(0);
     expect(namedCount(map.root, 'rustworks-horizontal-process-tank')).toBe(0);
@@ -241,14 +243,18 @@ describe('additional authored maps', () => {
       if (node instanceof THREE.Mesh && node.name === 'rustworks-open-one-container-closed-end') oneEndWalls.push(node);
     });
     expect(placements).toHaveLength(16);
-    expect(closed).toHaveLength(12);
-    expect(openShells).toHaveLength(12);
-    expect(oneEndWalls).toHaveLength(2);
-    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'closed')).toHaveLength(12);
-    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-both')).toHaveLength(2);
-    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-one')).toHaveLength(2);
+    expect(closed).toHaveLength(8);
+    expect(openShells).toHaveLength(24);
+    expect(oneEndWalls).toHaveLength(4);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'closed')).toHaveLength(8);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-both')).toHaveLength(4);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-one')).toHaveLength(4);
     for (const cluster of ['north-west', 'north-east', 'south-west', 'south-east']) {
-      expect(placements.filter((placement) => placement.userData.rustworksContainerCluster === cluster), cluster).toHaveLength(4);
+      const clusterPlacements = placements.filter((placement) => placement.userData.rustworksContainerCluster === cluster);
+      expect(clusterPlacements, cluster).toHaveLength(4);
+      expect(clusterPlacements.filter((placement) => placement.userData.rustworksContainerType === 'closed'), `${cluster}:closed`).toHaveLength(2);
+      expect(clusterPlacements.filter((placement) => placement.userData.rustworksContainerType === 'open-both'), `${cluster}:open-both`).toHaveLength(1);
+      expect(clusterPlacements.filter((placement) => placement.userData.rustworksContainerType === 'open-one'), `${cluster}:open-one`).toHaveLength(1);
     }
     expect(placements.every((placement) => Math.max(Math.abs(placement.position.x), Math.abs(placement.position.z)) < 21.5)).toBe(true);
 
@@ -292,12 +298,12 @@ describe('additional authored maps', () => {
     };
     expect(layout).toMatchObject({
       total: 16,
-      closed: 12,
-      open: 4,
-      openBothEnds: 2,
-      openOneEnd: 2,
-      closedPercent: 75,
-      openPercent: 25,
+      closed: 8,
+      open: 8,
+      openBothEnds: 4,
+      openOneEnd: 4,
+      closedPercent: 50,
+      openPercent: 50,
       clusters: 4,
       perCluster: 4,
       perimeterWall: false,
@@ -309,7 +315,7 @@ describe('additional authored maps', () => {
     const openRoutes = map.root.userData.rustworksOpenContainerRoutes as Array<{
       id: string; anchors: [number, number, number][];
     }>;
-    expect(openRoutes).toHaveLength(2);
+    expect(openRoutes).toHaveLength(4);
     for (const route of openRoutes) {
       for (const [x, y, z] of route.anchors) {
         expect(isBlocked({ x, y, z }, map.colliders, 0.38), `${route.id}@${x},${z}`).toBe(false);
@@ -351,6 +357,22 @@ describe('additional authored maps', () => {
     expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(38);
     expect(access.lowerRamp.size[0]).toBeGreaterThanOrEqual(4.8);
     expect(access.shipLadder.size[0]).toBeGreaterThanOrEqual(2.6);
+    const lowerRampMeshes = map.root.children.filter((node) => node.name === 'rustworks-lower-ramp');
+    expect(lowerRampMeshes).toHaveLength(1);
+    expect(lowerRampMeshes[0].visible).toBe(true);
+    expect(map.root.children.filter((node) => node.name === 'rustworks-lower-ramp-rail')).toHaveLength(0);
+    const [rampX, rampY, rampZ] = access.lowerRamp.position;
+    const [rampWidth, rampHeight, rampDepth] = access.lowerRamp.size;
+    const rampAuthorities = map.physicsColliders.filter((bounds) =>
+      Math.abs(bounds.minX - (rampX - rampWidth / 2)) < 1e-6
+      && Math.abs(bounds.maxX - (rampX + rampWidth / 2)) < 1e-6
+      && Math.abs((bounds.minY ?? -Infinity) - (rampY - rampHeight / 2)) < 1e-6
+      && Math.abs((bounds.maxY ?? Infinity) - (rampY + rampHeight / 2)) < 1e-6
+      && Math.abs(bounds.minZ - (rampZ - rampDepth / 2)) < 1e-6
+      && Math.abs(bounds.maxZ - (rampZ + rampDepth / 2)) < 1e-6
+      && Math.abs((bounds.rotation?.[0] ?? 0) - access.lowerRamp.rotation[0]) < 1e-6
+    );
+    expect(rampAuthorities).toHaveLength(1);
 
     const lowerAngle = Math.abs(access.lowerRamp.rotation[0]);
     const lowerHalfRun = Math.cos(lowerAngle) * access.lowerRamp.size[2] / 2;
@@ -777,6 +799,32 @@ describe('additional authored maps', () => {
     expect(clearance.aisleMetres).toBeGreaterThan(clearance.clearanceProbeDiameterMetres);
     expect(clearance.doorVisibleApertureMetres).toBeGreaterThanOrEqual(1.8);
     expect(clearance.opaqueDoorPanels).toBe(0);
+  });
+
+  it('uses transparent depth-safe glazing for cockpit and cabin apertures while keeping flight screens opaque', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const name of [
+      'skyline-cockpit-glass-front',
+      'skyline-cockpit-glass-north',
+      'skyline-cockpit-glass-south',
+      'skyline-cabin-window-north--13.5',
+      'skyline-cabin-window-inner-south-13.5',
+    ]) {
+      const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+      expect(mesh, name).toBeInstanceOf(THREE.Mesh);
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      expect(material.name).toBe('skyline-cockpit-glass-material');
+      expect(material.transparent).toBe(true);
+      expect(material.opacity).toBeLessThan(0.5);
+      expect(material.depthWrite).toBe(false);
+      expect(material.side).toBe(THREE.DoubleSide);
+    }
+    const screen = map.root.getObjectByName('skyline-flight-screen--29') as THREE.Mesh;
+    const screenMaterial = screen.material as THREE.MeshStandardMaterial;
+    expect(screenMaterial.name).toBe('skyline-flight-screen-material');
+    expect(screenMaterial.transparent).toBe(false);
+    expect(screenMaterial.depthWrite).toBe(true);
+    expect(screenMaterial.emissiveIntensity).toBeGreaterThan(0.5);
   });
 
   it('adds deliberate concourse cover while preserving centre and flank lanes', () => {

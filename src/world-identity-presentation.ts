@@ -26,9 +26,13 @@ export type WorldIdentityPresentation = {
   practicalLights: number;
   streetLights: number;
   interiorLights: number;
+  portalLights: number;
   fixtureInstances: number;
   ceilingInstances: number;
 };
+
+export const ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE = 6.8;
+export const ATOMIC_UPPER_PORTAL_LIGHT_DISTANCE = 2.6;
 
 function cssColor(hex: number): string {
   return `#${hex.toString(16).padStart(6, '0')}`;
@@ -214,6 +218,7 @@ export function createWorldIdentityPresentation(
     new THREE.MeshBasicMaterial({ color: 0x6df4ed, toneMapped: false }),
     new THREE.MeshBasicMaterial({ color: 0xffa17e, toneMapped: false }),
   ];
+  let portalLights = 0;
   for (const house of houses) {
     const opening = house.openings.find((entry) => entry.id === 'upper-room-opening');
     if (!opening) continue;
@@ -236,6 +241,20 @@ export function createWorldIdentityPresentation(
     threshold.name = `${doorway.name}-lit-threshold`;
     threshold.position.set(0, -opening.height / 2 + 0.035, 0);
     doorway.add(threshold);
+    if (!softwareRenderer) {
+      const portalLight = new THREE.PointLight(
+        0xffd6a2,
+        Math.min(1.1, lighting.interiorLightIntensity * 0.11),
+        ATOMIC_UPPER_PORTAL_LIGHT_DISTANCE,
+        2,
+      );
+      portalLight.name = `${doorway.name}-portal-light`;
+      portalLight.position.set(0, 0.12, house.origin.facing * 0.9);
+      portalLight.castShadow = false;
+      portalLight.userData.interiorBounded = true;
+      doorway.add(portalLight);
+      portalLights += 1;
+    }
     doorway.traverse((node) => {
       node.userData.presentationOnly = true;
       node.userData.blocksShots = false;
@@ -301,7 +320,7 @@ export function createWorldIdentityPresentation(
   const admittedInteriorLights = softwareRenderer ? 0 : lighting.interiorLightCount;
   if (admittedInteriorLights === 2) {
     for (const house of houses) {
-      const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, 11.5, 2);
+      const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE, 2);
       light.name = `interior-light-${house.id}-broad`;
       light.position.set(house.origin.x, 3.1, house.origin.z);
       light.castShadow = false;
@@ -310,7 +329,7 @@ export function createWorldIdentityPresentation(
   } else if (admittedInteriorLights === 4) {
     for (const house of houses) {
       for (const [level, y] of [['ground', 2.75], ['upper', 6.12]] as const) {
-        const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, 9.4, 2);
+        const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE, 2);
         light.name = `interior-light-${house.id}-${level}`;
         light.position.set(house.origin.x, y, house.origin.z);
         light.castShadow = false;
@@ -332,6 +351,7 @@ export function createWorldIdentityPresentation(
     practicalLights: admittedRouteLights + admittedStreetLights,
     streetLights: admittedStreetLights,
     interiorLights: admittedInteriorLights,
+    portalLights,
     fixtureInstances: fixtureCount,
     ceilingInstances: ceilingPlacements.length,
   };

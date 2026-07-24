@@ -10,6 +10,7 @@ export type OverdriveState = Readonly<{
   nextSpawnAt: number;
   holderId: string | null;
   activeUntil: number;
+  position: Readonly<{ x: number; y: number; z: number }>;
 }>;
 
 export function createOverdriveState(matchStartedAt: number): OverdriveState {
@@ -20,6 +21,7 @@ export function createOverdriveState(matchStartedAt: number): OverdriveState {
     nextSpawnAt: startedAt + OVERDRIVE_SPAWN_INTERVAL_MS,
     holderId: null,
     activeUntil: 0,
+    position: OVERDRIVE_POSITION,
   };
 }
 
@@ -27,11 +29,16 @@ export function advanceOverdrive(state: OverdriveState, now: number): OverdriveS
   const safeNow = Number.isFinite(now) ? now : 0;
   const active = state.holderId !== null && safeNow < state.activeUntil;
   if (active) return state;
+  const dropped = state.available && state.holderId === null && state.activeUntil > 0;
+  if (dropped && safeNow < state.activeUntil) return state;
+  if (dropped) {
+    return { ...state, available: false, holderId: null, activeUntil: 0, position: OVERDRIVE_POSITION };
+  }
   if (!state.available && safeNow >= state.nextSpawnAt) {
-    return { ...state, available: true, holderId: null, activeUntil: 0 };
+    return { ...state, available: true, holderId: null, activeUntil: 0, position: OVERDRIVE_POSITION };
   }
   if (state.holderId !== null || state.activeUntil !== 0) {
-    return { ...state, holderId: null, activeUntil: 0 };
+    return { ...state, holderId: null, activeUntil: 0, position: OVERDRIVE_POSITION };
   }
   return state;
 }
@@ -47,19 +54,21 @@ export function claimOverdrive(
   if (!advanced.available || !alive || !playerId || !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
     return { state: advanced, claimed: false };
   }
-  const distance = Math.hypot(position.x - OVERDRIVE_POSITION.x, position.z - OVERDRIVE_POSITION.z);
-  if (distance > OVERDRIVE_PICKUP_RADIUS || Math.abs(position.y - OVERDRIVE_POSITION.y) > 2.4) {
+  const distance = Math.hypot(position.x - advanced.position.x, position.z - advanced.position.z);
+  if (distance > OVERDRIVE_PICKUP_RADIUS || Math.abs(position.y - advanced.position.y) > 2.4) {
     return { state: advanced, claimed: false };
   }
   const safeNow = Number.isFinite(now) ? now : 0;
+  const continuingDroppedCore = advanced.activeUntil > safeNow;
   return {
     claimed: true,
     state: {
       generation: advanced.generation + 1,
       available: false,
-      nextSpawnAt: safeNow + OVERDRIVE_SPAWN_INTERVAL_MS,
+      nextSpawnAt: continuingDroppedCore ? advanced.nextSpawnAt : safeNow + OVERDRIVE_SPAWN_INTERVAL_MS,
       holderId: playerId,
-      activeUntil: safeNow + OVERDRIVE_DURATION_MS,
+      activeUntil: continuingDroppedCore ? advanced.activeUntil : safeNow + OVERDRIVE_DURATION_MS,
+      position: advanced.position,
     },
   };
 }
@@ -74,17 +83,24 @@ export function overdriveRemainingMs(state: OverdriveState, playerId: string, no
   return state.holderId === playerId ? Math.max(0, Math.ceil(state.activeUntil - now)) : 0;
 }
 
-export function transferOverdriveOnElimination(
+export function dropOverdriveOnElimination(
   state: OverdriveState,
   victimId: string,
-  killerId: string,
+  position: Readonly<{ x: number; y: number; z: number }>,
   now: number,
-): { state: OverdriveState; transferred: boolean } {
-  if (!killerId || killerId === victimId || state.holderId !== victimId || !Number.isFinite(now) || now >= state.activeUntil) {
-    return { state, transferred: false };
+): { state: OverdriveState; dropped: boolean } {
+  if (state.holderId !== victimId || !Number.isFinite(now) || now >= state.activeUntil
+    || !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
+    return { state, dropped: false };
   }
   return {
-    transferred: true,
-    state: { ...state, generation: state.generation + 1, holderId: killerId },
+    dropped: true,
+    state: {
+      ...state,
+      generation: state.generation + 1,
+      available: true,
+      holderId: null,
+      position: { x: position.x, y: position.y, z: position.z },
+    },
   };
 }

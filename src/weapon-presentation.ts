@@ -81,6 +81,10 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
 };
 
 const MELEE_PRESENTATION_MS = 620;
+export const HIP_VIEWMODEL_POSITION = Object.freeze({ x: 0.4, y: -0.42, z: -0.94 });
+export const HIP_VIEWMODEL_SCALE = 0.54;
+const ADS_VIEWMODEL_BASE_POSITION = Object.freeze({ x: 0.28, y: -0.34, z: -0.88 });
+const ADS_VIEWMODEL_SCALE = 0.64;
 
 /** Original first-person weapon presentation with ADS, sprint, recoil, melee and staged reload motion. */
 export class WeaponPresentation {
@@ -129,8 +133,8 @@ export class WeaponPresentation {
 
   constructor(private readonly camera: THREE.Camera, private readonly flattenMaterials = false) {
     this.root.name = 'original-weapon-view';
-    this.root.position.set(0.28, -0.34, -0.88);
-    this.root.scale.setScalar(0.64);
+    this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
+    this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
     camera.add(this.root);
     const viewmodelFill = new THREE.PointLight(0xe6f2ef, flattenMaterials ? 0 : 1.05, 2.6, 2);
     viewmodelFill.name = 'first-person-viewmodel-fill';
@@ -897,6 +901,7 @@ export class WeaponPresentation {
     this.swayX = THREE.MathUtils.lerp(this.swayX, 0, smoothing(7));
     this.swayY = THREE.MathUtils.lerp(this.swayY, 0, smoothing(7));
     this.adsBlend = advanceAdsBlend(this.adsBlend, pose.ads, pose.dt, this.active);
+    this.root.scale.setScalar(THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend));
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
@@ -1076,10 +1081,13 @@ export class WeaponPresentation {
     const grenadeProgress = THREE.MathUtils.clamp((performance.now() - this.grenadeStart) / 620, 0, 1);
     const grenadeArc = this.grenadeStart > 0 && grenadeProgress < 1 ? Math.sin(grenadeProgress * Math.PI) : 0;
 
+    const viewmodelBaseX = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
+    const viewmodelBaseY = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
+    const viewmodelBaseZ = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend);
     const targetPosition = new THREE.Vector3(
-      0.28 + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
-      -0.34 + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
-      -0.88 + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
+      viewmodelBaseX + adsX + bobX + this.swayX - pose.lateralSpeed * 0.012 - meleeArc * 0.24 + grenadeArc * 0.18 + reloadStage.lateral,
+      viewmodelBaseY + adsY + bobY + breath + sprintDrop + crouchLift + proneLift + switchDrop + reloadStage.lift - presentationKick * 0.095 - pose.landingImpulse * 0.075,
+      viewmodelBaseZ + adsZ + (pose.surfaceRetreat ?? 0) + presentationKick * profile.recoilTranslation * 1.12 - meleeArc * 0.32 + grenadeArc * 0.24,
     );
     this.surfaceRetreat = pose.surfaceRetreat ?? 0;
     this.root.position.lerp(targetPosition, smoothing(18));

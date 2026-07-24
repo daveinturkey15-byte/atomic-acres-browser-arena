@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { BLENDER_ARENA_ASSET, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
+import { BLENDER_ARENA_ASSET, enforceAtomicMaterialDepthContract, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
 
 const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.split('?')[0].replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
@@ -38,6 +38,16 @@ describe('Quality Graphics environment asset', () => {
     expect(quality.children).toHaveLength(3);
     expect(quality.children.every((child) => child.userData.qualityProfileMirror === true)).toBe(true);
     expect(procedural.children).toHaveLength(3);
+  });
+
+  it('forces opaque Atomic materials to remain opaque and depth-writing without changing glass', () => {
+    const opaque = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.2, depthWrite: false, alphaTest: 0.5 });
+    enforceAtomicMaterialDepthContract(opaque, false);
+    expect(opaque).toMatchObject({ transparent: false, opacity: 1, depthWrite: true, alphaTest: 0 });
+
+    const glass = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.2, depthWrite: false });
+    enforceAtomicMaterialDepthContract(glass, true);
+    expect(glass).toMatchObject({ transparent: true, opacity: 0.2, depthWrite: false });
   });
   it('ships a self-contained, bounded original arena GLB with semantic windows', () => {
     const buffer = readFileSync(assetPath);

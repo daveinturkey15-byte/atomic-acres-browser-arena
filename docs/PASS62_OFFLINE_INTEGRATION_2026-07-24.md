@@ -4,7 +4,7 @@ Date: 2026-07-24
 
 This is an unpublished local HITL candidate. It combines the gameplay/assets,
 graphics, and netcode streams without changing `origin/main`, GitHub Pages, or
-the Pass 59/60/61 release channels.
+the currently published release channels.
 
 ## Exact inputs
 

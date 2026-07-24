@@ -7,8 +7,8 @@ import {
   advanceOverdrive,
   claimOverdrive,
   createOverdriveState,
+  dropOverdriveOnElimination,
   overdriveDamageMultiplier,
-  transferOverdriveOnElimination,
 } from './overdrive';
 
 describe('Overdrive Core authority', () => {
@@ -48,12 +48,31 @@ describe('Overdrive Core authority', () => {
     expect(advanceOverdrive(expired, now + OVERDRIVE_SPAWN_INTERVAL_MS).available).toBe(true);
   });
 
-  it('hands the remaining power time to the player who eliminates its holder', () => {
+  it('drops the core at the holder death point and preserves only its remaining time', () => {
     const now = OVERDRIVE_SPAWN_INTERVAL_MS;
     const held = claimOverdrive(advanceOverdrive(createOverdriveState(0), now), 'holder', OVERDRIVE_POSITION, true, now).state;
-    const result = transferOverdriveOnElimination(held, 'holder', 'killer', now + 8_000);
-    expect(result.transferred).toBe(true);
-    expect(result.state).toMatchObject({ holderId: 'killer', activeUntil: now + OVERDRIVE_DURATION_MS });
-    expect(transferOverdriveOnElimination(held, 'other', 'killer', now).transferred).toBe(false);
+    const deathPoint = { x: 4, y: 0.82, z: -3 };
+    const result = dropOverdriveOnElimination(held, 'holder', deathPoint, now + 8_000);
+    expect(result.dropped).toBe(true);
+    expect(result.state).toMatchObject({ available: true, holderId: null, activeUntil: now + OVERDRIVE_DURATION_MS, position: deathPoint });
+    expect(claimOverdrive(result.state, 'killer', OVERDRIVE_POSITION, true, now + 9_000).claimed).toBe(false);
+    const reclaimed = claimOverdrive(result.state, 'killer', deathPoint, true, now + 9_000);
+    expect(reclaimed).toMatchObject({
+      claimed: true,
+      state: {
+        holderId: 'killer',
+        activeUntil: now + OVERDRIVE_DURATION_MS,
+        nextSpawnAt: held.nextSpawnAt,
+      },
+    });
+    expect(dropOverdriveOnElimination(held, 'other', deathPoint, now).dropped).toBe(false);
+  });
+
+  it('expires an unclaimed death drop without extending the normal respawn schedule', () => {
+    const now = OVERDRIVE_SPAWN_INTERVAL_MS;
+    const held = claimOverdrive(advanceOverdrive(createOverdriveState(0), now), 'holder', OVERDRIVE_POSITION, true, now).state;
+    const dropped = dropOverdriveOnElimination(held, 'holder', { x: 2, y: 0.82, z: 2 }, now + 10_000).state;
+    expect(advanceOverdrive(dropped, now + OVERDRIVE_DURATION_MS - 1).available).toBe(true);
+    expect(advanceOverdrive(dropped, now + OVERDRIVE_DURATION_MS)).toMatchObject({ available: false, holderId: null, activeUntil: 0 });
   });
 });

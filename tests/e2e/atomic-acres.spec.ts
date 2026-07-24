@@ -69,6 +69,7 @@ type DebugState = {
     } | null;
     neonHaze: boolean;
   }>;
+  corpses: { active: number; lifetimeMs: number; remainingMs: number[] };
   botEscalation: { deaths: number; initialBots: number; targetBots: number; activeBots: number; nextReinforcementAt: number };
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -905,7 +906,9 @@ test.describe('boot and authored presentation', () => {
     );
     await page.getByRole('button', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(999));
+    const redeploy = page.getByRole('button', { name: 'REDEPLOY NOW WITH SELECTED FIELD KIT' });
+    await expect(redeploy).toBeVisible();
+    await redeploy.click();
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'scattergun',
       undefined,
@@ -1250,10 +1253,12 @@ test.describe('solo mechanics', () => {
     expect(dying.alive).toBe(false);
     expect(dying.rootVisible).toBe(true);
     expect(dying.operatorModel?.activeClip).toBe('Death');
+    expect((await debug(page)).corpses).toMatchObject({ active: 1, lifetimeMs: 7_500 });
     await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 8_000 }).toBe(true);
     const respawned = (await debug(page)).bots[0];
     expect(respawned.rootVisible).toBe(true);
     expect(respawned.operatorModel?.activeClip).toBe('Idle_Gun_Pointing');
+    expect((await debug(page)).corpses.active).toBe(1);
   });
 
   test('animates the knife on misses while keeping first-person arms visible', async ({ page }) => {
@@ -1996,7 +2001,7 @@ test.describe('solo mechanics', () => {
       return { hidden: announcement?.hidden ?? true, text: announcement?.textContent ?? '' };
     });
     expect(spawnAnnouncement.hidden).toBe(false);
-    expect(spawnAnnouncement.text).toContain('QUAD DAMAGE ONLINE');
+    expect(spawnAnnouncement.text).toContain('2× DAMAGE ONLINE');
     await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
     expect((await debug(page)).overdrive).toMatchObject({
       available: true, presentationPrewarmed: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
@@ -2022,7 +2027,7 @@ test.describe('solo mechanics', () => {
     expect(observedActive.remainingMs).toBeLessThanOrEqual(30_000);
     await expect(page.locator('#overdrive-hud')).toBeVisible();
     await expect(page.locator('#overdrive-hud')).toContainText('2× DAMAGE');
-    await expect(page.locator('#power-announcement')).toContainText('QUAD DAMAGE');
+    await expect(page.locator('#power-announcement')).toContainText('2× DAMAGE');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setOverdrive: (mode: 'expired') => void } }).__ATOMIC_ACRES_DEBUG__.setOverdrive('expired'));
     await expect(page.locator('#overdrive-hud')).toBeHidden();
   });

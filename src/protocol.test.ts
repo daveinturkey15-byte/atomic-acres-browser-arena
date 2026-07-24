@@ -154,13 +154,17 @@ describe('network protocol guards', () => {
 
   it('validates bounded host-authoritative Overdrive claims and state', () => {
     const claim = { type: 'overdrive-claim' as const, by: 'abc', position: [0, 1.7, 0] as [number, number, number], generation: 2, nonce: 90 };
-    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };
+    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, position: [0, 0.82, 0] as [number, number, number], activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };
     expect(isGameMessage(claim)).toBe(true);
     expect(isGameMessage(state)).toBe(true);
     expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
     expect(isGameMessage({ ...claim, position: [Infinity, 1.7, 0] })).toBe(false);
     expect(isGameMessage({ ...state, activeRemainingMs: 30_001 })).toBe(false);
     expect(isGameMessage({ ...state, nextSpawnInMs: 120_001 })).toBe(false);
+    expect(isGameMessage({ ...state, position: [0, Number.NaN, 0] })).toBe(false);
+    const redeploy = { type: 'redeploy-request' as const, by: 'abc', nonce: 92 };
+    expect(isGameMessage(redeploy)).toBe(true);
+    expect(messageBelongsToPlayer(redeploy, 'abc')).toBe(true);
   });
 
   it('admits the machine pistol only as the sniper sidearm in snapshots', () => {
