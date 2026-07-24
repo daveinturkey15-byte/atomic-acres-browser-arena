@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "channel": "new-netcode",
+  "releasePass": "PASS 60",
+  "pagesSha": "fb06eeeefc42f35d591e9ee340a3adab62916883",
+  "sourceSha": "b1af49be064610126a80c2ee538af334389f8f43",
+  "path": "channels/new-netcode",
+  "exactRootFileCount": 143,
+  "passEvidenceFiles": [
+    "assets/preload-helper-DxopCoYJ.js",
+    "assets/preload-helper-LDXOyr2O.js"
+  ],
+  "treeSha256": "2d3589174313f7f4664e3223d1f057b008abc2f8b16c8f2a8261c76a4d4b017c"
+}

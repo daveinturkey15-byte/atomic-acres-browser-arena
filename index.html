@@ -3,15 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#10171b" />
+    <meta name="theme-color" content="#071218" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23081524'/%3E%3Cpath d='M13 48 32 10l19 38h-9l-4-9H26l-4 9Z' fill='%2300d4ff'/%3E%3C/svg%3E" />
-    <meta name="description" content="Atomic Acres: a fast original retro-future browser arena FPS with peer-to-peer multiplayer." />
-    <title>Atomic Acres — Browser Arena FPS</title>
-    <script type="module" crossorigin src="./assets/index-CGcDJ2XI.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/preload-helper-LDXOyr2O.js">
-    <link rel="stylesheet" crossorigin href="./assets/preload-helper-C5qjly_W.css">
+    <meta name="description" content="Choose the normal, stable, or experimental Atomic Acres browser build." />
+    <title>Choose build — Atomic Acres</title>
+    <link rel="stylesheet" href="./release-shell.css" />
+    <script defer src="./release-channel-config.js"></script>
+    <script defer src="./release-shell.js"></script>
   </head>
   <body>
-    <div id="app"></div>
+    <main id="release-channel-gate" aria-labelledby="release-channel-title">
+      <section class="release-channel-card">
+        <div class="eyebrow">ATOMIC ACRES · BUILD SELECT</div>
+        <h1 id="release-channel-title">CHOOSE YOUR <span>DEPLOYMENT</span></h1>
+        <p>Pass 60 remains normal live, Pass 59 stays frozen stable, and Pass 61 is isolated for experimental netcode testing.</p>
+        <div id="release-channel-options" class="release-channel-options" aria-live="polite"></div>
+        <footer>Room links opened at this root deliberately use normal Pass 60. Experimental invites stay inside the experimental channel.</footer>
+      </section>
+    </main>
   </body>
 </html>

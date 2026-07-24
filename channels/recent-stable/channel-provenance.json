@@ -1,11 +1,13 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "channel": "recent-stable",
   "releasePass": "PASS 59",
   "pagesSha": "b29d44f1f45a6ade65e72738fc4adb58235f6f26",
-  "sourceSubject": "PASS 59 from 31591b2655034788a19f4a2a68c6ab788926be53",
+  "sourceSha": null,
+  "path": "channels/recent-stable",
+  "exactRootFileCount": 133,
   "passEvidenceFiles": [
     "assets/preload-helper-ClgGRl56.js"
   ],
-  "exactRootFileCount": 133
+  "treeSha256": "d8d5ed34908cf6446da202685a66d27bbe51ab189595f2785968619d472578f6"
 }
