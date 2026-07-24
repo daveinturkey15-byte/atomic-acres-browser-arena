@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 
 describe('adaptive quality controller', () => {
-  it('drops authored shadows at low Blender tiers and never enables them in Performance', () => {
+  it('retains authored shadows throughout the Quality ladder and never enables them in Performance', () => {
     expect(adaptiveShadowsEnabled('blender', true, 1)).toBe(true);
-    expect(adaptiveShadowsEnabled('blender', true, 0.75)).toBe(false);
+    expect(adaptiveShadowsEnabled('blender', true, 0.75)).toBe(true);
+    expect(adaptiveShadowsEnabled('blender', true, 0.65)).toBe(true);
     expect(adaptiveShadowsEnabled('performance', true, 0.75)).toBe(false);
   });
 

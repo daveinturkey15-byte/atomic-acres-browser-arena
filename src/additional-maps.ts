@@ -1651,9 +1651,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     emissiveIntensity: 1.45,
   });
   const ivoryPanelMat = terminalSurfaceMaterial('panel', 0xf2f5f1, '#9bb1b4', 0.28, 0.42, [8, 4]);
-  // An unlit pale underside prevents the deep connector/mezzanine overhangs
-  // from collapsing into featureless black on the low-ratio quality path.
-  const soffitMat = new THREE.MeshBasicMaterial({ color: 0xe6efee });
+  // The old unlit soffit stayed uniformly white under every overhang and made
+  // Skyline read like a flat blockout. A lightly emissive PBR finish remains
+  // readable while still accepting key light, contact shading and shadows.
+  const soffitMat = new THREE.MeshStandardMaterial({
+    color: 0xe6efee,
+    roughness: 0.58,
+    metalness: 0.24,
+    emissive: 0x10191a,
+    emissiveIntensity: 0.12,
+  });
 
   const skylineClusterIds = [
     'floor-language',

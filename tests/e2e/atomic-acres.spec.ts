@@ -672,8 +672,8 @@ test.describe('boot and authored presentation', () => {
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
-        exposure: 1.06, hemisphereIntensity: 1.64, ambientIntensity: 0.66,
-        sunIntensity: 2.42, fogNear: 52, fogFar: 142,
+        exposure: 1, hemisphereIntensity: 0.72, ambientIntensity: 0.18,
+        sunIntensity: 3.25, fogNear: 52, fogFar: 142,
         routeLightIntensity: 3, streetLightIntensity: 3.8, interiorLightIntensity: 10,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.05, godRayLobes: 2,
@@ -2396,7 +2396,7 @@ test.describe('performance and stability', () => {
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
     expect(state.render.lighting).toMatchObject({
-      exposure: 1.16, hemisphereIntensity: 1.82, ambientIntensity: 0.78,
+      exposure: 1.02, hemisphereIntensity: 1.05, ambientIntensity: 0.32,
       sunIntensity: 2.65, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
       fogNear: 36, fogFar: 112,
       routeLightIntensity: 3, streetLightIntensity: 4, interiorLightIntensity: 11,

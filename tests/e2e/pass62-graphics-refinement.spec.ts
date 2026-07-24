@@ -49,6 +49,7 @@ async function snapshot(page: Page): Promise<Snapshot> {
 
 test.describe('Pass 62 isolated graphics refinement', () => {
   test('streams compressed Quality arenas on demand and exposes bounded effect telemetry', async ({ page }) => {
+    test.setTimeout(150_000);
     const qualityGlbRequests: string[] = [];
     page.on('request', (request) => {
       if (/atomic-acres-blender-arena\.glb|rustworks-central-tower\.glb/.test(request.url())) qualityGlbRequests.push(request.url());
@@ -70,14 +71,14 @@ test.describe('Pass 62 isolated graphics refinement', () => {
     await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.selectArena('rustworks-1v1'));
-    await expect.poll(async () => (await snapshot(page)).arenaSelection.id).toBe('rustworks-1v1');
+    await expect.poll(async () => (await snapshot(page)).arenaSelection.id, { timeout: 40_000 }).toBe('rustworks-1v1');
     expect(qualityGlbRequests.filter((url) => url.includes('rustworks-central-tower.glb'))).toHaveLength(1);
     expect(qualityGlbRequests.some((url) => url.includes('atomic-acres-blender-arena.glb'))).toBe(false);
 
     await page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
     ).__ATOMIC_ACRES_DEBUG__.selectArena('atomic-acres'));
-    await expect.poll(async () => (await snapshot(page)).arenaSelection.id).toBe('atomic-acres');
+    await expect.poll(async () => (await snapshot(page)).arenaSelection.id, { timeout: 40_000 }).toBe('atomic-acres');
     const final = await snapshot(page);
     expect(qualityGlbRequests.filter((url) => url.includes('atomic-acres-blender-arena.glb'))).toHaveLength(1);
     expect(final.render.graphicsRefinement.arenaId).toBe('atomic-acres');

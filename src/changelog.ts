@@ -45,7 +45,8 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     areas: Object.freeze(['RENDERING', 'LIGHTING', 'ATMOSPHERE', 'PERFORMANCE', 'ASSET STREAMING']),
     summary: 'Pass 62 is a local human-inspection build that deepens material, lighting and atmosphere quality without changing Pass 61 gameplay, physics or netcode.',
     highlights: Object.freeze([
-      'Procedural PMREM image-based lighting gives metals, glass and authored PBR surfaces a consistent reflection response without a premium HDR asset',
+      'Arena-scaled PMREM gives metals and glass a reflection response while authored sun, moon and practical lights remain the dominant source of shape and contrast',
+      'All four arenas use a stronger key-to-fill hierarchy; Quality adds two bounded practical spotlights per arena with one focused moving-caster shadow',
       'Quality Graphics adds restrained depth-buffer contact shading, low-altitude depth fog and bloom isolated to tagged emissive objects',
       'Each arena fits its own directional shadow volume instead of sharing one oversized global projection',
       'Adaptive quality now sheds contact shading, bloom resolution, fog, reflections, particles and decal persistence independently before relying on resolution alone',
