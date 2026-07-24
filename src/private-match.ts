@@ -175,7 +175,7 @@ export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[
 export function canHostStart(snapshot: LobbySnapshot): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
   return snapshot.phase === 'waiting'
-    && connected.length >= 2
+    && connected.length >= 1
     && connected.length <= snapshot.config.capacity
     && connected.every((member) => member.ready);
 }

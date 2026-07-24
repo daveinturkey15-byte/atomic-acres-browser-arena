@@ -60,8 +60,8 @@ describe('Quality Graphics environment asset', () => {
     const housePropSets = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'authored-house-furnishing-set');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(7_500_000);
-    expect(gltf.meshes?.length).toBe(34);
-    expect(gltf.materials?.length).toBe(28);
+    expect(gltf.meshes?.length).toBe(35);
+    expect(gltf.materials?.length).toBe(29);
     expect(gltf.images).toHaveLength(33);
     expect(gltf.textures).toHaveLength(60);
     expect((gltf.materials ?? []).filter((material) =>
@@ -85,6 +85,7 @@ describe('Quality Graphics environment asset', () => {
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_asphalt_charcoal')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_ground_olive')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_gunmetal')).toBe(true);
+    expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_ceiling_warm_white')).toBe(true);
     for (const name of ['BLD_BATCH_MAT_aqua_upper_brick', 'BLD_BATCH_MAT_aqua_rear_plaster', 'BLD_BATCH_MAT_coral_upper_plaster', 'BLD_BATCH_MAT_coral_rear_brick']) {
       expect((gltf.nodes ?? []).some((node) => node.name === name)).toBe(true);
     }
@@ -109,7 +110,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(44_812);
+    expect(provenance.runtimeAudit.triangles).toBe(44_196);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {

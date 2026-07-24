@@ -100,6 +100,7 @@ function splitWallAroundDoor(
   width: number,
   surface: 'aqua' | 'coral' | 'plaster',
   baseY = 0,
+  openToCeiling = false,
 ): LocalSolid[] {
   const left = centreX - width / 2;
   const right = centreX + width / 2;
@@ -107,7 +108,7 @@ function splitWallAroundDoor(
   return [
     solid(`${name}-left`, [(-HALF_WIDTH + left) / 2, baseY + height / 2, z], [left + HALF_WIDTH, height, WALL], surface),
     solid(`${name}-right`, [(right + HALF_WIDTH) / 2, baseY + height / 2, z], [HALF_WIDTH - right, height, WALL], surface),
-    solid(`${name}-lintel`, [centreX, baseY + height - 0.28, z], [width, 0.56, WALL], 'trim'),
+    ...(openToCeiling ? [] : [solid(`${name}-lintel`, [centreX, baseY + height - 0.28, z], [width, 0.56, WALL], 'trim')]),
   ];
 }
 
@@ -118,6 +119,7 @@ function splitSideWallAroundDoor(
   width: number,
   surface: 'aqua' | 'coral',
   baseY: number,
+  openToCeiling = false,
 ): LocalSolid[] {
   const rearEdge = centreZ - width / 2;
   const frontEdge = centreZ + width / 2;
@@ -127,7 +129,7 @@ function splitSideWallAroundDoor(
   return [
     solid(`${name}-rear`, [x, baseY + height / 2, (sideRear + rearEdge) / 2], [WALL, height, rearEdge - sideRear], surface),
     solid(`${name}-front`, [x, baseY + height / 2, (frontEdge + sideFront) / 2], [WALL, height, sideFront - frontEdge], surface),
-    solid(`${name}-lintel`, [x, baseY + height - 0.28, centreZ], [WALL, 0.56, width], 'trim'),
+    ...(openToCeiling ? [] : [solid(`${name}-lintel`, [x, baseY + height - 0.28, centreZ], [WALL, 0.56, width], 'trim')]),
   ];
 }
 
@@ -284,10 +286,10 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
   const indoorRampSide = -rampSide as 1 | -1;
   const sideWallDepth = DEPTH - WALL;
   const westUpperWall = rampSide === -1
-    ? splitSideWallAroundDoor('upper-ramp-side-wall', -HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
+    ? splitSideWallAroundDoor('upper-ramp-side-wall', -HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y, true)
     : [solid('upper-west-wall', [-HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, sideWallDepth], surface)];
   const eastUpperWall = rampSide === 1
-    ? splitSideWallAroundDoor('upper-ramp-side-wall', HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y)
+    ? splitSideWallAroundDoor('upper-ramp-side-wall', HALF_WIDTH, RAMP_ENTRY_Z, 2.6, surface, FLOOR_Y, true)
     : [solid('upper-east-wall', [HALF_WIDTH, FLOOR_Y + UPPER_HEIGHT / 2, 0], [WALL, UPPER_HEIGHT, sideWallDepth], surface)];
   const solids: LocalSolid[] = [
     solid('ground-west-wall', [-HALF_WIDTH, GROUND_HEIGHT / 2, 0], [WALL, GROUND_HEIGHT, sideWallDepth], surface),
@@ -296,14 +298,14 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     ...groundFrontWall(surface),
     ...doorFrame('front-entry', doorX, HALF_DEPTH + DOOR_FRAME_OUTSET),
     ...doorFrame('rear-entry', rearDoorX, -HALF_DEPTH - DOOR_FRAME_OUTSET),
-    ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.6, 'plaster'),
+    ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.6, 'plaster', 0, true),
     solid('ground-floor-slab', [0, 0.06, 0], [WIDTH - 0.2, 0.12, DEPTH - 0.2], 'concrete', false, 'floor'),
 
     ...westUpperWall,
     ...eastUpperWall,
     solid('upper-rear-wall', [0, FLOOR_Y + UPPER_HEIGHT / 2, -HALF_DEPTH], [WIDTH + WALL, UPPER_HEIGHT, WALL], surface),
     ...upperFrontWall(surface),
-    ...splitWallAroundDoor('upper-room-partition', 0, partitionOpeningX, 2.6, 'plaster', FLOOR_Y),
+    ...splitWallAroundDoor('upper-room-partition', 0, partitionOpeningX, 2.6, 'plaster', FLOOR_Y, true),
     ...sideDoorFrame('upper-ramp-entry', rampSide, RAMP_ENTRY_Z, FLOOR_Y),
     solid('floor-seam-front', [0, FLOOR_Y - 0.05, HALF_DEPTH + SEAM_OUTSET], [WIDTH + 0.24, 0.18, 0.14], 'trim', false, 'frame'),
     solid('floor-seam-rear', [0, FLOOR_Y - 0.05, -HALF_DEPTH - SEAM_OUTSET], [WIDTH + 0.24, 0.18, 0.14], 'trim', false, 'frame'),

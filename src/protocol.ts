@@ -83,6 +83,7 @@ export type ShotOutcome = {
   target: string;
   pelletHits: number;
   damage: number;
+  rawDamage?: number;
   resultingHealth: number;
   died: boolean;
   hitZone: 'head' | 'body' | 'limb';
@@ -336,6 +337,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
           return typeof item.target === 'string' && item.target.length > 0 && item.target.length <= 80
             && Number.isSafeInteger(item.pelletHits) && Number(item.pelletHits) >= 1 && Number(item.pelletHits) <= 12
             && Number.isFinite(item.damage) && Number(item.damage) >= 0 && Number(item.damage) <= 400
+            && (item.rawDamage === undefined || Number.isFinite(item.rawDamage) && Number(item.rawDamage) >= Number(item.damage) && Number(item.rawDamage) <= 9_999)
             && Number.isFinite(item.resultingHealth) && Number(item.resultingHealth) >= 0 && Number(item.resultingHealth) <= 100
             && typeof item.died === 'boolean' && (item.hitZone === 'head' || item.hitZone === 'body' || item.hitZone === 'limb')
             && typeof item.wallbang === 'boolean'

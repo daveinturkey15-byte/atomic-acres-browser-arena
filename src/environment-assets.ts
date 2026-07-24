@@ -150,10 +150,6 @@ export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]>
   [21.2, 29], [13.8, 18.2], [27.8, -18],
 ]);
 
-export const NEIGHBOURHOOD_BICYCLE_POSITIONS: ReadonlyArray<readonly [number, number, number]> = Object.freeze([
-  [-24.5, -35, 0.12], [24.5, 35, Math.PI + 0.12], [29.4, 14, Math.PI / 2],
-]);
-
 export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
   const group = new THREE.Group();
   group.name = 'pass31-neighbourhood-life';
@@ -226,28 +222,8 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     bin.position.set(x, 0.54, z); decorative(bin); group.add(bin);
   }
 
-  const tyre = new THREE.MeshStandardMaterial({ color: 0x151b1d, roughness: 0.88, side: THREE.DoubleSide });
-  const frameMaterial = new THREE.LineBasicMaterial({ color: 0xe0ad45 });
-  for (const [x, z, rotation] of NEIGHBOURHOOD_BICYCLE_POSITIONS) {
-    const bicycle = new THREE.Group(); bicycle.name = 'street-bicycle'; bicycle.position.set(x, 0, z); bicycle.rotation.y = rotation;
-    for (const wheelX of [-0.62, 0.62]) {
-      const wheelGeometry = reduced
-        ? new THREE.RingGeometry(0.31, 0.37, 6)
-        : new THREE.TorusGeometry(0.36, 0.035, 6, 18);
-      const wheel = new THREE.Mesh(wheelGeometry, tyre);
-      wheel.position.set(wheelX, 0.4, 0); bicycle.add(wheel);
-    }
-    const frame = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
-      new THREE.Vector3(0, 0.82, 0), new THREE.Vector3(0.56, 0.4, 0),
-      new THREE.Vector3(-0.56, 0.4, 0), new THREE.Vector3(0.25, 0.4, 0),
-      new THREE.Vector3(0.25, 0.4, 0), new THREE.Vector3(0, 0.82, 0),
-    ]), frameMaterial);
-    bicycle.add(frame); decorative(bicycle); group.add(bicycle);
-  }
-
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
-  group.userData.neighbourhoodLife = { flowers: flowerCount, flowerBeds: flowerBeds.length, benches: 4, bins: 6, bicycles: 3, markers: 0, butterflies: 0, birds: 0 };
+  group.userData.neighbourhoodLife = { flowers: flowerCount, flowerBeds: flowerBeds.length, benches: 4, bins: 6, bicycles: 0, markers: 0, butterflies: 0, birds: 0 };
   root.add(group);
   return group;
 }

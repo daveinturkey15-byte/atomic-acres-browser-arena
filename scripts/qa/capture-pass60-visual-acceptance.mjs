@@ -66,16 +66,21 @@ try {
   await capture('05-prone-near-wall', [12, 0.61, -32.55, 0, 0], 'prone');
   await capture('06-coral-upper-opening', [11, 5.18, 24.2, Math.PI, 0]);
 
-  await switchArena('rustworks-1v1');
-  await captureCamera('07-rustworks-centre', [24.5, 4.2, 0, Math.PI / 2, -0.24]);
-  await captureCamera('08-rustworks-open-yard', [-13.2, 1.7, -21.5, -Math.PI / 2, 0]);
+  if (process.env.QA_ONLY_ATOMIC !== '1') {
+    await switchArena('rustworks-1v1');
+    await captureCamera('07-rustworks-centre', [24.5, 4.2, 0, Math.PI / 2, -0.24]);
+    await captureCamera('08-rustworks-open-yard', [24, 1.7, 24, Math.PI / 4, 0]);
+    await captureCamera('08b-rustworks-welsh-flag', [10, 18, 6, 1.03, 0.05]);
 
-  await switchArena('gun-range');
-  await captureCamera('09-gun-range-wallbang', [0, 1.7, 15, 0, 0]);
+    await switchArena('gun-range');
+    await captureCamera('09-gun-range-wallbang', [0, 1.7, 15, 0, 0]);
 
-  await switchArena('skyline-terminal');
-  await captureCamera('10-terminal-concourse', [28, 2.1, -31, Math.PI / 2, -0.03]);
-  await captureCamera('11-terminal-apron', [28, 3.2, 29, 0.78, -0.1]);
+    await switchArena('skyline-terminal');
+    await captureCamera('10-terminal-concourse', [28, 2.1, -31, Math.PI / 2, -0.03]);
+    await captureCamera('11-terminal-apron', [28, 3.2, 29, 0.78, -0.1]);
+    await captureCamera('12-terminal-upper-kiosks', [0, 5.04, -23, 0, -0.02]);
+    await captureCamera('13-terminal-open-aircraft-walkway', [0, 4.25, -4, Math.PI, 0]);
+  }
 
   const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   console.log(JSON.stringify({

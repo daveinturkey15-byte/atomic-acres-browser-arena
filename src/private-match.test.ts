@@ -48,10 +48,19 @@ describe('private match lobby', () => {
     expect(balanceLobbyTeams(members)).toEqual(balanced);
   });
 
-  it('requires at least two connected and every connected player ready', () => {
+  it('lets a ready host start alone or with hosted bots while still requiring every connected human ready', () => {
     expect(canHostStart(snapshot())).toBe(true);
     expect(canHostStart(snapshot({ members: members.map((member, index) => index === 2 ? { ...member, ready: false } : member) }))).toBe(false);
-    expect(canHostStart(snapshot({ members: [members[0]] }))).toBe(false);
+    expect(canHostStart(snapshot({ members: [members[0]] }))).toBe(true);
+    expect(canHostStart(snapshot({
+      members: [{ ...members[0], ready: false }],
+      config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 4 },
+    }))).toBe(false);
+    expect(canHostStart(snapshot({
+      members: [members[0]],
+      config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 4 },
+    }))).toBe(true);
+    expect(canHostStart(snapshot({ members: [] }))).toBe(false);
     expect(canHostStart(snapshot({ phase: 'active' }))).toBe(false);
   });
 

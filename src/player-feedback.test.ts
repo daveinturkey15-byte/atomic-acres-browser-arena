@@ -9,8 +9,15 @@ describe('player feedback presentation', () => {
   });
 
   it('presents headshots as larger critical numbers and rejects invalid damage', () => {
-    expect(damageNumberPresentation(42.4, 'body')).toMatchObject({ amount: 42, critical: false, label: '42' });
-    expect(damageNumberPresentation(74.6, 'head')).toMatchObject({ amount: 75, critical: true, label: 'CRIT 75' });
+    expect(damageNumberPresentation(42.4, 'body')).toMatchObject({ amount: 42, overkill: 0, critical: false, label: '42' });
+    expect(damageNumberPresentation(74.6, 'head')).toMatchObject({ amount: 75, overkill: 0, critical: true, label: 'CRIT 75' });
+    expect(damageNumberPresentation(201, 'head', 100)).toMatchObject({
+      amount: 201,
+      overkill: 101,
+      critical: true,
+      label: 'CRIT 201 · +101 OVERKILL',
+    });
+    expect(damageNumberPresentation(91, 'body', 100)).toMatchObject({ amount: 91, overkill: 0, label: '91' });
     expect(damageNumberPresentation(0, 'body')).toBeNull();
     expect(damageNumberPresentation(Number.NaN, 'head')).toBeNull();
   });

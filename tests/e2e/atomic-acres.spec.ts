@@ -138,6 +138,7 @@ type DebugState = {
     spawns: number;
     pickups: number;
     expiries: number;
+    presentationPrewarmed: boolean;
     visible: boolean;
     worldIconVisible: boolean;
     worldIconName: string;
@@ -174,7 +175,6 @@ type DebugState = {
     routeAnchors: number;
     indoorRouteAnchors: number;
   }>;
-  teamPings: Array<{ kind: string; expiresInMs: number; position: number[] }>;
   activeImpactParticles: number;
   activeImpactMarks: number;
   activeTracers: number;
@@ -1321,7 +1321,7 @@ test.describe('solo mechanics', () => {
     expect(Number(await page.locator('#damage-numbers').getAttribute('data-last-damage'))).toBeGreaterThan(0);
     await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', /CRIT/);
     await expect(page.locator('#damage-done-feed [data-damage-dealt]')).toBeVisible();
-    await expect(page.locator('#damage-done-label')).toContainText('OUTGOING');
+    await expect(page.locator('#damage-done-label')).toHaveCount(0);
 
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -1334,7 +1334,7 @@ test.describe('solo mechanics', () => {
       api.damage(999);
     });
     await expect(page.locator('#damage-taken-feed [data-damage-taken]')).toBeVisible();
-    await expect(page.locator('#damage-taken-label')).toContainText('INCOMING');
+    await expect(page.locator('#damage-taken-label')).toHaveCount(0);
     await expect.poll(async () => (await debug(page)).player.hp, { timeout: 6_000 }).toBe(100);
     const respawned = (await debug(page)).player;
     expect(respawned.stance).toBe('stand');
@@ -1674,6 +1674,9 @@ test.describe('solo mechanics', () => {
     });
     await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
     await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(2);
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-damage', '201');
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-overkill', '101');
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', 'CRIT 201 · +101 OVERKILL');
 
     state = await debug(page);
     expect(state.player.equippedWeapons).toEqual(['sniper', 'machine-pistol']);
@@ -1923,7 +1926,7 @@ test.describe('solo mechanics', () => {
         const boxes = cards.map((card) => card.getBoundingClientRect());
         const persistentRegions = [
           '#matchbar', '#objective', '#network-strip', '#killfeed', '#location-label',
-          '#equipment-block', '#health-block', '#combat-stats', '#weapon-block', '#ping-block',
+          '#equipment-block', '#health-block', '#combat-stats', '#weapon-block',
         ].map((selector) => ({ selector, box: visibleBox(selector) }))
           .filter((entry): entry is { selector: string; box: DOMRect } => entry.box !== null && entry.box.width > 0 && entry.box.height > 0);
         const cardOverlap = boxes.some((box, index) => boxes.slice(index + 1).some((other) => intersects(box, other)));
@@ -1949,8 +1952,8 @@ test.describe('solo mechanics', () => {
       expect(metrics.ammoFont, JSON.stringify(viewport)).toBeGreaterThanOrEqual(viewport.width <= 700 ? 40 : 64);
       expect(metrics.cardCount, JSON.stringify(viewport)).toBe(5);
       expect(metrics.supportWidth, JSON.stringify(viewport)).toBeGreaterThanOrEqual(145);
-      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(525);
-      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(55);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(viewport.width <= 700 ? 525 : 180);
+      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(viewport.width <= 700 ? 55 : 150);
       expect(metrics.leftGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.rightGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
@@ -1983,7 +1986,7 @@ test.describe('solo mechanics', () => {
     expect(spawnAnnouncement.text).toContain('QUAD DAMAGE ONLINE');
     await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
     expect((await debug(page)).overdrive).toMatchObject({
-      available: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
+      available: true, presentationPrewarmed: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
     });
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -2055,28 +2058,6 @@ test.describe('solo mechanics', () => {
     expect(metrics.minimapWidth).toBe(240);
     expect(metrics.locationEquipmentGap).toBeGreaterThanOrEqual(6);
     expect(metrics.equipmentHealthGap).toBeGreaterThanOrEqual(6);
-  });
-
-  test('rate-limits fixed team pings and cleans their markers', async ({ page }) => {
-    await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { sendPing: (kind: 'enemy' | 'push') => void } }).__ATOMIC_ACRES_DEBUG__;
-      api.sendPing('enemy');
-      api.sendPing('push');
-    });
-    expect((await debug(page)).teamPings.map((ping) => ping.kind)).toEqual(['enemy']);
-    await expect(page.locator('#killfeed')).toContainText('ENEMY');
-    await expect.poll(async () => (await debug(page)).teamPings.length, { timeout: 7_000 }).toBe(0);
-    const secondKinds = await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
-        sendPing: (kind: 'push') => void;
-        snapshot: () => DebugState;
-      } }).__ATOMIC_ACRES_DEBUG__;
-      api.sendPing('push');
-      return api.snapshot().teamPings.map((ping) => ping.kind);
-    });
-    expect(secondKinds).toEqual(['push']);
-    await expect(page.locator('#killfeed')).toContainText('PUSH');
-    await expect.poll(async () => (await debug(page)).teamPings.length, { timeout: 7_000 }).toBe(0);
   });
 
   test('opening the deployment menu neutralizes movement input', async ({ page }) => {
@@ -2490,7 +2471,7 @@ test.describe('performance and stability', () => {
       flowerBeds: 6,
       benches: 4,
       bins: 6,
-      bicycles: 3,
+      bicycles: 0,
       genericMarkers: 0,
     });
     await page.setViewportSize({ width: 1000, height: 700 });

@@ -14,19 +14,29 @@ export const THIRD_PERSON_WEAPON_SCALE: Readonly<Record<WeaponId, number>> = Obj
 
 export type DamageNumberPresentation = Readonly<{
   amount: number;
+  overkill: number;
   critical: boolean;
   label: string;
   durationMs: number;
 }>;
 
-export function damageNumberPresentation(damage: number, zone: HitZone): DamageNumberPresentation | null {
+export function damageNumberPresentation(
+  damage: number,
+  zone: HitZone,
+  healthBefore?: number,
+): DamageNumberPresentation | null {
   if (!Number.isFinite(damage) || damage <= 0) return null;
   const amount = Math.max(1, Math.min(9_999, Math.round(damage)));
+  const boundedHealth = Number.isFinite(healthBefore)
+    ? Math.max(0, Math.min(9_999, Math.round(healthBefore!)))
+    : amount;
+  const overkill = Math.max(0, amount - boundedHealth);
   const critical = zone === 'head';
   return {
     amount,
+    overkill,
     critical,
-    label: critical ? `CRIT ${amount}` : String(amount),
+    label: `${critical ? 'CRIT ' : ''}${amount}${overkill > 0 ? ` · +${overkill} OVERKILL` : ''}`,
     durationMs: critical ? 1_250 : 1_100,
   };
 }
