@@ -45,8 +45,10 @@ The machine name identifies where the bytes originated; the harness identifies w
 
 4. Implement one bounded outcome. Do not share the worktree with another task.
 5. Run focused checks, then the relevant repository gates. Rendering changes require browser evidence.
-6. Commit intentionally, rerun the preflight, push only the contribution branch, and open a PR with the repository template.
-7. Stop at handoff. The contributor does not merge or deploy.
+6. For `release-shell` or `runtime` work targeting Pass 62 or later, add exactly one `acceptance/pass-<number>.json`. Translate every item of Dave's feedback into a numbered requirement with an expected result, falsifier, acceptance type, and concrete evidence. A passing test not named by a requirement is not evidence that the feedback was covered.
+7. Commit intentionally, rerun the preflight, push only the contribution branch, and open a PR with the repository template. CI builds the exact PR head and uploads `pr-preview-<pr>-<head-sha>`.
+8. Dave tests that immutable preview. Record its exact source SHA and timestamp in the manifest, add Dave's approval, and push only the manifest/process update. Any later runtime or release-shell change invalidates approval and requires a new preview.
+9. Stop at handoff. The contributor does not merge or deploy.
 
 Before implementation, declare one mechanically conservative impact class:
 
@@ -60,7 +62,7 @@ Before implementation, declare one mechanically conservative impact class:
 
 Do not change a test contract merely because CI failed. A timeout, performance budget, screenshot baseline/tolerance, or assertion change must identify the observed failure, explain why the old contract is wrong, retain the original product invariant elsewhere, and receive explicit integrator review. If that work is not required for the user outcome, move it to a separate maintenance PR.
 
-The preflight writes a scrubbed JSON receipt under ignored `artifacts/pipeline/`. Attach its contents or the equivalent fields to the PR; never attach credentials, room codes, private paths, or chat logs.
+The preflight writes a scrubbed JSON receipt under ignored `artifacts/pipeline/`. Attach its contents or the equivalent fields to the PR; never attach credentials, room codes, private paths, or chat logs. See `acceptance/README.md` and `acceptance/example.json` for the acceptance contract. Passes below 62 remain available for rollback and receive an explicit `legacyExempt` receipt rather than fabricated evidence.
 
 ## Integrator flow
 
@@ -69,19 +71,21 @@ One integrator owns the queue at a time.
 1. Read every open PR and reject overlapping write scopes until the owners reconcile them.
 2. Inspect the real diff; do not trust a task's self-report.
 3. Require the PR head to contain current `origin/main` and rerun checks after any reconciliation.
-4. Require all four checks:
+4. Require all five checks:
    - `static-and-unit (ubuntu-latest)`
    - `static-and-unit (windows-latest)`
    - `bounded-browser-linux`
    - `bounded-browser-windows`
-5. Merge one PR at a time. A merge means integrated, not live.
-6. Delete the remote contribution branch after merge only when its PR and recovery evidence are retained. Never delete another machine's local worktree.
+   - `requirements-acceptance`
+5. Inspect the acceptance coverage artifact. Confirm every requirement is verified or explicitly deferred by Dave, approval names the preview SHA, and the gate reports no runtime/release-shell change after that preview.
+6. Merge one PR at a time. A merge means integrated, not live.
+7. Delete the remote contribution branch after merge only when its PR and recovery evidence are retained. Never delete another machine's local worktree.
 
 ## Release-owner flow
 
 Only the `release-production` GitHub Actions workflow may publish production.
 
-1. Wait for the merge commit's four required checks to succeed.
+1. Wait for the merge commit's five required checks to succeed, including `requirements-acceptance`.
 2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
 
    ```ts
@@ -89,14 +93,17 @@ Only the `release-production` GitHub Actions workflow may publish production.
    ```
 3. Dispatch `release-production` with the exact full `main` SHA and release pass.
 4. The workflow refuses a non-tip SHA, requires successful checks, builds from a clean checkout, serializes Pages publication, preserves the historical review tree, and records source/Pages identities.
-5. Wait for the workflow receipt and Pages build to succeed.
-6. Verify the canonical HTTPS site with a cache-busting query:
+5. The workflow revalidates the accepted manifest against the exact source SHA. Pass 62 and later cannot publish without approval parity; older rollback passes are marked legacy-exempt.
+6. Wait for the workflow receipt and exact Pages build to succeed.
+7. The workflow then verifies the canonical HTTPS site with a cache-busting query. It checks:
    - release eyebrow/pass;
    - Last Release button and timestamp;
    - current release details;
    - affected gameplay path;
    - zero warning/error browser logs.
-7. Only then mark the release live and close the central tracker.
+8. Only then mark the release live and close the central tracker.
+
+Every verify run uploads `pipeline-metrics-<head-sha>` and writes a job summary with total wall time, per-job queue/start delay, per-job execution time, requirement coverage, feedback-to-preview time, and preview-to-approval time. Every production receipt adds build, Pages, live-smoke, and total release durations. Use these receipts for benchmarking; do not estimate pipeline performance from chat timestamps.
 
 The first successful exact-SHA receipt plus cache-busted live smoke is the terminal condition. Send the completion report immediately. A non-blocking favicon, copy, baseline, documentation, or CI-hygiene defect becomes a separate queued task and must not keep the release turn open. Only a load failure, security/data-loss risk, broken affected gameplay path, incorrect release identity, or unexpected runtime error that invalidates the live claim reopens the release as a hotfix.
 

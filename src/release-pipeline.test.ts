@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/release-production.yml', 'utf8');
+const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
+const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs', 'utf8');
 
 describe('production release workflow', () => {
   it('configures a repository-local bot identity before publishing gh-pages', () => {
@@ -40,7 +42,28 @@ describe('production release workflow', () => {
     expect(buildStep).toBeGreaterThan(timestampStep);
     expect(verifyStep).toBeGreaterThan(buildStep);
     expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
-    expect(workflow).toContain('--arg releaseBuiltAt "$RELEASE_BUILT_AT"');
+    expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
+    expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
+  });
+
+  it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
+    const acceptanceStep = workflow.indexOf('Validate accepted requirement manifest');
+    const publishStep = workflow.indexOf('Publish complete exact dist snapshot');
+    const pagesStep = workflow.indexOf('Wait for exact Pages build');
+    const liveStep = workflow.indexOf('Verify canonical live release');
+    const receiptStep = workflow.indexOf('Write acceptance-bound production receipt and timings');
+    expect(acceptanceStep).toBeGreaterThan(-1);
+    expect(acceptanceStep).toBeLessThan(publishStep);
+    expect(liveStep).toBeGreaterThan(pagesStep);
+    expect(receiptStep).toBeGreaterThan(liveStep);
+    expect(workflow).toContain('QA_OUTPUT: artifacts/pipeline/live-release-smoke.json');
+  });
+
+  it('publishes immutable PR previews while requirement acceptance and timing remain explicit jobs', () => {
+    expect(verifyWorkflow).toContain('requirements-acceptance:');
+    expect(verifyWorkflow).toContain('pr-preview-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}');
+    expect(verifyWorkflow).toContain('pipeline-metrics:');
+    expect(verifyWorkflow).toContain('scripts/release/workflow-metrics.mjs');
   });
 
   it('does not use a blocking GitHub Actions watcher inside the workflow', () => {

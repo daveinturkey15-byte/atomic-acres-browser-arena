@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const REQUIRED_CHECKS = Object.freeze([
+  'requirements-acceptance',
   'static-and-unit (ubuntu-latest)',
   'static-and-unit (windows-latest)',
   'bounded-browser-linux',

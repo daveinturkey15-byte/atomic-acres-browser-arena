@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "enforceFromPass": 62,
+  "manifestDirectory": "acceptance",
+  "ownerHandle": "Dave",
+  "allowedEvidenceKinds": [
+    "unit",
+    "contract",
+    "browser",
+    "trace",
+    "visual",
+    "manual"
+  ]
+}
