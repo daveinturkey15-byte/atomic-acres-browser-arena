@@ -40,10 +40,10 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
     id: 'pass62',
     pass: 'PASS 62',
-    title: 'Gameplay & Graphics Reconciliation',
+    title: 'Gameplay, Graphics & Netcode Reconciliation',
     releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
     areas: Object.freeze(['GAMEPLAY', 'HUD', 'MAPS', 'NETCODE', 'RENDERING', 'PERFORMANCE']),
-    summary: 'Pass 62 combines the new graphics pipeline with a targeted gameplay, HUD, lobby and arena-quality repair pass.',
+    summary: 'Pass 62 combines the refined graphics pipeline, gameplay and arena repairs, and an immutable host-resolved bullet timeline for offline inspection before release.',
     highlights: Object.freeze([
       'Arena-scaled PMREM gives metals and glass a reflection response while authored sun, moon and practical lights remain the dominant source of shape and contrast',
       'Arena-specific key-to-fill tuning preserves dark zones; extra bounded spotlights are limited to Atomic and Skyline while Rustworks and Gun Range retain their authored practical-light pools',
@@ -55,6 +55,9 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       'Compatibility retains the direct zero-post path, while Performance receives only the bounded low-cost subset',
       'A ready host can start alone or with hosted bots; no second human is required',
       'Sniper critical feedback shows total damage and overkill, while shot cadence is scheduled from the actual admitted shot time',
+      'Every multiplayer bullet carries immutable connection, life, weapon and sequence identity with separate authored fire and target-view times',
+      'The host resolves shooter origin at fire time and targets at target-view time, rejects stale or post-death fire, and retains valid pre-death trades',
+      'Clock uncertainty, adaptive interpolation and per-shot timing telemetry expose the actual network decision instead of a cosmetic clamped timestamp',
       'Solo play avoids unnecessary rewind and high-frequency network bookkeeping, and Quad presentation is compiled before its first spawn',
       'The gameplay HUD is reduced while Field Support becomes a narrow readable column; dormant Team Ping UI and permanent damage headings are removed',
       'Atomic Acres house debris, opaque apertures and poor bicycle props are removed; Rustworks gains useful inner-yard container cover and a clearer Welsh dragon',

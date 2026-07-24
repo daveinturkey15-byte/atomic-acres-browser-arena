@@ -7,6 +7,7 @@ import {
   dhvIncomingMultiplier,
   dhvOutgoingMultiplier,
   isDhv,
+  reportedDhvRawDamage,
 } from './handicap';
 
 describe('DHV handicap contract', () => {
@@ -30,5 +31,11 @@ describe('DHV handicap contract', () => {
     expect(applyDhvWeaponOutgoingDamage(100, 'X', true)).toBe(100);
     expect(applyDhvWeaponOutgoingDamage(45, 'X', true)).toBe(9);
     expect(applyDhvWeaponOutgoingDamage(100, 2, true)).toBe(20);
+  });
+
+  it('reports raw damage on the target handicap scale and never below applied damage', () => {
+    expect(reportedDhvRawDamage(10, 100, 8, 12)).toBe(12);
+    expect(reportedDhvRawDamage(4.6, 100, 10, 4.600000000000008)).toBe(4.600000000000008);
+    expect(reportedDhvRawDamage(120, 73, 'X', 73)).toBe(73);
   });
 });

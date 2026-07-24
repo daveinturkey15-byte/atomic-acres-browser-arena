@@ -31,7 +31,7 @@ import { nextShotDeadline } from './combat-timing';
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
-import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, type Dhv } from './handicap';
+import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
@@ -3517,6 +3517,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     const outgoing = handicapOutgoingDamage(request.by, powered, request.weapon);
     const rawOutgoing = handicapOutgoingDamage(request.by, hit.rawDamage * powerMultiplier, request.weapon);
     let appliedDamage = 0;
+    let reportedRawDamage = rawOutgoing;
     let resultingHealth = 0;
     let died = false;
     if (targetId === player.id) {
@@ -3524,6 +3525,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       const finalDamage = applyDhvIncomingDamage(outgoing, player.hp, localDhv);
       applyDamage(finalDamage, request.by, 1, false, { kind: 'gun', weapon: request.weapon }, true);
       appliedDamage = Math.max(0, healthBefore - player.hp);
+      reportedRawDamage = reportedDhvRawDamage(rawOutgoing, healthBefore, localDhv, appliedDamage);
       resultingHealth = player.hp;
       died = healthBefore > 0 && player.hp <= 0;
     } else if (bots.has(targetId)) {
@@ -3539,6 +3541,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       const applied = applyAuthoritativeRemoteDamage(health, finalDamage, receivedAt);
       if (!applied.applied) continue;
       appliedDamage = Math.max(0, health.hp - applied.state.hp);
+      reportedRawDamage = reportedDhvRawDamage(rawOutgoing, health.hp, memberDhv(targetId), appliedDamage);
       resultingHealth = applied.state.hp;
       died = applied.died;
       remoteHealthAuthorities.set(targetId, applied.state);
@@ -3563,7 +3566,8 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       }
     }
     if (appliedDamage > 0) outcomes.push({
-      target: targetId, pelletHits: hit.pelletHits, damage: appliedDamage, rawDamage: rawOutgoing,
+      target: targetId, pelletHits: hit.pelletHits, damage: appliedDamage,
+      rawDamage: Math.max(appliedDamage, reportedRawDamage),
       resultingHealth, died, hitZone: hit.hitZone, wallbang: hit.wallbang,
       penetrationMultiplier: hit.penetrationMultiplier,
     });
