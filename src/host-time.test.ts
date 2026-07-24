@@ -36,6 +36,45 @@ describe('monotonic guest-to-host time mapping', () => {
     expect(spike.mapping.rejectedOutliers).toBe(1);
   });
 
+  it('favours low-RTT samples when asymmetric high-RTT samples bias offset', () => {
+    let mapping = createHostTimeMapping();
+    const probes = [
+      { guestSentMonoMs: 0, hostReceivedMonoMs: 4_070, hostSentMonoMs: 4_071, guestReceivedMonoMs: 101 },
+      { guestSentMonoMs: 200, hostReceivedMonoMs: 4_210, hostSentMonoMs: 4_211, guestReceivedMonoMs: 221 },
+      { guestSentMonoMs: 400, hostReceivedMonoMs: 4_410, hostSentMonoMs: 4_411, guestReceivedMonoMs: 421 },
+      { guestSentMonoMs: 600, hostReceivedMonoMs: 4_610, hostSentMonoMs: 4_611, guestReceivedMonoMs: 621 },
+    ];
+    for (const probe of probes) mapping = observeHostClock(mapping, probe).mapping;
+    expect(mapping.bestRttMs).toBe(20);
+    expect(mapping.offsetMs).toBeCloseTo(4_000, 0);
+    expect(mapping.uncertaintyMs).toBeLessThan(20);
+  });
+
+  it('tracks slow monotonic clock drift without allowing a sudden mapping jump', () => {
+    let mapping = createHostTimeMapping();
+    for (let index = 0; index < 12; index += 1) {
+      const guestSentMonoMs = index * 1_000;
+      const offsetMs = 4_000 + index * 0.1;
+      mapping = observeHostClock(mapping, {
+        guestSentMonoMs,
+        hostReceivedMonoMs: guestSentMonoMs + offsetMs + 10,
+        hostSentMonoMs: guestSentMonoMs + offsetMs + 11,
+        guestReceivedMonoMs: guestSentMonoMs + 21,
+      }).mapping;
+    }
+    expect(mapping.driftPpm).toBeGreaterThan(20);
+    expect(mapping.driftPpm).toBeLessThan(150);
+    const before = mapping.offsetMs;
+    const jump = observeHostClock(mapping, {
+      guestSentMonoMs: 13_000,
+      hostReceivedMonoMs: 18_010,
+      hostSentMonoMs: 18_011,
+      guestReceivedMonoMs: 13_021,
+    });
+    expect(jump.reason).toBe('outlier');
+    expect(jump.mapping.offsetMs).toBe(before);
+  });
+
   it('never regresses mapped host time when wall time changes are irrelevant', () => {
     let mapping = { ...createHostTimeMapping(), offsetMs: 4_000, sampleCount: 1 };
     mapping = monotonicMappedHostNow(mapping, 2_000);

@@ -4,10 +4,11 @@ export type RemoteHealthAuthorityState = Readonly<{
   hp: number;
   alive: boolean;
   respawnEligibleAt: number;
+  diedAtHostTimeMs: number | null;
 }>;
 
 export function createRemoteHealthAuthorityState(alive = true): RemoteHealthAuthorityState {
-  return { hp: alive ? 100 : 0, alive, respawnEligibleAt: 0 };
+  return { hp: alive ? 100 : 0, alive, respawnEligibleAt: 0, diedAtHostTimeMs: alive ? null : 0 };
 }
 
 export function applyAuthoritativeRemoteDamage(
@@ -24,7 +25,7 @@ export function applyAuthoritativeRemoteDamage(
     applied: true,
     died,
     state: died
-      ? { hp: 0, alive: false, respawnEligibleAt: now + REMOTE_RESPAWN_MIN_MS }
+      ? { hp: 0, alive: false, respawnEligibleAt: now + REMOTE_RESPAWN_MIN_MS, diedAtHostTimeMs: now }
       : { ...state, hp },
   };
 }

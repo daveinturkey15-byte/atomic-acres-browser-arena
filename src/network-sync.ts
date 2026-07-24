@@ -30,6 +30,23 @@ export type SnapshotBufferStats = Readonly<{
   sequenceGaps: number;
   discontinuities: number;
   underruns: number;
+  overruns: number;
+}>;
+
+export type InterpolationDelayState = Readonly<{
+  delayMs: number;
+  targetMs: number;
+  stableSamples: number;
+  underrunSamples: number;
+  increases: number;
+  decreases: number;
+  updatedAt: number;
+}>;
+
+export type InterpolationDelayPressure = Readonly<{
+  snapshotRateHz: SnapshotRateHz;
+  jitterMs: number;
+  underruns: number;
 }>;
 
 export type InterpolatedSnapshot<T> = Readonly<{
@@ -47,10 +64,21 @@ export const DEFAULT_SNAPSHOT_RATE_HZ: SnapshotRateHz = 40;
 /** Legacy gameplay-contract aliases; runtime pacing is controller-driven. */
 export const STATE_BROADCAST_INTERVAL_MS = 50;
 export const REMOTE_INTERPOLATION_RATE = 24;
-export const SNAPSHOT_INTERPOLATION_DELAY_MS = 100;
+export const SNAPSHOT_INTERPOLATION_DELAY_MS = 60;
+export const MIN_SNAPSHOT_INTERPOLATION_DELAY_MS = 40;
+export const MAX_SNAPSHOT_INTERPOLATION_DELAY_MS = 120;
+export const INTERPOLATION_DELAY_UPDATE_INTERVAL_MS = 250;
+export const INTERPOLATION_UNDERRUN_SAMPLES = 3;
+export const INTERPOLATION_STABLE_SAMPLES = 20;
 export const MIN_RATE_RESIDENCY_MS = 1_000;
 export const PROMOTION_RESIDENCY_MS = 5_000;
 export const PROMOTION_STABLE_SAMPLES = 8;
+
+export const INTERPOLATION_DELAY_BANDS: Readonly<Record<SnapshotRateHz, Readonly<{ min: number; max: number }>>> = Object.freeze({
+  20: Object.freeze({ min: 80, max: 120 }),
+  30: Object.freeze({ min: 60, max: 90 }),
+  40: Object.freeze({ min: 40, max: 70 }),
+});
 export const DEMOTION_PRESSURE_SAMPLES = 2;
 
 export function createSnapshotRateState(now = 0): SnapshotRateState {
@@ -87,6 +115,78 @@ export function updateSnapshotRate(state: SnapshotRateState, input: ReplicationP
   return { ...state, stableSamples, pressuredSamples };
 }
 
+export function desiredInterpolationDelayMs(snapshotRateHz: SnapshotRateHz, jitterMs: number): number {
+  const jitter = Number.isFinite(jitterMs) ? Math.max(0, jitterMs) : INTERPOLATION_DELAY_BANDS[snapshotRateHz].max;
+  const band = INTERPOLATION_DELAY_BANDS[snapshotRateHz];
+  return Math.max(band.min, Math.min(band.max, snapshotIntervalMs(snapshotRateHz) * 2 + jitter * 1.5));
+}
+
+export function createInterpolationDelayState(now = 0): InterpolationDelayState {
+  return {
+    delayMs: SNAPSHOT_INTERPOLATION_DELAY_MS,
+    targetMs: SNAPSHOT_INTERPOLATION_DELAY_MS,
+    stableSamples: 0,
+    underrunSamples: 0,
+    increases: 0,
+    decreases: 0,
+    updatedAt: now,
+  };
+}
+
+export function updateInterpolationDelay(
+  state: InterpolationDelayState,
+  input: InterpolationDelayPressure,
+  now: number,
+): InterpolationDelayState {
+  if (!Number.isFinite(now) || now - state.updatedAt < INTERPOLATION_DELAY_UPDATE_INTERVAL_MS) return state;
+  const baseTargetMs = desiredInterpolationDelayMs(input.snapshotRateHz, input.jitterMs);
+  const underflowing = Number.isFinite(input.underruns) && input.underruns > 0;
+  const underrunSamples = underflowing ? state.underrunSamples + 1 : 0;
+  const stableSamples = underflowing ? 0 : state.stableSamples + 1;
+  const band = INTERPOLATION_DELAY_BANDS[input.snapshotRateHz];
+  const pressureTargetMs = underflowing
+    ? band.max
+    : baseTargetMs;
+
+  if (underflowing && underrunSamples >= INTERPOLATION_UNDERRUN_SAMPLES) {
+    const delayMs = Math.min(band.max, state.delayMs + 5);
+    return {
+      ...state,
+      delayMs,
+      targetMs: pressureTargetMs,
+      stableSamples: 0,
+      underrunSamples: 0,
+      increases: state.increases + Number(delayMs > state.delayMs),
+      updatedAt: now,
+    };
+  }
+  if (!underflowing && baseTargetMs > state.delayMs && stableSamples >= 4) {
+    const delayMs = Math.min(baseTargetMs, state.delayMs + 5);
+    return {
+      ...state,
+      delayMs,
+      targetMs: baseTargetMs,
+      stableSamples: 0,
+      underrunSamples: 0,
+      increases: state.increases + Number(delayMs > state.delayMs),
+      updatedAt: now,
+    };
+  }
+  if (!underflowing && stableSamples >= INTERPOLATION_STABLE_SAMPLES) {
+    const delayMs = Math.max(baseTargetMs, state.delayMs - 5);
+    return {
+      ...state,
+      delayMs,
+      targetMs: baseTargetMs,
+      stableSamples: 0,
+      underrunSamples: 0,
+      decreases: state.decreases + Number(delayMs < state.delayMs),
+      updatedAt: now,
+    };
+  }
+  return { ...state, targetMs: pressureTargetMs, stableSamples, underrunSamples, updatedAt: now };
+}
+
 export class SnapshotInterpolationBuffer<T> {
   private samples: TimestampedSnapshot<T>[] = [];
   private mutableStats: SnapshotBufferStats = {
@@ -96,6 +196,7 @@ export class SnapshotInterpolationBuffer<T> {
     sequenceGaps: 0,
     discontinuities: 0,
     underruns: 0,
+    overruns: 0,
   };
 
   constructor(private readonly interpolate: (before: T, after: T, alpha: number) => T, private readonly limit = 32) {}
@@ -133,10 +234,11 @@ export class SnapshotInterpolationBuffer<T> {
     const first = this.samples[0];
     const latest = this.samples.at(-1)!;
     if (targetTime <= first.hostTimeMs) {
-      this.mutableStats = { ...this.mutableStats, underruns: this.mutableStats.underruns + 1 };
+      this.mutableStats = { ...this.mutableStats, overruns: this.mutableStats.overruns + 1 };
       return this.result(first.value, first.hostTimeMs, hostNowMs, 'held-oldest', first.seq, first.seq, 0);
     }
     if (targetTime >= latest.hostTimeMs) {
+      this.mutableStats = { ...this.mutableStats, underruns: this.mutableStats.underruns + 1 };
       return this.result(latest.value, latest.hostTimeMs, hostNowMs, 'held-latest', latest.seq, latest.seq, 1);
     }
     for (let index = 1; index < this.samples.length; index += 1) {

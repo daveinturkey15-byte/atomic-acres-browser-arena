@@ -15,6 +15,9 @@ export type CombatantPoseRewind = Readonly<{
 
 export const COMBATANT_HISTORY_RETENTION_MS = 750;
 export const COMBATANT_HISTORY_LIMIT = 64;
+export const MAX_SHOOTER_FIRE_EXTRAPOLATION_MS = 75;
+const MAX_SHOOTER_HORIZONTAL_SPEED = 11;
+const MAX_SHOOTER_VERTICAL_SPEED = 14;
 
 export function recordCombatantPose(history: CombatantPoseSample[], sample: CombatantPoseSample): void {
   if (![sample.at, sample.x, sample.y, sample.z, sample.yaw].every(Number.isFinite)) return;
@@ -65,4 +68,50 @@ export function rewindCombatantPoseStrict(
     }, reason: 'accepted' };
   }
   return { pose: null, reason: 'outside-history' };
+}
+
+/**
+ * Event and transient movement lanes can arrive a fraction of a snapshot apart.
+ * Reconstruct only the shooter slightly beyond the newest admitted pose; target
+ * rewinds remain strict so a missing target history is never fabricated.
+ */
+export function reconstructShooterPoseAtFireTime(
+  history: readonly CombatantPoseSample[],
+  fireTimeMs: number,
+  expectedContinuity: number,
+): CombatantPoseRewind {
+  const strict = rewindCombatantPoseStrict(history, fireTimeMs, expectedContinuity);
+  if (strict.pose || strict.reason !== 'outside-history' || history.length === 0) return strict;
+  const latest = history.at(-1)!;
+  const futureMs = fireTimeMs - latest.at;
+  if (futureMs <= 0 || futureMs > MAX_SHOOTER_FIRE_EXTRAPOLATION_MS
+    || latest.continuity !== expectedContinuity) return strict;
+  const before = [...history].reverse().find((sample) => sample.at < latest.at
+    && sample.continuity === expectedContinuity);
+  if (!before) return {
+    pose: { ...latest, at: fireTimeMs },
+    reason: 'accepted',
+  };
+  const sampleSeconds = Math.max(0.001, (latest.at - before.at) / 1_000);
+  const futureSeconds = futureMs / 1_000;
+  const horizontalVelocityX = (latest.x - before.x) / sampleSeconds;
+  const horizontalVelocityZ = (latest.z - before.z) / sampleSeconds;
+  const horizontalSpeed = Math.hypot(horizontalVelocityX, horizontalVelocityZ);
+  const horizontalScale = horizontalSpeed > MAX_SHOOTER_HORIZONTAL_SPEED
+    ? MAX_SHOOTER_HORIZONTAL_SPEED / horizontalSpeed
+    : 1;
+  const verticalVelocity = Math.max(-MAX_SHOOTER_VERTICAL_SPEED, Math.min(
+    MAX_SHOOTER_VERTICAL_SPEED,
+    (latest.y - before.y) / sampleSeconds,
+  ));
+  return {
+    pose: {
+      ...latest,
+      at: fireTimeMs,
+      x: latest.x + horizontalVelocityX * horizontalScale * futureSeconds,
+      y: latest.y + verticalVelocity * futureSeconds,
+      z: latest.z + horizontalVelocityZ * horizontalScale * futureSeconds,
+    },
+    reason: 'accepted',
+  };
 }

@@ -125,6 +125,40 @@ try {
   const hostAccepted = hostState.networkSync.shotProtocol['accepted-hit'] ?? 0;
   const guestCreated = guestState.networkSync.shotProtocol['created-sent'] ?? 0;
   const guestConfirmed = guestState.networkSync.shotProtocol['result-hit-presented'] ?? 0;
+  const resolvedTimeline = hostState.networkSync.shotTimeline.resolved;
+  const resolutionTraces = hostState.networkSync.shotTimeline.recentResolutions;
+  const authoredTimeline = guestState.networkSync.shotTimeline.authored;
+  const interpolationDelay = guestState.networkSync.interpolationDelay;
+  const hostTiming = hostState.networkSync.shotTimeline.timing;
+  const guestTiming = guestState.networkSync.shotTimeline.timing;
+  const resolverMatchesReportedRewind = resolvedTimeline !== null && resolutionTraces.length === 7
+    && Math.abs(resolvedTimeline.fireTimeMs - resolvedTimeline.targetViewTimeMs
+      - resolvedTimeline.appliedRewindMs) < 0.001
+    && resolvedTimeline.resolvedAtHostTimeMs >= resolvedTimeline.receivedHostTimeMs
+    && resolvedTimeline.appliedRewindMs >= 0
+    && resolvedTimeline.appliedRewindMs <= hostState.networkSync.shotTimeline.rewindCeilingMs
+    && resolutionTraces.every((trace) => Math.abs(trace.fireTimeMs - trace.targetViewTimeMs
+      - trace.appliedRewindMs) < 0.001
+      && trace.resolvedAtHostTimeMs >= trace.receivedHostTimeMs
+      && trace.appliedRewindMs >= 0
+      && trace.appliedRewindMs <= hostState.networkSync.shotTimeline.rewindCeilingMs);
+  const delayBands = { 20: [80, 120], 30: [60, 90], 40: [40, 70] };
+  const [delayMinimum, delayMaximum] = delayBands[interpolationDelay.sourceSnapshotRateHz];
+  const delayFitsRewindBudget = interpolationDelay.delayMs >= delayMinimum && interpolationDelay.delayMs <= delayMaximum
+    && interpolationDelay.targetMs >= delayMinimum && interpolationDelay.targetMs <= delayMaximum
+    && interpolationDelay.delayMs + interpolationDelay.targetViewRewindHeadroomMs
+      === guestState.networkSync.shotTimeline.rewindCeilingMs
+    && authoredTimeline !== null
+    && Math.abs(authoredTimeline.fireTimeMs - authoredTimeline.targetViewTimeMs - authoredTimeline.targetViewDelayMs) < 0.001;
+  const rewindHistogramCount = Object.values(hostTiming.appliedRewindHistogram)
+    .reduce((total, count) => total + count, 0);
+  const transportTimingCaptured = hostTiming.authoredSpacing.count === 6
+    && hostTiming.packetReceiptSpacing.count === 6
+    && hostTiming.resolutionSpacing.count === 6
+    && guestTiming.resultDeliverySpacing.count === 6
+    && rewindHistogramCount === 7
+    && hostTiming.appliedRewindHistogram.rejected === 0
+    && hostState.networkLifecycle.eventChannelOrdered === true;
   const result = {
     errors,
     impairment: guestState.networkLifecycle,
@@ -133,11 +167,21 @@ try {
     guestConfirmed,
     hostHealthAfter: hostState.player.hp,
     exactAgreement: hostAccepted === 7 && guestCreated === 7 && guestConfirmed === 7,
+    resolverMatchesReportedRewind,
+    resolutionTraces,
+    authoredTimeline,
+    interpolationDelay,
+    delayFitsRewindBudget,
+    hostTiming,
+    guestTiming,
+    transportTimingCaptured,
     movementRateHz: guestState.networkSync.selectedRateHz,
     hostTime: guestState.networkSync.hostTime,
   };
   console.log(JSON.stringify(result, null, 2));
-  if (errors.length > 0 || !result.exactAgreement || result.hostHealthAfter >= 100) process.exitCode = 1;
+  if (errors.length > 0 || !result.exactAgreement || !resolverMatchesReportedRewind
+    || !authoredTimeline || !delayFitsRewindBudget || !transportTimingCaptured
+    || result.hostHealthAfter >= 100) process.exitCode = 1;
 } finally {
   await browser.close();
   peerProcess.kill();
