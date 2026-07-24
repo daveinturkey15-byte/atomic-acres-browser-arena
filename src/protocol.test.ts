@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type LeaderboardSyncMessage, type SupportActivateMessage } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type SupportActivateMessage } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -202,6 +202,50 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer({ type: 'ping', by: 'spoof', team: 0, kind: 'regroup', position: [0, 1.7, 0], nonce: 8 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'death', killer: 'enemy', victim: 'abc', cause: { kind: 'gun', weapon: 'carbine' }, nonce: 2 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'death', killer: 'abc', victim: 'other', cause: { kind: 'gun', weapon: 'carbine' }, nonce: 2 }, 'abc')).toBe(false);
+  });
+
+  it('binds chat submissions to the guest and accepts only bounded host-authoritative history', () => {
+    const entry = {
+      id: 41,
+      senderId: 'abc',
+      senderName: 'Tester',
+      text: 'Ready for the next round?',
+      sentAtHostTimeMs: 2_500,
+    };
+    const submit: ChatSubmitMessage = {
+      type: 'chat-submit' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc',
+      text: entry.text,
+      nonce: 40,
+    };
+    const message: ChatMessage = {
+      type: 'chat-message' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host',
+      entry,
+      nonce: entry.id,
+    };
+    const history: ChatHistoryMessage = {
+      type: 'chat-history' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host',
+      forPlayerId: 'abc',
+      entries: [entry],
+      nonce: 42,
+    };
+
+    expect(isGameMessage(submit)).toBe(true);
+    expect(messageBelongsToPlayer(submit, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer({ ...submit, by: 'spoof' }, 'abc')).toBe(false);
+    expect(isGameMessage({ ...submit, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+    expect(isGameMessage({ ...submit, text: ' trailing ' })).toBe(false);
+    expect(isGameMessage(message)).toBe(true);
+    expect(isHostAuthorityMessage(message)).toBe(true);
+    expect(isGameMessage(history)).toBe(true);
+    expect(isHostAuthorityMessage(history)).toBe(true);
+    expect(isGameMessage({ ...history, entries: [entry, entry] })).toBe(false);
+    expect(isGameMessage({ ...history, forPlayerId: '' })).toBe(false);
   });
 
   it('validates bounded lobby control traffic and identifies host authority', () => {
