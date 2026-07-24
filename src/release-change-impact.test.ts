@@ -8,6 +8,7 @@ describe('release change impact', () => {
       'docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md',
       '.github/workflows/verify.yml',
       'scripts/release/change-impact.mjs',
+      'scripts/qa/run-with-preview-server.mjs',
     ])).toEqual({ mode: 'none', reason: 'process-only' });
   });
 
