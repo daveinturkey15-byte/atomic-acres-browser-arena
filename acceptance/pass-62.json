@@ -65,7 +65,12 @@
       "expected": "The upper entrance is traversable without a black leaf; obsolete floating blue timber and wall debris are absent; opaque surfaces occlude lights; authored substantial geometry keeps matching authority.",
       "falsifier": "Any reported black doorway slab or floating interior piece remains, a light is visible through an opaque wall, or a substantial Acres prop can be walked through.",
       "acceptance": "mixed",
-      "state": "verified",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-07-24T15:10:26Z",
+        "reason": "Dave observed in the exact preview that lights remain visible through Atomic Acres walls and doors remain black, and explicitly deferred both defects to Pass 63 as non-urgent."
+      },
       "evidence": [
         {
           "kind": "browser",
@@ -113,7 +118,12 @@
       "expected": "Boarding, upper-platform, cabin, and cockpit routes contain no opaque black door leaf; true glass remains transparent while flight displays remain opaque and emissive.",
       "falsifier": "A black slab blocks a terminal route, cockpit glass renders opaque, a flight display becomes transparent, or a visible route prop lacks matching collision.",
       "acceptance": "mixed",
-      "state": "verified",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-07-24T15:10:26Z",
+        "reason": "Dave observed that Terminal doorways and the plane cockpit still render as pass-through walls, and explicitly deferred the correction to Pass 63."
+      },
       "evidence": [
         {
           "kind": "unit",
@@ -216,7 +226,12 @@
       "expected": "Atomic Acres retains its accepted lighting; Rustworks and Gun Range keep intentional dark zones; terminal remains readable; PMREM, selective bloom, contact shading, fog, shadows, materials, decals, particles, compression, and streaming degrade by effect without changing physics.",
       "falsifier": "Lighting is broadly flat, bloom appears through opaque walls, a compressed material is black or missing, Quality and Performance disagree on authority, or overload only reduces resolution and shadows.",
       "acceptance": "mixed",
-      "state": "verified",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-07-24T15:10:26Z",
+        "reason": "Dave's Atomic light-through-wall observation falsifies the occlusion slice of this graphics requirement; he explicitly deferred that non-urgent fix to Pass 63."
+      },
       "evidence": [
         {
           "kind": "unit",
