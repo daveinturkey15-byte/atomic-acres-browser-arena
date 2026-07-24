@@ -1,6 +1,4 @@
 import {
-  MAX_MATCH_DEATHS,
-  MAX_MATCH_KILLS,
   isValidDeathCount,
   isValidKillCount,
   isValidRecordedAt,

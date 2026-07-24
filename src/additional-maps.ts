@@ -261,7 +261,6 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const builder: Builder = {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
-  const sand = standard(0x8a5f42, 1, 0);
   const packed = standard(0x6e5a48, 0.98, 0.02);
   const rust = standard(0x7a3924, 0.82, 0.42);
   const rustDark = standard(0x3c2924, 0.9, 0.35);

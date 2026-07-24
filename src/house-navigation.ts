@@ -178,7 +178,6 @@ function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   const windowWidth = 3.2;
   const left = windowX - windowWidth / 2;
   const right = windowX + windowWidth / 2;
-  const sillTop = FLOOR_Y + WINDOW_SILL_TOP;
   const openingTop = FLOOR_Y + WINDOW_OPENING_TOP;
   return [
     solid('front-upper-left', [(-HALF_WIDTH + left) / 2, FLOOR_Y + UPPER_HEIGHT / 2, HALF_DEPTH], [left + HALF_WIDTH, UPPER_HEIGHT, WALL], surface),

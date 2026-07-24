@@ -6,7 +6,7 @@ import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBu
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
-import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
+import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
@@ -36,7 +36,7 @@ import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parse
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -114,8 +114,6 @@ import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
 import {
   advanceRangeScore,
-  formatRangeAccuracy,
-  GUN_RANGE_ROUND_MS,
   hasUnlimitedRangeAmmo,
   isGunRange,
   rangeAccuracyPercent,
@@ -133,7 +131,6 @@ import {
   type GunRangeScoreEntry,
 } from './gun-range-leaderboard';
 import {
-  OVERDRIVE_DAMAGE_MULTIPLIER,
   OVERDRIVE_DURATION_MS,
   OVERDRIVE_PICKUP_RADIUS,
   OVERDRIVE_POSITION,
@@ -297,12 +294,9 @@ import {
   ExplosiveSource,
   GameMessage,
   HitMessage,
-  LobbyBalanceMessage,
-  LobbyConfigMessage,
   LobbyJoinMessage,
   LobbyHandicapMessage,
   LobbyReadyMessage,
-  LobbyStartMessage,
   LobbyStateMessage,
   LobbyTeamMessage,
   MatchScoreMessage,
