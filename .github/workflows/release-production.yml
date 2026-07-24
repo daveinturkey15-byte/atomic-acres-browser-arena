@@ -50,6 +50,8 @@ jobs:
         run: npm run build
       - name: Verify exact production bytes
         run: npm run verify:release-tree
+      - name: Install topology browser
+        run: npx playwright install --with-deps chromium
       - name: Stage isolated three-channel release topology
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
