@@ -2,6 +2,10 @@
 
 ## Current development and release
 
+- [Pass 63 cleanup, Project Map, chat, and deferred visual repairs](PASS63_CLEANUP_PROJECT_MAP_CHAT_SPEC_2026-07-24.md) - current local HITL scope, numbered requirements, authority boundaries, and no-publish decision.
+- [Pass 62 offline integration record](PASS62_OFFLINE_INTEGRATION_2026-07-24.md) - exact gameplay, graphics, and netcode inputs plus integrated verification evidence.
+- [Pass 62 graphics refinement record](PASS62_GRAPHICS_REFINEMENT_HITL_2026-07-24.md) - current WebGL lighting/effects architecture, adaptive ladder, compression, and visual falsifiers.
+- [Pass 62 netcode correctness record](PASS62_NETCODE_CORRECTNESS_2026-07-24.md) - immutable authored-shot timeline and host-resolution contract retained by Pass 63.
 - [Player-facing production release ledger](../src/changelog.ts) - canonical Pass number, public notes, and first-successful-promotion time for the live game.
 - [Player feedback contribution specification](PLAYER_FEEDBACK_CONTRIBUTION_SPEC_2026-07-22.md) - weapon presentation, movement/collision, combat feedback, round statistics, and season-aware leaderboard reset contract.
 - [Atomic Acres aesthetic overhaul specification](ATOMIC_ACRES_AESTHETIC_OVERHAUL_SPEC_2026-07-22.md) - authored model-home, garden, material, lighting, performance, and deterministic browser-review contract.
