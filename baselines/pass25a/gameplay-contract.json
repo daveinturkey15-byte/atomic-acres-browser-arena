@@ -760,21 +760,6 @@
               ]
             },
             {
-              "collidable": true,
-              "id": "aqua-irrigation-workshop:ground-room-partition-lintel",
-              "kind": "wall",
-              "position": [
-                -7,
-                3.0700000000000003,
-                -28
-              ],
-              "size": [
-                2.6,
-                0.56,
-                0.42
-              ]
-            },
-            {
               "collidable": false,
               "id": "aqua-irrigation-workshop:ground-floor-slab",
               "kind": "floor",
@@ -817,21 +802,6 @@
                 0.42,
                 3.45,
                 11.489999999999998
-              ]
-            },
-            {
-              "collidable": true,
-              "id": "aqua-irrigation-workshop:upper-ramp-side-wall-lintel",
-              "kind": "wall",
-              "position": [
-                -19.1,
-                6.6499999999999995,
-                -32.8
-              ],
-              "size": [
-                0.42,
-                0.56,
-                2.6
               ]
             },
             {
@@ -966,21 +936,6 @@
               "size": [
                 6.8,
                 3.45,
-                0.42
-              ]
-            },
-            {
-              "collidable": true,
-              "id": "aqua-irrigation-workshop:upper-room-partition-lintel",
-              "kind": "wall",
-              "position": [
-                -7,
-                6.6499999999999995,
-                -28
-              ],
-              "size": [
-                2.6,
-                0.56,
                 0.42
               ]
             },
@@ -1985,21 +1940,6 @@
               ]
             },
             {
-              "collidable": true,
-              "id": "coral-orchard-conservatory:ground-room-partition-lintel",
-              "kind": "wall",
-              "position": [
-                11,
-                3.0700000000000003,
-                28
-              ],
-              "size": [
-                2.6,
-                0.56,
-                0.42
-              ]
-            },
-            {
               "collidable": false,
               "id": "coral-orchard-conservatory:ground-floor-slab",
               "kind": "floor",
@@ -2057,21 +1997,6 @@
                 0.42,
                 3.45,
                 11.489999999999998
-              ]
-            },
-            {
-              "collidable": true,
-              "id": "coral-orchard-conservatory:upper-ramp-side-wall-lintel",
-              "kind": "wall",
-              "position": [
-                19.1,
-                6.6499999999999995,
-                32.8
-              ],
-              "size": [
-                0.42,
-                0.56,
-                2.6
               ]
             },
             {
@@ -2191,21 +2116,6 @@
               "size": [
                 6.8,
                 3.45,
-                0.42
-              ]
-            },
-            {
-              "collidable": true,
-              "id": "coral-orchard-conservatory:upper-room-partition-lintel",
-              "kind": "wall",
-              "position": [
-                11,
-                6.6499999999999995,
-                28
-              ],
-              "size": [
-                2.6,
-                0.56,
                 0.42
               ]
             },
@@ -3467,10 +3377,11 @@
       "pass55-range-armory-lmg",
       "pass60-sniper-headshot-three-times",
       "pass60-overdrive-two-times-thirty-seconds",
-      "pass60-atomic-acres-collision-completion"
+      "pass60-atomic-acres-collision-completion",
+      "pass62-open-house-interior-routes"
     ],
     "baseSourceRevision": "72c313c494853ed1ee4673f06a8f064330ac9efc",
-    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 60",
+    "baseline": "Pass 24 approved gameplay feel plus owner-approved deltas through Pass 62",
     "dependencies": {
       "@dimforge/rapier3d-compat": "0.19.3",
       "peerjs": "1.5.5",

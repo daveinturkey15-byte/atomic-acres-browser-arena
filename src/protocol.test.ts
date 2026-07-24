@@ -66,7 +66,7 @@ describe('network protocol guards', () => {
       acceptedHostTimeMs: 2_520,
       appliedRewindMs: 20,
       outcomes: [{
-        target: 'host', pelletHits: 1, damage: 31.4, resultingHealth: 68.6,
+        target: 'host', pelletHits: 1, damage: 31.4, rawDamage: 31.4, resultingHealth: 68.6,
         died: false, hitZone: 'body' as const, wallbang: false, penetrationMultiplier: 1,
       }],
       nonce: 42,
@@ -76,6 +76,7 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...request, protocolVersion: 1 })).toBe(false);
     expect(isGameMessage({ ...request, direction: [0, 0, -0.5] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], damage: 401 }] })).toBe(false);
+    expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], rawDamage: 30 }] })).toBe(false);
   });
 
   it('requires action-correlated typed hit authority and earned support metadata', () => {

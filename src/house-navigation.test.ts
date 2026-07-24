@@ -170,6 +170,9 @@ describe('simplified two-floor house architecture', () => {
         architecture.openings.find((entry) => entry.id === 'rear-ground-window')?.centre[2],
       );
       expect(new Set(architecture.anchors.map((entry) => entry.id)).size).toBe(architecture.anchors.length);
+      expect(architecture.solids.some((solid) => solid.name === 'ground-room-partition-lintel')).toBe(false);
+      expect(architecture.solids.some((solid) => solid.name === 'upper-room-partition-lintel')).toBe(false);
+      expect(architecture.solids.some((solid) => solid.name === 'upper-ramp-side-wall-lintel')).toBe(false);
     }
   });
 

@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
-const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
-const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
+const baseUrl = process.argv[2] ?? process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
+const peerPort = Number(process.argv[3] ?? process.env.QA_PEER_PORT ?? 0);
 const browser = await chromium.launch({
   headless: process.env.QA_HEADED !== '1',
   args: [
@@ -36,7 +36,45 @@ async function openPlayer(label) {
   return page;
 }
 
+async function closePlayer(page) {
+  await pageContexts.get(page)?.close();
+  pageContexts.delete(page);
+  const index = pages.indexOf(page);
+  if (index >= 0) pages.splice(index, 1);
+}
+
+async function verifySoloHostStart(label, hostedBotCount) {
+  const host = await openPlayer(label);
+  await host.click('#host');
+  await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 1, undefined, { timeout: 45_000 });
+  const blockedBeforeReady = await host.locator('#lobby-start').isDisabled();
+  if (hostedBotCount > 0) {
+    await host.selectOption('#lobby-bots', String(hostedBotCount));
+    await host.waitForFunction((count) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.hostedBotCount === count, hostedBotCount, { timeout: 15_000 });
+  }
+  await host.click('#lobby-ready');
+  await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 15_000 });
+  const enabledWhenReady = !(await host.locator('#lobby-start').isDisabled());
+  await host.click('#lobby-start');
+  await host.waitForFunction((count) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.matchPhase === 'active' && state.bots.length === count;
+  }, hostedBotCount, { timeout: 45_000 });
+  const state = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+  const result = {
+    blockedBeforeReady,
+    enabledWhenReady,
+    active: state.matchPhase === 'active',
+    humans: state.privateMatch.members.filter((member) => member.connected).length,
+    bots: state.bots.length,
+  };
+  await closePlayer(host);
+  return result;
+}
+
 try {
+  const soloHostNoBots = await verifySoloHostStart('Solo Host', 0);
+  const soloHostWithBots = await verifySoloHostStart('Solo Bot Host', 4);
   const host = await openPlayer('Host Four');
   const guests = [await openPlayer('Guest One'), await openPlayer('Guest Two'), await openPlayer('Guest Three')];
   await host.selectOption('#team', '1');
@@ -85,9 +123,7 @@ try {
   const overflowRejected = overflowState.networkLifecycle.role === 'offline'
     && overflowState.gameStarted === false
     && (await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.length)) === 4;
-  await pageContexts.get(overflow).close();
-  pageContexts.delete(overflow);
-  pages.pop();
+  await closePlayer(overflow);
 
   await mkdir('artifacts/pass38', { recursive: true });
   await host.screenshot({ path: 'artifacts/pass38/private-lobby-host-four-player.png', fullPage: true });
@@ -159,6 +195,8 @@ try {
   const report = {
     schema: 'atomic-acres/pass38-private-lobby@1',
     errors,
+    soloHostNoBots,
+    soloHostWithBots,
     roomCodeLength: roomCode.length,
     balancedTeams,
     hostTeamSynchronized,
@@ -193,6 +231,10 @@ try {
   console.log(JSON.stringify(report, null, 2));
 
   const pass = errors.length === 0
+    && soloHostNoBots.blockedBeforeReady && soloHostNoBots.enabledWhenReady
+    && soloHostNoBots.active && soloHostNoBots.humans === 1 && soloHostNoBots.bots === 0
+    && soloHostWithBots.blockedBeforeReady && soloHostWithBots.enabledWhenReady
+    && soloHostWithBots.active && soloHostWithBots.humans === 1 && soloHostWithBots.bots === 4
     && roomCode.length === 36
     && balancedTeams[0] === 2 && balancedTeams[1] === 2
     && hostTeamSynchronized

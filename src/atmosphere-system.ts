@@ -16,6 +16,7 @@ export type AtmosphereTelemetry = Readonly<{
   textureSamples: 0;
   volumetricRayMarching: false;
   perFrameAllocations: 0;
+  densityScale: number;
   time: number;
 }>;
 
@@ -123,6 +124,7 @@ export class AtmosphereSystem {
   private readonly bypass: string | null;
   private readonly profile: RenderProfile;
   private arenaId: ArenaId;
+  private densityScale = 1;
 
   constructor(scene: THREE.Scene, profile: RenderProfile, rendererLabel: string, query: string | null, arenaId: ArenaId = 'atomic-acres') {
     this.root.name = 'pass30-subtle-ground-mist';
@@ -388,8 +390,9 @@ export class AtmosphereSystem {
     const layout = ATMOSPHERE_LAYOUTS[arenaId];
     const matrix = new THREE.Matrix4();
     const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
-    this.mesh.count = layout.mist.length;
-    for (let index = 0; index < layout.mist.length; index += 1) {
+    const mistCount = Math.max(1, Math.round(layout.mist.length * this.densityScale));
+    this.mesh.count = mistCount;
+    for (let index = 0; index < mistCount; index += 1) {
       const [x, z, width, depth] = layout.mist[index];
       matrix.compose(
         new THREE.Vector3(x, 0.16 + (index % 3) * 0.025, z),
@@ -401,8 +404,9 @@ export class AtmosphereSystem {
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.computeBoundingSphere();
 
-    this.smokeMesh.count = layout.smoke.length;
-    for (let index = 0; index < layout.smoke.length; index += 1) {
+    const smokeCount = Math.max(1, Math.round(layout.smoke.length * this.densityScale));
+    this.smokeMesh.count = smokeCount;
+    for (let index = 0; index < smokeCount; index += 1) {
       const [x, z, width, height] = layout.smoke[index];
       matrix.compose(new THREE.Vector3(x, height / 2 + 0.15, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
       this.smokeMesh.setMatrixAt(index, matrix);
@@ -435,11 +439,16 @@ export class AtmosphereSystem {
         position.setZ(index, dust.minZ + v * (dust.maxZ - dust.minZ));
       }
       position.needsUpdate = true;
-      this.dustPoints.geometry.setDrawRange(0, dust.count);
+      this.dustPoints.geometry.setDrawRange(0, Math.max(1, Math.round(dust.count * this.densityScale)));
       this.dustPoints.geometry.computeBoundingSphere();
       (this.dustMaterial.uniforms.uColor.value as THREE.Color).setHex(dust.color);
       this.dustMaterial.uniforms.uOpacity.value = dust.opacity;
     }
+  }
+
+  setDensityScale(scale: number): void {
+    this.densityScale = THREE.MathUtils.clamp(Number.isFinite(scale) ? scale : 1, 0.35, 1);
+    this.setArena(this.arenaId);
   }
 
   update(timeSeconds: number): void {
@@ -474,6 +483,7 @@ export class AtmosphereSystem {
       textureSamples: 0,
       volumetricRayMarching: false,
       perFrameAllocations: 0,
+      densityScale: this.densityScale,
       time: this.time,
     };
   }

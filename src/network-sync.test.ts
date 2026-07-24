@@ -5,6 +5,7 @@ import {
   desiredSnapshotRate,
   shortestYaw,
   snapshotIntervalMs,
+  stateBroadcastWakeIntervalMs,
   updateSnapshotRate,
 } from './network-sync';
 
@@ -18,6 +19,12 @@ describe('adaptive 20/30/40 Hz replication', () => {
     expect(snapshotIntervalMs(20)).toBe(50);
     expect(snapshotIntervalMs(30)).toBeCloseTo(33.333, 2);
     expect(snapshotIntervalMs(40)).toBe(25);
+  });
+
+  it('does not run the replication wake-up loop at network frequency in solo play', () => {
+    expect(stateBroadcastWakeIntervalMs('offline', true, true, 40)).toBe(250);
+    expect(stateBroadcastWakeIntervalMs('host', false, true, 40)).toBe(250);
+    expect(stateBroadcastWakeIntervalMs('client', true, true, 40)).toBe(25);
   });
 
   it('demotes quickly under sustained pressure without flapping', () => {

@@ -153,6 +153,7 @@ M = {
     "aqua_rear": make_material("MAT_aqua_rear_plaster", 0x819D97, 0.88, 0.02, texture="plaster-warm.png", tile_metres=2.45, texture_tint=0xBFE0DA),
     "coral_rear": make_material("MAT_coral_rear_brick", 0x805244, 0.9, 0.02, texture="brick-warm.png", tile_metres=2.6),
     "plaster": make_material("MAT_plaster_sand", 0xB8AE95, 0.9, texture="plaster-warm.png", tile_metres=2.8),
+    "ceiling": make_material("MAT_ceiling_warm_white", 0xE8E3D8, 0.9),
     "trim": make_material("MAT_trim_bone", 0xD4CBB7, 0.67, texture="plaster-warm.png", tile_metres=2.1),
     "brick": make_material("MAT_brick_brown", 0x6F4436, 0.91, texture="brick-warm.png", tile_metres=2.4),
     "timber": make_material("MAT_timber_dark", 0x574334, 0.9, texture="wood-deck.png", tile_metres=2.2),
@@ -359,7 +360,7 @@ for index, (x, z, width, depth) in enumerate(((-3.2, -28, 3.4, 5.2), (3.5, 27, 4
 surface_material = {
     "aqua": M["aqua"], "coral": M["coral"], "plaster": M["plaster"], "brick": M["brick"],
     "timber": M["timber"], "concrete": M["concrete"], "trim": M["trim"], "glass": M["glass"],
-    "metal": M["metal"], "ceiling": M["plaster"], "light": M["emissive_amber"],
+    "metal": M["metal"], "ceiling": M["ceiling"], "light": M["emissive_amber"],
 }
 for house_index, house in enumerate(spec["houses"]):
     prefix = "AQUA" if house["team"] == 0 else "CORAL"
@@ -372,7 +373,7 @@ for house_index, house in enumerate(spec["houses"]):
         # timber made it read as a huge floating roof from the ground floor.
         upper_floor = solid["name"].startswith("upper-floor-")
         if upper_floor:
-            solid_material = M["plaster"]
+            solid_material = M["ceiling"]
         if solid["surface"] in ("aqua", "coral"):
             if "upper" in solid["name"]:
                 solid_material = M["aqua_upper"] if house["team"] == 0 else M["coral_upper"]
@@ -398,7 +399,7 @@ for house_index, house in enumerate(spec["houses"]):
     add_box(f"BLD_HOUSE_{prefix}_roof", [x, 7.18, z], [width + 0.8, 0.48, depth + 0.8], M["roof"], 0.08)
     # Give the upper rooms a light, continuous soffit. Exposing the dark roof
     # shingle underside made every internal doorway read as a black rectangle.
-    add_box(f"BLD_HOUSE_{prefix}_upper_ceiling_soffit", [x, 6.92, z], [width - 0.24, 0.04, depth - 0.24], M["plaster"], 0)
+    add_box(f"BLD_HOUSE_{prefix}_upper_ceiling_soffit", [x, 6.92, z], [width - 0.24, 0.04, depth - 0.24], M["ceiling"], 0)
     # Upper-storey exterior walls keep their team colour outside, but a pale
     # interior lining prevents the siding texture from reading as blue/green
     # timber floating above the open ground floor.
@@ -458,7 +459,6 @@ for house_index, house in enumerate(spec["houses"]):
     facing = house["origin"]["facing"]
     prefix = "AQUA" if house["team"] == 0 else "CORAL"
     fabric = M["fabric_aqua"] if house["team"] == 0 else M["fabric_coral"]
-    accent = M["aqua"] if house["team"] == 0 else M["coral"]
 
     table_x, table_z = x - 3.0, z - facing * 2.7
     add_box(f"P32_FURN_{prefix}_dining_top", [table_x, 0.91, table_z], [2.6, 0.16, 1.25], M["timber"], 0.07)
@@ -490,7 +490,6 @@ for house_index, house in enumerate(spec["houses"]):
     for cabinet_index, cabinet_x in enumerate((x - 5.25, x - 3.9, x - 2.55, x - 1.2)):
         add_box(f"P32_FURN_{prefix}_kitchen_base_{cabinet_index}", [cabinet_x, 0.52, kitchen_z], [1.2, 0.95, 0.62], M["trim"], 0.045)
         add_box(f"P32_FURN_{prefix}_kitchen_upper_{cabinet_index}", [cabinet_x, 1.85, kitchen_z - facing * 0.05], [1.2, 0.85, 0.5], M["boundary"], 0.035)
-    add_box(f"P32_FURN_{prefix}_kitchen_counter", [x - 3.23, 1.04, kitchen_z + facing * 0.04], [5.5, 0.13, 0.72], M["timber"], 0.035)
     add_box(f"P32_FURN_{prefix}_kitchen_fridge", [x - 6.45, 1.12, kitchen_z], [1.05, 2.15, 0.72], M["metal_light"], 0.06)
     add_box(f"P32_FURN_{prefix}_living_rug", [sofa_x - 0.3, 0.095, sofa_z - facing * 1.5], [4.0, 0.035, 2.2], fabric, 0.025)
     add_box(f"P32_FURN_{prefix}_coffee_table", [sofa_x - 0.3, 0.42, sofa_z - facing * 1.5], [1.8, 0.22, 0.82], M["timber"], 0.08)
@@ -501,9 +500,6 @@ for house_index, house in enumerate(spec["houses"]):
                 [sofa_x - 0.3 + leg_x, 0.2, sofa_z - facing * 1.5 + leg_z],
                 [0.1, 0.4, 0.1], M["metal"], 0.018,
             )
-    for art_index, art_x in enumerate((x + 1.8, x + 3.2)):
-        add_box(f"P32_FURN_{prefix}_wall_art_{art_index}", [art_x, 1.85, z + facing * 5.28], [1.05, 0.78, 0.06], accent, 0.025)
-
     console_x, console_z = x + 3.7, z - facing * 3.1
     add_box(f"P32_FURN_{prefix}_media_cabinet", [console_x, 0.46, console_z], [2.45, 0.9, 0.62], M["timber"], 0.08)
     add_box(f"P32_FURN_{prefix}_media_screen_frame", [console_x, 1.55, console_z + facing * 0.18], [2.2, 1.25, 0.14], M["metal"], 0.06)
@@ -517,7 +513,6 @@ for house_index, house in enumerate(spec["houses"]):
     add_box(f"P32_FURN_{prefix}_upper_bed_frame", [bed_x, 3.82, bed_z], [3.0, 0.32, 2.1], M["timber"], 0.08)
     add_box(f"P32_FURN_{prefix}_upper_mattress", [bed_x, 4.12, bed_z], [2.82, 0.36, 1.96], M["fabric_neutral"], 0.12)
     add_box(f"P32_FURN_{prefix}_upper_blanket", [bed_x, 4.34, bed_z + facing * 0.32], [2.7, 0.14, 1.22], fabric, 0.08)
-    add_box(f"P32_FURN_{prefix}_upper_headboard", [bed_x, 4.72, bed_z - facing * 1.02], [3.08, 1.72, 0.2], M["fabric_neutral"], 0.07)
     for side in (-1, 1):
         add_box(f"P32_FURN_{prefix}_upper_pillow_{side}", [bed_x + side * 0.68, 4.37, bed_z - facing * 0.55], [1.05, 0.2, 0.55], M["fabric_neutral"], 0.12)
 

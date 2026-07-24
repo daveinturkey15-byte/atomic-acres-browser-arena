@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
@@ -25,6 +26,7 @@ import {
   type SpawnFlipHysteresis,
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
+import { nextShotDeadline } from './combat-timing';
 import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
@@ -203,12 +205,12 @@ import {
   leaderboardInstallId,
   submitGlobalStreak,
 } from './global-leaderboard';
-import { MAX_ACTIVE_TEAM_PINGS, TEAM_PING_LIFETIME_MS, admitTeamPing, createTeamPingAdmissionState, type TeamPingAdmissionState } from './social-ping';
 import {
   SNAPSHOT_INTERPOLATION_DELAY_MS,
   SnapshotInterpolationBuffer,
   createSnapshotRateState,
   snapshotIntervalMs,
+  stateBroadcastWakeIntervalMs,
   updateSnapshotRate,
   shortestYaw,
   type SnapshotRateState,
@@ -308,8 +310,6 @@ import {
   StateMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
-  TeamPingKind,
-  TeamPingMessage,
   WeaponId,
   WindowBreakMessage,
 } from './protocol';
@@ -484,11 +484,6 @@ type ExplosionFrameProfile = {
   maxImpactSyncMs: number;
 };
 
-type ActiveTeamPing = {
-  root: THREE.Group;
-  expiresAt: number;
-};
-
 type DeathDropEntity = {
   drop: DeathDrop;
   root: THREE.Group;
@@ -640,8 +635,8 @@ app.innerHTML = `
     </div>
     <div id="killfeed" aria-live="polite" aria-label="Match events"></div>
     <div id="damage-feeds" aria-label="Damage activity">
-      <section class="damage-feed done" aria-labelledby="damage-done-label"><b id="damage-done-label">DAMAGE DONE <span>OUTGOING</span></b><div id="damage-done-feed" aria-live="polite"></div></section>
-      <section class="damage-feed taken" aria-labelledby="damage-taken-label"><b id="damage-taken-label">DAMAGE TAKEN <span>INCOMING</span></b><div id="damage-taken-feed" aria-live="assertive"></div></section>
+      <section class="damage-feed done" aria-label="Damage dealt"><div id="damage-done-feed" aria-live="polite"></div></section>
+      <section class="damage-feed taken" aria-label="Damage received"><div id="damage-taken-feed" aria-live="assertive"></div></section>
     </div>
     <div id="objective">ATOMIC ACRES · FIVE MINUTES · MOST KILLS WINS</div>
     <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
@@ -668,7 +663,6 @@ app.innerHTML = `
     </div>
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>QUAD DAMAGE</strong><span>2× DAMAGE · 30 SECONDS</span></div>
-    <div id="ping-block"><span>TEAM PINGS</span><small>T ENEMY · Y REGROUP · U PUSH · I NICE</small></div>
     <div id="room-hud"></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
@@ -773,6 +767,14 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixe
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
+const graphicsRefinement = new GraphicsRefinementSystem(
+  renderer,
+  scene,
+  renderProfile,
+  softwareRenderer,
+  activeRenderConfig.pixelRatioCap,
+);
+let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -815,6 +817,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemet
 
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  const effectsBudget = graphicsEffectsBudget(renderProfile, pixelRatioCap);
+  graphicsRefinement.setBudget(effectsBudget);
+  atomicSignal.setEffectsBudget(effectsBudget);
+  applyPresentationEffectsBudget?.(effectsBudget);
   const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap);
   if (renderer.shadowMap.enabled !== shadowsEnabled) {
     renderer.shadowMap.enabled = shadowsEnabled;
@@ -1040,11 +1046,23 @@ quadGlow.position.y = 0.55;
 overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
-// Compile the Quad presentation during initial loading, not on the 120-second
-// spawn transition where a first-use shader hitch looks like a game freeze.
-overdriveRoot.visible = true;
-renderer.compile(overdriveRoot, camera);
-overdriveRoot.visible = false;
+let overdrivePresentationPrewarmed = false;
+async function prewarmOverdrivePresentation(): Promise<void> {
+  if (overdrivePresentationPrewarmed) return;
+  overdriveRoot.visible = true;
+  overdriveRoot.scale.setScalar(0.0001);
+  try {
+    // Compile against the actual scene and post-processing material state. A
+    // root-only compile missed scene lighting variants and deferred the hitch
+    // until Quad first became visible at the two-minute spawn.
+    await renderer.compileAsync(scene, camera);
+    renderer.render(scene, camera);
+    overdrivePresentationPrewarmed = true;
+  } finally {
+    overdriveRoot.visible = false;
+    overdriveRoot.scale.setScalar(1);
+  }
+}
 const atmosphereSystem = new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id);
 const waterSystem = new WaterSystem(scene);
 waterSystem.configure(selectedArena.id, renderProfile, {
@@ -1074,6 +1092,11 @@ renderer.domElement.addEventListener('webglcontextrestored', () => {
   resize();
 });
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
+applyPresentationEffectsBudget = (budget) => {
+  atmosphereSystem.setDensityScale(budget.particleDensityScale);
+  impactPresentation.setBudget(budget.particleDensityScale, budget.decalLifetimeScale);
+};
+applyPresentationEffectsBudget(graphicsEffectsBudget(renderProfile, adaptiveQuality.telemetry().pixelRatioCap));
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
@@ -1105,6 +1128,14 @@ nukeShockwave.raycast = () => undefined;
 scene.add(nukeShockwave);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
+let atomicQualityLoadPromise: Promise<THREE.Group | null> | null = null;
+let rustworksQualityLoadPromise: Promise<THREE.Group | null> | null = null;
+const qualityAssetStreaming = {
+  atomicAcres: 'idle' as 'idle' | 'loading' | 'ready' | 'fallback',
+  rustworks: 'idle' as 'idle' | 'loading' | 'ready' | 'fallback',
+  initialArena: selectedArena.id,
+  eagerQualityGlbs: 0,
+};
 let materialCompatibility: AtomicSignalMaterialAudit = {
   materials: 0,
   colorTexturesCorrected: 0,
@@ -1114,6 +1145,70 @@ let materialCompatibility: AtomicSignalMaterialAudit = {
   roughnessAdjusted: 0,
   metalnessAdjusted: 0,
 };
+
+async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
+  if (renderProfile !== 'blender') return arenaArtRoot;
+  if (blenderArenaActive && arenaArtRoot) return arenaArtRoot;
+  if (atomicQualityLoadPromise) return atomicQualityLoadPromise;
+  qualityAssetStreaming.atomicAcres = 'loading';
+  atomicQualityLoadPromise = (async () => {
+    try {
+      const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
+        const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+        setStatus(`Streaming Atomic Acres Quality art ${percent}%â€¦`);
+      });
+      blenderArenaActive = true;
+      arenaArtRoot = art.root;
+      qualityAssetStreaming.atomicAcres = 'ready';
+      graphicsRefinement.refine(art.root, renderer.capabilities.getMaxAnisotropy());
+      await renderer.compileAsync(scene, camera);
+      return art.root;
+    } catch (error) {
+      markBlenderArenaFallback(error);
+      console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
+      const fallback = await loadArenaArt(scene, (loaded, total) => {
+        setStatus(`Quality Graphics fallback ${loaded}/${total}â€¦`);
+      }, false);
+      blenderArenaActive = false;
+      arenaArtRoot = fallback.root;
+      qualityAssetStreaming.atomicAcres = 'fallback';
+      graphicsRefinement.refine(fallback.root, renderer.capabilities.getMaxAnisotropy());
+      await renderer.compileAsync(scene, camera);
+      return fallback.root;
+    }
+  })();
+  return atomicQualityLoadPromise;
+}
+
+async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null> {
+  if (renderProfile !== 'blender') return null;
+  if (rustworksBlenderTelemetry().status === 'ready') return rustworksArena.root;
+  if (rustworksQualityLoadPromise) return rustworksQualityLoadPromise;
+  qualityAssetStreaming.rustworks = 'loading';
+  rustworksQualityLoadPromise = loadRustworksBlenderTower(rustworksArena.root).then(async (root) => {
+    setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+    setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
+    qualityAssetStreaming.rustworks = 'ready';
+    graphicsRefinement.refine(root, renderer.capabilities.getMaxAnisotropy());
+    await renderer.compileAsync(scene, camera);
+    return root;
+  }).catch((error) => {
+    markRustworksBlenderFallback(error);
+    console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+    applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+    setRustworksProceduralPresentationVisible(rustworksArena.root, true);
+    qualityAssetStreaming.rustworks = 'fallback';
+    return null;
+  });
+  return rustworksQualityLoadPromise;
+}
+
+async function ensureSelectedQualityPresentation(id: ArenaId): Promise<void> {
+  if (renderProfile !== 'blender') return;
+  if (id === 'atomic-acres') await ensureAtomicQualityPresentation();
+  else if (id === 'rustworks-1v1') await ensureRustworksQualityPresentation();
+  graphicsRefinement.refreshSelectiveBloom(scene);
+}
 
 const player = {
   id: createPlayerId(),
@@ -1198,7 +1293,7 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
-const PASS61_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass61-experimental-netcode';
+const PASS62_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass62-gameplay-graphics-reconciliation';
 const PASS61_DIAGNOSTIC_SOURCE_ID = 'parent-b1af49b-pass60-live';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
@@ -1297,9 +1392,6 @@ const supportNetworkHitTelemetry: Record<OffensiveSupportSource, { sent: number;
   nuke: { sent: 0, blocked: 0, outOfRange: 0, missingAuthorization: 0 },
 };
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
-const remotePingAdmissions = new Map<string, TeamPingAdmissionState>();
-let localPingAdmission = createTeamPingAdmissionState();
-const activeTeamPings: ActiveTeamPing[] = [];
 const deathDrops: DeathDropEntity[] = [];
 const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expiresAt: number }>();
 const verifiedRemoteKills = new Map<string, number>();
@@ -1444,7 +1536,7 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
   matchDiagnostics = new MatchDiagnostics({
-    buildId: PASS61_DIAGNOSTIC_BUILD_ID,
+    buildId: PASS62_DIAGNOSTIC_BUILD_ID,
     sourceId: PASS61_DIAGNOSTIC_SOURCE_ID,
     sessionId: `${player.id}:${Date.now()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
@@ -2687,88 +2779,6 @@ function snapshot(): PlayerSnapshot {
   };
 }
 
-const TEAM_PING_LABELS: Record<TeamPingKind, string> = {
-  enemy: 'ENEMY',
-  regroup: 'REGROUP',
-  push: 'PUSH',
-  nice: 'NICE',
-};
-
-function removeTeamPing(ping: ActiveTeamPing): void {
-  scene.remove(ping.root);
-  ping.root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh)) return;
-    node.geometry.dispose();
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    for (const material of materials) material.dispose();
-  });
-}
-
-function presentTeamPing(message: TeamPingMessage, senderName: string, now = performance.now()): void {
-  while (activeTeamPings.length >= MAX_ACTIVE_TEAM_PINGS) removeTeamPing(activeTeamPings.shift()!);
-  const color = message.kind === 'enemy' ? 0xff6b54
-    : message.kind === 'regroup' ? 0x67e6ff
-      : message.kind === 'push' ? 0xffd166 : 0x7df29a;
-  const root = new THREE.Group();
-  root.name = `team-ping-${message.kind}`;
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.42, 0.6, 20),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, depthTest: false, toneMapped: false }),
-  );
-  ring.rotation.x = -Math.PI / 2;
-  const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.09, 1.5, 8),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.68, depthWrite: false, depthTest: false, toneMapped: false }),
-  );
-  beacon.position.y = 0.75;
-  const diamond = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.18, 0),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, toneMapped: false }),
-  );
-  diamond.position.y = 1.52;
-  root.add(ring, beacon, diamond);
-  root.position.set(...message.position);
-  root.renderOrder = 999;
-  root.userData.presentationOnly = true;
-  root.traverse((node) => { node.raycast = () => {}; });
-  scene.add(root);
-  activeTeamPings.push({ root, expiresAt: now + TEAM_PING_LIFETIME_MS });
-  addFeed(`${senderName}: ${TEAM_PING_LABELS[message.kind]}`, message.team === 0 ? 'aqua' : 'coral');
-}
-
-function sendTeamPing(kind: TeamPingKind): void {
-  if (!gameStarted || !player.alive || privateMatchMode === 'ffa') return;
-  const now = performance.now();
-  const direction = camera.getWorldDirection(new THREE.Vector3());
-  const projected = player.position.clone().addScaledVector(direction, 18);
-  const bounded = clampPointToBounds(projected, arena.bounds, 0.6);
-  const message: TeamPingMessage = {
-    type: 'ping', by: player.id, team: player.team, kind,
-    position: [bounded.x, 0.1, bounded.z],
-    nonce: randomNonce(),
-  };
-  const admission = admitTeamPing(message, snapshot(), now, localPingAdmission);
-  if (!admission.accepted) return;
-  localPingAdmission = admission.nextState;
-  presentTeamPing(message, player.name, now);
-  network.send(message);
-}
-
-function updateTeamPings(now: number): void {
-  for (let index = activeTeamPings.length - 1; index >= 0; index -= 1) {
-    const ping = activeTeamPings[index];
-    if (now >= ping.expiresAt) {
-      removeTeamPing(ping);
-      activeTeamPings.splice(index, 1);
-      continue;
-    }
-    const remaining = (ping.expiresAt - now) / TEAM_PING_LIFETIME_MS;
-    const distanceScale = THREE.MathUtils.clamp(camera.position.distanceTo(ping.root.position) / 8, 1, 2.5);
-    ping.root.scale.setScalar(distanceScale * (0.92 + Math.sin(now * 0.008) * 0.08));
-    ping.root.visible = remaining > 0;
-  }
-}
-
 function nextCombatTiming(): CombatTiming {
   const timing = { eventSeq: localCombatEventSeq, sentAtHostTimeMs: currentHostTimeMs() };
   recordMatchDiagnostic('combat-send', 'observed', {
@@ -3012,14 +3022,7 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'ping') {
-    const pingPoint = { x: message.position[0], y: message.position[1], z: message.position[2] };
-    if (privateMatchMode === 'ffa' || message.by === player.id || message.team !== player.team || !pointInsideBounds(pingPoint, arena.bounds, 0)) return;
-    const sender = remotes.get(message.by);
-    const prior = remotePingAdmissions.get(message.by) ?? createTeamPingAdmissionState();
-    const admission = admitTeamPing(message, sender?.snapshot, performance.now(), prior);
-    if (!admission.accepted || !sender) return;
-    remotePingAdmissions.set(message.by, admission.nextState);
-    presentTeamPing(message, sender.snapshot.name);
+    // Kept as a no-op for protocol compatibility with older peers.
     return;
   }
   if (message.type === 'window-break') {
@@ -3404,8 +3407,10 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   );
   const outcomes: ShotResultMessage['outcomes'] = [];
   for (const [targetId, hit] of derived) {
-    const powered = resolveRemotePoweredDamage(hit.damage, overdriveDamageMultiplier(overdriveState, request.by, receivedAt));
+    const powerMultiplier = overdriveDamageMultiplier(overdriveState, request.by, receivedAt);
+    const powered = resolveRemotePoweredDamage(hit.damage, powerMultiplier);
     const outgoing = handicapOutgoingDamage(request.by, powered, request.weapon);
+    const rawOutgoing = handicapOutgoingDamage(request.by, hit.rawDamage * powerMultiplier, request.weapon);
     let appliedDamage = 0;
     let resultingHealth = 0;
     let died = false;
@@ -3453,7 +3458,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       }
     }
     if (appliedDamage > 0) outcomes.push({
-      target: targetId, pelletHits: hit.pelletHits, damage: appliedDamage,
+      target: targetId, pelletHits: hit.pelletHits, damage: appliedDamage, rawDamage: rawOutgoing,
       resultingHealth, died, hitZone: hit.hitZone, wallbang: hit.wallbang,
       penetrationMultiplier: hit.penetrationMultiplier,
     });
@@ -3492,8 +3497,10 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   }
   const headshot = message.outcomes.some((outcome) => outcome.hitZone === 'head');
   const totalDamage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
+  const totalRawDamage = message.outcomes.reduce((total, outcome) => total + (outcome.rawDamage ?? outcome.damage), 0);
+  const totalHealthBefore = message.outcomes.reduce((total, outcome) => total + outcome.damage + outcome.resultingHealth, 0);
   showHitmarker(headshot);
-  showDamageNumber(totalDamage, headshot ? 'head' : 'body');
+  showDamageNumber(totalRawDamage, headshot ? 'head' : 'body', totalHealthBefore);
   audio.hit(headshot);
   roundHitShots += 1;
   roundHeadshots += message.outcomes.filter((outcome) => outcome.hitZone === 'head').length;
@@ -4053,7 +4060,6 @@ function removeRemote(id: string, reason: string): void {
   }
   peerTimingStates.delete(id);
   remoteMeleeAdmissions.delete(id);
-  remotePingAdmissions.delete(id);
   authorizedRemotePickups.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
@@ -4357,7 +4363,6 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
-  element<HTMLElement>('#ping-block').hidden = !selectedArena.multiplayer;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
   respawn(requestLock);
   if (mode === 'solo') spawnBots();
@@ -4455,8 +4460,7 @@ function tryFire(now: number): void {
   }
   const shotInterval = 60_000 / spec.rpm;
   if (now < player.nextShotAt) return;
-  if (player.nextShotAt === 0 || now - player.nextShotAt > shotInterval * 2) player.nextShotAt = now;
-  player.nextShotAt += shotInterval;
+  player.nextShotAt = nextShotDeadline(now, shotInterval);
   endSpawnProtectionOnOffense(now);
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
@@ -4648,10 +4652,11 @@ function tryFire(now: number): void {
           actionNonce: shot.nonce, nonce: randomNonce(),
         }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
-        showDamageNumber(Math.min(100, poweredDamage), hit.zone);
+        showDamageNumber(poweredDamage, hit.zone, bot.hp);
       } else {
-        const dealt = applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone, undefined, player.id, hit);
-        showDamageNumber(dealt, hit.zone);
+        const healthBefore = bot.hp;
+        applyBotDamage(bot, Math.min(400, poweredDamage), hit.zone, undefined, player.id, hit);
+        showDamageNumber(poweredDamage, hit.zone, healthBefore);
       }
     }
     else {
@@ -4661,14 +4666,12 @@ function tryFire(now: number): void {
         if (remoteOperator) reactOperator(remoteOperator, hit.zone);
         const nonce = randomNonce();
         const dealt = Math.min(100, hit.damage);
-        const powered = Math.min(100, poweredDamage);
-        const targetAdjusted = Math.min(remote.snapshot.hp, applyDhvIncomingDamage(powered, remote.snapshot.hp, memberDhv(target)));
         sendAuthoritativeHit({
           type: 'hit', by: player.id, target, damage: dealt, kind: 'shot',
           actionNonce: shot.nonce, nonce,
         }, { ...hit, hitZone: hit.zone });
         showHitmarker(hit.zone === 'head');
-        showDamageNumber(targetAdjusted, hit.zone);
+        showDamageNumber(poweredDamage, hit.zone, remote.snapshot.hp);
         audio.hit(hit.zone === 'head');
       }
     }
@@ -5452,10 +5455,12 @@ function updateBots(dt: number, now: number): void {
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
       continue;
     }
-    recordCombatantPose(bot.positionHistory, {
-      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-      yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
-    });
+    if (network.role === 'host' && remotes.size > 0) {
+      recordCombatantPose(bot.positionHistory, {
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
+        yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+      });
+    }
     if (botsFrozen) {
       poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001);
       continue;
@@ -5996,11 +6001,12 @@ function showHitmarker(headshot = false): void {
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
-function showDamageNumber(damage: number, zone: HitZone): void {
-  const presentation = damageNumberPresentation(damage, zone);
+function showDamageNumber(damage: number, zone: HitZone, healthBefore?: number): void {
+  const presentation = damageNumberPresentation(damage, zone, healthBefore);
   if (!presentation) return;
   const root = element<HTMLElement>('#damage-numbers');
   root.dataset.lastDamage = String(presentation.amount);
+  root.dataset.lastOverkill = String(presentation.overkill);
   root.dataset.lastCritical = String(presentation.critical);
   root.dataset.lastLabel = presentation.label;
   const row = document.createElement('strong');
@@ -7120,13 +7126,6 @@ function clearFieldSupport(): void {
   updateFieldSupportHud();
 }
 
-function clearTeamPings(): void {
-  for (const ping of activeTeamPings) removeTeamPing(ping);
-  activeTeamPings.length = 0;
-  remotePingAdmissions.clear();
-  localPingAdmission = createTeamPingAdmissionState();
-}
-
 function updatePhysics(dt: number): void {
   if (!playerSimulationEnabled() || !characterPhysics) return;
   const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -7264,11 +7263,14 @@ function updatePhysics(dt: number): void {
 }
 
 function updateRemotes(dt: number, now: number): void {
+  if (remotes.size === 0) return;
   const hostNow = currentHostTimeMs();
-  recordCombatantPose(localPositionHistory, {
-    at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
-    yaw: player.yaw, stance: player.stance, continuity: localContinuity,
-  });
+  if (network.role === 'host') {
+    recordCombatantPose(localPositionHistory, {
+      at: hostNow, x: player.position.x, y: player.position.y, z: player.position.z,
+      yaw: player.yaw, stance: player.stance, continuity: localContinuity,
+    });
+  }
   for (const [id, remote] of remotes) {
     if (now - remote.lastSeen > 12_000) {
       removeRemote(id, 'timed out');
@@ -8078,10 +8080,6 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
   if (event.code === 'KeyF' && !event.repeat) interactWithWeaponPickup();
-  if (event.code === 'KeyT' && !event.repeat) sendTeamPing('enemy');
-  if (event.code === 'KeyY' && !event.repeat) sendTeamPing('regroup');
-  if (event.code === 'KeyU' && !event.repeat) sendTeamPing('push');
-  if (event.code === 'KeyI' && !event.repeat) sendTeamPing('nice');
   if (event.code === 'Tab') {
     event.preventDefault();
     updateRoster();
@@ -8266,6 +8264,13 @@ function applyArenaLightingForSelection(): void {
     sunLight.color.setHex(lighting.sunColor);
     sunLight.intensity = lighting.sunIntensity;
     sunLight.position.set(...lighting.sunPosition);
+    graphicsRefinement.applyArena(
+      selectedArena.id,
+      arena.bounds,
+      sunLight,
+      lighting.sunPosition,
+      renderer.shadowMap.enabled ? activeRenderConfig.shadowMapSize : 0,
+    );
   }
   if (fillLight) {
     fillLight.color.setHex(lighting.fillColor);
@@ -8319,6 +8324,7 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     arena = nextArena;
     botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
+    await ensureSelectedQualityPresentation(selectedArena.id);
     setArenaPresentationVisibility();
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
@@ -8406,7 +8412,6 @@ function resetForMode(): void {
   clearGrenades();
   clearGrenadeExplosionVisuals();
   clearFieldSupport();
-  clearTeamPings();
   clearDeathDrops();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
@@ -8576,7 +8581,7 @@ if (invitedRoom && launchParams.get('autojoin') === '1') {
 
 function scheduleStateBroadcast(): void {
   if (stateBroadcastTimer) clearTimeout(stateBroadcastTimer);
-  const delay = snapshotIntervalMs(localSnapshotRateState.rateHz);
+  const delay = stateBroadcastWakeIntervalMs(network.role, gameStarted, player.alive, localSnapshotRateState.rateHz);
   stateBroadcastTimer = setTimeout(() => {
     if (gameStarted && network.role !== 'offline' && player.alive) {
       const now = performance.now();
@@ -8672,7 +8677,6 @@ function frame(now: number, scheduleNext = true): void {
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
     updateOverdrive(now);
-    updateTeamPings(now);
     updateDeathDrops(now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
@@ -8795,8 +8799,6 @@ const debugWindow = window as Window & {
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     degradeStateChannel: () => boolean;
-    sendPing: (kind: TeamPingKind) => void;
-    holdPings: (durationMs?: number) => void;
     endMatch: () => void;
     rematch: () => void;
     returnToMainMenu: () => void;
@@ -9167,6 +9169,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       spawns: overdriveSpawns,
       pickups: overdrivePickups,
       expiries: overdriveExpiries,
+      presentationPrewarmed: overdrivePresentationPrewarmed,
       visible: overdriveRoot.visible,
       worldIconVisible: overdriveRoot.visible && quadWorldIcon.visible,
       worldIconName: quadWorldIcon.name,
@@ -9224,11 +9227,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       floorSections: house.solids.filter((solid) => solid.kind === 'floor').map((solid) => solid.name),
       routeAnchors: house.routes['ramp-room-flow'].length,
       indoorRouteAnchors: house.routes['indoor-ramp-room-flow'].length,
-    })),
-    teamPings: activeTeamPings.map((ping) => ({
-      kind: ping.root.name.replace('team-ping-', ''),
-      expiresInMs: Math.max(0, ping.expiresAt - performance.now()),
-      position: ping.root.position.toArray(),
     })),
     activeImpactParticles: impactPresentation.activeParticles(),
     activeImpactMarks: impactPresentation.activeMarks(),
@@ -9370,6 +9368,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       framePacing: framePacing.summary(),
       minimapRenders: minimapRenderCount,
       adaptive: adaptiveQuality.telemetry(),
+      graphicsRefinement: graphicsRefinement.telemetry(),
+      qualityAssetStreaming: { ...qualityAssetStreaming },
       lighting: {
         ...activeLighting,
         fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
@@ -10018,11 +10018,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastOverdriveState(now);
   },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
-  sendPing: (kind: TeamPingKind) => sendTeamPing(kind),
-  holdPings: (durationMs = 30_000) => {
-    const expiresAt = performance.now() + Math.max(0, Math.min(60_000, durationMs));
-    for (const ping of activeTeamPings) ping.expiresAt = expiresAt;
-  },
   endMatch: () => {
     const now = performance.now();
     matchState = {
@@ -10072,17 +10067,20 @@ async function bootstrap(): Promise<void> {
   const weaponPromise = weaponView.load((loaded, total) => {
     setStatus(`Loading authored weapons ${loaded}/${total}…`);
   });
-  const artPromise = renderProfile === 'blender'
+  const artPromise = renderProfile === 'blender' && selectedArena.id === 'atomic-acres'
     ? (async () => {
+        qualityAssetStreaming.eagerQualityGlbs += 1;
         try {
           const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
             const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
             setStatus(`Loading Quality Graphics arena ${percent}%…`);
           });
           blenderArenaActive = true;
+          qualityAssetStreaming.atomicAcres = 'ready';
           return art;
         } catch (error) {
           markBlenderArenaFallback(error);
+          qualityAssetStreaming.atomicAcres = 'fallback';
           console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
           return loadArenaArt(scene, (loaded, total) => {
             setStatus(`Quality Graphics fallback ${loaded}/${total}…`);
@@ -10092,14 +10090,16 @@ async function bootstrap(): Promise<void> {
     : loadArenaArt(scene, (loaded, total) => {
         setStatus(`Loading authored arena models ${loaded}/${total}…`);
       }, reducedWorldDetail);
-  const rustworksArtPromise = renderProfile === 'blender'
-    ? loadRustworksBlenderTower(rustworksArena.root).then((root) => {
+  const rustworksArtPromise = renderProfile === 'blender' && selectedArena.id === 'rustworks-1v1'
+    ? (qualityAssetStreaming.eagerQualityGlbs += 1, loadRustworksBlenderTower(rustworksArena.root)).then((root) => {
         // Authored kit is the Quality silhouette; keep only dirt ray-target + lights from procedural.
         setRustworksProceduralPresentationVisible(rustworksArena.root, false);
         setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
+        qualityAssetStreaming.rustworks = 'ready';
         return root;
       }).catch((error) => {
         markRustworksBlenderFallback(error);
+        qualityAssetStreaming.rustworks = 'fallback';
         console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
         applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
         setRustworksProceduralPresentationVisible(rustworksArena.root, true);
@@ -10136,6 +10136,8 @@ async function bootstrap(): Promise<void> {
     renderProfile,
     renderer.capabilities.getMaxAnisotropy(),
   );
+  graphicsRefinement.refine(scene, renderer.capabilities.getMaxAnisotropy());
+  await renderer.compileAsync(scene, camera);
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (renderProfile !== 'blender') {
     batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
@@ -10150,6 +10152,7 @@ async function bootstrap(): Promise<void> {
   }
   const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
   batchStaticMeshes(neighbourhoodLifeRoot, neighbourhoodLifeRoot, () => '', lifeMaterialMode);
+  await prewarmOverdrivePresentation();
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   weaponView.setWeapon(player.weapon, true);
   setArenaPresentationVisibility();

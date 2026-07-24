@@ -32,77 +32,104 @@ function welshFlagTexture(): THREE.Texture {
   context.fillStyle = '#168b3a';
   context.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
 
-  // Deliberately bold dragon silhouette so the national flag remains readable
-  // from the Rustworks deck instead of becoming an indistinct red speck.
+  // Four-legged passant dragon: long curled tail, raised foreleg, two wings,
+  // horned head and forked tongue. The previous single body polygon read more
+  // like a generic lizard than Y Ddraig Goch.
   context.fillStyle = '#ce1126';
   context.strokeStyle = '#8d0718';
-  context.lineWidth = 14;
+  context.lineWidth = 11;
   context.lineJoin = 'round';
+  context.lineCap = 'round';
   context.beginPath();
-  context.moveTo(207, 386);
-  context.bezierCurveTo(139, 335, 132, 250, 210, 208);
-  context.bezierCurveTo(253, 185, 307, 202, 342, 240);
-  context.lineTo(306, 143);
-  context.lineTo(429, 224);
-  context.lineTo(485, 121);
-  context.lineTo(545, 250);
-  context.bezierCurveTo(598, 214, 671, 213, 716, 251);
-  context.lineTo(776, 228);
-  context.lineTo(824, 259);
-  context.lineTo(767, 282);
-  context.lineTo(842, 315);
-  context.lineTo(760, 328);
-  context.bezierCurveTo(720, 379, 657, 396, 596, 374);
-  context.lineTo(626, 438);
-  context.lineTo(578, 438);
-  context.lineTo(529, 365);
-  context.lineTo(443, 368);
-  context.lineTo(404, 448);
-  context.lineTo(350, 448);
-  context.lineTo(377, 361);
-  context.bezierCurveTo(306, 407, 246, 417, 207, 386);
+  context.moveTo(385, 350);
+  context.bezierCurveTo(330, 389, 258, 407, 204, 373);
+  context.bezierCurveTo(150, 338, 147, 278, 194, 245);
+  context.bezierCurveTo(238, 214, 300, 230, 319, 270);
+  context.bezierCurveTo(284, 250, 242, 261, 239, 291);
+  context.bezierCurveTo(236, 322, 286, 340, 343, 311);
+  context.bezierCurveTo(420, 270, 519, 253, 618, 272);
+  context.bezierCurveTo(667, 281, 701, 264, 729, 229);
+  context.lineTo(766, 190);
+  context.lineTo(759, 236);
+  context.lineTo(805, 208);
+  context.lineTo(786, 250);
+  context.lineTo(852, 260);
+  context.lineTo(892, 290);
+  context.lineTo(850, 307);
+  context.lineTo(891, 329);
+  context.lineTo(831, 333);
+  context.lineTo(802, 365);
+  context.lineTo(744, 344);
+  context.bezierCurveTo(714, 391, 651, 409, 584, 388);
+  context.lineTo(527, 362);
+  context.lineTo(458, 370);
+  context.bezierCurveTo(427, 374, 404, 367, 385, 350);
   context.closePath();
   context.fill();
   context.stroke();
 
-  // Head, tongue, wing cut, horns and claws make the dragon identifiable.
+  // Paired wings use the heraldic swept, webbed silhouette.
   context.beginPath();
-  context.moveTo(719, 251);
-  context.lineTo(761, 190);
-  context.lineTo(768, 248);
-  context.lineTo(821, 210);
-  context.lineTo(795, 272);
+  context.moveTo(432, 286);
+  context.lineTo(353, 144);
+  context.lineTo(476, 213);
+  context.lineTo(522, 123);
+  context.lineTo(560, 239);
+  context.lineTo(620, 180);
+  context.lineTo(599, 285);
   context.closePath();
   context.fill();
   context.stroke();
   context.beginPath();
-  context.moveTo(797, 291);
-  context.lineTo(917, 270);
-  context.lineTo(845, 311);
-  context.lineTo(916, 333);
-  context.stroke();
-  context.beginPath();
-  context.moveTo(414, 249);
-  context.lineTo(500, 174);
-  context.lineTo(548, 283);
+  context.moveTo(470, 287);
+  context.lineTo(448, 188);
+  context.lineTo(539, 252);
+  context.lineTo(583, 194);
+  context.lineTo(574, 300);
   context.closePath();
   context.fill();
   context.stroke();
-  for (const [x, y] of [[357, 451], [400, 451], [574, 441], [618, 441]] as const) {
+
+  // Four separate legs and splayed claws preserve the official passant pose.
+  for (const [hipX, hipY, kneeX, footX, raised] of [
+    [420, 352, 389, 365, false],
+    [494, 359, 521, 548, false],
+    [611, 374, 588, 565, false],
+    [687, 353, 708, 748, true],
+  ] as const) {
     context.beginPath();
-    context.moveTo(x, y);
-    context.lineTo(x - 28, y + 29);
-    context.moveTo(x, y);
-    context.lineTo(x + 25, y + 24);
+    context.moveTo(hipX, hipY);
+    context.lineTo(kneeX, raised ? hipY - 55 : 415);
+    context.lineTo(footX, raised ? 375 : 452);
+    context.lineWidth = 24;
+    context.stroke();
+    context.lineWidth = 9;
+    const clawY = raised ? 375 : 452;
+    context.beginPath();
+    context.moveTo(footX, clawY);
+    context.lineTo(footX - 24, clawY + 20);
+    context.moveTo(footX, clawY);
+    context.lineTo(footX + 4, clawY + 25);
+    context.moveTo(footX, clawY);
+    context.lineTo(footX + 28, clawY + 15);
     context.stroke();
   }
+
+  // Forked tongue and facial detail.
+  context.lineWidth = 9;
+  context.beginPath();
+  context.moveTo(876, 296);
+  context.bezierCurveTo(919, 284, 944, 276, 970, 264);
+  context.moveTo(944, 276);
+  context.lineTo(975, 292);
+  context.stroke();
   context.fillStyle = '#ffffff';
   context.beginPath();
-  context.arc(774, 274, 9, 0, Math.PI * 2);
+  context.arc(833, 280, 8, 0, Math.PI * 2);
   context.fill();
   context.fillStyle = '#111111';
   context.beginPath();
-  context.arc(777, 274, 4, 0, Math.PI * 2);
+  context.arc(836, 280, 3.5, 0, Math.PI * 2);
   context.fill();
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -122,6 +149,10 @@ export function createRustworksWelshFlag(): THREE.Group {
     animated: true,
     width: RUSTWORKS_WELSH_FLAG.width,
     height: RUSTWORKS_WELSH_FLAG.height,
+    dragon: 'four-legged-passant',
+    legs: 4,
+    wings: 2,
+    tongue: 'forked',
     poleHeight: RUSTWORKS_WELSH_FLAG.poleHeight,
   };
 

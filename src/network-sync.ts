@@ -61,6 +61,15 @@ export function snapshotIntervalMs(rateHz: SnapshotRateHz): number {
   return 1_000 / rateHz;
 }
 
+export function stateBroadcastWakeIntervalMs(
+  role: 'offline' | 'host' | 'client',
+  gameStarted: boolean,
+  playerAlive: boolean,
+  rateHz: SnapshotRateHz,
+): number {
+  return role === 'offline' || !gameStarted || !playerAlive ? 250 : snapshotIntervalMs(rateHz);
+}
+
 export function desiredSnapshotRate(input: ReplicationPressure): SnapshotRateHz {
   const pressure = Number.isFinite(input.bufferedPressure) ? Math.max(0, input.bufferedPressure) : 1;
   if (input.rttMs > 220 || input.jitterMs > 60 || input.sequenceGaps >= 3 || input.reordered >= 2 || pressure >= 0.6) return 20;

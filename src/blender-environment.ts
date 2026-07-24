@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { ArenaMap } from './map';
 import type { ArenaId } from './map-selection';
 import { ARENA_ROUTE_IDENTITIES } from './world-identity';
 
-export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass60-20260723-3';
+export const BLENDER_ARENA_ASSET = './assets/original/models/atomic-acres-blender-arena.glb?v=pass62-20260724-reconciled1';
 
 export type BlenderArenaTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';
@@ -89,7 +90,7 @@ export async function loadBlenderArena(
 ): Promise<{ root: THREE.Group; loadedModels: number }> {
   telemetry.status = 'loading';
   telemetry.error = null;
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const gltf = await loader.loadAsync(BLENDER_ARENA_ASSET, (event) => {
     onProgress?.(event.loaded, event.total || event.loaded || 1);
   });
