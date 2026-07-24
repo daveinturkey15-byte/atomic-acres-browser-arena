@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { BLENDER_ARENA_ASSET, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
+import { BLENDER_ARENA_ASSET, enforceAtomicMaterialDepthContract, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
 
 const assetPath = new URL(`../public/${BLENDER_ARENA_ASSET.split('?')[0].replace(/^\.\/assets\//, 'assets/')}`, import.meta.url);
 const specPath = new URL('../source-assets/blender/atomic-acres-arena-spec.json', import.meta.url);
@@ -39,6 +39,16 @@ describe('Quality Graphics environment asset', () => {
     expect(quality.children.every((child) => child.userData.qualityProfileMirror === true)).toBe(true);
     expect(procedural.children).toHaveLength(3);
   });
+
+  it('forces opaque Atomic materials to remain opaque and depth-writing without changing glass', () => {
+    const opaque = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.2, depthWrite: false, alphaTest: 0.5 });
+    enforceAtomicMaterialDepthContract(opaque, false);
+    expect(opaque).toMatchObject({ transparent: false, opacity: 1, depthWrite: true, alphaTest: 0 });
+
+    const glass = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.2, depthWrite: false });
+    enforceAtomicMaterialDepthContract(glass, true);
+    expect(glass).toMatchObject({ transparent: true, opacity: 0.2, depthWrite: false });
+  });
   it('ships a self-contained, bounded original arena GLB with semantic windows', () => {
     const buffer = readFileSync(assetPath);
     const gltf = glbJson(buffer) as {
@@ -60,10 +70,10 @@ describe('Quality Graphics environment asset', () => {
     const housePropSets = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_asset_class === 'authored-house-furnishing-set');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(7_500_000);
-    expect(gltf.meshes?.length).toBe(34);
-    expect(gltf.materials?.length).toBe(28);
+    expect(gltf.meshes?.length).toBe(35);
+    expect(gltf.materials?.length).toBe(29);
     expect(gltf.images).toHaveLength(33);
-    expect(gltf.textures).toHaveLength(60);
+    expect(gltf.textures).toHaveLength(33);
     expect((gltf.materials ?? []).filter((material) =>
       material.normalTexture && material.pbrMetallicRoughness?.metallicRoughnessTexture)).toHaveLength(20);
     expect(gltf.images?.every((image) => typeof image.bufferView === 'number' && image.uri === undefined)).toBe(true);
@@ -85,6 +95,7 @@ describe('Quality Graphics environment asset', () => {
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_asphalt_charcoal')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_ground_olive')).toBe(true);
     expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_gunmetal')).toBe(true);
+    expect((gltf.nodes ?? []).some((node) => node.name === 'BLD_BATCH_MAT_ceiling_warm_white')).toBe(true);
     for (const name of ['BLD_BATCH_MAT_aqua_upper_brick', 'BLD_BATCH_MAT_aqua_rear_plaster', 'BLD_BATCH_MAT_coral_upper_plaster', 'BLD_BATCH_MAT_coral_rear_brick']) {
       expect((gltf.nodes ?? []).some((node) => node.name === name)).toBe(true);
     }
@@ -109,7 +120,7 @@ describe('Quality Graphics environment asset', () => {
     expect(provenance.title).toBe('Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul');
     expect(createHash('sha256').update(buffer).digest('hex')).toBe(provenance.runtimeGlbSha256);
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
-    expect(provenance.runtimeAudit.triangles).toBe(44_812);
+    expect(provenance.runtimeAudit.triangles).toBe(44_196);
   });
 
   it('matches every authoritative breakable-window id generated for Blender', () => {

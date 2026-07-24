@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
-export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb?v=pass60-20260723-3';
+export const RUSTWORKS_BLENDER_ASSET = './assets/original/models/rustworks-central-tower.glb?v=pass62-20260724-1';
 export const RUSTWORKS_BLENDER_EXPECTED_VERSION = 'rustworks-pass60-feedback-v3';
+export const RUSTWORKS_BLENDER_OVERLAY_RETIRED = true;
 
 type RustworksBlenderTelemetry = {
   status: 'idle' | 'loading' | 'ready' | 'fallback';
   asset: string;
+  overlayRetired: boolean;
+  overlayVisible: boolean;
   assetVersion: string | null;
   meshCount: number;
   materialCount: number;
@@ -28,6 +32,8 @@ type RustworksBlenderTelemetry = {
 const telemetry: RustworksBlenderTelemetry = {
   status: 'idle',
   asset: RUSTWORKS_BLENDER_ASSET,
+  overlayRetired: RUSTWORKS_BLENDER_OVERLAY_RETIRED,
+  overlayVisible: false,
   assetVersion: null,
   meshCount: 0,
   materialCount: 0,
@@ -49,7 +55,7 @@ const telemetry: RustworksBlenderTelemetry = {
 let blenderRoot: THREE.Group | null = null;
 
 export function rustworksBlenderTelemetry(): RustworksBlenderTelemetry {
-  return { ...telemetry };
+  return { ...telemetry, overlayVisible: blenderRoot?.visible === true };
 }
 
 export function markRustworksBlenderFallback(error: unknown): void {
@@ -57,11 +63,14 @@ export function markRustworksBlenderFallback(error: unknown): void {
   telemetry.error = error instanceof Error ? error.message : String(error);
 }
 
-/** Hide duplicated procedural presentation once the authored Quality kit is live. */
+/** Keep the retired GLB hidden while toggling the single procedural authority. */
 export function setRustworksProceduralPresentationVisible(arenaRoot: THREE.Object3D, visible: boolean): void {
   arenaRoot.traverse((node) => {
+    if (node.userData.blenderAuthoredEnvironment) {
+      node.visible = false;
+      return;
+    }
     if (!(node instanceof THREE.Mesh)) return;
-    if (node.userData.blenderAuthoredEnvironment) return;
     if (String(node.name).startsWith('rustworks-quality-') || String(node.name).startsWith('rustworks-work-')) return;
     if (String(node.parent?.name ?? '').startsWith('rustworks-quality')) return;
     // Keep ground plane ray target always available for shots into dirt.
@@ -88,13 +97,15 @@ export function rustworksBlenderRoot(): THREE.Group | null {
 export async function loadRustworksBlenderTower(arenaRoot: THREE.Group): Promise<THREE.Group> {
   telemetry.status = 'loading';
   telemetry.error = null;
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const gltf = await loader.loadAsync(RUSTWORKS_BLENDER_ASSET);
   const root = gltf.scene;
   root.name = 'Rustworks Blender central tower';
+  root.visible = false;
   root.userData.presentationOnly = true;
   root.userData.blocksShots = false;
   root.userData.blenderAuthoredEnvironment = true;
+  root.userData.rustworksOverlayRetired = RUSTWORKS_BLENDER_OVERLAY_RETIRED;
 
   let meshCount = 0;
   let triangleCount = 0;
@@ -158,9 +169,10 @@ export async function loadRustworksBlenderTower(arenaRoot: THREE.Group): Promise
 
   arenaRoot.add(root);
   blenderRoot = root;
-  setRustworksProceduralPresentationVisible(arenaRoot, false);
+  setRustworksProceduralPresentationVisible(arenaRoot, true);
 
   telemetry.status = 'ready';
+  telemetry.overlayVisible = false;
   telemetry.assetVersion = assetVersion;
   telemetry.meshCount = meshCount;
   telemetry.materialCount = materials.size;

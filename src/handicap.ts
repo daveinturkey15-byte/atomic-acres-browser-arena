@@ -33,6 +33,21 @@ export function applyDhvIncomingDamage(damage: number, currentHealth: number, va
   return admitted * dhvIncomingMultiplier(value);
 }
 
+/**
+ * Reports theoretical pre-health-clamp damage on the same target-DHV scale as
+ * the authoritative applied value. The applied floor absorbs harmless binary
+ * floating-point drift and keeps shot-result packets protocol-valid.
+ */
+export function reportedDhvRawDamage(
+  rawDamage: number,
+  currentHealth: number,
+  value: Dhv,
+  appliedDamage: number,
+): number {
+  const applied = Math.max(0, Number.isFinite(appliedDamage) ? appliedDamage : 0);
+  return Math.max(applied, applyDhvIncomingDamage(rawDamage, currentHealth, value));
+}
+
 export function dhvLabel(value: Dhv): string {
   return value === 10 ? 'STANDARD' : value === 'X' ? 'ONE-SHOT / MAGNUM' : `${Math.round((1 - value / 10) * 100)}% HANDICAP`;
 }

@@ -64,6 +64,7 @@ export function deriveRemoteShotBaseDamage(
 
 export type DerivedRemoteShotOutcome = Readonly<{
   damage: number;
+  rawDamage: number;
   pelletHits: number;
   hitZone: HitZone;
   wallbang: boolean;
@@ -92,10 +93,12 @@ export function deriveAuthoritativeShotOutcomes(
     const multiplier = typeof rawPenetration === 'boolean' ? (rawPenetration ? 0 : 1) : Math.max(0, Math.min(1, rawPenetration));
     if (multiplier <= 0) continue;
     const prior = outcomes.get(nearest.target.id) ?? {
-      damage: 0, pelletHits: 0, hitZone: 'limb' as HitZone, wallbang: false, penetrationMultiplier: 1,
+      damage: 0, rawDamage: 0, pelletHits: 0, hitZone: 'limb' as HitZone, wallbang: false, penetrationMultiplier: 1,
     };
+    const rawDamage = prior.rawDamage + applyPenetrationDamage(computeDamage(spec, nearest.distance, nearest.zone), multiplier);
     outcomes.set(nearest.target.id, {
-      damage: Math.min(100, prior.damage + applyPenetrationDamage(computeDamage(spec, nearest.distance, nearest.zone), multiplier)),
+      damage: Math.min(100, rawDamage),
+      rawDamage,
       pelletHits: prior.pelletHits + 1,
       hitZone: nearest.zone === 'head' || nearest.zone === 'body' && prior.hitZone === 'limb' ? nearest.zone : prior.hitZone,
       wallbang: prior.wallbang || multiplier < 0.999,
@@ -113,7 +116,9 @@ export function deriveRemoteShotOutcome(
   penetration: (origin: THREE.Vector3, impact: THREE.Vector3, weapon: WeaponId) => boolean | number = () => 1,
 ): DerivedRemoteShotOutcome {
   const spec = WEAPONS[weapon];
-  if (pelletDirections.length !== spec.pellets) return { damage: 0, pelletHits: 0, hitZone: 'body', wallbang: false, penetrationMultiplier: 1 };
+  if (pelletDirections.length !== spec.pellets) return {
+    damage: 0, rawDamage: 0, pelletHits: 0, hitZone: 'body', wallbang: false, penetrationMultiplier: 1,
+  };
   let damage = 0;
   let pelletHits = 0;
   let hitZone: HitZone = 'limb';
@@ -131,6 +136,7 @@ export function deriveRemoteShotOutcome(
   }
   return {
     damage: Math.min(100, damage),
+    rawDamage: damage,
     pelletHits,
     hitZone,
     wallbang: penetrationMultiplier < 0.999,

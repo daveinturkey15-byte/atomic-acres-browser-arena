@@ -17,7 +17,10 @@ export type AdaptiveQualityTelemetry = {
 };
 
 export function adaptiveShadowsEnabled(profile: RenderProfile, authoredShadows: boolean, pixelRatioCap: number): boolean {
-  return profile === 'blender' && authoredShadows && pixelRatioCap >= 0.85;
+  // Shadows are part of the Quality presentation contract, not a disposable
+  // post effect. The controller sheds bloom, contact shading, fog, particles,
+  // decals, IBL and resolution first; Performance/Compatibility remain shadow-free.
+  return profile === 'blender' && authoredShadows && pixelRatioCap >= 0.65;
 }
 
 type AdaptiveQualityOptions = {

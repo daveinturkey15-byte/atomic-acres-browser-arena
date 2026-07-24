@@ -1,8 +1,45 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { WeaponPresentation } from './weapon-presentation';
+import { HIP_VIEWMODEL_POSITION, HIP_VIEWMODEL_SCALE, WeaponPresentation } from './weapon-presentation';
+
+const REST_POSE = {
+  dt: 1 / 60,
+  moving: false,
+  sprinting: false,
+  crouched: false,
+  prone: false,
+  ads: false,
+  phase: 0,
+  landingImpulse: 0,
+  lateralSpeed: 0,
+  reloadProgress: null,
+};
 
 describe('first-person anatomical presentation', () => {
+  it('starts materially smaller, lower and farther right at the hip', () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    expect(presentation.root.scale.x).toBeCloseTo(HIP_VIEWMODEL_SCALE, 8);
+    expect(presentation.root.scale.y).toBeCloseTo(HIP_VIEWMODEL_SCALE, 8);
+    expect(presentation.root.scale.z).toBeCloseTo(HIP_VIEWMODEL_SCALE, 8);
+    expect(presentation.root.position.toArray()).toEqual([
+      HIP_VIEWMODEL_POSITION.x,
+      HIP_VIEWMODEL_POSITION.y,
+      HIP_VIEWMODEL_POSITION.z,
+    ]);
+  });
+
+  it('returns to the full-size dynamically centred sight picture in ADS', async () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    await presentation.load();
+    for (let frame = 0; frame < 180; frame += 1) presentation.update({ ...REST_POSE, ads: true });
+    const state = presentation.presentationState();
+    expect(state.adsProgress).toBeGreaterThan(0.999);
+    expect(presentation.root.scale.x).toBeCloseTo(0.64, 3);
+    expect(state.sightOffset?.[0]).toBeCloseTo(0, 3);
+    expect(state.sightOffset?.[1]).toBeCloseTo(0, 3);
+  });
+
   it('preserves detailed PBR sleeve, hand and finger meshes in the quality viewmodel', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, false);

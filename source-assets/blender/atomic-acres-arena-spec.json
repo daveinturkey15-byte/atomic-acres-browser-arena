@@ -520,24 +520,6 @@
           "breakable": false
         },
         {
-          "id": "aqua-irrigation-workshop:ground-room-partition-lintel",
-          "name": "ground-room-partition-lintel",
-          "position": [
-            -7,
-            3.0700000000000003,
-            -28
-          ],
-          "size": [
-            2.6,
-            0.56,
-            0.42
-          ],
-          "surface": "trim",
-          "collidable": true,
-          "kind": "wall",
-          "breakable": false
-        },
-        {
           "id": "aqua-irrigation-workshop:ground-floor-slab",
           "name": "ground-floor-slab",
           "position": [
@@ -587,24 +569,6 @@
             11.489999999999998
           ],
           "surface": "aqua",
-          "collidable": true,
-          "kind": "wall",
-          "breakable": false
-        },
-        {
-          "id": "aqua-irrigation-workshop:upper-ramp-side-wall-lintel",
-          "name": "upper-ramp-side-wall-lintel",
-          "position": [
-            -19.1,
-            6.6499999999999995,
-            -32.8
-          ],
-          "size": [
-            0.42,
-            0.56,
-            2.6
-          ],
-          "surface": "trim",
           "collidable": true,
           "kind": "wall",
           "breakable": false
@@ -767,24 +731,6 @@
             0.42
           ],
           "surface": "plaster",
-          "collidable": true,
-          "kind": "wall",
-          "breakable": false
-        },
-        {
-          "id": "aqua-irrigation-workshop:upper-room-partition-lintel",
-          "name": "upper-room-partition-lintel",
-          "position": [
-            -7,
-            6.6499999999999995,
-            -28
-          ],
-          "size": [
-            2.6,
-            0.56,
-            0.42
-          ],
-          "surface": "trim",
           "collidable": true,
           "kind": "wall",
           "breakable": false
@@ -1977,24 +1923,6 @@
           "breakable": false
         },
         {
-          "id": "coral-orchard-conservatory:ground-room-partition-lintel",
-          "name": "ground-room-partition-lintel",
-          "position": [
-            11,
-            3.0700000000000003,
-            28
-          ],
-          "size": [
-            2.6,
-            0.56,
-            0.42
-          ],
-          "surface": "trim",
-          "collidable": true,
-          "kind": "wall",
-          "breakable": false
-        },
-        {
           "id": "coral-orchard-conservatory:ground-floor-slab",
           "name": "ground-floor-slab",
           "position": [
@@ -2062,24 +1990,6 @@
             11.489999999999998
           ],
           "surface": "coral",
-          "collidable": true,
-          "kind": "wall",
-          "breakable": false
-        },
-        {
-          "id": "coral-orchard-conservatory:upper-ramp-side-wall-lintel",
-          "name": "upper-ramp-side-wall-lintel",
-          "position": [
-            19.1,
-            6.6499999999999995,
-            32.8
-          ],
-          "size": [
-            0.42,
-            0.56,
-            2.6
-          ],
-          "surface": "trim",
           "collidable": true,
           "kind": "wall",
           "breakable": false
@@ -2224,24 +2134,6 @@
             0.42
           ],
           "surface": "plaster",
-          "collidable": true,
-          "kind": "wall",
-          "breakable": false
-        },
-        {
-          "id": "coral-orchard-conservatory:upper-room-partition-lintel",
-          "name": "upper-room-partition-lintel",
-          "position": [
-            11,
-            6.6499999999999995,
-            28
-          ],
-          "size": [
-            2.6,
-            0.56,
-            0.42
-          ],
-          "surface": "trim",
           "collidable": true,
           "kind": "wall",
           "breakable": false

@@ -48,11 +48,13 @@ export function rustworksLightingTint(
       ambientColor: 0x9ab1b3,
       sunColor: 0xc8edf0,
       fillColor: 0xffc27c,
-      sunIntensity: quality ? 0.34 : 0.28,
-      fillIntensity: quality ? 1.18 : 1.02,
-      hemisphereIntensity: quality ? 1.12 : 1.0,
-      ambientIntensity: quality ? 0.86 : 0.78,
-      exposure: Math.max(base.exposure, quality ? 1.08 : 1.02),
+      // Local ceiling/practical lights model the room. Global fill stays low
+      // so booths, baffles, targets and moving players retain contact shape.
+      sunIntensity: quality ? 0.75 : 0.62,
+      fillIntensity: quality ? 0.28 : 0.32,
+      hemisphereIntensity: quality ? 0.92 : 0.88,
+      ambientIntensity: quality ? 0.44 : 0.4,
+      exposure: quality ? 1.04 : 1.02,
       godRayStrength: 0,
       godRayLobes: 1,
     };
@@ -73,11 +75,12 @@ export function rustworksLightingTint(
       hemisphereGround: 0x8b8d80,
       ambientColor: 0xd1dfdc,
       fillColor: 0xffcf9b,
-      hemisphereIntensity: Math.max(base.hemisphereIntensity, quality ? 2.15 : 1.9),
-      ambientIntensity: Math.max(base.ambientIntensity, quality ? 1.02 : 0.9),
-      fillIntensity: Math.max(base.fillIntensity, quality ? 0.92 : 0.78),
-      exposure: Math.max(base.exposure, quality ? 1.2 : 1.12),
-      godRayStrength: Math.min(base.godRayStrength, 0.08),
+      sunIntensity: quality ? 2.2 : 2.15,
+      hemisphereIntensity: quality ? 0.72 : 0.88,
+      ambientIntensity: quality ? 0.28 : 0.32,
+      fillIntensity: quality ? 0.32 : 0.36,
+      exposure: quality ? 1 : 1.02,
+      godRayStrength: Math.min(base.godRayStrength, 0.06),
       godRayLobes: Math.min(base.godRayLobes, 3),
     };
   }
@@ -99,12 +102,13 @@ export function rustworksLightingTint(
     ambientColor: quality ? 0x6a7488 : 0x5c6678,
     sunColor: quality ? 0xd0dcff : 0xc0cce8,
     fillColor: quality ? 0xffb060 : 0xe8a050,
-    // Soft moon key + strong warm fill so metal reads without day sky.
-    sunIntensity: quality ? 0.55 : 0.42,
-    fillIntensity: quality ? 1.15 : 0.9,
-    hemisphereIntensity: quality ? 1.35 : 1.1,
-    ambientIntensity: quality ? 0.72 : 0.62,
-    exposure: quality ? Math.max(base.exposure, 1.05) : Math.max(base.exposure * 0.95, 0.95),
+    // Moon and authored floods stay dominant; broad fill no longer turns the
+    // complete oil rig into one evenly lit orange surface.
+    sunIntensity: quality ? 0.95 : 0.75,
+    fillIntensity: quality ? 0.28 : 0.34,
+    hemisphereIntensity: quality ? 0.45 : 0.58,
+    ambientIntensity: quality ? 0.16 : 0.24,
+    exposure: quality ? 1 : 0.98,
     godRayStrength: 0.04,
     godRayLobes: 2,
   };

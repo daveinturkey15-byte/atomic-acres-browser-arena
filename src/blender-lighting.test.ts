@@ -5,10 +5,10 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
   it('uses bounded purple-orange early-morning balance in Quality Graphics', () => {
     const blender = arenaLightingProfile('blender');
     expect(blender).toMatchObject({
-      exposure: 1.18,
-      hemisphereIntensity: 1.9,
-      ambientIntensity: 0.82,
-      sunIntensity: 2.7,
+      exposure: 1.02,
+      hemisphereIntensity: 0.7,
+      ambientIntensity: 0.18,
+      sunIntensity: 3.15,
       fogColor: 0xb0a5b5,
       fogNear: 50,
       fogFar: 128,
@@ -24,13 +24,14 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
       interiorLightIntensity: 15,
       interiorLightCount: 4,
       fillColor: 0xd8ddff,
-      fillIntensity: 0.7,
+      fillIntensity: 0.22,
       fillPosition: [54, 20, -42],
       godRayStrength: 0.12,
       godRayLobes: 4,
     });
-    expect(blender.sunIntensity / blender.hemisphereIntensity).toBeGreaterThanOrEqual(1.35);
-    expect(blender.sunIntensity / blender.hemisphereIntensity).toBeLessThanOrEqual(1.6);
+    expect(blender.sunIntensity / blender.hemisphereIntensity).toBeGreaterThanOrEqual(4);
+    expect(blender.sunIntensity / blender.hemisphereIntensity).toBeLessThanOrEqual(5);
+    expect(blender.softShadows).toBe(true);
     expect(blender.fogFar - blender.fogNear).toBeGreaterThanOrEqual(60);
     expect(blender.sunPosition).toEqual([-62, 25, 38]);
   });
@@ -39,22 +40,22 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
     const performance = arenaLightingProfile('performance');
     const compat = arenaLightingProfile('compat');
     expect(performance).toMatchObject({
-      exposure: 1.16,
-      hemisphereIntensity: 1.82,
-      ambientIntensity: 0.78,
-      sunIntensity: 2.65,
+      exposure: 1.06,
+      hemisphereIntensity: 1.05,
+      ambientIntensity: 0.34,
+      sunIntensity: 2.7,
       routeLightIntensity: 3,
       streetLightIntensity: 4,
       interiorLightIntensity: 11,
       routeLightCount: 3,
       streetLightCount: 4,
       interiorLightCount: 2,
-      fillIntensity: 0.58,
+      fillIntensity: 0.32,
       godRayStrength: 0.08,
       godRayLobes: 2,
     });
-    expect(performance.sunIntensity / performance.hemisphereIntensity).toBeGreaterThanOrEqual(1.4);
-    expect(performance.sunIntensity / performance.hemisphereIntensity).toBeLessThanOrEqual(1.55);
+    expect(performance.sunIntensity / performance.hemisphereIntensity).toBeGreaterThanOrEqual(2.4);
+    expect(performance.sunIntensity / performance.hemisphereIntensity).toBeLessThanOrEqual(2.7);
     expect(compat).toMatchObject({ routeLightCount: 0, streetLightCount: 0, interiorLightCount: 0, fillIntensity: 0.66, godRayStrength: 0, godRayLobes: 0 });
     expect(compat.ambientIntensity).toBeGreaterThan(performance.ambientIntensity);
   });
@@ -71,7 +72,7 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
     const atomic = arenaLightingProfile('blender', 'atomic-acres');
     const otherMap = arenaLightingProfile('blender', 'rustworks-1v1');
     expect(atomic).toMatchObject({
-      exposure: 1.06,
+      exposure: 1,
       fogColor: 0xaebdbd,
       fogNear: 58,
       fogFar: 148,
@@ -82,6 +83,8 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
       interiorLightIntensity: 10,
       godRayStrength: 0.05,
     });
+    expect(atomic.sunIntensity / atomic.hemisphereIntensity).toBeGreaterThan(4);
+    expect(atomic.ambientIntensity).toBeLessThan(0.25);
     expect(otherMap).toEqual(arenaLightingProfile('blender'));
   });
 });

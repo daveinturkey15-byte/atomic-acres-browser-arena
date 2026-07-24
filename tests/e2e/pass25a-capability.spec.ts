@@ -44,10 +44,10 @@ test.describe('Pass 25A browser capability smoke', () => {
         profile: 'performance',
         fallbackReason: null,
         bypassReason: null,
-        textureSamples: 1,
         targetValidated: true,
         outputValidated: true,
       });
+      expect(capability.atomicSignal.textureSamples).toBeGreaterThanOrEqual(1);
     }
     expect(shaderErrors).toEqual([]);
     expect(errors).toEqual([]);

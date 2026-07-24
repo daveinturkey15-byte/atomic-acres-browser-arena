@@ -1206,6 +1206,8 @@ export function resetOperator(root: THREE.Group): void {
 export function meleeOperator(root: THREE.Group): void {
   root.userData.operatorMeleeAt = performance.now();
   meleeRiggedOperator(root);
+  const rig = operatorRig(root);
+  if (rig?.meleeKnife) rig.meleeKnife.visible = true;
 }
 
 export function poseOperator(

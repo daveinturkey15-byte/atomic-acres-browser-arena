@@ -18,18 +18,18 @@
 
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('release')?.trim().toLowerCase();
-  if (params.get('room')?.trim() || requested === 'latest' || requested === 'normal') return route('normal');
+  if (params.get('room')?.trim() || requested === 'latest' || requested === 'normal') return route('experimental');
   if (requested === 'stable') return route('stable');
   if (requested === 'experimental') return route('experimental');
 
   const options = document.querySelector('#release-channel-options');
-  for (const key of ['normal', 'stable', 'experimental']) {
+  for (const key of ['experimental', 'stable']) {
     const channel = config[key];
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `release-channel-option ${key}`;
     button.dataset.releaseChoice = key;
-    button.innerHTML = `<small>${channel.pass} · ${key === 'stable' ? 'PINNED STABLE' : key === 'normal' ? 'NORMAL LIVE' : 'SEPARATE TEST CHANNEL'}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
+    button.innerHTML = `<small>${channel.pass} · ${key === 'stable' ? 'STABLE' : 'LIVE'}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
     button.addEventListener('click', () => route(key));
     options.append(button);
   }

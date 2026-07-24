@@ -52,4 +52,10 @@ describe('Pass 30 atmosphere budget', () => {
     expect(atmosphereFogRange('blender', 'skyline-terminal')).toEqual({ near: 40, far: 122 });
     expect(atmosphereFogRange('compat', 'atomic-acres')).toEqual({ near: 56, far: 140 });
   });
+
+  it('downshifts atmosphere density independently of framebuffer resolution', () => {
+    const system = new AtmosphereSystem(new THREE.Scene(), 'blender', 'ANGLE (NVIDIA RTX)', null);
+    system.setDensityScale(0.5);
+    expect(system.telemetry()).toMatchObject({ densityScale: 0.5, mistCards: 5, smokeCards: 3, dustMotes: 32, triangles: 16 });
+  });
 });

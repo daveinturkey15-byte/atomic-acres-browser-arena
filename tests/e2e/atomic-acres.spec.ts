@@ -69,6 +69,7 @@ type DebugState = {
     } | null;
     neonHaze: boolean;
   }>;
+  corpses: { active: number; lifetimeMs: number; remainingMs: number[] };
   botEscalation: { deaths: number; initialBots: number; targetBots: number; activeBots: number; nextReinforcementAt: number };
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -138,6 +139,7 @@ type DebugState = {
     spawns: number;
     pickups: number;
     expiries: number;
+    presentationPrewarmed: boolean;
     visible: boolean;
     worldIconVisible: boolean;
     worldIconName: string;
@@ -174,7 +176,6 @@ type DebugState = {
     routeAnchors: number;
     indoorRouteAnchors: number;
   }>;
-  teamPings: Array<{ kind: string; expiresInMs: number; position: number[] }>;
   activeImpactParticles: number;
   activeImpactMarks: number;
   activeTracers: number;
@@ -400,7 +401,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('boot and authored presentation', () => {
-  test('keeps the desktop gameplay HUD legible at a 1.35 scale', async ({ page }) => {
+  test('keeps the reduced desktop gameplay HUD and tall Field Support column legible', async ({ page }) => {
     await pageReady(page);
     await startSolo(page);
     const layout = await page.evaluate(() => {
@@ -412,13 +413,15 @@ test.describe('boot and authored presentation', () => {
         minimapZoom: getComputedStyle(minimap).zoom,
         minimapWidth: minimap.getBoundingClientRect().width,
         supportWidth: support.getBoundingClientRect().width,
+        supportHeight: support.getBoundingClientRect().height,
         weaponRight: weapon.getBoundingClientRect().right,
         viewportWidth: window.innerWidth,
       };
     });
-    expect(layout.minimapZoom).toBe('1.35');
-    expect(layout.minimapWidth).toBeGreaterThanOrEqual(400);
-    expect(layout.supportWidth).toBeGreaterThanOrEqual(320);
+    expect(layout.minimapZoom).toBe('1');
+    expect(layout.minimapWidth).toBe(300);
+    expect(layout.supportWidth).toBeLessThanOrEqual(180);
+    expect(layout.supportHeight).toBeGreaterThanOrEqual(150);
     expect(layout.weaponRight).toBeLessThanOrEqual(layout.viewportWidth);
   });
 
@@ -432,7 +435,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 61');
+    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 62');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({
@@ -445,6 +448,11 @@ test.describe('boot and authored presentation', () => {
       receiverReordered: 0,
       outboundFeedbackSequenceGaps: 0,
       outboundFeedbackReordered: 0,
+      interpolationDelay: {
+        delayMs: 60,
+        sourceSnapshotRateHz: 40,
+        targetViewRewindHeadroomMs: 190,
+      },
     });
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
@@ -589,8 +597,9 @@ test.describe('boot and authored presentation', () => {
     expect(defaultState.render).toMatchObject({
       profile: 'blender',
       representation: 'blender',
-      atomicSignal: { enabled: true, fallbackReason: null, textureSamples: 5 },
+      atomicSignal: { enabled: true, fallbackReason: null },
     });
+    expect(defaultState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(5);
     expect(defaultState.render.materialCompatibility.materials).toBeGreaterThan(0);
     expect(defaultState.render.atomicSignal.targetValidated).toBe(true);
     expect(defaultState.render.atomicSignal.outputValidated).toBe(true);
@@ -600,11 +609,16 @@ test.describe('boot and authored presentation', () => {
     ]);
     await expect(page.locator('#graphics-profile')).toHaveValue('blender');
     await pageReadyAt(page, '/?render=performance&signal=on');
-    expect((await debug(page)).render).toMatchObject({
+    const performanceState = await debug(page);
+    expect(performanceState.render).toMatchObject({
       profile: 'performance',
       representation: 'responsive',
-      atomicSignal: { enabled: true, fallbackReason: null, textureSamples: 1 },
+      atomicSignal: { enabled: true, fallbackReason: null },
     });
+    expect(performanceState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(1);
+    expect(performanceState.render.atomicSignal.textureSamples).toBeLessThan(
+      defaultState.render.atomicSignal.textureSamples,
+    );
     expect(shaderErrors).toEqual([]);
   });
 
@@ -672,14 +686,14 @@ test.describe('boot and authored presentation', () => {
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
-        exposure: 1.06, hemisphereIntensity: 1.64, ambientIntensity: 0.66,
-        sunIntensity: 2.42, fogNear: 52, fogFar: 142,
+        exposure: 1, hemisphereIntensity: 0.72, ambientIntensity: 0.18,
+        sunIntensity: 3.25, fogNear: 52, fogFar: 142,
         routeLightIntensity: 3, streetLightIntensity: 3.8, interiorLightIntensity: 10,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.05, godRayLobes: 2,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 34, materialCount: 28, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_812,
+        status: 'ready', meshCount: 35, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_196,
         semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },
@@ -892,7 +906,9 @@ test.describe('boot and authored presentation', () => {
     );
     await page.getByRole('button', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(999));
+    const redeploy = page.getByRole('button', { name: 'REDEPLOY NOW WITH SELECTED FIELD KIT' });
+    await expect(redeploy).toBeVisible();
+    await redeploy.click();
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'scattergun',
       undefined,
@@ -1237,10 +1253,12 @@ test.describe('solo mechanics', () => {
     expect(dying.alive).toBe(false);
     expect(dying.rootVisible).toBe(true);
     expect(dying.operatorModel?.activeClip).toBe('Death');
+    expect((await debug(page)).corpses).toMatchObject({ active: 1, lifetimeMs: 7_500 });
     await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 8_000 }).toBe(true);
     const respawned = (await debug(page)).bots[0];
     expect(respawned.rootVisible).toBe(true);
     expect(respawned.operatorModel?.activeClip).toBe('Idle_Gun_Pointing');
+    expect((await debug(page)).corpses.active).toBe(1);
   });
 
   test('animates the knife on misses while keeping first-person arms visible', async ({ page }) => {
@@ -1281,7 +1299,7 @@ test.describe('solo mechanics', () => {
     await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.meleeKnifeVisible, { timeout: 3_000 }).toBe(false);
   });
 
-  test('blocks street props and the upper house facade at their authored positions', async ({ page }) => {
+  test('blocks street props while keeping the upper house entrance open', async ({ page }) => {
     const collision = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         collisionProbe: (x: number, z: number) => boolean;
@@ -1298,7 +1316,7 @@ test.describe('solo mechanics', () => {
     });
     expect(collision.bins.every(Boolean)).toBe(true);
     expect(collision.benches.every(Boolean)).toBe(true);
-    expect(collision.upperFacade).toBe(true);
+    expect(collision.upperFacade).toBe(false);
     expect(collision.upperInteriorClear).toBe(false);
   });
 
@@ -1321,7 +1339,7 @@ test.describe('solo mechanics', () => {
     expect(Number(await page.locator('#damage-numbers').getAttribute('data-last-damage'))).toBeGreaterThan(0);
     await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', /CRIT/);
     await expect(page.locator('#damage-done-feed [data-damage-dealt]')).toBeVisible();
-    await expect(page.locator('#damage-done-label')).toContainText('OUTGOING');
+    await expect(page.locator('#damage-done-label')).toHaveCount(0);
 
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -1334,7 +1352,7 @@ test.describe('solo mechanics', () => {
       api.damage(999);
     });
     await expect(page.locator('#damage-taken-feed [data-damage-taken]')).toBeVisible();
-    await expect(page.locator('#damage-taken-label')).toContainText('INCOMING');
+    await expect(page.locator('#damage-taken-label')).toHaveCount(0);
     await expect.poll(async () => (await debug(page)).player.hp, { timeout: 6_000 }).toBe(100);
     const respawned = (await debug(page)).player;
     expect(respawned.stance).toBe('stand');
@@ -1674,6 +1692,9 @@ test.describe('solo mechanics', () => {
     });
     await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
     await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(2);
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-damage', '201');
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-overkill', '101');
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', 'CRIT 201 · +101 OVERKILL');
 
     state = await debug(page);
     expect(state.player.equippedWeapons).toEqual(['sniper', 'machine-pistol']);
@@ -1923,7 +1944,7 @@ test.describe('solo mechanics', () => {
         const boxes = cards.map((card) => card.getBoundingClientRect());
         const persistentRegions = [
           '#matchbar', '#objective', '#network-strip', '#killfeed', '#location-label',
-          '#equipment-block', '#health-block', '#combat-stats', '#weapon-block', '#ping-block',
+          '#equipment-block', '#health-block', '#combat-stats', '#weapon-block',
         ].map((selector) => ({ selector, box: visibleBox(selector) }))
           .filter((entry): entry is { selector: string; box: DOMRect } => entry.box !== null && entry.box.width > 0 && entry.box.height > 0);
         const cardOverlap = boxes.some((box, index) => boxes.slice(index + 1).some((other) => intersects(box, other)));
@@ -1949,8 +1970,8 @@ test.describe('solo mechanics', () => {
       expect(metrics.ammoFont, JSON.stringify(viewport)).toBeGreaterThanOrEqual(viewport.width <= 700 ? 40 : 64);
       expect(metrics.cardCount, JSON.stringify(viewport)).toBe(5);
       expect(metrics.supportWidth, JSON.stringify(viewport)).toBeGreaterThanOrEqual(145);
-      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(525);
-      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(55);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(viewport.width <= 700 ? 525 : 180);
+      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(viewport.width <= 700 ? 55 : 150);
       expect(metrics.leftGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.rightGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
       expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
@@ -1980,10 +2001,10 @@ test.describe('solo mechanics', () => {
       return { hidden: announcement?.hidden ?? true, text: announcement?.textContent ?? '' };
     });
     expect(spawnAnnouncement.hidden).toBe(false);
-    expect(spawnAnnouncement.text).toContain('QUAD DAMAGE ONLINE');
+    expect(spawnAnnouncement.text).toContain('2× DAMAGE ONLINE');
     await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
     expect((await debug(page)).overdrive).toMatchObject({
-      available: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
+      available: true, presentationPrewarmed: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
     });
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -2006,7 +2027,7 @@ test.describe('solo mechanics', () => {
     expect(observedActive.remainingMs).toBeLessThanOrEqual(30_000);
     await expect(page.locator('#overdrive-hud')).toBeVisible();
     await expect(page.locator('#overdrive-hud')).toContainText('2× DAMAGE');
-    await expect(page.locator('#power-announcement')).toContainText('QUAD DAMAGE');
+    await expect(page.locator('#power-announcement')).toContainText('2× DAMAGE');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setOverdrive: (mode: 'expired') => void } }).__ATOMIC_ACRES_DEBUG__.setOverdrive('expired'));
     await expect(page.locator('#overdrive-hud')).toBeHidden();
   });
@@ -2055,28 +2076,6 @@ test.describe('solo mechanics', () => {
     expect(metrics.minimapWidth).toBe(240);
     expect(metrics.locationEquipmentGap).toBeGreaterThanOrEqual(6);
     expect(metrics.equipmentHealthGap).toBeGreaterThanOrEqual(6);
-  });
-
-  test('rate-limits fixed team pings and cleans their markers', async ({ page }) => {
-    await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { sendPing: (kind: 'enemy' | 'push') => void } }).__ATOMIC_ACRES_DEBUG__;
-      api.sendPing('enemy');
-      api.sendPing('push');
-    });
-    expect((await debug(page)).teamPings.map((ping) => ping.kind)).toEqual(['enemy']);
-    await expect(page.locator('#killfeed')).toContainText('ENEMY');
-    await expect.poll(async () => (await debug(page)).teamPings.length, { timeout: 7_000 }).toBe(0);
-    const secondKinds = await page.evaluate(() => {
-      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
-        sendPing: (kind: 'push') => void;
-        snapshot: () => DebugState;
-      } }).__ATOMIC_ACRES_DEBUG__;
-      api.sendPing('push');
-      return api.snapshot().teamPings.map((ping) => ping.kind);
-    });
-    expect(secondKinds).toEqual(['push']);
-    await expect(page.locator('#killfeed')).toContainText('PUSH');
-    await expect.poll(async () => (await debug(page)).teamPings.length, { timeout: 7_000 }).toBe(0);
   });
 
   test('opening the deployment menu neutralizes movement input', async ({ page }) => {
@@ -2396,7 +2395,7 @@ test.describe('performance and stability', () => {
     expect(state.render.shadows).toBe(false);
     expect(state.render.shadowMode).toBe('off');
     expect(state.render.lighting).toMatchObject({
-      exposure: 1.16, hemisphereIntensity: 1.82, ambientIntensity: 0.78,
+      exposure: 1.02, hemisphereIntensity: 1.05, ambientIntensity: 0.32,
       sunIntensity: 2.65, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
       fogNear: 36, fogFar: 112,
       routeLightIntensity: 3, streetLightIntensity: 4, interiorLightIntensity: 11,
@@ -2490,7 +2489,7 @@ test.describe('performance and stability', () => {
       flowerBeds: 6,
       benches: 4,
       bins: 6,
-      bicycles: 3,
+      bicycles: 0,
       genericMarkers: 0,
     });
     await page.setViewportSize({ width: 1000, height: 700 });

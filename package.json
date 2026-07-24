@@ -5,6 +5,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "author:blender-arena": "node scripts/blender/run-authoring.mjs arena",
     "author:rustworks-tower": "node scripts/blender/run-authoring.mjs tower",
+    "assets:compress:quality": "node scripts/assets/compress-quality-glbs.mjs",
     "baseline:generate": "tsx scripts/qa/generate-pass25a-baselines.ts",
     "verify:gameplay-contract": "tsx scripts/qa/generate-pass25a-baselines.ts --check",
     "test": "vitest run",
@@ -35,7 +36,6 @@
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
     "qa:pass29:luminance": "python3 scripts/qa/measure-pass29-luminance.py",
     "qa:pass29:verify": "node scripts/qa/run-pass29-environment-verification.mjs",
-
     "leaderboard:check": "tsc -p worker/tsconfig.json && vitest run worker/src/index.test.ts src/global-leaderboard.test.ts src/high-scores.test.ts",
     "leaderboard:migrate:local": "wrangler d1 migrations apply atomic-acres-leaderboard --local",
     "leaderboard:dev": "wrangler dev --local --port 8787 --var RATE_LIMIT_SALT:local-qa-not-secret",
@@ -72,6 +72,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260718.1",
+    "@gltf-transform/cli": "^4.4.1",
     "@playwright/test": "1.61.1",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",

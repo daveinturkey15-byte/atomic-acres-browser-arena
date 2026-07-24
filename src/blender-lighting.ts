@@ -37,10 +37,10 @@ export type ArenaLightingProfile = {
 };
 
 const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
-  exposure: 1.04,
-  hemisphereIntensity: 1.58,
-  ambientIntensity: 0.64,
-  sunIntensity: 2.34,
+  exposure: 1.02,
+  hemisphereIntensity: 1.05,
+  ambientIntensity: 0.32,
+  sunIntensity: 2.65,
   shadowBias: -0.00028,
   shadowNormalBias: 0.025,
   softShadows: false,
@@ -60,7 +60,7 @@ const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xffedc8,
   sunPosition: [-48, 42, 30],
   fillColor: 0xcce0ed,
-  fillIntensity: 0.48,
+  fillIntensity: 0.28,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 2.4,
   streetLightIntensity: 3.2,
@@ -73,13 +73,13 @@ const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
 };
 
 const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
-  exposure: 1.06,
-  hemisphereIntensity: 1.64,
-  ambientIntensity: 0.66,
-  sunIntensity: 2.42,
+  exposure: 1,
+  hemisphereIntensity: 0.72,
+  ambientIntensity: 0.18,
+  sunIntensity: 3.25,
   shadowBias: -0.00012,
   shadowNormalBias: 0.04,
-  softShadows: false,
+  softShadows: true,
   fogColor: 0xaebdbd,
   fogNear: 58,
   fogFar: 148,
@@ -96,7 +96,7 @@ const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xfff0cb,
   sunPosition: [-48, 42, 30],
   fillColor: 0xc9dfef,
-  fillIntensity: 0.56,
+  fillIntensity: 0.2,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 3,
   streetLightIntensity: 3.8,
@@ -109,10 +109,10 @@ const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
 };
 
 const DEFAULT_LIGHTING: ArenaLightingProfile = {
-  exposure: 1.16,
-  hemisphereIntensity: 1.82,
-  ambientIntensity: 0.78,
-  sunIntensity: 2.65,
+  exposure: 1.06,
+  hemisphereIntensity: 1.05,
+  ambientIntensity: 0.34,
+  sunIntensity: 2.7,
   shadowBias: -0.00028,
   shadowNormalBias: 0.025,
   softShadows: false,
@@ -132,7 +132,7 @@ const DEFAULT_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xffd2a2,
   sunPosition: [-62, 25, 38],
   fillColor: 0xd8ddff,
-  fillIntensity: 0.58,
+  fillIntensity: 0.32,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 3,
   streetLightIntensity: 4,
@@ -145,13 +145,13 @@ const DEFAULT_LIGHTING: ArenaLightingProfile = {
 };
 
 const BLENDER_LIGHTING: ArenaLightingProfile = {
-  exposure: 1.18,
-  hemisphereIntensity: 1.9,
-  ambientIntensity: 0.82,
-  sunIntensity: 2.7,
+  exposure: 1.02,
+  hemisphereIntensity: 0.7,
+  ambientIntensity: 0.18,
+  sunIntensity: 3.15,
   shadowBias: -0.00012,
   shadowNormalBias: 0.04,
-  softShadows: false,
+  softShadows: true,
   fogColor: 0xb0a5b5,
   fogNear: 50,
   fogFar: 128,
@@ -168,7 +168,7 @@ const BLENDER_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xffc995,
   sunPosition: [-62, 25, 38],
   fillColor: 0xd8ddff,
-  fillIntensity: 0.7,
+  fillIntensity: 0.22,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 5,
   streetLightIntensity: 6,

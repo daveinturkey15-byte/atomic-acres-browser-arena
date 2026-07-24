@@ -646,7 +646,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // Keep the bed out of the upper partition sightline. Its old x + 3.6
     // placement made the dark headboard fill the opening and read as a sealed
     // black door even though the route was physically open.
-    substantial(`authored-house-${houseIndex}-upper-bed-collider`, [x + 6.1, 4.05, z - facing * 2.5], [3.2, 1.45, 2.2], 'wood');
+    substantial(`authored-house-${houseIndex}-upper-bed-collider`, [x + 6.1, 4.0, z - facing * 2.5], [3.2, 1.05, 2.2], 'wood');
     substantial(`authored-house-${houseIndex}-upper-desk-collider`, [x - 3.2, 4.25, z + facing * 2.8], [2.7, 1.65, 0.92], 'wood');
   }
   world.userData.atomicCollisionAudit.substantialProps = substantialPropColliders;

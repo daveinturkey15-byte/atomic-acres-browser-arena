@@ -45,6 +45,7 @@ describe('solo bot tuning', () => {
 
 describe('headshot damage contract', () => {
   it('keeps the DHV X magnum binary: lethal head, zero body or limb', () => {
+    expect(WEAPONS.magnum.rpm).toBe(90);
     expect(computeDamage(WEAPONS.magnum, 10, 'head')).toBe(100);
     expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(0);
     expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(0);

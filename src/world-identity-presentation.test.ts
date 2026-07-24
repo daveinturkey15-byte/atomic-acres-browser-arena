@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { arenaLightingProfile } from './blender-lighting';
-import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation } from './world-identity-presentation';
+import {
+  ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE,
+  ATOMIC_UPPER_PORTAL_LIGHT_DISTANCE,
+  createWorldIdentityPresentation,
+  setWorldIdentityHouseShellPresentation,
+} from './world-identity-presentation';
 
 describe('Pass 29 practical and interior presentation', () => {
   it('creates three route beacons, four sourced street lights, four interior lights and one eight-panel fixture draw in Blender', () => {
@@ -15,6 +20,7 @@ describe('Pass 29 practical and interior presentation', () => {
       practicalLights: 7,
       streetLights: 4,
       interiorLights: 4,
+      portalLights: 2,
       fixtureInstances: 8,
       ceilingInstances: 10,
     });
@@ -33,6 +39,25 @@ describe('Pass 29 practical and interior presentation', () => {
     expect(doorFinishes?.getObjectByName('aqua-irrigation-workshop-upper-room-door-finish-lit-threshold')).toBeInstanceOf(THREE.Mesh);
     expect(doorFinishes?.getObjectByName('coral-orchard-conservatory-upper-room-door-finish-lit-threshold')).toBeInstanceOf(THREE.Mesh);
     expect(doorFinishes?.getObjectByName('aqua-irrigation-workshop-upper-room-door-finish-open-leaf')).toBeUndefined();
+    const boundedInteriorLights: THREE.PointLight[] = [];
+    presentation.root.traverse((node) => {
+      if (node instanceof THREE.PointLight && (node.name.startsWith('interior-light-') || node.name.endsWith('-portal-light'))) {
+        boundedInteriorLights.push(node);
+      }
+    });
+    expect(boundedInteriorLights).toHaveLength(6);
+    expect(boundedInteriorLights.filter((light) => light.name.startsWith('interior-light-'))
+      .every((light) => light.distance === ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE)).toBe(true);
+    expect(boundedInteriorLights.filter((light) => light.name.endsWith('-portal-light'))
+      .every((light) => light.distance === ATOMIC_UPPER_PORTAL_LIGHT_DISTANCE && light.intensity <= 1.1)).toBe(true);
+    for (const light of boundedInteriorLights) {
+      const houseOrigin = light.name.includes('aqua-irrigation-workshop')
+        ? new THREE.Vector2(-9, -28)
+        : new THREE.Vector2(9, 28);
+      const world = light.getWorldPosition(new THREE.Vector3());
+      expect(Math.abs(world.x - houseOrigin.x) + light.distance).toBeLessThan(10.1);
+      expect(Math.abs(world.z - houseOrigin.y) + light.distance).toBeLessThan(8.2);
+    }
     doorFinishes?.traverse((node) => expect(node.userData.blocksShots).toBe(false));
   });
 
@@ -49,11 +74,11 @@ describe('Pass 29 practical and interior presentation', () => {
   it('uses two house lights in Performance and zero local lights on software/Compatibility', () => {
     const performanceScene = new THREE.Scene();
     const performance = createWorldIdentityPresentation(performanceScene, arenaLightingProfile('performance'));
-    expect(performance).toMatchObject({ practicalLights: 7, streetLights: 4, interiorLights: 2, fixtureInstances: 8, ceilingInstances: 10 });
+    expect(performance).toMatchObject({ practicalLights: 7, streetLights: 4, interiorLights: 2, portalLights: 2, fixtureInstances: 8, ceilingInstances: 10 });
 
     const compatScene = new THREE.Scene();
     const compat = createWorldIdentityPresentation(compatScene, arenaLightingProfile('compat'), true);
-    expect(compat).toMatchObject({ practicalLights: 0, streetLights: 0, interiorLights: 0, fixtureInstances: 8, routeSigns: 3 });
+    expect(compat).toMatchObject({ practicalLights: 0, streetLights: 0, interiorLights: 0, portalLights: 0, fixtureInstances: 8, routeSigns: 3 });
     expect(compat.root.children.filter((node) => node instanceof THREE.Light)).toHaveLength(0);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ATOMIC_SIGNAL_FRAGMENT, atomicSignalBypassReason, atomicSignalConfig, atomicSignalTextureSamples, isSoftwareWebGLRenderer } from './atomic-signal';
+import { ATOMIC_SIGNAL_FRAGMENT, atomicSignalBypassReason, atomicSignalConfig, atomicSignalEffectsTextureSamples, atomicSignalTextureSamples, isSoftwareWebGLRenderer } from './atomic-signal';
+import { graphicsEffectsBudget } from './graphics-refinement';
 
 describe('Atomic Signal profile contract', () => {
   it('keeps compatibility rendering on the direct zero-cost path', () => {
@@ -46,5 +47,15 @@ describe('Atomic Signal profile contract', () => {
     expect(ATOMIC_SIGNAL_FRAGMENT).toContain('atomicAcesFilmicToneMapping');
     expect(ATOMIC_SIGNAL_FRAGMENT.indexOf('vec3 encoded = linearToSrgb')).toBeLessThan(ATOMIC_SIGNAL_FRAGMENT.indexOf('encoded += (orderedDither'));
     expect(ATOMIC_SIGNAL_FRAGMENT).not.toContain('chromatic');
+  });
+
+  it('bounds Pass 62 depth and selective-emissive sampling by effect tier', () => {
+    const config = atomicSignalConfig('blender');
+    const full = graphicsEffectsBudget('blender', 1);
+    const low = graphicsEffectsBudget('blender', 0.65);
+    expect(atomicSignalEffectsTextureSamples(config, full)).toBeGreaterThan(atomicSignalEffectsTextureSamples(config, low));
+    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('contactOcclusion');
+    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('selectiveBloom');
+    expect(ATOMIC_SIGNAL_FRAGMENT).toContain('worldPositionFromDepth');
   });
 });

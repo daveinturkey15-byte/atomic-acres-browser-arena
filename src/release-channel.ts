@@ -7,14 +7,6 @@ export type ReleaseChannelConfig = {
     label: string;
     description: string;
   };
-  normal: {
-    label: string;
-    description: string;
-    pass: string;
-    sourceSha: string;
-    pagesSha: string;
-    path: string;
-  };
   experimental: {
     label: string;
     description: string;
@@ -25,6 +17,7 @@ export type ReleaseChannelConfig = {
     label: string;
     description: string;
     pass: string;
+    sourceSha: string;
     pagesSha: string;
     path: string;
   };
@@ -41,7 +34,7 @@ export function releaseChannelDecision(
   if (params.get('room')?.trim()) return 'latest';
 
   const requested = params.get('release')?.trim().toLowerCase();
-  if (requested === 'latest') return 'latest';
+  if (requested === 'latest' || requested === 'normal' || requested === 'experimental') return 'latest';
   if (requested === 'stable') return 'stable';
   if (requested === 'choose') return 'choose';
 
@@ -53,5 +46,7 @@ export function stableReleaseUrl(baseUri: string, configuredPath: string): strin
   if (!path || path.split('/').some((part) => part === '.' || part === '..')) {
     throw new Error('Stable release path must be a safe relative path');
   }
-  return new URL(`./${path}/`, baseUri).toString();
+  const target = new URL(`./${path}/`, baseUri);
+  target.searchParams.set('release', 'latest');
+  return target.toString();
 }

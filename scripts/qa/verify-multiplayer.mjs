@@ -63,6 +63,11 @@ for (const [label, page] of [['host', host], ['guest', guest]]) {
   if (Number.isInteger(peerQaPort) && peerQaPort >= 1_024 && peerQaPort <= 65_535) url.searchParams.set('peerQaPort', String(peerQaPort));
   await page.goto(url.toString());
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: connectionTimeoutMs });
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.map-card[data-arena-id]')].some((button) => !button.disabled),
+    undefined,
+    { timeout: connectionTimeoutMs },
+  );
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
   await page.fill('#player-name', label === 'host' ? 'Host QA' : 'Guest QA');
 }

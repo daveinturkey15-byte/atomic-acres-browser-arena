@@ -35,15 +35,17 @@ A polished, original near-future agritech browser arena FPS with three readable 
 The host browser is an authoritative lightweight relay over PeerJS/WebRTC. Static files can therefore run on free hosting without a paid game server.
 
 - Private multiplayer is human-only: four-player rooms reject a fifth connection, while six-player rooms support one host plus five guests. Bots remain exclusive to Bot Skirmish.
-- A reliable, ordered event lane carries lobby control, match start, combat, scores, pickups and world changes.
-- A separate unordered movement lane uses `maxRetransmits: 0`; snapshots run at a 50 ms/20 Hz baseline, adapt downward under latency, and are interpolated by peers.
+- A reliable, ordered event lane carries lobby control, match start, combat, scores, pickups and world changes. Guest firearm triggers are host-resolved shot requests with idempotent results; guest hit claims do not apply firearm damage.
+- A separate unordered movement lane uses `maxRetransmits: 0`; snapshots adapt among exact 20, 30 and 40 Hz tiers under measured pressure.
+- Four cadence layers stay independent: display presentation, fixed-step simulation, adaptive movement snapshots and weapon-authored fire events. Remote movement is bounded pose estimation from timestamped snapshots, not exact reconstruction.
+- Interpolation delay adapts smoothly from snapshot interval, measured jitter and repeated underruns inside cadence-specific bands: 20 Hz = 80–120 ms, 30 Hz = 60–90 ms and 40 Hz = 40–70 ms. Diagnostics expose the chosen delay and target-view rewind headroom beneath the rare 250 ms ceiling.
 - Guests connect only to the host. The host binds messages to admitted player identities, owns lobby settings/readiness/start time and score replication, and suppresses a guest's own movement echo.
 - The synchronized match epoch is estimated from host clock probes, so every browser derives countdown and remaining time from the same host-owned timeline.
 - A 30-second reservation and browser-local resume token allow a reloaded guest to reclaim the same identity and recover an active match. Host loss still ends the session; host migration is intentionally out of scope.
 - Invite links prefill the room code; `autojoin=1` is available for automated smoke testing. Room codes are unlisted invitations, not account/password authentication.
 - The default public PeerJS service provides signalling, not TURN relay. Restrictive NATs, VPNs, firewalls, symmetric NAT or blocked UDP can still prevent a connection; add TURN only if real multi-household testing demonstrates that need.
 
-This remains a friendly-session architecture, not cheat-resistant ranked netcode. The host validates and owns match/lobby state, but clients still report some hit outcomes; a public-ranked version should use server-authoritative rewind validation.
+This remains a friendly-session architecture, not cheat-resistant ranked netcode. The host validates and owns match/lobby state and resolves immutable per-bullet requests from bounded pose history: shooter origin at authored fire time, remote targets at authored target-view time, and stale requests rejected rather than clamped onto old poses. Movement remains host-admitted rather than fully host-simulated.
 
 ## Callsigns and persistent records
 

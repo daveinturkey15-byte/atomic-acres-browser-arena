@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { HOUSE_LAYOUT } from './arena-layout';
 import {
-  NEIGHBOURHOOD_BICYCLE_POSITIONS,
   NEIGHBOURHOOD_BIN_POSITIONS,
   NEIGHBOURHOOD_FLOWER_BEDS,
+  addNeighbourhoodLife,
   addSemanticHouseInteriors,
 } from './environment-assets';
 import { createHouseArchitecture } from './house-navigation';
@@ -27,14 +27,14 @@ describe('Pass 32 neighbourhood placement', () => {
     }
   });
 
-  it('keeps exterior bins and bicycles outside both house footprints', () => {
+  it('keeps exterior bins outside both house footprints and removes the low-quality bicycles', () => {
     const houses = HOUSE_LAYOUT.map((house) => createHouseArchitecture(house.team, house.x, house.z, house.facing));
     for (const [x, z] of NEIGHBOURHOOD_BIN_POSITIONS) {
       for (const house of houses) expect(clearOfHouse(x, z, 0.5, house), `bin ${x},${z} overlaps ${house.id}`).toBe(true);
     }
-    for (const [x, z] of NEIGHBOURHOOD_BICYCLE_POSITIONS) {
-      for (const house of houses) expect(clearOfHouse(x, z, 1, house), `bicycle ${x},${z} overlaps ${house.id}`).toBe(true);
-    }
+    const life = addNeighbourhoodLife(new THREE.Group(), false);
+    expect(life.getObjectByName('street-bicycle')).toBeUndefined();
+    expect(life.userData.neighbourhoodLife.bicycles).toBe(0);
   });
 });
 

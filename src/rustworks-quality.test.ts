@@ -20,16 +20,18 @@ describe('Rustworks Quality Graphics parity', () => {
     const atomic = rustworksLightingTint(base, 'blender', 'atomic-acres');
     expect(atomic.fogColor).toBe(base.fogColor);
     expect(rust.fogColor).not.toBe(base.fogColor);
-    // Night: darker sky, stronger warm fill floods, soft moon key.
+    // Night: darker sky and a moon/practical-light hierarchy, not broad fill.
     expect(rust.skyTop).toBeLessThan(base.skyTop);
-    expect(rust.fillIntensity).toBeGreaterThanOrEqual(base.fillIntensity);
+    expect(rust.sunIntensity).toBeGreaterThan(rust.fillIntensity);
+    expect(rust.ambientIntensity).toBeLessThan(0.3);
     expect(rust.sunIntensity).toBeLessThan(base.sunIntensity);
     expect(range.fogColor).not.toBe(base.fogColor);
-    expect(range.fillIntensity).toBeGreaterThan(range.sunIntensity);
+    expect(range.sunIntensity).toBeGreaterThan(range.fillIntensity * 2.5);
+    expect(range.ambientIntensity).toBeLessThan(0.45);
     expect(range.godRayStrength).toBe(0);
-    expect(skyline.ambientIntensity).toBeGreaterThan(base.ambientIntensity);
-    expect(skyline.hemisphereIntensity).toBeGreaterThanOrEqual(base.hemisphereIntensity);
-    expect(skyline.exposure).toBeGreaterThanOrEqual(1.2);
+    expect(skyline.sunIntensity).toBeGreaterThan(skyline.hemisphereIntensity * 3);
+    expect(skyline.ambientIntensity).toBeLessThan(0.3);
+    expect(skyline.exposure).toBeLessThanOrEqual(1.05);
   });
 
   it('adds flood lights, starfield, and richer materials for the night rig', () => {

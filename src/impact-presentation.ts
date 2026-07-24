@@ -21,6 +21,35 @@ const SURFACE_COLORS: Record<ImpactSurface, [number, number]> = {
   soil: [0x8ca56e, 0x5c4731],
 };
 
+function proceduralImpactTexture(size: number, kind: 'particle' | 'mark'): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const nx = (x + 0.5) / size * 2 - 1;
+      const ny = (y + 0.5) / size * 2 - 1;
+      const angle = Math.atan2(ny, nx);
+      const irregularRadius = Math.sqrt(nx * nx + ny * ny) * (1 + Math.sin(angle * 7 + 0.8) * 0.08);
+      const radial = kind === 'particle'
+        ? THREE.MathUtils.smoothstep(1 - irregularRadius, 0, 0.82)
+        : THREE.MathUtils.smoothstep(1 - irregularRadius, 0.04, 0.9);
+      const centre = kind === 'mark' ? 0.62 + 0.38 * THREE.MathUtils.smoothstep(0.42 - irregularRadius, 0, 0.42) : 1;
+      const alpha = Math.round(255 * THREE.MathUtils.clamp(radial * centre, 0, 1));
+      const offset = (y * size + x) * 4;
+      data[offset] = 255;
+      data[offset + 1] = 255;
+      data[offset + 2] = 255;
+      data[offset + 3] = alpha;
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.name = `pass62-procedural-impact-${kind}`;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 /** One-draw-call pooled impact debris for every combat surface. */
 export class ImpactPresentation {
   readonly points: THREE.Points;
@@ -31,6 +60,8 @@ export class ImpactPresentation {
   private readonly markLife = new Float32Array(MAX_MARKS);
   private cursor = 0;
   private markCursor = 0;
+  private particleDensityScale = 1;
+  private decalLifetimeScale = 1;
 
   constructor(scene: THREE.Scene, reducedDetail = false) {
     const geometry = new THREE.BufferGeometry();
@@ -46,6 +77,8 @@ export class ImpactPresentation {
       depthWrite: false,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
+      map: proceduralImpactTexture(32, 'particle'),
+      alphaTest: 0.025,
     });
     this.points = new THREE.Points(geometry, material);
     this.points.name = 'pooled-surface-impact-debris';
@@ -61,6 +94,8 @@ export class ImpactPresentation {
         depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -3,
+        map: proceduralImpactTexture(64, 'mark'),
+        alphaTest: 0.035,
       }),
       MAX_MARKS,
     );
@@ -78,7 +113,8 @@ export class ImpactPresentation {
 
   impact(point: THREE.Vector3, normal: THREE.Vector3, surface: ImpactSurface): void {
     const [primary, secondary] = SURFACE_COLORS[surface];
-    const count = surface === 'glass' ? 10 : surface === 'metal' ? 8 : surface === 'concrete' ? 6 : 5;
+    const authoredCount = surface === 'glass' ? 10 : surface === 'metal' ? 8 : surface === 'concrete' ? 6 : 5;
+    const count = Math.max(2, Math.round(authoredCount * this.particleDensityScale));
     const tangent = new THREE.Vector3(normal.z, 0.35, -normal.x).normalize();
     const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
     for (let index = 0; index < count; index += 1) {
@@ -102,7 +138,8 @@ export class ImpactPresentation {
       this.colors[positionIndex + 1] = particle.color.g;
       this.colors[positionIndex + 2] = particle.color.b;
     }
-    const markSlot = this.markCursor++ % MAX_MARKS;
+    const markCapacity = Math.max(8, Math.round(MAX_MARKS * this.decalLifetimeScale));
+    const markSlot = this.markCursor++ % markCapacity;
     const markNormal = normal.clone().normalize();
     const markPosition = point.clone().addScaledVector(markNormal, 0.018);
     const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
@@ -116,12 +153,26 @@ export class ImpactPresentation {
     this.marks.setColorAt(markSlot, new THREE.Color(
       surface === 'metal' ? 0x5c482f : surface === 'wood' ? 0x4d3322 : surface === 'soil' ? 0x4a452f : 0x4a4b49,
     ));
-    this.markLife[markSlot] = surface === 'metal' ? 5.5 : 8;
+    this.markLife[markSlot] = (surface === 'metal' ? 5.5 : 8) * this.decalLifetimeScale;
     this.marks.visible = true;
     this.marks.instanceMatrix.needsUpdate = true;
     if (this.marks.instanceColor) this.marks.instanceColor.needsUpdate = true;
     this.points.visible = true;
     this.markDirty();
+  }
+
+  setBudget(particleDensityScale: number, decalLifetimeScale: number): void {
+    this.particleDensityScale = THREE.MathUtils.clamp(particleDensityScale, 0.35, 1);
+    this.decalLifetimeScale = THREE.MathUtils.clamp(decalLifetimeScale, 0.35, 1);
+    const markCapacity = Math.max(8, Math.round(MAX_MARKS * this.decalLifetimeScale));
+    let changed = false;
+    for (let slot = markCapacity; slot < MAX_MARKS; slot += 1) {
+      if (this.markLife[slot] <= 0) continue;
+      this.markLife[slot] = 0;
+      this.marks.setMatrixAt(slot, new THREE.Matrix4().makeScale(0, 0, 0));
+      changed = true;
+    }
+    if (changed) this.marks.instanceMatrix.needsUpdate = true;
   }
 
   update(dt: number): void {

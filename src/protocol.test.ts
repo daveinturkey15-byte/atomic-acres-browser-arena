@@ -44,11 +44,13 @@ describe('network protocol guards', () => {
       protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'abc',
       shotId: 'session:abc:7',
+      connectionEpoch: 'connection_epoch_abc',
+      lifeId: 3,
       shotSeq: 7,
-      fireSeq: 11,
+      weaponSequence: 11,
       weapon: 'carbine' as const,
-      renderedHostTimeMs: 2_500,
-      continuity: 3,
+      fireTimeMs: 2_500,
+      targetViewTimeMs: 2_420,
       origin: [0, 1.6, 2] as [number, number, number],
       direction: [0, 0, -1] as [number, number, number],
       pelletDirections: [[0, 0, -1]] as [number, number, number][],
@@ -63,10 +65,13 @@ describe('network protocol guards', () => {
       shotSeq: request.shotSeq,
       status: 'accepted-hit' as const,
       reason: 'none' as const,
-      acceptedHostTimeMs: 2_520,
-      appliedRewindMs: 20,
+      fireTimeMs: request.fireTimeMs,
+      targetViewTimeMs: request.targetViewTimeMs,
+      receivedAtHostTimeMs: 2_520,
+      resolvedAtHostTimeMs: 2_521,
+      appliedRewindMs: 80,
       outcomes: [{
-        target: 'host', pelletHits: 1, damage: 31.4, resultingHealth: 68.6,
+        target: 'host', pelletHits: 1, damage: 31.4, rawDamage: 31.4, resultingHealth: 68.6,
         died: false, hitZone: 'body' as const, wallbang: false, penetrationMultiplier: 1,
       }],
       nonce: 42,
@@ -74,8 +79,10 @@ describe('network protocol guards', () => {
     expect(isGameMessage(request)).toBe(true);
     expect(isGameMessage(result)).toBe(true);
     expect(isGameMessage({ ...request, protocolVersion: 1 })).toBe(false);
+    expect(isGameMessage({ ...request, targetViewTimeMs: request.fireTimeMs + 1 })).toBe(false);
     expect(isGameMessage({ ...request, direction: [0, 0, -0.5] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], damage: 401 }] })).toBe(false);
+    expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], rawDamage: 30 }] })).toBe(false);
   });
 
   it('requires action-correlated typed hit authority and earned support metadata', () => {
@@ -147,13 +154,17 @@ describe('network protocol guards', () => {
 
   it('validates bounded host-authoritative Overdrive claims and state', () => {
     const claim = { type: 'overdrive-claim' as const, by: 'abc', position: [0, 1.7, 0] as [number, number, number], generation: 2, nonce: 90 };
-    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };
+    const state = { type: 'overdrive-state' as const, by: 'host', holderId: 'abc', available: false, generation: 3, position: [0, 0.82, 0] as [number, number, number], activeRemainingMs: 30_000, nextSpawnInMs: 120_000, nonce: 91 };
     expect(isGameMessage(claim)).toBe(true);
     expect(isGameMessage(state)).toBe(true);
     expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
     expect(isGameMessage({ ...claim, position: [Infinity, 1.7, 0] })).toBe(false);
     expect(isGameMessage({ ...state, activeRemainingMs: 30_001 })).toBe(false);
     expect(isGameMessage({ ...state, nextSpawnInMs: 120_001 })).toBe(false);
+    expect(isGameMessage({ ...state, position: [0, Number.NaN, 0] })).toBe(false);
+    const redeploy = { type: 'redeploy-request' as const, by: 'abc', nonce: 92 };
+    expect(isGameMessage(redeploy)).toBe(true);
+    expect(messageBelongsToPlayer(redeploy, 'abc')).toBe(true);
   });
 
   it('admits the machine pistol only as the sniper sidearm in snapshots', () => {
@@ -194,7 +205,7 @@ describe('network protocol guards', () => {
   });
 
   it('validates bounded lobby control traffic and identifies host authority', () => {
-    const join = { type: 'lobby-join' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION as 2, playerId: 'abc', name: 'Tester', requestedTeam: 0 as const, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 };
+    const join = { type: 'lobby-join', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, playerId: 'abc', connectionEpoch: 'connection_epoch_abc', name: 'Tester', requestedTeam: 0, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 } as const;
     const lobbyState = {
       type: 'lobby-state' as const,
       by: 'host',

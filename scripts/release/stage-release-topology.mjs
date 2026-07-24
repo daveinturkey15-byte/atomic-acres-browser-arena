@@ -21,9 +21,10 @@ const exactSha = (value, label) => {
   if (!/^[0-9a-f]{40}$/.test(value ?? '')) throw new Error(`${label} must be one exact 40-character Git SHA`);
   return value;
 };
-if (config.schemaVersion !== 2) throw new Error('release-channels.json schemaVersion must be 2');
+exactSha(sourceSha, 'SOURCE_SHA');
+if (config.schemaVersion !== 3) throw new Error('release-channels.json schemaVersion must be 3');
 if (releasePass !== config.experimental.pass) throw new Error(`Expected ${config.experimental.pass}, received ${releasePass}`);
-if (!existsSync(join(distRoot, 'index.html')) || !existsSync(join(distRoot, 'assets'))) throw new Error('Pass 61 candidate dist is incomplete');
+if (!existsSync(join(distRoot, 'index.html')) || !existsSync(join(distRoot, 'assets'))) throw new Error('Pass 62 candidate dist is incomplete');
 
 const walkFiles = (root) => {
   const files = [];
@@ -65,7 +66,14 @@ if (!experimentalJs.some((path) => readFileSync(path).includes(Buffer.from(confi
 
 function stagePinned(channelName, channel) {
   const pagesSha = exactSha(channel.pagesSha, `${channelName}.pagesSha`);
+  const pinnedSourceSha = exactSha(channel.sourceSha, `${channelName}.sourceSha`);
   execFileSync('git', ['cat-file', '-e', `${pagesSha}^{commit}`], { cwd: repositoryRoot, stdio: 'pipe' });
+  const sourceSubject = execFileSync('git', ['show', '-s', '--format=%s', pagesSha], {
+    cwd: repositoryRoot, encoding: 'utf8',
+  }).trim();
+  if (!sourceSubject.includes(channel.pass) || !sourceSubject.includes(pinnedSourceSha)) {
+    throw new Error(`${channelName} Pages commit does not attest ${channel.pass} from ${pinnedSourceSha}`);
+  }
   const output = execFileSync('git', ['ls-tree', '-r', '-z', '--name-only', pagesSha, '--', 'index.html', 'assets'], {
     cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
   });
@@ -87,19 +95,18 @@ function stagePinned(channelName, channel) {
   if (passEvidenceFiles.length === 0) throw new Error(`${pagesSha} does not contain configured ${channel.pass}`);
   const digest = treeDigest(targetRoot, paths.map((path) => join(targetRoot, path)));
   const provenance = {
-    schemaVersion: 2, channel: channelName, releasePass: channel.pass,
-    pagesSha, sourceSha: channel.sourceSha ?? null, path: channel.path,
+    schemaVersion: 3, channel: channelName, releasePass: channel.pass,
+    pagesSha, sourceSha: pinnedSourceSha, sourceSubject, path: channel.path,
     exactRootFileCount: paths.length, passEvidenceFiles, treeSha256: digest,
   };
   writeFileSync(join(targetRoot, 'channel-provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
   return provenance;
 }
 
-const normal = stagePinned('new-netcode', config.normal);
 const stable = stagePinned('recent-stable', config.stable);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
-  schemaVersion: 2, channel: 'experimental-netcode-pass', releasePass,
+  schemaVersion: 3, channel: 'experimental-netcode-pass', releasePass,
   sourceSha, path: config.experimental.path,
   exactRootFileCount: experimentalFiles.length,
   treeSha256: treeDigest(experimentalRoot, experimentalFiles),
@@ -109,20 +116,19 @@ writeFileSync(join(experimentalRoot, 'channel-provenance.json'), `${JSON.stringi
 for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
   copyFileSync(join(repositoryRoot, 'release-shell', file), join(distRoot, file));
 }
-const publicConfig = Object.fromEntries(['normal', 'stable', 'experimental'].map((key) => [key, {
+const publicConfig = Object.fromEntries(['experimental', 'stable'].map((key) => [key, {
   label: config[key].label, description: config[key].description, pass: config[key].pass, path: config[key].path,
 }]));
 writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`);
 
 mkdirSync(join(repositoryRoot, 'artifacts', 'pipeline'), { recursive: true });
 const topology = {
-  schemaVersion: 2, sourceSha, releasePass,
+  schemaVersion: 3, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
-  channels: { normal, stable, experimental },
+  channels: { experimental, stable },
 };
 writeFileSync(join(repositoryRoot, 'artifacts', 'pipeline', 'release-topology.json'), `${JSON.stringify(topology, null, 2)}\n`);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
-  normal: { pass: normal.releasePass, pagesSha: normal.pagesSha, digest: normal.treeSha256 },
-  stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
+  stable: { pass: stable.releasePass, pagesSha: stable.pagesSha, digest: stable.treeSha256 },
 } }));

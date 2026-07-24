@@ -1,7 +1,17 @@
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { RUSTWORKS_TOWER, rustworksDeckTopY } from './additional-maps';
-import { RUSTWORKS_BLENDER_EXPECTED_VERSION } from './rustworks-blender';
+import {
+  RUSTWORKS_TOWER,
+  applyRustworksPresentationProfile,
+  buildRustworks1v1,
+  rustworksDeckTopY,
+} from './additional-maps';
+import {
+  RUSTWORKS_BLENDER_EXPECTED_VERSION,
+  RUSTWORKS_BLENDER_OVERLAY_RETIRED,
+  setRustworksProceduralPresentationVisible,
+} from './rustworks-blender';
 
 function glbJson(buffer: Buffer): Record<string, unknown> {
   expect(buffer.toString('ascii', 0, 4)).toBe('glTF');
@@ -118,5 +128,33 @@ describe('Rustworks Blender Quality plant asset', () => {
     // Allow small deck-size drift between presentation kit and collision shell.
     expect(Math.abs((lowerRamp?.translation?.[1] ?? 0) - lowerCenterY)).toBeLessThan(0.45);
     expect(Math.abs((lowerRamp?.translation?.[2] ?? 0) - lowerCenterZ)).toBeLessThan(0.85);
+  });
+
+  it('retires the duplicate GLB overlay and keeps the procedural tower visible in every profile', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const retiredOverlay = new THREE.Group();
+    retiredOverlay.name = 'Rustworks Blender central tower';
+    retiredOverlay.userData.blenderAuthoredEnvironment = true;
+    retiredOverlay.userData.rustworksOverlayRetired = true;
+    const retiredMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial(),
+    );
+    retiredMesh.userData.blenderAuthoredEnvironment = true;
+    retiredOverlay.add(retiredMesh);
+    map.root.add(retiredOverlay);
+
+    expect(RUSTWORKS_BLENDER_OVERLAY_RETIRED).toBe(true);
+    for (const profile of ['performance', 'blender'] as const) {
+      retiredOverlay.visible = true;
+      retiredMesh.visible = true;
+      applyRustworksPresentationProfile(map.root, profile);
+      setRustworksProceduralPresentationVisible(map.root, true);
+      expect(retiredOverlay.visible, `${profile}:retired overlay root`).toBe(false);
+      expect(retiredMesh.visible, `${profile}:retired overlay mesh`).toBe(false);
+      expect(map.root.getObjectByName('rustworks-lower-ramp')?.visible, `${profile}:procedural lower ramp`).toBe(true);
+      expect(map.root.getObjectByName('rustworks-lower-deck')?.visible, `${profile}:procedural lower deck`).toBe(true);
+      expect(map.root.getObjectByName('rustworks-upper-deck')?.visible, `${profile}:procedural upper deck`).toBe(true);
+    }
   });
 });
