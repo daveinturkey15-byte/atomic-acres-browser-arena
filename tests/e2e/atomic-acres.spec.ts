@@ -432,7 +432,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 61');
+    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 62');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({

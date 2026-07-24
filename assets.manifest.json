@@ -37,15 +37,15 @@
       "generatedAsOf": "2026-07-23",
       "license": "Original project work",
       "files": "public/assets/original/models/atomic-acres-blender-arena.glb",
-      "sha256": "9e03220003c6b457ab995cf4061e6ca4b6c58be8882f82810d4e99ee616f86b7",
+      "sha256": "b0156466ecbcfada0bd0bfbc95448664aba89d16f48b6628919af6c26ffe0ab9",
       "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
       "sourceBlendSha256": "471541e489e115846feac36e5d9c16ba90176cf7b4aab85d9236e7281ec3daa2",
       "sourceSpec": "source-assets/blender/atomic-acres-arena-spec.json",
       "sourceSpecSha256": "0e1936599b9ab78bec3db86d960e5a1f50add9930e32b27253efac5174381b67",
       "sourceProvenance": "source-assets/blender/atomic-acres-blender-arena.provenance.json",
       "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-      "format": "glTF 2.0 binary, 34 meshes, 28 exported materials, 44812 triangles, 6 semantic breakable windows, 3 semantic route landmarks, 2 modeled transit buses, 4 authored large physical cover assets, 2 authored house furnishing sets, 33 embedded project-authored images, 60 texture bindings and 20 exported PBR materials",
-      "modifications": "Atomic Acres-owned complete environment, deterministically regenerated in Blender 5.1.2 from project primitives, project-authored textures and the checked-in TypeScript-derived arena specification. The 2026-07-23 Pass 60 repair grounds and opens the concrete-pipe cover, grounds house furniture, replaces the dark upper-floor underside with a plaster soffit and timber walking surface, lines upper exterior walls with interior plaster, moves the bed and upholstered headboard clear of both upper routes, and adds visible upper-room ceiling lights so open apertures cannot read as opaque black leaves. No commercial model, downloaded model, copied texture, logo, signage, map geometry, audio or extracted game asset is used. The GLB remains presentation-only; checked-in procedural authority owns collision and ballistics.",
+      "format": "glTF 2.0 binary with lossless WebP textures and Meshopt geometry, 34 meshes, 28 exported materials, 44812 triangles, 6 semantic breakable windows, 3 semantic route landmarks, 2 modeled transit buses, 4 authored large physical cover assets, 2 authored house furnishing sets, 33 embedded project-authored images, 33 deduplicated texture bindings and 20 exported PBR materials",
+      "modifications": "Atomic Acres-owned complete environment, deterministically regenerated in Blender 5.1.2 from project primitives, project-authored textures and the checked-in TypeScript-derived arena specification. Pass 62 derives the runtime GLB with pinned lossless WebP texture and Meshopt geometry compression, reducing it from 7136084 to 3503636 bytes while preserving semantic nodes and presentation-only authority. The 2026-07-23 Pass 60 repair grounds and opens the concrete-pipe cover, grounds house furniture, replaces the dark upper-floor underside with a plaster soffit and timber walking surface, lines upper exterior walls with interior plaster, moves the bed and upholstered headboard clear of both upper routes, and adds visible upper-room ceiling lights so open apertures cannot read as opaque black leaves. No commercial model, downloaded model, copied texture, logo, signage, map geometry, audio or extracted game asset is used. Checked-in procedural authority owns collision and ballistics.",
       "attributionRequired": false
     },
     {
@@ -56,12 +56,12 @@
       "generatedAsOf": "2026-07-23",
       "license": "Original project work",
       "files": "public/assets/original/models/rustworks-central-tower.glb",
-      "sha256": "272278efe67b1aa0215a36fd7ad3678970c04dc8efff8863234474bcc6172a5f",
+      "sha256": "4da23a6a944ef58f8d70f8735d6a6e07099eddc2ee8c24bb5f8189a160d84780",
       "sourceBlend": "source-assets/blender/rustworks-central-tower.blend",
       "sourceBlendSha256": "271337c132aac4169265c43b3396274ccdfc8e0d288e10c9bd6906319452e6c1",
       "sourceScript": "scripts/blender/create-rustworks-central-tower.py",
       "sourceScriptSha256": "641a42b386a6cae546a0c9bc9b27b76dd63d7adac21bf6a4700101970b1a283d",
-      "modifications": "Original climbable Rustworks oil-rig environment authored from Blender primitives by the repository generator. The Pass 60 v3 repair removes eight mixed centre-cover blocks and two unsupported trench crossovers, corrects the former 1.2 metre handrail slabs into supported rails, and authors exactly twenty-four shipping containers: eighteen closed, three open at both ends, and three open at one end. TypeScript boxes remain the collision and ballistic authority; a runtime-authored animated Welsh flag flies above the tower in every graphics profile; the versioned .blend source and generator remain included for deterministic inspection and rebuilding.",
+      "modifications": "Original climbable Rustworks oil-rig environment authored from Blender primitives by the repository generator. Pass 62 derives the runtime GLB with pinned lossless WebP texture and Meshopt geometry compression, reducing it from 9413732 to 6584716 bytes while preserving route metadata. The Pass 60 v3 repair removes eight mixed centre-cover blocks and two unsupported trench crossovers, corrects the former 1.2 metre handrail slabs into supported rails, and authors exactly twenty-four shipping containers: eighteen closed, three open at both ends, and three open at one end. TypeScript boxes remain the collision and ballistic authority; a runtime-authored animated Welsh flag flies above the tower in every graphics profile; the versioned .blend source and generator remain included for deterministic inspection and rebuilding.",
       "attributionRequired": false
     },
     {

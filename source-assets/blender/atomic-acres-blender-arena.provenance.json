@@ -13,11 +13,11 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "9e03220003c6b457ab995cf4061e6ca4b6c58be8882f82810d4e99ee616f86b7",
+  "runtimeGlbSha256": "b0156466ecbcfada0bd0bfbc95448664aba89d16f48b6628919af6c26ffe0ab9",
   "sourceBlendSha256": "471541e489e115846feac36e5d9c16ba90176cf7b4aab85d9236e7281ec3daa2",
   "sourceSpecSha256": "0e1936599b9ab78bec3db86d960e5a1f50add9930e32b27253efac5174381b67",
   "runtimeAudit": {
-    "bytes": 7136084,
+    "bytes": 3503636,
     "meshNodes": 34,
     "materials": 28,
     "triangles": 44812,
@@ -27,16 +27,24 @@
     "authoredLargePhysicalCoverAssets": 4,
     "authoredHouseFurnishingSets": 2,
     "images": 33,
-    "textureBindings": 60,
+    "textureBindings": 33,
     "pbrMaterials": 20,
     "groundLayout": "manicured-verges-v3",
     "externalUris": 0
   },
+  "runtimeCompression": {
+    "command": "npm run assets:compress:quality",
+    "geometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
+    "textures": "lossless EXT_texture_webp",
+    "uncompressedBytes": 7136084,
+    "compressedBytes": 3503636,
+    "reductionPercent": 50.9
+  },
   "determinism": {
-    "command": "npm run author:blender-arena",
+    "command": "npm run author:blender-arena && npm run assets:compress:quality",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0,
     "twoConsecutiveGlbBuildsByteIdentical": true,
-    "note": "The self-contained GLB is the reproducibility target. The editable .blend is checksum-tracked for this revision but Blender source binaries are not assumed portable across Blender releases."
+    "note": "The self-contained compressed GLB is the reproducibility target. Blender authors the semantic source GLB and the pinned glTF Transform pass derives the lossless-WebP/Meshopt runtime artifact. The editable .blend is checksum-tracked for this revision but Blender source binaries are not assumed portable across Blender releases."
   }
 }

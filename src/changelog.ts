@@ -38,10 +38,27 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass62',
+    pass: 'PASS 62',
+    title: 'Graphics Refinement HITL',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['RENDERING', 'LIGHTING', 'ATMOSPHERE', 'PERFORMANCE', 'ASSET STREAMING']),
+    summary: 'Pass 62 is a local human-inspection build that deepens material, lighting and atmosphere quality without changing Pass 61 gameplay, physics or netcode.',
+    highlights: Object.freeze([
+      'Procedural PMREM image-based lighting gives metals, glass and authored PBR surfaces a consistent reflection response without a premium HDR asset',
+      'Quality Graphics adds restrained depth-buffer contact shading, low-altitude depth fog and bloom isolated to tagged emissive objects',
+      'Each arena fits its own directional shadow volume instead of sharing one oversized global projection',
+      'Adaptive quality now sheds contact shading, bloom resolution, fog, reflections, particles and decal persistence independently before relying on resolution alone',
+      'Impact marks and particles use pooled procedural soft masks for cleaner decals and sparks without new downloaded art',
+      'Atomic Acres and Rustworks Quality GLBs use lossless WebP textures plus Meshopt geometry and stream only when their arena is selected',
+      'Compatibility retains the direct zero-post path, while Performance receives only the bounded low-cost subset',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass61',
     pass: 'PASS 61',
     title: 'Experimental Netcode Pass',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-07-24T02:57:37Z',
     areas: Object.freeze(['MULTIPLAYER', 'NETCODE', 'HIT REGISTRATION', 'REJOIN', 'DIAGNOSTICS']),
     summary: 'Pass 61 isolates a new monotonic timing and host-authoritative firearm path for fast public testing without replacing normal Pass 60 or stable Pass 59.',
     highlights: Object.freeze([

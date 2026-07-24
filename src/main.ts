@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
@@ -773,6 +774,14 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixe
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
+const graphicsRefinement = new GraphicsRefinementSystem(
+  renderer,
+  scene,
+  renderProfile,
+  softwareRenderer,
+  activeRenderConfig.pixelRatioCap,
+);
+let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -815,6 +824,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemet
 
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  const effectsBudget = graphicsEffectsBudget(renderProfile, pixelRatioCap);
+  graphicsRefinement.setBudget(effectsBudget);
+  atomicSignal.setEffectsBudget(effectsBudget);
+  applyPresentationEffectsBudget?.(effectsBudget);
   const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap);
   if (renderer.shadowMap.enabled !== shadowsEnabled) {
     renderer.shadowMap.enabled = shadowsEnabled;
@@ -1074,6 +1087,11 @@ renderer.domElement.addEventListener('webglcontextrestored', () => {
   resize();
 });
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
+applyPresentationEffectsBudget = (budget) => {
+  atmosphereSystem.setDensityScale(budget.particleDensityScale);
+  impactPresentation.setBudget(budget.particleDensityScale, budget.decalLifetimeScale);
+};
+applyPresentationEffectsBudget(graphicsEffectsBudget(renderProfile, adaptiveQuality.telemetry().pixelRatioCap));
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
@@ -1105,6 +1123,14 @@ nukeShockwave.raycast = () => undefined;
 scene.add(nukeShockwave);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
+let atomicQualityLoadPromise: Promise<THREE.Group | null> | null = null;
+let rustworksQualityLoadPromise: Promise<THREE.Group | null> | null = null;
+const qualityAssetStreaming = {
+  atomicAcres: 'idle' as 'idle' | 'loading' | 'ready' | 'fallback',
+  rustworks: 'idle' as 'idle' | 'loading' | 'ready' | 'fallback',
+  initialArena: selectedArena.id,
+  eagerQualityGlbs: 0,
+};
 let materialCompatibility: AtomicSignalMaterialAudit = {
   materials: 0,
   colorTexturesCorrected: 0,
@@ -1114,6 +1140,70 @@ let materialCompatibility: AtomicSignalMaterialAudit = {
   roughnessAdjusted: 0,
   metalnessAdjusted: 0,
 };
+
+async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
+  if (renderProfile !== 'blender') return arenaArtRoot;
+  if (blenderArenaActive && arenaArtRoot) return arenaArtRoot;
+  if (atomicQualityLoadPromise) return atomicQualityLoadPromise;
+  qualityAssetStreaming.atomicAcres = 'loading';
+  atomicQualityLoadPromise = (async () => {
+    try {
+      const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
+        const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+        setStatus(`Streaming Atomic Acres Quality art ${percent}%â€¦`);
+      });
+      blenderArenaActive = true;
+      arenaArtRoot = art.root;
+      qualityAssetStreaming.atomicAcres = 'ready';
+      graphicsRefinement.refine(art.root, renderer.capabilities.getMaxAnisotropy());
+      await renderer.compileAsync(scene, camera);
+      return art.root;
+    } catch (error) {
+      markBlenderArenaFallback(error);
+      console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
+      const fallback = await loadArenaArt(scene, (loaded, total) => {
+        setStatus(`Quality Graphics fallback ${loaded}/${total}â€¦`);
+      }, false);
+      blenderArenaActive = false;
+      arenaArtRoot = fallback.root;
+      qualityAssetStreaming.atomicAcres = 'fallback';
+      graphicsRefinement.refine(fallback.root, renderer.capabilities.getMaxAnisotropy());
+      await renderer.compileAsync(scene, camera);
+      return fallback.root;
+    }
+  })();
+  return atomicQualityLoadPromise;
+}
+
+async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null> {
+  if (renderProfile !== 'blender') return null;
+  if (rustworksBlenderTelemetry().status === 'ready') return rustworksArena.root;
+  if (rustworksQualityLoadPromise) return rustworksQualityLoadPromise;
+  qualityAssetStreaming.rustworks = 'loading';
+  rustworksQualityLoadPromise = loadRustworksBlenderTower(rustworksArena.root).then(async (root) => {
+    setRustworksProceduralPresentationVisible(rustworksArena.root, false);
+    setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
+    qualityAssetStreaming.rustworks = 'ready';
+    graphicsRefinement.refine(root, renderer.capabilities.getMaxAnisotropy());
+    await renderer.compileAsync(scene, camera);
+    return root;
+  }).catch((error) => {
+    markRustworksBlenderFallback(error);
+    console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+    applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
+    setRustworksProceduralPresentationVisible(rustworksArena.root, true);
+    qualityAssetStreaming.rustworks = 'fallback';
+    return null;
+  });
+  return rustworksQualityLoadPromise;
+}
+
+async function ensureSelectedQualityPresentation(id: ArenaId): Promise<void> {
+  if (renderProfile !== 'blender') return;
+  if (id === 'atomic-acres') await ensureAtomicQualityPresentation();
+  else if (id === 'rustworks-1v1') await ensureRustworksQualityPresentation();
+  graphicsRefinement.refreshSelectiveBloom(scene);
+}
 
 const player = {
   id: createPlayerId(),
@@ -1198,7 +1288,7 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
-const PASS61_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass61-experimental-netcode';
+const PASS62_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass62-graphics-refinement-hitl';
 const PASS61_DIAGNOSTIC_SOURCE_ID = 'parent-b1af49b-pass60-live';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
@@ -1444,7 +1534,7 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
   matchDiagnostics = new MatchDiagnostics({
-    buildId: PASS61_DIAGNOSTIC_BUILD_ID,
+    buildId: PASS62_DIAGNOSTIC_BUILD_ID,
     sourceId: PASS61_DIAGNOSTIC_SOURCE_ID,
     sessionId: `${player.id}:${Date.now()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
@@ -8266,6 +8356,13 @@ function applyArenaLightingForSelection(): void {
     sunLight.color.setHex(lighting.sunColor);
     sunLight.intensity = lighting.sunIntensity;
     sunLight.position.set(...lighting.sunPosition);
+    graphicsRefinement.applyArena(
+      selectedArena.id,
+      arena.bounds,
+      sunLight,
+      lighting.sunPosition,
+      renderer.shadowMap.enabled ? activeRenderConfig.shadowMapSize : 0,
+    );
   }
   if (fillLight) {
     fillLight.color.setHex(lighting.fillColor);
@@ -8319,6 +8416,7 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     arena = nextArena;
     botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
+    await ensureSelectedQualityPresentation(selectedArena.id);
     setArenaPresentationVisibility();
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
@@ -9370,6 +9468,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       framePacing: framePacing.summary(),
       minimapRenders: minimapRenderCount,
       adaptive: adaptiveQuality.telemetry(),
+      graphicsRefinement: graphicsRefinement.telemetry(),
+      qualityAssetStreaming: { ...qualityAssetStreaming },
       lighting: {
         ...activeLighting,
         fogNear: scene.fog instanceof THREE.Fog ? scene.fog.near : activeLighting.fogNear,
@@ -10072,17 +10172,20 @@ async function bootstrap(): Promise<void> {
   const weaponPromise = weaponView.load((loaded, total) => {
     setStatus(`Loading authored weapons ${loaded}/${total}…`);
   });
-  const artPromise = renderProfile === 'blender'
+  const artPromise = renderProfile === 'blender' && selectedArena.id === 'atomic-acres'
     ? (async () => {
+        qualityAssetStreaming.eagerQualityGlbs += 1;
         try {
           const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
             const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
             setStatus(`Loading Quality Graphics arena ${percent}%…`);
           });
           blenderArenaActive = true;
+          qualityAssetStreaming.atomicAcres = 'ready';
           return art;
         } catch (error) {
           markBlenderArenaFallback(error);
+          qualityAssetStreaming.atomicAcres = 'fallback';
           console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
           return loadArenaArt(scene, (loaded, total) => {
             setStatus(`Quality Graphics fallback ${loaded}/${total}…`);
@@ -10092,14 +10195,16 @@ async function bootstrap(): Promise<void> {
     : loadArenaArt(scene, (loaded, total) => {
         setStatus(`Loading authored arena models ${loaded}/${total}…`);
       }, reducedWorldDetail);
-  const rustworksArtPromise = renderProfile === 'blender'
-    ? loadRustworksBlenderTower(rustworksArena.root).then((root) => {
+  const rustworksArtPromise = renderProfile === 'blender' && selectedArena.id === 'rustworks-1v1'
+    ? (qualityAssetStreaming.eagerQualityGlbs += 1, loadRustworksBlenderTower(rustworksArena.root)).then((root) => {
         // Authored kit is the Quality silhouette; keep only dirt ray-target + lights from procedural.
         setRustworksProceduralPresentationVisible(rustworksArena.root, false);
         setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
+        qualityAssetStreaming.rustworks = 'ready';
         return root;
       }).catch((error) => {
         markRustworksBlenderFallback(error);
+        qualityAssetStreaming.rustworks = 'fallback';
         console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
         applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
         setRustworksProceduralPresentationVisible(rustworksArena.root, true);
@@ -10136,6 +10241,8 @@ async function bootstrap(): Promise<void> {
     renderProfile,
     renderer.capabilities.getMaxAnisotropy(),
   );
+  graphicsRefinement.refine(scene, renderer.capabilities.getMaxAnisotropy());
+  await renderer.compileAsync(scene, camera);
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (renderProfile !== 'blender') {
     batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
