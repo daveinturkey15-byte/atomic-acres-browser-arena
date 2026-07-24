@@ -46,6 +46,8 @@ export type LobbySnapshot = Readonly<{
   config: PrivateMatchConfig;
   members: readonly LobbyMember[];
   scores: readonly PlayerScore[];
+  snapshotHostTimeMs: number;
+  activeAtHostTimeMs: number | null;
   activeAtEpochMs: number | null;
 }>;
 
@@ -58,7 +60,12 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   durationMs: 300_000,
 });
 
-export const REJOIN_GRACE_MS = 30_000;
+export const REJOIN_GRACE_MS = 90_000;
+
+export function rejoinReservationExpired(disconnectedAtMonoMs: number, nowMonoMs: number): boolean {
+  return Number.isFinite(disconnectedAtMonoMs) && Number.isFinite(nowMonoMs)
+    && nowMonoMs - disconnectedAtMonoMs >= REJOIN_GRACE_MS;
+}
 export const LOBBY_START_LEAD_MS = 3_500;
 export const CLOCK_PING_INTERVAL_MS = 2_000;
 export const MAX_CLOCK_RTT_MS = 5_000;
@@ -142,8 +149,12 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
   if (!snapshot.members.some((member) => member.id === snapshot.hostId)) return false;
   if (!Array.isArray(snapshot.scores) || snapshot.scores.length > 10 || !snapshot.scores.every(isPlayerScore)) return false;
   if (new Set(snapshot.scores.map((score) => score.id)).size !== snapshot.scores.length) return false;
-  return snapshot.activeAtEpochMs === null
+  if (!Number.isFinite(snapshot.snapshotHostTimeMs) || Number(snapshot.snapshotHostTimeMs) < 0) return false;
+  const validHostStart = snapshot.activeAtHostTimeMs === null
+    || Number.isFinite(snapshot.activeAtHostTimeMs) && Number(snapshot.activeAtHostTimeMs) >= 0;
+  const validEpochStart = snapshot.activeAtEpochMs === null
     || Number.isFinite(snapshot.activeAtEpochMs) && Number(snapshot.activeAtEpochMs) >= 0 && Number(snapshot.activeAtEpochMs) <= 10_000_000_000_000;
+  return validHostStart && validEpochStart && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null);
 }
 
 export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[] {
@@ -212,17 +223,6 @@ export function estimateHostClockOffset(
     offsetMs: hostEpochMs - (clientSentAtEpochMs + clientReceivedAtEpochMs) / 2,
     rttMs,
   };
-}
-
-export function localPerformanceAtHostEpoch(
-  hostEpochMs: number,
-  hostOffsetMs: number,
-  localEpochMs: number,
-  localPerformanceMs: number,
-): number {
-  if (![hostEpochMs, hostOffsetMs, localEpochMs, localPerformanceMs].every(Number.isFinite)) return localPerformanceMs;
-  const estimatedHostNow = localEpochMs + hostOffsetMs;
-  return localPerformanceMs + hostEpochMs - estimatedHostNow;
 }
 
 export function latencyQuality(pingMs: number | null): 'unknown' | 'good' | 'fair' | 'poor' {

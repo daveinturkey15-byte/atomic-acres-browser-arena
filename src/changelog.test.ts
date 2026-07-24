@@ -13,7 +13,7 @@ describe('changelog', () => {
   it('keeps the current public release first with an explicit UK timezone', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass60');
+    expect(latest.id).toBe('pass61');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -27,6 +27,7 @@ describe('changelog', () => {
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
+    const pass60 = CHANGELOG.find((entry) => entry.id === 'pass60');
     const pass59 = CHANGELOG.find((entry) => entry.id === 'pass59');
     const pass58 = CHANGELOG.find((entry) => entry.id === 'pass58');
     const pass57 = CHANGELOG.find((entry) => entry.id === 'pass57');
@@ -34,6 +35,8 @@ describe('changelog', () => {
     const pass55 = CHANGELOG.find((entry) => entry.id === 'pass55');
     const pass51 = CHANGELOG.find((entry) => entry.id === 'pass51');
     const pass49 = CHANGELOG.find((entry) => entry.id === 'pass49');
+    expect(pass60?.releasedAt).toBe('2026-07-23T23:15:05Z');
+    expect(pass60?.title).toBe('New Netcode');
     expect(pass59?.releasedAt).toBe('2026-07-23T11:17:26+01:00');
     expect(pass58?.releasedAt).toBe('2026-07-22T21:25:35+01:00');
     expect(pass57?.releasedAt).toBe('2026-07-22T15:43:16+01:00');

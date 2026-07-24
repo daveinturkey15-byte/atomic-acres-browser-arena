@@ -8,9 +8,9 @@ import {
   freeForAllLeaders,
   isLobbySnapshot,
   latencyQuality,
-  localPerformanceAtHostEpoch,
   playersAreHostile,
   recordPlayerDamage,
+  rejoinReservationExpired,
   teamTotals,
   type LobbyMember,
   type LobbySnapshot,
@@ -30,11 +30,17 @@ const snapshot = (changes: Partial<LobbySnapshot> = {}): LobbySnapshot => ({
   config: DEFAULT_PRIVATE_MATCH_CONFIG,
   members,
   scores: members.map((member) => ({ id: member.id, kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 })),
+  snapshotHostTimeMs: 500,
+  activeAtHostTimeMs: null,
   activeAtEpochMs: null,
   ...changes,
 });
 
 describe('private match lobby', () => {
+  it('holds an identity through 89.9 seconds and expires it at 90 seconds on monotonic time', () => {
+    expect(rejoinReservationExpired(1_000, 90_999)).toBe(false);
+    expect(rejoinReservationExpired(1_000, 91_000)).toBe(true);
+  });
   it('balances a four-player lobby deterministically into 2v2', () => {
     const balanced = balanceLobbyTeams(members);
     expect(balanced.filter((member) => member.team === 0)).toHaveLength(2);
@@ -87,7 +93,6 @@ describe('private match lobby', () => {
   it('estimates midpoint host-clock offset and rejects extreme RTT', () => {
     expect(estimateHostClockOffset(1_000, 1_100, 2_050)).toEqual({ accepted: true, offsetMs: 1_000, rttMs: 100 });
     expect(estimateHostClockOffset(1_000, 7_000, 4_000).accepted).toBe(false);
-    expect(localPerformanceAtHostEpoch(10_000, 1_000, 8_000, 500)).toBe(1_500);
   });
 
   it('validates bounded snapshots and capacity', () => {
@@ -100,6 +105,8 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({ config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, capacity: 5 as 4 } }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, pingMs: 6_000 })) }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, dhv: 9 as 10 })) }))).toBe(false);
+    expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000 }))).toBe(false);
+    expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000, activeAtEpochMs: 2_000 }))).toBe(true);
   });
 
   it('restricts hosted bots to host-owned exact 0, 2, or 4 settings', () => {

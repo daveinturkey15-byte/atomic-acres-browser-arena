@@ -1,28 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type LeaderboardSyncMessage, type SupportActivateMessage } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type GrenadeThrowMessage, type LeaderboardSyncMessage, type SupportActivateMessage } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
   x: 0, y: 1.7, z: 2, yaw: 0, pitch: 0,
   hp: 100, kills: 2, deaths: 1, primary: 'carbine' as const, weapon: 'carbine' as const, seq: 4,
 };
+const state = (snapshot: any = player) => ({ type: 'state' as const, player: snapshot, hostTimeMs: 1_000, continuity: 1, rateHz: 40 as const });
 
 describe('network protocol guards', () => {
   it('accepts a bounded valid player snapshot and known stance', () => {
     expect(isPlayerSnapshot(player)).toBe(true);
-    expect(isGameMessage({ type: 'state', player: { ...player, stance: 'prone' } })).toBe(true);
+    expect(isGameMessage(state({ ...player, stance: 'prone' as const }))).toBe(true);
   });
 
   it('rejects malformed or unbounded messages', () => {
-    expect(isGameMessage({ type: 'state', player: { ...player, x: Infinity } })).toBe(false);
-    expect(isGameMessage({ type: 'state', player: { ...player, stance: 'burrowed' } })).toBe(false);
-    expect(isGameMessage({ type: 'state', player: { ...player, hp: 101 } })).toBe(false);
-    expect(isGameMessage({ type: 'state', player: { ...player, hp: -1 } })).toBe(false);
-    expect(isGameMessage({ type: 'state', player: { ...player, pitch: 2 } })).toBe(false);
-    expect(isGameMessage({ type: 'state', player: { ...player, kills: -1 } })).toBe(false);
-    expect(isGameMessage({ type: 'state', player: { ...player, seq: 4.5 } })).toBe(false);
+    expect(isGameMessage(state({ ...player, x: Infinity }))).toBe(false);
+    expect(isGameMessage(state({ ...player, stance: 'burrowed' as never }))).toBe(false);
+    expect(isGameMessage(state({ ...player, hp: 101 }))).toBe(false);
+    expect(isGameMessage(state({ ...player, hp: -1 }))).toBe(false);
+    expect(isGameMessage(state({ ...player, pitch: 2 }))).toBe(false);
+    expect(isGameMessage(state({ ...player, kills: -1 }))).toBe(false);
+    expect(isGameMessage(state({ ...player, seq: 4.5 }))).toBe(false);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 999, nonce: 1 })).toBe(false);
     expect(isGameMessage({ type: 'chat', by: 'a', text: 'unbounded text transport' })).toBe(false);
     expect(isGameMessage({ type: 'ping', by: 'a', team: 0, kind: 'link', position: [0, 1, 0], nonce: 1 })).toBe(false);
@@ -35,6 +36,46 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'machine-pistol', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 5 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'laser', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 3 })).toBe(false);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'smg', origin: [0, 1], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 3 })).toBe(false);
+  });
+
+  it('validates versioned authoritative firearm requests and idempotent results', () => {
+    const request = {
+      type: 'shot-request' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc',
+      shotId: 'session:abc:7',
+      shotSeq: 7,
+      fireSeq: 11,
+      weapon: 'carbine' as const,
+      renderedHostTimeMs: 2_500,
+      continuity: 3,
+      origin: [0, 1.6, 2] as [number, number, number],
+      direction: [0, 0, -1] as [number, number, number],
+      pelletDirections: [[0, 0, -1]] as [number, number, number][],
+      nonce: 41,
+    };
+    const result = {
+      type: 'shot-result' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host',
+      forPlayerId: 'abc',
+      shotId: request.shotId,
+      shotSeq: request.shotSeq,
+      status: 'accepted-hit' as const,
+      reason: 'none' as const,
+      acceptedHostTimeMs: 2_520,
+      appliedRewindMs: 20,
+      outcomes: [{
+        target: 'host', pelletHits: 1, damage: 31.4, resultingHealth: 68.6,
+        died: false, hitZone: 'body' as const, wallbang: false, penetrationMultiplier: 1,
+      }],
+      nonce: 42,
+    };
+    expect(isGameMessage(request)).toBe(true);
+    expect(isGameMessage(result)).toBe(true);
+    expect(isGameMessage({ ...request, protocolVersion: 1 })).toBe(false);
+    expect(isGameMessage({ ...request, direction: [0, 0, -0.5] })).toBe(false);
+    expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], damage: 401 }] })).toBe(false);
   });
 
   it('requires action-correlated typed hit authority and earned support metadata', () => {
@@ -54,7 +95,7 @@ describe('network protocol guards', () => {
   });
 
   it('validates combat timing and bounded host-bot authority messages', () => {
-    const timing = { eventSeq: 7, sentAtEpochMs: 1_700_000_000_000 };
+    const timing = { eventSeq: 7, sentAtHostTimeMs: 1_700 };
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing, nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing: { ...timing, eventSeq: -1 }, nonce: 3 })).toBe(false);
     const bot = { id: 'host-bot-0', name: 'Hosted Rival 1', team: 1 as const, weapon: 'lmg' as const, x: 1, y: 0, z: 2, yaw: 0, hp: 100, kills: 0, deaths: 0, alive: true, seq: 2 };
@@ -141,7 +182,7 @@ describe('network protocol guards', () => {
   });
 
   it('binds relayed guest claims to the established player id', () => {
-    expect(messageBelongsToPlayer({ type: 'state', player }, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer(state(), 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'shot', by: 'abc', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 1 }, 'abc')).toBe(true);
     expect(messageBelongsToPlayer({ type: 'shot', by: 'spoof', weapon: 'carbine', origin: [0, 1, 0], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], nonce: 1 }, 'abc')).toBe(false);
     expect(messageBelongsToPlayer({ type: 'melee', by: 'abc', origin: [0, 1.7, 0], direction: [0, 0, -1], nonce: 7 }, 'abc')).toBe(true);
@@ -153,7 +194,7 @@ describe('network protocol guards', () => {
   });
 
   it('validates bounded lobby control traffic and identifies host authority', () => {
-    const join = { type: 'lobby-join' as const, playerId: 'abc', name: 'Tester', requestedTeam: 0 as const, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 };
+    const join = { type: 'lobby-join' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION as 2, playerId: 'abc', name: 'Tester', requestedTeam: 0 as const, resumeToken: '12345678-1234-1234-1234-123456789abc', nonce: 1 };
     const lobbyState = {
       type: 'lobby-state' as const,
       by: 'host',
@@ -164,6 +205,8 @@ describe('network protocol guards', () => {
         config: { mode: 'tdm' as const, capacity: 4 as const, hostedBotCount: 0 as const, autoBalance: true, arenaId: 'atomic-acres' as const, durationMs: 300_000 },
         members: [{ id: 'host', name: 'Host', team: 0 as const, ready: true, connected: true, pingMs: 0, dhv: 10 as const }],
         scores: [{ id: 'host', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0 }],
+        snapshotHostTimeMs: 1_000,
+        activeAtHostTimeMs: null,
         activeAtEpochMs: null,
       },
       nonce: 2,
@@ -172,10 +215,11 @@ describe('network protocol guards', () => {
     expect(messageBelongsToPlayer(join, 'abc')).toBe(true);
     expect(isGameMessage({ ...join, resumeToken: 'short' })).toBe(false);
     expect(isGameMessage(lobbyState)).toBe(true);
+    expect(isGameMessage({ type: 'lobby-start', by: 'host', activeAtHostTimeMs: 4_000, activeAtEpochMs: 1_700_000_004_000, hostSentTimeMs: 1_000, revision: 3, nonce: 4 })).toBe(true);
     expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 'X', nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 9, nonce: 3 })).toBe(false);
     expect(isHostAuthorityMessage(lobbyState)).toBe(true);
-    expect(isStateTrafficMessage({ type: 'state', player })).toBe(true);
+    expect(isStateTrafficMessage(state())).toBe(true);
     expect(isStateTrafficMessage(lobbyState)).toBe(false);
     expect(isGameMessage({ ...lobbyState, snapshot: { ...lobbyState.snapshot, config: { ...lobbyState.snapshot.config, capacity: 5 } } })).toBe(false);
   });

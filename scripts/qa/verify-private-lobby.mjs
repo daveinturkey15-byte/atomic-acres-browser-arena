@@ -129,6 +129,7 @@ try {
 
   const states = await Promise.all([host, ...guests].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
   const timers = await Promise.all([host, ...guests].map((page) => page.textContent('#timer')));
+  const activeAtHostValues = states.map((state) => state.privateMatch.activeAtHostTimeMs);
   const activeAtValues = states.map((state) => state.privateMatch.activeAtEpochMs);
 
   const rejoinGuest = guests[0];
@@ -171,6 +172,7 @@ try {
     allReady,
     pingSamples,
     timers,
+    activeAtHostValues,
     activeAtValues,
     modes: states.map((state) => state.gameMode),
     dhvLoadouts: states.map((state) => ({ dhv: state.player.dhv, equippedWeapons: state.player.equippedWeapons })),
@@ -200,6 +202,7 @@ try {
     && overflowRejected && sixCapacityReplicated && sixPlayersAdmitted && allReady
     && ffaTeamControlsDisabled.every(Boolean)
     && pingSamples.slice(1).every((ping) => Number.isFinite(ping))
+    && new Set(activeAtHostValues).size === 1 && activeAtHostValues.every(Number.isFinite)
     && new Set(activeAtValues).size === 1
     && states[0].player.dhv === 'X' && states[0].player.equippedWeapons.includes('magnum')
     && states[1].player.dhv === 8 && !states[1].player.equippedWeapons.includes('magnum')

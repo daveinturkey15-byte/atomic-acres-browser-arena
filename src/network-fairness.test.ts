@@ -4,17 +4,17 @@ import { MAX_LAG_COMPENSATION_MS, admitCombatTiming, createPeerTimingState, shou
 describe('bounded host fairness timing', () => {
   it('admits ordered modest-latency actions with capped rewind', () => {
     const synchronized = updatePeerTiming(createPeerTimingState(), { clockOffsetMs: 20, rttMs: 120 });
-    const result = admitCombatTiming(synchronized, { eventSeq: 1, sentAtEpochMs: 1_000 }, 1_260);
+    const result = admitCombatTiming(synchronized, { eventSeq: 1, sentAtHostTimeMs: 1_020 }, 1_260);
     expect(result).toMatchObject({ accepted: true, reason: 'accepted', sampleAgeMs: 240 });
     expect(result.rewindMs).toBe(MAX_LAG_COMPENSATION_MS);
   });
 
   it('rejects duplicates, large gaps, stale actions, and future claims', () => {
     const base = { ...createPeerTimingState(), lastEventSeq: 10 };
-    expect(admitCombatTiming(base, { eventSeq: 10, sentAtEpochMs: 1_000 }, 1_010).reason).toBe('duplicate');
-    expect(admitCombatTiming(base, { eventSeq: 1_000, sentAtEpochMs: 1_000 }, 1_010).reason).toBe('sequence-gap');
-    expect(admitCombatTiming(base, { eventSeq: 11, sentAtEpochMs: 1_000 }, 1_700).reason).toBe('stale');
-    expect(admitCombatTiming(base, { eventSeq: 11, sentAtEpochMs: 1_200 }, 1_000).reason).toBe('future');
+    expect(admitCombatTiming(base, { eventSeq: 10, sentAtHostTimeMs: 1_000 }, 1_010).reason).toBe('duplicate');
+    expect(admitCombatTiming(base, { eventSeq: 1_000, sentAtHostTimeMs: 1_000 }, 1_010).reason).toBe('sequence-gap');
+    expect(admitCombatTiming(base, { eventSeq: 11, sentAtHostTimeMs: 1_000 }, 1_700).reason).toBe('stale');
+    expect(admitCombatTiming(base, { eventSeq: 11, sentAtHostTimeMs: 1_200 }, 1_000).reason).toBe('future');
   });
 
   it('retains host combat authority only for an active lobby member rejoin window', () => {

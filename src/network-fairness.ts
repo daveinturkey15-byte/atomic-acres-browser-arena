@@ -3,8 +3,14 @@ export const MAX_COMBAT_EVENT_FUTURE_MS = 120;
 export const MAX_COMBAT_SEQUENCE_GAP = 512;
 export const MAX_LAG_COMPENSATION_MS = 250;
 
-export type CombatTiming = Readonly<{ eventSeq: number; sentAtEpochMs: number }>;
-export type PeerTimingState = Readonly<{ lastEventSeq: number; clockOffsetMs: number; rttMs: number; jitterMs: number }>;
+export type CombatTiming = Readonly<{ eventSeq: number; sentAtHostTimeMs: number }>;
+export type PeerTimingState = Readonly<{
+  lastEventSeq: number;
+  clockOffsetMs: number;
+  rttMs: number;
+  jitterMs: number;
+  uncertaintyMs: number;
+}>;
 export type CombatTimingAdmission = Readonly<{
   accepted: boolean;
   reason: 'accepted' | 'duplicate' | 'sequence-gap' | 'stale' | 'future' | 'invalid';
@@ -14,12 +20,12 @@ export type CombatTimingAdmission = Readonly<{
 }>;
 
 export function createPeerTimingState(): PeerTimingState {
-  return { lastEventSeq: -1, clockOffsetMs: 0, rttMs: 0, jitterMs: 0 };
+  return { lastEventSeq: -1, clockOffsetMs: 0, rttMs: 0, jitterMs: 0, uncertaintyMs: 0 };
 }
 
-export function admitCombatTiming(state: PeerTimingState, timing: CombatTiming, receivedAtEpochMs: number): CombatTimingAdmission {
+export function admitCombatTiming(state: PeerTimingState, timing: CombatTiming, receivedAtHostTimeMs: number): CombatTimingAdmission {
   if (!Number.isSafeInteger(timing.eventSeq) || timing.eventSeq < 0
-    || !Number.isFinite(timing.sentAtEpochMs) || !Number.isFinite(receivedAtEpochMs)) {
+    || !Number.isFinite(timing.sentAtHostTimeMs) || !Number.isFinite(receivedAtHostTimeMs)) {
     return { accepted: false, reason: 'invalid', sampleAgeMs: 0, rewindMs: 0, state };
   }
   if (timing.eventSeq <= state.lastEventSeq) {
@@ -28,8 +34,7 @@ export function admitCombatTiming(state: PeerTimingState, timing: CombatTiming, 
   if (state.lastEventSeq >= 0 && timing.eventSeq - state.lastEventSeq > MAX_COMBAT_SEQUENCE_GAP) {
     return { accepted: false, reason: 'sequence-gap', sampleAgeMs: 0, rewindMs: 0, state };
   }
-  const estimatedHostSentAt = timing.sentAtEpochMs + state.clockOffsetMs;
-  const sampleAgeMs = receivedAtEpochMs - estimatedHostSentAt;
+  const sampleAgeMs = receivedAtHostTimeMs - timing.sentAtHostTimeMs;
   if (sampleAgeMs > MAX_COMBAT_EVENT_AGE_MS) {
     return { accepted: false, reason: 'stale', sampleAgeMs, rewindMs: 0, state };
   }
@@ -47,7 +52,12 @@ export function admitCombatTiming(state: PeerTimingState, timing: CombatTiming, 
   };
 }
 
-export function updatePeerTiming(state: PeerTimingState, sample: Readonly<{ clockOffsetMs: number; rttMs: number }>): PeerTimingState {
+export function updatePeerTiming(state: PeerTimingState, sample: Readonly<{
+  clockOffsetMs: number;
+  rttMs: number;
+  jitterMs?: number;
+  uncertaintyMs?: number;
+}>): PeerTimingState {
   if (!Number.isFinite(sample.clockOffsetMs) || !Number.isFinite(sample.rttMs) || sample.rttMs < 0 || sample.rttMs > 5_000) return state;
   const nextRtt = state.rttMs === 0 ? sample.rttMs : state.rttMs * 0.75 + sample.rttMs * 0.25;
   const deviation = Math.abs(sample.rttMs - nextRtt);
@@ -55,7 +65,10 @@ export function updatePeerTiming(state: PeerTimingState, sample: Readonly<{ cloc
     ...state,
     clockOffsetMs: state.rttMs === 0 ? sample.clockOffsetMs : state.clockOffsetMs * 0.75 + sample.clockOffsetMs * 0.25,
     rttMs: nextRtt,
-    jitterMs: state.rttMs === 0 ? 0 : state.jitterMs * 0.75 + deviation * 0.25,
+    jitterMs: sample.jitterMs === undefined
+      ? state.rttMs === 0 ? 0 : state.jitterMs * 0.75 + deviation * 0.25
+      : Math.max(0, Math.min(5_000, sample.jitterMs)),
+    uncertaintyMs: Math.max(0, Math.min(5_000, sample.uncertaintyMs ?? sample.rttMs / 2)),
   };
 }
 

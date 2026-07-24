@@ -38,10 +38,28 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass61',
+    pass: 'PASS 61',
+    title: 'Experimental Netcode Pass',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['MULTIPLAYER', 'NETCODE', 'HIT REGISTRATION', 'REJOIN', 'DIAGNOSTICS']),
+    summary: 'Pass 61 isolates a new monotonic timing and host-authoritative firearm path for fast public testing without replacing normal Pass 60 or stable Pass 59.',
+    highlights: Object.freeze([
+      'Guest and host clocks map through four-timestamp monotonic probes with bounded RTT, jitter, uncertainty and outlier telemetry',
+      'Remote players render from timestamped snapshot buffers at the actual recorded host-world playback time',
+      'Movement replication adapts independently through exact 20, 30 and 40 Hz tiers with hysteresis, gap, reorder and buffered-pressure feedback',
+      'Every guest trigger creates one reliable shot request and one cached idempotent host result; separate client-authored firearm hit claims are removed',
+      'Confirmed hitmarkers, hit audio and damage numbers now occur only after host-applied damage agrees with the result',
+      'Historical shooter and target poses reject missing or incompatible spawn, reconnect and teleport continuity instead of silently using a current pose',
+      'Private lobby identities are held for a monotonic 90-second rejoin window and transport recovery keeps retrying through that window',
+      'Technical match JSON includes bounded host-time, movement-rate, interpolation and shot lifecycle diagnostics',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass60',
     pass: 'PASS 60',
-    title: 'Fast-feedback combat, HUD & diagnostics pass',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    title: 'New Netcode',
+    releasedAt: '2026-07-23T23:15:05Z',
     areas: Object.freeze(['COMBAT', 'MULTIPLAYER', 'HUD', 'DIAGNOSTICS', 'MAPS', 'GUN RANGE']),
     summary: 'Pass 60 prioritises fast player-visible feedback: larger HUD presentation, authoritative per-player handicaps, actionable reports, and screenshot-driven arena rebuilds while preserving Pass 59 as the exact stable fallback.',
     highlights: Object.freeze([

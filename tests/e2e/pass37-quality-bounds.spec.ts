@@ -56,11 +56,11 @@ test.describe('Pass 37 Quality surface separation and fall-proof bounds', () => 
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/?render=blender&signal=off&grass=off&mist=off&clouds=off&rays=off&multiplayerQa=1&seed=37001');
     await waitReady(page);
-    await expect(page.locator('.eyebrow')).toContainText('PASS 58');
+    await expect(page.locator('.eyebrow')).toContainText('PASS 61');
     await expect(page.locator('#graphics-profile option[value="blender"]')).toHaveText('QUALITY GRAPHICS');
     expect((await snapshot(page)).render.blenderEnvironment).toMatchObject({
       status: 'ready',
-      triangleCount: 34_336,
+      triangleCount: 44_812,
       surfaceSeparationPass: true,
       proceduralRootActuallyVisible: false,
       qualityArtRootVisible: true,

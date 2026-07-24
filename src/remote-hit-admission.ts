@@ -17,6 +17,7 @@ type ShotTarget = Readonly<{
   yaw: number;
   stance: Stance;
 }>;
+export type AuthoritativeShotTarget = ShotTarget & Readonly<{ id: string }>;
 
 const HIT_PROXIES = AUTHORITATIVE_HIT_PROXIES;
 
@@ -58,17 +59,83 @@ export function deriveRemoteShotBaseDamage(
   target: ShotTarget,
   penetration: (origin: THREE.Vector3, impact: THREE.Vector3, weapon: WeaponId) => boolean | number = () => 1,
 ): number {
+  return deriveRemoteShotOutcome(weapon, origin, pelletDirections, target, penetration).damage;
+}
+
+export type DerivedRemoteShotOutcome = Readonly<{
+  damage: number;
+  pelletHits: number;
+  hitZone: HitZone;
+  wallbang: boolean;
+  penetrationMultiplier: number;
+}>;
+
+export function deriveAuthoritativeShotOutcomes(
+  weapon: WeaponId,
+  originTuple: readonly [number, number, number],
+  pelletDirections: readonly (readonly [number, number, number])[],
+  targets: readonly AuthoritativeShotTarget[],
+  penetration: (origin: THREE.Vector3, impact: THREE.Vector3, weapon: WeaponId) => boolean | number = () => 1,
+): Map<string, DerivedRemoteShotOutcome> {
+  const outcomes = new Map<string, DerivedRemoteShotOutcome>();
   const spec = WEAPONS[weapon];
-  if (pelletDirections.length !== spec.pellets) return 0;
+  if (pelletDirections.length !== spec.pellets) return outcomes;
+  const origin = new THREE.Vector3(...originTuple);
+  for (const direction of pelletDirections) {
+    let nearest: { target: AuthoritativeShotTarget; zone: HitZone; distance: number; point: THREE.Vector3 } | null = null;
+    for (const target of targets) {
+      const hit = firstProxyHit(originTuple, direction, target);
+      if (hit && (!nearest || hit.distance < nearest.distance)) nearest = { target, ...hit };
+    }
+    if (!nearest) continue;
+    const rawPenetration = penetration(origin, nearest.point, weapon);
+    const multiplier = typeof rawPenetration === 'boolean' ? (rawPenetration ? 0 : 1) : Math.max(0, Math.min(1, rawPenetration));
+    if (multiplier <= 0) continue;
+    const prior = outcomes.get(nearest.target.id) ?? {
+      damage: 0, pelletHits: 0, hitZone: 'limb' as HitZone, wallbang: false, penetrationMultiplier: 1,
+    };
+    outcomes.set(nearest.target.id, {
+      damage: Math.min(100, prior.damage + applyPenetrationDamage(computeDamage(spec, nearest.distance, nearest.zone), multiplier)),
+      pelletHits: prior.pelletHits + 1,
+      hitZone: nearest.zone === 'head' || nearest.zone === 'body' && prior.hitZone === 'limb' ? nearest.zone : prior.hitZone,
+      wallbang: prior.wallbang || multiplier < 0.999,
+      penetrationMultiplier: Math.min(prior.penetrationMultiplier, multiplier),
+    });
+  }
+  return outcomes;
+}
+
+export function deriveRemoteShotOutcome(
+  weapon: WeaponId,
+  origin: readonly [number, number, number],
+  pelletDirections: readonly (readonly [number, number, number])[],
+  target: ShotTarget,
+  penetration: (origin: THREE.Vector3, impact: THREE.Vector3, weapon: WeaponId) => boolean | number = () => 1,
+): DerivedRemoteShotOutcome {
+  const spec = WEAPONS[weapon];
+  if (pelletDirections.length !== spec.pellets) return { damage: 0, pelletHits: 0, hitZone: 'body', wallbang: false, penetrationMultiplier: 1 };
   let damage = 0;
+  let pelletHits = 0;
+  let hitZone: HitZone = 'limb';
+  let penetrationMultiplier = 1;
   for (const direction of pelletDirections) {
     const hit = firstProxyHit(origin, direction, target);
     if (!hit) continue;
     const result = penetration(new THREE.Vector3(...origin), hit.point, weapon);
     const multiplier = typeof result === 'boolean' ? (result ? 0 : 1) : Math.max(0, Math.min(1, result));
+    if (multiplier <= 0) continue;
+    pelletHits += 1;
+    if (hit.zone === 'head' || hit.zone === 'body' && hitZone === 'limb') hitZone = hit.zone;
+    penetrationMultiplier = Math.min(penetrationMultiplier, multiplier);
     damage += applyPenetrationDamage(computeDamage(spec, hit.distance, hit.zone), multiplier);
   }
-  return Math.min(100, damage);
+  return {
+    damage: Math.min(100, damage),
+    pelletHits,
+    hitZone,
+    wallbang: penetrationMultiplier < 0.999,
+    penetrationMultiplier,
+  };
 }
 
 export function maximumRemoteShotBaseDamage(weapon: WeaponId): number {

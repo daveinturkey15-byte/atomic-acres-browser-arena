@@ -7,6 +7,20 @@ export type ReleaseChannelConfig = {
     label: string;
     description: string;
   };
+  normal: {
+    label: string;
+    description: string;
+    pass: string;
+    sourceSha: string;
+    pagesSha: string;
+    path: string;
+  };
+  experimental: {
+    label: string;
+    description: string;
+    pass: string;
+    path: string;
+  };
   stable: {
     label: string;
     description: string;
