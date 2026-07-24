@@ -78,6 +78,13 @@ test.describe('Pass 25A baseline and lifecycle', () => {
     await page.locator('#last-updated-btn').evaluate((element) => {
       element.textContent = 'LAST RELEASE · 22 JUL 2026 · 21:25 BST';
     });
+    await expect(page.locator('#arena-lede')).toContainText('contested 2× Damage Core.');
+    // The current wording is asserted above. Keep the frozen Pass 25A copy in
+    // the pixel fixture so this baseline continues to measure menu geometry
+    // rather than intentional player-facing copy revisions.
+    await page.locator('#arena-lede').evaluate((element) => {
+      element.textContent = 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Quad Damage Core.';
+    });
     expect((await snapshot(page)).random.seed).toBe('pass25a-browser-baseline');
     await expect(page).toHaveScreenshot('pass25a-performance-menu.png', {
       animations: 'disabled',
