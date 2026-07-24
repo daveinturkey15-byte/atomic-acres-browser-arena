@@ -55,6 +55,15 @@ test('Project Map exposes one current-first tree and human/agent downloads', asy
   expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
   expect(markdown).toContain('### PASS 62:');
 
+  await page.click('#project-map-close');
+  await expect(page.locator('#project-map-panel')).toBeHidden();
+  await page.click('#last-updated-btn');
+  await expect(page.locator('#changelog-panel')).toBeVisible();
+  await expect(page.locator('#changelog-list > li').first()).toHaveAttribute('data-changelog-id', 'pass63');
+  await expect(page.locator('#changelog-list > li').first().locator('.changelog-entry-pass b')).toHaveText('CURRENT BUILD');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#changelog-panel')).toBeHidden();
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
   expect(browserErrors).toEqual([]);
