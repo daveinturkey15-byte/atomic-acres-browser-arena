@@ -693,7 +693,8 @@ describe('additional authored maps', () => {
       'skyline-roof-sculptural-fin-0',
       'skyline-apron-cyan-guidance-west',
       'skyline-apron-magenta-guidance-east',
-      'skyline-aircraft-livery-cyan-north',
+      'skyline-aircraft-livery-cyan-north-forward',
+      'skyline-aircraft-livery-cyan-north-aft',
       'skyline-aircraft-livery-magenta-south',
     ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
 
@@ -749,26 +750,29 @@ describe('additional authored maps', () => {
     const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
     const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
     const qualityNacelles = map.root.getObjectByName('skyline-aircraft-engine-nacelles');
-    const qualityShell = map.root.getObjectByName('skyline-quality-fuselage-shell');
+    const qualityShells = [
+      map.root.getObjectByName('skyline-quality-fuselage-shell-forward'),
+      map.root.getObjectByName('skyline-quality-fuselage-shell-aft'),
+    ];
     const fuselagePlaceholder = map.root.getObjectByName('skyline-jetliner-fuselage-top') as THREE.Mesh;
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
     expect(performanceSign).toBeTruthy();
     expect(qualityBoard).toBeTruthy();
     expect(qualityNacelles).toBeTruthy();
-    expect(qualityShell).toBeTruthy();
-    expect(qualityShell?.userData.assetOwner).toBe('skyline-terminal');
+    expect(qualityShells.every(Boolean)).toBe(true);
+    expect(qualityShells.every((shell) => shell?.userData.assetOwner === 'skyline-terminal')).toBe(true);
     applyAdditionalMapPresentationProfile(map.root, 'performance');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(false);
     expect(qualityNacelles?.visible).toBe(false);
-    expect(qualityShell?.visible).toBe(false);
+    expect(qualityShells.every((shell) => shell?.visible === false)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(true);
     expect(coreFloor?.visible).not.toBe(false);
     applyAdditionalMapPresentationProfile(map.root, 'blender');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(true);
     expect(qualityNacelles?.visible).toBe(true);
-    expect(qualityShell?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
   });
 
@@ -785,12 +789,17 @@ describe('additional authored maps', () => {
       'skyline-cockpit-door-panel',
       'skyline-cockpit-door-mark',
       'skyline-jetliner-cockpit-partition',
+      'skyline-jetbridge-bellows',
+      'skyline-quality-fuselage-shell',
+      'skyline-jetliner-nose',
     ]) expect(map.root.getObjectByName(removed), removed).toBeUndefined();
     const clearance = map.root.userData.skylineCabinClearance as {
       aisleMetres: number;
       physicsPlayerDiameterMetres: number;
       clearanceProbeDiameterMetres: number;
       doorVisibleApertureMetres: number;
+      cockpitVisibleApertureMetres: number;
+      cockpitAccessibleDepthMetres: number;
       opaqueDoorPanels: number;
     };
     expect(clearance.aisleMetres).toBeGreaterThanOrEqual(1.15);
@@ -798,7 +807,44 @@ describe('additional authored maps', () => {
     expect(clearance.clearanceProbeDiameterMetres).toBe(0.88);
     expect(clearance.aisleMetres).toBeGreaterThan(clearance.clearanceProbeDiameterMetres);
     expect(clearance.doorVisibleApertureMetres).toBeGreaterThanOrEqual(1.8);
+    expect(clearance.cockpitVisibleApertureMetres).toBeGreaterThanOrEqual(2.5);
+    expect(clearance.cockpitAccessibleDepthMetres).toBeGreaterThanOrEqual(2.5);
     expect(clearance.opaqueDoorPanels).toBe(0);
+    for (const name of [
+      'skyline-jetbridge-bellows-side--1.93',
+      'skyline-jetbridge-bellows-side-1.93',
+      'skyline-jetbridge-bellows-header',
+      'skyline-cockpit-floor',
+      'skyline-cockpit-glass-front',
+      'skyline-quality-fuselage-shell-forward',
+      'skyline-quality-fuselage-shell-aft',
+    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
+  });
+
+  it('proves every open Terminal aperture has visual, movement, and shot parity in both profiles', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineOpeningAudit as Record<'performance' | 'quality', Array<{
+      id: string;
+      movementBlockers: number;
+      shotBlockers: number;
+      opaquePresentationBlockers: number;
+      opaquePresentationBlockerNames: string[];
+    }>>;
+    for (const profile of ['performance', 'quality'] as const) {
+      expect(audit[profile].map((entry) => entry.id)).toEqual([
+        'terminal-gate',
+        'aircraft-boarding',
+        'cockpit-entry',
+      ]);
+      for (const opening of audit[profile]) {
+        expect(opening, `${profile}:${opening.id}`).toMatchObject({
+          movementBlockers: 0,
+          shotBlockers: 0,
+          opaquePresentationBlockers: 0,
+          opaquePresentationBlockerNames: [],
+        });
+      }
+    }
   });
 
   it('uses transparent depth-safe glazing for cockpit and cabin apertures while keeping flight screens opaque', () => {
@@ -825,6 +871,9 @@ describe('additional authored maps', () => {
     expect(screenMaterial.transparent).toBe(false);
     expect(screenMaterial.depthWrite).toBe(true);
     expect(screenMaterial.emissiveIntensity).toBeGreaterThan(0.5);
+    const screenFace = map.root.getObjectByName('skyline-flight-screen-face--29--19.895');
+    expect(screenFace?.userData.label).toBe('FLIGHT INFO - GATES 01—03');
+    expect(map.root.getObjectByName('skyline-flight-screen-frame-top--29')).toBeTruthy();
   });
 
   it('adds deliberate concourse cover while preserving centre and flank lanes', () => {
@@ -843,7 +892,7 @@ describe('additional authored maps', () => {
   it('walks every Skyline route in both directions with Rapier-backed collision', async () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const routes = map.root.userData.skylineRoutes as Record<string, RouteAnchor[]>;
-    for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac', 'cabin-through-aisle']) {
+    for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac', 'cabin-through-aisle', 'cabin-to-cockpit']) {
       await traverseRoute(map, routes[id]);
       await traverseRoute(map, routes[id], true);
     }
@@ -864,6 +913,7 @@ describe('additional authored maps', () => {
     expect(routes['mezzanine-to-jetbridge']).toHaveLength(5);
     expect(routes['fuselage-to-tarmac']).toHaveLength(4);
     expect(routes['cabin-through-aisle']).toHaveLength(3);
+    expect(routes['cabin-to-cockpit']).toHaveLength(3);
   });
 });
 
@@ -928,6 +978,7 @@ describe('Pass 59 map mechanical audits', () => {
     expect(audit).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'terminal-gate', state: 'open', clearWidth: 3.5 }),
       expect.objectContaining({ id: 'aircraft-boarding', state: 'open', clearWidth: 2.68 }),
+      expect.objectContaining({ id: 'cockpit-entry', state: 'open', mechanicalAuthority: 'open-cabin-shell-gap', clearWidth: 2.8 }),
       expect.objectContaining({ id: 'staff-west', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall' }),
       expect.objectContaining({ id: 'staff-east', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall' }),
     ]));

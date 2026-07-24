@@ -9094,6 +9094,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       targets: arena.targets.length,
       skylineAssetAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineAssetAudit : null,
       skylineCabinClearance: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineCabinClearance : null,
+      skylineOpeningAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineOpeningAudit : null,
       pass59GeometryAudit: selectedArena.id === 'atomic-acres'
         ? arena.root.userData.atomicCollisionAudit
         : selectedArena.id === 'rustworks-1v1'
