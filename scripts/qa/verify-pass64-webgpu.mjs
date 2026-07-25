@@ -103,7 +103,10 @@ function pngLuminance(png) {
   };
 }
 
-const server = await createServer({ server: { host: '127.0.0.1', port }, logLevel: 'error' });
+const server = await createServer({
+  server: { host: '127.0.0.1', port, strictPort: true },
+  logLevel: 'error',
+});
 let browser;
 let peerServer;
 try {
