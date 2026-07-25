@@ -22,6 +22,17 @@ npm run dev
 
 Validated envelopes are appended to the ignored `artifacts/pass64/match-diagnostics.jsonl` file. The collector binds only to `127.0.0.1`, accepts only localhost browser origins, uses the same strict schema and 48 KiB cap as the Worker, and has no read route.
 
+Analyze the collected JSONL without modifying it:
+
+```powershell
+npm run qa:pass64:diagnostics:analyze
+npm run qa:pass64:diagnostics:analyze -- artifacts/pass64/match-diagnostics.jsonl --json
+```
+
+Text output is intended for quick operator review; `--json` emits the same findings as a stable machine-readable report. The default bad-frame gate is p95 greater than `33 ms`; use `--bad-frame-p95-ms 20` when the review machine has a stricter measured budget. The report validates every collector line and envelope, groups results by build/arena/mode/role, and flags health arithmetic or continuity failures, impossible regeneration/death transitions, observable host-canonical reconciliation, evidence truncation, rejected admissions, network loss/reordering, dropped damage, fatal runtime categories, and bad p95 frame pacing.
+
+Output deliberately omits collector receipt IDs, receipt timestamps, idempotency keys, and raw invalid records. Only schema-validated build context and per-match pseudonyms can appear. The command only reads the supplied file; findings never rewrite, truncate, or delete diagnostic logs. Findings are diagnostic rather than a release gate because retained-event truncation can make continuity evidence incomplete.
+
 ## Production service and operator analysis
 
 Set `VITE_MATCH_DIAGNOSTICS_URL` to the existing Worker origin when building the reviewed candidate. Apply D1 migrations before deploying the Worker. This contribution does not deploy either surface.
