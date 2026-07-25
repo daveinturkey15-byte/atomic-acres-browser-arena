@@ -34,6 +34,47 @@ Artifacts are written under ignored `artifacts/agent-player/` and include start/
 
 On this WSL host, headless Chromium uses SwiftShader. Compositor captures are intentionally on-demand rather than continuous: background WebGL screencast/readback can starve input-release RPCs. `--fire-check` opts into one local mechanical shot, but is disabled by default because first-shot shader/audio work has wedged SwiftShader; combat performance must be judged in GPU-backed Windows Chrome.
 
+## GPU-backed Windows combat lane
+
+The dedicated Windows runner uses a separate temporary Chrome profile and CDP port; it does not attach to or close Dave's normal Chrome profile. Launch it from WSL with:
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
+  "$(wslpath -w /root/.hermes/scripts/launch_atomic_player_chrome.ps1)"
+```
+
+The Windows runner directory is:
+
+```text
+C:\Users\HB\AppData\Local\Temp\jigglyclaw-atomic-player-runner
+```
+
+A full non-scoring five-minute Latest baseline uses a 330-second outer deadline so the three-second warmup and post-match export can complete:
+
+```powershell
+node.exe scripts\agent-player\atomic-player-driver.mjs `
+  --cdp-url http://127.0.0.1:9333 `
+  --url "<latest-channel-url>&multiplayerQa=1" `
+  --allow-live --mode solo --duration 330 --wait-for-match-end `
+  --width 960 --height 540 --output artifacts\full-5min-baseline
+```
+
+The driver uses the visible Performance canvas and HUD for live decisions, requires a trusted ordinary click for pointer lock, and downloads both post-match JSON files. Analyse the result repeatably with:
+
+```bash
+node scripts/agent-player/analyze-combat.mjs \
+  --directory <artifact-directory>
+```
+
+This writes `combat-baseline.json` with combat, contact-window, perception, latency and input-safety metrics. Treat the observed channel URL/menu pass plus the human summary `build` field as build provenance; Pass 63 technical exports currently retain an older `context.sourceId`, so that field is diagnostic context rather than release proof. Stop and verify the dedicated browser after every run:
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
+  "$(wslpath -w /root/.hermes/scripts/stop_atomic_player_chrome.ps1)"
+```
+
+Do not push or open a game-source PR for player-harness work unless Dave explicitly asks.
+
 ## Private lobby shapes
 
 Host with two hosted bots, send a lobby message, ready, and start:

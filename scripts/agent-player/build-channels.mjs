@@ -72,8 +72,11 @@ async function main() {
     await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
   }
   console.log(JSON.stringify(report, null, 2));
-  const requiredLatest = Number(valueAfter('--require-latest-pass'));
-  if (Number.isFinite(requiredLatest) && channels[0].passNumber !== requiredLatest) process.exitCode = 2;
+  const requiredLatestValue = valueAfter('--require-latest-pass');
+  if (requiredLatestValue !== null) {
+    const requiredLatest = Number(requiredLatestValue);
+    if (!Number.isFinite(requiredLatest) || channels[0].passNumber !== requiredLatest) process.exitCode = 2;
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

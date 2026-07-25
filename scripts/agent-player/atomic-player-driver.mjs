@@ -3,7 +3,7 @@
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import { execFileSync } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findCoralTargets } from './vision.mjs';
@@ -173,16 +173,68 @@ async function createVisionCapture(context, page) {
   };
 }
 
+async function visibleHudSnapshot(page) {
+  return page.evaluate(() => {
+    const numericText = (selector) => {
+      const value = Number.parseInt(document.querySelector(selector)?.textContent?.trim() ?? '', 10);
+      return Number.isFinite(value) ? value : null;
+    };
+    return {
+      health: numericText('#health'),
+      ammo: numericText('#ammo'),
+      reserve: numericText('#reserve'),
+      damageDealt: numericText('#damage-dealt'),
+      damageTaken: numericText('#damage-taken'),
+      matchSummaryVisible: Boolean(document.querySelector('#download-match-summary')),
+    };
+  });
+}
+
+async function downloadVisibleMatchReport(page, selector, outputPath) {
+  const downloadPromise = page.waitForEvent('download', { timeout: 20_000 });
+  await page.locator(selector).click({ timeout: 20_000 });
+  const download = await downloadPromise;
+  await download.saveAs(outputPath);
+  const parsed = JSON.parse(await readFile(outputPath, 'utf8'));
+  return { suggestedFilename: download.suggestedFilename(), outputPath, parsed };
+}
+
+async function webGlRendererInfo(page) {
+  return page.evaluate(() => {
+    const canvas = document.querySelector('#game');
+    if (!(canvas instanceof HTMLCanvasElement)) return null;
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+    if (!gl) return null;
+    const extension = gl.getExtension('WEBGL_debug_renderer_info');
+    return {
+      vendor: extension ? gl.getParameter(extension.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+      renderer: extension ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      version: gl.getParameter(gl.VERSION),
+    };
+  });
+}
+
+async function trustedElementClick(page, selector) {
+  const box = await page.locator(selector).boundingBox();
+  if (!box) throw new Error(`Visible click target is unavailable: ${selector}`);
+  await page.bringToFront();
+  const cdp = await page.context().newCDPSession(page);
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+}
+
 async function prepareLobby(page, args, mode, headed) {
   await page.locator('#player-name').fill(String(args.callsign ?? 'Jigglyclaw'));
   await page.locator('#team').selectOption(String(args.team ?? '0'));
   if (mode === 'solo') {
-    await page.waitForFunction(() => !document.querySelector('#solo')?.disabled);
+    await page.waitForFunction(() => !document.querySelector('#solo')?.disabled, null, { timeout: 180_000 });
     if (headed) {
-      // A headed player session uses the real deployment button. Playwright's
-      // locator click can wait forever after a successful pointer-lock request,
-      // so invoke the same normal button handler without waiting for click ACK.
-      await page.locator('#solo').evaluate((button) => button.click());
+      // Use a real CDP mouse event so the visible Deploy button carries the
+      // trusted user gesture required by Chromium pointer lock. Locator.click()
+      // can wait forever after the page successfully captures the pointer.
+      await trustedElementClick(page, '#solo');
       return 'ordinary-deploy-button';
     }
     // Chromium's headless pointer-lock handshake can deadlock the normal click
@@ -231,7 +283,10 @@ async function run() {
   const maxHoldMs = integerArg(args['max-hold'], 2000, tickMs, 5000);
   const viewportWidth = integerArg(args.width, 640, 480, 1280);
   const viewportHeight = integerArg(args.height, 360, 270, 720);
-  const headed = Boolean(args.headed);
+  const cdpUrl = args['cdp-url'] ? String(args['cdp-url']) : null;
+  const headed = Boolean(args.headed) || Boolean(cdpUrl);
+  const waitForMatchEnd = Boolean(args['wait-for-match-end']);
+  const controlSleepMs = integerArg(args['control-sleep'], cdpUrl ? 120 : 700, 80, 1000);
   const allowLive = Boolean(args['allow-live']);
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');
   const targetUrl = new URL(baseUrl);
@@ -250,6 +305,7 @@ async function run() {
   const pressedKeys = new Set();
   const actions = [];
   let browser;
+  let context;
   let page;
   let visionStream;
   let safetyReleased = false;
@@ -266,16 +322,28 @@ async function run() {
   let startScreenshotCaptured = false;
   let finalScreenshotCaptured = false;
   let lobbyReceipt = null;
+  let matchEndedObserved = false;
+  let matchSummaryDownload = null;
+  let matchTechnicalDownload = null;
+  let rendererInfo = null;
   const visionDurationsMs = [];
 
   try {
     console.error('[atomic-player] phase=browser-launch');
-    browser = await chromium.launch({
-      headless: !headed,
-      args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
-    });
-    const context = await browser.newContext({ viewport: { width: viewportWidth, height: viewportHeight }, deviceScaleFactor: 1 });
-    page = await context.newPage();
+    if (cdpUrl) {
+      browser = await chromium.connectOverCDP(cdpUrl, { timeout: 30_000 });
+      context = browser.contexts()[0];
+      if (!context) throw new Error(`No browser context exposed by CDP endpoint ${cdpUrl}`);
+      page = context.pages().find((candidate) => candidate.url() === 'about:blank') ?? context.pages()[0] ?? await context.newPage();
+      await page.setViewportSize({ width: viewportWidth, height: viewportHeight }).catch(() => undefined);
+    } else {
+      browser = await chromium.launch({
+        headless: !headed,
+        args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
+      });
+      context = await browser.newContext({ viewport: { width: viewportWidth, height: viewportHeight }, deviceScaleFactor: 1 });
+      page = await context.newPage();
+    }
     page.setDefaultTimeout(15_000);
     page.on('console', (message) => {
       if (message.type() === 'warning' || message.type() === 'error') browserMessages.push({ type: message.type(), text: message.text() });
@@ -329,6 +397,7 @@ async function run() {
       await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot?.().gameStarted, null, { timeout: 45_000 });
     }
     initialSnapshot = await debugSnapshot(page);
+    rendererInfo = await webGlRendererInfo(page).catch(() => null);
     const passText = await page.locator('#menu .eyebrow').textContent().catch(() => '');
     const pass = passText?.match(/PASS\s+\d+/i)?.[0]?.toUpperCase() ?? 'UNKNOWN';
     if (initialSnapshot?.render?.profile !== 'performance') {
@@ -359,7 +428,8 @@ async function run() {
     } else if (initialSnapshot?.gameStarted) {
       console.error('[atomic-player] phase=control-loop');
       if (headed) {
-        await page.mouse.click(viewportWidth / 2, viewportHeight / 2);
+        const alreadyLocked = await page.evaluate(() => document.pointerLockElement?.id === 'game');
+        if (!alreadyLocked) await trustedElementClick(page, '#game');
       } else {
         // First-click semantics: the game requests pointer lock on the first
         // canvas press and deliberately does not fire that click.
@@ -368,6 +438,7 @@ async function run() {
       }
       await sleep(120);
       pointerLock = await page.evaluate(() => document.pointerLockElement?.id === 'game');
+      if (headed && !pointerLock) throw new Error('Trusted canvas click did not acquire pointer lock');
       visionStream = await createVisionCapture(context, page);
       await visionStream.capture();
       await writeFile(resolve(artifactDirectory, 'start.jpg'), visionStream.state.latest.jpeg);
@@ -378,6 +449,11 @@ async function run() {
       let currentTarget = null;
       while (Date.now() < deadline) {
         const tickStarted = performance.now();
+        if (waitForMatchEnd && await page.locator('#download-match-summary').isVisible().catch(() => false)) {
+          matchEndedObserved = true;
+          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'match-end-visible' });
+          break;
+        }
         const vision = await visionStream.capture().catch((error) => {
           visionStream.state.failedFrames += 1;
           browserMessages.push({ type: 'warning', text: error.message });
@@ -389,6 +465,16 @@ async function run() {
         visionFrames += 1;
         visionDurationsMs.push(vision.decodeMs);
         currentTarget = vision.targets[0] ?? null;
+        const hud = await visibleHudSnapshot(page).catch(() => null);
+        if (hud?.matchSummaryVisible) {
+          matchEndedObserved = true;
+          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'match-end-visible' });
+          break;
+        }
+        if (hud?.ammo !== null && hud.ammo <= 3 && Number(hud.reserve ?? 0) > 0) {
+          await page.keyboard.press('KeyR');
+          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'reload-visible-hud', ammo: hud.ammo, reserve: hud.reserve });
+        }
         if (currentTarget) {
           targetFrames += 1;
           const horizontal = currentTarget.x - vision.width / 2;
@@ -424,6 +510,7 @@ async function run() {
           desiredKeys.add('KeyW');
           if (movementCycle % 4 === 1) desiredKeys.add('KeyA');
           if (movementCycle % 4 === 3) desiredKeys.add('KeyD');
+          if (movementCycle % 13 === 7) desiredKeys.add('Space');
         }
         if (movementCycle % 9 < 2) desiredKeys.add('ShiftLeft');
         // SwiftShader can sample gameplay near 1 Hz on this host. A 120 ms
@@ -436,7 +523,7 @@ async function run() {
         const elapsed = performance.now() - tickStarted;
         // Leave a readback-free window for simulation and the local key-up
         // deadline before requesting the next frame.
-        await sleep(Math.max(700, tickMs - elapsed));
+        await sleep(Math.max(controlSleepMs, tickMs - elapsed));
       }
       console.error('[atomic-player] phase=finalize');
       if (visionStream.state.latest?.jpeg) {
@@ -461,6 +548,27 @@ async function run() {
         browserMessages.push({ type: 'warning', text: error.message });
         return initialSnapshot;
       });
+      if (matchEndedObserved) {
+        await page.screenshot({ path: resolve(artifactDirectory, 'post-game.jpg'), type: 'jpeg', quality: 75 }).catch((error) => {
+          browserMessages.push({ type: 'warning', text: `post-game screenshot: ${error.message}` });
+        });
+        matchSummaryDownload = await downloadVisibleMatchReport(
+          page,
+          '#download-match-summary',
+          resolve(artifactDirectory, 'match-summary.json'),
+        ).catch((error) => {
+          browserMessages.push({ type: 'warning', text: `match summary download: ${error.message}` });
+          return null;
+        });
+        matchTechnicalDownload = await downloadVisibleMatchReport(
+          page,
+          '#download-match-diagnostics',
+          resolve(artifactDirectory, 'match-technical.json'),
+        ).catch((error) => {
+          browserMessages.push({ type: 'warning', text: `match technical download: ${error.message}` });
+          return null;
+        });
+      }
     } else {
       finalSnapshot = initialSnapshot;
     }
@@ -504,6 +612,7 @@ async function run() {
         pointerLock,
         bootstrap: bootstrapKind,
         lobbyReceipt,
+        cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
         perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-coral-mask-v1',
@@ -519,10 +628,12 @@ async function run() {
         fpsCounter: finalSnapshot?.render?.fpsCounter ?? null,
         framePacing: finalSnapshot?.render?.framePacing ?? null,
         adaptive: finalSnapshot?.render?.adaptive ?? null,
+        webGlRenderer: rendererInfo,
         visionFrames,
         targetFrames,
         targetFrameRatio: visionFrames > 0 ? targetFrames / visionFrames : 0,
         tickMs,
+        controlSleepMs,
         viewport: { width: viewportWidth, height: viewportHeight },
         visionLoopMs: {
           minimum: sortedVisionDurations[0] ?? null,
@@ -572,6 +683,16 @@ async function run() {
           alive: finalSnapshot.bots.filter((bot) => bot.alive).length,
           totalKills: finalSnapshot.bots.reduce((sum, bot) => sum + Number(bot.kills ?? 0), 0),
         } : null,
+        matchEndedObserved,
+        downloadedSummary: matchSummaryDownload ? {
+          suggestedFilename: matchSummaryDownload.suggestedFilename,
+          file: 'match-summary.json',
+          report: matchSummaryDownload.parsed,
+        } : null,
+        downloadedTechnical: matchTechnicalDownload ? {
+          suggestedFilename: matchTechnicalDownload.suggestedFilename,
+          file: 'match-technical.json',
+        } : null,
       },
       browser: {
         pageErrors: errors,
@@ -579,7 +700,14 @@ async function run() {
         messages: browserMessages.slice(0, 50),
       },
       actions: actions.slice(-250),
-      artifacts: [startScreenshotCaptured ? 'start.jpg' : null, firstTargetCaptured ? 'first-target.jpg' : null, finalScreenshotCaptured ? 'final.jpg' : null].filter(Boolean),
+      artifacts: [
+        startScreenshotCaptured ? 'start.jpg' : null,
+        firstTargetCaptured ? 'first-target.jpg' : null,
+        finalScreenshotCaptured ? 'final.jpg' : null,
+        matchEndedObserved ? 'post-game.jpg' : null,
+        matchSummaryDownload ? 'match-summary.json' : null,
+        matchTechnicalDownload ? 'match-technical.json' : null,
+      ].filter(Boolean),
     };
     const reportPath = resolve(artifactDirectory, 'report.json');
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -593,7 +721,8 @@ async function run() {
       && report.performance.observedRenderProfile === 'performance'
       && report.input.releasedAtEnd
       && !report.input.holdWatchdogExceeded
-      && report.browser.pageErrors.length === 0;
+      && report.browser.pageErrors.length === 0
+      && (!waitForMatchEnd || Boolean(matchEndedObserved && matchSummaryDownload && matchTechnicalDownload));
     console.log(JSON.stringify({
       ok,
       reportPath,
