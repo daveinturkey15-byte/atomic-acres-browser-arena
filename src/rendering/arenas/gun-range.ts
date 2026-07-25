@@ -4,7 +4,7 @@ import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared
 
 export const definition = createProceduralArenaVisualDefinition({
   id: 'gun-range',
-  displayLabel: 'Acres Gun Range',
+  displayLabel: 'Gun Range',
   moduleId: 'arena.visual.gun-range.v1',
   assetDependencies: [],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,

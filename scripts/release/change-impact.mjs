@@ -87,8 +87,8 @@ function outputsFor(classification) {
   }
   return {
     ...classification,
-    windows_groups: 'pass25a-capability-chromium,boot-and-authored,pass64-hud-contracts',
-    linux_groups: 'pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts',
+    windows_groups: 'pass25a-capability-chromium,boot-and-authored,pass64-hud-contracts,pass64-renderer-foundation',
+    linux_groups: 'pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation',
   };
 }
 
