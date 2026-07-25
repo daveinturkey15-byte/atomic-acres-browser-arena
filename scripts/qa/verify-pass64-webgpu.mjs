@@ -35,7 +35,31 @@ try {
     await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&requireWebGPU=1&map=${arenaId}`);
     await page.waitForFunction(() => '__ATOMIC_ACRES_WEBGPU_DEBUG__' in window, undefined, { timeout: 30_000 });
     const proof = await page.evaluate((id) => window.__ATOMIC_ACRES_WEBGPU_DEBUG__.selectCamera(id), cameraId);
-    await page.waitForTimeout(500);
+    const captureLayout = await page.evaluate(async () => {
+      document.documentElement.dataset.pass64Capture = 'stable';
+      await document.fonts.ready;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const panel = document.querySelector('#webgpu-review');
+      const title = panel?.querySelector('strong');
+      if (!(panel instanceof HTMLElement) || !(title instanceof HTMLElement)) throw new Error('WebGPU review panel is incomplete');
+      const panelRect = panel.getBoundingClientRect();
+      const titleRect = title.getBoundingClientRect();
+      return {
+        fonts: document.fonts.status,
+        reviewFontLoaded: document.fonts.check("900 27px 'Barlow Condensed'"),
+        titleInsidePanel: titleRect.left >= panelRect.left && titleRect.right <= panelRect.right && titleRect.top >= panelRect.top && titleRect.bottom <= panelRect.bottom,
+      };
+    });
+    if (captureLayout.fonts !== 'loaded' || !captureLayout.reviewFontLoaded || !captureLayout.titleInsidePanel) {
+      throw new Error(`${arenaId} review UI was not layout-stable before capture`);
+    }
+    await page.waitForFunction(() => {
+      const status = document.querySelector('#webgpu-review-status')?.textContent ?? '';
+      const fps = Number(/(\d+) FPS/.exec(status)?.[1] ?? '0');
+      return fps >= 30;
+    }, undefined, { timeout: 5_000 });
+    await page.waitForTimeout(350);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.screenshot({ path: `${artifactRoot}/${arenaId}-${cameraId}.png`, animations: 'disabled' });
     const uniqueErrors = [...new Set(errors)];
     const receipt = {
@@ -54,6 +78,7 @@ try {
       principalHdrSamples: proof.runtime.principalHdrSamples,
       bloom: proof.bloom,
       releasePromotion: proof.releasePromotion,
+      captureLayout,
     };
     if (uniqueErrors.length > 0) throw new Error(`${arenaId} emitted browser/GPU errors: ${uniqueErrors[0]}`);
     if (receipt.backend !== 'webgpu' || receipt.softwareAdapter || receipt.deviceLost) {

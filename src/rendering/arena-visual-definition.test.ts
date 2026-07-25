@@ -33,6 +33,15 @@ describe('Pass 64 arena visual definitions', () => {
     }
   });
 
+  it('keeps the Gun Range overview inside its shell with a target-rich sightline', async () => {
+    const { definition } = await ARENA_VISUAL_REGISTRY['gun-range']();
+    const overview = definition.reviewCameras.find((entry) => entry.id === 'gun-range-overview');
+    expect(overview).toBeDefined();
+    expect(overview!.position[1]).toBeLessThan(7.1);
+    expect(overview!.position[2]).toBeGreaterThan(11);
+    expect(overview!.target[2]).toBeLessThan(-9);
+  });
+
   it('disposes geometry, materials and textures once even when teardown repeats', () => {
     const root = new THREE.Group();
     const texture = new THREE.Texture();

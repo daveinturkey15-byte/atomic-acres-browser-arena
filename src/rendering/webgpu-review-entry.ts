@@ -28,22 +28,29 @@ const REVIEW_ARENAS: readonly Readonly<{ id: ArenaId; label: string }>[] = Objec
 ]);
 
 const REVIEW_CONTRAST_KEYS: Readonly<Record<ArenaId, readonly Readonly<{
+  practicalId: string;
+  kind?: 'point' | 'spot';
   position: readonly [number, number, number];
   target: readonly [number, number, number];
   color: number;
   intensity: number;
   distance: number;
+  decay?: number;
 }>[]>> = Object.freeze({
   'atomic-acres': Object.freeze([
-    Object.freeze({ position: [-26, 11, 12] as const, target: [-18, 1.8, 2] as const, color: 0xffc981, intensity: 13, distance: 32 }),
-    Object.freeze({ position: [26, 10, -12] as const, target: [18, 1.8, -2] as const, color: 0xa9d8ff, intensity: 11, distance: 31 }),
+    Object.freeze({ practicalId: 'exterior-contrast-keys', position: [-26, 11, 12] as const, target: [-18, 1.8, 2] as const, color: 0xffc981, intensity: 13, distance: 32 }),
+    Object.freeze({ practicalId: 'exterior-contrast-keys', position: [26, 10, -12] as const, target: [18, 1.8, -2] as const, color: 0xa9d8ff, intensity: 11, distance: 31 }),
   ]),
   'skyline-terminal': Object.freeze([
-    Object.freeze({ position: [0, 4.8, 2] as const, target: [12, 5.4, 2] as const, color: 0xd9f4ff, intensity: 18, distance: 30 }),
-    Object.freeze({ position: [-20, 6.7, -30] as const, target: [-8, 0.8, -19] as const, color: 0xffc68a, intensity: 17, distance: 34 }),
+    // A shadowed point key reads the long cabin's roof, bins, seats and aisle
+    // without introducing an unoccluded ambient fill through the fuselage.
+    Object.freeze({ practicalId: 'aircraft-cabin-contrast-key', kind: 'point' as const, position: [4, 4.1, 2] as const, target: [10, 4.3, 2] as const, color: 0xd9f4ff, intensity: 8, distance: 28, decay: 1.65 }),
+    Object.freeze({ practicalId: 'concourse-contrast-key', position: [-20, 6.7, -30] as const, target: [-8, 0.8, -19] as const, color: 0xffc68a, intensity: 17, distance: 34 }),
   ]),
   'rustworks-1v1': Object.freeze([]),
-  'gun-range': Object.freeze([]),
+  'gun-range': Object.freeze([
+    Object.freeze({ practicalId: 'range-inspection-key', kind: 'point' as const, position: [0, 4.6, -6] as const, target: [0, 1.7, -23] as const, color: 0xc8f3ff, intensity: 10, distance: 45, decay: 1.6 }),
+  ]),
 });
 
 export type WebGpuReviewProof = Readonly<{
@@ -129,9 +136,20 @@ function createLighting(definition: ArenaVisualDefinition): THREE.Group {
   sun.shadow.camera.far = definition.shadows.maximumDistance;
   sun.shadow.normalBias = definition.shadows.normalBias;
   root.add(ambient, sun, sun.target);
-  for (const [index, spec] of REVIEW_CONTRAST_KEYS[definition.id].entries()) {
-    const key = new THREE.SpotLight(spec.color, spec.intensity, spec.distance, 0.62, 0.7, 2);
-    key.name = `${definition.id}-webgpu-contrast-key-${index + 1}`;
+  const contrastKeys = REVIEW_CONTRAST_KEYS[definition.id];
+  const sunShadowLights = definition.shadows.enabled && definition.lighting.sunIntensity > 0 ? 1 : 0;
+  if (contrastKeys.length + sunShadowLights > definition.budgets.maximumShadowLights) {
+    throw new Error(`${definition.id} review lighting exceeds its shadow-light budget`);
+  }
+  for (const [index, spec] of contrastKeys.entries()) {
+    const practical = definition.lighting.practicals.find((entry) => entry.id === spec.practicalId);
+    if (!practical || practical.policy !== 'shadowed-local' || !practical.castsShadow || spec.distance > practical.maximumDistance) {
+      throw new Error(`${definition.id} review key ${spec.practicalId} is not covered by a bounded shadowed-local practical`);
+    }
+    const key = spec.kind === 'point'
+      ? new THREE.PointLight(spec.color, spec.intensity, spec.distance, spec.decay ?? 2)
+      : new THREE.SpotLight(spec.color, spec.intensity, spec.distance, 0.62, 0.7, spec.decay ?? 2);
+    key.name = `${definition.id}-${spec.practicalId}-${index + 1}`;
     key.position.fromArray(spec.position);
     key.castShadow = true;
     key.shadow.mapSize.set(256, 256);
@@ -140,18 +158,21 @@ function createLighting(definition: ArenaVisualDefinition): THREE.Group {
     key.shadow.bias = -0.00022;
     key.shadow.normalBias = definition.shadows.normalBias;
     key.shadow.radius = 1.5;
-    const target = new THREE.Object3D();
-    target.name = `${key.name}-target`;
-    target.position.fromArray(spec.target);
-    key.target = target;
-    root.add(key, target);
+    root.add(key);
+    if (key instanceof THREE.SpotLight) {
+      const target = new THREE.Object3D();
+      target.name = `${key.name}-target`;
+      target.position.fromArray(spec.target);
+      key.target = target;
+      root.add(target);
+    }
   }
   return root;
 }
 
 function disposeLighting(root: THREE.Group | null): void {
   root?.traverse((node) => {
-    if (node instanceof THREE.DirectionalLight || node instanceof THREE.SpotLight) node.shadow.map?.dispose();
+    if (node instanceof THREE.DirectionalLight || node instanceof THREE.PointLight || node instanceof THREE.SpotLight) node.shadow.map?.dispose();
   });
   root?.removeFromParent();
   root?.clear();
@@ -256,6 +277,7 @@ export async function startWebGpuReview(request: RenderRuntimeRequest): Promise<
       scene.add(lighting);
       activeCamera = definition.reviewCameras[0];
       setCamera(camera, activeCamera);
+      runtime.renderer.toneMappingExposure = activeCamera.exposure;
       updateCameraOptions(shell.cameraSelect, definition, activeCamera.id);
       systems = createPass64TslSceneSystems(scene, camera, runtime.renderPipeline, definition);
       await runtime.renderer.compileAsync(scene, camera);
@@ -290,6 +312,7 @@ export async function startWebGpuReview(request: RenderRuntimeRequest): Promise<
     if (!next) throw new Error(`Unknown deterministic review camera ${cameraId}`);
     activeCamera = next;
     setCamera(camera, next);
+    runtime.renderer.toneMappingExposure = next.exposure;
     shell.cameraSelect.value = next.id;
     return publishProof();
   };

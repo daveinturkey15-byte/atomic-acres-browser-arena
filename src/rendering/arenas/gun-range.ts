@@ -13,6 +13,7 @@ export const definition = createProceduralArenaVisualDefinition({
     practicals: [
       { id: 'ceiling-panels', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
       { id: 'weapon-stations', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
+      { id: 'range-inspection-key', policy: 'shadowed-local', maximumDistance: 45, castsShadow: true },
     ],
   },
   fog: { color: 0x28333a, near: 38, far: 94 },
@@ -21,7 +22,9 @@ export const definition = createProceduralArenaVisualDefinition({
   colorPipeline: colorPipeline('pass64.gun-range.hdr.v1', 1),
   budgets: budgets({ maximumDrawCalls: 320, maximumTriangles: 700_000, maximumTextureBytes: 224 * 1024 * 1024, maximumShadowLights: 1 }),
   reviewCameras: [
-    camera('gun-range-overview', [16, 8, 17], [0, 2, -14], 'overview', 1),
+    // Stay below the 7.1 m ceiling and behind the armory so the overview
+    // actually frames firing booths, target lanes and the backstop.
+    camera('gun-range-overview', [0, 6.2, 18], [0, 1.5, -28], 'overview', 1.04),
     camera('gun-range-armory-support', [10, 2.2, 12], [0, 2, 10], 'geometry', 1),
     camera('gun-range-lane-wall', [6, 2, -4], [0, 2, -4], 'light-occlusion', 1),
   ],

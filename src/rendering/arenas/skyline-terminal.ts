@@ -23,7 +23,7 @@ export const definition = createProceduralArenaVisualDefinition({
   budgets: budgets({ maximumDrawCalls: 590, maximumTriangles: 1_500_000 }),
   reviewCameras: [
     camera('terminal-overview', [42, 29, 42], [0, 3, -10], 'overview', 1.06),
-    camera('terminal-cabin-ceiling', [0, 4.2, 2], [12, 5.4, 2], 'geometry', 1.06),
+    camera('terminal-cabin-ceiling', [-4, 4.05, 2], [10, 4.45, 2], 'geometry', 1.06),
     camera('terminal-concourse-wall-closed', [-13, 1.9, -32], [-21, 1.9, -34], 'light-occlusion', 1.06),
     camera('terminal-boarding-open', [0, 4.2, -7], [0, 4.2, 1], 'portal', 1.06),
   ],
