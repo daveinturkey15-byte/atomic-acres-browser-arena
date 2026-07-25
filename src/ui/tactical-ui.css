@@ -1031,13 +1031,13 @@
   }
 
   #map-heading {
-    position: absolute;
-    z-index: 2;
-    left: 18px;
-    top: 17px;
+    margin-top: 4px;
+    padding: 5px 6px;
+    background: rgba(0, 0, 0, 0.3);
     color: var(--ui-text);
     font: 900 9px/1 var(--ui-copy);
     letter-spacing: 0.13em;
+    text-align: right;
   }
 
   #location-label {

@@ -166,6 +166,12 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#support-block [data-support]')).toHaveCount(5);
     for (const viewport of reviewViewports) {
       await page.setViewportSize(viewport);
+      const mapGeometry = await page.evaluate(() => {
+        const minimap = document.querySelector('#minimap')!.getBoundingClientRect();
+        const heading = document.querySelector('#map-heading')!.getBoundingClientRect();
+        return { minimapBottom: minimap.bottom, headingTop: heading.top };
+      });
+      expect(mapGeometry.headingTop).toBeGreaterThanOrEqual(mapGeometry.minimapBottom);
       await captureReview(page, testInfo, 'live-hud', viewport);
     }
   });
