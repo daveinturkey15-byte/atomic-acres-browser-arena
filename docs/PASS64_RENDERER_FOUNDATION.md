@@ -1,7 +1,7 @@
 # Pass 64 renderer and arena-forging foundation
 
-Impact: `runtime`  
-Baseline: accepted Pass 63 source `0c1574b132db8d16666e6a1ce25c6711165194b9`  
+Impact: `runtime`
+Baseline: accepted Pass 63 source `0c1574b132db8d16666e6a1ce25c6711165194b9`
 Rollback oracle: immutable Pass 62 source `249a7ee77dce761eb237f3eb0e0d0ea1d0356317`, Pages `27c90967bdaf5387c0372933c7965a60ce75a765`, nested path `channels/experimental-netcode-pass`, runtime digest `035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d`
 
 Pass 62 remains exact hosted bytes. Pass 64 does not rebuild or reinterpret it through the new renderer architecture.

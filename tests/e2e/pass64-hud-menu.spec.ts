@@ -2,12 +2,15 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
+type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
+
 const reviewViewports = [
   { id: 'laptop', width: 1280, height: 720 },
   { id: 'desktop', width: 1920, height: 1080 },
   { id: 'ultrawide', width: 2560, height: 1080 },
   { id: 'narrow', width: 390, height: 844 },
-] as const;
+] as const satisfies readonly ReviewViewport[];
+const highDpiViewport = { id: 'high-dpi', width: 390, height: 844 } as const satisfies ReviewViewport;
 
 async function ready(page: Page): Promise<void> {
   await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud');
@@ -20,7 +23,7 @@ async function ready(page: Page): Promise<void> {
   await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
 }
 
-async function captureReview(page: Page, testInfo: TestInfo, state: string, viewport: typeof reviewViewports[number]): Promise<void> {
+async function captureReview(page: Page, testInfo: TestInfo, state: string, viewport: ReviewViewport): Promise<void> {
   const directory = resolve(process.cwd(), 'artifacts/pass64/ui-review');
   mkdirSync(directory, { recursive: true });
   const path = resolve(directory, `${state}-${viewport.id}-${viewport.width}x${viewport.height}.png`);
@@ -130,6 +133,39 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     });
   }
 
+  test('keeps the deployment shell bounded at real high DPI', async ({ browser }, testInfo) => {
+    const context = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL,
+      viewport: { width: highDpiViewport.width, height: highDpiViewport.height },
+      deviceScaleFactor: 2,
+    });
+    const page = await context.newPage();
+    try {
+      await ready(page);
+      expect(await page.evaluate(() => devicePixelRatio)).toBe(2);
+      const layout = await page.evaluate(() => {
+        const root = document.documentElement;
+        const menu = document.querySelector<HTMLElement>('#menu')!;
+        const bounds = menu.getBoundingClientRect();
+        return {
+          pageOverflowX: root.scrollWidth - root.clientWidth,
+          menuOverflowX: menu.scrollWidth - menu.clientWidth,
+          withinViewport: bounds.left >= -1 && bounds.right <= innerWidth + 1,
+          mapCardCount: document.querySelectorAll('.map-card').length,
+        };
+      });
+      expect(layout).toEqual({
+        pageOverflowX: 0,
+        menuOverflowX: 0,
+        withinViewport: true,
+        mapCardCount: 4,
+      });
+      await captureReview(page, testInfo, 'setup', highDpiViewport);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('honours reduced motion without hiding controls or status', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await ready(page);
@@ -174,6 +210,26 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(mapGeometry.headingTop).toBeGreaterThanOrEqual(mapGeometry.minimapBottom);
       await captureReview(page, testInfo, 'live-hud', viewport);
     }
+  });
+
+  test('renders real dead and respawning HUD states', async ({ page }) => {
+    await ready(page);
+    await startDeterministicSolo(page);
+    const killed = await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setRenderPaused(false);
+      api.damage(999);
+      return api.snapshot().player as { alive: boolean; hp: number };
+    });
+    expect(killed).toMatchObject({ alive: false, hp: 0 });
+    await expect(page.locator('#respawn')).toBeVisible();
+    await expect(page.locator('#respawn strong')).toHaveText('ELIMINATED');
+    await expect(page.locator('#respawn-countdown')).not.toHaveText('');
+    await expect.poll(async () => {
+      const player = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player) as { alive: boolean };
+      return player.alive;
+    }, { timeout: 5_000 }).toBe(true);
+    await expect(page.locator('#respawn')).toBeHidden();
   });
 
   test('renders a full returned-lobby command room at every review viewport', async ({ page }, testInfo) => {

@@ -41,7 +41,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     id: 'pass63',
     pass: 'PASS 63',
     title: 'Project Cleanup, Shared Chat & Visual Repairs',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-07-25T02:50:32Z',
     areas: Object.freeze(['PROJECT MAP', 'MULTIPLAYER CHAT', 'NUKE TOWN', 'TERMINAL', 'CLEANUP']),
     summary: 'Pass 63 closes the visual defects deferred from Pass 62, adds private-room text chat, and starts a measured recurring cleanup with a visible, downloadable project architecture map.',
     highlights: Object.freeze([

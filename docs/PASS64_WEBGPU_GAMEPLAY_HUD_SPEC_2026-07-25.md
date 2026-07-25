@@ -1,9 +1,9 @@
 # Pass 64 WebGPU, gameplay correctness, railgun, arena quality, and HUD overhaul
 
-Date: 2026-07-25  
-Impact: `runtime`  
+Date: 2026-07-25
+Impact: `runtime`
 Base candidate: Pass 63 accepted preview source `ac85e9b8b46cc2370aee903d564ecf3c4682b24c`; merged main comparator `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`
-Release intent: immutable WebGPU HITL candidate only; do not publish before Dave approves its exact preview.  
+Release intent: immutable WebGPU HITL candidate only; do not publish before Dave approves its exact preview.
 Rollback: byte-exact Pass 62 stable benchmark; Pass 63 remains the legacy-stack live comparator after its protected release completes.
 
 ## Claim states
