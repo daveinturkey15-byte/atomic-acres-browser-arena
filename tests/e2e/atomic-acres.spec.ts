@@ -714,7 +714,10 @@ test.describe('boot and authored presentation', () => {
     test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=blender&mist=on', 240_000);
+    // Freeze the renderer-backed menu flyover at its deterministic review
+    // instant before sampling draw-call budgets. Runner speed must not select
+    // a different point along the animated camera path.
+    await pageReadyAt(page, '/?render=blender&mist=on&previewTime=0', 240_000);
     const menuState = await debug(page);
     expect(menuState.render).toMatchObject({
       profile: 'blender', representation: 'blender', antialias: true,
