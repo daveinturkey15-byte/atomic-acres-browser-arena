@@ -220,7 +220,7 @@ Mechanics and presentation are separate commits but one weapon is not complete u
 | M02 | Arena forge | F11 | Audit/prune bad structures and semantic mismatches per arena. | R110,R605 | Deterministic cameras, movement/projectile semantics. | Per-arena audit. |
 | M03 | Arena forge | S06,DW10,K06 | Integrate audio zones, sheds and flight nav without spawn/sightline regressions. | R304,R401,R509 | Arena traversal/spawn/LOS/nav matrix. | Integration map report. |
 | M04 | Renderer owner | S09,DW09,O06,V03,W02–W14,F15,F16 | Unify all inventoried effects/materials in WebGPU TSL HDR path and frozen budgets. | R100,R108,R109,R111,R308,R402,R605 | Renderer-truth/no-GLSL/depth-bloom/fail-closed/device/disposal tests. | Renderer inventory/captures. |
-| M05 | Preview choreography owner | F11,F12,M02,M04 | Refine every map's menu-helicopter spline with smooth seeded micro-variation, forge the sleek cockpit/canopy, and author the Gun Range cat POV's comfortable joyful moment path and reduced-motion pose. | R112–R114,R608,R609 | Fixed/multi-seed trajectory bounds, loop seams, occlusion/clipping, reduced-motion, asset/provenance and deterministic video corpus. | Per-map helicopter/cockpit/cat review reel and path receipt. |
+| M05 | Preview choreography owner | F11,F12,M02,M04 | Refine every helicopter-preview map's spline with smooth seeded micro-variation, forge the sleek cockpit/canopy, and author the Gun Range cat POV's comfortable joyful moment path and reduced-motion pose. | R112–R114,R608,R609 | Fixed/multi-seed trajectory bounds, loop seams, occlusion/clipping, reduced-motion, asset/provenance and deterministic video corpus. | Per-map helicopter/cockpit/cat review reel and path receipt. |
 
 ## 13. QA, acceptance, and release tasks
 
