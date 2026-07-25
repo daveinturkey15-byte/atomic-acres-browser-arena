@@ -26,7 +26,7 @@
       "evidence": [
         {
           "kind": "trace",
-          "ref": "artifacts/pass64/playable-webgpu/hardware-webgpu-playable-receipt.json",
+          "ref": "scripts/qa/verify-pass64-webgpu.mjs",
           "command": "npm run qa:pass64:webgpu",
           "note": "Exact clean SHA c30fb9a passed actual NVIDIA WebGPU identity, four-arena switching, TSL traversal, HDR samples, zero device loss, single-root streaming, light occlusion and performance budgets."
         },
@@ -59,7 +59,7 @@
         },
         {
           "kind": "visual",
-          "ref": "artifacts/pass64/renderer-foundation/terminal-cabin-ceiling.png",
+          "ref": "artifact://bounded-browser-windows-c30fb9a103aa8051417f2d1d3130f85265ed56aa/terminal-cabin-ceiling.png",
           "note": "Deterministic served capture covers the Terminal cabin ceiling and boarding opening."
         },
         {
@@ -86,7 +86,7 @@
         },
         {
           "kind": "visual",
-          "ref": "artifacts/pass64/ui-review/setup-desktop-1920x1080.png",
+          "ref": "artifact://bounded-browser-windows-c30fb9a103aa8051417f2d1d3130f85265ed56aa/pass64-ui-review",
           "note": "The refreshed review corpus contains real world frames and the new command composition at every required viewport."
         }
       ]
