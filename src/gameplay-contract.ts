@@ -87,7 +87,9 @@ export function buildGameplayContract(): Record<string, unknown> {
         cooldownMs: BOT_GRENADE_COOLDOWN_MS,
         maximumActive: 1,
       },
-      weapons: Object.values(WEAPONS).map((weapon) => ({ ...weapon })),
+      // Pass 62 remains the immutable rollback gameplay benchmark. Pass 64's
+      // HITL railgun candidate is verified by its own authority contract.
+      weapons: Object.values(WEAPONS).filter((weapon) => weapon.id !== 'railgun').map((weapon) => ({ ...weapon })),
       grenade: { radius: GRENADE_RADIUS, maximumDamage: GRENADE_MAX_DAMAGE },
       melee: { cooldownMs: MELEE_COOLDOWN_MS, range: MELEE_RANGE, damage: MELEE_DAMAGE },
       match: {

@@ -68,7 +68,9 @@ export type GameplayReplayResult = {
   shotSchedule: string[];
 };
 
-const weaponIds = Object.keys(WEAPONS) as WeaponId[];
+// Golden replays are the immutable Pass 62 rollback lane. Candidate-only
+// special weapons have independent authority/replay gates until promoted.
+const weaponIds = (Object.keys(WEAPONS) as WeaponId[]).filter((id) => id !== 'railgun');
 const stepSeconds = 1 / SIMULATION_HZ;
 const stepMs = 1_000 / SIMULATION_HZ;
 const rounded = (value: number): number => Number(value.toFixed(9));
@@ -77,6 +79,10 @@ export function createGameplayReplayState(seed = 'atomic-acres-pass24'): { state
   const rng = createRandomStreams(seed).gameplay;
   const ammo = Object.fromEntries(weaponIds.map((id) => [id, WEAPONS[id].mag])) as Record<WeaponId, number>;
   const reserve = Object.fromEntries(weaponIds.map((id) => [id, WEAPONS[id].reserve])) as Record<WeaponId, number>;
+  // Keep the candidate operable in property tests without changing the
+  // enumerable Pass 62 golden-state bytes.
+  Object.defineProperty(ammo, 'railgun', { value: WEAPONS.railgun.mag, writable: true, enumerable: false });
+  Object.defineProperty(reserve, 'railgun', { value: 0, writable: true, enumerable: false });
   return {
     rng,
     state: {

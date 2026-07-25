@@ -33,6 +33,10 @@ export const WEAPON_FINISH_PROFILES: Record<WeaponId, WeaponFinishProfile> = {
     id: 'longline-olive-cerakote-v1', albedo: path('sniper'), normal: path('sniper', '-normal'),
     roughness: path('sniper', '-roughness'), metalness: 0.42, normalScale: 0.28, textureRepeat: 2,
   },
+  railgun: {
+    id: 'vx8-ceramic-cyan-v1', albedo: path('sniper'), normal: path('sniper', '-normal'),
+    roughness: path('sniper', '-roughness'), metalness: 0.68, normalScale: 0.26, textureRepeat: 2,
+  },
   pistol: {
     id: 'aster9-satin-service-v1', albedo: path('pistol'), normal: path('pistol', '-normal'),
     roughness: path('pistol', '-roughness'), metalness: 0.66, normalScale: 0.25, textureRepeat: 2,

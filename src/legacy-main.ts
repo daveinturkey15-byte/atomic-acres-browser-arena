@@ -5,7 +5,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { LegacyWebGlRenderRuntime } from './rendering/render-runtime';
+import { LegacyWebGlRenderRuntime, probeRequiredWebGpuCandidate } from './rendering/render-runtime';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
@@ -281,6 +281,11 @@ import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from '.
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
 import {
+  createLastMultiplayerDiagnostic,
+  loadLastMultiplayerDiagnostic,
+  saveLastMultiplayerDiagnostic,
+} from './last-multiplayer-diagnostic';
+import {
   CHAT_TEXT_MAX_CHARS,
   admitChatRate,
   appendChatHistory,
@@ -303,6 +308,26 @@ import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTeleme
 import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
+import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
+import {
+  RAILGUN_DAMAGE,
+  RAILGUN_RECHAMBER_MS,
+  RAILGUN_SPAWN_DELAY_MS,
+  RAILGUN_TOTAL_ROUNDS,
+  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  advanceRailgunAuthority,
+  advanceRailgunChamber,
+  claimRailgun,
+  createRailgunAuthorityState,
+  dropRailgun,
+  fireRailgun,
+  railgunThermalTargetEligible,
+  type RailgunAuthorityState,
+  type RailgunClaimRequestMessage,
+  type RailgunShotRequestMessage,
+  type RailgunShotResultMessage,
+  type RailgunStateMessage,
+} from './railgun-authority';
 import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
@@ -348,6 +373,10 @@ configureRuntimeRandom(runtimeSeed(window.location.search));
 
 function clientSessionStorage(): Storage | undefined {
   try { return window.sessionStorage; } catch { return undefined; }
+}
+
+function clientPersistentStorage(): Storage | undefined {
+  try { return window.localStorage; } catch { return undefined; }
 }
 
 window.addEventListener('error', (event) => {
@@ -652,6 +681,7 @@ app.innerHTML = `
       <div class="scope-reticle"><i></i><b></b><span></span><em></em></div>
       <small>3×</small>
     </div>
+    <div id="railgun-thermal" hidden aria-label="Railgun thermal scope" aria-live="off"><span>VX-8 THERMAL · HOSTILES</span></div>
     <div id="killfeed" aria-live="polite" aria-label="Match events"></div>
     <div id="damage-feeds" aria-label="Damage activity">
       <section class="damage-feed done" aria-label="Damage dealt"><div id="damage-done-feed" aria-live="polite"></div></section>
@@ -667,6 +697,7 @@ app.innerHTML = `
       <span id="weapon-name">M86 CARBINE</span>
       <div class="ammo-row"><b id="ammo">30</b><div class="reserve-stack"><small>RESERVE</small><span><i>/</i><em id="reserve">120</em></span></div></div>
       <small id="reload-state"></small>
+      <small id="railgun-status" hidden></small>
     </div>
     <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×2</b><small>V KNIFE · G THROW</small></div>
     <div id="support-block">
@@ -742,6 +773,7 @@ document.documentElement.classList.toggle('compat-render', renderProfile === 'co
 document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
 document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
+await probeRequiredWebGpuCandidate(window.location.search);
 const renderRuntime = await LegacyWebGlRenderRuntime.create({
   canvas,
   antialias: activeRenderConfig.antialias,
@@ -805,6 +837,7 @@ let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | 
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
+const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
 const VIEWMODEL_RENDER_LAYER = 2;
 camera.layers.enable(VIEWMODEL_RENDER_LAYER);
 let skyMaterial: THREE.ShaderMaterial | null = null;
@@ -1253,8 +1286,8 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve } as Record<WeaponId, number>,
+  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag, railgun: 0 } as Record<WeaponId, number>,
+  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve, railgun: 0 } as Record<WeaponId, number>,
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
@@ -1407,6 +1440,12 @@ let localShotSeq = 0;
 const localWeaponSequences = new Map<WeaponId, number>();
 let localConnectionEpoch: string = crypto.randomUUID();
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
+const resolvedRailgunShots = new Map<string, RailgunShotResultMessage>();
+let railgunState: RailgunAuthorityState = createRailgunAuthorityState('disabled', 0, 0, 0);
+let localRailgunPendingUntilHostTimeMs = 0;
+let railgunAdsResetRequired = false;
+let railgunRechamberPresentationActive = false;
+const RAILGUN_PICKUP_RANGE = 2.65;
 const presentedShotResults = new Set<string>();
 const processedShotResults = new Set<string>();
 const shotProtocolTelemetry: Record<string, number> = {};
@@ -2723,6 +2762,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
         const now = performance.now();
         const result = applyAuthoritativeRemoteRedeploy(health, now);
         if (result.applied) {
+          dropHeldRailgun(message.by, remote.target.clone().add(new THREE.Vector3(0, 0.3, 0)));
           processedNonces.add(message.nonce);
           remoteHealthAuthorities.set(message.by, result.state);
           const commit: RedeployCommitMessage = {
@@ -3210,6 +3250,38 @@ function admitIncomingCombatTiming(message: GameMessage): boolean {
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
+  if (message.type === 'railgun-state') {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) applyRailgunState(message.state);
+    return;
+  }
+  if (message.type === 'railgun-shot-result') {
+    acceptRailgunShotResult(message);
+    return;
+  }
+  if (message.type === 'railgun-claim-request') {
+    if (network.role !== 'host' || processedNonces.has(message.nonce)) return;
+    const remote = remotes.get(message.by);
+    const health = remoteHealthAuthorities.get(message.by);
+    const pickup = railgunState.pickupPosition ? new THREE.Vector3(...railgunState.pickupPosition) : null;
+    const reported = new THREE.Vector3(...message.position);
+    const authoritative = remote ? new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z) : null;
+    if (!remote || !health?.alive || !pickup || !authoritative
+      || authoritative.distanceTo(reported) > 2.8 || authoritative.distanceTo(pickup) > RAILGUN_PICKUP_RANGE + 0.5) return;
+    const claimed = claimRailgun(railgunState, message.by, message.generation);
+    if (!claimed.accepted) return;
+    processedNonces.add(message.nonce);
+    applyRailgunState(claimed.state);
+    remote.snapshot = { ...remote.snapshot, weapon: 'railgun' };
+    setOperatorWeapon(remote.root.userData.operator as THREE.Group, 'railgun', flattenOperatorMaterials);
+    recordMatchDiagnostic('railgun-pickup', 'accepted', { actorId: message.by, weaponOrEffect: 'railgun', position: authoritative.toArray(), reason: 'host-authoritative-pickup' });
+    broadcastRailgunState();
+    trimNonceSet();
+    return;
+  }
+  if (message.type === 'railgun-shot-request') {
+    resolveRailgunShot(message);
+    return;
+  }
   if (message.type === 'shot-result') {
     acceptAuthoritativeShotResult(message);
     return;
@@ -3296,6 +3368,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (message.type === 'join') {
         network.send(createStateMessage());
         broadcastOverdriveState(performance.now());
+        broadcastRailgunState();
       }
     }
     if (incoming.seq > remote.snapshot.seq) {
@@ -3352,6 +3425,7 @@ function onNetworkMessage(message: GameMessage): void {
       const pickup = authorizedRemotePickups.get(admittedIncoming.id);
       const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
       if (admittedIncoming.team !== remote.snapshot.team) return;
+      if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
       if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
@@ -3467,6 +3541,11 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'shot') {
     if (message.by === player.id) return;
+    if (message.weapon === 'railgun') {
+      if (network.role === 'host') return;
+      renderRemoteShot(message);
+      return;
+    }
     const sender = remotes.get(message.by);
     const prior = remoteShotAdmissions.get(message.by) ?? createRemoteShotAdmissionState();
     const admission = admitRemoteShot(message, sender?.snapshot, performance.now(), prior);
@@ -3956,7 +4035,7 @@ function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
   const direction = new THREE.Vector3(...message.direction).normalize();
-  const trace = traceWeaponPath(origin, direction, 50, message.weapon);
+  const trace = traceWeaponPath(origin, direction, message.weapon === 'railgun' ? 220 : 50, message.weapon);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
@@ -4143,7 +4222,7 @@ function interactWithGunRangeArmory(now = performance.now()): boolean {
 }
 
 function interactWithWeaponPickup(now = performance.now()): boolean {
-  return interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
+  return interactWithRailgunPickup(now) || interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
 }
 
 function interactWithDeathDrop(now = performance.now()): boolean {
@@ -4254,12 +4333,16 @@ function updateDeathDrops(now: number): void {
     .map((entity) => entity.drop)
     .filter((drop) => deathDropWeaponAvailable(drop, now) && (drop.weapon !== player.primaryWeapon || deathDropAmmoAvailable(drop, now)));
   const nearbyStation = nearbyGunRangeWeaponStation();
-  const nearby = player.alive && !nearbyStation
+  const nearbyRailgun = player.alive && railgunPickupNearby();
+  const nearby = player.alive && !nearbyRailgun && !nearbyStation
     ? nearestDeathDrop(candidates, player.position, DEATH_DROP_INTERACTION_RANGE, now, 'weapon')
     : null;
   const prompt = element<HTMLElement>('#pickup-prompt');
-  prompt.hidden = !nearby && !nearbyStation;
-  if (nearbyStation) {
+  prompt.hidden = !nearbyRailgun && !nearby && !nearbyStation;
+  if (nearbyRailgun) {
+    prompt.querySelector<HTMLElement>('span')!.textContent = 'PICK UP';
+    prompt.querySelector<HTMLElement>('strong')!.textContent = 'VX-8 RAILGUN';
+  } else if (nearbyStation) {
     const replenish = rangePrimaryUnlocked && nearbyStation.weapon === player.primaryWeapon;
     prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REFILL' : 'EQUIP';
     prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS[nearbyStation.weapon].name.toUpperCase();
@@ -4484,6 +4567,7 @@ function overdriveDropPosition(victimId: string): THREE.Vector3 | null {
 function processDeath(message: DeathMessage): void {
   const victimPoint = message.victim === player.id ? player.position : remotes.get(message.victim)?.target ?? bots.get(message.victim)?.position;
   if (victimPoint) recordSpawnDeath(victimPoint);
+  if (victimPoint && network.role !== 'client') dropHeldRailgun(message.victim, victimPoint.clone().add(new THREE.Vector3(0, 0.3, 0)));
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
   spawnCorpsePresentation(message.victim);
@@ -4557,6 +4641,7 @@ function processDeath(message: DeathMessage): void {
 function removeRemote(id: string, reason: string): void {
   const remote = remotes.get(id);
   if (!remote) return;
+  if (network.role === 'host') dropHeldRailgun(id, remote.target.clone().add(new THREE.Vector3(0, 0.3, 0)));
   scene.remove(remote.root);
   remotes.delete(id);
   verifiedRemoteKills.delete(id);
@@ -4788,6 +4873,7 @@ function respawn(requestLock = true, forceNewLife = false, deploymentWeaponOverr
 
 function applyLocalClassRedeploy(primary: PrimaryWeaponId, requestLock: boolean): void {
   if (!gameStarted || matchFinished || !player.alive || selectedArena.id === 'gun-range') return;
+  dropHeldRailgun(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
   respawn(requestLock, true, primary);
   setStatus(`Redeployed with ${WEAPONS[primary].name} without a combat death.`, 'ok');
 }
@@ -4878,6 +4964,8 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   overdriveExpiries = 0;
   overdriveRoot.visible = false;
   element<HTMLElement>('#overdrive-hud').hidden = true;
+  const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
+  initializeRailgunForMatch(railgunActiveAt);
   matchFinished = false;
   previousHudScores = [0, 0];
   if (respawnTimer) clearTimeout(respawnTimer);
@@ -4912,6 +5000,371 @@ function randomNonce(): number {
   return Math.floor(performance.now() * 1000 + protocolRandom() * 1_000_000);
 }
 
+function localHoldsRailgun(state = railgunState): boolean {
+  return state.holderId === player.id && (state.status === 'held' || state.status === 'depleted');
+}
+
+function syncRailgunHolderPresentation(previous: RailgunAuthorityState, next: RailgunAuthorityState): void {
+  if (next.holderId === player.id && previous.holderId !== player.id) {
+    interruptReload(true);
+    player.weapon = 'railgun';
+    player.ammo.railgun = next.roundsRemaining;
+    player.reserve.railgun = 0;
+    player.switchingUntil = performance.now() + 420;
+    weaponView.setWeapon('railgun');
+    audio.weaponSwitch();
+    addFeed(`VX-8 RAILGUN ACQUIRED · ${RAILGUN_TOTAL_ROUNDS} FINITE ROUNDS`, 'gold');
+  } else if (previous.holderId === player.id && next.holderId !== player.id && player.weapon === 'railgun') {
+    player.weapon = player.primaryWeapon;
+    player.switchingUntil = performance.now() + 280;
+    weaponView.setWeapon(player.weapon);
+  }
+  player.ammo.railgun = next.holderId === player.id ? next.roundsRemaining : 0;
+  player.reserve.railgun = 0;
+
+  if (previous.holderId && previous.holderId !== next.holderId) {
+    const priorRemote = remotes.get(previous.holderId);
+    if (priorRemote && priorRemote.snapshot.weapon === 'railgun') {
+      priorRemote.snapshot = { ...priorRemote.snapshot, weapon: priorRemote.snapshot.primary };
+      setOperatorWeapon(priorRemote.root.userData.operator as THREE.Group, priorRemote.snapshot.primary, flattenOperatorMaterials);
+    }
+  }
+  if (next.holderId && next.holderId !== player.id) {
+    const remote = remotes.get(next.holderId);
+    if (remote) {
+      remote.snapshot = { ...remote.snapshot, weapon: 'railgun' };
+      setOperatorWeapon(remote.root.userData.operator as THREE.Group, 'railgun', flattenOperatorMaterials);
+    }
+  }
+}
+
+function applyRailgunState(next: RailgunAuthorityState, announce = false): void {
+  if (next.generation < railgunState.generation) return;
+  const previous = railgunState;
+  railgunState = next;
+  syncRailgunHolderPresentation(previous, next);
+  if (next.holderId === player.id) localRailgunPendingUntilHostTimeMs = 0;
+  if (announce || next.announcementSent && !previous.announcementSent) addFeed('RAILGUN SPAWNED', 'gold');
+}
+
+function broadcastRailgunState(): void {
+  if (network.role !== 'host') return;
+  const message: RailgunStateMessage = {
+    type: 'railgun-state', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id, state: railgunState, nonce: randomNonce(),
+  };
+  network.send(message);
+}
+
+function initializeRailgunForMatch(activeAtHostTimeMs: number): void {
+  const generation = railgunState.generation + 1;
+  const next = network.role === 'client'
+    ? createRailgunAuthorityState('disabled', 0, 0, generation)
+    : createRailgunAuthorityState(selectedArena.id, activeAtHostTimeMs, gameplayRandom(), generation);
+  applyRailgunState(next);
+  localRailgunPendingUntilHostTimeMs = 0;
+  railgunAdsResetRequired = false;
+  railgunRechamberPresentationActive = false;
+  resolvedRailgunShots.clear();
+  railgunPresentation.updateWorld(railgunState, performance.now());
+  if (network.role === 'host') broadcastRailgunState();
+}
+
+function railgunPickupNearby(position = player.position): boolean {
+  return railgunState.status === 'available' && railgunState.pickupPosition !== null
+    && position.distanceTo(new THREE.Vector3(...railgunState.pickupPosition)) <= RAILGUN_PICKUP_RANGE;
+}
+
+function interactWithRailgunPickup(now = performance.now()): boolean {
+  if (!player.alive || matchState.phase !== 'active' || !railgunPickupNearby()) return false;
+  if (network.role === 'client') {
+    if (now < localRailgunPendingUntilHostTimeMs) return true;
+    const request: RailgunClaimRequestMessage = {
+      type: 'railgun-claim-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: player.id, generation: railgunState.generation,
+      position: player.position.toArray() as [number, number, number], nonce: randomNonce(),
+    };
+    network.send(request);
+    localRailgunPendingUntilHostTimeMs = now + 800;
+    setStatus('Railgun pickup requested from host.', 'ok');
+    return true;
+  }
+  const claimed = claimRailgun(railgunState, player.id, railgunState.generation);
+  if (!claimed.accepted) return false;
+  applyRailgunState(claimed.state);
+  recordMatchDiagnostic('railgun-pickup', 'accepted', { actorId: player.id, weaponOrEffect: 'railgun', position: player.position.toArray(), reason: 'host-authoritative-pickup' });
+  broadcastRailgunState();
+  return true;
+}
+
+function dropHeldRailgun(holderId: string, position: THREE.Vector3): boolean {
+  if (network.role === 'client') return false;
+  const bounded = clampPointToBounds(position, arena.bounds, 0.5);
+  const dropped = dropRailgun(railgunState, holderId, [bounded.x, bounded.y, bounded.z]);
+  if (!dropped.dropped) return false;
+  applyRailgunState(dropped.state);
+  addFeed('VX-8 RAILGUN DROPPED · AMMO PRESERVED', 'gold');
+  recordMatchDiagnostic('railgun-drop', 'accepted', { actorId: holderId, weaponOrEffect: 'railgun', position: [bounded.x, bounded.y, bounded.z], reason: 'holder-lifecycle-drop' });
+  broadcastRailgunState();
+  return true;
+}
+
+type RailgunTarget = Readonly<{ id: string; team: Team; kind: 'player' | 'bot'; health: number; position: THREE.Vector3 }>;
+
+function railgunTargets(shooterId: string, shooterTeam: Team): RailgunTarget[] {
+  const targets: RailgunTarget[] = [];
+  if (player.id !== shooterId && player.alive && areCombatantsHostile(shooterId, shooterTeam, player.id, player.team)) {
+    targets.push({ id: player.id, team: player.team, kind: 'player', health: player.hp, position: player.position.clone().add(new THREE.Vector3(0, -0.63, 0)) });
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.id === shooterId || remote.snapshot.hp <= 0
+      || !areCombatantsHostile(shooterId, shooterTeam, remote.snapshot.id, remote.snapshot.team)) continue;
+    targets.push({
+      id: remote.snapshot.id, team: remote.snapshot.team, kind: 'player', health: remote.snapshot.hp,
+      position: new THREE.Vector3(remote.snapshot.x, remote.snapshot.y - 0.63, remote.snapshot.z),
+    });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive || bot.id === shooterId || !areCombatantsHostile(shooterId, shooterTeam, bot.id, bot.team)) continue;
+    targets.push({ id: bot.id, team: bot.team, kind: 'bot', health: bot.hp, position: bot.position.clone().add(new THREE.Vector3(0, 0.95, 0)) });
+  }
+  return targets;
+}
+
+function selectRailgunTarget(shooterId: string, shooterTeam: Team, origin: THREE.Vector3, direction: THREE.Vector3): { target: RailgunTarget; distance: number } | null {
+  const ray = new THREE.Ray(origin, direction.clone().normalize());
+  let selected: { target: RailgunTarget; distance: number } | null = null;
+  for (const target of railgunTargets(shooterId, shooterTeam)) {
+    const alongRay = target.position.clone().sub(origin).dot(ray.direction);
+    if (alongRay < 0.1 || alongRay > 220) continue;
+    const closest = ray.at(alongRay, new THREE.Vector3());
+    if (closest.distanceToSquared(target.position) > 0.62 ** 2) continue;
+    if (!selected || alongRay < selected.distance) selected = { target, distance: alongRay };
+  }
+  return selected;
+}
+
+function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarget, distance: number): RailgunShotResultMessage['outcomes'][number] | null {
+  const cause: KillCause = { kind: 'gun', weapon: 'railgun' };
+  if (target.id === player.id) {
+    const healthBefore = player.hp;
+    applyDamage(RAILGUN_DAMAGE, shooterId, 1, false, cause, true);
+    const damage = Math.max(0, healthBefore - player.hp);
+    return damage > 0 ? { target: player.id, damage, resultingHealth: player.hp, died: !player.alive, distanceMeters: distance } : null;
+  }
+  const bot = bots.get(target.id);
+  if (bot) {
+    const damage = applyBotDamage(bot, RAILGUN_DAMAGE, 'body', cause, shooterId, { wallbang: true, penetrationMultiplier: 1, distanceMeters: distance });
+    return damage > 0 ? { target: bot.id, damage, resultingHealth: bot.hp, died: !bot.alive, distanceMeters: distance } : null;
+  }
+  const remote = remotes.get(target.id);
+  const health = remoteHealthAuthorities.get(target.id);
+  if (!remote || !health) return null;
+  const now = performance.now();
+  const applied = applyAuthoritativeRemoteDamage(health, RAILGUN_DAMAGE, now);
+  if (!applied.applied) return null;
+  const damage = Math.max(0, health.hp - applied.state.hp);
+  remoteHealthAuthorities.set(target.id, applied.state);
+  remote.snapshot = { ...remote.snapshot, hp: applied.state.hp };
+  remote.root.visible = applied.state.alive;
+  recordDamageEvent({
+    actorId: shooterId, targetId: target.id, weaponOrEffect: 'railgun',
+    healthBefore: health.hp, healthAfter: applied.state.hp,
+    damageRequested: RAILGUN_DAMAGE, damageApplied: damage,
+    hitZone: 'body', wallbang: true, penetrationMultiplier: 1, distanceMeters: distance,
+    reason: 'host-railgun-authority',
+  });
+  recordAuthoritativeDamage(shooterId, target.id, damage);
+  if (applied.died) {
+    const death: DeathMessage = { type: 'death', killer: shooterId, victim: target.id, cause, nonce: randomNonce() };
+    processedNonces.add(death.nonce);
+    network.send(death);
+    processDeath(death);
+  }
+  return { target: target.id, damage, resultingHealth: applied.state.hp, died: applied.died, distanceMeters: distance };
+}
+
+function presentRailgunShot(origin: THREE.Vector3, direction: THREE.Vector3, local: boolean): void {
+  const start = local ? weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin : origin;
+  spawnTracer(start, origin.clone().addScaledVector(direction, 180), WEAPONS.railgun.color);
+  if (local) {
+    const recoil = computeRecoilImpulse(WEAPONS.railgun, 0, 0.5, { ads: adsHeld, crouched: player.stance === 'crouch', prone: player.stance === 'prone' });
+    recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
+    recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
+    weaponView.fire(recoil.pitch);
+    weaponView.reload();
+    railgunRechamberPresentationActive = true;
+  }
+  audio.shot('railgun', !local, origin.distanceTo(camera.position));
+}
+
+function railgunResult(
+  shooterId: string,
+  generation: number,
+  shotId: string,
+  status: RailgunShotResultMessage['status'],
+  reason: RailgunShotResultMessage['reason'],
+  outcomes: RailgunShotResultMessage['outcomes'],
+): RailgunShotResultMessage {
+  return {
+    type: 'railgun-shot-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id, forPlayerId: shooterId, generation, shotId, status, reason, outcomes, nonce: randomNonce(),
+  };
+}
+
+function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResultMessage | null {
+  if (network.role !== 'host' || request.by === player.id) return null;
+  const cacheKey = `${request.by}:${request.shotId}`;
+  const cached = resolvedRailgunShots.get(cacheKey);
+  if (cached) {
+    network.sendToPlayer(request.by, cached);
+    return cached;
+  }
+  const remote = remotes.get(request.by);
+  const health = remoteHealthAuthorities.get(request.by);
+  const origin = new THREE.Vector3(...request.origin);
+  const direction = new THREE.Vector3(...request.direction);
+  const expectedOrigin = remote ? new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z) : null;
+  if (!remote || !health?.alive || request.generation !== railgunState.generation || !expectedOrigin
+    || origin.distanceTo(expectedOrigin) > 2.5 || direction.length() < 0.96 || direction.length() > 1.04) {
+    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', 'invalid', []);
+    network.sendToPlayer(request.by, rejected);
+    return rejected;
+  }
+  const fired = fireRailgun(railgunState, request.by, request.shotId, performance.now());
+  if (!fired.accepted) {
+    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', fired.reason, []);
+    network.sendToPlayer(request.by, rejected);
+    return rejected;
+  }
+  applyRailgunState(fired.state);
+  broadcastRailgunState();
+  const normalized = direction.normalize();
+  const target = selectRailgunTarget(request.by, remote.snapshot.team, origin, normalized);
+  const outcome = target ? applyAuthoritativeRailgunDamage(request.by, target.target, target.distance) : null;
+  const result = railgunResult(request.by, request.generation, request.shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : []);
+  resolvedRailgunShots.set(cacheKey, result);
+  while (resolvedRailgunShots.size > 64) resolvedRailgunShots.delete(resolvedRailgunShots.keys().next().value!);
+  const visual: ShotMessage = {
+    type: 'shot', by: request.by, weapon: 'railgun', origin: request.origin as [number, number, number],
+    direction: request.direction as [number, number, number], pelletDirections: [request.direction as [number, number, number]], nonce: request.nonce,
+  };
+  renderRemoteShot(visual);
+  network.send(visual, request.by);
+  network.send(result);
+  return result;
+}
+
+function acceptRailgunShotResult(message: RailgunShotResultMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.generation !== railgunState.generation) return;
+  for (const outcome of message.outcomes) {
+    if (outcome.target !== player.id || !player.alive) continue;
+    const canonicalDamage = Math.max(0, player.hp - outcome.resultingHealth);
+    if (canonicalDamage > 0) applyDamage(canonicalDamage, message.forPlayerId, 1, false, { kind: 'gun', weapon: 'railgun' }, true);
+    if (player.alive) player.hp = outcome.resultingHealth;
+  }
+  if (message.forPlayerId !== player.id || message.status !== 'accepted-hit') return;
+  const damage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
+  showHitmarker(false);
+  showDamageNumber(damage, 'body');
+  audio.hit(false);
+  roundHitShots += 1;
+  roundDamageDealt += damage;
+}
+
+function tryFireRailgun(now: number): void {
+  if (!localHoldsRailgun() || player.weapon !== 'railgun' || railgunState.roundsRemaining <= 0) {
+    audio.empty();
+    return;
+  }
+  const hostNow = currentHostTimeMs();
+  if (hostNow < Math.max(railgunState.chamberReadyAtHostTimeMs, localRailgunPendingUntilHostTimeMs)) return;
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const direction = camera.getWorldDirection(new THREE.Vector3()).normalize();
+  const shotId = `${localConnectionEpoch}:rail:${localShotSeq++}`;
+  railgunAdsResetRequired = true;
+  adsHeld = false;
+  presentRailgunShot(origin, direction, true);
+  roundShotsFired += 1;
+  if (network.role === 'client') {
+    localRailgunPendingUntilHostTimeMs = hostNow + RAILGUN_RECHAMBER_MS;
+    const request: RailgunShotRequestMessage = {
+      type: 'railgun-shot-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: player.id, generation: railgunState.generation, shotId,
+      origin: origin.toArray() as [number, number, number], direction: direction.toArray() as [number, number, number],
+      fireTimeMs: hostNow, nonce: randomNonce(),
+    };
+    network.send(request);
+    return;
+  }
+  const fired = fireRailgun(railgunState, player.id, shotId, now);
+  if (!fired.accepted) return;
+  applyRailgunState(fired.state);
+  broadcastRailgunState();
+  const target = selectRailgunTarget(player.id, player.team, origin, direction);
+  const outcome = target ? applyAuthoritativeRailgunDamage(player.id, target.target, target.distance) : null;
+  if (outcome) {
+    showHitmarker(false);
+    showDamageNumber(outcome.damage, 'body', target!.target.health);
+    audio.hit(false);
+    roundHitShots += 1;
+    roundDamageDealt += outcome.damage;
+  }
+  if (network.role === 'host') {
+    const result = railgunResult(player.id, railgunState.generation, shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : []);
+    const visual: ShotMessage = {
+      type: 'shot', by: player.id, weapon: 'railgun', origin: origin.toArray() as [number, number, number],
+      direction: direction.toArray() as [number, number, number], pelletDirections: [direction.toArray() as [number, number, number]], nonce: randomNonce(),
+    };
+    network.send(visual);
+    network.send(result);
+  }
+}
+
+function railgunThermalContacts(): RailgunThermalContact[] {
+  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const observer = { id: player.id, team: player.team };
+  return [
+    ...[...remotes.values()].filter((remote) => railgunThermalTargetEligible(observer, {
+      id: remote.snapshot.id, team: remote.snapshot.team, alive: remote.snapshot.hp > 0, kind: 'player',
+    }, mode)).map((remote) => ({ id: remote.snapshot.id, kind: 'player' as const, position: remote.target.clone().add(new THREE.Vector3(0, 1.05, 0)) })),
+    ...[...bots.values()].filter((bot) => railgunThermalTargetEligible(observer, {
+      id: bot.id, team: bot.team, alive: bot.alive, kind: 'bot',
+    }, mode)).map((bot) => ({ id: bot.id, kind: 'bot' as const, position: bot.position.clone().add(new THREE.Vector3(0, 1.05, 0)) })),
+  ];
+}
+
+function updateRailgun(now: number): void {
+  if (network.role !== 'client') {
+    const chambered = advanceRailgunChamber(railgunState, now);
+    if (chambered !== railgunState) {
+      applyRailgunState(chambered);
+      broadcastRailgunState();
+    }
+    const advanced = advanceRailgunAuthority(railgunState, now);
+    if (advanced.state !== railgunState) {
+      applyRailgunState(advanced.state, advanced.announcement !== null);
+      broadcastRailgunState();
+    }
+  }
+  if (localHoldsRailgun()) player.ammo.railgun = railgunState.roundsRemaining;
+  const hostNow = currentHostTimeMs();
+  if (railgunRechamberPresentationActive && hostNow >= railgunState.chamberReadyAtHostTimeMs) {
+    weaponView.cancelReload();
+    railgunRechamberPresentationActive = false;
+  }
+  railgunPresentation.updateWorld(railgunState, now);
+  const thermalActive = localHoldsRailgun() && player.weapon === 'railgun' && adsHeld
+    && !railgunAdsResetRequired && weaponView.adsProgress() >= 0.82;
+  railgunPresentation.updateThermal(camera, railgunThermalContacts(), thermalActive);
+}
+
+function admittedAdsHeld(rawHeld: boolean): boolean {
+  if (!railgunAdsResetRequired) return rawHeld;
+  if (!rawHeld && weaponView.adsProgress() <= 0.05) railgunAdsResetRequired = false;
+  return false;
+}
+
 function endSpawnProtectionOnOffense(now: number): void {
   if (now < player.invulnerableUntil) player.invulnerableUntil = 0;
 }
@@ -4919,7 +5372,7 @@ function endSpawnProtectionOnOffense(now: number): void {
 function switchWeapon(index: number): void {
   const id = selectedArena.id === 'gun-range'
     ? index === 0 ? rangePrimaryUnlocked ? player.primaryWeapon : undefined : index === 1 ? handicapSidearm(player.primaryWeapon) : undefined
-    : handicapLoadout(player.primaryWeapon)[index];
+    : index === 0 && localHoldsRailgun() ? 'railgun' : handicapLoadout(player.primaryWeapon)[index];
   if (!id || id === player.weapon || !player.alive) return;
   if (player.reloadState) {
     if (!cancelReload(player.reloadState, performance.now())) return;
@@ -4935,6 +5388,7 @@ function switchWeapon(index: number): void {
 
 function reload(): void {
   if (!player.alive || matchState.phase !== 'active') return;
+  if (player.weapon === 'railgun') return;
   const spec = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
   const availableReserve = reloadSupply(selectedArena.id, player.reserve[player.weapon], spec.mag);
@@ -4978,6 +5432,11 @@ function tryFire(now: number): void {
     return;
   }
   deferredFireAt = 0;
+  if (player.weapon === 'railgun') {
+    if (now < player.switchingUntil) return;
+    tryFireRailgun(now);
+    return;
+  }
   const spec = WEAPONS[player.weapon];
   if (!triggerHeld && spec.automatic) return;
   if (now < player.switchingUntil) return;
@@ -7770,6 +8229,9 @@ function updatePhysics(dt: number): void {
   cameraHeightOffset = damp(cameraHeightOffset, 0, prone ? 9 : 15, dt);
   const lateralSpeed = player.velocity.dot(right) / Math.max(1, profile.maxSpeed);
   cameraRoll = damp(cameraRoll, -lateralSpeed * (adsHeld ? 0.006 : 0.016), 11, dt);
+  const railgunReloadProgress = player.weapon === 'railgun' && railgunRechamberPresentationActive
+    ? THREE.MathUtils.clamp(1 - Math.max(0, railgunState.chamberReadyAtHostTimeMs - currentHostTimeMs()) / RAILGUN_RECHAMBER_MS, 0, 1)
+    : 0;
   const weaponActionEvents = weaponView.update({
     dt,
     moving,
@@ -7780,7 +8242,7 @@ function updatePhysics(dt: number): void {
     phase: weaponBob,
     landingImpulse,
     lateralSpeed,
-    reloadProgress: debugReloadProgress ?? gameplayReloadProgress(player.reloadState, performance.now()),
+    reloadProgress: debugReloadProgress ?? (player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(player.reloadState, performance.now())),
     surfaceRetreat: currentViewmodelSurfaceRetreat(),
   });
   for (const event of weaponActionEvents) {
@@ -8024,6 +8486,36 @@ function updateMatchState(now: number): void {
     });
     const completedAt = new Date().toISOString();
     const participants = matchParticipantReports();
+    if (privateMatch) {
+      saveLastMultiplayerDiagnostic(createLastMultiplayerDiagnostic({
+        completedAtEpochMs: Date.now(),
+        arena: selectedArena.id,
+        mode: privateMatchMode,
+        role: network.role === 'host' ? 'host' : 'guest',
+        protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+        durationMs: Math.max(0, performance.now() - matchDiagnosticsStartedAt),
+        participantCount: participants.length,
+        localPlayerName: player.name,
+        local: {
+          kills: summary.kills,
+          deaths: summary.deaths,
+          shotsFired: roundShotsFired,
+          hitShots: roundHitShots,
+          damageDealt: summary.damageDealt,
+          damageTaken: Math.max(roundDamageTaken, authoritativeLocal?.damageTaken ?? 0),
+          headshots: summary.headshots,
+        },
+        network: {
+          rttMs: localLobbyPingMs,
+          clockOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
+          interpolationDelayMs: interpolationDelayState.delayMs,
+          receiverSequenceGaps,
+          receiverReordered,
+          droppedDamageEvents: droppedHumanDamageEvents,
+        },
+        damageTimeline: humanDamageTimeline,
+      }), clientPersistentStorage());
+    }
     matchDiagnostics?.setFinalState({
       completedAt,
       result: presentation.headline ?? 'MATCH COMPLETE',
@@ -8411,6 +8903,18 @@ function updateHud(now: number): void {
   element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
   element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
   element<HTMLElement>('#reserve').textContent = reserveHudValue(selectedArena.id, player.reserve[player.weapon]);
+  const railgunStatus = element<HTMLElement>('#railgun-status');
+  railgunStatus.hidden = !localHoldsRailgun();
+  const railgunRechamberRemainingMs = Math.max(0, railgunState.chamberReadyAtHostTimeMs - currentHostTimeMs());
+  if (!railgunStatus.hidden) {
+    railgunStatus.textContent = railgunState.roundsRemaining <= 0
+      ? 'VX-8 DEPLETED · NO RESUPPLY'
+      : player.weapon !== 'railgun'
+        ? `SIDEARM ACTIVE · VX-8 ${railgunState.roundsRemaining} ROUNDS`
+        : railgunRechamberRemainingMs > 0
+          ? `VX-8 RECHAMBER ${Math.ceil(railgunRechamberRemainingMs / 100) / 10}s`
+          : railgunAdsResetRequired ? 'VX-8 RELEASE ADS' : 'VX-8 THERMAL READY';
+  }
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
   const hudScores: [number, number] = selectedArena.id === 'gun-range'
@@ -8438,12 +8942,14 @@ function updateHud(now: number): void {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
   const reloadStateElement = element<HTMLElement>('#reload-state');
-  reloadStateElement.textContent = player.reloadState
+  reloadStateElement.textContent = player.weapon === 'railgun' && railgunRechamberRemainingMs > 0
+    ? `RECHAMBERING ${(railgunRechamberRemainingMs / 1_000).toFixed(1)}s`
+    : player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
     : selectedArena.id === 'gun-range'
       ? `SCORE ${rangeScore} · ${targetHits} TARGETS HIT`
       : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
-  reloadStateElement.classList.toggle('active', player.reloadState !== null);
+  reloadStateElement.classList.toggle('active', player.reloadState !== null || player.weapon === 'railgun' && railgunRechamberRemainingMs > 0);
   element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
   element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
   updateFieldSupportHud();
@@ -8589,7 +9095,7 @@ function pollGamepad(dt: number): void {
     gamepadSprint = false;
     previousGamepadButtons = [];
     triggerHeld = mouseTriggerHeld;
-    adsHeld = debugAdsOverride ?? mouseAdsHeld;
+    adsHeld = admittedAdsHeld(debugAdsOverride ?? mouseAdsHeld);
     return;
   }
   const shapedMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
@@ -8606,7 +9112,7 @@ function pollGamepad(dt: number): void {
   const padTriggerActive = canControlPlayer && padTrigger && gamepadTriggerArmed;
   const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
   gamepadSprint = canControlPlayer && Boolean(buttons[10]);
-  adsHeld = debugAdsOverride ?? (mouseAdsHeld || padAdsActive);
+  adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   triggerHeld = mouseTriggerHeld || padTriggerActive;
   gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
   gamepadLookRate = integrateGamepadLookRate(
@@ -8626,7 +9132,7 @@ function pollGamepad(dt: number): void {
     if (pressed(1)) requestStance('toggle-crouch');
     if (pressed(13)) requestStance('toggle-prone');
     if (pressed(2)) reload();
-    if (pressed(3)) switchWeapon(player.weapon === player.primaryWeapon ? 1 : 0);
+    if (pressed(3)) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
     if (pressed(4)) throwGrenade();
     if (pressed(5)) melee();
     if (pressed(14)) selectGamepadSupport(-1);
@@ -8725,7 +9231,7 @@ canvas.addEventListener('mousedown', (event) => {
   }
   if (event.button === 2) {
     mouseAdsHeld = true;
-    adsHeld = true;
+    adsHeld = admittedAdsHeld(true);
     return;
   }
   if (event.button !== 0) return;
@@ -8737,7 +9243,7 @@ window.addEventListener('mouseup', (event) => {
   if (event.button === 0) mouseTriggerHeld = false;
   if (event.button === 2) mouseAdsHeld = false;
   triggerHeld = mouseTriggerHeld;
-  adsHeld = mouseAdsHeld;
+  adsHeld = admittedAdsHeld(mouseAdsHeld);
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
@@ -9026,6 +9532,13 @@ function resetForMode(): void {
   clearFieldSupport();
   clearDeathDrops();
   clearCorpsePresentations();
+  applyRailgunState(createRailgunAuthorityState('disabled', 0, 0, railgunState.generation + 1));
+  railgunAdsResetRequired = false;
+  railgunRechamberPresentationActive = false;
+  localRailgunPendingUntilHostTimeMs = 0;
+  resolvedRailgunShots.clear();
+  railgunPresentation.updateWorld(railgunState, performance.now());
+  railgunPresentation.updateThermal(camera, [], false);
   authorizedRemoteRedeploys.clear();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
@@ -9039,8 +9552,8 @@ function resetForMode(): void {
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve };
+  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag, railgun: 0 };
+  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve, railgun: 0 };
 }
 
 function returnToMainMenu(): void {
@@ -9271,6 +9784,7 @@ function frame(now: number, scheduleNext = true): void {
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
     updateOverdrive(now);
+    updateRailgun(now);
     updateDeathDrops(now);
     updateCorpsePresentations(now);
     impactPresentation.update(frameDt);
@@ -9394,6 +9908,9 @@ const debugWindow = window as Window & {
     forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
+    stageRailgunSpawn: (siteIndex?: number) => RailgunAuthorityState;
+    stageRemoteAtRailgunPickup: () => boolean;
+    interactRailgun: () => boolean;
     degradeStateChannel: () => boolean;
     endMatch: () => void;
     rematch: () => void;
@@ -9435,6 +9952,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       triggerHeld,
       adsHeld,
     },
+    railgun: {
+      ...railgunState,
+      spawnSite: railgunState.spawnSite ? { ...railgunState.spawnSite, position: [...railgunState.spawnSite.position] } : null,
+      pickupPosition: railgunState.pickupPosition ? [...railgunState.pickupPosition] : null,
+      processedShotIds: [...railgunState.processedShotIds],
+      localHolder: localHoldsRailgun(),
+      adsResetRequired: railgunAdsResetRequired,
+      rechamberPresentationActive: railgunRechamberPresentationActive,
+      adsProgress: weaponView.adsProgress(),
+      thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
+    },
+    lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
     scores: teamScores(),
     arenaSelection: {
       id: selectedArena.id,
@@ -10406,6 +10935,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
     player.invulnerableUntil = 0;
+    if (gameStarted) network.send(createStateMessage());
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0) => {
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
@@ -10564,7 +11094,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     melee();
     return { accepted: player.lastMeleeAt !== before, alive: player.alive, phase: matchState.phase, lastMeleeAt: player.lastMeleeAt };
   },
-  setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = held; },
+  setAds: (held: boolean) => { debugAdsOverride = held; adsHeld = admittedAdsHeld(held); },
   setMovement: (forward: boolean, sprint = false) => {
     keys.delete('KeyW');
     keys.delete('ShiftLeft');
@@ -10659,6 +11189,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateOverdrive(now);
     broadcastOverdriveState(now);
   },
+  stageRailgunSpawn: (siteIndex = 0) => {
+    if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
+    const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
+    const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
+    const advanced = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS);
+    applyRailgunState(advanced.state, advanced.announcement !== null);
+    broadcastRailgunState();
+    return railgunState;
+  },
+  stageRemoteAtRailgunPickup: () => {
+    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    if (network.role !== 'host' || !remote || !railgunState.pickupPosition) return false;
+    const [x, y, z] = railgunState.pickupPosition;
+    remote.snapshot = { ...remote.snapshot, x, y, z };
+    remote.target.set(x, y, z);
+    remote.root.position.set(x, y - 1.7, z);
+    return true;
+  },
+  interactRailgun: () => interactWithRailgunPickup(),
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
   endMatch: () => {
     const now = performance.now();

@@ -131,7 +131,7 @@ export function claimRailgun(
 }
 
 export function advanceRailgunChamber(state: RailgunAuthorityState, now: number): RailgunAuthorityState {
-  if (state.status !== 'held' || state.roundsRemaining <= 0 || !validHostTime(now)) return state;
+  if (state.status !== 'held' || state.roundsRemaining <= 0 || state.chamberReadyAtHostTimeMs <= 0 || !validHostTime(now)) return state;
   return now >= state.chamberReadyAtHostTimeMs ? { ...state, chamberReadyAtHostTimeMs: 0 } : state;
 }
 
@@ -240,6 +240,28 @@ export type RailgunStateMessage = Readonly<{
   nonce: number;
 }>;
 
+export type RailgunShotOutcome = Readonly<{
+  target: string;
+  damage: number;
+  resultingHealth: number;
+  died: boolean;
+  distanceMeters: number;
+}>;
+
+/** Host-authored result. Clients never infer railgun damage from their own raycast. */
+export type RailgunShotResultMessage = Readonly<{
+  type: 'railgun-shot-result';
+  protocolVersion: number;
+  by: string;
+  forPlayerId: string;
+  generation: number;
+  shotId: string;
+  status: 'accepted-hit' | 'accepted-miss' | 'rejected';
+  reason: RailgunShotResult['reason'];
+  outcomes: readonly RailgunShotOutcome[];
+  nonce: number;
+}>;
+
 function isVector3(value: unknown): value is readonly [number, number, number] {
   return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 }
@@ -262,7 +284,7 @@ export function isRailgunAuthorityState(value: unknown): value is RailgunAuthori
     && new Set(state.processedShotIds).size === state.processedShotIds.length;
 }
 
-export function isRailgunProtocolMessage(value: unknown, protocolVersion: number): value is RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunStateMessage {
+export function isRailgunProtocolMessage(value: unknown, protocolVersion: number): value is RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunStateMessage | RailgunShotResultMessage {
   if (!value || typeof value !== 'object') return false;
   const message = value as Record<string, unknown>;
   if (message.protocolVersion !== protocolVersion || typeof message.by !== 'string' || !validPlayerId(message.by)
@@ -275,6 +297,25 @@ export function isRailgunProtocolMessage(value: unknown, protocolVersion: number
       && typeof message.shotId === 'string' && message.shotId.length >= 8 && message.shotId.length <= 128
       && isVector3(message.origin) && isVector3(message.direction)
       && validHostTime(Number(message.fireTimeMs));
+  }
+  if (message.type === 'railgun-shot-result') {
+    const outcomes = message.outcomes;
+    const reasons = new Set<RailgunShotResult['reason']>(['accepted', 'not-holder', 'not-ready', 'empty', 'invalid', 'duplicate']);
+    return typeof message.forPlayerId === 'string' && validPlayerId(message.forPlayerId)
+      && Number.isSafeInteger(message.generation) && Number(message.generation) >= 0
+      && typeof message.shotId === 'string' && message.shotId.length >= 8 && message.shotId.length <= 128
+      && (message.status === 'accepted-hit' || message.status === 'accepted-miss' || message.status === 'rejected')
+      && reasons.has(message.reason as RailgunShotResult['reason'])
+      && Array.isArray(outcomes) && outcomes.length <= 1
+      && outcomes.every((outcome) => {
+        if (!outcome || typeof outcome !== 'object') return false;
+        const candidate = outcome as Partial<RailgunShotOutcome>;
+        return typeof candidate.target === 'string' && validPlayerId(candidate.target)
+          && Number.isFinite(candidate.damage) && Number(candidate.damage) >= 0 && Number(candidate.damage) <= RAILGUN_DAMAGE
+          && Number.isFinite(candidate.resultingHealth) && Number(candidate.resultingHealth) >= 0 && Number(candidate.resultingHealth) <= 100
+          && typeof candidate.died === 'boolean'
+          && Number.isFinite(candidate.distanceMeters) && Number(candidate.distanceMeters) >= 0 && Number(candidate.distanceMeters) <= 512;
+      });
   }
   return message.type === 'railgun-state' && isRailgunAuthorityState(message.state);
 }

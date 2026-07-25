@@ -80,8 +80,33 @@ try {
     // A complete second host+guest match is the regression gate. Both start
     // clocks must clear together when the host returns the ended match to the
     // lobby, otherwise peers reject the mixed waiting snapshot and cannot ready.
-    await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch())));
-    await Promise.all([host, guest].map((page) => page.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 })));
+    // These pages intentionally share one browser context, hence one localStorage.
+    // Capture each peer's retained summary immediately after its own completion,
+    // before the second page overwrites the same test-origin key.
+    await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
+    await host.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 });
+    const hostRetainedDiagnostic = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().lastCompletedMultiplayerDiagnostic);
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
+    await guest.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 });
+    const guestRetainedDiagnostic = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().lastCompletedMultiplayerDiagnostic);
+    const retainedDiagnostics = [hostRetainedDiagnostic, guestRetainedDiagnostic];
+    joined.diagnosticEvidence = retainedDiagnostics.map((diagnostic) => diagnostic ? {
+      schemaVersion: diagnostic.schemaVersion,
+      role: diagnostic.role,
+      arena: diagnostic.arena,
+      recentDamageCount: diagnostic.recentDamage?.length ?? null,
+    } : null);
+    joined.sanitizedDiagnosticRetained = retainedDiagnostics.every((diagnostic, index) => {
+      const serialized = JSON.stringify(diagnostic);
+      return diagnostic?.schemaVersion === 1
+        && diagnostic.role === (index === 0 ? 'host' : 'guest')
+        && diagnostic.arena === 'atomic-acres'
+        && Array.isArray(diagnostic.recentDamage)
+        && diagnostic.recentDamage.length <= 64
+        && !serialized.includes(`host ${cycle}`)
+        && !serialized.includes(`guest ${cycle}`)
+        && !serialized.includes(roomCode);
+    });
     await host.click('#rematch');
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -106,6 +131,34 @@ try {
       return state?.matchPhase === 'active' && state.remotes === 1;
     }, undefined, { timeout: 45_000 })));
     joined.secondMatchStarted = true;
+
+    const stagedRailgun = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.status === 'available', undefined, { timeout: 15_000 });
+    await guest.evaluate((pickup) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(...pickup), stagedRailgun.pickupPosition);
+    if (!await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRemoteAtRailgunPickup())) throw new Error('could not stage authoritative remote at railgun pickup');
+    joined.railgunGuestClaimed = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactRailgun());
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.railgun.status === 'held' && state.railgun.roundsRemaining === 8;
+    }, undefined, { timeout: 15_000 })));
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.localHolder === true, undefined, { timeout: 15_000 });
+    await guest.waitForTimeout(500);
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true, undefined, { timeout: 5_000 });
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7, undefined, { timeout: 15_000 })));
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+    joined.railgunImmediateRepeatBlocked = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7);
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(false));
+    await guest.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+      return state.adsResetRequired === false && state.chamberReadyAtHostTimeMs === 0;
+    }, undefined, { timeout: 5_000 });
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true, undefined, { timeout: 5_000 });
+    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 6, undefined, { timeout: 15_000 })));
+    joined.railgunReplicatedTwoShots = true;
 
     const beforeRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
     await guest.evaluate(() => {
@@ -132,6 +185,10 @@ try {
       && afterRedeploy[0].fieldSupport.streak === beforeRedeploy[0].fieldSupport.streak
       && afterRedeploy[1].fieldSupport.streak === beforeRedeploy[1].fieldSupport.streak
       && JSON.stringify(afterRedeploy[0].privateMatch.scores) === JSON.stringify(beforeRedeploy[0].privateMatch.scores);
+    joined.railgunDroppedOnRedeploy = afterRedeploy[0].railgun.status === 'available'
+      && afterRedeploy[0].railgun.roundsRemaining === 6
+      && afterRedeploy[1].railgun.status === 'available'
+      && afterRedeploy[1].railgun.roundsRemaining === 6;
 
     await guest.close({ runBeforeUnload: true });
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 30_000 });
@@ -147,6 +204,8 @@ try {
   console.log(JSON.stringify(report, null, 2));
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
     || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.guestRedeployNoCombatEffects
+    || !result.sanitizedDiagnosticRetained || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
+    || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy
     || !result.leaveObserved || !result.rejoinGraceObserved
     || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1
     || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false

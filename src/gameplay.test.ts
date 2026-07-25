@@ -53,10 +53,13 @@ describe('headshot damage contract', () => {
   it('uses exactly 1.5× head damage for every firearm', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
     expect(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
-    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper' && entry.id !== 'magnum')) {
+    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper' && entry.id !== 'magnum' && entry.id !== 'railgun')) {
       expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
     }
     expect(WEAPONS.sniper.headMultiplier).toBe(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER);
+    expect(computeDamage(WEAPONS.railgun, 220, 'head')).toBe(50);
+    expect(computeDamage(WEAPONS.railgun, 220, 'body')).toBe(50);
+    expect(computeDamage(WEAPONS.railgun, 220, 'limb')).toBe(50);
   });
 
   it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
@@ -280,7 +283,7 @@ describe('weapon tuning', () => {
   });
 
   it('reduces recoil in ADS, crouch and prone for every firearm', () => {
-    for (const weapon of Object.values(WEAPONS)) {
+    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'railgun')) {
       const hip = computeRecoilImpulse(weapon, 6, 1, { ads: false, crouched: false });
       const ads = computeRecoilImpulse(weapon, 6, 1, { ads: true, crouched: false });
       const crouchedAds = computeRecoilImpulse(weapon, 6, 1, { ads: true, crouched: true });

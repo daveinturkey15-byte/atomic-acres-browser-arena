@@ -314,6 +314,68 @@ select:focus-visible,
   box-shadow: var(--ui-shadow);
 }
 
+#railgun-status {
+  display: block;
+  margin-top: 5px;
+  color: #7df8ff;
+  font: 800 10px/1.1 Inter, sans-serif;
+  letter-spacing: .14em;
+  text-shadow: 0 0 12px rgba(80, 232, 255, .5);
+}
+
+#railgun-thermal {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 43%, rgba(4, 19, 22, .24) 69%, rgba(1, 7, 9, .68) 100%),
+    repeating-linear-gradient(0deg, rgba(80, 240, 255, .025) 0 1px, transparent 1px 4px);
+  box-shadow: inset 0 0 0 2px rgba(105, 245, 255, .18), inset 0 0 110px rgba(27, 160, 177, .16);
+}
+
+#railgun-thermal[hidden] { display: none; }
+
+#railgun-thermal > span {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(180, 253, 255, .82);
+  font: 800 10px/1 Inter, sans-serif;
+  letter-spacing: .2em;
+}
+
+#railgun-thermal .thermal-contact {
+  --thermal-scale: 1;
+  position: absolute;
+  width: calc(28px * var(--thermal-scale));
+  height: calc(62px * var(--thermal-scale));
+  transform: translate(-50%, -50%);
+  border-radius: 45% 45% 38% 38%;
+  background: linear-gradient(#fff7b0 0 19%, #ff8f43 21% 68%, #ff514b 70% 100%);
+  border: 2px solid rgba(255, 250, 203, .95);
+  box-shadow: 0 0 8px #fff2a8, 0 0 22px #ff664b, 0 0 42px rgba(255, 72, 54, .82);
+  opacity: .92;
+}
+
+#railgun-thermal .thermal-contact::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -21%;
+  width: 58%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #fff8bd;
+  border: 2px solid rgba(255, 250, 203, .95);
+  box-shadow: 0 0 13px #ff7a4a;
+}
+
+#railgun-thermal .thermal-contact.bot { filter: saturate(1.15) hue-rotate(-8deg); }
+
 @media (min-width: 1500px) {
   .panel {
     left: clamp(34px, 5vw, 100px);
