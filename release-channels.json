@@ -1,22 +1,25 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
     "label": "EXPERIMENTAL NEW NETCODE",
-    "description": "The live Pass 62 gameplay, graphics, and experimental networking build."
+    "description": "The live Pass 63 cleanup, chat, visual-repair, and experimental networking build."
   },
   "experimental": {
     "label": "EXPERIMENTAL NEW NETCODE",
-    "description": "Pass 62 live with the immutable host-resolved bullet timeline and adaptive networking.",
-    "pass": "PASS 62",
+    "description": "Pass 63 live while preserving the Pass 62 immutable host-resolved bullet timeline and adaptive networking.",
+    "pass": "PASS 63",
     "path": "channels/experimental-netcode-pass"
   },
   "stable": {
     "label": "NEW NETCODE",
-    "description": "The byte-exact Pass 60 release preserved as the stable fallback.",
-    "pass": "PASS 60",
-    "sourceSha": "b1af49be064610126a80c2ee538af334389f8f43",
-    "pagesSha": "fb06eeeefc42f35d591e9ee340a3adab62916883",
+    "description": "The byte-exact Pass 62 best-ever netcode benchmark preserved as the stable fallback.",
+    "pass": "PASS 62",
+    "sourceSha": "249a7ee77dce761eb237f3eb0e0d0ea1d0356317",
+    "pagesSha": "27c90967bdaf5387c0372933c7965a60ce75a765",
+    "pagesPath": "channels/experimental-netcode-pass",
+    "runtimeFileCount": 118,
+    "runtimeTreeSha256": "035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d",
     "path": "channels/recent-stable"
   }
 }

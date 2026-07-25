@@ -5,7 +5,7 @@ import { join, resolve, sep } from 'node:path';
 const root = resolve('.');
 const dist = join(root, 'dist');
 const config = JSON.parse(readFileSync(join(root, 'release-channels.json'), 'utf8'));
-if (config.schemaVersion !== 3) throw new Error('release topology verifier requires schemaVersion 3');
+if (config.schemaVersion !== 4) throw new Error('release topology verifier requires schemaVersion 4');
 const rootIndex = readFileSync(join(dist, 'index.html'), 'utf8');
 if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"') || existsSync(join(dist, 'assets'))) {
   throw new Error('Root must be a chooser-only shell with no game runtime assets');
@@ -15,11 +15,11 @@ const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.inde
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(['experimental', 'stable'])) {
   throw new Error(`Root chooser must expose only experimental and stable: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== 'PASS 62' || publicConfig.experimental.label !== 'EXPERIMENTAL NEW NETCODE') {
-  throw new Error('Root chooser is missing live Pass 62 experimental netcode');
+if (publicConfig.experimental.pass !== 'PASS 63' || publicConfig.experimental.label !== 'EXPERIMENTAL NEW NETCODE') {
+  throw new Error('Root chooser is missing live Pass 63 experimental netcode');
 }
-if (publicConfig.stable.pass !== 'PASS 60' || publicConfig.stable.label !== 'NEW NETCODE') {
-  throw new Error('Root chooser is missing stable Pass 60 new netcode');
+if (publicConfig.stable.pass !== 'PASS 62' || publicConfig.stable.label !== 'NEW NETCODE') {
+  throw new Error('Root chooser is missing stable Pass 62 new netcode');
 }
 const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -32,12 +32,16 @@ if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(['experimental-n
 function verifyPinned(channel) {
   const targetRoot = resolve(dist, channel.path);
   if (!targetRoot.startsWith(`${dist}${sep}`)) throw new Error('Unsafe staged channel');
-  const paths = execFileSync('git', ['ls-tree', '-r', '-z', '--name-only', channel.pagesSha, '--', 'index.html', 'assets'], {
+  const pagesPath = channel.pagesPath ?? '';
+  const treePaths = pagesPath ? [pagesPath] : ['index.html', 'assets'];
+  const sourcePaths = execFileSync('git', ['ls-tree', '-r', '-z', '--name-only', channel.pagesSha, '--', ...treePaths], {
     cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
   }).split('\0').filter(Boolean);
-  for (const path of paths) {
+  const prefix = pagesPath ? `${pagesPath}/` : '';
+  const paths = sourcePaths.map((path) => prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path);
+  for (const [index, path] of paths.entries()) {
     const staged = readFileSync(join(targetRoot, path));
-    const pinned = execFileSync('git', ['cat-file', 'blob', `${channel.pagesSha}:${path}`], {
+    const pinned = execFileSync('git', ['cat-file', 'blob', `${channel.pagesSha}:${sourcePaths[index]}`], {
       cwd: root, encoding: null, maxBuffer: 32 * 1024 * 1024,
     });
     if (!staged.equals(pinned)) throw new Error(`${channel.pass} staged byte mismatch: ${path}`);
@@ -45,12 +49,16 @@ function verifyPinned(channel) {
   return paths.length;
 }
 const stableFiles = verifyPinned(config.stable);
-const stableProvenance = JSON.parse(readFileSync(join(dist, config.stable.path, 'channel-provenance.json'), 'utf8'));
-if (stableProvenance.schemaVersion !== 3
+const stableProvenanceFile = config.stable.pagesPath ? 'pinned-channel-provenance.json' : 'channel-provenance.json';
+const stableProvenance = JSON.parse(readFileSync(join(dist, config.stable.path, stableProvenanceFile), 'utf8'));
+if (stableProvenance.schemaVersion !== 4
   || stableProvenance.releasePass !== config.stable.pass
   || stableProvenance.sourceSha !== config.stable.sourceSha
-  || stableProvenance.pagesSha !== config.stable.pagesSha) {
-  throw new Error('Stable Pass 60 provenance does not match the exact configured source and Pages SHAs');
+  || stableProvenance.pagesSha !== config.stable.pagesSha
+  || stableProvenance.pagesPath !== config.stable.pagesPath
+  || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
+  || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
+  throw new Error('Stable Pass 62 provenance does not match the exact configured source and Pages SHAs');
 }
 const experimentalRoot = resolve(dist, config.experimental.path);
 if (!existsSync(join(experimentalRoot, 'index.html')) || !existsSync(join(experimentalRoot, 'assets'))) throw new Error('Experimental channel is incomplete');

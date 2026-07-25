@@ -17,13 +17,13 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages pinned stable Pass 60 beside live Pass 62 before a complete publish', () => {
+  it('stages pinned stable Pass 62 beside live Pass 63 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 62 and byte-exact stable Pass 60');
+    expect(workflow).toContain('Stage live Pass 63 and byte-exact stable Pass 62');
     expect(workflow).not.toContain('three-channel');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');

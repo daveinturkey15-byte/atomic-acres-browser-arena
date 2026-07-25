@@ -27,8 +27,8 @@ describe('project map', () => {
     expect(bundle.archive).toEqual(CHANGELOG.slice(1));
     expect(bundle.changes).toEqual(CHANGELOG);
     expect(bundle.current.candidateState).toBe('hitl-candidate');
-    expect(bundle.publishedChannels.live.pass).toBe('PASS 62');
-    expect(bundle.publishedChannels.stable.pass).toBe('PASS 60');
+    expect(bundle.publishedChannels.live.pass).toBe('PASS 63');
+    expect(bundle.publishedChannels.stable.pass).toBe('PASS 62');
   });
 
   it('serializes agent JSON and human Markdown from the same bundle', () => {
@@ -42,7 +42,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[1]?.pass}: ${CHANGELOG[1]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toContain('Published live channel: PASS 62');
+    expect(markdown).toContain('Published live channel: PASS 63');
   });
 
   it('rejects an invalid generated timestamp', () => {
