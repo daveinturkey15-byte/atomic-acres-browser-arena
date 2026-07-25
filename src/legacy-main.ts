@@ -10341,7 +10341,11 @@ function monitorSelectedArenaRender(now: number): void {
   // Atomic Acres' quality GLB intentionally replaces the procedural gameplay
   // root visually. Every other selected arena must retain a drawable exact
   // authority root even if atmosphere and the DOM HUD are still rendering.
-  const eligible = !(selectedArena.id === 'atomic-acres' && blenderArenaActive);
+  // During the atomic switch transaction selectedArena/arena deliberately
+  // advance before the detached presentation root is validated and adopted.
+  // Audit only after that boundary commits; stable play remains fail-closed.
+  const eligible = arenaSelectionReady
+    && !(selectedArena.id === 'atomic-acres' && blenderArenaActive);
   let audit = auditArenaRenderLiveness(scene, arena.root, selectedArena.id, renderRuntime.renderInfo(), eligible, camera);
   if (eligible && audit.reasons.length > 0) {
     const restored = arenaVisualStream.restoreGameplayRoot(selectedArena.id, arena.root);
