@@ -69,7 +69,7 @@ Recompose the setup/menu, lobby, loadout, in-match HUD, overlays, match end and 
 
 ### R8 — Lightweight automatic match diagnostics
 
-Every completed solo or multiplayer match creates a bounded privacy-minimized diagnostic envelope. Capture stays in memory on the gameplay path; serialization and upload occur after match completion or during a safe page-lifecycle flush. Delivery uses `sendBeacon` first and `fetch(..., { keepalive: true })` as fallback, never WebRTC gameplay channels. Failed delivery remains in a capped local queue for later retry.
+Every completed solo or multiplayer match creates a bounded privacy-minimized diagnostic envelope. Capture stays in memory on the gameplay path; serialization and upload occur after match completion or during a safe page-lifecycle flush. Normal delivery uses `fetch(..., { keepalive: true })` and removes an envelope only after a valid collector receipt, never through WebRTC gameplay channels. `sendBeacon` is a last-chance lifecycle attempt and does not clear the capped local queue; idempotency makes later retries safe.
 
 The remote payload may include build/pass/backend, arena/mode/role, anonymous per-match pseudonyms, ordered damage/health/regeneration/admission events, RTT/jitter/clock-offset buckets, dropped-event counts, final scoreboard summary, frame-time quantiles and fatal runtime error categories. It must not include callsigns, chat, room codes, raw peer IDs, install IDs, IP addresses, credentials, cookies, free text, stack traces or precise long-term device fingerprints.
 
@@ -112,4 +112,3 @@ The supplied gameplay URL must be the full hardware WebGPU game. The supplied co
 - HUD specialist: R7 and C6, isolated worktree.
 - Diagnostics/gameplay specialist: R8–R9 and C7–C8, isolated worktree.
 - Integrator: R10–R11 and C9–C11, cross-lane reconciliation, benchmarks, real hardware/two-peer proof, PR and HITL handoff.
-

@@ -2,6 +2,8 @@
 
 Pass 64 captures a bounded privacy-minimized ledger in memory during a match and submits only its compact automatic envelope after the match ends. The upload path is HTTP-only and never uses the WebRTC gameplay event or state channels.
 
+Normal post-match delivery uses a credential-free keepalive request and clears an envelope only after the collector returns a valid storage receipt. Failed deliveries remain in a capped four-envelope local queue. A page-lifecycle beacon is only a last-chance attempt and does not clear that queue; idempotency makes a later receipt-bearing retry duplicate-safe.
+
 ## Local HITL collection
 
 Run the localhost-only collector in one terminal:

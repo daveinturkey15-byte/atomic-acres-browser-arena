@@ -110,19 +110,19 @@ export class MatchDiagnosticUploader {
 
   flushForPageLifecycle(): number {
     if (this.activeMatch || !this.endpoint || this.queue.length === 0) return 0;
-    let delivered = 0;
-    while (this.queue.length > 0) {
-      const envelope = this.queue[0];
+    let queued = 0;
+    for (const envelope of this.queue) {
       const json = JSON.stringify(envelope);
       this.attempted += 1;
       if (!this.tryBeacon(json)) break;
-      this.queue.shift();
-      this.delivered += 1;
-      delivered += 1;
+      queued += 1;
       this.lastDelivery = 'beacon';
     }
+    // sendBeacon only confirms that the browser accepted the request for
+    // delivery. Keep each envelope until a later receipt-bearing fetch proves
+    // that the collector stored it; the idempotency key makes retries safe.
     writeQueue(this.storage, this.queue);
-    return delivered;
+    return queued;
   }
 
   telemetry(): MatchDiagnosticUploadTelemetry {
@@ -158,14 +158,6 @@ export class MatchDiagnosticUploader {
       const envelope = this.queue[0];
       const json = JSON.stringify(envelope);
       this.attempted += 1;
-      if (this.tryBeacon(json)) {
-        this.queue.shift();
-        this.delivered += 1;
-        delivered += 1;
-        this.lastDelivery = 'beacon';
-        writeQueue(this.storage, this.queue);
-        continue;
-      }
       try {
         const response = await this.fetcher(`${this.endpoint}/v1/match-diagnostics`, {
           method: 'POST',

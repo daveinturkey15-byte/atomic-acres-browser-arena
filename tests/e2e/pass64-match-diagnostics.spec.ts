@@ -61,5 +61,5 @@ test('completed-match diagnostics stay off the active match path and beacon one 
   const completedTelemetry = await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().matchDiagnosticsUpload);
-  expect(completedTelemetry).toMatchObject({ activeMatch: false, pending: 0, delivered: 1, requestsDuringActiveMatch: 0, lastDelivery: 'beacon' });
+  expect(completedTelemetry).toMatchObject({ activeMatch: false, pending: 0, delivered: 1, requestsDuringActiveMatch: 0, lastDelivery: 'fetch' });
 });

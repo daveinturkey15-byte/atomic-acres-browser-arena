@@ -47,19 +47,15 @@ describe('automatic completed-match diagnostic delivery', () => {
     expect(uploader.telemetry()).toMatchObject({ activeMatch: true, pending: 1, requestsDuringActiveMatch: 0 });
   });
 
-  it('uses a CORS-safelisted text/plain beacon first after completion', async () => {
+  it('uses a receipt-bearing keepalive fetch after completion', async () => {
     const storage = new MemoryStorage();
-    const fetcher = vi.fn();
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ accepted: true, receiptId: 'md_receipt' }), { status: 201 }));
     const beacon = vi.fn<(url: string | URL, data?: BodyInit | null) => boolean>(() => true);
     const uploader = new MatchDiagnosticUploader('https://diagnostics.example', storage, fetcher, beacon);
     uploader.beginMatch();
     expect(await uploader.completeMatch(envelope())).toBe(1);
-    expect(beacon).toHaveBeenCalledTimes(1);
-    expect(beacon.mock.calls[0][0]).toBe('https://diagnostics.example/v1/match-diagnostics');
-    const body = beacon.mock.calls[0][1] as Blob;
-    expect(body.type).toBe('text/plain;charset=utf-8');
-    expect(JSON.parse(await body.text())).toMatchObject({ schemaVersion: 1, pass: 'PASS 64' });
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(beacon).not.toHaveBeenCalled();
     expect(storage.getItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY)).toBeNull();
   });
 
@@ -85,12 +81,24 @@ describe('automatic completed-match diagnostic delivery', () => {
     expect(offlineFetch).toHaveBeenCalledTimes(1);
 
     const retryBeacon = vi.fn<(url: string | URL, data?: BodyInit | null) => boolean>(() => true);
-    const retryFetch = vi.fn();
+    const retryFetch = vi.fn(async () => new Response(JSON.stringify({ accepted: true, receiptId: 'md_retry' }), { status: 201 }));
     const later = new MatchDiagnosticUploader('https://diagnostics.example', storage, retryFetch, retryBeacon);
     expect(await later.flushPending()).toBe(1);
-    expect(retryBeacon).toHaveBeenCalledTimes(1);
-    expect(retryFetch).not.toHaveBeenCalled();
+    expect(retryFetch).toHaveBeenCalledTimes(1);
+    expect(retryBeacon).not.toHaveBeenCalled();
     expect(later.telemetry().pending).toBe(0);
+  });
+
+  it('uses beacon only as a last-chance lifecycle attempt and retains the queue until receipt', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY, JSON.stringify({ schemaVersion: 1, items: [envelope()] }));
+    const beacon = vi.fn<(url: string | URL, data?: BodyInit | null) => boolean>(() => true);
+    const uploader = new MatchDiagnosticUploader('https://diagnostics.example', storage, vi.fn(), beacon);
+
+    expect(uploader.flushForPageLifecycle()).toBe(1);
+    expect(beacon).toHaveBeenCalledTimes(1);
+    expect(uploader.telemetry()).toMatchObject({ pending: 1, delivered: 0, lastDelivery: 'beacon' });
+    expect(storage.getItem(MATCH_DIAGNOSTICS_QUEUE_STORAGE_KEY)).not.toBeNull();
   });
 
   it('loads at most the newest four valid completed envelopes', () => {
