@@ -33,6 +33,8 @@ At `B0`, `scripts/release/change-impact.mjs` classifies `AGENTS.md` and `docs/**
 - `docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md`;
 - `docs/PASS65_BIG_ONE_MASTER_PLAN.md`;
 - `docs/PASS65_REQUIREMENTS_MATRIX.md`;
+- `docs/PASS65_DECISION_RECEIPTS.json`;
+- `docs/PASS65_DECISION_RECEIPTS.schema.json`;
 - `docs/PASS65_WORK_BREAKDOWN_RUNBOOK.md`;
 - `docs/PASS65_PROJECT_SKILLS_SPEC.md`;
 - `docs/PASS65_TECHNICAL_CONTRACT_SKETCHES.md`;
@@ -41,7 +43,7 @@ At `B0`, `scripts/release/change-impact.mjs` classifies `AGENTS.md` and `docs/**
 
 The P0 boundary expressly excludes:
 
-- `acceptance/pass-65.json`: the current executable schema permits only accepted/verified or owner-approved deferred candidates, so an invented pre-preview placeholder would be invalid. The runtime/release-shell contribution adds exactly one real Pass 65 manifest when evidence and Dave's exact-preview approval exist.
+- `acceptance/pass-65.json`: the current executable schema has no pending/skeleton status, requires sequential `R1..Rn`, and requires `status="accepted"` even before its separate human-acceptance object can pass. The runtime contribution therefore creates no P0 placeholder. After exact runtime source `S0` and `pr-preview-<pr>-<S0>` exist, Q10 adds one manifest-only descendant `S0M` with `R1..R99` mapped deterministically from the planning matrix, allowed evidence kinds, `status="accepted"`, and all mechanical fields complete while omitting `humanAcceptance`. Its sole expected gate error is missing Dave approval. After Dave approves exact S0, S1 changes only `humanAcceptance`.
 - `.agents/skills/**`: currently full-impact and therefore created and forward-tested on B1, not disguised as process-only.
 - baselines, package scripts, QA code, runtime source, tests, assets, workflows, and release-shell files.
 - any Pass 65 live/stable configuration or publication action.
@@ -52,15 +54,15 @@ Unknown or mixed paths fail closed to full runtime impact. The final P0 diff mus
 
 The repository package is self-contained and mechanically reconciled:
 
-- 94 unique `R###` requirements, each with expected result, active falsifier, evidence, and state;
-- 15 unique `DEC-##` product/engineering decisions with defaults and freeze deadlines;
-- 120 unique implementation/verification/release tasks, including explicit B1.0 lifecycle/authority and PV01 S0-freeze gates;
-- 120 matching P50/P90 estimate rows with no missing or extra task IDs;
+- 99 unique `R###` requirements, each with expected result, active falsifier, evidence, and state;
+- 15 unique `DEC-##` product/engineering decisions plus canonical schema-v1 receipts in `docs/PASS65_DECISION_RECEIPTS.json`; all P0 receipts are `OPEN`, have null authoritative values, and therefore unlock nothing;
+- 122 unique implementation/verification/release tasks, including explicit B1.0 lifecycle/authority and PV01 S0-freeze gates;
+- 122 matching P50/P90 estimate rows with no missing or extra task IDs;
 - balanced Markdown code fences, no duplicate IDs, no stale audit counts, and no missing index target;
 - design contracts for authority/presentation separation, stable identity and life epochs, catalogs/loadout migration, ordnance, strict support-state unions, destructible sheet surfaces, settings normalization, audio budgets, and evidence lineage;
 - one concise owner/taste HITL route backed by exhaustive precomputed mechanical evidence.
 
-The estimates are planning distributions, not a promise. Current totals are 795 P50 and 1,588 P90 active agent-hours before cross-lane reserve; the program model applies 15% P50 and 20% P90 integration reserve. The conjectured dependency-critical path is 295–550 active elapsed hours plus CI, artifact-generation, cache, and owner waits. Any implementation that materially changes this graph must update the estimate instead of silently preserving an obsolete number.
+The estimates are planning distributions, not a promise. Current totals are 813 P50 and 1,624 P90 active agent-hours before cross-lane reserve; the program model applies 15% P50 and 20% P90 integration reserve. The conjectured dependency-critical path is 307–575 active elapsed hours plus CI, artifact-generation, cache, and owner waits. Any implementation that materially changes this graph must update the estimate instead of silently preserving an obsolete number.
 
 ## 4. Base and integration discipline
 

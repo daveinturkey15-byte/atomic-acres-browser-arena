@@ -11,7 +11,7 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 
 ## Pass 65 routing
 
-- Before any Pass 65 work, read `docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md`, `docs/PASS65_REQUIREMENTS_MATRIX.md`, `docs/PASS65_WORK_BREAKDOWN_RUNBOOK.md`, and the relevant sections of `docs/PASS65_TECHNICAL_CONTRACT_SKETCHES.md`; release/HITL owners must also read `docs/PASS65_OWNER_HITL_CHECKLIST.md`.
+- Before any Pass 65 work, read `docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md`, `docs/PASS65_REQUIREMENTS_MATRIX.md`, `docs/PASS65_DECISION_RECEIPTS.json`, `docs/PASS65_WORK_BREAKDOWN_RUNBOOK.md`, and the relevant sections of `docs/PASS65_TECHNICAL_CONTRACT_SKETCHES.md`; release/HITL owners must also read `docs/PASS65_OWNER_HITL_CHECKLIST.md`.
 - Only the process-only P0 contribution starts from released Pass 64 base `B0=5075a52d80c6db69a97ed53acc2df5368728371a`. Runtime, release-shell, baseline, package, QA-code, asset, and `.agents/skills` work starts from exact post-P0 main `B1` after all five required checks are green.
 - An `OPEN` decision or documented default is not implementation authority. A task dependency written `P04[DEC-x=FROZEN]` requires the validated frozen decision receipt.
 - F11/B1.0 lifecycle, atomic arena transaction, collision-authority parity, and rapid same-tab falsifier gates precede specialist feature multiplication. PV01 explicitly freezes exact S0 and its preview/tree digests before final evidence.

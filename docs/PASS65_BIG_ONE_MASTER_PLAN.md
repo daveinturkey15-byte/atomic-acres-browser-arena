@@ -36,11 +36,12 @@ The requested scope combines several normally separate releases:
 4. New smoke, flash, and explosive-projectile gameplay.
 5. A versioned graphics/audio settings product surface.
 6. Map ambience and continued arena-structure cleanup.
-7. A reusable, networked, physically interactive destruction prototype.
-8. A selectable five-slot killstreak system with five complex new support effects.
-9. Multiplayer authority, anti-replay, performance, accessibility, and release evidence for all of the above.
+7. A polished map-preview showpiece: living helicopter motion, a sleek cockpit, and joyful Gun Range cat POV choreography.
+8. A reusable, networked, physically interactive destruction prototype.
+9. A selectable five-slot killstreak system with five complex new support effects and believable host-seeded chopper motion.
+10. Multiplayer authority, anti-replay, performance, accessibility, and release evidence for all of the above.
 
-This is not credibly a single-night implementation if “done” means the project’s existing standard: multiplayer-safe, visually reviewed, deterministic where required, hardware-verified, legally sourced, regression-tested, and recoverably released. The audited 120-task model totals 795 active agent-hours P50 and 1,588 P90 before the cross-lane reserve, or about 914/1,906 after the stated 15%/20% reserve. Even impossible perfect four-way utilization bottoms out near 229/477 wall-hours; the first dependency-aware conjecture is roughly 295–550 elapsed active hours plus external waits. `PASS65_ESTIMATION_AND_CRITICAL_PATH.md` carries every task row and must be recalculated from actual telemetry at B1. The B1.0 lifecycle/authority gate, destructible shed, authored viewmodels, and aerial support entities dominate risk.
+This is not credibly a single-night implementation if “done” means the project’s existing standard: multiplayer-safe, visually reviewed, deterministic where required, hardware-verified, legally sourced, regression-tested, and recoverably released. The audited 122-task model totals 813 active agent-hours P50 and 1,624 P90 before the cross-lane reserve, or about 935/1,949 after the stated 15%/20% reserve. Even impossible perfect four-way utilization bottoms out near 234/488 wall-hours; the first dependency-aware conjecture is roughly 307–575 elapsed active hours plus external waits. `PASS65_ESTIMATION_AND_CRITICAL_PATH.md` carries every task row and must be recalculated from actual telemetry at B1. The B1.0 lifecycle/authority gate, destructible shed, authored viewmodels, preview/cockpit choreography, and aerial support entities dominate risk.
 
 That estimate is not a reason to weaken the pass. It is a reason to structure it correctly:
 
@@ -80,6 +81,7 @@ That estimate is not a reason to weaken the pass. It is a reason to structure it
 - Long-lived, targetable choppers/drones/crates need host-owned entity lifecycles, not client-authored hit packets.
 - The shed needs a unified dynamic collision/ballistics authority; a moving render-only door over a static collider would be an immediate defect.
 - Convincing browser destruction should use authored damage cells and fracture chunks, not unbounded runtime CSG or soft-body simulation.
+- Random-feeling aircraft motion must be smooth and reproducible: menu motion can vary by seeded session, while killstreak motion must be host-seeded shared state rather than client-local randomness.
 
 ### 2.3 Recommended assumptions pending product confirmation
 
@@ -92,6 +94,7 @@ That estimate is not a reason to weaken the pass. It is a reason to structure it
 - Care packages are single-consume, host-authored objects. Recommended rule: enemies may steal them, with a shorter owner capture time.
 - Public default graphics mode is capability-aware High; the verified RTX 5080 profile selects High by default with Max available. Do not force Max or unsafe settings on weaker public devices.
 - Use original in-game names and original or clearly licensed art/audio. Familiar real-world labels are archetype references, not permission to copy franchise assets, sounds, code, UI, or branding.
+- The eventual approved release names are fixed by Dave: Pass 65 Live is `The Big One`; frozen Pass 64 Stable is `WebGPU Migration`.
 
 ### 2.4 Unknowns to freeze before their implementation wave
 
@@ -125,6 +128,9 @@ The plan must stop and be revised if any of these occurs:
 - Any new content ID falls back to a generic/missing model in an approved candidate.
 - WebGPU silently falls back or loads a legacy GLSL-only custom path.
 - Entity, debris, particle, audio-node, memory, or network caps are exceeded.
+- Menu helicopter or cat motion jitters, clips, loops visibly, causes discomfort, loses map composition, or ships a hollow/blocky cockpit.
+- Killstreak chopper variance diverges between peers or changes collision, targeting, LOS, cover, lifetime, or calibration outside its frozen tolerance.
+- Any final chooser/release surface names Pass 65 Live or Pass 64 Stable differently from `The Big One` / `WebGPU Migration`.
 - Any runtime or release-shell byte changes after Dave approves the exact preview.
 
 ## 3. Non-negotiable release invariants
@@ -152,6 +158,8 @@ The current acceptance system requires exact-preview approval for runtime/releas
 - Do not call `.agents/skills`, baseline records, package scripts, unclassified QA/release tooling, `release-channels.json`, or release-shell changes process-only unless the classifier is deliberately extended with base/head negative tests.
 - Assemble all Pass 65 runtime work in one draft integration PR through reviewed specialist commits.
 - Maintain exactly one `acceptance/pass-65.json` for the candidate.
+- Preserve stable planning IDs `R###` in the matrix, but generate the executable manifest's schema-required sequential IDs `R1..R99` from exact matrix table order. A Pass 65 mapping verifier must prove the one-to-one order and preserve each planning ID in `planningRequirementId` plus the summary prefix.
+- Freeze runtime/release-shell source as `S0`, obtain `pr-preview-<pr>-<S0>`, then add one manifest-only descendant `S0M`. Schema v1 requires `status="accepted"`; S0M uses that literal value, completes every other schema/evidence field, and deliberately omits only `humanAcceptance`, so the generic gate has exactly one expected error until Dave acts.
 - Do not merge that runtime PR before exact-SHA HITL.
 
 ### G5 — Authority and presentation separation
@@ -337,7 +345,7 @@ Replace the fixed internal list with:
 - `SupportActivation`: stable ID, owner/team/life, seed, earned time, activation time, state, consumed revision.
 - `SupportEntity`: entity ID, activation ID, owner/team, health, pose, velocity, ammo, reload, fuel/lifetime, target, navigation state.
 
-Every provisional product choice is represented by a typed `DecisionReceipt` with `OPEN`, `FROZEN`, or `SUPERSEDED` status, value, rationale, owner and timestamp. A dependency such as `P04[DEC-13=FROZEN]` is satisfied only by a validated `FROZEN` receipt; merely listing a default never unlocks implementation.
+Every provisional product choice is represented in canonical `docs/PASS65_DECISION_RECEIPTS.json`, validated against `docs/PASS65_DECISION_RECEIPTS.schema.json`. P0 contains 15 complete `OPEN` receipts with proposed defaults, null authoritative values, rationale, owner, recorded timestamp, deadline and supersession field. A dependency such as `P04[DEC-13=FROZEN]` is satisfied only by a validated `FROZEN` receipt with non-null value and resolution timestamp; merely listing or recording a default never unlocks implementation.
 
 Host fixed-step simulation authors navigation, targeting, damage, health, reward, crate roll, loot, and lifecycle. Reliable spawn/despawn/state transitions combine with bounded pose snapshots. Targetable support entities use hit proxies with pose history so ordinary host-authored shots can destroy them under latency.
 
@@ -479,8 +487,8 @@ Create the sole P0 branch/worktree from exact successfully released Pass 64 base
 
 - Numbered Pass 65 repo spec with R/C requirements and falsifiers.
 - Forging-team/path-ownership document.
-- Docs-only future-manifest mapping and evidence-index policy; do not add an invalid pre-preview `acceptance/pass-65.json` because the executable schema has no pending/skeleton state.
-- Integration ledger, decision receipts, task P50/P90/concurrency schedule and project-map documentation where classifier-safe.
+- Docs-only exact table-order `R1..R99` mapping and evidence-kind translation policy; do not add an invalid pre-preview `acceptance/pass-65.json` because the executable schema has no pending/skeleton status.
+- Integration ledger, schema-v1 `OPEN` decision receipts, task P50/P90/concurrency schedule and project-map documentation where classifier-safe.
 - No gameplay, asset, release-shell, or runtime change.
 
 The exact Pass 64 rollback evidence may be captured off-repo in Wave 1, but baseline records, `.agents/skills`, package scripts, QA/release code and release-shell configuration move to the runtime integration PR unless the classifier explicitly and safely permits them.
@@ -540,6 +548,7 @@ Parallel specialist batches after interface freeze:
 - Frag/smoke/flash/crossbow ordnance.
 - Audio mixer, spatial footsteps, ambience, music and announcement controls.
 - Graphics, sound, accessibility, custom-loadout and killstreak-selection menus.
+- Per-map menu helicopter/camera splines, sleek cockpit/canopy asset, and the Gun Range cat body/look-at moment path with deterministic and reduced-motion variants.
 - Arena structure pruning and surface/audio/navigation metadata.
 
 Exit: every content ID is complete across the registry; no placeholder/generic release fallback.
@@ -551,7 +560,7 @@ Build in dependency order:
 1. Adrenaline modifier reducer.
 2. Care-package plane, parachute, crate, weighted host RNG, and F interaction.
 3. Carpet-bomber path and pooled 20-bomb schedule.
-4. Chopper orbit, LOS, target acquisition, cover break, and damage calibration.
+4. Chopper orbit, LOS, target acquisition, cover break, damage calibration, and host-seeded smooth attitude/altitude/direction variance.
 5. Arena flight navigation/portals/no-fly/ceiling data.
 6. Drone Swarm entity count, health, navigation, ammo/reload, target acquisition, lifetime.
 7. Piloted-drone possession, input, wall sensor, ammo/fuel, damage, exit/restore.
@@ -580,22 +589,23 @@ Exit: multi-shed stress, network chaos, late join, rematch, and repeated arena s
 - Run two-peer/three-actor network scenarios with loss, delay, duplication, reorder, reconnect, and rematch.
 - Run High/Max RTX 5080 all-arena captures and stress scenarios.
 - Run accessibility, storage migration, resource-disposal, security, and provenance audits.
-- Add and validate the complete Pass 65 release-shell candidate: Pass 65 Live, exact frozen Pass 64 Stable, retained Pass 62 oracle policy, chooser/changelog/project-map identity, aliases and workflow labels. These exact release-shell trees belong to the preview.
-- Update the unapproved acceptance skeleton only with observed mechanical evidence; approval fields remain absent.
+- Add and validate the complete release-shell candidate: Pass 65 Live is named exactly `The Big One`; frozen Pass 64 Stable is named exactly `WebGPU Migration`; retain the Pass 62 oracle policy, chooser/changelog/project-map identity, aliases and workflow labels. These exact release-shell trees belong to the preview.
+- After PV01 freezes source S0 and its immutable preview, create manifest-only descendant S0M. Its `acceptance/pass-65.json` uses table-order `R1..R99`, preserves stable planning IDs, policy-allowed evidence kinds, schema-required `status="accepted"`, complete S0-bound evidence and preview fields, and deliberately omits only `humanAcceptance`.
 
-Exit at source `S0`: all four mechanical hosted checks and every Pass 65 functional/evidence verifier are green without threshold weakening; `requirements-acceptance` is expected to fail only because Dave has not yet approved the immutable preview. Hosted CI validates the schema/digest of the separately captured RTX 5080 receipt; it does not claim to be that hardware run.
+Exit at manifest head `S0M`: S0 runtime/release-shell trees are unchanged; all four mechanical hosted checks and every Pass 65 functional/evidence verifier are green without threshold weakening; `requirements-acceptance` has exactly one error, missing Dave's `humanAcceptance`. Hosted CI validates the schema/digest of the separately captured RTX 5080 receipt; it does not claim to be that hardware run.
 
 ### Wave 10 — immutable preview and HITL
 
 1. Complete runbook task `PV01`: freeze candidate source `S0`, record runtime/release-shell tree digests, and prohibit further mutation on that lineage.
 2. Build and digest preview `pr-preview-<pr>-<S0>`.
-3. Freeze runtime/release-shell paths.
-4. Supply Dave with exact preview link, SHA, build identity, known limitations, and a concise HITL route.
-5. Dave tests the actual NVIDIA/WebGPU build across the representative matrix.
-6. Dave explicitly approves `S0`.
-7. Only an approval/acceptance metadata commit `S1` may follow.
-8. Prove S0 ancestry and byte-identical runtime/release-shell trees at S1; any drift invalidates approval and returns to preview.
-9. Require all five checks green on S1.
+3. Freeze runtime/release-shell paths and add only Q10's process-only pre-approval manifest commit `S0M`.
+4. Prove S0 ancestry plus byte-identical runtime/release-shell trees at S0M; run both the Pass 65 mapping verifier and generic acceptance gate, whose only expected error is absent `humanAcceptance`.
+5. Supply Dave with exact S0 preview link, S0 and S0M SHAs, build/manifest identities, known limitations, and a concise HITL route.
+6. Dave tests the actual S0 NVIDIA/WebGPU build across the representative matrix.
+7. Dave explicitly approves `S0`.
+8. Only approval commit `S1`, adding the timestamped `humanAcceptance` object to the S0M manifest, may follow.
+9. Prove S0 ancestry and byte-identical runtime/release-shell trees across S0/S0M/S1; any drift invalidates approval and returns to preview.
+10. Require all five checks green on S1.
 
 ### Wave 11 — protected promotion
 
@@ -603,10 +613,20 @@ Exit at source `S0`: all four mechanical hosted checks and every Pass 65 functio
 - Require all five checks again on exact main.
 - Dispatch only the protected production workflow for `PASS 65` and exact main SHA.
 - Record one release-lineage receipt spanning S0 approved source/artifact/tree digests, S1 approval SHA, S2 merge SHA, parity, check runs, production run, Pages SHA and deployed subtree identity.
-- Independently verify source SHA, controlled production-build differences or exact-artifact promotion, workflow run, Pages SHA, receipt, chooser, Pass 65 live, Pass 64 stable, Pass 62 benchmark policy, aliases, room links, public runtime behaviour, and logs.
+- Independently verify source SHA, controlled production-build differences or exact-artifact promotion, workflow run, Pages SHA, receipt, chooser, Pass 65 Live `The Big One`, Pass 64 Stable `WebGPU Migration`, Pass 62 benchmark policy, aliases, room links, public runtime behaviour, and logs.
 - Stop after the first exact successful receipt and live smoke; never redeploy blindly.
 
 ## 7. Feature implementation contracts
+
+### 7.0 Main-menu helicopter, cockpit, cat POV, and chopper motion
+
+The menu helicopter must feel piloted rather than attached to a perfect turntable. Each map owns an authored safe spline and camera/look-at track. A seeded schedule occasionally selects small coupled changes in pitch, yaw, bank, turn bias, speed and altitude; critically damped interpolation and bounded angular/linear acceleration make those changes read as aircraft correction rather than noise. Normal menu sessions may use different recorded seeds, while review mode uses fixed seeds. There is no per-frame ambient randomness, sudden direction reversal, terrain/building penetration, camera clipping or horizon snap. Reduced motion keeps a deliberate near-static showcase.
+
+The cockpit is a release asset, not scenery hidden behind the camera: sleek canopy/frame proportions, readable pilot-space silhouette, restrained instruments, coherent glass/interior/exterior materials, LODs, shadows and provenance are reviewed in fly-by and close cockpit-adjacent frames.
+
+The Gun Range cat gets a composed miniature story beat. Its body path pauses at purposeful map details; the head/look track notices them with bounded expressive movement; acceleration and angular velocity stay comfortable; paws/body/camera never clip; and the loop closes without a visible pop. The reduced-motion state retains the cat and map identity instead of replacing the moment with a blank frame.
+
+The killstreak chopper uses the same visual principle under stricter authority: activation identity seeds host fixed-step micro-variation around the validated tactical route, clients interpolate replicated pose, and no local random source can change flight, collision, targeting, LOS, fire admission, lifetime or cover calibration. Multi-seed tests must prove variety inside the frozen navigation and pressure envelope.
 
 ### 7.1 Modern damage-direction feedback
 
@@ -1140,18 +1160,19 @@ No test threshold changes are hidden inside feature commits. Budget changes requ
 The exhaustive mechanics, every-weapon/action, every-arena multiplayer, chaos, accessibility and performance matrices are precomputed evidence, not a demand that Dave manually rerun hundreds of cases. Dave's blocking owner/taste route should be short enough to execute while still catching false completion; `PASS65_OWNER_HITL_CHECKLIST.md` separates the concise owner route from evidence-review appendices:
 
 1. Confirm exact preview SHA/build ID and actual WebGPU NVIDIA adapter.
-2. Open settings; verify High default/effective settings and Max; change representative graphics/audio/accessibility controls and reload.
-3. Review one curated kit and all custom presets; rename, choose primary/secondary/grenade, deploy, respawn, and rematch.
-4. Fire every new weapon in Gun Range; inspect hip/ADS/idle/fire/reload/switch/knife; test recoil, falloff, wallbang, movement penalty/spin-up, flashlight, crossbow timing, DMR smoke/wall rule, shotguns.
-5. Test damage directions, low-health feedback, breathing, reduced sensory modes.
-6. Test local/remote/bot footsteps and arena ambience.
-7. Test frag, smoke, and flash in solo and two-peer play.
-8. Test shed door, obstruction, bullet apertures, explosion fracture, debris nudge, and shooting through a visible hole.
-9. Select/earn or use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm, and Piloted Drone.
-10. Cycle all maps in High and representative Max stress.
-11. Run a private two-peer lifecycle: join, play, respawn, reconnect, rematch.
-12. Review known issues, performance summary, visual contact sheets, and exact frozen stable route.
-13. Approve or reject the exact SHA explicitly.
+2. Watch every map-preview loop; judge smooth varied helicopter motion, the sleek cockpit, Gun Range cat POV choreography and reduced-motion compositions.
+3. Open settings; verify High default/effective settings and Max; change representative graphics/audio/accessibility controls and reload.
+4. Review one curated kit and all custom presets; rename, choose primary/secondary/grenade, deploy, respawn, and rematch.
+5. Fire every new weapon in Gun Range; inspect hip/ADS/idle/fire/reload/switch/knife; test recoil, falloff, wallbang, movement penalty/spin-up, flashlight, crossbow timing, DMR smoke/wall rule, shotguns.
+6. Test damage directions, low-health feedback, breathing, reduced sensory modes.
+7. Test local/remote/bot footsteps and arena ambience.
+8. Test frag, smoke, and flash in solo and two-peer play.
+9. Test shed door, obstruction, bullet apertures, explosion fracture, debris nudge, and shooting through a visible hole.
+10. Select/earn or use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm, and Piloted Drone; inspect multiple host-seeded chopper motion variants.
+11. Cycle all maps in High and representative Max stress.
+12. Run a private two-peer lifecycle: join, play, respawn, reconnect, rematch.
+13. Review known issues, performance summary, visual contact sheets, exact frozen stable route, and final `The Big One` Live / `WebGPU Migration` Stable labels.
+14. Approve or reject the exact SHA explicitly.
 
 ## 16. Definition of done
 
@@ -1163,6 +1184,7 @@ Pass 65 is complete only when:
 - Every new weapon/grenade/streak has complete mechanics, art, animation, audio, effects, authority, provenance, and tests.
 - Custom loadouts, graphics, audio, accessibility, and five-slot streak selection are persisted and usable.
 - Damage, health, footsteps, ambience, arms, hands, weapons, knife, and effects meet deterministic visual/audio review.
+- Menu helicopter/cockpit and Gun Range cat POV choreography meet the fixed/multi-seed, comfort, reduced-motion, asset and owner-pleasure gates; killstreak chopper variance stays host-authoritative.
 - Smoke/flash/DMR/crossbow semantics are correct.
 - The shed vertical slice and outdoor deployments meet visual, authority, physics, network, performance, and disposal gates.
 - All killstreak entities meet counts, health, ammo, duration, control, LOS, cover, and exactly-once contracts.
@@ -1171,6 +1193,6 @@ Pass 65 is complete only when:
 - All required CI and Pass 65 suites pass without weakened thresholds.
 - The immutable preview is approved by Dave at the exact SHA.
 - The protected production workflow publishes the exact approved runtime/release-shell lineage, with controlled build differences recorded unless the stored preview artifact is promoted byte-for-byte.
-- Public chooser/live/stable/aliases and receipts independently agree.
+- Public chooser/live/stable/aliases and receipts independently agree, with Pass 65 Live named `The Big One` and Pass 64 Stable named `WebGPU Migration`.
 
 Until those are true, the correct status is “Pass 65 in progress,” not “done enough.”

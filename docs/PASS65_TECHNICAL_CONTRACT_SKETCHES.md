@@ -19,13 +19,17 @@ type DecisionId =
   | 'DEC-11' | 'DEC-12' | 'DEC-13' | 'DEC-14' | 'DEC-15';
 
 type DecisionReceipt<TValue> = Readonly<{
+  receiptVersion: 1;
   id: DecisionId;
   status: 'OPEN' | 'FROZEN' | 'SUPERSEDED';
+  proposedDefault: TValue;
   value: TValue | null;
   rationale: string;
   owner: string;
-  frozenAt: string | null;
-  supersedes: DecisionId | null;
+  recordedAt: string;
+  resolvedAt: string | null;
+  freezeNoLaterThan: string;
+  supersedesReceiptSha256: string | null;
 }>;
 
 type AuthorityStamp = Readonly<{
@@ -42,7 +46,67 @@ Invariants:
 - Revisions increase monotonically inside their epoch/entity.
 - Action sequences are per actor/life/action domain and reject duplicates/replay.
 - Catalog/definition IDs are allowlisted and length-capped. Dynamic host-created entity/activation IDs instead use strict type-specific prefixes, character patterns, maximum lengths, epoch ownership and uniqueness checks. Never accept arbitrary free text as either identity class.
-- A downstream `P04[DEC-x=FROZEN]` dependency is satisfied only by a validated `FROZEN` decision receipt with non-null value, rationale, owner and timestamp; a documented default or `OPEN` receipt is not authority.
+- `docs/PASS65_DECISION_RECEIPTS.json` is the canonical registry and `docs/PASS65_DECISION_RECEIPTS.schema.json` is its schema. P0 contains exactly one complete `OPEN` receipt for each DEC-01…DEC-15; every authoritative value and resolution timestamp is null.
+- A downstream `P04[DEC-x=FROZEN]` dependency is satisfied only by a schema-valid `FROZEN` decision receipt with non-null value, rationale, owner and resolution timestamp; a proposed default or `OPEN` receipt is not authority.
+
+## 1A. Preview and chopper motion choreography
+
+```ts
+type MotionVarianceEnvelope = Readonly<{
+  seed: number;
+  minimumHoldSeconds: number;
+  maximumHoldSeconds: number;
+  blendSeconds: number;
+  maximumPitchDegrees: number;
+  maximumYawOffsetDegrees: number;
+  maximumBankDegrees: number;
+  maximumAltitudeOffsetM: number;
+  maximumSpeedScaleDelta: number;
+  maximumAngularAcceleration: number;
+}>;
+
+type MenuHelicopterPreviewDefinition = Readonly<{
+  arenaId: CatalogId;
+  splineId: CatalogId;
+  safeFlightVolumeId: CatalogId;
+  cameraLookAtTrackId: CatalogId;
+  cockpitAssetId: CatalogId;
+  variance: MotionVarianceEnvelope;
+  deterministicCaptureSeed: number;
+  reducedMotionPoseId: CatalogId;
+}>;
+
+type CatPreviewDefinition = Readonly<{
+  arenaId: 'gun-range';
+  bodyPathId: CatalogId;
+  headLookTrackId: CatalogId;
+  pointsOfInterest: readonly CatalogId[];
+  loopBlendSeconds: number;
+  maximumLinearAcceleration: number;
+  maximumAngularVelocity: number;
+  deterministicCaptureSeed: number;
+  reducedMotionPoseId: CatalogId;
+}>;
+
+type ChopperMotionVarianceDefinition = Readonly<{
+  id: CatalogId;
+  envelope: Omit<MotionVarianceEnvelope, 'seed'>;
+  hostFixedStepHz: number;
+  replicationHz: number;
+  interpolationDelayMs: number;
+}>;
+
+const pass65ChannelNames = Object.freeze({
+  live: 'The Big One',
+  stable: 'WebGPU Migration',
+});
+```
+
+Menu motion is presentation-only: a seeded PRNG selects occasional targets and a band-limited/critically damped interpolator reaches them without per-frame `Math.random()`, discontinuities or flight-volume escape. Normal sessions may derive a fresh non-secret seed for variety; deterministic capture always supplies the recorded seed. Pitch, yaw, bank, speed and altitude remain coupled like aircraft motion rather than independent noise. Reduced motion keeps a strong static/near-static composition.
+
+The cockpit is an authored asset contract with canopy/frame/instrument silhouette, coherent glass and interior/exterior material response, LODs, source/licence digest and review cameras; it cannot be a hollow primitive shell hidden at most angles. Cat choreography owns separate body and look-at tracks, deliberate points of interest, comfortable acceleration/angular bounds, clean loop closure and an expressive reduced-motion pose.
+
+Killstreak variation is shared authority. The host derives the variance seed from activation identity, advances it at fixed step, constrains the resulting pose through arena flight/no-fly/collision data, and replicates bounded state for client interpolation. Client-local randomness cannot affect chopper pose, targeting, LOS, fire admission or expiry. Seed variation must change visual cadence without changing the frozen survival/pressure calibration outside tolerance.
 
 ## 2. Weapon catalog
 
@@ -763,10 +827,14 @@ Footstep actor state is keyed by actor + life + continuity. It tracks accepted g
 ## 16. Evidence index
 
 ```ts
+type AcceptanceManifestEvidenceKind = 'unit' | 'contract' | 'browser' | 'trace' | 'visual' | 'manual';
+type EvidenceClass = 'unit' | 'property' | 'browser' | 'visual' | 'hardware' | 'network' | 'receipt' | 'provenance' | 'manual';
+
 type AcceptanceEvidence = Readonly<{
   requirementId: string;
   falsifierId: string;
-  kind: 'unit' | 'property' | 'browser' | 'visual' | 'hardware' | 'network' | 'receipt' | 'provenance';
+  evidenceClass: EvidenceClass;
+  manifestKind: AcceptanceManifestEvidenceKind;
   sourceSha: string;
   buildId: string | null;
   command: string | null;
@@ -787,6 +855,8 @@ type AcceptanceEvidence = Readonly<{
 
 type ReleaseLineageReceipt = Readonly<{
   approvedPreviewShaS0: string;
+  preApprovalManifestShaS0M: string;
+  preApprovalManifestSha256: string;
   approvedArtifactId: string;
   approvedArtifactSha256: string;
   runtimeTreeSha256S0: string;
@@ -805,4 +875,12 @@ type ReleaseLineageReceipt = Readonly<{
 }>;
 ```
 
-Evidence is valid only when its immutable digest and verifier/environment identity actively exercise the stated falsifier. S0 hardware/visual evidence remains valid through S1/S2 only when ancestry plus runtime/release-shell tree parity is proven in the lineage receipt. A rebuilt production bundle must record controlled build-ID/timestamp differences unless the exact stored preview artifact is promoted byte-for-byte. “Implemented” is never automatically “verified.”
+Executable acceptance translation is fixed:
+
+1. Parse requirement rows from `PASS65_REQUIREMENTS_MATRIX.md` in file/table order. For zero-based row `i`, emit manifest ID `R${i + 1}` while copying the stable planning ID (for example `R001` or `R610`) into `planningRequirementId` and the summary prefix. Exactly 99 rows must map to `R1..R99` with no gaps, duplicates or order drift.
+2. A Pass 65 wrapper verifier checks that mapping before the generic `acceptance-gate.mjs` runs; the generic gate remains authoritative for schema v1 and release policy.
+3. Only policy kinds `unit`, `contract`, `browser`, `trace`, `visual`, and `manual` enter the manifest. Internal property evidence maps to `unit`; receipt/provenance checks map to `contract`; served multiplayer/network evidence maps to `browser`; local deterministic network traces map to `trace`; hardware receipts map through a local `contract` verifier plus `visual` artifacts; owner observations map to `manual`. Local kinds name an existing repository path and exact command.
+4. Exact runtime/release-shell source `S0` produces `pr-preview-<pr>-<S0>`. Q10 then creates manifest-only descendant `S0M` with schema-required `status="accepted"`, all `R1..R99` evidence complete, S0 preview identity, and no `humanAcceptance`. The generic gate must report exactly one error: missing Dave approval.
+5. After Dave approves exact S0, S1 changes only the timestamped `humanAcceptance` object. S0/S0M/S1 runtime and release-shell tree digests must be identical.
+
+Evidence is valid only when its immutable digest and verifier/environment identity actively exercise the stated falsifier. S0 hardware/visual evidence remains valid through S0M/S1/S2 only when ancestry plus runtime/release-shell tree parity is proven in the lineage receipt. A rebuilt production bundle must record controlled build-ID/timestamp differences unless the exact stored preview artifact is promoted byte-for-byte. “Implemented” is never automatically “verified.”

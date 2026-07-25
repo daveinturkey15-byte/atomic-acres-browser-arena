@@ -1,6 +1,6 @@
 # Pass 65 Estimation and Critical-Path Model
 
-This is an engineering estimate, not a deadline or a promise. It exists to make the 120-task runbook auditable and to expose the strongest counterargument to an overnight release: even perfect four-way parallelism cannot erase the serial architecture, integration, evidence, owner-review and release gates.
+This is an engineering estimate, not a deadline or a promise. It exists to make the 122-task runbook auditable and to expose the strongest counterargument to an overnight release: even perfect four-way parallelism cannot erase the serial architecture, integration, evidence, owner-review and release gates.
 
 ## 1. Estimation rules
 
@@ -112,11 +112,13 @@ This is an engineering estimate, not a deadline or a promise. It exists to make 
 | K09 | 12 | 24 | drone swarm | L | AI/performance |
 | K10 | 10 | 20 | piloted possession | L | control/network |
 | K11 | 6 | 12 | wall sensor | L | WebGPU/security |
+| K13 | 6 | 12 | host-seeded chopper motion variance | M | multiplayer/visual review |
 | K12 | 12 | 24 | support red team | L | hardware/chaos |
 | M01 | 6 | 12 | surface integration | M | viewport review |
 | M02 | 8 | 16 | arena cleanup | L | visual review |
 | M03 | 10 | 20 | arena systems integration | L | per-arena review |
 | M04 | 12 | 24 | renderer integration | L | hardware review |
+| M05 | 12 | 24 | menu helicopter/cockpit/cat choreography | L | asset/visual review |
 | RL01 | 5 | 10 | Pass 65 release shell | M | CI/browser |
 | Q01 | 8 | 16 | serial integration receipts | M | cumulative CI |
 | PV01 | 3 | 6 | exact S0 freeze and immutable preview | H | CI/artifact |
@@ -143,10 +145,10 @@ The task table is the source of truth; totals must be recomputed automatically a
 
 Planning expectation from this snapshot:
 
-- Base active effort is 795 agent-hours P50 and 1,588 agent-hours P90 before the program-level cross-lane reserve.
-- With the 15%/20% cross-lane reserve, plan around 914 agent-hours P50 and 1,906 agent-hours P90.
-- Four-slot perfect-parallel lower bounds are therefore roughly 229 and 477 wall-hours. They are physically unattainable because the integrator, B1.0 lifecycle/authority gate, schema chain, vertical slices, S0 evidence, owner HITL, S1/S2 gates and production are serial.
-- A first auditable critical-path conjecture is approximately 295–550 elapsed hours of active continuous operation, plus external GitHub/Pages/owner waits. This must be recalculated from actual task telemetry at B1.
+- Base active effort is 813 agent-hours P50 and 1,624 agent-hours P90 before the program-level cross-lane reserve.
+- With the 15%/20% cross-lane reserve, plan around 935 agent-hours P50 and 1,949 agent-hours P90.
+- Four-slot perfect-parallel lower bounds are therefore roughly 234 and 488 wall-hours. They are physically unattainable because the integrator, B1.0 lifecycle/authority gate, schema chain, vertical slices, preview-choreography/cockpit forge, S0 evidence, owner HITL, S1/S2 gates and production are serial.
+- A first auditable critical-path conjecture is approximately 307–575 elapsed hours of active continuous operation, plus external GitHub/Pages/owner waits. This must be recalculated from actual task telemetry at B1.
 
 These numbers replace the earlier unaudited 40–70 hour conjecture. A substantially earlier preview can only be a clearly labelled subset candidate; it cannot be represented as complete Pass 65.
 

@@ -13,7 +13,8 @@ The release integrator fills this before handing over the candidate:
 | Preview URL | Exact URL, including build identity rather than a moving alias |
 | Built at | UTC timestamp |
 | Pull request | PR number and head/base lineage |
-| Acceptance matrix | Digest of `acceptance/pass-65.json` |
+| Pre-approval manifest head | Full process-only `S0M` SHA descended from S0 |
+| Acceptance matrix | Digest of `acceptance/pass-65.json`; sequential `R1..R99` mapping and evidence policy pass, `status="accepted"` is present because schema v1 requires it, and `humanAcceptance` is absent so the generic gate has exactly one expected error |
 | Runtime tree | File count and SHA-256 tree digest |
 | Asset manifest | Digest plus licence/provenance report |
 | Required CI | Exact run ID and five required-job results |
@@ -23,7 +24,7 @@ The release integrator fills this before handing over the candidate:
 | Stable fallback | Frozen Pass 64 subtree/tree digest and route |
 | Best-netcode benchmark | Unchanged Pass 62 record/digest |
 
-Fail closed if any identity is missing, abbreviated ambiguously, moving, mutable, or inconsistent.
+Fail closed if any identity is missing, abbreviated ambiguously, moving, mutable, or inconsistent; also fail if S0M changes runtime/release-shell bytes or its acceptance output has any error other than missing Dave approval.
 
 ## 2. Review setup
 
@@ -41,23 +42,32 @@ Fail closed if any identity is missing, abbreviated ambiguously, moving, mutable
 Use diagnostic grants and deterministic setup so this stays practical:
 
 1. Confirm the full S0 SHA/build ID, real RTX 5080 WebGPU backend and clean browser/GPU logs.
-2. Inspect High default and Max; change representative graphics, audio and sensory controls and reload.
-3. Rename/use one custom preset, choose weapon/secondary/grenade, deploy, respawn and rematch.
-4. In Gun Range, sample every new weapon and the reworked knife; focus on feel, identity, hands, clipping, passive motion, fire/reload, sound and effects.
-5. Test damage directions, critical-health visuals/breathing and reduced-sensory behaviour.
-6. Hear local/remote/bot footsteps and two contrasting arena ambience profiles.
-7. Test smoke, flash, DMR smoke/wall rule and the explosive bolt with a second peer.
-8. Test one intact-to-damaged shed sequence: F door, obstruction, visible aperture shoot-through, explosion detach, non-flat nudge and flat/sleeping bullet wake.
-9. Use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm and Piloted Drone.
-10. Visit every map on High and one combined Max stress scene.
-11. Complete one representative two-peer join/play/death/respawn/reconnect/rematch lifecycle.
-12. Review the precomputed evidence summary, known issues, Pass 64 rollback rehearsal and final release-lineage plan; then approve, reject or defer the full S0 SHA.
+2. Watch every menu preview: judge the helicopter's smooth varied path and sleek cockpit, then the Gun Range cat's composed joyful POV loop and reduced-motion pose.
+3. Inspect High default and Max; change representative graphics, audio and sensory controls and reload.
+4. Rename/use one custom preset, choose weapon/secondary/grenade, deploy, respawn and rematch.
+5. In Gun Range, sample every new weapon and the reworked knife; focus on feel, identity, hands, clipping, passive motion, fire/reload, sound and effects.
+6. Test damage directions, critical-health visuals/breathing and reduced-sensory behaviour.
+7. Hear local/remote/bot footsteps and two contrasting arena ambience profiles.
+8. Test smoke, flash, DMR smoke/wall rule and the explosive bolt with a second peer.
+9. Test one intact-to-damaged shed sequence: F door, obstruction, visible aperture shoot-through, explosion detach, non-flat nudge and flat/sleeping bullet wake.
+10. Use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm and Piloted Drone; specifically judge whether chopper motion feels subtly alive without twitching or gameplay drift.
+11. Visit every map on High and one combined Max stress scene.
+12. Complete one representative two-peer join/play/death/respawn/reconnect/rematch lifecycle.
+13. Review the precomputed evidence summary, known issues, Pass 64 rollback rehearsal, final `The Big One` Live / `WebGPU Migration` Stable labels and release-lineage plan; then approve, reject or defer the full S0 SHA.
 
 ## 2B. Precomputed evidence review and optional spot checks
 
 Sections 3–12 are owned by the integrator and independent QA lanes. They must already be green and digest-bound at S0. Dave can inspect or repeat any case, but is not expected to manually reproduce the complete combinatorial matrix during the morning taste review.
 
 ## 3. Main menu and configuration
+
+### Preview choreography
+
+- Watch at least two complete loops for each map. The helicopter varies pitch, yaw, bank, turn bias, speed and height occasionally and smoothly; it never reads as a perfect orbit, a jitter source or a collision risk.
+- Compare two normal-session seeds and the fixed review seed. The feeling changes, while recorded review remains reproducible and all paths stay within the authored safe volume.
+- Inspect exterior fly-by and cockpit-adjacent moments. The canopy, frame, restrained instruments, interior/exterior materials, LODs and silhouette read as sleek and intentional rather than a hollow/blocky shell.
+- Watch the Gun Range cat body/head/look-at path through a full loop. It notices purposeful details, moves comfortably, never clips, closes the loop cleanly and remains a joy to watch rather than idle camera drift.
+- Enable reduced motion. Each preview keeps a strong, informative composition without rapid travel or disappearing content.
 
 ### Graphics
 
@@ -189,6 +199,7 @@ Reject a visual-only hole, invisible shoot-through, render-only door, client-aut
 - Piloted Drone restores player control on exit, destruction, death, disconnect and 30-second fuel expiry.
 - Piloted Drone altitude controls use Space/Crouch, wall vision matches the approved railgun-like rule, HP is 50 and ammunition is exactly two 20-round magazines.
 - Swarm and piloted variants use the identical immutable DroneGunProfileId; only reserve, lifetime and control mode differ.
+- Across several seeded activations, chopper pitch/yaw/bank/direction/height variance is subtle and smooth; peers see the same path and targeting, LOS, cover, collision and 30-second lifetime remain unchanged.
 - Verify pilot-body vulnerability policy, score attribution, spawn protection, rematch cleanup and late-join behaviour.
 - Stress overlapping aircraft/drones/explosions/audio; entity, projectile, particle, shadow, audio and network caps remain bounded.
 
@@ -222,4 +233,4 @@ Choose one outcome and record it against the full candidate SHA:
 
 Approval wording should explicitly name the full candidate SHA. Any later change to runtime, release shell, assets, gameplay data, settings, network schema or public topology invalidates the approval and requires a new immutable preview.
 
-After approval, the integrator must still run the post-approval acceptance commit gates, exact-merge gates, protected production workflow, Pages/receipt reconciliation and public live/stable/alias browser checks. Owner approval authorizes promotion of the named S0 source and runtime/release-shell trees; rebuilt production output must record controlled differences unless the exact stored artifact is promoted. Approval is not evidence that production succeeded.
+After approval, the integrator must still run the post-approval acceptance commit gates, exact-merge gates, protected production workflow, Pages/receipt reconciliation and public live/stable/alias browser checks. Those public checks must show Pass 65 Live as `The Big One` and Pass 64 Stable as `WebGPU Migration`. Owner approval authorizes promotion of the named S0 source and runtime/release-shell trees; rebuilt production output must record controlled differences unless the exact stored artifact is promoted. Approval is not evidence that production succeeded.
