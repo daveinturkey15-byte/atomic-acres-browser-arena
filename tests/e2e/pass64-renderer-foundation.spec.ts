@@ -1,28 +1,24 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
-test('fails required hardware WebGPU closed on the CI adapter without loading the legacy game chunk', async ({ page }) => {
-  const scripts: string[] = [];
-  page.on('request', (request) => {
-    if (request.resourceType() === 'script') scripts.push(request.url());
-  });
+test('fails the default playable WebGPU route closed on the CI adapter without mounting gameplay', async ({ page }) => {
   const pageError = page.waitForEvent('pageerror');
-  await page.goto('/?renderer=webgpu&requireWebGPU=1&render=blender');
+  await page.goto('/?render=blender');
   const error = await pageError;
   expect(error.message).toMatch(/WebGPU|TSL/);
   const state = await page.evaluate(() => ({
     backend: document.documentElement.dataset.renderBackend,
     debugApi: '__ATOMIC_ACRES_DEBUG__' in window,
-    blocked: document.querySelector('#webgpu-review-blocked')?.textContent,
+    blocked: document.querySelector('#webgpu-gameplay-blocked')?.textContent,
   }));
   expect(state).toMatchObject({ backend: 'blocked', debugApi: false });
-  expect(state.blocked).toContain('REVIEW BLOCKED');
-  expect(scripts.some((url) => /legacy-main|rapier/i.test(url))).toBe(false);
+  expect(state.blocked).toContain('GAMEPLAY RENDERER BLOCKED');
+  expect(state.backend).not.toBe('webgl2');
 });
 
 test('reports the active WebGL adapter and offscreen HDR samples separately', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto('/?render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.weaponReady === true && state?.render?.atomicSignal?.samples > 0;
@@ -47,7 +43,7 @@ test('reports the active WebGL adapter and offscreen HDR samples separately', as
 
 test('renders Terminal cabin ceiling with only shadowed contrast keys and an open boarding route', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto('/?render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
+  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
   await page.waitForFunction(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
     return api?.snapshot().weaponReady === true;

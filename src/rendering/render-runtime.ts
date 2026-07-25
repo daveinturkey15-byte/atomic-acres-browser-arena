@@ -28,10 +28,12 @@ export type RenderRuntimeTelemetry = Readonly<{
 
 export function resolveRenderRuntimeRequest(search: string): RenderRuntimeRequest {
   const query = new URLSearchParams(search);
-  const requestedBackend = query.get('renderer') === 'webgpu' ? 'webgpu' : 'webgl2';
+  const requestedBackend = query.get('renderer') === 'webgl2' ? 'webgl2' : 'webgpu';
   return {
     requestedBackend,
-    requireWebGPU: requestedBackend === 'webgpu' && query.get('requireWebGPU') === '1',
+    // WebGPU is a renderer contract, not a feature-detection hint. Silent
+    // WebGL fallback would make the HITL evidence and rollback boundary false.
+    requireWebGPU: requestedBackend === 'webgpu',
   };
 }
 

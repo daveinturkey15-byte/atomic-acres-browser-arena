@@ -1,30 +1,30 @@
 import * as THREE from 'three';
 import {
   DoubleSide,
-  MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   PointsNodeMaterial,
-  SpriteNodeMaterial,
   type RenderPipeline,
 } from 'three/webgpu';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import {
+  abs,
   color,
   dot,
   float,
   fract,
   instanceIndex,
-  length,
   mix,
+  max,
   pass,
   positionLocal,
   positionWorld,
   screenUV,
+  screenSize,
   sin,
   smoothstep,
   time,
   uniform,
-  uv,
   vec2,
   vec3,
   vec4,
@@ -42,7 +42,12 @@ export type RuntimeTslTraversal = Readonly<{
 export type Pass64TslSceneSystems = Readonly<{
   root: THREE.Group;
   principalHdrTarget: THREE.RenderTarget;
+  bloomSamples: 0;
+  depthAwareBloom: true;
+  bloomGraphId: 'pass64.full-scene-depth-tested-bloom.v1';
+  bloomOcclusionSource: 'authoritative-scene-depth';
   compiledPipelineIds: readonly string[];
+  applyDefinition(definition: ArenaVisualDefinition): void;
   dispose(): void;
 }>;
 
@@ -113,35 +118,52 @@ function makeSky(): THREE.Object3D {
 function makeMist(definition: ArenaVisualDefinition): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Pass 64 TSL mist';
-  const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
+  const material = new PointsNodeMaterial({ transparent: true, depthWrite: false, size: 0.34, sizeAttenuation: true });
   const drift = sin(positionWorld.x.mul(0.075).add(time.mul(0.055))).mul(0.5).add(0.5);
+  const mistStrength = uniform(Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09));
   material.colorNode = mix(color(0x7fa5ae), color(0xd0d9cf), drift);
-  material.opacityNode = float(Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09)).mul(drift.mul(0.35).add(0.65));
+  material.opacityNode = mistStrength.mul(drift.mul(0.35).add(0.65));
   tagPipeline(material, PIPELINE.mist);
-  const geometry = new THREE.PlaneGeometry(1, 1, 1, 1);
+  root.userData.opacityUniform = mistStrength;
+  const positions = new Float32Array(48 * 3);
+  for (let index = 0; index < 48; index += 1) {
+    positions[index * 3] = seededUnit(index, 11) - 0.5;
+    positions[index * 3 + 1] = seededUnit(index, 12) * 0.8;
+    positions[index * 3 + 2] = seededUnit(index, 13) - 0.5;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   for (const [x, z, width, depth] of ATMOSPHERE_LAYOUTS[definition.id].mist) {
-    const layer = new THREE.Mesh(geometry, material);
-    layer.position.set(x, 0.16, z);
-    layer.rotation.x = -Math.PI / 2;
-    layer.scale.set(width, depth, 1);
+    const layer = new THREE.Points(geometry, material);
+    layer.position.set(x, 0.08, z);
+    layer.scale.set(width, 0.85, depth);
     root.add(layer);
   }
   return root;
 }
 
-function makeSmoke(arenaId: ArenaVisualDefinition['id']): THREE.Group {
+function makeSmoke(definition: ArenaVisualDefinition): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Pass 64 TSL smoke';
-  const material = new SpriteNodeMaterial({ transparent: true, depthWrite: false });
+  const material = new PointsNodeMaterial({ transparent: true, depthWrite: false, size: 0.46, sizeAttenuation: true });
   const billow = sin(positionWorld.y.mul(0.7).sub(time.mul(0.33))).mul(0.5).add(0.5);
-  const feather = float(1).sub(smoothstep(0.16, 0.52, length(uv().sub(0.5).mul(vec2(1.4, 1)))));
+  const smokeStrength = uniform(0.035 + definition.atmosphere.mist * 0.12);
   material.colorNode = mix(color(0x2f3b3e), color(0x7d8984), billow);
-  material.opacityNode = float(0.085).mul(billow.mul(0.58).add(0.42)).mul(feather);
+  material.opacityNode = smokeStrength.mul(billow.mul(0.58).add(0.42));
   tagPipeline(material, PIPELINE.smoke);
-  for (const [x, z, width, height] of ATMOSPHERE_LAYOUTS[arenaId].smoke) {
-    const puff = new THREE.Sprite(material);
+  root.userData.opacityUniform = smokeStrength;
+  const positions = new Float32Array(36 * 3);
+  for (let index = 0; index < 36; index += 1) {
+    positions[index * 3] = seededUnit(index, 21) - 0.5;
+    positions[index * 3 + 1] = seededUnit(index, 22) - 0.5;
+    positions[index * 3 + 2] = seededUnit(index, 23) - 0.5;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  for (const [x, z, width, height] of ATMOSPHERE_LAYOUTS[definition.id].smoke) {
+    const puff = new THREE.Points(geometry, material);
     puff.position.set(x, height * 0.5 + 0.15, z);
-    puff.scale.set(width, height, 1);
+    puff.scale.set(width, height, width);
     root.add(puff);
   }
   return root;
@@ -152,9 +174,9 @@ function seededUnit(index: number, salt: number): number {
   return value - Math.floor(value);
 }
 
-function makeDust(arenaId: ArenaVisualDefinition['id']): THREE.Points {
-  const layout = ATMOSPHERE_LAYOUTS[arenaId].dust;
-  const count = layout.count;
+function makeDust(definition: ArenaVisualDefinition): THREE.Points {
+  const layout = ATMOSPHERE_LAYOUTS[definition.id].dust;
+  const count = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((entry) => entry.dust.count));
   const positions = new Float32Array(count * 3);
   for (let index = 0; index < count; index += 1) {
     positions[index * 3] = layout.minX + seededUnit(index, 1) * (layout.maxX - layout.minX);
@@ -165,12 +187,70 @@ function makeDust(arenaId: ArenaVisualDefinition['id']): THREE.Points {
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const material = new PointsNodeMaterial({ transparent: true, depthWrite: false, size: 1 });
   const flicker = sin(time.mul(0.7).add(positionWorld.x.mul(0.21))).mul(0.5).add(0.5);
+  const dustStrength = uniform(Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72));
   material.colorNode = mix(color(0xd7b47b), color(0xffebc7), flicker);
-  material.opacityNode = float(0.28).mul(flicker.mul(0.45).add(0.55));
+  material.opacityNode = dustStrength.mul(flicker.mul(0.45).add(0.55));
   tagPipeline(material, PIPELINE.dust);
   const dust = new THREE.Points(geometry, material);
   dust.name = 'Pass 64 TSL deterministic dust';
+  dust.userData.opacityUniform = dustStrength;
+  geometry.setDrawRange(0, layout.count);
   return dust;
+}
+
+function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefinition): void {
+  const layout = ATMOSPHERE_LAYOUTS[definition.id];
+  const mist = root.getObjectByName('Pass 64 TSL mist');
+  const mistUniform = mist?.userData.opacityUniform as { value: number } | undefined;
+  if (mistUniform) mistUniform.value = Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09);
+  mist?.children.forEach((node, index) => {
+    const placement = layout.mist[index];
+    node.visible = placement !== undefined;
+    if (placement) {
+      const [x, z, width, depth] = placement;
+      node.position.set(x, 0.08, z);
+      node.scale.set(width, 0.85, depth);
+    }
+  });
+  const smoke = root.getObjectByName('Pass 64 TSL smoke');
+  const smokeUniform = smoke?.userData.opacityUniform as { value: number } | undefined;
+  if (smokeUniform) smokeUniform.value = 0.035 + definition.atmosphere.mist * 0.12;
+  smoke?.children.forEach((node, index) => {
+    const placement = layout.smoke[index];
+    node.visible = placement !== undefined;
+    if (placement) {
+      const [x, z, width, height] = placement;
+      node.position.set(x, height * 0.5 + 0.15, z);
+      node.scale.set(width, height, width);
+    }
+  });
+  const dust = root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points | undefined;
+  const dustUniform = dust?.userData.opacityUniform as { value: number } | undefined;
+  if (dustUniform) dustUniform.value = Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72);
+  const positions = dust?.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (dust && positions) {
+    for (let index = 0; index < positions.count; index += 1) {
+      positions.setXYZ(
+        index,
+        layout.dust.minX + seededUnit(index, 1) * (layout.dust.maxX - layout.dust.minX),
+        0.4 + seededUnit(index, 2) * 16,
+        layout.dust.minZ + seededUnit(index, 3) * (layout.dust.maxZ - layout.dust.minZ),
+      );
+    }
+    positions.needsUpdate = true;
+    dust.geometry.setDrawRange(0, layout.dust.count);
+  }
+  const grass = root.getObjectByName('Pass 64 TSL grass');
+  if (grass) grass.visible = definition.id === 'atomic-acres';
+  const water = root.getObjectByName('Pass 64 TSL perimeter water');
+  if (water) water.visible = definition.id === 'rustworks-1v1';
+  const sky = root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh | undefined;
+  if (sky) {
+    sky.turbidity.value = definition.atmosphere.clouds ? 4.2 : 1.2;
+    sky.rayleigh.value = definition.atmosphere.clouds ? 1.75 : 0.85;
+  }
+  root.userData.tslArenaVisualDefinitionId = definition.id;
+  root.userData.tslAtmosphere = { ...definition.atmosphere };
 }
 
 function makeGrass(arenaId: ArenaVisualDefinition['id']): THREE.InstancedMesh {
@@ -200,24 +280,25 @@ function makeGrass(arenaId: ArenaVisualDefinition['id']): THREE.InstancedMesh {
   grass.castShadow = false;
   grass.receiveShadow = true;
   grass.frustumCulled = false;
-  if (arenaId !== 'atomic-acres') grass.position.y = -400;
+  grass.visible = arenaId === 'atomic-acres';
   return grass;
 }
 
 function makeWater(arenaId: ArenaVisualDefinition['id']): THREE.Mesh {
   const geometry = new THREE.PlaneGeometry(960, 960, 96, 96);
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, -19.5, 0);
   const material = new MeshStandardNodeMaterial({ transparent: true, opacity: 0.82, roughness: 0.27, metalness: 0.08, side: DoubleSide });
   const wave = sin(positionLocal.x.mul(0.12).add(time.mul(0.8)))
-    .add(sin(positionLocal.y.mul(0.16).sub(time.mul(0.53))))
+    .add(sin(positionLocal.z.mul(0.16).sub(time.mul(0.53))))
     .mul(0.1);
-  material.positionNode = positionLocal.add(vec3(0, 0, wave));
+  material.positionNode = positionLocal.add(vec3(0, wave, 0));
   const shimmer = sin(positionWorld.x.add(positionWorld.z).mul(0.09).add(time.mul(0.45))).mul(0.5).add(0.5);
   material.colorNode = mix(color(0x173e4b), color(0x4b8993), shimmer);
   tagPipeline(material, PIPELINE.water);
   const water = new THREE.Mesh(geometry, material);
   water.name = 'Pass 64 TSL perimeter water';
-  water.position.y = arenaId === 'rustworks-1v1' ? -19.5 : -400;
-  water.rotation.x = -Math.PI / 2;
+  water.visible = arenaId === 'rustworks-1v1';
   water.receiveShadow = true;
   water.renderOrder = -5;
   water.frustumCulled = false;
@@ -229,9 +310,10 @@ function configureHdrPipeline(
   scene: THREE.Scene,
   camera: THREE.Camera,
   definition: ArenaVisualDefinition,
-): ReturnType<typeof pass> {
-  const scenePass = pass(scene, camera);
+): Readonly<{ scenePass: ReturnType<typeof pass>; applyDefinition(next: ArenaVisualDefinition): void }> {
+  const scenePass = pass(scene, camera, { samples: 4 });
   const sceneColor = scenePass.getTextureNode('output');
+  const sceneDepth = scenePass.getTextureNode('depth');
   const saturation = uniform(definition.colorPipeline.grade.saturation);
   const contrast = uniform(definition.colorPipeline.grade.contrast);
   // Definition strength is authored in 8-bit output steps. Convert it before
@@ -243,9 +325,26 @@ function configureHdrPipeline(
   const orderedDither = fract(sin(dot(screenUV.mul(vec2(4096, 2160)), vec2(12.9898, 78.233))).mul(43758.5453))
     .sub(0.5)
     .mul(grain);
-  renderPipeline.outputNode = vec4(contrasted.add(orderedDither), sceneColor.a);
+  const pixel = vec2(1).div(screenSize);
+  const depthRight = sceneDepth.sample(screenUV.add(vec2(pixel.x, 0)));
+  const depthUp = sceneDepth.sample(screenUV.add(vec2(0, pixel.y)));
+  const depthDiscontinuity = max(abs(sceneDepth.sub(depthRight)), abs(sceneDepth.sub(depthUp)));
+  // Suppress the blur at geometry depth discontinuities. This keeps emissive
+  // energy on the visible side of roofs, walls and portal frames rather than
+  // allowing the low-resolution bloom chain to smear across their silhouettes.
+  const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
+  const emissiveBloom = bloom(sceneColor, 0.14, 0.32, 0.92);
+  const hdrWithBloom = contrasted.add(emissiveBloom.rgb.mul(depthEdgeGuard));
+  renderPipeline.outputNode = vec4(hdrWithBloom.add(orderedDither), sceneColor.a);
   renderPipeline.needsUpdate = true;
-  return scenePass;
+  return {
+    scenePass,
+    applyDefinition(next) {
+      saturation.value = next.colorPipeline.grade.saturation;
+      contrast.value = next.colorPipeline.grade.contrast;
+      grain.value = next.colorPipeline.grain.strength / 255;
+    },
+  };
 }
 
 function disposeRoot(root: THREE.Group): void {
@@ -275,18 +374,28 @@ export function createPass64TslSceneSystems(
   root.add(
     makeSky(),
     makeMist(definition),
-    makeSmoke(definition.id),
-    makeDust(definition.id),
+    makeSmoke(definition),
+    makeDust(definition),
     makeGrass(definition.id),
     makeWater(definition.id),
   );
   scene.add(root);
-  const scenePass = configureHdrPipeline(renderPipeline, scene, camera, definition);
+  const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition);
+  const scenePass = hdr.scenePass;
+  applyArenaSystemLayout(root, definition);
   const compiledPipelineIds = Object.freeze(TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId));
   return Object.freeze({
     root,
     principalHdrTarget: scenePass.renderTarget,
+    bloomSamples: 0,
+    depthAwareBloom: true,
+    bloomGraphId: 'pass64.full-scene-depth-tested-bloom.v1',
+    bloomOcclusionSource: 'authoritative-scene-depth',
     compiledPipelineIds,
+    applyDefinition: (nextDefinition) => {
+      applyArenaSystemLayout(root, nextDefinition);
+      hdr.applyDefinition(nextDefinition);
+    },
     dispose: () => {
       disposeRoot(root);
       scenePass.dispose();

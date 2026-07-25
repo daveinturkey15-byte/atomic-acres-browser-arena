@@ -79,7 +79,10 @@ export class WaterSystem {
   private islandHalfZ = 29;
   private night = true;
 
-  constructor(scene: THREE.Scene) {
+  constructor(
+    scene: THREE.Scene,
+    private readonly presentation: 'legacy-glsl' | 'external-tsl' = 'legacy-glsl',
+  ) {
     this.root.name = 'arena-water-system';
     this.root.userData.presentationOnly = true;
     this.root.userData.blocksShots = false;
@@ -100,6 +103,12 @@ export class WaterSystem {
     this.waterLevel = options?.waterLevel ?? (this.enabled ? -19.5 : -0.55);
     this.waveAmp = profile === 'blender' ? 1.55 : 1.15;
     this.segments = profile === 'blender' ? 160 : 96;
+    // WebGPU owns the visible water through Pass64TslSceneSystems. This object
+    // remains the deterministic CPU water/physics authority only.
+    if (this.presentation === 'external-tsl') {
+      this.root.visible = false;
+      return;
+    }
     this.rebuild();
   }
 

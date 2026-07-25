@@ -98,6 +98,31 @@ function fakeRegistry(overrides: Partial<Record<ArenaId, ArenaVisualDefinition>>
 }
 
 describe('Pass 64 arena visual streaming transaction', () => {
+  it('adopts the actual gameplay root and never mounts a duplicate arena', async () => {
+    const scene = new THREE.Scene();
+    const staging = new THREE.Scene();
+    const atomic = new THREE.Group();
+    const terminal = new THREE.Group();
+    const atomicGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const atomicMaterial = new THREE.MeshBasicMaterial();
+    atomic.add(new THREE.Mesh(atomicGeometry, atomicMaterial));
+    staging.add(atomic, terminal);
+    const stream = new ArenaVisualStreamController(scene, fakeRegistry());
+    const first = await stream.adoptGameplayRoot('atomic-acres', atomic);
+    expect(first).toMatchObject({ authority: 'gameplay-root-adopted', activePresentationRoots: 1 });
+    expect(scene.children).toEqual([atomic]);
+    const second = await stream.adoptGameplayRoot('skyline-terminal', terminal);
+    expect(second).toMatchObject({
+      arenaId: 'skyline-terminal',
+      generation: 2,
+      activePresentationRoots: 1,
+      retiredPresentationInventory: { geometries: 1, materials: 1 },
+    });
+    expect(scene.children).toEqual([terminal]);
+    expect(atomic.children).toHaveLength(1);
+    expect(atomic.parent).toBeNull();
+  });
+
   it('keeps exactly one presentation root and idempotently disposes the previous arena', async () => {
     const scene = new THREE.Scene();
     const stream = new ArenaVisualStreamController(scene, fakeRegistry());

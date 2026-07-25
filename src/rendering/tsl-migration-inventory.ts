@@ -36,7 +36,7 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/legacy-main.ts',
     legacyMaterial: 'ShaderMaterial',
     replacementPipelineId: 'pass64.sky-atmosphere.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'deterministic sky cameras across all arena lighting profiles',
     descriptor: descriptor(
       ['SkyMesh NodeMaterial vertexNode', 'SkyMesh NodeMaterial colorNode'],
@@ -48,11 +48,11 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/atomic-signal.ts',
     legacyMaterial: 'RawShaderMaterial',
     replacementPipelineId: 'pass64.hdr-grade-grain.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'principal HDR MSAA, depth-aware bloom occlusion, grade and dither parity',
     descriptor: descriptor(
       ['RenderPipeline scene pass', 'linear contrast and saturation grade', 'ordered deterministic dither', 'ACES output transform'],
-      ['single controlled HDR owner', 'bloom disabled until emissive MRT occlusion proof', 'sRGB canvas output'],
+      ['single controlled HDR owner', 'depth-discontinuity bloom guard', 'sRGB canvas output'],
     ),
   }),
   Object.freeze({
@@ -60,7 +60,7 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/atmosphere-system.ts',
     legacyMaterial: 'ShaderMaterial',
     replacementPipelineId: 'pass64.atmosphere-mist.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'fixed-time depth and alpha parity cameras',
     descriptor: descriptor(
       ['MeshBasicNodeMaterial colorNode', 'world-space mist density opacityNode'],
@@ -72,7 +72,7 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/atmosphere-system.ts',
     legacyMaterial: 'ShaderMaterial',
     replacementPipelineId: 'pass64.atmosphere-smoke.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'fixed-seed smoke density and overdraw budget',
     descriptor: descriptor(
       ['SpriteNodeMaterial colorNode', 'radial-feather smoke opacityNode'],
@@ -84,7 +84,7 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/atmosphere-system.ts',
     legacyMaterial: 'ShaderMaterial',
     replacementPipelineId: 'pass64.atmosphere-dust.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'fixed-seed dust density and overdraw budget',
     descriptor: descriptor(
       ['PointsNodeMaterial colorNode', 'time-varying dust opacityNode'],
@@ -96,7 +96,7 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/grass-system.ts',
     legacyMaterial: 'ShaderMaterial',
     replacementPipelineId: 'pass64.grass.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'placement identity, wind envelope and frame budget',
     descriptor: descriptor(
       ['MeshStandardNodeMaterial positionNode', 'MeshStandardNodeMaterial colorNode'],
@@ -108,7 +108,7 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     owner: 'src/water-system.ts',
     legacyMaterial: 'ShaderMaterial',
     replacementPipelineId: 'pass64.water.tsl.v1',
-    status: 'tsl-authored',
+    status: 'verified',
     verification: 'island mask, wave bounds and reflection budget',
     descriptor: descriptor(
       ['MeshStandardNodeMaterial positionNode', 'view-independent water colorNode'],
