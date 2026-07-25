@@ -796,7 +796,9 @@ test.describe('boot and authored presentation', () => {
     // Pass 60 renders the viewmodel after a depth clear so walls/floors cannot
     // punch holes through the weapon. That intentional overlay pass adds one
     // draw call to the transient combat sample.
-    expect(activeState.render.calls).toBeLessThanOrEqual(182);
+    // Pass 64's six precompiled 2x-damage presentation batches remain resident
+    // here as well, preventing a synchronized first-spawn compile/upload hitch.
+    expect(activeState.render.calls).toBeLessThanOrEqual(188);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
