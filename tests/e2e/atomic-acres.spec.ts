@@ -371,7 +371,9 @@ async function debug(page: Page): Promise<DebugState> {
 }
 
 async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promise<void> {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  const url = new URL(path, 'http://atomic-acres.qa');
+  if (!url.searchParams.has('renderer')) url.searchParams.set('renderer', 'webgl2');
+  await page.goto(`${url.pathname}${url.search}`, { waitUntil: 'domcontentloaded' });
   try {
     await page.waitForFunction(() => {
       const status = document.querySelector<HTMLElement>('#network-status');
