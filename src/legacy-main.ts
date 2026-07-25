@@ -280,6 +280,7 @@ import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-l
 import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from './hosted-bots';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
+import { MATCH_DIAGNOSTICS_ENDPOINT, MatchDiagnosticUploader } from './match-diagnostics-upload';
 import {
   createLastMultiplayerDiagnostic,
   loadLastMultiplayerDiagnostic,
@@ -1376,13 +1377,24 @@ let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
 const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
-const PASS62_DIAGNOSTIC_BUILD_ID = 'atomic-acres-pass62-gameplay-graphics-reconciliation';
-const PASS61_DIAGNOSTIC_SOURCE_ID = 'parent-b1af49b-pass60-live';
+const configuredDiagnosticBuildId = (import.meta.env.VITE_MATCH_BUILD_ID ?? '').trim();
+const PASS64_DIAGNOSTIC_BUILD_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(configuredDiagnosticBuildId)
+  ? configuredDiagnosticBuildId
+  : 'pass64-local-candidate';
+const PASS64_DIAGNOSTIC_SOURCE_ID = 'pass64-automatic-post-match';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 const localArenaSwitchQaDelayMs = localMultiplayerQa
   ? Math.min(1_000, Math.max(0, Number(new URLSearchParams(window.location.search).get('arenaSwitchQaDelayMs')) || 0))
   : 0;
+const matchDiagnosticUploader = new MatchDiagnosticUploader(
+  MATCH_DIAGNOSTICS_ENDPOINT,
+  clientPersistentStorage(),
+  window.fetch.bind(window),
+  navigator.sendBeacon?.bind(navigator),
+);
+void matchDiagnosticUploader.flushPending();
+window.addEventListener('online', () => { void matchDiagnosticUploader.flushPending(); });
 let globalLeaderboardState: 'pending' | 'live' | 'cached' | 'saved' = GLOBAL_LEADERBOARD_ENDPOINT && !localMultiplayerQa ? 'pending' : 'cached';
 const highScoreChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('atomic-acres:high-scores:v2') : null;
 let scoutSweepUntil = 0;
@@ -1663,10 +1675,11 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
   droppedHumanDamageEvents = 0;
   matchDiagnosticsStartedAt = startedAt;
   matchDiagnosticSequence = 0;
+  matchDiagnosticUploader.beginMatch();
   matchDiagnostics = new MatchDiagnostics({
-    buildId: PASS62_DIAGNOSTIC_BUILD_ID,
-    sourceId: PASS61_DIAGNOSTIC_SOURCE_ID,
-    sessionId: `${player.id}:${Date.now()}`,
+    buildId: PASS64_DIAGNOSTIC_BUILD_ID,
+    sourceId: PASS64_DIAGNOSTIC_SOURCE_ID,
+    sessionId: `${player.id}:${Date.now()}:${crypto.randomUUID()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
     arena: selectedArena.id,
     mode: mode === 'solo' ? 'solo' : privateMatchMode,
@@ -8181,7 +8194,18 @@ function updatePhysics(dt: number): void {
   player.velocity.x = integrated.x;
   player.velocity.z = integrated.z;
 
-  if (player.hp < 100 && now - lastDamageAt >= 5_000) player.hp = Math.min(100, player.hp + 18 * dt);
+  if (player.hp < 100 && now - lastDamageAt >= 5_000) {
+    const healthBeforeRegen = player.hp;
+    player.hp = Math.min(100, player.hp + 18 * dt);
+    if (Math.floor(healthBeforeRegen) !== Math.floor(player.hp) || player.hp === 100) {
+      recordMatchDiagnostic('health-regen', 'accepted', {
+        actorId: player.id,
+        actorKind: 'player',
+        healthBefore: healthBeforeRegen,
+        healthAfter: player.hp,
+      });
+    }
+  }
   if (playerGrounded) lastGroundedAt = now;
   const jumpBuffered = now - jumpQueuedAt <= 125;
   const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
@@ -8579,6 +8603,43 @@ function updateMatchState(now: number): void {
         })),
       },
     });
+    if (matchDiagnostics) {
+      const remoteEnvelope = matchDiagnostics.remoteEnvelope({
+        completedAtEpochMs: Date.now(),
+        pass: 'PASS 64',
+        backend: renderRuntime.telemetry().actualBackend === 'webgpu' ? 'webgpu' : 'webgl-compatibility',
+        durationMs: Math.max(0, performance.now() - matchDiagnosticsStartedAt),
+        network: {
+          rttMs: gameMode === 'solo' ? null : localLobbyPingMs,
+          jitterMs: network.role === 'client' ? hostTimeMapping.jitterMs : 0,
+          clockOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
+          interpolationDelayMs: interpolationDelayState.delayMs,
+          receiverSequenceGaps,
+          receiverReordered,
+          droppedDamageEvents: droppedHumanDamageEvents,
+        },
+        participants: participants.map(({ id, report }) => ({
+          id,
+          kind: report.kind,
+          team: report.team ?? 'free-for-all',
+          kills: report.kills,
+          deaths: report.deaths,
+          damageDealt: report.damageDealt,
+          damageTaken: report.damageTaken,
+          finalHealth: report.finalHealth,
+        })),
+        local: {
+          kills: summary.kills,
+          deaths: summary.deaths,
+          shotsFired: roundShotsFired,
+          hitShots: roundHitShots,
+          damageDealt: summary.damageDealt,
+          damageTaken: Math.max(roundDamageTaken, authoritativeLocal?.damageTaken ?? 0),
+          headshots: summary.headshots,
+        },
+      });
+      void matchDiagnosticUploader.completeMatch(remoteEnvelope).catch(() => undefined);
+    }
     const technical = matchDiagnostics?.export();
     if (technical) {
       lastMatchDownloads = {
@@ -9520,6 +9581,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[dat
 }
 
 function resetForMode(): void {
+  matchDiagnosticUploader.abandonActiveMatch();
   interruptReload(true);
   lastPrincipalShotAlignment = null;
   player.kills = 0;
@@ -9728,7 +9790,11 @@ function scheduleStateBroadcast(): void {
   }, delay);
 }
 scheduleStateBroadcast();
+window.addEventListener('pagehide', () => {
+  matchDiagnosticUploader.flushForPageLifecycle();
+});
 window.addEventListener('beforeunload', () => {
+  matchDiagnosticUploader.flushForPageLifecycle();
   network.close();
 });
 
@@ -9766,6 +9832,7 @@ function frame(now: number, scheduleNext = true): void {
     // Adaptive quality still receives the unclamped sample and independently
     // rejects values above its 250 ms control window.
     if (scheduleNext) framePacing.record(Math.min(rawFrameMs, 1_000));
+    if (scheduleNext && gameStarted && matchState.phase === 'active') matchDiagnostics?.recordFrame(rawFrameMs);
     const adaptivePixelRatio = scheduleNext ? adaptiveQuality.record(
       rawFrameMs,
       gameStarted && menu.classList.contains('hidden') && document.visibilityState === 'visible' && !debugRenderPaused,
@@ -9987,6 +10054,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
+    matchDiagnosticsUpload: matchDiagnosticUploader.telemetry(),
     scores: teamScores(),
     arenaSelection: {
       id: selectedArena.id,

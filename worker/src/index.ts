@@ -4,6 +4,12 @@ import {
   isValidSubmittedStreak,
 } from '../../shared/leaderboard-policy';
 import { LEADERBOARD_SEASON } from '../../shared/leaderboard-season';
+import {
+  MATCH_DIAGNOSTIC_MAX_BODY_BYTES,
+  MATCH_DIAGNOSTIC_RETENTION_DAYS,
+  validateMatchDiagnosticEnvelope,
+  type MatchDiagnosticUploadEnvelope,
+} from '../../shared/match-diagnostics-schema';
 
 export interface Env {
   DB: D1Database;
@@ -26,6 +32,7 @@ const MAX_BODY_BYTES = 2_048;
 const RATE_WINDOW_MS = 10 * 60_000;
 const IP_RATE_LIMIT = 90;
 const INSTALL_RATE_LIMIT = 30;
+const DIAGNOSTIC_IP_RATE_LIMIT = 20;
 const NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9 _-]{0,15}$/;
 const INSTALL_PATTERN = /^[a-zA-Z0-9_-]{8,80}$/;
 const BUILD_PATTERN = /^[a-zA-Z0-9._-]{3,40}$/;
@@ -80,6 +87,14 @@ export function validateStreakSubmission(value: unknown): { submission: StreakSu
   return { submission: item as unknown as StreakSubmission, error: null };
 }
 
+export function validateMatchDiagnosticSubmission(value: unknown): {
+  submission: MatchDiagnosticUploadEnvelope | null;
+  error: string | null;
+} {
+  const result = validateMatchDiagnosticEnvelope(value);
+  return { submission: result.envelope, error: result.error };
+}
+
 async function digest(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const hash = await crypto.subtle.digest('SHA-256', bytes);
@@ -97,6 +112,13 @@ export async function admitRateLimit(db: D1Database, key: string, limit: number,
     WHERE count < ?
   `).bind(key, bucket, now, limit).run();
   return result.meta.changes === 1;
+}
+
+export async function deleteExpiredMatchDiagnostics(db: D1Database, now = Date.now()): Promise<void> {
+  await Promise.all([
+    db.prepare('DELETE FROM match_diagnostics WHERE expires_at < ?').bind(now).run(),
+    db.prepare('DELETE FROM rate_limits WHERE updated_at < ?').bind(now - 2 * RATE_WINDOW_MS).run(),
+  ]);
 }
 
 export function leaderboardNameKey(name: string): string {
@@ -198,6 +220,54 @@ async function submitStreak(request: Request, env: Env, origin: string, context:
   }
 }
 
+async function submitMatchDiagnostics(request: Request, env: Env, origin: string, context: ExecutionContext): Promise<Response> {
+  const contentLength = Number(request.headers.get('content-length') ?? 0);
+  if (contentLength > MATCH_DIAGNOSTIC_MAX_BODY_BYTES) return json({ error: 'body too large' }, 413, origin, env);
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('text/plain')) {
+    return json({ error: 'content type must be text/plain' }, 415, origin, env);
+  }
+  const text = await request.text();
+  const bodyBytes = new TextEncoder().encode(text).byteLength;
+  if (bodyBytes > MATCH_DIAGNOSTIC_MAX_BODY_BYTES) return json({ error: 'body too large' }, 413, origin, env);
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { return json({ error: 'invalid JSON' }, 400, origin, env); }
+  const validated = validateMatchDiagnosticSubmission(parsed);
+  if (!validated.submission) return json({ error: validated.error }, 400, origin, env);
+  const submission = validated.submission;
+  const duplicate = await env.DB.prepare(
+    'SELECT receipt_id FROM match_diagnostics WHERE idempotency_key = ?',
+  ).bind(submission.idempotencyKey).first<{ receipt_id: string }>();
+  if (duplicate) return json({ accepted: true, idempotent: true, receiptId: duplicate.receipt_id }, 200, origin, env);
+  const now = Date.now();
+  const connectingIp = request.headers.get('CF-Connecting-IP') ?? 'local';
+  const ipHash = await digest(`${env.RATE_LIMIT_SALT}:diagnostic-ip:${connectingIp}`);
+  if (!await admitRateLimit(env.DB, `diagnostic-ip:${ipHash}`, DIAGNOSTIC_IP_RATE_LIMIT, now)) {
+    return json({ error: 'rate limit exceeded' }, 429, origin, env);
+  }
+  const receiptId = `md_${crypto.randomUUID().replaceAll('-', '')}`;
+  const expiresAt = now + MATCH_DIAGNOSTIC_RETENTION_DAYS * 24 * 60 * 60_000;
+  const result = await env.DB.prepare(`
+    INSERT INTO match_diagnostics (
+      receipt_id, idempotency_key, received_at, expires_at, completed_at_minute,
+      build_id, release_pass, backend, arena, mode, role, payload_bytes, payload_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(idempotency_key) DO NOTHING
+  `).bind(
+    receiptId, submission.idempotencyKey, now, expiresAt, submission.completedAtEpochMinute,
+    submission.buildId, submission.pass, submission.backend, submission.arena, submission.mode,
+    submission.role, bodyBytes, text,
+  ).run();
+  if ((result.meta.changes ?? 0) === 0) {
+    const raced = await env.DB.prepare(
+      'SELECT receipt_id FROM match_diagnostics WHERE idempotency_key = ?',
+    ).bind(submission.idempotencyKey).first<{ receipt_id: string }>();
+    if (!raced) throw new Error('diagnostic idempotency race did not retain a receipt');
+    return json({ accepted: true, idempotent: true, receiptId: raced.receipt_id }, 200, origin, env);
+  }
+  context.waitUntil(deleteExpiredMatchDiagnostics(env.DB, now));
+  return json({ accepted: true, idempotent: false, receiptId, retentionDays: MATCH_DIAGNOSTIC_RETENTION_DAYS }, 201, origin, env);
+}
+
 export default {
   async fetch(request: Request, env: Env, context: ExecutionContext): Promise<Response> {
     const origin = request.headers.get('origin');
@@ -210,10 +280,14 @@ export default {
     try {
       if (request.method === 'GET' && path === '/v1/leaderboard') return await listLeaderboard(request, env, origin);
       if (request.method === 'POST' && path === '/v1/streak') return await submitStreak(request, env, origin, context);
+      if (request.method === 'POST' && path === '/v1/match-diagnostics') return await submitMatchDiagnostics(request, env, origin, context);
       return json({ error: 'not found' }, 404, origin, env);
     } catch (error) {
       console.error('Leaderboard request failed', error instanceof Error ? error.message : String(error));
       return json({ error: 'service unavailable' }, 503, origin, env);
     }
+  },
+  async scheduled(controller: ScheduledController, env: Env, context: ExecutionContext): Promise<void> {
+    context.waitUntil(deleteExpiredMatchDiagnostics(env.DB, controller.scheduledTime));
   },
 } satisfies ExportedHandler<Env>;

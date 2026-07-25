@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import worker, { admitRateLimit, allowedOrigin, leaderboardNameKey, validateStreakSubmission } from './index';
+import worker, {
+  admitRateLimit,
+  allowedOrigin,
+  deleteExpiredMatchDiagnostics,
+  leaderboardNameKey,
+  validateMatchDiagnosticSubmission,
+  validateStreakSubmission,
+} from './index';
 import { LEADERBOARD_SEASON } from '../../shared/leaderboard-season';
 
 const valid = {
@@ -86,6 +93,90 @@ function streakRequest(): Request {
 
 function executionContext(): ExecutionContext {
   return { waitUntil: () => undefined } as unknown as ExecutionContext;
+}
+
+const validDiagnostic = {
+  schemaVersion: 1,
+  idempotencyKey: 'diagnostic:p-0123456789abcdef:host',
+  matchId: 'p-0123456789abcdef',
+  completedAtEpochMinute: 1_800_000,
+  buildId: 'pass64-test-build',
+  pass: 'PASS 64',
+  backend: 'webgpu',
+  arena: 'atomic-acres',
+  mode: 'tdm',
+  role: 'host',
+  durationMs: 90_000,
+  events: [{
+    sequence: 0, atMs: 100, category: 'damage', admission: 'accepted',
+    actor: 'p-1111111111111111', actorKind: 'player', target: 'p-2222222222222222', targetKind: 'player',
+    source: 'firearm', healthBefore: 100, healthAfter: 70, damageRequested: 30, damageApplied: 30, wallbang: false,
+  }],
+  droppedEvents: 0,
+  net: {
+    rttBucketMs: 30, jitterBucketMs: 5, clockOffsetBucketMs: -10, interpolationDelayBucketMs: 70,
+    receiverSequenceGaps: 0, receiverReordered: 0, droppedDamageEvents: 0,
+  },
+  perf: { sampleCount: 5_400, frameP50BucketMs: 16, frameP95BucketMs: 20, frameP99BucketMs: 33, maximumFrameBucketMs: 100 },
+  final: {
+    participantCount: 2,
+    participants: [
+      { participant: 'p-1111111111111111', kind: 'player', team: 0, kills: 10, deaths: 7, damageDealt: 900, damageTaken: 700, finalHealth: 80 },
+      { participant: 'p-2222222222222222', kind: 'player', team: 1, kills: 7, deaths: 10, damageDealt: 700, damageTaken: 900, finalHealth: 0 },
+    ],
+    local: { kills: 10, deaths: 7, shotsFired: 100, hitShots: 40, damageDealt: 900, damageTaken: 700, headshots: 8 },
+    fatalRuntimeErrorCategories: [],
+  },
+};
+
+class DiagnosticDb {
+  readonly counts = new Map<string, number>();
+  readonly receipts = new Map<string, string>();
+  readonly queries: string[] = [];
+  inserts = 0;
+
+  prepare(query: string) {
+    let values: unknown[] = [];
+    const normalized = query.replace(/\s+/g, ' ').trim();
+    const statement = {
+      bind: (...next: unknown[]) => { values = next; return statement; },
+      first: async () => {
+        this.queries.push(normalized);
+        if (normalized.includes('SELECT receipt_id FROM match_diagnostics')) {
+          const receiptId = this.receipts.get(String(values[0]));
+          return receiptId ? { receipt_id: receiptId } : null;
+        }
+        return null;
+      },
+      run: async () => {
+        this.queries.push(normalized);
+        if (normalized.includes('INSERT INTO rate_limits')) {
+          const compound = `${String(values[0])}:${String(values[1])}`;
+          const current = this.counts.get(compound) ?? 0;
+          if (current >= Number(values[3])) return { meta: { changes: 0 } };
+          this.counts.set(compound, current + 1);
+          return { meta: { changes: 1 } };
+        }
+        if (normalized.includes('INSERT INTO match_diagnostics')) {
+          const idempotencyKey = String(values[1]);
+          if (this.receipts.has(idempotencyKey)) return { meta: { changes: 0 } };
+          this.receipts.set(idempotencyKey, String(values[0]));
+          this.inserts += 1;
+          return { meta: { changes: 1 } };
+        }
+        return { meta: { changes: 0 } };
+      },
+    };
+    return statement;
+  }
+}
+
+function diagnosticRequest(value: unknown = validDiagnostic, contentType = 'text/plain;charset=UTF-8'): Request {
+  return new Request('https://leaderboard.example/v1/match-diagnostics', {
+    method: 'POST',
+    headers: { 'Content-Type': contentType, Origin: 'http://127.0.0.1:4173', 'CF-Connecting-IP': '203.0.113.9' },
+    body: JSON.stringify(value),
+  });
 }
 
 describe('global leaderboard worker policy', () => {
@@ -190,5 +281,85 @@ describe('global leaderboard worker policy', () => {
     }, executionContext());
     expect(response.status).toBe(503);
     expect(db.claims.has(valid.idempotencyKey)).toBe(false);
+  });
+
+  it('strictly validates the privacy-minimized match envelope', () => {
+    expect(validateMatchDiagnosticSubmission(validDiagnostic)).toEqual({ submission: validDiagnostic, error: null });
+    expect(validateMatchDiagnosticSubmission({ ...validDiagnostic, callsign: 'Dave' }).error).toBe('invalid envelope shape');
+    expect(validateMatchDiagnosticSubmission({
+      ...validDiagnostic,
+      events: [{ ...validDiagnostic.events[0], actor: 'raw-peer-id' }],
+    }).error).toBe('invalid event');
+    expect(validateMatchDiagnosticSubmission({
+      ...validDiagnostic,
+      events: [{ ...validDiagnostic.events[0], sequence: 2 }],
+    }).error).toBe('invalid event');
+    expect(validateMatchDiagnosticSubmission({
+      ...validDiagnostic,
+      final: { ...validDiagnostic.final, chat: 'must never be accepted' },
+    }).error).toBe('invalid final summary');
+  });
+
+  it('stores one server-receipted diagnostic with bounded retention cleanup', async () => {
+    const db = new DiagnosticDb();
+    const waiting: Promise<unknown>[] = [];
+    const context = { waitUntil: (promise: Promise<unknown>) => { waiting.push(promise); } } as ExecutionContext;
+    const response = await worker.fetch(diagnosticRequest(), {
+      ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
+    }, context);
+    expect(response.status).toBe(201);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ accepted: true, idempotent: false, retentionDays: 30 });
+    expect(body.receiptId).toMatch(/^md_[a-f0-9]{32}$/);
+    expect(db.inserts).toBe(1);
+    expect(db.receipts.get(validDiagnostic.idempotencyKey)).toBe(body.receiptId);
+    await Promise.all(waiting);
+    expect(db.queries.some((query) => query.includes('DELETE FROM match_diagnostics WHERE expires_at <'))).toBe(true);
+  });
+
+  it('returns the original receipt for an idempotent retry without a second write', async () => {
+    const db = new DiagnosticDb();
+    db.receipts.set(validDiagnostic.idempotencyKey, 'md_existingreceipt0000000000000000');
+    const response = await worker.fetch(diagnosticRequest(), {
+      ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
+    }, executionContext());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accepted: true, idempotent: true, receiptId: 'md_existingreceipt0000000000000000' });
+    expect(db.inserts).toBe(0);
+  });
+
+  it('enforces text/plain, body-size and per-IP rate limits', async () => {
+    const db = new DiagnosticDb();
+    const env = { ALLOWED_ORIGINS: '*', DB: db as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt' };
+    expect((await worker.fetch(diagnosticRequest(validDiagnostic, 'application/json'), env, executionContext())).status).toBe(415);
+    const oversized = diagnosticRequest(validDiagnostic);
+    oversized.headers.set('content-length', '49153');
+    expect((await worker.fetch(oversized, env, executionContext())).status).toBe(413);
+    for (let index = 0; index < 20; index += 1) {
+      const submission = {
+        ...validDiagnostic,
+        matchId: `p-${index.toString(16).padStart(16, '0')}`,
+        idempotencyKey: `diagnostic:p-${index.toString(16).padStart(16, '0')}:host`,
+      };
+      expect((await worker.fetch(diagnosticRequest(submission), env, executionContext())).status).toBe(201);
+    }
+    const limited = { ...validDiagnostic, matchId: 'p-ffffffffffffffff', idempotencyKey: 'diagnostic:p-ffffffffffffffff:host' };
+    expect((await worker.fetch(diagnosticRequest(limited), env, executionContext())).status).toBe(429);
+  });
+
+  it('does not expose stored diagnostics through a public read endpoint', async () => {
+    const response = await worker.fetch(new Request('https://leaderboard.example/v1/match-diagnostics', {
+      headers: { Origin: 'http://127.0.0.1:4173' },
+    }), {
+      ALLOWED_ORIGINS: '*', DB: new DiagnosticDb() as unknown as D1Database, RATE_LIMIT_SALT: 'test-salt',
+    }, executionContext());
+    expect(response.status).toBe(404);
+  });
+
+  it('enforces retention independently through the scheduled cleanup path', async () => {
+    const db = new DiagnosticDb();
+    await deleteExpiredMatchDiagnostics(db as unknown as D1Database, 9_000_000);
+    expect(db.queries.some((query) => query.includes('DELETE FROM match_diagnostics WHERE expires_at <'))).toBe(true);
+    expect(db.queries.some((query) => query.includes('DELETE FROM rate_limits WHERE updated_at <'))).toBe(true);
   });
 });

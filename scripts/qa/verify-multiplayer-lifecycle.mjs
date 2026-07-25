@@ -89,6 +89,7 @@ try {
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
     await guest.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 });
     const guestRetainedDiagnostic = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().lastCompletedMultiplayerDiagnostic);
+    const automaticDiagnostics = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchDiagnosticsUpload)));
     const retainedDiagnostics = [hostRetainedDiagnostic, guestRetainedDiagnostic];
     joined.diagnosticEvidence = retainedDiagnostics.map((diagnostic) => diagnostic ? {
       schemaVersion: diagnostic.schemaVersion,
@@ -107,6 +108,16 @@ try {
         && !serialized.includes(`guest ${cycle}`)
         && !serialized.includes(roomCode);
     });
+    joined.automaticDiagnosticEvidence = automaticDiagnostics.map((diagnostic) => ({
+      activeMatch: diagnostic.activeMatch,
+      lastEnvelopeBytes: diagnostic.lastEnvelopeBytes,
+      lastMatchIdPattern: /^p-[a-f0-9]{16}$/.test(diagnostic.lastMatchId ?? ''),
+      requestsDuringActiveMatch: diagnostic.requestsDuringActiveMatch,
+    }));
+    joined.automaticDiagnosticsCompleted = automaticDiagnostics.every((diagnostic) => diagnostic.activeMatch === false
+      && diagnostic.lastEnvelopeBytes > 0 && diagnostic.lastEnvelopeBytes <= 48 * 1024
+      && /^p-[a-f0-9]{16}$/.test(diagnostic.lastMatchId ?? '')
+      && diagnostic.requestsDuringActiveMatch === 0);
     await host.click('#rematch');
     await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -204,7 +215,7 @@ try {
   console.log(JSON.stringify(report, null, 2));
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
     || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.guestRedeployNoCombatEffects
-    || !result.sanitizedDiagnosticRetained || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
+    || !result.sanitizedDiagnosticRetained || !result.automaticDiagnosticsCompleted || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
     || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy
     || !result.leaveObserved || !result.rejoinGraceObserved
     || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1
