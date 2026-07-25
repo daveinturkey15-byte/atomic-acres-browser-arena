@@ -12,6 +12,8 @@ import { THIRD_PERSON_WEAPON_SCALE } from './player-feedback';
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
+const pendingTextureLoads = new Set<Promise<void>>();
+const textureLoadFailures: Array<{ path: string; error: unknown }> = [];
 const textureBatchColors: Record<string, number> = {
   'grass-turf.png': 0x789d55,
   'asphalt-aged.png': 0x4b5557,
@@ -234,13 +236,38 @@ function texture(path: string, repeatX = 1, repeatY = 1, colorData = true): THRE
   if (cached) return cached;
   // Unit/SSR model construction has no DOM image loader. Preserve the texture
   // contract and cache key there; browsers still load the authored image.
-  const value = typeof document === 'undefined' ? new THREE.Texture() : textureLoader.load(path);
+  let value: THREE.Texture;
+  if (typeof document === 'undefined') {
+    value = new THREE.Texture();
+  } else {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    value = textureLoader.load(
+      path,
+      finish,
+      undefined,
+      (error) => {
+        textureLoadFailures.push({ path, error });
+        finish();
+      },
+    );
+    pendingTextureLoads.add(pending);
+    void pending.finally(() => pendingTextureLoads.delete(pending));
+  }
   value.colorSpace = colorData ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   value.wrapS = value.wrapT = THREE.RepeatWrapping;
   value.repeat.set(repeatX, repeatY);
   value.anisotropy = 8;
   textureCache.set(key, value);
   return value;
+}
+
+export async function waitForPendingArtTextures(): Promise<void> {
+  while (pendingTextureLoads.size > 0) await Promise.all([...pendingTextureLoads]);
+  if (textureLoadFailures.length > 0) {
+    const failedPaths = [...new Set(textureLoadFailures.map((failure) => failure.path))];
+    throw new Error(`Authored texture loading failed: ${failedPaths.join(', ')}`);
+  }
 }
 
 export function texturedMaterial(

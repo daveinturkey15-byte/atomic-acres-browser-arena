@@ -10,7 +10,7 @@ import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSce
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
-import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
+import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
@@ -727,6 +727,7 @@ type BootstrapStage =
   | 'prewarming-death-drops'
   | 'prewarming-nuke'
   | 'binding-world'
+  | 'waiting-for-authored-textures'
   | 'compiling-scene'
   | 'batching-static-meshes'
   | 'prewarming-overdrive'
@@ -11992,6 +11993,8 @@ async function bootstrap(): Promise<void> {
     maximumAnisotropy,
   );
   graphicsRefinement.refine(scene, maximumAnisotropy);
+  bootstrapStage = 'waiting-for-authored-textures';
+  await waitForPendingArtTextures();
   bootstrapStage = 'compiling-scene';
   await renderer.compileAsync(scene, camera);
   bootstrapStage = 'batching-static-meshes';
