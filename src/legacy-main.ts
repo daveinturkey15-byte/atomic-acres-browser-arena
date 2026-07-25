@@ -192,7 +192,7 @@ import {
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
-import { loadRoomRejoinIdentity, saveRoomRejoinIdentity } from './room-rejoin-identity';
+import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity } from './room-rejoin-identity';
 import {
   HIGH_SCORE_STORAGE_KEY,
   HIGH_SCORE_SCHEMA_VERSION,
@@ -2470,31 +2470,44 @@ function randomLobbyCredential(): string {
   return `room_${Date.now().toString(36)}_${Math.floor(protocolRandom() * Number.MAX_SAFE_INTEGER).toString(36)}`;
 }
 
+const roomIdentityTabId = randomLobbyCredential();
+let activeRoomIdentityCode = '';
+
+function saveActiveRoomIdentity(roomCode: string): void {
+  saveRoomRejoinIdentity(
+    roomCode,
+    { playerId: player.id, token: localResumeToken },
+    sessionStorage,
+    localStorage,
+    REJOIN_GRACE_MS,
+    Date.now(),
+    roomIdentityTabId,
+  );
+  activeRoomIdentityCode = roomCode;
+}
+
 function restoreRoomIdentity(roomCode: string): void {
   let restored: ReturnType<typeof loadRoomRejoinIdentity> = null;
-  try { restored = loadRoomRejoinIdentity(roomCode, sessionStorage, localStorage); } catch { /* Hardened storage falls back to a fresh identity. */ }
+  try {
+    restored = loadRoomRejoinIdentity(roomCode, sessionStorage, localStorage, Date.now(), roomIdentityTabId);
+  } catch { /* Hardened storage falls back to a fresh identity. */ }
   if (restored) {
     player.id = restored.playerId;
     localResumeToken = restored.token;
-    try { saveRoomRejoinIdentity(roomCode, restored, sessionStorage, localStorage, REJOIN_GRACE_MS); } catch { /* The in-memory credential remains valid. */ }
+    try { saveActiveRoomIdentity(roomCode); } catch { /* The in-memory credential remains valid. */ }
     return;
   }
   localResumeToken = randomLobbyCredential();
   try {
-    saveRoomRejoinIdentity(roomCode, { playerId: player.id, token: localResumeToken }, sessionStorage, localStorage, REJOIN_GRACE_MS);
+    saveActiveRoomIdentity(roomCode);
   } catch { /* Rejoin remains available only while this page stays open. */ }
 }
 
 function persistRoomIdentityForCloseTabRejoin(): void {
   if (network.role !== 'client' || !network.roomCode || !localResumeToken) return;
   try {
-    saveRoomRejoinIdentity(
-      network.roomCode,
-      { playerId: player.id, token: localResumeToken },
-      sessionStorage,
-      localStorage,
-      REJOIN_GRACE_MS,
-    );
+    saveActiveRoomIdentity(network.roomCode);
+    releaseRoomRejoinIdentityLease(network.roomCode, localStorage, roomIdentityTabId);
   } catch { /* Browser storage policy can make close-tab recovery unavailable. */ }
 }
 
@@ -2504,6 +2517,10 @@ function hidePrivateLobbyPresentation(): void {
 }
 
 function resetPrivateLobbyState(): void {
+  if (activeRoomIdentityCode) {
+    try { releaseRoomRejoinIdentityLease(activeRoomIdentityCode, localStorage, roomIdentityTabId); } catch { /* Lease expires if storage is unavailable. */ }
+    activeRoomIdentityCode = '';
+  }
   if (lobbyClockTimer) clearTimeout(lobbyClockTimer);
   lobbyClockTimer = null;
   privateLobbySnapshot = null;
@@ -10176,6 +10193,10 @@ function scheduleStateBroadcast(): void {
   }, delay);
 }
 scheduleStateBroadcast();
+window.setInterval(() => {
+  if (network.role !== 'client' || !network.roomCode || !localResumeToken) return;
+  try { saveActiveRoomIdentity(network.roomCode); } catch { /* Rejoin isolation is best effort under restrictive storage policies. */ }
+}, 3_000);
 window.addEventListener('pagehide', () => {
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();

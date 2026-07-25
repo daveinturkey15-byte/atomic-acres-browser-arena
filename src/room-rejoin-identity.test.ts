@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadRoomRejoinIdentity, saveRoomRejoinIdentity } from './room-rejoin-identity';
+import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity } from './room-rejoin-identity';
 
 class MemoryStorage {
   readonly values = new Map<string, string>();
@@ -35,5 +35,16 @@ describe('bounded room rejoin identity', () => {
     expect(loadRoomRejoinIdentity('room-b', new MemoryStorage(), persistent, 2_000)).toBeNull();
     persistent.setItem('atomic-acres:room-identity:room-b', '{"token":"short"}');
     expect(loadRoomRejoinIdentity('room-b', new MemoryStorage(), persistent, 2_000)).toBeNull();
+  });
+
+  it('does not clone a live guest identity into another concurrently open tab', () => {
+    const firstTab = new MemoryStorage();
+    const secondTab = new MemoryStorage();
+    const persistent = new MemoryStorage();
+    saveRoomRejoinIdentity('room-a', identity, firstTab, persistent, 90_000, 1_000, 'tab-1');
+    expect(loadRoomRejoinIdentity('room-a', secondTab, persistent, 1_500, 'tab-2')).toBeNull();
+    expect(loadRoomRejoinIdentity('room-a', firstTab, persistent, 1_500, 'tab-1')).toEqual(identity);
+    releaseRoomRejoinIdentityLease('room-a', persistent, 'tab-1');
+    expect(loadRoomRejoinIdentity('room-a', secondTab, persistent, 1_500, 'tab-2')).toEqual(identity);
   });
 });

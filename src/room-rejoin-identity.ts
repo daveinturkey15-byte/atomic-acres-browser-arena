@@ -6,14 +6,27 @@ export type RoomRejoinIdentity = Readonly<{
 }>;
 
 type StoredRoomRejoinIdentity = Readonly<{
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   playerId: string;
   token: string;
   expiresAtEpochMs: number;
+  ownerTabId?: string;
 }>;
+
+type StoredRoomIdentityLease = Readonly<{
+  schemaVersion: 1;
+  ownerTabId: string;
+  expiresAtEpochMs: number;
+}>;
+
+const ACTIVE_LEASE_MS = 10_000;
 
 function roomIdentityKey(roomCode: string): string {
   return `atomic-acres:room-identity:${roomCode}`;
+}
+
+function roomIdentityLeaseKey(roomCode: string): string {
+  return `atomic-acres:room-identity-owner:${roomCode}`;
 }
 
 function validIdentity(value: unknown): value is RoomRejoinIdentity {
@@ -32,14 +45,43 @@ function readTransientIdentity(storage: StorageLike, key: string): RoomRejoinIde
   }
 }
 
-function readPersistentIdentity(storage: StorageLike, key: string, nowEpochMs: number): RoomRejoinIdentity | null {
+function activeOtherOwner(
+  storage: StorageLike,
+  roomCode: string,
+  ownerTabId: string | undefined,
+  nowEpochMs: number,
+): boolean {
+  try {
+    const key = roomIdentityLeaseKey(roomCode);
+    const lease = JSON.parse(storage.getItem(key) ?? 'null') as Partial<StoredRoomIdentityLease> | null;
+    if (!lease || lease.schemaVersion !== 1 || typeof lease.ownerTabId !== 'string'
+      || !Number.isFinite(lease.expiresAtEpochMs) || Number(lease.expiresAtEpochMs) <= nowEpochMs) {
+      storage.removeItem(key);
+      return false;
+    }
+    return lease.ownerTabId !== ownerTabId;
+  } catch {
+    return false;
+  }
+}
+
+function readPersistentIdentity(
+  storage: StorageLike,
+  roomCode: string,
+  key: string,
+  nowEpochMs: number,
+  ownerTabId?: string,
+): RoomRejoinIdentity | null {
   try {
     const parsed = JSON.parse(storage.getItem(key) ?? 'null') as Partial<StoredRoomRejoinIdentity> | null;
-    if (!parsed || parsed.schemaVersion !== 1 || !Number.isFinite(parsed.expiresAtEpochMs)
+    if (!parsed || (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2) || !Number.isFinite(parsed.expiresAtEpochMs)
       || Number(parsed.expiresAtEpochMs) <= nowEpochMs || !validIdentity(parsed)) {
       storage.removeItem(key);
       return null;
     }
+    // localStorage is shared by every tab on this origin. Do not let a second
+    // concurrently open guest clone the first guest's resume credential.
+    if (activeOtherOwner(storage, roomCode, ownerTabId, nowEpochMs)) return null;
     return { playerId: parsed.playerId, token: parsed.token };
   } catch {
     return null;
@@ -52,10 +94,11 @@ export function loadRoomRejoinIdentity(
   transientStorage: StorageLike,
   persistentStorage: StorageLike,
   nowEpochMs = Date.now(),
+  ownerTabId?: string,
 ): RoomRejoinIdentity | null {
   const key = roomIdentityKey(roomCode);
   return readTransientIdentity(transientStorage, key)
-    ?? readPersistentIdentity(persistentStorage, key, nowEpochMs);
+    ?? readPersistentIdentity(persistentStorage, roomCode, key, nowEpochMs, ownerTabId);
 }
 
 /** Persist only for the host's rejoin grace; this is not a permanent player identity. */
@@ -66,15 +109,38 @@ export function saveRoomRejoinIdentity(
   persistentStorage: StorageLike,
   rejoinGraceMs: number,
   nowEpochMs = Date.now(),
+  ownerTabId?: string,
 ): void {
   if (!validIdentity(identity) || !Number.isFinite(rejoinGraceMs) || rejoinGraceMs <= 0) return;
   const key = roomIdentityKey(roomCode);
   const document: StoredRoomRejoinIdentity = {
-    schemaVersion: 1,
+    schemaVersion: ownerTabId ? 2 : 1,
     ...identity,
     expiresAtEpochMs: nowEpochMs + rejoinGraceMs,
+    ...(ownerTabId ? { ownerTabId } : {}),
   };
   const serialized = JSON.stringify(document);
   try { transientStorage.setItem(key, serialized); } catch { /* A persistent recovery copy can still work. */ }
   try { persistentStorage.setItem(key, serialized); } catch { /* Same-tab rejoin remains available. */ }
+  if (ownerTabId) {
+    const lease: StoredRoomIdentityLease = {
+      schemaVersion: 1,
+      ownerTabId,
+      expiresAtEpochMs: nowEpochMs + ACTIVE_LEASE_MS,
+    };
+    try { persistentStorage.setItem(roomIdentityLeaseKey(roomCode), JSON.stringify(lease)); } catch { /* Lease isolation is best effort. */ }
+  }
+}
+
+/** Release only this tab's lease; the bounded credential remains recoverable. */
+export function releaseRoomRejoinIdentityLease(
+  roomCode: string,
+  persistentStorage: StorageLike,
+  ownerTabId: string,
+): void {
+  const key = roomIdentityLeaseKey(roomCode);
+  try {
+    const lease = JSON.parse(persistentStorage.getItem(key) ?? 'null') as Partial<StoredRoomIdentityLease> | null;
+    if (lease?.schemaVersion === 1 && lease.ownerTabId === ownerTabId) persistentStorage.removeItem(key);
+  } catch { /* A stale lease expires after ten seconds. */ }
 }
