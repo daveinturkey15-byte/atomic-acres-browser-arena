@@ -91,14 +91,20 @@ type HealthState = {
   health: number;
   deathObserved: boolean;
   lastAtMs: number;
+  lastCategory: MatchDiagnosticUploadEvent['category'];
   lastBefore?: number;
   lastAfter?: number;
 };
+
+const REGEN_DELAY_AFTER_DAMAGE_MS = 5_000;
+const MAX_REGEN_HEALTH_PER_SECOND = 22;
+const REGEN_SAMPLE_TOLERANCE = 0.3;
 
 const HEALTH_ANOMALY_CODES = new Set([
   'damage-transition-incomplete',
   'health-arithmetic-mismatch',
   'regen-transition-invalid',
+  'regen-rate-impossible',
   'death-transition-invalid',
   'death-without-lethal-transition',
   'duplicate-death-transition',
@@ -118,6 +124,17 @@ function healthSubject(event: MatchDiagnosticUploadEvent): string | undefined {
   if (event.category === 'regen') return event.actor;
   if (event.category === 'damage' || event.category === 'death') return event.target;
   return event.target ?? event.actor;
+}
+
+function plausibleUnobservedRegeneration(previous: HealthState, event: MatchDiagnosticUploadEvent): boolean {
+  if (previous.deathObserved || event.healthBefore === undefined || event.healthBefore + 0.1 < previous.health) return false;
+  if (previous.lastCategory !== 'damage' && previous.lastCategory !== 'regen') return false;
+  const elapsedMs = Math.max(0, event.atMs - previous.lastAtMs);
+  const availableRegenMs = previous.lastCategory === 'damage'
+    ? Math.max(0, elapsedMs - REGEN_DELAY_AFTER_DAMAGE_MS)
+    : elapsedMs;
+  const maximumUnobservedIncrease = availableRegenMs * MAX_REGEN_HEALTH_PER_SECOND / 1_000 + REGEN_SAMPLE_TOLERANCE;
+  return event.healthBefore - previous.health <= maximumUnobservedIncrease;
 }
 
 function flag(
@@ -186,7 +203,7 @@ function analyzeHealthEvents(envelope: MatchDiagnosticUploadEnvelope, flags: Dia
       const valid = Boolean(participant)
         && event.healthBefore !== undefined
         && event.healthAfter !== undefined
-        && event.healthAfter > event.healthBefore + 0.1
+        && event.healthAfter > event.healthBefore
         && event.healthAfter <= 100;
       if (!valid) {
         flag(flags, 'regen-transition-invalid', 'error', 'Regeneration must increase a known participant health value without exceeding 100.', {
@@ -233,7 +250,7 @@ function analyzeHealthEvents(envelope: MatchDiagnosticUploadEnvelope, flags: Dia
           expected: 0,
         });
       }
-      states.set(participant, { health: 0, deathObserved: true, lastAtMs: event.atMs, lastAfter: 0 });
+      states.set(participant, { health: 0, deathObserved: true, lastAtMs: event.atMs, lastCategory: event.category, lastAfter: 0 });
       continue;
     }
 
@@ -245,6 +262,20 @@ function analyzeHealthEvents(envelope: MatchDiagnosticUploadEnvelope, flags: Dia
         expected: 0,
       });
     }
+    const plausibleRegenGap = previous ? plausibleUnobservedRegeneration(previous, event) : false;
+    if (previous
+      && event.category === 'regen'
+      && event.healthBefore !== undefined
+      && event.healthBefore > previous.health + 0.1
+      && !plausibleRegenGap
+      && envelope.droppedEvents === 0) {
+      flag(flags, 'regen-rate-impossible', 'error', 'Unobserved health growth exceeded the bounded regeneration rate.', {
+        eventSequence: event.sequence,
+        participant,
+        observed: event.healthBefore,
+        expected: previous.health,
+      });
+    }
     if (previous
       && event.healthBefore !== undefined
       && !sameHealth(event.healthBefore, previous.health)
@@ -252,6 +283,7 @@ function analyzeHealthEvents(envelope: MatchDiagnosticUploadEnvelope, flags: Dia
       && !duplicateTransition
       && !canonicalCatchDown
       && !canonicalUpward
+      && !plausibleRegenGap
       && envelope.droppedEvents === 0) {
       flag(flags, 'health-continuity-gap', 'warning', 'The next health transition did not begin at the preceding canonical health.', {
         eventSequence: event.sequence,
@@ -265,6 +297,7 @@ function analyzeHealthEvents(envelope: MatchDiagnosticUploadEnvelope, flags: Dia
         health: event.healthAfter,
         deathObserved: isLifecycleReset ? false : previous?.deathObserved ?? false,
         lastAtMs: event.atMs,
+        lastCategory: event.category,
         ...(event.healthBefore !== undefined ? { lastBefore: event.healthBefore } : {}),
         lastAfter: event.healthAfter,
       });

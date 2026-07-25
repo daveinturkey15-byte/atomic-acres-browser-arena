@@ -88,6 +88,27 @@ describe('Pass 64 diagnostics analyzer', () => {
     });
   });
 
+  it('accepts sampled continuous regeneration while rejecting impossible hidden health growth', () => {
+    const sampled: MatchDiagnosticUploadEvent[] = [
+      { sequence: 0, atMs: 1_000, category: 'damage', admission: 'accepted', actor: LOCAL, target: REMOTE, source: 'firearm', healthBefore: 100, healthAfter: 80, damageRequested: 20, damageApplied: 20 },
+      { sequence: 1, atMs: 6_050, category: 'regen', admission: 'accepted', actor: REMOTE, source: 'state', healthBefore: 80.7, healthAfter: 80.9 },
+      { sequence: 2, atMs: 6_110, category: 'regen', admission: 'accepted', actor: REMOTE, source: 'state', healthBefore: 81.8, healthAfter: 82 },
+      { sequence: 3, atMs: 6_120, category: 'damage', admission: 'accepted', actor: LOCAL, target: REMOTE, source: 'firearm', healthBefore: 82.1, healthAfter: 70.1, damageRequested: 12, damageApplied: 12 },
+    ];
+    const sampledReport = analyzePass64DiagnosticsJsonl(collectorLine(envelope('p-0123456789abcdef', sampled)));
+    expect(sampledReport.totals).toMatchObject({ errors: 0, warnings: 0 });
+
+    const impossible: MatchDiagnosticUploadEvent[] = [
+      { sequence: 0, atMs: 1_000, category: 'damage', admission: 'accepted', actor: LOCAL, target: REMOTE, source: 'firearm', healthBefore: 100, healthAfter: 80, damageRequested: 20, damageApplied: 20 },
+      { sequence: 1, atMs: 5_020, category: 'regen', admission: 'accepted', actor: REMOTE, source: 'state', healthBefore: 90, healthAfter: 91 },
+    ];
+    const impossibleReport = analyzePass64DiagnosticsJsonl(collectorLine(envelope('p-fedcba9876543210', impossible)));
+    expect(impossibleReport.matches[0].flags.map((item) => item.code)).toEqual(expect.arrayContaining([
+      'regen-rate-impossible',
+      'health-continuity-gap',
+    ]));
+  });
+
   it('flags semantic health failures and distinguishes canonical reconciliation patterns', () => {
     const events: MatchDiagnosticUploadEvent[] = [
       { sequence: 0, atMs: 10, category: 'damage', admission: 'accepted', actor: LOCAL, target: REMOTE, source: 'firearm', healthBefore: 100, healthAfter: 70, damageRequested: 20, damageApplied: 20 },
