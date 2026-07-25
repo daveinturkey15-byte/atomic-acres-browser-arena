@@ -18,6 +18,6 @@ describe('menu documentation dialogs', () => {
     const markup = `${releaseHistoryButtonMarkup()}${releaseHistoryDialogMarkup()}`;
     expect(markup).toContain('aria-controls="changelog-panel"');
     expect(markup).toContain('data-changelog-id="pass62"');
-    expect(markup).toContain('CURRENT BUILD');
+    expect(markup).toContain('CURRENT LIVE');
   });
 });

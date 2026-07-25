@@ -21,7 +21,7 @@ export type ProjectMapBundle = Readonly<{
   current: Readonly<{
     product: 'Nuke Town';
     generatedAt: string;
-    architectureRevision: 'pass63-project-map-v1';
+    architectureRevision: 'pass64-webgpu-hud-v1';
     candidateState: 'hitl-candidate' | 'released';
     release: ChangelogEntry;
     previousRelease: string | null;
@@ -36,6 +36,28 @@ export type ProjectMapBundle = Readonly<{
   changes: readonly ChangelogEntry[];
   archive: readonly ChangelogEntry[];
 }>;
+
+/**
+ * The project map describes the active review candidate, while CHANGELOG is a
+ * production-only release ledger. Keeping the candidate separate prevents an
+ * unpublished pass from appearing as live release history.
+ */
+export const PROJECT_MAP_CANDIDATE: ChangelogEntry = Object.freeze({
+  id: 'pass64-candidate',
+  pass: 'PASS 64',
+  title: 'Playable WebGPU, Command UI & Multiplayer Hardening',
+  releasedAt: PENDING_PRODUCTION_RELEASE,
+  areas: Object.freeze(['WEBGPU', 'TSL', 'HUD', 'MULTIPLAYER', 'MAPS', 'DIAGNOSTICS']),
+  summary: 'HITL candidate for the complete playable WebGPU/TSL route, redesigned command HUD and menus, rematch and health reconciliation repairs, lightweight post-match diagnostics, Railgun, and arena visual-quality gates.',
+  highlights: Object.freeze([
+    'The normal gameplay route is fail-closed hardware WebGPU with TSL-owned atmosphere and HDR presentation; WebGL2 remains an explicit rollback-compatible route',
+    'Nuke Town, Terminal, RustRig and Gun Range each own a streamed ArenaVisualDefinition with deterministic review cameras and budgets',
+    'The HUD, lobby, map selection, loadout and match overlays use the new command interface without dropping gameplay controls',
+    'Private-match rematches, authoritative health regeneration and duplicate result handling have dedicated regression coverage',
+    'The Railgun spawns during Nuke Town matches with finite ammunition, rechamber cadence, wall penetration and hostile thermal identification',
+    'Pass 62 remains byte-exact stable and Pass 63 remains published live until this exact candidate is approved',
+  ]),
+});
 
 export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
   Object.freeze({
@@ -205,16 +227,16 @@ export function createProjectMapBundle(
   entries: readonly ChangelogEntry[] = CHANGELOG,
 ): ProjectMapBundle {
   if (Number.isNaN(Date.parse(generatedAt))) throw new Error(`Invalid project-map timestamp: ${generatedAt}`);
-  const release = latestChangelogEntry(entries);
+  const release = PROJECT_MAP_CANDIDATE;
   return {
     schemaVersion: 1,
     current: {
       product: 'Nuke Town',
       generatedAt,
-      architectureRevision: 'pass63-project-map-v1',
+      architectureRevision: 'pass64-webgpu-hud-v1',
       candidateState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'hitl-candidate' : 'released',
       release,
-      previousRelease: entries[1]?.pass ?? null,
+      previousRelease: latestChangelogEntry(entries).pass ?? null,
     },
     publishedChannels: {
       schemaVersion: releaseChannelsJson.schemaVersion,
@@ -233,8 +255,8 @@ export function createProjectMapBundle(
     },
     operatingBoundaries: PROJECT_OPERATING_BOUNDARIES,
     architecture: PROJECT_MAP_TREE,
-    changes: entries,
-    archive: entries.slice(1),
+    changes: Object.freeze([release, ...entries]),
+    archive: entries,
   };
 }
 
