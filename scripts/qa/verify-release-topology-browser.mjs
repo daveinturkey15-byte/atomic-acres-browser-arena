@@ -11,6 +11,10 @@ const outputPath = process.env.QA_OUTPUT ?? null;
 const screenshotDirectory = process.env.QA_SCREENSHOT_DIR ?? null;
 const rootUrl = new URL(baseUrl);
 if (sourceSha) rootUrl.searchParams.set('qa', sourceSha);
+// The production runner is intentionally GPU-less. Route/chooser validation
+// uses the explicit rollback renderer here; the accepted candidate's separate
+// hardware gate proves required WebGPU/TSL on a real high-performance adapter.
+rootUrl.searchParams.set('renderer', 'webgl2');
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1100, height: 700 } });
@@ -32,7 +36,8 @@ async function observedPage() {
     if (!observing) return;
     const text = message.text();
     const expectedHeadlessWarning = text === 'THREE.WebGLRenderer: KHR_parallel_shader_compile extension not supported.';
-    if (!expectedHeadlessWarning && (message.type() === 'warning' || message.type() === 'error')) {
+    const expectedReadbackWarning = /GL Driver Message .*GPU stall due to ReadPixels/.test(text);
+    if (!expectedHeadlessWarning && !expectedReadbackWarning && (message.type() === 'warning' || message.type() === 'error')) {
       failures.push(`console ${message.type()}: ${text}`);
     }
   });
@@ -76,11 +81,12 @@ async function verifyRuntime(page, expectedPath, expectedPass) {
   if (!page.url().includes(`/${expectedPath}/`) || !page.url().includes('release=latest')) {
     throw new Error(`Channel route mismatch: ${page.url()}`);
   }
-  const eyebrow = (await page.locator('.eyebrow').textContent())?.trim() ?? '';
-  if (!normalizedPass(eyebrow).includes(normalizedPass(expectedPass))) {
-    throw new Error(`Runtime ${eyebrow} does not match ${expectedPass}`);
+  const identityLabels = await page.locator('.command-brand span, .eyebrow').allTextContents();
+  const runtimeIdentity = identityLabels.map((label) => label.trim()).filter(Boolean).join(' | ');
+  if (!normalizedPass(runtimeIdentity).includes(normalizedPass(expectedPass))) {
+    throw new Error(`Runtime ${runtimeIdentity} does not match ${expectedPass}`);
   }
-  return eyebrow;
+  return runtimeIdentity;
 }
 
 async function verifyChoice(choice, expectedPath, expectedPass) {
