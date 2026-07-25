@@ -2,7 +2,7 @@
 
 Date: 2026-07-25  
 Impact: `runtime`  
-Base candidate: Pass 63 accepted source `0c1574b132db8d16666e6a1ce25c6711165194b9`  
+Base candidate: Pass 63 accepted preview source `94b7e17363bd553f6894bdba698a271a62c8814f`
 Release intent: immutable WebGPU HITL candidate only; do not publish before Dave approves its exact preview.  
 Rollback: byte-exact Pass 62 stable benchmark; Pass 63 remains the legacy-stack live comparator after its protected release completes.
 
