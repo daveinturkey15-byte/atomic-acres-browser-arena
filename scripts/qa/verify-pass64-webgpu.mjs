@@ -130,10 +130,9 @@ try {
       '--enable-unsafe-webgpu',
       // Performance budgets measure renderer throughput, not the refresh rate
       // of whichever display Windows currently associates with the adapter.
-      // Keep the headless hardware run uncapped so a 59 Hz desktop cannot turn
+      // Keep GPU presentation unsynchronised so a 59 Hz desktop cannot turn
       // a healthy sub-16.7 ms CPU/GPU frame into a false regression.
       '--disable-gpu-vsync',
-      '--disable-frame-rate-limit',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--disable-backgrounding-occluded-windows',
