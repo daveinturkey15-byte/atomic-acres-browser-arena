@@ -140,6 +140,21 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
       minimumWallDamageMultiplier: 0.48, maxPenetratedSurfaces: 3,
     },
   },
+  railgun: {
+    id: 'railgun', name: 'VX-8 Railgun', damage: 50, minimumDamage: 50,
+    falloffStart: 512, falloffEnd: 512, headMultiplier: 1, limbMultiplier: 1,
+    rpm: 40, mag: 8, reserve: 0, reload: 1.5,
+    hipSpread: 0.035, adsSpreadMultiplier: 0, movementSpreadMultiplier: 1,
+    crouchSpreadMultiplier: 1, sustainedSpreadPerShot: 0, maximumSpread: 0.035,
+    pellets: 1, recoilPitch: 0.085, recoilYaw: 0, recoilRecovery: 5.8,
+    adsRecoilMultiplier: 1, crouchRecoilMultiplier: 1, proneRecoilMultiplier: 1,
+    switchSeconds: 0.72, automatic: false, color: 0x7df8ff,
+    penetration: {
+      caliber: 'electromagnetic sabot', penetrationPower: 100_000, fmjMultiplier: 1,
+      energyFalloffStart: 512, energyFalloffEnd: 512, minimumEnergyRetention: 1,
+      minimumWallDamageMultiplier: 1, maxPenetratedSurfaces: 64,
+    },
+  },
   pistol: {
     id: 'pistol', name: 'Aster 9 Service Pistol', damage: 36, minimumDamage: 22,
     falloffStart: 20, falloffEnd: 58, headMultiplier: HEADSHOT_DAMAGE_MULTIPLIER, limbMultiplier: 0.84,

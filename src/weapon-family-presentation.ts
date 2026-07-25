@@ -45,6 +45,12 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     actionTravel: 0.13, smokeBase: 2,
     requiredDetails: ['sniper-scope', 'sniper-scope-lens', 'sniper-muzzle-brake', 'sniper-bolt-handle', 'sniper-chassis', 'bolt-or-slide'],
   },
+  railgun: {
+    sightHeight: 0.285, adsX: -0.36, adsY: 0.209, adsZ: 0.045, projectionCorrection: 0,
+    flashScale: 1.5, recoilTranslation: 0.25, recoilRotation: 0.34,
+    actionTravel: 0.16, smokeBase: 0.4,
+    requiredDetails: ['railgun-receiver', 'railgun-coil-left', 'railgun-coil-right', 'railgun-thermal-scope', 'railgun-capacitor', 'bolt-or-slide'],
+  },
   pistol: {
     sightHeight: 0.17, adsX: -0.36, adsY: 0.278, adsZ: -0.08, projectionCorrection: 0,
     flashScale: 0.7, recoilTranslation: 0.11, recoilRotation: 0.2,

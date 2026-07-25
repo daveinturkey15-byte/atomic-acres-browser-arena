@@ -23,6 +23,7 @@ import {
   isRailgunProtocolMessage,
   type RailgunClaimRequestMessage,
   type RailgunShotRequestMessage,
+  type RailgunShotResultMessage,
   type RailgunStateMessage,
 } from './railgun-authority';
 
@@ -30,10 +31,11 @@ export type Team = 0 | 1;
 export const MULTIPLAYER_PROTOCOL_VERSION = 6;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
-export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
+export type SpecialWeaponId = 'railgun';
+export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
-export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol', 'magnum']);
+export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol', 'magnum', 'railgun']);
 export const MAX_MATCH_SCORE_ENTRIES = 10;
 
 export type PlayerSnapshot = {
@@ -288,7 +290,7 @@ export type ChatHistoryMessage = {
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
-  | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunStateMessage;
+  | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -307,7 +309,7 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
     && weapons.has(p.weapon as WeaponId)
-    && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol') || p.weapon === 'magnum');
+    && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol') || p.weapon === 'magnum' || p.weapon === 'railgun');
 }
 
 function isOptionalCombatTiming(value: unknown): boolean {
@@ -556,6 +558,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isFinite(msg.nonce);
     case 'railgun-claim-request':
     case 'railgun-shot-request':
+    case 'railgun-shot-result':
     case 'railgun-state':
       return isRailgunProtocolMessage(msg, MULTIPLAYER_PROTOCOL_VERSION);
     case 'lobby-config':
@@ -660,6 +663,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'redeploy-commit':
     case 'railgun-claim-request':
     case 'railgun-shot-request':
+    case 'railgun-shot-result':
     case 'railgun-state':
     case 'lobby-config':
     case 'lobby-balance':
@@ -694,6 +698,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'chat-history'
     || message.type === 'redeploy-commit'
     || message.type === 'railgun-state'
+    || message.type === 'railgun-shot-result'
     || message.type === 'bot-state'
     || message.type === 'bot-damage';
 }

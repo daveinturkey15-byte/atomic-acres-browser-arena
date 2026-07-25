@@ -5,6 +5,7 @@ export const THIRD_PERSON_WEAPON_SCALE: Readonly<Record<WeaponId, number>> = Obj
   carbine: 0.47,
   lmg: 0.41,
   sniper: 0.45,
+  railgun: 0.43,
   smg: 0.51,
   scattergun: 0.46,
   pistol: 0.54,

@@ -433,12 +433,13 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     if (supportSocket) supportSocket.position.set(-0.04, -0.13, -0.68);
     return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
-  if (id === 'sniper') {
+  if (id === 'sniper' || id === 'railgun') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
-    root.name = 'sniper-original-weapon';
-    const sniperMetal = MAT.gunmetal('sniper');
-    root.userData.weaponModelId = 'sniper-authored-v6';
-    root.userData.weaponFinishId = weaponFinishProfile('sniper').id;
+    const precisionPrefix = id === 'railgun' ? 'railgun' : 'sniper';
+    root.name = `${precisionPrefix}-original-weapon`;
+    const sniperMetal = MAT.gunmetal(id);
+    root.userData.weaponModelId = id === 'railgun' ? 'railgun-authored-v1' : 'sniper-authored-v6';
+    root.userData.weaponFinishId = weaponFinishProfile(id).id;
     root.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
       const replace = (material: THREE.Material) => material.userData.weaponFinishId
@@ -539,6 +540,24 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     if (supportSocket) supportSocket.position.set(-0.035, -0.095, -0.63);
     const gripSocket = root.getObjectByName('grip-socket-r');
     if (gripSocket) gripSocket.position.set(0.045, -0.15, 0.04);
+    if (id === 'railgun') {
+      root.name = 'railgun-original-weapon';
+      const energy = flattenMaterials
+        ? new THREE.MeshBasicMaterial({ color: 0x65f4ff })
+        : new THREE.MeshStandardMaterial({ color: 0x65f4ff, emissive: 0x0b7285, emissiveIntensity: 2.1, roughness: 0.2, metalness: 0.66 });
+      part(root, roundedBox('railgun-receiver', [0.33, 0.22, 1.02], sniperMetal, 0.052, 4), [0, 0.01, -0.68]);
+      for (const side of [-1, 1]) {
+        part(root, roundedBox(side < 0 ? 'railgun-coil-left' : 'railgun-coil-right', [0.065, 0.09, 1.04], energy, 0.018, 3), [side * 0.19, 0.01, -0.88]);
+      }
+      const capacitor = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.52, 18), energy);
+      capacitor.name = 'railgun-capacitor';
+      part(root, capacitor, [0, -0.12, -0.5], [Math.PI / 2, 0, 0]);
+      const thermal = root.getObjectByName('sniper-scope');
+      if (thermal) thermal.name = 'railgun-thermal-scope';
+      if (muzzleSocket) muzzleSocket.position.z = -2.12;
+      const muzzleFlash = root.getObjectByName('world-muzzle-flash');
+      if (muzzleFlash) muzzleFlash.position.z = -2.28;
+    }
     return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
   const root = new THREE.Group();
@@ -994,6 +1013,7 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   lmg: [-0.06, -0.13, -0.26],
   scattergun: [-0.03, -0.025, 0.29],
   sniper: [-0.035, -0.095, -0.21],
+  railgun: [-0.04, -0.095, -0.24],
   pistol: [-0.06, -0.15, 0.03],
   magnum: [-0.06, -0.15, 0.03],
   'machine-pistol': [-0.06, -0.15, 0.03],

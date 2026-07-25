@@ -13,17 +13,19 @@ const URLS: Record<WeaponId, string> = {
   smg: './assets/third-party/quaternius/animated-guns/P90.glb',
   scattergun: './assets/third-party/quaternius/animated-guns/Shotgun.glb',
   sniper: './assets/third-party/quaternius/animated-guns/Rifle.glb',
+  railgun: './assets/third-party/quaternius/animated-guns/Rifle.glb',
   pistol: './assets/third-party/quaternius/animated-guns/Pistol.glb',
   magnum: './assets/third-party/quaternius/animated-guns/Pistol.glb',
   'machine-pistol': './assets/third-party/quaternius/animated-guns/Pistol.glb',
 };
-const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, lmg: 1.7, smg: 0.92, scattergun: 1.3, sniper: 1.55, pistol: 0.48, magnum: 0.62, 'machine-pistol': 0.5 };
+const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, lmg: 1.7, smg: 0.92, scattergun: 1.3, sniper: 1.55, railgun: 1.72, pistol: 0.48, magnum: 0.62, 'machine-pistol': 0.5 };
 const PRESENTATION_YAW: Record<WeaponId, number> = {
   carbine: 0,
   lmg: 0,
   smg: 0,
   scattergun: 0,
   sniper: 0,
+  railgun: 0,
   pistol: Math.PI / 2,
   magnum: Math.PI / 2,
   'machine-pistol': Math.PI / 2,
@@ -34,6 +36,7 @@ const PRESENTATION_ROLL: Record<WeaponId, number> = {
   smg: -0.1,
   scattergun: -0.08,
   sniper: -0.1,
+  railgun: -0.1,
   pistol: -0.06,
   magnum: -0.06,
   'machine-pistol': -0.06,
@@ -83,6 +86,7 @@ const SOCKETS: Record<WeaponId, {
   smg: { muzzle: [0, 0.005, -0.96], eject: [0.14, 0.06, -0.04], right: [0.03, -0.13, 0.02], left: [-0.03, -0.08, -0.43], reload: [-0.14, -0.16, -0.08], sight: 'smg-aperture' },
   scattergun: { muzzle: [0, 0.005, -1.24], eject: [0.14, 0.045, -0.03], right: [0.03, -0.14, 0.12], left: [-0.03, -0.025, -0.55], reload: [-0.18, -0.14, 0.02], sight: 'ghost-ring' },
   sniper: { muzzle: [0, 0.005, -1.52], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
+  railgun: { muzzle: [0, 0.005, -1.82], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.46, -0.07, 0.56], reload: [-0.13, -0.18, -0.08], sight: 'railgun-thermal-scope' },
   pistol: { muzzle: [0, 0.105, -0.58], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
   magnum: { muzzle: [0, 0.105, -0.72], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
   'machine-pistol': { muzzle: [0, 0.105, -0.58], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
@@ -98,7 +102,7 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
   const gunmetal = material(0x1d2930, 0.28, 0.78);
   const parkerized = material(0x344249, 0.4, 0.62);
   const grip = material(0x171c20, 0.72, 0.16);
-  const accent = material(id === 'scattergun' ? 0xc76f42 : id === 'sniper' ? 0x78d1c7 : id === 'lmg' ? 0x789f54 : 0xe2aa51, 0.34, 0.52, id === 'sniper' ? 0x0b2a2b : 0);
+  const accent = material(id === 'scattergun' ? 0xc76f42 : id === 'railgun' ? 0x65f4ff : id === 'sniper' ? 0x78d1c7 : id === 'lmg' ? 0x789f54 : 0xe2aa51, 0.34, 0.52, id === 'railgun' ? 0x0e7080 : id === 'sniper' ? 0x0b2a2b : 0);
   const lens = flattenMaterials
     ? new THREE.MeshBasicMaterial({ color: 0x78eef2, transparent: true, opacity: 0.58 })
     : new THREE.MeshStandardMaterial({ color: 0x78eef2, emissive: 0x123b43, emissiveIntensity: 0.7, roughness: 0.12, metalness: 0.2, transparent: true, opacity: 0.7 });
@@ -112,9 +116,9 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
     mesh.name = name; mesh.position.set(...position); mesh.rotation.x = Math.PI / 2; mesh.castShadow = !flattenMaterials; kit.add(mesh); return mesh;
   };
 
-  const longGun = id === 'carbine' || id === 'lmg' || id === 'smg' || id === 'scattergun' || id === 'sniper';
+  const longGun = id === 'carbine' || id === 'lmg' || id === 'smg' || id === 'scattergun' || id === 'sniper' || id === 'railgun';
   if (longGun) {
-    const railLength = id === 'sniper' ? 0.72 : id === 'scattergun' ? 0.58 : 0.48;
+    const railLength = id === 'railgun' ? 0.86 : id === 'sniper' ? 0.72 : id === 'scattergun' ? 0.58 : 0.48;
     addBox('receiver-side-plate', [0.3, 0.17, id === 'smg' ? 0.5 : 0.62], [0, 0, -0.22], parkerized);
     addBox('top-accessory-rail', [0.18, 0.032, railLength], [0, sightHeight - 0.08, -0.3], gunmetal);
     for (let tooth = 0; tooth < 6; tooth += 1) addBox(`rail-tooth-${tooth}`, [0.21, 0.025, 0.026], [0, sightHeight - 0.052, -0.08 - tooth * railLength / 6], gunmetal);
@@ -146,7 +150,7 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
     addBox('ventilated-rib', [0.055, 0.035, 0.72], [0, sightHeight - 0.07, -0.57], gunmetal);
     for (let vent = 0; vent < 4; vent += 1) addBox(`rib-bridge-${vent}`, [0.22, 0.025, 0.035], [0, sightHeight - 0.055, -0.28 - vent * 0.16], accent);
     const shell = addCylinder('reload-shell', 0.045, 0.11, [-0.16, -0.13, -0.02], material(0xb54c37, 0.54, 0.24), 10); shell.visible = false;
-  } else if (id === 'sniper') {
+  } else if (id === 'sniper' || id === 'railgun') {
     const magazine = addBox('straight-magazine', [0.22, 0.42, 0.19], [0, -0.26, -0.06], grip, [0.09, 0, 0]); magazine.userData.originalAnimatedPart = true;
     const bolt = addBox('bolt-or-slide', [0.18, 0.07, 0.24], [0.12, 0.04, -0.02], accent); bolt.userData.restZ = bolt.position.z;
     addCylinder('longline-scope-body', 0.115, 0.62, [0, sightHeight, -0.25], gunmetal, 18);
@@ -154,6 +158,13 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
     addCylinder('scope-front-lens', 0.102, 0.009, [0, sightHeight, -0.565], lens, 20);
     addBox('scope-turret', [0.12, 0.1, 0.12], [0, sightHeight + 0.15, -0.25], accent);
     addBox('folded-bipod', [0.26, 0.06, 0.48], [0, -0.105, -0.72], parkerized, [0.04, 0, 0]);
+    if (id === 'railgun') {
+      addBox('railgun-receiver', [0.34, 0.22, 0.98], [0, 0.015, -0.64], parkerized);
+      addBox('railgun-coil-left', [0.065, 0.09, 0.96], [-0.19, 0.015, -0.84], accent);
+      addBox('railgun-coil-right', [0.065, 0.09, 0.96], [0.19, 0.015, -0.84], accent);
+      addCylinder('railgun-capacitor', 0.095, 0.5, [0, -0.11, -0.48], accent, 18);
+      addCylinder('railgun-thermal-scope', 0.125, 0.68, [0, sightHeight, -0.25], gunmetal, 20);
+    }
   } else {
     const magazine = addBox('pistol-magazine', [0.13, id === 'machine-pistol' ? 0.5 : 0.32, 0.11], [0, -0.27, 0.06], grip, [0.15, 0, 0]); magazine.userData.originalAnimatedPart = true;
     const slide = addBox('bolt-or-slide', [0.24, 0.19, 0.5], [0, 0.08, -0.18], gunmetal); slide.userData.restZ = slide.position.z;
