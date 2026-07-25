@@ -118,6 +118,33 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000, activeAtEpochMs: 2_000 }))).toBe(true);
   });
 
+  it('returns host and guests to a valid readyable lobby before a second match', () => {
+    const ended = snapshot({
+      phase: 'ended',
+      activeAtHostTimeMs: 1_000,
+      activeAtEpochMs: 2_000,
+    });
+    const reset = {
+      ...ended,
+      revision: ended.revision + 1,
+      phase: 'waiting' as const,
+      activeAtHostTimeMs: null,
+      activeAtEpochMs: null,
+      members: ended.members.map((member) => ({ ...member, ready: false })),
+    };
+    expect(isLobbySnapshot(reset)).toBe(true);
+    expect(canHostStart(reset)).toBe(false);
+
+    const readiedAgain = { ...reset, members: reset.members.map((member) => ({ ...member, ready: true })) };
+    expect(canHostStart(readiedAgain)).toBe(true);
+    expect(isLobbySnapshot({
+      ...readiedAgain,
+      phase: 'countdown',
+      activeAtHostTimeMs: 9_000,
+      activeAtEpochMs: 10_000,
+    })).toBe(true);
+  });
+
   it('restricts hosted bots to host-owned exact 0, 2, or 4 settings', () => {
     expect(canGuestModifyHostedBots('host')).toBe(true);
     expect(canGuestModifyHostedBots('guest')).toBe(false);
