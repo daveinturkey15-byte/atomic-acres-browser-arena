@@ -14,6 +14,7 @@ const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 const results = [];
 const errors = [];
+const diagnosticTransportStatuses = [];
 async function keepPageAnimating(context, page) {
   if (headed) return;
   const cdp = await context.newCDPSession(page);
@@ -37,6 +38,13 @@ try {
         if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(`cycle ${cycle} ${label}: ${message.text()}`);
       });
       page.on('response', (response) => {
+        if (new URL(response.url()).pathname === '/v1/match-diagnostics') {
+          // Rematch correctness is isolated from the separately gated Worker
+          // deployment. Preserve the observed status in the receipt; the
+          // dedicated Pass 64 diagnostics browser test requires a real 201.
+          diagnosticTransportStatuses.push({ cycle, label, status: response.status() });
+          return;
+        }
         if (response.status() >= 400) errors.push(`cycle ${cycle} ${label}: HTTP ${response.status()} ${response.url()}`);
       });
       const url = new URL(baseUrl);
@@ -292,7 +300,7 @@ try {
     results.push(joined);
     await context.close();
   }
-  const report = { schema: 'atomic-acres/pass38-multiplayer-lifecycle@1', cycles, errors, results };
+  const report = { schema: 'atomic-acres/pass38-multiplayer-lifecycle@1', cycles, errors, diagnosticTransportStatuses, results };
   await mkdir('artifacts/pass38', { recursive: true });
   await writeFile('artifacts/pass38/multiplayer-lifecycle.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
