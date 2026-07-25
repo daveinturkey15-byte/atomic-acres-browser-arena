@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const mainSource = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
 describe('text chat UI contract', () => {

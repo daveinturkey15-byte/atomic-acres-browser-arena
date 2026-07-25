@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveRenderRuntimeRequest } from './render-runtime';
-import { assertTslCutoverReady, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
 describe('Pass 64 render runtime boundary', () => {
   it('keeps the shipped path explicit WebGL2 and only treats an exact query as WebGPU', () => {
@@ -20,6 +20,8 @@ describe('Pass 64 render runtime boundary', () => {
       'perimeter-water',
     ]);
     expect(pendingTslMigrationIds()).toHaveLength(TSL_MIGRATION_INVENTORY.length);
+    expect(new Set(TSL_MIGRATION_INVENTORY.map((entry) => entry.status))).toEqual(new Set(['tsl-authored']));
+    expect(() => assertTslReviewAuthored()).not.toThrow();
     expect(() => assertTslCutoverReady()).toThrow(/unverified TSL pipelines/);
   });
 

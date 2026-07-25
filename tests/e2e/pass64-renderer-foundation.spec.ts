@@ -1,7 +1,11 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
-test('fails a required WebGPU candidate closed before the legacy game can be mislabeled', async ({ page }) => {
+test('fails required hardware WebGPU closed on the CI adapter without loading the legacy game chunk', async ({ page }) => {
+  const scripts: string[] = [];
+  page.on('request', (request) => {
+    if (request.resourceType() === 'script') scripts.push(request.url());
+  });
   const pageError = page.waitForEvent('pageerror');
   await page.goto('/?renderer=webgpu&requireWebGPU=1&render=blender');
   const error = await pageError;
@@ -9,8 +13,11 @@ test('fails a required WebGPU candidate closed before the legacy game can be mis
   const state = await page.evaluate(() => ({
     backend: document.documentElement.dataset.renderBackend,
     debugApi: '__ATOMIC_ACRES_DEBUG__' in window,
+    blocked: document.querySelector('#webgpu-review-blocked')?.textContent,
   }));
-  expect(state).toEqual({ backend: undefined, debugApi: false });
+  expect(state).toMatchObject({ backend: 'blocked', debugApi: false });
+  expect(state.blocked).toContain('REVIEW BLOCKED');
+  expect(scripts.some((url) => /legacy-main|rapier/i.test(url))).toBe(false);
 });
 
 test('reports the active WebGL adapter and offscreen HDR samples separately', async ({ page }) => {
