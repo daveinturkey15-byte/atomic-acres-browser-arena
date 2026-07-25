@@ -12,6 +12,10 @@ const PROCESS_ONLY = Object.freeze([
   /^\.github\/PULL_REQUEST_TEMPLATE\.md$/,
   /^\.github\/workflows\/[^/]+\.ya?ml$/,
   /^scripts\/release\//,
+  // Agent-player drivers are external QA/controller tooling. They are never
+  // imported by src/ or copied into dist, so changing them cannot alter the
+  // shipped browser runtime.
+  /^scripts\/agent-player\//,
   /^scripts\/qa\/(?:run-with-preview-server|verify-release-topology-browser)\.mjs$/,
   /^acceptance\/(?:README\.md|example\.json|policy\.json|pass-[1-9][0-9]*\.json)$/,
   /^src\/(?:acceptance-gate|pipeline-metrics|production-receipt)\.test\.ts$/,
