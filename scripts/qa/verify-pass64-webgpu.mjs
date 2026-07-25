@@ -35,31 +35,66 @@ try {
     await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&requireWebGPU=1&map=${arenaId}`);
     await page.waitForFunction(() => '__ATOMIC_ACRES_WEBGPU_DEBUG__' in window, undefined, { timeout: 30_000 });
     const proof = await page.evaluate((id) => window.__ATOMIC_ACRES_WEBGPU_DEBUG__.selectCamera(id), cameraId);
-    const captureLayout = await page.evaluate(async () => {
+    await page.evaluate(async () => {
       document.documentElement.dataset.pass64Capture = 'stable';
       await document.fonts.ready;
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const panel = document.querySelector('#webgpu-review');
-      const title = panel?.querySelector('strong');
-      if (!(panel instanceof HTMLElement) || !(title instanceof HTMLElement)) throw new Error('WebGPU review panel is incomplete');
-      const panelRect = panel.getBoundingClientRect();
-      const titleRect = title.getBoundingClientRect();
-      return {
-        fonts: document.fonts.status,
-        reviewFontLoaded: document.fonts.check("900 27px 'Barlow Condensed'"),
-        titleInsidePanel: titleRect.left >= panelRect.left && titleRect.right <= panelRect.right && titleRect.top >= panelRect.top && titleRect.bottom <= panelRect.bottom,
-      };
     });
-    if (captureLayout.fonts !== 'loaded' || !captureLayout.reviewFontLoaded || !captureLayout.titleInsidePanel) {
-      throw new Error(`${arenaId} review UI was not layout-stable before capture`);
-    }
     await page.waitForFunction(() => {
       const status = document.querySelector('#webgpu-review-status')?.textContent ?? '';
       const fps = Number(/(\d+) FPS/.exec(status)?.[1] ?? '0');
       return fps >= 30;
     }, undefined, { timeout: 5_000 });
-    await page.waitForTimeout(350);
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const captureLayout = await page.evaluate(async () => {
+      const panel = document.querySelector('#webgpu-review');
+      if (!(panel instanceof HTMLElement)) throw new Error('WebGPU review panel is missing');
+      // Repaint the isolated HTML layer only after the WebGPU scene and remote
+      // fonts have both settled. This prevents a partial glyph layer from
+      // becoming evidence even when DOM geometry already looks valid.
+      panel.style.visibility = 'hidden';
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      panel.style.visibility = 'visible';
+      void panel.offsetWidth;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const panelRect = panel.getBoundingClientRect();
+      const directText = [...panel.querySelectorAll(':scope > small, :scope > strong, :scope > p')].map((node) => {
+        if (!(node instanceof HTMLElement)) throw new Error('Unexpected non-HTML review text node');
+        const rect = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return {
+          tag: node.tagName.toLowerCase(),
+          text: node.textContent?.trim() ?? '',
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+          insidePanel: rect.left >= panelRect.left && rect.right <= panelRect.right && rect.top >= panelRect.top && rect.bottom <= panelRect.bottom,
+          overflowX: style.overflowX,
+          textOverflow: style.textOverflow,
+          fontFamily: style.fontFamily,
+        };
+      });
+      return {
+        fonts: document.fonts.status,
+        reviewFontLoaded: document.fonts.check("900 27px 'Barlow Condensed'"),
+        directText,
+      };
+    });
+    const expectedDirectText = [
+      'PASS 64 · HARDWARE WEBGPU / TSL',
+      'VISUAL FORGE REVIEW',
+      'Inspection-only render path. Gameplay and network authority are deliberately disconnected.',
+    ];
+    const directTextStable = captureLayout.directText.length === expectedDirectText.length
+      && captureLayout.directText.every((entry, index) => (
+        entry.text === expectedDirectText[index]
+        && entry.scrollWidth <= entry.clientWidth + 1
+        && entry.insidePanel
+        && entry.overflowX === 'visible'
+        && entry.textOverflow === 'clip'
+      ));
+    if (captureLayout.fonts !== 'loaded' || !captureLayout.reviewFontLoaded || !directTextStable) {
+      throw new Error(`${arenaId} review text was not fully laid out before capture: ${JSON.stringify(captureLayout.directText)}`);
+    }
+    await page.waitForTimeout(150);
     await page.screenshot({ path: `${artifactRoot}/${arenaId}-${cameraId}.png`, animations: 'disabled' });
     const uniqueErrors = [...new Set(errors)];
     const receipt = {
