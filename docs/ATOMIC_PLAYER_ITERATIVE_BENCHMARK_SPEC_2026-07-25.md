@@ -50,13 +50,19 @@ A missing value never silently becomes zero. Metrics with no meaningful ordinal 
 - **C1:** Unit tests prove deterministic game IDs, metric directionality, tolerance handling, missing values, safety hard failures and immutable index updates.
 - **C2:** Migrating the existing baseline creates `G0001` without changing its source evidence and verifies every hash.
 - **C3:** A synthetic second game produces comparisons versus `G0001` and previous game covering every metric in the registry.
-- **C4:** Colour/UI fixtures reject top-right hostile-operator instructions and the central warmup countdown as fire authorization.
-- **C5:** No shot is possible while the visible countdown is active or respawn/postgame UI is visible.
-- **C6:** Firing requires a temporally confirmed, non-screen-locked target and is burst/cooldown bounded.
+- **C4:** Colour/UI fixtures reject minimap markers, top/right notifications and central countdown/engagement banners as fire authorization while retaining lower-left world pixels.
+- **C5:** No shot is possible while visible countdown, engagement banner, respawn or postgame UI is present.
+- **C6:** Automatic combat fire remains explicit opt-in and requires a temporally confirmed, visibly reviewed operator model; bursts and cooldowns remain bounded.
 - **C7:** Reload requests are debounced and suppressed while the visible reload state is active.
 - **C8:** No-target movement includes visible-frame stuck detection and a bounded reverse/turn escape action.
 - **C9:** The dedicated Windows GPU run ends with no held inputs, no dedicated Chrome process and no port-9333 listener.
 - **C10:** The next full Pass 63 game is archived and reports explicit improvement/regression/unchanged rows against `G0001`.
+
+## G0002 result and new gate
+
+G0002 proved that temporal persistence cannot rescue a wrong visual class. In Pass 63 Performance, walls, banners and damage notifications contain the Coral palette, while a visibly observed solo operator appeared tan/gold. Raw candidate saturation rose to 97.7%; the first temporally confirmed target was the `ENGAGE` banner; 150 screen-locked tracks were rejected; and the alignment gate allowed zero shots. One candidate frame visibly contained an operator in the lower-left world, but the old global 40%-left crop discarded it.
+
+The immediate correction gates the `ENGAGE` banner, masks the minimap and stacked right-side notices rather than the whole left field, and makes automatic combat fire explicit opt-in. Do not re-enable it until a replacement operator/motion model produces both a visibly confirmed engagement frame and an official credited bot hit in calibration.
 
 ## Out of scope
 

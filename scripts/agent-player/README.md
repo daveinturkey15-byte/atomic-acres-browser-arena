@@ -7,7 +7,8 @@ This directory contains Jigglyclaw's low-latency Atomic Acres player-side tools.
 - Drives the ordinary deploy/lobby controls with Playwright.
 - Forces `performance` rendering and records the observed live pass.
 - Supports `solo`, `host`, and `join` flows, private-room chat, Ready, and host-start.
-- Uses a downsampled rendered-canvas Coral detector with active-match gating, HUD exclusion, temporal confirmation and screen-lock rejection; colour alone never authorizes fire.
+- Uses a downsampled rendered-canvas Coral **candidate** detector with active-match/banner gating, HUD exclusion, temporal confirmation and screen-lock rejection; colour alone never proves an operator.
+- Automatic combat fire is opt-in with `--allow-combat-fire` and remains disabled until calibration produces a visibly confirmed operator and an official credited bot hit.
 - Uses latest-frame CDP screencast on GPU Chrome, with on-demand capture as a measured fallback.
 - Debounces reloads, bounds confirmed bursts, reacts to visible damage and uses visible-frame stuck recovery.
 - Sends bounded keyboard/mouse-equivalent events and releases every held input on exit/failure.

@@ -40,14 +40,17 @@ test('nearest plausible central coral component wins without exposing game state
   assert.ok(Math.abs(targets[0].y - 23) < 0.1);
 });
 
-test('Pass 63 minimap and top-HUD coral are ignored', () => {
+test('Pass 63 minimap and top-HUD coral are ignored without discarding lower-left world pixels', () => {
   const width = 100;
   const height = 60;
   const raw = frame(width, height);
-  paint(raw, width, 5, 18, 17, 38, [255, 116, 94]);
+  paint(raw, width, 5, 18, 17, 30, [255, 116, 94]);
   paint(raw, width, 29, 22, 33, 28, [255, 116, 94]);
   paint(raw, width, 48, 2, 55, 7, [255, 116, 94]);
-  assert.equal(findCoralTargets(raw, width, height, 3).length, 0);
+  paint(raw, width, 21, 34, 26, 45, [255, 116, 94]);
+  const targets = findCoralTargets(raw, width, height, 3);
+  assert.equal(targets.length, 1);
+  assert.ok(targets[0].x < 39 && targets[0].y > 31);
 });
 
 test('large coral scenery is rejected as an implausible operator', () => {
@@ -58,11 +61,12 @@ test('large coral scenery is rejected as an implausible operator', () => {
   assert.equal(findCoralTargets(raw, width, height, 3).length, 0);
 });
 
-test('Pass 63 top-right hostile-operator notification cannot become a target', () => {
+test('Pass 63 top-right hostile-operator and damage notifications cannot become targets', () => {
   const width = 100;
   const height = 60;
   const raw = frame(width, height);
   paint(raw, width, 70, 8, 78, 13, [255, 116, 94]);
+  paint(raw, width, 81, 22, 90, 29, [255, 116, 94]);
   paint(raw, width, 45, 24, 50, 35, [255, 116, 94]);
   const targets = findCoralTargets(raw, width, height, 3);
   assert.equal(targets.length, 1);

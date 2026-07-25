@@ -8,9 +8,12 @@ export const DEFAULT_CORAL_MASK = Object.freeze({
 });
 
 export const DEFAULT_EXCLUDED_REGIONS = Object.freeze([
-  // Pass 63's persistent hostile-operator notification uses the same Coral
-  // palette as operators. It is HUD, so it must never authorize aim or fire.
+  // The visible minimap may contain Coral markers; exclude its rectangle rather than the whole left field.
+  Object.freeze({ minimumXRatio: 0, maximumXRatio: 0.39, minimumYRatio: 0, maximumYRatio: 0.52 }),
+  // Pass 63's persistent hostile-operator notification uses the same Coral palette as operators.
   Object.freeze({ minimumXRatio: 0.67, maximumXRatio: 1, minimumYRatio: 0.05, maximumYRatio: 0.31 }),
+  // Stacked DAMAGE TAKEN notifications move as new rows appear, defeating simple screen-lock tracking.
+  Object.freeze({ minimumXRatio: 0.78, maximumXRatio: 1, minimumYRatio: 0.28, maximumYRatio: 0.72 }),
 ]);
 
 export function isCoralPixel(red, green, blue, config = DEFAULT_CORAL_MASK) {
@@ -29,12 +32,11 @@ export function findCoralTargets(raw, width, height, channels = 3, options = {})
   if (!Number.isInteger(channels) || channels < 3) throw new Error('Vision frame must have at least three channels');
   if (!raw || raw.length < width * height * channels) throw new Error('Vision frame is smaller than its declared dimensions');
 
-  // Pass 63 puts coral team markers in the large left minimap and red
-  // counters along the top. V1 deliberately sacrifices peripheral vision to
-  // avoid confidently aiming at HUD pixels.
+  // Pass 63 puts team markers in the minimap and counters along the top.
+  // Exclude the actual HUD rectangles while preserving world pixels below the minimap.
   const minimumY = Math.max(0, Math.floor(height * (options.minimumYRatio ?? 0.18)));
   const maximumY = Math.min(height - 1, Math.ceil(height * (options.maximumYRatio ?? 0.72)));
-  const minimumX = Math.max(0, Math.floor(width * (options.minimumXRatio ?? 0.40)));
+  const minimumX = Math.max(0, Math.floor(width * (options.minimumXRatio ?? 0.04)));
   const maximumX = Math.min(width - 1, Math.ceil(width * (options.maximumXRatio ?? 0.97)));
   const minimumPixels = Math.max(2, Math.floor(options.minimumPixels ?? 6));
   const maximumPixels = Math.max(minimumPixels, Math.floor(options.maximumPixels ?? width * height * 0.035));

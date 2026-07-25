@@ -248,6 +248,7 @@ async function visibleHudSnapshot(page) {
     };
     const timer = document.querySelector('#timer')?.textContent?.trim() ?? null;
     const countdownVisible = visible('#countdown');
+    const bannerVisible = visible('#banner');
     const respawnVisible = visible('#respawn');
     const matchSummaryVisible = Boolean(document.querySelector('#download-match-summary'));
     return {
@@ -258,10 +259,11 @@ async function visibleHudSnapshot(page) {
       damageTaken: numericText('#damage-taken'),
       timer,
       countdownVisible,
+      bannerVisible,
       respawnVisible,
       reloadState: document.querySelector('#reload-state')?.textContent?.trim() ?? '',
       matchSummaryVisible,
-      activeMatch: !countdownVisible && !respawnVisible && !matchSummaryVisible && Boolean(timer && timer !== '00:00'),
+      activeMatch: !countdownVisible && !bannerVisible && !respawnVisible && !matchSummaryVisible && Boolean(timer && timer !== '00:00'),
     };
   });
 }
@@ -368,6 +370,7 @@ async function run() {
   const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 40);
   const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
   const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
+  const allowCombatFire = Boolean(args['allow-combat-fire']);
   const allowLive = Boolean(args['allow-live']);
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');
   const targetUrl = new URL(baseUrl);
@@ -659,7 +662,7 @@ async function run() {
             firstTargetCaptured = true;
           }
           const currentlyReloading = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
-          if (activeMatch && alignment < 0.12 && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
+          if (allowCombatFire && activeMatch && alignment < 0.12 && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
             const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
             await fireBurst(page, shots, alignment < 0.075);
             shotPulses += shots;
@@ -817,6 +820,7 @@ async function run() {
       fairness: {
         perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-coral-mask-v2-temporal-visible-hud',
         policyVersion: 'atomic-player-policy-v2',
+        automaticCombatFireEnabled: allowCombatFire,
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
