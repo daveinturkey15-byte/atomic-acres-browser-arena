@@ -110,6 +110,8 @@ export class ArenaContrastLighting {
       light.userData.presentationOnly = true;
       light.userData.blocksShots = false;
       light.userData.practicalPolicyId = policy.id;
+      light.userData.authoredIntensity = spec.intensity;
+      light.userData.authoredTarget = [...spec.target];
       const target = new THREE.Object3D();
       target.name = `${light.name}-target`;
       target.position.set(spec.target[0], spec.target[1], spec.target[2]);
@@ -120,6 +122,25 @@ export class ArenaContrastLighting {
     }
     this.activeRoot = root;
     this.scene.add(root);
+  }
+
+  /** Slow deterministic practical-light motion; presentation only, no allocations. */
+  update(nowMs: number): void {
+    if (!this.activeRoot || (this.arenaId !== 'rustworks-1v1' && this.arenaId !== 'gun-range')) return;
+    const seconds = nowMs / 1_000;
+    let index = 0;
+    for (const node of this.activeRoot.children) {
+      if (!(node instanceof THREE.SpotLight)) continue;
+      const base = Number(node.userData.authoredIntensity ?? node.intensity);
+      const phase = index * 1.73;
+      const amplitude = this.arenaId === 'rustworks-1v1' ? 0.075 : 0.045;
+      node.intensity = base * (1 - amplitude + amplitude * (Math.sin(seconds * 0.72 + phase) * 0.5 + 0.5));
+      const authoredTarget = node.userData.authoredTarget as readonly number[] | undefined;
+      if (this.arenaId === 'gun-range' && authoredTarget?.length === 3) {
+        node.target.position.x = authoredTarget[0] + Math.sin(seconds * 0.24) * 2.4;
+      }
+      index += 1;
+    }
   }
 
   telemetry(): ArenaContrastLightingTelemetry {

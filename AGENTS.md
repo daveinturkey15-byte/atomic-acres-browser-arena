@@ -23,7 +23,14 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - Shipped humans, bots, and their corpses use the same canonical rigged operator family, current team appearance, and current weapon presentation. Primitive/blocky/procedural humanoids are test fixtures only and must never be a runtime fallback when a canonical rig exists. A corpse is a non-authoritative presentation snapshot, never a second low-quality character implementation.
 - Every arena change must pass the forging review: no floating or orphan geometry, no missing interior roof/floor, doors and openings read as their gameplay semantics, authored visible mass matches movement and projectile authority, opaque surfaces occlude local light/effects, asset quality is coherent with its surroundings, and deterministic review cameras cover the changed surfaces in both profiles.
 - Keep stable machine arena IDs separate from display labels. Current display order is Nuke Town, Terminal, RustRig, Gun Range. Decode retired labels only at explicit URL/storage/protocol compatibility boundaries and never emit them as current UI text.
-- Pass 64's required HITL route is WebGPU fail-closed after renderer initialization and contains no legacy custom GLSL materials. WebGL2 is compatibility coverage only. Preserve the byte-exact Pass 62 stable subtree as rollback; never reinterpret it through shared Pass 64 renderer code.
+- Pass 64's required HITL route is WebGPU fail-closed after renderer initialization and contains no legacy custom GLSL materials. WebGL2 is compatibility coverage only. Preserve the byte-exact Pass 63 production subtree as the selectable stable rollback and retain Pass 62's immutable benchmark record; never reinterpret either through shared Pass 64 renderer code.
+
+## HUD and menu forging
+
+- Preserve the typed UI surface and lifecycle-state inventories in `src/ui/surface-registry.ts`. A visual redesign may move or restyle a surface, but must not drop multiplayer state, loadout, accessibility, diagnostics, keyboard/gamepad focus, or return-to-lobby controls.
+- Player-facing command and HUD chrome must remain a bright, legible tactical system rather than regressing to a near-black or dark-blue monolith. At 1280x720, menu labels and critical HUD status text are at least 9px, primary actions and values are at least 12px, and every review viewport must be free of clipping and surface overlap.
+- Arena-selection previews use the selected arena's real renderer and a presentation-only camera. Nuke Town, Terminal, and RustRig use helicopter-cockpit flyover framing; Gun Range uses cat first-person framing. Keep `previewTime` deterministic for captures and make reduced-motion mode a static, equally informative pose.
+- Every HUD/menu change runs `src/ui/surface-registry.test.ts`, `src/ui/menu-preview-camera.test.ts`, and `tests/e2e/pass64-hud-menu.spec.ts`, then visually inspects the desktop, laptop, ultrawide, narrow, high-DPI, live-HUD, returned-lobby, and match-end artifacts.
 
 ## Integration and production
 

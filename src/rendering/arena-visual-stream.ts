@@ -172,6 +172,28 @@ export class ArenaVisualStreamController {
     if (!this.activeGameplayRequests.includes(url)) this.activeGameplayRequests.push(url);
   }
 
+  /**
+   * Repairs only presentation attachment/visibility for the exact root already
+   * adopted by the selected definition. It never rebuilds map collision,
+   * raycast authority, or substitutes another arena root.
+   */
+  restoreGameplayRoot(arenaId: ArenaId, root: THREE.Group): boolean {
+    if (this.activeGameplayRoot !== root || this.activeGameplayDefinition?.id !== arenaId) return false;
+    if (root.userData.authoritativeArenaId !== arenaId || root.userData.arenaVisualDefinitionId !== arenaId) return false;
+    let changed = false;
+    if (root.parent !== this.scene) {
+      this.scene.add(root);
+      changed = true;
+    }
+    if (!root.visible) {
+      root.visible = true;
+      changed = true;
+    }
+    const activeRoots = this.scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined);
+    if (activeRoots.length !== 1 || activeRoots[0] !== root) return false;
+    return changed;
+  }
+
   dispose(): void {
     this.pendingAbort?.abort();
     this.pendingAbort = null;

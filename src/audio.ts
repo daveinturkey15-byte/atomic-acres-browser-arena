@@ -7,6 +7,23 @@ import { presentationRandom } from './runtime-random';
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 export const GRENADE_FUSE_BEEP_START_MS = 1_450;
 
+export const RAILGUN_REPORT_PROFILE = Object.freeze({
+  body: 42,
+  bodyEnd: 13,
+  duration: 0.46,
+  crack: 5_200,
+  noise: 0.5,
+  lowpass: 3_200,
+  tail: 180,
+  tailDuration: 0.9,
+  pressureDuration: 0.62,
+  layerCount: 8,
+});
+
+export function railgunReportAttenuation(remote: boolean, distance: number): number {
+  return remote ? Math.max(0.1, 0.68 * (1 - Math.min(1, Math.max(0, distance) / 130))) : 1;
+}
+
 export function grenadeFuseBeepIntervalMs(remainingMs: number): number {
   const bounded = Math.min(GRENADE_FUSE_BEEP_START_MS, Math.max(0, Number.isFinite(remainingMs) ? remainingMs : 0));
   return Math.round(90 + bounded * 0.19);
@@ -61,6 +78,7 @@ export class ArenaAudio {
   private grenadeFuseBeeps = 0;
   private supportCuePlays = 0;
   private explosionAudioGate = createExplosionAudioGate();
+  private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
 
   unlock(): void {
     if (!this.context) {
@@ -101,8 +119,12 @@ export class ArenaAudio {
   shot(weapon: WeaponId, remote = false, distance = 0): void {
     this.unlock();
     if (!this.context || !this.weapons) return;
-    const attenuation = remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
-    const profile = weapon === 'scattergun'
+    const attenuation = weapon === 'railgun'
+      ? railgunReportAttenuation(remote, distance)
+      : remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
+    const profile = weapon === 'railgun'
+      ? RAILGUN_REPORT_PROFILE
+      : weapon === 'scattergun'
       ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
       : weapon === 'sniper'
         ? { body: 62, bodyEnd: 24, duration: 0.26, crack: 2920, noise: 0.3, lowpass: 2400, tail: 330, tailDuration: 0.42 }
@@ -149,11 +171,29 @@ export class ArenaAudio {
       if (!remote) this.noise({ duration: 0.022, volume: 0.046, filter: 'highpass', frequency: 4200, q: 0.55, delay: 0.043 }, this.feedback);
     }
 
+    if (weapon === 'railgun') {
+      // An authored pressure report, supersonic snap and long structural tail.
+      // It remains on the existing compressed weapon/ambience buses, so local
+      // and replicated shots are large without bypassing the bounded mix.
+      this.sweep(36, 10, RAILGUN_REPORT_PROFILE.pressureDuration, 0.2 * attenuation, 'sawtooth', this.weapons, 0.008);
+      this.sweep(118, 24, 0.38, 0.12 * attenuation, 'triangle', this.weapons, 0.026);
+      this.noise({ duration: 0.7, volume: 0.2 * attenuation, filter: 'bandpass', frequency: 165, q: 0.5, delay: 0.045 }, this.ambience);
+      this.noise({ duration: 0.08, volume: 0.16 * attenuation, filter: 'highpass', frequency: 4_800, q: 0.32, delay: 0.006 }, this.feedback);
+      this.tone(92, 0.42, 0.13 * attenuation, 'triangle', this.ambience, 0.075);
+    }
+
     if (!remote) {
       const mechanismDelay = weapon === 'scattergun' ? 0.21 : weapon === 'sniper' ? 0.62 : 0.055;
       this.tone(weapon === 'scattergun' ? 340 : weapon === 'sniper' ? 290 : 520, 0.028, 0.038, 'square', this.feedback, mechanismDelay);
       this.tone(weapon === 'smg' ? 680 : 430, 0.018, 0.022, 'triangle', this.feedback, mechanismDelay + 0.025);
     }
+  }
+
+  railgunReport(remote = false, distance = 0): void {
+    if (remote) this.railgunReports.replicated += 1;
+    else this.railgunReports.local += 1;
+    this.railgunReports.lastAttenuation = railgunReportAttenuation(remote, distance);
+    this.shot('railgun', remote, distance);
   }
 
   hit(headshot = false): void {
@@ -384,12 +424,14 @@ export class ArenaAudio {
     ambience: { continuousSources: 0; busGain: number };
     grenadeFuse: { beeps: number; startMs: number };
     support: { cues: number };
+    railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
   } {
     return {
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: { continuousSources: 0, busGain: this.ambience?.gain.value ?? 0.12 },
       grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
       support: { cues: this.supportCuePlays },
+      railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
     };
   }
 

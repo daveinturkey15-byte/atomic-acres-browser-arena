@@ -10,10 +10,10 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the current public release first with an explicit UK timezone', () => {
+  it('keeps the pending Pass 64 release first until production injects its timestamp', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass63');
+    expect(latest.id).toBe('pass64');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -23,7 +23,7 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · 25 JUL 2026 · 03:50 BST');
+    expect(lastUpdatedButtonLabel(latest)).toContain(PENDING_PRODUCTION_RELEASE);
   });
 
   it('uses the successful production promotion rather than implementation time', () => {

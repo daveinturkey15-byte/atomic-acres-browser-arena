@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FFA_MINIMUM_SPAWN_SEPARATION, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
 import type { ArenaId } from './map-selection';
 
 const arenas: ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'];
@@ -67,6 +67,34 @@ describe('mode-aware deterministic spawn safety', () => {
     expect([100, 101]).toContain(alpha.index);
     expect([100, 101]).toContain(bravo.index);
     expect(stableSpawnTieBreakSeed('alpha')).not.toBe(stableSpawnTieBreakSeed('bravo'));
+  });
+
+  it('reserves collision-free initial FFA deployment points before peer snapshots exist', () => {
+    const actors = ['charlie', 'alpha', 'bravo'];
+    const candidates = [
+      { index: 0, point: { x: 0, y: 0, z: 0 } },
+      { index: 1, point: { x: 3, y: 0, z: 0 } },
+      { index: 2, point: { x: 10, y: 0, z: 0 } },
+      { index: 3, point: { x: 20, y: 0, z: 0 } },
+    ];
+    const reservations = actors.map((actor) => initialFfaSpawnReservation(actor, actors, candidates, 42));
+    expect(new Set(reservations).size).toBe(actors.length);
+    const points = reservations.map((index) => candidates.find((candidate) => candidate.index === index)!.point);
+    for (let left = 0; left < points.length; left += 1) {
+      for (let right = left + 1; right < points.length; right += 1) {
+        expect(Math.hypot(points[left].x - points[right].x, points[left].z - points[right].z))
+          .toBeGreaterThanOrEqual(FFA_MINIMUM_SPAWN_SEPARATION);
+      }
+    }
+    expect(initialFfaSpawnReservation('alpha', actors, candidates, 42))
+      .toBe(initialFfaSpawnReservation('alpha', [...actors].reverse(), candidates, 42));
+  });
+
+  it('falls back when the authored spawn set cannot separate the initial roster', () => {
+    expect(initialFfaSpawnReservation('alpha', ['alpha', 'bravo'], [
+      { index: 0, point: { x: 0, y: 0, z: 0 } },
+      { index: 1, point: { x: 2, y: 0, z: 0 } },
+    ])).toBeNull();
   });
 
   it('rejects empty or non-finite candidate sets', () => {

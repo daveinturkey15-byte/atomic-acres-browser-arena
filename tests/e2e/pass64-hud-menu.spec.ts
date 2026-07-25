@@ -13,7 +13,7 @@ const reviewViewports = [
 const highDpiViewport = { id: 'high-dpi', width: 390, height: 844 } as const satisfies ReviewViewport;
 
 async function ready(page: Page): Promise<void> {
-  await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud');
+  await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud&previewTime=0');
   await page.waitForFunction(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const solo = document.querySelector<HTMLButtonElement>('#solo');
@@ -42,6 +42,15 @@ async function startDeterministicSolo(page: Page): Promise<void> {
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
 }
 
+async function refreshPausedCanvasAfterViewportChange(page: Page): Promise<void> {
+  // Resizing a canvas clears its backing store. Submit real world frames again
+  // before freezing deterministic HUD evidence so a solid clear colour can
+  // never masquerade as a valid live-match screenshot.
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+  await page.waitForTimeout(180);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+}
+
 test.describe('Pass 64 command HUD and menu contract', () => {
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
     await ready(page);
@@ -60,12 +69,25 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       { id: 'gun-range', route: 'gun-range' },
     ]);
 
+    await expect(page.locator('#menu-showcase > #game')).toBeVisible();
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
+    await expect(page.locator('#menu-preview-label')).toContainText('NUKE TOWN');
+
     await cards.nth(1).click();
     await expect(page.locator('#arena-title')).toHaveText('TERMINAL');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
+    await expect(page.locator('#menu-preview-label')).toContainText('TERMINAL');
     await cards.nth(2).click();
     await expect(page.locator('#arena-title')).toHaveText('RustRig');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
+    await expect(page.locator('#menu-preview-label')).toContainText('RUSTRIG');
+    await cards.nth(3).click();
+    await expect(page.locator('#arena-title')).toHaveText('GUN RANGE');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'cat');
+    await expect(page.locator('#menu-preview-label')).toContainText('CAT-CAM');
     await cards.nth(0).click();
     await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
   });
 
   test('supports keyboard tabs and traps/restores dialog focus', async ({ page }) => {
@@ -98,6 +120,35 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(opener).toBeFocused();
   });
 
+  test('animates the live arena preview when motion is allowed', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', (error) => runtimeErrors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') runtimeErrors.push(message.text());
+    });
+    await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud-motion');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    const before = await page.evaluate(() => ({
+      position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
+      motion: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.motion,
+      phase: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.phase,
+      parent: document.querySelector<HTMLCanvasElement>('#game')?.parentElement?.id,
+    }));
+    await page.waitForTimeout(350);
+    const after = await page.evaluate(() => ({
+      position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
+      phase: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.phase,
+    }));
+    const travel = Math.hypot(...after.position.map((value, index) => value - before.position[index]!));
+    expect(before.motion).toBe('orbit');
+    expect(before.parent).toBe('menu-showcase');
+    expect(runtimeErrors).toEqual([]);
+    expect(before.phase).toMatch(/^-?\d+\.\d+$/);
+    expect(after.phase).toMatch(/^-?\d+\.\d+$/);
+    expect(Number(after.phase) - Number(before.phase)).toBeGreaterThan(0.05);
+    expect(travel).toBeGreaterThan(0.05);
+  });
+
   for (const viewport of reviewViewports) {
     test(`keeps the deployment shell bounded at ${viewport.id} ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
@@ -111,6 +162,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         const workspace = document.querySelector<HTMLElement>('.command-workspace')!;
         const rect = menu.getBoundingClientRect();
         const mapRect = map.getBoundingClientRect();
+        const mapDetail = getComputedStyle(document.querySelector<HTMLElement>('.map-card small')!);
+        const heading = getComputedStyle(document.querySelector<HTMLElement>('.map-card span')!);
         return {
           contract: root.dataset.uiContract,
           pageOverflowX: root.scrollWidth - root.clientWidth,
@@ -118,6 +171,10 @@ test.describe('Pass 64 command HUD and menu contract', () => {
           withinViewport: rect.left >= -1 && rect.right <= innerWidth + 1 && rect.top >= -1 && rect.bottom <= innerHeight + 1,
           mapWithinMenu: mapRect.left >= rect.left - 1 && mapRect.right <= rect.right + 1,
           showcaseInsideWorkspace: workspace.contains(showcase),
+          rendererInsideShowcase: showcase.querySelector(':scope > #game') !== null,
+          previewFrameVisible: getComputedStyle(document.querySelector<HTMLElement>('#menu-preview-frame')!).display !== 'none',
+          mapDetailFontPx: Number.parseFloat(mapDetail.fontSize),
+          mapHeadingFontPx: Number.parseFloat(heading.fontSize),
           shellWidthRatio: rect.width / innerWidth,
         };
       });
@@ -127,6 +184,10 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(layout.withinViewport).toBe(true);
       expect(layout.mapWithinMenu).toBe(true);
       expect(layout.showcaseInsideWorkspace).toBe(true);
+      expect(layout.rendererInsideShowcase).toBe(true);
+      expect(layout.previewFrameVisible).toBe(true);
+      expect(layout.mapDetailFontPx).toBeGreaterThanOrEqual(9);
+      expect(layout.mapHeadingFontPx).toBeGreaterThanOrEqual(15);
       expect(layout.shellWidthRatio).toBeGreaterThan(viewport.id === 'ultrawide' ? 0.8 : viewport.id === 'narrow' ? 0.99 : 0.95);
 
       await captureReview(page, testInfo, 'setup', viewport);
@@ -181,12 +242,16 @@ test.describe('Pass 64 command HUD and menu contract', () => {
           : Number.parseFloat(card.transitionDuration) * 1000,
         status: document.querySelector('#network-status')?.textContent,
         controls: document.querySelectorAll('.menu-tabs button, .menu-actions button, .join-row button').length,
+        previewMotion: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.motion,
+        rendererParent: document.querySelector<HTMLCanvasElement>('#game')?.parentElement?.id,
       };
     });
     expect(contract.panelAnimationMs).toBeLessThanOrEqual(0.01);
     expect(contract.cardTransitionMs).toBeLessThanOrEqual(0.01);
     expect(contract.status).toContain('ready');
     expect(contract.controls).toBeGreaterThanOrEqual(8);
+    expect(contract.previewMotion).toBe('static');
+    expect(contract.rendererParent).toBe('menu-showcase');
   });
 
   test('preserves the critical live-match HUD across the review viewport matrix', async ({ page }, testInfo) => {
@@ -202,12 +267,36 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#support-block [data-support]')).toHaveCount(5);
     for (const viewport of reviewViewports) {
       await page.setViewportSize(viewport);
+      await refreshPausedCanvasAfterViewportChange(page);
       const mapGeometry = await page.evaluate(() => {
         const minimap = document.querySelector('#minimap')!.getBoundingClientRect();
         const heading = document.querySelector('#map-heading')!.getBoundingClientRect();
-        return { minimapBottom: minimap.bottom, headingTop: heading.top };
+        const panels = ['#matchbar', '#objective', '#fps-counter', '#network-strip', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console', '#support-block']
+          .map((selector) => ({ selector, rect: document.querySelector(selector)!.getBoundingClientRect().toJSON() }));
+        const overlapPairs: string[] = [];
+        for (let left = 0; left < panels.length; left += 1) {
+          for (let right = left + 1; right < panels.length; right += 1) {
+            const a = panels[left]!;
+            const b = panels[right]!;
+            const overlaps = a.rect.left < b.rect.right - 1
+              && a.rect.right > b.rect.left + 1
+              && a.rect.top < b.rect.bottom - 1
+              && a.rect.bottom > b.rect.top + 1;
+            if (overlaps) overlapPairs.push(`${a.selector}:${b.selector}`);
+          }
+        }
+        return {
+          minimapBottom: minimap.bottom,
+          headingTop: heading.top,
+          overlapPairs,
+          objectiveFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('#objective')!).fontSize),
+          supportStateFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.support-state')!).fontSize),
+        };
       });
       expect(mapGeometry.headingTop).toBeGreaterThanOrEqual(mapGeometry.minimapBottom);
+      expect(mapGeometry.overlapPairs).toEqual([]);
+      expect(mapGeometry.objectiveFontPx).toBeGreaterThanOrEqual(9);
+      expect(mapGeometry.supportStateFontPx).toBeGreaterThanOrEqual(viewport.id === 'narrow' ? 8 : 9);
       await captureReview(page, testInfo, 'live-hud', viewport);
     }
   });
@@ -279,6 +368,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
 
     for (const viewport of reviewViewports) {
       await page.setViewportSize(viewport);
+      await refreshPausedCanvasAfterViewportChange(page);
       await captureReview(page, testInfo, 'match-end', viewport);
     }
   });

@@ -84,7 +84,7 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     { count: 64, minX: -37, maxX: 37, minZ: -39, maxZ: 39 },
   ),
   'rustworks-1v1': atmosphereLayout(
-    [[-21, -18, 13, 4.4], [20, 18, 13, 4.4], [0, -12, 9, 3]],
+    [[-21, -18, 13, 4.4], [20, 18, 13, 4.4], [0, -12, 9, 3], [23, -7, 8, 3.2], [-23, 8, 8, 3.2]],
     [[-19, 9, 2.4, 4.4], [19, -10, 2.4, 4.4], [0, 1, 2.8, 5.4]],
     { count: 96, minX: -28, maxX: 28, minZ: -30, maxZ: 30 },
   ),
@@ -99,6 +99,7 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     { count: 80, minX: -34, maxX: 34, minZ: -34, maxZ: 34 },
   ),
 });
+const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 
 function tagPipeline(material: THREE.Material, pipelineId: string): void {
   material.userData.tslPipelineId = pipelineId;
@@ -137,10 +138,15 @@ function makeMist(definition: ArenaVisualDefinition): THREE.Group {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  for (const [x, z, width, depth] of ATMOSPHERE_LAYOUTS[definition.id].mist) {
+  for (let index = 0; index < MAX_MIST_LAYERS; index += 1) {
+    const placement = ATMOSPHERE_LAYOUTS[definition.id].mist[index];
     const layer = new THREE.Points(geometry, material);
-    layer.position.set(x, 0.08, z);
-    layer.scale.set(width, 0.85, depth);
+    layer.visible = placement !== undefined;
+    if (placement) {
+      const [x, z, width, depth] = placement;
+      layer.position.set(x, 0.08, z);
+      layer.scale.set(width, 0.85, depth);
+    }
     root.add(layer);
   }
   return root;
@@ -302,9 +308,9 @@ function makeWater(arenaId: ArenaVisualDefinition['id']): THREE.Mesh {
   geometry.translate(0, -19.5, 0);
   const material = new MeshStandardNodeMaterial({ transparent: true, opacity: 0.82, roughness: 0.27, metalness: 0.08, side: DoubleSide });
   const animationTime = uniform(0);
-  const wave = sin(positionLocal.x.mul(0.12).add(animationTime.mul(0.8)))
-    .add(sin(positionLocal.z.mul(0.16).sub(animationTime.mul(0.53))))
-    .mul(0.1);
+  const wave = sin(positionLocal.x.mul(0.12).add(animationTime.mul(0.8))).mul(0.085)
+    .add(sin(positionLocal.z.mul(0.16).sub(animationTime.mul(0.53))).mul(0.07))
+    .add(sin(positionLocal.x.mul(0.07).add(positionLocal.z.mul(0.11)).add(animationTime.mul(0.31))).mul(0.045));
   material.positionNode = positionLocal.add(vec3(0, wave, 0));
   const shimmer = sin(positionWorld.x.add(positionWorld.z).mul(0.09).add(animationTime.mul(0.45))).mul(0.5).add(0.5);
   material.colorNode = mix(color(0x173e4b), color(0x4b8993), shimmer);
@@ -316,6 +322,8 @@ function makeWater(arenaId: ArenaVisualDefinition['id']): THREE.Mesh {
   water.renderOrder = -5;
   water.frustumCulled = false;
   water.userData.animationTimeUniform = animationTime;
+  water.userData.waveBands = 3;
+  water.userData.waveAuthority = 'presentation-only-tsl';
   return water;
 }
 

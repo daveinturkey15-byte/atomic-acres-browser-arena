@@ -55,6 +55,44 @@ export function stableSpawnTieBreakSeed(id: string): number {
   return hash >>> 0;
 }
 
+/**
+ * Initial FFA deployment happens before peer snapshots are guaranteed to be
+ * visible. Reserve separated authored points from the shared lobby roster so
+ * every peer cannot independently select the same apparently-empty spawn.
+ */
+export function initialFfaSpawnReservation(
+  actorId: string,
+  actorIds: readonly string[],
+  candidates: readonly SpawnCandidate[],
+  rotationSeed = 0,
+): number | null {
+  const actors = [...new Set(actorIds.filter(Boolean))].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  const actorIndex = actors.indexOf(actorId);
+  if (actorIndex < 0 || candidates.length < actors.length) return null;
+
+  const orderedCandidates = [...candidates]
+    .filter(({ point }) => finitePoint(point))
+    .sort((left, right) => seededRank(left.index, rotationSeed) - seededRank(right.index, rotationSeed)
+      || left.index - right.index);
+  const reservations: SpawnCandidate[] = [];
+  const minimumSeparationSq = FFA_MINIMUM_SPAWN_SEPARATION ** 2;
+  const reserveSeparatedSet = (candidateIndex: number): boolean => {
+    if (reservations.length === actors.length) return true;
+    const required = actors.length - reservations.length;
+    if (orderedCandidates.length - candidateIndex < required) return false;
+    for (let index = candidateIndex; index < orderedCandidates.length; index += 1) {
+      const candidate = orderedCandidates[index];
+      if (!reservations.every((reserved) => distanceSq(candidate.point, reserved.point) >= minimumSeparationSq)) continue;
+      reservations.push(candidate);
+      if (reserveSeparatedSet(index + 1)) return true;
+      reservations.pop();
+    }
+    return false;
+  };
+  if (!reserveSeparatedSet(0)) return null;
+  return reservations[actorIndex]?.index ?? null;
+}
+
 function seededRank(index: number, seed: number): number {
   let value = Math.imul((index | 0) ^ (seed | 0), 0x45d9f3b);
   value ^= value >>> 16;

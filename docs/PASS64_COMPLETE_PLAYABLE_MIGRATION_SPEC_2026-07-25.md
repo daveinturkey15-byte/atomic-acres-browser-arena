@@ -2,7 +2,7 @@
 
 Date: 2026-07-25
 
-Status: implementation candidate; not accepted and not publishable
+Status: implementation and release candidate; Pass 64 publishes only after its exact required gates pass, with Pass 63 retained byte-exact as stable
 
 ## Overview
 
@@ -12,7 +12,7 @@ Replace the disconnected Pass 64 renderer laboratory with a complete playable Th
 
 ### Observations
 
-- Pass 62 remains the exact stable benchmark at source `249a7ee77dce761eb237f3eb0e0d0ea1d0356317` and runtime digest `035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d`.
+- Pass 62 remains the immutable best-netcode benchmark record at source `249a7ee77dce761eb237f3eb0e0d0ea1d0356317` and runtime digest `035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d`.
 - Pass 63 is the current live source at `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`.
 - Pass 64 draft SHA `21cb948a998ca527cc30e076d86766b60fec3dfe` routes the normal URL to `legacy-main.ts`/WebGL and routes `renderer=webgpu` to a disconnected visual review entry.
 - Owner HITL rejected that split and judged the HUD/menu changes insufficiently transformed.
@@ -101,7 +101,7 @@ The supplied gameplay URL must be the full hardware WebGPU game. The supplied co
 
 ## Out of scope before HITL
 
-- Publishing, merging or creating Pass 64 acceptance approval.
+- Publishing or merging before the exact candidate satisfies the acceptance and protected release gates.
 - Rebuilding Pass 62 with shared Pass 64 code.
 - Sending chat, callsigns, room codes, peer identifiers, IP addresses, secrets or raw browser profiles to diagnostics storage.
 - Claiming WAN/TURN, anti-cheat or host-migration guarantees from local browser tests.

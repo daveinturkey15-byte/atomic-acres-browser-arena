@@ -1,12 +1,26 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
+  BOT_EMISSIVE_BRIGHTNESS_SCALE,
+  applyBotEmissiveBrightness,
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
   suppressEmbeddedWeaponObjects,
 } from './operator-model';
 
 describe('rigged operator presentation contract', () => {
+  it('halves bot emissive brightness idempotently without changing base colour', () => {
+    const root = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({ color: 0xd85cff, emissive: 0x7d16bd, emissiveIntensity: 1.2 });
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
+    expect(applyBotEmissiveBrightness(root)).toBe(1);
+    expect(material.emissiveIntensity).toBeCloseTo(1.2 * BOT_EMISSIVE_BRIGHTNESS_SCALE);
+    expect(material.color.getHex()).toBe(0xd85cff);
+    applyBotEmissiveBrightness(root);
+    expect(material.emissiveIntensity).toBeCloseTo(0.6);
+    expect(root.userData.botEmissiveBrightnessScale).toBe(0.5);
+  });
+
   it('suppresses embedded loadout weapons by semantic identity without hiding body meshes', () => {
     const root = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)); body.name = 'Swat_Body';

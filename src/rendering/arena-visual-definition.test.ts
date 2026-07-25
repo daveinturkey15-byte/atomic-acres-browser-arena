@@ -123,6 +123,20 @@ describe('Pass 64 arena visual streaming transaction', () => {
     expect(atomic.parent).toBeNull();
   });
 
+  it('repairs a detached or hidden selected gameplay root without replacing authority', async () => {
+    const scene = new THREE.Scene();
+    const terminal = new THREE.Group();
+    terminal.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
+    const stream = new ArenaVisualStreamController(scene, fakeRegistry());
+    await stream.adoptGameplayRoot('skyline-terminal', terminal);
+    terminal.removeFromParent();
+    terminal.visible = false;
+    expect(stream.restoreGameplayRoot('skyline-terminal', terminal)).toBe(true);
+    expect(scene.children).toEqual([terminal]);
+    expect(terminal.visible).toBe(true);
+    expect(stream.restoreGameplayRoot('atomic-acres', terminal)).toBe(false);
+  });
+
   it('binds late quality-asset requests to the selected gameplay definition receipt', async () => {
     const scene = new THREE.Scene();
     const atomic = new THREE.Group();

@@ -33,6 +33,46 @@ export const GUN_RANGE_FIRING_LINE_BARRIER: Readonly<Box2> = Object.freeze({
 const standard = (color: number, roughness = 0.86, metalness = 0.08): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
+type RustSurfaceKind = 'deck' | 'oxidised' | 'painted-steel';
+
+function rustSurfaceTexture(kind: RustSurfaceKind, repeat: [number, number]): THREE.DataTexture {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const hash = ((x * 73 + y * 151 + x * y * 17) ^ (x << 3) ^ (y << 5)) & 255;
+      const seam = x % 16 === 0 || y % 16 === 0;
+      const streak = kind === 'oxidised' && ((x * 3 + y) % 29 < 3);
+      const base = kind === 'deck' ? 174 : kind === 'oxidised' ? 188 : 202;
+      const noise = (hash % 31) - 15;
+      const offset = (y * size + x) * 4;
+      data[offset] = THREE.MathUtils.clamp(base + noise + (streak ? 36 : 0) - (seam ? 42 : 0), 0, 255);
+      data[offset + 1] = THREE.MathUtils.clamp(base + noise - (streak ? 26 : 0) - (seam ? 34 : 0), 0, 255);
+      data[offset + 2] = THREE.MathUtils.clamp(base + noise - (streak ? 44 : 0) - (seam ? 28 : 0), 0, 255);
+      data[offset + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.name = `rustrig-${kind}-surface-v1`;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(...repeat);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function applyRustSurface(material: THREE.MeshStandardMaterial, kind: RustSurfaceKind, repeat: [number, number]): THREE.MeshStandardMaterial {
+  material.map = rustSurfaceTexture(kind, repeat);
+  material.userData.assetOwner = 'rustworks-1v1';
+  material.userData.assetKind = 'deterministic-industrial-surface';
+  material.userData.surfaceKind = kind;
+  return material;
+}
+
 function box(
   builder: Builder,
   name: string,
@@ -384,11 +424,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const builder: Builder = {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
-  const packed = standard(0x6e5a48, 0.98, 0.02);
-  const rust = standard(0x7a3924, 0.82, 0.42);
-  const rustDark = standard(0x3c2924, 0.9, 0.35);
-  const steel = standard(0x59656a, 0.58, 0.62);
-  const steelBright = standard(0x6d7a80, 0.48, 0.72);
+  const packed = applyRustSurface(standard(0x6e5a48, 0.98, 0.02), 'deck', [8, 8]);
+  const rust = applyRustSurface(standard(0x7a3924, 0.82, 0.42), 'oxidised', [4, 4]);
+  const rustDark = applyRustSurface(standard(0x3c2924, 0.9, 0.35), 'oxidised', [6, 6]);
+  const steel = applyRustSurface(standard(0x59656a, 0.58, 0.62), 'deck', [12, 12]);
+  const steelBright = applyRustSurface(standard(0x6d7a80, 0.48, 0.72), 'painted-steel', [5, 5]);
   const hazard = standard(0xd7972d, 0.72, 0.34);
   const hazardDark = standard(0x8a5a18, 0.8, 0.28);
   const concrete = standard(0x77756d, 0.98, 0.03);
@@ -1291,7 +1331,26 @@ function rangeTarget(
   bullseye.userData.hitZone = 'head';
   bullseye.position.set(0, 1.65, 0.01);
   bullseye.rotation.x = Math.PI / 2;
-  root.add(stand, plate, bullseye);
+  const movingLight = new THREE.Mesh(
+    new THREE.RingGeometry(0.12, 0.17, 18),
+    new THREE.MeshBasicMaterial({
+      color: distanceBand === 'near' ? 0x7afff6 : distanceBand === 'mid' ? 0xffdb67 : 0xff8a78,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  movingLight.name = 'gun-range-moving-target-light';
+  movingLight.position.set(0, 1.65, 0.085);
+  movingLight.userData.presentationOnly = true;
+  movingLight.userData.targetLightPhase = targets.length * 0.83;
+  movingLight.raycast = () => undefined;
+  root.add(stand, plate, bullseye, movingLight);
+  const movingLights = (builder.root.userData.gunRangeMovingTargetLights ??= []) as THREE.Mesh[];
+  movingLights.push(movingLight);
   const texture = scoreTexture(scoreValue);
   if (texture) {
     const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: false, depthTest: true, toneMapped: false }));
@@ -1412,6 +1471,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const redSafety = new THREE.MeshStandardMaterial({ color: 0xc74235, emissive: 0x4a0804, emissiveIntensity: 0.72, roughness: 0.54, metalness: 0.2 });
   const lamp = new THREE.MeshStandardMaterial({ color: 0xd9eff2, emissive: 0x9edfe9, emissiveIntensity: 2.5, roughness: 0.22, metalness: 0.08 });
   const targets: PracticeTarget[] = [];
+  root.userData.gunRangeBayLightMaterial = lamp;
 
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(42, 70), concrete);
   floor.name = 'gun-range-concrete-lanes';
@@ -1637,6 +1697,15 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
   });
   lights.forEach((light, index) => {
     light.color.copy(materials[index % materials.length].color);
+  });
+  const bayMaterial = root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial | undefined;
+  if (bayMaterial) bayMaterial.emissiveIntensity = 2.25 + (Math.sin(nowMs * 0.00062) * 0.5 + 0.5) * 0.55;
+  const targetLights = root.userData.gunRangeMovingTargetLights as THREE.Mesh[] | undefined;
+  targetLights?.forEach((light, index) => {
+    const phase = nowMs * 0.00135 + Number(light.userData.targetLightPhase ?? index);
+    light.position.x = Math.sin(phase) * 0.28;
+    light.position.y = 1.65 + Math.cos(phase * 0.73) * 0.12;
+    (light.material as THREE.MeshBasicMaterial).opacity = 0.58 + (Math.sin(phase * 1.4) * 0.5 + 0.5) * 0.34;
   });
 }
 

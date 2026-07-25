@@ -8,11 +8,13 @@ const record = JSON.parse(readFileSync(resolve(root, 'baselines/pass62/best-netc
 const channels = JSON.parse(readFileSync(resolve(root, 'release-channels.json'), 'utf8'));
 
 describe('immutable best-build benchmark', () => {
-  it('binds the stable release channel to explicit digest and provenance semantics', () => {
+  it('retains the immutable Pass 62 benchmark independently of the selected stable release', () => {
     expect(verifyBenchmarkRecord(record, channels)).toMatchObject({
       ok: true,
       releasePass: 'PASS 62',
       sourceSha: '249a7ee77dce761eb237f3eb0e0d0ea1d0356317',
+      currentStablePass: 'PASS 63',
+      benchmarkIsCurrentStable: false,
     });
   });
 
@@ -21,8 +23,8 @@ describe('immutable best-build benchmark', () => {
       .toThrow(/exact bytes and reject rebuilds/);
   });
 
-  it('rejects a stable-channel identity that drifts from the benchmark', () => {
-    const changed = { ...channels, stable: { ...channels.stable, runtimeFileCount: 119 } };
-    expect(() => verifyBenchmarkRecord(record, changed)).toThrow(/runtimeFileCount diverges/);
+  it('rejects an invalid current stable-channel identity without conflating it with the benchmark', () => {
+    const changed = { ...channels, stable: { ...channels.stable, runtimeFileCount: 0 } };
+    expect(() => verifyBenchmarkRecord(record, changed)).toThrow(/stable.runtimeFileCount must be a positive integer/);
   });
 });

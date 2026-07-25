@@ -253,6 +253,9 @@ describe('additional authored maps', () => {
     for (const name of required) {
       expect(map.root.getObjectByName(name), name).toBeTruthy();
     }
+    const deckMaterial = (map.root.getObjectByName('rustworks-rig-deck-top') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(deckMaterial.map?.name).toBe('rustrig-deck-surface-v1');
+    expect(deckMaterial.userData).toMatchObject({ assetOwner: 'rustworks-1v1', assetKind: 'deterministic-industrial-surface' });
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
@@ -626,8 +629,16 @@ describe('additional authored maps', () => {
     expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
     const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
     const before = neon.color.getHex();
+    const movingTargetLight = map.root.getObjectByName('gun-range-moving-target-light') as THREE.Mesh;
+    const movingTargetStart = movingTargetLight.position.clone();
+    const bayMaterial = map.root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial;
+    const bayIntensity = bayMaterial.emissiveIntensity;
     updateGunRangePresentation(map.root, 9_000);
     expect(neon.color.getHex()).not.toBe(before);
+    expect(movingTargetLight.position.equals(movingTargetStart)).toBe(false);
+    expect(movingTargetLight.userData.presentationOnly).toBe(true);
+    expect(map.raycastMeshes).not.toContain(movingTargetLight);
+    expect(bayMaterial.emissiveIntensity).not.toBe(bayIntensity);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
     expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);

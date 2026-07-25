@@ -61,17 +61,34 @@ test('renders Terminal cabin ceiling with only shadowed contrast keys and an ope
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
     api.setCaptureCameraPose(0, 4.25, 2, -Math.PI / 2, -0.38);
   });
+  await page.waitForFunction(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().render.playableScene.renderWatchdog.lastAudit !== null, undefined, { timeout: 10_000 });
   await page.waitForTimeout(350);
   const evidence = await page.evaluate(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: any }).__ATOMIC_ACRES_DEBUG__;
     const state = api.snapshot();
     return {
       lightOcclusion: state.render.arenaContrastLighting,
+      renderWatchdog: state.render.playableScene.renderWatchdog,
       boardingBlocked: api.collisionProbeAt(0, 4.25, 1),
       renderedMeshes: api.renderAudit().map((entry: { name: string }) => entry.name),
     };
   });
   expect(evidence.lightOcclusion.arenaId).toBe('skyline-terminal');
+  expect(evidence.renderWatchdog).toMatchObject({
+    status: 'healthy',
+    fatal: false,
+    lastAudit: {
+      arenaId: 'skyline-terminal',
+      rootAttached: true,
+      rootVisible: true,
+      definitionMatches: true,
+      activeDefinitionRoots: 1,
+    },
+  });
+  expect(evidence.renderWatchdog.lastAudit.visibleRenderableDescendants).toBeGreaterThan(20);
+  expect(evidence.renderWatchdog.lastAudit.cameraLayerRenderableDescendants).toBeGreaterThan(20);
   // Software Chromium deliberately bypasses the rig. Any admitted hardware
   // keys must all be shadowed; zero unshadowed keys is also valid.
   expect([0, 2]).toContain(evidence.lightOcclusion.activeLights);

@@ -15,11 +15,11 @@ const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.inde
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(['experimental', 'stable'])) {
   throw new Error(`Root chooser must expose only experimental and stable: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== 'PASS 63' || publicConfig.experimental.label !== 'EXPERIMENTAL NEW NETCODE') {
-  throw new Error('Root chooser is missing live Pass 63 experimental netcode');
+if (publicConfig.experimental.pass !== 'PASS 64' || publicConfig.experimental.label !== 'EXPERIMENTAL NEW NETCODE') {
+  throw new Error('Root chooser is missing live Pass 64 experimental netcode');
 }
-if (publicConfig.stable.pass !== 'PASS 62' || publicConfig.stable.label !== 'NEW NETCODE') {
-  throw new Error('Root chooser is missing stable Pass 62 new netcode');
+if (publicConfig.stable.pass !== 'PASS 63' || publicConfig.stable.label !== 'NEW NETCODE') {
+  throw new Error('Root chooser is missing stable Pass 63 new netcode');
 }
 const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -58,7 +58,7 @@ if (stableProvenance.schemaVersion !== 4
   || stableProvenance.pagesPath !== config.stable.pagesPath
   || stableProvenance.pinnedRuntime?.exactRootFileCount !== config.stable.runtimeFileCount
   || stableProvenance.pinnedRuntime?.treeSha256 !== config.stable.runtimeTreeSha256) {
-  throw new Error('Stable Pass 62 provenance does not match the exact configured source and Pages SHAs');
+  throw new Error('Stable Pass 63 provenance does not match the exact configured source and Pages SHAs');
 }
 const experimentalRoot = resolve(dist, config.experimental.path);
 if (!existsSync(join(experimentalRoot, 'index.html')) || !existsSync(join(experimentalRoot, 'assets'))) throw new Error('Experimental channel is incomplete');

@@ -38,6 +38,26 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass64',
+    pass: 'PASS 64',
+    title: 'WebGPU Combat, Tactical HUD & Arena Forge',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['WEBGPU', 'MULTIPLAYER', 'HUD', 'RAILGUN', 'TERMINAL', 'RUSTRIG', 'GUN RANGE']),
+    summary: 'Pass 64 moves the complete playable game to hardware WebGPU/TSL, rebuilds the tactical interface, hardens multiplayer recovery and gives every arena a focused visual-quality pass.',
+    highlights: Object.freeze([
+      'The full playable game now runs through the hardware WebGPU renderer with a fail-closed required route, one controlled HDR pipeline and explicit WebGL2 compatibility coverage',
+      'A brighter modern tactical HUD and menu reorganise combat, lobby, loadout and map information with readable type, responsive safe areas and animated arena previews',
+      'Terminal gains renderer-state recovery and camera/root invariants so the 3D world cannot silently collapse to a flat fog-colour frame while the HUD continues',
+      'Private-match rematches, close-tab rejoin, health regeneration authority, early-life damage admission, Free For All spawn separation and killstreak replication are hardened',
+      'Nuke Town gains a host-authoritative eight-round railgun with high-refresh blue thermal silhouettes, full-map penetration, a visible map-spanning beam and unmistakable report',
+      'RustRig receives richer industrial materials, rolling ocean presentation, illuminated mist and purposeful warm practical lights while coplanar deck surfaces stay stable',
+      'Gun Range gains animated lit targets, coloured practicals and clearer shooting-bay illumination',
+      'Material-aware impact decals and slightly stronger persistent tracers improve shot readability across every arena without changing weapon authority',
+      'Bots use a restrained illumination profile, while players, bots and corpses retain the same canonical operator family',
+      'Post-match diagnostics remain bounded and off the realtime gameplay channels, preserving exact Pass 63 production bytes as the stable rollback',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass63',
     pass: 'PASS 63',
     title: 'Project Cleanup, Shared Chat & Visual Repairs',

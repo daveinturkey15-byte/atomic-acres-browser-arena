@@ -49,6 +49,8 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
     water.geometry.computeBoundingBox();
     expect(water.visible).toBe(true);
+    expect(water.userData).toMatchObject({ waveBands: 3, waveAuthority: 'presentation-only-tsl' });
+    expect(systems.root.getObjectByName('Pass 64 TSL mist')?.children).toHaveLength(5);
     expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(false);
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;

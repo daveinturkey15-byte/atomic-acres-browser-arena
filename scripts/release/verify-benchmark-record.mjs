@@ -13,10 +13,6 @@ const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const PASS = /^PASS [1-9][0-9]*$/;
 
-const exactKeys = [
-  'pass', 'sourceSha', 'pagesSha', 'pagesPath', 'runtimeFileCount', 'runtimeTreeSha256',
-];
-
 function safeRelativePath(value, label) {
   if (value === '.') return value;
   if (typeof value !== 'string' || !value || value.includes('\\')
@@ -85,15 +81,12 @@ export function verifyBenchmarkRecord(record, channels, options = {}) {
   }
   for (const excluded of policy.excludedFiles) safeRelativePath(excluded, 'runtimeDigestPolicy.excludedFiles[]');
   if (channels.schemaVersion < 4 || !channels.stable) throw new Error('release channel config has no pinned stable channel');
-  const stableProjection = {
-    pass: record.releasePass,
-    sourceSha: record.sourceSha,
-    pagesSha: record.pagesSha,
-    pagesPath: record.pagesPath,
-    runtimeFileCount: record.runtimeFileCount,
-    runtimeTreeSha256: record.runtimeTreeSha256,
-  };
-  for (const key of exactKeys) if (channels.stable[key] !== stableProjection[key]) throw new Error(`stable channel ${key} diverges from benchmark`);
+  if (!PASS.test(channels.stable.pass) || !SHA40.test(channels.stable.sourceSha ?? '')
+    || !SHA40.test(channels.stable.pagesSha ?? '') || !SHA256.test(channels.stable.runtimeTreeSha256 ?? '')) {
+    throw new Error('release channel config has an invalid pinned stable identity');
+  }
+  safeRelativePath(channels.stable.pagesPath, 'stable.pagesPath');
+  positiveInteger(channels.stable.runtimeFileCount, 'stable.runtimeFileCount');
 
   let hosted = null;
   if (options.verifyGit) {
@@ -103,7 +96,14 @@ export function verifyBenchmarkRecord(record, channels, options = {}) {
     if (digest !== record.acceptanceManifestSha256) throw new Error(`acceptance manifest digest ${digest} != ${record.acceptanceManifestSha256}`);
     hosted = verifyHostedTree(record);
   }
-  return { ok: true, releasePass: record.releasePass, sourceSha: record.sourceSha, hosted };
+  return {
+    ok: true,
+    releasePass: record.releasePass,
+    sourceSha: record.sourceSha,
+    currentStablePass: channels.stable.pass,
+    benchmarkIsCurrentStable: channels.stable.sourceSha === record.sourceSha,
+    hosted,
+  };
 }
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {

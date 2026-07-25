@@ -6,12 +6,14 @@ import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBu
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
+import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { auditLocalLightOcclusion, makeEmissiveOnly } from './rendering/light-occlusion';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
+import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
@@ -38,6 +40,7 @@ import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+import { menuPreviewDefinition, menuPreviewPose } from './ui/menu-preview-camera';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
@@ -308,7 +311,7 @@ import {
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
 } from './match-report';
-import { FFA_MINIMUM_SPAWN_SEPARATION, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
 import { TracerPool } from './tracer-pool';
@@ -583,6 +586,17 @@ function element<T extends HTMLElement>(selector: string): T {
 
 const canvas = element<HTMLCanvasElement>('#game');
 const menu = element<HTMLElement>('#menu');
+const menuShowcase = element<HTMLElement>('#menu-showcase');
+const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
+const menuPreviewLabel = element<HTMLElement>('#menu-preview-label');
+const menuPreviewMotion = element<HTMLElement>('#menu-preview-motion');
+const canvasHomeAnchor = document.createComment('game-canvas-home');
+canvas.after(canvasHomeAnchor);
+const fixedMenuPreviewTimeRaw = new URLSearchParams(window.location.search).get('previewTime');
+const fixedMenuPreviewTimeMs = fixedMenuPreviewTimeRaw === null ? null : Number(fixedMenuPreviewTimeRaw);
+const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+let menuPreviewStartedAt = performance.now();
+let menuPreviewActive = false;
 const hudRoot = element<HTMLElement>('#hud');
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
@@ -1040,6 +1054,7 @@ function ensureAtomicWorldPresentation(): void {
 if (selectedArena.id === 'atomic-acres') ensureAtomicWorldPresentation();
 const arenaVisualStream = new ArenaVisualStreamController(scene);
 let arenaVisualReceipt: ArenaVisualSwitchReceipt = await arenaVisualStream.adoptGameplayRoot(selectedArena.id, arena.root);
+const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
 let pass64TslSystems: Pass64TslSceneSystems | null = null;
 let appliedTslArenaDefinitions = 0;
 let activeArenaReviewCameraId: string | null = null;
@@ -3281,6 +3296,7 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
     panel.classList.toggle('active', active);
     panel.hidden = !active;
   });
+  queueMicrotask(syncMenuPreviewCanvasPlacement);
 }
 
 function renderFieldKitSelection(): void {
@@ -4405,6 +4421,9 @@ function renderRemoteShot(message: ShotMessage): void {
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
   spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
+  if (message.weapon === 'railgun') {
+    railgunPresentation.presentBeam(remoteMuzzle ?? origin, visibleEnd, performance.now());
+  }
   if (remoteOperator) fireOperator(remoteOperator);
   let impactAudioPlayed = false;
   for (const impact of trace.impacts) {
@@ -4422,7 +4441,8 @@ function renderRemoteShot(message: ShotMessage): void {
     }
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
-  audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+  if (message.weapon === 'railgun') audio.railgunReport(true, origin.distanceTo(camera.position));
+  else audio.shot(message.weapon, true, origin.distanceTo(camera.position));
 }
 
 function showDamageDirection(attacker: string): void {
@@ -5109,7 +5129,18 @@ function spawnPoint(): THREE.Vector3 {
   const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipped ? opposite : home;
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < minimumSeparationSq));
-  const selectable = unoccupied.length > 0 ? unoccupied : valid;
+  const initialFfaReservation = spawnMode === 'ffa' && lastPlayerSpawnIndex < 0 && privateLobbySnapshot
+    ? initialFfaSpawnReservation(
+        player.id,
+        privateLobbySnapshot.members.filter((member) => member.connected).map((member) => member.id),
+        valid,
+        stableSpawnTieBreakSeed(`${selectedArena.id}:${privateMatchActiveAtHostTimeMs ?? 0}`),
+      )
+    : null;
+  const reserved = initialFfaReservation === null
+    ? []
+    : valid.filter(({ index }) => index === initialFfaReservation);
+  const selectable = reserved.length > 0 ? reserved : unoccupied.length > 0 ? unoccupied : valid;
   const candidates = selectable.map(({ point, index }) => ({
     index,
     point,
@@ -5154,7 +5185,12 @@ function spawnPoint(): THREE.Vector3 {
     position: [selectedSpawn.point.x, selectedSpawn.point.y, selectedSpawn.point.z],
     spawnScore: selection.score,
     spawnReason: selection.reason,
-    modifiers: [spawnMode, `population:${population}`, flipped ? 'spawn-flipped' : 'home-side'],
+    modifiers: [
+      spawnMode,
+      `population:${population}`,
+      initialFfaReservation === null ? 'dynamic-selection' : 'initial-roster-reservation',
+      flipped ? 'spawn-flipped' : 'home-side',
+    ],
   });
   lastPlayerSpawnIndex = selectedIndex;
   return selectedSpawn.point.clone();
@@ -5578,7 +5614,9 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
 
 function presentRailgunShot(origin: THREE.Vector3, direction: THREE.Vector3, local: boolean): void {
   const start = local ? weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin : origin;
-  spawnTracer(start, origin.clone().addScaledVector(direction, 180), WEAPONS.railgun.color);
+  const end = origin.clone().addScaledVector(direction, 180);
+  railgunPresentation.presentBeam(start, end, performance.now());
+  spawnTracer(start, end, WEAPONS.railgun.color);
   if (local) {
     const recoil = computeRecoilImpulse(WEAPONS.railgun, 0, 0.5, { ads: adsHeld, crouched: player.stance === 'crouch', prone: player.stance === 'prone' });
     recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
@@ -5587,7 +5625,7 @@ function presentRailgunShot(origin: THREE.Vector3, direction: THREE.Vector3, loc
     weaponView.reload();
     railgunRechamberPresentationActive = true;
   }
-  audio.shot('railgun', !local, origin.distanceTo(camera.position));
+  audio.railgunReport(!local, origin.distanceTo(camera.position));
 }
 
 function railgunResult(
@@ -6254,7 +6292,7 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
     map: neonBotHazeTexture(),
     color: 0xec8cff,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.17,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
@@ -6281,6 +6319,7 @@ function spawnBot(index: number, hosted = false): void {
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
   const root = buildOperator(botTeam, 'bot-operator', true, weapon, 'neon-purple');
+  applyBotEmissiveBrightness(root);
   addNeonBotHaze(root, index);
   root.traverse((node) => {
     if (node instanceof THREE.Mesh) node.castShadow = false;
@@ -9875,7 +9914,58 @@ function applyArenaLightingForSelection(): void {
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
+function menuPreviewShouldBeActive(): boolean {
+  return !gameStarted
+    && !menu.classList.contains('hidden')
+    && !element<HTMLElement>('#menu-panel-deploy').hidden;
+}
+
+function syncMenuPreviewCanvasPlacement(): void {
+  const active = menuPreviewShouldBeActive();
+  if (active && canvas.parentElement !== menuShowcase) {
+    menuShowcase.insertBefore(canvas, menuPreviewFrame);
+  } else if (!active && canvas.parentElement === menuShowcase && canvasHomeAnchor.parentNode) {
+    canvasHomeAnchor.parentNode.insertBefore(canvas, canvasHomeAnchor);
+  }
+  menuPreviewActive = active;
+  menuShowcase.dataset.previewActive = String(active);
+  document.documentElement.dataset.menuPreview = active ? 'live-arena' : 'inactive';
+  if (!active) {
+    camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
+    camera.updateProjectionMatrix();
+  }
+}
+
+function applyMenuPreviewCamera(now: number): boolean {
+  if (!menuPreviewActive || debugCaptureCameraActive) return false;
+  const reducedMotion = reducedMotionMedia.matches;
+  const elapsedMs = Number.isFinite(fixedMenuPreviewTimeMs)
+    ? Math.max(0, fixedMenuPreviewTimeMs ?? 0)
+    : Math.max(0, now - menuPreviewStartedAt);
+  const pose = menuPreviewPose(selectedArena.id, elapsedMs, reducedMotion);
+  const definition = menuPreviewDefinition(selectedArena.id);
+  camera.position.set(...pose.position);
+  camera.lookAt(...pose.target);
+  camera.fov = pose.fov;
+  const bounds = menuShowcase.getBoundingClientRect();
+  if (bounds.width > 0 && bounds.height > 0) camera.aspect = bounds.width / bounds.height;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  menuPreviewFrame.dataset.frame = definition.frame;
+  menuPreviewFrame.dataset.arena = selectedArena.id;
+  menuPreviewFrame.dataset.motion = reducedMotion || Number.isFinite(fixedMenuPreviewTimeMs) ? 'static' : 'orbit';
+  menuPreviewFrame.dataset.phase = pose.phase.toFixed(6);
+  menuPreviewLabel.textContent = definition.label;
+  menuPreviewMotion.textContent = definition.frame === 'cat'
+    ? reducedMotion ? 'FIRST-PERSON HOLD' : 'FIRST-PERSON PROWL'
+    : reducedMotion ? 'STABILIZED HOLD' : 'LIVE ORBIT';
+  return true;
+}
+
 function setArenaMenuCamera(): void {
+  menuPreviewStartedAt = performance.now();
+  syncMenuPreviewCanvasPlacement();
+  if (applyMenuPreviewCamera(menuPreviewStartedAt)) return;
   const centreX = (arena.bounds.minX + arena.bounds.maxX) / 2;
   const centreZ = (arena.bounds.minZ + arena.bounds.maxZ) / 2;
   if (selectedArena.id === 'gun-range') {
@@ -9898,6 +9988,17 @@ function setArenaMenuCamera(): void {
   camera.fov = 65;
   camera.updateProjectionMatrix();
 }
+
+const menuPreviewObserver = new MutationObserver(syncMenuPreviewCanvasPlacement);
+menuPreviewObserver.observe(menu, { attributes: true, attributeFilter: ['class'] });
+menuPreviewObserver.observe(element<HTMLElement>('#menu-panel-deploy'), { attributes: true, attributeFilter: ['hidden'] });
+reducedMotionMedia.addEventListener('change', () => applyMenuPreviewCamera(performance.now()));
+syncMenuPreviewCanvasPlacement();
+function animateMenuPreview(now: number): void {
+  applyMenuPreviewCamera(now);
+  requestAnimationFrame(animateMenuPreview);
+}
+requestAnimationFrame(animateMenuPreview);
 
 async function performArenaSelection(id: ArenaId): Promise<void> {
   if (gameStarted || !arenaSelectionReady || id === selectedArena.id) return;
@@ -10236,6 +10337,32 @@ function refreshStaticShadowsForDynamicCasters(now: number): void {
   staticShadowDynamicRefreshes += 1;
 }
 
+function monitorSelectedArenaRender(now: number): void {
+  // Atomic Acres' quality GLB intentionally replaces the procedural gameplay
+  // root visually. Every other selected arena must retain a drawable exact
+  // authority root even if atmosphere and the DOM HUD are still rendering.
+  const eligible = !(selectedArena.id === 'atomic-acres' && blenderArenaActive);
+  let audit = auditArenaRenderLiveness(scene, arena.root, selectedArena.id, renderRuntime.renderInfo(), eligible, camera);
+  if (eligible && audit.reasons.length > 0) {
+    const restored = arenaVisualStream.restoreGameplayRoot(selectedArena.id, arena.root);
+    if (restored) {
+      arenaRenderWatchdog.recordRecovery(audit.reasons.join(','));
+      requestStaticShadowRefresh();
+    }
+    // Profiles own source-vs-batch visibility. Reapply that contract once for
+    // an empty root; never blindly unhide collision proxies or source meshes.
+    if (audit.reasons.includes('selected-world-empty')) {
+      if (selectedArena.id === 'skyline-terminal') applyAdditionalMapPresentationProfile(arena.root, renderProfile);
+      if (selectedArena.id === 'rustworks-1v1') applyRustworksPresentationProfile(arena.root, renderProfile);
+    }
+    audit = auditArenaRenderLiveness(scene, arena.root, selectedArena.id, renderRuntime.renderInfo(), eligible, camera);
+  }
+  const watchdog = arenaRenderWatchdog.observe(audit, now);
+  if (watchdog.fatal && watchdog.consecutiveInvalidFrames === 3) {
+    console.error('[Pass 64 arena render watchdog fatal]', watchdog);
+  }
+}
+
 function frame(now: number, scheduleNext = true): void {
   const frameWorkStartedAt = performance.now();
   frameCount += 1;
@@ -10305,6 +10432,7 @@ function frame(now: number, scheduleNext = true): void {
     waterSystem.update(now / 1_000);
     if (gameStarted) updateMinimap(now);
     updateHud(now);
+    arenaContrastLighting.update(now);
     pass64TslSystems?.update(now);
     if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';
     if (debugCaptureCameraActive) {
@@ -10320,6 +10448,7 @@ function frame(now: number, scheduleNext = true): void {
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
       }
+      monitorSelectedArenaRender(now);
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
     }
     if (scheduleNext) {
@@ -10591,6 +10720,7 @@ function playableSceneProof(): Record<string, unknown> {
     authoritativeArenaRoots: authoritativeRoots.length,
     authoritativeArenaRootIsGameplayRoot: authoritativeRoots[0] === arena.root,
     duplicateArenaRoots: authoritativeRoots.length !== 1,
+    renderWatchdog: arenaRenderWatchdog.telemetry(),
     playerCamera: camera.parent === scene,
     cameraComposition: {
       position: camera.position.toArray(),
@@ -10781,6 +10911,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       rechamberPresentationActive: railgunRechamberPresentationActive,
       adsProgress: weaponView.adsProgress(),
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
+      presentation: railgunPresentation.telemetry(),
       claimAudit: { ...railgunClaimAudit },
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
@@ -11320,6 +11451,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     menuCamera: {
       position: camera.position.toArray(),
       towerNdc: new THREE.Vector3(0, 6, 0).project(camera).toArray(),
+    },
+    menuPreview: {
+      active: menuPreviewActive,
+      frame: menuPreviewFrame.dataset.frame,
+      arena: menuPreviewFrame.dataset.arena,
+      motion: menuPreviewFrame.dataset.motion,
+      phase: menuPreviewFrame.dataset.phase,
+      canvasParent: canvas.parentElement?.id ?? null,
+      label: menuPreviewLabel.textContent,
     },
     render: {
       profile: renderProfile,

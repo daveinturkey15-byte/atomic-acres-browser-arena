@@ -1,7 +1,7 @@
 import {
   CHANGELOG,
   PENDING_PRODUCTION_RELEASE,
-  latestChangelogEntry,
+  resolveProductionReleasedAt,
   type ChangelogEntry,
 } from './changelog';
 import releaseChannelsJson from '../release-channels.json';
@@ -46,7 +46,7 @@ export const PROJECT_MAP_CANDIDATE: ChangelogEntry = Object.freeze({
   id: 'pass64-candidate',
   pass: 'PASS 64',
   title: 'Playable WebGPU, Command UI & Multiplayer Hardening',
-  releasedAt: PENDING_PRODUCTION_RELEASE,
+  releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
   areas: Object.freeze(['WEBGPU', 'TSL', 'HUD', 'MULTIPLAYER', 'MAPS', 'DIAGNOSTICS']),
   summary: 'HITL candidate for the complete playable WebGPU/TSL route, redesigned command HUD and menus, rematch and health reconciliation repairs, lightweight post-match diagnostics, Railgun, and arena visual-quality gates.',
   highlights: Object.freeze([
@@ -55,7 +55,7 @@ export const PROJECT_MAP_CANDIDATE: ChangelogEntry = Object.freeze({
     'The HUD, lobby, map selection, loadout and match overlays use the new command interface without dropping gameplay controls',
     'Private-match rematches, authoritative health regeneration and duplicate result handling have dedicated regression coverage',
     'The Railgun spawns during Nuke Town matches with finite ammunition, rechamber cadence, wall penetration and hostile thermal identification',
-    'Pass 62 remains byte-exact stable and Pass 63 remains published live until this exact candidate is approved',
+    'Pass 63 is retained byte-exact as the stable rollback while the immutable Pass 62 benchmark record remains available for regression comparison',
   ]),
 });
 
@@ -236,7 +236,7 @@ export function createProjectMapBundle(
       architectureRevision: 'pass64-webgpu-hud-v1',
       candidateState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'hitl-candidate' : 'released',
       release,
-      previousRelease: latestChangelogEntry(entries).pass ?? null,
+      previousRelease: entries.find((entry) => entry.pass !== release.pass)?.pass ?? null,
     },
     publishedChannels: {
       schemaVersion: releaseChannelsJson.schemaVersion,
@@ -255,7 +255,7 @@ export function createProjectMapBundle(
     },
     operatingBoundaries: PROJECT_OPERATING_BOUNDARIES,
     architecture: PROJECT_MAP_TREE,
-    changes: Object.freeze([release, ...entries]),
+    changes: Object.freeze([release, ...entries.filter((entry) => entry.pass !== release.pass)]),
     archive: entries,
   };
 }

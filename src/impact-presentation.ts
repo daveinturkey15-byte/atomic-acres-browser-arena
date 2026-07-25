@@ -10,7 +10,7 @@ type Particle = {
 };
 
 const MAX_PARTICLES = 72;
-const MAX_MARKS = 32;
+export const MAX_IMPACT_MARKS = 48;
 const HIDDEN_Y = -10_000;
 
 const SURFACE_COLORS: Record<ImpactSurface, [number, number]> = {
@@ -57,7 +57,7 @@ export class ImpactPresentation {
   private readonly positions = new Float32Array(MAX_PARTICLES * 3);
   private readonly colors = new Float32Array(MAX_PARTICLES * 3);
   private readonly particles: Particle[] = [];
-  private readonly markLife = new Float32Array(MAX_MARKS);
+  private readonly markLife = new Float32Array(MAX_IMPACT_MARKS);
   private cursor = 0;
   private markCursor = 0;
   private particleDensityScale = 1;
@@ -97,13 +97,13 @@ export class ImpactPresentation {
         map: proceduralImpactTexture(64, 'mark'),
         alphaTest: 0.035,
       }),
-      MAX_MARKS,
+      MAX_IMPACT_MARKS,
     );
     this.marks.name = 'pooled-surface-impact-marks';
     this.marks.frustumCulled = false;
     this.marks.visible = false;
     const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (let index = 0; index < MAX_MARKS; index += 1) this.marks.setMatrixAt(index, hiddenMatrix);
+    for (let index = 0; index < MAX_IMPACT_MARKS; index += 1) this.marks.setMatrixAt(index, hiddenMatrix);
     this.marks.instanceMatrix.needsUpdate = true;
     scene.add(this.marks);
     for (let index = 0; index < MAX_PARTICLES; index += 1) {
@@ -138,7 +138,7 @@ export class ImpactPresentation {
       this.colors[positionIndex + 1] = particle.color.g;
       this.colors[positionIndex + 2] = particle.color.b;
     }
-    const markCapacity = Math.max(8, Math.round(MAX_MARKS * this.decalLifetimeScale));
+    const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalLifetimeScale));
     const markSlot = this.markCursor++ % markCapacity;
     const markNormal = normal.clone().normalize();
     const markPosition = point.clone().addScaledVector(markNormal, 0.018);
@@ -153,7 +153,7 @@ export class ImpactPresentation {
     this.marks.setColorAt(markSlot, new THREE.Color(
       surface === 'metal' ? 0x5c482f : surface === 'wood' ? 0x4d3322 : surface === 'soil' ? 0x4a452f : 0x4a4b49,
     ));
-    this.markLife[markSlot] = (surface === 'metal' ? 5.5 : 8) * this.decalLifetimeScale;
+    this.markLife[markSlot] = (surface === 'metal' ? 9 : 14) * this.decalLifetimeScale;
     this.marks.visible = true;
     this.marks.instanceMatrix.needsUpdate = true;
     if (this.marks.instanceColor) this.marks.instanceColor.needsUpdate = true;
@@ -164,9 +164,9 @@ export class ImpactPresentation {
   setBudget(particleDensityScale: number, decalLifetimeScale: number): void {
     this.particleDensityScale = THREE.MathUtils.clamp(particleDensityScale, 0.35, 1);
     this.decalLifetimeScale = THREE.MathUtils.clamp(decalLifetimeScale, 0.35, 1);
-    const markCapacity = Math.max(8, Math.round(MAX_MARKS * this.decalLifetimeScale));
+    const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalLifetimeScale));
     let changed = false;
-    for (let slot = markCapacity; slot < MAX_MARKS; slot += 1) {
+    for (let slot = markCapacity; slot < MAX_IMPACT_MARKS; slot += 1) {
       if (this.markLife[slot] <= 0) continue;
       this.markLife[slot] = 0;
       this.marks.setMatrixAt(slot, new THREE.Matrix4().makeScale(0, 0, 0));
@@ -201,7 +201,7 @@ export class ImpactPresentation {
     }
     this.points.visible = activeCount > 0;
     let marksChanged = false;
-    for (let slot = 0; slot < MAX_MARKS; slot += 1) {
+    for (let slot = 0; slot < MAX_IMPACT_MARKS; slot += 1) {
       if (this.markLife[slot] <= 0) continue;
       this.markLife[slot] -= dt;
       if (this.markLife[slot] <= 0) {

@@ -43,12 +43,20 @@ describe('Pass 62 arena contrast lighting', () => {
     expect(southMountedLight.position.toArray()).toEqual([...(southFixture?.position ?? [])]);
     expect(southMountedLight.target.position.toArray()).toEqual([...(southFixture?.target ?? [])]);
     expect(southMountedLight.shadow.mapSize.toArray()).toEqual([512, 512]);
+    const northIntensity = mountedLight.intensity;
+    rig.update(2_400);
+    expect(mountedLight.intensity).not.toBe(northIntensity);
+    expect(mountedLight.intensity).toBeLessThanOrEqual(fixture!.intensity);
     expect(rustworksDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
       'rustrig-mounted-work-lights',
       'rustrig-deck-surface',
     ]));
     rig.applyDefinition(gunRangeDefinition);
     expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 1, shadowCastingLights: 1 });
+    const rangeLight = scene.getObjectByName('gun-range-range-inspection-key-1') as THREE.SpotLight;
+    const targetX = rangeLight.target.position.x;
+    rig.update(3_000);
+    expect(rangeLight.target.position.x).not.toBe(targetX);
   });
 
   it('keeps unshadowed Performance and Compatibility free of the contrast-light volume', () => {

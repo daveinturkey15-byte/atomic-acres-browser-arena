@@ -54,8 +54,13 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
       </header>
       <aside id="menu-showcase" aria-hidden="true">
-        <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
-        <div class="showcase-telemetry"><span>LIVE ARENA FEED</span><b>CAM // REVIEW-01</b></div>
+        <img class="preview-poster" src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
+        <div id="menu-preview-frame" data-frame="helicopter" data-arena="atomic-acres" data-motion="orbit">
+          <div class="preview-helicopter"><i></i><i></i><i></i><b>ALT 018 // SPD 064</b></div>
+          <div class="preview-cat"><i></i><i></i><b></b><b></b><span>CAT-CAM</span></div>
+          <div class="preview-reticle"><i></i><b></b></div>
+        </div>
+        <div class="showcase-telemetry"><span id="menu-preview-label">HELO FLYOVER // NUKE TOWN</span><b id="menu-preview-motion">LIVE ORBIT</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
         <div class="map-selector-heading"><span>THEATRE INDEX</span><small>Four deployable spaces · choose before launch</small></div>
