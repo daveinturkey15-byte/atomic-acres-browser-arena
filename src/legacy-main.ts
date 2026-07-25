@@ -10547,7 +10547,7 @@ const debugWindow = window as Window & {
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     stageRailgunSpawn: (siteIndex?: number) => RailgunAuthorityState;
-    stageRemoteAtRailgunPickup: () => boolean;
+    stageRemoteAtRailgunPickup: (playerId?: string) => boolean;
     interactRailgun: () => boolean;
     degradeStateChannel: () => boolean;
     endMatch: () => void;
@@ -11945,8 +11945,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastRailgunState();
     return railgunState;
   },
-  stageRemoteAtRailgunPickup: () => {
-    const remote = remotes.values().next().value as RemotePlayer | undefined;
+  stageRemoteAtRailgunPickup: (playerId) => {
+    const remote = playerId ? remotes.get(playerId) : remotes.values().next().value as RemotePlayer | undefined;
     if (network.role !== 'host' || !remote || !railgunState.pickupPosition) return false;
     const [x, y, z] = railgunState.pickupPosition;
     remote.snapshot = { ...remote.snapshot, x, y, z };

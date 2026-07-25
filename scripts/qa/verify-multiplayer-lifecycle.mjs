@@ -200,8 +200,11 @@ try {
 
     const stagedRailgun = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.status === 'available', undefined, { timeout: 15_000 });
+    const railgunClaimantId = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.id);
     await guest.evaluate((pickup) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(...pickup), stagedRailgun.pickupPosition);
-    if (!await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRemoteAtRailgunPickup())) throw new Error('could not stage authoritative remote at railgun pickup');
+    if (!await host.evaluate((playerId) => window.__ATOMIC_ACRES_DEBUG__.stageRemoteAtRailgunPickup(playerId), railgunClaimantId)) {
+      throw new Error('could not stage the authoritative claiming remote at the Railgun pickup');
+    }
     joined.railgunGuestClaimed = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactRailgun());
     await Promise.all(labelledPages.map(async ([label, page]) => {
       try {
