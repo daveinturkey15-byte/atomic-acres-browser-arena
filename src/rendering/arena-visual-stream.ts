@@ -13,6 +13,17 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'skyline-terminal': () => import('./arenas/skyline-terminal'),
 });
 
+export async function loadArenaVisualModule(
+  arenaId: ArenaId,
+  registry: ArenaVisualRegistry = ARENA_VISUAL_REGISTRY,
+): Promise<ArenaVisualModule> {
+  const module = await registry[arenaId]();
+  if (module.definition.id !== arenaId) {
+    throw new Error(`Arena module identity mismatch: requested ${arenaId}, loaded ${module.definition.id}`);
+  }
+  return module;
+}
+
 export type ArenaVisualSwitchReceipt = Readonly<{
   arenaId: ArenaId;
   generation: number;
@@ -39,10 +50,7 @@ export class ArenaVisualStreamController {
     this.generation = generation;
     let candidate: LoadedArenaVisual | null = null;
     try {
-      const module = await this.registry[arenaId]();
-      if (module.definition.id !== arenaId) {
-        throw new Error(`Arena module identity mismatch: requested ${arenaId}, loaded ${module.definition.id}`);
-      }
+      const module = await loadArenaVisualModule(arenaId, this.registry);
       const requestedResources: string[] = [];
       candidate = await module.definition.load({
         signal: abort.signal,

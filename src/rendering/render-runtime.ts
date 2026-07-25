@@ -88,6 +88,7 @@ type WebGpuBackendShape = Readonly<{
 
 type GpuDeviceShape = Readonly<{
   lost?: Promise<unknown>;
+  queue?: Readonly<{ onSubmittedWorkDone?: () => Promise<void> }>;
   destroy?: () => void;
   constructor?: { name?: string };
 }>;
@@ -115,7 +116,8 @@ function adapterInfoLabel(info: GpuAdapterInfoShape): string {
 
 /**
  * An actual initialized Three r185 WebGPU renderer and RenderPipeline owner.
- * It is deliberately not accepted by main.ts until the TSL inventory is green.
+ * Hardware readiness admits the isolated HITL scene; candidate readiness stays
+ * stricter and blocks gameplay/release cutover until the TSL ledger is verified.
  */
 export class WebGpuRenderRuntime {
   readonly backend = 'webgpu' as const;
@@ -129,6 +131,8 @@ export class WebGpuRenderRuntime {
   private readonly deviceClass: string;
   private readonly softwareAdapter: boolean;
   private readonly device: GpuDeviceShape;
+  private principalHdrSamples: number | null = null;
+  private bloomSamples: number | null = null;
 
   private constructor(
     renderer: WebGPURenderer,
@@ -208,21 +212,34 @@ export class WebGpuRenderRuntime {
       softwareAdapter: this.softwareAdapter,
       canvasAntialias: this.canvasAntialias,
       canvasSamples: this.canvasSamples,
-      principalHdrSamples: null,
-      bloomSamples: null,
+      principalHdrSamples: this.principalHdrSamples,
+      bloomSamples: this.bloomSamples,
       renderPipelineApi: 'three-r185-render-pipeline',
       deviceLost: this.deviceLost,
     };
   }
 
   assertCandidateReady(): void {
+    this.assertHardwareReady();
+    assertTslCutoverReady();
+  }
+
+  assertHardwareReady(): void {
     const telemetry = this.telemetry();
     if (telemetry.actualBackend !== 'webgpu') {
       throw new Error('WebGPU candidate verification failed closed: actual backend is not WebGPU');
     }
     if (telemetry.softwareAdapter) throw new Error('WebGPU candidate verification failed closed: software/fallback adapter');
     if (telemetry.deviceLost) throw new Error('WebGPU candidate verification failed closed: device was lost');
-    assertTslCutoverReady();
+  }
+
+  setRenderTargetTelemetry(principalHdrSamples: number, bloomSamples: number): void {
+    this.principalHdrSamples = principalHdrSamples;
+    this.bloomSamples = bloomSamples;
+  }
+
+  async waitForSubmittedWork(): Promise<void> {
+    await this.device.queue?.onSubmittedWorkDone?.();
   }
 
   dispose(): void {

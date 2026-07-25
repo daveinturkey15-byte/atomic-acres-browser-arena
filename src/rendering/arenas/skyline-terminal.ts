@@ -12,7 +12,8 @@ export const definition = createProceduralArenaVisualDefinition({
     sunColor: 0xeaf7ff, sunIntensity: 2.9, ambientColor: 0x8aa5af, ambientIntensity: 0.38,
     practicals: [
       { id: 'terminal-ceiling-practicals', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
-      { id: 'concourse-contrast-keys', policy: 'shadowed-local', maximumDistance: 34, castsShadow: true },
+      { id: 'aircraft-cabin-contrast-key', policy: 'shadowed-local', maximumDistance: 30, castsShadow: true },
+      { id: 'concourse-contrast-key', policy: 'shadowed-local', maximumDistance: 34, castsShadow: true },
     ],
   },
   fog: { color: 0xa9bec4, near: 64, far: 156 },

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { UI_REVIEW_VIEWPORTS, UI_STATE_INVENTORY, UI_SURFACE_INVENTORY } from './surface-registry';
 
-const mainSource = readFileSync(new URL('../main.ts', import.meta.url), 'utf8');
+const mainSource = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
 const generatedDialogSources = [
   readFileSync(new URL('./project-map-dialog.ts', import.meta.url), 'utf8'),
   readFileSync(new URL('./release-history-dialog.ts', import.meta.url), 'utf8'),

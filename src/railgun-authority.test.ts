@@ -50,6 +50,7 @@ describe('host-authoritative railgun', () => {
     state = first.state;
     expect(fireRailgun(state, 'player-a', 'shot-0002', 200_000 + RAILGUN_RECHAMBER_MS - 1).reason).toBe('not-ready');
     state = advanceRailgunChamber(state, 200_000 + RAILGUN_RECHAMBER_MS);
+    expect(advanceRailgunChamber(state, 200_000 + RAILGUN_RECHAMBER_MS)).toBe(state);
     expect(fireRailgun(state, 'player-a', 'shot-0002', 200_000 + RAILGUN_RECHAMBER_MS).accepted).toBe(true);
   });
 
@@ -103,6 +104,16 @@ describe('host-authoritative railgun', () => {
       type: 'railgun-shot-request', protocolVersion: 6, by: 'player-a', generation: 1,
       shotId: 'shot-0001', origin: [1, 2, 3], direction: [0, 0, -1], fireTimeMs: 2_000, nonce: 2,
     }, 6)).toBe(true);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [{ target: 'player-b', damage: 50, resultingHealth: 50, died: false, distanceMeters: 180 }], nonce: 3,
+    }, 6)).toBe(true);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [{ target: 'player-b', damage: 51, resultingHealth: 49, died: false, distanceMeters: 180 }], nonce: 3,
+    }, 6)).toBe(false);
     expect(isRailgunProtocolMessage({
       type: 'railgun-claim-request', protocolVersion: 5, by: 'player-a', generation: 1,
       position: [1, 2, 3], nonce: 1,

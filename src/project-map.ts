@@ -51,7 +51,7 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
         summary: 'Bootstraps release routing, builds the menu/HUD shell, and coordinates the live game loop.',
         authority: 'Composition only; it must call domain contracts rather than silently reimplement them.',
         status: 'progressive-migration',
-        paths: Object.freeze(['src/bootstrap.ts', 'src/main.ts', 'src/style.css']),
+        paths: Object.freeze(['src/bootstrap.ts', 'src/main.ts', 'src/legacy-main.ts', 'src/style.css']),
       }),
       Object.freeze({
         id: 'gameplay-authority',

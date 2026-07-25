@@ -7,10 +7,12 @@ import type { WeaponId } from './protocol';
 
 const weapons = Object.keys(WEAPON_FINISH_PROFILES) as WeaponId[];
 
-describe('eight-weapon authored asset contract', () => {
-  it('assigns every weapon a unique deterministic PBR finish triplet', () => {
-    expect(weapons).toHaveLength(8);
-    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].id)).size).toBe(8);
+describe('nine-weapon authored asset contract', () => {
+  it('assigns every weapon a unique finish identity with bounded intentional texture reuse', () => {
+    expect(weapons).toHaveLength(9);
+    expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].id)).size).toBe(9);
+    // VX-8 starts from the mature Longline PBR surface set while its authored
+    // coils, receiver and emissive thermal assembly remain model-unique.
     expect(new Set(weapons.map((weapon) => WEAPON_FINISH_PROFILES[weapon].albedo)).size).toBe(8);
     expect(new Set(weapons.flatMap((weapon) => {
       const profile = WEAPON_FINISH_PROFILES[weapon];

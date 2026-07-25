@@ -151,7 +151,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
     switchSeconds: 0.72, automatic: false, color: 0x7df8ff,
     penetration: {
       caliber: 'electromagnetic sabot', penetrationPower: 100_000, fmjMultiplier: 1,
-      energyFalloffStart: 512, energyFalloffEnd: 512, minimumEnergyRetention: 1,
+      energyFalloffStart: 512, energyFalloffEnd: 513, minimumEnergyRetention: 1,
       minimumWallDamageMultiplier: 1, maxPenetratedSurfaces: 64,
     },
   },

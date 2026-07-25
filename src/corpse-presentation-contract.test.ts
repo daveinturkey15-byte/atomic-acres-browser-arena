@@ -10,7 +10,7 @@ describe('canonical corpse presentation contract', () => {
   });
 
   it('builds corpses through the same canonical operator path as live players and bots', () => {
-    const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     expect(main).toContain("buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon)");
     expect(main).not.toMatch(/fallen-operator[^\n]*source\.weapon\s*,\s*false/);
   });

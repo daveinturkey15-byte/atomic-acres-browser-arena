@@ -438,7 +438,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     const precisionPrefix = id === 'railgun' ? 'railgun' : 'sniper';
     root.name = `${precisionPrefix}-original-weapon`;
     const sniperMetal = MAT.gunmetal(id);
-    root.userData.weaponModelId = id === 'railgun' ? 'railgun-authored-v1' : 'sniper-authored-v6';
+      root.userData.weaponModelId = id === 'railgun' ? 'railgun-authored-v6' : 'sniper-authored-v6';
     root.userData.weaponFinishId = weaponFinishProfile(id).id;
     root.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;

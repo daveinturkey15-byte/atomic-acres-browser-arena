@@ -131,7 +131,7 @@ export function claimRailgun(
 }
 
 export function advanceRailgunChamber(state: RailgunAuthorityState, now: number): RailgunAuthorityState {
-  if (state.status !== 'held' || state.roundsRemaining <= 0 || !validHostTime(now)) return state;
+  if (state.status !== 'held' || state.roundsRemaining <= 0 || state.chamberReadyAtHostTimeMs <= 0 || !validHostTime(now)) return state;
   return now >= state.chamberReadyAtHostTimeMs ? { ...state, chamberReadyAtHostTimeMs: 0 } : state;
 }
 
