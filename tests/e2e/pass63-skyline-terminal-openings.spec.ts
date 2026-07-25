@@ -46,7 +46,7 @@ test('keeps Terminal, aircraft, and cockpit apertures visually and mechanically 
   page.on('pageerror', (error) => errors.push(error.message));
 
   for (const profile of ['performance', 'blender'] as const) {
-    await page.goto(`/?render=${profile}&map=skyline-terminal&signal=off`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/?renderer=webgl2&render=${profile}&map=skyline-terminal&signal=off`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => {
       const status = document.querySelector<HTMLElement>('#network-status');
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: SkylineDebug }).__ATOMIC_ACRES_DEBUG__;

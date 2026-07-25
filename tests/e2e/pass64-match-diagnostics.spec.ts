@@ -16,7 +16,7 @@ test('completed-match diagnostics stay off the active match path and beacon one 
     });
   });
 
-  await page.goto('/?release=latest&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=6408&map=atomic-acres');
+  await page.goto('/?release=latest&renderer=webgl2&render=performance&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=6408&map=atomic-acres');
   await page.waitForFunction(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
     return api?.snapshot().weaponReady === true;

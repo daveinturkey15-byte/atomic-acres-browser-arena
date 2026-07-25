@@ -10,7 +10,7 @@ const reviewViewports = [
 ] as const;
 
 async function ready(page: Page): Promise<void> {
-  await page.goto('/?release=latest&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud');
+  await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud');
   await page.waitForFunction(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const solo = document.querySelector<HTMLButtonElement>('#solo');

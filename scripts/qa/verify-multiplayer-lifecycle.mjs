@@ -35,7 +35,8 @@ try {
         if (response.status() >= 400) errors.push(`cycle ${cycle} ${label}: HTTP ${response.status()} ${response.url()}`);
       });
       const url = new URL(baseUrl);
-      url.searchParams.set('render', 'compatibility');
+      url.searchParams.set('renderer', 'webgl2');
+      url.searchParams.set('render', 'compat');
       url.searchParams.set('seed', `pass25a-mp-${cycle}-${label}`);
       url.searchParams.set('multiplayerQa', '1');
       if (peerPort) url.searchParams.set('peerQaPort', String(peerPort));

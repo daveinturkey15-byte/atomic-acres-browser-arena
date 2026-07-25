@@ -57,7 +57,8 @@ test.afterAll(() => {
 async function openPlayer(context: BrowserContext, name: string, seed: string): Promise<Page> {
   const page = await context.newPage();
   const url = new URL('/', test.info().project.use.baseURL as string);
-  url.searchParams.set('render', 'compatibility');
+  url.searchParams.set('renderer', 'webgl2');
+  url.searchParams.set('render', 'compat');
   url.searchParams.set('signal', 'off');
   url.searchParams.set('grass', 'off');
   url.searchParams.set('mist', 'off');

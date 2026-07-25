@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('renders the lowered dynamic ocean and symmetric authored Rustworks layout', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto('/?render=blender&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=72254&map=rustworks-1v1');
+  await page.goto('/?renderer=webgl2&render=blender&signal=off&grass=off&mist=off&clouds=off&rays=off&seed=72254&map=rustworks-1v1');
   await page.waitForFunction(() => {
     const api = (window as unknown as {
       __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any };

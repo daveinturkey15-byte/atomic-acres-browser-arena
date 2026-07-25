@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
@@ -14,6 +14,9 @@ const chromeCandidates = [
 ].filter(Boolean);
 const executablePath = chromeCandidates.find((candidate) => existsSync(candidate));
 if (!executablePath) throw new Error('Pass 64 hardware WebGPU QA requires PASS64_CHROME_PATH or installed Google Chrome');
+const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const trackedWorktreeDirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim().length > 0;
+if (trackedWorktreeDirty) throw new Error('Pass 64 hardware WebGPU QA requires a clean tracked worktree so its receipt identifies exact source');
 
 const cases = process.env.PASS64_ARENAS
   ? process.env.PASS64_ARENAS.split(',').map((value) => value.trim()).filter(Boolean)
@@ -117,7 +120,16 @@ try {
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({ headless: true, executablePath, args: ['--enable-unsafe-webgpu'] });
+  browser = await chromium.launch({
+    headless: true,
+    executablePath,
+    args: [
+      '--enable-unsafe-webgpu',
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
+      '--disable-backgrounding-occluded-windows',
+    ],
+  });
   const receipts = [];
   for (const arenaId of cases) {
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
@@ -351,17 +363,42 @@ try {
   await guest.click('#lobby-ready');
   await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 45_000 });
   await host.click('#lobby-start');
-  await Promise.all(multiplayerPages.map((page) => page.waitForFunction(() => {
-    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return state?.gameStarted === true && state?.remotes >= 1;
-  }, undefined, { timeout: 45_000 })));
+  try {
+    await Promise.all(multiplayerPages.map((page) => page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === true && state?.remotes >= 1;
+    }, undefined, { timeout: 45_000 })));
+  } catch (error) {
+    const stalled = await Promise.all(multiplayerPages.map((page) => page.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state ? {
+        gameStarted: state.gameStarted,
+        matchPhase: state.matchPhase,
+        remotes: state.remotes,
+        networkRole: state.networkRole,
+        privateMatch: state.privateMatch,
+        runtime: state.render?.runtime,
+      } : null;
+    })));
+    throw new Error(`Two-peer WebGPU match start stalled: ${JSON.stringify(stalled)}`, { cause: error });
+  }
+  await Promise.all(multiplayerPages.map((page) => page.evaluate(
+    () => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget(),
+  )));
   const twoPeerWebGpu = await Promise.all(multiplayerPages.map((page) => page.evaluate(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    return { runtime: state.render.runtime, playableScene: state.render.playableScene, networkRole: state.networkRole, remotes: state.remotes };
+    return {
+      runtime: state.render.runtime,
+      playableScene: state.render.playableScene,
+      networkRole: state.networkLifecycle?.role ?? null,
+      remotes: state.remotes,
+    };
   })));
-  for (const peer of twoPeerWebGpu) {
+  for (const [index, peer] of twoPeerWebGpu.entries()) {
+    const expectedRole = index === 0 ? 'host' : 'client';
     if (peer.runtime.actualBackend !== 'webgpu' || peer.runtime.softwareAdapter || peer.runtime.deviceLost
-      || peer.playableScene.authoritativeArenaRoots !== 1 || peer.playableScene.remoteObjects < 1 || peer.remotes < 1) {
+      || peer.playableScene.authoritativeArenaRoots !== 1 || peer.playableScene.remoteObjects < 1 || peer.remotes < 1
+      || !peer.playableScene.budgetAudit.pass || peer.networkRole !== expectedRole) {
       throw new Error(`Two-peer playable WebGPU gate failed: ${JSON.stringify(peer)}`);
     }
   }
@@ -379,6 +416,7 @@ try {
   const output = {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
+    source: { revision: sourceRevision, trackedWorktreeDirty },
     browserExecutable: executablePath,
     rendererPolicy: 'webgpu-default-fail-closed-webgl-explicit-compatibility',
     arenaRetirementPolicy: 'single-authoritative-gameplay-root',

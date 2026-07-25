@@ -6,7 +6,7 @@ const evidenceRoot = resolve('artifacts/pass63/atomic-visuals');
 
 test('keeps every Atomic house aperture visibly open and bloom depth-occluded', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto('/?render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6301&map=atomic-acres');
+  await page.goto('/?renderer=webgl2&render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6301&map=atomic-acres');
   await page.waitForFunction(() => {
     const state = (window as unknown as {
       __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any };
@@ -63,7 +63,7 @@ test('keeps every Atomic house aperture visibly open and bloom depth-occluded', 
     animations: 'disabled',
   });
 
-  await page.goto('/?render=performance&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6301&map=atomic-acres');
+  await page.goto('/?renderer=webgl2&render=performance&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6301&map=atomic-acres');
   await page.waitForFunction(() => {
     const state = (window as unknown as {
       __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any };
