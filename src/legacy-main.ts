@@ -5334,13 +5334,14 @@ function applyRailgunState(next: RailgunAuthorityState, announce = false): void 
   if (announce || next.announcementSent && !previous.announcementSent) addFeed('RAILGUN SPAWNED', 'gold');
 }
 
-function broadcastRailgunState(): void {
+function broadcastRailgunState(reliableCommit = true): void {
   if (network.role !== 'host') return;
   const message: RailgunStateMessage = {
     type: 'railgun-state', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id, state: railgunState, nonce: randomNonce(),
   };
   network.send(message);
+  if (reliableCommit) network.sendStateCommitReliably(message);
   lastRailgunStateBroadcastAt = performance.now();
 }
 
@@ -5637,7 +5638,7 @@ function updateRailgun(now: number): void {
       applyRailgunState(advanced.state, advanced.announcement !== null);
       broadcastRailgunState();
     }
-    if (railgunStateResyncDue(lastRailgunStateBroadcastAt, now)) broadcastRailgunState();
+    if (railgunStateResyncDue(lastRailgunStateBroadcastAt, now)) broadcastRailgunState(false);
   }
   if (localHoldsRailgun()) player.ammo.railgun = railgunState.roundsRemaining;
   const hostNow = currentHostTimeMs();

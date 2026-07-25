@@ -35,6 +35,7 @@ type NetworkDiagnostics = Record<string, unknown> & {
   stateChannelMaxRetransmits: number | null;
   stateMessagesSent: number;
   stateMessagesRelayed: number;
+  reliableStateCommitMirrors: number;
   selfStateEchoesSuppressed: number;
   reconnectAttempts: number;
   stateFallbackActive: boolean;
@@ -167,6 +168,7 @@ export class ArenaNetwork {
   private reconnectDeadlineMonoMs: number | null = null;
   private stateMessagesSent = 0;
   private stateMessagesRelayed = 0;
+  private reliableStateCommitMirrors = 0;
   private selfStateEchoesSuppressed = 0;
   private stateFallbackMessages = 0;
   private clientReadyNotified = false;
@@ -235,6 +237,21 @@ export class ArenaNetwork {
         if (isStateTrafficMessage(message)) this.stateMessagesSent += 1;
         if (stateFallback) this.stateFallbackMessages += 1;
       }
+    }
+  }
+
+  sendStateCommitReliably(message: GameMessage, exceptPlayerId?: string): void {
+    if (!isGameMessage(message) || !isStateTrafficMessage(message)) return;
+    if (this.role === 'host') {
+      for (const bundle of this.guestBundles.values()) {
+        if (bundle.playerId === exceptPlayerId || !shouldRelayMessageToTeam(message, bundle.team)) continue;
+        if (!bundle.events.open) continue;
+        this.transmit(bundle.events, message, false);
+        this.reliableStateCommitMirrors += 1;
+      }
+    } else if (this.role === 'client' && this.hostEventConnection?.open) {
+      this.transmit(this.hostEventConnection, message, false);
+      this.reliableStateCommitMirrors += 1;
     }
   }
 
@@ -334,6 +351,7 @@ export class ArenaNetwork {
       stateChannelMaxRetransmits: stateDataChannel?.maxRetransmits ?? null,
       stateMessagesSent: this.stateMessagesSent,
       stateMessagesRelayed: this.stateMessagesRelayed,
+      reliableStateCommitMirrors: this.reliableStateCommitMirrors,
       selfStateEchoesSuppressed: this.selfStateEchoesSuppressed,
       reconnectAttempts: this.reconnectAttempts,
       pendingStateChannels: this.pendingStateConnections.size,

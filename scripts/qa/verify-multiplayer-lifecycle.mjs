@@ -266,6 +266,7 @@ try {
       && afterRedeploy[0].railgun.roundsRemaining === 6
       && afterRedeploy[1].railgun.status === 'available'
       && afterRedeploy[1].railgun.roundsRemaining === 6;
+    joined.railgunReliableStateMirrors = afterRedeploy[0].networkLifecycle.reliableStateCommitMirrors;
 
     await Promise.all(guests.map((page) => page.close({ runBeforeUnload: true })));
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 30_000 });
@@ -282,7 +283,7 @@ try {
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
     || !result.hostStartReadinessCommitted || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.regenSmallDamageSurvived || !result.guestRedeployNoCombatEffects
     || !result.sanitizedDiagnosticRetained || !result.automaticDiagnosticsCompleted || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
-    || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy
+    || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy || result.railgunReliableStateMirrors < 1
     || !result.leaveObserved || !result.rejoinGraceObserved
     || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1
     || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false
