@@ -33,3 +33,9 @@ npx wrangler d1 execute atomic-acres-leaderboard --remote --command "SELECT rece
 ```
 
 Do not publish exported rows. The stored payload contains no callsigns, chat, room codes, raw peer IDs, installation IDs, IP addresses, credentials, cookies, free text, stack traces, user-agent strings, viewport/device metadata, or long-term device fingerprints.
+
+The 192-event automatic envelope reserves retention for damage, regeneration, death transitions, and rejected admission anomalies before filling remaining space with recent routine events. High-rate accepted state reconciliation therefore cannot evict the health sequence needed to investigate delayed-death reports.
+
+## Residual stale-life protocol gate
+
+The reliable event lane preserves order within one live connection, but current target-health and death results still lack an end-to-end target `lifeId` plus monotonic `healthRevision`. This contribution deliberately does not half-wire those fields. Before claiming stale results are rejected across reconnect, respawn, or class redeploy, add both fields coherently to every authoritative gun, hosted-bot, railgun, legacy-hit, and death result; reset the client revision on a new life; reject mismatched or non-increasing results; and add reconnect/epoch tests.

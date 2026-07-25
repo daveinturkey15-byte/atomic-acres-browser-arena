@@ -11,6 +11,21 @@ export type RemoteHealthAuthorityState = Readonly<{
   lastAdvancedAtHostTimeMs: number;
 }>;
 
+export type AuthoritativeRemoteDamageResult = Readonly<{
+  applied: boolean;
+  died: boolean;
+  /** Stored health before this mutation advanced deterministic regeneration. */
+  healthBeforeAdvance: number;
+  /** Canonical health after regeneration and before admitted damage. */
+  healthBefore: number;
+  healthAfter: number;
+  damageRequested: number;
+  damageApplied: number;
+  state: RemoteHealthAuthorityState;
+}>;
+
+export type RemoteDamageResolver = (damage: number, canonicalHealth: number) => number;
+
 export function createRemoteHealthAuthorityState(alive = true, now = 0): RemoteHealthAuthorityState {
   const hostTime = Number.isFinite(now) ? Math.max(0, now) : 0;
   return {
@@ -44,16 +59,46 @@ export function applyAuthoritativeRemoteDamage(
   state: RemoteHealthAuthorityState,
   damage: number,
   now: number,
-): { applied: boolean; died: boolean; state: RemoteHealthAuthorityState } {
+  resolveDamage: RemoteDamageResolver = (requested) => requested,
+): AuthoritativeRemoteDamageResult {
   if (!state.alive || !Number.isFinite(damage) || damage <= 0 || !Number.isFinite(now)) {
-    return { applied: false, died: false, state };
+    return {
+      applied: false,
+      died: false,
+      healthBeforeAdvance: state.hp,
+      healthBefore: state.hp,
+      healthAfter: state.hp,
+      damageRequested: 0,
+      damageApplied: 0,
+      state,
+    };
   }
   const advanced = advanceRemoteHealthAuthority(state, now);
-  const hp = Math.max(0, advanced.hp - Math.min(100, damage));
+  const resolvedDamage = resolveDamage(damage, advanced.hp);
+  if (!Number.isFinite(resolvedDamage) || resolvedDamage <= 0) {
+    return {
+      applied: false,
+      died: false,
+      healthBeforeAdvance: state.hp,
+      healthBefore: state.hp,
+      healthAfter: state.hp,
+      damageRequested: 0,
+      damageApplied: 0,
+      state,
+    };
+  }
+  const damageRequested = Math.min(100, resolvedDamage);
+  const hp = Math.max(0, advanced.hp - damageRequested);
+  const damageApplied = advanced.hp - hp;
   const died = hp <= 0;
   return {
     applied: true,
     died,
+    healthBeforeAdvance: state.hp,
+    healthBefore: advanced.hp,
+    healthAfter: hp,
+    damageRequested,
+    damageApplied,
     state: died
       ? {
           ...advanced,

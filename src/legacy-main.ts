@@ -272,6 +272,7 @@ import {
   applyAuthoritativeRemoteDamage,
   applyAuthoritativeRemoteRedeploy,
   createRemoteHealthAuthorityState,
+  type AuthoritativeRemoteDamageResult,
   type RemoteHealthAuthorityState,
 } from './remote-health-authority';
 import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
@@ -1608,6 +1609,25 @@ function recordDamageEvent(details: DamageRecord): void {
     droppedHumanDamageEvents += 1;
   }
   humanDamageTimeline.push(event);
+}
+
+function recordHealthRegeneration(actorId: string, healthBefore: number, healthAfter: number, reason: string): void {
+  if (healthAfter <= healthBefore) return;
+  recordMatchDiagnostic('health-regen', 'accepted', {
+    actorId,
+    actorKind: 'player',
+    healthBefore,
+    healthAfter,
+    reason,
+  });
+}
+
+function recordAuthoritativeRemoteRegeneration(
+  targetId: string,
+  result: AuthoritativeRemoteDamageResult,
+  reason: string,
+): void {
+  recordHealthRegeneration(targetId, result.healthBeforeAdvance, result.healthBefore, reason);
 }
 
 function downloadJsonFile(exported: DownloadableJson): void {
@@ -3254,10 +3274,11 @@ function onNetworkMessage(message: GameMessage): void {
       let admittedIncoming = incoming;
       let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0 || redeployed;
       if (network.role === 'host') {
-        const health = advanceRemoteHealthAuthority(
-          remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0, now),
-          now,
-        );
+        const priorHealth = remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0, now);
+        const health = advanceRemoteHealthAuthority(priorHealth, now);
+        if (Math.floor(priorHealth.hp) !== Math.floor(health.hp) || health.hp === 100 && priorHealth.hp < 100) {
+          recordHealthRegeneration(incoming.id, priorHealth.hp, health.hp, 'host-remote-health-authority');
+        }
         const respawnAdmission = admitAuthoritativeRemoteRespawn(health, incoming.hp, now);
         if (respawnAdmission.respawned) {
           remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
@@ -3622,21 +3643,26 @@ function sendAuthoritativeHit(
     overdriveDamageMultiplier(overdriveState, timedMessage.by, now),
   );
   const outgoingHandicapped = handicapOutgoingDamage(timedMessage.by, poweredDamage, timedMessage.kind === 'shot' ? attackerWeapon : undefined);
-  const finalDamage = applyDhvIncomingDamage(outgoingHandicapped, health.hp, memberDhv(timedMessage.target));
-  const result = applyAuthoritativeRemoteDamage(health, finalDamage, now);
+  const targetDhv = memberDhv(timedMessage.target);
+  const result = applyAuthoritativeRemoteDamage(
+    health,
+    outgoingHandicapped,
+    now,
+    (damage, canonicalHealth) => applyDhvIncomingDamage(damage, canonicalHealth, targetDhv),
+  );
   if (!result.applied) return;
-  const appliedDamage = Math.max(0, health.hp - result.state.hp);
   remoteHealthAuthorities.set(timedMessage.target, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
+  recordAuthoritativeRemoteRegeneration(timedMessage.target, result, 'host-remote-health-authority-before-legacy-hit');
   recordDamageEvent({
     actorId: timedMessage.by,
     targetId: timedMessage.target,
     weaponOrEffect: timedMessage.kind === 'shot' ? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon : timedMessage.explosiveSource ?? timedMessage.kind,
-    healthBefore: health.hp,
-    healthAfter: result.state.hp,
-    damageRequested: finalDamage,
-    damageApplied: appliedDamage,
+    healthBefore: result.healthBefore,
+    healthAfter: result.healthAfter,
+    damageRequested: result.damageRequested,
+    damageApplied: result.damageApplied,
     hitZone: evidence?.hitZone,
     critical: evidence?.hitZone === 'head',
     wallbang: evidence?.wallbang,
@@ -3644,7 +3670,7 @@ function sendAuthoritativeHit(
     distanceMeters: evidence?.distanceMeters,
     reason: 'host-remote-health-authority',
   });
-  recordAuthoritativeDamage(timedMessage.by, timedMessage.target, appliedDamage);
+  recordAuthoritativeDamage(timedMessage.by, timedMessage.target, result.damageApplied);
   network.send(timedMessage);
   if (result.died) {
     const death: DeathMessage = {
@@ -3827,20 +3853,26 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       const remote = remotes.get(targetId);
       const health = remoteHealthAuthorities.get(targetId);
       if (!remote || !health) continue;
-      const finalDamage = applyDhvIncomingDamage(outgoing, health.hp, memberDhv(targetId));
-      const applied = applyAuthoritativeRemoteDamage(health, finalDamage, receivedAt);
+      const targetDhv = memberDhv(targetId);
+      const applied = applyAuthoritativeRemoteDamage(
+        health,
+        outgoing,
+        receivedAt,
+        (damage, canonicalHealth) => applyDhvIncomingDamage(damage, canonicalHealth, targetDhv),
+      );
       if (!applied.applied) continue;
-      appliedDamage = Math.max(0, health.hp - applied.state.hp);
-      reportedRawDamage = reportedDhvRawDamage(rawOutgoing, health.hp, memberDhv(targetId), appliedDamage);
+      appliedDamage = applied.damageApplied;
+      reportedRawDamage = reportedDhvRawDamage(rawOutgoing, applied.healthBefore, targetDhv, appliedDamage);
       resultingHealth = applied.state.hp;
       died = applied.died;
       remoteHealthAuthorities.set(targetId, applied.state);
       remote.snapshot = { ...remote.snapshot, hp: applied.state.hp };
       remote.root.visible = applied.state.alive;
+      recordAuthoritativeRemoteRegeneration(targetId, applied, 'host-remote-health-authority-before-authored-shot');
       recordDamageEvent({
         actorId: request.by, targetId, weaponOrEffect: request.weapon,
-        healthBefore: health.hp, healthAfter: applied.state.hp,
-        damageRequested: finalDamage, damageApplied: appliedDamage,
+        healthBefore: applied.healthBefore, healthAfter: applied.healthAfter,
+        damageRequested: applied.damageRequested, damageApplied: appliedDamage,
         hitZone: hit.hitZone, critical: hit.hitZone === 'head', wallbang: hit.wallbang,
         penetrationMultiplier: hit.penetrationMultiplier, reason: 'host-shot-request-authority',
       });
@@ -3865,6 +3897,38 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   finish(outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss', 'none', admission.appliedRewindMs, outcomes);
 }
 
+function reconcileLocalAuthoritativeHealth(
+  resultingHealth: number,
+  admittedDamage: number,
+  attacker: string,
+  minimumDamage: number,
+  cause: KillCause,
+): void {
+  if (!player.alive) return;
+  const localHealthBefore = player.hp;
+  const canonicalDamage = Math.max(0, localHealthBefore - resultingHealth);
+  recordMatchDiagnostic('health-reconciliation', 'accepted', {
+    actorId: attacker,
+    targetId: player.id,
+    actorKind: combatantLabel(attacker).kind,
+    targetKind: 'player',
+    weaponOrEffect: cause.kind === 'gun' ? cause.weapon : cause.kind,
+    healthBefore: localHealthBefore,
+    healthAfter: resultingHealth,
+    damageRequested: admittedDamage,
+    damageApplied: canonicalDamage,
+    reason: canonicalDamage > admittedDamage + 0.1 ? 'host-canonical-catch-down' : canonicalDamage <= 0 ? 'host-canonical-upward' : 'host-canonical-result',
+  });
+  if (canonicalDamage > 0) {
+    applyDamage(canonicalDamage, attacker, minimumDamage, false, cause, true);
+  } else if (admittedDamage > 0) {
+    // A host result can move health upward when the local fixed-step simulation
+    // lagged host time. The admitted hit still restarts the regen delay.
+    lastDamageAt = performance.now();
+  }
+  if (player.alive) player.hp = resultingHealth;
+}
+
 function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
   shotTimingTelemetry.recordResultDelivery(performance.now());
@@ -3877,9 +3941,13 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   while (processedShotResults.size > 512) processedShotResults.delete(processedShotResults.values().next().value!);
   for (const outcome of message.outcomes) {
     if (outcome.target !== player.id || !player.alive) continue;
-    const canonicalDamage = Math.max(0, player.hp - outcome.resultingHealth);
-    if (canonicalDamage > 0) applyDamage(canonicalDamage, message.forPlayerId, 0, false, { kind: 'gun', weapon: remotes.get(message.forPlayerId)?.snapshot.weapon ?? 'carbine' }, true);
-    if (player.alive) player.hp = outcome.resultingHealth;
+    reconcileLocalAuthoritativeHealth(
+      outcome.resultingHealth,
+      outcome.damage,
+      message.forPlayerId,
+      0,
+      { kind: 'gun', weapon: remotes.get(message.forPlayerId)?.snapshot.weapon ?? 'carbine' },
+    );
   }
   if (message.forPlayerId !== player.id || presentedShotResults.has(message.shotId)) return;
   presentedShotResults.add(message.shotId);
@@ -4438,6 +4506,20 @@ function overdriveDropPosition(victimId: string): THREE.Vector3 | null {
 }
 
 function processDeath(message: DeathMessage): void {
+  const deathSource = message.cause.kind === 'gun'
+    ? message.cause.weapon
+    : message.cause.kind === 'killstreak'
+      ? message.cause.effect
+      : message.cause.kind;
+  recordMatchDiagnostic('death-authoritative', network.role === 'client' ? 'observed' : 'accepted', {
+    actorId: message.killer,
+    actorKind: combatantLabel(message.killer).kind,
+    targetId: message.victim,
+    targetKind: combatantLabel(message.victim).kind,
+    weaponOrEffect: deathSource,
+    healthAfter: 0,
+    reason: 'authoritative-death-transition',
+  }, `death-${message.nonce}`);
   const victimPoint = message.victim === player.id ? player.position : remotes.get(message.victim)?.target ?? bots.get(message.victim)?.position;
   if (victimPoint) recordSpawnDeath(victimPoint);
   if (victimPoint && network.role !== 'client') dropHeldRailgun(message.victim, victimPoint.clone().add(new THREE.Vector3(0, 0.3, 0)));
@@ -5036,25 +5118,25 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
   const now = performance.now();
   const applied = applyAuthoritativeRemoteDamage(health, RAILGUN_DAMAGE, now);
   if (!applied.applied) return null;
-  const damage = Math.max(0, health.hp - applied.state.hp);
   remoteHealthAuthorities.set(target.id, applied.state);
   remote.snapshot = { ...remote.snapshot, hp: applied.state.hp };
   remote.root.visible = applied.state.alive;
+  recordAuthoritativeRemoteRegeneration(target.id, applied, 'host-remote-health-authority-before-railgun');
   recordDamageEvent({
     actorId: shooterId, targetId: target.id, weaponOrEffect: 'railgun',
-    healthBefore: health.hp, healthAfter: applied.state.hp,
-    damageRequested: RAILGUN_DAMAGE, damageApplied: damage,
+    healthBefore: applied.healthBefore, healthAfter: applied.healthAfter,
+    damageRequested: applied.damageRequested, damageApplied: applied.damageApplied,
     hitZone: 'body', wallbang: true, penetrationMultiplier: 1, distanceMeters: distance,
     reason: 'host-railgun-authority',
   });
-  recordAuthoritativeDamage(shooterId, target.id, damage);
+  recordAuthoritativeDamage(shooterId, target.id, applied.damageApplied);
   if (applied.died) {
     const death: DeathMessage = { type: 'death', killer: shooterId, victim: target.id, cause, nonce: randomNonce() };
     processedNonces.add(death.nonce);
     network.send(death);
     processDeath(death);
   }
-  return { target: target.id, damage, resultingHealth: applied.state.hp, died: applied.died, distanceMeters: distance };
+  return { target: target.id, damage: applied.damageApplied, resultingHealth: applied.healthAfter, died: applied.died, distanceMeters: distance };
 }
 
 function presentRailgunShot(origin: THREE.Vector3, direction: THREE.Vector3, local: boolean): void {
@@ -5132,9 +5214,7 @@ function acceptRailgunShotResult(message: RailgunShotResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.generation !== railgunState.generation) return;
   for (const outcome of message.outcomes) {
     if (outcome.target !== player.id || !player.alive) continue;
-    const canonicalDamage = Math.max(0, player.hp - outcome.resultingHealth);
-    if (canonicalDamage > 0) applyDamage(canonicalDamage, message.forPlayerId, 1, false, { kind: 'gun', weapon: 'railgun' }, true);
-    if (player.alive) player.hp = outcome.resultingHealth;
+    reconcileLocalAuthoritativeHealth(outcome.resultingHealth, outcome.damage, message.forPlayerId, 1, { kind: 'gun', weapon: 'railgun' });
   }
   if (message.forPlayerId !== player.id || message.status !== 'accepted-hit') return;
   const damage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
@@ -6242,25 +6322,30 @@ function applyHostedBotDamageToRemote(
   const health = remoteHealthAuthorities.get(target.id);
   const remote = remotes.get(target.id);
   if (!health || !remote) return;
-  const handicappedDamage = applyDhvIncomingDamage(damage, health.hp, memberDhv(target.id));
-  const result = applyAuthoritativeRemoteDamage(health, handicappedDamage, now);
+  const targetDhv = memberDhv(target.id);
+  const result = applyAuthoritativeRemoteDamage(
+    health,
+    damage,
+    now,
+    (requested, canonicalHealth) => applyDhvIncomingDamage(requested, canonicalHealth, targetDhv),
+  );
   if (!result.applied) return;
-  const damageApplied = Math.max(0, health.hp - result.state.hp);
-  if (damageApplied <= 0) return;
   remoteHealthAuthorities.set(target.id, result.state);
   remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
   remote.root.visible = result.state.alive;
+  recordAuthoritativeRemoteRegeneration(target.id, result, 'host-remote-health-authority-before-hosted-bot');
+  if (result.damageApplied <= 0) return;
   recordDamageEvent({
     actorId: bot.id,
     targetId: target.id,
     weaponOrEffect: bot.weapon,
-    healthBefore: health.hp,
-    healthAfter: result.state.hp,
-    damageRequested: damage,
-    damageApplied,
+    healthBefore: result.healthBefore,
+    healthAfter: result.healthAfter,
+    damageRequested: result.damageRequested,
+    damageApplied: result.damageApplied,
     reason: 'hosted-bot-remote-health-authority',
   });
-  recordAuthoritativeDamage(bot.id, target.id, damageApplied);
+  recordAuthoritativeDamage(bot.id, target.id, result.damageApplied);
   const message: BotDamageMessage = {
     type: 'bot-damage',
     by: player.id,
@@ -6269,9 +6354,9 @@ function applyHostedBotDamageToRemote(
     weapon: bot.weapon,
     origin: origin.toArray(),
     direction: direction.toArray(),
-    damageApplied,
-    healthBefore: health.hp,
-    healthAfter: result.state.hp,
+    damageApplied: result.damageApplied,
+    healthBefore: result.healthBefore,
+    healthAfter: result.healthAfter,
     nonce: randomNonce(),
   };
   network.send(message);
@@ -6298,13 +6383,7 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
   spawnTracer(bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3()) ?? origin, origin.clone().addScaledVector(direction, 55), WEAPONS[message.weapon].color);
   audio.shot(message.weapon, true, origin.distanceTo(camera.position));
   if (message.target === player.id) {
-    const canonicalDamage = Math.max(0, player.hp - message.healthAfter);
-    if (canonicalDamage > 0) {
-      applyDamage(canonicalDamage, message.botId, 0, false, { kind: 'gun', weapon: message.weapon }, true);
-    }
-    // Hosted matches use the host's remote-health ledger as the canonical value.
-    // Reconcile upward as well as downward so prior client-side drift cannot persist.
-    if (player.alive) player.hp = message.healthAfter;
+    reconcileLocalAuthoritativeHealth(message.healthAfter, message.damageApplied, message.botId, 0, { kind: 'gun', weapon: message.weapon });
   } else {
     const remote = remotes.get(message.target);
     if (remote) reactOperator(remote.root, 'body');

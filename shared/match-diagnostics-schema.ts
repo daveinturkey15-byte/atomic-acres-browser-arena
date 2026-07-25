@@ -9,7 +9,7 @@ export const MATCH_DIAGNOSTIC_ARENAS = ['atomic-acres', 'skyline-terminal', 'rus
 export const MATCH_DIAGNOSTIC_MODES = ['solo', 'tdm', 'ffa'] as const;
 export const MATCH_DIAGNOSTIC_ROLES = ['offline', 'host', 'guest'] as const;
 export const MATCH_DIAGNOSTIC_ADMISSIONS = ['accepted', 'rejected', 'observed'] as const;
-export const MATCH_DIAGNOSTIC_EVENT_CATEGORIES = ['damage', 'health', 'regen', 'admission'] as const;
+export const MATCH_DIAGNOSTIC_EVENT_CATEGORIES = ['damage', 'health', 'regen', 'death', 'admission'] as const;
 export const MATCH_DIAGNOSTIC_ACTOR_KINDS = [
   'player', 'hosted-bot', 'solo-bot', 'practice-target', 'flying-target', 'environment', 'unknown',
 ] as const;

@@ -45,6 +45,44 @@ describe('remote health authority', () => {
     const laterHit = applyAuthoritativeRemoteDamage(damaged, 23, 100 + REMOTE_HEALTH_REGEN_DELAY_MS + 10_000);
     expect(laterHit.died).toBe(false);
     expect(laterHit.state.hp).toBe(77);
+    expect(laterHit).toMatchObject({
+      healthBeforeAdvance: 20,
+      healthBefore: 100,
+      healthAfter: 77,
+      damageRequested: 23,
+      damageApplied: 23,
+    });
+  });
+
+  it.each(['legacy hit', 'authored shot', 'hosted bot', 'railgun'])(
+    'keeps the %s route outcome consistent after a full regeneration gap',
+    () => {
+      const damaged = applyAuthoritativeRemoteDamage(createRemoteHealthAuthorityState(true, 100), 80, 100).state;
+      const result = applyAuthoritativeRemoteDamage(damaged, 23, 100 + REMOTE_HEALTH_REGEN_DELAY_MS + 10_000);
+
+      expect(result).toMatchObject({
+        applied: true,
+        died: false,
+        healthBeforeAdvance: 20,
+        healthBefore: 100,
+        healthAfter: 77,
+        damageRequested: 23,
+        damageApplied: 23,
+        state: { hp: 77, alive: true },
+      });
+    },
+  );
+
+  it('resolves health-dependent incoming damage from post-regeneration health', () => {
+    const damaged = applyAuthoritativeRemoteDamage(createRemoteHealthAuthorityState(true, 100), 80, 100).state;
+    const result = applyAuthoritativeRemoteDamage(
+      damaged,
+      1,
+      100 + REMOTE_HEALTH_REGEN_DELAY_MS + 10_000,
+      (_damage, canonicalHealth) => canonicalHealth,
+    );
+
+    expect(result).toMatchObject({ healthBefore: 100, damageRequested: 100, damageApplied: 100, healthAfter: 0, died: true });
   });
 
   it('redeploys an alive remote as a fresh life without entering the death lifecycle', () => {

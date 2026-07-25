@@ -144,6 +144,23 @@ function isDamageEvent(event: ExportEvent): boolean {
   return event.damageApplied !== undefined || event.eventType.includes('damage');
 }
 
+function isPriorityRemoteEvent(event: ExportEvent): boolean {
+  return isDamageEvent(event)
+    || event.eventType === 'health-regen'
+    || event.eventType.includes('death')
+    || event.admission === 'rejected';
+}
+
+function selectRemoteEvents(events: readonly ExportEvent[]): ExportEvent[] {
+  const prioritized = events.filter(isPriorityRemoteEvent).slice(-MATCH_DIAGNOSTIC_MAX_EVENTS);
+  const prioritizedSet = new Set(prioritized);
+  const ordinarySlots = MATCH_DIAGNOSTIC_MAX_EVENTS - prioritized.length;
+  const ordinary = ordinarySlots > 0
+    ? events.filter((event) => !prioritizedSet.has(event)).slice(-ordinarySlots)
+    : [];
+  return [...prioritized, ...ordinary].sort((left, right) => left.monotonicMs - right.monotonicMs);
+}
+
 const FRAME_BUCKETS_MS = [8, 12, 16, 20, 25, 33, 50, 100, 250, 500, 1_000] as const;
 
 function boundedInteger(value: number, maximum: number): number {
@@ -242,7 +259,9 @@ export class MatchDiagnostics {
     };
     this.events.push(event);
     if (this.events.length > MAX_DIAGNOSTIC_EVENTS) {
-      this.events.shift();
+      const ordinaryIndex = this.events.findIndex((candidate) => !isPriorityRemoteEvent(candidate));
+      if (ordinaryIndex >= 0) this.events.splice(ordinaryIndex, 1);
+      else this.events.shift();
       this.droppedEvents += 1;
     }
     if (isDamageEvent(event)) {
@@ -281,10 +300,12 @@ export class MatchDiagnostics {
 
   remoteEnvelope(completion: RemoteMatchDiagnosticCompletion): MatchDiagnosticUploadEnvelope {
     const durationMs = boundedInteger(completion.durationMs, 4 * 60 * 60_000);
-    const retained = this.events.slice(-MATCH_DIAGNOSTIC_MAX_EVENTS);
+    const retained = selectRemoteEvents(this.events);
     const events = retained.map((event, sequence) => {
       const hasHealth = event.healthBefore !== undefined || event.healthAfter !== undefined;
-      const category = event.eventType === 'health-regen'
+      const category = event.eventType.includes('death')
+        ? 'death' as const
+        : event.eventType === 'health-regen'
         ? 'regen' as const
         : isDamageEvent(event)
           ? 'damage' as const
