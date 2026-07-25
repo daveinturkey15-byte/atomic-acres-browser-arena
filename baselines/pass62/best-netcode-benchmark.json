@@ -9,6 +9,13 @@
   "pagesPath": "channels/experimental-netcode-pass",
   "runtimeFileCount": 118,
   "runtimeTreeSha256": "035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d",
+  "runtimeDigestPolicy": {
+    "excludedFiles": [
+      "channel-provenance.json"
+    ],
+    "completeSubtreeFileCount": 119,
+    "wrapperProvenanceFile": "pinned-channel-provenance.json"
+  },
   "acceptanceManifestSha256": "5ed8e2ec6062006e2a1caa79f252d1b51b9768db6204a744229cb4736bbeb914",
   "requiredChecksRun": 30105747548,
   "productionWorkflowRun": 30109672269,
