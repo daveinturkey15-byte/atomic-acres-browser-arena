@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DataConnection } from 'peerjs';
-import { guestMessageEndsSession, isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner, stateTrafficUsesFallback } from './network';
+import { guestMessageEndsSession, initialLobbyJoinHasProtocolMismatch, isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner, stateTrafficUsesFallback } from './network';
+import { MULTIPLAYER_PROTOCOL_VERSION } from './protocol';
 
 describe('guest event connection lifecycle', () => {
   it('does not let a stale same-peer close callback evict the replacement session', () => {
@@ -13,6 +14,22 @@ describe('guest event connection lifecycle', () => {
   it('fails an initial bad room cleanly while retaining bounded retry for a dropped session', () => {
     expect(joinTimeoutAction(false)).toBe('offline');
     expect(joinTimeoutAction(true)).toBe('retry');
+  });
+
+  it('rejects a pre-v5 initial lobby handshake as a protocol mismatch', () => {
+    const join = {
+      type: 'lobby-join',
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      playerId: 'player-1',
+      connectionEpoch: 'connection_epoch_player_1',
+      name: 'Player 1',
+      requestedTeam: 0,
+      resumeToken: '12345678-1234-1234-1234-123456789abc',
+      nonce: 1,
+    };
+    expect(initialLobbyJoinHasProtocolMismatch(join)).toBe(false);
+    expect(initialLobbyJoinHasProtocolMismatch({ ...join, protocolVersion: 4 })).toBe(true);
+    expect(initialLobbyJoinHasProtocolMismatch({ type: 'chat-submit', protocolVersion: 4 })).toBe(false);
   });
 
   it('keeps movement flowing over the reliable event lane when the transient lane degrades', () => {

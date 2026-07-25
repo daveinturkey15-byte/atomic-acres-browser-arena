@@ -38,10 +38,28 @@ export function resolveProductionReleasedAt(
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
   Object.freeze({
+    id: 'pass63',
+    pass: 'PASS 63',
+    title: 'Project Cleanup, Shared Chat & Visual Repairs',
+    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    areas: Object.freeze(['PROJECT MAP', 'MULTIPLAYER CHAT', 'ATOMIC ACRES', 'SKYLINE', 'CLEANUP']),
+    summary: 'Pass 63 closes the visual defects deferred from Pass 62, adds private-room text chat, and starts a measured recurring cleanup with a visible, downloadable project architecture map.',
+    highlights: Object.freeze([
+      'Project Map adds Overview, Structure, Changes and Archive pages beside Last Release, with human Markdown and full agent JSON downloads derived from one canonical tree',
+      'Hosted lobbies and live private matches gain bounded host-relayed Enter-to-chat without external storage or diagnostic-log capture',
+      'Atomic Acres opaque walls contain local lighting and the audited house openings no longer render as black slabs',
+      'Skyline Terminal door, boarding and cockpit openings now match their movement and projectile authority in Performance and Quality',
+      'Release-history and project-documentation dialogs move behind reusable UI controllers, reducing duplicate shell wiring while preserving gameplay authority',
+      'Measured dead imports and locals are removed; larger domain moves remain bounded follow-up work instead of a risky tree-wide rename',
+      'A narrow PostCSS patch override closes the current production dependency advisory without changing the Vite or gameplay stack',
+      'The accepted Rustworks rebuild and Pass 62 host-authoritative gameplay, physics, netcode and release topology remain unchanged',
+    ]),
+  }),
+  Object.freeze({
     id: 'pass62',
     pass: 'PASS 62',
     title: 'Gameplay, Graphics & Netcode Reconciliation',
-    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+    releasedAt: '2026-07-24T16:36:32Z',
     areas: Object.freeze(['GAMEPLAY', 'HUD', 'MAPS', 'NETCODE', 'RENDERING', 'PERFORMANCE']),
     summary: 'Pass 62 combines the refined graphics pipeline, gameplay and arena repairs, and an immutable host-resolved bullet timeline for offline inspection before release.',
     highlights: Object.freeze([

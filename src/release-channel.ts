@@ -19,6 +19,9 @@ export type ReleaseChannelConfig = {
     pass: string;
     sourceSha: string;
     pagesSha: string;
+    pagesPath?: string;
+    runtimeFileCount?: number;
+    runtimeTreeSha256?: string;
     path: string;
   };
 };

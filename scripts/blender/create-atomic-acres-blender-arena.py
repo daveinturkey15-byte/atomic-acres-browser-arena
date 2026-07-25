@@ -427,9 +427,17 @@ for house_index, house in enumerate(spec["houses"]):
             f"BLD_HOUSE_{prefix}_upper_room_light_{room_index}",
             [x, 6.875, room_z], [4.8, 0.025, 1.1], M["emissive_amber"], 0.02,
         )
-    # Deliberately asymmetric model-home trim preserves every structural opening.
+    # Four actual corner posts preserve the side-wall ramp aperture. The former
+    # full-depth "corner" strips were effectively opaque gunmetal walls laid
+    # across both side facades, so the open upper ramp entry rendered as a black
+    # door even though TypeScript collision correctly left the route open.
     for side in (-1, 1):
-        add_box(f"BLD_HOUSE_{prefix}_corner_{side}", [x + side * (width / 2 + 0.06), 3.55, z], [0.18, 7.1, depth + 0.25], M["metal"], 0.02)
+        for end in (-1, 1):
+            add_box(
+                f"BLD_HOUSE_{prefix}_corner_{side}_{end}",
+                [x + side * (width / 2 + 0.06), 3.55, z + end * (depth / 2 + 0.06)],
+                [0.18, 7.1, 0.28], M["metal"], 0.02,
+            )
     facade_z = z + facing * (depth / 2 + 0.24)
     add_box(f"BLD_HOUSE_{prefix}_facade_band", [x, 6.35, facade_z], [14.8, 0.34, 0.18], accent, 0.035)
     for offset in (-7.0, 7.0):
@@ -742,6 +750,69 @@ for landmark_name, route_id, position in (
     landmark["atomic_route_id"] = route_id
     env.objects.link(landmark)
 
+# Prove that every declared house aperture is free of opaque presentation
+# geometry before material batching erases individual source-object names. Nine
+# rays cover the centre and inner thirds of each opening. Window glass is the
+# only admitted intersection; an opaque mesh anywhere in the wall corridor is a
+# hard authoring failure.
+def audit_house_apertures():
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    audited = []
+    samples_per_aperture = 9
+    bpy.context.view_layer.update()
+    for house in spec["houses"]:
+        house_x, _, house_z = house["origin"]["x"], 0.0, house["origin"]["z"]
+        for opening in house["openings"]:
+            centre = Vector(opening["centre"])
+            normal = Vector((0.0, 0.0, 0.0))
+            horizontal = Vector((0.0, 0.0, 0.0))
+            if opening["kind"] == "ramp-entry":
+                normal.x = 1.0 if centre.x >= house_x else -1.0
+                horizontal.z = 1.0
+            else:
+                normal.z = 1.0 if centre.z >= house_z else -1.0
+                horizontal.x = 1.0
+            for horizontal_factor in (-0.28, 0.0, 0.28):
+                for vertical_factor in (-0.22, 0.0, 0.22):
+                    sample = centre + horizontal * (opening["width"] * horizontal_factor)
+                    sample.y += opening["height"] * vertical_factor
+                    start_game = sample - normal * 0.75
+                    end_game = sample + normal * 0.75
+                    origin = Vector(game_location(start_game))
+                    end = Vector(game_location(end_game))
+                    direction = (end - origin).normalized()
+                    remaining = (end - origin).length
+                    while remaining > 0.001:
+                        hit, location, _normal, _face, obj, _matrix = bpy.context.scene.ray_cast(
+                            depsgraph, origin, direction, distance=remaining,
+                        )
+                        if not hit:
+                            break
+                        if obj.get("atomic_semantic") != "breakable-window":
+                            raise RuntimeError(
+                                "Opaque house aperture blocker: "
+                                f"{house['id']}:{opening['id']} -> {obj.name} at {tuple(round(v, 4) for v in location)}"
+                            )
+                        travelled = (location - origin).length + 0.01
+                        origin = location + direction * 0.01
+                        remaining -= travelled
+            marker = bpy.data.objects.new(
+                f"P63_APERTURE_{house['id']}_{opening['id']}", None,
+            )
+            marker.location = game_location(centre)
+            marker["atomic_semantic"] = "aperture-audit"
+            marker["atomic_aperture_id"] = f"{house['id']}:{opening['id']}"
+            marker["atomic_aperture_kind"] = opening["kind"]
+            marker["atomic_aperture_clear"] = True
+            marker["atomic_aperture_samples"] = samples_per_aperture
+            marker["atomic_aperture_transparent"] = opening["kind"] == "window"
+            env.objects.link(marker)
+            audited.append(marker)
+    return audited
+
+
+aperture_audit_markers = audit_house_apertures()
+
 # Join ordinary non-semantic meshes by material to keep browser draw calls bounded.
 window_objects = {obj for obj in env.objects if obj.get("atomic_semantic") == "breakable-window"}
 protected_objects = window_objects
@@ -874,5 +945,8 @@ meshes = [obj for obj in env.objects if obj.type == "MESH"]
 triangles = sum(len(obj.data.loop_triangles) if obj.data.loop_triangles else (obj.data.calc_loop_triangles() or len(obj.data.loop_triangles)) for obj in meshes)
 print(json.dumps({
     "blend": str(BLEND_PATH), "glb": str(GLB_PATH), "preview": str(PREVIEW_PATH),
-    "meshes": len(meshes), "materials": len(M), "semanticWindows": len(window_objects), "triangles": triangles,
+    "meshes": len(meshes), "materials": len(M), "semanticWindows": len(window_objects),
+    "auditedApertures": len(aperture_audit_markers), "apertureSamples": sum(
+        marker["atomic_aperture_samples"] for marker in aperture_audit_markers
+    ), "triangles": triangles,
 }, sort_keys=True))

@@ -2,26 +2,45 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const config = JSON.parse(readFileSync('release-channels.json', 'utf8'));
+const pass62Benchmark = JSON.parse(readFileSync('baselines/pass62/best-netcode-benchmark.json', 'utf8'));
 const shell = readFileSync('release-shell/release-shell.js', 'utf8');
 const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 
-describe('Pass 62 two-channel release topology', () => {
-  it('uses schema 3 and pins stable Pass 60 by exact source and Pages SHAs', () => {
-    expect(config.schemaVersion).toBe(3);
+describe('Pass 63 two-channel release topology', () => {
+  it('binds the stable channel to the immutable best-ever Pass 62 benchmark', () => {
+    expect(pass62Benchmark).toMatchObject({
+      designation: 'user-approved-best-ever-netcode',
+      releasePass: config.stable.pass,
+      immutable: true,
+      sourceSha: config.stable.sourceSha,
+      pagesSha: config.stable.pagesSha,
+      pagesPath: config.stable.pagesPath,
+      runtimeFileCount: config.stable.runtimeFileCount,
+      runtimeTreeSha256: config.stable.runtimeTreeSha256,
+      productionWorkflowRun: 30109672269,
+      pagesWorkflowRun: 30109872134,
+    });
+  });
+
+  it('uses schema 4 and pins stable Pass 62 by exact source, Pages subtree, and runtime digest', () => {
+    expect(config.schemaVersion).toBe(4);
     expect(config.stable).toEqual({
-      pass: 'PASS 60',
+      pass: 'PASS 62',
       label: 'NEW NETCODE',
       description: expect.any(String),
-      sourceSha: 'b1af49be064610126a80c2ee538af334389f8f43',
-      pagesSha: 'fb06eeeefc42f35d591e9ee340a3adab62916883',
+      sourceSha: '249a7ee77dce761eb237f3eb0e0d0ea1d0356317',
+      pagesSha: '27c90967bdaf5387c0372933c7965a60ce75a765',
+      pagesPath: 'channels/experimental-netcode-pass',
+      runtimeFileCount: 118,
+      runtimeTreeSha256: '035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d',
       path: 'channels/recent-stable',
     });
   });
 
-  it('keeps Pass 62 live at the experimental netcode path and removes old channels', () => {
+  it('keeps Pass 63 live at the experimental netcode path and removes old channels', () => {
     expect(config.experimental).toEqual({
-      pass: 'PASS 62',
+      pass: 'PASS 63',
       label: 'EXPERIMENTAL NEW NETCODE',
       description: expect.any(String),
       path: 'channels/experimental-netcode-pass',
@@ -31,27 +50,29 @@ describe('Pass 62 two-channel release topology', () => {
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 62 and stable Pass 60 choices', () => {
+  it('renders exactly live Pass 63 and stable Pass 62 choices', () => {
     expect(shell).toContain("['experimental', 'stable']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
-    expect(shellHtml).toContain('live Pass 62 experimental netcode build');
-    expect(shellHtml).toContain('byte-exact Pass 60 stable fallback');
+    expect(shellHtml).toContain('live Pass 63 build');
+    expect(shellHtml).toContain('byte-exact Pass 62 best-netcode benchmark');
     expect(shellHtml).not.toContain('Pass 59');
   });
 
-  it('routes root rooms and legacy latest or normal aliases to Pass 62', () => {
+  it('routes root rooms and legacy latest or normal aliases to Pass 63', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
     expect(shell).toContain("requested === 'stable'");
     expect(shell).toContain("target.searchParams.set('release', 'latest')");
   });
 
-  it('moves the candidate under experimental and reconstructs only stable Pass 60 from Git blobs', () => {
+  it('moves the candidate under experimental and reconstructs only stable Pass 62 from Git blobs', () => {
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
     expect(staging).toContain("const stable = stagePinned('recent-stable', config.stable)");
+    expect(staging).toContain('channel.pagesPath');
+    expect(staging).toContain("'pinned-channel-provenance.json'");
     expect(staging).not.toContain("stagePinned('new-netcode'");
     expect(staging).toContain("channels: { experimental, stable }");
-    expect(staging).toContain("schemaVersion: 3");
+    expect(staging).toContain("schemaVersion: 4");
   });
 });

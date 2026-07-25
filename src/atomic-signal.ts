@@ -170,7 +170,7 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
     return occlusion * 0.25;
   }
 
-  vec3 selectiveBloom(float centreDepth) {
+  vec3 selectiveBloom() {
     vec3 bloom = vec3(0.0);
     float weight = 0.0;
     for (int x = -1; x <= 1; x++) {
@@ -179,7 +179,11 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
         vec2 uv = clamp(vUv + offset, vec2(0.0), vec2(1.0));
         vec3 sampleColor = texture2D(tBloom, uv).rgb;
         float bloomDepth = texture2D(tBloomDepth, uv).x;
-        float visible = step(bloomDepth, centreDepth + 0.0025);
+        // Occlusion belongs to the sampled ray, not the destination pixel. A
+        // centre-depth comparison let emissive fixtures behind angled house
+        // walls bleed into nearby exterior pixels at half-resolution bloom.
+        float sceneSampleDepth = texture2D(tDepth, uv).x;
+        float visible = step(bloomDepth, sceneSampleDepth + 0.0025);
         float kernel = (x == 0 && y == 0) ? 0.18 : ((x == 0 || y == 0) ? 0.12 : 0.085);
         float isolated = smoothstep(1.05, 2.1, luminance(sampleColor));
         bloom += sampleColor * isolated * visible * kernel;
@@ -195,7 +199,7 @@ export const ATOMIC_SIGNAL_FRAGMENT = /* glsl */`
     float centreDistance = viewDistanceFromDepth(sceneDepth);
 
     if (selectiveBloomStrength > 0.0001) {
-      color += selectiveBloom(sceneDepth) * selectiveBloomStrength;
+      color += selectiveBloom() * selectiveBloomStrength;
     }
 
     if (contactShadowStrength > 0.0001 && sceneDepth < 0.99999) {

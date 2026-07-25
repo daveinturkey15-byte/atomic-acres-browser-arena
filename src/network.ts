@@ -95,6 +95,12 @@ export function stateTrafficUsesFallback(stateOpen: boolean, eventOpen: boolean)
   return !stateOpen && eventOpen;
 }
 
+export function initialLobbyJoinHasProtocolMismatch(payload: unknown): boolean {
+  return Boolean(payload && typeof payload === 'object'
+    && (payload as { type?: unknown }).type === 'lobby-join'
+    && !isGameMessage(payload));
+}
+
 export function replaceGuestPeerOwner(
   owners: Map<string, string>,
   playerId: string,
@@ -429,7 +435,7 @@ export class ArenaNetwork {
     let playerId = '';
     connection.on('data', (payload) => {
       if (!isGameMessage(payload)) {
-        if (!playerId && payload && typeof payload === 'object' && (payload as { type?: unknown }).type === 'lobby-join') {
+        if (!playerId && initialLobbyJoinHasProtocolMismatch(payload)) {
           this.rejectConnection(connection, 'protocol-mismatch');
         }
         return;
@@ -480,7 +486,8 @@ export class ArenaNetwork {
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'state-feedback' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
         || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
-        || payload.type === 'lobby-balance' || payload.type === 'redeploy-request' || payload.type === 'clock-ping') {
+        || payload.type === 'lobby-balance' || payload.type === 'redeploy-request' || payload.type === 'clock-ping'
+        || payload.type === 'chat-submit') {
         this.onMessage(payload);
         return;
       }

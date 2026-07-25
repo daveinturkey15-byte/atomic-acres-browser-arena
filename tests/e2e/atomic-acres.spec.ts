@@ -435,7 +435,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 62');
+    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 63');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({
@@ -693,7 +693,7 @@ test.describe('boot and authored presentation', () => {
         godRayStrength: 0.05, godRayLobes: 2,
       },
       blenderEnvironment: {
-        status: 'ready', meshCount: 35, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_196,
+        status: 'ready', meshCount: 35, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_372,
         semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
         proceduralWorldHidden: true, error: null,
       },

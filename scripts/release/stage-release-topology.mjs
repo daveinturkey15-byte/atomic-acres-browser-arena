@@ -22,9 +22,9 @@ const exactSha = (value, label) => {
   return value;
 };
 exactSha(sourceSha, 'SOURCE_SHA');
-if (config.schemaVersion !== 3) throw new Error('release-channels.json schemaVersion must be 3');
+if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
 if (releasePass !== config.experimental.pass) throw new Error(`Expected ${config.experimental.pass}, received ${releasePass}`);
-if (!existsSync(join(distRoot, 'index.html')) || !existsSync(join(distRoot, 'assets'))) throw new Error('Pass 62 candidate dist is incomplete');
+if (!existsSync(join(distRoot, 'index.html')) || !existsSync(join(distRoot, 'assets'))) throw new Error(`${releasePass} candidate dist is incomplete`);
 
 const walkFiles = (root) => {
   const files = [];
@@ -67,6 +67,7 @@ if (!experimentalJs.some((path) => readFileSync(path).includes(Buffer.from(confi
 function stagePinned(channelName, channel) {
   const pagesSha = exactSha(channel.pagesSha, `${channelName}.pagesSha`);
   const pinnedSourceSha = exactSha(channel.sourceSha, `${channelName}.sourceSha`);
+  const pagesPath = channel.pagesPath ? safePath(channel.pagesPath, `${channelName}.pagesPath`) : '';
   execFileSync('git', ['cat-file', '-e', `${pagesSha}^{commit}`], { cwd: repositoryRoot, stdio: 'pipe' });
   const sourceSubject = execFileSync('git', ['show', '-s', '--format=%s', pagesSha], {
     cwd: repositoryRoot, encoding: 'utf8',
@@ -74,19 +75,38 @@ function stagePinned(channelName, channel) {
   if (!sourceSubject.includes(channel.pass) || !sourceSubject.includes(pinnedSourceSha)) {
     throw new Error(`${channelName} Pages commit does not attest ${channel.pass} from ${pinnedSourceSha}`);
   }
-  const output = execFileSync('git', ['ls-tree', '-r', '-z', '--name-only', pagesSha, '--', 'index.html', 'assets'], {
+  const treePaths = pagesPath ? [pagesPath] : ['index.html', 'assets'];
+  const output = execFileSync('git', ['ls-tree', '-r', '-z', '--name-only', pagesSha, '--', ...treePaths], {
     cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
   });
-  const paths = output.split('\0').filter(Boolean);
+  const sourcePaths = output.split('\0').filter(Boolean);
+  const prefix = pagesPath ? `${pagesPath}/` : '';
+  const paths = sourcePaths.map((path) => prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path);
   if (!paths.includes('index.html') || !paths.some((path) => path.startsWith('assets/'))) throw new Error(`${pagesSha} is not a complete root release`);
+  let pinnedRuntime = null;
+  if (pagesPath) {
+    const sourceProvenancePath = `${pagesPath}/channel-provenance.json`;
+    if (!sourcePaths.includes(sourceProvenancePath)) throw new Error(`${pagesSha} is missing pinned runtime provenance`);
+    pinnedRuntime = JSON.parse(execFileSync('git', ['cat-file', 'blob', `${pagesSha}:${sourceProvenancePath}`], {
+      cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024,
+    }));
+    if (pinnedRuntime.releasePass !== channel.pass
+      || pinnedRuntime.sourceSha !== pinnedSourceSha
+      || pinnedRuntime.path !== pagesPath
+      || pinnedRuntime.exactRootFileCount !== channel.runtimeFileCount
+      || pinnedRuntime.treeSha256 !== channel.runtimeTreeSha256) {
+      throw new Error(`${channelName} runtime provenance does not match the configured benchmark`);
+    }
+  }
   const targetRoot = channelRoot(channel.path);
   mkdirSync(targetRoot, { recursive: true });
   const passEvidenceFiles = [];
-  for (const path of paths) {
+  for (const [index, path] of paths.entries()) {
+    const sourcePath = sourcePaths[index];
     const target = resolve(targetRoot, path);
     if (!target.startsWith(`${targetRoot}${sep}`)) throw new Error(`Unsafe Pages path: ${path}`);
     mkdirSync(dirname(target), { recursive: true });
-    const blob = execFileSync('git', ['cat-file', 'blob', `${pagesSha}:${path}`], {
+    const blob = execFileSync('git', ['cat-file', 'blob', `${pagesSha}:${sourcePath}`], {
       cwd: repositoryRoot, encoding: null, maxBuffer: 32 * 1024 * 1024,
     });
     if (path.endsWith('.js') && blob.includes(Buffer.from(channel.pass))) passEvidenceFiles.push(path);
@@ -95,18 +115,21 @@ function stagePinned(channelName, channel) {
   if (passEvidenceFiles.length === 0) throw new Error(`${pagesSha} does not contain configured ${channel.pass}`);
   const digest = treeDigest(targetRoot, paths.map((path) => join(targetRoot, path)));
   const provenance = {
-    schemaVersion: 3, channel: channelName, releasePass: channel.pass,
-    pagesSha, sourceSha: pinnedSourceSha, sourceSubject, path: channel.path,
-    exactRootFileCount: paths.length, passEvidenceFiles, treeSha256: digest,
+    schemaVersion: 4, channel: channelName, releasePass: channel.pass,
+    pagesSha, pagesPath: pagesPath || '.', sourceSha: pinnedSourceSha, sourceSubject, path: channel.path,
+    exactRootFileCount: paths.length, passEvidenceFiles, treeSha256: digest, pinnedRuntime,
   };
-  writeFileSync(join(targetRoot, 'channel-provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
-  return provenance;
+  const provenanceFile = paths.includes('channel-provenance.json')
+    ? 'pinned-channel-provenance.json'
+    : 'channel-provenance.json';
+  writeFileSync(join(targetRoot, provenanceFile), `${JSON.stringify(provenance, null, 2)}\n`);
+  return { ...provenance, provenanceFile };
 }
 
 const stable = stagePinned('recent-stable', config.stable);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
-  schemaVersion: 3, channel: 'experimental-netcode-pass', releasePass,
+  schemaVersion: 4, channel: 'experimental-netcode-pass', releasePass,
   sourceSha, path: config.experimental.path,
   exactRootFileCount: experimentalFiles.length,
   treeSha256: treeDigest(experimentalRoot, experimentalFiles),
@@ -123,7 +146,7 @@ writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRE
 
 mkdirSync(join(repositoryRoot, 'artifacts', 'pipeline'), { recursive: true });
 const topology = {
-  schemaVersion: 3, sourceSha, releasePass,
+  schemaVersion: 4, sourceSha, releasePass,
   root: { kind: 'chooser-only', files: ['index.html', 'release-shell.css', 'release-shell.js', 'release-channel-config.js'] },
   channels: { experimental, stable },
 };

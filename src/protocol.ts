@@ -6,6 +6,12 @@ import type { KillCause } from './kill-provenance';
 import type { CombatTiming } from './network-fairness';
 import { isDhv, type Dhv } from './handicap';
 import {
+  CHAT_HISTORY_LIMIT,
+  isCanonicalChatText,
+  isChatEntry,
+  type ChatEntry,
+} from './text-chat';
+import {
   isLobbySnapshot,
   isPlayerScore,
   isPrivateMatchConfig,
@@ -15,7 +21,7 @@ import {
 } from './private-match';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 4;
+export const MULTIPLAYER_PROTOCOL_VERSION = 5;
 export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
 export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId;
@@ -254,9 +260,22 @@ export type ClockPongMessage = {
 };
 export type MatchScoreMessage = { type: 'match-score'; by: string; scores: PlayerScore[]; nonce: number };
 export type RangeScoreClaimMessage = { type: 'range-score-claim'; by: string; score: number; hits: number; shots: number; nonce: number };
+export type ChatSubmitMessage = {
+  type: 'chat-submit'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string; text: string; nonce: number;
+};
+export type ChatMessage = {
+  type: 'chat-message'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string; entry: ChatEntry; nonce: number;
+};
+export type ChatHistoryMessage = {
+  type: 'chat-history'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
+};
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage;
+  | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+  | ChatSubmitMessage | ChatMessage | ChatHistoryMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -558,6 +577,25 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isSafeInteger(msg.hits) && Number(msg.hits) >= 0 && Number(msg.hits) <= 100_000
         && Number.isSafeInteger(msg.shots) && Number(msg.shots) >= 0 && Number(msg.shots) <= 100_000
         && Number.isFinite(msg.nonce);
+    case 'chat-submit':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isCanonicalChatText(msg.text)
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
+    case 'chat-message':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isChatEntry(msg.entry)
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
+    case 'chat-history': {
+      if (msg.protocolVersion !== MULTIPLAYER_PROTOCOL_VERSION
+        || typeof msg.by !== 'string' || msg.by.length === 0 || msg.by.length > 80
+        || typeof msg.forPlayerId !== 'string' || msg.forPlayerId.length === 0 || msg.forPlayerId.length > 80
+        || !Array.isArray(msg.entries) || msg.entries.length > CHAT_HISTORY_LIMIT
+        || !msg.entries.every(isChatEntry)
+        || !Number.isSafeInteger(msg.nonce) || Number(msg.nonce) < 0) return false;
+      return new Set(msg.entries.map((entry) => entry.id)).size === msg.entries.length;
+    }
     default:
       return false;
   }
@@ -601,6 +639,9 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'clock-pong':
     case 'match-score':
     case 'range-score-claim':
+    case 'chat-submit':
+    case 'chat-message':
+    case 'chat-history':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;
@@ -619,6 +660,8 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'clock-pong'
     || message.type === 'shot-result'
     || message.type === 'match-score'
+    || message.type === 'chat-message'
+    || message.type === 'chat-history'
     || message.type === 'bot-state'
     || message.type === 'bot-damage';
 }

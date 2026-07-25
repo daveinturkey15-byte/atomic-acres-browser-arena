@@ -119,14 +119,14 @@ The first successful exact-SHA receipt plus cache-busted live smoke is the termi
 
 ## Player release channels
 
-The canonical root is a chooser, not a gameplay build. Schema 3 presents exactly two explicit choices:
+The canonical root is a chooser, not a gameplay build. Schema 4 presents exactly two explicit choices and can pin a nested historical Pages subtree by exact digest:
 
-- **Experimental New Netcode** loads the exact green source SHA being promoted as live Pass 62.
-- **New Netcode** loads the immutable stable channel pinned to Pass 60 source `b1af49be064610126a80c2ee538af334389f8f43` and Pages SHA `fb06eeeefc42f35d591e9ee340a3adab62916883`.
+- **Experimental New Netcode** loads the exact green source SHA being promoted as live Pass 63.
+- **New Netcode** loads the immutable stable channel pinned to the user-designated best-ever Pass 62 source `249a7ee77dce761eb237f3eb0e0d0ea1d0356317`, Pages SHA `27c90967bdaf5387c0372933c7965a60ce75a765`, exact `channels/experimental-netcode-pass` subtree, 118-file runtime set, and tree digest `035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d`.
 
-The stable channel is a Git commit identity, not a moving branch or manually copied folder. During promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 60 only from the source and Pages commits pinned in `release-channels.json`, builds the Pass 62 experimental candidate from the exact promoted source, removes the retired Pass 59 and `channels/new-netcode` trees, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 60 file to its pinned Git blob before deployment. Room invitations and legacy `latest` or `normal` links bypass the chooser into live Pass 62.
+The stable channel is a Git commit identity, not a moving branch or manually copied folder. During promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 62 only from the source and Pages commits pinned in `release-channels.json`, builds the Pass 63 live candidate from the exact promoted source, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 62 file to its pinned Git blob before deployment. Room invitations and legacy `latest` or `normal` links bypass the chooser into live Pass 63.
 
-Changing either pinned Pass 60 SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test the root chooser plus both direct channel URLs before promotion. Never infer "stable" from a pass number, branch name, local build, or chat claim.
+Changing either pinned Pass 62 SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test the root chooser plus both direct channel URLs before promotion. Never infer "stable" from a pass number, branch name, local build, or chat claim.
 
 ## Multi-machine setup
 

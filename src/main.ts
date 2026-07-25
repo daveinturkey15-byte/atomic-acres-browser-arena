@@ -6,7 +6,7 @@ import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBu
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
-import { batchStaticMeshes, buildOperator, buildWeaponModel, deathOperator, fireOperator, meleeOperator, optimizeAttachedWeapon, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
+import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
   BOT_REACTION_DELAY,
@@ -28,13 +28,15 @@ import {
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { nextShotDeadline } from './combat-timing';
-import { CHANGELOG, lastUpdatedButtonLabel, latestChangelogEntry, formatChangelogTimestampDetail } from './changelog';
+import { latestChangelogEntry } from './changelog';
+import { bindReleaseHistoryDialog, releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './ui/release-history-dialog';
+import { bindProjectMapDialog, projectMapButtonMarkup, projectMapDialogMarkup } from './ui/project-map-dialog';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio } from './audio';
-import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, shortestAngleDelta, sweepSphereAgainstBoxes } from './collision';
+import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
   ballisticImpactSurface,
@@ -112,8 +114,6 @@ import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
 import {
   advanceRangeScore,
-  formatRangeAccuracy,
-  GUN_RANGE_ROUND_MS,
   hasUnlimitedRangeAmmo,
   isGunRange,
   rangeAccuracyPercent,
@@ -131,7 +131,6 @@ import {
   type GunRangeScoreEntry,
 } from './gun-range-leaderboard';
 import {
-  OVERDRIVE_DAMAGE_MULTIPLIER,
   OVERDRIVE_DURATION_MS,
   OVERDRIVE_PICKUP_RADIUS,
   OVERDRIVE_POSITION,
@@ -272,6 +271,16 @@ import { isHostedBotCount, type HostedBotCount, type HostedBotSnapshot } from '.
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
 import {
+  CHAT_TEXT_MAX_CHARS,
+  admitChatRate,
+  appendChatHistory,
+  normalizeChatHistory,
+  normalizeChatSenderName,
+  normalizeChatText,
+  type ChatEntry,
+  type ChatRateState,
+} from './text-chat';
+import {
   createHumanMatchReport,
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
@@ -291,16 +300,16 @@ import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
 import {
   BotDamageMessage,
   BotStateMessage,
+  ChatHistoryMessage,
+  ChatMessage,
+  ChatSubmitMessage,
   DeathMessage,
   ExplosiveSource,
   GameMessage,
   HitMessage,
-  LobbyBalanceMessage,
-  LobbyConfigMessage,
   LobbyJoinMessage,
   LobbyHandicapMessage,
   LobbyReadyMessage,
-  LobbyStartMessage,
   LobbyStateMessage,
   LobbyTeamMessage,
   MatchScoreMessage,
@@ -593,39 +602,25 @@ app.innerHTML = `
         <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
         <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="blender">QUALITY GRAPHICS</option></select></label>
       </div>
-      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
+      <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster · <b>ENTER</b> chat<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
       <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
     </div>
   </section>
   <aside id="menu-showcase" aria-hidden="true">
     <img src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
   </aside>
-  <button id="last-updated-btn" type="button" aria-haspopup="dialog" aria-controls="changelog-panel" aria-expanded="false">${lastUpdatedButtonLabel()}</button>
-  <div id="changelog-backdrop" hidden></div>
-  <section id="changelog-panel" class="panel" hidden role="dialog" aria-modal="true" aria-labelledby="changelog-title">
-    <header class="changelog-header">
-      <div>
-        <small>PUBLIC RELEASE HISTORY</small>
-        <strong id="changelog-title">RECENT CHANGES</strong>
-      </div>
-      <button id="changelog-close" type="button" aria-label="Close changelog">CLOSE</button>
-    </header>
-    <p class="changelog-lede">Player-facing production releases only. <b>PUBLISHED</b> is the first successful live release time, shown in UK local time and with its UTC offset. Newest first.</p>
-    <ol id="changelog-list">
-      ${CHANGELOG.map((entry, index) => `
-        <li data-changelog-id="${entry.id}">
-          <div class="changelog-entry-head">
-            <div class="changelog-entry-pass"><span>${entry.pass}</span>${index === 0 ? '<b>CURRENT LIVE</b>' : ''}</div>
-            <time datetime="${entry.releasedAt}"><small>PUBLISHED</small>${formatChangelogTimestampDetail(entry.releasedAt)}</time>
-          </div>
-          <strong>${entry.title}</strong>
-          <div class="changelog-areas">${entry.areas.map((area) => `<span>${area}</span>`).join('')}</div>
-          <p>${entry.summary}</p>
-          <ul>${entry.highlights.map((line) => `<li>${line}</li>`).join('')}</ul>
-        </li>
-      `).join('')}
-    </ol>
+  <section id="text-chat" hidden aria-label="Room text chat" data-open="false">
+    <header><strong>ROOM CHAT</strong><small id="text-chat-hint">ENTER TO CHAT</small></header>
+    <div id="text-chat-log" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <form id="text-chat-form" autocomplete="off">
+      <label for="text-chat-input">MESSAGE</label>
+      <input id="text-chat-input" type="text" maxlength="${CHAT_TEXT_MAX_CHARS}" autocomplete="off" spellcheck="true" aria-label="Chat message">
+      <button type="submit">SEND</button>
+    </form>
   </section>
+  <div id="menu-meta-actions">${releaseHistoryButtonMarkup()}${projectMapButtonMarkup()}</div>
+  ${releaseHistoryDialogMarkup()}
+  ${projectMapDialogMarkup()}
   <div id="refresh-warning" hidden><strong>30 HZ DISPLAY LIMIT</strong><span>Set Windows Advanced display or the remote-stream client to 60 Hz+ for synchronized motion.</span></div>
   <section id="strike-map-overlay" hidden aria-label="Tri-Pass tactical targeting map">
     <header><span>TRI-PASS</span><strong>SELECT THREE TARGETS</strong><b id="strike-target-count">0 / 3</b></header>
@@ -698,6 +693,11 @@ const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
 const roomCard = element<HTMLElement>('#room-card');
 const roomCodeEl = element<HTMLElement>('#room-code');
 const statusEl = element<HTMLElement>('#network-status');
+const textChatRoot = element<HTMLElement>('#text-chat');
+const textChatLog = element<HTMLElement>('#text-chat-log');
+const textChatHint = element<HTMLElement>('#text-chat-hint');
+const textChatForm = element<HTMLFormElement>('#text-chat-form');
+const textChatInput = element<HTMLInputElement>('#text-chat-input');
 const minimapCanvas = element<HTMLCanvasElement>('#minimap');
 const minimapContextValue = minimapCanvas.getContext('2d');
 if (!minimapContextValue) throw new Error('Canvas2D minimap is unavailable');
@@ -1464,6 +1464,13 @@ const hostLobbyTokens = new Map<string, string>();
 const hostLobbyConnectionEpochs = new Map<string, string>();
 const hostDisconnectedAt = new Map<string, number>();
 const authoritativeScores = new Map<string, PlayerScore>();
+let textChatHistory: ChatEntry[] = [];
+let localChatRateState: ChatRateState = [];
+const hostChatRateStates = new Map<string, ChatRateState>();
+const hostChatNonces = new Map<string, number[]>();
+let textChatOpen = false;
+let textChatNotice: string | null = null;
+let textChatHintTimer: ReturnType<typeof setTimeout> | null = null;
 
 function memberDhv(id: string): Dhv {
   return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
@@ -1731,7 +1738,7 @@ let arenaSelectionReady = false;
 let arenaSelectionTask: Promise<void> = Promise.resolve();
 
 function gameplayInputEnabled(): boolean {
-  return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden');
+  return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden') && !isTextChatTyping();
 }
 
 function playerSimulationEnabled(): boolean {
@@ -1985,6 +1992,179 @@ if (!webRtcSupported) {
 
 const network = new ArenaNetwork(onNetworkMessage, setStatus);
 
+function textChatAvailable(): boolean {
+  return network.role !== 'offline' && privateLobbySnapshot !== null;
+}
+
+function isTextChatTyping(): boolean {
+  return textChatOpen;
+}
+
+function renderTextChat(): void {
+  const available = textChatAvailable();
+  textChatRoot.hidden = !available;
+  textChatRoot.dataset.open = textChatOpen ? 'true' : 'false';
+  textChatRoot.dataset.context = gameStarted ? 'game' : 'lobby';
+  textChatHint.textContent = textChatNotice ?? (textChatOpen ? 'ENTER SEND / ESC CANCEL' : 'ENTER TO CHAT');
+  if (!available) return;
+
+  textChatLog.replaceChildren();
+  if (textChatHistory.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'text-chat-empty';
+    empty.textContent = 'No messages yet.';
+    textChatLog.append(empty);
+  } else {
+    for (const entry of textChatHistory) {
+      const row = document.createElement('p');
+      row.className = entry.senderId === player.id ? 'text-chat-own' : '';
+      const sender = document.createElement('strong');
+      const message = document.createElement('span');
+      sender.textContent = entry.senderName;
+      message.textContent = entry.text;
+      row.append(sender, message);
+      textChatLog.append(row);
+    }
+  }
+  textChatLog.scrollTop = textChatLog.scrollHeight;
+}
+
+function showTextChatNotice(message: string, durationMs = 1_800): void {
+  if (textChatHintTimer) clearTimeout(textChatHintTimer);
+  textChatNotice = message;
+  renderTextChat();
+  textChatHintTimer = setTimeout(() => {
+    textChatHintTimer = null;
+    textChatNotice = null;
+    renderTextChat();
+  }, durationMs);
+}
+
+function openTextChat(): void {
+  if (!textChatAvailable() || textChatOpen) return;
+  clearGameplayInput();
+  element<HTMLElement>('#roster').hidden = true;
+  textChatOpen = true;
+  renderTextChat();
+  if (document.pointerLockElement === canvas) void document.exitPointerLock();
+  textChatInput.focus({ preventScroll: true });
+}
+
+function closeTextChat(resumeControls: boolean): void {
+  if (!textChatOpen) return;
+  textChatOpen = false;
+  textChatInput.value = '';
+  textChatInput.blur();
+  renderTextChat();
+  if (resumeControls && gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden')) {
+    requestGamePointerLock();
+  }
+}
+
+function resetTextChat(): void {
+  if (textChatHintTimer) clearTimeout(textChatHintTimer);
+  textChatHintTimer = null;
+  textChatNotice = null;
+  textChatOpen = false;
+  textChatInput.value = '';
+  textChatInput.blur();
+  textChatHistory = [];
+  localChatRateState = [];
+  hostChatRateStates.clear();
+  hostChatNonces.clear();
+  renderTextChat();
+}
+
+function acceptChatEntry(entry: ChatEntry): void {
+  textChatHistory = appendChatHistory(textChatHistory, entry);
+  renderTextChat();
+}
+
+function sendTextChatHistory(playerId: string): void {
+  if (network.role !== 'host') return;
+  const message: ChatHistoryMessage = {
+    type: 'chat-history',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    forPlayerId: playerId,
+    entries: [...textChatHistory],
+    nonce: randomNonce(),
+  };
+  network.sendToPlayer(playerId, message);
+}
+
+function admitHostChatSubmit(message: ChatSubmitMessage): void {
+  if (network.role !== 'host') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected) return;
+  const recentNonces = hostChatNonces.get(message.by) ?? [];
+  if (recentNonces.includes(message.nonce)) return;
+
+  const now = performance.now();
+  const rate = admitChatRate(hostChatRateStates.get(message.by) ?? [], now);
+  hostChatRateStates.set(message.by, rate.state);
+  if (!rate.accepted) {
+    if (message.by === player.id) showTextChatNotice('SLOW DOWN');
+    return;
+  }
+  hostChatNonces.set(message.by, [...recentNonces, message.nonce].slice(-64));
+
+  let id = randomNonce();
+  while (textChatHistory.some((entry) => entry.id === id)) id += 1;
+  const entry: ChatEntry = {
+    id,
+    senderId: member.id,
+    senderName: normalizeChatSenderName(member.name),
+    text: message.text,
+    sentAtHostTimeMs: now,
+  };
+  acceptChatEntry(entry);
+  const accepted: ChatMessage = {
+    type: 'chat-message',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    entry,
+    nonce: id,
+  };
+  network.send(accepted);
+}
+
+function submitTextChat(): void {
+  const text = normalizeChatText(textChatInput.value);
+  if (!text) {
+    closeTextChat(true);
+    return;
+  }
+  const rate = admitChatRate(localChatRateState, performance.now());
+  localChatRateState = rate.state;
+  if (!rate.accepted) {
+    showTextChatNotice('SLOW DOWN');
+    textChatInput.select();
+    return;
+  }
+  const message: ChatSubmitMessage = {
+    type: 'chat-submit',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    text,
+    nonce: randomNonce(),
+  };
+  if (network.role === 'host') admitHostChatSubmit(message);
+  else if (network.role === 'client') network.send(message);
+  closeTextChat(true);
+}
+
+function acceptHostChatMessage(message: ChatMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
+  acceptChatEntry(message.entry);
+}
+
+function acceptHostChatHistory(message: ChatHistoryMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id) return;
+  textChatHistory = normalizeChatHistory(message.entries);
+  renderTextChat();
+}
+
 function randomLobbyCredential(): string {
   if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
   return `room_${Date.now().toString(36)}_${Math.floor(protocolRandom() * Number.MAX_SAFE_INTEGER).toString(36)}`;
@@ -2035,6 +2215,7 @@ function resetPrivateLobbyState(): void {
   hostLobbyConnectionEpochs.clear();
   hostDisconnectedAt.clear();
   authoritativeScores.clear();
+  resetTextChat();
   hidePrivateLobbyPresentation();
 }
 
@@ -2068,6 +2249,7 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   const message: LobbyStateMessage = { type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() };
   network.send(message);
   renderPrivateLobby();
+  renderTextChat();
 }
 
 function initializeHostLobby(): void {
@@ -2161,6 +2343,7 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
     for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
   }
   broadcastHostLobby(currentPhase);
+  sendTextChatHistory(message.playerId);
   if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
     network.sendToPlayer(message.playerId, {
       type: 'lobby-start', by: player.id, activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
@@ -2232,6 +2415,8 @@ function markLobbyDisconnected(playerId: string): void {
     hostLobbyConnectionEpochs.delete(playerId);
     authoritativeShotAdmissions.delete(playerId);
     authoritativeScores.delete(playerId);
+    hostChatRateStates.delete(playerId);
+    hostChatNonces.delete(playerId);
     remoteSupportAuthorities.delete(playerId);
     remoteGrenadeAuthorities.delete(playerId);
     remoteHealthAuthorities.delete(playerId);
@@ -2426,6 +2611,7 @@ function returnPrivateMatchToLobby(asHost: boolean): void {
     broadcastHostLobby('waiting');
   }
   renderPrivateLobby();
+  renderTextChat();
   setStatus(asHost ? 'Lobby reset — ready up for another match.' : 'Host returned everyone to the lobby.', 'ok');
 }
 
@@ -2453,6 +2639,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     return;
   }
   renderPrivateLobby();
+  renderTextChat();
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
     void beginPrivateMatch('client', message.snapshot.activeAtHostTimeMs, message.snapshot.activeAtEpochMs, message.snapshot.snapshotHostTimeMs);
@@ -2460,6 +2647,18 @@ function acceptLobbyState(message: LobbyStateMessage): void {
 }
 
 function handleLobbyMessage(message: GameMessage): boolean {
+  if (message.type === 'chat-submit') {
+    admitHostChatSubmit(message);
+    return true;
+  }
+  if (message.type === 'chat-message') {
+    acceptHostChatMessage(message);
+    return true;
+  }
+  if (message.type === 'chat-history') {
+    acceptHostChatHistory(message);
+    return true;
+  }
   if (message.type === 'lobby-join') {
     admitLobbyJoin(message);
     return true;
@@ -2532,6 +2731,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
     network.close();
     privateLobbySnapshot = null;
     renderPrivateLobby();
+    resetTextChat();
     syncArenaSelectionUi();
     return true;
   }
@@ -2580,6 +2780,8 @@ function handleLobbyMessage(message: GameMessage): boolean {
         authoritativeShotAdmissions.delete(message.playerId);
         hostDisconnectedAt.delete(message.playerId);
         authoritativeScores.delete(message.playerId);
+        hostChatRateStates.delete(message.playerId);
+        hostChatNonces.delete(message.playerId);
         broadcastHostLobby(privateLobbySnapshot.phase);
       } else {
         markLobbyDisconnected(message.playerId);
@@ -4607,6 +4809,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
     sendLeaderboardSync();
     if (mode === 'host') broadcastOverdriveState(matchStartedAt);
   }
+  renderTextChat();
 }
 
 function randomNonce(): number {
@@ -8337,7 +8540,38 @@ function pollGamepad(dt: number): void {
   previousGamepadButtons = buttons;
 }
 
+textChatForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  submitTextChat();
+});
+textChatInput.addEventListener('keydown', (event) => {
+  event.stopPropagation();
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeTextChat(true);
+  }
+});
+textChatInput.addEventListener('keyup', (event) => event.stopPropagation());
 window.addEventListener('keydown', (event) => {
+  if (isTextChatTyping()) {
+    if (event.target === textChatInput) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (event.key === 'Escape') closeTextChat(true);
+    else textChatInput.focus({ preventScroll: true });
+    return;
+  }
+  if (event.key !== 'Enter' || event.repeat || !textChatAvailable()) return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  openTextChat();
+});
+
+window.addEventListener('keydown', (event) => {
+  if (isTextChatTyping()) return;
   if (tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
     event.preventDefault();
     cancelTriPassTargeting(true);
@@ -8380,7 +8614,7 @@ window.addEventListener('focus', () => {
   if (gameStarted && player.alive && !matchFinished) menu.classList.add('hidden');
 });
 window.addEventListener('mousemove', (event) => {
-  if (document.pointerLockElement !== canvas || !player.alive) return;
+  if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;
   const aimScale = mouseSensitivityMultiplier(adsHeld, currentSprinting);
   player.yaw -= event.movementX * 0.00215 * sensitivity * aimScale;
   player.pitch = Math.max(-1.42, Math.min(1.42, player.pitch - event.movementY * 0.0019 * sensitivity * aimScale));
@@ -8388,6 +8622,7 @@ window.addEventListener('mousemove', (event) => {
 });
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 canvas.addEventListener('mousedown', (event) => {
+  if (isTextChatTyping()) return;
   if (document.pointerLockElement !== canvas) {
     requestGamePointerLock();
     return;
@@ -8411,6 +8646,10 @@ window.addEventListener('mouseup', (event) => {
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas) {
     clearGameplayInput();
+    if (isTextChatTyping()) {
+      menu.classList.add('hidden');
+      return;
+    }
     if (tacticalMapOpen) {
       menu.classList.add('hidden');
       return;
@@ -8747,28 +8986,8 @@ element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainM
 element<HTMLButtonElement>('#menu-download-match-summary').addEventListener('click', downloadMatchSummary);
 element<HTMLButtonElement>('#menu-download-match-technical').addEventListener('click', downloadMatchDiagnostics);
 
-function setChangelogOpen(open: boolean): void {
-  const panel = element<HTMLElement>('#changelog-panel');
-  const backdrop = element<HTMLElement>('#changelog-backdrop');
-  const button = element<HTMLButtonElement>('#last-updated-btn');
-  panel.hidden = !open;
-  backdrop.hidden = !open;
-  button.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (open) element<HTMLButtonElement>('#changelog-close').focus();
-  else button.focus();
-}
-
-element<HTMLButtonElement>('#last-updated-btn').addEventListener('click', () => {
-  setChangelogOpen(true);
-});
-element<HTMLButtonElement>('#changelog-close').addEventListener('click', () => setChangelogOpen(false));
-element<HTMLElement>('#changelog-backdrop').addEventListener('click', () => setChangelogOpen(false));
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !element<HTMLElement>('#changelog-panel').hidden) {
-    event.preventDefault();
-    setChangelogOpen(false);
-  }
-});
+bindReleaseHistoryDialog();
+bindProjectMapDialog();
 
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (!requirePlayerName()) return;
@@ -9073,6 +9292,7 @@ const debugWindow = window as Window & {
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
     setAds: (held: boolean) => void;
     setMovement: (forward: boolean, sprint?: boolean) => void;
+    sendRawChat: (text: string, claimedBy?: string) => boolean;
     setMeleeCaptureProgress: (progress: number | null) => void;
     setFireCaptureAgeMs: (ageMs: number | null) => void;
     setReloadCaptureProgress: (progress: number | null) => void;
@@ -9120,6 +9340,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostTimeOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
       localPingMs: localLobbyPingMs,
     } : null,
+    textChat: {
+      open: textChatOpen,
+      focused: document.activeElement === textChatInput,
+      entries: textChatHistory.map((entry) => ({ ...entry })),
+      heldKeys: [...keys].sort(),
+      triggerHeld,
+      adsHeld,
+    },
     scores: teamScores(),
     arenaSelection: {
       id: selectedArena.id,
@@ -9141,6 +9369,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       targets: arena.targets.length,
       skylineAssetAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineAssetAudit : null,
       skylineCabinClearance: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineCabinClearance : null,
+      skylineOpeningAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineOpeningAudit : null,
       pass59GeometryAudit: selectedArena.id === 'atomic-acres'
         ? arena.root.userData.atomicCollisionAudit
         : selectedArena.id === 'rustworks-1v1'
@@ -10253,6 +10482,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     keys.delete('ShiftRight');
     if (forward) keys.add('KeyW');
     if (forward && sprint) keys.add('ShiftLeft');
+  },
+  sendRawChat: (text, claimedBy = player.id) => {
+    if (new URLSearchParams(window.location.search).get('multiplayerQa') !== '1' || network.role === 'offline') return false;
+    const normalized = normalizeChatText(text);
+    if (!normalized) return false;
+    const message: ChatSubmitMessage = {
+      type: 'chat-submit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: claimedBy, text: normalized, nonce: randomNonce(),
+    };
+    if (network.role === 'host') admitHostChatSubmit(message);
+    else network.send(message);
+    return true;
   },
   setMeleeCaptureProgress: (progress: number | null) => weaponView.setMeleeCaptureProgress(progress),
   setFireCaptureAgeMs: (ageMs: number | null) => weaponView.setFireCaptureAgeMs(ageMs),

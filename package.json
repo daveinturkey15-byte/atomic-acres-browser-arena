@@ -31,7 +31,9 @@
     "qa:pass53:changelog": "npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass53-changelog.mjs",
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
     "qa:network-chaos:soak": "tsx scripts/qa/run-network-chaos-soak.ts",
-    "qa:pass61:netcode": "node scripts/qa/verify-pass61-authoritative-netcode.mjs",
+    "qa:pass61:netcode": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass61-authoritative-netcode.mjs",
+    "qa:pass63": "playwright test tests/e2e/pass63-project-map.spec.ts tests/e2e/pass63-atomic-visuals.spec.ts tests/e2e/pass63-skyline-terminal-openings.spec.ts tests/e2e/pass63-text-chat.spec.ts tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
+    "qa:pass63:text-chat": "playwright test tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
     "qa:pass29:luminance": "python3 scripts/qa/measure-pass29-luminance.py",
@@ -59,6 +61,7 @@
     "deploy:ci": "gh-pages -d dist"
   },
   "overrides": {
+    "postcss": "8.5.23",
     "typed-rest-client": {
       "qs": "6.15.3"
     }

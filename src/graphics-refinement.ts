@@ -145,7 +145,7 @@ export class GraphicsRefinementSystem {
   private budget: GraphicsEffectsBudget;
 
   constructor(
-    private readonly renderer: THREE.WebGLRenderer,
+    renderer: THREE.WebGLRenderer,
     private readonly scene: THREE.Scene,
     private readonly profile: RenderProfile,
     softwareRenderer: boolean,
