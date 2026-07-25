@@ -30,13 +30,14 @@ export type LightOcclusionAudit = Readonly<{
   violations: readonly string[];
 }>;
 
-export function auditLocalLightOcclusion(root: THREE.Object3D): LightOcclusionAudit {
+export function auditLocalLightOcclusion(root: THREE.Object3D, layerMask?: number): LightOcclusionAudit {
   let activeLocalLights = 0;
   let shadowedLocalLights = 0;
   let emissiveOnlySources = 0;
   const violations: string[] = [];
   root.traverse((node) => {
     if (!(node instanceof THREE.PointLight || node instanceof THREE.SpotLight)) return;
+    if (layerMask !== undefined && (node.layers.mask & layerMask) === 0) return;
     const tagged = node as OcclusionTaggedLight;
     if (tagged.userData.occlusionPolicy === 'emissive-only') {
       emissiveOnlySources += 1;

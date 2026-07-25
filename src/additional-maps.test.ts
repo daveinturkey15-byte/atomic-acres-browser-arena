@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
 import { isBlocked, pointInsideBounds } from './collision';
@@ -557,6 +558,11 @@ describe('additional authored maps', () => {
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(auditLocalLightOcclusion(map.root)).toMatchObject({
+      activeLocalLights: 0,
+      emissiveOnlySources: 16,
+      violations: [],
+    });
     expect(map.root.getObjectByName('gun-range-moderate-ambient')).toBeInstanceOf(THREE.HemisphereLight);
     const wallMaterial = (map.root.getObjectByName('gun-range-left-wall') as THREE.Mesh).material as THREE.MeshStandardMaterial;
     const ceilingMaterial = (map.root.getObjectByName('gun-range-ceiling') as THREE.Mesh).material as THREE.MeshStandardMaterial;

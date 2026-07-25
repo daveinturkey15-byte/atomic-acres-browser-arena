@@ -8,6 +8,7 @@ import { LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequ
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
+import { auditLocalLightOcclusion, makeEmissiveOnly } from './rendering/light-occlusion';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
@@ -1208,6 +1209,7 @@ quadBeacon.position.y = 0.55;
 const quadGlow = new THREE.PointLight(0x8e78ff, 2.4, 8, 2);
 quadGlow.name = 'quad-damage-local-glow';
 quadGlow.position.y = 0.55;
+makeEmissiveOnly(quadGlow);
 overdriveRoot.add(overdriveCore, ...overdriveRings, overdrivePedestal, quadWorldIcon, quadBeacon, quadGlow);
 overdriveRoot.traverse((node) => { node.userData.presentationOnly = true; node.userData.blocksShots = false; node.raycast = () => undefined; });
 scene.add(overdriveRoot);
@@ -3303,7 +3305,7 @@ renderFieldKitSelection();
 
 const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
 viewFill.position.set(0, 0.4, 0.2);
-viewFill.layers.enable(VIEWMODEL_RENDER_LAYER);
+viewFill.layers.set(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
 function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
@@ -11175,6 +11177,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       adaptive: adaptiveQuality.telemetry(),
       graphicsRefinement: graphicsRefinement.telemetry(),
       arenaContrastLighting: arenaContrastLighting.telemetry(),
+      worldLocalLightOcclusion: auditLocalLightOcclusion(scene, 1),
       qualityAssetStreaming: { ...qualityAssetStreaming },
       lighting: {
         ...activeLighting,

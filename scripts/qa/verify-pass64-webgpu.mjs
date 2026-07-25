@@ -174,6 +174,7 @@ try {
         playableScene: state.render.playableScene,
         arenaStreaming: state.arenaSelection.streaming,
         lightOcclusion: state.render.arenaContrastLighting,
+        worldLightOcclusion: state.render.worldLocalLightOcclusion,
         terminalGeometry: {
           cabinClearance: state.arenaSelection.skylineCabinClearance,
           openingAudit: state.arenaSelection.skylineOpeningAudit,
@@ -227,6 +228,11 @@ try {
     if (!evidence.playableScene.budgetAudit.pass || evidence.playableScene.budgetAudit.definitionId !== arenaId) {
       throw new Error(`${arenaId} exceeded an ArenaVisualDefinition runtime budget: ${JSON.stringify(evidence.playableScene.budgetAudit)}`);
     }
+    if (evidence.worldLightOcclusion.violations.length !== 0
+      || evidence.worldLightOcclusion.activeLocalLights !== evidence.worldLightOcclusion.shadowedLocalLights
+      || evidence.worldLightOcclusion.activeLocalLights > evidence.playableScene.appliedArenaVisualPolicy.budgets.maximumShadowLights) {
+      throw new Error(`${arenaId} retained an unoccluded world-local light: ${JSON.stringify(evidence.worldLightOcclusion)}`);
+    }
     const systemVisibility = evidence.playableScene.tslSystemVisibility;
     if ((arenaId === 'rustworks-1v1') !== systemVisibility.waterVisible
       || (arenaId === 'atomic-acres') !== systemVisibility.grassVisible
@@ -261,6 +267,10 @@ try {
     const composition = pngLuminance(playablePng);
     if (composition.centralOcclusionRatio >= 0.5 || composition.centralStdDev <= 12) {
       throw new Error(`${arenaId} deterministic overview failed central visibility/composition gate: ${JSON.stringify(composition)}`);
+    }
+    const centralLuminanceFloor = arenaId === 'rustworks-1v1' ? 28 : arenaId === 'gun-range' ? 34 : 80;
+    if (composition.centralMean < centralLuminanceFloor) {
+      throw new Error(`${arenaId} deterministic overview is below its authored luminance floor ${centralLuminanceFloor}: ${JSON.stringify(composition)}`);
     }
     let roi = null;
     if (arenaId === 'skyline-terminal' || arenaId === 'atomic-acres') {

@@ -14,4 +14,15 @@ describe('Pass 64 local-light occlusion policy', () => {
     makeEmissiveOnly(leaking);
     expect(auditLocalLightOcclusion(root)).toMatchObject({ activeLocalLights: 0, emissiveOnlySources: 1, violations: [] });
   });
+
+  it('can audit only lights visible to the authoritative world layer', () => {
+    const root = new THREE.Group();
+    const worldLeak = new THREE.PointLight(0xffffff, 1, 10);
+    worldLeak.name = 'world-leak';
+    const viewmodelOnly = new THREE.PointLight(0xffffff, 1, 3);
+    viewmodelOnly.name = 'viewmodel-only';
+    viewmodelOnly.layers.set(2);
+    root.add(worldLeak, viewmodelOnly);
+    expect(auditLocalLightOcclusion(root, 1).violations).toEqual(['world-leak:unoccluded-active-light']);
+  });
 });

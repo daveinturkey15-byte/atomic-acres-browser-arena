@@ -9,6 +9,7 @@ import { GUN_RANGE_WEAPON_STATIONS } from './gun-range-armory';
 import type { ArenaMap, BreakableWindow, PracticeTarget } from './map';
 import type { Team } from './protocol';
 import { createRustworksWelshFlag } from './rustworks-flag';
+import { makeEmissiveOnly } from './rendering/light-occlusion';
 
 type Builder = {
   root: THREE.Group;
@@ -1318,6 +1319,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     light.position.set(z % 4 === 0 ? -7 : 7, 5.9, z);
     light.castShadow = false;
     light.userData.presentationOnly = true;
+    makeEmissiveOnly(light);
     root.add(light);
   }
   const ambient = new THREE.HemisphereLight(0xe8f5f5, 0x253137, 0.68);
@@ -1344,6 +1346,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     light.position.set(index % 2 === 0 ? -12 : 12, 4.8, z);
     light.userData.presentationOnly = true;
     light.userData.neonIndex = index;
+    makeEmissiveOnly(light);
     neonLights.push(light);
     root.add(light);
   }
@@ -1440,6 +1443,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     stationLight.name = 'gun-range-armory-light';
     stationLight.position.set(0, 2.2, 0.6);
     stationLight.userData.presentationOnly = true;
+    makeEmissiveOnly(stationLight);
     stationRoot.add(stationLight);
     root.add(stationRoot);
   }
