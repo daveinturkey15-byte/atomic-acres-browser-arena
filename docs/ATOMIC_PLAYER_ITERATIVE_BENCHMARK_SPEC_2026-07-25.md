@@ -29,6 +29,13 @@ Fixed full-round baseline `G0001`:
 - **R9 — failure preservation:** A timeout, browser crash, missing download, partial game or failed safety check still receives a manifest and index entry with the exact failure state.
 - **R10 — reproducibility:** Archive the player-harness commit, policy version, command arguments, viewport/capture mode, callsign and generated-file SHA-256 hashes.
 - **R11 — no PR:** Harness commits remain on `local/jigglyclaw/atomic-player-harness` unless Dave explicitly requests upstream work.
+- **R12 — frozen player-policy hypothesis:** Before each counted game, record the one main player-policy change being tested, the expected metric movement, unchanged controls and rollback condition. Do not bundle perception, movement, aim and orchestration changes unless the run is explicitly labelled exploratory.
+- **R13 — real configuration receipts:** Record the resolved model/provider/reasoning/service tier, tool policy, player-harness commit and exact runtime arguments. Profile names and environment-variable labels are not proof of the effective policy.
+- **R14 — lifecycle separation:** Preserve observation, recommendation, selected input, input-delivery receipt and official game outcome as separate events. A fired pulse is not a hit; a stable detection is not an operator; a browser click is not an official score.
+- **R15 — ablations before mixtures:** Compare the simplest safe player with local-perception-only, model-only and combined-policy candidates when those lanes exist. Extra agents or tools must earn their latency, cost and coordination overhead through measured outcomes.
+- **R16 — replication before promotion:** A one-game high score creates a candidate only. Reserve at least two comparable full games for unchanged replication before adopting a policy as the new default; any safety/fairness hard-gate failure vetoes promotion.
+- **R17 — diagnostic replay is non-scoring:** Saved-frame or recorded-match replay may explain a miss and train the next policy, but it never rewrites a live archive result or counts as a live validation game.
+- **R18 — claim-state discipline:** Label observations, inferences and assumptions separately. Random maps/opponents make single-match deltas exploratory; report uncertainty and sample limits rather than claiming universal causality.
 
 ## Metric registry
 
@@ -44,6 +51,20 @@ Higher is better unless noted:
 - Safety/fairness fields are invariant and any failure is a hard regression.
 
 A missing value never silently becomes zero. Metrics with no meaningful ordinal direction remain informational.
+
+## Player-policy promotion gate
+
+Atomic Acres improvement is ranked lexicographically rather than by one blended vanity score:
+
+1. Safety, fairness, visible-state boundaries and cleanup must all pass.
+2. Official objective outcomes: kills, credited hits/damage, survival and deaths.
+3. Reliability: valid perception coverage, input delivery, process/browser cleanup and absence of page errors.
+4. Speed: perception, decision and input latency distributions, including p95 tails.
+5. Resource cost and operational simplicity.
+
+Every candidate is compared with both fixed baseline `G0001` and the previous comparable game. Promotion requires repeated full games under an unchanged configuration fingerprint, no catastrophic regression in any hard gate, and a written reason that cites archived evidence. Prefer the smallest policy that repeatedly achieves the objective; additional model lanes, detectors or control stages are removed when ablation shows no measurable value.
+
+The reusable cross-game method is captured in Hermes skill `evidence-driven-player-improvement`. Atomic Acres remains an external player-learning project: upstream game code, rules and deployment are not optimization levers.
 
 ## Acceptance criteria
 

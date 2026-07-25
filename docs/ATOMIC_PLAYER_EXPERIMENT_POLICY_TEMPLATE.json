@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "policyId": "atomic-player-candidate-YYYYMMDD-NN",
+  "hypothesis": "One primary player-policy change and why it should improve an official outcome.",
+  "expectedMetricMovements": [
+    "combat.creditedHits increases",
+    "control.unconfirmedShotPulses does not increase"
+  ],
+  "unchangedControls": [
+    "Performance render profile",
+    "visible-state perception only",
+    "bounded input and release-at-end",
+    "same deployed channel/menu pass"
+  ],
+  "rollbackCondition": "Any safety/fairness hard-gate failure or repeated regression in the declared official objective.",
+  "configuration": {
+    "playerHarnessCommit": "REPLACE_WITH_GIT_SHA",
+    "profile": "atomicplayer",
+    "provider": "openai-codex",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "serviceTier": "normal",
+    "localTools": [
+      "visible-pixel capture",
+      "bounded input driver"
+    ],
+    "automaticCombatFire": false
+  },
+  "replication": {
+    "candidateGamesRequired": 1,
+    "unchangedReplicationGamesRequired": 2,
+    "promotionOrder": [
+      "safety/fairness",
+      "official objective outcomes",
+      "reliability",
+      "latency",
+      "resource cost and simplicity"
+    ]
+  }
+}

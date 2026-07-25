@@ -210,6 +210,31 @@ export function partialBenchmarkFromReport(report) {
   };
 }
 
+export function validateExperimentPolicy(policy) {
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
+    throw new Error('experiment-policy.json must contain an object');
+  }
+  for (const key of ['policyId', 'hypothesis', 'rollbackCondition']) {
+    if (typeof policy[key] !== 'string' || policy[key].trim().length < 4) {
+      throw new Error(`experiment-policy.json requires a substantive ${key}`);
+    }
+  }
+  for (const key of ['expectedMetricMovements', 'unchangedControls']) {
+    if (!Array.isArray(policy[key]) || policy[key].length === 0 || policy[key].some((item) => typeof item !== 'string' || !item.trim())) {
+      throw new Error(`experiment-policy.json requires a non-empty string array ${key}`);
+    }
+  }
+  if (!policy.configuration || typeof policy.configuration !== 'object' || Array.isArray(policy.configuration)) {
+    throw new Error('experiment-policy.json requires a configuration object');
+  }
+  for (const key of ['playerHarnessCommit', 'profile', 'provider', 'model', 'reasoningEffort', 'serviceTier']) {
+    if (typeof policy.configuration[key] !== 'string' || !policy.configuration[key].trim()) {
+      throw new Error(`experiment-policy.json configuration requires ${key}`);
+    }
+  }
+  return policy;
+}
+
 async function exists(path) {
   try { await stat(path); return true; } catch { return false; }
 }
@@ -286,10 +311,18 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
   const index = await readJson(indexPath, { schemaVersion: 1, kind: 'atomic-player-game-index', baselineGameId: null, games: [] });
   const reportPath = join(sourceDirectory, 'report.json');
   if (!await exists(reportPath)) throw new Error(`Source game has no report.json: ${sourceDirectory}`);
+  const experimentPolicyPath = join(sourceDirectory, 'experiment-policy.json');
+  const experimentPolicy = await readJson(experimentPolicyPath);
+  const requiresExperimentPolicy = runType === 'benchmark' && index.games.length >= 2;
+  if (requiresExperimentPolicy && !experimentPolicy) {
+    throw new Error('Counted Atomic Player games G0003+ require a frozen experiment-policy.json before play');
+  }
+  if (experimentPolicy) validateExperimentPolicy(experimentPolicy);
   const fingerprintHash = createHash('sha256');
   fingerprintHash.update(await readFile(reportPath));
   const sourceSummaryPath = join(sourceDirectory, 'match-summary.json');
   if (await exists(sourceSummaryPath)) fingerprintHash.update(await readFile(sourceSummaryPath));
+  if (experimentPolicy) fingerprintHash.update(await readFile(experimentPolicyPath));
   const sourceFingerprint = fingerprintHash.digest('hex');
   const duplicate = index.games.find((game) => game.sourceFingerprint === sourceFingerprint);
   if (duplicate) return { duplicate: true, game: duplicate, directory: join(archiveRoot, duplicate.directory) };
@@ -333,6 +366,8 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     `- Build: ${benchmark?.source?.build ?? report?.source?.pass ?? 'unknown'}`,
     `- Result: ${benchmark?.result?.headline ?? 'no post-game summary'}`,
     `- Archive baseline: ${baselineId ?? 'not assigned'}`,
+    `- Player policy: ${experimentPolicy?.policyId ?? 'legacy/pre-policy archive'}`,
+    `- Hypothesis: ${experimentPolicy?.hypothesis ?? 'not recorded'}`,
     '',
     markdownComparison('Versus fixed baseline', baselineComparison),
     markdownComparison('Versus previous comparable game', previousComparison),
@@ -357,6 +392,14 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     sourceDirectory,
     baselineGameId: baselineId,
     previousComparableGameId: previousGame?.id ?? null,
+    playerPolicy: experimentPolicy ? {
+      policyId: experimentPolicy.policyId,
+      hypothesis: experimentPolicy.hypothesis,
+      expectedMetricMovements: experimentPolicy.expectedMetricMovements,
+      unchangedControls: experimentPolicy.unchangedControls,
+      rollbackCondition: experimentPolicy.rollbackCondition,
+      configuration: experimentPolicy.configuration,
+    } : null,
     harnessGitSha: benchmark?.source?.harnessGitSha ?? report?.source?.gitSha ?? null,
     provenance: {
       observedUrl: report?.source?.url ?? null,
@@ -382,6 +425,8 @@ export async function archiveGame({ sourceDirectory, archiveRoot, runType = 'ben
     summaryFile: `${gameRelativeDirectory}/summary.md`,
     manifestFile: `${gameRelativeDirectory}/manifest.json`,
     previousComparableGameId: previousGame?.id ?? null,
+    policyId: experimentPolicy?.policyId ?? null,
+    hypothesis: experimentPolicy?.hypothesis ?? null,
     comparisonVsBaseline: baselineComparison?.counts ?? null,
     comparisonVsPrevious: previousComparison?.counts ?? null,
     hardRegression: Boolean(baselineComparison?.hardRegression || previousComparison?.hardRegression),

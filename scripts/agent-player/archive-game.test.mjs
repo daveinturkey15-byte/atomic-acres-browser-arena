@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { archiveGame, compareBenchmarks, METRIC_REGISTRY, partialBenchmarkFromReport } from './archive-game.mjs';
+import { archiveGame, compareBenchmarks, METRIC_REGISTRY, partialBenchmarkFromReport, validateExperimentPolicy } from './archive-game.mjs';
 import { verifyArchive } from './verify-archive.mjs';
 
 function benchmarkFixture(overrides = {}) {
@@ -97,4 +97,47 @@ test('archive assigns immutable sequential IDs, deduplicates imports and compare
   const verification = await verifyArchive(archiveRoot);
   assert.equal(verification.ok, true, verification.errors.join('\n'));
   assert.equal(verification.gameCount, 2);
+});
+
+test('G0003 and later counted benchmarks require a validated frozen player-policy hypothesis', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'atomic-policy-test-'));
+  const archiveRoot = join(root, 'archive');
+  for (let game = 1; game <= 3; game += 1) {
+    const directory = join(root, `source-${game}`);
+    await writeGameSource(directory, {
+      startedAt: `2026-07-25T0${game}:00:00Z`,
+      kills: game - 1,
+      deaths: 10 - game,
+      damageDealt: (game - 1) * 100,
+      damageTaken: 1000 - game * 100,
+    });
+    if (game < 3) {
+      await archiveGame({ sourceDirectory: directory, archiveRoot, setBaseline: game === 1 });
+      continue;
+    }
+    await assert.rejects(
+      archiveGame({ sourceDirectory: directory, archiveRoot }),
+      /require a frozen experiment-policy\.json/,
+    );
+    const policy = validateExperimentPolicy({
+      policyId: 'atomic-player-candidate-01',
+      hypothesis: 'Temporal operator confirmation will improve credited hits without extra blind fire.',
+      expectedMetricMovements: ['combat.creditedHits increases'],
+      unchangedControls: ['Performance render profile', 'visible-state inputs only'],
+      rollbackCondition: 'Any safety-gate failure or repeated official outcome regression.',
+      configuration: {
+        playerHarnessCommit: 'abc123',
+        profile: 'atomicplayer',
+        provider: 'openai-codex',
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'low',
+        serviceTier: 'normal',
+      },
+    });
+    await writeFile(join(directory, 'experiment-policy.json'), `${JSON.stringify(policy, null, 2)}\n`);
+    const archived = await archiveGame({ sourceDirectory: directory, archiveRoot });
+    assert.equal(archived.game.id, 'G0003');
+    assert.equal(archived.game.policyId, 'atomic-player-candidate-01');
+    assert.equal(archived.manifest.playerPolicy.hypothesis, policy.hypothesis);
+  }
 });
