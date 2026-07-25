@@ -10276,8 +10276,18 @@ function activeRuntimeTelemetry(): ReturnType<LegacyWebGlRenderRuntime['telemetr
 
 type ArenaPerformanceBudgetSample = Readonly<{
   definitionId: ArenaId;
+  cpuFrameP50Ms: number;
   cpuFrameP95Ms: number;
+  cpuFrameP99Ms: number;
+  cpuFrameMaxMs: number;
+  queueSubmissionP50Ms: number;
   queueSubmissionP95Ms: number;
+  queueSubmissionP99Ms: number;
+  queueSubmissionMaxMs: number;
+  frameSampleCount: number;
+  queueSubmissionSampleCount: number;
+  frameHitchThresholdMs: number;
+  frameHitchCount: number;
   steadyStateFps: number;
   textureBytesEstimate: number;
   transientBytesEstimate: number;
@@ -10287,10 +10297,10 @@ type ArenaPerformanceBudgetSample = Readonly<{
 }>;
 let latestArenaPerformanceBudgetSample: ArenaPerformanceBudgetSample | null = null;
 
-function percentile95(values: readonly number[]): number {
+function percentile(values: readonly number[], quantile: number): number {
   if (values.length === 0) return Number.POSITIVE_INFINITY;
   const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor((sorted.length - 1) * 0.95)];
+  return sorted[Math.floor((sorted.length - 1) * THREE.MathUtils.clamp(quantile, 0, 1))];
 }
 
 function estimateResidentTextureBytes(): number {
@@ -10351,13 +10361,28 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
   } finally {
     debugRenderPaused = previousRenderPaused;
   }
-  const cpuFrameP95Ms = percentile95(frameMs);
-  const queueSubmissionP95Ms = percentile95(queueMs);
+  const cpuFrameP50Ms = percentile(frameMs, 0.5);
+  const cpuFrameP95Ms = percentile(frameMs, 0.95);
+  const cpuFrameP99Ms = percentile(frameMs, 0.99);
+  const queueSubmissionP50Ms = percentile(queueMs, 0.5);
+  const queueSubmissionP95Ms = percentile(queueMs, 0.95);
+  const queueSubmissionP99Ms = percentile(queueMs, 0.99);
+  const frameHitchThresholdMs = 50;
   latestArenaPerformanceBudgetSample = Object.freeze({
     definitionId: definition.id,
+    cpuFrameP50Ms,
     cpuFrameP95Ms,
+    cpuFrameP99Ms,
+    cpuFrameMaxMs: Math.max(...frameMs),
+    queueSubmissionP50Ms,
     queueSubmissionP95Ms,
-    steadyStateFps: 1_000 / Math.max(0.001, percentile95(frameMs)),
+    queueSubmissionP99Ms,
+    queueSubmissionMaxMs: Math.max(...queueMs),
+    frameSampleCount: frameMs.length,
+    queueSubmissionSampleCount: queueMs.length,
+    frameHitchThresholdMs,
+    frameHitchCount: frameMs.filter((durationMs) => durationMs > frameHitchThresholdMs).length,
+    steadyStateFps: 1_000 / Math.max(0.001, cpuFrameP95Ms),
     textureBytesEstimate: estimateResidentTextureBytes(),
     transientBytesEstimate: estimateTransientRenderBytes(),
     gpuTimingMethod: 'queue-on-submitted-work-done-conservative-proxy',

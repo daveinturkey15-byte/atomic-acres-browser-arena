@@ -242,6 +242,31 @@ try {
     if (performanceBudget.steadyStateFps < 55) {
       throw new Error(`${arenaId} steady-state hardware WebGPU frame rate is below 55 FPS: ${JSON.stringify(performanceBudget)}`);
     }
+    const requiredPerformanceNumbers = [
+      performanceBudget.cpuFrameP50Ms,
+      performanceBudget.cpuFrameP95Ms,
+      performanceBudget.cpuFrameP99Ms,
+      performanceBudget.cpuFrameMaxMs,
+      performanceBudget.queueSubmissionP50Ms,
+      performanceBudget.queueSubmissionP95Ms,
+      performanceBudget.queueSubmissionP99Ms,
+      performanceBudget.queueSubmissionMaxMs,
+      performanceBudget.frameHitchThresholdMs,
+      performanceBudget.frameHitchCount,
+    ];
+    if (!requiredPerformanceNumbers.every(Number.isFinite)
+      || performanceBudget.frameSampleCount !== 90
+      || performanceBudget.queueSubmissionSampleCount !== 7
+      || performanceBudget.cpuFrameP50Ms > performanceBudget.cpuFrameP95Ms
+      || performanceBudget.cpuFrameP95Ms > performanceBudget.cpuFrameP99Ms
+      || performanceBudget.cpuFrameP99Ms > performanceBudget.cpuFrameMaxMs
+      || performanceBudget.queueSubmissionP50Ms > performanceBudget.queueSubmissionP95Ms
+      || performanceBudget.queueSubmissionP95Ms > performanceBudget.queueSubmissionP99Ms
+      || performanceBudget.queueSubmissionP99Ms > performanceBudget.queueSubmissionMaxMs
+      || performanceBudget.frameHitchCount < 0
+      || performanceBudget.frameHitchCount > performanceBudget.frameSampleCount) {
+      throw new Error(`${arenaId} hardware performance distribution or hitch telemetry is incomplete: ${JSON.stringify(performanceBudget)}`);
+    }
     if (evidence.playableScene.traversal.legacyShaderMaterials.length !== 0
       || evidence.playableScene.traversal.compiledPipelineIds.length !== 7) {
       throw new Error(`${arenaId} did not complete the seven-owner TSL cutover`);
