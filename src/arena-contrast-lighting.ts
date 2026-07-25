@@ -18,9 +18,11 @@ const KEY_LIGHTS = {
     { position: [-26, 11, 12], target: [-18, 1.8, 2], color: 0xffc981, intensity: 13, distance: 32, angle: 0.62 },
     { position: [26, 10, -12], target: [18, 1.8, -2], color: 0xa9d8ff, intensity: 11, distance: 31, angle: 0.6 },
   ],
-  // Rustworks already has authored industrial floods. Its definition keeps
-  // them emissive-only, so it intentionally allocates no local shadow key.
-  'rustworks-1v1': [],
+  // One overhead moon/flood key keeps the deck readable while retaining real
+  // wall/container occlusion. Authored flood fixtures remain emissive-only.
+  'rustworks-1v1': [
+    { position: [0, 20, 0], target: [0, 0.8, 0], color: 0xffd2a0, intensity: 22, distance: 55, angle: 1.05 },
+  ],
   'gun-range': [
     { position: [0, 6.2, 12], target: [0, 1.6, -17], color: 0xd8f3ff, intensity: 14, distance: 45, angle: 0.58 },
   ],

@@ -23,7 +23,12 @@ describe('Pass 62 arena contrast lighting', () => {
       expect(visibleRoots).toHaveLength(1);
     }
     rig.applyDefinition(rustworksDefinition);
-    expect(rig.telemetry()).toMatchObject({ arenaId: 'rustworks-1v1', activeLights: 0, shadowCastingLights: 0 });
+    expect(rig.telemetry()).toMatchObject({
+      arenaId: 'rustworks-1v1',
+      activeLights: 1,
+      shadowCastingLights: 1,
+      occlusion: { activeLocalLights: 1, shadowedLocalLights: 1, violations: [] },
+    });
     rig.applyDefinition(gunRangeDefinition);
     expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 1, shadowCastingLights: 1 });
   });
