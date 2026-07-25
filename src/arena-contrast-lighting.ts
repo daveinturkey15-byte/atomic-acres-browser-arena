@@ -21,7 +21,7 @@ const KEY_LIGHTS = {
   // One overhead moon/flood key keeps the deck readable while retaining real
   // wall/container occlusion. Authored flood fixtures remain emissive-only.
   'rustworks-1v1': [
-    { position: [0, 20, 0], target: [0, 0.8, 0], color: 0xffd2a0, intensity: 22, distance: 55, angle: 1.05 },
+    { position: [0, 20, 0], target: [0, 0.8, 0], color: 0xffd2a0, intensity: 30, distance: 55, angle: 1.05 },
   ],
   'gun-range': [
     { position: [0, 6.2, 12], target: [0, 1.6, -17], color: 0xd8f3ff, intensity: 14, distance: 45, angle: 0.58 },
