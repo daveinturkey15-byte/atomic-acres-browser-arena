@@ -326,6 +326,8 @@ import {
   createRailgunAuthorityState,
   dropRailgun,
   fireRailgun,
+  isStaleRailgunAuthorityState,
+  railgunStateResyncDue,
   railgunThermalTargetEligible,
   type RailgunAuthorityState,
   type RailgunClaimRequestMessage,
@@ -1623,6 +1625,7 @@ const resolvedRailgunShots = new Map<string, RailgunShotResultMessage>();
 const processedRailgunShotResults = new Set<string>();
 let railgunState: RailgunAuthorityState = createRailgunAuthorityState('disabled', 0, 0, 0);
 let localRailgunPendingUntilHostTimeMs = 0;
+let lastRailgunStateBroadcastAt = -Infinity;
 let railgunAdsResetRequired = false;
 let railgunRechamberPresentationActive = false;
 const RAILGUN_PICKUP_RANGE = 2.65;
@@ -5321,7 +5324,7 @@ function syncRailgunHolderPresentation(previous: RailgunAuthorityState, next: Ra
 }
 
 function applyRailgunState(next: RailgunAuthorityState, announce = false): void {
-  if (next.generation < railgunState.generation) return;
+  if (isStaleRailgunAuthorityState(railgunState, next)) return;
   const previous = railgunState;
   railgunState = next;
   syncRailgunHolderPresentation(previous, next);
@@ -5336,6 +5339,7 @@ function broadcastRailgunState(): void {
     by: player.id, state: railgunState, nonce: randomNonce(),
   };
   network.send(message);
+  lastRailgunStateBroadcastAt = performance.now();
 }
 
 function initializeRailgunForMatch(activeAtHostTimeMs: number): void {
@@ -5631,6 +5635,7 @@ function updateRailgun(now: number): void {
       applyRailgunState(advanced.state, advanced.announcement !== null);
       broadcastRailgunState();
     }
+    if (railgunStateResyncDue(lastRailgunStateBroadcastAt, now)) broadcastRailgunState();
   }
   if (localHoldsRailgun()) player.ammo.railgun = railgunState.roundsRemaining;
   const hostNow = currentHostTimeMs();
@@ -9890,6 +9895,7 @@ function resetForMode(): void {
   railgunAdsResetRequired = false;
   railgunRechamberPresentationActive = false;
   localRailgunPendingUntilHostTimeMs = 0;
+  lastRailgunStateBroadcastAt = -Infinity;
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
   railgunPresentation.updateWorld(railgunState, performance.now());
@@ -10532,6 +10538,7 @@ const debugWindow = window as Window & {
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
     damageFromRemote: (amount: number, cause?: KillCause['kind']) => void;
+    damageRemoteAuthoritatively: (amount: number) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
     earnSupport: (eliminations: number) => void;
     forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
@@ -11884,6 +11891,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           : kind === 'melee' ? { kind: 'melee' }
             : { kind: 'environment' };
     applyDamage(amount, remote.snapshot.id, 1, false, cause);
+  },
+  damageRemoteAuthoritatively: (amount: number) => {
+    if (!localMultiplayerQa || network.role !== 'host' || !Number.isFinite(amount) || amount <= 0) return null;
+    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    if (!remote) return null;
+    const health = remoteHealthAuthorities.get(remote.snapshot.id);
+    if (!health) return null;
+    const storedBefore = health.hp;
+    const result = applyAuthoritativeRemoteDamage(health, Math.min(100, amount), performance.now());
+    if (!result.applied) return null;
+    remoteHealthAuthorities.set(remote.snapshot.id, result.state);
+    remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
+    recordAuthoritativeRemoteRegeneration(remote.snapshot.id, result, 'qa-host-ledger-before-small-hit');
+    return {
+      targetId: remote.snapshot.id,
+      storedBefore,
+      canonicalBefore: result.healthBefore,
+      storedAfter: result.state.hp,
+    };
   },
   earnSupport: (eliminations: number) => {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);

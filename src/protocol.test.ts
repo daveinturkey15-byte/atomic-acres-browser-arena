@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage } from './protocol';
+import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DELAY_MS } from './railgun-authority';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -302,6 +303,13 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'lobby-handicap', by: 'host', dhv: 9, nonce: 3 })).toBe(false);
     expect(isHostAuthorityMessage(lobbyState)).toBe(true);
     expect(isStateTrafficMessage(state())).toBe(true);
+    expect(isStateTrafficMessage({
+      type: 'railgun-state',
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host',
+      state: advanceRailgunAuthority(createRailgunAuthorityState('atomic-acres', 0, 0), RAILGUN_SPAWN_DELAY_MS).state,
+      nonce: 5,
+    })).toBe(true);
     expect(isStateTrafficMessage(lobbyState)).toBe(false);
     expect(isGameMessage({ ...lobbyState, snapshot: { ...lobbyState.snapshot, config: { ...lobbyState.snapshot.config, capacity: 5 } } })).toBe(false);
   });

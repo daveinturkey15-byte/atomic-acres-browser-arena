@@ -6,6 +6,7 @@ export const RAILGUN_PENETRATION_MULTIPLIER = 1;
 export const RAILGUN_RECHAMBER_MS = 1_500;
 export const RAILGUN_TOTAL_ROUNDS = 8;
 export const RAILGUN_PROCESSED_SHOT_LIMIT = 64;
+export const RAILGUN_STATE_RESYNC_MS = 1_000;
 
 export type RailgunSpawnSite = Readonly<{
   id: 'aqua-front' | 'aqua-rear' | 'coral-front' | 'coral-rear';
@@ -22,6 +23,8 @@ export const RAILGUN_UPPER_ROOM_SPAWN_SITES: readonly RailgunSpawnSite[] = Objec
 
 export type RailgunAuthorityState = Readonly<{
   generation: number;
+  /** Monotonic within one match generation; rejects reordered authority snapshots. */
+  revision: number;
   status: 'disabled' | 'scheduled' | 'available' | 'held' | 'depleted';
   spawnAtHostTimeMs: number | null;
   spawnSite: RailgunSpawnSite | null;
@@ -77,6 +80,7 @@ export function createRailgunAuthorityState(
   if (arenaId !== RAILGUN_ARENA_ID || !validHostTime(matchStartedAtHostTimeMs)) {
     return {
       generation,
+      revision: 0,
       status: 'disabled',
       spawnAtHostTimeMs: null,
       spawnSite: null,
@@ -91,6 +95,7 @@ export function createRailgunAuthorityState(
   const spawnSite = chooseRailgunUpperRoom(randomUnit);
   return {
     generation,
+    revision: 0,
     status: 'scheduled',
     spawnAtHostTimeMs: matchStartedAtHostTimeMs + RAILGUN_SPAWN_DELAY_MS,
     spawnSite,
@@ -110,7 +115,7 @@ export function advanceRailgunAuthority(state: RailgunAuthorityState, now: numbe
   }
   const announce = !state.announcementSent;
   return {
-    state: { ...state, status: 'available', announcementSent: true },
+    state: { ...state, revision: state.revision + 1, status: 'available', announcementSent: true },
     spawned: true,
     announcement: announce ? 'RAILGUN SPAWNED' : null,
   };
@@ -126,13 +131,13 @@ export function claimRailgun(
   }
   return {
     accepted: true,
-    state: { ...state, status: 'held', holderId: playerId, pickupPosition: null },
+    state: { ...state, revision: state.revision + 1, status: 'held', holderId: playerId, pickupPosition: null },
   };
 }
 
 export function advanceRailgunChamber(state: RailgunAuthorityState, now: number): RailgunAuthorityState {
   if (state.status !== 'held' || state.roundsRemaining <= 0 || state.chamberReadyAtHostTimeMs <= 0 || !validHostTime(now)) return state;
-  return now >= state.chamberReadyAtHostTimeMs ? { ...state, chamberReadyAtHostTimeMs: 0 } : state;
+  return now >= state.chamberReadyAtHostTimeMs ? { ...state, revision: state.revision + 1, chamberReadyAtHostTimeMs: 0 } : state;
 }
 
 export function fireRailgun(
@@ -162,6 +167,7 @@ export function fireRailgun(
   const nextProcessed = [...state.processedShotIds, shotId].slice(-RAILGUN_PROCESSED_SHOT_LIMIT);
   const nextState: RailgunAuthorityState = {
     ...state,
+    revision: state.revision + 1,
     status: roundsRemaining === 0 ? 'depleted' : 'held',
     roundsRemaining,
     chamberReadyAtHostTimeMs: roundsRemaining === 0 ? 0 : now + RAILGUN_RECHAMBER_MS,
@@ -190,6 +196,7 @@ export function dropRailgun(
     dropped: true,
     state: {
       ...state,
+      revision: state.revision + 1,
       status: 'available',
       holderId: null,
       pickupPosition: copyPosition(position),
@@ -200,6 +207,18 @@ export function dropRailgun(
 /** Railgun ammunition is a match-lifetime resource: no pickup, reload or range rule may replenish it. */
 export function replenishRailgunAmmo(state: RailgunAuthorityState): { replenished: false; state: RailgunAuthorityState } {
   return { replenished: false, state };
+}
+
+export function isStaleRailgunAuthorityState(
+  current: RailgunAuthorityState,
+  incoming: RailgunAuthorityState,
+): boolean {
+  return incoming.generation < current.generation
+    || incoming.generation === current.generation && incoming.revision < current.revision;
+}
+
+export function railgunStateResyncDue(lastSentAt: number, now: number): boolean {
+  return validHostTime(now) && (!Number.isFinite(lastSentAt) || now - lastSentAt >= RAILGUN_STATE_RESYNC_MS);
 }
 
 export function railgunThermalTargetEligible(
@@ -270,6 +289,7 @@ export function isRailgunAuthorityState(value: unknown): value is RailgunAuthori
   if (!value || typeof value !== 'object') return false;
   const state = value as Partial<RailgunAuthorityState>;
   return Number.isSafeInteger(state.generation) && Number(state.generation) >= 0
+    && Number.isSafeInteger(state.revision) && Number(state.revision) >= 0
     && (state.status === 'disabled' || state.status === 'scheduled' || state.status === 'available' || state.status === 'held' || state.status === 'depleted')
     && (state.spawnAtHostTimeMs === null || validHostTime(Number(state.spawnAtHostTimeMs)))
     && (state.spawnSite === null || RAILGUN_UPPER_ROOM_SPAWN_SITES.some((site) => site.id === state.spawnSite?.id

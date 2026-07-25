@@ -4,6 +4,7 @@ import {
   RAILGUN_PENETRATION_MULTIPLIER,
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
+  RAILGUN_STATE_RESYNC_MS,
   RAILGUN_TOTAL_ROUNDS,
   RAILGUN_UPPER_ROOM_SPAWN_SITES,
   advanceRailgunAuthority,
@@ -13,6 +14,8 @@ import {
   createRailgunAuthorityState,
   dropRailgun,
   fireRailgun,
+  isStaleRailgunAuthorityState,
+  railgunStateResyncDue,
   isRailgunProtocolMessage,
   railgunThermalTargetEligible,
   replenishRailgunAmmo,
@@ -34,6 +37,24 @@ describe('host-authoritative railgun', () => {
     const spawned = advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS);
     expect(spawned).toMatchObject({ spawned: true, announcement: 'RAILGUN SPAWNED' });
     expect(advanceRailgunAuthority(spawned.state, 999_999)).toMatchObject({ spawned: false, announcement: null });
+  });
+
+  it('orders every mutation within a generation and rejects stale equal-generation snapshots', () => {
+    const scheduled = createRailgunAuthorityState('atomic-acres', 0, 0, 9);
+    const available = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS).state;
+    const held = claimRailgun(available, 'player-a', 9).state;
+    const fired = fireRailgun(held, 'player-a', 'revision-shot', 200_000).state;
+    expect([scheduled.revision, available.revision, held.revision, fired.revision]).toEqual([0, 1, 2, 3]);
+    expect(isStaleRailgunAuthorityState(held, available)).toBe(true);
+    expect(isStaleRailgunAuthorityState(held, held)).toBe(false);
+    expect(isStaleRailgunAuthorityState(available, held)).toBe(false);
+    expect(isStaleRailgunAuthorityState(held, createRailgunAuthorityState('atomic-acres', 0, 0, 10))).toBe(false);
+  });
+
+  it('periodically resends authoritative state so every guest converges after a missed event', () => {
+    expect(railgunStateResyncDue(-Infinity, 0)).toBe(true);
+    expect(railgunStateResyncDue(10_000, 10_000 + RAILGUN_STATE_RESYNC_MS - 1)).toBe(false);
+    expect(railgunStateResyncDue(10_000, 10_000 + RAILGUN_STATE_RESYNC_MS)).toBe(true);
   });
 
   it('fires 50-damage full-penetration shots, breaks ADS, and rechambers for 1.5 seconds', () => {

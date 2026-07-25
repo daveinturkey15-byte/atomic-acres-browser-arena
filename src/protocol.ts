@@ -703,8 +703,8 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'bot-damage';
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage {
-  return message.type === 'state' || message.type === 'bot-state';
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage {
+  return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state';
 }
 
 export function sanitizeName(value: string): string {

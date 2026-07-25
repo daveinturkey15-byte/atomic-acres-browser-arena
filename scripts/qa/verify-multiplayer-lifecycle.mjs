@@ -166,15 +166,58 @@ try {
     }, guestCount, { timeout: 45_000 })));
     joined.secondMatchStarted = true;
 
+    // Reproduce the reported delayed-death shape across a real host/guest
+    // connection: heavy damage, full visible regeneration, then a small hit.
+    // The host's stored remote ledger must advance before applying hit two.
+    const [firstRemoteDamage] = await Promise.all([
+      host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(80)),
+      guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageFromRemote(80)),
+    ]);
+    await guest.waitForFunction(() => {
+      const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+      return player.alive === true && player.hp <= 20.5;
+    }, undefined, { timeout: 15_000 });
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.hp >= 99, undefined, { timeout: 15_000 });
+    const recoveredGuestHealth = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.hp);
+    const [smallRemoteDamage] = await Promise.all([
+      host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(10)),
+      guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageFromRemote(10)),
+    ]);
+    await guest.waitForFunction(() => {
+      const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+      return player.alive === true && player.hp >= 89 && player.hp <= 91;
+    }, undefined, { timeout: 15_000 });
+    const postSmallHitGuest = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player);
+    joined.regenSmallDamageEvidence = { firstRemoteDamage, recoveredGuestHealth, smallRemoteDamage, postSmallHitGuest };
+    joined.regenSmallDamageSurvived = firstRemoteDamage?.storedBefore === 100
+      && firstRemoteDamage.canonicalBefore === 100
+      && firstRemoteDamage.storedAfter === 20
+      && recoveredGuestHealth >= 99
+      && smallRemoteDamage?.canonicalBefore >= 99
+      && smallRemoteDamage.storedAfter >= 89
+      && postSmallHitGuest.alive === true
+      && postSmallHitGuest.hp >= 89;
+
     const stagedRailgun = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.status === 'available', undefined, { timeout: 15_000 });
     await guest.evaluate((pickup) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(...pickup), stagedRailgun.pickupPosition);
     if (!await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRemoteAtRailgunPickup())) throw new Error('could not stage authoritative remote at railgun pickup');
     joined.railgunGuestClaimed = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactRailgun());
-    await Promise.all(peers.map((page) => page.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return state.railgun.status === 'held' && state.railgun.roundsRemaining === 8;
-    }, undefined, { timeout: 15_000 })));
+    await Promise.all(labelledPages.map(async ([label, page]) => {
+      try {
+        await page.waitForFunction(() => {
+          const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+          return state.railgun.status === 'held' && state.railgun.roundsRemaining === 8;
+        }, undefined, { timeout: 15_000 });
+      } catch (error) {
+        const evidence = await page.evaluate(() => ({
+          railgun: window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun,
+          player: window.__ATOMIC_ACRES_DEBUG__.snapshot().player,
+          remotes: window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers,
+        }));
+        throw new Error(`${label} missed held Railgun replication: ${JSON.stringify(evidence)}`, { cause: error });
+      }
+    }));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.localHolder === true, undefined, { timeout: 15_000 });
     await guest.waitForTimeout(500);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
@@ -237,7 +280,7 @@ try {
   await writeFile('artifacts/pass38/multiplayer-lifecycle.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
-    || !result.hostStartReadinessCommitted || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.guestRedeployNoCombatEffects
+    || !result.hostStartReadinessCommitted || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.regenSmallDamageSurvived || !result.guestRedeployNoCombatEffects
     || !result.sanitizedDiagnosticRetained || !result.automaticDiagnosticsCompleted || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
     || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy
     || !result.leaveObserved || !result.rejoinGraceObserved

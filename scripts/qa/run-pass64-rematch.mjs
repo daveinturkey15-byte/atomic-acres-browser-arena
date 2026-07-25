@@ -52,7 +52,7 @@ try {
       ...environment,
       QA_BASE_URL: `http://127.0.0.1:${previewPort}/`,
       QA_PEER_PORT: String(peerPort),
-      QA_MULTIPLAYER_CYCLES: '1',
+      QA_MULTIPLAYER_CYCLES: '2',
       QA_MULTIPLAYER_GUESTS: '2',
     },
     stdio: 'inherit',
