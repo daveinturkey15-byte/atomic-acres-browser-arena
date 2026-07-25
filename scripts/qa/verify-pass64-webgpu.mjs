@@ -128,11 +128,6 @@ try {
     executablePath,
     args: [
       '--enable-unsafe-webgpu',
-      // Performance budgets measure renderer throughput, not the refresh rate
-      // of whichever display Windows currently associates with the adapter.
-      // Keep GPU presentation unsynchronised so a 59 Hz desktop cannot turn
-      // a healthy sub-16.7 ms CPU/GPU frame into a false regression.
-      '--disable-gpu-vsync',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--disable-backgrounding-occluded-windows',
@@ -252,6 +247,10 @@ try {
       performanceBudget.cpuFrameP95Ms,
       performanceBudget.cpuFrameP99Ms,
       performanceBudget.cpuFrameMaxMs,
+      performanceBudget.presentationFrameP50Ms,
+      performanceBudget.presentationFrameP95Ms,
+      performanceBudget.presentationFrameP99Ms,
+      performanceBudget.presentationFrameMaxMs,
       performanceBudget.queueSubmissionP50Ms,
       performanceBudget.queueSubmissionP95Ms,
       performanceBudget.queueSubmissionP99Ms,
@@ -261,10 +260,14 @@ try {
     ];
     if (!requiredPerformanceNumbers.every(Number.isFinite)
       || performanceBudget.frameSampleCount !== 90
+      || performanceBudget.presentationFrameSampleCount !== 90
       || performanceBudget.queueSubmissionSampleCount !== 7
       || performanceBudget.cpuFrameP50Ms > performanceBudget.cpuFrameP95Ms
       || performanceBudget.cpuFrameP95Ms > performanceBudget.cpuFrameP99Ms
       || performanceBudget.cpuFrameP99Ms > performanceBudget.cpuFrameMaxMs
+      || performanceBudget.presentationFrameP50Ms > performanceBudget.presentationFrameP95Ms
+      || performanceBudget.presentationFrameP95Ms > performanceBudget.presentationFrameP99Ms
+      || performanceBudget.presentationFrameP99Ms > performanceBudget.presentationFrameMaxMs
       || performanceBudget.queueSubmissionP50Ms > performanceBudget.queueSubmissionP95Ms
       || performanceBudget.queueSubmissionP95Ms > performanceBudget.queueSubmissionP99Ms
       || performanceBudget.queueSubmissionP99Ms > performanceBudget.queueSubmissionMaxMs

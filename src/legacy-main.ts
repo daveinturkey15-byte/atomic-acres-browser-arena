@@ -1759,6 +1759,8 @@ let roundDamageTaken = 0;
 let rangePrimaryUnlocked = false;
 let accumulator = 0;
 let frameCount = 0;
+const recentFrameWorkMs: number[] = [];
+const FRAME_WORK_SAMPLE_LIMIT = 240;
 let recoilVisual = 0;
 let recoilCamera = { pitch: 0, yaw: 0 };
 let landingImpulse = 0;
@@ -10214,6 +10216,7 @@ function refreshStaticShadowsForDynamicCasters(now: number): void {
 }
 
 function frame(now: number, scheduleNext = true): void {
+  const frameWorkStartedAt = performance.now();
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
@@ -10298,7 +10301,13 @@ function frame(now: number, scheduleNext = true): void {
       }
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
     }
-    if (scheduleNext) requestAnimationFrame(frame);
+    if (scheduleNext) {
+      recentFrameWorkMs.push(Math.max(0, performance.now() - frameWorkStartedAt));
+      if (recentFrameWorkMs.length > FRAME_WORK_SAMPLE_LIMIT) {
+        recentFrameWorkMs.splice(0, recentFrameWorkMs.length - FRAME_WORK_SAMPLE_LIMIT);
+      }
+      requestAnimationFrame(frame);
+    }
   } catch (error) {
     showFatalError(error);
   }
@@ -10346,11 +10355,16 @@ type ArenaPerformanceBudgetSample = Readonly<{
   cpuFrameP95Ms: number;
   cpuFrameP99Ms: number;
   cpuFrameMaxMs: number;
+  presentationFrameP50Ms: number;
+  presentationFrameP95Ms: number;
+  presentationFrameP99Ms: number;
+  presentationFrameMaxMs: number;
   queueSubmissionP50Ms: number;
   queueSubmissionP95Ms: number;
   queueSubmissionP99Ms: number;
   queueSubmissionMaxMs: number;
   frameSampleCount: number;
+  presentationFrameSampleCount: number;
   queueSubmissionSampleCount: number;
   frameHitchThresholdMs: number;
   frameHitchCount: number;
@@ -10404,14 +10418,20 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
   const definition = activeArenaVisualDefinition;
   if (!definition) throw new Error('Cannot sample arena budget without an active ArenaVisualDefinition');
   for (let index = 0; index < 60; index += 1) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  const frameMs: number[] = [];
+  recentFrameWorkMs.length = 0;
+  const presentationFrameMs: number[] = [];
   let previous = performance.now();
   for (let index = 0; index < 90; index += 1) {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const now = performance.now();
-    frameMs.push(now - previous);
+    presentationFrameMs.push(now - previous);
     previous = now;
   }
+  for (let attempt = 0; recentFrameWorkMs.length < 90 && attempt < 30; attempt += 1) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+  const frameMs = recentFrameWorkMs.slice(-90);
+  if (frameMs.length !== 90) throw new Error(`CPU frame-work sampler collected ${frameMs.length}/90 samples`);
   const queueMs: number[] = [];
   const previousRenderPaused = debugRenderPaused;
   debugRenderPaused = true;
@@ -10430,6 +10450,9 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
   const cpuFrameP50Ms = percentile(frameMs, 0.5);
   const cpuFrameP95Ms = percentile(frameMs, 0.95);
   const cpuFrameP99Ms = percentile(frameMs, 0.99);
+  const presentationFrameP50Ms = percentile(presentationFrameMs, 0.5);
+  const presentationFrameP95Ms = percentile(presentationFrameMs, 0.95);
+  const presentationFrameP99Ms = percentile(presentationFrameMs, 0.99);
   const queueSubmissionP50Ms = percentile(queueMs, 0.5);
   const queueSubmissionP95Ms = percentile(queueMs, 0.95);
   const queueSubmissionP99Ms = percentile(queueMs, 0.99);
@@ -10440,15 +10463,21 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     cpuFrameP95Ms,
     cpuFrameP99Ms,
     cpuFrameMaxMs: Math.max(...frameMs),
+    presentationFrameP50Ms,
+    presentationFrameP95Ms,
+    presentationFrameP99Ms,
+    presentationFrameMaxMs: Math.max(...presentationFrameMs),
     queueSubmissionP50Ms,
     queueSubmissionP95Ms,
     queueSubmissionP99Ms,
     queueSubmissionMaxMs: Math.max(...queueMs),
     frameSampleCount: frameMs.length,
+    presentationFrameSampleCount: presentationFrameMs.length,
     queueSubmissionSampleCount: queueMs.length,
     frameHitchThresholdMs,
     frameHitchCount: frameMs.filter((durationMs) => durationMs > frameHitchThresholdMs).length,
-    steadyStateFps: 1_000 / Math.max(0.001, cpuFrameP95Ms),
+    steadyStateFps: presentationFrameMs.length * 1_000
+      / Math.max(0.001, presentationFrameMs.reduce((sum, durationMs) => sum + durationMs, 0)),
     textureBytesEstimate: estimateResidentTextureBytes(),
     transientBytesEstimate: estimateTransientRenderBytes(),
     gpuTimingMethod: 'queue-on-submitted-work-done-conservative-proxy',
