@@ -612,7 +612,7 @@ Exit at manifest head `S0M`: S0 runtime/release-shell trees are unchanged; all f
 - Merge S1 serially and record exact main SHA `S2`.
 - Require all five checks again on exact main.
 - Dispatch only the protected production workflow for `PASS 65` and exact main SHA.
-- Record one release-lineage receipt spanning S0 approved source/artifact/tree digests, S1 approval SHA, S2 merge SHA, parity, check runs, production run, Pages SHA and deployed subtree identity.
+- Record one release-lineage receipt spanning S0 approved source/artifact/tree digests; S0M SHA, manifest digest and runtime/release-shell tree digests; S1 approval SHA/tree digests; S2 merge SHA/tree digests; four-head ancestry/parity; check runs; production run; Pages SHA; and deployed subtree identity.
 - Independently verify source SHA, controlled production-build differences or exact-artifact promotion, workflow run, Pages SHA, receipt, chooser, Pass 65 Live `The Big One`, Pass 64 Stable `WebGPU Migration`, Pass 62 benchmark policy, aliases, room links, public runtime behaviour, and logs.
 - Stop after the first exact successful receipt and live smoke; never redeploy blindly.
 

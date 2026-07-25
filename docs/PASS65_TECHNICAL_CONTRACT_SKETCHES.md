@@ -861,6 +861,8 @@ type ReleaseLineageReceipt = Readonly<{
   approvedArtifactSha256: string;
   runtimeTreeSha256S0: string;
   releaseShellTreeSha256S0: string;
+  runtimeTreeSha256S0M: string;
+  releaseShellTreeSha256S0M: string;
   approvalCommitShaS1: string;
   mergedMainShaS2: string;
   runtimeTreeSha256S1: string;
