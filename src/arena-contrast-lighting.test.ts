@@ -26,17 +26,23 @@ describe('Pass 62 arena contrast lighting', () => {
     rig.applyDefinition(rustworksDefinition);
     expect(rig.telemetry()).toMatchObject({
       arenaId: 'rustworks-1v1',
-      activeLights: 1,
-      shadowCastingLights: 1,
-      occlusion: { activeLocalLights: 1, shadowedLocalLights: 1, violations: [] },
+      activeLights: 2,
+      shadowCastingLights: 2,
+      occlusion: { activeLocalLights: 2, shadowedLocalLights: 2, violations: [] },
     });
-    const fixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.shadowed);
+    const fixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.id === 'north');
+    const southFixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.id === 'south');
     const mountedLight = scene.getObjectByName('rustworks-1v1-tower-mounted-work-light-1') as THREE.SpotLight;
+    const southMountedLight = scene.getObjectByName('rustworks-1v1-tower-mounted-work-light-south-2') as THREE.SpotLight;
     expect(fixture).toBeTruthy();
     expect(mountedLight).toBeInstanceOf(THREE.SpotLight);
     expect(mountedLight.position.toArray()).toEqual([...(fixture?.position ?? [])]);
     expect(mountedLight.target.position.toArray()).toEqual([...(fixture?.target ?? [])]);
     expect(mountedLight.shadow.mapSize.toArray()).toEqual([512, 512]);
+    expect(southMountedLight).toBeInstanceOf(THREE.SpotLight);
+    expect(southMountedLight.position.toArray()).toEqual([...(southFixture?.position ?? [])]);
+    expect(southMountedLight.target.position.toArray()).toEqual([...(southFixture?.target ?? [])]);
+    expect(southMountedLight.shadow.mapSize.toArray()).toEqual([512, 512]);
     expect(rustworksDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
       'rustrig-mounted-work-lights',
       'rustrig-deck-surface',

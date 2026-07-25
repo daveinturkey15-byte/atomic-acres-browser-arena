@@ -339,9 +339,9 @@ export const RUSTWORKS_TOWER = Object.freeze({
 
 /**
  * Authored fixture locations shared by the RustRig presentation and its one
- * budgeted shadowed-local work light. Both heads remain visible/emissive; only
- * the north head owns a runtime light volume so the moon + local-light budget
- * stays at two shadow casters.
+ * budgeted shadowed-local work lights. Both heads remain visible/emissive and
+ * own bounded, opposed shadowed volumes so the playable deck is readable from
+ * both ends without reintroducing unoccluded point-light leakage.
  */
 export const RUSTWORKS_WORK_LIGHTS = Object.freeze([
   Object.freeze({
@@ -361,10 +361,10 @@ export const RUSTWORKS_WORK_LIGHTS = Object.freeze([
     mount: [0, 8.35, 3.35] as const,
     target: [0, 0.8, -13.5] as const,
     color: 0xffd2a0,
-    intensity: 0,
-    distance: 0,
+    intensity: 42,
+    distance: 34,
     angle: 0.82,
-    shadowed: false,
+    shadowed: true,
   }),
 ]);
 
@@ -669,7 +669,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       shadowedLocalVolume: fixture.shadowed,
     })),
     shadowedLocalVolumes: RUSTWORKS_WORK_LIGHTS.filter((fixture) => fixture.shadowed).length,
-    maximumShadowCastersIncludingMoon: 2,
+    maximumShadowCastersIncludingMoon: 3,
   };
 
   // Ground → lower deck ramp on -Z with explicit foot/top landings (≤50°).

@@ -194,8 +194,8 @@ describe('additional authored maps', () => {
       maximumShadowCastersIncludingMoon: number;
     };
     expect(lightAudit).toMatchObject({
-      shadowedLocalVolumes: 1,
-      maximumShadowCastersIncludingMoon: 2,
+      shadowedLocalVolumes: 2,
+      maximumShadowCastersIncludingMoon: 3,
     });
     expect(lightAudit.fixtures).toHaveLength(2);
     expect(lightAudit.fixtures.map((fixture) => fixture.id)).toEqual(RUSTWORKS_WORK_LIGHTS.map((fixture) => fixture.id));
