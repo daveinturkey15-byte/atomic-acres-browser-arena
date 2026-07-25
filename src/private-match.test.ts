@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PRIVATE_MATCH_CONFIG,
   balanceLobbyTeams,
+  canHostCommitStart,
   canHostStart,
   canGuestModifyHostedBots,
   estimateHostClockOffset,
@@ -62,6 +63,19 @@ describe('private match lobby', () => {
     }))).toBe(true);
     expect(canHostStart(snapshot({ members: [] }))).toBe(false);
     expect(canHostStart(snapshot({ phase: 'active' }))).toBe(false);
+  });
+
+  it('treats Start Match as the host ready commit without weakening guest readiness', () => {
+    expect(canHostCommitStart(snapshot({
+      members: members.map((member) => member.id === 'host' ? { ...member, ready: false } : member),
+    }))).toBe(true);
+    expect(canHostCommitStart(snapshot({
+      members: members.map((member) => member.id === 'host' || member.id === 'b'
+        ? { ...member, ready: false }
+        : member),
+    }))).toBe(false);
+    expect(canHostCommitStart(snapshot({ members: members.filter((member) => member.id !== 'host') }))).toBe(false);
+    expect(canHostCommitStart(snapshot({ phase: 'active' }))).toBe(false);
   });
 
   it('treats colours as presentation-only in FFA', () => {

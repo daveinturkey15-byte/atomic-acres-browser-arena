@@ -238,6 +238,7 @@ import {
   REJOIN_GRACE_MS,
   rejoinReservationExpired,
   balanceLobbyTeams,
+  canHostCommitStart,
   canHostStart,
   emptyPlayerScore,
   freeForAllLeaders,
@@ -2551,6 +2552,7 @@ function rejectLobbyPlayer(playerId: string, reason: 'room-full' | 'rejoin-denie
 function admitLobbyJoin(message: LobbyJoinMessage): void {
   if (network.role !== 'host') return;
   const existing = hostLobbyMembers.get(message.playerId);
+  const joiningNewMember = existing === undefined;
   const currentPhase = privateLobbySnapshot?.phase ?? 'waiting';
   if (existing) {
     if (hostLobbyTokens.get(message.playerId) !== message.resumeToken) {
@@ -2587,7 +2589,9 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
     });
     authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
   }
-  if (currentPhase === 'waiting' && privateMatchConfig.autoBalance) {
+  // Reconnecting an existing identity does not change lobby composition or
+  // teams, so it must not clear everybody else's readiness.
+  if (joiningNewMember && currentPhase === 'waiting' && privateMatchConfig.autoBalance) {
     for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
   }
   broadcastHostLobby(currentPhase);
@@ -2817,9 +2821,19 @@ async function beginPrivateMatch(
 
 function hostStartPrivateMatch(): void {
   if (network.role !== 'host') return;
+  const candidate = hostSnapshot('waiting');
+  if (!canHostCommitStart(candidate)) {
+    setStatus('Every connected guest must be ready before the host starts.', 'warn');
+    return;
+  }
+  const hostMember = hostLobbyMembers.get(player.id);
+  if (!hostMember?.connected) return;
+  if (!hostMember.ready) {
+    hostLobbyMembers.set(player.id, { ...hostMember, ready: true });
+  }
   const current = hostSnapshot('waiting');
   if (!canHostStart(current)) {
-    setStatus('Every connected player must be ready before the host starts.', 'warn');
+    setStatus('Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
   privateMatchActiveAtHostTimeMs = performance.now() + LOBBY_START_LEAD_MS;
@@ -3117,7 +3131,7 @@ function renderPrivateLobby(): void {
   ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
   const start = element<HTMLButtonElement>('#lobby-start');
   start.hidden = network.role !== 'host';
-  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostStart(snapshot);
+  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot);
   const teamInput = element<HTMLSelectElement>('#team');
   teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   const roster = element<HTMLElement>('#lobby-roster');

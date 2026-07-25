@@ -180,6 +180,15 @@ export function canHostStart(snapshot: LobbySnapshot): boolean {
     && connected.every((member) => member.ready);
 }
 
+export function canHostCommitStart(snapshot: LobbySnapshot): boolean {
+  const connected = snapshot.members.filter((member) => member.connected);
+  return snapshot.phase === 'waiting'
+    && connected.length >= 1
+    && connected.length <= snapshot.config.capacity
+    && connected.some((member) => member.id === snapshot.hostId)
+    && connected.every((member) => member.id === snapshot.hostId || member.ready);
+}
+
 export function canGuestModifyHostedBots(role: 'host' | 'guest'): boolean {
   return role === 'host';
 }

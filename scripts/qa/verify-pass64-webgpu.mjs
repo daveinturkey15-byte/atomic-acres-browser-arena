@@ -359,7 +359,6 @@ try {
     undefined,
     { timeout: 45_000 },
   )));
-  await host.click('#lobby-ready');
   await guest.click('#lobby-ready');
   await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 45_000 });
   await host.click('#lobby-start');

@@ -61,14 +61,19 @@ try {
     await host.bringToFront();
     await host.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: 30_000 });
     await guest.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: 30_000 });
-    await host.click('#lobby-ready');
     await guest.click('#lobby-ready');
     await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 30_000 });
+    const hostReadyBeforeStartCommit = await host.evaluate(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.privateMatch.members[0]?.ready ?? null;
+    });
     await host.click('#lobby-start');
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
+    const readinessAfterStartCommit = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.map((member) => member.ready));
     const joined = {
       cycle,
+      hostStartReadinessCommitted: hostReadyBeforeStartCommit === false && readinessAfterStartCommit.every(Boolean),
       roomCodeLength: roomCode.length,
       hostMode: await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameMode),
       guestMode: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameMode),
@@ -215,7 +220,7 @@ try {
   await writeFile('artifacts/pass38/multiplayer-lifecycle.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
-    || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.guestRedeployNoCombatEffects
+    || !result.hostStartReadinessCommitted || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.guestRedeployNoCombatEffects
     || !result.sanitizedDiagnosticRetained || !result.automaticDiagnosticsCompleted || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
     || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy
     || !result.leaveObserved || !result.rejoinGraceObserved
