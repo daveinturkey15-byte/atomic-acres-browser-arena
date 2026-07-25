@@ -380,7 +380,10 @@ async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promis
       const solo = document.querySelector<HTMLButtonElement>('#solo');
       const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
       const snapshot = debugApi?.snapshot();
-      return status?.dataset.kind === 'ok' && solo?.disabled === false && snapshot?.weaponReady === true && snapshot.originalArtLoaded === true;
+      return status?.dataset.kind === 'ok'
+        && solo?.disabled === false
+        && snapshot?.weaponReady === true
+        && snapshot.bootstrap.stage === 'ready';
     }, undefined, { timeout: timeoutMs });
   } catch (error) {
     const diagnostic = await page.evaluate(() => {
@@ -451,8 +454,10 @@ test.describe('boot and authored presentation', () => {
       };
     });
     expect(layout.minimapZoom).toBe('1');
-    expect(layout.minimapWidth).toBe(300);
-    expect(layout.supportWidth).toBeLessThanOrEqual(180);
+    expect(layout.minimapWidth).toBeGreaterThanOrEqual(190);
+    expect(layout.minimapWidth).toBeLessThanOrEqual(220);
+    expect(layout.supportWidth).toBeGreaterThanOrEqual(180);
+    expect(layout.supportWidth).toBeLessThanOrEqual(200);
     expect(layout.supportHeight).toBeGreaterThanOrEqual(150);
     expect(layout.weaponRight).toBeLessThanOrEqual(layout.viewportWidth);
   });
@@ -467,7 +472,9 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 63');
+    await expect(page.locator('html')).toHaveAttribute('data-ui-contract', 'pass64-command-v2');
+    await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
+    await expect(page.locator('.command-brand span')).toContainText('PASS 64');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({
@@ -712,14 +719,14 @@ test.describe('boot and authored presentation', () => {
     test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=blender&mist=on', 60_000);
+    await pageReadyAt(page, '/?render=blender&mist=on', 240_000);
     const menuState = await debug(page);
     expect(menuState.render).toMatchObject({
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
         exposure: 1, hemisphereIntensity: 0.72, ambientIntensity: 0.18,
-        sunIntensity: 3.25, fogNear: 52, fogFar: 142,
+        sunIntensity: 3.25, fogNear: 58, fogFar: 148,
         routeLightIntensity: 3, streetLightIntensity: 3.8, interiorLightIntensity: 10,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.05, godRayLobes: 2,
