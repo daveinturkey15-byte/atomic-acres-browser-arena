@@ -497,8 +497,8 @@ type KillstreakLoadoutV1 = Readonly<{
 Validation:
 
 - Exactly five legal IDs under the frozen duplication/alternative policy.
-- The decision receipt freezes every retained/new/retired/care-only ID, exact kill cost, tier alternatives, earning/death/carry/repeatability and care-pool eligibility.
-- Weight units are exact non-negative safe integers, normalized over an explicit non-recursive eligible pool, and non-increasing with higher kill cost unless the receipt documents an exception.
+- The decision receipt freezes every retained/new/retired/care-only ID, exact kill cost, tier alternatives, earning/death/carry/repeatability and complete nonrecursive care-pool weights.
+- Every shippable definition except the care package itself has a positive exact safe-integer weight and appears exactly once in the normalized reward pool; the care package has weight zero so a roll cannot recurse. Weights are non-increasing with higher kill cost unless the receipt documents an exception.
 - Nuke weight units / total eligible weight units equals exactly `1 / 100` when DEC-03 is frozen; its existing host-owned effect remains verifier-green under R512.
 - Every non-null support definition reference resolves to a strict per-kind definition. The registry freezes targetability/health/hitbox, gun identity, magazine/reserve/reload, lifetime/fuel, navigation/targeting/sensor policy, presentation/audio and entity cap before implementation.
 - Selection freezes at match start and never accepts remote free text.
@@ -575,6 +575,8 @@ Lossy bounded snapshots:
 - Current target and animation phase where repairable.
 
 No reliable per-frame pose stream.
+
+The Drone Swarm targeting policy admits only opposing living `player` and `bot` actors under current match/life/team identity; allies, dead/stale lives, support entities and scenery are ineligible. Its fixed-start/cover-route/armour-health/seed/sample profile freezes an approximately-five-second exposure/escape survival percentile, so target selection and damage pressure cannot drift behind a generic targeting-policy ID.
 
 ## 10. Care package
 
@@ -833,6 +835,7 @@ type EvidenceClass = 'unit' | 'property' | 'browser' | 'visual' | 'hardware' | '
 type AcceptanceEvidence = Readonly<{
   requirementId: string;
   falsifierId: string;
+  phase: 'pre-hitl' | 'post-release';
   evidenceClass: EvidenceClass;
   manifestKind: AcceptanceManifestEvidenceKind;
   sourceSha: string;
@@ -881,8 +884,10 @@ Executable acceptance translation is fixed:
 
 1. Parse requirement rows from `PASS65_REQUIREMENTS_MATRIX.md` in file/table order. For zero-based row `i`, emit manifest ID `R${i + 1}` while copying the stable planning ID (for example `R001` or `R610`) into `planningRequirementId` and the summary prefix. Exactly 99 rows must map to `R1..R99` with no gaps, duplicates or order drift.
 2. A Pass 65 wrapper verifier checks that mapping before the generic `acceptance-gate.mjs` runs; the generic gate remains authoritative for schema v1 and release policy.
-3. Only policy kinds `unit`, `contract`, `browser`, `trace`, `visual`, and `manual` enter the manifest. Internal property evidence maps to `unit`; receipt/provenance checks map to `contract`; served multiplayer/network evidence maps to `browser`; local deterministic network traces map to `trace`; hardware receipts map through a local `contract` verifier plus `visual` artifacts; owner observations map to `manual`. Local kinds name an existing repository path and exact command.
-4. Exact runtime/release-shell source `S0` produces `pr-preview-<pr>-<S0>`. Q10 then creates manifest-only descendant `S0M` with schema-required `status="accepted"`, all `R1..R99` evidence complete, S0 preview identity, and no `humanAcceptance`. The generic gate must report exactly one error: missing Dave approval.
+3. Only `phase='pre-hitl'` evidence enters the manifest, using policy kinds `unit`, `contract`, `browser`, `trace`, `visual`, and `manual`. Internal property evidence maps to `unit`; receipt/provenance checks map to `contract`; served multiplayer/network evidence maps to `browser`; local deterministic network traces map to `trace`; hardware receipts map through a local `contract` verifier plus `visual` artifacts; independent QA observations map to `manual`. Local kinds name an existing repository path and exact command. `post-release` evidence is reserved for R04 and cannot be cited as if it existed at S0M.
+4. Exact runtime/release-shell source `S0` produces `pr-preview-<pr>-<S0>`. Q10 then creates manifest-only descendant `S0M` with schema-required `status="accepted"`, all `R1..R99` pre-HITL evidence complete, S0 preview identity, and no `humanAcceptance`. Phase-tagged post-release R04 evidence is not claimed early. The generic gate must report exactly one error: missing Dave approval.
 5. After Dave approves exact S0, S1 changes only the timestamped `humanAcceptance` object. S0/S0M/S1 runtime and release-shell tree digests must be identical.
 
 Evidence is valid only when its immutable digest and verifier/environment identity actively exercise the stated falsifier. S0 hardware/visual evidence remains valid through S0M/S1/S2 only when ancestry plus runtime/release-shell tree parity is proven in the lineage receipt. A rebuilt production bundle must record controlled build-ID/timestamp differences unless the exact stored preview artifact is promoted byte-for-byte. “Implemented” is never automatically “verified.”
+
+Per-requirement S0M evidence cannot depend on Dave's later H02 disposition. Deterministic mechanical results, served-browser artifacts, visual/audio captures and independent QA review establish row-level verification first; the single global R006/H02 `humanAcceptance` object then records Dave's owner/taste decision without rewriting those rows.

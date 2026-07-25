@@ -92,6 +92,7 @@ That estimate is not a reason to weaken the pass. It is a reason to structure it
 - Drone Swarm replaces Nuke in the selectable top-tier slot, while Nuke remains a care-package-only 1% jackpot. This reconciles both statements in the request.
 - A piloted-drone user’s body remains stationary and vulnerable; body death, drone death, fuel expiry, or ammo exhaustion exits possession cleanly.
 - Care packages are single-consume, host-authored objects. Recommended rule: enemies may steal them, with a shorter owner capture time.
+- “Any random killstreak” means every shippable non-care-package streak appears exactly once in the weighted reward catalog; only the care package itself is excluded to prevent recursive rewards, and Nuke remains exactly 1%.
 - Public default graphics mode is capability-aware High; the verified RTX 5080 profile selects High by default with Max available. Do not force Max or unsafe settings on weaker public devices.
 - Use original in-game names and original or clearly licensed art/audio. Familiar real-world labels are archetype references, not permission to copy franchise assets, sounds, code, UI, or branding.
 - The eventual approved release names are fixed by Dave: Pass 65 Live is `The Big One`; frozen Pass 64 Stable is `WebGPU Migration`.
@@ -159,7 +160,8 @@ The current acceptance system requires exact-preview approval for runtime/releas
 - Assemble all Pass 65 runtime work in one draft integration PR through reviewed specialist commits.
 - Maintain exactly one `acceptance/pass-65.json` for the candidate.
 - Preserve stable planning IDs `R###` in the matrix, but generate the executable manifest's schema-required sequential IDs `R1..R99` from exact matrix table order. A Pass 65 mapping verifier must prove the one-to-one order and preserve each planning ID in `planningRequirementId` plus the summary prefix.
-- Freeze runtime/release-shell source as `S0`, obtain `pr-preview-<pr>-<S0>`, then add one manifest-only descendant `S0M`. Schema v1 requires `status="accepted"`; S0M uses that literal value, completes every other schema/evidence field, and deliberately omits only `humanAcceptance`, so the generic gate has exactly one expected error until Dave acts.
+- Freeze runtime/release-shell source as `S0`, obtain `pr-preview-<pr>-<S0>`, then add one manifest-only descendant `S0M`. Schema v1 requires `status="accepted"`; S0M uses that literal value, completes every other schema field and every required pre-HITL evidence field, and deliberately omits only `humanAcceptance`, so the generic gate has exactly one expected error until Dave acts. Phase-tagged post-release R04 evidence is never fabricated into S0M.
+- Per-requirement S0M evidence must be mechanical, visual, or independently reviewed and complete before Dave acts. Dave's later owner/taste disposition is represented once by global R006/H02 and `humanAcceptance`, never smuggled into a row that S0M claims already verified.
 - Do not merge that runtime PR before exact-SHA HITL.
 
 ### G5 — Authority and presentation separation
@@ -590,7 +592,7 @@ Exit: multi-shed stress, network chaos, late join, rematch, and repeated arena s
 - Run High/Max RTX 5080 all-arena captures and stress scenarios.
 - Run accessibility, storage migration, resource-disposal, security, and provenance audits.
 - Add and validate the complete release-shell candidate: Pass 65 Live is named exactly `The Big One`; frozen Pass 64 Stable is named exactly `WebGPU Migration`; retain the Pass 62 oracle policy, chooser/changelog/project-map identity, aliases and workflow labels. These exact release-shell trees belong to the preview.
-- After PV01 freezes source S0 and its immutable preview, create manifest-only descendant S0M. Its `acceptance/pass-65.json` uses table-order `R1..R99`, preserves stable planning IDs, policy-allowed evidence kinds, schema-required `status="accepted"`, complete S0-bound evidence and preview fields, and deliberately omits only `humanAcceptance`.
+- After PV01 freezes source S0 and its immutable preview, create manifest-only descendant S0M. Its `acceptance/pass-65.json` uses table-order `R1..R99`, preserves stable planning IDs, policy-allowed evidence kinds, schema-required `status="accepted"`, complete S0-bound pre-HITL evidence and preview fields, and deliberately omits only `humanAcceptance`; post-release R04 fields remain separately phase-tagged future verification.
 
 Exit at manifest head `S0M`: S0 runtime/release-shell trees are unchanged; all four mechanical hosted checks and every Pass 65 functional/evidence verifier are green without threshold weakening; `requirements-acceptance` has exactly one error, missing Dave's `humanAcceptance`. Hosted CI validates the schema/digest of the separately captured RTX 5080 receipt; it does not claim to be that hardware run.
 
@@ -928,7 +930,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 ### 11.1 Five-slot selection
 
 - Main menu exposes exactly five legal slots under one frozen roster/cost/alternative/duplication table.
-- Catalog controls exact kill cost, tier alternatives, selectable/care-only/retired status, earning/death/carry/repeatability and care-pool eligibility.
+- Catalog controls exact kill cost, tier alternatives, selectable/care-only/retired status, earning/death/carry/repeatability and complete nonrecursive care-pool weights.
 - Selection persists locally and freezes at match start.
 - Keys 3–7 activate the selected slots.
 - Earning, death, repeatability, carry, and consumption rules are explicit.
@@ -947,7 +949,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 - Parachute crate descends, collides, lands, and expires inside a frozen measurable trajectory/time envelope.
 - `F` loot validates actor/life, range, LOS, crate revision, and exclusive capture.
 - Host deterministic non-negative integer-unit weighted table stores the roll and reward privately until reveal policy allows.
-- Nuke probability exactly 1%; every remaining eligible weight is explicit, normalized and non-increasing with kill cost unless a reviewed exception says otherwise. Care-package self-roll and selected-five independence are explicit.
+- Nuke probability is exactly 1%; every other shippable non-care-package streak has a positive explicit normalized weight, and only the care package itself is excluded to prevent recursion. Odds are non-increasing with kill cost unless a reviewed exception says otherwise; selected-five independence is explicit.
 - The existing Nuke stays verifier-green, host-owned and exactly once if retained care-only.
 - Single consume under retries/reconnect; enemy-steal/owner-advantage rule frozen.
 
@@ -973,7 +975,8 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 - Up to 60 seconds lifetime.
 - 20-round magazines with reload loops; unlimited reloads within lifetime.
 - Indoor/outdoor flight navigation, portals, ceilings, no-fly zones, collision avoidance, LOS and cover loss.
-- Target acquisition and exposed damage use the same frozen start/cover/seed/survival calibration discipline as the chopper.
+- Targeting includes eligible opposing living human players and bots, rejects allies/dead lives, and uses stable life/team identity.
+- Exposed damage freezes start geometry, armour/health, cover route, seeds/sample count and a survival/pressure percentile so breaking exposure after approximately five seconds usually permits survival, matching the requested pressure intent.
 - Hard entity/audio/light/network caps and clean teardown.
 
 ### 11.7 Piloted Drone
