@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ATOMIC_SIGNAL_FRAGMENT, atomicSignalBypassReason, atomicSignalConfig, atomicSignalEffectsTextureSamples, atomicSignalTextureSamples, isSoftwareWebGLRenderer } from './atomic-signal';
+import { ATOMIC_SIGNAL_FRAGMENT, atomicSignalBypassReason, atomicSignalConfig, atomicSignalEffectsTextureSamples, atomicSignalPrincipalHdrSamples, atomicSignalTextureSamples, isSoftwareWebGLRenderer } from './atomic-signal';
 import { graphicsEffectsBudget } from './graphics-refinement';
 
 describe('Atomic Signal profile contract', () => {
@@ -18,6 +18,13 @@ describe('Atomic Signal profile contract', () => {
     expect(blender.enabled).toBe(true);
     expect(blender.sharpen).toBeGreaterThan(0);
     expect(atomicSignalTextureSamples(blender)).toBe(5);
+  });
+
+  it('multisamples the principal HDR scene target independently of canvas and bloom targets', () => {
+    expect(atomicSignalPrincipalHdrSamples('blender', 8)).toBe(4);
+    expect(atomicSignalPrincipalHdrSamples('performance', 8)).toBe(2);
+    expect(atomicSignalPrincipalHdrSamples('blender', 2)).toBe(2);
+    expect(atomicSignalPrincipalHdrSamples('compat', 8)).toBe(0);
   });
 
   it('bypasses software renderers by default while preserving explicit QA overrides', () => {
