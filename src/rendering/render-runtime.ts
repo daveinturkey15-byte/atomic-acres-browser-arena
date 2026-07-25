@@ -26,6 +26,23 @@ export type RenderRuntimeTelemetry = Readonly<{
   deviceLost: boolean;
 }>;
 
+export type RenderInfoSnapshot = Readonly<{
+  calls: number;
+  triangles: number;
+  points: number;
+  lines: number;
+}>;
+
+export type ShadowRuntimeState = Readonly<{
+  enabled: boolean;
+  autoUpdate: boolean;
+  needsUpdate: boolean;
+}>;
+
+export type PresentationPrewarmRuntime = Readonly<{
+  compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void>;
+}>;
+
 export function resolveRenderRuntimeRequest(search: string): RenderRuntimeRequest {
   const query = new URLSearchParams(search);
   const requestedBackend = query.get('renderer') === 'webgl2' ? 'webgl2' : 'webgpu';
@@ -76,6 +93,96 @@ export class LegacyWebGlRenderRuntime {
       renderPipelineApi: 'legacy-direct',
       deviceLost: gl.isContextLost(),
     };
+  }
+
+  configureOutput(exposure: number): void {
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = exposure;
+  }
+
+  setExposure(exposure: number): void {
+    this.renderer.toneMappingExposure = exposure;
+  }
+
+  configureShadows(options: Readonly<{
+    enabled: boolean;
+    type?: THREE.ShadowMapType;
+    autoUpdate?: boolean;
+    needsUpdate?: boolean;
+  }>): void {
+    this.renderer.shadowMap.enabled = options.enabled;
+    if (options.type !== undefined) this.renderer.shadowMap.type = options.type;
+    if (options.autoUpdate !== undefined) this.renderer.shadowMap.autoUpdate = options.autoUpdate;
+    if (options.needsUpdate !== undefined) this.renderer.shadowMap.needsUpdate = options.needsUpdate;
+  }
+
+  setShadowsEnabled(enabled: boolean): void {
+    this.renderer.shadowMap.enabled = enabled;
+  }
+
+  shadowsEnabled(): boolean {
+    return this.renderer.shadowMap.enabled;
+  }
+
+  requestShadowUpdate(needsUpdate = true): void {
+    this.renderer.shadowMap.needsUpdate = needsUpdate;
+  }
+
+  shadowState(): ShadowRuntimeState {
+    return {
+      enabled: this.renderer.shadowMap.enabled,
+      autoUpdate: this.renderer.shadowMap.autoUpdate,
+      needsUpdate: this.renderer.shadowMap.needsUpdate,
+    };
+  }
+
+  setPixelRatio(pixelRatio: number): void {
+    this.renderer.setPixelRatio(pixelRatio);
+  }
+
+  pixelRatio(): number {
+    return this.renderer.getPixelRatio();
+  }
+
+  setSize(width: number, height: number, updateStyle = false): void {
+    this.renderer.setSize(width, height, updateStyle);
+  }
+
+  drawingBufferSize(target = new THREE.Vector2()): THREE.Vector2 {
+    return this.renderer.getDrawingBufferSize(target);
+  }
+
+  maximumAnisotropy(): number {
+    return this.renderer.capabilities.getMaxAnisotropy();
+  }
+
+  async compile(root: THREE.Object3D, camera: THREE.Camera, scene?: THREE.Scene): Promise<void> {
+    await this.renderer.compileAsync(root, camera, scene);
+  }
+
+  async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
+    await this.compile(root, camera, scene);
+    this.renderer.render(scene, camera);
+  }
+
+  compileAndRenderImmediate(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
+    void this.renderer.compileAsync(root, camera, scene);
+    this.renderer.render(scene, camera);
+  }
+
+  resetRenderInfo(): void {
+    this.renderer.info.reset();
+  }
+
+  renderInfo(): RenderInfoSnapshot {
+    const { calls, triangles, points, lines } = this.renderer.info.render;
+    return { calls, triangles, points, lines };
+  }
+
+  webGlVersion(): string {
+    const gl = this.renderer.getContext();
+    return String(gl.getParameter(gl.VERSION));
   }
 
   dispose(): void {
@@ -238,6 +345,104 @@ export class WebGpuRenderRuntime {
   setRenderTargetTelemetry(principalHdrSamples: number, bloomSamples: number): void {
     this.principalHdrSamples = principalHdrSamples;
     this.bloomSamples = bloomSamples;
+  }
+
+  configureOutput(exposure: number): void {
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = exposure;
+  }
+
+  setExposure(exposure: number): void {
+    this.renderer.toneMappingExposure = exposure;
+  }
+
+  configureShadows(options: Readonly<{
+    enabled: boolean;
+    type?: THREE.ShadowMapType;
+    autoUpdate?: boolean;
+    needsUpdate?: boolean;
+  }>): void {
+    this.renderer.shadowMap.enabled = options.enabled;
+    if (options.type !== undefined) this.renderer.shadowMap.type = options.type;
+  }
+
+  setShadowsEnabled(enabled: boolean): void {
+    this.renderer.shadowMap.enabled = enabled;
+  }
+
+  shadowsEnabled(): boolean {
+    return this.renderer.shadowMap.enabled;
+  }
+
+  requestShadowUpdate(): void {
+    // Three's common WebGPU renderer updates shadow maps through the active
+    // RenderPipeline. There is no WebGL `needsUpdate` flag to mutate here.
+  }
+
+  shadowState(): ShadowRuntimeState {
+    return { enabled: this.renderer.shadowMap.enabled, autoUpdate: true, needsUpdate: false };
+  }
+
+  setPixelRatio(pixelRatio: number): void {
+    this.renderer.setPixelRatio(pixelRatio);
+  }
+
+  pixelRatio(): number {
+    return this.renderer.getPixelRatio();
+  }
+
+  setSize(width: number, height: number, updateStyle = false): void {
+    this.renderer.setSize(width, height, updateStyle);
+  }
+
+  drawingBufferSize(target = new THREE.Vector2()): THREE.Vector2 {
+    return this.renderer.getDrawingBufferSize(target);
+  }
+
+  maximumAnisotropy(): number {
+    return this.renderer.getMaxAnisotropy();
+  }
+
+  async compile(root: THREE.Object3D, camera: THREE.Camera, scene?: THREE.Scene): Promise<void> {
+    await this.renderer.compileAsync(root, camera, scene);
+  }
+
+  async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
+    await this.compile(root, camera, scene);
+    this.renderPipeline.render();
+    await this.waitForSubmittedWork();
+  }
+
+  compileAndRenderImmediate(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
+    void this.renderer.compileAsync(root, camera, scene);
+    this.renderPipeline.render();
+  }
+
+  submitFrame(): void {
+    this.renderer.info.reset();
+    this.renderPipeline.render();
+  }
+
+  resetRenderInfo(): void {
+    this.renderer.info.reset();
+  }
+
+  renderInfo(): RenderInfoSnapshot {
+    const { calls, triangles, points, lines } = this.renderer.info.render;
+    return { calls, triangles, points, lines };
+  }
+
+  webGlVersion(): null {
+    return null;
+  }
+
+  async readRenderTargetPixels(
+    target: THREE.RenderTarget,
+    width: number,
+    height: number,
+  ): Promise<ArrayBufferView> {
+    return this.renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
   }
 
   async waitForSubmittedWork(): Promise<void> {

@@ -123,6 +123,19 @@ describe('Pass 64 arena visual streaming transaction', () => {
     expect(atomic.parent).toBeNull();
   });
 
+  it('binds late quality-asset requests to the selected gameplay definition receipt', async () => {
+    const scene = new THREE.Scene();
+    const atomic = new THREE.Group();
+    const selected = fakeDefinition('atomic-acres');
+    const stream = new ArenaVisualStreamController(scene, fakeRegistry({ 'atomic-acres': selected }));
+    const receipt = await stream.adoptGameplayRoot('atomic-acres', atomic);
+    stream.recordSelectedAssetRequest('atomic-acres', './selected.glb');
+    stream.recordSelectedAssetRequest('atomic-acres', './selected.glb');
+    expect(receipt.requestedResources).toEqual(['./selected.glb']);
+    expect(() => stream.recordSelectedAssetRequest('atomic-acres', './wrong.glb')).toThrow(/undeclared or unselected/);
+    expect(() => stream.recordSelectedAssetRequest('skyline-terminal', './selected.glb')).toThrow(/no active matching/);
+  });
+
   it('keeps exactly one presentation root and idempotently disposes the previous arena', async () => {
     const scene = new THREE.Scene();
     const stream = new ArenaVisualStreamController(scene, fakeRegistry());

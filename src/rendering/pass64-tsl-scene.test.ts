@@ -56,6 +56,18 @@ describe('Pass 64 authored TSL pipeline set', () => {
     systems.applyDefinition(definition);
     expect(water.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(true);
+    const reviewCamera = { ...definition.reviewCameras[0], fixedTimeMs: 63_321, seed: 9_117 };
+    systems.setReviewCamera(reviewCamera);
+    systems.update(999_999);
+    expect(systems.root.userData).toMatchObject({
+      tslReviewCameraId: reviewCamera.id,
+      tslReviewTimeMs: reviewCamera.fixedTimeMs,
+      tslReviewSeed: reviewCamera.seed,
+    });
+    systems.clearReviewCamera();
+    systems.update(12_345);
+    expect(systems.root.userData.tslReviewTimeMs).toBe(12_345);
+    expect(systems.root.userData.tslReviewCameraId).toBeUndefined();
     systems.dispose();
   });
 

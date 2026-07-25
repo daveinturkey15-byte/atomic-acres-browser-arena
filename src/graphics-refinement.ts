@@ -145,14 +145,14 @@ export class GraphicsRefinementSystem {
   private budget: GraphicsEffectsBudget;
 
   constructor(
-    renderer: THREE.WebGLRenderer,
+    renderer: THREE.WebGLRenderer | null,
     private readonly scene: THREE.Scene,
     private readonly profile: RenderProfile,
     softwareRenderer: boolean,
     initialPixelRatioCap: number,
   ) {
     this.budget = graphicsEffectsBudget(profile, initialPixelRatioCap);
-    if (profile === 'compat' || softwareRenderer) return;
+    if (!renderer || profile === 'compat' || softwareRenderer) return;
     try {
       const pmrem = new THREE.PMREMGenerator(renderer);
       pmrem.compileCubemapShader();

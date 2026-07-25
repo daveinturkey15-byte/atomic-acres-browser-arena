@@ -101,8 +101,8 @@ import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt, type ArenaArtResult } from './environment-assets';
-import { blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
-import { loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
+import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
+import { RUSTWORKS_BLENDER_ASSET, loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
   enhanceRustworksQualityMaterials,
@@ -631,33 +631,28 @@ const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
       powerPreference: 'high-performance',
     });
 if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
-// Three's WebGLRenderer and r185 common Renderer intentionally share the
-// gameplay-facing scene/camera/size/compile/render surface. WebGL-only access
-// is kept behind the runtime branch below.
-const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer;
+const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
 function submitWebGpuFrame(): void {
-  if (renderRuntime.backend === 'webgpu') renderRuntime.renderPipeline.render();
+  if (renderRuntime.backend === 'webgpu') renderRuntime.submitFrame();
 }
 async function flushWebGpuFrames(): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork();
 }
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = activeRenderConfig.shadows;
-renderer.shadowMap.type = THREE.PCFShadowMap;
-if (renderRuntime.backend === 'webgl2') {
-  renderer.shadowMap.autoUpdate = activeRenderConfig.shadowMode === 'dynamic';
-  renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
-}
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = activeLighting.exposure;
+renderRuntime.configureOutput(activeLighting.exposure);
+renderRuntime.configureShadows({
+  enabled: activeRenderConfig.shadows,
+  type: THREE.PCFShadowMap,
+  autoUpdate: activeRenderConfig.shadowMode === 'dynamic',
+  needsUpdate: activeRenderConfig.shadowMode === 'static',
+});
 const signalQuery = new URLSearchParams(window.location.search).get('signal');
 const rendererLabel = renderRuntime.telemetry().adapterLabel;
 const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
 document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
 const atomicSignal = renderRuntime.backend === 'webgl2'
-  ? new AtomicSignalPass(renderer, renderProfile, (reason) => {
+  ? new AtomicSignalPass(renderRuntime.renderer, renderProfile, (reason) => {
       document.documentElement.classList.remove('atomic-signal-render');
       document.documentElement.dataset.atomicSignal = 'fallback';
       console.warn('[Nuke Town Atomic Signal fallback]', reason);
@@ -670,7 +665,12 @@ const skyCloudsEnabled = !reducedRenderMode || cloudsQuery === 'on';
 const raysQuery = new URLSearchParams(window.location.search).get('rays');
 const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on')) ? 0 : activeLighting.godRayStrength;
 const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
-document.documentElement.classList.toggle('atomic-signal-render', atomicSignal?.telemetry().enabled ?? false);
+// Both renderer backends own grade, dither/grain and vignette in their GPU
+// pipeline. CSS post overlays must never double-apply on the WebGPU route.
+document.documentElement.classList.toggle(
+  'atomic-signal-render',
+  renderRuntime.backend === 'webgpu' || (atomicSignal?.telemetry().enabled ?? false),
+);
 document.documentElement.dataset.atomicSignal = atomicSignal?.telemetry().enabled ? 'active' : 'tsl-hdr';
 let webglContextLost = false;
 let webglContextLosses = 0;
@@ -678,7 +678,7 @@ let webglContextRestorations = 0;
 let staticShadowDynamicRefreshes = 0;
 let lastStaticShadowRefreshAt = -Infinity;
 if (renderRuntime.backend === 'webgl2') {
-  renderer.domElement.addEventListener('webglcontextlost', (event) => {
+  renderRuntime.renderer.domElement.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
     webglContextLost = true;
     webglContextLosses += 1;
@@ -689,23 +689,21 @@ document.documentElement.dataset.webglContext = 'ready';
 // Both public profiles can reduce their internal framebuffer when sustained
 // frame time exceeds the detected display budget. Shadows disable
 // automatically below a moderate DPR threshold.
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
+renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const graphicsRefinement = new GraphicsRefinementSystem(
-  renderer,
+  legacyRenderer,
   scene,
   renderProfile,
   softwareRenderer || renderRuntime.backend === 'webgpu',
   activeRenderConfig.pixelRatioCap,
 );
-const maximumAnisotropy = renderRuntime.backend === 'webgpu'
-  ? renderRuntime.renderer.getMaxAnisotropy()
-  : renderer.capabilities.getMaxAnisotropy();
+const maximumAnisotropy = renderRuntime.maximumAnisotropy();
 
 function requestStaticShadowRefresh(value = true): void {
-  if (renderRuntime.backend === 'webgl2') renderer.shadowMap.needsUpdate = value;
+  renderRuntime.requestShadowUpdate(value);
 }
 let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
@@ -768,20 +766,20 @@ const adaptiveQuality = new AdaptiveQualityController({
   targetFrameMs: detectedDisplayFrameMs,
   initialPixelRatioCap: activeRenderConfig.pixelRatioCap,
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
+renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
 let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
   const effectsBudget = graphicsEffectsBudget(renderProfile, pixelRatioCap);
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
   applyPresentationEffectsBudget?.(effectsBudget);
   const shadowsEnabled = adaptiveShadowsEnabled(renderProfile, activeRenderConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
-  if (renderer.shadowMap.enabled !== shadowsEnabled) {
-    renderer.shadowMap.enabled = shadowsEnabled;
-    if (renderRuntime.backend === 'webgl2') renderer.shadowMap.needsUpdate = shadowsEnabled;
+  if (renderRuntime.shadowsEnabled() !== shadowsEnabled) {
+    renderRuntime.setShadowsEnabled(shadowsEnabled);
+    renderRuntime.requestShadowUpdate(shadowsEnabled);
   }
   document.documentElement.dataset.adaptiveShadows = shadowsEnabled ? 'on' : 'off';
 }
@@ -1038,6 +1036,11 @@ const arenaVisualStream = new ArenaVisualStreamController(scene);
 let arenaVisualReceipt: ArenaVisualSwitchReceipt = await arenaVisualStream.adoptGameplayRoot(selectedArena.id, arena.root);
 let pass64TslSystems: Pass64TslSceneSystems | null = null;
 let appliedTslArenaDefinitions = 0;
+let activeArenaReviewCameraId: string | null = null;
+let activeArenaReviewFixedTimeMs: number | null = null;
+let activeArenaReviewSeed: number | null = null;
+let activeArenaReviewExposure: number | null = null;
+let activeArenaReviewHud: 'hidden' | 'visible' | null = null;
 const arenaContrastLighting = new ArenaContrastLighting(scene, renderProfile, softwareRenderer);
 let appliedArenaVisualPolicy: Readonly<{
   definitionId: ArenaId;
@@ -1053,7 +1056,7 @@ let appliedArenaVisualPolicy: Readonly<{
 
 function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): void {
   activeLighting = rustworksLightingTint(arenaLightingProfile(renderProfile, definition.id), renderProfile, definition.id);
-  renderer.toneMappingExposure = definition.colorPipeline.exposure;
+  renderRuntime.setExposure(definition.colorPipeline.exposure);
   if (scene.fog instanceof THREE.Fog) {
     scene.fog.color.setHex(definition.fog.color);
     scene.fog.near = definition.fog.near;
@@ -1068,7 +1071,7 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
     activeRenderConfig.shadows && definition.shadows.enabled,
     adaptiveQuality.telemetry().pixelRatioCap,
   );
-  renderer.shadowMap.enabled = definitionShadowsEnabled;
+  renderRuntime.setShadowsEnabled(definitionShadowsEnabled);
   sunLight.castShadow = definitionShadowsEnabled && definition.lighting.sunIntensity > 0;
   sunLight.shadow.mapSize.set(definition.shadows.mapSize, definition.shadows.mapSize);
   sunLight.shadow.normalBias = definition.shadows.normalBias;
@@ -1093,7 +1096,7 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
     budgets: definition.budgets,
     reviewCameraIds: Object.freeze(definition.reviewCameras.map((entry) => entry.id)),
   });
-  if (renderer.shadowMap.enabled) requestStaticShadowRefresh();
+  if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
 async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group): Promise<void> {
@@ -1113,6 +1116,11 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     const traversal = auditRuntimeTslTraversal(scene, pass64TslSystems.compiledPipelineIds);
     assertRuntimeTslTraversal(traversal);
   }
+  activeArenaReviewCameraId = null;
+  activeArenaReviewFixedTimeMs = null;
+  activeArenaReviewSeed = null;
+  activeArenaReviewExposure = null;
+  activeArenaReviewHud = null;
 }
 await configurePlayableArenaVisuals(selectedArena.id, arena.root);
 
@@ -1210,8 +1218,7 @@ async function prewarmOverdrivePresentation(): Promise<void> {
     // Traverse only the hidden pickup while the target scene supplies its real
     // lighting/environment variants. Compiling the entire arena here repeats
     // Quality-scene work and can starve menu readiness under SwiftShader.
-    await renderer.compileAsync(overdriveRoot, camera, scene);
-    renderer.render(scene, camera);
+    await renderRuntime.compileAndRender(overdriveRoot, camera, scene);
     overdrivePresentationPrewarmed = true;
   } finally {
     overdriveRoot.visible = false;
@@ -1241,11 +1248,11 @@ const grassSystem = renderRuntime.backend === 'webgl2'
   : null;
 grassSystem?.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
 if (renderRuntime.backend === 'webgl2') {
-  renderer.domElement.addEventListener('webglcontextrestored', () => {
+  renderRuntime.renderer.domElement.addEventListener('webglcontextrestored', () => {
     webglContextLost = false;
     webglContextRestorations += 1;
     document.documentElement.dataset.webglContext = 'ready';
-    renderer.shadowMap.needsUpdate = activeRenderConfig.shadows;
+    renderRuntime.requestShadowUpdate(activeRenderConfig.shadows);
     atomicSignal?.invalidateValidation();
     atmosphereSystem?.handleContextRestored();
     grassSystem?.handleContextRestored();
@@ -1277,8 +1284,7 @@ async function prewarmNukePresentation(): Promise<void> {
   nukeShockwave.visible = true;
   nukeShockwave.scale.setScalar(0.0001);
   try {
-    await renderer.compileAsync(nukeShockwave, camera, scene);
-    renderer.render(scene, camera);
+    await renderRuntime.compileAndRender(nukeShockwave, camera, scene);
     nukePresentationPrewarmed = true;
   } finally {
     nukeShockwave.visible = false;
@@ -1343,7 +1349,7 @@ async function ensureAtomicAuthoredPresentation(): Promise<THREE.Group | null> {
     qualityAssetStreaming.atomicAcres = 'ready';
     bindAtomicPresentationRaycasts(art.root, authority);
     graphicsRefinement.refine(art.root, maximumAnisotropy);
-    await renderer.compileAsync(scene, camera);
+    await renderRuntime.compile(scene, camera);
     return art.root;
   });
   return atomicAuthoredLoadPromise;
@@ -1358,6 +1364,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
   qualityAssetStreaming.atomicAcres = 'loading';
   atomicQualityLoadPromise = (async () => {
     try {
+      arenaVisualStream.recordSelectedAssetRequest('atomic-acres', BLENDER_ARENA_ASSET);
       const art = await loadBlenderArena(scene, authority, (loaded, total) => {
         const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
         setStatus(`Streaming Nuke Town Quality art ${percent}%â€¦`);
@@ -1367,7 +1374,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       qualityAssetStreaming.atomicAcres = 'ready';
       bindAtomicPresentationRaycasts(art.root, authority);
       graphicsRefinement.refine(art.root, maximumAnisotropy);
-      await renderer.compileAsync(scene, camera);
+      await renderRuntime.compile(scene, camera);
       return art.root;
     } catch (error) {
       markBlenderArenaFallback(error);
@@ -1380,7 +1387,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       qualityAssetStreaming.atomicAcres = 'fallback';
       bindAtomicPresentationRaycasts(fallback.root, authority);
       graphicsRefinement.refine(fallback.root, maximumAnisotropy);
-      await renderer.compileAsync(scene, camera);
+      await renderRuntime.compile(scene, camera);
       return fallback.root;
     }
   })();
@@ -1394,12 +1401,13 @@ async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null>
   if (existingRoot instanceof THREE.Group) return existingRoot;
   if (rustworksQualityLoadPromise) return rustworksQualityLoadPromise;
   qualityAssetStreaming.rustworks = 'loading';
+  arenaVisualStream.recordSelectedAssetRequest('rustworks-1v1', RUSTWORKS_BLENDER_ASSET);
   rustworksQualityLoadPromise = loadRustworksBlenderTower(authority.root).then(async (root) => {
     setRustworksProceduralPresentationVisible(authority.root, true);
     setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
     qualityAssetStreaming.rustworks = 'ready';
     graphicsRefinement.refine(root, maximumAnisotropy);
-    await renderer.compileAsync(scene, camera);
+    await renderRuntime.compile(scene, camera);
     return root;
   }).catch((error) => {
     markRustworksBlenderFallback(error);
@@ -6208,8 +6216,7 @@ function prewarmDormantBotPresentations(): void {
     bot.root.scale.setScalar(0.0001);
   }
   try {
-    void renderer.compileAsync(scene, camera);
-    renderer.render(scene, camera);
+    renderRuntime.compileAndRenderImmediate(scene, camera, scene);
     dormantBotsPrewarmed = true;
   } finally {
     for (const bot of dormantBots.values()) {
@@ -9338,7 +9345,7 @@ function escapeHtml(value: string): string {
 function resize(): void {
   const width = window.innerWidth;
   const height = window.innerHeight;
-  renderer.setSize(width, height, false);
+  renderRuntime.setSize(width, height, false);
   atomicSignal?.resize();
   camera.aspect = width / Math.max(1, height);
   camera.updateProjectionMatrix();
@@ -9675,8 +9682,8 @@ function applyArenaLightingForSelection(): void {
   );
   const lighting = activeLighting;
   const definition = activeArenaVisualDefinition?.id === selectedArena.id ? activeArenaVisualDefinition : null;
-  renderer.toneMappingExposure = definition?.colorPipeline.exposure ?? lighting.exposure;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderRuntime.setExposure(definition?.colorPipeline.exposure ?? lighting.exposure);
+  renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: THREE.PCFShadowMap });
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(definition?.fog.color ?? lighting.fogColor);
   if (skyMaterial) {
     skyMaterial.uniforms.top.value.setHex(lighting.skyTop);
@@ -9711,7 +9718,7 @@ function applyArenaLightingForSelection(): void {
       activeRenderConfig.shadows && (definition?.shadows.enabled ?? true),
       adaptiveQuality.telemetry().pixelRatioCap,
     );
-    renderer.shadowMap.enabled = shadowsEnabled;
+    renderRuntime.setShadowsEnabled(shadowsEnabled);
     sunLight.castShadow = shadowsEnabled && (definition?.lighting.sunIntensity ?? lighting.sunIntensity) > 0;
     if (definition) {
       sunLight.shadow.mapSize.set(definition.shadows.mapSize, definition.shadows.mapSize);
@@ -9722,7 +9729,7 @@ function applyArenaLightingForSelection(): void {
       arena.bounds,
       sunLight,
       lighting.sunPosition,
-      renderer.shadowMap.enabled ? (definition?.shadows.mapSize ?? activeRenderConfig.shadowMapSize) : 0,
+      renderRuntime.shadowsEnabled() ? (definition?.shadows.mapSize ?? activeRenderConfig.shadowMapSize) : 0,
     );
     if (definition) {
       sunLight.shadow.camera.far = Math.min(sunLight.shadow.camera.far, definition.shadows.maximumDistance);
@@ -9735,7 +9742,7 @@ function applyArenaLightingForSelection(): void {
     fillLight.position.set(...lighting.fillPosition);
   }
   if (definition) arenaContrastLighting.applyDefinition(definition);
-  if (renderer.shadowMap.enabled) requestStaticShadowRefresh();
+  if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
 function setArenaMenuCamera(): void {
@@ -10079,7 +10086,7 @@ function refreshStaticShadowsForDynamicCasters(now: number): void {
     || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0 || hunterDrones.length > 0;
   const admittedAt = admitStaticShadowDynamicRefresh({
     shadowMode: activeRenderConfig.shadowMode,
-    shadowsEnabled: renderer.shadowMap.enabled,
+    shadowsEnabled: renderRuntime.shadowsEnabled(),
     contextLost: webglContextLost,
     hasDynamicCasters,
     now,
@@ -10159,6 +10166,8 @@ function frame(now: number, scheduleNext = true): void {
     waterSystem.update(now / 1_000);
     if (gameStarted) updateMinimap(now);
     updateHud(now);
+    pass64TslSystems?.update(now);
+    if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';
     if (debugCaptureCameraActive) {
       camera.position.copy(debugCaptureCameraPosition);
       camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
@@ -10167,7 +10176,7 @@ function frame(now: number, scheduleNext = true): void {
     refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !webglContextLost && document.visibilityState === 'visible') {
       if (renderRuntime.backend === 'webgpu') {
-        renderer.info.reset();
+        renderRuntime.resetRenderInfo();
         submitWebGpuFrame();
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
@@ -10258,7 +10267,7 @@ function estimateResidentTextureBytes(): number {
 }
 
 function estimateTransientRenderBytes(): number {
-  const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const size = renderRuntime.drawingBufferSize();
   const pixels = Math.max(1, size.x) * Math.max(1, size.y);
   const samples = Math.max(1, pass64TslSystems?.principalHdrTarget.samples ?? 1);
   // RGBA16F HDR + 32-bit depth at MSAA sample count, resolved HDR output and
@@ -10285,7 +10294,7 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     await flushWebGpuFrames();
     for (let index = 0; index < 7; index += 1) {
       const started = performance.now();
-      renderer.info.reset();
+      renderRuntime.resetRenderInfo();
       submitWebGpuFrame();
       await flushWebGpuFrames();
       queueMs.push(performance.now() - started);
@@ -10335,7 +10344,7 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
   const measured = {
     drawCalls,
     triangles: Math.ceil(triangles),
-    rendererReportedCalls: renderer.info.render.calls,
+    rendererReportedCalls: renderRuntime.renderInfo().calls,
     drawCallMethod: 'visible-camera-layer-renderable-upper-bound',
     shadowLights,
     shadowMapPixels,
@@ -10406,13 +10415,22 @@ function playableSceneProof(): Record<string, unknown> {
     traversal,
     appliedTslArenaDefinitions,
     appliedArenaVisualPolicy,
+    deterministicReview: {
+      cameraId: activeArenaReviewCameraId,
+      fixedTimeMs: activeArenaReviewFixedTimeMs,
+      seed: activeArenaReviewSeed,
+      exposure: activeArenaReviewExposure,
+      hud: activeArenaReviewHud,
+      tslTimeMs: pass64TslSystems?.root.userData.tslReviewTimeMs ?? null,
+      tslSeed: pass64TslSystems?.root.userData.tslReviewSeed ?? null,
+    },
     actualArenaVisualPolicy: {
       definitionId: activeArenaVisualDefinition?.id ?? null,
       sun: { color: sunLight.color.getHex(), intensity: sunLight.intensity },
       ambient: { color: ambientLight.color.getHex(), intensity: ambientLight.intensity },
       fog: scene.fog instanceof THREE.Fog ? { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far } : null,
       shadows: {
-        enabled: renderer.shadowMap.enabled,
+        enabled: renderRuntime.shadowsEnabled(),
         sunCastShadow: sunLight.castShadow,
         mapSize: sunLight.shadow.mapSize.x,
         maximumDistance: sunLight.shadow.camera.far,
@@ -11124,21 +11142,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         visible: !hudRoot.hidden,
         anchor: 'top-right',
       },
-      pixelRatio: renderer.getPixelRatio(),
-      drawingBuffer: renderer.getDrawingBufferSize(new THREE.Vector2()).toArray(),
+      pixelRatio: renderRuntime.pixelRatio(),
+      drawingBuffer: renderRuntime.drawingBufferSize().toArray(),
       antialias: activeRuntimeTelemetry().canvasAntialias,
-      webglVersion: renderRuntime.backend === 'webgl2'
-        ? renderer.getContext().getParameter(renderer.getContext().VERSION)
-        : null,
-      calls: renderer.info.render.calls,
-      triangles: renderer.info.render.triangles,
-      points: renderer.info.render.points,
-      lines: renderer.info.render.lines,
+      webglVersion: renderRuntime.webGlVersion(),
+      calls: renderRuntime.renderInfo().calls,
+      triangles: renderRuntime.renderInfo().triangles,
+      points: renderRuntime.renderInfo().points,
+      lines: renderRuntime.renderInfo().lines,
       sceneObjects: scene.children.length,
       reducedMode: reducedRenderMode,
-      shadows: renderer.shadowMap.enabled,
-      shadowAutoUpdate: renderRuntime.backend === 'webgl2' ? renderer.shadowMap.autoUpdate : true,
-      shadowNeedsUpdate: renderRuntime.backend === 'webgl2' ? renderer.shadowMap.needsUpdate : false,
+      shadows: renderRuntime.shadowState().enabled,
+      shadowAutoUpdate: renderRuntime.shadowState().autoUpdate,
+      shadowNeedsUpdate: renderRuntime.shadowState().needsUpdate,
       staticShadowDynamicRefreshes,
       contextLifecycle: {
         lost: webglContextLost,
@@ -11572,6 +11588,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0) => {
     debugCaptureCameraActive = [x, y, z, yaw, pitch].every(Number.isFinite);
     if (!debugCaptureCameraActive) return;
+    pass64TslSystems?.clearReviewCamera();
+    activeArenaReviewCameraId = null;
+    activeArenaReviewFixedTimeMs = null;
+    activeArenaReviewSeed = null;
+    activeArenaReviewExposure = null;
+    activeArenaReviewHud = null;
+    if (activeArenaVisualDefinition) renderRuntime.setExposure(activeArenaVisualDefinition.colorPipeline.exposure);
     debugCaptureCameraPosition.set(x!, y, z);
     debugCaptureCameraYaw = yaw;
     debugCaptureCameraPitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
@@ -11586,6 +11609,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.far = reviewCamera.far;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
+    renderRuntime.setExposure(reviewCamera.exposure);
+    pass64TslSystems?.setReviewCamera(reviewCamera);
+    activeArenaReviewCameraId = reviewCamera.id;
+    activeArenaReviewFixedTimeMs = reviewCamera.fixedTimeMs;
+    activeArenaReviewSeed = reviewCamera.seed;
+    activeArenaReviewExposure = reviewCamera.exposure;
+    activeArenaReviewHud = reviewCamera.hud;
+    hudRoot.hidden = reviewCamera.hud === 'hidden';
     debugCaptureCameraPosition.copy(camera.position);
     debugCaptureCameraYaw = camera.rotation.y;
     debugCaptureCameraPitch = camera.rotation.x;
@@ -11698,7 +11729,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     debugShadowProbe.position.y = 1;
     requestStaticShadowRefresh();
     atomicSignal?.render(scene, camera);
-    const gl = renderer.getContext();
+    if (!legacyRenderer) throw new Error('WebGL shadow readback requires the explicit compatibility renderer');
+    const gl = legacyRenderer.getContext();
     const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
     gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     let hash = 0x811c9dc5;
@@ -11718,7 +11750,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const target = pass64TslSystems.principalHdrTarget;
     const width = Math.max(1, Math.min(target.width, 64));
     const height = Math.max(1, Math.min(target.height, 64));
-    const pixels = await renderRuntime.renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+    const pixels = await renderRuntime.readRenderTargetPixels(target, width, height);
     const bytes = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
     let hash = 0x811c9dc5;
     for (const byte of bytes) {
@@ -11950,6 +11982,7 @@ async function bootstrap(): Promise<void> {
     ? (async () => {
         qualityAssetStreaming.eagerQualityGlbs += 1;
         try {
+          arenaVisualStream.recordSelectedAssetRequest('atomic-acres', BLENDER_ARENA_ASSET);
           const art = await loadBlenderArena(scene, arena, (loaded, total) => {
             const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
             setStatus(`Loading Quality Graphics arena ${percent}%…`);
@@ -11970,7 +12003,9 @@ async function bootstrap(): Promise<void> {
         setStatus(`Loading authored arena models ${loaded}/${total}…`);
       }, reducedWorldDetail);
   const rustworksArtPromise = renderProfile === 'blender' && selectedArena.id === 'rustworks-1v1'
-    ? (qualityAssetStreaming.eagerQualityGlbs += 1, loadRustworksBlenderTower(arena.root)).then((root) => {
+    ? (qualityAssetStreaming.eagerQualityGlbs += 1,
+      arenaVisualStream.recordSelectedAssetRequest('rustworks-1v1', RUSTWORKS_BLENDER_ASSET),
+      loadRustworksBlenderTower(arena.root)).then((root) => {
         // The retired GLB remains hidden; procedural geometry owns visibility and collision.
         setRustworksProceduralPresentationVisible(arena.root, true);
         setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
@@ -12003,11 +12038,11 @@ async function bootstrap(): Promise<void> {
   // can no longer cut holes through hands and weapons in prone/crouch poses.
   weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
   bootstrapStage = 'prewarming-grenade-explosion';
-  await grenadeExplosionPresentation.prewarm(renderer, camera);
+  await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
   bootstrapStage = 'prewarming-support-explosion';
-  await supportExplosionPresentation.prewarm(renderer, camera);
+  await supportExplosionPresentation.prewarm(renderRuntime, camera);
   bootstrapStage = 'prewarming-death-drops';
-  await deathDropPresentationPool.prewarm(renderer, camera);
+  await deathDropPresentationPool.prewarm(renderRuntime, camera);
   bootstrapStage = 'prewarming-nuke';
   await prewarmNukePresentation();
   bootstrapStage = 'binding-world';
@@ -12022,7 +12057,7 @@ async function bootstrap(): Promise<void> {
   bootstrapStage = 'waiting-for-authored-textures';
   await waitForPendingArtTextures();
   bootstrapStage = 'compiling-scene';
-  await renderer.compileAsync(scene, camera);
+  await renderRuntime.compile(scene, camera);
   bootstrapStage = 'batching-static-meshes';
   const arenaRoot = arena.root;
   if (selectedArena.id === 'rustworks-1v1' && renderProfile === 'blender') {

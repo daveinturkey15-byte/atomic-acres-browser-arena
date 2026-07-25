@@ -55,6 +55,8 @@ export class ArenaVisualStreamController {
   private pendingAbort: AbortController | null = null;
   private active: LoadedArenaVisual | null = null;
   private activeGameplayRoot: THREE.Group | null = null;
+  private activeGameplayDefinition: ArenaVisualDefinition | null = null;
+  private activeGameplayRequests: string[] = [];
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -139,6 +141,8 @@ export class ArenaVisualStreamController {
     root.visible = true;
     if (root.parent !== this.scene) this.scene.add(root);
     this.activeGameplayRoot = root;
+    this.activeGameplayDefinition = module.definition;
+    this.activeGameplayRequests = [];
     this.pendingAbort = null;
     const activeRoots = this.scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined);
     if (activeRoots.length !== 1 || activeRoots[0] !== root) {
@@ -148,11 +152,24 @@ export class ArenaVisualStreamController {
       arenaId,
       generation,
       moduleId: module.definition.moduleId,
-      requestedResources: [],
+      // Keep the receipt array live so selected quality assets loaded after the
+      // atomic root adoption remain bound to the same generation receipt.
+      requestedResources: this.activeGameplayRequests,
       activePresentationRoots: 1,
       authority: 'gameplay-root-adopted',
       retiredPresentationInventory,
     };
+  }
+
+  recordSelectedAssetRequest(arenaId: ArenaId, url: string): void {
+    const definition = this.activeGameplayDefinition;
+    if (!definition || definition.id !== arenaId || this.activeGameplayRoot?.userData.arenaVisualDefinitionId !== arenaId) {
+      throw new Error(`${arenaId} asset request has no active matching ArenaVisualDefinition`);
+    }
+    const allowedResources = [...definition.assetDependencies, ...definition.sharedAssetDependencies];
+    const allowed = allowedResources.some((dependency) => dependency.endsWith('/') ? url.startsWith(dependency) : url === dependency);
+    if (!allowed) throw new Error(`${arenaId} requested undeclared or unselected arena resource ${url}`);
+    if (!this.activeGameplayRequests.includes(url)) this.activeGameplayRequests.push(url);
   }
 
   dispose(): void {
@@ -167,5 +184,7 @@ export class ArenaVisualStreamController {
       delete this.activeGameplayRoot.userData.arenaVisualGeneration;
     }
     this.activeGameplayRoot = null;
+    this.activeGameplayDefinition = null;
+    this.activeGameplayRequests = [];
   }
 }

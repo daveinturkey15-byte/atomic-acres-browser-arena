@@ -23,13 +23,12 @@ import {
   screenSize,
   sin,
   smoothstep,
-  time,
   uniform,
   vec2,
   vec3,
   vec4,
 } from 'three/tsl';
-import type { ArenaVisualDefinition } from './arena-visual-definition';
+import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-definition';
 import { createGrassPlacements } from '../grass-placement';
 import { TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
@@ -48,6 +47,9 @@ export type Pass64TslSceneSystems = Readonly<{
   bloomOcclusionSource: 'authoritative-scene-depth';
   compiledPipelineIds: readonly string[];
   applyDefinition(definition: ArenaVisualDefinition): void;
+  setReviewCamera(camera: ArenaReviewCamera): void;
+  clearReviewCamera(): void;
+  update(timeMs: number): void;
   dispose(): void;
 }>;
 
@@ -119,12 +121,14 @@ function makeMist(definition: ArenaVisualDefinition): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Pass 64 TSL mist';
   const material = new PointsNodeMaterial({ transparent: true, depthWrite: false, size: 0.34, sizeAttenuation: true });
-  const drift = sin(positionWorld.x.mul(0.075).add(time.mul(0.055))).mul(0.5).add(0.5);
+  const animationTime = uniform(0);
+  const drift = sin(positionWorld.x.mul(0.075).add(animationTime.mul(0.055))).mul(0.5).add(0.5);
   const mistStrength = uniform(Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09));
   material.colorNode = mix(color(0x7fa5ae), color(0xd0d9cf), drift);
   material.opacityNode = mistStrength.mul(drift.mul(0.35).add(0.65));
   tagPipeline(material, PIPELINE.mist);
   root.userData.opacityUniform = mistStrength;
+  root.userData.animationTimeUniform = animationTime;
   const positions = new Float32Array(48 * 3);
   for (let index = 0; index < 48; index += 1) {
     positions[index * 3] = seededUnit(index, 11) - 0.5;
@@ -146,12 +150,14 @@ function makeSmoke(definition: ArenaVisualDefinition): THREE.Group {
   const root = new THREE.Group();
   root.name = 'Pass 64 TSL smoke';
   const material = new PointsNodeMaterial({ transparent: true, depthWrite: false, size: 0.46, sizeAttenuation: true });
-  const billow = sin(positionWorld.y.mul(0.7).sub(time.mul(0.33))).mul(0.5).add(0.5);
+  const animationTime = uniform(0);
+  const billow = sin(positionWorld.y.mul(0.7).sub(animationTime.mul(0.33))).mul(0.5).add(0.5);
   const smokeStrength = uniform(0.035 + definition.atmosphere.mist * 0.12);
   material.colorNode = mix(color(0x2f3b3e), color(0x7d8984), billow);
   material.opacityNode = smokeStrength.mul(billow.mul(0.58).add(0.42));
   tagPipeline(material, PIPELINE.smoke);
   root.userData.opacityUniform = smokeStrength;
+  root.userData.animationTimeUniform = animationTime;
   const positions = new Float32Array(36 * 3);
   for (let index = 0; index < 36; index += 1) {
     positions[index * 3] = seededUnit(index, 21) - 0.5;
@@ -169,24 +175,26 @@ function makeSmoke(definition: ArenaVisualDefinition): THREE.Group {
   return root;
 }
 
-function seededUnit(index: number, salt: number): number {
-  const value = Math.sin((index + 1) * (12.9898 + salt * 8.233)) * 43758.5453;
+function seededUnit(index: number, salt: number, seed = 6401): number {
+  const value = Math.sin((index + 1 + seed * 0.001) * (12.9898 + salt * 8.233)) * 43758.5453;
   return value - Math.floor(value);
 }
 
 function makeDust(definition: ArenaVisualDefinition): THREE.Points {
   const layout = ATMOSPHERE_LAYOUTS[definition.id].dust;
+  const seed = definition.reviewCameras[0]?.seed ?? 6401;
   const count = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((entry) => entry.dust.count));
   const positions = new Float32Array(count * 3);
   for (let index = 0; index < count; index += 1) {
-    positions[index * 3] = layout.minX + seededUnit(index, 1) * (layout.maxX - layout.minX);
-    positions[index * 3 + 1] = 0.4 + seededUnit(index, 2) * 16;
-    positions[index * 3 + 2] = layout.minZ + seededUnit(index, 3) * (layout.maxZ - layout.minZ);
+    positions[index * 3] = layout.minX + seededUnit(index, 1, seed) * (layout.maxX - layout.minX);
+    positions[index * 3 + 1] = 0.4 + seededUnit(index, 2, seed) * 16;
+    positions[index * 3 + 2] = layout.minZ + seededUnit(index, 3, seed) * (layout.maxZ - layout.minZ);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const material = new PointsNodeMaterial({ transparent: true, depthWrite: false, size: 1 });
-  const flicker = sin(time.mul(0.7).add(positionWorld.x.mul(0.21))).mul(0.5).add(0.5);
+  const animationTime = uniform(0);
+  const flicker = sin(animationTime.mul(0.7).add(positionWorld.x.mul(0.21))).mul(0.5).add(0.5);
   const dustStrength = uniform(Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72));
   material.colorNode = mix(color(0xd7b47b), color(0xffebc7), flicker);
   material.opacityNode = dustStrength.mul(flicker.mul(0.45).add(0.55));
@@ -194,11 +202,12 @@ function makeDust(definition: ArenaVisualDefinition): THREE.Points {
   const dust = new THREE.Points(geometry, material);
   dust.name = 'Pass 64 TSL deterministic dust';
   dust.userData.opacityUniform = dustStrength;
+  dust.userData.animationTimeUniform = animationTime;
   geometry.setDrawRange(0, layout.count);
   return dust;
 }
 
-function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefinition): void {
+function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefinition, seed = definition.reviewCameras[0]?.seed ?? 6401): void {
   const layout = ATMOSPHERE_LAYOUTS[definition.id];
   const mist = root.getObjectByName('Pass 64 TSL mist');
   const mistUniform = mist?.userData.opacityUniform as { value: number } | undefined;
@@ -232,9 +241,9 @@ function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefini
     for (let index = 0; index < positions.count; index += 1) {
       positions.setXYZ(
         index,
-        layout.dust.minX + seededUnit(index, 1) * (layout.dust.maxX - layout.dust.minX),
-        0.4 + seededUnit(index, 2) * 16,
-        layout.dust.minZ + seededUnit(index, 3) * (layout.dust.maxZ - layout.dust.minZ),
+        layout.dust.minX + seededUnit(index, 1, seed) * (layout.dust.maxX - layout.dust.minX),
+        0.4 + seededUnit(index, 2, seed) * 16,
+        layout.dust.minZ + seededUnit(index, 3, seed) * (layout.dust.maxZ - layout.dust.minZ),
       );
     }
     positions.needsUpdate = true;
@@ -251,6 +260,7 @@ function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefini
   }
   root.userData.tslArenaVisualDefinitionId = definition.id;
   root.userData.tslAtmosphere = { ...definition.atmosphere };
+  root.userData.tslReviewSeed = seed;
 }
 
 function makeGrass(arenaId: ArenaVisualDefinition['id']): THREE.InstancedMesh {
@@ -258,7 +268,8 @@ function makeGrass(arenaId: ArenaVisualDefinition['id']): THREE.InstancedMesh {
   const geometry = new THREE.PlaneGeometry(1, 1, 1, 3);
   geometry.translate(0, 0.5, 0);
   const material = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: 0.92, metalness: 0 });
-  const wind = sin(time.mul(1.35).add(float(instanceIndex).mul(0.73))).mul(positionLocal.y).mul(0.045);
+  const animationTime = uniform(0);
+  const wind = sin(animationTime.mul(1.35).add(float(instanceIndex).mul(0.73))).mul(positionLocal.y).mul(0.045);
   material.positionNode = positionLocal.add(vec3(wind, 0, 0));
   material.colorNode = mix(color(0x254c2e), color(0x7f9f51), positionLocal.y);
   tagPipeline(material, PIPELINE.grass);
@@ -281,6 +292,7 @@ function makeGrass(arenaId: ArenaVisualDefinition['id']): THREE.InstancedMesh {
   grass.receiveShadow = true;
   grass.frustumCulled = false;
   grass.visible = arenaId === 'atomic-acres';
+  grass.userData.animationTimeUniform = animationTime;
   return grass;
 }
 
@@ -289,11 +301,12 @@ function makeWater(arenaId: ArenaVisualDefinition['id']): THREE.Mesh {
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, -19.5, 0);
   const material = new MeshStandardNodeMaterial({ transparent: true, opacity: 0.82, roughness: 0.27, metalness: 0.08, side: DoubleSide });
-  const wave = sin(positionLocal.x.mul(0.12).add(time.mul(0.8)))
-    .add(sin(positionLocal.z.mul(0.16).sub(time.mul(0.53))))
+  const animationTime = uniform(0);
+  const wave = sin(positionLocal.x.mul(0.12).add(animationTime.mul(0.8)))
+    .add(sin(positionLocal.z.mul(0.16).sub(animationTime.mul(0.53))))
     .mul(0.1);
   material.positionNode = positionLocal.add(vec3(0, wave, 0));
-  const shimmer = sin(positionWorld.x.add(positionWorld.z).mul(0.09).add(time.mul(0.45))).mul(0.5).add(0.5);
+  const shimmer = sin(positionWorld.x.add(positionWorld.z).mul(0.09).add(animationTime.mul(0.45))).mul(0.5).add(0.5);
   material.colorNode = mix(color(0x173e4b), color(0x4b8993), shimmer);
   tagPipeline(material, PIPELINE.water);
   const water = new THREE.Mesh(geometry, material);
@@ -302,7 +315,22 @@ function makeWater(arenaId: ArenaVisualDefinition['id']): THREE.Mesh {
   water.receiveShadow = true;
   water.renderOrder = -5;
   water.frustumCulled = false;
+  water.userData.animationTimeUniform = animationTime;
   return water;
+}
+
+function setAnimationTime(root: THREE.Group, timeMs: number): void {
+  for (const name of [
+    'Pass 64 TSL mist',
+    'Pass 64 TSL smoke',
+    'Pass 64 TSL deterministic dust',
+    'Pass 64 TSL grass',
+    'Pass 64 TSL perimeter water',
+  ]) {
+    const uniformNode = root.getObjectByName(name)?.userData.animationTimeUniform as { value?: number } | undefined;
+    if (uniformNode) uniformNode.value = timeMs / 1_000;
+  }
+  root.userData.tslReviewTimeMs = timeMs;
 }
 
 function configureHdrPipeline(
@@ -368,6 +396,8 @@ export function createPass64TslSceneSystems(
   renderPipeline: RenderPipeline,
   definition: ArenaVisualDefinition,
 ): Pass64TslSceneSystems {
+  let activeDefinition = definition;
+  let activeReviewCamera: ArenaReviewCamera | null = null;
   const root = new THREE.Group();
   root.name = 'Pass 64 WebGPU TSL presentation systems';
   root.userData.pass64TslPresentation = true;
@@ -383,6 +413,7 @@ export function createPass64TslSceneSystems(
   const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition);
   const scenePass = hdr.scenePass;
   applyArenaSystemLayout(root, definition);
+  setAnimationTime(root, 0);
   const compiledPipelineIds = Object.freeze(TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId));
   return Object.freeze({
     root,
@@ -393,8 +424,24 @@ export function createPass64TslSceneSystems(
     bloomOcclusionSource: 'authoritative-scene-depth',
     compiledPipelineIds,
     applyDefinition: (nextDefinition) => {
+      activeDefinition = nextDefinition;
+      activeReviewCamera = null;
+      delete root.userData.tslReviewCameraId;
       applyArenaSystemLayout(root, nextDefinition);
       hdr.applyDefinition(nextDefinition);
+    },
+    setReviewCamera: (reviewCamera) => {
+      activeReviewCamera = reviewCamera;
+      applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed);
+      setAnimationTime(root, reviewCamera.fixedTimeMs);
+      root.userData.tslReviewCameraId = reviewCamera.id;
+    },
+    clearReviewCamera: () => {
+      activeReviewCamera = null;
+      delete root.userData.tslReviewCameraId;
+    },
+    update: (timeMs) => {
+      setAnimationTime(root, activeReviewCamera?.fixedTimeMs ?? timeMs);
     },
     dispose: () => {
       disposeRoot(root);
