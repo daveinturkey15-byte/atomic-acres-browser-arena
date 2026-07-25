@@ -1,5 +1,6 @@
 import releaseChannelsJson from '../release-channels.json';
 import './style.css';
+import './ui/tactical-ui.css';
 import { latestChangelogEntry } from './changelog';
 import {
   releaseChannelDecision,

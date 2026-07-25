@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
+import './ui/tactical-ui.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
@@ -31,6 +32,7 @@ import { nextShotDeadline } from './combat-timing';
 import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog, releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './ui/release-history-dialog';
 import { bindProjectMapDialog, projectMapButtonMarkup, projectMapDialogMarkup } from './ui/project-map-dialog';
+import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KITS, FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
@@ -343,7 +345,7 @@ window.addEventListener('error', (event) => {
     kind: 'error', message: event.message || 'unknown error', source: event.filename,
     line: event.lineno, column: event.colno, stack: event.error?.stack,
   }, clientSessionStorage());
-  console.error('[Atomic Acres runtime error]', event.message || 'unknown error', event.error?.stack || '');
+  console.error('[Nuke Town runtime error]', event.message || 'unknown error', event.error?.stack || '');
 });
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason instanceof Error ? `${event.reason.message}\n${event.reason.stack ?? ''}` : String(event.reason);
@@ -352,7 +354,7 @@ window.addEventListener('unhandledrejection', (event) => {
     message: event.reason instanceof Error ? event.reason.message : String(event.reason),
     stack: event.reason instanceof Error ? event.reason.stack : undefined,
   }, clientSessionStorage());
-  console.error('[Atomic Acres unhandled rejection]', reason);
+  console.error('[Nuke Town unhandled rejection]', reason);
 });
 
 type RemotePlayer = {
@@ -519,30 +521,31 @@ const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
 let storedPlayerName = '';
 try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
 app.innerHTML = `
-  <canvas id="game" aria-label="Atomic Acres multiplayer arena"></canvas>
+  <canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
   <div id="color-grade"></div><div id="film-grain"></div>
   <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
   <div id="nuke-flash" hidden></div>
   <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
   <section id="menu" class="panel">
+    <div class="tactical-rail"><span>ARENA CONTROL // DEPLOYMENT</span><b>ONLINE SYSTEMS</b></div>
     <div class="eyebrow">FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · ${latestChangelogEntry().pass}</div>
-    <h1 id="arena-title">ATOMIC <span>ACRES</span></h1>
+    <h1 id="arena-title">NUKE <span>TOWN</span></h1>
     <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
-    <nav class="menu-tabs" aria-label="Deployment menu">
-      <button type="button" data-menu-tab="deploy" class="active" aria-selected="true">DEPLOY</button>
-      <button type="button" data-menu-tab="kit" aria-selected="false">FIELD KIT</button>
-      <button type="button" data-menu-tab="options" aria-selected="false">OPTIONS</button>
+    <nav class="menu-tabs" role="tablist" aria-label="Deployment menu">
+      <button id="menu-tab-deploy" type="button" role="tab" data-menu-tab="deploy" class="active" aria-controls="menu-panel-deploy" aria-selected="true" tabindex="0">DEPLOY</button>
+      <button id="menu-tab-kit" type="button" role="tab" data-menu-tab="kit" aria-controls="menu-panel-kit" aria-selected="false" tabindex="-1">FIELD KIT</button>
+      <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1">OPTIONS</button>
     </nav>
-    <div class="menu-panel active" data-menu-panel="deploy">
+    <div id="menu-panel-deploy" class="menu-panel active" role="tabpanel" aria-labelledby="menu-tab-deploy" data-menu-panel="deploy">
       <div class="setup-grid">
         <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" required aria-describedby="player-name-error" placeholder="Enter callsign" value="${storedPlayerName}"><small id="player-name-error" class="input-error" hidden>Enter a callsign before deployment.</small></label>
         <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
       </div>
-      <section class="map-selector" aria-label="Choose map">
+      <section id="map-selector" class="map-selector" aria-label="Choose map">
         <div class="map-selector-heading"><span>SELECT MAP</span><small>Choose before deployment</small></div>
         <div class="map-card-grid">
-          ${ARENA_SELECTIONS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" aria-pressed="${index === 0}" disabled>
-            <span>${entry.selectorLabel}</span><strong>${entry.summary}</strong><small>${entry.rulesLabel}</small>
+          ${ARENA_SELECTIONS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" aria-pressed="${index === 0}" disabled>
+            <i class="map-index">0${index + 1}</i><span>${entry.selectorLabel}</span><strong>${entry.summary}</strong><small>${entry.rulesLabel}</small>
           </button>`).join('')}
         </div>
       </section>
@@ -580,12 +583,12 @@ app.innerHTML = `
         <button id="menu-download-match-technical" type="button">TECHNICAL DEBUG JSON</button>
       </section>
       <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak">
-        <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">ACRES LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
+        <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">NUKE TOWN LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
         <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
         <p id="high-score-footnote">Global streak records sync across builds and devices · local cache remains available offline.</p>
       </section>
     </div>
-    <div class="menu-panel" data-menu-panel="kit" hidden>
+    <div id="menu-panel-kit" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-kit" data-menu-panel="kit" hidden>
       <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary and issued sidearm.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
       <div class="kit-grid">
         ${FIELD_KITS.map((kit) => `<button type="button" class="kit-card" data-kit-id="${kit.id}">
@@ -594,7 +597,7 @@ app.innerHTML = `
         </button>`).join('')}
       </div>
     </div>
-    <div class="menu-panel" data-menu-panel="options" hidden>
+    <div id="menu-panel-options" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-options" data-menu-panel="options" hidden>
       <div class="options-heading"><b>OPTIONS</b><span>Input and view settings apply immediately.</span></div>
       <div class="settings-grid">
         <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
@@ -644,7 +647,7 @@ app.innerHTML = `
       <section class="damage-feed done" aria-label="Damage dealt"><div id="damage-done-feed" aria-live="polite"></div></section>
       <section class="damage-feed taken" aria-label="Damage received"><div id="damage-taken-feed" aria-live="assertive"></div></section>
     </div>
-    <div id="objective">ATOMIC ACRES · FIVE MINUTES · MOST KILLS WINS</div>
+    <div id="objective">NUKE TOWN · FIVE MINUTES · MOST KILLS WINS</div>
     <canvas id="minimap" width="360" height="360" aria-label="Tactical minimap"></canvas>
     <div id="map-heading">N · 000°</div>
     <div id="location-label">CIVIC TRANSIT</div>
@@ -677,6 +680,9 @@ app.innerHTML = `
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>
   </div>
 `;
+
+assertUiSurfaceInventory(document);
+document.documentElement.dataset.uiContract = 'pass64-tactical-v1';
 
 function element<T extends HTMLElement>(selector: string): T {
   const value = document.querySelector<T>(selector);
@@ -748,7 +754,7 @@ document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'soft
 const atomicSignal = new AtomicSignalPass(renderer, renderProfile, (reason) => {
   document.documentElement.classList.remove('atomic-signal-render');
   document.documentElement.dataset.atomicSignal = 'fallback';
-  console.warn('[Atomic Acres Atomic Signal fallback]', reason);
+  console.warn('[Nuke Town Atomic Signal fallback]', reason);
 }, atomicSignalBypass);
 const grassQuery = new URLSearchParams(window.location.search).get('grass');
 const mistQuery = new URLSearchParams(window.location.search).get('mist');
@@ -812,11 +818,11 @@ const [operatorLoad, weaponLoad] = await Promise.allSettled([
 ]);
 if (operatorLoad.status === 'rejected') {
   riggedOperatorLoadError = operatorLoad.reason instanceof Error ? operatorLoad.reason.message : String(operatorLoad.reason);
-  console.error('[Atomic Acres operator asset load failed]', riggedOperatorLoadError);
+  console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
 }
 if (weaponLoad.status === 'rejected') {
   importedWeaponLoadError = weaponLoad.reason instanceof Error ? weaponLoad.reason.message : String(weaponLoad.reason);
-  console.error('[Atomic Acres weapon asset load failed]', importedWeaponLoadError);
+  console.error('[Nuke Town weapon asset load failed]', importedWeaponLoadError);
 }
 const detectedDisplayFrameMs = await displayCadencePromise;
 const adaptiveQuality = new AdaptiveQualityController({
@@ -1169,7 +1175,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
     try {
       const art = await loadBlenderArena(scene, atomicArena, (loaded, total) => {
         const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
-        setStatus(`Streaming Atomic Acres Quality art ${percent}%â€¦`);
+        setStatus(`Streaming Nuke Town Quality art ${percent}%â€¦`);
       });
       blenderArenaActive = true;
       arenaArtRoot = art.root;
@@ -1179,7 +1185,7 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       return art.root;
     } catch (error) {
       markBlenderArenaFallback(error);
-      console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
+      console.error('[Nuke Town Quality Graphics asset load failed; using authored fallback]', error);
       const fallback = await loadArenaArt(scene, (loaded, total) => {
         setStatus(`Quality Graphics fallback ${loaded}/${total}â€¦`);
       }, false);
@@ -1208,7 +1214,7 @@ async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null>
     return root;
   }).catch((error) => {
     markRustworksBlenderFallback(error);
-    console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+    console.error('[RustRig Blender tower asset load failed; keeping procedural tower]', error);
     applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
     setRustworksProceduralPresentationVisible(rustworksArena.root, true);
     qualityAssetStreaming.rustworks = 'fallback';
@@ -1820,7 +1826,7 @@ function renderHighScores(): void {
     return;
   }
   card.dataset.board = 'streak';
-  element<HTMLElement>('#high-score-title').textContent = 'ACRES LEADERBOARD';
+  element<HTMLElement>('#high-score-title').textContent = 'NUKE TOWN LEADERBOARD';
   element<HTMLElement>('#high-score-footnote').textContent = 'Global streak records sync across builds and devices · local cache remains available offline.';
   if (highScores.length === 0) {
     list.innerHTML = '<li class="empty">Set the first named streak record.</li>';
@@ -1978,7 +1984,7 @@ function showFatalError(error: unknown): void {
   const banner = element<HTMLElement>('#banner');
   banner.innerHTML = '<strong>SYSTEM PAUSED</strong><span>Reload the page to re-enter the test block.</span>';
   banner.hidden = false;
-  console.error('[Atomic Acres fatal]', error);
+  console.error('[Nuke Town fatal]', error);
 }
 
 const webRtcSupported = typeof window.RTCPeerConnection === 'function';
@@ -2897,6 +2903,7 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
     const active = button.dataset.menuTab === tab;
     button.classList.toggle('active', active);
     button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll<HTMLElement>('[data-menu-panel]').forEach((panel) => {
     const active = panel.dataset.menuPanel === tab;
@@ -2942,6 +2949,21 @@ function chooseFieldKit(id: string): void {
 
 document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
   button.addEventListener('click', () => setMenuTab(button.dataset.menuTab as 'deploy' | 'kit' | 'options'));
+  button.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]:not([hidden]):not(:disabled)')];
+    const index = tabs.indexOf(button);
+    if (index < 0 || tabs.length === 0) return;
+    event.preventDefault();
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? tabs.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    const next = tabs[nextIndex]!;
+    setMenuTab(next.dataset.menuTab as 'deploy' | 'kit' | 'options');
+    next.focus();
+  });
 });
 document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) => {
   button.addEventListener('click', () => chooseFieldKit(button.dataset.kitId ?? 'balanced'));
@@ -4792,7 +4814,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
     : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTWORKS DUEL' : 'RUSTWORKS MATCH') : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
   element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
@@ -8695,20 +8717,10 @@ function syncArenaSelectionUi(): void {
   hostButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
   joinButton.disabled = !arenaSelectionReady || !selectedArena.multiplayer || !webRtcSupported;
   element<HTMLInputElement>('#room-input').disabled = !selectedArena.multiplayer;
-  element<HTMLElement>('#arena-title').innerHTML = selectedArena.id === 'atomic-acres'
-    ? 'ATOMIC <span>ACRES</span>'
-    : selectedArena.id === 'rustworks-1v1'
-      ? 'RUST<span>WORKS</span>'
-      : selectedArena.id === 'gun-range'
-        ? 'GUN <span>RANGE</span>'
-        : 'SKYLINE <span>TERMINAL</span>';
-  element<HTMLElement>('#arena-lede').textContent = selectedArena.id === 'atomic-acres'
-    ? 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.'
-    : selectedArena.id === 'rustworks-1v1'
-      ? 'Host private industrial tower matches for up to six, or solo a single bot through the climbable central plant and yard cover.'
-      : selectedArena.id === 'gun-range'
-        ? 'Explore the indoor armory, pick a weapon from a bench, then work the 100 / 200 / 300 point lanes.'
-        : 'Fight through an original airport concourse and jetliner apron with security chokes, a narrow gangway, and open tarmac sightlines.';
+  element<HTMLElement>('#arena-title').innerHTML = selectedArena.titleAccent
+    ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
+    : selectedArena.titleLead;
+  element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
   renderFieldKitSelection();
 }
 
@@ -8862,12 +8874,12 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     try {
       previousPhysics?.dispose();
     } catch (disposeError) {
-      console.warn('[Atomic Acres previous map physics disposal failed]', disposeError);
+      console.warn('[Nuke Town previous map physics disposal failed]', disposeError);
     }
     setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
     renderHighScores();
   } catch (error) {
-    console.error('[Atomic Acres map selection failed]', error);
+    console.error('[Nuke Town map selection failed]', error);
     if (nextPhysics) nextPhysics.dispose();
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
@@ -10634,7 +10646,7 @@ async function bootstrap(): Promise<void> {
         } catch (error) {
           markBlenderArenaFallback(error);
           qualityAssetStreaming.atomicAcres = 'fallback';
-          console.error('[Atomic Acres Quality Graphics asset load failed; using authored fallback]', error);
+          console.error('[Nuke Town Quality Graphics asset load failed; using authored fallback]', error);
           return loadArenaArt(scene, (loaded, total) => {
             setStatus(`Quality Graphics fallback ${loaded}/${total}…`);
           }, false);
@@ -10653,7 +10665,7 @@ async function bootstrap(): Promise<void> {
       }).catch((error) => {
         markRustworksBlenderFallback(error);
         qualityAssetStreaming.rustworks = 'fallback';
-        console.error('[Rustworks Blender tower asset load failed; keeping procedural tower]', error);
+        console.error('[RustRig Blender tower asset load failed; keeping procedural tower]', error);
         applyRustworksPresentationProfile(rustworksArena.root, renderProfile);
         setRustworksProceduralPresentationVisible(rustworksArena.root, true);
         return null;
