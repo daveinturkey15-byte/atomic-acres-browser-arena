@@ -15,18 +15,18 @@
       "attributionRequired": false
     },
     {
-      "id": "atomic-acres-sanctified-frag-2026-07-15",
+      "id": "atomic-acres-frag-grenade-2026-07-25",
       "kind": "original-project-3d-model",
       "creator": "Atomic Acres project / Jigglyclaw",
-      "source": "scripts/blender/create-holy-hand-frag.py",
-      "generatedAsOf": "2026-07-15",
+      "source": "scripts/blender/create-frag-grenade.py",
+      "generatedAsOf": "2026-07-25",
       "license": "Original project work",
-      "files": "public/assets/original/models/holy-hand-frag.glb",
-      "sha256": "892a7e0fe08d24e3d743843b3642c2453715f69875af1bcad6a098c59fdba80c",
-      "sourceBlend": "source-assets/blender/holy-hand-frag.blend",
-      "sourceBlendSha256": "2312c8a20e7f9ec5227127dc3775f727bed263c157bc13e2bc48a8f592023e48",
-      "preview": "artifacts/holy-hand-frag/holy-hand-frag-preview.png",
-      "modifications": "Original ceremonial grenade authored from Blender primitives through the local Blender MCP socket. No commercial model, texture, or extracted game asset is used. Runtime loading preserves the existing gameplay collider, fuse, damage, networking, and explosion behavior.",
+      "files": "public/assets/original/models/frag-grenade.glb",
+      "sha256": "f61879017d6ea343644a1bcb2718155f543ecea858246e676fc2e28c15543ed8",
+      "sourceBlend": "source-assets/blender/frag-grenade.blend",
+      "sourceBlendSha256": "c644db639cda7d62dfeeb6f9da9ae92edadf639971603bbca0a52c3fa25c2a8e",
+      "preview": "artifacts/frag-grenade/frag-grenade-preview.png",
+      "modifications": "Original conventional fragmentation grenade authored from Blender primitives with a segmented olive cast body, fuse head, safety lever, pull pin, and ring. No commercial model, texture, or extracted game asset is used. Runtime loading preserves the gameplay collider, fuse, damage, networking, and explosion behavior.",
       "attributionRequired": false
     },
     {
@@ -78,21 +78,6 @@
       "sourceProvenance": "source-assets/menu/atomic-acres-menu-squad-original.provenance.json",
       "sourceProvenanceSha256": "236818817d7f2b02e073f4b90f463d4f95c4124ba2eeb4900fdd8df358118f58",
       "modifications": "Direct in-engine Quality Graphics capture of the Atomic Acres Civic Transit bus lane with the slightly funny close-up bus and three genuine runtime SWAT operators in clean idle weapon poses. The frame received a restrained contrast, gamma, saturation, and vignette grade. No generated or external image content is present.",
-      "attributionRequired": false
-    },
-    {
-      "id": "atomic-acres-sanctified-frag-choir-2026-07-16",
-      "kind": "original-project-audio",
-      "creator": "Atomic Acres project / Jigglyclaw",
-      "source": "scripts/audio/create-sanctified-frag-choir.py",
-      "generatedAsOf": "2026-07-16",
-      "license": "Original project work",
-      "files": "public/assets/original/audio/sanctified-frag-hallelujah.wav",
-      "sha256": "cf8a0bcd12b56e43ac41fcaa28f3b737296fd88085a062fc15470e6c9fa0d3ee",
-      "sourceScript": "scripts/audio/create-sanctified-frag-choir.py",
-      "format": "PCM WAV, stereo, 16-bit, 22050 Hz, 3.55 seconds",
-      "externalSamples": 0,
-      "description": "Original four-syllable formant-synthesized choir sting singing Hal-le-lu-jah for the Sanctified Frag explosion. No sampled or commercial recording is used.",
       "attributionRequired": false
     },
     {

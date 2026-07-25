@@ -84,6 +84,21 @@ export function isCurrentGuestEventConnection(
   return current === closing;
 }
 
+export function isCurrentClientConnection(
+  current: DataConnection | null,
+  candidate: DataConnection,
+): boolean {
+  return current === candidate;
+}
+
+export function activeGuestCanBeReplaced(
+  existingOpen: boolean,
+  knownResumeToken: string | undefined,
+  incomingResumeToken: string | undefined,
+): boolean {
+  return existingOpen && Boolean(knownResumeToken && incomingResumeToken && knownResumeToken === incomingResumeToken);
+}
+
 export function guestMessageEndsSession(message: GameMessage): boolean {
   return message.type === 'leave';
 }
@@ -156,6 +171,7 @@ export class ArenaNetwork {
   private hostStateConnection: DataConnection | null = null;
   private guestBundles = new Map<string, GuestBundle>();
   private guestPeerOwners = new Map<string, string>();
+  private guestResumeTokens = new Map<string, string>();
   private pendingStateConnections = new Map<string, DataConnection>();
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,6 +205,10 @@ export class ArenaNetwork {
     if (bundle) bundle.team = team;
   }
 
+  forgetPlayerRejoinCredential(playerId: string): void {
+    if (this.role === 'host') this.guestResumeTokens.delete(playerId);
+  }
+
   host(onReady: () => void): void {
     this.close();
     this.manualClose = false;
@@ -198,13 +218,24 @@ export class ArenaNetwork {
     const peer = createArenaPeer();
     this.peer = peer;
     peer.on('open', (id) => {
+      if (this.peer !== peer || this.role !== 'host' || this.manualClose) return;
+      const signallingRestored = this.roomCode.length > 0;
       this.roomCode = id;
-      this.onStatus('Lobby ready — share the invite after setup', 'ok');
-      onReady();
+      this.onStatus(signallingRestored ? 'Lobby signalling restored' : 'Lobby ready — share the invite after setup', 'ok');
+      if (!signallingRestored) onReady();
     });
-    peer.on('connection', (connection) => this.wireIncomingGuest(connection));
-    peer.on('error', (error) => this.onStatus(this.describeError(error), 'error'));
-    peer.on('disconnected', () => this.onStatus('Signalling disconnected; existing peers may continue', 'warn'));
+    peer.on('connection', (connection) => {
+      if (this.peer === peer && this.role === 'host' && !this.manualClose) this.wireIncomingGuest(connection);
+      else connection.close();
+    });
+    peer.on('error', (error) => {
+      if (this.peer === peer && this.role === 'host' && !this.manualClose) this.onStatus(this.describeError(error), 'error');
+    });
+    peer.on('disconnected', () => {
+      if (this.peer !== peer || this.role !== 'host' || this.manualClose) return;
+      this.onStatus('Lobby signalling interrupted; reconnecting while active data channels continue', 'warn');
+      try { peer.reconnect(); } catch { /* Active data channels remain usable if signalling recovery fails. */ }
+    });
   }
 
   join(roomCode: string, onReady: () => void): void {
@@ -380,6 +411,7 @@ export class ArenaNetwork {
     }
     this.guestBundles.clear();
     this.guestPeerOwners.clear();
+    this.guestResumeTokens.clear();
     this.pendingStateConnections.clear();
     this.hostEventConnection = null;
     this.hostStateConnection = null;
@@ -413,7 +445,11 @@ export class ArenaNetwork {
     const peer = createArenaPeer();
     this.peer = peer;
     peer.on('open', () => {
-      if (this.manualClose || this.role !== 'client') return;
+      if (this.peer !== peer || this.manualClose || this.role !== 'client') return;
+      if (this.hostEventConnection || this.hostStateConnection) {
+        this.onStatus('Signalling restored; active data channels preserved', 'ok');
+        return;
+      }
       const events = peer.connect(this.roomCode, {
         label: EVENT_LABEL,
         metadata: { channel: 'events' },
@@ -431,9 +467,17 @@ export class ArenaNetwork {
         this.onStatus('Movement channel degraded; using reliable fallback', 'warn');
       }
     });
-    peer.on('error', (error) => this.onStatus(this.describeError(error), 'error'));
+    peer.on('error', (error) => {
+      if (this.peer === peer && this.role === 'client' && !this.manualClose) this.onStatus(this.describeError(error), 'error');
+    });
     peer.on('disconnected', () => {
-      if (this.role === 'client') this.onStatus('Signalling disconnected; preserving active data channels', 'warn');
+      if (this.peer !== peer || this.manualClose || this.role !== 'client') return;
+      this.onStatus(this.channelsReady()
+        ? 'Signalling interrupted; reconnecting while active data channels continue'
+        : 'Signalling interrupted before the host connection opened; reconnecting', 'warn');
+      try { peer.reconnect(); } catch {
+        if (!this.channelsReady()) this.scheduleReconnect('Signalling disconnected');
+      }
     });
   }
 
@@ -463,8 +507,14 @@ export class ArenaNetwork {
         const requestedId = payload.type === 'lobby-join' ? payload.playerId : payload.player.id;
         const requestedTeam = payload.type === 'lobby-join' ? payload.requestedTeam : payload.player.team;
         const existing = this.guestBundles.get(requestedId);
-        if (existing?.events.open) {
-          this.rejectConnection(connection, 'identity-in-use');
+        const incomingResumeToken = payload.type === 'lobby-join' ? payload.resumeToken : undefined;
+        const replaceActiveConnection = activeGuestCanBeReplaced(
+          Boolean(existing?.events.open),
+          this.guestResumeTokens.get(requestedId),
+          incomingResumeToken,
+        );
+        if (existing?.events.open && !replaceActiveConnection) {
+          this.rejectConnection(connection, payload.type === 'lobby-join' ? 'rejoin-denied' : 'identity-in-use');
           return;
         }
         if (!existing && this.guestBundles.size >= this.maximumPlayers - 1) {
@@ -481,7 +531,12 @@ export class ArenaNetwork {
         };
         this.pendingStateConnections.delete(connection.peer);
         this.guestBundles.set(playerId, bundle);
+        if (incomingResumeToken) this.guestResumeTokens.set(playerId, incomingResumeToken);
         replaceGuestPeerOwner(this.guestPeerOwners, playerId, existing?.peerId, connection.peer);
+        if (existing) {
+          try { existing.events.close(); } catch { /* The replacement event lane is already authoritative. */ }
+          try { existing.state?.close(); } catch { /* The replacement state lane or reliable fallback remains. */ }
+        }
         this.onStatus(`${this.guestBundles.size} guest connection${this.guestBundles.size === 1 ? '' : 's'}`, 'ok');
         this.onMessage(payload);
         return;
@@ -550,21 +605,28 @@ export class ArenaNetwork {
   }
 
   private wireHostChannel(connection: DataConnection, kind: ChannelKind): void {
-    connection.on('open', () => this.maybeClientReady());
+    const current = () => isCurrentClientConnection(
+      kind === 'events' ? this.hostEventConnection : this.hostStateConnection,
+      connection,
+    );
+    connection.on('open', () => {
+      if (current()) this.maybeClientReady();
+    });
     connection.on('data', (payload) => {
-      if (!isGameMessage(payload)) return;
+      if (!current() || !isGameMessage(payload)) return;
       if (kind === 'state' && !isStateTrafficMessage(payload)) return;
       this.onMessage(payload);
     });
     connection.on('close', () => {
-      if (this.manualClose || this.role !== 'client') return;
+      if (this.manualClose || this.role !== 'client' || !current()) return;
       if (kind === 'events') this.scheduleReconnect('Host connection closed');
       else {
-        if (this.hostStateConnection === connection) this.hostStateConnection = null;
+        this.hostStateConnection = null;
         this.onStatus('Movement channel degraded; using reliable fallback', 'warn');
       }
     });
     connection.on('error', () => {
+      if (!current()) return;
       if (kind === 'events') this.onStatus('Could not establish peer event channel', 'error');
       else this.onStatus('Could not establish movement channel', 'warn');
     });
@@ -637,7 +699,7 @@ export class ArenaNetwork {
     this.onStatus('A guest disconnected; rejoin slot held for 90 seconds', 'warn');
   }
 
-  private rejectConnection(connection: DataConnection, reason: 'room-full' | 'identity-in-use' | 'protocol-mismatch'): void {
+  private rejectConnection(connection: DataConnection, reason: 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'protocol-mismatch'): void {
     if (connection.open) this.transmit(connection, { type: 'lobby-reject', reason, nonce: Date.now() } satisfies GameMessage, false);
     window.setTimeout(() => connection.close(), 50);
   }

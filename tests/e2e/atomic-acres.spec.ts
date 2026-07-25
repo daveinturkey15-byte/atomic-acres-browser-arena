@@ -98,15 +98,9 @@ type DebugState = {
     profile: { disposeMs: number; audioMs: number; visualMs: number; targetDamageMs: number; selfDamageMs: number; totalSyncMs: number };
   };
   audio: {
-    sanctifiedFragChoir: {
-      asset: string;
-      status: 'idle' | 'loading' | 'fetched' | 'decoding' | 'ready' | 'error';
-      ready: boolean;
-      prewarmed: boolean;
-      byteLength: number;
-      durationSeconds: number;
-      plays: number;
-    };
+    ambience: { continuousSources: number; busGain: number };
+    grenadeFuse: { beeps: number; startMs: number };
+    support: { cues: number };
   };
   fieldSupport: {
     streak: number;
@@ -147,6 +141,7 @@ type DebugState = {
     expiries: number;
     presentationPrewarmed: boolean;
     visible: boolean;
+    renderResident: boolean;
     worldIconVisible: boolean;
     worldIconName: string;
     minimapSymbol: string;
@@ -2043,6 +2038,12 @@ test.describe('solo mechanics', () => {
     });
     expect(initialSpawnInMs).toBeGreaterThan(105_000);
     expect(initialSpawnInMs).toBeLessThanOrEqual(120_000);
+    expect((await debug(page)).overdrive).toMatchObject({
+      available: false,
+      visible: false,
+      renderResident: true,
+      presentationPrewarmed: true,
+    });
     const spawnAnnouncement = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         setOverdrive: (mode: 'available' | 'expired') => void;
@@ -2057,7 +2058,7 @@ test.describe('solo mechanics', () => {
     expect(spawnAnnouncement.text).toContain('2× DAMAGE ONLINE');
     await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
     expect((await debug(page)).overdrive).toMatchObject({
-      available: true, presentationPrewarmed: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
+      available: true, presentationPrewarmed: true, renderResident: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
     });
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -2285,15 +2286,7 @@ test.describe('solo mechanics', () => {
     expect(after.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
   });
 
-  test('starts with two frags and resolves a prewarmed Hallelujah explosion without a detonation hitch', async ({ page }) => {
-    await page.waitForFunction(
-      () => {
-        const choir = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().audio.sanctifiedFragChoir;
-        return choir.ready === true && choir.prewarmed === true;
-      },
-      undefined,
-      { timeout: 10_000 },
-    );
+  test('starts with two normal frags, accelerates the fuse beep, and resolves the prewarmed explosion without a hitch', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState; throwGrenade: () => void; teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
       const before = api.snapshot();
@@ -2345,26 +2338,23 @@ test.describe('solo mechanics', () => {
 
     expect(result.before.player.grenades).toBe(2);
     expect(result.before.grenadeVisual.status).toBe('ready');
-    expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/holy-hand-frag.glb');
+    expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/frag-grenade.glb');
     expect(result.before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
     expect(result.before.grenadeExplosion).toMatchObject({ poolCapacity: 4, dynamicLights: 0, prewarmed: true });
-    expect(result.before.audio.sanctifiedFragChoir).toMatchObject({
-      asset: './assets/original/audio/sanctified-frag-hallelujah.wav',
-      status: 'ready',
-      ready: true,
-      prewarmed: true,
-      byteLength: 313_152,
-      plays: 0,
+    expect(result.before.audio).toMatchObject({
+      ambience: { continuousSources: 0 },
+      grenadeFuse: { beeps: 0, startMs: 1_450 },
     });
+    expect(result.before.audio.ambience.busGain).toBeCloseTo(0.12, 5);
     expect(result.thrown.player.grenades).toBe(1);
     expect(result.thrown.grenades).toBe(1);
     expect(result.thrown.grenadeVisual.active).toHaveLength(1);
-    expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'sanctified-frag-authored-glb', authored: true });
+    expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'frag-grenade-authored-glb', authored: true });
     expect(result.thrown.grenadeVisual.active[0].meshes).toBeGreaterThanOrEqual(12);
     expect(result.after.grenadeExplosion.total).toBe(1);
     expect(result.after.grenadeExplosion.activeVisuals).toBe(0);
     expect(result.after.grenades).toBe(0);
-    expect(result.after.audio.sanctifiedFragChoir.plays).toBe(1);
+    expect(result.after.audio.grenadeFuse.beeps).toBeGreaterThanOrEqual(4);
     const hitchEvidence = `baselineFrameP95=${result.baselineP95FrameMs.toFixed(1)}ms detonationFrame=${result.detonationMaxFrameMs.toFixed(1)}ms baselineLongTaskP95=${result.baselineP95LongTaskMs.toFixed(1)}ms detonationLongTask=${result.detonationMaxLongTaskMs.toFixed(1)}ms sync=${JSON.stringify(result.after.grenadeExplosion.profile)}`;
     expect(result.after.grenadeExplosion.profile.totalSyncMs, hitchEvidence).toBeLessThan(12);
     expect(result.detonationMaxFrameMs - result.baselineP95FrameMs, hitchEvidence).toBeLessThan(100);
@@ -2432,6 +2422,26 @@ test.describe('solo mechanics', () => {
     await page.waitForTimeout(5_700);
     expect((await debug(page)).player.hp).toBeGreaterThan(damaged.player.hp);
   });
+});
+
+test('keeps Field Support visible and audible on Terminal', async ({ page }) => {
+  await pageReadyAt(page, '/?render=performance&map=terminal');
+  await startSolo(page);
+  await expect(page.locator('#support-block')).toBeVisible();
+  const result = await page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+      snapshot: () => DebugState;
+      earnSupport: (eliminations: number) => void;
+      activateSupport: (id: 'yardhawk') => void;
+    } }).__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot();
+    api.earnSupport(5);
+    api.activateSupport('yardhawk');
+    return { before, after: api.snapshot() };
+  });
+  expect(result.after.fieldSupport.yardhawk.active).toBe(true);
+  expect(result.after.audio.support.cues).toBeGreaterThan(result.before.audio.support.cues);
+  await expect(page.locator('#killfeed')).toContainText('YARDHAWK THROWN');
 });
 
 test.describe('performance and stability', () => {

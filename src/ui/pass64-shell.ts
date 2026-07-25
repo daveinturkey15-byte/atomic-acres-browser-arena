@@ -157,7 +157,7 @@ function menuMarkup(model: Pass64ShellViewModel): string {
 }
 
 function chatMarkup(): string {
-  return `<section id="text-chat" hidden aria-label="Room text chat" data-open="false">
+  return `<section id="text-chat" hidden aria-label="Room text chat" data-open="false" data-visible="false">
     <header><strong>ROOM CHAT</strong><small id="text-chat-hint">ENTER TO CHAT</small></header>
     <div id="text-chat-log" role="log" aria-live="polite" aria-relevant="additions text"></div>
     <form id="text-chat-form" autocomplete="off">

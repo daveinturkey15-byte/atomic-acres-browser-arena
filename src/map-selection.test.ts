@@ -45,7 +45,7 @@ describe('opening arena selection', () => {
       selectorLabel: 'TERMINAL',
       displayName: 'Terminal',
       multiplayer: true,
-      fieldSupport: false,
+      fieldSupport: true,
       overdrive: false,
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });

@@ -7,6 +7,7 @@ import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
   RUSTWORKS_TOWER,
+  RUSTWORKS_WORK_LIGHTS,
   applyAdditionalMapPresentationProfile,
   applyRustworksPresentationProfile,
   buildGunRange,
@@ -19,6 +20,8 @@ import {
 import type { ArenaMap } from './map';
 import type { Stance } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
+import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
+import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
 
@@ -60,6 +63,17 @@ function namedPrefixCount(root: THREE.Object3D, prefix: string): number {
   let count = 0;
   root.traverse((node) => {
     if (node.name.startsWith(prefix)) count += 1;
+  });
+  return count;
+}
+
+function visibleMeshDrawUpperBound(root: THREE.Object3D): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.visible) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => material.visible)) return;
+    count += node instanceof THREE.InstancedMesh ? node.count : 1;
   });
   return count;
 }
@@ -170,6 +184,46 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('rustworks-lower-ramp')?.visible).not.toBe(false);
     applyRustworksPresentationProfile(map.root, 'blender');
     expect(servicePlatform?.visible).toBe(true);
+  });
+
+  it('mounts emissive RustRig work lights and removes coplanar deck overlays', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const lightAudit = map.root.userData.rustworksWorkLightAudit as {
+      fixtures: Array<{ id: string; position: number[]; target: number[]; emissiveOnlyLens: boolean; shadowedLocalVolume: boolean }>;
+      shadowedLocalVolumes: number;
+      maximumShadowCastersIncludingMoon: number;
+    };
+    expect(lightAudit).toMatchObject({
+      shadowedLocalVolumes: 1,
+      maximumShadowCastersIncludingMoon: 2,
+    });
+    expect(lightAudit.fixtures).toHaveLength(2);
+    expect(lightAudit.fixtures.map((fixture) => fixture.id)).toEqual(RUSTWORKS_WORK_LIGHTS.map((fixture) => fixture.id));
+    for (const fixture of RUSTWORKS_WORK_LIGHTS) {
+      const lens = map.root.getObjectByName(`rustworks-work-light-lens-${fixture.id}`) as THREE.Mesh;
+      const housing = map.root.getObjectByName(`rustworks-work-light-housing-${fixture.id}`) as THREE.Mesh;
+      const mount = map.root.getObjectByName(`rustworks-work-light-mount-${fixture.id}`) as THREE.Mesh;
+      expect(lens, `${fixture.id}:lens`).toBeInstanceOf(THREE.Mesh);
+      expect(housing, `${fixture.id}:housing`).toBeInstanceOf(THREE.Mesh);
+      expect(mount, `${fixture.id}:mount`).toBeInstanceOf(THREE.Mesh);
+      expect(lens.position.toArray()).toEqual([...fixture.position]);
+      expect((lens.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThanOrEqual(4);
+      expect(lens.userData.occlusionPolicy).toBe('emissive-only');
+    }
+
+    expect(map.root.userData.rustworksDeckSurfaceAudit).toEqual({
+      perimeterEdgeSegments: 4,
+      serviceLaneSegments: 4,
+      fullDeckLipOverlay: false,
+      coplanarOverlapPairs: [],
+    });
+    expect(map.root.getObjectByName('rustworks-rig-deck-edge')).toBeUndefined();
+    expect(namedPrefixCount(map.root, 'rustworks-rig-deck-edge-')).toBe(4);
+    expect(namedPrefixCount(map.root, 'rustworks-service-lane-')).toBe(4);
+    for (const profile of ['performance', 'blender'] as const) {
+      applyRustworksPresentationProfile(map.root, profile);
+      expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(rustworksVisualDefinition.budgets.maximumDrawCalls);
+    }
   });
 
   it('exposes clean access, undercroft, trench, and useful inner-yard freight cover', () => {
@@ -925,6 +979,74 @@ describe('additional authored maps', () => {
     for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac', 'cabin-through-aisle', 'cabin-to-cockpit']) {
       await traverseRoute(map, routes[id]);
       await traverseRoute(map, routes[id], true);
+    }
+  }, 30_000);
+
+  it('keeps both mezzanine side routes and retained Quality wings physically supported', async () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylinePlatformAuthorityAudit as {
+      version: string;
+      wingSliceCount: number;
+      wingAuthorityMaximumOverhang: number;
+      platforms: Array<{
+        id: string;
+        qualityPresentationName: string | null;
+        movementAuthority: boolean;
+        physicsAuthority: boolean;
+        shotAuthority: boolean;
+      }>;
+    };
+    expect(audit.version).toBe('pass64-shared-platform-authority-v1');
+    expect(audit.wingSliceCount).toBe(8);
+    expect(audit.wingAuthorityMaximumOverhang).toBeLessThan(STANCE_SHAPES.stand.radius);
+    expect(audit.platforms.every((platform) => platform.movementAuthority && platform.physicsAuthority && platform.shotAuthority)).toBe(true);
+    expect(audit.platforms.filter((platform) => platform.id.startsWith('jetliner-wing-'))).toHaveLength(16);
+    expect(audit.platforms.filter((platform) => platform.qualityPresentationName === 'skyline-quality-wing-port')).toHaveLength(8);
+    expect(audit.platforms.filter((platform) => platform.qualityPresentationName === 'skyline-quality-wing-starboard')).toHaveLength(8);
+    expect(terminalVisualDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
+      'terminal-port-wing-authority',
+      'terminal-starboard-wing-authority',
+    ]));
+    for (const profile of ['performance', 'blender'] as const) {
+      applyAdditionalMapPresentationProfile(map.root, profile);
+      expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(terminalVisualDefinition.budgets.maximumDrawCalls);
+    }
+    for (const [rootZ, tipDeltaZ] of [[3.6, 16.8], [0.4, -16.8]] as const) {
+      for (let sample = 0; sample <= 32; sample += 1) {
+        const t = sample / 32;
+        const z = rootZ + tipDeltaZ * t;
+        const left = -3.2 + 1.9 * t;
+        const right = 2.7 - 0.9 * t;
+        for (const x of [left, (left + right) / 2, right]) {
+          expect(
+            map.physicsColliders.some((collider) => x >= collider.minX - 1e-6
+              && x <= collider.maxX + 1e-6
+              && z >= collider.minZ - 1e-6
+              && z <= collider.maxZ + 1e-6
+              && (collider.minY ?? -Infinity) <= 2.82
+              && (collider.maxY ?? Infinity) >= 2.82),
+            `wing support x=${x.toFixed(3)} z=${z.toFixed(3)}`,
+          ).toBe(true);
+        }
+      }
+    }
+
+    const platformRuns = [
+      { start: { x: -23.8, y: 5.04, z: -33.4 }, target: { x: -23.8, y: 5.04, z: -22.4 } },
+      { start: { x: 23.8, y: 5.04, z: -33.4 }, target: { x: 23.8, y: 5.04, z: -22.4 } },
+      { start: { x: -0.2, y: 4.66, z: 3.9 }, target: { x: 0.18, y: 4.66, z: 20.0 } },
+      { start: { x: -0.2, y: 4.66, z: 0.1 }, target: { x: 0.18, y: 4.66, z: -16.0 } },
+    ];
+    for (const run of platformRuns) {
+      const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+      try {
+        physics.teleportEye(run.start);
+        const result = await walkToward(physics, run.target, 1_200);
+        expect(Math.hypot(result.x - run.target.x, result.z - run.target.z)).toBeLessThan(0.55);
+        expect(Math.abs(result.y - run.target.y)).toBeLessThan(0.55);
+      } finally {
+        physics.dispose();
+      }
     }
   }, 30_000);
 

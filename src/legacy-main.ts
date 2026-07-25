@@ -42,7 +42,7 @@ import { copyTextWithFallback } from './clipboard';
 import { FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
-import { ArenaAudio } from './audio';
+import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
@@ -192,6 +192,7 @@ import {
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
+import { loadRoomRejoinIdentity, saveRoomRejoinIdentity } from './room-rejoin-identity';
 import {
   HIGH_SCORE_STORAGE_KEY,
   HIGH_SCORE_SCHEMA_VERSION,
@@ -301,12 +302,13 @@ import {
   type ChatEntry,
   type ChatRateState,
 } from './text-chat';
+import { roomChatPresentation } from './room-chat-presentation';
 import {
   createHumanMatchReport,
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
 } from './match-report';
-import { scoreSpawnCandidates, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
 import { TracerPool } from './tracer-pool';
@@ -477,6 +479,7 @@ type GrenadeEntity = {
   velocity: THREE.Vector3;
   angularVelocity: THREE.Vector3;
   explodeAt: number;
+  nextFuseBeepAt: number;
   lastBounceAt: number;
   actionNonce: number;
   ownerKind: 'player' | 'bot' | 'remote';
@@ -1722,6 +1725,9 @@ const hostChatNonces = new Map<string, number[]>();
 let textChatOpen = false;
 let textChatNotice: string | null = null;
 let textChatHintTimer: ReturnType<typeof setTimeout> | null = null;
+let textChatFadeTimer: ReturnType<typeof setTimeout> | null = null;
+let textChatLastActivityAtMs: number | null = null;
+let textChatWasAvailable = false;
 
 function memberDhv(id: string): Dhv {
   return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
@@ -2275,10 +2281,20 @@ function isTextChatTyping(): boolean {
 
 function renderTextChat(): void {
   const available = textChatAvailable();
+  const now = performance.now();
+  if (available && !textChatWasAvailable) textChatLastActivityAtMs = now;
+  textChatWasAvailable = available;
+  const presentation = roomChatPresentation(now, available, textChatOpen, textChatLastActivityAtMs);
   textChatRoot.hidden = !available;
   textChatRoot.dataset.open = textChatOpen ? 'true' : 'false';
+  textChatRoot.dataset.visible = presentation.visible ? 'true' : 'false';
   textChatRoot.dataset.context = gameStarted ? 'game' : 'lobby';
   textChatHint.textContent = textChatNotice ?? (textChatOpen ? 'ENTER SEND / ESC CANCEL' : 'ENTER TO CHAT');
+  if (textChatFadeTimer) clearTimeout(textChatFadeTimer);
+  textChatFadeTimer = presentation.fadeAfterMs === null ? null : setTimeout(() => {
+    textChatFadeTimer = null;
+    renderTextChat();
+  }, presentation.fadeAfterMs);
   if (!available) return;
 
   textChatLog.replaceChildren();
@@ -2302,10 +2318,15 @@ function renderTextChat(): void {
   textChatLog.scrollTop = textChatLog.scrollHeight;
 }
 
+function markTextChatActivity(): void {
+  textChatLastActivityAtMs = performance.now();
+  renderTextChat();
+}
+
 function showTextChatNotice(message: string, durationMs = 1_800): void {
   if (textChatHintTimer) clearTimeout(textChatHintTimer);
   textChatNotice = message;
-  renderTextChat();
+  markTextChatActivity();
   textChatHintTimer = setTimeout(() => {
     textChatHintTimer = null;
     textChatNotice = null;
@@ -2318,7 +2339,7 @@ function openTextChat(): void {
   clearGameplayInput();
   element<HTMLElement>('#roster').hidden = true;
   textChatOpen = true;
-  renderTextChat();
+  markTextChatActivity();
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
   textChatInput.focus({ preventScroll: true });
 }
@@ -2328,7 +2349,7 @@ function closeTextChat(resumeControls: boolean): void {
   textChatOpen = false;
   textChatInput.value = '';
   textChatInput.blur();
-  renderTextChat();
+  markTextChatActivity();
   if (resumeControls && gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden')) {
     requestGamePointerLock();
   }
@@ -2336,9 +2357,13 @@ function closeTextChat(resumeControls: boolean): void {
 
 function resetTextChat(): void {
   if (textChatHintTimer) clearTimeout(textChatHintTimer);
+  if (textChatFadeTimer) clearTimeout(textChatFadeTimer);
   textChatHintTimer = null;
+  textChatFadeTimer = null;
   textChatNotice = null;
   textChatOpen = false;
+  textChatLastActivityAtMs = null;
+  textChatWasAvailable = false;
   textChatInput.value = '';
   textChatInput.blur();
   textChatHistory = [];
@@ -2350,7 +2375,7 @@ function resetTextChat(): void {
 
 function acceptChatEntry(entry: ChatEntry): void {
   textChatHistory = appendChatHistory(textChatHistory, entry);
-  renderTextChat();
+  markTextChatActivity();
 }
 
 function sendTextChatHistory(playerId: string): void {
@@ -2435,7 +2460,7 @@ function acceptHostChatMessage(message: ChatMessage): void {
 function acceptHostChatHistory(message: ChatHistoryMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id) return;
   textChatHistory = normalizeChatHistory(message.entries);
-  renderTextChat();
+  markTextChatActivity();
 }
 
 function randomLobbyCredential(): string {
@@ -2444,18 +2469,31 @@ function randomLobbyCredential(): string {
 }
 
 function restoreRoomIdentity(roomCode: string): void {
-  const key = `atomic-acres:room-identity:${roomCode}`;
-  try {
-    const parsed = JSON.parse(sessionStorage.getItem(key) ?? 'null') as { playerId?: unknown; token?: unknown } | null;
-    if (parsed && typeof parsed.playerId === 'string' && parsed.playerId.length > 0 && parsed.playerId.length <= 80
-      && typeof parsed.token === 'string' && parsed.token.length >= 24 && parsed.token.length <= 128) {
-      player.id = parsed.playerId;
-      localResumeToken = parsed.token;
-      return;
-    }
-  } catch { /* A fresh bounded identity is safe when session storage is blocked or malformed. */ }
+  let restored: ReturnType<typeof loadRoomRejoinIdentity> = null;
+  try { restored = loadRoomRejoinIdentity(roomCode, sessionStorage, localStorage); } catch { /* Hardened storage falls back to a fresh identity. */ }
+  if (restored) {
+    player.id = restored.playerId;
+    localResumeToken = restored.token;
+    try { saveRoomRejoinIdentity(roomCode, restored, sessionStorage, localStorage, REJOIN_GRACE_MS); } catch { /* The in-memory credential remains valid. */ }
+    return;
+  }
   localResumeToken = randomLobbyCredential();
-  try { sessionStorage.setItem(key, JSON.stringify({ playerId: player.id, token: localResumeToken })); } catch { /* Rejoin becomes same-page only. */ }
+  try {
+    saveRoomRejoinIdentity(roomCode, { playerId: player.id, token: localResumeToken }, sessionStorage, localStorage, REJOIN_GRACE_MS);
+  } catch { /* Rejoin remains available only while this page stays open. */ }
+}
+
+function persistRoomIdentityForCloseTabRejoin(): void {
+  if (network.role !== 'client' || !network.roomCode || !localResumeToken) return;
+  try {
+    saveRoomRejoinIdentity(
+      network.roomCode,
+      { playerId: player.id, token: localResumeToken },
+      sessionStorage,
+      localStorage,
+      REJOIN_GRACE_MS,
+    );
+  } catch { /* Browser storage policy can make close-tab recovery unavailable. */ }
 }
 
 function hidePrivateLobbyPresentation(): void {
@@ -2688,6 +2726,7 @@ function markLobbyDisconnected(playerId: string): void {
     hostDisconnectedAt.delete(playerId);
     hostLobbyMembers.delete(playerId);
     hostLobbyTokens.delete(playerId);
+    network.forgetPlayerRejoinCredential(playerId);
     hostLobbyConnectionEpochs.delete(playerId);
     authoritativeShotAdmissions.delete(playerId);
     authoritativeScores.delete(playerId);
@@ -3094,6 +3133,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
       if (message.voluntary) {
         hostLobbyMembers.delete(message.playerId);
         hostLobbyTokens.delete(message.playerId);
+        network.forgetPlayerRejoinCredential(message.playerId);
         hostLobbyConnectionEpochs.delete(message.playerId);
         authoritativeShotAdmissions.delete(message.playerId);
         hostDisconnectedAt.delete(message.playerId);
@@ -5004,6 +5044,7 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
 function spawnPoint(): THREE.Vector3 {
+  const spawnMode = activeSpawnMode();
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
@@ -5014,7 +5055,7 @@ function spawnPoint(): THREE.Vector3 {
       .filter((remote) => areCombatantsHostile(remote.snapshot.id, remote.snapshot.team, player.id, player.team) && remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
     ...[...bots.values()]
-      .filter((bot) => bot.team !== player.team && bot.alive)
+      .filter((bot) => (spawnMode === 'ffa' || bot.team !== player.team) && bot.alive)
       .map((bot) => bot.position.clone().add(new THREE.Vector3(0, 1.42, 0))),
   ];
   const validForSide = (side: Team) => arena.spawns[side]
@@ -5028,7 +5069,7 @@ function spawnPoint(): THREE.Vector3 {
   const home = validForSide(player.team);
   const oppositeTeam: Team = player.team === 0 ? 1 : 0;
   const opposite = validForSide(oppositeTeam);
-  if (home.length === 0) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored player spawn for team ${player.team}`);
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scored = options.map(({ point }) => ({
       visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
@@ -5040,12 +5081,15 @@ function spawnPoint(): THREE.Vector3 {
       safestNearestThreatDistanceSq: Math.max(...scored.filter((entry) => entry.visibleThreats === minimumVisibleThreats).map((entry) => entry.nearestThreatDistanceSq)),
     };
   };
-  const instantaneousFlip = threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
-  const flipDecision = advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const flipDecision = spawnMode === 'ffa'
+    ? { flip: false, state: spawnFlipHysteresis[player.team] }
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
   spawnFlipHysteresis[player.team] = flipDecision.state;
   const flipped = flipDecision.flip;
-  const valid = flipped ? opposite : home;
-  const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < 20));
+  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipped ? opposite : home;
+  const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
+  const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < minimumSeparationSq));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
   const candidates = selectable.map(({ point, index }) => ({
     index,
@@ -5057,7 +5101,6 @@ function spawnPoint(): THREE.Vector3 {
   }));
   const previousIndex = lastPlayerSpawnIndex;
   const population = otherPlayers.length + 1;
-  const spawnMode = activeSpawnMode();
   const selection = scoreSpawnCandidates({
     arenaId: selectedArena.id,
     mode: spawnMode,
@@ -5068,6 +5111,7 @@ function spawnPoint(): THREE.Vector3 {
     recentDeaths: recentSpawnDeathPoints(),
     colliders: arena.colliders,
     previousIndex,
+    tieBreakSeed: stableSpawnTieBreakSeed(player.id),
   });
   const selectedIndex = selection.index;
   const minimumVisibleThreats = Math.min(...candidates.map((candidate) => candidate.visibleThreats));
@@ -5156,7 +5200,7 @@ function respawn(requestLock = true, forceNewLife = false, deploymentWeaponOverr
   player.reloadState = null;
   player.alive = true;
   respawnEndsAt = 0;
-  player.invulnerableUntil = performance.now() + 1350;
+  player.invulnerableUntil = performance.now() + playerSpawnProtectionMs(activeSpawnMode());
   player.yaw = operatorYawToward({ x: player.position.x, z: player.position.z }, { x: 0, z: 0 });
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
@@ -6101,16 +6145,17 @@ function castShot(
   };
 }
 
-function selectSafeBotSpawn(team: Team): THREE.Vector3 {
+function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vector3 {
+  const spawnMode = activeSpawnMode();
   const otherPlayers = [
     ...(player.alive ? [player.position.clone()] : []),
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
     ...[...bots.values()].filter((bot) => bot.alive).map((bot) => bot.position.clone()),
   ];
   const threats = [
-    ...(player.alive && player.team !== team ? [player.position.clone()] : []),
+    ...(player.alive && (spawnMode === 'ffa' || player.team !== team) ? [player.position.clone()] : []),
     ...[...remotes.values()]
-      .filter((remote) => remote.snapshot.team !== team && remote.snapshot.hp > 0)
+      .filter((remote) => (spawnMode === 'ffa' || remote.snapshot.team !== team) && remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
   ];
   const validForSide = (side: Team) => arena.spawns[side]
@@ -6123,7 +6168,7 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
     });
   const home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
-  if (home.length === 0) throw new Error(`No valid authored spawn for team ${team}`);
+  if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored spawn for team ${team}`);
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scores = options.map(({ candidate }) => ({
       visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
@@ -6135,15 +6180,18 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
       safestNearestThreatDistanceSq: Math.max(...scores.filter((score) => score.visibleThreats === minimumVisibleThreats).map((score) => score.distance)),
     };
   };
-  const instantaneousFlip = threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
-  const flipDecision = advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const flipDecision = spawnMode === 'ffa'
+    ? { flip: false, state: spawnFlipHysteresis[team] }
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
   spawnFlipHysteresis[team] = flipDecision.state;
-  const valid = flipDecision.flip ? opposite : home;
-  const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < 20));
+  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipDecision.flip ? opposite : home;
+  const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
+  const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < minimumSeparationSq));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
   const selection = scoreSpawnCandidates({
     arenaId: selectedArena.id,
-    mode: activeSpawnMode(),
+    mode: spawnMode,
     population: otherPlayers.length + 1,
     candidates: selectable.map(({ candidate, index }) => ({ index, point: candidate })),
     threats,
@@ -6151,6 +6199,7 @@ function selectSafeBotSpawn(team: Team): THREE.Vector3 {
     recentDeaths: recentSpawnDeathPoints(),
     colliders: arena.colliders,
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
+    tieBreakSeed: stableSpawnTieBreakSeed(actorId),
   });
   const selectedIndex = selection.index;
   lastBotSpawnIndices.set(team, selectedIndex);
@@ -6235,7 +6284,7 @@ function spawnBot(index: number, hosted = false): void {
     node.userData.playerId = id;
     node.userData.targetRoot = root;
   });
-  const spawn = selectSafeBotSpawn(botTeam);
+  const spawn = selectSafeBotSpawn(botTeam, id);
   const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
   root.position.copy(position);
   scene.add(root);
@@ -6279,7 +6328,7 @@ function activateDormantBot(index: number): boolean {
   if (!bot) return false;
   dormantBots.delete(id);
   const now = performance.now();
-  const spawn = selectSafeBotSpawn(bot.team);
+  const spawn = selectSafeBotSpawn(bot.team, bot.id);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.root.scale.setScalar(1);
@@ -6461,6 +6510,7 @@ function throwBotGrenade(
     velocity,
     angularVelocity: new THREE.Vector3(7.6, 5.8, 9.4),
     explodeAt: now + Math.max(120, fuseMs),
+    nextFuseBeepAt: now + Math.max(120, fuseMs) - GRENADE_FUSE_BEEP_START_MS,
     lastBounceAt: 0,
     actionNonce: randomNonce(),
     ownerKind: 'bot',
@@ -6572,7 +6622,7 @@ function applyBotDamage(
 
 function respawnBot(bot: BotPlayer, now: number): void {
   const state = respawnBotState(now);
-  const spawn = selectSafeBotSpawn(bot.team);
+  const spawn = selectSafeBotSpawn(bot.team, bot.id);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.continuity += 1;
@@ -6797,7 +6847,7 @@ function updateBots(dt: number, now: number): void {
     }
     // A corrupted position can never become an out-of-arena damage source.
     if (!pointInsideBounds(bot.position, arena.bounds, 0.44)) {
-      const safeSpawn = selectSafeBotSpawn(bot.team);
+      const safeSpawn = selectSafeBotSpawn(bot.team, bot.id);
       bot.position.set(safeSpawn.x, safeSpawn.y - 1.7, safeSpawn.z);
       bot.root.position.copy(bot.position);
       bot.hasLineOfSight = false;
@@ -7046,11 +7096,13 @@ function throwGrenade(): void {
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
+  const thrownAt = performance.now();
   grenades.push({
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
-    explodeAt: performance.now() + 2_300,
+    explodeAt: thrownAt + 2_300,
+    nextFuseBeepAt: thrownAt + 2_300 - GRENADE_FUSE_BEEP_START_MS,
     lastBounceAt: 0,
     actionNonce,
     ownerKind: 'player',
@@ -7063,11 +7115,13 @@ function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-thr
   mesh.position.fromArray(message.origin);
   mesh.castShadow = true;
   scene.add(mesh);
+  const receivedAt = performance.now();
   grenades.push({
     mesh,
     velocity: new THREE.Vector3(...message.velocity),
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
-    explodeAt: performance.now() + 2_300,
+    explodeAt: receivedAt + 2_300,
+    nextFuseBeepAt: receivedAt + 2_300 - GRENADE_FUSE_BEEP_START_MS,
     lastBounceAt: 0,
     actionNonce: message.actionNonce,
     ownerKind: 'remote',
@@ -7111,8 +7165,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   else scene.remove(entity.mesh);
   releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
-  if (entity.ownerKind === 'bot') audio.explosion(afterPresentationDetach);
-  else audio.sanctifiedFragExplosion();
+  audio.explosion(afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
   if (entity.ownerKind !== 'remote') breakWindowsInGrenadeBlast(point, entity.actionNonce, entity.ownerKind === 'player');
@@ -7176,6 +7229,11 @@ function explodeGrenade(entity: GrenadeEntity): void {
 function updateGrenades(dt: number, now: number): void {
   for (let index = grenades.length - 1; index >= 0; index -= 1) {
     const grenade = grenades[index];
+    const fuseRemainingMs = grenade.explodeAt - now;
+    if (fuseRemainingMs <= GRENADE_FUSE_BEEP_START_MS && now >= grenade.nextFuseBeepAt) {
+      audio.grenadeFuseBeep(fuseRemainingMs, now);
+      grenade.nextFuseBeepAt = now + grenadeFuseBeepIntervalMs(fuseRemainingMs);
+    }
     grenade.velocity.y -= 18 * dt;
     grenade.mesh.rotation.x += grenade.angularVelocity.x * dt;
     grenade.mesh.rotation.y += grenade.angularVelocity.y * dt;
@@ -7526,8 +7584,13 @@ function updateOverdrive(now: number): void {
     overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
   }
 
-  overdriveRoot.visible = overdriveState.available && gameStarted && matchState.phase === 'active';
-  if (overdriveRoot.visible) {
+  // Keep the already-compiled presentation resident at sub-pixel scale during
+  // active play. Toggling a never-submitted material tree visible at the timed
+  // spawn caused every WebGPU client to discover/upload it on the same frame.
+  // Scaling the resident tree is allocation-free and removes that synchronized hitch.
+  overdriveRoot.visible = gameStarted && matchState.phase === 'active';
+  overdriveRoot.scale.setScalar(overdriveState.available ? 1 : 0.0001);
+  if (overdriveRoot.visible && overdriveState.available) {
     overdriveRoot.position.set(
       overdriveState.position.x,
       overdriveState.position.y + Math.sin(now * 0.0032) * 0.14,
@@ -9532,6 +9595,7 @@ textChatInput.addEventListener('keydown', (event) => {
     closeTextChat(true);
   }
 });
+textChatInput.addEventListener('input', markTextChatActivity);
 textChatInput.addEventListener('keyup', (event) => event.stopPropagation());
 window.addEventListener('keydown', (event) => {
   if (isTextChatTyping()) {
@@ -10111,9 +10175,11 @@ function scheduleStateBroadcast(): void {
 }
 scheduleStateBroadcast();
 window.addEventListener('pagehide', () => {
+  persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
 });
 window.addEventListener('beforeunload', () => {
+  persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
   network.close();
   pass64TslSystems?.dispose();
@@ -11041,8 +11107,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       pickups: overdrivePickups,
       expiries: overdriveExpiries,
       presentationPrewarmed: overdrivePresentationPrewarmed,
-      visible: overdriveRoot.visible,
-      worldIconVisible: overdriveRoot.visible && quadWorldIcon.visible,
+      visible: overdriveState.available && overdriveRoot.visible,
+      renderResident: overdriveRoot.visible,
+      worldIconVisible: overdriveState.available && overdriveRoot.visible && quadWorldIcon.visible,
       worldIconName: quadWorldIcon.name,
       minimapSymbol: '2×',
     },
@@ -12113,9 +12180,8 @@ async function bootstrap(): Promise<void> {
         return value;
       });
   const grenadePromise = loadGrenadePresentation();
-  const choirPromise = audio.preloadSanctifiedFragChoir();
   const [physics, , art] = await Promise.all([
-    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise, choirPromise,
+    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise,
   ]);
   characterPhysics = physics;
   arenaArtRoot = art?.root ?? null;

@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import http from 'node:http';
 import { resolve } from 'node:path';
+import { ROOM_CHAT_IDLE_FADE_MS } from '../../src/room-chat-presentation';
 
 const peerPort = 9_063;
 let peerProcess: ChildProcess | null = null;
@@ -93,6 +94,23 @@ async function chatSnapshot(page: Page): Promise<any> {
   return page.evaluate(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().textChat);
 }
 
+async function chatPlacement(page: Page): Promise<Record<string, string | number>> {
+  return page.locator('#text-chat').evaluate((element) => {
+    const style = getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    return {
+      position: style.position,
+      left: style.left,
+      right: style.right,
+      bottom: style.bottom,
+      transform: style.transform,
+      rightInset: Math.round((innerWidth - bounds.right) * 10) / 10,
+      bottomInset: Math.round((innerHeight - bounds.bottom) * 10) / 10,
+      width: Math.round(bounds.width * 10) / 10,
+    };
+  });
+}
+
 test('shares safe authoritative history in lobby and match, gates input, and restores it on rejoin', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1_920, height: 1_080 } });
   const host = await openPlayer(context, 'Host 63', 'pass63-chat-host');
@@ -111,6 +129,8 @@ test('shares safe authoritative history in lobby and match, gates input, and res
   await sendChat(host, 'Host says hello.');
   await expect(host.locator('#text-chat-log')).toContainText('Host says hello.');
   await expect(guest.locator('#text-chat-log')).toContainText('Host says hello.');
+  await expect(host.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
+  await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
 
   const xssText = 'Literal <img src=x onerror="window.__chatXss=1">';
   await sendChat(guest, xssText);
@@ -130,7 +150,13 @@ test('shares safe authoritative history in lobby and match, gates input, and res
   expect((await chatSnapshot(host)).entries).toHaveLength(beforeSpoof);
   expect((await chatSnapshot(guest)).entries).toHaveLength(beforeSpoof);
 
+  await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'false', {
+    timeout: ROOM_CHAT_IDLE_FADE_MS + 3_000,
+  });
+  await expect(guest.locator('#text-chat')).toHaveCSS('opacity', '0');
   await openChat(guest);
+  await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
+  await expect(guest.locator('#text-chat')).toHaveCSS('opacity', '1');
   await guest.keyboard.down('w');
   await guest.keyboard.up('w');
   expect((await chatSnapshot(guest)).heldKeys).not.toContain('KeyW');
@@ -138,6 +164,8 @@ test('shares safe authoritative history in lobby and match, gates input, and res
   await guest.keyboard.press('Escape');
   await expect(guest.locator('#text-chat')).toHaveAttribute('data-open', 'false');
   await expect(guest.locator('#text-chat-input')).toHaveValue('');
+  await expect(host.locator('#text-chat')).toHaveAttribute('data-context', 'lobby');
+  const lobbyChatPlacement = await chatPlacement(host);
 
   await host.click('#lobby-ready');
   await guest.click('#lobby-ready');
@@ -147,10 +175,14 @@ test('shares safe authoritative history in lobby and match, gates input, and res
     host.waitForFunction(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true),
     guest.waitForFunction(() => (window as any).__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true),
   ]);
+  await expect(host.locator('#text-chat')).toHaveAttribute('data-context', 'game');
+  expect(await chatPlacement(host)).toEqual(lobbyChatPlacement);
 
   await sendChat(guest, 'Live match check.');
   await expect(host.locator('#text-chat-log')).toContainText('Live match check.');
   await expect(guest.locator('#text-chat-log')).toContainText('Live match check.');
+  await expect(host.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
+  await expect(guest.locator('#text-chat')).toHaveAttribute('data-visible', 'true');
 
   const overlapAudit = await host.evaluate(() => {
     const rect = (selector: string) => document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() ?? null;

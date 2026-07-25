@@ -337,6 +337,37 @@ export const RUSTWORKS_TOWER = Object.freeze({
   openContainerClearHeight: 2.46,
 });
 
+/**
+ * Authored fixture locations shared by the RustRig presentation and its one
+ * budgeted shadowed-local work light. Both heads remain visible/emissive; only
+ * the north head owns a runtime light volume so the moon + local-light budget
+ * stays at two shadow casters.
+ */
+export const RUSTWORKS_WORK_LIGHTS = Object.freeze([
+  Object.freeze({
+    id: 'north',
+    position: [0, 8.35, -4.35] as const,
+    mount: [0, 8.35, -3.35] as const,
+    target: [0, 0.8, 13.5] as const,
+    color: 0xffd2a0,
+    intensity: 46,
+    distance: 34,
+    angle: 0.82,
+    shadowed: true,
+  }),
+  Object.freeze({
+    id: 'south',
+    position: [0, 8.35, 4.35] as const,
+    mount: [0, 8.35, 3.35] as const,
+    target: [0, 0.8, -13.5] as const,
+    color: 0xffd2a0,
+    intensity: 0,
+    distance: 0,
+    angle: 0.82,
+    shadowed: false,
+  }),
+]);
+
 export function rustworksDeckTopY(centerY: number, thickness: number = RUSTWORKS_TOWER.deckThickness): number {
   return centerY + thickness / 2;
 }
@@ -365,6 +396,14 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   const tarp = standard(0x315665, 0.94, 0.02);
   const oxide = standard(0x4a2c22, 0.9, 0.3);
   const grate = standard(0x4e585c, 0.62, 0.55);
+  const workLightHousing = standard(0x20282b, 0.58, 0.72);
+  const workLightLens = new THREE.MeshStandardMaterial({
+    color: 0xffedcf,
+    roughness: 0.18,
+    metalness: 0.06,
+    emissive: 0xffb45c,
+    emissiveIntensity: 4.8,
+  });
 
   // Raised oil-rig deck (playable surface stays at y≈0 for physics). Ocean sits far below.
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(54, 58), steel);
@@ -386,7 +425,15 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   ground.userData.ballisticSurfaceId = groundSurface.id;
   // Thick deck plate + edge lip so the drop to water reads when looking over.
   box(builder, 'rustworks-rig-deck-slab', [0, -0.85, 0], [54.5, 1.6, 58.5], rustDark, { solid: false, cast: true, shots: false });
-  box(builder, 'rustworks-rig-deck-edge', [0, -0.08, 0], [55.2, 0.22, 59.2], hazardDark, { solid: false, cast: false, shots: false });
+  const deckEdgeSpecs = [
+    { id: 'north', position: [0, -0.08, -28.85] as [number, number, number], size: [54.5, 0.22, 0.8] as [number, number, number] },
+    { id: 'south', position: [0, -0.08, 28.85] as [number, number, number], size: [54.5, 0.22, 0.8] as [number, number, number] },
+    { id: 'west', position: [-26.85, -0.08, 0] as [number, number, number], size: [0.8, 0.22, 56.9] as [number, number, number] },
+    { id: 'east', position: [26.85, -0.08, 0] as [number, number, number], size: [0.8, 0.22, 56.9] as [number, number, number] },
+  ];
+  for (const edge of deckEdgeSpecs) {
+    box(builder, `rustworks-rig-deck-edge-${edge.id}`, edge.position, edge.size, hazardDark, { solid: false, cast: false, shots: false });
+  }
   // Support legs down toward the ocean (visual only — no snag colliders).
   for (const x of [-22, -8, 8, 22]) for (const z of [-24, -8, 8, 24]) {
     box(builder, 'rustworks-rig-leg', [x, -8.5, z], [1.35, 15.5, 1.35], steelBright, { solid: false, detail: 'performance' });
@@ -401,11 +448,31 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   }
 
   // Painted walk lanes — presentation only, clear paths for bots/players.
-  box(builder, 'rustworks-tower-hardstand', [0, 0.03, 0], [16, 0.06, 16], packed, { solid: false, cast: false });
-  box(builder, 'rustworks-service-lane', [0, 0.04, 0], [5.5, 0.05, 48], concreteDark, { solid: false, cast: false });
-  box(builder, 'rustworks-service-lane', [0, 0.04, 0], [48, 0.05, 5.5], concreteDark, { solid: false, cast: false });
-  for (const z of [-20, 20]) {
-    box(builder, 'rustworks-ground-chevron', [0, 0.05, z], [2.8, 0.03, 0.45], hazard, { solid: false, cast: false, shots: false });
+  const hardstandSpec = {
+    id: 'hardstand',
+    position: [0, 0.03, 0] as [number, number, number],
+    size: [16, 0.06, 16] as [number, number, number],
+  };
+  box(builder, 'rustworks-tower-hardstand', hardstandSpec.position, hardstandSpec.size, packed, { solid: false, cast: false });
+  // Four edge-abutting lane sections replace the two intersecting full-length
+  // overlays. Their top faces no longer occupy the same pixels at the central
+  // cross/hardstand, removing the long-distance deck shimmer.
+  const serviceLaneSpecs = [
+    { id: 'north', position: [0, 0.04, -16] as [number, number, number], size: [5.5, 0.05, 16] as [number, number, number] },
+    { id: 'south', position: [0, 0.04, 16] as [number, number, number], size: [5.5, 0.05, 16] as [number, number, number] },
+    { id: 'west', position: [-16, 0.04, 0] as [number, number, number], size: [16, 0.05, 5.5] as [number, number, number] },
+    { id: 'east', position: [16, 0.04, 0] as [number, number, number], size: [16, 0.05, 5.5] as [number, number, number] },
+  ];
+  for (const lane of serviceLaneSpecs) {
+    box(builder, `rustworks-service-lane-${lane.id}`, lane.position, lane.size, concreteDark, { solid: false, cast: false });
+  }
+  const chevronSpecs = [-20, 20].map((z) => ({
+    id: `chevron-${z < 0 ? 'north' : 'south'}`,
+    position: [0, 0.075, z] as [number, number, number],
+    size: [2.8, 0.02, 0.45] as [number, number, number],
+  }));
+  for (const chevron of chevronSpecs) {
+    box(builder, 'rustworks-ground-chevron', chevron.position, chevron.size, hazard, { solid: false, cast: false, shots: false });
   }
 
   // Open safety rail (NOT solid walls) — world bounds stop exits; ocean stays visible.
@@ -532,6 +599,78 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     shots: false,
     detail: 'performance',
   });
+
+  for (const fixture of RUSTWORKS_WORK_LIGHTS) {
+    const head = new THREE.Vector3(...fixture.position);
+    const target = new THREE.Vector3(...fixture.target);
+    const direction = target.clone().sub(head).normalize();
+    const orientation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+    presentationBeam(
+      builder,
+      `rustworks-work-light-mount-${fixture.id}`,
+      [...fixture.mount],
+      [...fixture.position],
+      0.16,
+      steelBright,
+    );
+    const housingPosition = head.clone().addScaledVector(direction, -0.12);
+    const housing = box(
+      builder,
+      `rustworks-work-light-housing-${fixture.id}`,
+      housingPosition.toArray(),
+      [0.92, 0.52, 0.34],
+      workLightHousing,
+      { solid: false, shots: false, detail: 'performance' },
+    );
+    housing.quaternion.copy(orientation);
+    const lens = box(
+      builder,
+      `rustworks-work-light-lens-${fixture.id}`,
+      [...fixture.position],
+      [0.72, 0.34, 0.055],
+      workLightLens,
+      { solid: false, shots: false, cast: false, detail: 'performance' },
+    );
+    lens.quaternion.copy(orientation);
+    lens.userData.occlusionPolicy = 'emissive-only';
+    lens.userData.practicalPolicyId = 'tower-work-light-lenses';
+    lens.userData.fixtureId = fixture.id;
+  }
+
+  const managedSurfaceSpecs = [hardstandSpec, ...serviceLaneSpecs, ...chevronSpecs, ...deckEdgeSpecs];
+  const coplanarOverlapPairs: string[] = [];
+  for (let first = 0; first < managedSurfaceSpecs.length; first += 1) {
+    const a = managedSurfaceSpecs[first];
+    const aTop = a.position[1] + a.size[1] / 2;
+    for (let second = first + 1; second < managedSurfaceSpecs.length; second += 1) {
+      const b = managedSurfaceSpecs[second];
+      const bTop = b.position[1] + b.size[1] / 2;
+      const overlapX = Math.min(a.position[0] + a.size[0] / 2, b.position[0] + b.size[0] / 2)
+        - Math.max(a.position[0] - a.size[0] / 2, b.position[0] - b.size[0] / 2);
+      const overlapZ = Math.min(a.position[2] + a.size[2] / 2, b.position[2] + b.size[2] / 2)
+        - Math.max(a.position[2] - a.size[2] / 2, b.position[2] - b.size[2] / 2);
+      if (Math.abs(aTop - bTop) < 1e-4 && overlapX > 1e-4 && overlapZ > 1e-4) {
+        coplanarOverlapPairs.push(`${a.id}:${b.id}`);
+      }
+    }
+  }
+  root.userData.rustworksDeckSurfaceAudit = {
+    perimeterEdgeSegments: deckEdgeSpecs.length,
+    serviceLaneSegments: serviceLaneSpecs.length,
+    fullDeckLipOverlay: false,
+    coplanarOverlapPairs,
+  };
+  root.userData.rustworksWorkLightAudit = {
+    fixtures: RUSTWORKS_WORK_LIGHTS.map((fixture) => ({
+      id: fixture.id,
+      position: [...fixture.position],
+      target: [...fixture.target],
+      emissiveOnlyLens: true,
+      shadowedLocalVolume: fixture.shadowed,
+    })),
+    shadowedLocalVolumes: RUSTWORKS_WORK_LIGHTS.filter((fixture) => fixture.shadowed).length,
+    maximumShadowCastersIncludingMoon: 2,
+  };
 
   // Ground → lower deck ramp on -Z with explicit foot/top landings (≤50°).
   const lowerRampAngle = (lowerRampAngleDegrees * Math.PI) / 180;
@@ -1843,6 +1982,38 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     mesh.userData.skylineQualityPlaceholder = true;
     return mesh;
   };
+  type SkylineWalkablePlatform = Readonly<{
+    id: string;
+    presentationName: string;
+    bounds: Box2;
+    y: number;
+    ballisticSurfaceId: string;
+    qualityPresentationName?: string;
+  }>;
+  const walkablePlatforms: SkylineWalkablePlatform[] = [];
+  const addWalkablePlatform = (
+    id: string,
+    presentationName: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.MeshStandardMaterial,
+    options: Readonly<{ qualityPlaceholder?: boolean; qualityPresentationName?: string }> = {},
+  ): THREE.Mesh => {
+    const mesh = options.qualityPlaceholder
+      ? qualityPlaceholderBox(presentationName, position, size, material)
+      : box(builder, presentationName, position, size, material);
+    const bounds = builder.physicsColliders[builder.physicsColliders.length - 1];
+    walkablePlatforms.push({
+      id,
+      presentationName,
+      bounds,
+      y: position[1] + size[1] / 2,
+      ballisticSurfaceId: mesh.userData.ballisticSurfaceId as string,
+      qualityPresentationName: options.qualityPresentationName,
+    });
+    mesh.userData.skylineWalkablePlatformId = id;
+    return mesh;
+  };
   root.userData.skylineDetailClusters = [...skylineClusterIds];
   root.userData.skylineAssetAudit = {
     retained: ['terminal-shell', 'mezzanine-routes', 'breakable-facade', 'jetbridge', 'airstair', 'apron-boundaries'],
@@ -1957,10 +2128,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   // Split the mezzanine around both escalators. A monolithic slab creates a
   // low underside above each ramp and physically stops the character halfway.
-  box(builder, 'skyline-concourse-mezzanine', [0, 3.2, -31.25], [52, 0.28, 5.5], floorMat);
-  box(builder, 'skyline-mezzanine-front-center', [0, 3.2, -25.25], [36.4, 0.28, 6.5], floorMat);
-  box(builder, 'skyline-mezzanine-front-west', [-23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
-  box(builder, 'skyline-mezzanine-front-east', [23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
+  addWalkablePlatform('mezzanine-back', 'skyline-concourse-mezzanine', [0, 3.2, -31.25], [52, 0.28, 5.5], floorMat);
+  addWalkablePlatform('mezzanine-front-center', 'skyline-mezzanine-front-center', [0, 3.2, -25.25], [36.4, 0.28, 6.5], floorMat);
+  addWalkablePlatform('mezzanine-front-west', 'skyline-mezzanine-front-west', [-23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
+  addWalkablePlatform('mezzanine-front-east', 'skyline-mezzanine-front-east', [23.8, 3.2, -25.25], [4.4, 0.28, 6.5], floorMat);
   // A pale coffered underside keeps the deployment end readable without
   // changing the collision-authoritative mezzanine slabs above it.
   detailBox('wall-structure', 'skyline-mezzanine-soffit-back', [0, 3.035, -31.25], [51.4, 0.035, 4.95], soffitMat);
@@ -1989,7 +2160,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // not visually pass through a barrier.
   box(builder, 'skyline-mezzanine-rail', [-14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
   box(builder, 'skyline-mezzanine-rail', [14, 4.2, -22.1], [24, 1.1, 0.15], trimMat, { solid: false, detail: 'performance' });
-  box(builder, 'skyline-gate-connector-floor', [0, 3.2, -17], [3.6, 0.24, 10], soffitMat);
+  addWalkablePlatform('gate-connector', 'skyline-gate-connector-floor', [0, 3.2, -17], [3.6, 0.24, 10], soffitMat);
   detailBox('boarding-route', 'skyline-gate-connector-soffit', [0, 3.065, -17], [3.42, 0.035, 9.72], soffitMat);
   for (const lightZ of [-20.2, -17, -13.8]) {
     detailBox('boarding-route', `skyline-gate-connector-underlight-${lightZ}`, [0, 3.035, lightZ], [2.65, 0.025, 0.11], practicalMat);
@@ -2237,7 +2408,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   detailBox('boarding-route', 'skyline-jetbridge-bellows-header', [0, 5.42, -11.8], [4.1, 0.36, 0.5], jetbridgeMat, 'quality');
 
-  box(builder, 'skyline-jetbridge-floor', [0, 3.2, -7], [3.6, 0.24, 10], jetbridgeMat);
+  addWalkablePlatform('jetbridge', 'skyline-jetbridge-floor', [0, 3.2, -7], [3.6, 0.24, 10], jetbridgeMat);
   box(builder, 'skyline-jetbridge-wall-left', [-1.75, 4.4, -6], [0.15, 2.2, 12], wallMat);
   box(builder, 'skyline-jetbridge-wall-right', [1.75, 4.4, -6], [0.15, 2.2, 12], wallMat);
   box(builder, 'skyline-jetbridge-roof', [0, 5.5, -6], [3.6, 0.15, 12], jetbridgeMat, { solid: false, shots: false });
@@ -2269,7 +2440,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // opaque portal.
 
   qualityPlaceholderBox('skyline-jetliner-fuselage-top', [0, 5.8, 2.0], [36.0, 1.2, 4.2], planeHullMat);
-  box(builder, 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
+  addWalkablePlatform('jetliner-cabin', 'skyline-jetliner-cabin-floor', [0, 2.4, 2.0], [35.0, 0.3, 3.8], floorMat);
   // Split the north fuselage wall around the jetbridge doorway. A single solid
   // wall made the authored bridge-to-cabin route stop outside the aircraft.
   box(builder, 'skyline-jetliner-side-north', [-9.65, 3.75, 0.2], [15.7, 2.4, 0.2], planeHullMat);
@@ -2279,7 +2450,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // sphere backed by a different invisible box. The cabin floor and side
   // authority now continue to a glass-fronted cockpit, while the rear aperture
   // remains open in both profiles.
-  box(builder, 'skyline-cockpit-floor', [-18.75, 2.4, 2.0], [2.5, 0.3, 3.8], floorMat);
+  addWalkablePlatform('jetliner-cockpit', 'skyline-cockpit-floor', [-18.75, 2.4, 2.0], [2.5, 0.3, 3.8], floorMat);
   box(builder, 'skyline-cockpit-lower-side-north', [-18.75, 3.3, 0.2], [2.5, 1.5, 0.2], planeHullMat);
   box(builder, 'skyline-cockpit-lower-side-south', [-18.75, 3.3, 3.8], [2.5, 1.5, 0.2], planeHullMat);
   box(builder, 'skyline-cockpit-glass-north', [-18.75, 4.42, 0.2], [2.5, 0.74, 0.2], cockpitGlassMat, { ballisticMaterial: 'glass' });
@@ -2399,8 +2570,40 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   }
   detailBox('terminal-story', 'skyline-cabin-exit-sign', [15.9, 4.95, 2], [0.1, 0.32, 1.25], practicalMat);
 
-  qualityPlaceholderBox('skyline-jetliner-wing-port', [0, 2.8, 11.0], [5.0, 0.3, 15.0], planeWingMat);
-  qualityPlaceholderBox('skyline-jetliner-wing-starboard', [0, 2.8, -7.0], [5.0, 0.3, 15.0], planeWingMat);
+  // The retained Quality wings are tapered prisms. Their former single box
+  // colliders stopped short of the visible tips and leading edges, so players
+  // could stand on rendered wing surface with no Rapier support. Eight narrow
+  // authority sections per side conservatively cover the prism with at most a
+  // 0.238 m edge overhang (below the 0.38 m player radius).
+  const wingSliceCount = 8;
+  const wingAuthorityMaximumOverhang = 1.9 / wingSliceCount;
+  const addWingAuthority = (
+    side: 'port' | 'starboard',
+    rootZ: number,
+    tipDeltaZ: number,
+    qualityPresentationName: string,
+  ): void => {
+    for (let index = 0; index < wingSliceCount; index += 1) {
+      const start = index / wingSliceCount;
+      const end = (index + 1) / wingSliceCount;
+      const startZ = rootZ + tipDeltaZ * start;
+      const endZ = rootZ + tipDeltaZ * end;
+      // The rootward width contains the complete tapered prism throughout this
+      // slice; the bounded excess shrinks with every section.
+      const minX = -3.2 + 1.9 * start;
+      const maxX = 2.7 - 0.9 * start;
+      addWalkablePlatform(
+        `jetliner-wing-${side}-${index + 1}`,
+        `skyline-jetliner-wing-${side}-authority-${index + 1}`,
+        [(minX + maxX) / 2, 2.82, (startZ + endZ) / 2],
+        [maxX - minX, 0.28, Math.abs(endZ - startZ)],
+        planeWingMat,
+        { qualityPlaceholder: true, qualityPresentationName },
+      );
+    }
+  };
+  addWingAuthority('port', 3.6, 16.8, 'skyline-quality-wing-port');
+  addWingAuthority('starboard', 0.4, -16.8, 'skyline-quality-wing-starboard');
   qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [2.2, 2.2, 4.5], engineMat);
   qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [2.2, 2.2, 4.5], engineMat);
   const portWing = detailMesh(
@@ -2560,6 +2763,21 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       aperture: { minX: -17.75, maxX: -17.3, minY: 2.8, maxY: 5.0, minZ: 0.6, maxZ: 3.4 },
     },
   ]);
+  root.userData.skylinePlatformAuthorityAudit = {
+    version: 'pass64-shared-platform-authority-v1',
+    wingSliceCount,
+    wingAuthorityMaximumOverhang,
+    platforms: walkablePlatforms.map((platform) => ({
+      id: platform.id,
+      presentationName: platform.presentationName,
+      qualityPresentationName: platform.qualityPresentationName ?? null,
+      bounds: { ...platform.bounds },
+      y: platform.y,
+      movementAuthority: builder.colliders.includes(platform.bounds),
+      physicsAuthority: builder.physicsColliders.includes(platform.bounds),
+      shotAuthority: builder.shotSurfaces.some((surface) => surface.id === platform.ballisticSurfaceId),
+    })),
+  };
 
   root.userData.skylineRoutes = {
     'concourse-to-mezzanine': [
@@ -2604,15 +2822,14 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       { id: 'jetbridge-cabin-ramp', from: [0, 3.32, -2.03], to: [0, 2.55, 0.03], width: 3.6 },
       { id: 'rear-airstair', from: [21.35, 0, 2], to: [17.45, 2.55, 2], width: 2.2 },
     ],
-    platforms: [
-      { id: 'mezzanine-back', minX: -26, maxX: 26, minZ: -34, maxZ: -28.5, y: 3.34 },
-      { id: 'mezzanine-front-center', minX: -18.2, maxX: 18.2, minZ: -28.5, maxZ: -22, y: 3.34 },
-      { id: 'mezzanine-front-west', minX: -26, maxX: -21.6, minZ: -28.5, maxZ: -22, y: 3.34 },
-      { id: 'mezzanine-front-east', minX: 21.6, maxX: 26, minZ: -28.5, maxZ: -22, y: 3.34 },
-      { id: 'gate-connector', minX: -1.8, maxX: 1.8, minZ: -22, maxZ: -12, y: 3.32 },
-      { id: 'jetbridge', minX: -1.8, maxX: 1.8, minZ: -12, maxZ: -2, y: 3.32 },
-      { id: 'jetliner-cabin', minX: -17.5, maxX: 17.5, minZ: 0.1, maxZ: 3.9, y: 2.55 },
-    ],
+    platforms: walkablePlatforms.map((platform) => ({
+      id: platform.id,
+      minX: platform.bounds.minX,
+      maxX: platform.bounds.maxX,
+      minZ: platform.bounds.minZ,
+      maxZ: platform.bounds.maxZ,
+      y: platform.y,
+    })),
   };
 
   root.userData.skylineAccess = {

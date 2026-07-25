@@ -11,7 +11,10 @@ describe('text chat UI contract', () => {
     expect(shellSource).toContain('id="text-chat-log" role="log" aria-live="polite"');
     expect(shellSource).toContain('id="text-chat-input"');
     expect(shellSource).toContain('maxlength="${CHAT_TEXT_MAX_CHARS}"');
-    expect(styleSource).toContain('#text-chat[data-context=lobby]');
+    expect(shellSource).toContain('data-visible="false"');
+    expect(styleSource).not.toContain('#text-chat[data-context=lobby]');
+    expect(styleSource).toContain('left:auto;right:24px;bottom:300px;transform:none');
+    expect(styleSource).toContain('#text-chat[data-visible=false][data-open=false]{opacity:0;pointer-events:none}');
     expect(styleSource).toContain('#text-chat[data-open=true] #text-chat-log');
   });
 

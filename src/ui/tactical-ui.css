@@ -1305,8 +1305,10 @@
   }
 
   #text-chat {
+    left: auto;
     right: 24px;
     bottom: 300px;
+    transform: none;
     width: min(360px, calc(100vw - 32px));
     border: 1px solid var(--ui-line-strong);
     border-radius: 0;

@@ -11,8 +11,8 @@ export const definition = createProceduralArenaVisualDefinition({
   lighting: {
     sunColor: 0xe2ebff, sunIntensity: 3.6, ambientColor: 0x718aa5, ambientIntensity: 0.56,
     practicals: [
-      { id: 'industrial-floods', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
-      { id: 'deck-contrast-key', policy: 'shadowed-local', maximumDistance: 55, castsShadow: true },
+      { id: 'tower-work-light-lenses', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
+      { id: 'tower-mounted-work-light', policy: 'shadowed-local', maximumDistance: 34, castsShadow: true },
     ],
   },
   fog: { color: 0x293747, near: 58, far: 152 },
@@ -25,6 +25,8 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('rustrig-overview', [38, 31, 42], [0, 5, 0], 'overview', 1.48),
     camera('rustrig-tower-support', [14, 2.4, 12], [0, 5, 0], 'geometry', 1.48),
     camera('rustrig-container-wall', [10, 2.1, -18], [4, 2.1, -18], 'light-occlusion', 1.48),
+    camera('rustrig-mounted-work-lights', [11, 5.4, -12], [0, 6.4, 0], 'light-occlusion', 1.48),
+    camera('rustrig-deck-surface', [18, 2.2, 18], [0, 0.04, 0], 'geometry', 1.48),
   ],
   collisionIdentity: { authoritativeArenaId: 'rustworks-1v1', evidence: 'ArenaMap rustworks-1v1 collider and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['animated Welsh flag cloth is presentation-only'],

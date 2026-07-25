@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { RUSTWORKS_WORK_LIGHTS } from './additional-maps';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { definition as atomicDefinition } from './rendering/arenas/atomic-acres';
 import { definition as gunRangeDefinition } from './rendering/arenas/gun-range';
@@ -29,6 +30,17 @@ describe('Pass 62 arena contrast lighting', () => {
       shadowCastingLights: 1,
       occlusion: { activeLocalLights: 1, shadowedLocalLights: 1, violations: [] },
     });
+    const fixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.shadowed);
+    const mountedLight = scene.getObjectByName('rustworks-1v1-tower-mounted-work-light-1') as THREE.SpotLight;
+    expect(fixture).toBeTruthy();
+    expect(mountedLight).toBeInstanceOf(THREE.SpotLight);
+    expect(mountedLight.position.toArray()).toEqual([...(fixture?.position ?? [])]);
+    expect(mountedLight.target.position.toArray()).toEqual([...(fixture?.target ?? [])]);
+    expect(mountedLight.shadow.mapSize.toArray()).toEqual([512, 512]);
+    expect(rustworksDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
+      'rustrig-mounted-work-lights',
+      'rustrig-deck-surface',
+    ]));
     rig.applyDefinition(gunRangeDefinition);
     expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 1, shadowCastingLights: 1 });
   });

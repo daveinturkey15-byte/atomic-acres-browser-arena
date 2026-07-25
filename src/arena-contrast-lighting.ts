@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RUSTWORKS_WORK_LIGHTS } from './additional-maps';
 import type { ArenaId } from './map-selection';
 import type { RenderProfile } from './render-profile';
 import type { ArenaVisualDefinition } from './rendering/arena-visual-definition';
@@ -11,18 +12,28 @@ type ArenaKeyLight = Readonly<{
   intensity: number;
   distance: number;
   angle: number;
+  shadowMapSize?: number;
 }>;
 
-const KEY_LIGHTS = {
+const KEY_LIGHTS: Readonly<Record<ArenaId, readonly ArenaKeyLight[]>> = {
   'atomic-acres': [
     { position: [-26, 11, 12], target: [-18, 1.8, 2], color: 0xffc981, intensity: 13, distance: 32, angle: 0.62 },
     { position: [26, 10, -12], target: [18, 1.8, -2], color: 0xa9d8ff, intensity: 11, distance: 31, angle: 0.6 },
   ],
-  // One overhead moon/flood key keeps the deck readable while retaining real
-  // wall/container occlusion. Authored flood fixtures remain emissive-only.
-  'rustworks-1v1': [
-    { position: [0, 20, 0], target: [0, 0.8, 0], color: 0xffd2a0, intensity: 30, distance: 55, angle: 1.05 },
-  ],
+  // The visual fixture and shadowed volume share authored coordinates. The
+  // opposite head remains emissive-only so the moon + practical stay within
+  // RustRig's two-shadow-light budget.
+  'rustworks-1v1': RUSTWORKS_WORK_LIGHTS
+    .filter((fixture) => fixture.shadowed)
+    .map((fixture) => ({
+      position: fixture.position,
+      target: fixture.target,
+      color: fixture.color,
+      intensity: fixture.intensity,
+      distance: fixture.distance,
+      angle: fixture.angle,
+      shadowMapSize: 512,
+    })),
   'gun-range': [
     { position: [0, 6.2, 12], target: [0, 1.6, -17], color: 0xd8f3ff, intensity: 14, distance: 45, angle: 0.58 },
   ],
@@ -30,7 +41,7 @@ const KEY_LIGHTS = {
     { position: [-20, 6.7, -30], target: [-8, 0.8, -19], color: 0xbcecff, intensity: 20, distance: 34, angle: 0.62 },
     { position: [20, 6.7, -24], target: [8, 0.8, -17], color: 0xffc68a, intensity: 17, distance: 34, angle: 0.62 },
   ],
-} as const satisfies Readonly<Record<ArenaId, readonly ArenaKeyLight[]>>;
+};
 
 export type ArenaContrastLightingTelemetry = Readonly<{
   profile: RenderProfile;
@@ -89,7 +100,8 @@ export class ArenaContrastLighting {
       light.name = `${definition.id}-${policy.id}-${index + 1}`;
       light.position.set(spec.position[0], spec.position[1], spec.position[2]);
       makeShadowedLocal(light);
-      light.shadow.mapSize.set(256, 256);
+      const shadowMapSize = spec.shadowMapSize ?? 256;
+      light.shadow.mapSize.set(shadowMapSize, shadowMapSize);
       light.shadow.camera.near = 0.5;
       light.shadow.camera.far = Math.min(spec.distance, policy.maximumDistance);
       light.shadow.bias = -0.00022;
