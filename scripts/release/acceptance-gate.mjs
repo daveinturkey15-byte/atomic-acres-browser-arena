@@ -210,7 +210,11 @@ function readPolicy() {
 }
 
 export function classifyPreviewDelta(paths, manifestPath) {
-  const relevantPaths = paths.filter((path) => path !== manifestPath);
+  // Test sources never enter the shipped Vite tree. They must still classify
+  // as full CI impact in change-impact.mjs so the edited gate is exercised,
+  // but correcting a non-shipping assertion must not invalidate approval of
+  // byte-identical runtime output.
+  const relevantPaths = paths.filter((path) => path !== manifestPath && !/^tests\//.test(path));
   const classification = relevantPaths.length === 0 ? { mode: 'none' } : classifyPaths(relevantPaths);
   return classification.mode === 'none'
     ? { ok: true, paths: relevantPaths, reason: 'only process/acceptance paths changed after preview' }
