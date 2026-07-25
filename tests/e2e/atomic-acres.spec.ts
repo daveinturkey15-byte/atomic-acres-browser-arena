@@ -906,11 +906,11 @@ test.describe('boot and authored presentation', () => {
   test('selects and persists an allowlisted field kit for deployment', async ({ page }) => {
     test.setTimeout(120_000);
     await pageReady(page);
-    await page.getByRole('button', { name: 'FIELD KIT' }).click();
+    await page.getByRole('tab', { name: 'FIELD KIT' }).click();
     const runner = page.locator('[data-kit-id="runner"]');
     await runner.click();
     await expect(runner).toHaveClass(/selected/);
-    await page.getByRole('button', { name: 'DEPLOY' }).click();
+    await page.getByRole('tab', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('Circuit Runner');
     await page.reload();
     await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
@@ -927,14 +927,14 @@ test.describe('boot and authored presentation', () => {
       document.querySelector('#menu')?.classList.remove('hidden');
     });
     await expect(page.locator('#menu')).toBeVisible();
-    await page.getByRole('button', { name: 'FIELD KIT' }).click();
+    await page.getByRole('tab', { name: 'FIELD KIT' }).click();
     await page.locator('[data-kit-id="breacher"]').click();
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
       undefined,
       { timeout: 20_000 },
     );
-    await page.getByRole('button', { name: 'DEPLOY' }).click();
+    await page.getByRole('tab', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
     const redeploy = page.getByRole('button', { name: 'REDEPLOY NOW WITH SELECTED FIELD KIT' });
     await expect(redeploy).toBeVisible();
