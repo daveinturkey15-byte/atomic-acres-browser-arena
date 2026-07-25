@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findCoralTargets, isCoralPixel } from './vision.mjs';
+import {
+  createTemporalTargetTracker,
+  findCoralTargets,
+  frameSignature,
+  isCoralPixel,
+  signatureDifference,
+} from './vision.mjs';
 
 function frame(width, height) {
   return new Uint8Array(width * height * 3).fill(18);
@@ -50,4 +56,47 @@ test('large coral scenery is rejected as an implausible operator', () => {
   const raw = frame(width, height);
   paint(raw, width, 2, 5, 45, 35, [198, 109, 90]);
   assert.equal(findCoralTargets(raw, width, height, 3).length, 0);
+});
+
+test('Pass 63 top-right hostile-operator notification cannot become a target', () => {
+  const width = 100;
+  const height = 60;
+  const raw = frame(width, height);
+  paint(raw, width, 70, 8, 78, 13, [255, 116, 94]);
+  paint(raw, width, 45, 24, 50, 35, [255, 116, 94]);
+  const targets = findCoralTargets(raw, width, height, 3);
+  assert.equal(targets.length, 1);
+  assert.ok(targets[0].x < 60);
+});
+
+test('temporal confirmation rejects inactive countdown and screen-locked HUD', () => {
+  const tracker = createTemporalTargetTracker({ confirmationFrames: 3 });
+  const target = (x) => [{ x, y: 40, pixels: 30, score: 0, bounds: { width: 4, height: 8 } }];
+  assert.equal(tracker.update(target(50), { width: 100, height: 60, active: false }).reason, 'inactive-match');
+  tracker.update(target(50), { width: 100, height: 60, active: true, cameraMoved: true });
+  tracker.update(target(50), { width: 100, height: 60, active: true, cameraMoved: true });
+  const locked = tracker.update(target(50), { width: 100, height: 60, active: true, cameraMoved: true });
+  assert.equal(locked.confirmedTarget, null);
+  assert.equal(locked.reason, 'screen-locked-overlay');
+});
+
+test('temporal confirmation accepts a plausible world track after camera motion', () => {
+  const tracker = createTemporalTargetTracker({ confirmationFrames: 3 });
+  const target = (x) => [{ x, y: 40, pixels: 30, score: 0, bounds: { width: 4, height: 8 } }];
+  tracker.update(target(60), { width: 100, height: 60, active: true, cameraMoved: true });
+  tracker.update(target(57), { width: 100, height: 60, active: true, cameraMoved: true });
+  const confirmed = tracker.update(target(54), { width: 100, height: 60, active: true, cameraMoved: true });
+  assert.equal(confirmed.reason, 'temporally-confirmed');
+  assert.equal(confirmed.confirmedTarget.x, 54);
+});
+
+test('frame signatures detect visual motion without exposing world state', () => {
+  const width = 80;
+  const height = 45;
+  const first = frame(width, height);
+  const second = frame(width, height);
+  paint(second, width, 20, 12, 60, 32, [200, 200, 200]);
+  const firstSignature = frameSignature(first, width, height);
+  assert.equal(signatureDifference(firstSignature, firstSignature), 0);
+  assert.ok(signatureDifference(firstSignature, frameSignature(second, width, height)) > 20);
 });

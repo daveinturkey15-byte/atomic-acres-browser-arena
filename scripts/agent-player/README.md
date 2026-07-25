@@ -7,7 +7,9 @@ This directory contains Jigglyclaw's low-latency Atomic Acres player-side tools.
 - Drives the ordinary deploy/lobby controls with Playwright.
 - Forces `performance` rendering and records the observed live pass.
 - Supports `solo`, `host`, and `join` flows, private-room chat, Ready, and host-start.
-- Uses a downsampled rendered-canvas coral-palette detector for first-pass visible-enemy tracking.
+- Uses a downsampled rendered-canvas Coral detector with active-match gating, HUD exclusion, temporal confirmation and screen-lock rejection; colour alone never authorizes fire.
+- Uses latest-frame CDP screencast on GPU Chrome, with on-demand capture as a measured fallback.
+- Debounces reloads, bounds confirmed bursts, reacts to visible damage and uses visible-frame stuck recovery.
 - Sends bounded keyboard/mouse-equivalent events and releases every held input on exit/failure.
 - Uses `__ATOMIC_ACRES_DEBUG__.snapshot()` only after actions for aggregate verification and benchmark evidence. Hidden bot positions and direct QA aim/damage/teleport hooks are forbidden as gameplay inputs.
 - Refuses non-local solo/host runs unless `--allow-live` is explicit, preventing accidental global-leaderboard pollution.
@@ -49,13 +51,20 @@ The Windows runner directory is:
 C:\Users\HB\AppData\Local\Temp\jigglyclaw-atomic-player-runner
 ```
 
-A full non-scoring five-minute Latest baseline uses a 330-second outer deadline so the three-second warmup and post-match export can complete:
+A full non-scoring five-minute Latest game uses a 330-second outer deadline so the three-second warmup and post-match export can complete. The preferred wrapper copies the exact committed harness into Windows, launches only the dedicated Chrome profile, runs, cleans up and archives the game even when the driver fails:
+
+```bash
+scripts/agent-player/run-windows-game.sh
+```
+
+The underlying Windows command is:
 
 ```powershell
 node.exe scripts\agent-player\atomic-player-driver.mjs `
   --cdp-url http://127.0.0.1:9333 `
   --url "<latest-channel-url>&multiplayerQa=1" `
   --allow-live --mode solo --duration 330 --wait-for-match-end `
+  --capture-mode screencast --candidate-images 12 `
   --width 960 --height 540 --output artifacts\full-5min-baseline
 ```
 
@@ -66,7 +75,7 @@ node scripts/agent-player/analyze-combat.mjs \
   --directory <artifact-directory>
 ```
 
-This writes `combat-baseline.json` with combat, contact-window, perception, latency and input-safety metrics. Treat the observed channel URL/menu pass plus the human summary `build` field as build provenance; Pass 63 technical exports currently retain an older `context.sourceId`, so that field is diagnostic context rather than release proof. Stop and verify the dedicated browser after every run:
+This writes `combat-benchmark.json` with combat, contact-window, survival, perception, latency and input-safety metrics. Treat the observed channel URL/menu pass plus the human summary `build` field as build provenance; Pass 63 technical exports currently retain an older `context.sourceId`, so that field is diagnostic context rather than release proof. Stop and verify the dedicated browser after every run:
 
 ```bash
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
@@ -74,6 +83,33 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
 ```
 
 Do not push or open a game-source PR for player-harness work unless Dave explicitly asks.
+
+## Permanent game archive
+
+Every game—complete, partial, failed or calibration—is imported into the immutable local sequence:
+
+```text
+artifacts/agent-player/archive/
+├── index.json
+└── games/G0001, G0002, ...
+```
+
+Import an existing run with:
+
+```bash
+node scripts/agent-player/archive-game.mjs \
+  --source <artifact-directory> \
+  --archive-root artifacts/agent-player/archive \
+  --run-type full-benchmark
+```
+
+Each game stores a manifest with SHA-256 hashes, raw reports, full telemetry, screenshots/contact sheet, `combat-benchmark.json`, Markdown summary, comparison versus the fixed first baseline and comparison versus the previous archived game. The metric registry emits `improved`, `regressed`, `unchanged`, `informational`, `missing` or `incomparable` for every tracked row. Missing measurements never become zero, and safety/fairness failures are hard regressions.
+
+Verify the complete sequence and every archived byte with:
+
+```bash
+node scripts/agent-player/verify-archive.mjs artifacts/agent-player/archive
+```
 
 ## Private lobby shapes
 
@@ -119,8 +155,8 @@ A benchmark is only green when the report observes Performance mode, gameplay st
 
 ## Planned refinement
 
-1. Tune false positives using real served frames from each latest pass.
-2. Add optical-flow confirmation and HUD-only OCR without hidden world state.
-3. Add an event-driven tactical-policy socket for the `atomicplayer` Hermes profile.
-4. Add private-lobby lifecycle and chat/Ready E2E receipts.
-5. After latest succeeds, run the same read-only compatibility harness against pinned Stable and record differences by pass.
+1. Tune temporal/operator-shape thresholds from archived candidate/contact sheets and official credited-hit evidence.
+2. Improve visible-minimap route choice and obstacle classification without hidden world state.
+3. Add directional damage and recoil estimation from rendered evidence.
+4. Add an event-driven tactical-policy socket for the `atomicplayer` Hermes profile.
+5. After Latest improves, run the same compatibility harness against pinned Stable and record differences by pass.

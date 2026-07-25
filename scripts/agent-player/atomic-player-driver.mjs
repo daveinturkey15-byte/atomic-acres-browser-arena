@@ -6,7 +6,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findCoralTargets } from './vision.mjs';
+import {
+  createTemporalTargetTracker,
+  findCoralTargets,
+  frameSignature,
+  signatureDifference,
+} from './vision.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../..');
@@ -118,9 +123,18 @@ async function firePulse(page, ads) {
   }, { useAds: ads });
 }
 
-async function createVisionCapture(context, page) {
+async function fireBurst(page, shots, ads) {
+  for (let shot = 0; shot < shots; shot += 1) {
+    await firePulse(page, ads);
+    if (shot + 1 < shots) await sleep(42);
+  }
+}
+
+async function createVisionCapture(context, page, options = {}) {
   const cdp = await context.newCDPSession(page);
+  const mode = options.mode ?? 'on-demand';
   const state = {
+    mode,
     receivedFrames: 0,
     decodedFrames: 0,
     failedFrames: 0,
@@ -131,44 +145,91 @@ async function createVisionCapture(context, page) {
     latest: null,
     stopped: false,
   };
+  let latestPacket = null;
+  let packetSequence = 0;
+  let consumedPacketSequence = 0;
+  const frameWaiters = new Set();
+
+  const recordPacket = (encodedData, receivedAt) => {
+    state.receivedFrames += 1;
+    state.firstReceivedAt ??= receivedAt;
+    state.latestReceivedAt = receivedAt;
+    packetSequence += 1;
+    latestPacket = { encodedData, receivedAt, sequence: packetSequence };
+    for (const resolveWaiter of frameWaiters) resolveWaiter();
+    frameWaiters.clear();
+  };
+
+  if (mode === 'screencast') {
+    cdp.on('Page.screencastFrame', (event) => {
+      const receivedAt = performance.now();
+      void cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => undefined);
+      recordPacket(event.data, receivedAt);
+    });
+    await cdp.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: 28,
+      maxWidth: Number(options.maxWidth ?? 640),
+      maxHeight: Number(options.maxHeight ?? 360),
+      everyNthFrame: 1,
+    });
+  }
+
+  const decodePacket = async (packet, captureStartedAt) => {
+    const decodeStartedAt = performance.now();
+    const jpeg = Buffer.from(packet.encodedData, 'base64');
+    const { data, info } = await sharp(jpeg)
+      .resize({ width: 320, height: 180, fit: 'fill' })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const targets = findCoralTargets(data, info.width, info.height, info.channels);
+    const decodeMs = performance.now() - decodeStartedAt;
+    const captureMs = Math.max(0, packet.receivedAt - captureStartedAt);
+    state.captureDurationsMs.push(captureMs);
+    state.decodeDurationsMs.push(decodeMs);
+    state.decodedFrames += 1;
+    state.latest = {
+      sequence: state.decodedFrames,
+      receivedAt: packet.receivedAt,
+      jpeg,
+      targets,
+      signature: frameSignature(data, info.width, info.height, info.channels),
+      width: info.width,
+      height: info.height,
+      captureMs,
+      decodeMs,
+    };
+    return state.latest;
+  };
+
   return {
     state,
     async capture() {
       if (state.stopped) throw new Error('Vision capture is stopped');
       const captureStartedAt = performance.now();
+      if (mode === 'screencast') {
+        if (!latestPacket || latestPacket.sequence <= consumedPacketSequence) {
+          await withTimeout(new Promise((resolveFrame) => frameWaiters.add(resolveFrame)), 3_000, 'screencast frame');
+        }
+        if (!latestPacket) throw new Error('Screencast produced no frame');
+        consumedPacketSequence = latestPacket.sequence;
+        return decodePacket(latestPacket, captureStartedAt);
+      }
       const result = await withTimeout(cdp.send('Page.captureScreenshot', {
         format: 'jpeg', quality: 25, fromSurface: true,
       }), 8_000, 'visual capture');
       const receivedAt = performance.now();
-      state.receivedFrames += 1;
-      state.firstReceivedAt ??= receivedAt;
-      state.latestReceivedAt = receivedAt;
-      state.captureDurationsMs.push(receivedAt - captureStartedAt);
-      const decodeStartedAt = performance.now();
-      const jpeg = Buffer.from(result.data, 'base64');
-      const { data, info } = await sharp(jpeg)
-        .resize({ width: 320, height: 180, fit: 'fill' })
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      const targets = findCoralTargets(data, info.width, info.height, info.channels);
-      const decodeMs = performance.now() - decodeStartedAt;
-      state.decodeDurationsMs.push(decodeMs);
-      state.decodedFrames += 1;
-      state.latest = {
-        sequence: state.decodedFrames,
-        receivedAt,
-        jpeg,
-        targets,
-        width: info.width,
-        height: info.height,
-        captureMs: receivedAt - captureStartedAt,
-        decodeMs,
-      };
-      return state.latest;
+      recordPacket(result.data, receivedAt);
+      consumedPacketSequence = packetSequence;
+      return decodePacket(latestPacket, captureStartedAt);
     },
     async stop() {
+      if (state.stopped) return;
       state.stopped = true;
+      for (const resolveWaiter of frameWaiters) resolveWaiter();
+      frameWaiters.clear();
+      if (mode === 'screencast') await cdp.send('Page.stopScreencast').catch(() => undefined);
     },
   };
 }
@@ -179,13 +240,28 @@ async function visibleHudSnapshot(page) {
       const value = Number.parseInt(document.querySelector(selector)?.textContent?.trim() ?? '', 10);
       return Number.isFinite(value) ? value : null;
     };
+    const visible = (selector) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement) || element.hidden) return false;
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    };
+    const timer = document.querySelector('#timer')?.textContent?.trim() ?? null;
+    const countdownVisible = visible('#countdown');
+    const respawnVisible = visible('#respawn');
+    const matchSummaryVisible = Boolean(document.querySelector('#download-match-summary'));
     return {
       health: numericText('#health'),
       ammo: numericText('#ammo'),
       reserve: numericText('#reserve'),
       damageDealt: numericText('#damage-dealt'),
       damageTaken: numericText('#damage-taken'),
-      matchSummaryVisible: Boolean(document.querySelector('#download-match-summary')),
+      timer,
+      countdownVisible,
+      respawnVisible,
+      reloadState: document.querySelector('#reload-state')?.textContent?.trim() ?? '',
+      matchSummaryVisible,
+      activeMatch: !countdownVisible && !respawnVisible && !matchSummaryVisible && Boolean(timer && timer !== '00:00'),
     };
   });
 }
@@ -286,7 +362,12 @@ async function run() {
   const cdpUrl = args['cdp-url'] ? String(args['cdp-url']) : null;
   const headed = Boolean(args.headed) || Boolean(cdpUrl);
   const waitForMatchEnd = Boolean(args['wait-for-match-end']);
-  const controlSleepMs = integerArg(args['control-sleep'], cdpUrl ? 120 : 700, 80, 1000);
+  const controlSleepMs = integerArg(args['control-sleep'], cdpUrl ? 80 : 700, 50, 1000);
+  const requestedCaptureMode = String(args['capture-mode'] ?? (cdpUrl ? 'screencast' : 'on-demand'));
+  if (!['screencast', 'on-demand'].includes(requestedCaptureMode)) throw new Error('--capture-mode must be screencast or on-demand');
+  const candidateImageLimit = integerArg(args['candidate-images'], 12, 0, 40);
+  const burstShots = integerArg(args['burst-shots'], 3, 1, 5);
+  const fireCooldownMs = integerArg(args['fire-cooldown'], 420, 180, 2000);
   const allowLive = Boolean(args['allow-live']);
   const baseUrl = String(args.url ?? 'http://127.0.0.1:4173/');
   const targetUrl = new URL(baseUrl);
@@ -312,10 +393,22 @@ async function run() {
   let pointerLock = false;
   let initialSnapshot = null;
   let finalSnapshot = null;
+  let firstRawTargetCaptured = false;
   let firstTargetCaptured = false;
-  let targetFrames = 0;
+  let rawTargetFrames = 0;
+  let warmupRawTargetFrames = 0;
+  let confirmedTargetFrames = 0;
+  let rejectedScreenLockedFrames = 0;
   let visionFrames = 0;
+  let activeVisionFrames = 0;
   let shotPulses = 0;
+  let bursts = 0;
+  let warmupShotPulses = 0;
+  let unconfirmedShotPulses = 0;
+  let reloadRequests = 0;
+  let stuckRecoveries = 0;
+  let damageReactions = 0;
+  let candidateImagesSaved = 0;
   let aimMoves = 0;
   let maximumObservedHoldMs = 0;
   let bootstrapKind = null;
@@ -326,6 +419,8 @@ async function run() {
   let matchSummaryDownload = null;
   let matchTechnicalDownload = null;
   let rendererInfo = null;
+  let controlStartedAtMs = null;
+  let controlEndedAtMs = null;
   const visionDurationsMs = [];
 
   try {
@@ -439,14 +534,35 @@ async function run() {
       await sleep(120);
       pointerLock = await page.evaluate(() => document.pointerLockElement?.id === 'game');
       if (headed && !pointerLock) throw new Error('Trusted canvas click did not acquire pointer lock');
-      visionStream = await createVisionCapture(context, page);
-      await visionStream.capture();
+      visionStream = await createVisionCapture(context, page, { mode: requestedCaptureMode });
+      try {
+        await visionStream.capture();
+      } catch (error) {
+        if (requestedCaptureMode !== 'screencast') throw error;
+        browserMessages.push({ type: 'warning', text: `screencast fallback: ${error.message}` });
+        await visionStream.stop().catch(() => undefined);
+        visionStream = await createVisionCapture(context, page, { mode: 'on-demand' });
+        await visionStream.capture();
+      }
       await writeFile(resolve(artifactDirectory, 'start.jpg'), visionStream.state.latest.jpeg);
       startScreenshotCaptured = true;
-      const deadline = Date.now() + durationSeconds * 1000;
+      controlStartedAtMs = Date.now();
+      const deadline = controlStartedAtMs + durationSeconds * 1000;
+      const targetTracker = createTemporalTargetTracker({ confirmationFrames: 3 });
       let movementCycle = 0;
-      let lastVisionSequence = 0;
       let currentTarget = null;
+      let previousSignature = visionStream.state.latest.signature;
+      let previousDamageTaken = null;
+      let lowMotionFrames = 0;
+      let previousMovementForward = false;
+      let cameraMovedLastFrame = false;
+      let lastReloadRequestAt = Number.NEGATIVE_INFINITY;
+      let reloadSuppressedUntil = 0;
+      let lastBurstAt = Number.NEGATIVE_INFINITY;
+      let lastCandidateImageAt = Number.NEGATIVE_INFINITY;
+      let damageReactionUntil = 0;
+      let reactionDirection = 1;
+      let fireCheckDone = false;
       while (Date.now() < deadline) {
         const tickStarted = performance.now();
         if (waitForMatchEnd && await page.locator('#download-match-summary').isVisible().catch(() => false)) {
@@ -460,71 +576,150 @@ async function run() {
           return null;
         });
         if (!vision) break;
+        const now = Date.now();
+        const atMs = now - startedAt.getTime();
         const desiredKeys = new Set();
-        lastVisionSequence = vision.sequence;
         visionFrames += 1;
         visionDurationsMs.push(vision.decodeMs);
-        currentTarget = vision.targets[0] ?? null;
         const hud = await visibleHudSnapshot(page).catch(() => null);
         if (hud?.matchSummaryVisible) {
           matchEndedObserved = true;
-          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'match-end-visible' });
+          actions.push({ atMs, kind: 'match-end-visible' });
           break;
         }
-        if (hud?.ammo !== null && hud.ammo <= 3 && Number(hud.reserve ?? 0) > 0) {
+        const activeMatch = Boolean(hud?.activeMatch);
+        if (activeMatch) activeVisionFrames += 1;
+        const visualDifference = signatureDifference(previousSignature, vision.signature);
+        if (previousMovementForward && !cameraMovedLastFrame && visualDifference !== null && visualDifference < 2.2) lowMotionFrames += 1;
+        else if (!previousMovementForward || cameraMovedLastFrame || (visualDifference !== null && visualDifference >= 2.2)) lowMotionFrames = 0;
+        previousSignature = vision.signature;
+
+        if (previousDamageTaken !== null && Number(hud?.damageTaken ?? previousDamageTaken) > previousDamageTaken) {
+          damageReactionUntil = now + 1_100;
+          reactionDirection *= -1;
+          damageReactions += 1;
+          actions.push({ atMs, kind: 'damage-reaction', damageTaken: hud.damageTaken, health: hud.health });
+          if (damageReactions <= 3) await writeFile(resolve(artifactDirectory, `damage-contact-${String(damageReactions).padStart(2, '0')}.jpg`), vision.jpeg);
+        }
+        if (hud?.damageTaken !== null && hud?.damageTaken !== undefined) previousDamageTaken = Number(hud.damageTaken);
+
+        const reloadingVisible = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
+        if (activeMatch && hud?.ammo !== null && hud.ammo <= 3 && Number(hud.reserve ?? 0) > 0
+          && !reloadingVisible && now - lastReloadRequestAt >= 2_200) {
           await page.keyboard.press('KeyR');
-          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'reload-visible-hud', ammo: hud.ammo, reserve: hud.reserve });
+          lastReloadRequestAt = now;
+          reloadSuppressedUntil = now + 1_500;
+          reloadRequests += 1;
+          actions.push({ atMs, kind: 'reload-visible-hud', ammo: hud.ammo, reserve: hud.reserve });
+        }
+
+        const tracking = targetTracker.update(vision.targets, {
+          width: vision.width,
+          height: vision.height,
+          active: activeMatch,
+          cameraMoved: cameraMovedLastFrame,
+        });
+        const rawTarget = tracking.rawTarget;
+        currentTarget = tracking.confirmedTarget;
+        let cameraMovedThisFrame = false;
+        if (rawTarget) {
+          if (activeMatch) rawTargetFrames += 1;
+          else warmupRawTargetFrames += 1;
+          if (activeMatch && !firstRawTargetCaptured) {
+            await writeFile(resolve(artifactDirectory, 'first-raw-target.jpg'), vision.jpeg);
+            firstRawTargetCaptured = true;
+          }
+          if (activeMatch && candidateImagesSaved < candidateImageLimit && atMs - lastCandidateImageAt >= 2_000) {
+            candidateImagesSaved += 1;
+            lastCandidateImageAt = atMs;
+            await writeFile(resolve(artifactDirectory, `candidate-${String(candidateImagesSaved).padStart(2, '0')}.jpg`), vision.jpeg);
+          }
+          if (tracking.reason === 'screen-locked-overlay') {
+            rejectedScreenLockedFrames += 1;
+            targetTracker.reset();
+          } else if (activeMatch) {
+            const horizontal = rawTarget.x - vision.width / 2;
+            const vertical = rawTarget.y - vision.height / 2;
+            const movementX = Math.max(-42, Math.min(42, Math.round(horizontal * 0.55)));
+            const movementY = Math.max(-28, Math.min(28, Math.round(vertical * 0.48)));
+            if (movementX !== 0 || movementY !== 0) {
+              await moveAim(page, movementX, movementY);
+              aimMoves += 1;
+              cameraMovedThisFrame = true;
+            }
+          }
         }
         if (currentTarget) {
-          targetFrames += 1;
+          confirmedTargetFrames += 1;
           const horizontal = currentTarget.x - vision.width / 2;
           const vertical = currentTarget.y - vision.height / 2;
-          const movementX = Math.max(-55, Math.min(55, Math.round(horizontal * 0.82)));
-          const movementY = Math.max(-38, Math.min(38, Math.round(vertical * 0.72)));
-          await moveAim(page, movementX, movementY);
-          aimMoves += 1;
           const alignment = Math.hypot(horizontal / vision.width, vertical / vision.height);
-          if (alignment < 0.16) {
-            await firePulse(page, alignment < 0.09);
-            shotPulses += 1;
-          }
           if (!firstTargetCaptured) {
             await writeFile(resolve(artifactDirectory, 'first-target.jpg'), vision.jpeg);
             firstTargetCaptured = true;
           }
-          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'track', alignment, pixels: currentTarget.pixels, candidates: vision.targets.length });
+          const currentlyReloading = Boolean(hud?.reloadState) || now < reloadSuppressedUntil;
+          if (activeMatch && alignment < 0.12 && !currentlyReloading && now - lastBurstAt >= fireCooldownMs) {
+            const shots = Math.max(1, Math.min(burstShots, Number(hud?.ammo ?? burstShots)));
+            await fireBurst(page, shots, alignment < 0.075);
+            shotPulses += shots;
+            bursts += 1;
+            lastBurstAt = now;
+            actions.push({ atMs, kind: 'confirmed-burst', shots, alignment, trackAge: tracking.age, pixels: currentTarget.pixels });
+          }
+          actions.push({ atMs, kind: 'confirmed-track', alignment, pixels: currentTarget.pixels, candidates: vision.targets.length, trackAge: tracking.age });
         } else {
-          await moveAim(page, movementCycle % 7 < 4 ? 34 : -46, 0);
-          aimMoves += 1;
-          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'scan', candidates: 0 });
+          if (activeMatch && movementCycle % 6 === 0) {
+            await moveAim(page, movementCycle % 24 < 12 ? 20 : -26, 0);
+            aimMoves += 1;
+            cameraMovedThisFrame = true;
+          }
+          actions.push({ atMs, kind: rawTarget ? 'unconfirmed-track' : 'scan', candidates: vision.targets.length, reason: tracking.reason });
         }
-        if (mode === 'solo' && movementCycle === 2 && shotPulses === 0 && args['fire-check']) {
+
+        if (mode === 'solo' && activeMatch && !fireCheckDone && shotPulses === 0 && args['fire-check']) {
           await firePulse(page, false);
+          fireCheckDone = true;
           shotPulses += 1;
-          actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'mechanical-fire-check' });
+          unconfirmedShotPulses += 1;
+          actions.push({ atMs, kind: 'mechanical-fire-check' });
         }
-        if (currentTarget) {
-          const alignment = Math.hypot((currentTarget.x - 160) / 320, (currentTarget.y - 90) / 180);
-          desiredKeys.add(alignment < 0.11 ? (movementCycle % 2 === 0 ? 'KeyA' : 'KeyD') : 'KeyW');
-        } else {
-          desiredKeys.add('KeyW');
-          if (movementCycle % 4 === 1) desiredKeys.add('KeyA');
-          if (movementCycle % 4 === 3) desiredKeys.add('KeyD');
-          if (movementCycle % 13 === 7) desiredKeys.add('Space');
+
+        if (activeMatch) {
+          if (lowMotionFrames >= 3) {
+            desiredKeys.add('KeyS');
+            desiredKeys.add(reactionDirection > 0 ? 'KeyD' : 'KeyA');
+            await moveAim(page, reactionDirection > 0 ? 92 : -92, 0);
+            aimMoves += 1;
+            cameraMovedThisFrame = true;
+            stuckRecoveries += 1;
+            lowMotionFrames = 0;
+            actions.push({ atMs, kind: 'stuck-recovery', visualDifference });
+          } else if (now < damageReactionUntil || Number(hud?.health ?? 100) < 35) {
+            desiredKeys.add('KeyS');
+            desiredKeys.add(reactionDirection > 0 ? 'KeyD' : 'KeyA');
+            desiredKeys.add('ShiftLeft');
+          } else if (currentTarget) {
+            desiredKeys.add(movementCycle % 2 === 0 ? 'KeyA' : 'KeyD');
+            if (Number(hud?.health ?? 100) >= 55) desiredKeys.add('KeyW');
+          } else {
+            desiredKeys.add('KeyW');
+            if (movementCycle % 10 === 3) desiredKeys.add('KeyA');
+            if (movementCycle % 10 === 8) desiredKeys.add('KeyD');
+            if (movementCycle % 17 === 11) desiredKeys.add('Space');
+          }
+          if (movementCycle % 11 < 2) desiredKeys.add('ShiftLeft');
         }
-        if (movementCycle % 9 < 2) desiredKeys.add('ShiftLeft');
-        // SwiftShader can sample gameplay near 1 Hz on this host. A 120 ms
-        // pulse may never intersect a game frame, so use a longer deadline-
-        // bounded pulse while retaining an unconditional local release timer.
         const boundedHoldMs = Math.min(maxHoldMs, 350);
         await boundedMovement(page, desiredKeys, boundedHoldMs);
+        previousMovementForward = desiredKeys.has('KeyW');
+        cameraMovedLastFrame = cameraMovedThisFrame;
         movementCycle += 1;
-        console.error(`[atomic-player] frame=${vision.sequence} targets=${vision.targets.length} shots=${shotPulses}`);
+        console.error(`[atomic-player] frame=${vision.sequence} raw=${vision.targets.length} confirmed=${currentTarget ? 1 : 0} shots=${shotPulses}`);
         const elapsed = performance.now() - tickStarted;
-        // Leave a readback-free window for simulation and the local key-up
-        // deadline before requesting the next frame.
         await sleep(Math.max(controlSleepMs, tickMs - elapsed));
       }
+      controlEndedAtMs = Date.now();
       console.error('[atomic-player] phase=finalize');
       if (visionStream.state.latest?.jpeg) {
         await writeFile(resolve(artifactDirectory, 'final.jpg'), visionStream.state.latest.jpeg);
@@ -590,11 +785,15 @@ async function run() {
     const holdWatchdogExceeded = maximumObservedHoldMs > maxHoldMs;
     const releaseVerified = Boolean(safetyReleased && boundedInputStats && boundedInputStats.held?.length === 0);
     const sortedVisionDurations = [...visionDurationsMs].sort((left, right) => left - right);
-    const percentile = (ratio) => sortedVisionDurations.length === 0
+    const sortedCaptureDurations = [...(visionStream?.state.captureDurationsMs ?? [])].sort((left, right) => left - right);
+    const percentileFrom = (values, ratio) => values.length === 0
       ? null
-      : sortedVisionDurations[Math.min(sortedVisionDurations.length - 1, Math.floor(sortedVisionDurations.length * ratio))];
+      : values[Math.min(values.length - 1, Math.floor((values.length - 1) * ratio))];
+    await writeFile(resolve(artifactDirectory, 'telemetry.json'), `${JSON.stringify({ schemaVersion: 1, actions }, null, 2)}\n`);
+    const candidateArtifacts = Array.from({ length: candidateImagesSaved }, (_, index) => `candidate-${String(index + 1).padStart(2, '0')}.jpg`);
+    const damageArtifacts = Array.from({ length: Math.min(3, damageReactions) }, (_, index) => `damage-contact-${String(index + 1).padStart(2, '0')}.jpg`);
     const report = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: 'atomic-player-benchmark',
       startedAt: startedAt.toISOString(),
       endedAt: new Date().toISOString(),
@@ -602,6 +801,7 @@ async function run() {
         url: scrubUrl(targetUrl.toString()),
         pass,
         gitSha: localHost(targetUrl) ? currentSourceSha() : null,
+        harnessGitSha: args['harness-sha'] ? String(args['harness-sha']) : currentSourceSha(),
         channel: targetUrl.searchParams.get('release') ?? 'direct-latest-source',
       },
       session: {
@@ -615,7 +815,8 @@ async function run() {
         cdpAttached: Boolean(cdpUrl),
       },
       fairness: {
-        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-coral-mask-v1',
+        perception: args['lifecycle-only'] ? 'none-lifecycle-only' : 'rendered-pixels-coral-mask-v2-temporal-visible-hud',
+        policyVersion: 'atomic-player-policy-v2',
         decisionInputs: args['lifecycle-only']
           ? ['ordinary lobby controls and post-action lifecycle receipt']
           : ['rendered canvas pixels', 'visible HUD state through ordinary controls'],
@@ -630,25 +831,37 @@ async function run() {
         adaptive: finalSnapshot?.render?.adaptive ?? null,
         webGlRenderer: rendererInfo,
         visionFrames,
-        targetFrames,
-        targetFrameRatio: visionFrames > 0 ? targetFrames / visionFrames : 0,
+        activeVisionFrames,
+        targetFrames: rawTargetFrames,
+        rawTargetFrames,
+        warmupRawTargetFrames,
+        confirmedTargetFrames,
+        rejectedScreenLockedFrames,
+        targetFrameRatio: activeVisionFrames > 0 ? rawTargetFrames / activeVisionFrames : 0,
+        confirmedTargetFrameRatio: activeVisionFrames > 0 ? confirmedTargetFrames / activeVisionFrames : 0,
+        decisionFps: controlStartedAtMs !== null && controlEndedAtMs > controlStartedAtMs
+          ? visionFrames / ((controlEndedAtMs - controlStartedAtMs) / 1000)
+          : null,
         tickMs,
         controlSleepMs,
         viewport: { width: viewportWidth, height: viewportHeight },
         visionLoopMs: {
           minimum: sortedVisionDurations[0] ?? null,
-          median: percentile(0.5),
-          p95: percentile(0.95),
+          median: percentileFrom(sortedVisionDurations, 0.5),
+          p95: percentileFrom(sortedVisionDurations, 0.95),
           maximum: sortedVisionDurations.at(-1) ?? null,
         },
         visionStream: visionStream ? {
-          mode: 'on-demand-cdp-jpeg',
+          mode: visionStream.state.mode === 'screencast' ? 'cdp-screencast-latest-frame' : 'on-demand-cdp-jpeg',
+          requestedMode: requestedCaptureMode,
           receivedFrames: visionStream.state.receivedFrames,
           decodedFrames: visionStream.state.decodedFrames,
           failedFrames: visionStream.state.failedFrames,
           captureMs: {
-            minimum: Math.min(...visionStream.state.captureDurationsMs),
-            maximum: Math.max(...visionStream.state.captureDurationsMs),
+            minimum: sortedCaptureDurations[0] ?? null,
+            median: percentileFrom(sortedCaptureDurations, 0.5),
+            p95: percentileFrom(sortedCaptureDurations, 0.95),
+            maximum: sortedCaptureDurations.at(-1) ?? null,
           },
           sourceFps: visionStream.state.firstReceivedAt !== null && visionStream.state.latestReceivedAt > visionStream.state.firstReceivedAt
             ? visionStream.state.receivedFrames / ((visionStream.state.latestReceivedAt - visionStream.state.firstReceivedAt) / 1000)
@@ -658,6 +871,12 @@ async function run() {
       input: {
         aimMoves,
         shotPulses,
+        bursts,
+        warmupShotPulses,
+        unconfirmedShotPulses,
+        reloadRequests,
+        stuckRecoveries,
+        damageReactions,
         requestedHoldMs: 350,
         maximumObservedHoldMs,
         configuredMaxHoldMs: maxHoldMs,
@@ -699,14 +918,19 @@ async function run() {
         warningOrErrorCount: browserMessages.length,
         messages: browserMessages.slice(0, 50),
       },
+      actionsFile: 'telemetry.json',
       actions: actions.slice(-250),
       artifacts: [
         startScreenshotCaptured ? 'start.jpg' : null,
+        firstRawTargetCaptured ? 'first-raw-target.jpg' : null,
         firstTargetCaptured ? 'first-target.jpg' : null,
+        ...candidateArtifacts,
+        ...damageArtifacts,
         finalScreenshotCaptured ? 'final.jpg' : null,
         matchEndedObserved ? 'post-game.jpg' : null,
         matchSummaryDownload ? 'match-summary.json' : null,
         matchTechnicalDownload ? 'match-technical.json' : null,
+        'telemetry.json',
       ].filter(Boolean),
     };
     const reportPath = resolve(artifactDirectory, 'report.json');
@@ -730,7 +954,8 @@ async function run() {
       renderProfile: report.performance.observedRenderProfile,
       pointerLock,
       visionFrames,
-      targetFrames,
+      rawTargetFrames,
+      confirmedTargetFrames,
       shotPulses,
       outcome: report.outcome,
       pageErrors: errors.length,

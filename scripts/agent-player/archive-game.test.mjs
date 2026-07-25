@@ -1,0 +1,100 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { archiveGame, compareBenchmarks, METRIC_REGISTRY, partialBenchmarkFromReport } from './archive-game.mjs';
+import { verifyArchive } from './verify-archive.mjs';
+
+function benchmarkFixture(overrides = {}) {
+  return {
+    result: { kills: 0, deaths: 10, killDeathRatio: 0, shotsFired: 100, shotsHit: 0, accuracyPercent: 0, damageDealt: 0, damageTaken: 1000, headshots: 0, bestKillstreak: 0, shotsPerKill: null, damagePerShot: 0 },
+    survival: { firstIncomingDamageAtSeconds: 10, firstDeathAtSeconds: 20, medianCompletedLifeSeconds: 20, longestCompletedLifeSeconds: 30 },
+    contacts: { creditedBotDamageEvents: 0, nonBotDamageEvents: 1, firstCreditedBotHitAtSeconds: null, creditedBotDamageFromTimeline: 0 },
+    perception: { sourceFps: 2, captureFailures: 0, captureMedianMs: 300, captureP95Ms: 500, decodeMedianMs: 10, rawTargetFrames: 90, rawTargetFrameRatio: 0.9, confirmedTargetFrames: 0, confirmedToRawRatio: 0, rejectedScreenLockedFrames: 0 },
+    control: { gameFps: 29, gameCadenceHz: 29, warmupShotPulses: 2, unconfirmedShotPulses: 100, reloadRequests: 20, stuckRecoveries: 0, damageReactions: 0, maximumObservedHoldMs: 1000, browserWarnings: 0, performanceProfile: 'performance', pointerLock: true, releasedAtEnd: true, holdWatchdogExceeded: false, pageErrors: [] },
+    integrity: { droppedDamageEvents: 0, forbiddenInputsUsed: [], matchEndedObserved: true, summaryDownloaded: true, technicalDownloaded: true },
+    ...overrides,
+  };
+}
+
+test('all registered metrics receive deterministic comparison labels and hard safety regressions fail', () => {
+  const baseline = benchmarkFixture();
+  const current = benchmarkFixture({
+    result: { ...baseline.result, kills: 1, deaths: 8, killDeathRatio: 0.125, shotsHit: 3, accuracyPercent: 3, damageDealt: 90, damageTaken: 800, shotsPerKill: 100, damagePerShot: 0.9 },
+    control: { ...baseline.control, releasedAtEnd: false, warmupShotPulses: 0, unconfirmedShotPulses: 0 },
+  });
+  const comparison = compareBenchmarks(current, baseline, 'G0001');
+  assert.equal(comparison.rows.length, METRIC_REGISTRY.length);
+  assert.equal(comparison.rows.find((row) => row.key === 'combat.kills').label, 'improved');
+  assert.equal(comparison.rows.find((row) => row.key === 'combat.deaths').label, 'improved');
+  assert.equal(comparison.rows.find((row) => row.key === 'safety.releasedAtEnd').label, 'regressed');
+  assert.equal(comparison.hardRegression, true);
+  assert.deepEqual(comparison.hardRegressions, ['safety.releasedAtEnd']);
+});
+
+test('missing metrics are not coerced to zero', () => {
+  const comparison = compareBenchmarks({ result: { kills: null } }, { result: { kills: 0 } }, 'G0001', [
+    { key: 'combat.kills', path: 'result.kills', direction: 'higher' },
+  ]);
+  assert.equal(comparison.rows[0].label, 'missing');
+  assert.equal(comparison.rows[0].value, null);
+});
+
+test('partial games preserve available control evidence without inventing combat results', () => {
+  const partial = partialBenchmarkFromReport({
+    source: { pass: 'PASS 63' }, session: { mode: 'solo', pointerLock: true },
+    performance: { observedRenderProfile: 'performance', visionFrames: 12, visionStream: { sourceFps: 6, failedFrames: 1 } },
+    input: { releasedAtEnd: true, holdWatchdogExceeded: false }, browser: { pageErrors: [] },
+    fairness: { forbiddenInputsUsed: [] }, outcome: { matchEndedObserved: false },
+  });
+  assert.deepEqual(partial.result, {});
+  assert.equal(partial.perception.sourceFps, 6);
+  assert.equal(partial.control.releasedAtEnd, true);
+  assert.equal(partial.integrity.matchEndedObserved, false);
+});
+
+async function writeGameSource(directory, { startedAt, kills, deaths, damageDealt, damageTaken }) {
+  await mkdir(directory, { recursive: true });
+  const report = {
+    startedAt, endedAt: startedAt, source: { url: 'https://example.test/?release=latest', pass: 'PASS 63', harnessGitSha: 'abc' },
+    session: { mode: 'solo', callsign: 'Jigglyclaw', pointerLock: true }, fairness: { forbiddenInputsUsed: [] },
+    performance: { observedRenderProfile: 'performance', visionFrames: 10, rawTargetFrames: 2, confirmedTargetFrames: 1, fpsCounter: { value: '30' }, framePacing: { cadenceHz: 30 }, visionLoopMs: {}, visionStream: { sourceFps: 5, failedFrames: 0, captureMs: {}, mode: 'test' } },
+    input: { releasedAtEnd: true, holdWatchdogExceeded: false }, browser: { pageErrors: [], warningOrErrorCount: 0 },
+    outcome: { matchEndedObserved: true, downloadedSummary: {}, downloadedTechnical: {} },
+  };
+  const summary = {
+    build: 'PASS 63', match: { arena: 'Atomic Acres', mode: 'solo', result: kills > 0 ? 'VICTORY' : 'DEFEAT', durationSeconds: 303, completedAt: startedAt, damageTimelineComplete: true },
+    stats: { kills, deaths, killDeathRatio: deaths ? kills / deaths : kills, shotsFired: 10, shotsHit: kills, accuracyPercent: kills * 10, damageDealt, damageTaken, headshots: 0, bestKillstreak: kills },
+    participants: [{ name: 'Jigglyclaw', kind: 'player', finalHealth: 100 }, { name: 'BOT', kind: 'solo-bot', kills: deaths, deaths: kills, damageDealt: damageTaken, damageTaken: damageDealt, finalHealth: 100 }],
+    damageTimeline: [], droppedDamageEvents: 0,
+  };
+  await writeFile(join(directory, 'report.json'), `${JSON.stringify(report)}\n`);
+  await writeFile(join(directory, 'match-summary.json'), `${JSON.stringify(summary)}\n`);
+  await writeFile(join(directory, 'match-technical.json'), '{"schemaVersion":2}\n');
+}
+
+test('archive assigns immutable sequential IDs, deduplicates imports and compares every completed game', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'atomic-archive-test-'));
+  const archiveRoot = join(root, 'archive');
+  const first = join(root, 'first');
+  const second = join(root, 'second');
+  await writeGameSource(first, { startedAt: '2026-07-25T00:00:00Z', kills: 0, deaths: 10, damageDealt: 0, damageTaken: 1000 });
+  await writeGameSource(second, { startedAt: '2026-07-25T01:00:00Z', kills: 1, deaths: 8, damageDealt: 100, damageTaken: 800 });
+  const archivedFirst = await archiveGame({ sourceDirectory: first, archiveRoot, setBaseline: true });
+  const duplicate = await archiveGame({ sourceDirectory: first, archiveRoot });
+  const archivedSecond = await archiveGame({ sourceDirectory: second, archiveRoot });
+  assert.equal(archivedFirst.game.id, 'G0001');
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(archivedSecond.game.id, 'G0002');
+  assert.equal(archivedSecond.game.previousComparableGameId, 'G0001');
+  assert.equal(archivedSecond.baselineComparison.rows.length, METRIC_REGISTRY.length);
+  const index = JSON.parse(await readFile(join(archiveRoot, 'index.json'), 'utf8'));
+  assert.equal(index.baselineGameId, 'G0001');
+  assert.deepEqual(index.games.map((game) => game.id), ['G0001', 'G0002']);
+  const manifest = JSON.parse(await readFile(join(archiveRoot, 'games/G0002/manifest.json'), 'utf8'));
+  assert.ok(manifest.evidence.some((entry) => entry.file === 'combat-benchmark.json' && /^[a-f0-9]{64}$/.test(entry.sha256)));
+  const verification = await verifyArchive(archiveRoot);
+  assert.equal(verification.ok, true, verification.errors.join('\n'));
+  assert.equal(verification.gameCount, 2);
+});
