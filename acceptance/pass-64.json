@@ -1,0 +1,346 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 64",
+  "feedbackReceivedAt": "2026-07-25T16:27:19Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-32-c30fb9a103aa8051417f2d1d3130f85265ed56aa",
+    "sourceSha": "c30fb9a103aa8051417f2d1d3130f85265ed56aa",
+    "createdAt": "2026-07-25T18:33:57Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-07-25T18:34:54Z",
+    "evidence": "After the immutable Pass 64 preview existed, Codex applied Dave's standing instruction in the active task: once all requested work is implemented, push Pass 64 as Live and keep Pass 63 as Stable. This records that conditional release authorization against the exact completed runtime SHA."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Complete playable hardware WebGPU and TSL migration",
+      "expected": "The normal Pass 64 game runs gameplay, physics, bots, multiplayer, HUD and all arenas on an actual fail-closed WebGPU backend with TSL pipelines, selected-only arena residency and one controlled HDR path; WebGL2 remains explicit compatibility only.",
+      "falsifier": "The required route falls back, loads a legacy shader, loses the device, retains multiple arena roots, misses a TSL/HDR identity, or omits playable game systems.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "trace",
+          "ref": "artifacts/pass64/playable-webgpu/hardware-webgpu-playable-receipt.json",
+          "command": "npm run qa:pass64:webgpu",
+          "note": "Exact clean SHA c30fb9a passed actual NVIDIA WebGPU identity, four-arena switching, TSL traversal, HDR samples, zero device loss, single-root streaming, light occlusion and performance budgets."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass64-renderer-foundation.spec.ts",
+          "command": "npm run qa:pass64:renderer",
+          "note": "Proves fail-closed CI behavior, WebGL compatibility telemetry and the served Terminal renderer foundation."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pass64-hardware-webgpu-c30fb9a103aa8051417f2d1d3130f85265ed56aa/contact-sheet",
+          "note": "Exact-SHA hardware captures cover the complete playable route across all four arenas."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Terminal world-loss, roof, opening and lighting integrity",
+      "expected": "Terminal retains its drawable selected world while HUD and atmosphere run, exposes a real aircraft ceiling and valid open boarding route, and keeps practical light behind opaque geometry.",
+      "falsifier": "The world collapses to a flat fog colour, a stable selected root is detached/hidden/empty, the cabin roof disappears, an open route blocks, or a local light leaks through a closed wall.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/rendering/arena-render-watchdog.test.ts",
+          "command": "npx vitest run src/rendering/arena-render-watchdog.test.ts src/rendering/arena-visual-definition.test.ts",
+          "note": "The watchdog excludes only the atomic switch transaction, repairs only the exact adopted root, and marks stable missing geometry fatal rather than masking it."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifacts/pass64/renderer-foundation/terminal-cabin-ceiling.png",
+          "note": "Deterministic served capture covers the Terminal cabin ceiling and boarding opening."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass64-renderer-foundation.spec.ts",
+          "command": "npm run qa:pass64:renderer",
+          "note": "The served Terminal cabin/roof/opening test passes and asserts a healthy non-fatal selected-world watchdog."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Bright modern behavior-complete HUD and menu overhaul",
+      "expected": "Setup, lobby, loadout, gameplay, death, match-end and returned-lobby states use a bright readable tactical composition with no critical overlaps or tiny unreadable text while retaining every gameplay and accessibility surface.",
+      "falsifier": "A required control disappears, map or damage surfaces overlap, critical text falls below the contract, focus escapes, narrow/ultrawide layouts clip, or the interface regresses to the rejected dark-blue composition.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass64-hud-menu.spec.ts",
+          "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "All 13 HUD tests pass across laptop, desktop, ultrawide, narrow, high-DPI, live, dead, match-end and returned-lobby states with overlap and font-size assertions."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifacts/pass64/ui-review/setup-desktop-1920x1080.png",
+          "note": "The refreshed review corpus contains real world frames and the new command composition at every required viewport."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Animated arena selection previews",
+      "expected": "Nuke Town, Terminal and RustRig show renderer-backed helicopter flyovers, while Gun Range uses the cat's first-person view; motion is smooth, deterministic for review and static under reduced-motion preference.",
+      "falsifier": "A map shows a static poster only, the wrong framing is selected, movement stalls, the gameplay camera is mutated after deployment, or reduced-motion hides information.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/ui/menu-preview-camera.test.ts",
+          "command": "npx vitest run src/ui/menu-preview-camera.test.ts src/ui/surface-registry.test.ts",
+          "note": "Typed poses cover every canonical arena and deterministic/reduced-motion behavior."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass64-hud-menu.spec.ts",
+          "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --grep \"animates the live arena preview\"",
+          "note": "The served renderer canvas moves through a real preview pose and stays inside the intended showcase."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://bounded-browser-windows-c30fb9a103aa8051417f2d1d3130f85265ed56aa/pass64-ui-review",
+          "note": "The exact-SHA viewport corpus shows the helo and cat frames in the redesigned selector."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Repeatable lobby, rematch and close-tab recovery",
+      "expected": "Host and guests return to one pure waiting lobby, all can ready again, a second match starts, and a reconnecting tab recovers the intended identity without cloning live data channels.",
+      "falsifier": "Either match clock remains populated, readiness diverges, match two cannot start, signalling loss destroys healthy channels, or two tabs claim one guest identity.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/run-pass64-rematch.mjs",
+          "command": "npm run qa:pass64:rematch",
+          "note": "Two cycles with one host and two guests clear both clocks and all readiness flags, ready everyone again, start match two, and observe leave/rejoin grace."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/room-rejoin-identity.test.ts",
+          "command": "npx vitest run src/room-rejoin-identity.test.ts src/network-lifecycle.test.ts src/private-match.test.ts",
+          "note": "Covers per-tab ownership leases, 90-second recovery identity and signalling/data-channel lifecycle."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "Shot timing, health regeneration and Free For All spawn correctness",
+      "expected": "Authoritative shot timing remains exact under impairment, regenerated remote health survives a later small hit, early FFA protection is symmetric, and initial peers reserve distinct authored spawns at least eight metres apart when the map supports it.",
+      "falsifier": "Host and guest disagree, valid shots are universally blocked at match start, a healed player dies to a small hit, one peer retains asymmetric immunity, or simultaneous initial peers choose the same spawn.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-pass61-authoritative-netcode.mjs",
+          "command": "npm run qa:pass61:netcode",
+          "note": "Impaired two-peer run accepted and confirmed 7 of 7 shots with exact agreement and no rewind rejection or event-lane pressure."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-multiplayer-lifecycle.mjs",
+          "command": "npm run qa:pass64:rematch",
+          "note": "Both cycles recovered remote health to about 99 HP and survived the next 10-damage hit at about 89 HP."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/spawn-safety.test.ts",
+          "command": "npx vitest run src/spawn-safety.test.ts src/remote-health-authority.test.ts",
+          "note": "Deterministic locale-independent roster reservations prove separated initial spawns and explicit bounded fallback."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "Host-authoritative railgun with high-impact shared presentation",
+      "expected": "The eight-round Nuke Town railgun spawns after three minutes, announces once, penetrates the map for 50 damage, forces ADS exit and a 1.5-second rechamber, never replenishes, shows high-refresh blue hostile silhouettes through walls, and emits a massive shared beam and audible report.",
+      "falsifier": "Spawn/pickup/damage/ammo diverges, a repeat shot fires early, thermal shows invalid contacts, a remote shot lacks the beam/report, or ammo replenishes.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass64-railgun.spec.ts",
+          "command": "npm run qa:pass64:railgun",
+          "note": "Served gameplay proves ADS exit, exact rechamber, second-shot admission and presentation telemetry."
+        },
+        {
+          "kind": "unit",
+          "ref": "src/railgun-presentation.test.ts",
+          "command": "npx vitest run src/railgun-authority.test.ts src/railgun-presentation.test.ts src/audio-railgun.test.ts",
+          "note": "Covers authority, pooled local/replicated beam, 3D thermal silhouettes and the bounded eight-layer local/remote report."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://bounded-browser-windows-c30fb9a103aa8051417f2d1d3130f85265ed56aa/pass64-railgun",
+          "note": "Exact-SHA browser evidence contains the shared beam and thermal presentation."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "RustRig ocean, materials, mist, lights and z-fight quality",
+      "expected": "RustRig retains its authored routes and assets while gaining coherent industrial textures, large layered waves, light-reactive mist and purposeful warm practicals without coplanar deck flicker or pitch-black play lanes.",
+      "falsifier": "Deck surfaces z-fight, the sea is flat/static, mist ignores the lighting profile, practicals leak or exceed budget, routes change, or representative lanes are unreadably dark.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/additional-maps.test.ts",
+          "command": "npx vitest run src/additional-maps.test.ts src/arena-contrast-lighting.test.ts src/rendering/pass64-tsl-scene.test.ts",
+          "note": "Covers deterministic material families, animated warm lighting, three-band TSL water and mist policy."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-pass64-webgpu.mjs",
+          "command": "npm run qa:pass64:webgpu",
+          "note": "Hardware review and budget receipt include RustRig wave, mist, warm-light and single-root presentation."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pass64-hardware-webgpu-c30fb9a103aa8051417f2d1d3130f85265ed56aa/rustworks-1v1-playable.png",
+          "note": "The exact hardware capture records the revised RustRig composition."
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "summary": "Gun Range lighting and moving targets plus global combat readability",
+      "expected": "Gun Range has animated lit targets and shooting-bay lighting; bots are half as emissive across arenas; decals respect material families; and tracers are subtly bolder and longer-lived without changing hit authority.",
+      "falsifier": "Targets remain static/unlit, bays are unreadable, bots retain the overbright profile, impact marks ignore materials, or tracer/impact pools cause unbounded growth.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/impact-presentation.test.ts",
+          "command": "npx vitest run src/additional-maps.test.ts src/operator-model.test.ts src/impact-presentation.test.ts",
+          "note": "Covers moving target lights, bay motion, global 0.5 emissive multiplier and material-specific pooled decals."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-pass64-webgpu.mjs",
+          "command": "npm run qa:pass64:webgpu",
+          "note": "Gun Range passes actual WebGPU lighting, shadow and frame budgets."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pass64-hardware-webgpu-c30fb9a103aa8051417f2d1d3130f85265ed56aa/gun-range-playable.png",
+          "note": "The exact hardware capture records the animated target and bay-light environment."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "Retained gameplay, chat, grenade, killstreak, class and canonical operator contracts",
+      "expected": "Chat fades and reopens in lobby/match; normal grenades beep and explode conventionally; Terminal supports killstreaks and damage; class redeploy has no fake death; 2x Damage avoids spawn hitch; and players, bots and corpses use the canonical rigged operator family.",
+      "falsifier": "Any listed behavior regresses, the 2x spawn stalls peers, a class switch records combat side effects, or a block-built runtime body returns.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/corpse-presentation-contract.test.ts",
+          "command": "npm test",
+          "note": "The complete 763-test suite retains room chat, grenade audio/model, support, killstreak, redeploy, prewarm, canonical corpse/operator, lobby and arena contracts."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-multiplayer-lifecycle.mjs",
+          "command": "npm run qa:pass64:rematch",
+          "note": "Real peers prove clean redeploy and replicated railgun/drop state across the retained lifecycle."
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "summary": "Lightweight post-match diagnostics and log analysis",
+      "expected": "Combat/health/timing evidence is bounded in memory during play and uploaded only post-match through a private validated idempotent envelope, never over gameplay channels and never with chat, room codes, raw peer IDs, IPs or credentials.",
+      "falsifier": "Diagnostics add active-match traffic, exceed caps, retain prohibited data, clear an unacknowledged queue, expose public reads, or fail schema/idempotency checks.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass64-match-diagnostics.spec.ts",
+          "command": "npm run qa:pass64:diagnostics",
+          "note": "A completed match emits one private envelope after play with zero active-match diagnostic requests."
+        },
+        {
+          "kind": "unit",
+          "ref": "shared/match-diagnostics-schema.test.ts",
+          "command": "npm run diagnostics:check",
+          "note": "All 41 diagnostics schema, uploader, analyzer, collector and Worker validation tests pass."
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "summary": "Pass 64 Live with byte-exact Pass 63 Stable and retained Pass 62 benchmark",
+      "expected": "The chooser exposes only Pass 64 Live and Pass 63 Stable, aliases enter Pass 64, Pass 63 is copied byte-exact from production source 1bd55076 and Pages 2201a606, and the immutable Pass 62 best-netcode benchmark remains verifiable separately.",
+      "falsifier": "Pass 63 is rebuilt, a pinned byte/digest differs, an alias enters the wrong channel, an extra channel appears, or the Pass 62 benchmark record is overwritten or reclassified.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "release-channels.json",
+          "command": "npm run build && npm run stage:release-topology && npm run verify:release-topology",
+          "note": "Stages and byte-compares the 120-file complete Pass 63 Pages subtree against the pinned production commit while preserving its 119-file runtime digest."
+        },
+        {
+          "kind": "contract",
+          "ref": "baselines/pass62/best-netcode-benchmark.json",
+          "command": "npm run verify:benchmark -- --verify-git",
+          "note": "Pass 62 remains an independent immutable 118-file benchmark with digest 035e868a while Pass 63 is current Stable."
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "summary": "Exact immutable Pass 64 candidate is authorized for production",
+      "expected": "The published runtime derives from exact preview source c30fb9a and differs afterward only by this acceptance manifest and allowed process metadata; protected checks and the production receipt bind the final main SHA.",
+      "falsifier": "Runtime/release-shell content changes after preview, required checks fail, approval parity fails, the merge omits the exact preview ancestor, or production lacks a matching source/Pages receipt and live smoke.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-32-c30fb9a103aa8051417f2d1d3130f85265ed56aa",
+          "note": "GitHub Actions artifact 8622616687 was created from the exact clean runtime SHA before release authorization was recorded."
+        },
+        {
+          "kind": "contract",
+          "ref": "acceptance/pass-64.json",
+          "command": "node scripts/release/acceptance-gate.mjs --phase ci --impact full --base 1bd55076c952080d5f7a8a5b0b8869aaa0646a76 --head HEAD",
+          "note": "The acceptance gate enforces complete coverage, preview-to-approval ordering and no post-preview runtime or release-shell drift."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-release-topology-browser.mjs",
+          "command": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The exact two-channel candidate is served through chooser, Stable, latest, normal and room routes."
+        }
+      ]
+    }
+  ]
+}
