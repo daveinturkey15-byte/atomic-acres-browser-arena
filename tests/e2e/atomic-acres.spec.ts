@@ -841,7 +841,7 @@ test.describe('boot and authored presentation', () => {
   test('menu exposes controls and accessibility settings', async ({ page }) => {
     await pageReady(page);
     await expect(page.locator('#solo')).toHaveText('BOT SKIRMISH');
-    await page.getByRole('button', { name: 'OPTIONS' }).click();
+    await page.getByRole('tab', { name: 'OPTIONS' }).click();
     await expect(page.locator('#sensitivity')).toBeVisible();
     await expect(page.locator('#controller-sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
@@ -856,7 +856,7 @@ test.describe('boot and authored presentation', () => {
     });
     await page.reload();
     await pageReady(page);
-    await page.getByRole('button', { name: 'OPTIONS' }).click();
+    await page.getByRole('tab', { name: 'OPTIONS' }).click();
     await expect(page.locator('#controller-sensitivity')).toHaveValue('1.45');
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
