@@ -5,6 +5,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
+import { LegacyWebGlRenderRuntime, probeRequiredWebGpuCandidate } from './rendering/render-runtime';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon } from './art-kit';
@@ -732,11 +733,14 @@ document.documentElement.classList.toggle('compat-render', renderProfile === 'co
 document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
 document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
-const renderer = new THREE.WebGLRenderer({
+await probeRequiredWebGpuCandidate(window.location.search);
+const renderRuntime = await LegacyWebGlRenderRuntime.create({
   canvas,
   antialias: activeRenderConfig.antialias,
   powerPreference: 'high-performance',
 });
+const renderer = renderRuntime.renderer;
+document.documentElement.dataset.renderBackend = renderRuntime.backend;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = activeRenderConfig.shadows;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -745,9 +749,7 @@ renderer.shadowMap.needsUpdate = activeRenderConfig.shadowMode === 'static';
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = activeLighting.exposure;
 const signalQuery = new URLSearchParams(window.location.search).get('signal');
-const gl = renderer.getContext();
-const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info') as { UNMASKED_RENDERER_WEBGL: number } | null;
-const rendererLabel = rendererInfo ? String(gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
+const rendererLabel = renderRuntime.telemetry().adapterLabel;
 const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
 document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
@@ -9886,6 +9888,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       profile: renderProfile,
       representation: activeRenderConfig.representation,
       atomicSignal: atomicSignal.telemetry(),
+      runtime: renderRuntime.telemetry(atomicSignal.targetSampleTelemetry()),
       materialCompatibility: { ...materialCompatibility },
       fpsCounter: {
         value: fpsCounterValue.textContent,
