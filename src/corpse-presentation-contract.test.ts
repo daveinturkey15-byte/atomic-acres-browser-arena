@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { buildOperator } from './art-kit';
 
 describe('canonical corpse presentation contract', () => {
   it('does not retain or expose the retired bounded operator implementation', () => {
@@ -7,6 +8,12 @@ describe('canonical corpse presentation contract', () => {
     expect(artKit).not.toContain('buildBoundedOperatorLod');
     expect(artKit).not.toContain('bounded-operator-lod');
     expect(artKit).not.toContain('preferRigged');
+    expect(artKit).not.toContain('rigged: false');
+  });
+
+  it('fails closed when the canonical rig asset is unavailable', () => {
+    expect(() => buildOperator(0, 'missing-canonical-rig'))
+      .toThrow(/Canonical rigged operator asset is unavailable.*primitive operator fallback is prohibited/);
   });
 
   it('builds corpses through the same canonical operator path as live players and bots', () => {
