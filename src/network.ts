@@ -487,6 +487,7 @@ export class ArenaNetwork {
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
         || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
         || payload.type === 'lobby-balance' || payload.type === 'redeploy-request' || payload.type === 'clock-ping'
+        || payload.type === 'railgun-claim-request' || payload.type === 'railgun-shot-request'
         || payload.type === 'chat-submit') {
         this.onMessage(payload);
         return;

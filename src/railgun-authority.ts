@@ -1,0 +1,280 @@
+export const RAILGUN_WEAPON_ID = 'railgun' as const;
+export const RAILGUN_ARENA_ID = 'atomic-acres' as const; // Stable arena id; Pass 64 display name is Nuke Town.
+export const RAILGUN_SPAWN_DELAY_MS = 180_000;
+export const RAILGUN_DAMAGE = 50;
+export const RAILGUN_PENETRATION_MULTIPLIER = 1;
+export const RAILGUN_RECHAMBER_MS = 1_500;
+export const RAILGUN_TOTAL_ROUNDS = 8;
+export const RAILGUN_PROCESSED_SHOT_LIMIT = 64;
+
+export type RailgunSpawnSite = Readonly<{
+  id: 'aqua-front' | 'aqua-rear' | 'coral-front' | 'coral-rear';
+  /** World-space pickup position in one of the four authored upper rooms. */
+  position: readonly [number, number, number];
+}>;
+
+export const RAILGUN_UPPER_ROOM_SPAWN_SITES: readonly RailgunSpawnSite[] = Object.freeze([
+  Object.freeze({ id: 'aqua-front', position: [-9, 4.18, -24] as const }),
+  Object.freeze({ id: 'aqua-rear', position: [-9, 4.18, -32] as const }),
+  Object.freeze({ id: 'coral-front', position: [9, 4.18, 24] as const }),
+  Object.freeze({ id: 'coral-rear', position: [9, 4.18, 32] as const }),
+]);
+
+export type RailgunAuthorityState = Readonly<{
+  generation: number;
+  status: 'disabled' | 'scheduled' | 'available' | 'held' | 'depleted';
+  spawnAtHostTimeMs: number | null;
+  spawnSite: RailgunSpawnSite | null;
+  pickupPosition: readonly [number, number, number] | null;
+  holderId: string | null;
+  roundsRemaining: number;
+  chamberReadyAtHostTimeMs: number;
+  announcementSent: boolean;
+  processedShotIds: readonly string[];
+}>;
+
+export type RailgunAdvanceResult = Readonly<{
+  state: RailgunAuthorityState;
+  spawned: boolean;
+  announcement: 'RAILGUN SPAWNED' | null;
+}>;
+
+export type RailgunShotResult = Readonly<{
+  state: RailgunAuthorityState;
+  accepted: boolean;
+  duplicate: boolean;
+  reason: 'accepted' | 'not-holder' | 'not-ready' | 'empty' | 'invalid' | 'duplicate';
+  damage: number;
+  penetrationMultiplier: number;
+  adsAfterShot: false;
+  rechamberMs: number;
+}>;
+
+function validHostTime(value: number): boolean {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function validPlayerId(value: string): boolean {
+  return value.length > 0 && value.length <= 80;
+}
+
+function copyPosition(value: readonly [number, number, number]): readonly [number, number, number] {
+  return [value[0], value[1], value[2]];
+}
+
+export function chooseRailgunUpperRoom(randomUnit: number): RailgunSpawnSite {
+  const bounded = Number.isFinite(randomUnit) ? Math.max(0, Math.min(0.999999999999, randomUnit)) : 0;
+  return RAILGUN_UPPER_ROOM_SPAWN_SITES[Math.floor(bounded * RAILGUN_UPPER_ROOM_SPAWN_SITES.length)];
+}
+
+/** Host-only match initialization. Non-Nuke-Town arenas never schedule the pickup. */
+export function createRailgunAuthorityState(
+  arenaId: string,
+  matchStartedAtHostTimeMs: number,
+  randomUnit = Math.random(),
+  generation = 1,
+): RailgunAuthorityState {
+  if (arenaId !== RAILGUN_ARENA_ID || !validHostTime(matchStartedAtHostTimeMs)) {
+    return {
+      generation,
+      status: 'disabled',
+      spawnAtHostTimeMs: null,
+      spawnSite: null,
+      pickupPosition: null,
+      holderId: null,
+      roundsRemaining: RAILGUN_TOTAL_ROUNDS,
+      chamberReadyAtHostTimeMs: 0,
+      announcementSent: false,
+      processedShotIds: [],
+    };
+  }
+  const spawnSite = chooseRailgunUpperRoom(randomUnit);
+  return {
+    generation,
+    status: 'scheduled',
+    spawnAtHostTimeMs: matchStartedAtHostTimeMs + RAILGUN_SPAWN_DELAY_MS,
+    spawnSite,
+    pickupPosition: copyPosition(spawnSite.position),
+    holderId: null,
+    roundsRemaining: RAILGUN_TOTAL_ROUNDS,
+    chamberReadyAtHostTimeMs: 0,
+    announcementSent: false,
+    processedShotIds: [],
+  };
+}
+
+/** Advance on the host monotonic clock. The announcement is emitted exactly on the spawn transition. */
+export function advanceRailgunAuthority(state: RailgunAuthorityState, now: number): RailgunAdvanceResult {
+  if (state.status !== 'scheduled' || state.spawnAtHostTimeMs === null || !validHostTime(now) || now < state.spawnAtHostTimeMs) {
+    return { state, spawned: false, announcement: null };
+  }
+  const announce = !state.announcementSent;
+  return {
+    state: { ...state, status: 'available', announcementSent: true },
+    spawned: true,
+    announcement: announce ? 'RAILGUN SPAWNED' : null,
+  };
+}
+
+export function claimRailgun(
+  state: RailgunAuthorityState,
+  playerId: string,
+  generation: number,
+): { accepted: boolean; state: RailgunAuthorityState } {
+  if (state.status !== 'available' || state.generation !== generation || !validPlayerId(playerId) || state.roundsRemaining <= 0) {
+    return { accepted: false, state };
+  }
+  return {
+    accepted: true,
+    state: { ...state, status: 'held', holderId: playerId, pickupPosition: null },
+  };
+}
+
+export function advanceRailgunChamber(state: RailgunAuthorityState, now: number): RailgunAuthorityState {
+  if (state.status !== 'held' || state.roundsRemaining <= 0 || !validHostTime(now)) return state;
+  return now >= state.chamberReadyAtHostTimeMs ? { ...state, chamberReadyAtHostTimeMs: 0 } : state;
+}
+
+export function fireRailgun(
+  state: RailgunAuthorityState,
+  playerId: string,
+  shotId: string,
+  now: number,
+): RailgunShotResult {
+  const base = {
+    state,
+    accepted: false,
+    duplicate: false,
+    damage: 0,
+    penetrationMultiplier: 0,
+    adsAfterShot: false as const,
+    rechamberMs: 0,
+  };
+  if (state.processedShotIds.includes(shotId)) return { ...base, duplicate: true, reason: 'duplicate' };
+  if (!validPlayerId(playerId) || shotId.length < 8 || shotId.length > 128 || !validHostTime(now)) {
+    return { ...base, reason: 'invalid' };
+  }
+  if (state.status !== 'held' || state.holderId !== playerId) return { ...base, reason: 'not-holder' };
+  if (state.roundsRemaining <= 0) return { ...base, reason: 'empty' };
+  if (state.chamberReadyAtHostTimeMs > now) return { ...base, reason: 'not-ready' };
+
+  const roundsRemaining = state.roundsRemaining - 1;
+  const nextProcessed = [...state.processedShotIds, shotId].slice(-RAILGUN_PROCESSED_SHOT_LIMIT);
+  const nextState: RailgunAuthorityState = {
+    ...state,
+    status: roundsRemaining === 0 ? 'depleted' : 'held',
+    roundsRemaining,
+    chamberReadyAtHostTimeMs: roundsRemaining === 0 ? 0 : now + RAILGUN_RECHAMBER_MS,
+    processedShotIds: nextProcessed,
+  };
+  return {
+    state: nextState,
+    accepted: true,
+    duplicate: false,
+    reason: 'accepted',
+    damage: RAILGUN_DAMAGE,
+    penetrationMultiplier: RAILGUN_PENETRATION_MULTIPLIER,
+    adsAfterShot: false,
+    rechamberMs: roundsRemaining === 0 ? 0 : RAILGUN_RECHAMBER_MS,
+  };
+}
+
+export function dropRailgun(
+  state: RailgunAuthorityState,
+  playerId: string,
+  position: readonly [number, number, number],
+): { dropped: boolean; state: RailgunAuthorityState } {
+  if (state.status !== 'held' || state.holderId !== playerId || state.roundsRemaining <= 0
+    || position.length !== 3 || !position.every(Number.isFinite)) return { dropped: false, state };
+  return {
+    dropped: true,
+    state: {
+      ...state,
+      status: 'available',
+      holderId: null,
+      pickupPosition: copyPosition(position),
+    },
+  };
+}
+
+/** Railgun ammunition is a match-lifetime resource: no pickup, reload or range rule may replenish it. */
+export function replenishRailgunAmmo(state: RailgunAuthorityState): { replenished: false; state: RailgunAuthorityState } {
+  return { replenished: false, state };
+}
+
+export function railgunThermalTargetEligible(
+  observer: Readonly<{ id: string; team: 0 | 1 }>,
+  target: Readonly<{ id: string; team: 0 | 1; alive: boolean; kind: 'player' | 'bot' }>,
+  mode: 'tdm' | 'ffa',
+): boolean {
+  if (!target.alive || observer.id === target.id) return false;
+  return mode === 'ffa' || observer.team !== target.team;
+}
+
+export type RailgunClaimRequestMessage = Readonly<{
+  type: 'railgun-claim-request';
+  protocolVersion: number;
+  by: string;
+  generation: number;
+  position: readonly [number, number, number];
+  nonce: number;
+}>;
+
+export type RailgunShotRequestMessage = Readonly<{
+  type: 'railgun-shot-request';
+  protocolVersion: number;
+  by: string;
+  generation: number;
+  shotId: string;
+  origin: readonly [number, number, number];
+  direction: readonly [number, number, number];
+  fireTimeMs: number;
+  nonce: number;
+}>;
+
+export type RailgunStateMessage = Readonly<{
+  type: 'railgun-state';
+  protocolVersion: number;
+  by: string;
+  state: RailgunAuthorityState;
+  nonce: number;
+}>;
+
+function isVector3(value: unknown): value is readonly [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
+}
+
+export function isRailgunAuthorityState(value: unknown): value is RailgunAuthorityState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Partial<RailgunAuthorityState>;
+  return Number.isSafeInteger(state.generation) && Number(state.generation) >= 0
+    && (state.status === 'disabled' || state.status === 'scheduled' || state.status === 'available' || state.status === 'held' || state.status === 'depleted')
+    && (state.spawnAtHostTimeMs === null || validHostTime(Number(state.spawnAtHostTimeMs)))
+    && (state.spawnSite === null || RAILGUN_UPPER_ROOM_SPAWN_SITES.some((site) => site.id === state.spawnSite?.id
+      && isVector3(state.spawnSite.position) && site.position.every((valueAtAxis, axis) => valueAtAxis === state.spawnSite?.position[axis])))
+    && (state.pickupPosition === null || isVector3(state.pickupPosition))
+    && (state.holderId === null || typeof state.holderId === 'string' && validPlayerId(state.holderId))
+    && Number.isSafeInteger(state.roundsRemaining) && Number(state.roundsRemaining) >= 0 && Number(state.roundsRemaining) <= RAILGUN_TOTAL_ROUNDS
+    && validHostTime(Number(state.chamberReadyAtHostTimeMs))
+    && typeof state.announcementSent === 'boolean'
+    && Array.isArray(state.processedShotIds) && state.processedShotIds.length <= RAILGUN_PROCESSED_SHOT_LIMIT
+    && state.processedShotIds.every((id) => typeof id === 'string' && id.length >= 8 && id.length <= 128)
+    && new Set(state.processedShotIds).size === state.processedShotIds.length;
+}
+
+export function isRailgunProtocolMessage(value: unknown, protocolVersion: number): value is RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunStateMessage {
+  if (!value || typeof value !== 'object') return false;
+  const message = value as Record<string, unknown>;
+  if (message.protocolVersion !== protocolVersion || typeof message.by !== 'string' || !validPlayerId(message.by)
+    || !Number.isSafeInteger(message.nonce) || Number(message.nonce) < 0) return false;
+  if (message.type === 'railgun-claim-request') {
+    return Number.isSafeInteger(message.generation) && Number(message.generation) >= 0 && isVector3(message.position);
+  }
+  if (message.type === 'railgun-shot-request') {
+    return Number.isSafeInteger(message.generation) && Number(message.generation) >= 0
+      && typeof message.shotId === 'string' && message.shotId.length >= 8 && message.shotId.length <= 128
+      && isVector3(message.origin) && isVector3(message.direction)
+      && validHostTime(Number(message.fireTimeMs));
+  }
+  return message.type === 'railgun-state' && isRailgunAuthorityState(message.state);
+}

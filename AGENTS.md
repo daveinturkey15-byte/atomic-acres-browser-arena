@@ -37,3 +37,5 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 ## Durable gotcha
 
 **Symptom -> Cause -> Correction -> Verify:** several agents report successful work but production is stale or contradictory -> local worktrees, PR merges, Pages pushes, and release metadata were treated as interchangeable state -> use PRs as the contribution ledger and the single serialized production workflow as the only publisher -> confirm exact `main` SHA, successful required checks, workflow receipt, Pages SHA, release-button timestamp, and live browser logs.
+
+**Symptom -> Cause -> Correction -> Verify:** a corpse or low-detail path shows the retired block-built humanoid while live combatants use the authored rig -> character presentation was given a separate primitive fallback or a caller could opt out of the canonical rig -> all players, bots, reinforcements, and corpses must use `buildOperator` with the same loaded rig, team appearance, and carried weapon; performance profiles may simplify materials but never substitute anatomy -> run `src/corpse-presentation-contract.test.ts` and the canonical rigged death browser check.

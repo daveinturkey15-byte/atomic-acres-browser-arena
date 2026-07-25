@@ -76,6 +76,63 @@ try {
       hostNetwork: await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle),
       guestNetwork: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle),
     };
+
+    // A complete second host+guest match is the regression gate. Both start
+    // clocks must clear together when the host returns the ended match to the
+    // lobby, otherwise peers reject the mixed waiting snapshot and cannot ready.
+    await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch())));
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 })));
+    await host.click('#rematch');
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === false && state.privateMatch?.phase === 'waiting';
+    }, undefined, { timeout: 30_000 })));
+    const resetStates = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch)));
+    joined.rematchResetStates = resetStates.map((state) => ({
+      phase: state.phase,
+      activeAtHostTimeMs: state.activeAtHostTimeMs,
+      activeAtEpochMs: state.activeAtEpochMs,
+      readiness: state.members.map((member) => member.ready),
+    }));
+    joined.rematchReset = resetStates.every((state) => state.activeAtHostTimeMs === null && state.activeAtEpochMs === null
+      && state.members.every((member) => member.ready === false));
+    await host.click('#lobby-ready');
+    await guest.click('#lobby-ready');
+    await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 30_000 });
+    joined.secondReady = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.every((member) => member.ready));
+    await host.click('#lobby-start');
+    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.matchPhase === 'active' && state.remotes === 1;
+    }, undefined, { timeout: 45_000 })));
+    joined.secondMatchStarted = true;
+
+    const beforeRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
+    await guest.evaluate(() => {
+      if (document.pointerLockElement) void document.exitPointerLock();
+      document.querySelector('#menu')?.classList.remove('hidden');
+    });
+    await guest.click('[data-menu-tab="kit"]');
+    await guest.click('[data-kit-id="runner"]');
+    await guest.click('[data-menu-tab="deploy"]');
+    await guest.waitForFunction(() => {
+      const button = document.querySelector('#field-kit-redeploy');
+      return button && button.hidden === false && button.disabled === false;
+    }, undefined, { timeout: 15_000 });
+    await guest.click('#field-kit-redeploy');
+    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.primaryWeapon === 'smg', undefined, { timeout: 15_000 });
+    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers[0]?.primary === 'smg', undefined, { timeout: 15_000 });
+    const afterRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
+    joined.guestRedeployNoCombatEffects = afterRedeploy[1].player.deaths === beforeRedeploy[1].player.deaths
+      && afterRedeploy[1].player.kills === beforeRedeploy[1].player.kills
+      && afterRedeploy[0].corpses.active === beforeRedeploy[0].corpses.active
+      && afterRedeploy[1].corpses.active === beforeRedeploy[1].corpses.active
+      && afterRedeploy[0].deathDrops.length === beforeRedeploy[0].deathDrops.length
+      && afterRedeploy[1].deathDrops.length === beforeRedeploy[1].deathDrops.length
+      && afterRedeploy[0].fieldSupport.streak === beforeRedeploy[0].fieldSupport.streak
+      && afterRedeploy[1].fieldSupport.streak === beforeRedeploy[1].fieldSupport.streak
+      && JSON.stringify(afterRedeploy[0].privateMatch.scores) === JSON.stringify(beforeRedeploy[0].privateMatch.scores);
+
     await guest.close({ runBeforeUnload: true });
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 30_000 });
     await host.waitForFunction(() => document.querySelector('#lobby-roster')?.textContent?.includes('REJOINING'), undefined, { timeout: 30_000 });
@@ -88,7 +145,12 @@ try {
   await mkdir('artifacts/pass38', { recursive: true });
   await writeFile('artifacts/pass38/multiplayer-lifecycle.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
-  if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client' || !result.leaveObserved || !result.rejoinGraceObserved || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1 || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false || result.hostNetwork.stateChannelMaxRetransmits !== 0 || result.guestNetwork.stateChannelMaxRetransmits !== 0)) process.exitCode = 1;
+  if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
+    || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.guestRedeployNoCombatEffects
+    || !result.leaveObserved || !result.rejoinGraceObserved
+    || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1
+    || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false
+    || result.hostNetwork.stateChannelMaxRetransmits !== 0 || result.guestNetwork.stateChannelMaxRetransmits !== 0)) process.exitCode = 1;
 } finally {
   await browser.close();
 }

@@ -263,7 +263,14 @@ import {
 import { ShotTimingTelemetry } from './shot-timing-telemetry';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
-import { admitAuthoritativeRemoteRespawn, applyAuthoritativeRemoteDamage, createRemoteHealthAuthorityState, type RemoteHealthAuthorityState } from './remote-health-authority';
+import {
+  advanceRemoteHealthAuthority,
+  admitAuthoritativeRemoteRespawn,
+  applyAuthoritativeRemoteDamage,
+  applyAuthoritativeRemoteRedeploy,
+  createRemoteHealthAuthorityState,
+  type RemoteHealthAuthorityState,
+} from './remote-health-authority';
 import { isKillstreakEligible, killCauseFromHit, type KillCause } from './kill-provenance';
 import { reconstructShooterPoseAtFireTime, recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
 import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
@@ -322,6 +329,8 @@ import {
   PickupMessage,
   PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
+  RedeployCommitMessage,
+  RedeployRequestMessage,
   ShotMessage,
   ShotRequestMessage,
   ShotResultMessage,
@@ -1373,6 +1382,7 @@ const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplo
 const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
 const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const authorizedRemoteRedeploys = new Map<string, { primary: PrimaryWeaponId; expiresAt: number; nonce: number }>();
 const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
@@ -2601,8 +2611,11 @@ function returnPrivateMatchToLobby(asHost: boolean): void {
   element<HTMLButtonElement>('#main-menu').hidden = true;
   setArenaMenuCamera();
   if (document.pointerLockElement) void document.exitPointerLock();
+  // Both clocks form one lobby-start identity. Leaving either populated makes
+  // the waiting snapshot invalid and prevents peers from readying a rematch.
+  privateMatchActiveAtHostTimeMs = null;
+  privateMatchActiveAtEpochMs = null;
   if (asHost && network.role === 'host') {
-    privateMatchActiveAtEpochMs = null;
     authoritativeScores.clear();
     for (const member of hostLobbyMembers.values()) {
       hostLobbyMembers.set(member.id, { ...member, ready: false });
@@ -2646,6 +2659,25 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   }
 }
 
+function authorizeRedeploy(message: RedeployCommitMessage, now = performance.now()): void {
+  authorizedRemoteRedeploys.set(message.target, {
+    primary: message.primary,
+    expiresAt: now + 5_000,
+    nonce: message.nonce,
+  });
+}
+
+function acceptRedeployCommit(message: RedeployCommitMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || processedNonces.has(message.nonce)) return;
+  processedNonces.add(message.nonce);
+  authorizeRedeploy(message);
+  if (message.target === player.id) {
+    applyLocalClassRedeploy(message.primary, true);
+    authorizedRemoteRedeploys.delete(player.id);
+  }
+  trimNonceSet();
+}
+
 function handleLobbyMessage(message: GameMessage): boolean {
   if (message.type === 'chat-submit') {
     admitHostChatSubmit(message);
@@ -2681,22 +2713,31 @@ function handleLobbyMessage(message: GameMessage): boolean {
       const remote = remotes.get(message.by);
       const health = remoteHealthAuthorities.get(message.by);
       if (member && remote && health?.alive) {
-        const result = applyAuthoritativeRemoteDamage(health, health.hp, performance.now());
-        if (result.applied && result.died) {
+        const now = performance.now();
+        const result = applyAuthoritativeRemoteRedeploy(health, now);
+        if (result.applied) {
           processedNonces.add(message.nonce);
           remoteHealthAuthorities.set(message.by, result.state);
-          remote.snapshot = { ...remote.snapshot, hp: 0 };
-          const death: DeathMessage = {
-            type: 'death', killer: message.by, victim: message.by,
-            cause: { kind: 'environment' }, nonce: message.nonce,
+          const commit: RedeployCommitMessage = {
+            type: 'redeploy-commit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+            by: player.id, target: message.by, primary: message.primary,
+            hostTimeMs: now, nonce: randomNonce(),
           };
-          network.send(death);
-          processDeath(death);
-          recordMatchDiagnostic('field-kit-redeploy', 'accepted', { actorId: message.by, reason: 'player-requested-redeploy' });
+          authorizeRedeploy(commit, now);
+          network.send(commit);
+          recordMatchDiagnostic('field-kit-redeploy', 'accepted', {
+            actorId: message.by,
+            reason: 'host-authoritative-noncombat-redeploy',
+            modifiers: [`primary:${message.primary}`],
+          });
           trimNonceSet();
         }
       }
     }
+    return true;
+  }
+  if (message.type === 'redeploy-commit') {
+    acceptRedeployCommit(message);
     return true;
   }
   if (message.type === 'lobby-state') {
@@ -2949,7 +2990,13 @@ document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) =
 element<HTMLButtonElement>('#field-kit-redeploy').addEventListener('click', () => {
   const kit = fieldKitById(selectedFieldKit);
   if (!gameStarted || !player.alive || matchFinished || selectedArena.id === 'gun-range' || player.primaryWeapon === kit.weapon) return;
-  const message = { type: 'redeploy-request' as const, by: player.id, nonce: randomNonce() };
+  const message: RedeployRequestMessage = {
+    type: 'redeploy-request' as const,
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    primary: kit.weapon,
+    nonce: randomNonce(),
+  };
   if (network.role === 'client') {
     network.send(message);
     const button = element<HTMLButtonElement>('#field-kit-redeploy');
@@ -2958,10 +3005,16 @@ element<HTMLButtonElement>('#field-kit-redeploy').addEventListener('click', () =
     setStatus('Redeploy requested from host.', 'ok');
     return;
   }
-  if (network.role === 'host') processedNonces.add(message.nonce);
-  const death: DeathMessage = { type: 'death', killer: player.id, victim: player.id, cause: { kind: 'environment' }, nonce: message.nonce };
-  if (network.role === 'host') network.send(death);
-  processDeath(death);
+  if (network.role === 'host') {
+    processedNonces.add(message.nonce);
+    const commit: RedeployCommitMessage = {
+      type: 'redeploy-commit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: player.id, target: player.id, primary: kit.weapon,
+      hostTimeMs: performance.now(), nonce: randomNonce(),
+    };
+    network.send(commit);
+  }
+  applyLocalClassRedeploy(kit.weapon, true);
 });
 player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
 player.weapon = player.primaryWeapon;
@@ -3207,7 +3260,7 @@ function onNetworkMessage(message: GameMessage): void {
     let remote = remotes.get(incoming.id);
     if (!remote) {
       const retainedHealth = network.role === 'host' ? remoteHealthAuthorities.get(incoming.id) : undefined;
-      const initialHealth = retainedHealth ?? createRemoteHealthAuthorityState(incoming.hp > 0);
+      const initialHealth = retainedHealth ?? createRemoteHealthAuthorityState(incoming.hp > 0, performance.now());
       const initialIncoming = network.role === 'host' ? { ...incoming, hp: initialHealth.hp } : incoming;
       remote = createRemote(initialIncoming);
       remotes.set(incoming.id, remote);
@@ -3224,18 +3277,30 @@ function onNetworkMessage(message: GameMessage): void {
     }
     if (incoming.seq > remote.snapshot.seq) {
       const now = performance.now();
+      const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
+      const redeployed = redeployAuthorization !== undefined
+        && redeployAuthorization.expiresAt >= now
+        && redeployAuthorization.primary === incoming.primary;
+      if (redeployAuthorization && redeployAuthorization.expiresAt < now) authorizedRemoteRedeploys.delete(incoming.id);
       let admittedIncoming = incoming;
-      let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0;
+      let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0 || redeployed;
       if (network.role === 'host') {
-        const health = remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0);
+        const health = advanceRemoteHealthAuthority(
+          remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0, now),
+          now,
+        );
         const respawnAdmission = admitAuthoritativeRemoteRespawn(health, incoming.hp, now);
         if (respawnAdmission.respawned) {
-          remoteHealthAuthorities.set(incoming.id, respawnAdmission.state);
+          remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+        }
+        if (redeployed) {
           remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
           remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
         }
         const authoritativeHealth = respawnAdmission.state;
-        respawned = respawnAdmission.respawned;
+        remoteHealthAuthorities.set(incoming.id, authoritativeHealth);
+        respawned = respawnAdmission.respawned || redeployed;
         admittedIncoming = { ...incoming, hp: authoritativeHealth.hp };
       }
       const movement = admitRemoteSnapshotMovement(
@@ -3266,6 +3331,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (admittedIncoming.team !== remote.snapshot.team) return;
       if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
+      if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
       remote.claimEligibleAt = movement.claimEligibleAt;
       const coreDistance = Math.hypot(admittedIncoming.x - overdriveState.position.x, admittedIncoming.z - overdriveState.position.z);
       if (movement.resynchronized && coreDistance <= OVERDRIVE_PICKUP_RADIUS + 3) remote.claimRequiresCoreExit = true;
@@ -4366,7 +4432,7 @@ function corpseSource(victimId: string): { team: Team; weapon: WeaponId; positio
 function spawnCorpsePresentation(victimId: string, now = performance.now()): void {
   const source = corpseSource(victimId);
   if (!source) return;
-  const root = buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon, false);
+  const root = buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon);
   root.position.copy(source.position);
   root.position.y += 0.08;
   root.rotation.y = source.yaw;
@@ -4488,6 +4554,7 @@ function removeRemote(id: string, reason: string): void {
   peerTimingStates.delete(id);
   remoteMeleeAdmissions.delete(id);
   authorizedRemotePickups.delete(id);
+  authorizedRemoteRedeploys.delete(id);
   addFeed(`${remote.snapshot.name} ${reason}`);
 }
 
@@ -4629,8 +4696,8 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   return true;
 }
 
-function respawn(requestLock = true): void {
-  if (!player.alive) {
+function respawn(requestLock = true, forceNewLife = false, deploymentWeaponOverride?: PrimaryWeaponId): void {
+  if (!player.alive || forceNewLife) {
     localContinuity += 1;
     localPositionHistory.length = 0;
   }
@@ -4678,7 +4745,7 @@ function respawn(requestLock = true): void {
     player.switchingUntil = 0;
     weaponView.setWeapon(sidearm, true);
   } else {
-    const deploymentWeapon = fieldKitById(selectedFieldKit).weapon;
+    const deploymentWeapon = deploymentWeaponOverride ?? fieldKitById(selectedFieldKit).weapon;
     player.primaryWeapon = deploymentWeapon;
     for (const weapon of handicapLoadout(deploymentWeapon)) {
       player.ammo[weapon] = WEAPONS[weapon].mag;
@@ -4694,6 +4761,12 @@ function respawn(requestLock = true): void {
   element<HTMLElement>('#respawn').hidden = true;
   if (gameStarted && requestLock) requestGamePointerLock();
   network.send(createStateMessage());
+}
+
+function applyLocalClassRedeploy(primary: PrimaryWeaponId, requestLock: boolean): void {
+  if (!gameStarted || matchFinished || !player.alive || selectedArena.id === 'gun-range') return;
+  respawn(requestLock, true, primary);
+  setStatus(`Redeployed with ${WEAPONS[primary].name} without a combat death.`, 'ok');
 }
 
 function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtLocalMonoMs?: number): void {
@@ -5325,7 +5398,7 @@ function spawnBot(index: number, hosted = false): void {
   const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
-  const root = buildOperator(botTeam, 'bot-operator', true, weapon, true, 'neon-purple');
+  const root = buildOperator(botTeam, 'bot-operator', true, weapon, 'neon-purple');
   addNeonBotHaze(root, index);
   root.traverse((node) => {
     if (node instanceof THREE.Mesh) node.castShadow = false;
@@ -8940,6 +9013,7 @@ function resetForMode(): void {
   clearFieldSupport();
   clearDeathDrops();
   clearCorpsePresentations();
+  authorizedRemoteRedeploys.clear();
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared');
   verifiedRemoteKills.clear();
@@ -9601,6 +9675,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       active: corpsePresentations.length,
       lifetimeMs: CORPSE_LIFETIME_MS,
       remainingMs: corpsePresentations.map((corpse) => Math.max(0, Math.round(corpse.expiresAt - performance.now()))),
+      models: corpsePresentations.map((corpse) => riggedOperatorTelemetry(corpse.root)),
     },
     grenadeVisual: {
       ...grenadePresentationTelemetry(),
