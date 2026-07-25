@@ -1612,6 +1612,7 @@ const localWeaponSequences = new Map<WeaponId, number>();
 let localConnectionEpoch: string = crypto.randomUUID();
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
 const resolvedRailgunShots = new Map<string, RailgunShotResultMessage>();
+const processedRailgunShotResults = new Set<string>();
 let railgunState: RailgunAuthorityState = createRailgunAuthorityState('disabled', 0, 0, 0);
 let localRailgunPendingUntilHostTimeMs = 0;
 let railgunAdsResetRequired = false;
@@ -4775,7 +4776,9 @@ function updateCorpsePresentations(now: number): void {
   }
 }
 
-function corpseSource(victimId: string): { team: Team; weapon: WeaponId; position: THREE.Vector3; yaw: number } | null {
+type CorpseSource = Readonly<{ team: Team; weapon: WeaponId; position: THREE.Vector3; yaw: number }>;
+
+function corpseSource(victimId: string): CorpseSource | null {
   if (victimId === player.id) return {
     team: player.team,
     weapon: player.weapon,
@@ -4789,8 +4792,7 @@ function corpseSource(victimId: string): { team: Team; weapon: WeaponId; positio
   return null;
 }
 
-function spawnCorpsePresentation(victimId: string, now = performance.now()): void {
-  const source = corpseSource(victimId);
+function spawnCorpsePresentation(victimId: string, source = corpseSource(victimId), now = performance.now()): void {
   if (!source) return;
   const root = buildOperator(source.team, 'fallen-operator', flattenOperatorMaterials, source.weapon);
   root.position.copy(source.position);
@@ -4819,6 +4821,9 @@ function overdriveDropPosition(victimId: string): THREE.Vector3 | null {
 }
 
 function processDeath(message: DeathMessage): void {
+  // Capture the canonical live rig state before authoritative item drops mutate
+  // the holder back to their primary weapon.
+  const fallenOperatorSource = corpseSource(message.victim);
   const deathSource = message.cause.kind === 'gun'
     ? message.cause.weapon
     : message.cause.kind === 'killstreak'
@@ -4838,7 +4843,7 @@ function processDeath(message: DeathMessage): void {
   if (victimPoint && network.role !== 'client') dropHeldRailgun(message.victim, victimPoint.clone().add(new THREE.Vector3(0, 0.3, 0)));
   const killer = message.killer === player.id ? player.name : remotes.get(message.killer)?.snapshot.name ?? bots.get(message.killer)?.name ?? 'Unknown';
   const victim = message.victim === player.id ? player.name : remotes.get(message.victim)?.snapshot.name ?? bots.get(message.victim)?.name ?? 'Unknown';
-  spawnCorpsePresentation(message.victim);
+  spawnCorpsePresentation(message.victim, fallenOperatorSource);
   spawnDeathDrop(message);
   if (message.victim === player.id && player.alive) {
     const now = performance.now();
@@ -5175,6 +5180,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   resolvedShotRequests.clear();
   presentedShotResults.clear();
   processedShotResults.clear();
+  processedRailgunShotResults.clear();
   authoritativeShotAdmissions.clear();
   for (const key of Object.keys(shotProtocolTelemetry)) delete shotProtocolTelemetry[key];
   localSnapshotRateState = createSnapshotRateState(performance.now());
@@ -5334,6 +5340,7 @@ function initializeRailgunForMatch(activeAtHostTimeMs: number): void {
   railgunAdsResetRequired = false;
   railgunRechamberPresentationActive = false;
   resolvedRailgunShots.clear();
+  processedRailgunShotResults.clear();
   railgunPresentation.updateWorld(railgunState, performance.now());
   if (network.role === 'host') broadcastRailgunState();
 }
@@ -5525,6 +5532,10 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
 
 function acceptRailgunShotResult(message: RailgunShotResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.generation !== railgunState.generation) return;
+  const resultKey = `${message.by}:${message.forPlayerId}:${message.generation}:${message.shotId}`;
+  if (processedRailgunShotResults.has(resultKey)) return;
+  processedRailgunShotResults.add(resultKey);
+  while (processedRailgunShotResults.size > 512) processedRailgunShotResults.delete(processedRailgunShotResults.values().next().value!);
   for (const outcome of message.outcomes) {
     if (outcome.target !== player.id || !player.alive) continue;
     reconcileLocalAuthoritativeHealth(outcome.resultingHealth, outcome.damage, message.forPlayerId, 1, { kind: 'gun', weapon: 'railgun' });
@@ -6477,7 +6488,7 @@ function applyBotDamage(
     processDeath(death);
     broadcastHostedBotState();
   } else {
-    spawnCorpsePresentation(bot.id, now);
+    spawnCorpsePresentation(bot.id, corpseSource(bot.id), now);
     spawnDeathDrop(death, now);
   }
   const afterDeathDrop = performance.now();
@@ -9873,6 +9884,7 @@ function resetForMode(): void {
   railgunRechamberPresentationActive = false;
   localRailgunPendingUntilHostTimeMs = 0;
   resolvedRailgunShots.clear();
+  processedRailgunShotResults.clear();
   railgunPresentation.updateWorld(railgunState, performance.now());
   railgunPresentation.updateThermal(camera, [], false);
   authorizedRemoteRedeploys.clear();

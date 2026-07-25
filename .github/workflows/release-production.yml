@@ -53,6 +53,9 @@ jobs:
           echo "RELEASE_BUILT_AT=$released_at" >> "$GITHUB_ENV"
       - name: Build production bytes
         run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ inputs.source_sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
       - name: Verify exact production bytes
         run: npm run verify:release-tree
       - name: Install topology browser

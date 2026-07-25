@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 const workflow = readFileSync('.github/workflows/release-production.yml', 'utf8');
 const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
 const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs', 'utf8');
+const productionEnv = readFileSync('.env.production', 'utf8');
+const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
 
 describe('production release workflow', () => {
   it('configures a repository-local bot identity before publishing gh-pages', () => {
@@ -46,6 +48,18 @@ describe('production release workflow', () => {
     expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
+  });
+
+  it('binds production and immutable preview diagnostics to the exact source SHA', () => {
+    const workerOrigin = 'https://atomic-acres-leaderboard.atomic-acres.workers.dev';
+    expect(productionEnv).toContain(`VITE_MATCH_DIAGNOSTICS_URL=${workerOrigin}`);
+    expect(workflow).toContain('VITE_MATCH_BUILD_ID: ${{ inputs.source_sha }}');
+    expect(workflow).toContain(`VITE_MATCH_DIAGNOSTICS_URL: ${workerOrigin}`);
+    expect(verifyWorkflow).toContain('VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(verifyWorkflow).toContain(`VITE_MATCH_DIAGNOSTICS_URL: ${workerOrigin}`);
+    expect(diagnosticsPreviewRunner).toContain("execFileSync('git', ['rev-parse', 'HEAD']");
+    expect(diagnosticsPreviewRunner).toContain('VITE_MATCH_BUILD_ID: sourceSha');
+    expect(diagnosticsPreviewRunner).not.toContain("VITE_MATCH_BUILD_ID: 'pass64-browser-candidate'");
   });
 
   it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {
