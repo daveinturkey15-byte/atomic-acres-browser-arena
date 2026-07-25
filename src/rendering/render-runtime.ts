@@ -15,6 +15,9 @@ export type RenderRuntimeTelemetry = Readonly<{
   initialized: boolean;
   failClosed: boolean;
   adapterLabel: string;
+  adapterClass: string;
+  deviceClass: string | null;
+  softwareAdapter: boolean;
   canvasAntialias: boolean;
   canvasSamples: number;
   principalHdrSamples: number | null;
@@ -61,6 +64,9 @@ export class LegacyWebGlRenderRuntime {
       initialized: true,
       failClosed: false,
       adapterLabel: this.adapterLabel,
+      adapterClass: gl.constructor.name || 'WebGL2RenderingContext',
+      deviceClass: null,
+      softwareAdapter: /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic render driver/i.test(this.adapterLabel),
       canvasAntialias: gl.getContextAttributes()?.antialias ?? false,
       canvasSamples: Number(gl.getParameter(gl.SAMPLES) ?? 0),
       principalHdrSamples: targets?.principalHdrSamples ?? null,
@@ -77,8 +83,35 @@ export class LegacyWebGlRenderRuntime {
 
 type WebGpuBackendShape = Readonly<{
   isWebGPUBackend?: boolean;
-  device?: { lost?: Promise<unknown> };
+  device?: GpuDeviceShape;
 }>;
+
+type GpuDeviceShape = Readonly<{
+  lost?: Promise<unknown>;
+  destroy?: () => void;
+  constructor?: { name?: string };
+}>;
+
+type GpuAdapterInfoShape = Readonly<Record<string, string | number | boolean | undefined>>;
+type GpuAdapterShape = Readonly<{
+  info?: GpuAdapterInfoShape;
+  isFallbackAdapter?: boolean;
+  requestAdapterInfo?: () => Promise<GpuAdapterInfoShape>;
+  requestDevice(): Promise<GpuDeviceShape>;
+  constructor?: { name?: string };
+}>;
+
+type GpuNavigatorShape = Readonly<{
+  gpu?: Readonly<{
+    requestAdapter(options: Readonly<{ powerPreference: 'high-performance' }>): Promise<GpuAdapterShape | null>;
+  }>;
+}>;
+
+function adapterInfoLabel(info: GpuAdapterInfoShape): string {
+  const orderedKeys = ['vendor', 'architecture', 'device', 'description'];
+  const values = orderedKeys.map((key) => info[key]).filter((value) => value !== undefined && String(value).trim() !== '');
+  return values.length > 0 ? values.map(String).join(' / ') : 'WebGPU adapter info unavailable';
+}
 
 /**
  * An actual initialized Three r185 WebGPU renderer and RenderPipeline owner.
@@ -89,12 +122,37 @@ export class WebGpuRenderRuntime {
   readonly renderer: WebGPURenderer;
   readonly renderPipeline: RenderPipeline;
   private deviceLost = false;
+  private readonly canvasAntialias: boolean;
+  private readonly canvasSamples: number;
+  private readonly adapterLabel: string;
+  private readonly adapterClass: string;
+  private readonly deviceClass: string;
+  private readonly softwareAdapter: boolean;
+  private readonly device: GpuDeviceShape;
 
-  private constructor(renderer: WebGPURenderer, renderPipeline: RenderPipeline) {
+  private constructor(
+    renderer: WebGPURenderer,
+    renderPipeline: RenderPipeline,
+    identity: Readonly<{
+      canvasAntialias: boolean;
+      canvasSamples: number;
+      adapterLabel: string;
+      adapterClass: string;
+      deviceClass: string;
+      softwareAdapter: boolean;
+      device: GpuDeviceShape;
+    }>,
+  ) {
     this.renderer = renderer;
     this.renderPipeline = renderPipeline;
-    const backend = renderer.backend as WebGpuBackendShape;
-    void backend.device?.lost?.then(() => { this.deviceLost = true; });
+    this.canvasAntialias = identity.canvasAntialias;
+    this.canvasSamples = identity.canvasSamples;
+    this.adapterLabel = identity.adapterLabel;
+    this.adapterClass = identity.adapterClass;
+    this.deviceClass = identity.deviceClass;
+    this.softwareAdapter = identity.softwareAdapter;
+    this.device = identity.device;
+    void identity.device.lost?.then(() => { this.deviceLost = true; });
   }
 
   static async create(parameters: Readonly<{
@@ -103,12 +161,20 @@ export class WebGpuRenderRuntime {
     samples: number;
     requireWebGPU: boolean;
   }>): Promise<WebGpuRenderRuntime> {
+    const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
+    if (!gpu) throw new Error('WebGPU was required, but navigator.gpu is unavailable');
+    const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!adapter) throw new Error('WebGPU was required, but no high-performance adapter was available');
+    const adapterInfo = adapter.info ?? await adapter.requestAdapterInfo?.() ?? {};
+    const adapterLabel = adapterInfoLabel(adapterInfo);
+    const device = await adapter.requestDevice();
     const module = await import('three/webgpu');
     const renderer = new module.WebGPURenderer({
       canvas: parameters.canvas,
       antialias: parameters.antialias,
       samples: parameters.samples,
       powerPreference: 'high-performance',
+      device,
     });
     await renderer.init();
     const backend = renderer.backend as WebGpuBackendShape;
@@ -117,7 +183,15 @@ export class WebGpuRenderRuntime {
       throw new Error('WebGPU was required, but Three r185 initialized its WebGL2 fallback backend');
     }
     const renderPipeline = new module.RenderPipeline(renderer);
-    return new WebGpuRenderRuntime(renderer, renderPipeline);
+    return new WebGpuRenderRuntime(renderer, renderPipeline, {
+      canvasAntialias: parameters.antialias,
+      canvasSamples: parameters.antialias ? parameters.samples : 0,
+      adapterLabel,
+      adapterClass: adapter.constructor?.name || 'GPUAdapter',
+      deviceClass: device.constructor?.name || 'GPUDevice',
+      softwareAdapter: adapter.isFallbackAdapter === true || /swiftshader|llvmpipe|software|softpipe|\bwarp\b/i.test(adapterLabel),
+      device,
+    });
   }
 
   telemetry(requestedBackend: RenderBackendId = 'webgpu'): RenderRuntimeTelemetry {
@@ -128,9 +202,12 @@ export class WebGpuRenderRuntime {
       actualBackend,
       initialized: true,
       failClosed: requestedBackend === 'webgpu' && actualBackend !== 'webgpu',
-      adapterLabel: backend.isWebGPUBackend === true ? 'three-r185-webgpu-backend' : 'three-r185-webgl2-fallback',
-      canvasAntialias: false,
-      canvasSamples: 0,
+      adapterLabel: this.adapterLabel,
+      adapterClass: this.adapterClass,
+      deviceClass: this.deviceClass,
+      softwareAdapter: this.softwareAdapter,
+      canvasAntialias: this.canvasAntialias,
+      canvasSamples: this.canvasSamples,
       principalHdrSamples: null,
       bloomSamples: null,
       renderPipelineApi: 'three-r185-render-pipeline',
@@ -143,6 +220,7 @@ export class WebGpuRenderRuntime {
     if (telemetry.actualBackend !== 'webgpu') {
       throw new Error('WebGPU candidate verification failed closed: actual backend is not WebGPU');
     }
+    if (telemetry.softwareAdapter) throw new Error('WebGPU candidate verification failed closed: software/fallback adapter');
     if (telemetry.deviceLost) throw new Error('WebGPU candidate verification failed closed: device was lost');
     assertTslCutoverReady();
   }
@@ -150,6 +228,7 @@ export class WebGpuRenderRuntime {
   dispose(): void {
     this.renderPipeline.dispose();
     this.renderer.dispose();
+    this.device.destroy?.();
   }
 }
 

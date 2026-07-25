@@ -1,6 +1,18 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
+test('fails a required WebGPU candidate closed before the legacy game can be mislabeled', async ({ page }) => {
+  const pageError = page.waitForEvent('pageerror');
+  await page.goto('/?renderer=webgpu&requireWebGPU=1&render=blender');
+  const error = await pageError;
+  expect(error.message).toMatch(/WebGPU|TSL/);
+  const state = await page.evaluate(() => ({
+    backend: document.documentElement.dataset.renderBackend,
+    debugApi: '__ATOMIC_ACRES_DEBUG__' in window,
+  }));
+  expect(state).toEqual({ backend: undefined, debugApi: false });
+});
+
 test('reports the active WebGL adapter and offscreen HDR samples separately', async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto('/?render=blender&signal=on&grass=off&mist=off&clouds=off&rays=off&seed=6401&map=skyline-terminal');
