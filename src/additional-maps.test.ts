@@ -133,7 +133,7 @@ describe('additional authored maps', () => {
   it('builds an original compact collision-backed industrial 1v1 arena', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     expect(map.id).toBe('rustworks-1v1');
-    expect(map.label).toBe('Rustworks');
+    expect(map.label).toBe('RustRig');
     expect(map.root.name).toContain('Rustworks');
     expect(map.colliders.length).toBeGreaterThanOrEqual(25);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(25);
@@ -522,7 +522,7 @@ describe('additional authored maps', () => {
   it('builds an untimed three-distance score range with reusable targets', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
-    expect(map.label).toBe('Acres Indoor Gun Range');
+    expect(map.label).toBe('Indoor Gun Range');
     expect(map.targets).toHaveLength(14);
     expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
     expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
@@ -605,7 +605,7 @@ describe('additional authored maps', () => {
   it('builds an original airport-terminal arena with concourse, jet bridge, fuselage, and tarmac apron', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     expect(map.id).toBe('skyline-terminal');
-    expect(map.label).toBe('Skyline Terminal');
+    expect(map.label).toBe('Terminal');
     expect(map.root.name).toContain('Skyline Terminal');
     expect(map.colliders.length).toBeGreaterThanOrEqual(15);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(15);
@@ -624,7 +624,7 @@ describe('additional authored maps', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
     expect(mainSign).toBeTruthy();
-    expect(mainSign?.userData.label).toBe('SKYLINE TERMINAL - GATES 1-12');
+    expect(mainSign?.userData.label).toBe('TERMINAL - GATES 1-12');
 
     const flightDisplay = map.root.getObjectByName('skyline-flight-display-board');
     expect(flightDisplay).toBeTruthy();
@@ -753,6 +753,8 @@ describe('additional authored maps', () => {
     const qualityShells = [
       map.root.getObjectByName('skyline-quality-fuselage-shell-forward'),
       map.root.getObjectByName('skyline-quality-fuselage-shell-aft'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft'),
     ];
     const fuselagePlaceholder = map.root.getObjectByName('skyline-jetliner-fuselage-top') as THREE.Mesh;
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
@@ -774,6 +776,28 @@ describe('additional authored maps', () => {
     expect(qualityNacelles?.visible).toBe(true);
     expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+  });
+
+  it('gives the Quality aircraft a separate BackSide cabin roof without closing the boarding aperture', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const ceilingShells = [
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward') as THREE.Mesh,
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft') as THREE.Mesh,
+    ];
+    expect(ceilingShells.every((shell) => shell instanceof THREE.Mesh)).toBe(true);
+    for (const shell of ceilingShells) {
+      const material = shell.material as THREE.MeshStandardMaterial;
+      expect(material.name).toBe('skyline-aircraft-interior-ceiling-material');
+      expect(material.side).toBe(THREE.BackSide);
+      expect(material.side).not.toBe(THREE.DoubleSide);
+      expect(shell.userData.interiorFaceOrientation).toBe('back-side');
+      expect(shell.userData.boardingAperturePreserved).toBe(true);
+    }
+    const forwardBounds = new THREE.Box3().setFromObject(ceilingShells[0]);
+    const aftBounds = new THREE.Box3().setFromObject(ceilingShells[1]);
+    expect(forwardBounds.max.x).toBeLessThan(-1.8);
+    expect(aftBounds.min.x).toBeGreaterThan(1.8);
+    expect(isBlocked({ x: 0, y: 5.02, z: 0.4 }, map.colliders, 0.35)).toBe(false);
   });
 
   it('authors an open boarding walkway and cabin aisle without opaque door panels', () => {

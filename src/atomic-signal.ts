@@ -28,6 +28,10 @@ export type AtomicSignalTelemetry = {
   averagePassCpuMs: number;
   samples: number;
   textureSamples: number;
+  canvasAntialias: boolean;
+  canvasSamples: number;
+  principalHdrSamples: number;
+  bloomSamples: number;
   targetValidated: boolean;
   outputValidated: boolean;
   width: number;
@@ -39,6 +43,12 @@ export type AtomicSignalTelemetry = {
   bloomWidth: number;
   bloomHeight: number;
 };
+
+export function atomicSignalPrincipalHdrSamples(profile: RenderProfile, maximumSamples: number): number {
+  if (profile === 'compat') return 0;
+  const requested = profile === 'blender' ? 4 : 2;
+  return Math.max(0, Math.min(requested, Math.floor(maximumSamples)));
+}
 
 const FULLSCREEN_VERTEX = /* glsl */`
   precision highp float;
@@ -332,6 +342,10 @@ export class AtomicSignalPass {
   private bloomWidth = 1;
   private bloomHeight = 1;
   private effectsBudget: GraphicsEffectsBudget;
+  private readonly canvasAntialias: boolean;
+  private readonly canvasSamples: number;
+  private readonly principalHdrSamples: number;
+  private readonly bloomSamples = 0;
 
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
@@ -339,6 +353,10 @@ export class AtomicSignalPass {
     private readonly onFallback?: (reason: string) => void,
     bypassReason: string | null = null,
   ) {
+    const gl = renderer.getContext();
+    this.canvasAntialias = gl.getContextAttributes()?.antialias ?? false;
+    this.canvasSamples = Number(gl.getParameter(gl.SAMPLES) ?? 0);
+    this.principalHdrSamples = atomicSignalPrincipalHdrSamples(profile, renderer.capabilities.maxSamples);
     this.screenToneMapping = renderer.toneMapping;
     const configured = atomicSignalConfig(profile);
     this.effectsBudget = graphicsEffectsBudget(profile, profile === 'blender' ? 1 : profile === 'performance' ? 0.75 : 0.2);
@@ -364,6 +382,7 @@ export class AtomicSignalPass {
       generateMipmaps: false,
     });
     this.target.texture.name = `AtomicSignal.${profile}.hdr`;
+    this.target.samples = this.principalHdrSamples;
     this.target.depthTexture = new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
     this.target.depthTexture.name = `AtomicSignal.${profile}.depth`;
 
@@ -376,6 +395,7 @@ export class AtomicSignalPass {
       generateMipmaps: false,
     });
     this.bloomTarget.texture.name = `AtomicSignal.${profile}.selective-bloom`;
+    this.bloomTarget.samples = this.bloomSamples;
     this.bloomTarget.depthTexture = new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
     this.bloomTarget.depthTexture.name = `AtomicSignal.${profile}.selective-bloom-depth`;
 
@@ -587,6 +607,10 @@ export class AtomicSignalPass {
       averagePassCpuMs: active ? this.averagePassCpuMs : 0,
       samples: active ? this.samples : 0,
       textureSamples: active ? atomicSignalEffectsTextureSamples(this.config, this.effectsBudget) : 0,
+      canvasAntialias: this.canvasAntialias,
+      canvasSamples: this.canvasSamples,
+      principalHdrSamples: active ? this.principalHdrSamples : 0,
+      bloomSamples: active ? this.bloomSamples : 0,
       targetValidated: active && this.targetValidated,
       outputValidated: active && this.outputValidated,
       width: this.width,
@@ -597,6 +621,13 @@ export class AtomicSignalPass {
       depthFogStrength: active ? this.effectsBudget.depthFogStrength : 0,
       bloomWidth: active ? this.bloomWidth : 0,
       bloomHeight: active ? this.bloomHeight : 0,
+    };
+  }
+
+  targetSampleTelemetry(): Readonly<{ principalHdrSamples: number; bloomSamples: number }> {
+    return {
+      principalHdrSamples: this.config.enabled ? this.principalHdrSamples : 0,
+      bloomSamples: this.config.enabled ? this.bloomSamples : 0,
     };
   }
 

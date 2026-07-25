@@ -8,7 +8,12 @@ describe('Pass 62 arena contrast lighting', () => {
     const rig = new ArenaContrastLighting(scene, 'blender');
     for (const arenaId of ['atomic-acres', 'skyline-terminal'] as const) {
       rig.setArena(arenaId);
-      expect(rig.telemetry()).toMatchObject({ arenaId, activeLights: 2, shadowCastingLights: 1 });
+      expect(rig.telemetry()).toMatchObject({
+        arenaId,
+        activeLights: 2,
+        shadowCastingLights: 2,
+        occlusion: { activeLocalLights: 2, shadowedLocalLights: 2, violations: [] },
+      });
       const visibleRoots = scene.children.filter((node) => node.name.includes('contrast-lighting') && node.visible);
       expect(visibleRoots).toHaveLength(1);
     }
@@ -18,11 +23,11 @@ describe('Pass 62 arena contrast lighting', () => {
     }
   });
 
-  it('keeps Performance illuminated without extra shadow maps and Compatibility free of the rig', () => {
+  it('keeps unshadowed Performance and Compatibility free of the contrast-light volume', () => {
     const performance = new ArenaContrastLighting(new THREE.Scene(), 'performance');
     const compat = new ArenaContrastLighting(new THREE.Scene(), 'compat');
     performance.setArena('atomic-acres');
-    expect(performance.telemetry()).toMatchObject({ activeLights: 2, shadowCastingLights: 0 });
+    expect(performance.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0, occlusion: { violations: [] } });
     performance.setArena('rustworks-1v1');
     expect(performance.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });
     expect(compat.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });

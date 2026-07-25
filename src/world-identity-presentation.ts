@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeEmissiveOnly } from './rendering/light-occlusion';
 import { HOUSE_LAYOUT } from './arena-layout';
 import type { ArenaLightingProfile } from './blender-lighting';
 import { createHouseArchitecture } from './house-navigation';
@@ -186,7 +187,7 @@ export function createWorldIdentityPresentation(
     const light = new THREE.PointLight(route.secondaryColor, lighting.routeLightIntensity, 13, 2);
     light.name = `route-light-${route.id}`;
     light.position.set(...practicalAnchors[route.id]);
-    light.castShadow = false;
+    makeEmissiveOnly(light);
     root.add(light);
   }
 
@@ -204,7 +205,7 @@ export function createWorldIdentityPresentation(
     const light = new THREE.PointLight(0xffd2a0, lighting.streetLightIntensity, 14.5, 2);
     light.name = `street-light-${index + 1}`;
     light.position.set(...streetAnchors[index]);
-    light.castShadow = false;
+    makeEmissiveOnly(light);
     root.add(light);
   }
 
@@ -250,7 +251,7 @@ export function createWorldIdentityPresentation(
       );
       portalLight.name = `${doorway.name}-portal-light`;
       portalLight.position.set(0, 0.12, house.origin.facing * 0.9);
-      portalLight.castShadow = false;
+      makeEmissiveOnly(portalLight);
       portalLight.userData.interiorBounded = true;
       doorway.add(portalLight);
       portalLights += 1;
@@ -323,7 +324,7 @@ export function createWorldIdentityPresentation(
       const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE, 2);
       light.name = `interior-light-${house.id}-broad`;
       light.position.set(house.origin.x, 3.1, house.origin.z);
-      light.castShadow = false;
+      makeEmissiveOnly(light);
       root.add(light);
     }
   } else if (admittedInteriorLights === 4) {
@@ -332,7 +333,7 @@ export function createWorldIdentityPresentation(
         const light = new THREE.PointLight(0xffd6a2, lighting.interiorLightIntensity, ATOMIC_INTERIOR_LIGHT_MAX_DISTANCE, 2);
         light.name = `interior-light-${house.id}-${level}`;
         light.position.set(house.origin.x, y, house.origin.z);
-        light.castShadow = false;
+        makeEmissiveOnly(light);
         root.add(light);
       }
     }

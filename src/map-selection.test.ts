@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection } from './map-selection';
+import { ARENA_SELECTIONS, activeSoloBotTarget, arenaSelection, decodeArenaId } from './map-selection';
 
 describe('opening arena selection', () => {
   it('publishes four unique, fully described maps', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
       'atomic-acres',
+      'skyline-terminal',
       'rustworks-1v1',
       'gun-range',
-      'skyline-terminal',
     ]);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range']);
     expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(4);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
@@ -24,7 +25,7 @@ describe('opening arena selection', () => {
     expect(atomic.maximumSoloBots).toBe(6);
   });
 
-  it('defines one-bot solo Rustworks, gun range and 4th Skyline Terminal with private multiplayer hosting', () => {
+  it('defines one-bot solo RustRig, gun range and Terminal with private multiplayer hosting', () => {
     expect(arenaSelection('rustworks-1v1')).toMatchObject({
       soloBotCount: 1,
       maximumSoloBots: 1,
@@ -41,8 +42,8 @@ describe('opening arena selection', () => {
     });
     expect(arenaSelection('skyline-terminal')).toMatchObject({
       id: 'skyline-terminal',
-      selectorLabel: 'SKYLINE TERMINAL',
-      displayName: 'Skyline Terminal',
+      selectorLabel: 'TERMINAL',
+      displayName: 'Terminal',
       multiplayer: true,
       fieldSupport: false,
       overdrive: false,
@@ -59,7 +60,16 @@ describe('opening arena selection', () => {
     expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(6);
   });
 
-  it('falls back safely to Atomic Acres', () => {
+  it('decodes current route labels and preserves stable URL/storage/protocol ids', () => {
+    expect(decodeArenaId('nuke-town')).toBe('atomic-acres');
+    expect(decodeArenaId('terminal')).toBe('skyline-terminal');
+    expect(decodeArenaId('rustrig')).toBe('rustworks-1v1');
+    expect(decodeArenaId('atomic-acres')).toBe('atomic-acres');
+    expect(decodeArenaId('skyline-terminal')).toBe('skyline-terminal');
+    expect(decodeArenaId('rustworks-1v1')).toBe('rustworks-1v1');
+  });
+
+  it('falls back safely to Nuke Town', () => {
     expect(arenaSelection('unknown').id).toBe('atomic-acres');
     expect(arenaSelection(null).id).toBe('atomic-acres');
   });

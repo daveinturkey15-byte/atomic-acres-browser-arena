@@ -1,0 +1,413 @@
+@layer pass64.tokens, pass64.components, pass64.accessibility;
+
+@layer pass64.tokens {
+  :root {
+    --ui-void: #05090d;
+    --ui-deep: #091218;
+    --ui-surface: rgba(9, 18, 24, 0.965);
+    --ui-surface-raised: rgba(15, 29, 36, 0.94);
+    --ui-line: rgba(164, 205, 205, 0.2);
+    --ui-line-strong: rgba(137, 241, 232, 0.58);
+    --ui-text: #f4f8f4;
+    --ui-muted: #94aaa8;
+    --ui-cyan: #79f3e7;
+    --ui-amber: #f6c756;
+    --ui-danger: #ff7868;
+    --ui-space-1: 4px;
+    --ui-space-2: 8px;
+    --ui-space-3: 12px;
+    --ui-space-4: 18px;
+    --ui-space-5: 26px;
+    --ui-radius: 3px;
+    --ui-shadow: 0 24px 80px rgba(0, 0, 0, 0.62);
+    --ui-motion-fast: 120ms;
+    --ui-motion-medium: 220ms;
+  }
+}
+
+@layer pass64.components {
+  .tactical-rail {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-space-3);
+    margin: -6px 0 var(--ui-space-4);
+    padding-bottom: var(--ui-space-2);
+    border-bottom: 1px solid var(--ui-line);
+    color: var(--ui-muted);
+    font: 800 8px/1 Inter, sans-serif;
+    letter-spacing: 0.18em;
+  }
+
+  .tactical-rail b {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--ui-cyan);
+    font: inherit;
+    white-space: nowrap;
+  }
+
+  .tactical-rail b::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 10px currentColor;
+  }
+
+  .map-index {
+    align-self: flex-start;
+    color: #6e8483;
+    font: 800 8px/1 Inter, sans-serif;
+    font-style: normal;
+    letter-spacing: 0.16em;
+  }
+
+  .map-card.selected .map-index {
+    color: var(--ui-cyan);
+  }
+
+  #hud::before {
+    content: '';
+    position: absolute;
+    inset: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    border: 1px solid rgba(121, 243, 231, 0.07);
+    clip-path: polygon(0 0, 42px 0, 42px 1px, calc(100% - 42px) 1px, calc(100% - 42px) 0, 100% 0, 100% 42px, calc(100% - 1px) 42px, calc(100% - 1px) calc(100% - 42px), 100% calc(100% - 42px), 100% 100%, calc(100% - 42px) 100%, calc(100% - 42px) calc(100% - 1px), 42px calc(100% - 1px), 42px 100%, 0 100%, 0 calc(100% - 42px), 1px calc(100% - 42px), 1px 42px, 0 42px);
+    pointer-events: none;
+  }
+}
+
+/* Bounded legacy bridge: the existing monolithic stylesheet remains intact;
+   these selectors are the only Pass 64 overrides until component extraction. */
+:root {
+  --aqua: var(--ui-cyan);
+  --gold: var(--ui-amber);
+  --coral: var(--ui-danger);
+  --ink: var(--ui-deep);
+  --panel: var(--ui-surface);
+  color: var(--ui-text);
+  background: var(--ui-void);
+}
+
+button,
+input,
+select {
+  border-radius: var(--ui-radius);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role='tab']:focus-visible {
+  outline: 2px solid var(--ui-cyan);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px var(--ui-void), 0 0 20px rgba(121, 243, 231, 0.28);
+}
+
+.panel {
+  width: min(580px, calc(100vw - 36px));
+  padding: clamp(22px, 3.3vw, 38px);
+  border-color: var(--ui-line);
+  border-left: 3px solid var(--ui-cyan);
+  background:
+    linear-gradient(115deg, rgba(121, 243, 231, 0.045), transparent 32%),
+    linear-gradient(155deg, var(--ui-surface), rgba(8, 17, 22, 0.94));
+  box-shadow: var(--ui-shadow), inset 0 1px rgba(255, 255, 255, 0.035);
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%);
+  scrollbar-gutter: stable;
+}
+
+.panel::before {
+  width: 2px;
+  background: var(--ui-cyan);
+  box-shadow: 0 0 22px rgba(121, 243, 231, 0.3);
+}
+
+.panel h1 {
+  font-size: clamp(54px, 7vw, 78px);
+  line-height: 0.76;
+  letter-spacing: -0.025em;
+}
+
+.panel h1 span {
+  color: var(--ui-cyan);
+  -webkit-text-stroke: 0;
+  text-shadow: 0 0 26px rgba(121, 243, 231, 0.12);
+}
+
+.eyebrow {
+  color: var(--ui-amber);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+
+.lede {
+  margin: 20px 0;
+  color: #b3c4c1;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.menu-tabs {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-line);
+  background: transparent;
+}
+
+.menu-tabs button {
+  position: relative;
+  padding: 11px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #7f9693;
+  background: transparent;
+  transition: color var(--ui-motion-fast) ease, background var(--ui-motion-fast) ease;
+}
+
+.menu-tabs button:hover,
+.menu-tabs button.active {
+  color: var(--ui-text);
+  border-color: var(--ui-cyan);
+  background: linear-gradient(180deg, transparent, rgba(121, 243, 231, 0.075));
+}
+
+.menu-tabs button.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 28px;
+  height: 1px;
+  transform: translateX(-50%);
+  background: var(--ui-cyan);
+  box-shadow: 0 0 12px var(--ui-cyan);
+}
+
+.setup-grid input,
+.setup-grid select,
+.join-row input,
+.settings-grid select {
+  border-color: var(--ui-line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.map-selector {
+  border: 1px solid var(--ui-line);
+  border-left: 2px solid var(--ui-amber);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.map-card-grid {
+  gap: 5px;
+}
+
+.map-card {
+  position: relative;
+  min-height: 100px;
+  padding: 9px;
+  gap: 5px;
+  border-color: rgba(164, 205, 205, 0.14);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.025), rgba(0, 0, 0, 0.2));
+  transition: transform var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease, background var(--ui-motion-fast) ease;
+}
+
+.map-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(246, 199, 86, 0.62);
+  background: rgba(246, 199, 86, 0.055);
+}
+
+.map-card.selected {
+  border-color: var(--ui-line-strong);
+  box-shadow: inset 0 -2px var(--ui-cyan), 0 8px 22px rgba(0, 0, 0, 0.22);
+  background: linear-gradient(145deg, rgba(121, 243, 231, 0.1), rgba(121, 243, 231, 0.025));
+}
+
+.map-card span {
+  font-size: 17px;
+}
+
+.map-card strong {
+  color: #93aaa7;
+  font-size: 8px;
+}
+
+.map-card small {
+  color: #cbb568;
+}
+
+.selected-kit-summary,
+#private-lobby,
+#last-match-reports,
+#high-score-card {
+  border-color: var(--ui-line);
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.menu-actions button,
+.join-row button,
+.lobby-actions button,
+#field-kit-redeploy {
+  border-color: var(--ui-line);
+  background: var(--ui-surface-raised);
+  transition: transform var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease, background var(--ui-motion-fast) ease;
+}
+
+.menu-actions .primary,
+.lobby-actions .primary {
+  border-color: var(--ui-amber);
+  background: var(--ui-amber);
+  color: #10191d;
+}
+
+#matchbar {
+  height: 68px;
+  border-top: 1px solid rgba(121, 243, 231, 0.32);
+  background: linear-gradient(180deg, rgba(4, 9, 13, 0.9), rgba(4, 9, 13, 0.34), transparent);
+  clip-path: polygon(2% 0, 98% 0, 94% 100%, 6% 100%);
+}
+
+#connection-pill,
+#fps-counter,
+#network-strip span {
+  border-color: var(--ui-line-strong);
+  background: rgba(4, 10, 14, 0.76);
+}
+
+#weapon-block,
+#support-block {
+  border-color: var(--ui-line);
+  border-right-color: var(--ui-cyan);
+  background: linear-gradient(135deg, rgba(4, 10, 14, 0.94), rgba(9, 20, 25, 0.78));
+}
+
+#health-block,
+#equipment-block,
+#weapon-block,
+#support-block,
+#minimap,
+#pause-hint {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.48));
+}
+
+#minimap {
+  border-color: rgba(121, 243, 231, 0.38);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+#health-block b,
+#weapon-block #ammo,
+#timer,
+#scoreline b {
+  font-variant-numeric: tabular-nums;
+}
+
+#text-chat,
+.menu-modal-panel,
+#strike-map-overlay {
+  border-color: var(--ui-line-strong);
+  background: linear-gradient(150deg, rgba(5, 12, 16, 0.98), rgba(12, 26, 32, 0.97));
+  box-shadow: var(--ui-shadow);
+}
+
+@media (min-width: 1500px) {
+  .panel {
+    left: clamp(34px, 5vw, 100px);
+  }
+}
+
+@media (max-width: 980px) {
+  .panel {
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (max-width: 700px) {
+  .panel {
+    inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    width: auto;
+    max-height: none;
+    transform: none;
+    padding: 64px 16px 20px;
+  }
+
+  #menu-meta-actions {
+    top: max(14px, env(safe-area-inset-top));
+    left: max(18px, env(safe-area-inset-left));
+    right: max(18px, env(safe-area-inset-right));
+    justify-content: flex-end;
+    max-width: none;
+  }
+
+  #menu-meta-actions > button {
+    min-width: 0;
+    padding: 8px 9px;
+    font-size: 8px;
+  }
+
+  .tactical-rail {
+    margin-top: 0;
+  }
+
+  .panel h1 {
+    font-size: clamp(48px, 18vw, 68px);
+  }
+
+  .map-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .map-card {
+    min-height: 92px;
+  }
+
+  #matchbar {
+    min-width: calc(100vw - 12px);
+  }
+}
+
+@media (max-height: 760px) and (min-width: 701px) {
+  .panel {
+    padding-block: 18px;
+  }
+
+  .tactical-rail,
+  .lede {
+    margin-bottom: 10px;
+  }
+
+  .map-card {
+    min-height: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .panel,
+  .map-card,
+  #weapon-block,
+  #support-block,
+  #text-chat {
+    border: 1px solid CanvasText;
+  }
+
+  .map-card.selected,
+  .menu-tabs button.active {
+    outline: 2px solid Highlight;
+  }
+}

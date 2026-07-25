@@ -936,7 +936,7 @@ export function buildRetroShuttleBus(): THREE.Group {
   for (const x of [-1.72, 1.72]) for (const z of [-3.45, 3.35]) wheel(root, x, z, 0.7);
   part(root, roundedBox('shuttle-front-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, -5.42]);
   part(root, roundedBox('shuttle-rear-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, 5.42]);
-  const sign = decal('ACRES SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
+  const sign = decal('NUKE SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
   return root;
 }
 
