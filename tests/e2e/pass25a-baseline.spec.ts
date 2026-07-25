@@ -45,7 +45,7 @@ async function snapshot(page: Page): Promise<Pass25State> {
 }
 
 async function ready(page: Page, profile: 'performance' | 'blender' = 'performance', forceSignal = false): Promise<void> {
-  await page.goto(`/?render=${profile}&seed=pass25a-browser-baseline${forceSignal ? '&signal=on' : ''}`);
+  await page.goto(`/?renderer=webgl2&render=${profile}&seed=pass25a-browser-baseline${forceSignal ? '&signal=on' : ''}`);
   await page.waitForFunction(() => {
     const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => Pass25State } }).__ATOMIC_ACRES_DEBUG__?.snapshot();
     const solo = document.querySelector<HTMLButtonElement>('#solo');
