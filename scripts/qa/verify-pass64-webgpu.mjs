@@ -145,7 +145,9 @@ try {
     await page.waitForFunction(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       const state = api?.snapshot();
-      return state?.weaponReady === true && state?.render?.runtime?.actualBackend === 'webgpu';
+      return state?.weaponReady === true
+        && state?.bootstrap?.stage === 'ready'
+        && state?.render?.runtime?.actualBackend === 'webgpu';
     }, undefined, { timeout: 60_000 });
     await page.evaluate(() => {
       window.__ATOMIC_ACRES_DEBUG__.startSolo();
