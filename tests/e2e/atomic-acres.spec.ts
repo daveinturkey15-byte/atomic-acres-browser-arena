@@ -801,7 +801,11 @@ test.describe('boot and authored presentation', () => {
     }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_100);
     const stableState = await debug(page);
-    expect(stableState.render.calls).toBeLessThanOrEqual(163);
+    // Pass 64 keeps the already-compiled 2x-damage presentation resident at
+    // sub-pixel scale during active play. Its six audited mesh/sprite batches
+    // deliberately trade a tiny, bounded steady-state cost for removing the
+    // synchronized first-spawn shader/upload hitch across every client.
+    expect(stableState.render.calls).toBeLessThanOrEqual(169);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
