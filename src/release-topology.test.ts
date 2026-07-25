@@ -56,6 +56,8 @@ describe('Pass 63 two-channel release topology', () => {
     expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
     expect(shellHtml).toContain('live Pass 63 build');
     expect(shellHtml).toContain('byte-exact Pass 62 best-netcode benchmark');
+    expect(shellHtml).toContain('Nuke Town');
+    expect(shellHtml).not.toContain('Atomic Acres');
     expect(shellHtml).not.toContain('Pass 59');
   });
 

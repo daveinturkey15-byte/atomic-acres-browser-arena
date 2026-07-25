@@ -39,7 +39,7 @@ test.describe('Pass 64 tactical HUD and menu contract', () => {
     await cards.nth(1).click();
     await expect(page.locator('#arena-title')).toHaveText('TERMINAL');
     await cards.nth(2).click();
-    await expect(page.locator('#arena-title')).toContainText('RUST RIG');
+    await expect(page.locator('#arena-title')).toHaveText('RustRig');
     await cards.nth(0).click();
     await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
   });
