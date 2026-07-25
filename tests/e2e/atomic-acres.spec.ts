@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
 type DebugState = {
+  bootstrap: { stage: string; error: string | null };
   gameStarted: boolean;
   frameCount: number;
   gameMode: string;
@@ -371,13 +372,37 @@ async function debug(page: Page): Promise<DebugState> {
 
 async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promise<void> {
   await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => {
-    const status = document.querySelector<HTMLElement>('#network-status');
-    const solo = document.querySelector<HTMLButtonElement>('#solo');
-    const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
-    const snapshot = debugApi?.snapshot();
-    return status?.dataset.kind === 'ok' && solo?.disabled === false && snapshot?.weaponReady === true && snapshot.originalArtLoaded === true;
-  }, undefined, { timeout: timeoutMs });
+  try {
+    await page.waitForFunction(() => {
+      const status = document.querySelector<HTMLElement>('#network-status');
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      const snapshot = debugApi?.snapshot();
+      return status?.dataset.kind === 'ok' && solo?.disabled === false && snapshot?.weaponReady === true && snapshot.originalArtLoaded === true;
+    }, undefined, { timeout: timeoutMs });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => {
+      const status = document.querySelector<HTMLElement>('#network-status');
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      const snapshot = debugApi?.snapshot();
+      return {
+        path: window.location.pathname + window.location.search,
+        statusKind: status?.dataset.kind ?? null,
+        statusText: status?.textContent ?? null,
+        soloDisabled: solo?.disabled ?? null,
+        debugApiReady: Boolean(debugApi),
+        weaponReady: snapshot?.weaponReady ?? null,
+        originalArtLoaded: snapshot?.originalArtLoaded ?? null,
+        bootstrap: snapshot?.bootstrap ?? null,
+        blenderEnvironment: snapshot?.render.blenderEnvironment ?? null,
+      };
+    }).catch((diagnosticError: unknown) => ({
+      diagnosticError: diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError),
+    }));
+    if (error instanceof Error) error.message += `\nReadiness diagnostic: ${JSON.stringify(diagnostic)}`;
+    throw error;
+  }
 }
 
 async function pageReady(page: Page): Promise<void> {

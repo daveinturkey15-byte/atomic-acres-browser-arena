@@ -844,6 +844,24 @@ let skyMaterial: THREE.ShaderMaterial | null = null;
 
 let riggedOperatorLoadError: string | null = null;
 let importedWeaponLoadError: string | null = null;
+type BootstrapStage =
+  | 'loading-module-assets'
+  | 'measuring-display'
+  | 'module-ready'
+  | 'loading-gameplay-assets'
+  | 'prewarming-grenade-explosion'
+  | 'prewarming-support-explosion'
+  | 'prewarming-death-drops'
+  | 'prewarming-nuke'
+  | 'binding-world'
+  | 'compiling-scene'
+  | 'batching-static-meshes'
+  | 'prewarming-overdrive'
+  | 'finalizing'
+  | 'ready'
+  | 'failed';
+let bootstrapStage: BootstrapStage = 'loading-module-assets';
+let bootstrapError: string | null = null;
 const displayCadencePromise = new Promise<number>((resolve) => {
   const samples: number[] = [];
   let previous = performance.now();
@@ -859,6 +877,7 @@ const [operatorLoad, weaponLoad] = await Promise.allSettled([
   loadRiggedOperatorAsset(),
   loadImportedWeaponAssets(),
 ]);
+bootstrapStage = 'measuring-display';
 if (operatorLoad.status === 'rejected') {
   riggedOperatorLoadError = operatorLoad.reason instanceof Error ? operatorLoad.reason.message : String(operatorLoad.reason);
   console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
@@ -868,6 +887,7 @@ if (weaponLoad.status === 'rejected') {
   console.error('[Nuke Town weapon asset load failed]', importedWeaponLoadError);
 }
 const detectedDisplayFrameMs = await displayCadencePromise;
+bootstrapStage = 'module-ready';
 const adaptiveQuality = new AdaptiveQualityController({
   profile: renderProfile,
   targetFrameMs: detectedDisplayFrameMs,
@@ -1115,10 +1135,10 @@ async function prewarmOverdrivePresentation(): Promise<void> {
   overdriveRoot.visible = true;
   overdriveRoot.scale.setScalar(0.0001);
   try {
-    // Compile against the actual scene and post-processing material state. A
-    // root-only compile missed scene lighting variants and deferred the hitch
-    // until the 2× Damage Core first became visible at the two-minute spawn.
-    await renderer.compileAsync(scene, camera);
+    // Traverse only the hidden pickup while the target scene supplies its real
+    // lighting/environment variants. Compiling the entire arena here repeats
+    // Quality-scene work and can starve menu readiness under SwiftShader.
+    await renderer.compileAsync(overdriveRoot, camera, scene);
     renderer.render(scene, camera);
     overdrivePresentationPrewarmed = true;
   } finally {
@@ -1179,7 +1199,7 @@ async function prewarmNukePresentation(): Promise<void> {
   nukeShockwave.visible = true;
   nukeShockwave.scale.setScalar(0.0001);
   try {
-    await renderer.compileAsync(scene, camera);
+    await renderer.compileAsync(nukeShockwave, camera, scene);
     renderer.render(scene, camera);
     nukePresentationPrewarmed = true;
   } finally {
@@ -2028,6 +2048,8 @@ function requirePlayerName(): string | null {
 
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
+  bootstrapStage = 'failed';
+  bootstrapError = message;
   triggerHeld = false;
   setStatus(`Game paused: ${message}`, 'error');
   menu.classList.remove('hidden');
@@ -9924,6 +9946,7 @@ const debugWindow = window as Window & {
 };
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   snapshot: () => ({
+    bootstrap: { stage: bootstrapStage, error: bootstrapError },
     gameStarted,
     frameCount,
     gameMode,
@@ -11252,6 +11275,7 @@ async function bootstrap(): Promise<void> {
   soloButton.disabled = true;
   hostButton.disabled = true;
   joinButton.disabled = true;
+  bootstrapStage = 'loading-gameplay-assets';
   setStatus('Loading authored arena art, weapons and advanced collision…');
 
   const physicsPromise = CharacterPhysics.create(arena.physicsColliders, arena.bounds);
@@ -11312,10 +11336,15 @@ async function bootstrap(): Promise<void> {
   // retreat still keeps it visually tucked near walls, while floor/wall depth
   // can no longer cut holes through hands and weapons in prone/crouch poses.
   weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
+  bootstrapStage = 'prewarming-grenade-explosion';
   await grenadeExplosionPresentation.prewarm(renderer, camera);
+  bootstrapStage = 'prewarming-support-explosion';
   await supportExplosionPresentation.prewarm(renderer, camera);
+  bootstrapStage = 'prewarming-death-drops';
   await deathDropPresentationPool.prewarm(renderer, camera);
+  bootstrapStage = 'prewarming-nuke';
   await prewarmNukePresentation();
+  bootstrapStage = 'binding-world';
   const visibleMapMeshes = atomicArena.raycastMeshes.filter((mesh) => mesh.visible || mesh.userData.collisionProxy === true);
   atomicArena.raycastMeshes.splice(0, atomicArena.raycastMeshes.length, ...visibleMapMeshes);
   art.root.traverse((node) => {
@@ -11328,7 +11357,9 @@ async function bootstrap(): Promise<void> {
     renderer.capabilities.getMaxAnisotropy(),
   );
   graphicsRefinement.refine(scene, renderer.capabilities.getMaxAnisotropy());
+  bootstrapStage = 'compiling-scene';
   await renderer.compileAsync(scene, camera);
+  bootstrapStage = 'batching-static-meshes';
   const arenaRoot = scene.getObjectByName('Atomic Acres arena');
   if (renderProfile !== 'blender') {
     batchStaticMeshes(rustworksArena.root, rustworksArena.root, () => '', staticMaterialMode);
@@ -11343,7 +11374,9 @@ async function bootstrap(): Promise<void> {
   }
   const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
   batchStaticMeshes(neighbourhoodLifeRoot, neighbourhoodLifeRoot, () => '', lifeMaterialMode);
+  bootstrapStage = 'prewarming-overdrive';
   await prewarmOverdrivePresentation();
+  bootstrapStage = 'finalizing';
   if (activeRenderConfig.shadowMode === 'static') renderer.shadowMap.needsUpdate = true;
   weaponView.setWeapon(player.weapon, true);
   setArenaPresentationVisibility();
@@ -11354,6 +11387,7 @@ async function bootstrap(): Promise<void> {
   arenaSelectionReady = true;
   syncArenaSelectionUi();
   setStatus(`${selectedArena.displayName} ready · ${selectedArena.rulesLabel}.`);
+  bootstrapStage = 'ready';
   requestAnimationFrame(frame);
 }
 

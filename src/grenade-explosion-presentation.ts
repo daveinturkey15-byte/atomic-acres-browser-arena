@@ -85,13 +85,15 @@ export class GrenadeExplosionPresentation {
 
   async prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): Promise<void> {
     if (this.wasPrewarmed) return;
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene)) throw new Error('Grenade explosion presentation must be attached to a scene before prewarm');
     for (const slot of this.slots) {
       slot.root.visible = true;
       slot.root.scale.setScalar(0.0001);
     }
     try {
-      await renderer.compileAsync(this.root.parent as THREE.Scene, camera);
-      renderer.render(this.root.parent as THREE.Scene, camera);
+      await renderer.compileAsync(this.root, camera, parentScene);
+      renderer.render(parentScene, camera);
       this.wasPrewarmed = true;
     } finally {
       for (const slot of this.slots) {
