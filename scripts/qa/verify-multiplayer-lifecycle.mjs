@@ -4,6 +4,8 @@ import { chromium } from '@playwright/test';
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const peerPort = Number(process.env.QA_PEER_PORT ?? 0);
 const cycles = Number(process.env.QA_MULTIPLAYER_CYCLES ?? 20);
+const guestCount = Number(process.env.QA_MULTIPLAYER_GUESTS ?? 1);
+if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 3) throw new Error(`Invalid QA_MULTIPLAYER_GUESTS: ${guestCount}`);
 const chromiumArgs = [
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
   '--allow-loopback-in-peer-connection', '--disable-features=WebRtcHideLocalIpsWithMdns',
@@ -23,9 +25,12 @@ try {
     console.error(`[multiplayer-lifecycle] cycle ${cycle}/${cycles}`);
     const context = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
     const host = await context.newPage();
-    const guest = await context.newPage();
-    await Promise.all([keepPageAnimating(context, host), keepPageAnimating(context, guest)]);
-    for (const [label, page] of [['host', host], ['guest', guest]]) {
+    const guests = await Promise.all(Array.from({ length: guestCount }, () => context.newPage()));
+    const guest = guests[0];
+    const peers = [host, ...guests];
+    const labelledPages = [['host', host], ...guests.map((page, index) => [`guest-${index + 1}`, page])];
+    await Promise.all(peers.map((page) => keepPageAnimating(context, page)));
+    for (const [label, page] of labelledPages) {
       await page.bringToFront();
       page.on('pageerror', (error) => errors.push(`cycle ${cycle} ${label}: ${error.message}`));
       page.on('console', (message) => {
@@ -54,25 +59,34 @@ try {
     await host.evaluate(() => document.querySelector('#host')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim().length > 0, undefined, { timeout: 45_000 });
     const roomCode = (await host.textContent('#room-code')).trim();
-    await guest.bringToFront();
-    await guest.selectOption('#team', '1');
-    await guest.fill('#room-input', roomCode);
-    await guest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    await host.bringToFront();
-    await host.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: 30_000 });
-    await guest.waitForFunction(() => document.querySelectorAll('#lobby-roster .lobby-player').length === 2, undefined, { timeout: 30_000 });
-    await guest.click('#lobby-ready');
+    for (const [index, joiningGuest] of guests.entries()) {
+      await joiningGuest.bringToFront();
+      await joiningGuest.selectOption('#team', index % 2 === 0 ? '1' : '0');
+      await joiningGuest.fill('#room-input', roomCode);
+      await joiningGuest.evaluate(() => document.querySelector('#join')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+      const expectedRoster = index + 2;
+      await Promise.all([host, ...guests.slice(0, index + 1)].map((page) => page.waitForFunction(
+        (count) => document.querySelectorAll('#lobby-roster .lobby-player').length === count,
+        expectedRoster,
+        { timeout: 30_000 },
+      )));
+    }
+    await Promise.all(guests.map((page) => page.click('#lobby-ready')));
     await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 30_000 });
     const hostReadyBeforeStartCommit = await host.evaluate(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return state.privateMatch.members[0]?.ready ?? null;
     });
     await host.click('#lobby-start');
-    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
-    await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 1, undefined, { timeout: 30_000 });
+    await Promise.all(peers.map((page) => page.waitForFunction(
+      (count) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === count,
+      guestCount,
+      { timeout: 30_000 },
+    )));
     const readinessAfterStartCommit = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.map((member) => member.ready));
     const joined = {
       cycle,
+      guestCount,
       hostStartReadinessCommitted: hostReadyBeforeStartCommit === false && readinessAfterStartCommit.every(Boolean),
       roomCodeLength: roomCode.length,
       hostMode: await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameMode),
@@ -83,7 +97,7 @@ try {
       guestNetwork: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle),
     };
 
-    // A complete second host+guest match is the regression gate. Both start
+    // A complete second host+guests match is the regression gate. Both start
     // clocks must clear together when the host returns the ended match to the
     // lobby, otherwise peers reject the mixed waiting snapshot and cannot ready.
     // These pages intentionally share one browser context, hence one localStorage.
@@ -92,11 +106,14 @@ try {
     await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
     await host.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 });
     const hostRetainedDiagnostic = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().lastCompletedMultiplayerDiagnostic);
-    await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
-    await guest.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 });
-    const guestRetainedDiagnostic = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().lastCompletedMultiplayerDiagnostic);
-    const automaticDiagnostics = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchDiagnosticsUpload)));
-    const retainedDiagnostics = [hostRetainedDiagnostic, guestRetainedDiagnostic];
+    const guestRetainedDiagnostics = [];
+    for (const joiningGuest of guests) {
+      await joiningGuest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
+      await joiningGuest.waitForFunction(() => document.querySelector('#rematch') !== null, undefined, { timeout: 15_000 });
+      guestRetainedDiagnostics.push(await joiningGuest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().lastCompletedMultiplayerDiagnostic));
+    }
+    const automaticDiagnostics = await Promise.all(peers.map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchDiagnosticsUpload)));
+    const retainedDiagnostics = [hostRetainedDiagnostic, ...guestRetainedDiagnostics];
     joined.diagnosticEvidence = retainedDiagnostics.map((diagnostic) => diagnostic ? {
       schemaVersion: diagnostic.schemaVersion,
       role: diagnostic.role,
@@ -111,7 +128,8 @@ try {
         && Array.isArray(diagnostic.recentDamage)
         && diagnostic.recentDamage.length <= 64
         && !serialized.includes(`host ${cycle}`)
-        && !serialized.includes(`guest ${cycle}`)
+        && !serialized.includes(`guest-1 ${cycle}`)
+        && !serialized.includes(`guest-2 ${cycle}`)
         && !serialized.includes(roomCode);
     });
     joined.automaticDiagnosticEvidence = automaticDiagnostics.map((diagnostic) => ({
@@ -125,11 +143,11 @@ try {
       && /^p-[a-f0-9]{16}$/.test(diagnostic.lastMatchId ?? '')
       && diagnostic.requestsDuringActiveMatch === 0);
     await host.click('#rematch');
-    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    await Promise.all(peers.map((page) => page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.gameStarted === false && state.privateMatch?.phase === 'waiting';
     }, undefined, { timeout: 30_000 })));
-    const resetStates = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch)));
+    const resetStates = await Promise.all(peers.map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch)));
     joined.rematchResetStates = resetStates.map((state) => ({
       phase: state.phase,
       activeAtHostTimeMs: state.activeAtHostTimeMs,
@@ -138,15 +156,14 @@ try {
     }));
     joined.rematchReset = resetStates.every((state) => state.activeAtHostTimeMs === null && state.activeAtEpochMs === null
       && state.members.every((member) => member.ready === false));
-    await host.click('#lobby-ready');
-    await guest.click('#lobby-ready');
+    await Promise.all(peers.map((page) => page.click('#lobby-ready')));
     await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 30_000 });
     joined.secondReady = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.every((member) => member.ready));
     await host.click('#lobby-start');
-    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    await Promise.all(peers.map((page) => page.waitForFunction((count) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return state?.matchPhase === 'active' && state.remotes === 1;
-    }, undefined, { timeout: 45_000 })));
+      return state?.matchPhase === 'active' && state.remotes === count;
+    }, guestCount, { timeout: 45_000 })));
     joined.secondMatchStarted = true;
 
     const stagedRailgun = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
@@ -154,7 +171,7 @@ try {
     await guest.evaluate((pickup) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(...pickup), stagedRailgun.pickupPosition);
     if (!await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRemoteAtRailgunPickup())) throw new Error('could not stage authoritative remote at railgun pickup');
     joined.railgunGuestClaimed = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactRailgun());
-    await Promise.all([host, guest].map((page) => page.waitForFunction(() => {
+    await Promise.all(peers.map((page) => page.waitForFunction(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return state.railgun.status === 'held' && state.railgun.roundsRemaining === 8;
     }, undefined, { timeout: 15_000 })));
@@ -163,7 +180,7 @@ try {
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true, undefined, { timeout: 5_000 });
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-    await Promise.all([host, guest].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7, undefined, { timeout: 15_000 })));
+    await Promise.all(peers.map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7, undefined, { timeout: 15_000 })));
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
     joined.railgunImmediateRepeatBlocked = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(false));
@@ -174,7 +191,7 @@ try {
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true, undefined, { timeout: 5_000 });
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-    await Promise.all([host, guest].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 6, undefined, { timeout: 15_000 })));
+    await Promise.all(peers.map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 6, undefined, { timeout: 15_000 })));
     joined.railgunReplicatedTwoShots = true;
 
     const beforeRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
@@ -207,7 +224,7 @@ try {
       && afterRedeploy[1].railgun.status === 'available'
       && afterRedeploy[1].railgun.roundsRemaining === 6;
 
-    await guest.close({ runBeforeUnload: true });
+    await Promise.all(guests.map((page) => page.close({ runBeforeUnload: true })));
     await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 0, undefined, { timeout: 30_000 });
     await host.waitForFunction(() => document.querySelector('#lobby-roster')?.textContent?.includes('REJOINING'), undefined, { timeout: 30_000 });
     joined.leaveObserved = true;
