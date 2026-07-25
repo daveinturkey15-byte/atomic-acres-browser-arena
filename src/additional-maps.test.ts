@@ -753,6 +753,8 @@ describe('additional authored maps', () => {
     const qualityShells = [
       map.root.getObjectByName('skyline-quality-fuselage-shell-forward'),
       map.root.getObjectByName('skyline-quality-fuselage-shell-aft'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft'),
     ];
     const fuselagePlaceholder = map.root.getObjectByName('skyline-jetliner-fuselage-top') as THREE.Mesh;
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
@@ -774,6 +776,28 @@ describe('additional authored maps', () => {
     expect(qualityNacelles?.visible).toBe(true);
     expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+  });
+
+  it('gives the Quality aircraft a separate BackSide cabin roof without closing the boarding aperture', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const ceilingShells = [
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward') as THREE.Mesh,
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft') as THREE.Mesh,
+    ];
+    expect(ceilingShells.every((shell) => shell instanceof THREE.Mesh)).toBe(true);
+    for (const shell of ceilingShells) {
+      const material = shell.material as THREE.MeshStandardMaterial;
+      expect(material.name).toBe('skyline-aircraft-interior-ceiling-material');
+      expect(material.side).toBe(THREE.BackSide);
+      expect(material.side).not.toBe(THREE.DoubleSide);
+      expect(shell.userData.interiorFaceOrientation).toBe('back-side');
+      expect(shell.userData.boardingAperturePreserved).toBe(true);
+    }
+    const forwardBounds = new THREE.Box3().setFromObject(ceilingShells[0]);
+    const aftBounds = new THREE.Box3().setFromObject(ceilingShells[1]);
+    expect(forwardBounds.max.x).toBeLessThan(-1.8);
+    expect(aftBounds.min.x).toBeGreaterThan(1.8);
+    expect(isBlocked({ x: 0, y: 5.02, z: 0.4 }, map.colliders, 0.35)).toBe(false);
   });
 
   it('authors an open boarding walkway and cabin aisle without opaque door panels', () => {

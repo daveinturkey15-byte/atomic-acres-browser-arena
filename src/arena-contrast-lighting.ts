@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ArenaId } from './map-selection';
 import type { RenderProfile } from './render-profile';
+import { auditLocalLightOcclusion, makeShadowedLocal, type LightOcclusionAudit } from './rendering/light-occlusion';
 
 type ArenaKeyLight = Readonly<{
   position: readonly [number, number, number];
@@ -32,6 +33,7 @@ export type ArenaContrastLightingTelemetry = Readonly<{
   arenaId: ArenaId;
   activeLights: number;
   shadowCastingLights: number;
+  occlusion: LightOcclusionAudit;
 }>;
 
 /**
@@ -47,8 +49,11 @@ export class ArenaContrastLighting {
     private readonly profile: RenderProfile,
     softwareRenderer = false,
   ) {
-    if (profile === 'compat' || softwareRenderer) return;
-    const intensityScale = profile === 'blender' ? 1 : 0.52;
+    // These keys have no baked occlusion. On a profile without local shadow
+    // maps they would light through walls, so the emissive/global rig owns the
+    // Performance and Compatibility presentations instead.
+    if (profile !== 'blender' || softwareRenderer) return;
+    const intensityScale = 1;
     for (const [arenaId, specs] of Object.entries(KEY_LIGHTS) as Array<[ArenaId, readonly ArenaKeyLight[]]>) {
       const root = new THREE.Group();
       root.name = `pass62-${arenaId}-contrast-lighting`;
@@ -65,9 +70,7 @@ export class ArenaContrastLighting {
         );
         light.name = `${arenaId}-contrast-key-${index + 1}`;
         light.position.set(...spec.position);
-        // One focused practical shadow per arena is enough to ground moving
-        // actors. The companion key remains direct-only to bound GPU cost.
-        light.castShadow = profile === 'blender' && index === 0;
+        makeShadowedLocal(light);
         light.shadow.mapSize.set(256, 256);
         light.shadow.camera.near = 0.5;
         light.shadow.camera.far = spec.distance;
@@ -99,7 +102,13 @@ export class ArenaContrastLighting {
     const root = this.roots.get(this.arenaId);
     const activeLights = root?.children.filter((node) => node instanceof THREE.SpotLight).length ?? 0;
     const shadowCastingLights = root?.children.filter((node) => node instanceof THREE.SpotLight && node.castShadow).length ?? 0;
-    return { profile: this.profile, arenaId: this.arenaId, activeLights, shadowCastingLights };
+    return {
+      profile: this.profile,
+      arenaId: this.arenaId,
+      activeLights,
+      shadowCastingLights,
+      occlusion: root ? auditLocalLightOcclusion(root) : { activeLocalLights: 0, shadowedLocalLights: 0, emissiveOnlySources: 0, violations: [] },
+    };
   }
 
   dispose(): void {
