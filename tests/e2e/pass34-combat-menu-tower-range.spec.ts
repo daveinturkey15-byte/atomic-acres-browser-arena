@@ -135,7 +135,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     const selected = await snapshot(page);
     expect(selected.arenaSelection).toMatchObject({
       id: 'rustworks-1v1',
-      label: 'Rustworks',
+      label: 'RustRig',
       rules: { durationMs: 300_000, scoreLimit: null },
       multiplayer: true,
       soloBotCount: 1,
@@ -179,7 +179,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     let state = await snapshot(page);
     expect(state.arenaSelection).toMatchObject({
       id: 'gun-range',
-      label: 'Acres Indoor Gun Range',
+      label: 'Indoor Gun Range',
       rules: { durationMs: 120_000, scoreLimit: null },
       multiplayer: true,
       soloBotCount: 0,

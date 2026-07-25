@@ -880,7 +880,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   };
 
   const labelBoard = box(builder, 'rustworks-original-arena-sign', [0, 11.1, 2.15], [3.8, 0.72, 0.12], hazard, { solid: false, shots: false, detail: 'performance' });
-  labelBoard.userData.label = 'RUSTWORKS';
+  labelBoard.userData.label = 'RUSTRIG';
   const welshFlag = createRustworksWelshFlag();
   root.add(welshFlag);
   root.userData.rustworksFlagAudit = welshFlag.userData.rustworksFlagAudit;
@@ -947,7 +947,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   // container ring so deployment never starts in a narrow exterior service gap.
   return {
     id: 'rustworks-1v1',
-    label: 'Rustworks',
+    label: 'RustRig',
     root,
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
@@ -1462,7 +1462,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
 
   return {
     id: 'gun-range',
-    label: 'Acres Indoor Gun Range',
+    label: 'Indoor Gun Range',
     root,
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
@@ -2023,8 +2023,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     }
   }
 
-  const mainSign = box(builder, 'skyline-terminal-main-sign', [0, 6.2, -33.8], [14.0, 1.2, 0.2], terminalWayfindingMaterial('SKYLINE TERMINAL', 'GATES 01—12  •  CONCOURSE A', '#d69a2d'), { solid: false, shots: false, detail: 'performance' });
-  mainSign.userData.label = 'SKYLINE TERMINAL - GATES 1-12';
+  const mainSign = box(builder, 'skyline-terminal-main-sign', [0, 6.2, -33.8], [14.0, 1.2, 0.2], terminalWayfindingMaterial('TERMINAL', 'GATES 01—12  •  CONCOURSE A', '#d69a2d'), { solid: false, shots: false, detail: 'performance' });
+  mainSign.userData.label = 'TERMINAL - GATES 1-12';
   mainSign.userData.skylineCluster = 'terminal-story';
 
   const flightDisplay = box(builder, 'skyline-flight-display-board', [0, 4.8, -27.8], [6.5, 1.4, 0.25], terminalWayfindingMaterial('DEPARTURES', 'AERO 86  •  BOARDING', '#4d9b98'), { solid: false, shots: false, detail: 'quality' });
@@ -2599,7 +2599,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
 
   return {
     id: 'skyline-terminal',
-    label: 'Skyline Terminal',
+    label: 'Terminal',
     root,
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,

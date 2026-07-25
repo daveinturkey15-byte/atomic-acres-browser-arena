@@ -1,4 +1,4 @@
-# Atomic Acres
+# Nuke Town
 
 A polished, original near-future agritech browser arena FPS with three readable combat routes, fast respawns, four field kits, repeatable field support, bot skirmishes and peer-to-peer multiplayer.
 

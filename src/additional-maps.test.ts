@@ -133,7 +133,7 @@ describe('additional authored maps', () => {
   it('builds an original compact collision-backed industrial 1v1 arena', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     expect(map.id).toBe('rustworks-1v1');
-    expect(map.label).toBe('Rustworks');
+    expect(map.label).toBe('RustRig');
     expect(map.root.name).toContain('Rustworks');
     expect(map.colliders.length).toBeGreaterThanOrEqual(25);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(25);
@@ -522,7 +522,7 @@ describe('additional authored maps', () => {
   it('builds an untimed three-distance score range with reusable targets', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
-    expect(map.label).toBe('Acres Indoor Gun Range');
+    expect(map.label).toBe('Indoor Gun Range');
     expect(map.targets).toHaveLength(14);
     expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
     expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
@@ -605,7 +605,7 @@ describe('additional authored maps', () => {
   it('builds an original airport-terminal arena with concourse, jet bridge, fuselage, and tarmac apron', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     expect(map.id).toBe('skyline-terminal');
-    expect(map.label).toBe('Skyline Terminal');
+    expect(map.label).toBe('Terminal');
     expect(map.root.name).toContain('Skyline Terminal');
     expect(map.colliders.length).toBeGreaterThanOrEqual(15);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(15);
@@ -624,7 +624,7 @@ describe('additional authored maps', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
     expect(mainSign).toBeTruthy();
-    expect(mainSign?.userData.label).toBe('SKYLINE TERMINAL - GATES 1-12');
+    expect(mainSign?.userData.label).toBe('TERMINAL - GATES 1-12');
 
     const flightDisplay = map.root.getObjectByName('skyline-flight-display-board');
     expect(flightDisplay).toBeTruthy();
