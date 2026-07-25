@@ -2283,10 +2283,11 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-cockpit-roof', [-18.75, 5.18, 2.0], [2.5, 0.3, 3.8], planeHullMat);
   box(builder, 'skyline-cockpit-front-lower', [-20.08, 3.25, 2.0], [0.2, 1.7, 3.8], planeHullMat);
   box(builder, 'skyline-cockpit-glass-front', [-20.08, 4.52, 2.0], [0.2, 0.84, 3.8], cockpitGlassMat, { ballisticMaterial: 'glass' });
-  const fuselageShells = [
+  const fuselageShellSpecs = [
     { name: 'skyline-quality-fuselage-shell-forward', x: -9.35, length: 14.9 },
     { name: 'skyline-quality-fuselage-shell-aft', x: 9.7, length: 15.6 },
-  ].map(({ name, x, length }) => detailMesh(
+  ] as const;
+  const fuselageShells = fuselageShellSpecs.map(({ name, x, length }) => detailMesh(
     'quality-aircraft',
     name,
     new THREE.CylinderGeometry(2.1, 2.1, length, 28, 1, true, 0, Math.PI),
@@ -2295,6 +2296,26 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [0, 0, Math.PI / 2],
   ));
   for (const shell of fuselageShells) shell.userData.assetOwner = 'skyline-terminal';
+  // The exterior half-cylinder is intentionally FrontSide. From the cabin its
+  // backfaces disappear, which made the aircraft roof look absent in Quality.
+  // A slightly inset, separately split BackSide shell restores the interior
+  // ceiling without a blanket DoubleSide material or an opaque bridge door.
+  const cabinCeilingMaterial = planeHullMat.clone();
+  cabinCeilingMaterial.name = 'skyline-aircraft-interior-ceiling-material';
+  cabinCeilingMaterial.side = THREE.BackSide;
+  const cabinCeilingShells = fuselageShellSpecs.map(({ name, x, length }) => detailMesh(
+    'quality-aircraft',
+    name.replace('fuselage-shell', 'cabin-ceiling-shell'),
+    new THREE.CylinderGeometry(2.02, 2.02, length, 28, 1, true, 0, Math.PI),
+    cabinCeilingMaterial,
+    [x, 4.3, 2],
+    [0, 0, Math.PI / 2],
+  ));
+  for (const shell of cabinCeilingShells) {
+    shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.interiorFaceOrientation = 'back-side';
+    shell.userData.boardingAperturePreserved = true;
+  }
   detailBox('quality-aircraft', 'skyline-quality-fuselage-door-crown', [0, 6.08, 2], [3.8, 0.58, 4.15], planeHullMat, 'quality');
   const qualityNose = detailMesh(
     'quality-aircraft',
