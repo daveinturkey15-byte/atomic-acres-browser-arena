@@ -92,7 +92,7 @@ That estimate is not a reason to weaken the pass. It is a reason to structure it
 - Drone Swarm replaces Nuke in the selectable top-tier slot, while Nuke remains a care-package-only 1% jackpot. This reconciles both statements in the request.
 - A piloted-drone user’s body remains stationary and vulnerable; body death, drone death, fuel expiry, or ammo exhaustion exits possession cleanly.
 - Care packages are single-consume, host-authored objects. Recommended rule: enemies may steal them, with a shorter owner capture time.
-- “Any random killstreak” means every shippable non-care-package streak appears exactly once in the weighted reward catalog; only the care package itself is excluded to prevent recursive rewards, and Nuke remains exactly 1%.
+- “Any random killstreak” means every catalog entry whose typed availability is not `retired`, except the care package itself, appears exactly once in the derived weighted reward pool; the care package is excluded to prevent recursion, and care-only Nuke remains exactly 1%.
 - Public default graphics mode is capability-aware High; the verified RTX 5080 profile selects High by default with Max available. Do not force Max or unsafe settings on weaker public devices.
 - Use original in-game names and original or clearly licensed art/audio. Familiar real-world labels are archetype references, not permission to copy franchise assets, sounds, code, UI, or branding.
 - The eventual approved release names are fixed by Dave: Pass 65 Live is `The Big One`; frozen Pass 64 Stable is `WebGPU Migration`.
@@ -930,7 +930,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 ### 11.1 Five-slot selection
 
 - Main menu exposes exactly five legal slots under one frozen roster/cost/alternative/duplication table.
-- Catalog controls exact kill cost, tier alternatives, selectable/care-only/retired status, earning/death/carry/repeatability and complete nonrecursive care-pool weights.
+- One unique-ID catalog controls exact kill cost, tier alternatives, typed `selectable | care-only | retired` availability, earning/death/carry/repeatability and complete nonrecursive care-pool weights. `Shippable` means availability is not `retired`; the reward pool is derived from that catalog rather than duplicated as an independently drifting list.
 - Selection persists locally and freezes at match start.
 - Keys 3–7 activate the selected slots.
 - Earning, death, repeatability, carry, and consumption rules are explicit.
@@ -949,7 +949,7 @@ Before F07, asset authoring or shed coding, capture final live Pass 64 on the sa
 - Parachute crate descends, collides, lands, and expires inside a frozen measurable trajectory/time envelope.
 - `F` loot validates actor/life, range, LOS, crate revision, and exclusive capture.
 - Host deterministic non-negative integer-unit weighted table stores the roll and reward privately until reveal policy allows.
-- Nuke probability is exactly 1%; every other shippable non-care-package streak has a positive explicit normalized weight, and only the care package itself is excluded to prevent recursion. Odds are non-increasing with kill cost unless a reviewed exception says otherwise; selected-five independence is explicit.
+- Nuke is typed `care-only` and its probability is exactly 1%. Every catalog definition with availability other than `retired`, except the care package itself, has one positive explicit integer weight and appears exactly once in the derived normalized pool; retired definitions and the care package have weight zero. Odds are non-increasing with kill cost unless a reviewed exception says otherwise; selected-five independence is explicit.
 - The existing Nuke stays verifier-green, host-owned and exactly once if retained care-only.
 - Single consume under retries/reconnect; enemy-steal/owner-advantage rule frozen.
 

@@ -2,7 +2,7 @@
   "$schema": "PASS65_DECISION_RECEIPTS.schema.json",
   "schemaVersion": 1,
   "releasePass": "PASS 65",
-  "updatedAt": "2026-07-25T23:26:24Z",
+  "updatedAt": "2026-07-25T23:42:28Z",
   "receipts": [
     {
       "receiptVersion": 1,
@@ -164,7 +164,7 @@
       "receiptVersion": 1,
       "id": "DEC-13",
       "status": "OPEN",
-      "proposedDefault": "Freeze the complete killstreak roster, costs, alternatives, duplication, earning and carry rules; include every shippable non-care-package streak exactly once in the reward pool while excluding recursive care-package reward; and freeze chopper calibration, Drone Swarm player/bot eligibility plus approximately-five-second pressure, sensor envelope, and Carpet Bomber anchor semantics before support schema work",
+      "proposedDefault": "Freeze the complete killstreak roster with typed selectable, care-only, or retired availability, costs, alternatives, duplication, earning and carry rules; derive the reward pool exactly once from every non-retired streak except care package, with zero weight for retired and recursive care-package entries; and freeze chopper calibration, Drone Swarm player/bot eligibility plus approximately-five-second pressure, sensor envelope, and Carpet Bomber anchor semantics before support schema work",
       "value": null,
       "rationale": "Support schemas and every killstreak slice depend on one complete product, reward-completeness, targeting, and calibration contract.",
       "owner": "Pass 65 product-decision owner",

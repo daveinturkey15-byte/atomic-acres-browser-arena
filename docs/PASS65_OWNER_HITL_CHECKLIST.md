@@ -191,7 +191,7 @@ Reject a visual-only hole, invisible shoot-through, render-only door, client-aut
 - Earn/select/consume every streak through legitimate host-owned score flow.
 - Adrenaline lasts exactly 15 seconds, applies the approved non-stacking damage/move/reload modifiers, expires on schedule and follows the agreed death policy.
 - Care-package aircraft, parachute and crate lifecycle is coherent; F loot is range/LOS/sequence validated and exactly once.
-- Inspect deterministic weighted reward evidence: every shippable non-care-package streak appears exactly once, the care package cannot roll itself, and Nuke is exactly 1% under the frozen table.
+- Inspect deterministic weighted reward evidence: the unique catalog types every streak `selectable`, `care-only`, or `retired`; its derived pool contains every non-retired streak except care package exactly once, contains no retired/recursive entry, and gives care-only Nuke exactly 1%.
 - Chopper circles for 30 seconds, acquires valid targets, respects cover/LOS and meets the measurable four-to-five-second escape/survival envelope.
 - Carpet Bomber activation supplies only the frozen strip anchor semantics; host-seeded RNG chooses and communicates a random valid ingress, then resolves exactly 20 bounded zigzag impacts along the intended strip.
 - Drone Swarm creates exactly 12 targetable 50-HP drones, seeks eligible opposing living human players and bots indoors/outdoors, rejects allies/dead lives, performs unlimited host-authored 20-round reload loops until its 60-second hard expiry, and meets the frozen approximately-five-second exposure/escape survival-pressure band.

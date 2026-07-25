@@ -473,6 +473,8 @@ type SupportEntityDefinition =
       kind: 'bomb'; targetable: boolean; healthQ: number | null; hitboxProfileId: CatalogId | null; impactProfileId: CatalogId;
     }>);
 
+type KillstreakAvailability = 'selectable' | 'care-only' | 'retired';
+
 type KillstreakDefinition = Readonly<{
   id: KillstreakId;
   displayName: string;
@@ -482,7 +484,7 @@ type KillstreakDefinition = Readonly<{
   supportDefinitionId: SupportDefinitionId | null;
   durationMs: number;
   repeatable: boolean;
-  selectable: boolean;
+  availability: KillstreakAvailability;
   carePackageWeightUnits: number; // strict non-negative safe integer
   authorityPolicyId: string;
   presentationId: string;
@@ -497,9 +499,10 @@ type KillstreakLoadoutV1 = Readonly<{
 Validation:
 
 - Exactly five legal IDs under the frozen duplication/alternative policy.
-- The decision receipt freezes every retained/new/retired/care-only ID, exact kill cost, tier alternatives, earning/death/carry/repeatability and complete nonrecursive care-pool weights.
-- Every shippable definition except the care package itself has a positive exact safe-integer weight and appears exactly once in the normalized reward pool; the care package has weight zero so a roll cannot recurse. Weights are non-increasing with higher kill cost unless the receipt documents an exception.
-- Nuke weight units / total eligible weight units equals exactly `1 / 100` when DEC-03 is frozen; its existing host-owned effect remains verifier-green under R512.
+- The decision receipt freezes every ID, its typed `selectable | care-only | retired` availability, exact kill cost, tier alternatives, earning/death/carry/repeatability and complete nonrecursive care-pool weights. Only `selectable` definitions may enter the five-slot loadout.
+- `shippable` is mechanically defined as `availability !== 'retired'`. The reward-eligible set is derived directly from the unique-ID catalog as `availability !== 'retired' && id !== CARE_PACKAGE_ID`; it is not maintained as a second list.
+- Every reward-eligible definition has one positive exact safe-integer `carePackageWeightUnits` value and therefore appears exactly once in the normalized reward pool. Every ineligible definition (the care package itself or `retired`) has weight zero. Weights are non-increasing with higher kill cost unless the receipt documents an exception.
+- Nuke has `availability: 'care-only'`; its weight units / total reward-eligible weight units equals exactly `1 / 100` when DEC-03 is frozen, and its existing host-owned effect remains verifier-green under R512.
 - Every non-null support definition reference resolves to a strict per-kind definition. The registry freezes targetability/health/hitbox, gun identity, magazine/reserve/reload, lifetime/fuel, navigation/targeting/sensor policy, presentation/audio and entity cap before implementation.
 - Selection freezes at match start and never accepts remote free text.
 
