@@ -1,0 +1,225 @@
+# Pass 65 Owner HITL Checklist
+
+This document has two layers: a concise blocking owner/taste route for Dave, followed by the exhaustive mechanical evidence checklist that the integrator must precompute and Dave may review or spot-check. It is not approval by itself. Publication remains locked until Dave explicitly approves the exact preview source SHA named in the evidence header.
+
+## 1. Immutable evidence header
+
+The release integrator fills this before handing over the candidate:
+
+| Field | Required value |
+|---|---|
+| Source commit | Full 40-character Pass 65 candidate SHA |
+| Preview build | Immutable `pr-preview-<pr>-<sha>` identity |
+| Preview URL | Exact URL, including build identity rather than a moving alias |
+| Built at | UTC timestamp |
+| Pull request | PR number and head/base lineage |
+| Acceptance matrix | Digest of `acceptance/pass-65.json` |
+| Runtime tree | File count and SHA-256 tree digest |
+| Asset manifest | Digest plus licence/provenance report |
+| Required CI | Exact run ID and five required-job results |
+| Browser/backend | Chrome version, actual WebGPU, adapter/vendor/architecture, no fallback |
+| Settings | High and Max effective-setting hashes |
+| Test machine | RTX 5080, driver, display resolution/refresh |
+| Stable fallback | Frozen Pass 64 subtree/tree digest and route |
+| Best-netcode benchmark | Unchanged Pass 62 record/digest |
+
+Fail closed if any identity is missing, abbreviated ambiguously, moving, mutable, or inconsistent.
+
+## 2. Review setup
+
+- Open the immutable preview, not `latest`, `normal`, the public live channel, or a local dirty server.
+- Confirm the on-screen build/pass identity matches the evidence header.
+- Confirm native Chrome reports actual WebGPU on the NVIDIA hardware adapter with no software fallback.
+- Use the primary 2560×1440 display for the owner pass; retain the deterministic 1600×900 evidence corpus for comparison.
+- Start on High, then repeat stress-sensitive scenes on Max.
+- Keep browser console/GPU error capture active.
+- Use a fresh private match for lifecycle checks and a second peer for authority checks.
+- Stop immediately on a device loss, wrong build, wrong backend, corrupted settings migration, cross-profile gameplay drift, or unexpected publication action.
+
+## 2A. Concise blocking owner route
+
+Use diagnostic grants and deterministic setup so this stays practical:
+
+1. Confirm the full S0 SHA/build ID, real RTX 5080 WebGPU backend and clean browser/GPU logs.
+2. Inspect High default and Max; change representative graphics, audio and sensory controls and reload.
+3. Rename/use one custom preset, choose weapon/secondary/grenade, deploy, respawn and rematch.
+4. In Gun Range, sample every new weapon and the reworked knife; focus on feel, identity, hands, clipping, passive motion, fire/reload, sound and effects.
+5. Test damage directions, critical-health visuals/breathing and reduced-sensory behaviour.
+6. Hear local/remote/bot footsteps and two contrasting arena ambience profiles.
+7. Test smoke, flash, DMR smoke/wall rule and the explosive bolt with a second peer.
+8. Test one intact-to-damaged shed sequence: F door, obstruction, visible aperture shoot-through, explosion detach, non-flat nudge and flat/sleeping bullet wake.
+9. Use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm and Piloted Drone.
+10. Visit every map on High and one combined Max stress scene.
+11. Complete one representative two-peer join/play/death/respawn/reconnect/rematch lifecycle.
+12. Review the precomputed evidence summary, known issues, Pass 64 rollback rehearsal and final release-lineage plan; then approve, reject or defer the full S0 SHA.
+
+## 2B. Precomputed evidence review and optional spot checks
+
+Sections 3–12 are owned by the integrator and independent QA lanes. They must already be green and digest-bound at S0. Dave can inspect or repeat any case, but is not expected to manually reproduce the complete combinatorial matrix during the morning taste review.
+
+## 3. Main menu and configuration
+
+### Graphics
+
+- High is the effective default on the capable target machine.
+- Max is explicit and visibly changes only intended presentation budgets.
+- Performance/High/Max/Custom labels and effective values are understandable.
+- Unsupported settings are clamped with a reason; they do not silently fail.
+- Live-change and arena-reload settings behave as labelled.
+- Render scale, shadows, filtering, atmosphere, particles, decals, bloom/exposure, material quality, dynamic-debris quality, motion and damage-flash controls persist correctly.
+- Performance and Max do not change collision, recoil, damage, projectile, visibility, spawn, or movement authority.
+- WebGL compatibility remains an explicit compatibility route rather than a silent WebGPU fallback.
+
+### Audio and accessibility
+
+- Master, effects/weapons, announcements, movement, ambience, menu music and in-game music controls are independent and persistent.
+- Mute states, zero-volume states and resumed browser audio behave correctly.
+- Reduced motion, reduced damage flash and reduced sensory effects visibly reduce presentation without changing shared gameplay.
+- Keyboard/focus order, labels and escape/back behaviour work at desktop and narrow viewport sizes.
+
+### Loadouts and streak selection
+
+- Existing four curated kits remain present and coherent.
+- The second row presents Custom 1/2/3 plus the approved fourth-tile behaviour.
+- Rename accepts useful Unicode, rejects empty/oversized/unsafe input, survives reload and is not exposed to peers.
+- Every custom preset selects one allowed primary, secondary and grenade.
+- Five killstreak slots are selectable and valid under the frozen roster/cost/alternative/duplication rules, persisted and reflected in match.
+- Corrupt/old saved data recovers without destroying the last known-good selection.
+
+## 4. Core combat feedback
+
+- Take damage from eight compass directions while facing a fixed heading; every wedge points correctly.
+- Rotate the camera between hits; existing and new wedges remain camera-relative.
+- Receive concurrent damage from at least four sources; distinct directions merge and decay legibly without covering the reticle.
+- Exercise bullet, pellet, explosion, self, fall/environmental and unknown-source damage.
+- Cross the low-health threshold repeatedly; hysteresis prevents flicker.
+- At severe health, verify pulse/vignette and breathing/heartbeat intensity.
+- Recover, die, respawn, rematch and change arena; no low-health or direction effect sticks.
+- Repeat with reduced-flash/reduced-sensory settings and confirm intelligible feedback; review the automated final-frame analysis against the frozen photosensitive-flash limits.
+
+## 5. Movement, footsteps and ambience
+
+- Walk, sprint, crouch and stop locally; cadence follows actual travelled distance and never emits while stationary.
+- Observe a remote player and bot at near/mid/far distances; attenuation and left/right panning follow position and speed.
+- Teleport, respawn or reconcile a peer; no burst of queued footsteps occurs.
+- Move across defined surfaces; sound identity changes at the correct physical boundary.
+- Visit every arena and identify its distinct continuous environmental ambience.
+- Switch arenas repeatedly; old ambience and spatial voices stop rather than accumulating.
+
+## 6. First-person presentation and weapon corpus
+
+For every selectable firearm, crossbow and knife, inspect:
+
+- Equip and unequip.
+- Hip idle and passive breathing/inertia.
+- Walk, sprint, landing and retreat from nearby geometry.
+- ADS in/out where applicable.
+- Fire, dry fire, recoil and recovery.
+- Tactical and empty reload.
+- Switch and melee/knife attack.
+- Left-hand grip, wrist/finger deformation, magazine/bolt/pump/socket contact.
+- Muzzle, casing, tracer, impact, report, mechanics and environmental tail.
+- World/drop model and third-person presentation.
+- Material response, texture density, LOD transition and absence of generic/debug fallback.
+
+Reject clipping through the camera/world, detached fingers, mismatched sockets, excessive idle sway, authority-ray movement caused by visual animation, ripped/unlicensed content, shared generic assets that defeat the requested identity, or unbounded bloom/audio.
+
+## 7. Arsenal role checks
+
+Run short close/mid/long-range comparisons rather than judging feel from one target:
+
+- Uzi-role SMG: fastest/most mobile close-range identity, steep falloff and weak penetration.
+- MP5-role SMG: more controlled and useful at moderate range without becoming an assault rifle.
+- Loud flashlight pistol: visibly occlusion-correct always-on light, slower cadence, stronger hit and bounded loud report.
+- Explosive crossbow: slow bolt, stable attachment, canonical beeps and one small timed blast.
+- Machine pistol: selectable, weakest damage/highest recoil secondary role.
+- Balanced M4-role rifle: predictable 30-round generalist.
+- Harder AK-role rifle: harder hit/penetration with slower, clunkier handling and stronger recoil.
+- Existing LMG: selectable without accidental Pass 64 stat drift.
+- Minigun: exact frozen spin-up and magazine values plus exactly 20% equipped movement reduction.
+- DMR: 2.5× thermal sees living targets through smoke but never through a solid wall.
+- Slug shotgun: exactly one accurate projectile and distinct longer-range/high-recoil role.
+- Revised scatter shotgun: lower total damage, wider spread and longer useful envelope without dominance.
+- Knife: authored model/material/lighting, convincing attack and passive movement.
+
+Spot-check recoil, falloff, wallbang, reserve/magazine, reload, switch and stance policies against the frozen balance report. No weapon may be “complete” with a missing bot/drop/replay/network/telemetry mapping.
+
+## 8. Grenades and visibility
+
+- Frag behaviour still matches its frozen comparator.
+- Smoke deploys from a typed inventory slot, has a coherent lifetime, blocks normal visual/AI acquisition and does not block bullets.
+- A late-joining peer reconstructs active smoke consistently.
+- Flash strength follows distance, facing and line of sight; a closed solid wall blocks it.
+- Reduced-flash mode changes presentation, not the authoritative result.
+- DMR thermal sees a living target through smoke while normal view does not; both views stop at walls.
+- Grenade use, respawn, reconnect, duplicate/reordered messages and rematch do not duplicate effects or inventory.
+
+## 9. Destructible shed vertical slice and map rollout
+
+Test each agreed outdoor-map placement, then the dedicated stress scene:
+
+- At least two sheds appear in every map classified as outdoor by the frozen product decision.
+- Dark-green corrugated cube base and pitched roof read correctly at near/mid/far range.
+- Press F within range/LOS: the door opens or closes over one nominal second.
+- Reverse/interact mid-motion; motion remains stable and authoritative.
+- Interrupt with player, major debris and a host-resolved bullet; mesh, collider and state agree.
+- Shoot an intact panel: decal/rim/hole presentation matches the authoritative aperture.
+- Fire again through the visible aperture: the panel no longer blocks that trace.
+- Fire beside the aperture: intact metal still resolves material, penetration and damage correctly.
+- Saturate the bounded hole/dent budget; rendering and ballistics retain the same exact canonical aperture region, with no enlarged invisible shoot-through.
+- Apply explosions below/at/above authored thresholds; dents, deformation, detachment and collapse are stable and exactly once.
+- Walk into non-flat major debris; valid contact wakes and nudges it within bounded authority rules.
+- Verify flat/sleeping debris settles and stops wasteful routine replication, then shoot it and confirm the host wakes/applies bounded impulse at any time.
+- Late join, packet loss/reorder, death, rematch and arena reset reconstruct the same shed state.
+- Confirm bullets, players, AI LOS, grenades and navigation agree on current dynamic geometry.
+- Repeat the maximum-shed/debris stress case on High and Max; no cap, long-task, physics, GPU or network budget is exceeded.
+
+Reject a visual-only hole, invisible shoot-through, render-only door, client-authored fracture, unbounded debris, runtime arbitrary CSG claim, or presentation that differs in gameplay authority by quality profile.
+
+## 10. Killstreaks
+
+- Earn/select/consume every streak through legitimate host-owned score flow.
+- Adrenaline lasts exactly 15 seconds, applies the approved non-stacking damage/move/reload modifiers, expires on schedule and follows the agreed death policy.
+- Care-package aircraft, parachute and crate lifecycle is coherent; F loot is range/LOS/sequence validated and exactly once.
+- Inspect deterministic weighted reward evidence; the Nuke weight is exactly 1% under the frozen table.
+- Chopper circles for 30 seconds, acquires valid targets, respects cover/LOS and meets the measurable four-to-five-second escape/survival envelope.
+- Carpet Bomber activation supplies only the frozen strip anchor semantics; host-seeded RNG chooses and communicates a random valid ingress, then resolves exactly 20 bounded zigzag impacts along the intended strip.
+- Drone Swarm creates exactly 12 targetable 50-HP drones, handles indoor/outdoor navigation, and performs unlimited host-authored 20-round reload loops until its 60-second hard expiry.
+- Destroy drones within the frozen hitbox/core and per-weapon shot-count bands; no client can forge drone damage/death.
+- Piloted Drone restores player control on exit, destruction, death, disconnect and 30-second fuel expiry.
+- Piloted Drone altitude controls use Space/Crouch, wall vision matches the approved railgun-like rule, HP is 50 and ammunition is exactly two 20-round magazines.
+- Swarm and piloted variants use the identical immutable DroneGunProfileId; only reserve, lifetime and control mode differ.
+- Verify pilot-body vulnerability policy, score attribution, spawn protection, rematch cleanup and late-join behaviour.
+- Stress overlapping aircraft/drones/explosions/audio; entity, projectile, particle, shadow, audio and network caps remain bounded.
+
+## 11. Multiplayer and lifecycle pass
+
+- Complete one solo match and one two-peer private match on every arena.
+- Exercise join, deploy, combat, death, respawn, loadout change/redeploy, disconnect/reconnect, late join, match end and rematch.
+- Run selected smoke, flash, crossbow, shed and support-entity scenarios under injected delay, loss, duplication and reordering.
+- Confirm host/client hashes converge after repair snapshots.
+- Confirm clients cannot author ammo, reload, damage, health, score, rewards, support entities, visibility, doors, fracture or debris.
+- Confirm bot rules and target acquisition remain coherent with smoke, sheds and support entities.
+- Confirm room links and presentation profiles do not change shared mechanics.
+
+## 12. Performance, disposal and legal review
+
+- Review per-arena High/Max CPU and GPU p50/p95/p99, hitch, draw, triangle, texture, transient target, shadow, particle, audio-node and physics-body evidence.
+- Repeat worst-case smoke + explosions + two sheds + drone swarm + combat scene.
+- Change arenas at least ten times; resource counts settle near baseline and no continuous audio/physics/render resources leak.
+- Review `F-R610-01`: ten delayed A→B→C arena plus chooser/latest/normal/room/stable/back same-tab circuits, including pagehide/pageshow, show zero Three.js `isReady`/GPU errors, stale-generation mutation, duplicate owners or lifecycle-counter growth.
+- Check browser console, uncaptured GPU errors and device-loss status.
+- Inspect the asset/provenance manifest for every new model, texture, animation, sound and music stem.
+- Reject missing checksums/licences, proprietary franchise assets, or undocumented external code/data.
+
+## 13. Owner disposition
+
+Choose one outcome and record it against the full candidate SHA:
+
+- **APPROVE EXACT SHA** — candidate satisfies owner HITL; only the acceptance-manifest/process-only commit permitted by the repository policy may follow.
+- **REJECT** — list observed failures with arena, mode, weapon/entity, reproduction steps and evidence.
+- **DEFER** — candidate remains unpublished; identify checks not completed or decisions still open.
+
+Approval wording should explicitly name the full candidate SHA. Any later change to runtime, release shell, assets, gameplay data, settings, network schema or public topology invalidates the approval and requires a new immutable preview.
+
+After approval, the integrator must still run the post-approval acceptance commit gates, exact-merge gates, protected production workflow, Pages/receipt reconciliation and public live/stable/alias browser checks. Owner approval authorizes promotion of the named S0 source and runtime/release-shell trees; rebuilt production output must record controlled differences unless the exact stored artifact is promoted. Approval is not evidence that production succeeded.
