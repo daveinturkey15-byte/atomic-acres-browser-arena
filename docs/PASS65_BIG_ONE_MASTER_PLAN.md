@@ -20,7 +20,7 @@ That gate was independently satisfied at 2026-07-25 22:35 BST:
 
 - Final released Pass 64 main and Pass 65 `B0` are `5075a52d80c6db69a97ed53acc2df5368728371a`.
 - Exact-main verification run `30175101338`, protected production run `30175191044`, and Pages run `30175279180` all succeeded; the resulting Pages SHA is `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`.
-- Production receipt artifact `8624038234` binds those identities to the 130-file Pass 64 subtree digest `ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b`.
+- Production receipt artifact `8624038234` binds those identities to a captured Pass 64 topology pointer: channel `channels/experimental-netcode-pass`, `exactRootFileCount=130`, and `treeSha256=ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b`. This is not yet the complete rollback record; B1 task F00 must materialize its schema, digest scope/exclusions, verifier, and protected no-rebuild restoration policy.
 - A cache-busted chooser rendered Pass 64 Live / Pass 63 Stable; direct Pass 64 entered bot gameplay; fresh stable, normal, and room routes loaded with no unexpected browser logs.
 - The isolated P0 worktree was then created from exact `B0`; runtime work still waits for post-P0 `B1`.
 
@@ -471,7 +471,7 @@ Required evidence:
 10. Public game enters and logs contain no unexpected errors.
 11. Final Pass 64 runtime and complete-subtree file counts/digests come from actual deployed Git blobs.
 
-Exit: exact rollback record exists; no guessed or ignored local artifact identity is used.
+Exit: a complete off-repo evidence packet and machine-readable field contract exist; no guessed or ignored local artifact identity is used. The repository rollback record remains blocked on B1 task F00.
 
 ### Wave 2 — process-only preparation PR
 
