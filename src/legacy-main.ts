@@ -1631,6 +1631,16 @@ let lastRailgunStateBroadcastAt = -Infinity;
 let railgunAdsResetRequired = false;
 let railgunRechamberPresentationActive = false;
 const RAILGUN_PICKUP_RANGE = 2.65;
+const createRailgunClaimAudit = () => ({
+  received: 0,
+  accepted: 0,
+  rejected: 0,
+  lastReason: null as string | null,
+  lastGeneration: null as number | null,
+  lastAuthoritativeToReportedMeters: null as number | null,
+  lastAuthoritativeToPickupMeters: null as number | null,
+});
+let railgunClaimAudit = createRailgunClaimAudit();
 const presentedShotResults = new Set<string>();
 const processedShotResults = new Set<string>();
 const shotProtocolTelemetry: Record<string, number> = {};
@@ -3479,16 +3489,44 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'railgun-claim-request') {
-    if (network.role !== 'host' || processedNonces.has(message.nonce)) return;
+    if (network.role !== 'host') return;
+    railgunClaimAudit.received += 1;
     const remote = remotes.get(message.by);
     const health = remoteHealthAuthorities.get(message.by);
     const pickup = railgunState.pickupPosition ? new THREE.Vector3(...railgunState.pickupPosition) : null;
     const reported = new THREE.Vector3(...message.position);
     const authoritative = remote ? new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z) : null;
-    if (!remote || !health?.alive || !pickup || !authoritative
-      || authoritative.distanceTo(reported) > 2.8 || authoritative.distanceTo(pickup) > RAILGUN_PICKUP_RANGE + 0.5) return;
+    const authoritativeToReported = authoritative?.distanceTo(reported) ?? null;
+    const authoritativeToPickup = authoritative && pickup ? authoritative.distanceTo(pickup) : null;
+    const rejectionReason = processedNonces.has(message.nonce) ? 'duplicate-nonce'
+      : !remote ? 'unknown-remote'
+        : !health?.alive ? 'remote-not-alive'
+          : !pickup || !authoritative ? 'pickup-unavailable'
+            : authoritativeToReported !== null && authoritativeToReported > 2.8 ? 'reported-position-mismatch'
+              : authoritativeToPickup !== null && authoritativeToPickup > RAILGUN_PICKUP_RANGE + 0.5 ? 'outside-authoritative-pickup-range'
+                : null;
+    railgunClaimAudit = {
+      ...railgunClaimAudit,
+      lastReason: rejectionReason,
+      lastGeneration: message.generation,
+      lastAuthoritativeToReportedMeters: authoritativeToReported,
+      lastAuthoritativeToPickupMeters: authoritativeToPickup,
+    };
+    if (rejectionReason) {
+      railgunClaimAudit.rejected += 1;
+      recordMatchDiagnostic('railgun-pickup', 'rejected', { actorId: message.by, weaponOrEffect: 'railgun', reason: rejectionReason });
+      return;
+    }
+    if (!remote || !authoritative) return;
     const claimed = claimRailgun(railgunState, message.by, message.generation);
-    if (!claimed.accepted) return;
+    if (!claimed.accepted) {
+      railgunClaimAudit.rejected += 1;
+      railgunClaimAudit.lastReason = 'authority-state-rejected';
+      recordMatchDiagnostic('railgun-pickup', 'rejected', { actorId: message.by, weaponOrEffect: 'railgun', reason: 'authority-state-rejected' });
+      return;
+    }
+    railgunClaimAudit.accepted += 1;
+    railgunClaimAudit.lastReason = 'accepted';
     processedNonces.add(message.nonce);
     applyRailgunState(claimed.state);
     remote.snapshot = { ...remote.snapshot, weapon: 'railgun' };
@@ -5356,6 +5394,7 @@ function initializeRailgunForMatch(activeAtHostTimeMs: number): void {
   railgunRechamberPresentationActive = false;
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
+  railgunClaimAudit = createRailgunClaimAudit();
   railgunPresentation.updateWorld(railgunState, performance.now());
   if (network.role === 'host') broadcastRailgunState();
 }
@@ -9899,6 +9938,7 @@ function resetForMode(): void {
   railgunRechamberPresentationActive = false;
   localRailgunPendingUntilHostTimeMs = 0;
   lastRailgunStateBroadcastAt = -Infinity;
+  railgunClaimAudit = createRailgunClaimAudit();
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
   railgunPresentation.updateWorld(railgunState, performance.now());
@@ -10541,13 +10581,12 @@ const debugWindow = window as Window & {
     setStance: (stance: Stance) => void;
     damage: (amount: number) => void;
     damageFromRemote: (amount: number, cause?: KillCause['kind']) => void;
-    damageRemoteAuthoritatively: (amount: number) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
+    damageRemoteAuthoritatively: (amount: number, playerId?: string) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
     earnSupport: (eliminations: number) => void;
     forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     stageRailgunSpawn: (siteIndex?: number) => RailgunAuthorityState;
-    stageRemoteAtRailgunPickup: (playerId?: string) => boolean;
     interactRailgun: () => boolean;
     degradeStateChannel: () => boolean;
     endMatch: () => void;
@@ -10601,6 +10640,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       rechamberPresentationActive: railgunRechamberPresentationActive,
       adsProgress: weaponView.adsProgress(),
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
+      claimAudit: { ...railgunClaimAudit },
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
     matchDiagnosticsUpload: matchDiagnosticUploader.telemetry(),
@@ -11896,9 +11936,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
             : { kind: 'environment' };
     applyDamage(amount, remote.snapshot.id, 1, false, cause);
   },
-  damageRemoteAuthoritatively: (amount: number) => {
+  damageRemoteAuthoritatively: (amount: number, playerId) => {
     if (!localMultiplayerQa || network.role !== 'host' || !Number.isFinite(amount) || amount <= 0) return null;
-    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    const remote = playerId ? remotes.get(playerId) : remotes.values().next().value as RemotePlayer | undefined;
     if (!remote) return null;
     const health = remoteHealthAuthorities.get(remote.snapshot.id);
     if (!health) return null;
@@ -11944,15 +11984,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();
     return railgunState;
-  },
-  stageRemoteAtRailgunPickup: (playerId) => {
-    const remote = playerId ? remotes.get(playerId) : remotes.values().next().value as RemotePlayer | undefined;
-    if (network.role !== 'host' || !remote || !railgunState.pickupPosition) return false;
-    const [x, y, z] = railgunState.pickupPosition;
-    remote.snapshot = { ...remote.snapshot, x, y, z };
-    remote.target.set(x, y, z);
-    remote.root.position.set(x, y - 1.7, z);
-    return true;
   },
   interactRailgun: () => interactWithRailgunPickup(),
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),

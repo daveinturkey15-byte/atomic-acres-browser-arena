@@ -165,12 +165,14 @@ try {
       return state?.matchPhase === 'active' && state.remotes === count;
     }, guestCount, { timeout: 45_000 })));
     joined.secondMatchStarted = true;
+    const testedGuestId = await guest.evaluate((name) => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.find((member) => member.name === name)?.id, `guest-1 ${cycle}`);
+    if (!testedGuestId) throw new Error('could not resolve the tested guest from the authoritative lobby roster');
 
     // Reproduce the reported delayed-death shape across a real host/guest
     // connection: heavy damage, full visible regeneration, then a small hit.
     // The host's stored remote ledger must advance before applying hit two.
     const [firstRemoteDamage] = await Promise.all([
-      host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(80)),
+      host.evaluate((playerId) => window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(80, playerId), testedGuestId),
       guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageFromRemote(80)),
     ]);
     await guest.waitForFunction(() => {
@@ -180,7 +182,7 @@ try {
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.hp >= 99, undefined, { timeout: 15_000 });
     const recoveredGuestHealth = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.hp);
     const [smallRemoteDamage] = await Promise.all([
-      host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(10)),
+      host.evaluate((playerId) => window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(10, playerId), testedGuestId),
       guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damageFromRemote(10)),
     ]);
     await guest.waitForFunction(() => {
@@ -200,27 +202,38 @@ try {
 
     const stagedRailgun = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.stageRailgunSpawn(0));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.status === 'available', undefined, { timeout: 15_000 });
-    const railgunClaimantId = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.id);
+    const railgunClaimantId = testedGuestId;
     await guest.evaluate((pickup) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(...pickup), stagedRailgun.pickupPosition);
-    if (!await host.evaluate((playerId) => window.__ATOMIC_ACRES_DEBUG__.stageRemoteAtRailgunPickup(playerId), railgunClaimantId)) {
-      throw new Error('could not stage the authoritative claiming remote at the Railgun pickup');
+    try {
+      await host.waitForFunction(({ playerId, pickup }) => {
+        const claimant = window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers.find((remote) => remote.id === playerId);
+        return claimant && Math.hypot(claimant.position[0] - pickup[0], claimant.position[2] - pickup[2]) < 0.25;
+      }, { playerId: railgunClaimantId, pickup: stagedRailgun.pickupPosition }, { timeout: 15_000 });
+    } catch (error) {
+      const hostState = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+      const guestState = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+      throw new Error(`host did not observe claimant ${railgunClaimantId} at ${JSON.stringify(stagedRailgun.pickupPosition)}: ${JSON.stringify({ hostRemotes: hostState.remotePlayers, guestPlayer: guestState.player })}`, { cause: error });
     }
     joined.railgunGuestClaimed = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactRailgun());
-    await Promise.all(labelledPages.map(async ([label, page]) => {
-      try {
-        await page.waitForFunction(() => {
-          const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-          return state.railgun.status === 'held' && state.railgun.roundsRemaining === 8;
-        }, undefined, { timeout: 15_000 });
-      } catch (error) {
-        const evidence = await page.evaluate(() => ({
-          railgun: window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun,
-          player: window.__ATOMIC_ACRES_DEBUG__.snapshot().player,
-          remotes: window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers,
-        }));
-        throw new Error(`${label} missed held Railgun replication: ${JSON.stringify(evidence)}`, { cause: error });
-      }
-    }));
+    try {
+      await Promise.all(labelledPages.map(([, page]) => page.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        return state.railgun.status === 'held' && state.railgun.roundsRemaining === 8;
+      }, undefined, { timeout: 15_000 })));
+    } catch (error) {
+      const evidence = await Promise.all(labelledPages.map(async ([label, page]) => {
+        const state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+        return {
+          label,
+          railgun: state.railgun,
+          player: state.player,
+          remotes: state.remotePlayers,
+          network: state.networkLifecycle,
+          lobbyRevision: state.privateMatch.revision,
+        };
+      }));
+      throw new Error(`peers missed held Railgun replication: ${JSON.stringify(evidence)}`, { cause: error });
+    }
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.localHolder === true, undefined, { timeout: 15_000 });
     await guest.waitForTimeout(500);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
@@ -254,7 +267,7 @@ try {
     }, undefined, { timeout: 15_000 });
     await guest.click('#field-kit-redeploy');
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.primaryWeapon === 'smg', undefined, { timeout: 15_000 });
-    await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers[0]?.primary === 'smg', undefined, { timeout: 15_000 });
+    await host.waitForFunction((playerId) => window.__ATOMIC_ACRES_DEBUG__.snapshot().remotePlayers.find((remote) => remote.id === playerId)?.primary === 'smg', testedGuestId, { timeout: 15_000 });
     const afterRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
     joined.guestRedeployNoCombatEffects = afterRedeploy[1].player.deaths === beforeRedeploy[1].player.deaths
       && afterRedeploy[1].player.kills === beforeRedeploy[1].player.kills
