@@ -787,18 +787,6 @@ test.describe('boot and authored presentation', () => {
     const activeState = await debug(page);
     expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
-    // Quality keeps authored PBR receiver/arm silhouettes plus Pass 32 mist,
-    // grounded signage and large-cover batches. The measured worst staged view
-    // remains bounded at 180 calls after Pass 59 adds three explicitly audited
-    // collision-mirror meshes; one live impact/fragment draw may still be
-    // present in this transient sample. The stricter settled-scene budget is
-    // enforced below.
-    // Pass 60 renders the viewmodel after a depth clear so walls/floors cannot
-    // punch holes through the weapon. That intentional overlay pass adds one
-    // draw call to the transient combat sample.
-    // Pass 64's six precompiled 2x-damage presentation batches remain resident
-    // here as well, preventing a synchronized first-spawn compile/upload hitch.
-    expect(activeState.render.calls).toBeLessThanOrEqual(188);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -811,6 +799,10 @@ test.describe('boot and authored presentation', () => {
     // deliberately trade a tiny, bounded steady-state cost for removing the
     // synchronized first-spawn shader/upload hitch across every client.
     expect(stableState.render.calls).toBeLessThanOrEqual(169);
+    // Compare the transient window-break frame with its own settled view. This
+    // isolates the bounded glass shards, pooled impact presentation and combat
+    // overlays from camera-dependent culling and the resident pickup baseline.
+    expect(activeState.render.calls - stableState.render.calls).toBeLessThanOrEqual(24);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
