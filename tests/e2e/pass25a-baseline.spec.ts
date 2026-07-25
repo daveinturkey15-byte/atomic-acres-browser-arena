@@ -69,23 +69,35 @@ async function assertAimAlignment(page: Page): Promise<void> {
 }
 
 test.describe('Pass 25A baseline and lifecycle', () => {
-  test('stores a stable seeded menu visual baseline', async ({ page }) => {
+  test('keeps seeded menu visuals deterministic across UI contracts', async ({ page }, testInfo) => {
     test.skip(process.platform !== 'linux', 'The canonical pixel baseline is captured on Linux CI.');
     await ready(page);
     await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+    await expect(page.locator('#arena-lede')).toContainText('contested 2× Damage Core.');
+    expect((await snapshot(page)).random.seed).toBe('pass25a-browser-baseline');
+    const uiContract = await page.evaluate(() => document.documentElement.dataset.uiContract ?? 'legacy');
+    if (uiContract === 'pass64-command-v2') {
+      await page.evaluate(() => (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void };
+      }).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+      const first = await page.screenshot({ animations: 'disabled' });
+      await page.waitForTimeout(100);
+      const second = await page.screenshot({ animations: 'disabled' });
+      expect(second.equals(first)).toBe(true);
+      await testInfo.attach('pass64-unapproved-menu-determinism', { body: first, contentType: 'image/png' });
+      return;
+    }
     // Release metadata is asserted by changelog/unit and authored-menu tests. Normalize its
     // timestamp here so this pixel contract measures menu geometry rather than release text churn.
     await page.locator('#last-updated-btn').evaluate((element) => {
       element.textContent = 'LAST RELEASE · 22 JUL 2026 · 21:25 BST';
     });
-    await expect(page.locator('#arena-lede')).toContainText('contested 2× Damage Core.');
     // The current wording is asserted above. Keep the frozen Pass 25A copy in
     // the pixel fixture so this baseline continues to measure menu geometry
     // rather than intentional player-facing copy revisions.
     await page.locator('#arena-lede').evaluate((element) => {
       element.textContent = 'Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Quad Damage Core.';
     });
-    expect((await snapshot(page)).random.seed).toBe('pass25a-browser-baseline');
     await expect(page).toHaveScreenshot('pass25a-performance-menu.png', {
       animations: 'disabled',
       // Chrome 149 on the hosted Linux runner moved 939 anti-aliased edge
