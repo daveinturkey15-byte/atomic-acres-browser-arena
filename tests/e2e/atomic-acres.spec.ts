@@ -69,7 +69,12 @@ type DebugState = {
     } | null;
     neonHaze: boolean;
   }>;
-  corpses: { active: number; lifetimeMs: number; remainingMs: number[] };
+  corpses: {
+    active: number;
+    lifetimeMs: number;
+    remainingMs: number[];
+    models: Array<{ source: string; appearance: string; skinnedMeshes: number; weaponChildren: number; activeClip: string } | null>;
+  };
   botEscalation: { deaths: number; initialBots: number; targetBots: number; activeBots: number; nextReinforcementAt: number };
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -908,13 +913,20 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
     const redeploy = page.getByRole('button', { name: 'REDEPLOY NOW WITH SELECTED FIELD KIT' });
     await expect(redeploy).toBeVisible();
+    const beforeRedeploy = await debug(page);
     await redeploy.click();
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'scattergun',
       undefined,
       { timeout: 12_000 },
     );
-    expect((await debug(page)).player.equippedWeapons).toEqual(['scattergun', 'pistol']);
+    const afterRedeploy = await debug(page);
+    expect(afterRedeploy.player.equippedWeapons).toEqual(['scattergun', 'pistol']);
+    expect(afterRedeploy.player.kills).toBe(beforeRedeploy.player.kills);
+    expect(afterRedeploy.player.deaths).toBe(beforeRedeploy.player.deaths);
+    expect(afterRedeploy.corpses.active).toBe(beforeRedeploy.corpses.active);
+    expect(afterRedeploy.deathDrops).toHaveLength(beforeRedeploy.deathDrops.length);
+    expect(afterRedeploy.fieldSupport.streak).toBe(beforeRedeploy.fieldSupport.streak);
   });
 });
 
@@ -1239,7 +1251,7 @@ test.describe('solo mechanics', () => {
     }
   });
 
-  test('plays a bounded rigged death animation before a clean respawn', async ({ page }) => {
+  test('plays the canonical rigged death animation before a clean respawn', async ({ page }) => {
     const dying = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         placeBotAhead: (distance: number) => void;
@@ -1254,6 +1266,13 @@ test.describe('solo mechanics', () => {
     expect(dying.rootVisible).toBe(true);
     expect(dying.operatorModel?.activeClip).toBe('Death');
     expect((await debug(page)).corpses).toMatchObject({ active: 1, lifetimeMs: 7_500 });
+    expect((await debug(page)).corpses.models[0]).toMatchObject({
+      source: 'Quaternius Ultimate Modular Males / Swat.gltf',
+      appearance: 'team',
+      skinnedMeshes: 5,
+      weaponChildren: 1,
+      activeClip: 'Death',
+    });
     await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 8_000 }).toBe(true);
     const respawned = (await debug(page)).bots[0];
     expect(respawned.rootVisible).toBe(true);

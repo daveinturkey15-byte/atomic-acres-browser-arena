@@ -49,6 +49,9 @@ import {
 } from './overdrive';
 
 const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'compat'];
+// UI card order is a presentation choice. Keep the frozen Pass 62 gameplay
+// contract order stable so a naming/menu pass cannot rewrite benchmark bytes.
+const GAMEPLAY_CONTRACT_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const;
 const movementContexts = {
   walk: { crouched: false, prone: false, ads: false, sprinting: false, grounded: true },
   sprint: { crouched: false, prone: false, ads: false, sprinting: true, grounded: true },
@@ -90,7 +93,7 @@ export function buildGameplayContract(): Record<string, unknown> {
       match: {
         warmupMs: MATCH_WARMUP_MS,
         defaultDurationMs: MATCH_DURATION_MS,
-        arenas: ARENA_SELECTIONS.map((selection) => ({
+        arenas: GAMEPLAY_CONTRACT_ARENA_IDS.map((id) => ARENA_SELECTIONS.find((selection) => selection.id === id)!).map((selection) => ({
           id: selection.id,
           soloBotCount: selection.soloBotCount,
           maximumSoloBots: selection.maximumSoloBots,

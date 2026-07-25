@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type SupportActivateMessage } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage } from './protocol';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -162,9 +162,36 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...state, activeRemainingMs: 30_001 })).toBe(false);
     expect(isGameMessage({ ...state, nextSpawnInMs: 120_001 })).toBe(false);
     expect(isGameMessage({ ...state, position: [0, Number.NaN, 0] })).toBe(false);
-    const redeploy = { type: 'redeploy-request' as const, by: 'abc', nonce: 92 };
+    const redeploy: RedeployRequestMessage = { type: 'redeploy-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: 'abc', primary: 'smg', nonce: 92 };
     expect(isGameMessage(redeploy)).toBe(true);
     expect(messageBelongsToPlayer(redeploy, 'abc')).toBe(true);
+    const redeployCommit: RedeployCommitMessage = {
+      type: 'redeploy-commit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host', target: 'abc', primary: 'smg', hostTimeMs: 1_500, nonce: 93,
+    };
+    expect(isGameMessage(redeployCommit)).toBe(true);
+    expect(isHostAuthorityMessage(redeployCommit)).toBe(true);
+    expect(isGameMessage({ ...redeploy, primary: 'laser' })).toBe(false);
+    expect(isGameMessage({ ...redeploy, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+  });
+
+  it('admits versioned railgun requests and host state only on the reliable authority lane', () => {
+    const claim = {
+      type: 'railgun-claim-request' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc', generation: 1, position: [0, 4.18, 0] as [number, number, number], nonce: 94,
+    };
+    const shot = {
+      type: 'railgun-shot-request' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc', generation: 1, shotId: 'rail-shot-1', origin: [0, 4.18, 0] as [number, number, number],
+      direction: [0, 0, -1] as [number, number, number], fireTimeMs: 2_000, nonce: 95,
+    };
+    expect(isGameMessage(claim)).toBe(true);
+    expect(isGameMessage(shot)).toBe(true);
+    expect(messageBelongsToPlayer(claim, 'abc')).toBe(true);
+    expect(messageBelongsToPlayer(shot, 'abc')).toBe(true);
+    expect(isHostAuthorityMessage(claim)).toBe(false);
+    expect(isHostAuthorityMessage(shot)).toBe(false);
+    expect(isGameMessage({ ...shot, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
   });
 
   it('admits the machine pistol only as the sniper sidearm in snapshots', () => {

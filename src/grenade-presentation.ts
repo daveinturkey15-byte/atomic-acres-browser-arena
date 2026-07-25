@@ -38,7 +38,7 @@ export function loadGrenadePresentation(): Promise<void> {
       resolve();
     }, undefined, (error) => {
       state = 'fallback';
-      console.warn('[Atomic Acres] Sanctified Frag GLB unavailable; using original fallback.', error);
+      console.warn('[Nuke Town] Sanctified Frag GLB unavailable; using original fallback.', error);
       resolve();
     });
   });

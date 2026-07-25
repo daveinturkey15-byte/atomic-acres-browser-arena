@@ -19,7 +19,7 @@ export type ProjectMapNode = Readonly<{
 export type ProjectMapBundle = Readonly<{
   schemaVersion: 1;
   current: Readonly<{
-    product: 'Atomic Acres';
+    product: 'Nuke Town';
     generatedAt: string;
     architectureRevision: 'pass63-project-map-v1';
     candidateState: 'hitl-candidate' | 'released';
@@ -209,7 +209,7 @@ export function createProjectMapBundle(
   return {
     schemaVersion: 1,
     current: {
-      product: 'Atomic Acres',
+      product: 'Nuke Town',
       generatedAt,
       architectureRevision: 'pass63-project-map-v1',
       candidateState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'hitl-candidate' : 'released',
@@ -262,7 +262,7 @@ function markdownTree(nodes: readonly ProjectMapNode[], depth = 2): string[] {
 export function projectMapMarkdown(bundle: ProjectMapBundle = createProjectMapBundle()): string {
   const current = bundle.current.release;
   const lines = [
-    '# Atomic Acres project map',
+    '# Nuke Town project map',
     '',
     `Generated: ${bundle.current.generatedAt}`,
     `Architecture revision: ${bundle.current.architectureRevision}`,

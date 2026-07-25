@@ -684,7 +684,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     board.rotation.y = rotationY;
     world.add(board);
   }
-  sign('ATOMIC ACRES', 0, 4.7, -42.9, 0);
+  sign('NUKE TOWN', 0, 4.7, -42.9, 0);
   sign('TEST BLOCK 86', 0, 4.7, 42.9, Math.PI);
 
   function target(id: string, x: number, z: number, team: Team): void {
@@ -722,7 +722,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   return {
     id: 'atomic-acres',
-    label: 'Atomic Acres',
+    label: 'Nuke Town',
     root: world,
     colliders,
     physicsColliders,

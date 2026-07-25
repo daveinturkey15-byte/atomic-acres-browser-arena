@@ -936,7 +936,7 @@ export function buildRetroShuttleBus(): THREE.Group {
   for (const x of [-1.72, 1.72]) for (const z of [-3.45, 3.35]) wheel(root, x, z, 0.7);
   part(root, roundedBox('shuttle-front-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, -5.42]);
   part(root, roundedBox('shuttle-rear-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, 5.42]);
-  const sign = decal('ACRES SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
+  const sign = decal('NUKE SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
   return root;
 }
 
@@ -1312,91 +1312,14 @@ export function poseOperator(
   }
 }
 
-function buildBoundedOperatorLod(team: Team, name: string, weaponId: WeaponId): THREE.Group {
-  const root = new THREE.Group();
-  root.name = name;
-  root.userData.dynamic = true;
-  root.userData.boundedOperatorLod = true;
-  const pelvis = new THREE.Group();
-  pelvis.name = 'pelvis-joint';
-  pelvis.position.y = 0.9;
-  root.add(pelvis);
-  const spine = new THREE.Group();
-  spine.name = 'spine-joint';
-  spine.position.y = 0.18;
-  pelvis.add(spine);
-  const teamColor = new THREE.Color(team === 0 ? 0x55d8d2 : 0xff745e);
-  const teamAccent = new THREE.Color(team === 0 ? 0x8ffff7 : 0xffb09d);
-  const armour = new THREE.Color(0x29393d);
-  const skin = new THREE.Color(0xd8a781);
-  const parts: THREE.BufferGeometry[] = [];
-  const addPart = (geometry: THREE.BufferGeometry, position: [number, number, number], color: THREE.Color) => {
-    geometry.translate(...position);
-    const expanded = geometry.index ? geometry.toNonIndexed() : geometry;
-    if (expanded !== geometry) geometry.dispose();
-    const colors = new Float32Array(expanded.getAttribute('position').count * 3);
-    for (let index = 0; index < colors.length; index += 3) {
-      colors[index] = color.r; colors[index + 1] = color.g; colors[index + 2] = color.b;
-    }
-    expanded.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    parts.push(expanded);
-  };
-  addPart(new THREE.BoxGeometry(0.52, 0.3, 0.34), [0, 0, 0], armour);
-  addPart(new THREE.BoxGeometry(0.68, 0.7, 0.38), [0, 0.48, 0], teamColor);
-  addPart(new THREE.BoxGeometry(0.72, 0.09, 0.42), [0, 0.62, -0.02], teamAccent);
-  addPart(new THREE.OctahedronGeometry(0.24, 0), [0, 1.17, 0], skin);
-  addPart(new THREE.BoxGeometry(0.5, 0.12, 0.36), [0, 1.32, 0], armour);
-  for (const side of [-1, 1]) {
-    addPart(new THREE.BoxGeometry(0.2, 0.78, 0.22), [side * 0.45, 0.35, 0], armour);
-    addPart(new THREE.BoxGeometry(0.25, 0.9, 0.3), [side * 0.17, -0.57, 0], teamColor);
-    addPart(new THREE.BoxGeometry(0.27, 0.16, 0.4), [side * 0.17, -1.05, -0.07], armour);
-  }
-  const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('Could not assemble bounded operator LOD');
-  const visual = new THREE.Mesh(merged, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true }));
-  visual.name = 'bounded-operator-lod';
-  visual.userData.presentationOnly = true;
-  visual.raycast = () => undefined;
-  pelvis.add(visual);
-
-  const leftUpperArm = new THREE.Group(); const rightUpperArm = new THREE.Group();
-  const leftForearm = new THREE.Group(); const rightForearm = new THREE.Group();
-  const leftThigh = new THREE.Group(); const rightThigh = new THREE.Group();
-  const leftShin = new THREE.Group(); const rightShin = new THREE.Group();
-  const reactionRoot = new THREE.Group(); reactionRoot.name = 'presentation-reaction-gear'; spine.add(reactionRoot);
-  for (const detailName of ['field-radio-pack', 'asymmetric-shoulder-plate', 'utility-pouch', 'team-radio-antenna']) {
-    const placeholder = new THREE.Group(); placeholder.name = detailName; reactionRoot.add(placeholder);
-  }
-  const meleeKnife = new THREE.Group(); meleeKnife.name = 'operator-melee-knife'; meleeKnife.visible = false; rightForearm.add(meleeKnife);
-  const weaponSocket = new THREE.Group(); weaponSocket.name = 'weapon-socket'; weaponSocket.position.set(0.22, 0.43, -0.36); spine.add(weaponSocket);
-  const hitProxyRoot = new THREE.Group(); hitProxyRoot.name = 'authoritative-hit-proxies'; root.add(hitProxyRoot);
-  const proxyMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, colorWrite: false, depthWrite: false });
-  const proxy = (proxyName: string, zone: 'head' | 'body' | 'limb', size: [number, number, number], position: [number, number, number]) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), proxyMaterial);
-    mesh.name = proxyName; mesh.position.set(...position); mesh.visible = false;
-    mesh.userData.hitZone = zone; mesh.userData.authoritativeProxy = true; hitProxyRoot.add(mesh);
-  };
-    for (const [index, def] of AUTHORITATIVE_HIT_PROXIES.entries()) {
-      proxy(`hit-proxy-${def.zone}-${index}`, def.zone, [def.size[0], def.size[1], def.size[2]], [def.position[0], def.position[1], def.position[2]]);
-    }
-  root.userData.operatorRig = {
-    rigged: false, pelvis, spine, leftUpperArm, rightUpperArm, leftForearm, rightForearm,
-    leftThigh, rightThigh, leftShin, rightShin, weaponSocket, reactionRoot, hitProxyRoot, meleeKnife, weaponId,
-  } satisfies OperatorRig;
-  setOperatorWeapon(root, weaponId, true);
-  root.traverse((node) => { node.userData.targetRoot = root; });
-  return root;
-}
-
 export function buildOperator(
   team: Team,
   name = 'operator',
   flattenMaterials = false,
   weaponId: WeaponId = 'carbine',
-  preferRigged = true,
   appearance: OperatorAppearance = 'team',
 ): THREE.Group {
-  const rigged = preferRigged ? createRiggedOperator(team, name, flattenMaterials, appearance) : null;
+  const rigged = createRiggedOperator(team, name, flattenMaterials, appearance);
   if (rigged) {
     const { root, weaponSocket } = rigged;
     const hitProxyRoot = new THREE.Group();
@@ -1461,7 +1384,6 @@ export function buildOperator(
     });
     return root;
   }
-  if (!preferRigged) return buildBoundedOperatorLod(team, name, weaponId);
   const root = new THREE.Group(); root.name = name;
   root.userData.dynamic = true;
   const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;

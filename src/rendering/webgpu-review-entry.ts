@@ -35,12 +35,12 @@ const REVIEW_CONTRAST_KEYS: Readonly<Record<ArenaId, readonly Readonly<{
   distance: number;
 }>[]>> = Object.freeze({
   'atomic-acres': Object.freeze([
-    Object.freeze({ position: [-26, 11, 12], target: [-18, 1.8, 2], color: 0xffc981, intensity: 13, distance: 32 }),
-    Object.freeze({ position: [26, 10, -12], target: [18, 1.8, -2], color: 0xa9d8ff, intensity: 11, distance: 31 }),
+    Object.freeze({ position: [-26, 11, 12] as const, target: [-18, 1.8, 2] as const, color: 0xffc981, intensity: 13, distance: 32 }),
+    Object.freeze({ position: [26, 10, -12] as const, target: [18, 1.8, -2] as const, color: 0xa9d8ff, intensity: 11, distance: 31 }),
   ]),
   'skyline-terminal': Object.freeze([
-    Object.freeze({ position: [0, 4.8, 2], target: [12, 5.4, 2], color: 0xd9f4ff, intensity: 18, distance: 30 }),
-    Object.freeze({ position: [-20, 6.7, -30], target: [-8, 0.8, -19], color: 0xffc68a, intensity: 17, distance: 34 }),
+    Object.freeze({ position: [0, 4.8, 2] as const, target: [12, 5.4, 2] as const, color: 0xd9f4ff, intensity: 18, distance: 30 }),
+    Object.freeze({ position: [-20, 6.7, -30] as const, target: [-8, 0.8, -19] as const, color: 0xffc68a, intensity: 17, distance: 34 }),
   ]),
   'rustworks-1v1': Object.freeze([]),
   'gun-range': Object.freeze([]),
