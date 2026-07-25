@@ -19,7 +19,8 @@ export const definition = createProceduralArenaVisualDefinition({
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 180, normalBias: 0.038 },
   atmosphere: { preset: 'industrial-night', mist: 0.28, dust: 0.1, clouds: true },
   colorPipeline: colorPipeline('pass64.rustrig.hdr.v1', 1.26),
-  budgets: budgets({ maximumDrawCalls: 500, maximumTriangles: 1_250_000, maximumShadowLights: 1 }),
+  // One directional moon plus one bounded, shadowed deck key.
+  budgets: budgets({ maximumDrawCalls: 500, maximumTriangles: 1_250_000, maximumShadowLights: 2 }),
   reviewCameras: [
     camera('rustrig-overview', [38, 31, 42], [0, 5, 0], 'overview', 1.26),
     camera('rustrig-tower-support', [14, 2.4, 12], [0, 5, 0], 'geometry', 1.26),
