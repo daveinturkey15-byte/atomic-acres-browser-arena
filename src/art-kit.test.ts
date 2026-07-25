@@ -1,6 +1,32 @@
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
-import { batchStaticMeshes, buildWeaponModel, optimizeAttachedWeapon } from './art-kit';
+import { describe, expect, it, vi } from 'vitest';
+import { batchStaticMeshes, buildWeaponModel, optimizeAttachedWeapon, texturedMaterial, waitForPendingArtTextures } from './art-kit';
+
+describe('authored texture readiness', () => {
+  it('waits for null-image TextureLoader placeholders before WebGPU scene compilation', async () => {
+    vi.stubGlobal('document', {});
+    const load = vi.spyOn(THREE.TextureLoader.prototype, 'load').mockImplementation(((_url: string, onLoad?: (texture: THREE.Texture) => void) => {
+      const value = new THREE.Texture();
+      value.needsUpdate = true;
+      queueMicrotask(() => {
+        value.image = { complete: true, width: 1, height: 1 };
+        onLoad?.(value);
+      });
+      return value;
+    }) as THREE.TextureLoader['load']);
+    try {
+      const material = texturedMaterial('/qa/pass64-delayed-texture.png');
+      expect(material.map?.image).toBeNull();
+
+      await waitForPendingArtTextures();
+
+      expect(material.map?.image).toMatchObject({ complete: true, width: 1, height: 1 });
+    } finally {
+      load.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe('palette static batching', () => {
   it('preserves ordinary material colours instead of blending the default black emissive channel', () => {

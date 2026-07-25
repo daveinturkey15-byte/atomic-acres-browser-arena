@@ -1,5 +1,6 @@
 import releaseChannelsJson from '../release-channels.json';
 import './style.css';
+import './ui/tactical-ui.css';
 import { latestChangelogEntry } from './changelog';
 import {
   releaseChannelDecision,
@@ -14,7 +15,7 @@ if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
 
 async function loadLatestBuild(): Promise<void> {
-  document.title = 'Atomic Acres — Browser Arena FPS';
+  document.title = 'Nuke Town — Browser Arena FPS';
   app.replaceChildren();
   await import('./main');
 }
@@ -24,11 +25,11 @@ function openStableBuild(): void {
 }
 
 function showReleaseChooser(): void {
-  document.title = 'Choose build — Atomic Acres';
+  document.title = 'Choose build — Nuke Town';
   app.innerHTML = `
     <main id="release-channel-gate" aria-labelledby="release-channel-title">
       <section class="release-channel-card">
-        <div class="release-channel-eyebrow">ATOMIC ACRES · BUILD SELECT</div>
+        <div class="release-channel-eyebrow">NUKE TOWN · BUILD SELECT</div>
         <h1 id="release-channel-title">CHOOSE YOUR <span>DEPLOYMENT</span></h1>
         <p>Load the newest approved build, or keep playing the preserved version people already know.</p>
         <div class="release-channel-options">

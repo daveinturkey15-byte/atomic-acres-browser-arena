@@ -1,7 +1,7 @@
 import {
   CHANGELOG,
   PENDING_PRODUCTION_RELEASE,
-  latestChangelogEntry,
+  resolveProductionReleasedAt,
   type ChangelogEntry,
 } from './changelog';
 import releaseChannelsJson from '../release-channels.json';
@@ -19,9 +19,9 @@ export type ProjectMapNode = Readonly<{
 export type ProjectMapBundle = Readonly<{
   schemaVersion: 1;
   current: Readonly<{
-    product: 'Atomic Acres';
+    product: 'Nuke Town';
     generatedAt: string;
-    architectureRevision: 'pass63-project-map-v1';
+    architectureRevision: 'pass64-webgpu-hud-v1';
     candidateState: 'hitl-candidate' | 'released';
     release: ChangelogEntry;
     previousRelease: string | null;
@@ -37,6 +37,28 @@ export type ProjectMapBundle = Readonly<{
   archive: readonly ChangelogEntry[];
 }>;
 
+/**
+ * The project map describes the active review candidate, while CHANGELOG is a
+ * production-only release ledger. Keeping the candidate separate prevents an
+ * unpublished pass from appearing as live release history.
+ */
+export const PROJECT_MAP_CANDIDATE: ChangelogEntry = Object.freeze({
+  id: 'pass64-candidate',
+  pass: 'PASS 64',
+  title: 'Playable WebGPU, Command UI & Multiplayer Hardening',
+  releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
+  areas: Object.freeze(['WEBGPU', 'TSL', 'HUD', 'MULTIPLAYER', 'MAPS', 'DIAGNOSTICS']),
+  summary: 'HITL candidate for the complete playable WebGPU/TSL route, redesigned command HUD and menus, rematch and health reconciliation repairs, lightweight post-match diagnostics, Railgun, and arena visual-quality gates.',
+  highlights: Object.freeze([
+    'The normal gameplay route is fail-closed hardware WebGPU with TSL-owned atmosphere and HDR presentation; WebGL2 remains an explicit rollback-compatible route',
+    'Nuke Town, Terminal, RustRig and Gun Range each own a streamed ArenaVisualDefinition with deterministic review cameras and budgets',
+    'The HUD, lobby, map selection, loadout and match overlays use the new command interface without dropping gameplay controls',
+    'Private-match rematches, authoritative health regeneration and duplicate result handling have dedicated regression coverage',
+    'The Railgun spawns during Nuke Town matches with finite ammunition, rechamber cadence, wall penetration and hostile thermal identification',
+    'Pass 63 is retained byte-exact as the stable rollback while the immutable Pass 62 benchmark record remains available for regression comparison',
+  ]),
+});
+
 export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
   Object.freeze({
     id: 'browser-client',
@@ -51,7 +73,7 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
         summary: 'Bootstraps release routing, builds the menu/HUD shell, and coordinates the live game loop.',
         authority: 'Composition only; it must call domain contracts rather than silently reimplement them.',
         status: 'progressive-migration',
-        paths: Object.freeze(['src/bootstrap.ts', 'src/main.ts', 'src/style.css']),
+        paths: Object.freeze(['src/bootstrap.ts', 'src/main.ts', 'src/legacy-main.ts', 'src/style.css']),
       }),
       Object.freeze({
         id: 'gameplay-authority',
@@ -205,16 +227,16 @@ export function createProjectMapBundle(
   entries: readonly ChangelogEntry[] = CHANGELOG,
 ): ProjectMapBundle {
   if (Number.isNaN(Date.parse(generatedAt))) throw new Error(`Invalid project-map timestamp: ${generatedAt}`);
-  const release = latestChangelogEntry(entries);
+  const release = PROJECT_MAP_CANDIDATE;
   return {
     schemaVersion: 1,
     current: {
-      product: 'Atomic Acres',
+      product: 'Nuke Town',
       generatedAt,
-      architectureRevision: 'pass63-project-map-v1',
+      architectureRevision: 'pass64-webgpu-hud-v1',
       candidateState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'hitl-candidate' : 'released',
       release,
-      previousRelease: entries[1]?.pass ?? null,
+      previousRelease: entries.find((entry) => entry.pass !== release.pass)?.pass ?? null,
     },
     publishedChannels: {
       schemaVersion: releaseChannelsJson.schemaVersion,
@@ -233,8 +255,8 @@ export function createProjectMapBundle(
     },
     operatingBoundaries: PROJECT_OPERATING_BOUNDARIES,
     architecture: PROJECT_MAP_TREE,
-    changes: entries,
-    archive: entries.slice(1),
+    changes: Object.freeze([release, ...entries.filter((entry) => entry.pass !== release.pass)]),
+    archive: entries,
   };
 }
 
@@ -262,7 +284,7 @@ function markdownTree(nodes: readonly ProjectMapNode[], depth = 2): string[] {
 export function projectMapMarkdown(bundle: ProjectMapBundle = createProjectMapBundle()): string {
   const current = bundle.current.release;
   const lines = [
-    '# Atomic Acres project map',
+    '# Nuke Town project map',
     '',
     `Generated: ${bundle.current.generatedAt}`,
     `Architecture revision: ${bundle.current.architectureRevision}`,

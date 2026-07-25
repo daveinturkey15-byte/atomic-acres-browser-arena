@@ -8,7 +8,7 @@ test('Project Map exposes one current-first tree and human/agent downloads', asy
     if (message.type() === 'error') browserErrors.push(`console: ${message.text()}`);
   });
 
-  await page.goto('/?release=latest&render=compat&seed=pass63-project-map', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?release=latest&renderer=webgl2&render=compat&seed=pass63-project-map', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
 

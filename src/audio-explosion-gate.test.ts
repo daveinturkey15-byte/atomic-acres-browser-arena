@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   ArenaAudio,
   EXPLOSION_AUDIO_COALESCE_MS,
+  GRENADE_FUSE_BEEP_START_MS,
   admitExplosionAudioMix,
   createExplosionAudioGate,
+  grenadeFuseBeepIntervalMs,
 } from './audio';
 
 describe('explosion audio admission', () => {
@@ -27,36 +29,14 @@ describe('explosion audio admission', () => {
     expect(later.state).toMatchObject({ requests: 2, mixes: 2, coalesced: 0 });
   });
 
-  it('keeps the Sanctified Frag choir when the heavy explosion mix is coalesced', () => {
+  it('uses an accelerating conventional frag warning cadence and no always-on noise sources', () => {
     const audio = new ArenaAudio();
-    const start = vi.fn();
-    const stop = vi.fn();
-    const feedback = {};
-    const gain = {
-      gain: {
-        setValueAtTime: vi.fn(),
-        linearRampToValueAtTime: vi.fn(),
-        exponentialRampToValueAtTime: vi.fn(),
-      },
-      connect: vi.fn(() => feedback),
-    };
-    const source = {
-      buffer: null as { duration: number } | null,
-      connect: vi.fn(() => gain),
-      start,
-      stop,
-    };
-    Object.assign(audio, {
-      context: { currentTime: 1, createBufferSource: () => source, createGain: () => gain },
-      feedback,
-      sanctifiedChoirBuffer: { duration: 1.2 },
+    const intervals = [GRENADE_FUSE_BEEP_START_MS, 900, 450, 100].map(grenadeFuseBeepIntervalMs);
+    expect(intervals).toEqual([...intervals].sort((a, b) => b - a));
+    expect(intervals.at(-1)).toBeLessThan(120);
+    expect(audio.telemetry()).toMatchObject({
+      ambience: { continuousSources: 0, busGain: 0.12 },
+      grenadeFuse: { beeps: 0, startMs: GRENADE_FUSE_BEEP_START_MS },
     });
-    vi.spyOn(audio, 'explosion').mockReturnValue(false);
-
-    audio.sanctifiedFragExplosion();
-
-    expect(start).toHaveBeenCalledOnce();
-    expect(stop).toHaveBeenCalledOnce();
-    expect(audio.telemetry().sanctifiedFragChoir.plays).toBe(1);
   });
 });

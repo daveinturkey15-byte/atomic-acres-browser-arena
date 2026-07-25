@@ -6,6 +6,32 @@ import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
 
+export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
+
+/** Applies the global bot-only emissive budget once without dimming players. */
+export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
+  const materials = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const candidates = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of candidates) materials.add(material);
+  });
+  let adjusted = 0;
+  for (const material of materials) {
+    if (!(material instanceof THREE.MeshStandardMaterial)
+      && !(material instanceof THREE.MeshLambertMaterial)
+      && !(material instanceof THREE.MeshPhongMaterial)) continue;
+    const stored = material.userData.botEmissiveBaseIntensity;
+    const base = typeof stored === 'number' ? stored : material.emissiveIntensity;
+    material.userData.botEmissiveBaseIntensity = base;
+    material.emissiveIntensity = base * BOT_EMISSIVE_BRIGHTNESS_SCALE;
+    adjusted += 1;
+  }
+  root.userData.botEmissiveBrightnessScale = BOT_EMISSIVE_BRIGHTNESS_SCALE;
+  root.userData.botEmissiveMaterialsAdjusted = adjusted;
+  return adjusted;
+}
+
 const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
 const FIRST_PERSON_ARMS_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb';
 

@@ -25,7 +25,7 @@ export function matchPresentationAt(
   scores: [number, number],
   playerTeam: 0 | 1,
   rules: MatchRules = DEFAULT_MATCH_RULES,
-  arenaLabel = 'Atomic Acres',
+  arenaLabel = 'Nuke Town',
 ): MatchPresentation {
   if (state.phase === 'warmup') {
     const remaining = Math.max(0, Math.ceil((state.endsAt - now) / 1000));

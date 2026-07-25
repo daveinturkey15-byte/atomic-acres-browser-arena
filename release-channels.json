@@ -3,23 +3,23 @@
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
     "label": "EXPERIMENTAL NEW NETCODE",
-    "description": "The live Pass 63 cleanup, chat, visual-repair, and experimental networking build."
+    "description": "The live Pass 64 WebGPU, HUD, arena-quality, and multiplayer-correction build."
   },
   "experimental": {
     "label": "EXPERIMENTAL NEW NETCODE",
-    "description": "Pass 63 live while preserving the Pass 62 immutable host-resolved bullet timeline and adaptive networking.",
-    "pass": "PASS 63",
+    "description": "Pass 64 live while preserving the byte-exact Pass 63 release as the stable rollback.",
+    "pass": "PASS 64",
     "path": "channels/experimental-netcode-pass"
   },
   "stable": {
     "label": "NEW NETCODE",
-    "description": "The byte-exact Pass 62 best-ever netcode benchmark preserved as the stable fallback.",
-    "pass": "PASS 62",
-    "sourceSha": "249a7ee77dce761eb237f3eb0e0d0ea1d0356317",
-    "pagesSha": "27c90967bdaf5387c0372933c7965a60ce75a765",
+    "description": "The byte-exact Pass 63 production build preserved as the stable fallback.",
+    "pass": "PASS 63",
+    "sourceSha": "1bd55076c952080d5f7a8a5b0b8869aaa0646a76",
+    "pagesSha": "2201a606a8c9f83d441036eac07dc140bd7e63f5",
     "pagesPath": "channels/experimental-netcode-pass",
-    "runtimeFileCount": 118,
-    "runtimeTreeSha256": "035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d",
+    "runtimeFileCount": 119,
+    "runtimeTreeSha256": "61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7",
     "path": "channels/recent-stable"
   }
 }

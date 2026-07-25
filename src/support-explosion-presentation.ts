@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const SUPPORT_EXPLOSION_POOL_CAPACITY = 12;
 export const SUPPORT_EXPLOSION_DURATION_MS = 460;
@@ -67,15 +68,16 @@ export class SupportExplosionPresentation {
     }
   }
 
-  async prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): Promise<void> {
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
     if (this.wasPrewarmed) return;
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene)) throw new Error('Support explosion presentation must be attached to a scene before prewarm');
     for (const slot of this.slots) {
       slot.root.visible = true;
       slot.root.scale.setScalar(0.0001);
     }
     try {
-      await renderer.compileAsync(this.root.parent as THREE.Scene, camera);
-      renderer.render(this.root.parent as THREE.Scene, camera);
+      await runtime.compileAndRender(this.root, camera, parentScene);
       this.wasPrewarmed = true;
     } finally {
       for (const slot of this.slots) {

@@ -54,14 +54,14 @@ describe('third-party asset provenance', () => {
     }
   });
 
-  it('records exact checksums for the original Sanctified Frag GLB and editable Blender source', () => {
+  it('records exact checksums for the conventional frag GLB and editable Blender source', () => {
     const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
-    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-sanctified-frag-2026-07-15');
+    const asset = manifest.assets.find((entry) => entry.id === 'atomic-acres-frag-grenade-2026-07-25');
     expect(asset).toBeTruthy();
-    expect(asset?.files).toBe('public/assets/original/models/holy-hand-frag.glb');
+    expect(asset?.files).toBe('public/assets/original/models/frag-grenade.glb');
     expect(asset?.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(sha256(asset?.files as string)).toBe(asset?.sha256);
-    expect(asset?.sourceBlend).toBe('source-assets/blender/holy-hand-frag.blend');
+    expect(asset?.sourceBlend).toBe('source-assets/blender/frag-grenade.blend');
     expect(asset?.sourceBlendSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(sha256(asset?.sourceBlend as string)).toBe(asset?.sourceBlendSha256);
   });

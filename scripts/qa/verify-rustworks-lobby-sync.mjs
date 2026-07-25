@@ -55,7 +55,7 @@ try {
       guidance: document.querySelector('#lobby-guidance')?.textContent?.trim(),
       mapCardsLocked: [...document.querySelectorAll('.map-card[data-arena-id]')].every((button) => button.disabled),
     }));
-    if (!arenaSyncGate.readyDisabled || !arenaSyncGate.mapCardsLocked || !arenaSyncGate.guidance?.startsWith('Synchronizing Rustworks')) {
+    if (!arenaSyncGate.readyDisabled || !arenaSyncGate.mapCardsLocked || !arenaSyncGate.guidance?.startsWith('Synchronizing RustRig')) {
       throw new Error(`Arena synchronization gate missing: ${JSON.stringify(arenaSyncGate)}`);
     }
   }

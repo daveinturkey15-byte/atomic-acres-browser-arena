@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const MAX_TRACERS = 18;
+export const MAX_TRACERS = 32;
 
 /** Fixed-capacity, one-draw-call tracer presentation. Authoritative rays remain external. */
 export class TracerPool {
@@ -28,14 +28,14 @@ export class TracerPool {
     scene.add(this.lines);
   }
 
-  emit(start: THREE.Vector3, end: THREE.Vector3, color: number, lifetime = 0.055): void {
+  emit(start: THREE.Vector3, end: THREE.Vector3, color: number, lifetime = 0.085): void {
     if (![start.x, start.y, start.z, end.x, end.y, end.z, lifetime].every(Number.isFinite)) return;
     const slot = this.cursor++ % MAX_TRACERS;
     const offset = slot * 6;
     this.positions.set([start.x, start.y, start.z, end.x, end.y, end.z], offset);
     const tint = new THREE.Color(color);
     this.colors.set([tint.r, tint.g, tint.b, tint.r, tint.g, tint.b], offset);
-    this.life[slot] = THREE.MathUtils.clamp(lifetime, 0.016, 0.12);
+    this.life[slot] = THREE.MathUtils.clamp(lifetime, 0.016, 0.18);
     this.lines.visible = true;
     this.markDirty();
   }

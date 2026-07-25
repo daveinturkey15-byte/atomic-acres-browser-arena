@@ -58,6 +58,9 @@ jobs:
       - run: npm test
       - run: npm run leaderboard:check
       - run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
       - run: npm run verify:release-tree
       - name: Write immutable PR preview receipt
         if: github.event_name == 'pull_request' && runner.os == 'Linux' && needs.classify-change.outputs.mode != 'none'
@@ -122,6 +125,9 @@ jobs:
         run: npx playwright install chromium
       - if: needs.classify-change.outputs.mode != 'none'
         run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
       - if: needs.classify-change.outputs.mode != 'none'
         env:
           QA_E2E_GROUPS: ${{ needs.classify-change.outputs.windows_groups }}

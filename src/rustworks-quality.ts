@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ArenaId } from './map-selection';
 import type { ArenaLightingProfile } from './blender-lighting';
 import type { RenderProfile } from './render-profile';
+import { auditLocalLightOcclusion, makeEmissiveOnly } from './rendering/light-occlusion';
 
 /**
  * Night oil-rig presentation for Rustworks: dark sky, moon fill, dense flood
@@ -10,6 +11,9 @@ import type { RenderProfile } from './render-profile';
 
 export type RustworksQualityTelemetry = Readonly<{
   lights: number;
+  activeLocalLights: number;
+  emissiveOnlySources: number;
+  occlusionViolations: readonly string[];
   enhancedMaterials: number;
   profile: RenderProfile;
   active: boolean;
@@ -204,6 +208,10 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
     light.position.set(...fixture.position);
     light.castShadow = false;
     light.userData.presentationOnly = true;
+    // The authored flood meshes provide the visible emitters. The legacy
+    // point-light volumes had no occlusion and could illuminate through deck
+    // structures, so the migration keeps them as audited emissive-only anchors.
+    makeEmissiveOnly(light);
     root.add(light);
     // Point lights stay invisible. The old generic housing/bulb geometry was
     // generated at every light origin without a supporting pole or tower mount,
@@ -215,7 +223,6 @@ export function createRustworksQualityLights(parent: THREE.Object3D, profile: Re
   if (profile === 'performance') {
     root.traverse((node) => {
       if (node instanceof THREE.PointLight) {
-        node.intensity *= 0.85;
         node.distance *= 0.9;
       }
     });
@@ -293,11 +300,21 @@ export function setRustworksQualityPresentationActive(active: boolean, profile: 
 
 export function rustworksQualityTelemetry(profile: RenderProfile, arenaId: ArenaId): RustworksQualityTelemetry {
   const active = arenaId === 'rustworks-1v1' && qualityState.lightsRoot?.visible === true;
+  const occlusion = rustworksQualityLightOcclusion();
   return {
     lights: qualityState.lightsRoot?.children.filter((node) => node instanceof THREE.PointLight).length ?? 0,
+    activeLocalLights: occlusion.activeLocalLights,
+    emissiveOnlySources: occlusion.emissiveOnlySources,
+    occlusionViolations: occlusion.violations,
     enhancedMaterials: qualityState.enhanced,
     profile,
     active,
     night: arenaId === 'rustworks-1v1',
   };
+}
+
+export function rustworksQualityLightOcclusion(): ReturnType<typeof auditLocalLightOcclusion> {
+  return qualityState.lightsRoot
+    ? auditLocalLightOcclusion(qualityState.lightsRoot)
+    : { activeLocalLights: 0, shadowedLocalLights: 0, emissiveOnlySources: 0, violations: [] };
 }

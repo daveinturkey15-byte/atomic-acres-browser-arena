@@ -7,6 +7,11 @@ import {
   MatchDiagnostics,
   sanitizeDiagnosticValue,
 } from './match-diagnostics';
+import {
+  MATCH_DIAGNOSTIC_MAX_BODY_BYTES,
+  MATCH_DIAGNOSTIC_MAX_EVENTS,
+  validateMatchDiagnosticEnvelope,
+} from '../shared/match-diagnostics-schema';
 
 function logger(): MatchDiagnostics {
   return new MatchDiagnostics({
@@ -24,7 +29,7 @@ describe('bounded downloadable match diagnostics', () => {
       reason: 'relay 192.168.1.42 room_qwerty123 accepted',
     });
     const exported = diagnostics.export();
-    expect(exported.filename).toMatch(/^atomic-acres-match-atomic-acres-p-[a-f0-9]{8}\.json$/);
+    expect(exported.filename).toMatch(/^atomic-acres-match-atomic-acres-p-[a-f0-9]{16}\.json$/);
     expect(exported.json).not.toContain('ROOM-CODE');
     expect(exported.json).not.toContain('peer-real-id');
     expect(exported.json).not.toContain('192.168.1.42');
@@ -104,5 +109,114 @@ describe('bounded downloadable match diagnostics', () => {
     expect(parsed.finalState.roomCode).toBeUndefined();
     expect(JSON.stringify(parsed)).not.toContain('real-attacker');
     expect(MAX_DAMAGE_LEDGER_EVENTS).toBeGreaterThan(MAX_DIAGNOSTIC_EVENTS);
+  });
+
+  it('derives a compact remote envelope with ordered health, regen, admission, net, performance and final evidence', () => {
+    const diagnostics = logger();
+    diagnostics.record({
+      monotonicMs: 10, localEpochMs: 20, matchTimeMs: 10, eventId: 'raw-network-nonce', eventType: 'damage-applied',
+      actorId: 'Dave callsign peer-id', actorKind: 'player', targetId: 'guest-room-code', targetKind: 'player',
+      weaponOrEffect: 'railgun', admission: 'accepted', reason: 'room_SECRET chat free text 192.168.1.4',
+      healthBefore: 100, healthAfter: 50, damageRequested: 50, damageApplied: 50, wallbang: true,
+    });
+    diagnostics.record({
+      monotonicMs: 20, localEpochMs: 30, matchTimeMs: 20, eventId: 'regen-1', eventType: 'health-regen',
+      actorId: 'guest-room-code', actorKind: 'player', admission: 'accepted', healthBefore: 50, healthAfter: 51,
+    });
+    diagnostics.record({
+      monotonicMs: 30, localEpochMs: 40, matchTimeMs: 30, eventId: 'state-1', eventType: 'state-reconciliation',
+      actorId: 'guest-room-code', actorKind: 'player', admission: 'rejected', reason: 'raw peer id and stack text',
+    });
+    for (const sample of [8, 16, 16, 20, 50, 100]) diagnostics.recordFrame(sample);
+    const envelope = diagnostics.remoteEnvelope({
+      completedAtEpochMs: 1_800_000,
+      pass: 'PASS 64',
+      backend: 'webgpu',
+      durationMs: 30,
+      network: {
+        rttMs: 23, jitterMs: 7, clockOffsetMs: -14, interpolationDelayMs: 71,
+        receiverSequenceGaps: 2, receiverReordered: 1, droppedDamageEvents: 3,
+      },
+      participants: [
+        { id: 'Dave callsign peer-id', kind: 'player', team: 'team-1', kills: 2, deaths: 1, damageDealt: 150, damageTaken: 50, finalHealth: 51 },
+        { id: 'guest-room-code', kind: 'player', team: 'team-2', kills: 1, deaths: 2, damageDealt: 50, damageTaken: 150, finalHealth: 0 },
+      ],
+      local: { kills: 2, deaths: 1, shotsFired: 4, hitShots: 3, damageDealt: 150, damageTaken: 50, headshots: 1 },
+    });
+    expect(validateMatchDiagnosticEnvelope(envelope)).toEqual({ envelope, error: null });
+    expect(envelope.events.map((event) => [event.sequence, event.category, event.atMs])).toEqual([
+      [0, 'damage', 10], [1, 'regen', 20], [2, 'admission', 30],
+    ]);
+    expect(envelope.net).toMatchObject({ rttBucketMs: 20, jitterBucketMs: 5, clockOffsetBucketMs: -10, interpolationDelayBucketMs: 70 });
+    expect(envelope.perf).toMatchObject({ sampleCount: 6, frameP50BucketMs: 16, frameP95BucketMs: 100, frameP99BucketMs: 100 });
+    expect(envelope.final.participants).toHaveLength(2);
+    const serialized = JSON.stringify(envelope);
+    for (const forbidden of ['Dave', 'guest-room-code', 'raw-network-nonce', 'free text', '192.168.1.4', 'room_SECRET']) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
+  it('caps the automatic envelope independently from the larger downloadable ledger', () => {
+    const diagnostics = logger();
+    for (let index = 0; index < MAX_DIAGNOSTIC_EVENTS; index += 1) diagnostics.record({
+      monotonicMs: index, localEpochMs: index, matchTimeMs: index,
+      eventId: `event-${index}`, eventType: 'damage-applied', actorId: `peer-${index % 8}`, targetId: `target-${index % 8}`,
+      actorKind: 'player', targetKind: 'player', weaponOrEffect: 'carbine', admission: 'accepted',
+      healthBefore: 100, healthAfter: 99, damageRequested: 1, damageApplied: 1,
+    });
+    const envelope = diagnostics.remoteEnvelope({
+      completedAtEpochMs: 1_800_000, pass: 'PASS 64', backend: 'webgpu', durationMs: MAX_DIAGNOSTIC_EVENTS,
+      network: { rttMs: null, jitterMs: 0, clockOffsetMs: 0, interpolationDelayMs: 0, receiverSequenceGaps: 0, receiverReordered: 0, droppedDamageEvents: 0 },
+      participants: [{ id: 'peer-0', kind: 'player', team: 'team-1', kills: 0, deaths: 0, damageDealt: 0, damageTaken: 0, finalHealth: 100 }],
+      local: { kills: 0, deaths: 0, shotsFired: 0, hitShots: 0, damageDealt: 0, damageTaken: 0, headshots: 0 },
+    });
+    expect(envelope.events.length).toBeLessThanOrEqual(MATCH_DIAGNOSTIC_MAX_EVENTS);
+    expect(new TextEncoder().encode(JSON.stringify(envelope)).byteLength).toBeLessThanOrEqual(MATCH_DIAGNOSTIC_MAX_BODY_BYTES);
+    expect(envelope.droppedEvents).toBeGreaterThan(0);
+  });
+
+  it('retains health mutations, deaths and rejected admissions through high-rate state flood', () => {
+    const diagnostics = logger();
+    diagnostics.record({
+      monotonicMs: 1, localEpochMs: 1, matchTimeMs: 1, eventId: 'damage-cause', eventType: 'damage-applied',
+      actorId: 'attacker', targetId: 'victim', actorKind: 'player', targetKind: 'player', weaponOrEffect: 'carbine',
+      admission: 'accepted', healthBefore: 100, healthAfter: 20, damageRequested: 80, damageApplied: 80,
+    });
+    diagnostics.record({
+      monotonicMs: 2, localEpochMs: 2, matchTimeMs: 2, eventId: 'regen-evidence', eventType: 'health-regen',
+      actorId: 'victim', actorKind: 'player', admission: 'accepted', healthBefore: 20, healthAfter: 100,
+    });
+    diagnostics.record({
+      monotonicMs: 3, localEpochMs: 3, matchTimeMs: 3, eventId: 'death-evidence', eventType: 'death-authoritative',
+      actorId: 'attacker', targetId: 'victim', actorKind: 'player', targetKind: 'player', weaponOrEffect: 'carbine',
+      admission: 'accepted', healthAfter: 0,
+    });
+    diagnostics.record({
+      monotonicMs: 4, localEpochMs: 4, matchTimeMs: 4, eventId: 'admission-anomaly', eventType: 'combat-timing',
+      actorId: 'attacker', actorKind: 'player', admission: 'rejected', weaponOrEffect: 'shot',
+    });
+    for (let index = 0; index < MAX_DIAGNOSTIC_EVENTS + 500; index += 1) diagnostics.record({
+      monotonicMs: 5 + index, localEpochMs: 5 + index, matchTimeMs: 5 + index,
+      eventId: `state-${index}`, eventType: 'state-reconciliation', actorId: 'victim', actorKind: 'player', admission: 'accepted',
+    });
+
+    const envelope = diagnostics.remoteEnvelope({
+      completedAtEpochMs: 1_800_000, pass: 'PASS 64', backend: 'webgpu', durationMs: MAX_DIAGNOSTIC_EVENTS + 505,
+      network: { rttMs: 20, jitterMs: 5, clockOffsetMs: 0, interpolationDelayMs: 70, receiverSequenceGaps: 0, receiverReordered: 0, droppedDamageEvents: 0 },
+      participants: [
+        { id: 'attacker', kind: 'player', team: 'team-1', kills: 1, deaths: 0, damageDealt: 100, damageTaken: 0, finalHealth: 100 },
+        { id: 'victim', kind: 'player', team: 'team-2', kills: 0, deaths: 1, damageDealt: 0, damageTaken: 100, finalHealth: 0 },
+      ],
+      local: { kills: 1, deaths: 0, shotsFired: 2, hitShots: 2, damageDealt: 100, damageTaken: 0, headshots: 0 },
+    });
+
+    expect(validateMatchDiagnosticEnvelope(envelope)).toEqual({ envelope, error: null });
+    expect(envelope.events).toHaveLength(MATCH_DIAGNOSTIC_MAX_EVENTS);
+    expect(envelope.events.some((event) => event.category === 'damage' && event.healthBefore === 100 && event.healthAfter === 20)).toBe(true);
+    expect(envelope.events.some((event) => event.category === 'regen' && event.healthBefore === 20 && event.healthAfter === 100)).toBe(true);
+    expect(envelope.events.some((event) => event.category === 'death' && event.healthAfter === 0)).toBe(true);
+    expect(envelope.events.some((event) => event.category === 'admission' && event.admission === 'rejected')).toBe(true);
+    expect(envelope.events.every((event, index) => index === 0 || event.atMs >= envelope.events[index - 1].atMs)).toBe(true);
+    expect(envelope.droppedEvents).toBeGreaterThan(500);
   });
 });

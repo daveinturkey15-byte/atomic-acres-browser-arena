@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
 import { isBlocked, pointInsideBounds } from './collision';
@@ -6,6 +7,7 @@ import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
   RUSTWORKS_TOWER,
+  RUSTWORKS_WORK_LIGHTS,
   applyAdditionalMapPresentationProfile,
   applyRustworksPresentationProfile,
   buildGunRange,
@@ -18,6 +20,8 @@ import {
 import type { ArenaMap } from './map';
 import type { Stance } from './gameplay';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
+import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
+import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
 
 type RouteAnchor = { id: string; position: [number, number, number] };
 
@@ -59,6 +63,17 @@ function namedPrefixCount(root: THREE.Object3D, prefix: string): number {
   let count = 0;
   root.traverse((node) => {
     if (node.name.startsWith(prefix)) count += 1;
+  });
+  return count;
+}
+
+function visibleMeshDrawUpperBound(root: THREE.Object3D): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.visible) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => material.visible)) return;
+    count += node instanceof THREE.InstancedMesh ? node.count : 1;
   });
   return count;
 }
@@ -133,7 +148,7 @@ describe('additional authored maps', () => {
   it('builds an original compact collision-backed industrial 1v1 arena', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     expect(map.id).toBe('rustworks-1v1');
-    expect(map.label).toBe('Rustworks');
+    expect(map.label).toBe('RustRig');
     expect(map.root.name).toContain('Rustworks');
     expect(map.colliders.length).toBeGreaterThanOrEqual(25);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(25);
@@ -171,6 +186,46 @@ describe('additional authored maps', () => {
     expect(servicePlatform?.visible).toBe(true);
   });
 
+  it('mounts emissive RustRig work lights and removes coplanar deck overlays', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const lightAudit = map.root.userData.rustworksWorkLightAudit as {
+      fixtures: Array<{ id: string; position: number[]; target: number[]; emissiveOnlyLens: boolean; shadowedLocalVolume: boolean }>;
+      shadowedLocalVolumes: number;
+      maximumShadowCastersIncludingMoon: number;
+    };
+    expect(lightAudit).toMatchObject({
+      shadowedLocalVolumes: 2,
+      maximumShadowCastersIncludingMoon: 3,
+    });
+    expect(lightAudit.fixtures).toHaveLength(2);
+    expect(lightAudit.fixtures.map((fixture) => fixture.id)).toEqual(RUSTWORKS_WORK_LIGHTS.map((fixture) => fixture.id));
+    for (const fixture of RUSTWORKS_WORK_LIGHTS) {
+      const lens = map.root.getObjectByName(`rustworks-work-light-lens-${fixture.id}`) as THREE.Mesh;
+      const housing = map.root.getObjectByName(`rustworks-work-light-housing-${fixture.id}`) as THREE.Mesh;
+      const mount = map.root.getObjectByName(`rustworks-work-light-mount-${fixture.id}`) as THREE.Mesh;
+      expect(lens, `${fixture.id}:lens`).toBeInstanceOf(THREE.Mesh);
+      expect(housing, `${fixture.id}:housing`).toBeInstanceOf(THREE.Mesh);
+      expect(mount, `${fixture.id}:mount`).toBeInstanceOf(THREE.Mesh);
+      expect(lens.position.toArray()).toEqual([...fixture.position]);
+      expect((lens.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThanOrEqual(4);
+      expect(lens.userData.occlusionPolicy).toBe('emissive-only');
+    }
+
+    expect(map.root.userData.rustworksDeckSurfaceAudit).toEqual({
+      perimeterEdgeSegments: 4,
+      serviceLaneSegments: 4,
+      fullDeckLipOverlay: false,
+      coplanarOverlapPairs: [],
+    });
+    expect(map.root.getObjectByName('rustworks-rig-deck-edge')).toBeUndefined();
+    expect(namedPrefixCount(map.root, 'rustworks-rig-deck-edge-')).toBe(4);
+    expect(namedPrefixCount(map.root, 'rustworks-service-lane-')).toBe(4);
+    for (const profile of ['performance', 'blender'] as const) {
+      applyRustworksPresentationProfile(map.root, profile);
+      expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(rustworksVisualDefinition.budgets.maximumDrawCalls);
+    }
+  });
+
   it('exposes clean access, undercroft, trench, and useful inner-yard freight cover', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const required = [
@@ -198,6 +253,9 @@ describe('additional authored maps', () => {
     for (const name of required) {
       expect(map.root.getObjectByName(name), name).toBeTruthy();
     }
+    const deckMaterial = (map.root.getObjectByName('rustworks-rig-deck-top') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(deckMaterial.map?.name).toBe('rustrig-deck-surface-v1');
+    expect(deckMaterial.userData).toMatchObject({ assetOwner: 'rustworks-1v1', assetKind: 'deterministic-industrial-surface' });
     expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
     expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
     expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
@@ -522,7 +580,7 @@ describe('additional authored maps', () => {
   it('builds an untimed three-distance score range with reusable targets', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
-    expect(map.label).toBe('Acres Indoor Gun Range');
+    expect(map.label).toBe('Indoor Gun Range');
     expect(map.targets).toHaveLength(14);
     expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
     expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
@@ -557,6 +615,11 @@ describe('additional authored maps', () => {
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(auditLocalLightOcclusion(map.root)).toMatchObject({
+      activeLocalLights: 0,
+      emissiveOnlySources: 16,
+      violations: [],
+    });
     expect(map.root.getObjectByName('gun-range-moderate-ambient')).toBeInstanceOf(THREE.HemisphereLight);
     const wallMaterial = (map.root.getObjectByName('gun-range-left-wall') as THREE.Mesh).material as THREE.MeshStandardMaterial;
     const ceilingMaterial = (map.root.getObjectByName('gun-range-ceiling') as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -566,8 +629,16 @@ describe('additional authored maps', () => {
     expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
     const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
     const before = neon.color.getHex();
+    const movingTargetLight = map.root.getObjectByName('gun-range-moving-target-light') as THREE.Mesh;
+    const movingTargetStart = movingTargetLight.position.clone();
+    const bayMaterial = map.root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial;
+    const bayIntensity = bayMaterial.emissiveIntensity;
     updateGunRangePresentation(map.root, 9_000);
     expect(neon.color.getHex()).not.toBe(before);
+    expect(movingTargetLight.position.equals(movingTargetStart)).toBe(false);
+    expect(movingTargetLight.userData.presentationOnly).toBe(true);
+    expect(map.raycastMeshes).not.toContain(movingTargetLight);
+    expect(bayMaterial.emissiveIntensity).not.toBe(bayIntensity);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
     expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);
@@ -605,7 +676,7 @@ describe('additional authored maps', () => {
   it('builds an original airport-terminal arena with concourse, jet bridge, fuselage, and tarmac apron', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     expect(map.id).toBe('skyline-terminal');
-    expect(map.label).toBe('Skyline Terminal');
+    expect(map.label).toBe('Terminal');
     expect(map.root.name).toContain('Skyline Terminal');
     expect(map.colliders.length).toBeGreaterThanOrEqual(15);
     expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(15);
@@ -624,7 +695,7 @@ describe('additional authored maps', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
     expect(mainSign).toBeTruthy();
-    expect(mainSign?.userData.label).toBe('SKYLINE TERMINAL - GATES 1-12');
+    expect(mainSign?.userData.label).toBe('TERMINAL - GATES 1-12');
 
     const flightDisplay = map.root.getObjectByName('skyline-flight-display-board');
     expect(flightDisplay).toBeTruthy();
@@ -753,6 +824,8 @@ describe('additional authored maps', () => {
     const qualityShells = [
       map.root.getObjectByName('skyline-quality-fuselage-shell-forward'),
       map.root.getObjectByName('skyline-quality-fuselage-shell-aft'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft'),
     ];
     const fuselagePlaceholder = map.root.getObjectByName('skyline-jetliner-fuselage-top') as THREE.Mesh;
     const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
@@ -774,6 +847,28 @@ describe('additional authored maps', () => {
     expect(qualityNacelles?.visible).toBe(true);
     expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+  });
+
+  it('gives the Quality aircraft a separate BackSide cabin roof without closing the boarding aperture', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const ceilingShells = [
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward') as THREE.Mesh,
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft') as THREE.Mesh,
+    ];
+    expect(ceilingShells.every((shell) => shell instanceof THREE.Mesh)).toBe(true);
+    for (const shell of ceilingShells) {
+      const material = shell.material as THREE.MeshStandardMaterial;
+      expect(material.name).toBe('skyline-aircraft-interior-ceiling-material');
+      expect(material.side).toBe(THREE.BackSide);
+      expect(material.side).not.toBe(THREE.DoubleSide);
+      expect(shell.userData.interiorFaceOrientation).toBe('back-side');
+      expect(shell.userData.boardingAperturePreserved).toBe(true);
+    }
+    const forwardBounds = new THREE.Box3().setFromObject(ceilingShells[0]);
+    const aftBounds = new THREE.Box3().setFromObject(ceilingShells[1]);
+    expect(forwardBounds.max.x).toBeLessThan(-1.8);
+    expect(aftBounds.min.x).toBeGreaterThan(1.8);
+    expect(isBlocked({ x: 0, y: 5.02, z: 0.4 }, map.colliders, 0.35)).toBe(false);
   });
 
   it('authors an open boarding walkway and cabin aisle without opaque door panels', () => {
@@ -895,6 +990,74 @@ describe('additional authored maps', () => {
     for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac', 'cabin-through-aisle', 'cabin-to-cockpit']) {
       await traverseRoute(map, routes[id]);
       await traverseRoute(map, routes[id], true);
+    }
+  }, 30_000);
+
+  it('keeps both mezzanine side routes and retained Quality wings physically supported', async () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylinePlatformAuthorityAudit as {
+      version: string;
+      wingSliceCount: number;
+      wingAuthorityMaximumOverhang: number;
+      platforms: Array<{
+        id: string;
+        qualityPresentationName: string | null;
+        movementAuthority: boolean;
+        physicsAuthority: boolean;
+        shotAuthority: boolean;
+      }>;
+    };
+    expect(audit.version).toBe('pass64-shared-platform-authority-v1');
+    expect(audit.wingSliceCount).toBe(8);
+    expect(audit.wingAuthorityMaximumOverhang).toBeLessThan(STANCE_SHAPES.stand.radius);
+    expect(audit.platforms.every((platform) => platform.movementAuthority && platform.physicsAuthority && platform.shotAuthority)).toBe(true);
+    expect(audit.platforms.filter((platform) => platform.id.startsWith('jetliner-wing-'))).toHaveLength(16);
+    expect(audit.platforms.filter((platform) => platform.qualityPresentationName === 'skyline-quality-wing-port')).toHaveLength(8);
+    expect(audit.platforms.filter((platform) => platform.qualityPresentationName === 'skyline-quality-wing-starboard')).toHaveLength(8);
+    expect(terminalVisualDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
+      'terminal-port-wing-authority',
+      'terminal-starboard-wing-authority',
+    ]));
+    for (const profile of ['performance', 'blender'] as const) {
+      applyAdditionalMapPresentationProfile(map.root, profile);
+      expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(terminalVisualDefinition.budgets.maximumDrawCalls);
+    }
+    for (const [rootZ, tipDeltaZ] of [[3.6, 16.8], [0.4, -16.8]] as const) {
+      for (let sample = 0; sample <= 32; sample += 1) {
+        const t = sample / 32;
+        const z = rootZ + tipDeltaZ * t;
+        const left = -3.2 + 1.9 * t;
+        const right = 2.7 - 0.9 * t;
+        for (const x of [left, (left + right) / 2, right]) {
+          expect(
+            map.physicsColliders.some((collider) => x >= collider.minX - 1e-6
+              && x <= collider.maxX + 1e-6
+              && z >= collider.minZ - 1e-6
+              && z <= collider.maxZ + 1e-6
+              && (collider.minY ?? -Infinity) <= 2.82
+              && (collider.maxY ?? Infinity) >= 2.82),
+            `wing support x=${x.toFixed(3)} z=${z.toFixed(3)}`,
+          ).toBe(true);
+        }
+      }
+    }
+
+    const platformRuns = [
+      { start: { x: -23.8, y: 5.04, z: -33.4 }, target: { x: -23.8, y: 5.04, z: -22.4 } },
+      { start: { x: 23.8, y: 5.04, z: -33.4 }, target: { x: 23.8, y: 5.04, z: -22.4 } },
+      { start: { x: -0.2, y: 4.66, z: 3.9 }, target: { x: 0.18, y: 4.66, z: 20.0 } },
+      { start: { x: -0.2, y: 4.66, z: 0.1 }, target: { x: 0.18, y: 4.66, z: -16.0 } },
+    ];
+    for (const run of platformRuns) {
+      const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+      try {
+        physics.teleportEye(run.start);
+        const result = await walkToward(physics, run.target, 1_200);
+        expect(Math.hypot(result.x - run.target.x, result.z - run.target.z)).toBeLessThan(0.55);
+        expect(Math.abs(result.y - run.target.y)).toBeLessThan(0.55);
+      } finally {
+        physics.dispose();
+      }
     }
   }, 30_000);
 

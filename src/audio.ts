@@ -4,8 +4,30 @@ import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 import { presentationRandom } from './runtime-random';
 
-export const SANCTIFIED_FRAG_CHOIR_ASSET = './assets/original/audio/sanctified-frag-hallelujah.wav';
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
+export const GRENADE_FUSE_BEEP_START_MS = 1_450;
+
+export const RAILGUN_REPORT_PROFILE = Object.freeze({
+  body: 42,
+  bodyEnd: 13,
+  duration: 0.46,
+  crack: 5_200,
+  noise: 0.5,
+  lowpass: 3_200,
+  tail: 180,
+  tailDuration: 0.9,
+  pressureDuration: 0.62,
+  layerCount: 8,
+});
+
+export function railgunReportAttenuation(remote: boolean, distance: number): number {
+  return remote ? Math.max(0.1, 0.68 * (1 - Math.min(1, Math.max(0, distance) / 130))) : 1;
+}
+
+export function grenadeFuseBeepIntervalMs(remainingMs: number): number {
+  const bounded = Math.min(GRENADE_FUSE_BEEP_START_MS, Math.max(0, Number.isFinite(remainingMs) ? remainingMs : 0));
+  return Math.round(90 + bounded * 0.19);
+}
 
 export type ExplosionAudioGate = {
   lastMixAt: number;
@@ -30,8 +52,6 @@ export function admitExplosionAudioMix(state: ExplosionAudioGate, now: number): 
   };
 }
 
-type SanctifiedFragChoirStatus = 'idle' | 'loading' | 'fetched' | 'decoding' | 'ready' | 'error';
-
 type NoiseOptions = {
   duration: number;
   volume: number;
@@ -51,72 +71,14 @@ export class ArenaAudio {
   private ambience: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private stepVariant = 0;
-  private ambienceStarted = false;
   private lastNearMissAt = -10_000;
   private arenaZone: ArenaZone | null = null;
   private lastZoneCueAt = -10_000;
-  private sanctifiedChoirBytes: ArrayBuffer | null = null;
-  private sanctifiedChoirBuffer: AudioBuffer | null = null;
-  private sanctifiedChoirLoadPromise: Promise<void> | null = null;
-  private sanctifiedChoirDecodePromise: Promise<void> | null = null;
-  private sanctifiedChoirStatus: SanctifiedFragChoirStatus = 'idle';
-  private sanctifiedChoirPrewarming = false;
-  private sanctifiedChoirPrewarmed = false;
-  private sanctifiedChoirPlays = 0;
+  private lastGrenadeFuseBeepAt = Number.NEGATIVE_INFINITY;
+  private grenadeFuseBeeps = 0;
+  private supportCuePlays = 0;
   private explosionAudioGate = createExplosionAudioGate();
-
-  preloadSanctifiedFragChoir(): Promise<void> {
-    if (this.sanctifiedChoirLoadPromise) return this.sanctifiedChoirLoadPromise;
-    this.sanctifiedChoirStatus = 'loading';
-    this.sanctifiedChoirLoadPromise = fetch(SANCTIFIED_FRAG_CHOIR_ASSET)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Sanctified Frag choir HTTP ${response.status}`);
-        return response.arrayBuffer();
-      })
-      .then((bytes) => {
-        this.sanctifiedChoirBytes = bytes;
-        this.sanctifiedChoirStatus = 'fetched';
-        if (this.context) void this.decodeSanctifiedFragChoir();
-      })
-      .catch((error: unknown) => {
-        this.sanctifiedChoirStatus = 'error';
-        console.warn('Sanctified Frag choir unavailable; explosion remains functional.', error);
-      });
-    return this.sanctifiedChoirLoadPromise;
-  }
-
-  private decodeSanctifiedFragChoir(): Promise<void> {
-    if (this.sanctifiedChoirBuffer || !this.context || !this.sanctifiedChoirBytes) return Promise.resolve();
-    if (this.sanctifiedChoirDecodePromise) return this.sanctifiedChoirDecodePromise;
-    this.sanctifiedChoirStatus = 'decoding';
-    this.sanctifiedChoirDecodePromise = this.context.decodeAudioData(this.sanctifiedChoirBytes.slice(0))
-      .then((buffer) => {
-        this.sanctifiedChoirBuffer = buffer;
-        this.sanctifiedChoirStatus = 'ready';
-        this.prewarmSanctifiedFragChoir();
-      })
-      .catch((error: unknown) => {
-        this.sanctifiedChoirStatus = 'error';
-        console.warn('Sanctified Frag choir could not be decoded; explosion remains functional.', error);
-      });
-    return this.sanctifiedChoirDecodePromise;
-  }
-
-  private prewarmSanctifiedFragChoir(): void {
-    if (this.sanctifiedChoirPrewarmed || this.sanctifiedChoirPrewarming || !this.context || !this.feedback || !this.sanctifiedChoirBuffer) return;
-    this.sanctifiedChoirPrewarming = true;
-    const source = this.context.createBufferSource();
-    const gain = this.context.createGain();
-    source.buffer = this.sanctifiedChoirBuffer;
-    gain.gain.value = 0.0001;
-    source.connect(gain).connect(this.feedback);
-    source.onended = () => {
-      this.sanctifiedChoirPrewarming = false;
-      this.sanctifiedChoirPrewarmed = true;
-    };
-    source.start(this.context.currentTime);
-    source.stop(this.context.currentTime + 0.08);
-  }
+  private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
 
   unlock(): void {
     if (!this.context) {
@@ -133,37 +95,10 @@ export class ArenaAudio {
       this.weapons = this.createBus(0.78);
       this.feedback = this.createBus(0.5);
       this.movement = this.createBus(0.34);
-      this.ambience = this.createBus(0.16);
+      this.ambience = this.createBus(0.12);
       this.noiseBuffer = this.createNoiseBuffer(1.2);
-      this.startAmbience();
     }
     if (this.context.state === 'suspended') void this.context.resume();
-    void this.preloadSanctifiedFragChoir().then(() => this.decodeSanctifiedFragChoir());
-  }
-
-  private startAmbience(): void {
-    if (this.ambienceStarted || !this.context || !this.ambience || !this.noiseBuffer) return;
-    this.ambienceStarted = true;
-    const wind = this.context.createBufferSource();
-    const filter = this.context.createBiquadFilter();
-    const gain = this.context.createGain();
-    wind.buffer = this.noiseBuffer;
-    wind.loop = true;
-    wind.loopStart = 0.1;
-    wind.loopEnd = 1.1;
-    filter.type = 'bandpass';
-    filter.frequency.value = 480;
-    filter.Q.value = 0.45;
-    gain.gain.value = 0.055;
-    wind.connect(filter).connect(gain).connect(this.ambience);
-    wind.start();
-    const electrical = this.context.createOscillator();
-    const electricalGain = this.context.createGain();
-    electrical.type = 'sine';
-    electrical.frequency.value = 58;
-    electricalGain.gain.value = 0.012;
-    electrical.connect(electricalGain).connect(this.ambience);
-    electrical.start();
   }
 
   setArenaZone(zone: ArenaZone): void {
@@ -173,9 +108,6 @@ export class ArenaAudio {
     }
     if (zone === this.arenaZone) return;
     this.arenaZone = zone;
-    const level = zone === 'central-transit' ? 0.2 : zone === 'east-service' ? 0.18 : zone === 'west-garden' ? 0.145 : 0.16;
-    this.ambience.gain.cancelScheduledValues(this.context.currentTime);
-    this.ambience.gain.linearRampToValueAtTime(level, this.context.currentTime + 0.45);
     const now = performance.now();
     if (now - this.lastZoneCueAt < 1_200) return;
     this.lastZoneCueAt = now;
@@ -187,8 +119,12 @@ export class ArenaAudio {
   shot(weapon: WeaponId, remote = false, distance = 0): void {
     this.unlock();
     if (!this.context || !this.weapons) return;
-    const attenuation = remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
-    const profile = weapon === 'scattergun'
+    const attenuation = weapon === 'railgun'
+      ? railgunReportAttenuation(remote, distance)
+      : remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
+    const profile = weapon === 'railgun'
+      ? RAILGUN_REPORT_PROFILE
+      : weapon === 'scattergun'
       ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
       : weapon === 'sniper'
         ? { body: 62, bodyEnd: 24, duration: 0.26, crack: 2920, noise: 0.3, lowpass: 2400, tail: 330, tailDuration: 0.42 }
@@ -235,11 +171,29 @@ export class ArenaAudio {
       if (!remote) this.noise({ duration: 0.022, volume: 0.046, filter: 'highpass', frequency: 4200, q: 0.55, delay: 0.043 }, this.feedback);
     }
 
+    if (weapon === 'railgun') {
+      // An authored pressure report, supersonic snap and long structural tail.
+      // It remains on the existing compressed weapon/ambience buses, so local
+      // and replicated shots are large without bypassing the bounded mix.
+      this.sweep(36, 10, RAILGUN_REPORT_PROFILE.pressureDuration, 0.2 * attenuation, 'sawtooth', this.weapons, 0.008);
+      this.sweep(118, 24, 0.38, 0.12 * attenuation, 'triangle', this.weapons, 0.026);
+      this.noise({ duration: 0.7, volume: 0.2 * attenuation, filter: 'bandpass', frequency: 165, q: 0.5, delay: 0.045 }, this.ambience);
+      this.noise({ duration: 0.08, volume: 0.16 * attenuation, filter: 'highpass', frequency: 4_800, q: 0.32, delay: 0.006 }, this.feedback);
+      this.tone(92, 0.42, 0.13 * attenuation, 'triangle', this.ambience, 0.075);
+    }
+
     if (!remote) {
       const mechanismDelay = weapon === 'scattergun' ? 0.21 : weapon === 'sniper' ? 0.62 : 0.055;
       this.tone(weapon === 'scattergun' ? 340 : weapon === 'sniper' ? 290 : 520, 0.028, 0.038, 'square', this.feedback, mechanismDelay);
       this.tone(weapon === 'smg' ? 680 : 430, 0.018, 0.022, 'triangle', this.feedback, mechanismDelay + 0.025);
     }
+  }
+
+  railgunReport(remote = false, distance = 0): void {
+    if (remote) this.railgunReports.replicated += 1;
+    else this.railgunReports.local += 1;
+    this.railgunReports.lastAttenuation = railgunReportAttenuation(remote, distance);
+    this.shot('railgun', remote, distance);
   }
 
   hit(headshot = false): void {
@@ -363,25 +317,16 @@ export class ArenaAudio {
     this.tone(185, 0.035, 0.026 * level, 'square', this.feedback, 0.012);
   }
 
-  sanctifiedFragExplosion(): void {
-    this.explosion();
-    const play = () => {
-      if (!this.context || !this.feedback || !this.sanctifiedChoirBuffer) return;
-      const now = this.context.currentTime + 0.045;
-      const source = this.context.createBufferSource();
-      const gain = this.context.createGain();
-      source.buffer = this.sanctifiedChoirBuffer;
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(0.72, now + 0.065);
-      gain.gain.setValueAtTime(0.56, now + Math.min(0.55, source.buffer.duration * 0.25));
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + source.buffer.duration);
-      source.connect(gain).connect(this.feedback);
-      source.start(now);
-      source.stop(now + source.buffer.duration);
-      this.sanctifiedChoirPlays += 1;
-    };
-    if (this.sanctifiedChoirBuffer) play();
-    else void this.decodeSanctifiedFragChoir().then(play);
+  grenadeFuseBeep(remainingMs: number, now = performance.now()): boolean {
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0 || remainingMs > GRENADE_FUSE_BEEP_START_MS
+      || now - this.lastGrenadeFuseBeepAt < 55) return false;
+    this.lastGrenadeFuseBeepAt = now;
+    this.grenadeFuseBeeps += 1;
+    this.unlock();
+    const urgency = 1 - remainingMs / GRENADE_FUSE_BEEP_START_MS;
+    this.tone(920 + urgency * 360, 0.042, 0.052, 'square', this.feedback);
+    this.tone(1_840 + urgency * 420, 0.028, 0.022, 'sine', this.feedback, 0.006);
+    return true;
   }
 
   explosion(now = performance.now()): boolean {
@@ -398,6 +343,7 @@ export class ArenaAudio {
 
   scoutSweep(): void {
     this.unlock();
+    this.supportCuePlays += 1;
     for (let pulse = 0; pulse < 5; pulse += 1) {
       const delay = pulse * 2.4;
       this.sweep(420, 1_080, 0.18, 0.045, 'triangle', this.feedback, delay);
@@ -407,6 +353,7 @@ export class ArenaAudio {
 
   supportInbound(source: 'yardhawk' | 'tri-pass' | 'hunter-swarm'): void {
     this.unlock();
+    this.supportCuePlays += 1;
     if (source === 'tri-pass') {
       for (let index = 0; index < 3; index += 1) {
         this.sweep(1_450 + index * 90, 180, 0.72, 0.055, 'sawtooth', this.feedback, index * 0.12);
@@ -474,27 +421,17 @@ export class ArenaAudio {
 
   telemetry(): {
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
-    sanctifiedFragChoir: {
-      asset: string;
-      status: SanctifiedFragChoirStatus;
-      ready: boolean;
-      prewarmed: boolean;
-      byteLength: number;
-      durationSeconds: number;
-      plays: number;
-    };
+    ambience: { continuousSources: 0; busGain: number };
+    grenadeFuse: { beeps: number; startMs: number };
+    support: { cues: number };
+    railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
   } {
     return {
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
-      sanctifiedFragChoir: {
-        asset: SANCTIFIED_FRAG_CHOIR_ASSET,
-        status: this.sanctifiedChoirStatus,
-        ready: this.sanctifiedChoirBuffer !== null,
-        prewarmed: this.sanctifiedChoirPrewarmed,
-        byteLength: this.sanctifiedChoirBytes?.byteLength ?? 0,
-        durationSeconds: this.sanctifiedChoirBuffer?.duration ?? 0,
-        plays: this.sanctifiedChoirPlays,
-      },
+      ambience: { continuousSources: 0, busGain: this.ambience?.gain.value ?? 0.12 },
+      grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
+      support: { cues: this.supportCuePlays },
+      railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
     };
   }
 

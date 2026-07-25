@@ -53,13 +53,17 @@ jobs:
           echo "RELEASE_BUILT_AT=$released_at" >> "$GITHUB_ENV"
       - name: Build production bytes
         run: npm run build
+        env:
+          VITE_MATCH_BUILD_ID: ${{ inputs.source_sha }}
+          VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
       - name: Verify exact production bytes
         run: npm run verify:release-tree
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Stage live Pass 63 and byte-exact stable Pass 62
+      - name: Stage live Pass 64 and byte-exact stable Pass 63
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
+          npm run verify:benchmark -- --verify-git
           npm run stage:release-topology
           npm run verify:release-topology
           node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs

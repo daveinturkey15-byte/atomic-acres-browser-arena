@@ -2,6 +2,8 @@
 
 ## Current development and release
 
+- [Pass 64 WebGPU, gameplay, railgun, arena-quality, and HUD specification](PASS64_WEBGPU_GAMEPLAY_HUD_SPEC_2026-07-25.md) - frozen requirements, authority boundaries, migration phases, falsifiers, and immutable HITL contract.
+- [Pass 64 forging team](PASS64_FORGING_TEAM_2026-07-25.md) - twelve specialist roles, dependency order, branch ownership, and integration discipline.
 - [Pass 63 cleanup, Project Map, chat, and deferred visual repairs](PASS63_CLEANUP_PROJECT_MAP_CHAT_SPEC_2026-07-24.md) - current local HITL scope, numbered requirements, authority boundaries, and no-publish decision.
 - [Pass 62 offline integration record](PASS62_OFFLINE_INTEGRATION_2026-07-24.md) - exact gameplay, graphics, and netcode inputs plus integrated verification evidence.
 - [Pass 62 graphics refinement record](PASS62_GRAPHICS_REFINEMENT_HITL_2026-07-24.md) - current WebGL lighting/effects architecture, adaptive ladder, compression, and visual falsifiers.

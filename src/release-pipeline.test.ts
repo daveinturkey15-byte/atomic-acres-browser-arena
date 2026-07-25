@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 const workflow = readFileSync('.github/workflows/release-production.yml', 'utf8');
 const verifyWorkflow = readFileSync('.github/workflows/verify.yml', 'utf8');
 const receiptWriter = readFileSync('scripts/release/write-production-receipt.mjs', 'utf8');
+const productionEnv = readFileSync('.env.production', 'utf8');
+const diagnosticsPreviewRunner = readFileSync('scripts/qa/run-pass64-diagnostics-browser.mjs', 'utf8');
 
 describe('production release workflow', () => {
   it('configures a repository-local bot identity before publishing gh-pages', () => {
@@ -17,13 +19,13 @@ describe('production release workflow', () => {
     expect(workflow).not.toContain('git config --global');
   });
 
-  it('stages pinned stable Pass 62 beside live Pass 63 before a complete publish', () => {
+  it('stages pinned stable Pass 63 beside live Pass 64 before a complete publish', () => {
     expect(workflow).toContain('npm run stage:release-topology');
     expect(workflow).toContain('npm run verify:release-topology');
     expect(workflow).toContain('SOURCE_SHA: ${{ inputs.source_sha }}');
     expect(workflow).toContain('RELEASE_PASS: ${{ inputs.release_pass }}');
     expect(workflow).not.toContain('stage:stable-channel');
-    expect(workflow).toContain('Stage live Pass 63 and byte-exact stable Pass 62');
+    expect(workflow).toContain('Stage live Pass 64 and byte-exact stable Pass 63');
     expect(workflow).not.toContain('three-channel');
     expect(readFileSync('package.json', 'utf8')).toContain('"deploy:ci": "gh-pages -d dist"');
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
@@ -46,6 +48,18 @@ describe('production release workflow', () => {
     expect(workflow).toContain('VITE_RELEASED_AT=$released_at');
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
+  });
+
+  it('binds production and immutable preview diagnostics to the exact source SHA', () => {
+    const workerOrigin = 'https://atomic-acres-leaderboard.atomic-acres.workers.dev';
+    expect(productionEnv).toContain(`VITE_MATCH_DIAGNOSTICS_URL=${workerOrigin}`);
+    expect(workflow).toContain('VITE_MATCH_BUILD_ID: ${{ inputs.source_sha }}');
+    expect(workflow).toContain(`VITE_MATCH_DIAGNOSTICS_URL: ${workerOrigin}`);
+    expect(verifyWorkflow).toContain('VITE_MATCH_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}');
+    expect(verifyWorkflow).toContain(`VITE_MATCH_DIAGNOSTICS_URL: ${workerOrigin}`);
+    expect(diagnosticsPreviewRunner).toContain("execFileSync('git', ['rev-parse', 'HEAD']");
+    expect(diagnosticsPreviewRunner).toContain('VITE_MATCH_BUILD_ID: sourceSha');
+    expect(diagnosticsPreviewRunner).not.toContain("VITE_MATCH_BUILD_ID: 'pass64-browser-candidate'");
   });
 
   it('blocks production on accepted requirements and verifies the canonical site after Pages builds', () => {

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CHANGELOG } from './changelog';
 import {
+  PROJECT_MAP_CANDIDATE,
   PROJECT_MAP_TREE,
   createProjectMapBundle,
   flattenProjectMap,
@@ -22,13 +23,13 @@ describe('project map', () => {
 
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
-    expect(bundle.current.release).toEqual(CHANGELOG[0]);
-    expect(bundle.current.previousRelease).toBe(CHANGELOG[1]?.pass);
-    expect(bundle.archive).toEqual(CHANGELOG.slice(1));
-    expect(bundle.changes).toEqual(CHANGELOG);
+    expect(bundle.current.release).toEqual(PROJECT_MAP_CANDIDATE);
+    expect(bundle.current.previousRelease).toBe('PASS 63');
+    expect(bundle.archive).toEqual(CHANGELOG);
+    expect(bundle.changes).toEqual([PROJECT_MAP_CANDIDATE, ...CHANGELOG.filter((entry) => entry.pass !== 'PASS 64')]);
     expect(bundle.current.candidateState).toBe('hitl-candidate');
-    expect(bundle.publishedChannels.live.pass).toBe('PASS 63');
-    expect(bundle.publishedChannels.stable.pass).toBe('PASS 62');
+    expect(bundle.publishedChannels.live.pass).toBe('PASS 64');
+    expect(bundle.publishedChannels.stable.pass).toBe('PASS 63');
   });
 
   it('serializes agent JSON and human Markdown from the same bundle', () => {
@@ -37,12 +38,12 @@ describe('project map', () => {
     const markdown = projectMapMarkdown(bundle);
     expect(JSON.parse(json)).toMatchObject({
       schemaVersion: 1,
-      current: { release: { pass: CHANGELOG[0]?.pass } },
+      current: { release: { pass: PROJECT_MAP_CANDIDATE.pass } },
     });
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
-    expect(markdown).toContain(`### ${CHANGELOG[1]?.pass}: ${CHANGELOG[1]?.title}`);
+    expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toContain('Published live channel: PASS 63');
+    expect(markdown).toContain('Published live channel: PASS 64');
   });
 
   it('rejects an invalid generated timestamp', () => {

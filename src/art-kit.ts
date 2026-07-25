@@ -7,12 +7,13 @@ import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
 import type { Team, WeaponId } from './protocol';
-import { hitReactionAt } from './weapon-presentation-state';
 import { AUTHORITATIVE_HIT_PROXIES, hitProxyRootTransform } from './hit-proxies';
 import { THIRD_PERSON_WEAPON_SCALE } from './player-feedback';
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, THREE.Texture>();
+const pendingTextureLoads = new Set<Promise<void>>();
+const textureLoadFailures: Array<{ path: string; error: unknown }> = [];
 const textureBatchColors: Record<string, number> = {
   'grass-turf.png': 0x789d55,
   'asphalt-aged.png': 0x4b5557,
@@ -235,13 +236,38 @@ function texture(path: string, repeatX = 1, repeatY = 1, colorData = true): THRE
   if (cached) return cached;
   // Unit/SSR model construction has no DOM image loader. Preserve the texture
   // contract and cache key there; browsers still load the authored image.
-  const value = typeof document === 'undefined' ? new THREE.Texture() : textureLoader.load(path);
+  let value: THREE.Texture;
+  if (typeof document === 'undefined') {
+    value = new THREE.Texture();
+  } else {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    value = textureLoader.load(
+      path,
+      finish,
+      undefined,
+      (error) => {
+        textureLoadFailures.push({ path, error });
+        finish();
+      },
+    );
+    pendingTextureLoads.add(pending);
+    void pending.finally(() => pendingTextureLoads.delete(pending));
+  }
   value.colorSpace = colorData ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   value.wrapS = value.wrapT = THREE.RepeatWrapping;
   value.repeat.set(repeatX, repeatY);
   value.anisotropy = 8;
   textureCache.set(key, value);
   return value;
+}
+
+export async function waitForPendingArtTextures(): Promise<void> {
+  while (pendingTextureLoads.size > 0) await Promise.all([...pendingTextureLoads]);
+  if (textureLoadFailures.length > 0) {
+    const failedPaths = [...new Set(textureLoadFailures.map((failure) => failure.path))];
+    throw new Error(`Authored texture loading failed: ${failedPaths.join(', ')}`);
+  }
 }
 
 export function texturedMaterial(
@@ -433,12 +459,13 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     if (supportSocket) supportSocket.position.set(-0.04, -0.13, -0.68);
     return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
-  if (id === 'sniper') {
+  if (id === 'sniper' || id === 'railgun') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
-    root.name = 'sniper-original-weapon';
-    const sniperMetal = MAT.gunmetal('sniper');
-    root.userData.weaponModelId = 'sniper-authored-v6';
-    root.userData.weaponFinishId = weaponFinishProfile('sniper').id;
+    const precisionPrefix = id === 'railgun' ? 'railgun' : 'sniper';
+    root.name = `${precisionPrefix}-original-weapon`;
+    const sniperMetal = MAT.gunmetal(id);
+      root.userData.weaponModelId = id === 'railgun' ? 'railgun-authored-v6' : 'sniper-authored-v6';
+    root.userData.weaponFinishId = weaponFinishProfile(id).id;
     root.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
       const replace = (material: THREE.Material) => material.userData.weaponFinishId
@@ -539,6 +566,24 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     if (supportSocket) supportSocket.position.set(-0.035, -0.095, -0.63);
     const gripSocket = root.getObjectByName('grip-socket-r');
     if (gripSocket) gripSocket.position.set(0.045, -0.15, 0.04);
+    if (id === 'railgun') {
+      root.name = 'railgun-original-weapon';
+      const energy = flattenMaterials
+        ? new THREE.MeshBasicMaterial({ color: 0x65f4ff })
+        : new THREE.MeshStandardMaterial({ color: 0x65f4ff, emissive: 0x0b7285, emissiveIntensity: 2.1, roughness: 0.2, metalness: 0.66 });
+      part(root, roundedBox('railgun-receiver', [0.33, 0.22, 1.02], sniperMetal, 0.052, 4), [0, 0.01, -0.68]);
+      for (const side of [-1, 1]) {
+        part(root, roundedBox(side < 0 ? 'railgun-coil-left' : 'railgun-coil-right', [0.065, 0.09, 1.04], energy, 0.018, 3), [side * 0.19, 0.01, -0.88]);
+      }
+      const capacitor = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.52, 18), energy);
+      capacitor.name = 'railgun-capacitor';
+      part(root, capacitor, [0, -0.12, -0.5], [Math.PI / 2, 0, 0]);
+      const thermal = root.getObjectByName('sniper-scope');
+      if (thermal) thermal.name = 'railgun-thermal-scope';
+      if (muzzleSocket) muzzleSocket.position.z = -2.12;
+      const muzzleFlash = root.getObjectByName('world-muzzle-flash');
+      if (muzzleFlash) muzzleFlash.position.z = -2.28;
+    }
     return finalizeWeaponGeometryLod(root, flattenMaterials);
   }
   const root = new THREE.Group();
@@ -936,31 +981,13 @@ export function buildRetroShuttleBus(): THREE.Group {
   for (const x of [-1.72, 1.72]) for (const z of [-3.45, 3.35]) wheel(root, x, z, 0.7);
   part(root, roundedBox('shuttle-front-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, -5.42]);
   part(root, roundedBox('shuttle-rear-bumper', [5.02, 0.34, 0.34], MAT.dark(), 0.08), [0, 0.7, 5.42]);
-  const sign = decal('ACRES SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
+  const sign = decal('NUKE SHUTTLE', 3.5, 0.72); sign.position.set(0, 3.18, -5.46); root.add(sign);
   return root;
 }
 
 type OperatorStance = 'stand' | 'crouch' | 'prone';
 
 type OperatorRig = {
-  rigged: false;
-  pelvis: THREE.Group;
-  spine: THREE.Group;
-  leftUpperArm: THREE.Group;
-  rightUpperArm: THREE.Group;
-  leftForearm: THREE.Group;
-  rightForearm: THREE.Group;
-  leftThigh: THREE.Group;
-  rightThigh: THREE.Group;
-  leftShin: THREE.Group;
-  rightShin: THREE.Group;
-  weaponSocket: THREE.Group;
-  reactionRoot: THREE.Group;
-  hitProxyRoot: THREE.Group;
-  meleeKnife: THREE.Group;
-  weapon?: THREE.Group;
-  weaponId: WeaponId;
-} | {
   rigged: true;
   weaponSocket: THREE.Group;
   hitProxyRoot: THREE.Group;
@@ -994,6 +1021,7 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   lmg: [-0.06, -0.13, -0.26],
   scattergun: [-0.03, -0.025, 0.29],
   sniper: [-0.035, -0.095, -0.21],
+  railgun: [-0.04, -0.095, -0.24],
   pistol: [-0.06, -0.15, 0.03],
   magnum: [-0.06, -0.15, 0.03],
   'machine-pistol': [-0.06, -0.15, 0.03],
@@ -1146,18 +1174,14 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   optimizeAttachedWeapon(weapon, flattenMaterials ? 'palette-basic' : 'vertex-lit');
   weapon.name = `operator-${weaponId}`;
   weapon.userData.weaponId = weaponId;
-  weapon.scale.setScalar(rig.rigged ? THIRD_PERSON_WEAPON_SCALE[weaponId] : weaponId === 'smg' ? 0.72 : 0.68);
-  if (rig.rigged) {
-    weapon.position.set(0, 0, 0);
-    weapon.quaternion.identity();
-    weapon.userData.riggedForwardCorrection = 'stable-body-mount-minus-z';
-    const supportGrip = weapon.getObjectByName('support-socket-l');
-    if (supportGrip) {
-      supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId]);
-      supportGrip.userData.riggedReachCalibrated = true;
-    }
-  } else {
-    weapon.rotation.y = Math.PI;
+  weapon.scale.setScalar(THIRD_PERSON_WEAPON_SCALE[weaponId]);
+  weapon.position.set(0, 0, 0);
+  weapon.quaternion.identity();
+  weapon.userData.riggedForwardCorrection = 'stable-body-mount-minus-z';
+  const supportGrip = weapon.getObjectByName('support-socket-l');
+  if (supportGrip) {
+    supportGrip.position.set(...RIGGED_SUPPORT_GRIP_POSITION[weaponId]);
+    supportGrip.userData.riggedReachCalibrated = true;
   }
   // World weapons are presentation only: visual recoil must never move an authoritative hit proxy.
   weapon.traverse((node) => {
@@ -1173,7 +1197,7 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   // A rigged swap is solved on the next presentation frame, after the mixer
   // restores the base animation. Solving here would use the previous weapon's
   // already-IK'd bones and compound rotations across rapid loadout changes.
-  if (rig.rigged) root.userData.operatorGripTelemetry = null;
+  root.userData.operatorGripTelemetry = null;
 }
 
 export function fireOperator(root: THREE.Group): void {
@@ -1214,9 +1238,9 @@ export function poseOperator(
   root: THREE.Group,
   stance: OperatorStance,
   speed: number,
-  phase: number,
-  blend = 1,
-  aimPitch = 0,
+  _phase: number,
+  _blend = 1,
+  _aimPitch = 0,
 ): void {
   const rig = operatorRig(root);
   if (!rig) return;
@@ -1224,168 +1248,33 @@ export function poseOperator(
   const proxyTransform = hitProxyRootTransform(stance);
   rig.hitProxyRoot.position.set(...proxyTransform.position);
   rig.hitProxyRoot.rotation.set(proxyTransform.rotationX, 0, 0);
-  if (rig.rigged) {
-    const meleeAge = performance.now() - Number(root.userData.operatorMeleeAt ?? -10_000);
-    const meleeActive = meleeAge >= 0 && meleeAge < 520;
-    // Three's mixer only writes properties that exist in the active clip. Put
-    // every arm bone back at the previous clean post-mixer pose first so IK
-    // cannot accumulate on an unkeyed shoulder or wrist across frames/swaps.
-    for (const entry of rig.armPoseBeforeIk ?? []) {
-      entry.bone.position.copy(entry.position);
-      entry.bone.quaternion.copy(entry.quaternion);
-    }
-    updateRiggedOperator(root, speed, stance);
-    const armBones = [
-      rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone,
-      rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone,
-    ].filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone);
-    rig.armPoseBeforeIk = armBones.map((bone) => ({
-      bone,
-      position: bone.position.clone(),
-      quaternion: bone.quaternion.clone(),
-    }));
-    root.updateWorldMatrix(true, true);
-    if (rig.weapon) {
-      rig.weapon.visible = !meleeActive;
-      // The mixer writes animated bones first; two-arm IK is the final
-      // presentation layer so locomotion/fire clips cannot steer the muzzle.
-      root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(rig, rig.weapon);
-    }
-    if (rig.meleeKnife) rig.meleeKnife.visible = meleeActive;
-    return;
-  }
-  const shotAge = performance.now() - Number(root.userData.operatorShotAt ?? -10_000);
-  const shotKick = shotAge < 180 ? Math.sin((shotAge / 180) * Math.PI) : 0;
-  const hitAge = performance.now() - Number(root.userData.operatorHitAt ?? -10_000);
-  const rawHitZone = root.userData.operatorHitZone;
-  const hitZone = rawHitZone === 'head' || rawHitZone === 'limb' ? rawHitZone : 'body';
-  const hitReaction = hitReactionAt(hitAge, hitZone);
   const meleeAge = performance.now() - Number(root.userData.operatorMeleeAt ?? -10_000);
   const meleeActive = meleeAge >= 0 && meleeAge < 520;
-  const meleeEnvelope = meleeActive ? Math.sin(THREE.MathUtils.clamp(meleeAge / 520, 0, 1) * Math.PI) : 0;
-  const hitSign = Number(root.userData.operatorHitSign ?? 1);
-  rig.weaponSocket.position.x = hitReaction.roll * hitSign * 0.18;
-  rig.weaponSocket.position.z = -0.36 + shotKick * 0.11 + hitReaction.envelope * 0.055;
-  rig.weaponSocket.rotation.x = -shotKick * 0.12 + hitReaction.pitch;
-  rig.weaponSocket.rotation.z = hitReaction.roll * hitSign;
-  rig.reactionRoot.rotation.x = hitReaction.pitch * 0.72;
-  rig.reactionRoot.rotation.z = hitReaction.roll * hitSign * 0.85;
-  const actionPart = rig.weapon?.getObjectByName(rig.weaponId === 'scattergun' ? 'pump' : 'bolt-or-slide');
-  if (actionPart) {
-    const restZ = Number(actionPart.userData.restZ ?? actionPart.position.z);
-    const actionDelay = rig.weaponId === 'scattergun' ? 180 : 0;
-    const actionDuration = rig.weaponId === 'scattergun' ? 440 : rig.weaponId === 'smg' ? 44 : 62;
-    const progress = THREE.MathUtils.clamp((shotAge - actionDelay) / actionDuration, 0, 1);
-    actionPart.position.z = restZ + Math.sin(progress * Math.PI) * (rig.weaponId === 'scattergun' ? 0.22 : 0.08);
+  // Three's mixer only writes properties that exist in the active clip. Put
+  // every arm bone back at the previous clean post-mixer pose first so IK
+  // cannot accumulate on an unkeyed shoulder or wrist across frames/swaps.
+  for (const entry of rig.armPoseBeforeIk ?? []) {
+    entry.bone.position.copy(entry.position);
+    entry.bone.quaternion.copy(entry.quaternion);
   }
-  const flash = rig.weapon?.getObjectByName('world-muzzle-flash');
-  if (flash) flash.visible = shotAge >= 0 && shotAge < 55;
-  if (rig.weapon) rig.weapon.visible = !meleeActive;
-  rig.meleeKnife.visible = meleeActive;
-  const gait = Math.sin(phase) * Math.min(1, speed / 4.8);
-  const crouched = stance === 'crouch';
-  const prone = stance === 'prone';
-  const lerp = (from: number, to: number) => THREE.MathUtils.lerp(from, to, blend);
-  // Authoritative hit proxies follow replicated stance only. They never inherit
-  // gait, weapon kick, gear reaction or cosmetic limb animation.
-  rig.pelvis.position.y = lerp(rig.pelvis.position.y, prone ? 0.38 : crouched ? 0.67 : 0.9);
-  rig.pelvis.rotation.x = lerp(rig.pelvis.rotation.x, prone ? -1.08 : 0);
-  rig.spine.rotation.x = lerp(rig.spine.rotation.x, prone ? -0.24 : crouched ? 0.13 : aimPitch * 0.28);
-  rig.leftThigh.rotation.x = lerp(rig.leftThigh.rotation.x, prone ? -1.22 + gait * 0.12 : crouched ? -0.7 + gait * 0.18 : gait * 0.48);
-  rig.rightThigh.rotation.x = lerp(rig.rightThigh.rotation.x, prone ? -1.22 - gait * 0.12 : crouched ? -0.7 - gait * 0.18 : -gait * 0.48);
-  rig.leftShin.rotation.x = lerp(rig.leftShin.rotation.x, prone ? 1.32 : crouched ? 1.15 : Math.max(0, -gait) * 0.32);
-  rig.rightShin.rotation.x = lerp(rig.rightShin.rotation.x, prone ? 1.32 : crouched ? 1.15 : Math.max(0, gait) * 0.32);
-  const shoulderPitch = prone ? -1.05 : -0.72 + aimPitch * 0.45;
-  rig.leftUpperArm.rotation.x = lerp(rig.leftUpperArm.rotation.x, shoulderPitch - gait * 0.08);
-  rig.rightUpperArm.rotation.x = lerp(rig.rightUpperArm.rotation.x, shoulderPitch + gait * 0.08);
-  rig.leftUpperArm.rotation.z = lerp(rig.leftUpperArm.rotation.z, -0.54);
-  rig.rightUpperArm.rotation.z = lerp(rig.rightUpperArm.rotation.z, 0.45);
-  rig.leftForearm.rotation.x = lerp(rig.leftForearm.rotation.x, -1.08);
-  rig.rightForearm.rotation.x = lerp(rig.rightForearm.rotation.x, -1.22);
-  if (meleeActive) {
-    rig.rightUpperArm.rotation.x = lerp(rig.rightUpperArm.rotation.x, -1.6 + meleeEnvelope * 1.15);
-    rig.rightUpperArm.rotation.z = lerp(rig.rightUpperArm.rotation.z, 0.12 - meleeEnvelope * 0.42);
-    rig.rightForearm.rotation.x = lerp(rig.rightForearm.rotation.x, -0.35 - meleeEnvelope * 0.75);
-    rig.spine.rotation.y = lerp(rig.spine.rotation.y, -meleeEnvelope * 0.16);
-  } else {
-    rig.spine.rotation.y = lerp(rig.spine.rotation.y, 0);
+  updateRiggedOperator(root, speed, stance);
+  const armBones = [
+    rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone,
+    rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone,
+  ].filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone);
+  rig.armPoseBeforeIk = armBones.map((bone) => ({
+    bone,
+    position: bone.position.clone(),
+    quaternion: bone.quaternion.clone(),
+  }));
+  root.updateWorldMatrix(true, true);
+  if (rig.weapon) {
+    rig.weapon.visible = !meleeActive;
+    // The mixer writes animated bones first; two-arm IK is the final
+    // presentation layer so locomotion/fire clips cannot steer the muzzle.
+    root.userData.operatorGripTelemetry = meleeActive ? null : applyRiggedWeaponGrip(rig, rig.weapon);
   }
-}
-
-function buildBoundedOperatorLod(team: Team, name: string, weaponId: WeaponId): THREE.Group {
-  const root = new THREE.Group();
-  root.name = name;
-  root.userData.dynamic = true;
-  root.userData.boundedOperatorLod = true;
-  const pelvis = new THREE.Group();
-  pelvis.name = 'pelvis-joint';
-  pelvis.position.y = 0.9;
-  root.add(pelvis);
-  const spine = new THREE.Group();
-  spine.name = 'spine-joint';
-  spine.position.y = 0.18;
-  pelvis.add(spine);
-  const teamColor = new THREE.Color(team === 0 ? 0x55d8d2 : 0xff745e);
-  const teamAccent = new THREE.Color(team === 0 ? 0x8ffff7 : 0xffb09d);
-  const armour = new THREE.Color(0x29393d);
-  const skin = new THREE.Color(0xd8a781);
-  const parts: THREE.BufferGeometry[] = [];
-  const addPart = (geometry: THREE.BufferGeometry, position: [number, number, number], color: THREE.Color) => {
-    geometry.translate(...position);
-    const expanded = geometry.index ? geometry.toNonIndexed() : geometry;
-    if (expanded !== geometry) geometry.dispose();
-    const colors = new Float32Array(expanded.getAttribute('position').count * 3);
-    for (let index = 0; index < colors.length; index += 3) {
-      colors[index] = color.r; colors[index + 1] = color.g; colors[index + 2] = color.b;
-    }
-    expanded.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    parts.push(expanded);
-  };
-  addPart(new THREE.BoxGeometry(0.52, 0.3, 0.34), [0, 0, 0], armour);
-  addPart(new THREE.BoxGeometry(0.68, 0.7, 0.38), [0, 0.48, 0], teamColor);
-  addPart(new THREE.BoxGeometry(0.72, 0.09, 0.42), [0, 0.62, -0.02], teamAccent);
-  addPart(new THREE.OctahedronGeometry(0.24, 0), [0, 1.17, 0], skin);
-  addPart(new THREE.BoxGeometry(0.5, 0.12, 0.36), [0, 1.32, 0], armour);
-  for (const side of [-1, 1]) {
-    addPart(new THREE.BoxGeometry(0.2, 0.78, 0.22), [side * 0.45, 0.35, 0], armour);
-    addPart(new THREE.BoxGeometry(0.25, 0.9, 0.3), [side * 0.17, -0.57, 0], teamColor);
-    addPart(new THREE.BoxGeometry(0.27, 0.16, 0.4), [side * 0.17, -1.05, -0.07], armour);
-  }
-  const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('Could not assemble bounded operator LOD');
-  const visual = new THREE.Mesh(merged, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true }));
-  visual.name = 'bounded-operator-lod';
-  visual.userData.presentationOnly = true;
-  visual.raycast = () => undefined;
-  pelvis.add(visual);
-
-  const leftUpperArm = new THREE.Group(); const rightUpperArm = new THREE.Group();
-  const leftForearm = new THREE.Group(); const rightForearm = new THREE.Group();
-  const leftThigh = new THREE.Group(); const rightThigh = new THREE.Group();
-  const leftShin = new THREE.Group(); const rightShin = new THREE.Group();
-  const reactionRoot = new THREE.Group(); reactionRoot.name = 'presentation-reaction-gear'; spine.add(reactionRoot);
-  for (const detailName of ['field-radio-pack', 'asymmetric-shoulder-plate', 'utility-pouch', 'team-radio-antenna']) {
-    const placeholder = new THREE.Group(); placeholder.name = detailName; reactionRoot.add(placeholder);
-  }
-  const meleeKnife = new THREE.Group(); meleeKnife.name = 'operator-melee-knife'; meleeKnife.visible = false; rightForearm.add(meleeKnife);
-  const weaponSocket = new THREE.Group(); weaponSocket.name = 'weapon-socket'; weaponSocket.position.set(0.22, 0.43, -0.36); spine.add(weaponSocket);
-  const hitProxyRoot = new THREE.Group(); hitProxyRoot.name = 'authoritative-hit-proxies'; root.add(hitProxyRoot);
-  const proxyMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, colorWrite: false, depthWrite: false });
-  const proxy = (proxyName: string, zone: 'head' | 'body' | 'limb', size: [number, number, number], position: [number, number, number]) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), proxyMaterial);
-    mesh.name = proxyName; mesh.position.set(...position); mesh.visible = false;
-    mesh.userData.hitZone = zone; mesh.userData.authoritativeProxy = true; hitProxyRoot.add(mesh);
-  };
-    for (const [index, def] of AUTHORITATIVE_HIT_PROXIES.entries()) {
-      proxy(`hit-proxy-${def.zone}-${index}`, def.zone, [def.size[0], def.size[1], def.size[2]], [def.position[0], def.position[1], def.position[2]]);
-    }
-  root.userData.operatorRig = {
-    rigged: false, pelvis, spine, leftUpperArm, rightUpperArm, leftForearm, rightForearm,
-    leftThigh, rightThigh, leftShin, rightShin, weaponSocket, reactionRoot, hitProxyRoot, meleeKnife, weaponId,
-  } satisfies OperatorRig;
-  setOperatorWeapon(root, weaponId, true);
-  root.traverse((node) => { node.userData.targetRoot = root; });
-  return root;
+  if (rig.meleeKnife) rig.meleeKnife.visible = meleeActive;
 }
 
 export function buildOperator(
@@ -1393,10 +1282,9 @@ export function buildOperator(
   name = 'operator',
   flattenMaterials = false,
   weaponId: WeaponId = 'carbine',
-  preferRigged = true,
   appearance: OperatorAppearance = 'team',
 ): THREE.Group {
-  const rigged = preferRigged ? createRiggedOperator(team, name, flattenMaterials, appearance) : null;
+  const rigged = createRiggedOperator(team, name, flattenMaterials, appearance);
   if (rigged) {
     const { root, weaponSocket } = rigged;
     const hitProxyRoot = new THREE.Group();
@@ -1461,148 +1349,5 @@ export function buildOperator(
     });
     return root;
   }
-  if (!preferRigged) return buildBoundedOperatorLod(team, name, weaponId);
-  const root = new THREE.Group(); root.name = name;
-  root.userData.dynamic = true;
-  const teamColor = team === 0 ? 0x55d8d2 : 0xff745e;
-  // Performance must simplify shading, not erase combatants. Unlit semantic
-  // team/skin/armour blocks stay readable through low-DPR and remote-display
-  // paths; Quality retains the authored physically shaded materials.
-  const uniform: THREE.Material = flattenMaterials
-    ? new THREE.MeshBasicMaterial({ color: teamColor })
-    : new THREE.MeshStandardMaterial({
-      color: teamColor,
-      emissive: team === 0 ? 0x0b4c4b : 0x5a160f,
-      emissiveIntensity: 0.24,
-      roughness: 0.68,
-    });
-  const identifier: THREE.Material = flattenMaterials
-    ? new THREE.MeshBasicMaterial({ color: team === 0 ? 0x8ffff7 : 0xffb09d })
-    : new THREE.MeshStandardMaterial({ color: teamColor, emissive: teamColor, emissiveIntensity: 0.72, roughness: 0.46 });
-  const armour: THREE.Material = flattenMaterials
-    ? new THREE.MeshBasicMaterial({ color: 0x29393d })
-    : MAT.dark();
-  const skin: THREE.Material = flattenMaterials
-    ? new THREE.MeshBasicMaterial({ color: 0xd8a781 })
-    : new THREE.MeshStandardMaterial({ color: 0xc99b78, roughness: 0.82 });
-  const joint = (parent: THREE.Object3D, jointName: string, position: [number, number, number]) => {
-    const group = new THREE.Group(); group.name = jointName; group.position.set(...position); parent.add(group); return group;
-  };
-  const limb = (parent: THREE.Group, meshName: string, size: [number, number, number], y: number, material: THREE.Material) => {
-    const mesh = roundedBox(meshName, size, material, Math.min(...size) * 0.3, 3);
-    mesh.position.y = y; mesh.userData.hitZone = 'limb'; parent.add(mesh); return mesh;
-  };
-  const presentationOnly = (mesh: THREE.Mesh): THREE.Mesh => {
-    mesh.userData.presentationOnly = true;
-    mesh.raycast = () => undefined;
-    return mesh;
-  };
-
-  const pelvis = joint(root, 'pelvis-joint', [0, 0.9, 0]);
-  const pelvisArmour = roundedBox('pelvis-armour', [0.5, 0.28, 0.32], armour, 0.08, 3);
-  pelvisArmour.userData.hitZone = 'body'; pelvis.add(pelvisArmour);
-  const spine = joint(pelvis, 'spine-joint', [0, 0.18, 0]);
-  const torso = roundedBox('torso', [0.66, 0.72, 0.35], uniform, 0.13, 4);
-  torso.position.y = 0.38; torso.userData.hitZone = 'body'; spine.add(torso);
-  const vest = roundedBox('chest-armour', [0.71, 0.48, 0.41], armour, 0.08, 3);
-  vest.position.set(0, 0.4, -0.04); vest.userData.hitZone = 'body'; spine.add(vest);
-  const band = roundedBox('team-identifier', [0.74, 0.085, 0.43], identifier, 0.02, 2);
-  band.position.set(0, team === 0 ? 0.55 : 0.42, -0.06); band.rotation.z = team === 0 ? 0 : -0.28; band.userData.hitZone = 'body'; spine.add(band);
-
-  // Asymmetric presentation-only field gear improves team silhouettes and can
-  // react to hits without moving the authoritative body/head/limb meshes.
-  const reactionRoot = joint(spine, 'presentation-reaction-gear', [0, 0, 0]);
-  if (flattenMaterials) {
-    for (const name of ['field-radio-pack', 'asymmetric-shoulder-plate', 'utility-pouch', 'team-radio-antenna']) {
-      const placeholder = new THREE.Group();
-      placeholder.name = name;
-      reactionRoot.add(placeholder);
-    }
-  } else {
-    const backpack = presentationOnly(roundedBox('field-radio-pack', [0.42, 0.48, 0.18], armour, 0.06, 2));
-    backpack.position.set(team === 0 ? -0.07 : 0.07, 0.38, 0.25); reactionRoot.add(backpack);
-    const shoulderPlate = presentationOnly(roundedBox('asymmetric-shoulder-plate', [0.3, 0.13, 0.34], identifier, 0.035, 2));
-    shoulderPlate.position.set(team === 0 ? -0.44 : 0.44, 0.67, 0); shoulderPlate.rotation.z = team === 0 ? -0.12 : 0.12; reactionRoot.add(shoulderPlate);
-    const utilityPouch = presentationOnly(roundedBox('utility-pouch', [0.2, 0.22, 0.13], uniform, 0.035, 2));
-    utilityPouch.position.set(team === 0 ? 0.24 : -0.24, 0.05, -0.21); reactionRoot.add(utilityPouch);
-    const antenna = presentationOnly(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), identifier));
-    antenna.name = 'team-radio-antenna'; antenna.position.set(team === 0 ? -0.16 : 0.16, 0.78, 0.22); antenna.rotation.z = team === 0 ? -0.12 : 0.12; reactionRoot.add(antenna);
-  }
-
-  const neck = joint(spine, 'neck-joint', [0, 0.81, 0]);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.225, 16, 12), skin); head.position.y = 0.18; head.userData.hitZone = 'head'; head.castShadow = true; neck.add(head);
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.255, 16, 9, 0, Math.PI * 2, 0, Math.PI * 0.58), armour);
-  helmet.position.y = 0.24; helmet.userData.hitZone = 'head'; neck.add(helmet);
-  const visor = roundedBox('visor', [0.36, 0.1, 0.06], identifier, 0.025, 2); visor.position.set(0, 0.2, -0.2); visor.userData.hitZone = 'head'; neck.add(visor);
-
-  const upperArms: THREE.Group[] = [];
-  const forearms: THREE.Group[] = [];
-  const thighs: THREE.Group[] = [];
-  const shins: THREE.Group[] = [];
-  for (const side of [-1, 1] as const) {
-    const upperArm = joint(spine, side < 0 ? 'left-upper-arm-joint' : 'right-upper-arm-joint', [side * 0.42, 0.66, 0]);
-    limb(upperArm, 'upper-arm', [0.19, 0.42, 0.21], -0.2, uniform);
-    const forearm = joint(upperArm, side < 0 ? 'left-elbow-joint' : 'right-elbow-joint', [0, -0.4, 0]);
-    limb(forearm, 'forearm', [0.17, 0.38, 0.19], -0.18, armour);
-    const hand = roundedBox('hand', [0.18, 0.2, 0.18], armour, 0.065, 3); hand.position.y = -0.4; hand.userData.hitZone = 'limb'; forearm.add(hand);
-    const thigh = joint(pelvis, side < 0 ? 'left-thigh-joint' : 'right-thigh-joint', [side * 0.17, -0.12, 0]);
-    limb(thigh, 'thigh', [0.24, 0.49, 0.28], -0.23, uniform);
-    const shin = joint(thigh, side < 0 ? 'left-knee-joint' : 'right-knee-joint', [0, -0.47, 0]);
-    limb(shin, 'shin', [0.22, 0.48, 0.25], -0.22, armour);
-    const foot = roundedBox('foot', [0.23, 0.16, 0.38], armour, 0.055, 3); foot.position.set(0, -0.49, -0.08); foot.userData.hitZone = 'limb'; shin.add(foot);
-    upperArms.push(upperArm); forearms.push(forearm); thighs.push(thigh); shins.push(shin);
-  }
-
-  const beacon = team === 0
-    ? new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 14), identifier)
-    : new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.2, 3), identifier);
-  beacon.name = 'team-shoulder-beacon'; beacon.position.set(team === 0 ? -0.44 : 0.44, 0.7, 0); beacon.rotation.z = Math.PI / 2; beacon.userData.hitZone = 'body'; spine.add(beacon);
-  const meleeKnife = new THREE.Group();
-  meleeKnife.name = 'operator-melee-knife';
-  const knifeHandle = presentationOnly(roundedBox('operator-knife-handle', [0.13, 0.13, 0.3], armour, 0.035, 2));
-  const knifeBlade = presentationOnly(roundedBox('operator-knife-blade', [0.075, 0.035, 0.54], new THREE.MeshBasicMaterial({ color: 0xdce8e5 }), 0.012, 1));
-  knifeBlade.position.z = -0.4;
-  meleeKnife.add(knifeHandle, knifeBlade);
-  meleeKnife.position.set(0, -0.47, -0.16);
-  meleeKnife.rotation.x = -0.24;
-  meleeKnife.visible = false;
-  forearms[1].add(meleeKnife);
-  const weaponSocket = joint(spine, 'weapon-socket', [0.22, 0.43, -0.36]);
-  const hitProxyRoot = new THREE.Group();
-  hitProxyRoot.name = 'authoritative-hit-proxies';
-  root.add(hitProxyRoot);
-  const proxyMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, colorWrite: false, depthWrite: false });
-  const proxy = (name: string, zone: 'head' | 'body' | 'limb', size: [number, number, number], position: [number, number, number]) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), proxyMaterial);
-    mesh.name = name;
-    mesh.position.set(...position);
-    // Hidden meshes stay out of rendering but remain explicit raycast targets.
-    mesh.visible = false;
-    mesh.userData.hitZone = zone;
-    mesh.userData.authoritativeProxy = true;
-    hitProxyRoot.add(mesh);
-  };
-    for (const [index, def] of AUTHORITATIVE_HIT_PROXIES.entries()) {
-      proxy(`hit-proxy-${def.zone}-${index}`, def.zone, [def.size[0], def.size[1], def.size[2]], [def.position[0], def.position[1], def.position[2]]);
-    }
-  const rig: OperatorRig = {
-    rigged: false,
-    pelvis, spine,
-    leftUpperArm: upperArms[0], rightUpperArm: upperArms[1],
-    leftForearm: forearms[0], rightForearm: forearms[1],
-    leftThigh: thighs[0], rightThigh: thighs[1],
-    leftShin: shins[0], rightShin: shins[1],
-    weaponSocket, reactionRoot, hitProxyRoot, meleeKnife, weaponId,
-  };
-  root.userData.operatorRig = rig;
-  setOperatorWeapon(root, weaponId, flattenMaterials);
-  poseOperator(root, 'stand', 0, 0, 1);
-  root.traverse((node) => {
-    node.userData.targetRoot = root;
-    if (node instanceof THREE.Mesh && node.userData.authoritativeProxy !== true) {
-      node.userData.presentationOnly = true;
-      node.raycast = () => undefined;
-    }
-  });
-  return finalizeWeaponGeometryLod(root, flattenMaterials);
+  throw new Error(`Canonical rigged operator asset is unavailable for ${name}; primitive operator fallback is prohibited`);
 }

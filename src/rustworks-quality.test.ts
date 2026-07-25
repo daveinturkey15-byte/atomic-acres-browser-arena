@@ -7,6 +7,7 @@ import {
   ensureRustworksStarfield,
   rustworksLightingTint,
   rustworksQualityTelemetry,
+  rustworksQualityLightOcclusion,
   setRustworksQualityPresentationActive,
 } from './rustworks-quality';
 import { buildRustworks1v1 } from './additional-maps';
@@ -40,8 +41,15 @@ describe('Rustworks Quality Graphics parity', () => {
     const lights = createRustworksQualityLights(map.root, 'blender');
     const pointLights = lights.children.filter((node) => node instanceof THREE.PointLight);
     expect(pointLights.length).toBeGreaterThanOrEqual(16);
-    // Light emitters are invisible; no unsupported fixture cubes/bulbs float in the sky.
+    // Visible authored fixtures own emission; legacy volumes remain disabled and
+    // audited so they cannot illuminate through deck walls or containers.
     expect(lights.children).toHaveLength(pointLights.length);
+    expect(pointLights.every((light) => light.intensity === 0 && light.castShadow === false)).toBe(true);
+    expect(rustworksQualityLightOcclusion()).toMatchObject({
+      activeLocalLights: 0,
+      emissiveOnlySources: pointLights.length,
+      violations: [],
+    });
     expect(lights.getObjectByName('rustworks-flood-housing-0')).toBeUndefined();
     expect(lights.getObjectByName('rustworks-work-bulb-0')).toBeUndefined();
     const enhanced = enhanceRustworksQualityMaterials(map.root, 'blender');
@@ -52,6 +60,11 @@ describe('Rustworks Quality Graphics parity', () => {
     setRustworksQualityPresentationActive(true, 'blender');
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').active).toBe(true);
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').night).toBe(true);
+    expect(rustworksQualityTelemetry('blender', 'rustworks-1v1')).toMatchObject({
+      activeLocalLights: 0,
+      emissiveOnlySources: pointLights.length,
+      occlusionViolations: [],
+    });
     setRustworksQualityPresentationActive(false, 'blender');
     expect(rustworksQualityTelemetry('blender', 'rustworks-1v1').active).toBe(false);
     expect(enhanceRustworksQualityMaterials(map.root, 'performance')).toBe(0);

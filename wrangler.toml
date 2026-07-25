@@ -3,6 +3,9 @@ main = "worker/src/index.ts"
 compatibility_date = "2026-07-18"
 workers_dev = true
 
+[triggers]
+crons = ["17 4 * * *"]
+
 [vars]
 ALLOWED_ORIGINS = "https://daveinturkey15-byte.github.io"
 

@@ -11,15 +11,32 @@ const browser = await chromium.launch({
 });
 const errors = [];
 
-async function openPlayer(name) {
-  const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
+async function openPlayer(name, context = null) {
+  const page = context
+    ? await context.newPage()
+    : await browser.newPage({ viewport: { width: 640, height: 360 } });
   page.on('pageerror', (error) => errors.push(`${name}: ${error.message}`));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(`${name} console: ${message.text()}`);
+  });
   const url = new URL(baseUrl);
-  url.searchParams.set('render', 'compatibility');
+  url.searchParams.set('renderer', 'webgl2');
+  url.searchParams.set('render', 'performance');
   url.searchParams.set('multiplayerQa', '1');
   url.searchParams.set('peerQaPort', String(peerPort));
   await page.goto(url.toString());
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
+  try {
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
+  } catch (error) {
+    console.error(`${name} startup diagnostics`, JSON.stringify({
+      url: page.url(),
+      title: await page.title(),
+      body: (await page.locator('body').innerText()).slice(0, 2_000),
+      debugPresent: await page.evaluate(() => Boolean(window.__ATOMIC_ACRES_DEBUG__)),
+      errors,
+    }, null, 2));
+    throw error;
+  }
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
   await page.fill('#player-name', name);
   return page;
@@ -27,7 +44,8 @@ async function openPlayer(name) {
 
 try {
   const host = await openPlayer('Recovery Host');
-  const guest = await openPlayer('Recovery Guest');
+  const guestContext = await browser.newContext({ viewport: { width: 640, height: 360 } });
+  let guest = await openPlayer('Recovery Guest', guestContext);
   await host.click('#host');
   await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim(), undefined, { timeout: 30_000 });
   const roomCode = (await host.textContent('#room-code')).trim();
@@ -69,11 +87,13 @@ try {
     throw error;
   }
 
-  await guest.reload({ waitUntil: 'load' });
+  const durableIdentityWritten = await guest.evaluate((code) => localStorage.getItem(`atomic-acres:room-identity:${code}`) !== null, roomCode);
+  await guest.evaluate((code) => localStorage.removeItem(`atomic-acres:room-identity:${code}`), roomCode);
+  await guest.close({ runBeforeUnload: true });
   await host.waitForFunction((id) => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.some((member) => member.id === id && !member.connected), guestId, { timeout: 30_000 });
-  await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
-  await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
-  await guest.fill('#player-name', 'Recovery Guest');
+  guest = await openPlayer('Recovery Guest', guestContext);
+  const reopenedTabHasFreshSession = await guest.evaluate((code) => sessionStorage.getItem(`atomic-acres:room-identity:${code}`) === null, roomCode);
+  const closeLifecyclePersistedIdentity = await guest.evaluate((code) => localStorage.getItem(`atomic-acres:room-identity:${code}`) !== null, roomCode);
   await guest.fill('#room-input', roomCode);
   await guest.click('#join');
   await guest.waitForFunction(() => {
@@ -85,12 +105,16 @@ try {
     errors,
     proneReplicated: true,
     reliableFallback: true,
+    durableIdentityWritten,
+    reopenedTabHasFreshSession,
+    closeLifecyclePersistedIdentity,
     identityPreserved: rejoinedId === guestId,
     rejoinedActiveMatch: true,
     guestNetwork: await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().networkLifecycle),
   };
   console.log(JSON.stringify(result, null, 2));
-  if (errors.length || !result.identityPreserved) process.exitCode = 1;
+  if (errors.length || !result.durableIdentityWritten || !result.reopenedTabHasFreshSession
+    || !result.closeLifecyclePersistedIdentity || !result.identityPreserved) process.exitCode = 1;
 } finally {
   await browser.close();
 }

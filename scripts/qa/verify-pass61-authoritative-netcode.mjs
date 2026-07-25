@@ -39,7 +39,8 @@ async function openPlayer(name) {
   });
   const url = new URL(baseUrl);
   url.searchParams.set('release', 'latest');
-  url.searchParams.set('render', 'compatibility');
+  url.searchParams.set('renderer', 'webgl2');
+  url.searchParams.set('render', 'compat');
   url.searchParams.set('multiplayerQa', '1');
   url.searchParams.set('peerQaPort', String(peerPort));
   url.searchParams.set('eventDelayQaMs', '10');

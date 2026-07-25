@@ -1,16 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const mainSource = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const shellSource = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
 describe('text chat UI contract', () => {
   it('renders one shared room-chat surface outside the menu and HUD', () => {
-    expect(mainSource.match(/id="text-chat"/g)).toHaveLength(1);
-    expect(mainSource).toContain('id="text-chat-log" role="log" aria-live="polite"');
-    expect(mainSource).toContain('id="text-chat-input"');
-    expect(mainSource).toContain('maxlength="${CHAT_TEXT_MAX_CHARS}"');
-    expect(styleSource).toContain('#text-chat[data-context=lobby]');
+    expect(shellSource.match(/id="text-chat"/g)).toHaveLength(1);
+    expect(shellSource).toContain('id="text-chat-log" role="log" aria-live="polite"');
+    expect(shellSource).toContain('id="text-chat-input"');
+    expect(shellSource).toContain('maxlength="${CHAT_TEXT_MAX_CHARS}"');
+    expect(shellSource).toContain('data-visible="false"');
+    expect(styleSource).not.toContain('#text-chat[data-context=lobby]');
+    expect(styleSource).toContain('left:auto;right:24px;bottom:300px;transform:none');
+    expect(styleSource).toContain('#text-chat[data-visible=false][data-open=false]{opacity:0;pointer-events:none}');
     expect(styleSource).toContain('#text-chat[data-open=true] #text-chat-log');
   });
 

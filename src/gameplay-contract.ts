@@ -49,6 +49,9 @@ import {
 } from './overdrive';
 
 const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'compat'];
+// UI card order is a presentation choice. Keep the frozen Pass 62 gameplay
+// contract order stable so a naming/menu pass cannot rewrite benchmark bytes.
+const GAMEPLAY_CONTRACT_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const;
 const movementContexts = {
   walk: { crouched: false, prone: false, ads: false, sprinting: false, grounded: true },
   sprint: { crouched: false, prone: false, ads: false, sprinting: true, grounded: true },
@@ -84,13 +87,15 @@ export function buildGameplayContract(): Record<string, unknown> {
         cooldownMs: BOT_GRENADE_COOLDOWN_MS,
         maximumActive: 1,
       },
-      weapons: Object.values(WEAPONS).map((weapon) => ({ ...weapon })),
+      // Pass 62 remains the immutable rollback gameplay benchmark. Pass 64's
+      // HITL railgun candidate is verified by its own authority contract.
+      weapons: Object.values(WEAPONS).filter((weapon) => weapon.id !== 'railgun').map((weapon) => ({ ...weapon })),
       grenade: { radius: GRENADE_RADIUS, maximumDamage: GRENADE_MAX_DAMAGE },
       melee: { cooldownMs: MELEE_COOLDOWN_MS, range: MELEE_RANGE, damage: MELEE_DAMAGE },
       match: {
         warmupMs: MATCH_WARMUP_MS,
         defaultDurationMs: MATCH_DURATION_MS,
-        arenas: ARENA_SELECTIONS.map((selection) => ({
+        arenas: GAMEPLAY_CONTRACT_ARENA_IDS.map((id) => ARENA_SELECTIONS.find((selection) => selection.id === id)!).map((selection) => ({
           id: selection.id,
           soloBotCount: selection.soloBotCount,
           maximumSoloBots: selection.maximumSoloBots,

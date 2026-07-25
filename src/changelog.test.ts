@@ -10,10 +10,10 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the current public release first with an explicit UK timezone', () => {
+  it('keeps the pending Pass 64 release first until production injects its timestamp', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass63');
+    expect(latest.id).toBe('pass64');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
     expect(formatChangelogTimestamp('2026-07-22T15:43:16+01:00')).toBe('22 JUL 2026 · 15:43 BST');
     expect(formatChangelogTimestampDetail('2026-07-22T15:43:16+01:00')).toBe(
@@ -23,10 +23,11 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('LAST RELEASE · PENDING_PRODUCTION');
+    expect(lastUpdatedButtonLabel(latest)).toContain(PENDING_PRODUCTION_RELEASE);
   });
 
   it('uses the successful production promotion rather than implementation time', () => {
+    const pass63 = CHANGELOG.find((entry) => entry.id === 'pass63');
     const pass62 = CHANGELOG.find((entry) => entry.id === 'pass62');
     const pass60 = CHANGELOG.find((entry) => entry.id === 'pass60');
     const pass59 = CHANGELOG.find((entry) => entry.id === 'pass59');
@@ -36,6 +37,7 @@ describe('changelog', () => {
     const pass55 = CHANGELOG.find((entry) => entry.id === 'pass55');
     const pass51 = CHANGELOG.find((entry) => entry.id === 'pass51');
     const pass49 = CHANGELOG.find((entry) => entry.id === 'pass49');
+    expect(pass63?.releasedAt).toBe('2026-07-25T02:50:32Z');
     expect(pass62?.releasedAt).toBe('2026-07-24T16:36:32Z');
     expect(pass60?.releasedAt).toBe('2026-07-23T23:15:05Z');
     expect(pass60?.title).toBe('New Netcode');

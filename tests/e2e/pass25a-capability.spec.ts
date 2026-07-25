@@ -9,7 +9,7 @@ test.describe('Pass 25A browser capability smoke', () => {
       if (message.type() === 'error' && /Atomic Signal|Shader Error|WebGLProgram/.test(message.text())) shaderErrors.push(message.text());
     });
     const shaderOverride = browserName === 'firefox' ? '' : '&signal=on';
-    await page.goto(`/?render=performance${shaderOverride}&seed=pass25a-capability`);
+    await page.goto(`/?renderer=webgl2&render=performance${shaderOverride}&seed=pass25a-capability`);
     await expect(page.locator('#menu')).toBeVisible();
     await expect(page.locator('#solo')).toBeEnabled({ timeout: 30_000 });
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().render.calls > 0, undefined, { timeout: 30_000 });

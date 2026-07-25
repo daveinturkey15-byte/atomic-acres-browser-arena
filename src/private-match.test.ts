@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PRIVATE_MATCH_CONFIG,
   balanceLobbyTeams,
+  canHostCommitStart,
   canHostStart,
   canGuestModifyHostedBots,
   estimateHostClockOffset,
@@ -64,6 +65,19 @@ describe('private match lobby', () => {
     expect(canHostStart(snapshot({ phase: 'active' }))).toBe(false);
   });
 
+  it('treats Start Match as the host ready commit without weakening guest readiness', () => {
+    expect(canHostCommitStart(snapshot({
+      members: members.map((member) => member.id === 'host' ? { ...member, ready: false } : member),
+    }))).toBe(true);
+    expect(canHostCommitStart(snapshot({
+      members: members.map((member) => member.id === 'host' || member.id === 'b'
+        ? { ...member, ready: false }
+        : member),
+    }))).toBe(false);
+    expect(canHostCommitStart(snapshot({ members: members.filter((member) => member.id !== 'host') }))).toBe(false);
+    expect(canHostCommitStart(snapshot({ phase: 'active' }))).toBe(false);
+  });
+
   it('treats colours as presentation-only in FFA', () => {
     expect(playersAreHostile('tdm', members[0], { ...members[1], team: 0 })).toBe(false);
     expect(playersAreHostile('ffa', members[0], { ...members[1], team: 0 })).toBe(true);
@@ -116,6 +130,33 @@ describe('private match lobby', () => {
     expect(isLobbySnapshot(snapshot({ members: members.map((member) => ({ ...member, dhv: 9 as 10 })) }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000 }))).toBe(false);
     expect(isLobbySnapshot(snapshot({ activeAtHostTimeMs: 1_000, activeAtEpochMs: 2_000 }))).toBe(true);
+  });
+
+  it('returns host and guests to a valid readyable lobby before a second match', () => {
+    const ended = snapshot({
+      phase: 'ended',
+      activeAtHostTimeMs: 1_000,
+      activeAtEpochMs: 2_000,
+    });
+    const reset = {
+      ...ended,
+      revision: ended.revision + 1,
+      phase: 'waiting' as const,
+      activeAtHostTimeMs: null,
+      activeAtEpochMs: null,
+      members: ended.members.map((member) => ({ ...member, ready: false })),
+    };
+    expect(isLobbySnapshot(reset)).toBe(true);
+    expect(canHostStart(reset)).toBe(false);
+
+    const readiedAgain = { ...reset, members: reset.members.map((member) => ({ ...member, ready: true })) };
+    expect(canHostStart(readiedAgain)).toBe(true);
+    expect(isLobbySnapshot({
+      ...readiedAgain,
+      phase: 'countdown',
+      activeAtHostTimeMs: 9_000,
+      activeAtEpochMs: 10_000,
+    })).toBe(true);
   });
 
   it('restricts hosted bots to host-owned exact 0, 2, or 4 settings', () => {

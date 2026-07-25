@@ -1,29 +1,70 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { RUSTWORKS_WORK_LIGHTS } from './additional-maps';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
+import { definition as atomicDefinition } from './rendering/arenas/atomic-acres';
+import { definition as gunRangeDefinition } from './rendering/arenas/gun-range';
+import { definition as rustworksDefinition } from './rendering/arenas/rustworks-1v1';
+import { definition as terminalDefinition } from './rendering/arenas/skyline-terminal';
 
 describe('Pass 62 arena contrast lighting', () => {
   it('provides bounded real-time keys only where the arena lacks enough authored practical light', () => {
     const scene = new THREE.Scene();
     const rig = new ArenaContrastLighting(scene, 'blender');
-    for (const arenaId of ['atomic-acres', 'skyline-terminal'] as const) {
-      rig.setArena(arenaId);
-      expect(rig.telemetry()).toMatchObject({ arenaId, activeLights: 2, shadowCastingLights: 1 });
-      const visibleRoots = scene.children.filter((node) => node.name.includes('contrast-lighting') && node.visible);
+    for (const definition of [atomicDefinition, terminalDefinition]) {
+      rig.applyDefinition(definition);
+      expect(rig.telemetry()).toMatchObject({
+        arenaId: definition.id,
+        definitionId: definition.id,
+        activeLights: 2,
+        shadowCastingLights: 2,
+        occlusion: { activeLocalLights: 2, shadowedLocalLights: 2, violations: [] },
+      });
+      const visibleRoots = scene.children.filter((node) => node.name.includes('definition-practicals') && node.visible);
       expect(visibleRoots).toHaveLength(1);
     }
-    for (const arenaId of ['rustworks-1v1', 'gun-range'] as const) {
-      rig.setArena(arenaId);
-      expect(rig.telemetry()).toMatchObject({ arenaId, activeLights: 0, shadowCastingLights: 0 });
-    }
+    rig.applyDefinition(rustworksDefinition);
+    expect(rig.telemetry()).toMatchObject({
+      arenaId: 'rustworks-1v1',
+      activeLights: 2,
+      shadowCastingLights: 2,
+      occlusion: { activeLocalLights: 2, shadowedLocalLights: 2, violations: [] },
+    });
+    const fixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.id === 'north');
+    const southFixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.id === 'south');
+    const mountedLight = scene.getObjectByName('rustworks-1v1-tower-mounted-work-light-1') as THREE.SpotLight;
+    const southMountedLight = scene.getObjectByName('rustworks-1v1-tower-mounted-work-light-south-2') as THREE.SpotLight;
+    expect(fixture).toBeTruthy();
+    expect(mountedLight).toBeInstanceOf(THREE.SpotLight);
+    expect(mountedLight.position.toArray()).toEqual([...(fixture?.position ?? [])]);
+    expect(mountedLight.target.position.toArray()).toEqual([...(fixture?.target ?? [])]);
+    expect(mountedLight.shadow.mapSize.toArray()).toEqual([512, 512]);
+    expect(southMountedLight).toBeInstanceOf(THREE.SpotLight);
+    expect(southMountedLight.position.toArray()).toEqual([...(southFixture?.position ?? [])]);
+    expect(southMountedLight.target.position.toArray()).toEqual([...(southFixture?.target ?? [])]);
+    expect(southMountedLight.shadow.mapSize.toArray()).toEqual([512, 512]);
+    const northIntensity = mountedLight.intensity;
+    rig.update(2_400);
+    expect(mountedLight.intensity).not.toBe(northIntensity);
+    expect(mountedLight.intensity).toBeLessThanOrEqual(fixture!.intensity);
+    expect(rustworksDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
+      'rustrig-mounted-work-lights',
+      'rustrig-deck-surface',
+    ]));
+    rig.applyDefinition(gunRangeDefinition);
+    expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 1, shadowCastingLights: 1 });
+    const rangeLight = scene.getObjectByName('gun-range-range-inspection-key-1') as THREE.SpotLight;
+    const targetX = rangeLight.target.position.x;
+    rig.update(3_000);
+    expect(rangeLight.target.position.x).not.toBe(targetX);
   });
 
-  it('keeps Performance illuminated without extra shadow maps and Compatibility free of the rig', () => {
+  it('keeps unshadowed Performance and Compatibility free of the contrast-light volume', () => {
     const performance = new ArenaContrastLighting(new THREE.Scene(), 'performance');
     const compat = new ArenaContrastLighting(new THREE.Scene(), 'compat');
-    performance.setArena('atomic-acres');
-    expect(performance.telemetry()).toMatchObject({ activeLights: 2, shadowCastingLights: 0 });
-    performance.setArena('rustworks-1v1');
+    performance.applyDefinition(atomicDefinition);
+    expect(performance.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0, occlusion: { violations: [] } });
+    performance.applyDefinition(rustworksDefinition);
     expect(performance.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });
     expect(compat.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });
   });

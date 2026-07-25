@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { DataConnection } from 'peerjs';
-import { guestMessageEndsSession, initialLobbyJoinHasProtocolMismatch, isCurrentGuestEventConnection, joinTimeoutAction, replaceGuestPeerOwner, stateTrafficUsesFallback } from './network';
+import {
+  activeGuestCanBeReplaced,
+  guestMessageEndsSession,
+  initialLobbyJoinHasProtocolMismatch,
+  isCurrentClientConnection,
+  isCurrentGuestEventConnection,
+  joinTimeoutAction,
+  replaceGuestPeerOwner,
+  stateTrafficUsesFallback,
+} from './network';
 import { MULTIPLAYER_PROTOCOL_VERSION } from './protocol';
 
 describe('guest event connection lifecycle', () => {
@@ -9,6 +18,20 @@ describe('guest event connection lifecycle', () => {
     const replacement = { peer: 'stable-peer' } as DataConnection;
     expect(isCurrentGuestEventConnection(replacement, oldConnection)).toBe(false);
     expect(isCurrentGuestEventConnection(replacement, replacement)).toBe(true);
+  });
+
+  it('does not let a stale client channel callback tear down a newer join transport', () => {
+    const oldConnection = { peer: 'host-peer' } as DataConnection;
+    const replacement = { peer: 'host-peer' } as DataConnection;
+    expect(isCurrentClientConnection(replacement, oldConnection)).toBe(false);
+    expect(isCurrentClientConnection(replacement, replacement)).toBe(true);
+  });
+
+  it('atomically replaces an abandoned open channel only with the same rejoin credential', () => {
+    const token = '12345678-1234-1234-1234-123456789abc';
+    expect(activeGuestCanBeReplaced(true, token, token)).toBe(true);
+    expect(activeGuestCanBeReplaced(true, token, '87654321-4321-4321-4321-cba987654321')).toBe(false);
+    expect(activeGuestCanBeReplaced(false, token, token)).toBe(false);
   });
 
   it('fails an initial bad room cleanly while retaining bounded retry for a dropped session', () => {

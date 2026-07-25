@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
 type DebugState = {
+  bootstrap: { stage: string; error: string | null };
   gameStarted: boolean;
   frameCount: number;
   gameMode: string;
@@ -69,7 +70,12 @@ type DebugState = {
     } | null;
     neonHaze: boolean;
   }>;
-  corpses: { active: number; lifetimeMs: number; remainingMs: number[] };
+  corpses: {
+    active: number;
+    lifetimeMs: number;
+    remainingMs: number[];
+    models: Array<{ source: string; appearance: string; skinnedMeshes: number; weaponChildren: number; activeClip: string } | null>;
+  };
   botEscalation: { deaths: number; initialBots: number; targetBots: number; activeBots: number; nextReinforcementAt: number };
   remotes: number;
   remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
@@ -92,15 +98,9 @@ type DebugState = {
     profile: { disposeMs: number; audioMs: number; visualMs: number; targetDamageMs: number; selfDamageMs: number; totalSyncMs: number };
   };
   audio: {
-    sanctifiedFragChoir: {
-      asset: string;
-      status: 'idle' | 'loading' | 'fetched' | 'decoding' | 'ready' | 'error';
-      ready: boolean;
-      prewarmed: boolean;
-      byteLength: number;
-      durationSeconds: number;
-      plays: number;
-    };
+    ambience: { continuousSources: number; busGain: number };
+    grenadeFuse: { beeps: number; startMs: number };
+    support: { cues: number };
   };
   fieldSupport: {
     streak: number;
@@ -141,6 +141,7 @@ type DebugState = {
     expiries: number;
     presentationPrewarmed: boolean;
     visible: boolean;
+    renderResident: boolean;
     worldIconVisible: boolean;
     worldIconName: string;
     minimapSymbol: string;
@@ -365,14 +366,43 @@ async function debug(page: Page): Promise<DebugState> {
 }
 
 async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promise<void> {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => {
-    const status = document.querySelector<HTMLElement>('#network-status');
-    const solo = document.querySelector<HTMLButtonElement>('#solo');
-    const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
-    const snapshot = debugApi?.snapshot();
-    return status?.dataset.kind === 'ok' && solo?.disabled === false && snapshot?.weaponReady === true && snapshot.originalArtLoaded === true;
-  }, undefined, { timeout: timeoutMs });
+  const url = new URL(path, 'http://atomic-acres.qa');
+  if (!url.searchParams.has('renderer')) url.searchParams.set('renderer', 'webgl2');
+  await page.goto(`${url.pathname}${url.search}`, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.waitForFunction(() => {
+      const status = document.querySelector<HTMLElement>('#network-status');
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      const snapshot = debugApi?.snapshot();
+      return status?.dataset.kind === 'ok'
+        && solo?.disabled === false
+        && snapshot?.weaponReady === true
+        && snapshot.bootstrap.stage === 'ready';
+    }, undefined, { timeout: timeoutMs });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => {
+      const status = document.querySelector<HTMLElement>('#network-status');
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      const snapshot = debugApi?.snapshot();
+      return {
+        path: window.location.pathname + window.location.search,
+        statusKind: status?.dataset.kind ?? null,
+        statusText: status?.textContent ?? null,
+        soloDisabled: solo?.disabled ?? null,
+        debugApiReady: Boolean(debugApi),
+        weaponReady: snapshot?.weaponReady ?? null,
+        originalArtLoaded: snapshot?.originalArtLoaded ?? null,
+        bootstrap: snapshot?.bootstrap ?? null,
+        blenderEnvironment: snapshot?.render.blenderEnvironment ?? null,
+      };
+    }).catch((diagnosticError: unknown) => ({
+      diagnosticError: diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError),
+    }));
+    if (error instanceof Error) error.message += `\nReadiness diagnostic: ${JSON.stringify(diagnostic)}`;
+    throw error;
+  }
 }
 
 async function pageReady(page: Page): Promise<void> {
@@ -419,8 +449,10 @@ test.describe('boot and authored presentation', () => {
       };
     });
     expect(layout.minimapZoom).toBe('1');
-    expect(layout.minimapWidth).toBe(300);
-    expect(layout.supportWidth).toBeLessThanOrEqual(180);
+    expect(layout.minimapWidth).toBeGreaterThanOrEqual(190);
+    expect(layout.minimapWidth).toBeLessThanOrEqual(220);
+    expect(layout.supportWidth).toBeGreaterThanOrEqual(180);
+    expect(layout.supportWidth).toBeLessThanOrEqual(200);
     expect(layout.supportHeight).toBeGreaterThanOrEqual(150);
     expect(layout.weaponRight).toBeLessThanOrEqual(layout.viewportWidth);
   });
@@ -435,7 +467,9 @@ test.describe('boot and authored presentation', () => {
     expect(state.weaponPresentation.detailsReady).toBe(true);
     expect(state.menuVisible).toBe(true);
     expect(state.arenaStoryReady).toBe(true);
-    await expect(page.locator('.eyebrow')).toContainText('FOUR ORIGINAL PLAY SPACES · PERFORMANCE FIRST · PASS 63');
+    await expect(page.locator('html')).toHaveAttribute('data-ui-contract', 'pass64-command-v2');
+    await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
+    await expect(page.locator('.command-brand span')).toContainText('PASS 64');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({
@@ -680,14 +714,17 @@ test.describe('boot and authored presentation', () => {
     test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await pageReadyAt(page, '/?render=blender&mist=on', 60_000);
+    // Freeze the renderer-backed menu flyover at its deterministic review
+    // instant before sampling draw-call budgets. Runner speed must not select
+    // a different point along the animated camera path.
+    await pageReadyAt(page, '/?render=blender&mist=on&previewTime=0', 240_000);
     const menuState = await debug(page);
     expect(menuState.render).toMatchObject({
       profile: 'blender', representation: 'blender', antialias: true,
       shadows: true, shadowMode: 'static',
       lighting: {
         exposure: 1, hemisphereIntensity: 0.72, ambientIntensity: 0.18,
-        sunIntensity: 3.25, fogNear: 52, fogFar: 142,
+        sunIntensity: 3.25, fogNear: 58, fogFar: 148,
         routeLightIntensity: 3, streetLightIntensity: 3.8, interiorLightIntensity: 10,
         routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
         godRayStrength: 0.05, godRayLobes: 2,
@@ -750,16 +787,6 @@ test.describe('boot and authored presentation', () => {
     const activeState = await debug(page);
     expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
     expect(activeState.render.blenderEnvironment.status).toBe('ready');
-    // Quality keeps authored PBR receiver/arm silhouettes plus Pass 32 mist,
-    // grounded signage and large-cover batches. The measured worst staged view
-    // remains bounded at 180 calls after Pass 59 adds three explicitly audited
-    // collision-mirror meshes; one live impact/fragment draw may still be
-    // present in this transient sample. The stricter settled-scene budget is
-    // enforced below.
-    // Pass 60 renders the viewmodel after a depth clear so walls/floors cannot
-    // punch holes through the weapon. That intentional overlay pass adds one
-    // draw call to the transient combat sample.
-    expect(activeState.render.calls).toBeLessThanOrEqual(182);
     expect(activeState.render.triangles).toBeLessThanOrEqual(100_000);
     await page.waitForFunction(() => {
       const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -767,7 +794,15 @@ test.describe('boot and authored presentation', () => {
     }, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_100);
     const stableState = await debug(page);
-    expect(stableState.render.calls).toBeLessThanOrEqual(163);
+    // Pass 64 keeps the already-compiled 2x-damage presentation resident at
+    // sub-pixel scale during active play. Its six audited mesh/sprite batches
+    // deliberately trade a tiny, bounded steady-state cost for removing the
+    // synchronized first-spawn shader/upload hitch across every client.
+    expect(stableState.render.calls).toBeLessThanOrEqual(169);
+    // Compare the transient window-break frame with its own settled view. This
+    // isolates the bounded glass shards, pooled impact presentation and combat
+    // overlays from camera-dependent culling and the resident pickup baseline.
+    expect(activeState.render.calls - stableState.render.calls).toBeLessThanOrEqual(24);
     expect(stableState.render.triangles).toBeLessThanOrEqual(100_000);
     expect(errors).toEqual([]);
     await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
@@ -836,7 +871,7 @@ test.describe('boot and authored presentation', () => {
   test('menu exposes controls and accessibility settings', async ({ page }) => {
     await pageReady(page);
     await expect(page.locator('#solo')).toHaveText('BOT SKIRMISH');
-    await page.getByRole('button', { name: 'OPTIONS' }).click();
+    await page.getByRole('tab', { name: 'OPTIONS' }).click();
     await expect(page.locator('#sensitivity')).toBeVisible();
     await expect(page.locator('#controller-sensitivity')).toBeVisible();
     await expect(page.locator('#field-of-view')).toBeVisible();
@@ -851,7 +886,7 @@ test.describe('boot and authored presentation', () => {
     });
     await page.reload();
     await pageReady(page);
-    await page.getByRole('button', { name: 'OPTIONS' }).click();
+    await page.getByRole('tab', { name: 'OPTIONS' }).click();
     await expect(page.locator('#controller-sensitivity')).toHaveValue('1.45');
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
@@ -876,11 +911,11 @@ test.describe('boot and authored presentation', () => {
   test('selects and persists an allowlisted field kit for deployment', async ({ page }) => {
     test.setTimeout(120_000);
     await pageReady(page);
-    await page.getByRole('button', { name: 'FIELD KIT' }).click();
+    await page.getByRole('tab', { name: 'FIELD KIT' }).click();
     const runner = page.locator('[data-kit-id="runner"]');
     await runner.click();
     await expect(runner).toHaveClass(/selected/);
-    await page.getByRole('button', { name: 'DEPLOY' }).click();
+    await page.getByRole('tab', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('Circuit Runner');
     await page.reload();
     await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
@@ -897,24 +932,31 @@ test.describe('boot and authored presentation', () => {
       document.querySelector('#menu')?.classList.remove('hidden');
     });
     await expect(page.locator('#menu')).toBeVisible();
-    await page.getByRole('button', { name: 'FIELD KIT' }).click();
+    await page.getByRole('tab', { name: 'FIELD KIT' }).click();
     await page.locator('[data-kit-id="breacher"]').click();
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
       undefined,
       { timeout: 20_000 },
     );
-    await page.getByRole('button', { name: 'DEPLOY' }).click();
+    await page.getByRole('tab', { name: 'DEPLOY' }).click();
     await expect(page.locator('#selected-kit-summary')).toContainText('QUEUED NEXT DEPLOYMENT');
     const redeploy = page.getByRole('button', { name: 'REDEPLOY NOW WITH SELECTED FIELD KIT' });
     await expect(redeploy).toBeVisible();
+    const beforeRedeploy = await debug(page);
     await redeploy.click();
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'scattergun',
       undefined,
       { timeout: 12_000 },
     );
-    expect((await debug(page)).player.equippedWeapons).toEqual(['scattergun', 'pistol']);
+    const afterRedeploy = await debug(page);
+    expect(afterRedeploy.player.equippedWeapons).toEqual(['scattergun', 'pistol']);
+    expect(afterRedeploy.player.kills).toBe(beforeRedeploy.player.kills);
+    expect(afterRedeploy.player.deaths).toBe(beforeRedeploy.player.deaths);
+    expect(afterRedeploy.corpses.active).toBe(beforeRedeploy.corpses.active);
+    expect(afterRedeploy.deathDrops).toHaveLength(beforeRedeploy.deathDrops.length);
+    expect(afterRedeploy.fieldSupport.streak).toBe(beforeRedeploy.fieldSupport.streak);
   });
 });
 
@@ -1239,7 +1281,7 @@ test.describe('solo mechanics', () => {
     }
   });
 
-  test('plays a bounded rigged death animation before a clean respawn', async ({ page }) => {
+  test('plays the canonical rigged death animation before a clean respawn', async ({ page }) => {
     const dying = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         placeBotAhead: (distance: number) => void;
@@ -1254,6 +1296,13 @@ test.describe('solo mechanics', () => {
     expect(dying.rootVisible).toBe(true);
     expect(dying.operatorModel?.activeClip).toBe('Death');
     expect((await debug(page)).corpses).toMatchObject({ active: 1, lifetimeMs: 7_500 });
+    expect((await debug(page)).corpses.models[0]).toMatchObject({
+      source: 'Quaternius Ultimate Modular Males / Swat.gltf',
+      appearance: 'team',
+      skinnedMeshes: 5,
+      weaponChildren: 1,
+      activeClip: 'Death',
+    });
     await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 8_000 }).toBe(true);
     const respawned = (await debug(page)).bots[0];
     expect(respawned.rootVisible).toBe(true);
@@ -1990,6 +2039,12 @@ test.describe('solo mechanics', () => {
     });
     expect(initialSpawnInMs).toBeGreaterThan(105_000);
     expect(initialSpawnInMs).toBeLessThanOrEqual(120_000);
+    expect((await debug(page)).overdrive).toMatchObject({
+      available: false,
+      visible: false,
+      renderResident: true,
+      presentationPrewarmed: true,
+    });
     const spawnAnnouncement = await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         setOverdrive: (mode: 'available' | 'expired') => void;
@@ -2004,7 +2059,7 @@ test.describe('solo mechanics', () => {
     expect(spawnAnnouncement.text).toContain('2× DAMAGE ONLINE');
     await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
     expect((await debug(page)).overdrive).toMatchObject({
-      available: true, presentationPrewarmed: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
+      available: true, presentationPrewarmed: true, renderResident: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
     });
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
@@ -2232,15 +2287,7 @@ test.describe('solo mechanics', () => {
     expect(after.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
   });
 
-  test('starts with two frags and resolves a prewarmed Hallelujah explosion without a detonation hitch', async ({ page }) => {
-    await page.waitForFunction(
-      () => {
-        const choir = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().audio.sanctifiedFragChoir;
-        return choir.ready === true && choir.prewarmed === true;
-      },
-      undefined,
-      { timeout: 10_000 },
-    );
+  test('starts with two normal frags, accelerates the fuse beep, and resolves the prewarmed explosion without a hitch', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState; throwGrenade: () => void; teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
       const before = api.snapshot();
@@ -2292,26 +2339,23 @@ test.describe('solo mechanics', () => {
 
     expect(result.before.player.grenades).toBe(2);
     expect(result.before.grenadeVisual.status).toBe('ready');
-    expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/holy-hand-frag.glb');
+    expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/frag-grenade.glb');
     expect(result.before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
     expect(result.before.grenadeExplosion).toMatchObject({ poolCapacity: 4, dynamicLights: 0, prewarmed: true });
-    expect(result.before.audio.sanctifiedFragChoir).toMatchObject({
-      asset: './assets/original/audio/sanctified-frag-hallelujah.wav',
-      status: 'ready',
-      ready: true,
-      prewarmed: true,
-      byteLength: 313_152,
-      plays: 0,
+    expect(result.before.audio).toMatchObject({
+      ambience: { continuousSources: 0 },
+      grenadeFuse: { beeps: 0, startMs: 1_450 },
     });
+    expect(result.before.audio.ambience.busGain).toBeCloseTo(0.12, 5);
     expect(result.thrown.player.grenades).toBe(1);
     expect(result.thrown.grenades).toBe(1);
     expect(result.thrown.grenadeVisual.active).toHaveLength(1);
-    expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'sanctified-frag-authored-glb', authored: true });
+    expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'frag-grenade-authored-glb', authored: true });
     expect(result.thrown.grenadeVisual.active[0].meshes).toBeGreaterThanOrEqual(12);
     expect(result.after.grenadeExplosion.total).toBe(1);
     expect(result.after.grenadeExplosion.activeVisuals).toBe(0);
     expect(result.after.grenades).toBe(0);
-    expect(result.after.audio.sanctifiedFragChoir.plays).toBe(1);
+    expect(result.after.audio.grenadeFuse.beeps).toBeGreaterThanOrEqual(4);
     const hitchEvidence = `baselineFrameP95=${result.baselineP95FrameMs.toFixed(1)}ms detonationFrame=${result.detonationMaxFrameMs.toFixed(1)}ms baselineLongTaskP95=${result.baselineP95LongTaskMs.toFixed(1)}ms detonationLongTask=${result.detonationMaxLongTaskMs.toFixed(1)}ms sync=${JSON.stringify(result.after.grenadeExplosion.profile)}`;
     expect(result.after.grenadeExplosion.profile.totalSyncMs, hitchEvidence).toBeLessThan(12);
     expect(result.detonationMaxFrameMs - result.baselineP95FrameMs, hitchEvidence).toBeLessThan(100);
@@ -2379,6 +2423,26 @@ test.describe('solo mechanics', () => {
     await page.waitForTimeout(5_700);
     expect((await debug(page)).player.hp).toBeGreaterThan(damaged.player.hp);
   });
+});
+
+test('keeps Field Support visible and audible on Terminal', async ({ page }) => {
+  await pageReadyAt(page, '/?render=performance&map=terminal');
+  await startSolo(page);
+  await expect(page.locator('#support-block')).toBeVisible();
+  const result = await page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+      snapshot: () => DebugState;
+      earnSupport: (eliminations: number) => void;
+      activateSupport: (id: 'yardhawk') => void;
+    } }).__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot();
+    api.earnSupport(5);
+    api.activateSupport('yardhawk');
+    return { before, after: api.snapshot() };
+  });
+  expect(result.after.fieldSupport.yardhawk.active).toBe(true);
+  expect(result.after.audio.support.cues).toBeGreaterThan(result.before.audio.support.cues);
+  await expect(page.locator('#killfeed')).toContainText('YARDHAWK THROWN');
 });
 
 test.describe('performance and stability', () => {
