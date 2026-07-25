@@ -1,4 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 const reviewViewports = [
   { id: 'laptop', width: 1280, height: 720 },
@@ -18,7 +20,26 @@ async function ready(page: Page): Promise<void> {
   await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
 }
 
-test.describe('Pass 64 tactical HUD and menu contract', () => {
+async function captureReview(page: Page, testInfo: TestInfo, state: string, viewport: typeof reviewViewports[number]): Promise<void> {
+  const directory = resolve(process.cwd(), 'artifacts/pass64/ui-review');
+  mkdirSync(directory, { recursive: true });
+  const path = resolve(directory, `${state}-${viewport.id}-${viewport.width}x${viewport.height}.png`);
+  await page.screenshot({ path, animations: 'disabled' });
+  await testInfo.attach(`${state}-${viewport.id}`, { path, contentType: 'image/png' });
+}
+
+async function startDeterministicSolo(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
+    window.__ATOMIC_ACRES_DEBUG__.startSolo();
+  });
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+  await page.waitForTimeout(2_500);
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+}
+
+test.describe('Pass 64 command HUD and menu contract', () => {
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
     await ready(page);
     const cards = page.locator('.map-card');
@@ -83,6 +104,8 @@ test.describe('Pass 64 tactical HUD and menu contract', () => {
         const root = document.documentElement;
         const menu = document.querySelector<HTMLElement>('#menu')!;
         const map = document.querySelector<HTMLElement>('#map-selector')!;
+        const showcase = document.querySelector<HTMLElement>('#menu-showcase')!;
+        const workspace = document.querySelector<HTMLElement>('.command-workspace')!;
         const rect = menu.getBoundingClientRect();
         const mapRect = map.getBoundingClientRect();
         return {
@@ -91,20 +114,19 @@ test.describe('Pass 64 tactical HUD and menu contract', () => {
           menuOverflowX: menu.scrollWidth - menu.clientWidth,
           withinViewport: rect.left >= -1 && rect.right <= innerWidth + 1 && rect.top >= -1 && rect.bottom <= innerHeight + 1,
           mapWithinMenu: mapRect.left >= rect.left - 1 && mapRect.right <= rect.right + 1,
+          showcaseInsideWorkspace: workspace.contains(showcase),
+          shellWidthRatio: rect.width / innerWidth,
         };
       });
-      expect(layout).toEqual({
-        contract: 'pass64-tactical-v1',
-        pageOverflowX: 0,
-        menuOverflowX: 0,
-        withinViewport: true,
-        mapWithinMenu: true,
-      });
+      expect(layout.contract).toBe('pass64-command-v2');
+      expect(layout.pageOverflowX).toBe(0);
+      expect(layout.menuOverflowX).toBe(0);
+      expect(layout.withinViewport).toBe(true);
+      expect(layout.mapWithinMenu).toBe(true);
+      expect(layout.showcaseInsideWorkspace).toBe(true);
+      expect(layout.shellWidthRatio).toBeGreaterThan(viewport.id === 'ultrawide' ? 0.8 : viewport.id === 'narrow' ? 0.99 : 0.95);
 
-      await testInfo.attach(`pass64-menu-${viewport.id}`, {
-        body: await page.screenshot({ animations: 'disabled' }),
-        contentType: 'image/png',
-      });
+      await captureReview(page, testInfo, 'setup', viewport);
     });
   }
 
@@ -131,26 +153,71 @@ test.describe('Pass 64 tactical HUD and menu contract', () => {
     expect(contract.controls).toBeGreaterThanOrEqual(8);
   });
 
-  test('preserves the critical live-match HUD at the deterministic desktop camera', async ({ page }, testInfo) => {
+  test('preserves the critical live-match HUD across the review viewport matrix', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
     await page.setViewportSize({ width: 1920, height: 1080 });
     await ready(page);
-    await page.evaluate(() => {
-      window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
-      window.__ATOMIC_ACRES_DEBUG__.startSolo();
-    });
-    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
-    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
-    await page.waitForTimeout(2_500);
-    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+    await startDeterministicSolo(page);
 
     for (const selector of ['#hud', '#matchbar', '#crosshair', '#minimap', '#health-block', '#weapon-block', '#equipment-block', '#support-block']) {
       await expect(page.locator(selector)).toBeVisible();
     }
     await expect(page.locator('#objective')).toContainText('NUKE TOWN');
     await expect(page.locator('#support-block [data-support]')).toHaveCount(5);
-    await testInfo.attach('pass64-live-hud-desktop', {
-      body: await page.screenshot({ animations: 'disabled' }),
-      contentType: 'image/png',
+    for (const viewport of reviewViewports) {
+      await page.setViewportSize(viewport);
+      await captureReview(page, testInfo, 'live-hud', viewport);
+    }
+  });
+
+  test('renders a full returned-lobby command room at every review viewport', async ({ page }, testInfo) => {
+    await ready(page);
+    await page.evaluate(() => {
+      const lobby = document.querySelector<HTMLElement>('#private-lobby')!;
+      const room = document.querySelector<HTMLElement>('#room-card')!;
+      const title = document.querySelector<HTMLElement>('#private-lobby-title')!;
+      const roster = document.querySelector<HTMLElement>('#lobby-roster')!;
+      const status = document.querySelector<HTMLElement>('#network-status')!;
+      lobby.hidden = false;
+      room.hidden = false;
+      title.textContent = 'RETURNED TO LOBBY';
+      document.querySelector<HTMLElement>('#room-code')!.textContent = 'PASS-64-REVIEW';
+      document.querySelector<HTMLElement>('#lobby-capacity-label')!.textContent = '3 / 6';
+      status.textContent = 'Lobby reset · all operators can ready for the next match.';
+      roster.innerHTML = [
+        ['HOST OPERATOR', 'HOST · AQUA', '18 ms', 'READY'],
+        ['GUEST ALPHA', 'GUEST · CORAL', '31 ms', 'SETTING UP'],
+        ['GUEST BRAVO', 'GUEST · AQUA', '42 ms', 'READY'],
+      ].map(([name, role, ping, state]) => `<div class="lobby-player"><span><strong>${name}</strong><small>${role}</small></span><b>${ping}</b><em>${state}</em></div>`).join('');
     });
+
+    for (const viewport of reviewViewports) {
+      await page.setViewportSize(viewport);
+      await expect(page.locator('#private-lobby')).toBeVisible();
+      await expect(page.locator('#lobby-ready')).toBeVisible();
+      await expect(page.locator('#lobby-start')).toBeVisible();
+      const bounded = await page.locator('#private-lobby').evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.left >= -1 && rect.right <= innerWidth + 1;
+      });
+      expect(bounded).toBe(true);
+      await captureReview(page, testInfo, 'returned-lobby', viewport);
+    }
+  });
+
+  test('renders the after-action match-end composition at every review viewport', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await ready(page);
+    await startDeterministicSolo(page);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.endMatch());
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'ended');
+    await expect(page.locator('#banner .round-stats')).toBeVisible();
+    await expect(page.locator('#rematch')).toBeVisible();
+
+    for (const viewport of reviewViewports) {
+      await page.setViewportSize(viewport);
+      await captureReview(page, testInfo, 'match-end', viewport);
+    }
   });
 });

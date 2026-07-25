@@ -4,6 +4,7 @@ import { UI_REVIEW_VIEWPORTS, UI_STATE_INVENTORY, UI_SURFACE_INVENTORY } from '.
 
 const mainSource = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
 const generatedDialogSources = [
+  readFileSync(new URL('./pass64-shell.ts', import.meta.url), 'utf8'),
   readFileSync(new URL('./project-map-dialog.ts', import.meta.url), 'utf8'),
   readFileSync(new URL('./release-history-dialog.ts', import.meta.url), 'utf8'),
 ].join('\n');
