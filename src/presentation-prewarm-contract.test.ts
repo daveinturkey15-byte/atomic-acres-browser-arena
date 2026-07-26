@@ -26,6 +26,11 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
+    expect(source).toContain("bootstrapStage = 'verifying-first-presentation'");
+    expect(bootstrap.indexOf("bootstrapStage = 'verifying-first-presentation'"))
+      .toBeLessThan(bootstrap.indexOf("bootstrapStage = 'ready'"));
+    expect(bootstrap).toContain('submitWebGpuFrame(performance.now(), true)');
+    expect(bootstrap).toContain('await flushWebGpuFrames(8_000)');
     expect(source).toContain("bootstrapStage = 'ready'");
   });
 

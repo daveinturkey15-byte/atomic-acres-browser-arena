@@ -791,6 +791,7 @@ type BootstrapStage =
   | 'batching-static-meshes'
   | 'prewarming-overdrive'
   | 'finalizing'
+  | 'verifying-first-presentation'
   | 'ready'
   | 'failed';
 let bootstrapStage: BootstrapStage = 'loading-module-assets';
@@ -12783,6 +12784,22 @@ async function bootstrap(): Promise<void> {
   respawn();
   weaponView.root.visible = false;
   setArenaMenuCamera();
+
+  // Scene compilation alone does not prove that WebGPU can submit and retire
+  // the first complete frame. Do that while bootstrap still owns the loading
+  // surface so the runtime watchdog only arms after a real presentation fence.
+  bootstrapStage = 'verifying-first-presentation';
+  renderRuntime.resetRenderInfo();
+  if (renderRuntime.backend === 'webgpu') {
+    submitWebGpuFrame(performance.now(), true);
+    await flushWebGpuFrames(8_000);
+    const initialPresentation = renderRuntime.presentationTelemetry();
+    if (initialPresentation.status !== 'healthy' || renderRuntime.renderInfo().calls <= 0) {
+      throw new Error(`Initial WebGPU presentation was not healthy: ${JSON.stringify(initialPresentation)}`);
+    }
+  } else {
+    atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+  }
 
   arenaSelectionReady = true;
   syncArenaSelectionUi();
