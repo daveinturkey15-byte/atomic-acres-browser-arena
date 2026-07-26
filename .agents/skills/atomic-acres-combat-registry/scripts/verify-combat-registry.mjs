@@ -16,8 +16,34 @@ const WEAPON_ORACLE = Object.freeze({
   railgun: Object.freeze({ slot: 'special', family: 'marksman', fireKind: 'hitscan', fireMode: 'semi', damagePolicy: 'standard' }),
 });
 const REQUIRED_WEAPON_IDS = Object.freeze(Object.keys(WEAPON_ORACLE));
+const TRACER_COLOR_ORACLE = Object.freeze({
+  carbine: 0xffd166,
+  smg: 0x65e7ff,
+  lmg: 0x9fda72,
+  scattergun: 0xff8a5b,
+  sniper: 0xa9e7ff,
+  pistol: 0xe8c77b,
+  'machine-pistol': 0xff9f43,
+  magnum: 0xffd36a,
+  railgun: 0x7df8ff,
+});
+const RANGE_ORACLE = Object.freeze({
+  carbine: Object.freeze({ kind: 'station', stationId: 'range-carbine' }),
+  smg: Object.freeze({ kind: 'station', stationId: 'range-smg' }),
+  lmg: Object.freeze({ kind: 'station', stationId: 'range-lmg' }),
+  scattergun: Object.freeze({ kind: 'station', stationId: 'range-scattergun' }),
+  sniper: Object.freeze({ kind: 'station', stationId: 'range-sniper' }),
+  pistol: Object.freeze({ kind: 'companion-sidearm', primaryIds: Object.freeze(['carbine', 'smg', 'lmg', 'scattergun']) }),
+  'machine-pistol': Object.freeze({ kind: 'companion-sidearm', primaryIds: Object.freeze(['sniper']) }),
+  magnum: Object.freeze({ kind: 'entitlement-only', entitlementPolicyId: 'dhv-x-sidearm-v1' }),
+  railgun: Object.freeze({ kind: 'never' }),
+});
+const LOADOUT_POLICY_ORACLE = Object.freeze({
+  carbine: 'eligible', smg: 'eligible', lmg: 'eligible', scattergun: 'eligible', sniper: 'eligible',
+  pistol: 'eligible', 'machine-pistol': 'eligible', magnum: 'never', railgun: 'pickup-only',
+});
 const REQUIRED_COVERAGE = Object.freeze([
-  'gameplay', 'protocol', 'loadout', 'bots', 'drops', 'replay', 'presentation',
+  'gameplay', 'protocol', 'loadout', 'range', 'bots', 'drops', 'replay', 'presentation',
   'audio', 'penetration', 'telemetry', 'tests', 'provenance',
 ]);
 const SLOT_VALUES = new Set(['primary', 'secondary', 'special']);
@@ -88,11 +114,39 @@ function validateOptic(optic, weaponId, failures, allowReviewedThermalSchemaProb
   failures.push(`${label}: invalid optic discriminant ${String(optic.kind)}`);
 }
 
+function validateRangePolicy(range, weaponId, failures) {
+  const label = `${weaponId}.policies.range`;
+  if (!isObject(range)) {
+    failures.push(`${label}: must be a typed object`);
+    return;
+  }
+  const oracle = RANGE_ORACLE[weaponId];
+  if (range.kind === 'station') {
+    exactKeys(range, ['kind', 'stationId'], label, failures);
+    if (!idOk(range.stationId)) failures.push(`${label}: stationId invalid`);
+    if (oracle?.kind === 'station' && range.stationId !== oracle.stationId) failures.push(`${label}: stationId contradicts the B1 Gun Range oracle`);
+  } else if (range.kind === 'companion-sidearm') {
+    exactKeys(range, ['kind', 'primaryIds'], label, failures);
+    if (!Array.isArray(range.primaryIds) || range.primaryIds.length < 1 || new Set(range.primaryIds).size !== range.primaryIds.length || !range.primaryIds.every(idOk)) failures.push(`${label}: primaryIds invalid`);
+    if (oracle?.kind === 'companion-sidearm') exactStringSet(range.primaryIds, oracle.primaryIds, `${label}.primaryIds`, failures);
+  } else if (range.kind === 'entitlement-only') {
+    exactKeys(range, ['kind', 'entitlementPolicyId'], label, failures);
+    if (!idOk(range.entitlementPolicyId)) failures.push(`${label}: entitlementPolicyId invalid`);
+    if (oracle?.kind === 'entitlement-only' && range.entitlementPolicyId !== oracle.entitlementPolicyId) failures.push(`${label}: entitlement policy contradicts the B1 DHV route`);
+  } else if (range.kind === 'never') {
+    exactKeys(range, ['kind'], label, failures);
+  } else {
+    exactKeys(range, ['kind'], label, failures);
+    failures.push(`${label}: invalid range discriminant ${String(range.kind)}`);
+  }
+  if (!oracle || range.kind !== oracle.kind) failures.push(`${label}: availability contradicts the B1 Gun Range oracle`);
+}
+
 function validateWeapon(weapon, failures) {
   const label = idOk(weapon?.id) ? weapon.id : '<invalid-weapon>';
   const required = [
     'id', 'displayName', 'slot', 'family', 'fireKind', 'fireMode', 'rpm', 'pellets', 'spinUpMs',
-    'movementMultiplier', 'damage', 'spread', 'recoil', 'ammo', 'penetration', 'optic', 'projectileId',
+    'movementMultiplier', 'damage', 'spread', 'recoil', 'ammo', 'penetration', 'effects', 'optic', 'projectileId',
     'policies', 'modelSetId', 'presentationId', 'audioId', 'provenanceId', 'evidenceIds',
   ];
   exactKeys(weapon, required, label, failures);
@@ -157,19 +211,31 @@ function validateWeapon(weapon, failures) {
   if (!Number.isInteger(penetration?.maximumSurfaces) || penetration.maximumSurfaces < 0 || penetration.maximumSurfaces > 64) failures.push(`${label}: maximumSurfaces invalid`);
   if (weapon?.id === 'railgun' && !(penetration?.power === 100000 && penetration?.maximumSurfaces === 64)) failures.push(`${label}: railgun must preserve exact power 100000 and 64 surfaces`);
 
+  const effects = weapon?.effects;
+  exactKeys(effects, ['tracerColorHex'], `${label}.effects`, failures);
+  const tracerColorValid = Number.isInteger(effects?.tracerColorHex) && effects.tracerColorHex >= 0 && effects.tracerColorHex <= 0xffffff;
+  if (!tracerColorValid) failures.push(`${label}: tracerColorHex must be a 24-bit integer`);
+  if (tracerColorValid && Object.hasOwn(TRACER_COLOR_ORACLE, weapon?.id) && effects.tracerColorHex !== TRACER_COLOR_ORACLE[weapon.id]) failures.push(`${label}: tracerColorHex contradicts the B1 color oracle`);
+
   validateOptic(weapon?.optic, weapon?.id, failures);
   if (weapon?.fireKind === 'projectile') {
     if (!idOk(weapon?.projectileId)) failures.push(`${label}: projectile fireKind requires projectileId`);
   } else if (weapon?.projectileId !== null) failures.push(`${label}: non-projectile fireKind must use null projectileId`);
 
   const policies = weapon?.policies;
-  exactKeys(policies, ['loadout', 'bot', 'drop', 'replay', 'telemetry', 'stance', 'authority'], `${label}.policies`, failures);
-  if (!['eligible', 'diagnostic-only', 'never'].includes(policies?.loadout)) failures.push(`${label}: loadout policy invalid`);
+  exactKeys(policies, ['loadout', 'bot', 'drop', 'range', 'replay', 'telemetry', 'stance', 'authority'], `${label}.policies`, failures);
+  if (!['eligible', 'curated-only', 'pickup-only', 'never'].includes(policies?.loadout)) failures.push(`${label}: loadout policy invalid`);
+  if (Object.hasOwn(LOADOUT_POLICY_ORACLE, weapon?.id) && policies?.loadout !== LOADOUT_POLICY_ORACLE[weapon.id]) failures.push(`${label}: loadout policy contradicts the reviewed F01 target`);
   if (!['eligible', 'diagnostic-only', 'never'].includes(policies?.bot)) failures.push(`${label}: bot policy invalid`);
   if (!['droppable', 'map-pickup', 'never'].includes(policies?.drop)) failures.push(`${label}: drop policy invalid`);
+  validateRangePolicy(policies?.range, weapon?.id, failures);
   if (!['serialized', 'decode-only'].includes(policies?.replay)) failures.push(`${label}: replay policy invalid`);
-  if (policies?.telemetry !== 'bounded') failures.push(`${label}: telemetry policy invalid`);
-  if (!['stand-crouch-prone', 'stand-crouch'].includes(policies?.stance)) failures.push(`${label}: stance policy invalid`);
+  if (!['standard', 'not-applicable'].includes(policies?.telemetry)) failures.push(`${label}: telemetry policy invalid`);
+  if (oracle && policies?.telemetry !== 'standard') failures.push(`${label}: telemetry policy contradicts B1 combat-event coverage`);
+  const stance = policies?.stance;
+  exactKeys(stance, ['stand', 'crouch', 'prone'], `${label}.policies.stance`, failures);
+  for (const key of ['stand', 'crouch', 'prone']) if (!['allowed', 'blocked'].includes(stance?.[key])) failures.push(`${label}: stance ${key} policy invalid`);
+  if (oracle && ['stand', 'crouch', 'prone'].some(key => stance?.[key] !== 'allowed')) failures.push(`${label}: stance policy contradicts B1 all-stance behavior`);
   if (!['host-shot-v1', 'host-railgun-v1', 'host-projectile-v1'].includes(policies?.authority)) failures.push(`${label}: authority policy invalid`);
   if (weapon?.id === 'railgun' ? policies?.authority !== 'host-railgun-v1' : policies?.authority !== 'host-shot-v1') failures.push(`${label}: authority policy contradicts the B1 route`);
   for (const key of ['modelSetId', 'presentationId', 'audioId', 'provenanceId']) if (!idOk(weapon?.[key])) failures.push(`${label}: ${key} missing or invalid`);
@@ -223,9 +289,15 @@ function runSelfTest() {
     ['unknown-recoil', value => { value.weapons[0].recoil.recoveryMs = 100; }, 'carbine.recoil: unknown key recoveryMs'],
     ['unknown-ammo', value => { value.weapons[0].ammo.reloadMs = 100; }, 'carbine.ammo: unknown key reloadMs'],
     ['unknown-penetration', value => { value.weapons[0].penetration.retentionPerSurface = 0.8; }, 'carbine.penetration: unknown key retentionPerSurface'],
+    ['unknown-effects', value => { value.weapons[0].effects.threeColor = 'red'; }, 'carbine.effects: unknown key threeColor'],
     ['unknown-standard-optic', value => { value.weapons[0].optic.overlay = 'candidate'; }, 'carbine.optic: unknown key overlay'],
     ['unknown-special-optic', value => { value.weapons.find(item => item.id === 'railgun').optic.overlay = 'candidate'; }, 'railgun.optic: unknown key overlay'],
     ['unknown-policies', value => { value.weapons[0].policies.candidate = 'eligible'; }, 'carbine.policies: unknown key candidate'],
+    ['unknown-range-station', value => { value.weapons[0].policies.range.candidate = true; }, 'carbine.policies.range: unknown key candidate'],
+    ['unknown-range-sidearm', value => { value.weapons.find(item => item.id === 'pistol').policies.range.candidate = true; }, 'pistol.policies.range: unknown key candidate'],
+    ['unknown-range-entitlement', value => { value.weapons.find(item => item.id === 'magnum').policies.range.candidate = true; }, 'magnum.policies.range: unknown key candidate'],
+    ['unknown-range-never', value => { value.weapons.find(item => item.id === 'railgun').policies.range.candidate = true; }, 'railgun.policies.range: unknown key candidate'],
+    ['unknown-stance', value => { value.weapons[0].policies.stance.candidate = 'allowed'; }, 'carbine.policies.stance: unknown key candidate'],
     ['unknown-coverage', value => { value.coverage[0].candidate = true; }, 'coverage.carbine: unknown key candidate'],
     ['missing-root', value => { delete value.schemaVersion; }, 'manifest: missing required key schemaVersion'],
     ['missing-weapon', value => { delete value.weapons[0].displayName; }, 'carbine: missing required key displayName'],
@@ -234,9 +306,17 @@ function runSelfTest() {
     ['missing-recoil', value => { delete value.weapons[0].recoil.recoveryPerSecond; }, 'carbine.recoil: missing required key recoveryPerSecond'],
     ['missing-ammo', value => { delete value.weapons[0].ammo.emptyReloadSeconds; }, 'carbine.ammo: missing required key emptyReloadSeconds'],
     ['missing-penetration', value => { delete value.weapons[0].penetration.calibreLabel; }, 'carbine.penetration: missing required key calibreLabel'],
+    ['missing-effects-object', value => { delete value.weapons[0].effects; }, 'carbine: missing required key effects'],
+    ['missing-tracer-color', value => { delete value.weapons[0].effects.tracerColorHex; }, 'carbine.effects: missing required key tracerColorHex'],
     ['missing-standard-optic', value => { delete value.weapons[0].optic.solidOcclusion; }, 'carbine.optic: missing required key solidOcclusion'],
     ['missing-special-optic', value => { delete value.weapons.find(item => item.id === 'railgun').optic.authorityPolicyId; }, 'railgun.optic: missing required key authorityPolicyId'],
     ['missing-policies', value => { delete value.weapons[0].policies.stance; }, 'carbine.policies: missing required key stance'],
+    ['missing-range-policy', value => { delete value.weapons[0].policies.range; }, 'carbine.policies: missing required key range'],
+    ['missing-range-station-id', value => { delete value.weapons[0].policies.range.stationId; }, 'carbine.policies.range: missing required key stationId'],
+    ['missing-range-sidearm-ids', value => { delete value.weapons.find(item => item.id === 'pistol').policies.range.primaryIds; }, 'pistol.policies.range: missing required key primaryIds'],
+    ['missing-range-entitlement-id', value => { delete value.weapons.find(item => item.id === 'magnum').policies.range.entitlementPolicyId; }, 'magnum.policies.range: missing required key entitlementPolicyId'],
+    ['missing-range-never-kind', value => { delete value.weapons.find(item => item.id === 'railgun').policies.range.kind; }, 'railgun.policies.range: missing required key kind'],
+    ['missing-stance-key', value => { delete value.weapons[0].policies.stance.prone; }, 'carbine.policies.stance: missing required key prone'],
     ['missing-coverage', value => { delete value.coverage[0].evidenceSha256; }, 'coverage.carbine: missing required key evidenceSha256'],
     ['invalid-discriminant', value => { value.weapons[0].fireKind = 'laser'; }, 'carbine: invalid fireKind'],
     ['invalid-damage-policy', value => { value.weapons[0].damage.policy = 'candidate-defined'; }, 'carbine: invalid damage policy'],
@@ -248,11 +328,28 @@ function runSelfTest() {
     ['pellet-cap', value => { value.weapons.find(item => item.id === 'scattergun').pellets = 13; }, 'scattergun: pellets must be an integer from 1 through 12'],
     ['railgun-power-above-exact', value => { value.weapons.find(item => item.id === 'railgun').penetration.power = 100001; }, 'railgun: penetration power invalid'],
     ['railgun-surfaces-above-exact', value => { value.weapons.find(item => item.id === 'railgun').penetration.maximumSurfaces = 65; }, 'railgun: maximumSurfaces invalid'],
+    ['tracer-color-below-range', value => { value.weapons[0].effects.tracerColorHex = -1; }, 'carbine: tracerColorHex must be a 24-bit integer'],
+    ['tracer-color-above-range', value => { value.weapons[0].effects.tracerColorHex = 0x1000000; }, 'carbine: tracerColorHex must be a 24-bit integer'],
+    ['tracer-color-non-integer', value => { value.weapons[0].effects.tracerColorHex = 1.5; }, 'carbine: tracerColorHex must be a 24-bit integer'],
     ['degree-spread-field', value => { value.weapons[0].spread.hipSpreadDeg = 1; }, 'carbine.spread: unknown key hipSpreadDeg'],
     ['millisecond-recovery-field', value => { value.weapons[0].recoil.recoveryMs = 100; }, 'carbine.recoil: unknown key recoveryMs'],
     ['missing-explicit-stance-multiplier', value => { delete value.weapons[0].spread.standMultiplier; }, 'carbine.spread: missing required key standMultiplier'],
     ['missing-recoil-stance-multiplier', value => { delete value.weapons[0].recoil.proneMultiplier; }, 'carbine.recoil: missing required key proneMultiplier'],
-    ['invalid-policy-enum', value => { value.weapons[0].policies.stance = 'candidate-defined'; }, 'carbine: stance policy invalid'],
+    ['legacy-loadout-enum', value => { value.weapons[0].policies.loadout = 'diagnostic-only'; }, 'carbine: loadout policy invalid'],
+    ['lmg-loadout-target-drift', value => { value.weapons.find(item => item.id === 'lmg').policies.loadout = 'curated-only'; }, 'lmg: loadout policy contradicts the reviewed F01 target'],
+    ['machine-pistol-loadout-target-drift', value => { value.weapons.find(item => item.id === 'machine-pistol').policies.loadout = 'curated-only'; }, 'machine-pistol: loadout policy contradicts the reviewed F01 target'],
+    ['magnum-ordinary-loadout-drift', value => { value.weapons.find(item => item.id === 'magnum').policies.loadout = 'eligible'; }, 'magnum: loadout policy contradicts the reviewed F01 target'],
+    ['railgun-pickup-loadout-drift', value => { value.weapons.find(item => item.id === 'railgun').policies.loadout = 'never'; }, 'railgun: loadout policy contradicts the reviewed F01 target'],
+    ['legacy-telemetry-enum', value => { value.weapons[0].policies.telemetry = 'bounded'; }, 'carbine: telemetry policy invalid'],
+    ['telemetry-b1-drift', value => { value.weapons[0].policies.telemetry = 'not-applicable'; }, 'carbine: telemetry policy contradicts B1 combat-event coverage'],
+    ['invalid-stance-enum', value => { value.weapons[0].policies.stance.prone = 'candidate-defined'; }, 'carbine: stance prone policy invalid'],
+    ['stance-b1-drift', value => { value.weapons[0].policies.stance.prone = 'blocked'; }, 'carbine: stance policy contradicts B1 all-stance behavior'],
+    ['invalid-range-discriminant', value => { value.weapons[0].policies.range = { kind: 'pickup-only' }; }, 'carbine.policies.range: invalid range discriminant pickup-only'],
+    ['range-station-drift', value => { value.weapons[0].policies.range.stationId = 'range-other'; }, 'carbine.policies.range: stationId contradicts the B1 Gun Range oracle'],
+    ['range-sidearm-drift', value => { value.weapons.find(item => item.id === 'pistol').policies.range.primaryIds.pop(); }, 'pistol.policies.range.primaryIds: missing pinned value scattergun'],
+    ['range-sidearm-duplicate', value => { value.weapons.find(item => item.id === 'pistol').policies.range.primaryIds.push('carbine'); }, 'pistol.policies.range: primaryIds invalid'],
+    ['range-entitlement-drift', value => { value.weapons.find(item => item.id === 'magnum').policies.range.entitlementPolicyId = 'candidate-entitlement'; }, 'magnum.policies.range: entitlement policy contradicts the B1 DHV route'],
+    ['range-never-drift', value => { value.weapons.find(item => item.id === 'railgun').policies.range = { kind: 'station', stationId: 'range-railgun' }; }, 'railgun.policies.range: availability contradicts the B1 Gun Range oracle'],
     ['contradictory-empty-reload', value => { value.weapons[0].ammo.emptyReloadSeconds = value.weapons[0].ammo.reloadSeconds - 0.1; }, 'carbine: reload timings invalid'],
     ['contradictory-energy-falloff', value => { value.weapons[0].penetration.energyFalloffEndM = value.weapons[0].penetration.energyFalloffStartM; }, 'carbine: penetration energy falloff invalid'],
     ['broken-head-only', value => { value.weapons.find(item => item.id === 'magnum').damage.limbMultiplier = 1; }, 'magnum: head-only policy must encode the B1 binary head contract'],
@@ -264,6 +361,12 @@ function runSelfTest() {
     ['duplicate-provenance', value => { value.weapons[1].provenanceId = value.weapons[0].provenanceId; }, 'manifest: provenanceId values must be unique per release weapon'],
     ['duplicate-recoil-pattern', value => { value.weapons[1].recoil.deterministicPatternId = value.weapons[0].recoil.deterministicPatternId; }, 'manifest: deterministic recoil pattern IDs must be unique per release weapon'],
     ['coverage-self-oracle', value => { value.coverage[0].channels = ['gameplay']; }, 'coverage.carbine.channels: missing pinned value protocol'],
+    ['coverage-range-drift', value => { value.coverage[0].channels = value.coverage[0].channels.filter(channel => channel !== 'range'); }, 'coverage.carbine.channels: missing pinned value range'],
+    ...fixture.weapons.map((weapon, index) => [
+      `tracer-color-drift-${weapon.id}`,
+      value => { value.weapons[index].effects.tracerColorHex += 1; },
+      `${weapon.id}: tracerColorHex contradicts the B1 color oracle`,
+    ]),
   ];
   for (const [name, mutate, expected] of cases) {
     const candidate = clone(fixture);

@@ -14,7 +14,7 @@ Keep combat definitions typed, exhaustive, host-authoritative, and presentation-
 3. Change the canonical definition before adding runtime wiring. Keep catalog and reducer modules free of Three.js and WebAudio imports.
 4. Extend strict protocol parsing and clean version-mismatch behavior whenever an identity or replicated field changes.
 5. Compare definitions and coverage against validator-owned B1/F01 oracles; never let candidate data declare which IDs or channels are required.
-6. Test boundary distances, radians-based deterministic recoil/spread, cadence, tactical/empty reload, movement, modifier ordering, and physically ordered energy penetration.
+6. Test boundary distances, radians-based deterministic recoil/spread, cadence, tactical/empty reload, movement, modifier ordering, renderer-neutral tracer identity, Gun Range availability, and physically ordered energy penetration.
 7. Compare role/TTK envelopes and actively challenge dominance, stale-life, replay, forged ammo/action, and missing-mapping falsifiers.
 8. Return the exact source and integrated SHAs, changed paths, tests, evidence, assumptions, unknowns, and residual falsifiers.
 
@@ -26,6 +26,7 @@ Keep combat definitions typed, exhaustive, host-authoritative, and presentation-
 - Performance: bound pellets, penetration surfaces, projectiles, effects, audio voices, and transient allocations; prewarm hitch-sensitive paths.
 - Provenance: require original or license-vetted models, textures, animation, audio, source records, and digests; never copy franchise content.
 - Compatibility: preserve frozen existing statistics during behavior-only migration unless a numbered requirement explicitly changes them.
+- Presentation seam: keep registry effects renderer-neutral; adapters may translate bounded color IDs into Three.js materials, tracers, signs, or lights.
 - Completion: reject generic release fallbacks and implicit default policies.
 
 ## Validate
