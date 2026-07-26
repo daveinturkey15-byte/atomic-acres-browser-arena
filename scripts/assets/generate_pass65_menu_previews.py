@@ -129,6 +129,32 @@ def cone(
     return obj
 
 
+def polygon_plate(
+    name: str,
+    points: Iterable[tuple[float, float]],
+    z: float,
+    mat,
+    *,
+    thickness: float = 0.04,
+    bevel: float = 0.018,
+):
+    """Create a softly edged authored silhouette facing the preview camera."""
+    vertices = [(x, y, z) for x, y in points]
+    mesh = bpy.data.meshes.new(f"{name}-mesh")
+    mesh.from_pydata(vertices, [], [tuple(range(len(vertices)))])
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    assign(obj, mat)
+    solidify = obj.modifiers.new("soft-silhouette-thickness", "SOLIDIFY")
+    solidify.thickness = thickness
+    solidify.offset = 0
+    edge = obj.modifiers.new("soft-silhouette-edge", "BEVEL")
+    edge.width = bevel
+    edge.segments = 3
+    return obj
+
+
 def parent(child, owner) -> None:
     child.parent = owner
 
@@ -195,8 +221,10 @@ def reset_scene() -> dict[str, object]:
         "yellow": material("warning-yellow", (0.76, 0.45, 0.025, 1), emission=(1.0, 0.46, 0.02, 1), emission_strength=2.1, roughness=0.42),
         "grass": material("grass", (0.035, 0.16, 0.075, 1), roughness=0.9),
         "ocean": material("ocean", (0.006, 0.09, 0.14, 1), metallic=0.18, roughness=0.19),
-        "fur": material("cat-fur", (0.16, 0.23, 0.29, 1), emission=(0.025, 0.065, 0.09, 1), emission_strength=0.3, roughness=0.88),
-        "pink": material("cat-pads", (0.72, 0.25, 0.34, 1), emission=(0.34, 0.055, 0.08, 1), emission_strength=0.45, roughness=0.72),
+        "fur": material("cat-fur-charcoal", (0.035, 0.032, 0.038, 1), emission=(0.012, 0.01, 0.016, 1), emission_strength=0.2, roughness=0.92),
+        "fur_highlight": material("cat-fur-silver", (0.32, 0.30, 0.29, 1), emission=(0.055, 0.045, 0.05, 1), emission_strength=0.2, roughness=0.86),
+        "pink": material("cat-pads-soft-coral", (0.58, 0.16, 0.23, 1), emission=(0.22, 0.025, 0.045, 1), emission_strength=0.32, roughness=0.68),
+        "pink_inner": material("cat-inner-ear", (0.48, 0.12, 0.18, 1), emission=(0.16, 0.018, 0.03, 1), emission_strength=0.24, roughness=0.76),
     }
 
 
@@ -386,23 +414,62 @@ def animate_helicopter_camera(rig, map_name: str) -> None:
 
 
 def add_cat_pov(rig, mats) -> None:
-    for x in (-0.48, 0.48):
-        ear = cone("clear-cat-ear", (x, 0.36, -1.24), 0.14, 0.38, mats["fur"], rotation=(math.radians(-76), 0, 0))
-        parent(ear, rig)
-        inner = cone("clear-cat-ear-inner", (x, 0.34, -1.14), 0.075, 0.22, mats["pink"], rotation=(math.radians(-76), 0, 0))
-        parent(inner, rig)
-    for x in (-0.34, 0.34):
-        paw = uv_sphere("clear-cat-paw", (x, -0.27, -1.15), (0.22, 0.10, 0.24), mats["fur"])
-        parent(paw, rig)
-        for pad_x in (-0.09, 0.0, 0.09):
-            pad = uv_sphere("cat-paw-pad", (x + pad_x, -0.24, -0.84), (0.042, 0.025, 0.055), mats["pink"])
-            parent(pad, rig)
-        paw.rotation_mode = "XYZ"
-        paw.keyframe_insert(data_path="rotation_euler", frame=1)
-        paw.rotation_euler[0] = math.radians(4 if x < 0 else -4)
-        paw.keyframe_insert(data_path="rotation_euler", frame=FINAL_FRAME // 2)
-        paw.rotation_euler[0] = 0
-        paw.keyframe_insert(data_path="rotation_euler", frame=FINAL_FRAME + 1)
+    for side in (-1, 1):
+        ear_root = bpy.data.objects.new(f"authored-cat-ear-root-{'left' if side < 0 else 'right'}", None)
+        bpy.context.collection.objects.link(ear_root)
+        ear_root.location = (side * 0.50, 0.06, -1.18)
+        ear_root.scale = (0.65, 0.65, 0.65)
+        parent(ear_root, rig)
+        outer = polygon_plate(
+            "authored-feline-ear-silhouette",
+            [(-0.23, 0.0), (-0.21, 0.12), (-0.11, 0.29), (side * 0.08, 0.43), (0.13, 0.28), (0.22, 0.11), (0.23, 0.0)],
+            0,
+            mats["fur_highlight"],
+            thickness=0.065,
+            bevel=0.028,
+        )
+        parent(outer, ear_root)
+        inner = polygon_plate(
+            "authored-feline-ear-inner",
+            [(-0.13, 0.05), (-0.10, 0.15), (side * 0.055, 0.33), (0.08, 0.17), (0.13, 0.05)],
+            0.043,
+            mats["pink_inner"],
+            thickness=0.018,
+            bevel=0.016,
+        )
+        parent(inner, ear_root)
+        ear_root.rotation_mode = "XYZ"
+        for frame, twitch in [(1, 0), (61, 0), (70, side * 4.5), (79, -side * 1.5), (88, 0), (FINAL_FRAME + 1, 0)]:
+            ear_root.rotation_euler[2] = math.radians(twitch)
+            ear_root.keyframe_insert(data_path="rotation_euler", frame=frame)
+
+    for side in (-1, 1):
+        paw_root = bpy.data.objects.new(f"authored-cat-forepaw-root-{'left' if side < 0 else 'right'}", None)
+        bpy.context.collection.objects.link(paw_root)
+        paw_root.location = (side * 0.35, -0.26, -1.04)
+        paw_root.scale = (0.72, 0.72, 0.72)
+        parent(paw_root, rig)
+        foreleg = uv_sphere("authored-cat-foreleg", (0, -0.13, -0.25), (0.19, 0.13, 0.31), mats["fur"])
+        palm = uv_sphere("authored-cat-paw-palm", (0, 0, 0), (0.25, 0.12, 0.23), mats["fur"])
+        parent(foreleg, paw_root)
+        parent(palm, paw_root)
+        for toe_x in (-0.15, -0.05, 0.05, 0.15):
+            toe = uv_sphere("authored-cat-paw-toe", (toe_x, 0.045, 0.19), (0.082, 0.065, 0.105), mats["fur_highlight"])
+            pad = uv_sphere("authored-cat-digital-pad", (toe_x, 0.052, 0.295), (0.032, 0.018, 0.037), mats["pink"])
+            parent(toe, paw_root)
+            parent(pad, paw_root)
+        central_pad = uv_sphere("authored-cat-central-pad", (0, -0.015, 0.285), (0.08, 0.022, 0.055), mats["pink"])
+        parent(central_pad, paw_root)
+        paw_root.rotation_mode = "XYZ"
+        for frame, lift, splay in [
+            (1, 0, 0),
+            (FINAL_FRAME // 4 + 1, side * 3.5, -side * 2.0),
+            (FINAL_FRAME // 2 + 1, 0, 0),
+            (FINAL_FRAME * 3 // 4 + 1, -side * 2.5, side * 1.5),
+            (FINAL_FRAME + 1, 0, 0),
+        ]:
+            paw_root.rotation_euler = (math.radians(lift), math.radians(splay), math.radians(side * lift * 0.35))
+            paw_root.keyframe_insert(data_path="rotation_euler", frame=frame)
     add_point_light("cat-pov-cyan-rim", (0, -0.08, -0.68), (0.08, 0.55, 1.0), 9, 0.28).parent = rig
 
 

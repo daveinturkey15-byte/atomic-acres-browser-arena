@@ -149,11 +149,11 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate_pass65_menu_previews.py",
-      "sourceScriptSha256": "7a82af438a40674fcb82ddb9d2d19c979b1b545de7664e639388f54ba0b45a4f",
+      "sourceScriptSha256": "b30660db7ccb8a3e3f3c60c4537dd0aab9da78d1cf395d00e4c377cb753068b5",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "1c6d8af867b59f52c0f41ac2d5a775ab8725161d1e47b69593a8f81577e03497",
+      "sourceProvenanceSha256": "bf845928db07462990121a86b9bef0f00d1279e6171f56b9c3b9eefefa5ab058",
       "format": "Four 960x540 eight-second 24 FPS loops, each shipped as VP9/Opus WebM, H.264/AAC MP4 and WebP poster",
-      "modifications": "Project-original Blender primitive scenes record three helicopter cockpit flyovers and one cat first-person range prowl. The helicopter clips include deterministic bounded flight variation, visible spinning rotor geometry, a modeled dashboard and quiet synthesized rotor harmonics. The cat clip includes clearer ears and paws plus animated illuminated targets. No downloaded model, texture, video, sampled audio, logo or extracted game asset is used.",
+      "modifications": "Project-original Blender primitive scenes record three helicopter cockpit flyovers and one cat first-person range prowl. The helicopter clips include deterministic bounded flight variation, visible spinning rotor geometry, a modeled dashboard and quiet synthesized rotor harmonics. The cat clip includes beveled feline silhouette ears with inset pinnae, articulated forelegs, palms, toes and embedded pads, plus animated illuminated targets. No downloaded model, texture, video, sampled audio, logo or extracted game asset is used.",
       "attributionRequired": false
     },
     {
