@@ -8,6 +8,7 @@ export const ARENA_MAX_AWAKE_SHED_BODIES = 18;
 export const SHED_DOOR_TRAVEL_TICKS = 60;
 export const SHED_ANGLE_Q = 10_000;
 export const SHED_PANEL_COORD_Q = 10_000;
+export const SHED_MAX_INTERACTION_ACTORS = 12;
 
 export const WORLD_COLLISION_CONSUMERS = Object.freeze([
   'movement',
@@ -182,6 +183,54 @@ const IDENTITY_POSE: QuantizedPose = Object.freeze({
   rotation: Object.freeze({ xQ: 0, yQ: 0, zQ: 0, wQ: SHED_PANEL_COORD_Q }),
 });
 
+function frameRotationQ(frame: SheetSurfaceDefinition['frame']): QuantizedPose['rotation'] {
+  const normal = {
+    x: frame.uAxis.y * frame.vAxis.z - frame.uAxis.z * frame.vAxis.y,
+    y: frame.uAxis.z * frame.vAxis.x - frame.uAxis.x * frame.vAxis.z,
+    z: frame.uAxis.x * frame.vAxis.y - frame.uAxis.y * frame.vAxis.x,
+  };
+  const m00 = frame.uAxis.x; const m01 = frame.vAxis.x; const m02 = normal.x;
+  const m10 = frame.uAxis.y; const m11 = frame.vAxis.y; const m12 = normal.y;
+  const m20 = frame.uAxis.z; const m21 = frame.vAxis.z; const m22 = normal.z;
+  const trace = m00 + m11 + m22;
+  let x: number;
+  let y: number;
+  let z: number;
+  let w: number;
+  if (trace > 0) {
+    const scale = Math.sqrt(trace + 1) * 2;
+    w = scale / 4;
+    x = (m21 - m12) / scale;
+    y = (m02 - m20) / scale;
+    z = (m10 - m01) / scale;
+  } else if (m00 > m11 && m00 > m22) {
+    const scale = Math.sqrt(1 + m00 - m11 - m22) * 2;
+    w = (m21 - m12) / scale;
+    x = scale / 4;
+    y = (m01 + m10) / scale;
+    z = (m02 + m20) / scale;
+  } else if (m11 > m22) {
+    const scale = Math.sqrt(1 + m11 - m00 - m22) * 2;
+    w = (m02 - m20) / scale;
+    x = (m01 + m10) / scale;
+    y = scale / 4;
+    z = (m12 + m21) / scale;
+  } else {
+    const scale = Math.sqrt(1 + m22 - m00 - m11) * 2;
+    w = (m10 - m01) / scale;
+    x = (m02 + m20) / scale;
+    y = (m12 + m21) / scale;
+    z = scale / 4;
+  }
+  const length = Math.hypot(x, y, z, w) || 1;
+  return Object.freeze({
+    xQ: Math.round(x / length * SHED_PANEL_COORD_Q),
+    yQ: Math.round(y / length * SHED_PANEL_COORD_Q),
+    zQ: Math.round(z / length * SHED_PANEL_COORD_Q),
+    wQ: Math.round(w / length * SHED_PANEL_COORD_Q),
+  });
+}
+
 function finiteInteger(value: number, min = 0, max = Number.MAX_SAFE_INTEGER): boolean {
   return Number.isSafeInteger(value) && value >= min && value <= max;
 }
@@ -350,7 +399,11 @@ export function admitShedDoorInteraction(state: ShedState, request: DoorInteract
   if (!Number.isFinite(request.distance) || request.distance > 2.35) return { accepted: false, reason: 'out-of-range', state };
   if (!request.hasLineOfSight) return { accepted: false, reason: 'line-of-sight-blocked', state };
   const prior = state.interactionSequences.find((entry) => entry.actorId === request.actorId)?.sequence ?? 0;
-  if (!validId(request.actorId) || !finiteInteger(request.sequence, prior + 1) || !finiteInteger(request.tick)) {
+  const newActor = !state.interactionSequences.some((entry) => entry.actorId === request.actorId);
+  if (!validId(request.actorId)
+    || request.sequence !== prior + 1
+    || !finiteInteger(request.tick)
+    || (newActor && state.interactionSequences.length >= SHED_MAX_INTERACTION_ACTORS)) {
     return { accepted: false, reason: 'invalid-sequence', state };
   }
   const currentAngleQ = doorAngleAt(state.door, request.tick);
@@ -557,6 +610,7 @@ export function applyShedExplosion(
         yQ: Math.round(surfaceDefinition.frame.centre.y * 1_000),
         zQ: Math.round(surfaceDefinition.frame.centre.z * 1_000),
       }),
+      rotation: frameRotationQ(surfaceDefinition.frame),
     }),
     velocityQ: ZERO_VECTOR,
     angularVelocityQ: ZERO_VECTOR,
@@ -743,7 +797,7 @@ function isDoorBlocker(value: unknown): value is NonNullable<ShedDoorState['bloc
 }
 
 function isShedDoorState(value: unknown): value is ShedDoorState {
-  return isRecord(value)
+  if (!(isRecord(value)
     && exactKeys(value, [
       'surfaceId', 'commandId', 'commandSequence', 'angleQ', 'motionOriginAngleQ', 'desiredAngleQ', 'direction', 'phase',
       'startedAtTick', 'completesAtTick', 'blockedAtTick', 'blockedBy', 'resumePolicy',
@@ -762,7 +816,15 @@ function isShedDoorState(value: unknown): value is ShedDoorState {
     && finiteInteger(Number(value.completesAtTick))
     && (value.blockedAtTick === null || finiteInteger(Number(value.blockedAtTick)))
     && (value.blockedBy === null || isDoorBlocker(value.blockedBy))
-    && ['remain-blocked-until-new-command', 'resume-when-clear'].includes(String(value.resumePolicy));
+    && ['remain-blocked-until-new-command', 'resume-when-clear'].includes(String(value.resumePolicy)))) return false;
+  const blocked = value.phase === 'blocked';
+  if (blocked !== (value.blockedBy !== null && value.blockedAtTick !== null)) return false;
+  if (Number(value.completesAtTick) < Number(value.startedAtTick)) return false;
+  if (value.phase === 'closed') return value.direction === 'stationary' && value.angleQ === 0 && value.desiredAngleQ === 0;
+  if (value.phase === 'open') return value.direction === 'stationary' && value.angleQ === SHED_ANGLE_Q && value.desiredAngleQ === SHED_ANGLE_Q;
+  if (value.phase === 'opening') return value.direction === 'opening' && value.desiredAngleQ === SHED_ANGLE_Q;
+  if (value.phase === 'closing') return value.direction === 'closing' && value.desiredAngleQ === 0;
+  return value.direction !== 'stationary';
 }
 
 function isMajorDebrisState(value: unknown): value is MajorDebrisState {
@@ -798,6 +860,7 @@ export function isShedState(value: unknown): value is ShedState {
     || !finiteInteger(Number(value.nextApertureId), 1) || !finiteInteger(Number(value.nextDentId), 1)
     || !Array.isArray(value.surfaces) || !Array.isArray(value.detachedChunkIds)
     || !Array.isArray(value.majorDebris) || !Array.isArray(value.interactionSequences)
+    || value.interactionSequences.length > SHED_MAX_INTERACTION_ACTORS
     || value.detachedChunkIds.length > SHED_MAX_MAJOR_CHUNKS || value.majorDebris.length > SHED_MAX_MAJOR_CHUNKS) return false;
   if (!isShedDoorState(value.door)
     || !value.surfaces.every(isSheetSurfaceState)
@@ -809,12 +872,26 @@ export function isShedState(value: unknown): value is ShedState {
   const debrisIds = value.majorDebris.map((debris) => debris.chunkId);
   const actorIds = value.interactionSequences.map((entry) => entry.actorId);
   if (!unique(surfaceIds) || !unique(detachedChunkIds) || !unique(debrisIds) || !unique(actorIds)
+    || !surfaceIds.includes(value.door.surfaceId)
     || debrisIds.some((chunkId) => !detachedChunkIds.includes(chunkId))) return false;
   let apertures = 0;
   let dents = 0;
+  const apertureIds: number[] = [];
+  const dentIds: number[] = [];
   for (const entry of value.surfaces) {
     apertures += entry.apertures.length;
     dents += entry.dents.length;
+    apertureIds.push(...entry.apertures.map((aperture) => aperture.id));
+    dentIds.push(...entry.dents.map((dent) => dent.id));
+    if (entry.stage === 'intact' && (entry.apertures.length > 0 || entry.dents.length > 0)) return false;
+    if (entry.stage === 'dented' && (entry.dents.length === 0 || entry.apertures.length > 0)) return false;
+    if (entry.stage === 'perforated' && entry.apertures.length === 0) return false;
+    if (entry.stage === 'detached' && entry.attachedChunkId !== null) return false;
   }
-  return apertures <= SHED_MAX_APERTURES && dents <= SHED_MAX_DENTS;
+  return apertures <= SHED_MAX_APERTURES
+    && dents <= SHED_MAX_DENTS
+    && unique(apertureIds.map(String))
+    && unique(dentIds.map(String))
+    && Number(value.nextApertureId) > Math.max(0, ...apertureIds)
+    && Number(value.nextDentId) > Math.max(0, ...dentIds);
 }

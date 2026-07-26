@@ -84,6 +84,30 @@ describe('Pass 65 destructible shed presentation', () => {
     presentation.dispose();
   });
 
+  it('keeps a door aperture rim attached to the identical moving panel frame', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 5);
+    const perforated = applyShedSheetImpact(FIELD_SHED_DEFINITION, initial, {
+      isHost: true, matchEpoch: 5, expectedRevision: 0, surfaceId: 'door-south',
+      uQ: 4_000, vQ: 0, radiusUQ: 800, radiusVQ: 800, damageQ: 60, penetrationEnergyQ: 70,
+    });
+    const presentation = createFieldShedPresentation(placement, perforated.state);
+    const rims = presentation.root.getObjectByName('field-shed-aperture-rims') as THREE.InstancedMesh;
+    const closed = new THREE.Matrix4();
+    rims.getMatrixAt(0, closed);
+    const moving = admitShedDoorInteraction(perforated.state, {
+      isHost: true, matchEpoch: 5, expectedRevision: perforated.state.revision,
+      actorId: 'player-a', actorAlive: true, sequence: 1, distance: 1, hasLineOfSight: true, tick: 10,
+    });
+    const halfway = advanceShedDoor(moving.state, 40);
+    presentation.sync(halfway);
+    const opened = new THREE.Matrix4();
+    rims.getMatrixAt(0, opened);
+    const closedPosition = new THREE.Vector3().setFromMatrixPosition(closed);
+    const openedPosition = new THREE.Vector3().setFromMatrixPosition(opened);
+    expect(openedPosition.distanceTo(closedPosition)).toBeGreaterThan(0.25);
+    presentation.dispose();
+  });
+
   it('swaps an authored detached panel for one bounded major-debris instance', () => {
     const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 4);
     const presentation = createFieldShedPresentation(placement, initial);

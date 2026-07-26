@@ -128,6 +128,11 @@ describe('Pass 65 destructible-world authority', () => {
       sequence: 1, distance: 1, hasLineOfSight: true, tick: 161,
     });
     expect(replay.reason).toBe('invalid-sequence');
+    const sequenceGap = admitShedDoorInteraction(complete, {
+      isHost: true, matchEpoch: 11, expectedRevision: complete.revision, actorId: 'player-a', actorAlive: true,
+      sequence: 3, distance: 1, hasLineOfSight: true, tick: 161,
+    });
+    expect(sequenceGap.reason).toBe('invalid-sequence');
     const stale = admitShedDoorInteraction(complete, {
       isHost: true, matchEpoch: 10, expectedRevision: complete.revision, actorId: 'player-a', actorAlive: true,
       sequence: 2, distance: 1, hasLineOfSight: true, tick: 161,
@@ -222,6 +227,7 @@ describe('Pass 65 destructible-world authority', () => {
     expect(damaged.accepted).toBe(true);
     expect(damaged.state.detachedChunkIds).toEqual(['chunk-west']);
     expect(damaged.state.majorDebris).toHaveLength(1);
+    expect(damaged.state.majorDebris[0]!.poseQ.rotation).not.toEqual({ xQ: 0, yQ: 0, zQ: 0, wQ: 10_000 });
     expect(applyShedExplosion(definition, damaged.state, {
       isHost: true, matchEpoch: 11, expectedRevision: damaged.state.revision, surfaceId: 'wall-west', damageQ: 220,
     }).reason).toBe('already-detached');

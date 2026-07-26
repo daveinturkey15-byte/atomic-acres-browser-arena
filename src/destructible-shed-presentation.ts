@@ -158,7 +158,10 @@ function createFrame(material: THREE.Material): THREE.InstancedMesh {
   const placements: ReadonlyArray<readonly [THREE.Vector3, THREE.Vector3, THREE.Quaternion?]> = [
     ...[-1.8, 1.8].flatMap((x) => [-2.1, 2.1].map((z) => [new THREE.Vector3(x, 1.3, z), new THREE.Vector3(0.11, 1.3, 0.11)] as const)),
     [new THREE.Vector3(0, 3.45, 0), new THREE.Vector3(0.09, 0.09, 2.22)] as const,
-    ...[-2.1, 2.1].flatMap((z) => [-1.8, 1.8].map((x) => [new THREE.Vector3(x, 2.43, z), new THREE.Vector3(0.1, 0.1, 0.12)] as const)),
+    ...[-2.1, 2.1].map((z) => [new THREE.Vector3(0, 2.43, z), new THREE.Vector3(1.8, 0.09, 0.09)] as const),
+    ...[-1.8, 1.8].map((x) => [new THREE.Vector3(x, 2.43, 0), new THREE.Vector3(0.09, 0.09, 2.1)] as const),
+    ...[-2.1, 2.1].map((z) => [new THREE.Vector3(0, 0.12, z), new THREE.Vector3(1.8, 0.08, 0.08)] as const),
+    ...[-1.8, 1.8].map((x) => [new THREE.Vector3(x, 0.12, 0), new THREE.Vector3(0.08, 0.08, 2.1)] as const),
     [new THREE.Vector3(-0.78, 1.1, 2.13), new THREE.Vector3(0.07, 1.1, 0.07)] as const,
     [new THREE.Vector3(0.78, 1.1, 2.13), new THREE.Vector3(0.07, 1.1, 0.07)] as const,
   ];
@@ -187,6 +190,34 @@ function apertureLocalPosition(surface: SheetSurfaceDefinition, aperture: Ballis
 
 function panelQuaternion(surface: SheetSurfaceDefinition): THREE.Quaternion {
   return new THREE.Quaternion().setFromRotationMatrix(panelBasis(surface));
+}
+
+function rotateY(point: THREE.Vector3, angle: number): THREE.Vector3 {
+  return point.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+}
+
+function presentationSurfaceDefinition(
+  surface: SheetSurfaceDefinition,
+  doorAngleQ: number,
+): SheetSurfaceDefinition {
+  if (surface.role !== 'door') return surface;
+  const angle = -doorAngleQ / SHED_ANGLE_Q * Math.PI / 2;
+  const u = new THREE.Vector3(surface.frame.uAxis.x, surface.frame.uAxis.y, surface.frame.uAxis.z);
+  const v = new THREE.Vector3(surface.frame.vAxis.x, surface.frame.vAxis.y, surface.frame.vAxis.z);
+  const hinge = new THREE.Vector3(surface.frame.centre.x, surface.frame.centre.y, surface.frame.centre.z)
+    .addScaledVector(u, -surface.frame.halfU);
+  const centre = hinge.clone().add(rotateY(u.multiplyScalar(surface.frame.halfU), angle));
+  const rotatedU = rotateY(new THREE.Vector3(surface.frame.uAxis.x, surface.frame.uAxis.y, surface.frame.uAxis.z), angle);
+  const rotatedV = rotateY(v, angle);
+  return Object.freeze({
+    ...surface,
+    frame: Object.freeze({
+      ...surface.frame,
+      centre: Object.freeze({ x: centre.x, y: centre.y, z: centre.z }),
+      uAxis: Object.freeze({ x: rotatedU.x, y: rotatedU.y, z: rotatedU.z }),
+      vAxis: Object.freeze({ x: rotatedV.x, y: rotatedV.y, z: rotatedV.z }),
+    }),
+  });
 }
 
 export type ShedPresentationTelemetry = Readonly<{
@@ -310,8 +341,9 @@ export class DestructibleShedPresentation {
     let apertureIndex = 0;
     let dentIndex = 0;
     for (const surfaceState of state.surfaces) {
-      const surfaceDefinition = this.definition.surfaces.find((surface) => surface.id === surfaceState.surfaceId);
-      if (!surfaceDefinition || surfaceState.stage === 'detached') continue;
+      const canonicalSurface = this.definition.surfaces.find((surface) => surface.id === surfaceState.surfaceId);
+      if (!canonicalSurface || surfaceState.stage === 'detached') continue;
+      const surfaceDefinition = presentationSurfaceDefinition(canonicalSurface, state.door.angleQ);
       const rotation = panelQuaternion(surfaceDefinition);
       for (const aperture of surfaceState.apertures) {
         if (apertureIndex >= SHED_MAX_APERTURES) break;

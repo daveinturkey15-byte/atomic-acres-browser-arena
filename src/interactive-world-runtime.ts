@@ -12,6 +12,7 @@ import {
   createInitialShedState,
   createWorldCollisionSnapshot,
   isShedState,
+  impulseMajorShedDebris,
   resetShedState,
   resumeShedDoorWhenClear,
   shedApertureContainsWorldPoint,
@@ -21,6 +22,7 @@ import {
   type ShedPlacement,
   type ShedState,
   type WorldCollisionSnapshot,
+  type QuantizedVector,
 } from './destructible-world';
 import {
   DestructibleShedPresentation,
@@ -53,6 +55,8 @@ export type InteractiveWorldStateEnvelope = Readonly<{
   matchEpoch: number;
   revision: number;
   sheds: readonly ShedState[];
+  hashAlgorithm: 'sha256';
+  hash: string;
 }>;
 
 type RuntimeShed = {
@@ -157,6 +161,32 @@ function panelCoordinates(frame: SurfaceFrame, point: Point3): Readonly<{ uQ: nu
   });
 }
 
+function majorDebrisBounds(shed: RuntimeShed, body: ShedState['majorDebris'][number]): Box2 {
+  const localPosition = new THREE.Vector3(
+    body.poseQ.position.xQ / 1_000,
+    body.poseQ.position.yQ / 1_000,
+    body.poseQ.position.zQ / 1_000,
+  );
+  const centre = transformPoint(localPosition, shed.placement);
+  const localRotation = new THREE.Quaternion(
+    body.poseQ.rotation.xQ / SHED_PANEL_COORD_Q,
+    body.poseQ.rotation.yQ / SHED_PANEL_COORD_Q,
+    body.poseQ.rotation.zQ / SHED_PANEL_COORD_Q,
+    body.poseQ.rotation.wQ / SHED_PANEL_COORD_Q,
+  ).normalize();
+  const worldRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), shed.placement.yaw).multiply(localRotation);
+  const euler = new THREE.Euler().setFromQuaternion(worldRotation, 'XYZ');
+  return Object.freeze({
+    minX: centre.x - 0.625,
+    maxX: centre.x + 0.625,
+    minY: centre.y - 0.06,
+    maxY: centre.y + 0.06,
+    minZ: centre.z - 0.875,
+    maxZ: centre.z + 0.875,
+    rotation: [euler.x, euler.y, euler.z] as [number, number, number],
+  });
+}
+
 function worldRevision(sheds: readonly RuntimeShed[]): number {
   return sheds.reduce((sum, shed) => sum + shed.state.revision, 0);
 }
@@ -212,6 +242,18 @@ export class InteractiveWorldRuntime {
           }),
         }));
       }
+      for (const body of shed.state.majorDebris) {
+        const bounds = majorDebrisBounds(shed, body);
+        movementColliders.push(bounds);
+        ballisticSurfaces.push(Object.freeze({
+          id: `${shed.placement.id}:debris:${body.chunkId}`,
+          name: `destructible shed debris ${body.chunkId}`,
+          bounds,
+          material: 'thin-metal' as const,
+          classification: 'explicit' as const,
+          majorDebris: Object.freeze({ placementId: shed.placement.id, chunkId: body.chunkId }),
+        }));
+      }
     }
     return Object.freeze({
       revision: worldRevision(this.sheds),
@@ -241,12 +283,16 @@ export class InteractiveWorldRuntime {
   }
 
   stateEnvelope(): InteractiveWorldStateEnvelope {
+    const sheds = Object.freeze(this.sheds.map((shed) => shed.state));
+    const snapshot = createWorldCollisionSnapshot(this.arenaId, `${this.arenaId}-static-v65`, sheds);
     return Object.freeze({
       schemaVersion: 1,
       arenaId: this.arenaId,
       matchEpoch: this.matchEpoch,
       revision: worldRevision(this.sheds),
-      sheds: Object.freeze(this.sheds.map((shed) => shed.state)),
+      sheds,
+      hashAlgorithm: 'sha256',
+      hash: snapshot.hash,
     });
   }
 
@@ -254,11 +300,14 @@ export class InteractiveWorldRuntime {
     if (!value || typeof value !== 'object') return false;
     const envelope = value as Partial<InteractiveWorldStateEnvelope> & Record<string, unknown>;
     const keys = Object.keys(envelope).sort();
-    if (keys.join('|') !== ['arenaId', 'matchEpoch', 'revision', 'schemaVersion', 'sheds'].sort().join('|')
+    if (keys.join('|') !== ['arenaId', 'matchEpoch', 'revision', 'schemaVersion', 'sheds', 'hashAlgorithm', 'hash'].sort().join('|')
       || envelope.schemaVersion !== 1
       || envelope.arenaId !== this.arenaId
       || envelope.matchEpoch !== this.matchEpoch
       || !Number.isSafeInteger(envelope.revision)
+      || envelope.hashAlgorithm !== 'sha256'
+      || typeof envelope.hash !== 'string'
+      || !/^[a-f0-9]{64}$/.test(envelope.hash)
       || !Array.isArray(envelope.sheds)
       || envelope.sheds.length !== this.sheds.length
       || !envelope.sheds.every(isShedState)) return false;
@@ -267,6 +316,8 @@ export class InteractiveWorldRuntime {
       || states.some((state) => state.arenaId !== this.arenaId || state.matchEpoch !== this.matchEpoch)
       || states.reduce((sum, state) => sum + state.revision, 0) !== envelope.revision
       || Number(envelope.revision) < worldRevision(this.sheds)) return false;
+    const candidateHash = createWorldCollisionSnapshot(this.arenaId, `${this.arenaId}-static-v65`, states).hash;
+    if (candidateHash !== envelope.hash) return false;
     for (const shed of this.sheds) {
       const state = states.find((candidate) => candidate.placementId === shed.placement.id);
       if (!state || state.shedId !== shed.definition.id) return false;
@@ -359,7 +410,19 @@ export class InteractiveWorldRuntime {
     penetrationEnergyQ: number;
     radiusUQ: number;
     radiusVQ: number;
+    impulseQ?: QuantizedVector;
   }>): ShedMutationResult | null {
+    if (request.surface.majorDebris) {
+      const shed = this.sheds.find((candidate) => candidate.placement.id === request.surface.majorDebris?.placementId);
+      if (!shed) return null;
+      return this.commit(shed, impulseMajorShedDebris(shed.state, {
+        isHost: this.hostAuthority,
+        expectedRevision: shed.state.revision,
+        chunkId: request.surface.majorDebris.chunkId,
+        source: 'bullet',
+        impulseQ: request.impulseQ ?? { xQ: 0, yQ: Math.min(50_000, request.penetrationEnergyQ * 20), zQ: 0 },
+      }));
+    }
     const identity = request.surface.destructibleSurface;
     if (!identity) return null;
     const shed = this.sheds.find((candidate) => candidate.placement.id === identity.placementId);

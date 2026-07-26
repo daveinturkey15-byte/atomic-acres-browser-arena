@@ -100,9 +100,10 @@ describe('shared interactive-world runtime adapter', () => {
     });
     expect(fractured?.accepted).toBe(true);
     const after = runtime.collisions();
-    expect(after.movementColliders).toHaveLength(before.movementColliders.length - 1);
-    expect(after.ballisticSurfaces).toHaveLength(before.ballisticSurfaces.length - 1);
+    expect(after.movementColliders).toHaveLength(before.movementColliders.length);
+    expect(after.ballisticSurfaces).toHaveLength(before.ballisticSurfaces.length);
     expect(after.ballisticSurfaces.some((surface) => surface.destructibleSurface?.surfaceId === 'wall-west')).toBe(false);
+    expect(after.ballisticSurfaces.some((surface) => surface.majorDebris?.chunkId === 'chunk-west')).toBe(true);
     expect(runtime.telemetry()).toMatchObject({ detachedChunks: 1, awakeMajorBodies: 1, presentationDraws: 5 });
     runtime.dispose();
   });
@@ -120,6 +121,7 @@ describe('shared interactive-world runtime adapter', () => {
     expect(guest.applyAuthoritativeEnvelope(envelope)).toBe(true);
     expect(guest.stateEnvelope()).toEqual(host.stateEnvelope());
     expect(guest.applyAuthoritativeEnvelope({ ...envelope, clientCanFracture: true })).toBe(false);
+    expect(guest.applyAuthoritativeEnvelope({ ...envelope, hash: '0'.repeat(64) })).toBe(false);
     expect(guest.interactNearestDoor({
       actorId: 'player-b', actorAlive: true, actorPosition: { x: 0, y: 1.1, z: 3 }, sequence: 1, tick: 30,
       hasLineOfSight: () => true,

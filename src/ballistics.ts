@@ -41,6 +41,10 @@ export type BallisticSurface = Readonly<{
     placementId: string;
     surfaceId: string;
   }>;
+  majorDebris?: Readonly<{
+    placementId: string;
+    chunkId: string;
+  }>;
 }>;
 
 type MaterialResistance = Readonly<{
