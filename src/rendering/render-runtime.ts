@@ -83,6 +83,22 @@ export type ShadowRuntimeState = Readonly<{
   needsUpdate: boolean;
 }>;
 
+export function configureSceneLightShadowSchedule(
+  root: THREE.Object3D,
+  autoUpdate: boolean,
+  needsUpdate: boolean,
+): number {
+  let configured = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.DirectionalLight || node instanceof THREE.SpotLight || node instanceof THREE.PointLight)
+      || !node.castShadow) return;
+    node.shadow.autoUpdate = autoUpdate;
+    node.shadow.needsUpdate = needsUpdate;
+    configured += 1;
+  });
+  return configured;
+}
+
 export type PresentationPrewarmRuntime = Readonly<{
   compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void>;
 }>;
@@ -189,6 +205,10 @@ export class LegacyWebGlRenderRuntime {
 
   requestShadowUpdate(needsUpdate = true): void {
     this.renderer.shadowMap.needsUpdate = needsUpdate;
+  }
+
+  configureLightShadows(root: THREE.Object3D, autoUpdate: boolean, needsUpdate: boolean): number {
+    return configureSceneLightShadowSchedule(root, autoUpdate, needsUpdate);
   }
 
   shadowState(): ShadowRuntimeState {
@@ -519,7 +539,13 @@ export class WebGpuRenderRuntime {
 
   requestShadowUpdate(): void {
     // Three's common WebGPU renderer updates shadow maps through the active
-    // RenderPipeline. There is no WebGL `needsUpdate` flag to mutate here.
+    // RenderPipeline. Renderer-level WebGL flags do not control that path.
+  }
+
+  configureLightShadows(root: THREE.Object3D, autoUpdate: boolean, needsUpdate: boolean): number {
+    // Three r185's ShadowNode reads scheduling from each LightShadow. Without
+    // this, static profiles silently regenerate every shadow map every frame.
+    return configureSceneLightShadowSchedule(root, autoUpdate, needsUpdate);
   }
 
   shadowState(): ShadowRuntimeState {

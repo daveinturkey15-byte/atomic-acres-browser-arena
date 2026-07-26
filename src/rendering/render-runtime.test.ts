@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPresentationFreshness, resolveRenderRuntimeRequest, webGpuRenderInfoSnapshot } from './render-runtime';
+import * as THREE from 'three';
+import {
+  classifyPresentationFreshness,
+  configureSceneLightShadowSchedule,
+  resolveRenderRuntimeRequest,
+  webGpuRenderInfoSnapshot,
+} from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
 describe('Pass 64 render runtime boundary', () => {
@@ -63,5 +69,20 @@ describe('Pass 64 render runtime boundary', () => {
       points: 0,
       lines: 0,
     });
+  });
+
+  it('schedules static shadows on each WebGPU light instead of a WebGL-only renderer flag', () => {
+    const scene = new THREE.Scene();
+    const sun = new THREE.DirectionalLight();
+    const practical = new THREE.SpotLight();
+    const unshadowed = new THREE.PointLight();
+    sun.castShadow = true;
+    practical.castShadow = true;
+    unshadowed.castShadow = false;
+    scene.add(sun, practical, unshadowed);
+    expect(configureSceneLightShadowSchedule(scene, false, true)).toBe(2);
+    expect([sun, practical].every((light) => !light.shadow.autoUpdate && light.shadow.needsUpdate)).toBe(true);
+    expect(configureSceneLightShadowSchedule(scene, false, false)).toBe(2);
+    expect([sun, practical].every((light) => !light.shadow.autoUpdate && !light.shadow.needsUpdate)).toBe(true);
   });
 });

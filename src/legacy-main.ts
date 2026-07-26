@@ -736,6 +736,11 @@ const maximumAnisotropy = renderRuntime.maximumAnisotropy();
 
 function requestStaticShadowRefresh(value = true): void {
   renderRuntime.requestShadowUpdate(value);
+  renderRuntime.configureLightShadows(
+    scene,
+    activeRenderConfig.shadowMode === 'dynamic',
+    value,
+  );
 }
 let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
