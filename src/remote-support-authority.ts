@@ -1,10 +1,4 @@
-import {
-  consumeFieldSupport,
-  createFieldSupportState,
-  recordSupportDeath,
-  recordSupportElimination,
-  type FieldSupportState,
-} from './field-support';
+import type { Pass65KillstreakId } from './killstreak-catalog';
 import type { OffensiveSupportSource, SupportActivateMessage } from './protocol';
 
 const SUPPORT_WINDOW_MS: Record<OffensiveSupportSource, number> = {
@@ -28,7 +22,17 @@ const SUPPORT_MIN_IMPACT_DELAY_MS: Record<OffensiveSupportSource, number> = {
   nuke: 4_500,
 };
 
+const SUPPORT_ACTIVATION_PROOF_WINDOW_MS = 5_000;
+
+type PendingSupportActivation = Readonly<{
+  source: OffensiveSupportSource;
+  canonicalActivationId: string;
+  registeredAt: number;
+  expiresAt: number;
+}>;
+
 type SupportAuthorization = Readonly<{
+  canonicalActivationId: string;
   activationNonce: number;
   activatedAt: number;
   expiresAt: number;
@@ -38,20 +42,50 @@ type SupportAuthorization = Readonly<{
 }>;
 
 export type RemoteSupportAuthorityState = Readonly<{
-  progression: FieldSupportState;
+  pending: Readonly<Record<string, PendingSupportActivation>>;
   authorizations: Readonly<Partial<Record<OffensiveSupportSource, SupportAuthorization>>>;
 }>;
 
-export function createRemoteSupportAuthorityState(): RemoteSupportAuthorityState {
-  return { progression: createFieldSupportState(), authorizations: {} };
+export function isLegacyOffensiveSupport(id: Pass65KillstreakId): id is OffensiveSupportSource {
+  return id === 'yardhawk' || id === 'tri-pass' || id === 'hunter-swarm' || id === 'nuke';
 }
 
-export function recordRemoteSupportElimination(state: RemoteSupportAuthorityState): RemoteSupportAuthorityState {
-  return { ...state, progression: recordSupportElimination(state.progression) };
+export function createRemoteSupportAuthorityState(): RemoteSupportAuthorityState {
+  return { pending: {}, authorizations: {} };
+}
+
+/**
+ * Registers proof only after HostKillstreakRuntime has consumed the actor's
+ * frozen-loadout reward. The peer-provided request ID is merely a correlation
+ * key; the host-generated canonical ID remains the authority identity.
+ */
+export function registerRemoteSupportActivation(
+  state: RemoteSupportAuthorityState,
+  input: Readonly<{
+    activationRequestId: string;
+    canonicalActivationId: string;
+    source: OffensiveSupportSource;
+    now: number;
+  }>,
+): RemoteSupportAuthorityState {
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(input.activationRequestId)
+    || !/^ks-activation-[0-9]+-[0-9]+$/.test(input.canonicalActivationId)
+    || !Number.isFinite(input.now)) return state;
+  const pending = Object.fromEntries(Object.entries(state.pending)
+    .filter(([, proof]) => proof.expiresAt >= input.now));
+  pending[input.activationRequestId] = Object.freeze({
+    source: input.source,
+    canonicalActivationId: input.canonicalActivationId,
+    registeredAt: input.now,
+    expiresAt: input.now + SUPPORT_ACTIVATION_PROOF_WINDOW_MS,
+  });
+  return { ...state, pending };
 }
 
 export function recordRemoteSupportDeath(state: RemoteSupportAuthorityState): RemoteSupportAuthorityState {
-  return { progression: recordSupportDeath(state.progression), authorizations: {} };
+  // A death cancels an unconfirmed compatibility hand-off, but an already
+  // admitted support effect remains valid for its bounded lifetime.
+  return { ...state, pending: {} };
 }
 
 export function admitRemoteSupportActivation(
@@ -60,15 +94,20 @@ export function admitRemoteSupportActivation(
   now: number,
 ): { accepted: boolean; state: RemoteSupportAuthorityState } {
   if (!Number.isFinite(now) || !Number.isFinite(message.activationNonce)) return { accepted: false, state };
-  const consumed = consumeFieldSupport(state.progression, message.source);
-  if (!consumed.activated) return { accepted: false, state };
+  const proof = state.pending[message.activationRequestId];
+  if (!proof || proof.source !== message.source || now < proof.registeredAt || now > proof.expiresAt) {
+    return { accepted: false, state };
+  }
+  const pending = { ...state.pending };
+  delete pending[message.activationRequestId];
   return {
     accepted: true,
     state: {
-      progression: consumed.state,
+      pending,
       authorizations: {
         ...state.authorizations,
         [message.source]: {
+          canonicalActivationId: proof.canonicalActivationId,
           activationNonce: message.activationNonce,
           activatedAt: now,
           expiresAt: now + SUPPORT_WINDOW_MS[message.source],

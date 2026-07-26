@@ -44,7 +44,7 @@ import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 7;
+export const MULTIPLAYER_PROTOCOL_VERSION = 8;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -217,6 +217,8 @@ export type SupportActivateMessage = {
   type: 'support-activate';
   by: string;
   source: OffensiveSupportSource;
+  /** Correlates this compatibility effect with a host-admitted killstreak request. */
+  activationRequestId: string;
   activationNonce: number;
   effectOrigins: [number, number, number][];
   targetIds: string[];
@@ -516,6 +518,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'support-activate':
       return typeof msg.by === 'string'
         && offensiveSupportSources.has(msg.source as OffensiveSupportSource)
+        && typeof msg.activationRequestId === 'string'
+        && /^[A-Za-z0-9_-]{8,80}$/.test(msg.activationRequestId)
         && Number.isFinite(msg.activationNonce)
         && Array.isArray(msg.effectOrigins) && msg.effectOrigins.length <= 3
         && msg.effectOrigins.every((origin) => Array.isArray(origin) && origin.length === 3 && origin.every(Number.isFinite))

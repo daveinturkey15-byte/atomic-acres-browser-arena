@@ -20,6 +20,14 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('event.targetLifeId !== localContinuity');
   });
 
+  it('binds legacy offensive effects to the exact host-admitted activation request', () => {
+    expect(source).toContain('registerRemoteSupportActivation(state, {');
+    expect(source).toContain('activationRequestId: message.activationId');
+    expect(source).toContain('canonicalActivationId: admission.activationId');
+    expect(source).toContain("type: 'support-activate', by: player.id, source, activationRequestId");
+    expect(source).not.toContain('recordRemoteSupportElimination');
+  });
+
   it('projects support damage from the admitted victim and never flashes the caller reticle', () => {
     const start = source.indexOf('function recordOwnerSupportDamage(');
     const end = source.indexOf('\nfunction killstreakActorModifiers(', start);

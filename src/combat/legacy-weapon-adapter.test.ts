@@ -26,8 +26,8 @@ function expectDeepFrozen(value: unknown): void {
 }
 
 describe('Pass 65 runtime weapon adapter', () => {
-  it('projects the complete protocol-v7 roster in canonical order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(7);
+  it('projects the complete protocol-v8 roster in canonical order', () => {
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(8);
     expect(Object.keys(LEGACY_WEAPONS)).toEqual(WEAPON_CATALOG.map((weapon) => weapon.id));
     expect(Object.keys(LEGACY_WEAPONS).slice(0, 9)).toEqual(legacyBaseline.legacyEnumerationOrder);
     expect(LEGACY_WEAPONS.carbine).toMatchObject({ id: 'carbine', name: 'HK416', damage: 31, mag: 30 });

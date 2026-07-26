@@ -35,8 +35,8 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
 }
 
 describe('Pass 65 canonical weapon catalog', () => {
-  it('contains exactly the protocol-v7 roster in a stable enumeration order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(7);
+  it('contains exactly the protocol-v8 roster in a stable enumeration order', () => {
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(8);
     expect(LEGACY_WEAPON_ENUMERATION_ORDER).toEqual([
       ...PASS65_WEAPON_IDS,
     ]);

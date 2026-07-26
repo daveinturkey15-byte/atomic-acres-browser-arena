@@ -120,7 +120,10 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'tri-pass', origin: [1, 0, 2], actionNonce: 3, nonce: 6 })).toBe(false);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 60, kind: 'explosive', explosiveSource: 'explosive-crossbow', origin: [1, 0, 2], actionNonce: 3, nonce: 6 })).toBe(true);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'magic', origin: [1, 0, 2], actionNonce: 3, supportNonce: 2, nonce: 6 })).toBe(false);
-    const activation: SupportActivateMessage = { type: 'support-activate', by: 'a', source: 'nuke', activationNonce: 7, effectOrigins: [], targetIds: [], nonce: 8 };
+    const activation: SupportActivateMessage = {
+      type: 'support-activate', by: 'a', source: 'nuke', activationRequestId: 'activation-nuke-1',
+      activationNonce: 7, effectOrigins: [], targetIds: [], nonce: 8,
+    };
     expect(isGameMessage(activation)).toBe(true);
     expect(messageBelongsToPlayer(activation, 'a')).toBe(true);
     const grenadeThrow: GrenadeThrowMessage = {

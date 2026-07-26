@@ -250,6 +250,8 @@ export type KillstreakControlIntent = Readonly<{
 export type KillstreakAdmission = Readonly<{
   accepted: boolean;
   reason: string;
+  /** Host-generated identity for the admitted activation, never supplied by a peer. */
+  activationId: string | null;
   activatedId: Pass65KillstreakId | null;
   entityIds: readonly string[];
 }>;
@@ -586,7 +588,9 @@ export class HostKillstreakRuntime {
 
   activate(intent: KillstreakActivationIntent, nowMs: number, world: KillstreakWorld): KillstreakAdmission {
     const actor = this.actors.get(intent.by);
-    const reject = (reason: string): KillstreakAdmission => Object.freeze({ accepted: false, reason, activatedId: null, entityIds: [] });
+    const reject = (reason: string): KillstreakAdmission => Object.freeze({
+      accepted: false, reason, activationId: null, activatedId: null, entityIds: [],
+    });
     if (!actor) return reject('unknown-actor');
     if (intent.matchEpoch !== this.matchEpoch) return reject('match-epoch-mismatch');
     if (intent.lifeId !== actor.lifeId) return reject('life-mismatch');
@@ -758,7 +762,13 @@ export class HostKillstreakRuntime {
       });
     }
     this.revision += 1;
-    return Object.freeze({ accepted: true, reason: 'accepted', activatedId: actualId, entityIds: Object.freeze(entityIds) });
+    return Object.freeze({
+      accepted: true,
+      reason: 'accepted',
+      activationId,
+      activatedId: actualId,
+      entityIds: Object.freeze(entityIds),
+    });
   }
 
   private clampAnchor(anchor: SupportVec3, world: KillstreakWorld): [number, number, number] {

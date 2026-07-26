@@ -367,7 +367,15 @@ import {
 } from './authoritative-shot';
 import { HostTriggerAuthorityRegistry } from './host-trigger-authority';
 import { ShotTimingTelemetry } from './shot-timing-telemetry';
-import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
+import {
+  admitRemoteSupportActivation,
+  admitRemoteSupportHit,
+  createRemoteSupportAuthorityState,
+  isLegacyOffensiveSupport,
+  recordRemoteSupportDeath,
+  registerRemoteSupportActivation,
+  type RemoteSupportAuthorityState,
+} from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, remoteGrenadeForAction, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import {
   advanceRemoteHealthAuthority,
@@ -4655,8 +4663,18 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-activate-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || !admitIncomingCombatTiming(message)) return;
-    const admission = killstreakRuntime.activate(message, performance.now(), killstreakWorldState());
+    const now = performance.now();
+    const admission = killstreakRuntime.activate(message, now, killstreakWorldState());
     if (admission.accepted) {
+      if (admission.activationId && admission.activatedId && isLegacyOffensiveSupport(admission.activatedId)) {
+        const state = remoteSupportAuthorities.get(message.by) ?? createRemoteSupportAuthorityState();
+        remoteSupportAuthorities.set(message.by, registerRemoteSupportActivation(state, {
+          activationRequestId: message.activationId,
+          canonicalActivationId: admission.activationId,
+          source: admission.activatedId,
+          now,
+        }));
+      }
       addFeed(`${combatantLabel(message.by).name} CALLED ${GAMEPAD_SUPPORT_LABELS[admission.activatedId!]}`, 'gold');
       broadcastKillstreakState();
     }
@@ -4882,12 +4900,14 @@ function onNetworkMessage(message: GameMessage): void {
         }
         const respawnAdmission = admitAuthoritativeRemoteRespawn(health, incoming.hp, now);
         if (respawnAdmission.respawned) {
-          remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+          const support = remoteSupportAuthorities.get(incoming.id) ?? createRemoteSupportAuthorityState();
+          remoteSupportAuthorities.set(incoming.id, recordRemoteSupportDeath(support));
           remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
           hostTriggerAuthorities.reset(incoming.id, 'respawn');
         }
         if (redeployed) {
-          remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
+          const support = remoteSupportAuthorities.get(incoming.id) ?? createRemoteSupportAuthorityState();
+          remoteSupportAuthorities.set(incoming.id, recordRemoteSupportDeath(support));
           remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
           hostTriggerAuthorities.reset(incoming.id, 'respawn');
         }
@@ -5008,9 +5028,8 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'support-activate') {
-    const state = remoteSupportAuthorities.get(message.by);
     const sender = remotes.get(message.by);
-    if (!state || !sender || sender.snapshot.hp <= 0) return;
+    if (!sender || sender.snapshot.hp <= 0) return;
     if (message.effectOrigins.some((origin) => !pointInsideBounds(new THREE.Vector3(...origin), arena.bounds, 0))) return;
     if (message.targetIds.some((id) => {
       if (id === player.id) return !player.alive || !areCombatantsHostile(message.by, sender.snapshot.team, player.id, player.team);
@@ -5020,11 +5039,17 @@ function onNetworkMessage(message: GameMessage): void {
       if (botTarget) return !botTarget.alive || !areCombatantsHostile(message.by, sender.snapshot.team, botTarget.id, botTarget.team);
       return true;
     })) return;
+    if (network.role !== 'host') {
+      presentRemoteSupportActivation(message, sender.snapshot);
+      return;
+    }
+    const state = remoteSupportAuthorities.get(message.by);
+    if (!state) return;
     const admission = admitRemoteSupportActivation(state, message, performance.now());
     if (admission.accepted) {
       remoteSupportAuthorities.set(message.by, admission.state);
       presentRemoteSupportActivation(message, sender.snapshot);
-      if (network.role === 'host') network.send(message);
+      network.send(message);
     }
     return;
   }
@@ -6335,8 +6360,6 @@ function processDeath(message: DeathMessage): void {
   }
   if (message.victim === player.id) scheduleLocalRespawn();
   if (message.killer !== message.victim && isKillstreakEligible(message.cause)) {
-    const killerAuthority = remoteSupportAuthorities.get(message.killer);
-    if (killerAuthority) remoteSupportAuthorities.set(message.killer, recordRemoteSupportElimination(killerAuthority));
     if (network.role === 'host' && message.killer !== player.id) killstreakRuntime.recordEligibleElimination(message.killer, 'weapon');
   }
   const victimAuthority = remoteSupportAuthorities.get(message.victim);
@@ -10245,10 +10268,11 @@ function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
   return index < 0 ? null : (index + 1) as 1 | 2 | 3 | 4 | 5;
 }
 
-function requestKillstreakActivation(id: Pass65KillstreakId, now: number, anchor?: [number, number, number]): boolean {
+function requestKillstreakActivation(id: Pass65KillstreakId, now: number, anchor?: [number, number, number]): string | null {
   const slot = killstreakSlotFor(id);
-  if (!slot) return false;
+  if (!slot) return null;
   killstreakActivationSequence += 1;
+  const activationRequestId = `activation-${killstreakMatchEpoch}-${killstreakActivationSequence}`;
   const message: KillstreakActivateIntentMessage = {
     type: 'killstreak-activate-intent',
     by: player.id,
@@ -10256,7 +10280,7 @@ function requestKillstreakActivation(id: Pass65KillstreakId, now: number, anchor
     lifeId: localContinuity,
     sequence: killstreakActivationSequence,
     slot,
-    activationId: `activation-${killstreakMatchEpoch}-${killstreakActivationSequence}`,
+    activationId: activationRequestId,
     expectedId: id,
     ...(anchor ? { anchor } : {}),
     timing: nextCombatTiming(),
@@ -10264,16 +10288,16 @@ function requestKillstreakActivation(id: Pass65KillstreakId, now: number, anchor
   };
   if (network.role === 'client') {
     network.send(message);
-    return true;
+    return activationRequestId;
   }
   const admission = killstreakRuntime.activate(message, now, killstreakWorldState());
   if (!admission.accepted) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} REJECTED · ${admission.reason.toUpperCase()}`, 'coral');
-    return false;
+    return null;
   }
   refreshLocalKillstreakSnapshot(now);
   broadcastKillstreakState(now);
-  return true;
+  return activationRequestId;
 }
 
 function requestKillstreakControl(
@@ -11275,13 +11299,16 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
   drawStrikeMap();
   if (next.complete) {
     const anchor = next.points[1] ?? next.points[0];
-    if (!anchor || !requestKillstreakActivation('tri-pass', confirmedAt, [anchor.x, 0.2, anchor.z])) {
+    const activationRequestId = anchor
+      ? requestKillstreakActivation('tri-pass', confirmedAt, [anchor.x, 0.2, anchor.z])
+      : null;
+    if (!activationRequestId) {
       fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'tri-pass': true } };
       addFeed('TRI-PASS AUTHORITY REJECTED · REFUNDED', 'coral');
       cancelSupportTargeting(false);
       return true;
     }
-    authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
+    authorizeLocalOffensiveSupport('tri-pass', activationRequestId, next.points.map((point) => [point.x, 0.2, point.z]));
     scheduleTriPassMissiles(next.points, confirmedAt);
     cancelSupportTargeting(false);
   }
@@ -11314,13 +11341,17 @@ strikeMapCanvas.addEventListener('click', (event) => {
 
 function authorizeLocalOffensiveSupport(
   source: OffensiveSupportSource,
+  activationRequestId: string,
   effectOrigins: [number, number, number][] = [],
   targetIds: string[] = [],
 ): number {
   const activationNonce = randomNonce();
   localSupportNonces.set(source, activationNonce);
   if (network.role !== 'offline') {
-    network.send({ type: 'support-activate', by: player.id, source, activationNonce, effectOrigins, targetIds, timing: nextCombatTiming(), nonce: randomNonce() });
+    network.send({
+      type: 'support-activate', by: player.id, source, activationRequestId,
+      activationNonce, effectOrigins, targetIds, timing: nextCombatTiming(), nonce: randomNonce(),
+    });
   }
   return activationNonce;
 }
@@ -11349,7 +11380,8 @@ function activateFieldSupport(id: FieldSupportId): void {
       refund();
       return;
     }
-    if (!requestKillstreakActivation(activatedId, now, [target.point.x, target.point.y, target.point.z])) { refund(); return; }
+    const activationRequestId = requestKillstreakActivation(activatedId, now, [target.point.x, target.point.y, target.point.z]);
+    if (!activationRequestId) { refund(); return; }
     if (yardhawk) disposeSupportRoot(yardhawk.root);
     const root = new THREE.Group(); root.name = 'yardhawk-hunter-killer';
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, 0.9), new THREE.MeshBasicMaterial({ color: 0x29393d }));
@@ -11369,7 +11401,7 @@ function activateFieldSupport(id: FieldSupportId): void {
       expiresAt: now + 6_500,
     };
     audio.supportInbound('yardhawk');
-    authorizeLocalOffensiveSupport('yardhawk', [], [target.id]);
+    authorizeLocalOffensiveSupport('yardhawk', activationRequestId, [], [target.id]);
     addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
   } else if (activatedId === 'tri-pass') {
     beginTriPassTargeting();
@@ -11380,16 +11412,18 @@ function activateFieldSupport(id: FieldSupportId): void {
       refund();
       addFeed('HUNTER SWARM · NO HOSTILE TARGETS · REFUNDED', 'gold');
     } else {
-      if (!requestKillstreakActivation(activatedId, now)) {
+      const activationRequestId = requestKillstreakActivation(activatedId, now);
+      if (!activationRequestId) {
         for (const drone of hunterDrones.splice(firstSpawnedDrone)) disposeSupportRoot(drone.root);
         refund();
         return;
       }
-      authorizeLocalOffensiveSupport('hunter-swarm', [], assignments);
+      authorizeLocalOffensiveSupport('hunter-swarm', activationRequestId, [], assignments);
     }
   } else if (activatedId === 'nuke') {
-    if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
-    authorizeLocalOffensiveSupport('nuke');
+    const activationRequestId = requestKillstreakActivation(activatedId, now);
+    if (!activationRequestId) { refund(); return; }
+    authorizeLocalOffensiveSupport('nuke', activationRequestId);
     beginNuke(now);
   } else if (activatedId === 'adrenaline') {
     if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
@@ -14774,10 +14808,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     remoteSupportAuthority: [...remoteSupportAuthorities.entries()].map(([id, authority]) => ({
       id,
-      streak: authority.progression.streak,
-      available: { ...authority.progression.available },
+      pendingActivationRequestIds: Object.keys(authority.pending),
       authorizations: Object.fromEntries(
         Object.entries(authority.authorizations).map(([source, authorization]) => [source, authorization ? {
+          canonicalActivationId: authorization.canonicalActivationId,
           activationNonce: authorization.activationNonce,
           expiresInMs: Math.max(0, authorization.expiresAt - performance.now()),
           admittedOrigins: Object.keys(authorization.targetsByOrigin).length,
@@ -15589,8 +15623,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     triPassTargeting = next;
     drawStrikeMap();
     if (!next.complete) return false;
-    authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
-    scheduleTriPassMissiles(next.points, performance.now());
+    const anchor = next.points[1] ?? next.points[0];
+    const now = performance.now();
+    const activationRequestId = anchor
+      ? requestKillstreakActivation('tri-pass', now, [anchor.x, 0.2, anchor.z])
+      : null;
+    if (!activationRequestId) return false;
+    authorizeLocalOffensiveSupport('tri-pass', activationRequestId, next.points.map((point) => [point.x, 0.2, point.z]));
+    scheduleTriPassMissiles(next.points, now);
     cancelSupportTargeting(false);
     return true;
   },
@@ -15801,7 +15841,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   earnSupport: (eliminations: number) => {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
   },
-  activateKillstreak: (id: Pass65KillstreakId, anchor) => requestKillstreakActivation(id, performance.now(), anchor),
+  activateKillstreak: (id: Pass65KillstreakId, anchor) => Boolean(requestKillstreakActivation(id, performance.now(), anchor)),
   forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;
