@@ -645,6 +645,25 @@ export class ArenaAudio {
     return true;
   }
 
+  flashbang(): void {
+    // One sharp, limiter-bounded onset plus a short tinnitus tail. The visual
+    // recovery is continuous, so this cue never introduces a repeated strobe.
+    this.noise({ duration: 0.085, volume: 0.48, filter: 'highpass', frequency: 2_900, q: 0.55 }, this.weapons);
+    this.sweep(5_600, 2_100, 0.72, 0.12, 'sine', this.feedback, 0.025);
+    this.sweep(7_200, 3_100, 0.48, 0.065, 'sine', this.feedback, 0.09);
+  }
+
+  supportGun(kind: 'chopper' | 'drone'): void {
+    if (kind === 'chopper') {
+      this.sweep(104, 38, 0.16, 0.21, 'sawtooth', this.weapons);
+      this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, this.weapons);
+      this.noise({ duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45 }, this.weapons);
+      return;
+    }
+    this.sweep(178, 72, 0.09, 0.13, 'square', this.weapons);
+    this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, this.weapons);
+  }
+
   scoutSweep(): void {
     this.supportCuePlays += 1;
     this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
@@ -653,6 +672,29 @@ export class ArenaAudio {
     this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
       startFrequency: 1_320, endFrequency: 1_320, duration: 0.07, volume: 0.028, delay: pulse * 2.4 + 0.12,
     })), 'sine', this.announcements);
+  }
+
+  matchCountdown(step: 1 | 2 | 3 | 'engage'): void {
+    if (step === 'engage') {
+      this.sweep(360, 1_120, 0.24, 0.065, 'sawtooth', this.announcements);
+      this.tone(1_320, 0.18, 0.045, 'square', this.ui, 0.08);
+      return;
+    }
+    const frequency = 430 + (3 - step) * 85;
+    this.tone(frequency, 0.11, 0.045, 'triangle', this.announcements);
+    this.tone(frequency * 2, 0.07, 0.024, 'sine', this.ui, 0.025);
+  }
+
+  adrenalineState(active: boolean): void {
+    this.supportCuePlays += 1;
+    if (active) {
+      this.sweep(110, 760, 0.38, 0.07, 'sawtooth', this.announcements);
+      this.tone(92, 0.16, 0.055, 'sine', this.feedback, 0.05);
+      this.tone(118, 0.2, 0.05, 'sine', this.feedback, 0.23);
+      this.noise({ duration: 0.3, volume: 0.035, filter: 'highpass', frequency: 1_600, q: 0.8 }, this.ui);
+      return;
+    }
+    this.sweep(420, 105, 0.25, 0.035, 'triangle', this.ui);
   }
 
   supportInbound(source: 'yardhawk' | 'tri-pass' | 'hunter-swarm'): void {

@@ -235,7 +235,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'entityId', 'action', 'nonce'], [
       'yawQ', 'pitchQ', 'thrustQ', 'verticalQ', 'fire', 'timing',
     ]) && baseIntent(value) && hostEntityId(value.entityId)
-      && (value.action === 'toggle-chopper-gunner' || value.action === 'pilot-control' || value.action === 'exit-piloted-drone')
+      && (value.action === 'toggle-chopper-gunner' || value.action === 'toggle-piloted-drone' || value.action === 'pilot-control' || value.action === 'exit-piloted-drone')
       && (value.yawQ === undefined || finite(value.yawQ, -Math.PI, Math.PI))
       && (value.pitchQ === undefined || finite(value.pitchQ, -1.2, 1.2))
       && (value.thrustQ === undefined || finite(value.thrustQ, -1, 1))

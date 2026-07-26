@@ -150,7 +150,10 @@ describe('Pass 65 killstreak blockers', () => {
     earn(runtime, 5);
     const entityId = runtime.activate(activation('piloted-drone', 2), 1_000, world).entityIds[0];
     runtime.control({
-      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'pilot-control',
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-piloted-drone',
+    }, 1_000);
+    runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'pilot-control',
       yawQ: 0, pitchQ: 0, thrustQ: 0, verticalQ: 0, fire: true,
     }, 1_001);
     const result = runtime.advance(1_001, world);

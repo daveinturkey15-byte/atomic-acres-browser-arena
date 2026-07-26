@@ -160,7 +160,7 @@ function fieldKitPanelMarkup(): string {
         <label>NAME<input id="loadout-preset-name" type="text" maxlength="32" autocomplete="off"></label>
         <label>PRIMARY<select id="loadout-primary">${weaponOptionsMarkup('primary')}</select></label>
         <label>SECONDARY<select id="loadout-secondary">${weaponOptionsMarkup('secondary')}</select></label>
-        <label>GRENADE<select id="loadout-grenade"><option value="frag">Frag</option><option value="smoke">Smoke</option><option value="flash">Flash</option></select></label>
+        <label>GRENADE<select id="loadout-grenade"><option value="frag">Frag</option><option value="smoke">Smoke</option><option value="flash">Flash</option><option value="semtex">Semtex</option></select></label>
         <button id="loadout-save" type="button">SAVE PRESET</button>
       </div>
     </section>

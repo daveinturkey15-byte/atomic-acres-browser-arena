@@ -49,7 +49,7 @@ export type SidearmWeaponId =
   | 'pistol' | 'machine-pistol' | 'magnum' | 'flashlight-pistol' | 'explosive-crossbow';
 export type SpecialWeaponId = 'railgun';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
-export type GrenadeId = 'frag' | 'smoke' | 'flash';
+export type GrenadeId = 'frag' | 'smoke' | 'flash' | 'semtex';
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
   'carbine', 'smg', 'lmg', 'scattergun', 'sniper',
@@ -58,7 +58,7 @@ export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
 export const SIDEARM_WEAPON_IDS: readonly SidearmWeaponId[] = Object.freeze([
   'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
 ]);
-export const GRENADE_IDS: readonly GrenadeId[] = Object.freeze(['frag', 'smoke', 'flash']);
+export const GRENADE_IDS: readonly GrenadeId[] = Object.freeze(['frag', 'smoke', 'flash', 'semtex']);
 export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, ...SIDEARM_WEAPON_IDS, 'railgun']);
 export const MAX_MATCH_SCORE_ENTRIES = 10;
 

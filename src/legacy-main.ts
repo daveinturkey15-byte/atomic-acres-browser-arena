@@ -37,6 +37,7 @@ import {
 } from './bot-ai';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { nextShotDeadline } from './combat-timing';
+import { SEMTEX_HITL_CONTRACT, flashbangPresentation, semtexBlastDamage } from './combat/pass65-ordnance-contract';
 import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
@@ -588,6 +589,9 @@ type GrenadeEntity = {
   ownerKind: 'player' | 'bot' | 'remote';
   ownerId: string;
   ownerTeam: Team;
+  impactedAt: number | null;
+  attachedTargetId: string | null;
+  attachedTargetLifeId: number | null;
 };
 
 type RuntimeSmokeVolume = SmokeVolume & Readonly<{ presentationLease: SmokeVolumePresentationLease }>;
@@ -2076,6 +2080,10 @@ let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const killstreakRegisteredActors = new Set<string>();
 let displayedCareReward: Pass65KillstreakId | null = null;
+let supportDamageActivationId: string | null = null;
+let chopperDamageDealt = 0;
+let adrenalineHudWasActive = false;
+let lastMatchCountdownCue: string | null = null;
 let overdriveState: OverdriveState = createOverdriveState(0);
 let overdriveClaimGeneration = -1;
 let overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
@@ -4516,7 +4524,10 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
-    for (const event of message.events) if (event.targetId === player.id) applyKillstreakDamageEvent(event);
+    for (const event of message.events) {
+      if (event.ownerId === player.id) recordOwnerSupportDamage(event);
+      if (event.targetId === player.id) applyKillstreakDamageEvent(event);
+    }
     return;
   }
   if (message.type === 'railgun-state') {
@@ -8123,6 +8134,9 @@ function throwBotGrenade(
     ownerKind: 'bot',
     ownerId: bot.id,
     ownerTeam: bot.team,
+    impactedAt: null,
+    attachedTargetId: null,
+    attachedTargetLifeId: null,
   });
   bot.grenadeActive = true;
   bot.nextGrenadeAt = now + BOT_GRENADE_COOLDOWN_MS;
@@ -8924,18 +8938,23 @@ function throwGrenade(): void {
   mesh.castShadow = true;
   scene.add(mesh);
   const thrownAt = performance.now();
+  const impactDetonated = player.selectedGrenade === 'flash';
+  const sticky = player.selectedGrenade === 'semtex';
   grenades.push({
     grenade: player.selectedGrenade,
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
-    explodeAt: thrownAt + 2_300,
-    nextFuseBeepAt: thrownAt + 2_300 - GRENADE_FUSE_BEEP_START_MS,
+    explodeAt: thrownAt + (impactDetonated || sticky ? SEMTEX_HITL_CONTRACT.maximumNoImpactLifetimeMs : 2_300),
+    nextFuseBeepAt: impactDetonated ? Number.POSITIVE_INFINITY : thrownAt + 2_300 - GRENADE_FUSE_BEEP_START_MS,
     lastBounceAt: 0,
     actionNonce,
     ownerKind: 'player',
     ownerId: player.id,
     ownerTeam: player.team,
+    impactedAt: null,
+    attachedTargetId: null,
+    attachedTargetLifeId: null,
   });
 }
 
@@ -8945,18 +8964,23 @@ function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-thr
   mesh.castShadow = true;
   scene.add(mesh);
   const receivedAt = performance.now();
+  const impactDetonated = message.grenade === 'flash';
+  const sticky = message.grenade === 'semtex';
   grenades.push({
     grenade: message.grenade,
     mesh,
     velocity: new THREE.Vector3(...message.velocity),
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
-    explodeAt: receivedAt + 2_300,
-    nextFuseBeepAt: receivedAt + 2_300 - GRENADE_FUSE_BEEP_START_MS,
+    explodeAt: receivedAt + (impactDetonated || sticky ? SEMTEX_HITL_CONTRACT.maximumNoImpactLifetimeMs : 2_300),
+    nextFuseBeepAt: impactDetonated ? Number.POSITIVE_INFINITY : receivedAt + 2_300 - GRENADE_FUSE_BEEP_START_MS,
     lastBounceAt: 0,
     actionNonce: message.actionNonce,
     ownerKind: 'remote',
     ownerId: message.by,
     ownerTeam,
+    impactedAt: null,
+    attachedTargetId: null,
+    attachedTargetLifeId: null,
   });
 }
 
@@ -9016,8 +9040,9 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
     friendly: entity.ownerTeam === player.team,
   });
   if (exposure.accepted) {
-    flashExposureStrength = Math.max(flashExposureStrength, exposure.intensity);
-    flashExposureUntil = Math.max(flashExposureUntil, now + exposure.durationMs);
+    const presentation = flashbangPresentation(exposure.intensity, accessibilityRuntime.reducedSensory);
+    flashExposureStrength = Math.max(flashExposureStrength, presentation.whiteoutOpacity);
+    flashExposureUntil = Math.max(flashExposureUntil, now + presentation.recoveryMs);
   }
   if (!shouldResolveFlashAgainstBots(network.role, entity.ownerKind)) return;
   for (const bot of bots.values()) {
@@ -9072,7 +9097,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
     return;
   }
   if (entity.grenade === 'flash') {
-    audio.explosion(afterPresentationDetach);
+    audio.flashbang();
     spawnImpactFlash(point, 'metal');
     applyFlashGrenade(point, entity, afterPresentationDetach);
     return;
@@ -9084,10 +9109,14 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const afterVisual = performance.now();
   // Remote grenades are presentation-only. Authoritative hit/window events are the sole mutation path.
   if (entity.ownerKind === 'remote') return;
-  applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);
+  const blastRadius = entity.grenade === 'semtex' ? SEMTEX_HITL_CONTRACT.blastRadiusM : GRENADE_RADIUS;
+  const blastDamage = (distance: number, prone = false): number => entity.grenade === 'semtex'
+    ? semtexBlastDamage(distance, prone)
+    : grenadeDamage(distance);
+  applyInteractiveWorldExplosion(point, blastRadius, entity.grenade === 'semtex' ? SEMTEX_HITL_CONTRACT.blastMaximumDamage : 100);
   if (entity.ownerKind === 'bot') {
     const blocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, player.position, box));
-    const damage = blocked ? 0 : botScaledDamage(grenadeDamage(player.position.distanceTo(point)));
+    const damage = blocked ? 0 : botScaledDamage(blastDamage(player.position.distanceTo(point), player.stance === 'prone'));
     lastBotGrenadeDamage = damage;
     if (damage > 0 && player.alive) {
       applyDamage(damage, entity.ownerId, 0, false, { kind: 'grenade' });
@@ -9111,14 +9140,14 @@ function explodeGrenade(entity: GrenadeEntity): void {
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const blocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box));
-    const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), afterAudio);
+    const damage = blocked ? 0 : outgoingDamage(blastDamage(bot.position.distanceTo(point)), afterAudio);
     if (damage > 0) applyBotDamage(bot, damage, 'body', { kind: 'grenade' });
   }
   const blastNonce = entity.actionNonce;
   for (const remote of remotes.values()) {
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
-    const baseDamage = grenadeDamage(target.distanceTo(point));
+    const baseDamage = blastDamage(target.distanceTo(point), remote.snapshot.stance === 'prone');
     if (baseDamage > 0) sendAuthoritativeHit({
       type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, baseDamage), kind: 'explosive',
       explosiveSource: 'grenade', origin: point.toArray(), actionNonce: blastNonce, nonce: randomNonce(),
@@ -9126,7 +9155,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   }
   const afterTargets = performance.now();
   const selfBlocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, player.position, box));
-  const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
+  const selfDamage = selfBlocked ? 0 : blastDamage(player.position.distanceTo(point), player.stance === 'prone') * 0.35;
   if (selfDamage > 0) applyDamage(selfDamage, player.id, 1, false, { kind: 'grenade' });
   const finished = performance.now();
   lastGrenadeExplosionProfile = {
@@ -9139,14 +9168,49 @@ function explodeGrenade(entity: GrenadeEntity): void {
   };
 }
 
+function armImpactGrenade(
+  grenade: GrenadeEntity,
+  now: number,
+  position: THREE.Vector3,
+  target: ExplosiveBoltTarget | null = null,
+): void {
+  if (grenade.impactedAt !== null) return;
+  grenade.impactedAt = now;
+  grenade.mesh.position.copy(position);
+  grenade.velocity.set(0, 0, 0);
+  grenade.angularVelocity.set(0, 0, 0);
+  grenade.attachedTargetId = target?.id ?? null;
+  grenade.attachedTargetLifeId = target?.lifeId ?? null;
+  if (grenade.grenade === 'flash') {
+    grenade.explodeAt = now;
+    grenade.nextFuseBeepAt = Number.POSITIVE_INFINITY;
+  } else if (grenade.grenade === 'semtex') {
+    grenade.explodeAt = now + SEMTEX_HITL_CONTRACT.fuseMs;
+    grenade.nextFuseBeepAt = now;
+  }
+  audio.coverImpact(position.distanceTo(player.position));
+}
+
 function updateGrenades(dt: number, now: number): void {
   updateOrdnanceVolumes(now);
   for (let index = grenades.length - 1; index >= 0; index -= 1) {
     const grenade = grenades[index];
     const fuseRemainingMs = grenade.explodeAt - now;
-    if (fuseRemainingMs <= GRENADE_FUSE_BEEP_START_MS && now >= grenade.nextFuseBeepAt) {
+    if (grenade.grenade !== 'flash' && fuseRemainingMs <= GRENADE_FUSE_BEEP_START_MS && now >= grenade.nextFuseBeepAt) {
       audio.grenadeFuseBeep(fuseRemainingMs, now);
       grenade.nextFuseBeepAt = now + grenadeFuseBeepIntervalMs(fuseRemainingMs);
+    }
+    if (grenade.impactedAt !== null) {
+      if (grenade.attachedTargetId !== null && grenade.attachedTargetLifeId !== null) {
+        const target = explosiveBoltTargets(grenade.ownerId, grenade.ownerTeam)
+          .find((candidate) => candidate.id === grenade.attachedTargetId && candidate.lifeId === grenade.attachedTargetLifeId);
+        if (target) grenade.mesh.position.copy(target.position);
+      }
+      if (now >= grenade.explodeAt) {
+        grenades.splice(index, 1);
+        explodeGrenade(grenade);
+      }
+      continue;
     }
     grenade.velocity.y -= 18 * dt;
     grenade.mesh.rotation.x += grenade.angularVelocity.x * dt;
@@ -9155,7 +9219,24 @@ function updateGrenades(dt: number, now: number): void {
     const start = grenade.mesh.position.clone();
     const delta = grenade.velocity.clone().multiplyScalar(dt);
     const collision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders());
-    if (collision) {
+    let targetHit: ExplosiveBoltTarget | null = null;
+    let targetFraction = 2;
+    if (grenade.grenade === 'flash' || grenade.grenade === 'semtex') {
+      for (const target of explosiveBoltTargets(grenade.ownerId, grenade.ownerTeam)) {
+        const fraction = segmentSphereFraction(start, delta, target.position, 0.58);
+        if (fraction !== null && fraction < targetFraction) {
+          targetHit = target;
+          targetFraction = fraction;
+        }
+      }
+    }
+    const worldFraction = collision?.time ?? 2;
+    if (targetHit && targetFraction <= worldFraction) {
+      armImpactGrenade(grenade, now, start.clone().addScaledVector(delta, targetFraction), targetHit);
+    } else if (collision && (grenade.grenade === 'flash' || grenade.grenade === 'semtex')) {
+      const collisionNormal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
+      armImpactGrenade(grenade, now, start.clone().addScaledVector(delta, collision.time).addScaledVector(collisionNormal, 0.025));
+    } else if (collision) {
       const collisionNormal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
       grenade.mesh.position.copy(start).addScaledVector(delta, collision.time).addScaledVector(collisionNormal, 0.025);
       const incoming = grenade.velocity.dot(collisionNormal);
@@ -9168,9 +9249,22 @@ function updateGrenades(dt: number, now: number): void {
     } else {
       grenade.mesh.position.add(delta);
     }
+    if (grenade.impactedAt !== null && now >= grenade.explodeAt) {
+      grenades.splice(index, 1);
+      explodeGrenade(grenade);
+      continue;
+    }
     if (!pointInsideBounds(grenade.mesh.position, arena.bounds, 0.16)) {
       const impact = clampPointToBounds(grenade.mesh.position, arena.bounds, 0.16);
       grenade.mesh.position.set(impact.x, impact.y, impact.z);
+      if (grenade.grenade === 'flash' || grenade.grenade === 'semtex') {
+        armImpactGrenade(grenade, now, grenade.mesh.position);
+        if (grenade.grenade === 'flash') {
+          grenades.splice(index, 1);
+          explodeGrenade(grenade);
+        }
+        continue;
+      }
       spawnImpactFlash(grenade.mesh.position.clone());
       audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
       scheduleDeferredGpuRetirement(grenade.mesh, grenade.mesh.userData.authoredGrenade !== true);
@@ -9179,6 +9273,15 @@ function updateGrenades(dt: number, now: number): void {
       continue;
     }
     if (grenade.mesh.position.y < 0.18) {
+      if (grenade.grenade === 'flash' || grenade.grenade === 'semtex') {
+        grenade.mesh.position.y = 0.18;
+        armImpactGrenade(grenade, now, grenade.mesh.position);
+        if (grenade.grenade === 'flash') {
+          grenades.splice(index, 1);
+          explodeGrenade(grenade);
+        }
+        continue;
+      }
       const impactSpeed = Math.abs(grenade.velocity.y);
       if (impactSpeed > 1.8 && now - grenade.lastBounceAt > 90) {
         grenade.lastBounceAt = now;
@@ -9366,10 +9469,105 @@ function updateFieldSupportHud(): void {
     const state = item.querySelector<HTMLElement>('.support-state');
     if (state) state.textContent = ready ? 'READY' : 'LOCKED';
   });
+  updateSupportStatusHud();
 }
 
 function localKillstreakActorSnapshot(): KillstreakRecipientSnapshot['actors'][number] | null {
   return killstreakSnapshot.actors.find((actor) => actor.actorId === player.id) ?? null;
+}
+
+function updateSupportStatusHud(): void {
+  const actor = localKillstreakActorSnapshot();
+  const adrenalineRemainingMs = Math.max(0, actor?.adrenalineRemainingMs ?? 0);
+  const adrenalineActive = adrenalineRemainingMs > 0;
+  const adrenalineHud = element<HTMLElement>('#adrenaline-hud');
+  adrenalineHud.hidden = !adrenalineActive;
+  element<HTMLElement>('#adrenaline-time').textContent = (adrenalineRemainingMs / 1_000).toFixed(1);
+  if (adrenalineActive !== adrenalineHudWasActive) {
+    audio.adrenalineState(adrenalineActive);
+    adrenalineHudWasActive = adrenalineActive;
+  }
+
+  const ownedChopper = killstreakSnapshot.entities.find((entity) => (
+    entity.kind === 'chopper' && entity.ownerId === player.id && entity.expiresInMs > 0
+  ));
+  const feedback = element<HTMLElement>('#support-combat-feedback');
+  feedback.hidden = !ownedChopper;
+  if (!ownedChopper) {
+    supportDamageActivationId = null;
+    chopperDamageDealt = 0;
+  } else if (supportDamageActivationId !== ownedChopper.activationId) {
+    supportDamageActivationId = ownedChopper.activationId;
+    chopperDamageDealt = 0;
+  }
+  element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(chopperDamageDealt));
+}
+
+function updateCarePackagePrompt(): void {
+  const prompt = element<HTMLElement>('#support-interaction-prompt');
+  const promptLabel = prompt.querySelector<HTMLElement>('span');
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (!player.alive) {
+    prompt.hidden = true;
+    return;
+  }
+  if (possession?.kind === 'piloted-drone') {
+    if (promptLabel) promptLabel.textContent = 'AUTONOMOUS DRONE CONTROL';
+    prompt.hidden = false;
+    return;
+  }
+  const standaloneDrone = killstreakSnapshot.entities.find((entity) => (
+    entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === player.id
+  ));
+  if (standaloneDrone) {
+    if (promptLabel) promptLabel.textContent = 'ENTER DRONE · FIRST PERSON';
+    prompt.hidden = false;
+    return;
+  }
+  if (possession) {
+    prompt.hidden = true;
+    return;
+  }
+  const crate = killstreakSnapshot.entities
+    .filter((entity) => entity.kind === 'care-crate' && (entity.phase === 'landed' || entity.phase === 'capturing'))
+    .sort((left, right) => Math.hypot(left.position[0] - player.position.x, left.position[2] - player.position.z)
+      - Math.hypot(right.position[0] - player.position.x, right.position[2] - player.position.z))[0];
+  if (!crate) {
+    prompt.hidden = true;
+    return;
+  }
+  if (promptLabel) promptLabel.textContent = 'COLLECT KILLSTREAK';
+  const playerEye: [number, number, number] = [player.position.x, player.position.y + 1.1, player.position.z];
+  const distance = Math.hypot(crate.position[0] - player.position.x, crate.position[2] - player.position.z);
+  const lineOfSight = !activeWorldColliders().some((box) => segmentIntersectsBox(
+    { x: playerEye[0], y: playerEye[1], z: playerEye[2] },
+    { x: crate.position[0], y: crate.position[1] + 0.45, z: crate.position[2] },
+    box,
+  ));
+  prompt.hidden = distance > 2.75 || !lineOfSight;
+}
+
+function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
+  if (event.ownerId !== player.id || event.damage <= 0) return;
+  const targetPosition = event.targetId === player.id
+    ? player.position.clone().add(new THREE.Vector3(0, 1, 0))
+    : bots.get(event.targetId)?.position.clone().add(new THREE.Vector3(0, 1, 0))
+      ?? remotes.get(event.targetId)?.target.clone().add(new THREE.Vector3(0, 1, 0));
+  if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
+    const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
+    spawnTracer(new THREE.Vector3(...event.origin), targetPosition, drone ? 0x52e8ff : 0xffc65c);
+    audio.supportGun(drone ? 'drone' : 'chopper');
+  }
+  showHitmarker(false);
+  showDamageNumber(event.damage, 'body');
+  audio.hit(false);
+  if (event.source !== 'chopper') return;
+  if (supportDamageActivationId !== event.activationId) {
+    supportDamageActivationId = event.activationId;
+    chopperDamageDealt = 0;
+  }
+  chopperDamageDealt += event.damage;
+  element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(chopperDamageDealt));
 }
 
 function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
@@ -9600,8 +9798,16 @@ function requestKillstreakControl(
 function interactWithKillstreakSupport(now = performance.now()): boolean {
   const actor = localKillstreakActorSnapshot();
   if (actor?.possession?.kind === 'piloted-drone') {
-    requestKillstreakControl(actor.possession.entityId, 'exit-piloted-drone', {}, now);
-    addFeed('PILOTED DRONE · PLAYER CONTROL RELEASED', 'gold');
+    requestKillstreakControl(actor.possession.entityId, 'toggle-piloted-drone', {}, now);
+    addFeed('PILOTED DRONE · AUTONOMOUS CONTROL', 'gold');
+    return true;
+  }
+  const standaloneDrone = killstreakSnapshot.entities.find((entity) => (
+    entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === player.id
+  ));
+  if (standaloneDrone) {
+    requestKillstreakControl(standaloneDrone.id, 'toggle-piloted-drone', {}, now);
+    addFeed('PILOTED DRONE · FIRST-PERSON CONTROL', 'gold');
     return true;
   }
   const chopper = killstreakSnapshot.entities.find((entity) => entity.kind === 'chopper' && entity.ownerId === player.id);
@@ -9726,6 +9932,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
+    for (const event of applied) recordOwnerSupportDamage(event);
     for (const impact of result.impactEvents) {
       applyInteractiveWorldExplosion(new THREE.Vector3(...impact.position), 4.5, 80);
     }
@@ -9741,6 +9948,8 @@ function updatePass65KillstreakRuntime(now: number): void {
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
+  updateSupportStatusHud();
+  updateCarePackagePrompt();
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
   weaponView.root.visible = !possession && player.alive;
@@ -11251,14 +11460,21 @@ function updateMatchState(now: number): void {
   }
   const countdown = element<HTMLElement>('#countdown');
   if (matchState.phase === 'warmup') {
-    countdown.textContent = presentation.headline ?? '';
+    const headline = presentation.headline ?? '';
+    countdown.textContent = headline;
     countdown.hidden = false;
+    if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
+      audio.matchCountdown(Number(headline) as 1 | 2 | 3);
+      lastMatchCountdownCue = headline;
+    }
   } else {
     countdown.hidden = true;
   }
   if (previous === matchState.phase) return;
   const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
+    audio.matchCountdown('engage');
+    lastMatchCountdownCue = 'engage';
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
     banner.innerHTML = `<strong>ENGAGE</strong><span>${privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel}</span>`;
@@ -11267,6 +11483,7 @@ function updateMatchState(now: number): void {
     return;
   }
   if (matchState.phase === 'ended') {
+    lastMatchCountdownCue = null;
     matchFinished = true;
     killstreakLoadoutController.releaseAfterMatch();
     killstreakMenuBinding.setMatchActive(false);
@@ -12175,7 +12392,6 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => {
   keys.delete(event.code);
-  if (event.code === 'KeyF') releaseCareCapture();
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {

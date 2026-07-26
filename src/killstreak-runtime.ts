@@ -204,7 +204,7 @@ export type KillstreakControlIntent = Readonly<{
   lifeId: number;
   sequence: number;
   entityId: string;
-  action: 'toggle-chopper-gunner' | 'pilot-control' | 'exit-piloted-drone';
+  action: 'toggle-chopper-gunner' | 'toggle-piloted-drone' | 'pilot-control' | 'exit-piloted-drone';
   yawQ?: number;
   pitchQ?: number;
   thrustQ?: number;
@@ -659,7 +659,6 @@ export class HostKillstreakRuntime {
         nextSensorRefreshAtMs: nowMs,
         sensorContacts: [],
       });
-      actor.possession = Object.freeze({ kind: 'piloted-drone', entityId: id });
       entityIds.push(id);
     } else if (actualId === 'drone-swarm') {
       for (let index = 0; index < DRONE_SWARM_COUNT; index += 1) {
@@ -750,6 +749,19 @@ export class HostKillstreakRuntime {
         entity.gunController = 'ai';
         entity.pendingPlayerFire = false;
         this.restoreActorControl(actor, false);
+      }
+      entity.revision += 1;
+    } else if (intent.action === 'toggle-piloted-drone') {
+      if (entity.kind !== 'drone' || entity.mode !== 'piloted') return reject('wrong-entity-kind');
+      if (actor.possession?.kind === 'piloted-drone' && actor.possession.entityId === entity.id) {
+        entity.pendingPlayerFire = false;
+        entity.thrust = 0;
+        entity.vertical = 0;
+        this.restoreActorControl(actor, false);
+      } else {
+        this.restoreActorControl(actor, true);
+        actor.possession = Object.freeze({ kind: 'piloted-drone', entityId: entity.id });
+        entity.nextSensorRefreshAtMs = Math.min(entity.nextSensorRefreshAtMs, nowMs);
       }
       entity.revision += 1;
     } else if (intent.action === 'exit-piloted-drone') {
@@ -998,7 +1010,10 @@ export class HostKillstreakRuntime {
     if (!owner) return;
     if (entity.gunProfileId !== DRONE_GUN_PROFILE_ID) throw new Error(`unknown drone gun profile ${entity.gunProfileId}`);
     const gunProfile: DroneGunProfile = DRONE_GUN_PROFILE;
-    if (entity.mode === 'piloted') this.updatePilotedDroneSensor(entity, owner, nowMs, world);
+    const playerControlled = entity.mode === 'piloted'
+      && owner.possession?.kind === 'piloted-drone'
+      && owner.possession.entityId === entity.id;
+    if (playerControlled) this.updatePilotedDroneSensor(entity, owner, nowMs, world);
     if (entity.phase === 'reloading') {
       if (entity.reloadCompletesAtMs !== null && nowMs >= entity.reloadCompletesAtMs) {
         if (entity.reserveClips === null || entity.reserveClips > 0) {
@@ -1011,7 +1026,7 @@ export class HostKillstreakRuntime {
       }
       return;
     }
-    if (entity.mode === 'piloted') {
+    if (playerControlled) {
       const forward = supportForwardFromYawPitch(entity.yaw, entity.pitch);
       const speed = 10 * entity.thrust;
       const desired: [number, number, number] = [
@@ -1074,7 +1089,15 @@ export class HostKillstreakRuntime {
           entity.attitude = attitudeFromMotion(previous, next, entity.attitude);
         }
         if (range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position) && nowMs >= entity.nextShotAtMs && entity.magazine > 0) {
-          damageEvents.push(this.damageEvent(entity.activationId, 'drone-swarm', owner.actorId, target, gunProfile.damage, entity.position, nowMs));
+          damageEvents.push(this.damageEvent(
+            entity.activationId,
+            entity.mode === 'piloted' ? 'piloted-drone' : 'drone-swarm',
+            owner.actorId,
+            target,
+            gunProfile.damage,
+            entity.position,
+            nowMs,
+          ));
           entity.magazine -= 1;
           entity.nextShotAtMs = nowMs + gunProfile.cadenceMs;
         }

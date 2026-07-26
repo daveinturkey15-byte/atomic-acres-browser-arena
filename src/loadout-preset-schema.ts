@@ -19,7 +19,7 @@ export const LOADOUT_PRESET_IDS = Object.freeze([
   'custom-2',
   'custom-3',
 ] as const);
-export const LOADOUT_GRENADE_IDS = Object.freeze(['frag', 'smoke', 'flash'] as const);
+export const LOADOUT_GRENADE_IDS = Object.freeze(['frag', 'smoke', 'flash', 'semtex'] as const);
 export const CURATED_KIT_IDS = Object.freeze(FIELD_KITS.map((kit) => kit.id));
 
 export type LoadoutPresetId = (typeof LOADOUT_PRESET_IDS)[number];

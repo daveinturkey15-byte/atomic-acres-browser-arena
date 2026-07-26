@@ -28,6 +28,10 @@ describe('killstreak protocol', () => {
     })).toBe(false);
     expect(isKillstreakProtocolMessage({
       type: 'killstreak-control-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2,
+      entityId: 'ks-7-pilot-drone-1', action: 'toggle-piloted-drone', nonce: 3,
+    })).toBe(true);
+    expect(isKillstreakProtocolMessage({
+      type: 'killstreak-control-intent', by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2,
       entityId: 'ks-7-chopper-1', action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 0, verticalQ: 0,
       position: [99, 99, 99], flightAuthority: 'player', nonce: 3,
     })).toBe(false);
@@ -68,7 +72,7 @@ describe('killstreak protocol', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, pilotLoadout);
     for (let index = 0; index < 5; index += 1) runtime.recordEligibleElimination('owner', 'weapon');
-    runtime.activate({
+    const activation = runtime.activate({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, slot: 2,
       activationId: 'activation-piloted-sensor', expectedId: 'piloted-drone', anchor: [0, 0, 0],
     }, 1_000, {
@@ -79,6 +83,10 @@ describe('killstreak protocol', () => {
       ],
       hasLineOfSight: () => false,
     });
+    runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1,
+      entityId: activation.entityIds[0], action: 'toggle-piloted-drone',
+    }, 1_000);
     runtime.advance(1_001, {
       bounds: { minX: -20, maxX: 20, minZ: -20, maxZ: 20, floorY: 0, ceilingY: 20 },
       targets: [
