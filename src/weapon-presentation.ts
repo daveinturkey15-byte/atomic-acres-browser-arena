@@ -2,12 +2,23 @@ import * as THREE from 'three';
 import { presentationRandom } from './runtime-random';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial } from './art-kit';
-import type { FirstPersonArmChain } from './operator-model';
+import {
+  createFirstPersonRiggedArms,
+  loadFirstPersonArmsAsset,
+  type FirstPersonArmChain,
+} from './operator-model';
 import { solveTwoBoneElbow } from './ik';
 import { reloadActionEvents, reloadPoseAt, viewmodelReloadStageAt, type ReloadPose, type WeaponActionEvent } from './weapon-actions';
 import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presentation-state';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
-import { fireImportedWeapon, importedWeaponTelemetry, reloadImportedWeapon, updateImportedWeapon } from './weapon-model';
+import {
+  createPass65CrossbowModel,
+  fireImportedWeapon,
+  importedWeaponTelemetry,
+  loadPass65CrossbowAssets,
+  reloadImportedWeapon,
+  updateImportedWeapon,
+} from './weapon-model';
 import { WEAPONS } from './gameplay';
 import type { WeaponId } from './protocol';
 import { characterActionContract, measureCameraFraming, resolveSocketWorld, type CharacterActionContract } from './character-presentation-contract';
@@ -567,6 +578,28 @@ export class WeaponPresentation {
   }
 
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
+    const browserRuntime = typeof document !== 'undefined';
+    if (browserRuntime) {
+      await Promise.all([loadPass65CrossbowAssets(), loadFirstPersonArmsAsset()]);
+      const authoredArms = createFirstPersonRiggedArms(this.flattenMaterials);
+      if (!authoredArms || authoredArms.chains.length !== 2) {
+        throw new Error('Pass 65 authored first-person arms failed the two-chain release contract');
+      }
+      const fallbackArms = this.root.getObjectByName('first-person-arms');
+      if (fallbackArms) this.root.remove(fallbackArms);
+      this.armRigs.length = 0;
+      this.riggedArmRigs.length = 0;
+      for (const chain of authoredArms.chains) {
+        this.riggedArmRigs.push({
+          ...chain,
+          bindShoulder: chain.shoulder.quaternion.clone(),
+          bindElbow: chain.elbow.quaternion.clone(),
+          bindWrist: chain.wrist.quaternion.clone(),
+        });
+      }
+      this.root.add(authoredArms.root);
+    }
+
     const ids = Object.keys(WEAPONS) as WeaponId[];
     ids.forEach((id, index) => {
       // Camera-space weapons use the project-authored high-detail model. The
@@ -574,8 +607,11 @@ export class WeaponPresentation {
       // The low-poly imported pickups remain valid world assets, but first
       // person needs the authored PBR receiver, functional action parts and
       // calibrated sockets rather than a camera-close pickup mesh.
-      const model = buildWeaponModel(id, this.flattenMaterials, false);
-      model.userData.firstPersonSource = 'authored-pbr-v6-seven-unique-finishes';
+      const model = id === 'explosive-crossbow' && browserRuntime
+        ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
+        : buildWeaponModel(id, this.flattenMaterials, false);
+      if (!model) throw new Error(`Pass 65 first-person asset unavailable: ${id}`);
+      if (id !== 'explosive-crossbow') model.userData.firstPersonSource = 'authored-pbr-v6-seven-unique-finishes';
       const firstPersonHidden: Record<WeaponId, Set<string>> = {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
@@ -611,7 +647,7 @@ export class WeaponPresentation {
       // Preserve the authored PBR materials, normal/roughness maps and small
       // receiver parts in the quality viewmodel. Reduced profiles retain the
       // bounded merged path.
-      if (this.flattenMaterials) optimizeAttachedWeapon(model, 'palette-basic');
+      if (this.flattenMaterials && id !== 'explosive-crossbow') optimizeAttachedWeapon(model, 'palette-basic');
       model.visible = false;
       this.models.set(id, model);
       this.root.add(model);
@@ -624,6 +660,13 @@ export class WeaponPresentation {
     return this.models.size === Object.keys(WEAPONS).length;
   }
 
+  private socketLocalPosition(model: THREE.Object3D, name: string): THREE.Vector3 | null {
+    const socket = model.getObjectByName(name);
+    if (!socket) return null;
+    this.root.updateMatrixWorld(true);
+    return this.root.worldToLocal(socket.getWorldPosition(new THREE.Vector3()));
+  }
+
   setWeapon(id: WeaponId, immediate = false): void {
     if (id !== this.active) resetMinigunSpool(this.minigunSpool);
     this.active = id;
@@ -632,10 +675,10 @@ export class WeaponPresentation {
     this.pendingScattergunShell = false;
     for (const [weaponId, model] of this.models) model.visible = weaponId === id;
     const activeModel = this.models.get(id);
-    const muzzleSocket = activeModel?.getObjectByName('muzzle-socket');
-    if (muzzleSocket) {
-      this.muzzleLight.position.copy(muzzleSocket.position);
-      this.muzzleFlash.position.copy(muzzleSocket.position);
+    const muzzlePosition = activeModel ? this.socketLocalPosition(activeModel, 'muzzle-socket') : null;
+    if (muzzlePosition) {
+      this.muzzleLight.position.copy(muzzlePosition);
+      this.muzzleFlash.position.copy(muzzlePosition);
     }
     const flashlight = WEAPONS[id].flashlight;
     this.weaponFlashlight.visible = flashlight !== null && !this.flattenMaterials;
@@ -649,8 +692,9 @@ export class WeaponPresentation {
     const casing = this.casings[this.casingCursor++ % this.casings.length];
     casing.mesh.geometry = shell ? this.shellGeometry : this.brassGeometry;
     casing.mesh.material = shell ? this.shellMaterial : this.brassMaterial;
-    const ejectSocket = this.models.get(this.active)?.getObjectByName('eject-socket');
-    casing.mesh.position.copy(ejectSocket?.position ?? new THREE.Vector3(0.12, 0.04, -0.48));
+    const activeModel = this.models.get(this.active);
+    const ejectPosition = activeModel ? this.socketLocalPosition(activeModel, 'eject-socket') : null;
+    casing.mesh.position.copy(ejectPosition ?? new THREE.Vector3(0.12, 0.04, -0.48));
     casing.mesh.rotation.set(presentationRandom() * 0.4, 0, Math.PI / 2);
     casing.mesh.visible = true;
     casing.velocity.set(
@@ -688,14 +732,15 @@ export class WeaponPresentation {
     this.muzzleFlash.scale.setScalar(profile.flashScale);
     this.muzzleFlash.rotation.z = (this.shotsPresented * 2.399963229728653) % Math.PI;
 
-    const muzzleSocket = this.models.get(this.active)?.getObjectByName('muzzle-socket');
+    const activeModelForSmoke = this.models.get(this.active);
+    const muzzlePosition = activeModelForSmoke ? this.socketLocalPosition(activeModelForSmoke, 'muzzle-socket') : null;
     const smokeCount = Math.min(this.smokes.length, profile.smokeBase + (this.weaponHeat > 0.56 ? 1 : 0));
     const cycle = fireCycleAt(this.active, 0, this.weaponHeat);
     for (let index = 0; index < smokeCount; index += 1) {
       const slot = this.smokeCursor++ % this.smokes.length;
       const smoke = this.smokes[slot];
       const offset = slot * 3;
-      const muzzle = muzzleSocket?.position ?? new THREE.Vector3(0, 0.08, -1.15);
+      const muzzle = muzzlePosition ?? new THREE.Vector3(0, 0.08, -1.15);
       this.smokePositions[offset] = muzzle.x + (presentationRandom() - 0.5) * 0.025;
       this.smokePositions[offset + 1] = muzzle.y + (presentationRandom() - 0.5) * 0.02;
       this.smokePositions[offset + 2] = muzzle.z - 0.05 - index * 0.035;

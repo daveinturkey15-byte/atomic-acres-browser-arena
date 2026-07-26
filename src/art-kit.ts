@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
-import { createImportedWeaponModel } from './weapon-model';
+import { createImportedWeaponModel, createPass65CrossbowModel } from './weapon-model';
 import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
@@ -445,6 +445,10 @@ function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMat
 }
 
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
+  if (id === 'explosive-crossbow') {
+    const authoredCrossbow = createPass65CrossbowModel(flattenMaterials, 'world');
+    if (authoredCrossbow) return authoredCrossbow;
+  }
   const imported = preferImported && id !== 'lmg' ? createImportedWeaponModel(id, flattenMaterials) : null;
   if (imported) return imported;
   const proceduralBase = PROCEDURAL_WEAPON_BASE[id];

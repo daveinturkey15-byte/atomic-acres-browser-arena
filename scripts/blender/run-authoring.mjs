@@ -30,6 +30,35 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+function optimizeGlb(input, output) {
+  run(process.execPath, [
+    gltfTransformCli, 'optimize', input, output,
+    '--compress', 'meshopt', '--meshopt-level', 'high',
+    '--flatten', 'false', '--join', 'false', '--instance', 'false',
+    '--palette', 'false', '--prune', 'false', '--simplify', 'false',
+    '--texture-compress', 'webp', '--texture-size', '512',
+  ]);
+}
+
+function authorCrossbow() {
+  mkdirSync('public/assets/original/models/weapons/pass65-crossbow', { recursive: true });
+  run(blenderCommand, ['--background', '--factory-startup', '--python', 'scripts/blender/create-pass65-explosive-crossbow.py']);
+  for (const name of [
+    'pass65-crossbow-fp-lod0', 'pass65-crossbow-fp-lod1',
+    'pass65-crossbow-world-lod0', 'pass65-crossbow-world-lod1', 'pass65-crossbow-world-lod2',
+    'pass65-crossbow-drop-lod0',
+  ]) optimizeGlb(`artifacts/blender-crossbow/raw/${name}.glb`, `public/assets/original/models/weapons/pass65-crossbow/${name}.glb`);
+}
+
+function authorOperatorArms() {
+  mkdirSync('public/assets/original/models/operators', { recursive: true });
+  run(blenderCommand, ['--background', '--factory-startup', '--python', 'scripts/blender/create-pass65-first-person-arms.py']);
+  for (const lod of [0, 1]) optimizeGlb(
+    `artifacts/blender-operator-arms/raw/pass65-first-person-arms-lod${lod}.glb`,
+    `public/assets/original/models/operators/pass65-first-person-arms-lod${lod}.glb`,
+  );
+}
+
 if (target === 'arena') {
   run(npxCommand, [
     'vite-node',
@@ -103,6 +132,16 @@ if (target === 'arena') {
     ]);
   }
   run(process.execPath, ['scripts/blender/finalize-semtex-bundle-assets.mjs']);
+} else if (target === 'crossbow') {
+  authorCrossbow();
+  run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
+} else if (target === 'operator-arms') {
+  authorOperatorArms();
+  run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
+} else if (target === 'pass65-weapon-tranche') {
+  authorCrossbow();
+  authorOperatorArms();
+  run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
 } else {
   console.error(`Unknown authoring target: ${target ?? '<missing>'}`);
   process.exit(2);

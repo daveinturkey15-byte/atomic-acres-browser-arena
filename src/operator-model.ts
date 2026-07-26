@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
@@ -34,7 +35,7 @@ export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
 }
 
 const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
-const FIRST_PERSON_ARMS_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb';
+const FIRST_PERSON_ARMS_URL = './assets/original/models/operators/pass65-first-person-arms-lod0.glb';
 
 type RiggedOperatorAsset = {
   scene: THREE.Group;
@@ -83,6 +84,7 @@ export type OperatorAppearance = 'team' | 'neon-purple';
 let operatorAsset: RiggedOperatorAsset | null = null;
 let firstPersonArmsAsset: THREE.Group | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
+let firstPersonArmsAssetPromise: Promise<void> | null = null;
 
 const STANCE_PIVOT_HEIGHT = 0.84;
 const EMBEDDED_WEAPON_NAME = /(^|[\s_.-])(pistol|rifle|shotgun|smg|gun|weapon)([\s_.-]|$)/i;
@@ -358,17 +360,25 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
   return result;
 }
 
+const loadRiggedGltf = (url: string) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
+
+export function loadFirstPersonArmsAsset(): Promise<void> {
+  if (firstPersonArmsAsset) return Promise.resolve();
+  firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).then((arms) => {
+    firstPersonArmsAsset = arms.scene;
+  });
+  return firstPersonArmsAssetPromise;
+}
+
 export function loadRiggedOperatorAsset(): Promise<void> {
   if (operatorAsset && firstPersonArmsAsset) return Promise.resolve();
   if (operatorAssetPromise) return operatorAssetPromise;
-  const loader = new GLTFLoader();
-  const load = (url: string) => new Promise<Awaited<ReturnType<GLTFLoader['loadAsync']>>>((resolve, reject) => {
-    loader.load(url, resolve, undefined, reject);
-  });
-  operatorAssetPromise = Promise.all([load(OPERATOR_URL), load(FIRST_PERSON_ARMS_URL)]).then(([operator, arms]) => {
-    operatorAsset = { scene: operator.scene, clips: operator.animations };
-    firstPersonArmsAsset = arms.scene;
-  });
+  operatorAssetPromise = Promise.all([
+    operatorAsset ? Promise.resolve() : loadRiggedGltf(OPERATOR_URL).then((operator) => {
+      operatorAsset = { scene: operator.scene, clips: operator.animations };
+    }),
+    loadFirstPersonArmsAsset(),
+  ]).then(() => undefined);
   return operatorAssetPromise;
 }
 
@@ -394,16 +404,22 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   const root = new THREE.Group();
   root.name = 'first-person-arms';
   const visual = cloneSkeleton(firstPersonArmsAsset) as THREE.Group;
-  visual.name = 'licensed-first-person-arms-visual';
-  visual.rotation.y = Math.PI;
-  visual.scale.setScalar(1.6);
-  visual.position.set(-0.28, -2.02, 1.05);
+  visual.name = 'authored-first-person-arms-visual';
+  visual.scale.setScalar(1);
+  visual.position.set(0, 0, 0);
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.castShadow = false;
     node.receiveShadow = false;
-    if (Array.isArray(node.material)) node.material = node.material.map((material) => materialForFirstPerson(material, flattenMaterials));
-    else node.material = materialForFirstPerson(node.material, flattenMaterials);
+    const prepare = (material: THREE.Material) => {
+      const result = materialForFirstPerson(material, flattenMaterials);
+      result.transparent = false;
+      result.opacity = 1;
+      result.depthWrite = true;
+      return result;
+    };
+    if (Array.isArray(node.material)) node.material = node.material.map(prepare);
+    else node.material = prepare(node.material);
   });
   root.add(visual);
   const chain = (side: 'left' | 'right'): FirstPersonArmChain | null => {
@@ -417,13 +433,6 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
       : null;
   };
   const chains = [chain('right'), chain('left')].filter((value): value is FirstPersonArmChain => value !== null);
-  // The source third-person proportions are slightly short for a camera-space
-  // two-hand stance. Extend bone offsets without inflating sleeve thickness.
-  for (const arm of chains) {
-    const reachScale = arm.side === 'left' ? 1.5 : 1.3;
-    arm.elbow.position.multiplyScalar(reachScale);
-    arm.wrist.position.multiplyScalar(reachScale);
-  }
   for (const suffix of ['L', 'R']) {
     for (const fingerName of ['Index', 'Middle', 'Ring', 'Pinky']) {
       for (let joint = 1; joint <= 3; joint += 1) {
@@ -434,7 +443,10 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
     const thumb = visual.getObjectByName(`Thumb2${suffix}`);
     if (thumb instanceof THREE.Bone) thumb.rotation.x += 0.58;
   }
-  root.userData.importedFirstPersonArms = true;
+  root.userData.importedFirstPersonArms = false;
+  root.userData.authoredFirstPersonArms = true;
+  root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
+  root.userData.materialContract = 'opaque-depth-writing';
   root.userData.importedFirstPersonArmChains = chains.length;
   return { root, chains };
 }

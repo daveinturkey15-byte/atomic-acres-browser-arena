@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
 import type { WeaponId } from './protocol';
@@ -7,6 +8,13 @@ import { weaponFamilyPresentation } from './weapon-family-presentation';
 
 type WeaponAsset = { scene: THREE.Group; clips: THREE.AnimationClip[] };
 type ImportedWeaponRuntime = { mixer: THREE.AnimationMixer; actions: Map<string, THREE.AnimationAction>; weapon: WeaponId };
+export type Pass65CrossbowVariant = 'first-person' | 'world' | 'drop';
+
+const PASS65_CROSSBOW_URLS: Record<Pass65CrossbowVariant, string> = Object.freeze({
+  'first-person': './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb',
+  world: './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-world-lod0.glb',
+  drop: './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-drop-lod0.glb',
+});
 
 const URLS: Record<WeaponId, string> = {
   carbine: './assets/third-party/quaternius/animated-guns/Rifle.glb',
@@ -26,7 +34,7 @@ const URLS: Record<WeaponId, string> = {
   'm14-ebr': './assets/third-party/quaternius/animated-guns/Rifle.glb',
   'slug-shotgun': './assets/third-party/quaternius/animated-guns/Shotgun.glb',
   'flashlight-pistol': './assets/third-party/quaternius/animated-guns/Pistol.glb',
-  'explosive-crossbow': './assets/third-party/quaternius/animated-guns/Pistol.glb',
+  'explosive-crossbow': PASS65_CROSSBOW_URLS.world,
 };
 const LENGTHS: Record<WeaponId, number> = {
   carbine: 1.35, lmg: 1.7, smg: 0.92, scattergun: 1.3, sniper: 1.55, railgun: 1.72,
@@ -75,11 +83,17 @@ const PRESENTATION_ROLL: Record<WeaponId, number> = {
   'explosive-crossbow': -0.06,
 };
 const assets = new Map<WeaponId, WeaponAsset>();
+const pass65CrossbowAssets = new Map<Pass65CrossbowVariant, WeaponAsset>();
 let loadPromise: Promise<void> | null = null;
+let pass65CrossbowLoadPromise: Promise<void> | null = null;
+
+function loader(): GLTFLoader {
+  return new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+}
 
 function loadOne(id: WeaponId): Promise<void> {
   return new Promise((resolve, reject) => {
-    new GLTFLoader().load(URLS[id], (gltf) => {
+    loader().load(URLS[id], (gltf) => {
       assets.set(id, { scene: gltf.scene, clips: gltf.animations });
       resolve();
     }, undefined, reject);
@@ -87,8 +101,17 @@ function loadOne(id: WeaponId): Promise<void> {
 }
 
 export function loadImportedWeaponAssets(): Promise<void> {
-  loadPromise ??= Promise.all((Object.keys(URLS) as WeaponId[]).map(loadOne)).then(() => undefined);
+  loadPromise ??= Promise.all((Object.keys(URLS) as WeaponId[]).filter((id) => id !== 'explosive-crossbow').map(loadOne)).then(() => undefined);
   return loadPromise;
+}
+
+export function loadPass65CrossbowAssets(): Promise<void> {
+  pass65CrossbowLoadPromise ??= Promise.all((Object.entries(PASS65_CROSSBOW_URLS) as Array<[Pass65CrossbowVariant, string]>).map(
+    ([variant, url]) => loader().loadAsync(url).then((gltf) => {
+      pass65CrossbowAssets.set(variant, { scene: gltf.scene, clips: gltf.animations });
+    }),
+  )).then(() => undefined);
+  return pass65CrossbowLoadPromise;
 }
 
 function socket(root: THREE.Object3D, name: string, position: [number, number, number]): THREE.Group {
@@ -109,6 +132,46 @@ function flattenMaterial(material: THREE.Material): THREE.Material {
     alphaTest: source.alphaTest,
     side: source.side,
   });
+}
+
+/** Project-original Pass 65 crossbow. Embedded Blender sockets remain the sole socket authority. */
+export function createPass65CrossbowModel(
+  flattenMaterials: boolean,
+  variant: Pass65CrossbowVariant,
+): THREE.Group | null {
+  const asset = pass65CrossbowAssets.get(variant);
+  if (!asset) return null;
+  const root = new THREE.Group();
+  root.name = `explosive-crossbow-pass65-${variant}-model`;
+  const visual = cloneSkeleton(asset.scene) as THREE.Group;
+  visual.name = `explosive-crossbow-pass65-${variant}-visual`;
+  visual.scale.setScalar(0.68);
+  visual.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.castShadow = !flattenMaterials;
+    node.receiveShadow = !flattenMaterials;
+    const prepare = (material: THREE.Material) => {
+      const result = flattenMaterials ? flattenMaterial(material) : material.clone();
+      result.transparent = false;
+      result.opacity = 1;
+      result.depthWrite = true;
+      return result;
+    };
+    node.material = Array.isArray(node.material) ? node.material.map(prepare) : prepare(node.material);
+    node.userData.presentationOnly = true;
+  });
+  cloneMeshGeometriesForOwner(visual, `pass65-crossbow-${variant}`);
+  root.add(visual);
+  const mixer = new THREE.AnimationMixer(visual);
+  const actions = new Map(asset.clips.map((clip) => [clip.name, mixer.clipAction(clip)]));
+  root.userData.importedWeaponRuntime = { mixer, actions, weapon: 'explosive-crossbow' } satisfies ImportedWeaponRuntime;
+  root.userData.importedWeaponSource = PASS65_CROSSBOW_URLS[variant];
+  root.userData.firstPersonSource = variant === 'first-person' ? 'project-original-blender-pass65-crossbow' : undefined;
+  root.userData.projectOriginalWeapon = true;
+  root.userData.deliveryVariant = variant;
+  root.userData.opticMagnification = 1.5;
+  root.userData.runtimeForwardAxis = '-Z';
+  return root;
 }
 
 const SOCKETS: Record<WeaponId, {
@@ -222,6 +285,7 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
 }
 
 export function createImportedWeaponModel(id: WeaponId, flattenMaterials: boolean): THREE.Group | null {
+  if (id === 'explosive-crossbow') return createPass65CrossbowModel(flattenMaterials, 'world');
   const asset = assets.get(id);
   if (!asset) return null;
   const root = new THREE.Group();
