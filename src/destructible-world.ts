@@ -1,4 +1,4 @@
-import { canonicalStateHash } from './canonical-state';
+import { canonicalSha256 } from './canonical-state';
 import type { Point3 } from './collision';
 
 export const SHED_MAX_APERTURES = 32;
@@ -150,6 +150,7 @@ export type WorldCollisionSnapshot = Readonly<{
   staticDefinitionId: string;
   consumers: readonly WorldCollisionConsumer[];
   sheds: readonly ShedState[];
+  hashAlgorithm: 'sha256';
   hash: string;
 }>;
 
@@ -664,7 +665,7 @@ export function createWorldCollisionSnapshot(
     consumers: WORLD_COLLISION_CONSUMERS,
     sheds: Object.freeze([...sheds].sort((left, right) => left.placementId.localeCompare(right.placementId))),
   });
-  return Object.freeze({ ...body, hash: canonicalStateHash(body) });
+  return Object.freeze({ ...body, hashAlgorithm: 'sha256', hash: canonicalSha256(body) });
 }
 
 export function resetShedState(state: ShedState, nextMatchEpoch: number, definition: DestructibleShedDefinition, placement: ShedPlacement): ShedState {

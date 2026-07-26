@@ -246,6 +246,8 @@ describe('Pass 65 destructible-world authority', () => {
     const first = createWorldCollisionSnapshot('atomic-acres', 'atomic-static-v65', [state]);
     const second = createWorldCollisionSnapshot('atomic-acres', 'atomic-static-v65', [JSON.parse(JSON.stringify(state)) as ShedState]);
     expect(first.hash).toBe(second.hash);
+    expect(first).toMatchObject({ hashAlgorithm: 'sha256' });
+    expect(first.hash).toMatch(/^[a-f0-9]{64}$/);
     expect(isShedState(JSON.parse(JSON.stringify(state)))).toBe(true);
     expect(isShedState({ ...state, clientCanFracture: true })).toBe(false);
     expect(isShedState({
