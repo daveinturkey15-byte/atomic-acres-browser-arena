@@ -142,6 +142,7 @@ import {
   type ReloadState,
   type Stance,
 } from './gameplay';
+import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countdown-continuity';
 import { ArenaMap, buildArena } from './map';
 import { activeSoloBotTarget, arenaSelection, type ArenaId, type ArenaSelection } from './map-selection';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
@@ -2294,7 +2295,6 @@ let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
 let adrenalineHudWasActive = false;
-type MatchCountdownCue = '3' | '2' | '1' | 'engage';
 let lastMatchCountdownCue: MatchCountdownCue | null = null;
 let matchCountdownCueSequence = 0;
 let overdriveState: OverdriveState = createOverdriveState(0);
@@ -12235,6 +12235,7 @@ function updateMatchState(now: number): void {
   const rules = currentMatchRules();
   const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]);
+  matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
   matchState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
     : advanceMatch(matchState, now, scores, rules);

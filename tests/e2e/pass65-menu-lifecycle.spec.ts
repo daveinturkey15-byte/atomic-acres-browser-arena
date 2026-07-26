@@ -526,6 +526,28 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await page.keyboard.up('f');
   });
 
+  test('does not skip Atomic Acres countdown cues across a long presentation stall', async ({ page }) => {
+    test.setTimeout(60_000);
+    await ready(page);
+    await selectArena(page, 'atomic-acres');
+    await installCountdownAnimationProbe(page);
+    await page.evaluate(() => {
+      const countdown = document.querySelector<HTMLElement>('#countdown');
+      if (!countdown) throw new Error('Missing match countdown');
+      let stalled = false;
+      countdown.addEventListener('animationstart', () => {
+        if (stalled || countdown.dataset.cue !== '3') return;
+        stalled = true;
+        const until = performance.now() + 1_600;
+        while (performance.now() < until) { /* deliberate renderer/driver-stall surrogate */ }
+      });
+      window.__ATOMIC_ACRES_DEBUG__.startSolo();
+    });
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 30_000 });
+    await expect.poll(async () => (await countdownAnimations(page)).length).toBe(4);
+    expect((await countdownAnimations(page)).map((event) => event.cue)).toEqual(['3', '2', '1', 'engage']);
+  });
+
   test('survives twenty all-arena solo starts without an unsolicited menu bounce', async ({ page }) => {
     test.setTimeout(300_000);
     const browserErrors = collectUnexpectedBrowserErrors(page, 'twenty-start');
