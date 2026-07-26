@@ -15,10 +15,10 @@ const acceptedCockpitEvidence = 'docs/assets/pass65-vehicles/chopper/pass65-chop
 const acceptedCockpitDigest = 'a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f';
 const helicopterArenas = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1'];
 const pinnedGunRange = new Map([
-  ['public/assets/original/menu-previews/gun-range.mp4', '232aaebe4ddce666c43f4ac36da2fc9713933d2cd0b8f027dfcd5af8db001f05'],
-  ['public/assets/original/menu-previews/gun-range.webm', '842cd51d05e7b9dd6fde9c808d21da9da8e43a4a75cd0a21cd9038d735194fe7'],
-  ['public/assets/original/menu-previews/gun-range.webp', '00e476fd509bd94ad75abdc7e2af16c6c81fe667bf1f629a3fa53e3a51c65288'],
-  ['source-assets/menu/pass65-preview-masters/gun-range.blend', 'f681075ab3b963754202f1a6ca9993aa31acfb7db6cb2ab0dabce8374b04680d'],
+  ['public/assets/original/menu-previews/gun-range.mp4', '3de2c28899d32ee48b8a023613305690d59227b1e64189ffafaf1aa0b447fc13'],
+  ['public/assets/original/menu-previews/gun-range.webm', '708bdf00af28906a8ce7b1605dc1c534c854c537fb82fecab62173dbce1e9885'],
+  ['public/assets/original/menu-previews/gun-range.webp', '23479fe37b290d909e21d0c3015e49f3b09a244d51d986b67c665136fce210fe'],
+  ['source-assets/menu/pass65-preview-masters/gun-range.blend', '14d9f6bc7b3a3b1b0948559d9d172c2666156c1730110540a88650b2a5c1994b'],
 ]);
 const blenderCandidates = [
   process.env.BLENDER_EXECUTABLE,
@@ -91,7 +91,7 @@ function auditBlend(blender, arena) {
     `bpy.ops.wm.open_mainfile(filepath=${JSON.stringify(blendPath)})`,
     "roots=[o for o in bpy.data.objects if o.get('asset_id')=='chopper-gunner-vehicle-v1' and o.get('quality_tier')=='LOD0']",
     "semantics=[o.get('canonical_node_name') for o in bpy.data.objects if o.get('canonical_node_name')]",
-    "print('AA_BLEND_AUDIT='+json.dumps({'roots':len(roots),'offline':[o.get('offline_preview_source') for o in roots],'visibility':[o.get('offline_preview_visibility') for o in roots],'semantics':semantics,'catEars':len([o for o in bpy.data.objects if o.name.startswith('clear-cat-ear')]),'catPaws':len([o for o in bpy.data.objects if o.name.startswith('clear-cat-paw')])}))",
+    "print('AA_BLEND_AUDIT='+json.dumps({'roots':len(roots),'offline':[o.get('offline_preview_source') for o in roots],'visibility':[o.get('offline_preview_visibility') for o in roots],'semantics':semantics,'catEars':len([o for o in bpy.data.objects if o.name.startswith('authored-feline-ear-silhouette')]),'catPaws':len([o for o in bpy.data.objects if o.name.startswith('authored-cat-paw-palm')])}))",
   ].join(';');
   const result = spawnSync(blender, ['--background', '--factory-startup', '--python-expr', expression], {
     cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024,
