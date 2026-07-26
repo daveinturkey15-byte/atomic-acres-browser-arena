@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { RUSTWORKS_WORK_LIGHTS } from './additional-maps';
-import { ArenaContrastLighting } from './arena-contrast-lighting';
+import { buildGunRange, RUSTWORKS_WORK_LIGHTS } from './additional-maps';
+import { ArenaContrastLighting, sampleArenaPracticalLight } from './arena-contrast-lighting';
+import { arenaVolumeContainsPoint, MAX_PRACTICAL_MOTION_FREQUENCY_HZ } from './rendering/arena-visual-definition';
 import { definition as atomicDefinition } from './rendering/arenas/atomic-acres';
 import { definition as gunRangeDefinition } from './rendering/arenas/gun-range';
 import { definition as rustworksDefinition } from './rendering/arenas/rustworks-1v1';
@@ -72,5 +73,112 @@ describe('Pass 62 arena contrast lighting', () => {
   it('bypasses the extra rig on software WebGL', () => {
     const rig = new ArenaContrastLighting(new THREE.Scene(), 'blender', true);
     expect(rig.telemetry()).toMatchObject({ activeLights: 0, shadowCastingLights: 0 });
+  });
+});
+
+describe('Pass 65 Gun Range authored contrast light', () => {
+  it('keeps the canonical fixture and its complete target sweep inside the occluded room shell', () => {
+    const practical = gunRangeDefinition.lighting.practicals.find((entry) => entry.id === 'range-inspection-key');
+    const light = practical?.light;
+    expect(light).toBeDefined();
+    expect(gunRangeDefinition.budgets.maximumShadowLights).toBe(1);
+    expect(gunRangeDefinition.lighting.practicals.filter((entry) => entry.castsShadow)).toHaveLength(1);
+    expect(arenaVolumeContainsPoint(light!.intendedVolume, light!.position)).toBe(true);
+    expect(arenaVolumeContainsPoint(light!.intendedVolume, light!.target)).toBe(true);
+    const targetAmplitude = light!.motion?.target?.amplitude ?? [0, 0, 0];
+    const targetMinimum = light!.target.map((value, axis) => value - Math.abs(targetAmplitude[axis])) as [number, number, number];
+    const targetMaximum = light!.target.map((value, axis) => value + Math.abs(targetAmplitude[axis])) as [number, number, number];
+    expect(arenaVolumeContainsPoint(light!.intendedVolume, targetMinimum)).toBe(true);
+    expect(arenaVolumeContainsPoint(light!.intendedVolume, targetMaximum)).toBe(true);
+
+    const scene = new THREE.Scene();
+    const map = buildGunRange(scene);
+    map.root.updateMatrixWorld(true);
+    const shell = {
+      left: new THREE.Box3().setFromObject(map.root.getObjectByName('gun-range-left-wall')!),
+      right: new THREE.Box3().setFromObject(map.root.getObjectByName('gun-range-right-wall')!),
+      backstop: new THREE.Box3().setFromObject(map.root.getObjectByName('gun-range-backstop')!),
+      rear: new THREE.Box3().setFromObject(map.root.getObjectByName('gun-range-rear-wall')!),
+      ceiling: new THREE.Box3().setFromObject(map.root.getObjectByName('gun-range-ceiling')!),
+    };
+    expect(light!.intendedVolume.minimum[0]).toBeGreaterThan(shell.left.max.x);
+    expect(light!.intendedVolume.maximum[0]).toBeLessThan(shell.right.min.x);
+    expect(light!.intendedVolume.minimum[2]).toBeGreaterThan(shell.backstop.max.z);
+    expect(light!.intendedVolume.maximum[2]).toBeLessThan(shell.rear.min.z);
+    expect(light!.intendedVolume.maximum[1]).toBeLessThan(shell.ceiling.min.y);
+
+    const origin = new THREE.Vector3(...light!.position);
+    const outsideProbes = [
+      new THREE.Vector3(-22, 4.8, -12),
+      new THREE.Vector3(22, 4.8, -12),
+      new THREE.Vector3(0, 4.8, -50),
+      new THREE.Vector3(0, 4.8, 21),
+      new THREE.Vector3(8, 8, -12),
+    ];
+    for (const outside of outsideProbes) {
+      const ray = outside.clone().sub(origin);
+      const distance = ray.length();
+      const hits = new THREE.Raycaster(origin, ray.normalize(), 0, distance).intersectObjects(map.raycastMeshes, false);
+      expect(hits.some((hit) => hit.distance < distance && hit.object.castShadow), `unoccluded probe ${outside.toArray()}`).toBe(true);
+    }
+  });
+
+  it('applies deterministic, non-zero, bounded slow motion without entering a strobe cadence', () => {
+    const practical = gunRangeDefinition.lighting.practicals.find((entry) => entry.id === 'range-inspection-key')!;
+    const lightDefinition = practical.light!;
+    const intensityMotion = lightDefinition.motion!.intensity!;
+    const targetMotion = lightDefinition.motion!.target!;
+    expect(intensityMotion.frequencyHz).toBeGreaterThan(0);
+    expect(targetMotion.frequencyHz).toBeGreaterThan(0);
+    expect(Math.max(intensityMotion.frequencyHz, targetMotion.frequencyHz)).toBeLessThanOrEqual(MAX_PRACTICAL_MOTION_FREQUENCY_HZ);
+
+    const scene = new THREE.Scene();
+    const rig = new ArenaContrastLighting(scene, 'blender');
+    rig.applyDefinition(gunRangeDefinition);
+    const rangeLight = scene.getObjectByName('gun-range-range-inspection-key-1') as THREE.SpotLight;
+    expect(rangeLight).toBeInstanceOf(THREE.SpotLight);
+    expect(rangeLight.position.toArray()).toEqual([...lightDefinition.position]);
+    expect(rangeLight.target.position.toArray()).toEqual([...lightDefinition.target]);
+    expect(rangeLight.castShadow).toBe(true);
+    expect(rangeLight.shadow.mapSize.toArray()).toEqual([512, 512]);
+    expect(rangeLight.userData).toMatchObject({ presentationOnly: true, blocksShots: false, practicalPolicyId: practical.id });
+    expect(rig.telemetry()).toMatchObject({
+      activeLights: 1,
+      shadowCastingLights: 1,
+      maximumShadowLights: 1,
+      authoredLights: [{ practicalId: practical.id, intendedVolume: { id: lightDefinition.intendedVolume.id } }],
+      occlusion: { activeLocalLights: 1, shadowedLocalLights: 1, violations: [] },
+    });
+
+    const stepMs = 100;
+    const durationMs = 60_000;
+    const intensities: number[] = [];
+    const targets: THREE.Vector3[] = [];
+    for (let nowMs = 0; nowMs <= durationMs; nowMs += stepMs) {
+      const expected = sampleArenaPracticalLight(lightDefinition, nowMs);
+      expect(sampleArenaPracticalLight(lightDefinition, nowMs)).toEqual(expected);
+      rig.update(nowMs);
+      expect(rangeLight.intensity).toBeCloseTo(expected.intensity, 12);
+      expect(rangeLight.target.position.toArray()).toEqual([...expected.target]);
+      expect(arenaVolumeContainsPoint(lightDefinition.intendedVolume, expected.target)).toBe(true);
+      intensities.push(rangeLight.intensity);
+      targets.push(rangeLight.target.position.clone());
+    }
+
+    const intensitySpan = Math.max(...intensities) - Math.min(...intensities);
+    const targetXSpan = Math.max(...targets.map((target) => target.x)) - Math.min(...targets.map((target) => target.x));
+    expect(intensitySpan).toBeGreaterThan(lightDefinition.intensity * intensityMotion.amplitudeRatio * 1.9);
+    expect(intensitySpan).toBeLessThanOrEqual(lightDefinition.intensity * intensityMotion.amplitudeRatio * 2 + 1e-9);
+    expect(targetXSpan).toBeGreaterThan(targetMotion.amplitude[0] * 1.9);
+    expect(targetXSpan).toBeLessThanOrEqual(targetMotion.amplitude[0] * 2 + 1e-9);
+
+    const maximumIntensityDelta = lightDefinition.intensity * intensityMotion.amplitudeRatio
+      * Math.PI * 2 * intensityMotion.frequencyHz * (stepMs / 1_000);
+    const maximumTargetDelta = new THREE.Vector3(...targetMotion.amplitude).length()
+      * Math.PI * 2 * targetMotion.frequencyHz * (stepMs / 1_000);
+    for (let index = 1; index < intensities.length; index += 1) {
+      expect(Math.abs(intensities[index] - intensities[index - 1])).toBeLessThanOrEqual(maximumIntensityDelta + 1e-9);
+      expect(targets[index].distanceTo(targets[index - 1])).toBeLessThanOrEqual(maximumTargetDelta + 1e-9);
+    }
   });
 });

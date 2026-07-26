@@ -1,6 +1,17 @@
 import { buildGunRange } from '../../additional-maps';
+import type { ArenaInteriorVolumeDefinition } from '../arena-visual-definition';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
+
+// Clear interior faces of the authored shell: side walls x=+/-20, rear wall
+// z=19.5, backstop z=-48.4, floor y=0 and ceiling underside y=6.875.
+// The small inset prevents a fixture or animated target from living exactly on
+// a wall plane where floating-point drift could put the light outside.
+export const GUN_RANGE_INTERIOR_VOLUME: ArenaInteriorVolumeDefinition = Object.freeze({
+  id: 'gun-range-authored-shell-interior',
+  minimum: [-19.95, 0.05, -48.35] as const,
+  maximum: [19.95, 6.825, 19.45] as const,
+});
 
 export const definition = createProceduralArenaVisualDefinition({
   id: 'gun-range',
@@ -13,7 +24,29 @@ export const definition = createProceduralArenaVisualDefinition({
     practicals: [
       { id: 'ceiling-panels', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
       { id: 'weapon-stations', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
-      { id: 'range-inspection-key', policy: 'shadowed-local', maximumDistance: 45, castsShadow: true },
+      {
+        id: 'range-inspection-key',
+        policy: 'shadowed-local',
+        maximumDistance: 38,
+        castsShadow: true,
+        light: {
+          kind: 'spot',
+          position: [0, 6.05, 13.4],
+          target: [0, 1.7, -17.5],
+          color: 0xbdefff,
+          intensity: 18,
+          distance: 38,
+          angle: 0.44,
+          penumbra: 0.82,
+          decay: 2,
+          shadowMapSize: 512,
+          intendedVolume: GUN_RANGE_INTERIOR_VOLUME,
+          motion: {
+            intensity: { amplitudeRatio: 0.06, frequencyHz: 0.09, phaseRadians: -Math.PI / 2 },
+            target: { amplitude: [2.25, 0.18, 0], frequencyHz: 0.045, phaseRadians: 0 },
+          },
+        },
+      },
     ],
   },
   fog: { color: 0x28333a, near: 38, far: 94 },

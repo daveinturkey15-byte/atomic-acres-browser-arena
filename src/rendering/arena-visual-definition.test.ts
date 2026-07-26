@@ -42,6 +42,27 @@ describe('Pass 64 arena visual definitions', () => {
     expect(overview!.target[2]).toBeLessThan(-9);
   });
 
+  it('rejects canonical practical motion that escapes its volume or exceeds the slow-motion bound', async () => {
+    const { definition } = await ARENA_VISUAL_REGISTRY['gun-range']();
+    const replaceLight = (replacement: Record<string, unknown>): ArenaVisualDefinition => ({
+      ...definition,
+      lighting: {
+        ...definition.lighting,
+        practicals: definition.lighting.practicals.map((practical) => practical.light ? {
+          ...practical,
+          light: { ...practical.light, ...replacement },
+        } : practical),
+      },
+    });
+    expect(() => validateArenaVisualDefinition(replaceLight({ position: [30, 6, 12] }))).toThrow(/position escapes intended volume/);
+    expect(() => validateArenaVisualDefinition(replaceLight({
+      motion: {
+        ...definition.lighting.practicals.find((practical) => practical.light)!.light!.motion,
+        intensity: { amplitudeRatio: 0.06, frequencyHz: 3, phaseRadians: 0 },
+      },
+    }))).toThrow(/non-strobe frequency bound/);
+  });
+
   it('disposes geometry, materials and textures once even when teardown repeats', () => {
     const root = new THREE.Group();
     const texture = new THREE.Texture();
