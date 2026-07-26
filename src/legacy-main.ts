@@ -6990,11 +6990,21 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   // stall that looked like a frozen match and tripped the fatal watchdog.
   const priorRenderSubmissionPaused = renderSubmissionPaused;
   renderSubmissionPaused = true;
+  const matchActiveOverdrivePrewarm = selectedArena.overdrive;
+  if (matchActiveOverdrivePrewarm) {
+    // The Atomic-only overdrive tree first becomes resident when the countdown
+    // ends. Compile that exact visibility/light variant against the completed
+    // arena while the transition surface still owns the screen; its earlier
+    // root-only bootstrap compile predates the selected arena lighting rig.
+    overdriveRoot.visible = true;
+    overdriveRoot.scale.setScalar(0.0001);
+  }
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     await renderRuntime.compile(scene, camera);
     await settleWebGpuPresentation('Initial match');
   } finally {
+    if (matchActiveOverdrivePrewarm) overdriveRoot.visible = false;
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
   gameStarted = true;

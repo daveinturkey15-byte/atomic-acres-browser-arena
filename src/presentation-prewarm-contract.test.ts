@@ -35,6 +35,9 @@ describe('presentation prewarm startup contract', () => {
     expect(menuBootstrap).not.toContain('renderRuntime.compile(scene, camera)');
     expect(arenaDeployment.match(/renderRuntime\.compile\(scene, camera\)/g)).toHaveLength(1);
     expect(matchDeployment.match(/renderRuntime\.compile\(scene, camera\)/g)).toHaveLength(1);
+    expect(matchDeployment).toContain('const matchActiveOverdrivePrewarm = selectedArena.overdrive;');
+    expect(matchDeployment).toContain('overdriveRoot.visible = true;');
+    expect(matchDeployment).toContain('if (matchActiveOverdrivePrewarm) overdriveRoot.visible = false;');
     expect(source).not.toContain('const renderer = renderRuntime.renderer as unknown as THREE.WebGLRenderer');
     expect(source).toContain("bootstrapStage = 'prewarming-grenade-explosion'");
     expect(source).toContain("bootstrapStage = 'prewarming-overdrive'");
