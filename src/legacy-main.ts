@@ -10763,12 +10763,14 @@ function frame(now: number, scheduleNext = true): void {
     }
     refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
+      let frameSubmitted = false;
       if (renderRuntime.backend === 'webgpu') {
-        submitWebGpuFrame(now);
+        frameSubmitted = submitWebGpuFrame(now);
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+        frameSubmitted = true;
       }
-      if (gameStarted && menuLifecycle.surface === 'hidden') {
+      if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
         lastGameplayPresentedFrame = frameCount;
         retainLatestGameplayBackdrop(now);
       }
