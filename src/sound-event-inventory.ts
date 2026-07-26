@@ -310,7 +310,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
   runtimeCallsite('matchCountdown', "'engage'", 1, ['announcement.match']),
-  runtimeCallsite('matchCountdown', 'Number(headline) as 1 | 2 | 3', 1, ['announcement.match']),
+  runtimeCallsite('matchCountdown', 'Number(cue) as 1 | 2 | 3', 1, ['announcement.match']),
   runtimeCallsite('melee', '', 2, ['weapon.melee-swing', 'weapon.melee-world']),
   runtimeCallsite('minigunDrive', "0,'idle',false", 1, ['weapon.minigun-drive']),
   runtimeCallsite('minigunDrive', "weaponView.minigunSpoolFraction(),weaponView.minigunSpoolPhase(),gameStarted && player.alive && player.weapon === 'minigun'", 1, ['weapon.minigun-drive']),
