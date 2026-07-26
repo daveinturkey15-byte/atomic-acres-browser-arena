@@ -170,6 +170,11 @@ try {
       const state = api.snapshot();
       return {
         runtime: state.render.runtime,
+        shadowScheduling: {
+          autoUpdate: state.render.shadowAutoUpdate,
+          needsUpdate: state.render.shadowNeedsUpdate,
+          boundedDynamicRefreshes: state.render.staticShadowDynamicRefreshes,
+        },
         post: state.render.atomicSignal,
         playableScene: state.render.playableScene,
         arenaStreaming: state.arenaSelection.streaming,
@@ -184,8 +189,13 @@ try {
     });
     const uniqueErrors = [...new Set(errors)];
     if (uniqueErrors.length > 0) throw new Error(`${arenaId} emitted browser/GPU errors: ${uniqueErrors[0]}`);
-    if (evidence.runtime.actualBackend !== 'webgpu' || evidence.runtime.softwareAdapter || evidence.runtime.deviceLost) {
+    if (evidence.runtime.actualBackend !== 'webgpu' || evidence.runtime.softwareAdapter || evidence.runtime.deviceLost
+      || evidence.runtime.canvasAlphaMode !== 'opaque'
+      || evidence.runtime.presentation.status !== 'healthy') {
       throw new Error(`${arenaId} did not retain healthy hardware WebGPU`);
+    }
+    if (evidence.shadowScheduling.autoUpdate || evidence.shadowScheduling.needsUpdate) {
+      throw new Error(`${arenaId} did not retain bounded per-light static shadow scheduling: ${JSON.stringify(evidence.shadowScheduling)}`);
     }
     if (evidence.playableScene.route !== 'complete-playable-game'
       || evidence.playableScene.authoritativeArenaRoots !== 1

@@ -351,6 +351,8 @@ export class WebGpuRenderRuntime {
   private completionFailures = 0;
   private lastFailure: string | null = null;
   private skippedSubmissions = 0;
+  private lightShadowAutoUpdate = true;
+  private lightShadowNeedsUpdate = false;
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
@@ -552,6 +554,8 @@ export class WebGpuRenderRuntime {
   }>): void {
     this.renderer.shadowMap.enabled = options.enabled;
     if (options.type !== undefined) this.renderer.shadowMap.type = options.type;
+    if (options.autoUpdate !== undefined) this.lightShadowAutoUpdate = options.autoUpdate;
+    if (options.needsUpdate !== undefined) this.lightShadowNeedsUpdate = options.needsUpdate;
   }
 
   setShadowsEnabled(enabled: boolean): void {
@@ -562,19 +566,26 @@ export class WebGpuRenderRuntime {
     return this.renderer.shadowMap.enabled;
   }
 
-  requestShadowUpdate(): void {
+  requestShadowUpdate(needsUpdate = true): void {
     // Three's common WebGPU renderer updates shadow maps through the active
     // RenderPipeline. Renderer-level WebGL flags do not control that path.
+    this.lightShadowNeedsUpdate = needsUpdate;
   }
 
   configureLightShadows(root: THREE.Object3D, autoUpdate: boolean, needsUpdate: boolean): number {
     // Three r185's ShadowNode reads scheduling from each LightShadow. Without
     // this, static profiles silently regenerate every shadow map every frame.
+    this.lightShadowAutoUpdate = autoUpdate;
+    this.lightShadowNeedsUpdate = needsUpdate;
     return configureSceneLightShadowSchedule(root, autoUpdate, needsUpdate);
   }
 
   shadowState(): ShadowRuntimeState {
-    return { enabled: this.renderer.shadowMap.enabled, autoUpdate: true, needsUpdate: false };
+    return {
+      enabled: this.renderer.shadowMap.enabled,
+      autoUpdate: this.lightShadowAutoUpdate,
+      needsUpdate: this.lightShadowNeedsUpdate,
+    };
   }
 
   setPixelRatio(pixelRatio: number): void {
