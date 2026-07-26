@@ -5,7 +5,7 @@
 - [Pass 65 P0 release foundation](PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md) - exact Pass 64 handoff evidence, B0/B1 branch discipline, process-only allowlist, planning-corpus validation, and the mandatory no-publish-before-HITL stop.
 - [Pass 65 “Big One” master plan](PASS65_BIG_ONE_MASTER_PLAN.md) - complete scope, architecture, phased delivery, authority boundaries, integration strategy, QA, immutable preview, and protected release plan.
 - [Pass 65 requirements and decisions](PASS65_REQUIREMENTS_MATRIX.md) - 99 user-facing/system requirements with active falsifiers and evidence, plus 15 explicit product decisions and freeze deadlines.
-- [Pass 65 decision receipts](PASS65_DECISION_RECEIPTS.json) and [schema](PASS65_DECISION_RECEIPTS.schema.json) - canonical 15-entry receipt registry; every P0 receipt is explicitly `OPEN` and therefore unlocks no implementation task.
+- [Pass 65 decision receipts](PASS65_DECISION_RECEIPTS.json) and [schema](PASS65_DECISION_RECEIPTS.schema.json) - canonical 15-entry receipt registry; P0 created all entries as `OPEN`, and post-B1 source-authorized freezes are recorded here with non-null values and resolution metadata.
 - [Pass 65 forging-team runbook](PASS65_WORK_BREAKDOWN_RUNBOOK.md) - 122 bounded tasks, dependencies, ownership leases, handoff rules, integration order, and wave exits.
 - [Pass 65 technical contract sketches](PASS65_TECHNICAL_CONTRACT_SKETCHES.md) - design-only typed contracts for identities, catalogs, loadouts, ordnance, support entities, destructible surfaces, settings, audio, and evidence.
 - [Pass 65 project-skill plan](PASS65_PROJECT_SKILLS_SPEC.md) - six narrow future repo-local skills, validators, negative fixtures, and forward-test gates; the skills themselves are deliberately deferred to B1.

@@ -2,18 +2,22 @@
   "$schema": "PASS65_DECISION_RECEIPTS.schema.json",
   "schemaVersion": 1,
   "releasePass": "PASS 65",
-  "updatedAt": "2026-07-25T23:42:28Z",
+  "updatedAt": "2026-07-25T23:58:03.401Z",
   "receipts": [
     {
       "receiptVersion": 1,
       "id": "DEC-01",
-      "status": "OPEN",
+      "status": "FROZEN",
       "proposedDefault": "Three renameable custom presets plus a Manage/Rename tile",
-      "value": null,
-      "rationale": "The request permits three or four presets; the proposed layout is planning input only until explicitly frozen.",
-      "owner": "Pass 65 product-decision owner",
+      "value": {
+        "customPresetCount": 3,
+        "secondRowTiles": ["Custom 1", "Custom 2", "Custom 3", "Manage/Rename"],
+        "renameablePresetIds": ["custom-1", "custom-2", "custom-3"]
+      },
+      "rationale": "Dave's attached Pass 65 specification explicitly requests a new row of four kit-selection options and names Custom 1, Custom 2, Custom 3, plus an option to rename them. This freezes the row composition only; loadout-content rules remain governed by their own receipts.",
+      "owner": "Dave — attached Pass 65 specification",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": null,
+      "resolvedAt": "2026-07-25T23:58:03.401Z",
       "freezeNoLaterThan": "Loadout-schema wave",
       "supersedesReceiptSha256": null
     },
@@ -33,13 +37,17 @@
     {
       "receiptVersion": 1,
       "id": "DEC-03",
-      "status": "OPEN",
+      "status": "FROZEN",
       "proposedDefault": "Nuke is care-package-only at exactly 1 percent; Drone Swarm is the selectable top tier",
-      "value": null,
-      "rationale": "Selectable roster and care-only eligibility alter progression, UI, probability, and release compatibility.",
-      "owner": "Pass 65 product-decision owner",
+      "value": {
+        "selectableTopTier": "drone-swarm",
+        "nukeAvailability": "care-only",
+        "nukeCarePackageProbability": { "numerator": 1, "denominator": 100 }
+      },
+      "rationale": "Dave's attached Pass 65 specification explicitly calls Drone Swarm the Nuke replacement option and separately requires Nuke at exactly 1 percent in the care package. Full roster, costs, weights, and earning/carry rules remain gated by DEC-13.",
+      "owner": "Dave — attached Pass 65 specification",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": null,
+      "resolvedAt": "2026-07-25T23:58:03.401Z",
       "freezeNoLaterThan": "Killstreak-catalog wave",
       "supersedesReceiptSha256": null
     },

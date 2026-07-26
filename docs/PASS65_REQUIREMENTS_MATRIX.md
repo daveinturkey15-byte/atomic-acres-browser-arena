@@ -153,13 +153,13 @@ Every Pass 65 row starts as `BLOCKED-P64` or `PLANNED`. Nothing in this planning
 
 ## Decision register
 
-The canonical receipt registry is `PASS65_DECISION_RECEIPTS.json`, validated against `PASS65_DECISION_RECEIPTS.schema.json`. The table below is the human-readable index. All P0 receipts are real `OPEN` receipts with `value=null`, rationale, owner, recorded timestamp, freeze deadline and supersession field; an `OPEN` receipt or its proposed default is not implementation authority.
+The canonical receipt registry is `PASS65_DECISION_RECEIPTS.json`, validated against `PASS65_DECISION_RECEIPTS.schema.json`. The table below is the human-readable index. All receipts entered P0 as real `OPEN` receipts with `value=null`, rationale, owner, recorded timestamp, freeze deadline and supersession field. Post-B1 transitions require a validated non-null `FROZEN` value and resolution metadata; an `OPEN` receipt or its proposed default is not implementation authority.
 
 | ID | Decision needed | Default until changed | Freeze no later than | Status |
 |---|---|---|---|---|
-| DEC-01 | Three or four renameable custom presets | Three + Manage/Rename tile | Loadout-schema wave | OPEN |
+| DEC-01 | Three or four renameable custom presets | Three + Manage/Rename tile | Loadout-schema wave | FROZEN |
 | DEC-02 | Adrenaline exact arithmetic and stacking | ×1.10 damage, ×1.10 movement, ×0.90 reload duration, no stack | Combat-schema wave | OPEN |
-| DEC-03 | Nuke selectable or care-only | Care-package-only at exactly 1%; Drone Swarm selectable top tier | Killstreak-catalog wave | OPEN |
+| DEC-03 | Nuke selectable or care-only | Care-package-only at exactly 1%; Drone Swarm selectable top tier | Killstreak-catalog wave | FROZEN |
 | DEC-04 | Chopper AI or player-controlled | AI-operated | Killstreak-catalog wave | OPEN |
 | DEC-05 | Care-package ownership/theft | Enemy-stealable; owner captures faster | Care-package slice | OPEN |
 | DEC-06 | Piloted-drone body | Immobile and vulnerable | Support-authority wave | OPEN |
