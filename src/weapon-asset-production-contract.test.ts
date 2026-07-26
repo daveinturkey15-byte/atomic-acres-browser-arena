@@ -7,13 +7,28 @@ type ProductionEntry = Readonly<{
   releaseState: 'blocked' | 'release-ready';
   currentRuntimeSource?: string;
   blockers?: readonly string[];
-  firstPersonGlbs?: readonly { path: string; sha256: string; triangles: number }[];
+  firstPersonGlbs?: readonly {
+    path: string;
+    sha256: string;
+    triangles: number;
+    skinnedMeshNodes?: number;
+    renderPrimitives?: number;
+    sourceWeightedParts?: number;
+    bones?: number;
+  }[];
   worldGlbs?: readonly { path: string; sha256: string; triangles: number }[];
   dropGlbs?: readonly { path: string; sha256: string; triangles: number }[];
   actions?: readonly string[];
   pbrMaps?: Readonly<Record<string, { path: string; sha256: string }>>;
   opticMagnification?: number;
   materialContract?: string;
+  renderBudget?: Readonly<{
+    maxSkinnedRenderableMeshesPerLod: number;
+    maxSkinnedPrimitivesPerLod: number;
+    sourceWeightedParts: number;
+    boneCount: number;
+    batchingPolicy: string;
+  }>;
 }>;
 
 const manifest = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-production.manifest.json', 'utf8')) as {
@@ -66,6 +81,23 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
       currentRuntimeSource: 'public/assets/original/models/operators/pass65-first-person-arms-lod0.glb',
     });
     expect(manifest.operatorArms.firstPersonGlbs).toHaveLength(2);
+    expect(manifest.operatorArms.renderBudget).toEqual({
+      maxSkinnedRenderableMeshesPerLod: 6,
+      maxSkinnedPrimitivesPerLod: 6,
+      sourceWeightedParts: 45,
+      boneCount: 37,
+      batchingPolicy: 'one-shared-armature-batch-per-material',
+    });
+    for (const lod of manifest.operatorArms.firstPersonGlbs ?? []) {
+      expect(lod.skinnedMeshNodes).toBe(4);
+      expect(lod.renderPrimitives).toBe(4);
+      expect(lod.skinnedMeshNodes).toBeGreaterThanOrEqual(1);
+      expect(lod.skinnedMeshNodes).toBeLessThanOrEqual(6);
+      expect(lod.renderPrimitives).toBeGreaterThanOrEqual(1);
+      expect(lod.renderPrimitives).toBeLessThanOrEqual(6);
+      expect(lod.sourceWeightedParts).toBe(45);
+      expect(lod.bones).toBe(37);
+    }
     expect(manifest.operatorArms.actions).toEqual(expect.arrayContaining([...manifest.requiredCoreActions]));
     expect(manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')
       .every((entry) => entry.releaseState === 'blocked')).toBe(true);

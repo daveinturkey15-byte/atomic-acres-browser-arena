@@ -10,26 +10,36 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-first-person-arms.py",
-    "sha256": "177b7eddc3991bd2bb9b7b8138e122f9adfdf6313254dda034ad19710abbc5d8"
+    "sha256": "4e19edd3881cc195cf71662fedde636363a3db13ea2a874ba721cfe12157d4b4"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-first-person-operator-arms.blend",
-    "sha256": "233d6885092a5d207d3dde1a98e02c2fdb438fb91d7bf8c1b5770292f36de0ef"
+    "sha256": "463af87c51744b8971e13cab08900667bbf6cef198b19e97c45e7d3d83db6b0f"
   },
   "firstPersonGlbs": [
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-      "sha256": "80216229ff8b0d0087c52076d9f2d43055cc421d948311b989a737b5b22da394",
+      "sha256": "9e3f0f3fcb4112b6192e08bef0ca7724371e31ca40e7bba004b5bfbfaba52b81",
       "lod": 0,
       "triangles": 10116,
-      "bytes": 413728
+      "bytes": 374452,
+      "skinnedMeshNodes": 4,
+      "renderPrimitives": 4,
+      "skins": 4,
+      "sourceWeightedParts": 45,
+      "bones": 37
     },
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-      "sha256": "7bf645a0616535f4ce9a5da3e8c89cdcd4a9250264443e2c6e5f3db6824d338e",
+      "sha256": "31030d919b6225c515c23f401360e6d05c2aab71b604d1e25312174272870437",
       "lod": 1,
       "triangles": 9212,
-      "bytes": 410160
+      "bytes": 362544,
+      "skinnedMeshNodes": 4,
+      "renderPrimitives": 4,
+      "skins": 4,
+      "sourceWeightedParts": 45,
+      "bones": 37
     }
   ],
   "pbrMaps": {
@@ -64,18 +74,38 @@
     "LowerArmR",
     "WristR",
     "Index1R",
+    "Index2R",
+    "Index3R",
     "Middle1R",
+    "Middle2R",
+    "Middle3R",
     "Ring1R",
+    "Ring2R",
+    "Ring3R",
     "Pinky1R",
+    "Pinky2R",
+    "Pinky3R",
     "Thumb1R",
+    "Thumb2R",
+    "Thumb3R",
     "UpperArmL",
     "LowerArmL",
     "WristL",
     "Index1L",
+    "Index2L",
+    "Index3L",
     "Middle1L",
+    "Middle2L",
+    "Middle3L",
     "Ring1L",
+    "Ring2L",
+    "Ring3L",
     "Pinky1L",
-    "Thumb1L"
+    "Pinky2L",
+    "Pinky3L",
+    "Thumb1L",
+    "Thumb2L",
+    "Thumb3L"
   ],
   "requiredSockets": [
     "right-hand-grip-socket",
@@ -99,6 +129,13 @@
     "inspect"
   ],
   "materialContract": "All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.",
+  "performanceContract": {
+    "maxSkinnedRenderableMeshesPerLod": 6,
+    "maxSkinnedPrimitivesPerLod": 6,
+    "sourceWeightedParts": 45,
+    "boneCount": 37,
+    "batchingPolicy": "one-shared-armature-batch-per-material"
+  },
   "review": {
     "authoringSeed": 0,
     "frame": 1,
@@ -106,28 +143,28 @@
     "renders": [
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-neutral-front.png",
-        "sha256": "af7b54d5fe4d9997e4f073f88152a9f3cb169bd5c6a3fc988dd335e3d5f32a3a",
+        "sha256": "4968428d25322ede54913ee6b9a9d7c457aa7da5a404286ef1cb01c8e8814e87",
         "width": 512,
         "height": 512,
         "cameraId": "neutral-front"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-neutral-quarter.png",
-        "sha256": "d5b9ddefcd94246e97d5207e5c800f6ed0a1e09257e01ff22fa5900cc8a651b2",
+        "sha256": "0d2057d1c0fb727e99c7ca89639224e3b3e23476846a4612e4a1fbce20f6b24d",
         "width": 512,
         "height": 512,
         "cameraId": "neutral-quarter"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-glove-closeup.png",
-        "sha256": "bb10d36a2f29c5fef27ba9b640f6131a6e1bceb620614689d602b027a5c3ee52",
+        "sha256": "cacab7a55105ecfdac30817f42732b2fc1167be8919c8aa2fabba5aca60a689d",
         "width": 512,
         "height": 512,
         "cameraId": "glove-closeup"
       },
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-reload-action.png",
-        "sha256": "004168314bb310ed6eae39b58f9e94b5f7e4d70e2ab37e67f99bdcf69fab6fa9",
+        "sha256": "f5a43ee535b81eeb6c7325c04f1684b818bdf80e2a39748e576b625f55b7f258",
         "width": 512,
         "height": 512,
         "cameraId": "reload-action"
@@ -135,7 +172,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
-      "sha256": "ab9a4f1be5fbfe75e4ff69825a06a35547480963ba0595834581129fa0430886",
+      "sha256": "0dcdfd947c51324aa3be9d0a202f5df6825a31618473afc12e62beb248f10ba5",
       "width": 1024,
       "height": 1024
     }
@@ -145,11 +182,13 @@
       {
         "lod": 0,
         "triangles": 10116,
-        "bytes": 413728,
-        "meshNodes": 45,
-        "skinnedMeshNodes": 45,
-        "skins": 45,
-        "bones": 17,
+        "bytes": 374452,
+        "meshNodes": 4,
+        "skinnedMeshNodes": 4,
+        "renderPrimitives": 4,
+        "sourceWeightedParts": 45,
+        "skins": 4,
+        "bones": 37,
         "materials": 4,
         "images": 3,
         "animations": [
@@ -172,11 +211,13 @@
       {
         "lod": 1,
         "triangles": 9212,
-        "bytes": 410160,
-        "meshNodes": 45,
-        "skinnedMeshNodes": 45,
-        "skins": 45,
-        "bones": 17,
+        "bytes": 362544,
+        "meshNodes": 4,
+        "skinnedMeshNodes": 4,
+        "renderPrimitives": 4,
+        "sourceWeightedParts": 45,
+        "skins": 4,
+        "bones": 37,
         "materials": 4,
         "images": 3,
         "animations": [

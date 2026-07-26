@@ -3,7 +3,12 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { auditCrossbowGlb, auditOperatorArmsGlb, readGlb } from './pass65-crossbow-arms-glb.mjs';
+import {
+  auditCrossbowGlb,
+  auditOperatorArmsGlb,
+  OPERATOR_ARMS_RENDER_BUDGET,
+  readGlb,
+} from './pass65-crossbow-arms-glb.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const manifestPath = path.join(root, 'source-assets/blender/pass65-weapon-production.manifest.json');
@@ -82,6 +87,9 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
     if (!arms.bones?.includes(bone)) failures.push(`operator arms: missing ${bone} bone`);
   }
   for (const action of manifest.requiredCoreActions) if (!arms.actions?.includes(action)) failures.push(`operator arms: missing ${action} action`);
+  for (const [field, expected] of Object.entries(OPERATOR_ARMS_RENDER_BUDGET)) {
+    if (arms.renderBudget?.[field] !== expected) failures.push(`operator arms: render budget ${field} must equal ${expected}`);
+  }
   for (const deliverable of [arms.sourceBlend, arms.sourceScript, arms.provenance,
     ...(arms.firstPersonGlbs ?? []), ...Object.values(arms.pbrMaps ?? {})]) queueDeliverable('operator arms', deliverable);
   for (const deliverable of arms.firstPersonGlbs ?? []) {
@@ -91,6 +99,9 @@ if (manifest.operatorArms?.releaseState !== 'release-ready') {
       const audit = auditOperatorArmsGlb(json, deliverable.lod, bytes.length);
       for (const failure of audit.failures) failures.push(failure);
       if (audit.triangles !== deliverable.triangles) failures.push(`operator arms: triangle receipt mismatch: ${deliverable.path}`);
+      for (const field of ['skinnedMeshNodes', 'renderPrimitives', 'skins', 'sourceWeightedParts', 'bones']) {
+        if (audit[field] !== deliverable[field]) failures.push(`operator arms: ${field} receipt mismatch: ${deliverable.path}`);
+      }
     } catch (error) {
       failures.push(`operator arms: structural audit failed: ${deliverable.path}: ${error instanceof Error ? error.message : String(error)}`);
     }

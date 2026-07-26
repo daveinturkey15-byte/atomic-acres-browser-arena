@@ -27,6 +27,15 @@ CORE_ACTIONS = (
     "fire", "dry-fire", "reload", "empty-reload", "melee", "inspect",
 )
 FINGER_NAMES = ("Index", "Middle", "Ring", "Pinky")
+EXPECTED_WEIGHTED_PARTS = 45
+EXPECTED_BONE_COUNT = 37
+MAX_SKINNED_RENDERABLES = 6
+EXPECTED_BATCH_MATERIALS = (
+    "MAT_Pass65_Arms_ArmorPad",
+    "MAT_Pass65_Arms_Glove_PBR",
+    "MAT_Pass65_Arms_Sleeve_PBR",
+    "MAT_Pass65_Arms_WristDisplay",
+)
 
 for directory in (SOURCE_BLEND.parent, RAW_DIR, TEXTURE_DIR, REVIEW_DIR):
     directory.mkdir(parents=True, exist_ok=True)
@@ -233,6 +242,90 @@ def skin_to_bone(obj, armature, bone_name):
     return obj
 
 
+def batch_skinned_renderables(root, armature):
+    """Join rigidly weighted source pieces into one renderable per material.
+
+    The independently authored pieces and their vertex groups remain intact
+    inside the batches. Keeping the skinned nodes as scene roots preserves the
+    glTF skinning contract while avoiding one WebGPU pipeline/draw per finger,
+    guard and sleeve component.
+    """
+    root_key = root.get("asset_root_key", root.name)
+    source_parts = sorted(
+        (
+            obj for obj in bpy.data.objects
+            if obj.type == "MESH" and obj.get("pass65_asset_root") == root_key
+        ),
+        key=lambda obj: obj.name,
+    )
+    if len(source_parts) != EXPECTED_WEIGHTED_PARTS:
+        raise RuntimeError(
+            f"{root.name}: expected {EXPECTED_WEIGHTED_PARTS} weighted source parts, "
+            f"found {len(source_parts)}"
+        )
+
+    by_material = {}
+    for obj in source_parts:
+        assigned_materials = [material for material in obj.data.materials if material is not None]
+        if len(assigned_materials) != 1:
+            raise RuntimeError(f"{obj.name}: batching requires exactly one assigned material")
+        armature_modifiers = [modifier for modifier in obj.modifiers if modifier.type == "ARMATURE"]
+        if len(armature_modifiers) != 1 or armature_modifiers[0].object != armature:
+            raise RuntimeError(f"{obj.name}: batching requires exactly one shared armature modifier")
+        by_material.setdefault(assigned_materials[0].name, []).append(obj)
+
+    if tuple(sorted(by_material)) != EXPECTED_BATCH_MATERIALS:
+        raise RuntimeError(
+            f"{root.name}: expected material batches {EXPECTED_BATCH_MATERIALS}, "
+            f"found {tuple(sorted(by_material))}"
+        )
+    if len(by_material) > MAX_SKINNED_RENDERABLES:
+        raise RuntimeError(
+            f"{root.name}: {len(by_material)} material batches exceed "
+            f"the {MAX_SKINNED_RENDERABLES}-renderable budget"
+        )
+
+    batches = []
+    for material_name, pieces in sorted(by_material.items()):
+        weighted_bones = sorted({group.name for piece in pieces for group in piece.vertex_groups})
+        bpy.ops.object.select_all(action="DESELECT")
+        for piece in pieces:
+            piece.select_set(True)
+        batch = pieces[0]
+        bpy.context.view_layer.objects.active = batch
+        if len(pieces) > 1:
+            bpy.ops.object.join()
+        bpy.ops.object.material_slot_remove_unused()
+
+        material_slug = material_name.removeprefix("MAT_Pass65_Arms_").removesuffix("_PBR")
+        batch.name = f"Pass65_Arms_Batch_{material_slug}_{root.get('quality_tier')}"
+        batch.parent = None
+        batch["pass65_asset_root"] = root_key
+        batch["opaque_release_mesh"] = True
+        batch["batched_skinned_renderable"] = True
+        batch["batched_material"] = material_name
+        batch["weighted_part_count"] = len(pieces)
+        batch["weighted_bones_csv"] = ",".join(weighted_bones)
+        if "weighted_bone" in batch:
+            del batch["weighted_bone"]
+
+        assigned_materials = [material for material in batch.data.materials if material is not None]
+        if len(assigned_materials) != 1 or assigned_materials[0].name != material_name:
+            raise RuntimeError(f"{batch.name}: joined batch did not retain exactly one material")
+        armature_modifiers = [modifier for modifier in batch.modifiers if modifier.type == "ARMATURE"]
+        if len(armature_modifiers) != 1 or armature_modifiers[0].object != armature:
+            raise RuntimeError(f"{batch.name}: joined batch did not retain the shared armature")
+        batches.append(batch)
+
+    root["source_weighted_part_count"] = len(source_parts)
+    root["expected_bone_count"] = EXPECTED_BONE_COUNT
+    root["batched_skinned_mesh_count"] = len(batches)
+    root["max_skinned_renderable_meshes"] = MAX_SKINNED_RENDERABLES
+    root["max_skinned_primitives"] = MAX_SKINNED_RENDERABLES
+    root["batching_policy"] = "one-shared-armature-batch-per-material"
+    return batches
+
+
 def set_pose_rotation(armature, bone_name, rotation):
     bone = armature.pose.bones.get(bone_name)
     if bone is None:
@@ -349,6 +442,10 @@ def build_armature(label: str, detail: float):
         add_edit_bone(armature, f"Thumb2{side}", thumb_one, thumb_two, f"Thumb1{side}")
         add_edit_bone(armature, f"Thumb3{side}", thumb_two, thumb_three, f"Thumb2{side}")
     bpy.ops.object.mode_set(mode="OBJECT")
+    if len(armature.data.bones) != EXPECTED_BONE_COUNT:
+        raise RuntimeError(
+            f"{armature.name}: expected {EXPECTED_BONE_COUNT} bones, found {len(armature.data.bones)}"
+        )
 
     segments = 18 if detail > 0.8 else 10
     rings = 10 if detail > 0.8 else 6
@@ -387,6 +484,8 @@ def build_armature(label: str, detail: float):
                 radius, radius * 0.86, materials["glove"], max(8, segments // 2),
             )
             skin_to_bone(mesh, armature, bone.name)
+
+    batch_skinned_renderables(root, armature)
 
     for name, location, semantic in (
         ("right-hand-grip-socket", (0.155, 0.86, -0.045), "rightGrip"),

@@ -4,6 +4,7 @@ import path from 'node:path';
 import {
   auditCrossbowGlb,
   auditOperatorArmsGlb,
+  OPERATOR_ARMS_RENDER_BUDGET,
   readGlb,
   REQUIRED_ARM_BONES,
   REQUIRED_ARM_SOCKETS,
@@ -63,7 +64,16 @@ for (const lod of [0, 1]) {
   const { bytes, json } = await readGlb(absolute(relative));
   const audit = auditOperatorArmsGlb(json, lod, bytes.length);
   if (audit.failures.length > 0) throw new Error(`${relative} is not releasable:\n${audit.failures.map((failure) => `- ${failure}`).join('\n')}`);
-  armsGlbs.push(await fileRecord(relative, { lod, triangles: audit.triangles, bytes: audit.bytes }));
+  armsGlbs.push(await fileRecord(relative, {
+    lod,
+    triangles: audit.triangles,
+    bytes: audit.bytes,
+    skinnedMeshNodes: audit.skinnedMeshNodes,
+    renderPrimitives: audit.renderPrimitives,
+    skins: audit.skins,
+    sourceWeightedParts: audit.sourceWeightedParts,
+    bones: audit.bones,
+  }));
   armsAudits.push({ lod, ...audit });
 }
 if (!(armsGlbs[0].triangles > armsGlbs[1].triangles)) throw new Error('Operator arm LOD triangle counts must decrease strictly');
@@ -120,6 +130,7 @@ const armsProvenance = {
   firstPersonGlbs: armsGlbs, pbrMaps: armsPbrMaps,
   requiredBones: REQUIRED_ARM_BONES, requiredSockets: REQUIRED_ARM_SOCKETS, animationClips: REQUIRED_CORE_ACTIONS,
   materialContract: 'All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.',
+  performanceContract: OPERATOR_ARMS_RENDER_BUDGET,
   review: { authoringSeed: 0, frame: 1, renderEngine: 'BLENDER_EEVEE', renders: armsRenders, contactSheet: armsContactSheet },
   runtimeAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit), externalUris: 0 },
   gameplayBoundary: 'Presentation asset only. Camera, weapon sockets, IK targets, gameplay authority and networking remain TypeScript-owned.',
@@ -151,6 +162,7 @@ productionManifest.operatorArms = {
   pbrMaps: armsPbrMaps, provenance: armsProvenanceRecord,
   bones: REQUIRED_ARM_BONES, sockets: REQUIRED_ARM_SOCKETS, actions: REQUIRED_CORE_ACTIONS,
   materialContract: 'opaque-depth-writing',
+  renderBudget: OPERATOR_ARMS_RENDER_BUDGET,
   review: { renders: armsRenders, contactSheet: armsContactSheet },
   technicalAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit) },
 };
@@ -177,8 +189,8 @@ const assetRecords = [
     sourceScript: armsSourceScript.path, sourceScriptSha256: armsSourceScript.sha256,
     sourceProvenance: armsProvenanceRecord.path, sourceProvenanceSha256: armsProvenanceRecord.sha256,
     preview: armsContactSheet.path,
-    format: 'Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, weighted tactical sleeves and complete articulated hands, embedded WebP PBR textures, opaque materials and thirteen action clips',
-    modifications: 'Project-original first-person operator arms authored in Blender with tactical sleeves, gloves, wrist guards, full fingers/thumbs, wrist display, grip/knife/grenade sockets and an equip-to-inspect action corpus. Runtime camera-space IK remains TypeScript-owned.',
+    format: 'Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips',
+    modifications: 'Project-original first-person operator arms authored in Blender from 45 weighted sleeve, glove, guard, full-finger/thumb and wrist-display parts, then batched one-per-material under a six-renderable/six-primitive budget. Grip/knife/grenade sockets and the equip-to-inspect action corpus remain intact; runtime camera-space IK remains TypeScript-owned.',
     attributionRequired: false,
   },
 ];
