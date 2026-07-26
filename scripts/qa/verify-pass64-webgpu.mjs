@@ -355,6 +355,23 @@ try {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.weaponReady === true && state?.bootstrap?.stage === 'ready';
   }, undefined, { timeout: 60_000 });
+  const deferredMenuState = await switchPage.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return {
+      constructionCount: state.arenaSelection.streaming.constructionCount,
+      residentArenaRoots: state.arenaSelection.streaming.residentArenaRoots,
+      submissionSequence: state.render.runtime.presentation.submissionSequence,
+      gameplayArena: document.documentElement.dataset.gameplayArena,
+      previewMode: document.documentElement.dataset.menuPreview,
+    };
+  });
+  if (deferredMenuState.constructionCount !== 0
+    || deferredMenuState.residentArenaRoots !== 0
+    || deferredMenuState.submissionSequence !== 0
+    || deferredMenuState.gameplayArena !== 'deferred-until-deployment'
+    || deferredMenuState.previewMode !== 'prerecorded-video') {
+    throw new Error(`Prerecorded menu eagerly constructed or submitted gameplay: ${JSON.stringify(deferredMenuState)}`);
+  }
   const switchReceipts = [];
   const maximumResidentTextureBytes = 768 * 1024 * 1024;
   const maximumResidentGeometryBytes = 256 * 1024 * 1024;
@@ -377,15 +394,17 @@ try {
       throw new Error(`${arenaId} gameplay switch failed: ${JSON.stringify({ switchState, switchErrors })}`);
     }
     const receipt = switchState.playableScene;
-    if (receipt.arena.retiredPresentationInventory.geometries <= 0
-      || receipt.arena.retiredPresentationInventory.materials <= 0
-      || receipt.appliedTslArenaDefinitions < 2) {
+    const expectedAppliedDefinitions = switchIndex + 1;
+    const retirementInventoryRequired = switchIndex > 0;
+    if ((retirementInventoryRequired && receipt.arena.retiredPresentationInventory.geometries <= 0)
+      || (retirementInventoryRequired && receipt.arena.retiredPresentationInventory.materials <= 0)
+      || receipt.appliedTslArenaDefinitions < expectedAppliedDefinitions) {
       throw new Error(`${arenaId} switch did not detach the prior presentation and apply the selected TSL definition`);
     }
     if (receipt.traversal.legacyShaderMaterials.length !== 0 || receipt.duplicateArenaRoots) {
       throw new Error(`${arenaId} switch introduced a duplicate arena or legacy shader material`);
     }
-    const expectedResidentRoots = Math.min(switchIndex + 2, 2);
+    const expectedResidentRoots = Math.min(switchIndex + 1, 2);
     if (switchState.streaming.cachePolicy !== 'fenced-two-arena-lru'
       || switchState.streaming.canonicalCacheBound !== 2
       || switchState.streaming.residentArenaRoots !== expectedResidentRoots
@@ -634,6 +653,7 @@ try {
     browserExecutable: executablePath,
     rendererPolicy: 'webgpu-default-fail-closed-webgl-explicit-compatibility',
     arenaRetirementPolicy: 'single-authoritative-gameplay-root',
+    deferredMenuState,
     menuResidencyEnvelope,
     gameplayResidencyBaselines: Object.fromEntries(gameplayResidencyBaselines),
     gameplayResidencyVisits: Object.fromEntries(gameplayResidencyVisits),
