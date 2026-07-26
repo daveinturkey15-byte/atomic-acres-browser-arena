@@ -14,6 +14,16 @@ test('ships the bounded, shadowed, slow-moving Gun Range contrast-light contract
     return api?.snapshot().weaponReady === true;
   }, undefined, { timeout: 45_000 });
 
+  await page.locator('#player-name').fill('PASS 65 RANGE LIGHT QA');
+  await page.locator('#solo').click();
+  await page.waitForFunction(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => any } }).__ATOMIC_ACRES_DEBUG__;
+    const snapshot = api?.snapshot();
+    return snapshot?.gameStarted === true
+      && snapshot?.arenaSelection?.id === 'gun-range'
+      && snapshot?.render?.arenaContrastLighting?.arenaId === 'gun-range';
+  }, undefined, { timeout: 45_000 });
+
   const evidence = await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().render.arenaContrastLighting);
