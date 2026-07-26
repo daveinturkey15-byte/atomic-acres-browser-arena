@@ -52,6 +52,7 @@
     "qa:pass65:owner-feedback": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test",
     "qa:pass65:drone-asset": "node scripts/qa/verify-pass65-drone-production.mjs",
     "qa:pass65:weapon-assets": "node scripts/qa/verify-pass65-weapon-production.mjs",
+    "qa:pass65:production-assets": "node .agents/skills/atomic-acres-production-asset-governance/scripts/verify-production-assets.mjs",
     "qa:pass64:renderer": "playwright test tests/e2e/pass64-renderer-foundation.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
