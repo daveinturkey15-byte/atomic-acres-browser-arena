@@ -25,7 +25,7 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('terminal-overview', [42, 29, 42], [0, 3, -10], 'overview', 1.06),
     camera('terminal-cabin-ceiling', [-4, 4.05, 2], [10, 4.45, 2], 'geometry', 1.06),
     camera('terminal-concourse-wall-closed', [-13, 1.9, -32], [-21, 1.9, -34], 'light-occlusion', 1.06),
-    camera('terminal-boarding-open', [0, 4.2, -7], [0, 4.2, 1], 'portal', 1.06),
+    camera('terminal-boarding-open', [0, 5, -7], [0, 4.2, 1], 'portal', 1.06),
     camera('terminal-port-wing-authority', [11, 7.8, 23], [0, 2.82, 12], 'geometry', 1.06),
     camera('terminal-starboard-wing-authority', [11, 7.8, -19], [0, 2.82, -8], 'geometry', 1.06),
   ],

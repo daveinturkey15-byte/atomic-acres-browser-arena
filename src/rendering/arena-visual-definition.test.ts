@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { buildSkylineTerminal } from '../additional-maps';
 import { HOUSE_LAYOUT } from '../arena-layout';
 import { firstSegmentBoxHit, isBlocked, type Point3 } from '../collision';
 import { createHouseArchitecture, solidBounds } from '../house-navigation';
@@ -44,6 +45,15 @@ describe('Pass 64 arena visual definitions', () => {
     expect(overview!.position[1]).toBeLessThan(7.1);
     expect(overview!.position[2]).toBeGreaterThan(11);
     expect(overview!.target[2]).toBeLessThan(-9);
+  });
+
+  it('keeps the Terminal open-boarding review camera above its walkable floor authority', async () => {
+    const { definition } = await ARENA_VISUAL_REGISTRY['skyline-terminal']();
+    const portal = definition.reviewCameras.find((entry) => entry.id === 'terminal-boarding-open');
+    expect(portal).toBeDefined();
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const [x, y, z] = portal!.position;
+    expect(isBlocked({ x, y, z }, map.colliders, 0.16)).toBe(false);
   });
 
   it('compares the Atomic solid wall and open portal from one legal room position', async () => {
