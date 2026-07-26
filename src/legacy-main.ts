@@ -10859,7 +10859,7 @@ type ArenaPerformanceBudgetSample = Readonly<{
   cachedGeometryBytesEstimate: number;
   geometryBytesEstimate: number;
   transientBytesEstimate: number;
-  gpuTimingMethod: 'queue-on-submitted-work-done-conservative-proxy';
+  gpuTimingMethod: 'presentation-frame-upper-bound-plus-queue-freshness';
   textureEstimateMethod: 'unique-active-plus-detached-cache-textures-rgba8-mip-chain';
   geometryEstimateMethod: 'unique-active-plus-detached-cache-buffer-arrays';
   transientEstimateMethod: 'principal-msaa-hdr-depth-post-upper-bound';
@@ -10962,7 +10962,7 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     cachedGeometryBytesEstimate: residency.cachedGeometryBytes,
     geometryBytesEstimate: residency.totalGeometryBytes,
     transientBytesEstimate: estimateTransientRenderBytes(),
-    gpuTimingMethod: 'queue-on-submitted-work-done-conservative-proxy',
+    gpuTimingMethod: 'presentation-frame-upper-bound-plus-queue-freshness',
     textureEstimateMethod: 'unique-active-plus-detached-cache-textures-rgba8-mip-chain',
     geometryEstimateMethod: 'unique-active-plus-detached-cache-buffer-arrays',
     transientEstimateMethod: 'principal-msaa-hdr-depth-post-upper-bound',
@@ -11017,7 +11017,10 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
       ? latestArenaPerformanceBudgetSample.cpuFrameP95Ms
       : null,
     gpuFrameP95Ms: latestArenaPerformanceBudgetSample?.definitionId === definition.id
-      ? latestArenaPerformanceBudgetSample.queueSubmissionP95Ms
+      // Presentation cadence is the conservative player-visible CPU+GPU
+      // upper bound. Queue completion remains separate freshness telemetry;
+      // serial driver round trips are not GPU timestamp queries.
+      ? latestArenaPerformanceBudgetSample.presentationFrameP95Ms
       : null,
   };
   const limits = definition.budgets;
