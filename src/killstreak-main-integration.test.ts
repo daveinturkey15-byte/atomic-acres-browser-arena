@@ -59,6 +59,10 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain("interaction.kind === 'support-enter-chopper'");
     expect(source).toContain("interaction.kind === 'support-enter-drone'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
+    expect(source).toContain("if (event.code === 'KeyF') releaseCareCapture();");
+    expect(source).toMatch(/function clearGameplayInput\(\): void \{\s+releaseCareCapture\(\);/);
+    expect(source).toContain('if (appliedDamage > 0) releaseCareCapture(now);');
+    expect(source).toContain('killstreakRuntime.recordActorDamage(victimId)');
     expect(source).not.toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)/);
   });
 

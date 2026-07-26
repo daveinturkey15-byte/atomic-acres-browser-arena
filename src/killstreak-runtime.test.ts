@@ -329,6 +329,57 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('other', 8_350).actors[0].revealedCareRewards).toEqual([]);
   });
 
+  it('requires continuous care capture through release, damage, range, LOS, death and exactly-once completion', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    const entityId = runtime.activate(intent('care-package', 1), 1_000, DEFAULT_WORLD).entityIds[0];
+    runtime.advance(7_100, DEFAULT_WORLD);
+
+    expect(runtime.beginCareCapture('owner', 1, entityId, 7_100, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.interruptCareCapture('owner', 99)).toBe(false);
+    expect(runtime.interruptCareCapture('owner', 1)).toBe(true);
+    expect(runtime.advance(9_000, DEFAULT_WORLD).damageEvents).toEqual([]);
+    expect(runtime.snapshotFor('owner', 9_000)).toMatchObject({
+      entities: [expect.objectContaining({ id: entityId, phase: 'landed', captureProgress: null })],
+      actors: [expect.objectContaining({ revealedCareRewards: [] })],
+    });
+
+    expect(runtime.beginCareCapture('owner', 1, entityId, 9_000, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.recordActorDamage('owner')).toBe(true);
+    expect(runtime.recordActorDamage('owner')).toBe(false);
+    expect(runtime.snapshotFor('owner', 9_001).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
+
+    expect(runtime.beginCareCapture('owner', 1, entityId, 9_100, DEFAULT_WORLD).accepted).toBe(true);
+    const beforeRangeRevision = runtime.snapshotFor('owner', 9_100).revision;
+    const outOfRangeWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: DEFAULT_WORLD.targets.map((target) => target.id === 'owner'
+        ? { ...target, position: [20, 1.7, 20] }
+        : target),
+    };
+    runtime.advance(9_200, outOfRangeWorld);
+    expect(runtime.snapshotFor('owner', 9_200)).toMatchObject({
+      revision: expect.any(Number),
+      entities: [expect.objectContaining({ phase: 'landed', captureProgress: null })],
+    });
+    expect(runtime.snapshotFor('owner', 9_200).revision).toBeGreaterThan(beforeRangeRevision);
+
+    expect(runtime.beginCareCapture('owner', 1, entityId, 9_300, DEFAULT_WORLD).accepted).toBe(true);
+    runtime.advance(9_400, { ...DEFAULT_WORLD, hasLineOfSight: () => false });
+    expect(runtime.snapshotFor('owner', 9_400).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
+
+    expect(runtime.beginCareCapture('owner', 1, entityId, 9_500, DEFAULT_WORLD).accepted).toBe(true);
+    runtime.recordActorDeath('owner', 2);
+    expect(runtime.snapshotFor('owner', 9_501).entities[0]).toMatchObject({ phase: 'landed', captureProgress: null });
+
+    expect(runtime.beginCareCapture('owner', 2, entityId, 9_600, DEFAULT_WORLD).accepted).toBe(true);
+    runtime.advance(10_850, DEFAULT_WORLD);
+    expect(runtime.snapshotFor('owner', 10_850).actors[0].revealedCareRewards).toHaveLength(1);
+    runtime.advance(20_000, DEFAULT_WORLD);
+    expect(runtime.snapshotFor('owner', 20_000).actors[0].revealedCareRewards).toHaveLength(1);
+  });
+
   it('produces identical host snapshots and exactly-once damage IDs for identical seed/time', () => {
     const run = () => {
       const runtime = new HostKillstreakRuntime(7);

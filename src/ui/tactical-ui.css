@@ -2917,7 +2917,14 @@
     isolation: isolate;
     color: #fff5ce;
     text-shadow: 0 0 16px rgba(255, 190, 72, 0.82), 0 7px 25px rgba(0, 0, 0, 0.72);
-    animation: pass65CountdownBeat 680ms cubic-bezier(.16, .82, .24, 1);
+  }
+
+  #countdown.countdown-cue-active[data-cue-key='odd'] {
+    animation: pass65CountdownBeatOdd 680ms cubic-bezier(.16, .82, .24, 1);
+  }
+
+  #countdown.countdown-cue-active[data-cue-key='even'] {
+    animation: pass65CountdownBeatEven 680ms cubic-bezier(.16, .82, .24, 1);
   }
 
   #countdown::before {
@@ -2932,7 +2939,13 @@
     box-shadow: 0 0 0 7px rgba(86, 225, 221, 0.08);
   }
 
-  @keyframes pass65CountdownBeat {
+  @keyframes pass65CountdownBeatOdd {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.42); filter: blur(6px); }
+    38% { opacity: 1; transform: translate(-50%, -50%) scale(0.94); filter: blur(0); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  @keyframes pass65CountdownBeatEven {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(1.42); filter: blur(6px); }
     38% { opacity: 1; transform: translate(-50%, -50%) scale(0.94); filter: blur(0); }
     100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }

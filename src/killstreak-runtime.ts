@@ -937,8 +937,9 @@ export class HostKillstreakRuntime {
     return Object.freeze({ accepted: true, reason: 'accepted' });
   }
 
-  interruptCareCapture(actorId: string, lifeId: number): void {
-    if (this.actors.get(actorId)?.lifeId !== lifeId) return;
+  interruptCareCapture(actorId: string, lifeId: number): boolean {
+    if (this.actors.get(actorId)?.lifeId !== lifeId) return false;
+    let interrupted = false;
     for (const entity of this.entities.values()) {
       if (entity.kind !== 'care-crate' || entity.captureActorId !== actorId) continue;
       entity.phase = 'landed';
@@ -946,7 +947,14 @@ export class HostKillstreakRuntime {
       entity.captureStartedAtMs = null;
       entity.revision += 1;
       this.revision += 1;
+      interrupted = true;
     }
+    return interrupted;
+  }
+
+  recordActorDamage(actorId: string): boolean {
+    const actor = this.actors.get(actorId);
+    return actor ? this.interruptCareCapture(actorId, actor.lifeId) : false;
   }
 
   damageEntity(entityId: string, damage: number): Readonly<{ applied: boolean; destroyed: boolean; health: number }> {
@@ -1063,6 +1071,8 @@ export class HostKillstreakRuntime {
       entity.phase = 'landed';
       entity.captureActorId = null;
       entity.captureStartedAtMs = null;
+      entity.revision += 1;
+      this.revision += 1;
       return;
     }
     const requiredMs = captureActor.team === entity.team ? 1_250 : 2_500;

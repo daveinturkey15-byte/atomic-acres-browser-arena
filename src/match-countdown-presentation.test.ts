@@ -7,7 +7,12 @@ describe('Pass 65 match countdown presentation contract', () => {
     const audio = readFileSync('src/audio.ts', 'utf8');
 
     expect(gameplay).toContain("if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline))");
-    expect(gameplay).toContain('audio.matchCountdown(Number(headline) as 1 | 2 | 3)');
+    expect(gameplay).toContain('function presentMatchCountdownCue(cue: MatchCountdownCue)');
+    expect(gameplay).toContain("countdown.classList.remove('countdown-cue-active')");
+    expect(gameplay).toContain('void countdown.offsetWidth');
+    expect(gameplay).toContain("countdown.classList.add('countdown-cue-active')");
+    expect(gameplay).toContain("presentMatchCountdownCue('engage')");
+    expect(gameplay).toContain('audio.matchCountdown(Number(cue) as 1 | 2 | 3)');
     expect(gameplay).toContain("audio.matchCountdown('engage')");
     expect(audio).toContain("matchCountdown(step: 1 | 2 | 3 | 'engage')");
     expect(audio).toContain('this.announcements');
@@ -19,8 +24,11 @@ describe('Pass 65 match countdown presentation contract', () => {
     const accessibility = readFileSync('src/ui/tactical-ui.css', 'utf8');
 
     expect(style).toContain("font:900 clamp(84px,14vw,150px)/1 'Barlow Condensed'");
-    expect(style).toContain('animation:countdownBeat .72s ease-out');
+    expect(style).toContain('#countdown.countdown-cue-active{animation:countdownBeat .72s ease-out}');
     expect(style).toContain('@keyframes countdownBeat');
+    expect(accessibility).toContain('#countdown.countdown-cue-active');
+    expect(accessibility).toContain('animation: pass65CountdownBeatOdd 680ms');
+    expect(accessibility).toContain('animation: pass65CountdownBeatEven 680ms');
     expect(accessibility).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*animation-duration:\s*0\.001ms\s*!important/i);
   });
 });

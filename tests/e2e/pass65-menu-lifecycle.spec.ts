@@ -131,6 +131,31 @@ async function lifecycle(page: Page): Promise<Record<string, any>> {
   return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().menuLifecycle as Record<string, any>);
 }
 
+type CountdownAnimationEvent = Readonly<{ cue: string; sequence: number; animationName: string }>;
+
+async function installCountdownAnimationProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const countdown = document.querySelector<HTMLElement>('#countdown');
+    if (!countdown) throw new Error('Missing match countdown');
+    const events: CountdownAnimationEvent[] = [];
+    Object.defineProperty(window, '__PASS65_COUNTDOWN_ANIMATIONS__', { configurable: true, value: events });
+    countdown.addEventListener('animationstart', (event) => {
+      if (!event.animationName.startsWith('pass65CountdownBeat') && event.animationName !== 'countdownBeat') return;
+      events.push({
+        cue: countdown.dataset.cue ?? '',
+        sequence: Number(countdown.dataset.cueSequence ?? 0),
+        animationName: event.animationName,
+      });
+    });
+  });
+}
+
+async function countdownAnimations(page: Page): Promise<CountdownAnimationEvent[]> {
+  return page.evaluate(() => [...((window as unknown as {
+    __PASS65_COUNTDOWN_ANIMATIONS__: CountdownAnimationEvent[];
+  }).__PASS65_COUNTDOWN_ANIMATIONS__ ?? [])]);
+}
+
 async function startFromMenu(page: Page): Promise<void> {
   await page.locator('#player-name').fill('PASS65 QA');
   await page.locator('#solo').click();
@@ -426,6 +451,79 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       visibilityChangeCount: 2,
       pauseOpenCount: 1,
     });
+  });
+
+  test('restarts all four countdown cues and requires continuous F for care capture', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.addInitScript((loadout) => {
+      localStorage.setItem('atomic-acres:killstreak-loadout:v1', JSON.stringify(loadout));
+    }, { schemaVersion: 1, slots: ['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke'] });
+    await ready(page);
+    await selectArena(page, 'rustworks-1v1');
+    await installCountdownAnimationProbe(page);
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
+    await page.waitForFunction(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return snapshot.gameStarted === true && snapshot.matchPhase === 'active';
+    }, undefined, { timeout: 30_000 });
+    await expect.poll(async () => (await countdownAnimations(page)).length).toBe(4);
+    const animations = await countdownAnimations(page);
+    expect(animations.map((event) => event.cue)).toEqual(['3', '2', '1', 'engage']);
+    expect(animations.map((event) => event.sequence)).toEqual([1, 2, 3, 4]);
+    expect(animations.map((event) => event.animationName)).toEqual([
+      'pass65CountdownBeatOdd', 'pass65CountdownBeatEven', 'pass65CountdownBeatOdd', 'pass65CountdownBeatEven',
+    ]);
+    await page.evaluate(() => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      debug.setBotsFrozen(true);
+      debug.earnSupport(4);
+      const position = (debug.snapshot().player as { position: number[] }).position;
+      if (!debug.activateKillstreak('care-package', [position[0], 0, position[2]])) {
+        throw new Error('Care Package activation was rejected');
+      }
+    });
+
+    const careState = () => page.evaluate(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as any;
+      const crate = snapshot.killstreak.entities.find((entity: any) => entity.kind === 'care-crate');
+      return {
+        id: crate?.id ?? null,
+        phase: crate?.phase ?? null,
+        heldCrateId: snapshot.fieldSupport.careCapture.heldCrateId,
+        rewards: snapshot.killstreak.actors[0]?.revealedCareRewards.length ?? 0,
+      };
+    });
+
+    await expect.poll(careState, { timeout: 10_000 }).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    await expect(page.locator('#support-interaction-prompt')).toBeVisible();
+    await expect(page.locator('#support-interaction-prompt')).toContainText('COLLECT KILLSTREAK');
+
+    await page.keyboard.down('f');
+    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
+    await page.keyboard.up('f');
+    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    await page.waitForTimeout(1_400);
+    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+
+    await page.keyboard.down('f');
+    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.damage(5));
+    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    await page.keyboard.up('f');
+
+    await page.keyboard.down('f');
+    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    await page.keyboard.up('f');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+    await page.keyboard.down('f');
+    await expect.poll(careState).toMatchObject({ phase: 'capturing', rewards: 0 });
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.openMenu());
+    await expect(page.locator('#menu')).toBeVisible();
+    await expect.poll(careState).toMatchObject({ phase: 'landed', heldCrateId: null, rewards: 0 });
+    await page.keyboard.up('f');
   });
 
   test('survives twenty all-arena solo starts without an unsolicited menu bounce', async ({ page }) => {

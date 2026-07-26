@@ -2236,7 +2236,9 @@ let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
 let adrenalineHudWasActive = false;
-let lastMatchCountdownCue: string | null = null;
+type MatchCountdownCue = '3' | '2' | '1' | 'engage';
+let lastMatchCountdownCue: MatchCountdownCue | null = null;
+let matchCountdownCueSequence = 0;
 let overdriveState: OverdriveState = createOverdriveState(0);
 let overdriveClaimGeneration = -1;
 let overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
@@ -2857,6 +2859,7 @@ function interruptReload(force = false, now = performance.now()): void {
 }
 
 function clearGameplayInput(): void {
+  releaseCareCapture();
   interruptReload(false);
   keys.clear();
   gamepadMove = { x: 0, y: 0 };
@@ -3082,6 +3085,7 @@ function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   bootstrapStage = 'failed';
   bootstrapError = message;
+  clearGameplayInput();
   setLocalTriggerHeld(false);
   setStatus(`Game paused: ${message}`, 'error');
   applyMenuLifecycle({ type: 'fatal-error' });
@@ -3686,7 +3690,9 @@ function presentLocalDamageDelta(previous: PlayerScore | undefined, next: Player
 }
 
 function recordAuthoritativeDamage(attackerId: string, victimId: string, damage: number): void {
-  if (network.role !== 'host' || attackerId === victimId || damage <= 0) return;
+  if (network.role !== 'host' || damage <= 0) return;
+  if (killstreakRuntime.recordActorDamage(victimId)) broadcastKillstreakState();
+  if (attackerId === victimId) return;
   const previousLocal = authoritativeScores.get(player.id);
   const next = recordPlayerDamage(authoritativeScores, attackerId, victimId, damage);
   authoritativeScores.clear();
@@ -5763,6 +5769,7 @@ function applyDamage(
   const handicappedDamage = damageAlreadyHandicapped ? damage : applyDhvIncomingDamage(damage, player.hp, localDhv);
   player.hp = Math.max(0, player.hp - admittedPlayerDamage(handicappedDamage, minimumDamage));
   const appliedDamage = Math.max(0, previousHp - player.hp);
+  if (appliedDamage > 0) releaseCareCapture(now);
   roundDamageTaken += appliedDamage;
   recordDamageEvent({
     actorId: attacker,
@@ -10138,6 +10145,9 @@ function killstreakWorldState(): KillstreakWorld {
 
 function refreshLocalKillstreakSnapshot(now = performance.now()): void {
   if (network.role !== 'client') killstreakSnapshot = killstreakRuntime.snapshotFor(player.id, now);
+  if (localCareCaptureCrateId && !killstreakSnapshot.entities.some((entity) => (
+    entity.id === localCareCaptureCrateId && entity.kind === 'care-crate' && entity.phase === 'capturing'
+  ))) localCareCaptureCrateId = null;
   const actor = localKillstreakActorSnapshot();
   const reward = actor?.revealedCareRewards[0] ?? null;
   let hudChanged = false;
@@ -11613,6 +11623,7 @@ function clearGrenades(): void {
 }
 
 function clearFieldSupport(): void {
+  localCareCaptureCrateId = null;
   killstreakPresentation.clear();
   if (yardhawk) disposeSupportRoot(yardhawk.root);
   yardhawk = null;
@@ -12002,6 +12013,28 @@ function matchParticipantReports(): Array<{ id: string; report: MatchParticipant
   return reports;
 }
 
+function presentMatchCountdownCue(cue: MatchCountdownCue): number {
+  const countdown = element<HTMLElement>('#countdown');
+  const sequence = ++matchCountdownCueSequence;
+  countdown.classList.remove('countdown-cue-active');
+  countdown.textContent = cue === 'engage' ? 'ENGAGE' : cue;
+  countdown.dataset.cue = cue;
+  countdown.dataset.cueSequence = String(sequence);
+  countdown.dataset.cueKey = sequence % 2 === 0 ? 'even' : 'odd';
+  countdown.hidden = false;
+  // Reflow is bounded to four match-start cues and guarantees a fresh CSS
+  // timeline while the single accessible HUD node remains mounted.
+  void countdown.offsetWidth;
+  countdown.classList.add('countdown-cue-active');
+  return sequence;
+}
+
+function hideMatchCountdownCue(): void {
+  const countdown = element<HTMLElement>('#countdown');
+  countdown.hidden = true;
+  countdown.classList.remove('countdown-cue-active');
+}
+
 function updateMatchState(now: number): void {
   const previous = matchState.phase;
   const scores = teamScores();
@@ -12029,28 +12062,30 @@ function updateMatchState(now: number): void {
       objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
     };
   }
-  const countdown = element<HTMLElement>('#countdown');
   if (matchState.phase === 'warmup') {
     const headline = presentation.headline ?? '';
-    countdown.textContent = headline;
-    countdown.hidden = false;
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
-      audio.matchCountdown(Number(headline) as 1 | 2 | 3);
-      lastMatchCountdownCue = headline;
+      const cue = headline as Extract<MatchCountdownCue, '1' | '2' | '3'>;
+      presentMatchCountdownCue(cue);
+      audio.matchCountdown(Number(cue) as 1 | 2 | 3);
+      lastMatchCountdownCue = cue;
     }
-  } else {
-    countdown.hidden = true;
-  }
+  } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
   const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
+    const engageSequence = presentMatchCountdownCue('engage');
     audio.matchCountdown('engage');
     lastMatchCountdownCue = 'engage';
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
     banner.innerHTML = `<strong>ENGAGE</strong><span>${privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel}</span>`;
     banner.hidden = false;
-    window.setTimeout(() => { if (matchState.phase === 'active') banner.hidden = true; }, 900);
+    window.setTimeout(() => {
+      if (matchState.phase !== 'active') return;
+      banner.hidden = true;
+      if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
+    }, 900);
     return;
   }
   if (matchState.phase === 'ended') {
@@ -12943,11 +12978,11 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => {
   keys.delete(event.code);
+  if (event.code === 'KeyF') releaseCareCapture();
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
   lastWindowBlurAt = performance.now();
-  releaseCareCapture();
   clearGameplayInput();
   applyMenuLifecycle({ type: 'focus-lost' });
 });
@@ -13399,7 +13434,10 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[dat
 
 function resetForMode(): void {
   matchDiagnosticUploader.abandonActiveMatch();
+  clearGameplayInput();
   interruptReload(true);
+  lastMatchCountdownCue = null;
+  matchCountdownCueSequence = 0;
   lastPrincipalShotAlignment = null;
   player.kills = 0;
   player.deaths = 0;
@@ -14672,6 +14710,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     fieldSupport: {
       streak: fieldSupport.streak,
       rewardCycle: fieldSupport.rewardCycle,
+      careCapture: { heldCrateId: localCareCaptureCrateId },
       bestStreakThisMatch,
       available: { ...fieldSupport.available },
       scoutActive: performance.now() < scoutSweepUntil,
