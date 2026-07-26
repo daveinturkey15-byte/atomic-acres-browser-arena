@@ -90,6 +90,8 @@ type MinigunDriveLoop = {
   gain: GainNode;
 };
 
+type ChopperRotorLoop = MinigunDriveLoop & { panner: PannerNode };
+
 /** Layered, original procedural arena mix. No sampled or proprietary game audio is used. */
 export class ArenaAudio {
   private context: AudioContext | null = null;
@@ -120,6 +122,9 @@ export class ArenaAudio {
   private minigunDriveFraction = 0;
   private minigunDrivePhase: MinigunSpoolPhase = 'idle';
   private minigunDriveLastUpdateAt = Number.NEGATIVE_INFINITY;
+  private readonly chopperRotorLoops = new Map<string, ChopperRotorLoop>();
+  private chopperRotorStarts = 0;
+  private chopperRotorStops = 0;
   private supportCuePlays = 0;
   private explosionAudioGate = createExplosionAudioGate();
   private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
@@ -178,6 +183,7 @@ export class ArenaAudio {
 
   dispose(): void {
     this.stopMinigunDrive();
+    this.stopAllChopperRotors();
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
     this.stopSources(this.lowHealthSources);
@@ -664,6 +670,75 @@ export class ArenaAudio {
     this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, this.weapons);
   }
 
+  syncChopperRotors(sources: readonly Readonly<{
+    id: string;
+    position: SpatialPoint;
+    phase: 'inbound' | 'orbiting' | 'outbound';
+  }>[]): void {
+    const admitted = sources
+      .filter((entry) => entry.id.length > 0 && Number.isFinite(entry.position.x)
+        && Number.isFinite(entry.position.y) && Number.isFinite(entry.position.z))
+      .slice(0, 4);
+    const liveIds = new Set(admitted.map((entry) => entry.id));
+    for (const id of this.chopperRotorLoops.keys()) {
+      if (!liveIds.has(id)) this.stopChopperRotor(id);
+    }
+    if (!this.context || !this.ambience) return;
+    for (const entry of admitted) {
+      let loop = this.chopperRotorLoops.get(entry.id);
+      const listenerDistance = Math.hypot(
+        entry.position.x - this.listenerPosition.x,
+        entry.position.y - this.listenerPosition.y,
+        entry.position.z - this.listenerPosition.z,
+      );
+      if (!loop) {
+        const source = this.context.createOscillator();
+        const filter = this.context.createBiquadFilter();
+        const gain = this.context.createGain();
+        const panner = this.context.createPanner();
+        source.type = 'sawtooth';
+        source.frequency.value = 38;
+        filter.type = 'lowpass';
+        filter.frequency.value = 230;
+        filter.Q.value = 0.62;
+        gain.gain.value = 0.011;
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = 4;
+        panner.maxDistance = 110;
+        panner.rolloffFactor = 0.72;
+        source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
+        if (!this.registerVoice(source, this.ambience, 1, true, listenerDistance)) {
+          filter.disconnect();
+          gain.disconnect();
+          panner.disconnect();
+          continue;
+        }
+        loop = { source, filter, gain, panner };
+        const voiceEnded = source.onended;
+        source.onended = (event) => {
+          this.spatialChains = Math.max(0, this.spatialChains - 1);
+          voiceEnded?.call(source, event);
+          filter.disconnect();
+          gain.disconnect();
+          panner.disconnect();
+          if (this.chopperRotorLoops.get(entry.id) === loop) this.chopperRotorLoops.delete(entry.id);
+        };
+        source.start(this.context.currentTime);
+        this.spatialChains += 1;
+        this.chopperRotorLoops.set(entry.id, loop);
+        this.chopperRotorStarts += 1;
+      }
+      loop.panner.positionX.value = entry.position.x;
+      loop.panner.positionY.value = entry.position.y;
+      loop.panner.positionZ.value = entry.position.z;
+      loop.source.frequency.value = entry.phase === 'inbound' ? 36 : entry.phase === 'outbound' ? 34 : 38;
+      loop.gain.gain.value = entry.phase === 'inbound' ? 0.009 : entry.phase === 'outbound' ? 0.007 : 0.011;
+      const voice = this.activeVoices.get(loop.source);
+      if (voice) voice.distance = listenerDistance;
+    }
+  }
+
   scoutSweep(): void {
     this.supportCuePlays += 1;
     this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
@@ -767,7 +842,7 @@ export class ArenaAudio {
     grenadeFuse: { beeps: number; startMs: number };
     crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
-    support: { cues: number };
+    support: { cues: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
     railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
@@ -795,7 +870,12 @@ export class ArenaAudio {
         fraction: this.minigunDriveFraction,
         phase: this.minigunDrivePhase,
       },
-      support: { cues: this.supportCuePlays },
+      support: {
+        cues: this.supportCuePlays,
+        chopperRotorActive: this.chopperRotorLoops.size > 0,
+        chopperRotorStarts: this.chopperRotorStarts,
+        chopperRotorStops: this.chopperRotorStops,
+      },
       railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
       runtime: {
         voices: this.activeVoices.size,
@@ -892,6 +972,18 @@ export class ArenaAudio {
     this.minigunDriveStops += 1;
     this.minigunDriveLastUpdateAt = Number.NEGATIVE_INFINITY;
     this.stopSource(loop.source);
+  }
+
+  private stopChopperRotor(id: string): void {
+    const loop = this.chopperRotorLoops.get(id);
+    if (!loop) return;
+    this.chopperRotorLoops.delete(id);
+    this.chopperRotorStops += 1;
+    this.stopSource(loop.source);
+  }
+
+  private stopAllChopperRotors(): void {
+    for (const id of [...this.chopperRotorLoops.keys()]) this.stopChopperRotor(id);
   }
 
   private stopSources(sources: AudioScheduledSourceNode[]): void {

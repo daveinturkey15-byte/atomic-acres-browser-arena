@@ -13,6 +13,8 @@ import {
   cancelReload,
   completeReload,
   computeDamage,
+  effectiveHitZoneForWeapon,
+  weaponCanCritical,
   computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
@@ -59,6 +61,13 @@ describe('headshot damage contract', () => {
     expect(WEAPONS.scattergun.headMultiplier).toBe(1.35);
     expect(WEAPONS['mini-uzi'].headMultiplier).toBe(1.45);
     expect(WEAPONS.minigun.headMultiplier).toBe(1);
+    expect(effectiveHitZoneForWeapon(WEAPONS.minigun, 'head')).toBe('body');
+    expect(effectiveHitZoneForWeapon(WEAPONS.carbine, 'head')).toBe('head');
+    expect(weaponCanCritical(WEAPONS.minigun)).toBe(false);
+    expect(weaponCanCritical(WEAPONS.carbine)).toBe(true);
+    expect(WEAPONS.minigun.damage).toBe(11.25);
+    expect(WEAPONS.minigun.minimumDamage).toBe(8.4375);
+    expect(computeDamage(WEAPONS.minigun, 5, 'head')).toBe(11);
     expect(WEAPONS['m14-ebr'].headMultiplier).toBe(1.7);
     expect(WEAPONS['slug-shotgun'].headMultiplier).toBe(1.35);
     expect(WEAPONS['explosive-crossbow'].headMultiplier).toBe(1);

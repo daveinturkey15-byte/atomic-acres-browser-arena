@@ -298,8 +298,15 @@ function hudMarkup(): string {
       <div class="support-list">${fieldSupportRowsMarkup()}</div>
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </aside>
-    <section id="support-combat-feedback" hidden aria-live="polite" data-support-kind="chopper">
-      <small>CHOPPER GUNNER // DAMAGE DEALT</small><strong><span id="chopper-damage-dealt">0</span> DMG</strong>
+    <section id="support-combat-feedback" hidden aria-live="polite" data-support-kind="none" data-possessed="false">
+      <header><small id="support-platform-name">SUPPORT PLATFORM</small><b id="support-platform-mode">AI FLIGHT</b></header>
+      <div class="support-optic-frame" aria-hidden="true"><i></i><i></i><span></span></div>
+      <div class="support-platform-readout">
+        <span>LINK <b>SECURE</b></span><span>HP <b id="support-platform-health">100</b></span>
+        <span>AMMO <b id="support-platform-ammo">--</b></span><span>TIME <b id="support-platform-time">30.0</b></span>
+      </div>
+      <strong class="support-damage-total"><span id="chopper-damage-dealt">0</span><small> DAMAGE</small></strong>
+      <footer id="support-control-action">F EXIT · AI FLIGHT CONTINUES</footer>
     </section>
     <section id="adrenaline-hud" hidden aria-live="polite">
       <small>ADRENALINE ACTIVE</small><strong><span id="adrenaline-time">15.0</span>S</strong>

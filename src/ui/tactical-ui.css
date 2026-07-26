@@ -2669,6 +2669,52 @@
   #adrenaline-hud strong { font: 900 22px/1 var(--ui-display); letter-spacing: 0.08em; }
   #support-interaction-prompt kbd { padding: 7px 10px; background: var(--ui-cyan); color: #061014; font: 900 14px/1 var(--ui-copy); }
 
+  #support-combat-feedback {
+    top: clamp(18px, 4vh, 48px);
+    width: min(760px, calc(100vw - 48px));
+    grid-template-columns: 1fr auto;
+    justify-items: stretch;
+    align-items: start;
+    gap: 7px 22px;
+    padding: 12px 18px 10px;
+    border: 1px solid rgba(83, 237, 255, 0.35);
+    border-top: 2px solid #53edff;
+    border-bottom-color: rgba(91, 255, 159, 0.32);
+    background: linear-gradient(135deg, rgba(1, 13, 20, 0.89), rgba(3, 30, 35, 0.6) 56%, rgba(4, 22, 17, 0.76));
+    box-shadow: 0 0 36px rgba(38, 221, 242, 0.13), inset 0 0 24px rgba(29, 206, 242, 0.05);
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    pointer-events: none;
+  }
+
+  #support-combat-feedback[hidden] { display: none; }
+  #support-combat-feedback header { display: grid; gap: 4px; }
+  #support-platform-name { color: #d5fbff; font: 900 15px/1 var(--ui-display); letter-spacing: 0.16em; }
+  #support-platform-mode { color: #65ffa8; font: 800 10px/1 var(--ui-copy); letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(80, 255, 158, 0.66); }
+  .support-platform-readout { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(80px, 1fr)); gap: 6px; }
+  .support-platform-readout > span { padding: 6px 8px; border-left: 2px solid rgba(83, 237, 255, 0.5); background: rgba(4, 25, 31, 0.68); color: rgba(184, 231, 236, 0.72); font: 700 9px/1 var(--ui-copy); letter-spacing: 0.09em; }
+  .support-platform-readout b { float: right; color: #deffff; font-size: 11px; }
+  #support-combat-feedback .support-damage-total { justify-self: end; color: #53edff; text-shadow: 0 0 12px rgba(64, 226, 255, 0.56); }
+  #support-combat-feedback .support-damage-total small { color: rgba(203, 247, 250, 0.7); font-size: 8px; }
+  #support-control-action { grid-column: 1 / -1; justify-self: center; color: #65ffa8; font: 800 9px/1 var(--ui-copy); letter-spacing: 0.14em; }
+  .support-optic-frame { display: none; }
+  #support-combat-feedback[data-possessed="true"] .support-optic-frame {
+    position: fixed;
+    display: block;
+    left: 50%;
+    top: 50%;
+    width: min(58vw, 760px);
+    height: min(48vh, 520px);
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(83, 237, 255, 0.2);
+    background: linear-gradient(90deg, rgba(42, 217, 242, 0.1), transparent 8%, transparent 92%, rgba(72, 255, 151, 0.09));
+    clip-path: polygon(0 10%, 7% 0, 93% 0, 100% 10%, 100% 90%, 93% 100%, 7% 100%, 0 90%);
+  }
+  #support-combat-feedback[data-possessed="true"] .support-optic-frame::before,
+  #support-combat-feedback[data-possessed="true"] .support-optic-frame::after { content: ''; position: absolute; top: 50%; width: 16%; height: 1px; background: #53edff; box-shadow: 0 0 7px #53edff; }
+  #support-combat-feedback[data-possessed="true"] .support-optic-frame::before { left: 18%; }
+  #support-combat-feedback[data-possessed="true"] .support-optic-frame::after { right: 18%; }
+  #support-combat-feedback[data-possessed="true"] .support-optic-frame span { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); border: 1px solid #65ffa8; border-radius: 50%; box-shadow: 0 0 10px rgba(101, 255, 168, 0.6); }
+
   #countdown {
     isolation: isolate;
     color: #fff5ce;
@@ -3043,6 +3089,31 @@
       top: 275px;
       width: 190px;
     }
+
+    #support-combat-feedback {
+      left: 8px;
+      top: 118px;
+      width: 148px;
+      transform: none;
+      grid-template-columns: 1fr;
+      gap: 5px;
+      padding: 8px;
+    }
+
+    #support-combat-feedback header,
+    #support-combat-feedback .support-damage-total,
+    #support-control-action {
+      justify-self: stretch;
+      text-align: center;
+    }
+
+    #support-platform-name { font-size: 11px; }
+    #support-platform-mode,
+    #support-control-action { font-size: 7px; }
+    .support-platform-readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .support-platform-readout > span { min-width: 0; padding: 5px; font-size: 7px; }
+    .support-platform-readout b { float: none; display: block; padding-top: 3px; font-size: 9px; }
+    #support-combat-feedback[data-possessed="true"] .support-optic-frame { width: calc(100vw - 32px); height: 42vh; }
 
     #banner:has(.round-stats) {
       padding: 24px 16px;

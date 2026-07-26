@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   FRAG_GRENADE_ASSET,
   FRAG_GRENADE_MAX_DIMENSION,
+  SEMTEX_BUNDLE_ASSET,
+  SEMTEX_BUNDLE_MAX_DIMENSION,
   createGrenadePresentation,
   disposeGrenadePresentation,
   grenadePresentationTelemetry,
@@ -44,5 +46,30 @@ describe('conventional fragmentation grenade presentation', () => {
     expect(root.getObjectByName('fallback-frag-pin-ring')).toBeTruthy();
     disposeGrenadePresentation(root);
     expect(root.parent).toBeNull();
+  });
+});
+
+describe('Semtex bundle presentation', () => {
+  it('ships three decreasing authored Blender LODs with bundle semantics and PBR materials', () => {
+    expect(SEMTEX_BUNDLE_ASSET).toBe('./assets/original/models/ordnance/semtex-bundle-lod0.glb');
+    const lods = [0, 1, 2].map((lod) => glbJson(`public/assets/original/models/ordnance/semtex-bundle-lod${lod}.glb`));
+    for (const gltf of lods) {
+      const nodeNames = (gltf.nodes ?? []).map((node) => node.name);
+      expect(nodeNames).toEqual(expect.arrayContaining([
+        'semtex-bundle-root', 'semtex-block-1', 'semtex-block-2', 'semtex-block-3', 'semtex-block-4',
+        'semtex-detonator', 'semtex-wire', 'semtex-sticky-pad', 'semtex-held-socket', 'semtex-world-socket',
+      ]));
+      expect((gltf.materials ?? []).map((material) => material.name)).toContain('Semtex red PBR');
+    }
+    expect(SEMTEX_BUNDLE_MAX_DIMENSION).toBeLessThanOrEqual(0.6);
+  });
+
+  it('never substitutes the frag silhouette while the Semtex GLB is loading', () => {
+    const root = createGrenadePresentation('semtex');
+    expect(root.name).toBe('semtex-bundle-fallback');
+    expect(root.userData.grenadeKind).toBe('semtex');
+    expect(root.getObjectByName('fallback-semtex-block-4')).toBeTruthy();
+    expect(root.getObjectByName('fallback-semtex-detonator')).toBeTruthy();
+    disposeGrenadePresentation(root);
   });
 });

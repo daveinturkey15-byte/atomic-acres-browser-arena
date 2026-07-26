@@ -336,6 +336,8 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
+  runtimeCallsite('syncChopperRotors', '[]', 2, ['support.chopper-rotor']),
+  runtimeCallsite('syncChopperRotors', "killstreakSnapshot.entities .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0) .map((entity) => ({ id: entity.id, position: { x: entity.position[0], y: entity.position[1], z: entity.position[2] }, phase: entity.phase === 'inbound' || entity.phase === 'outbound' ? entity.phase : 'orbiting', }))", 1, ['support.chopper-rotor']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
   runtimeCallsite('weaponSwitch', '', 4, ['weapon.switch', 'interaction.weapon-pickup']),
   runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),
@@ -856,11 +858,12 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R502', 'R511', 'R308'], concurrency: LOCAL_CRITICAL, lifecycleOwner: 'support-entity',
     coverageDetail: 'Capture feedback is local, contention-aware, and cannot reveal a reward before host claim resolution.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'support.chopper-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'orbit-loop', 'depart'],
+    emitterSymbols: ['syncChopperRotors'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'Rotor audio follows replicated aircraft pose and the exact chopper entity lifetime.',
+    coverageDetail: 'One quiet HRTF rotor loop follows each replicated chopper pose and is stopped on entity retirement, match end, or audio disposal.',
   }),
   existingEvent({
     id: 'support.chopper-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -1000,7 +1003,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = 'a81e1a40bf0edfc0dd767700612062ce683c03b567128d2011ab9f28993b3fb9';
+export const SOUND_EVENT_INVENTORY_SHA256 = '897e98b905a07483ab9ebdfd04cb04e7e54b5dc7c953a7da5f0856f4018b3ea0';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

@@ -123,6 +123,7 @@ import {
   cancelReload,
   completeReload as completeReloadState,
   computeDamage,
+  effectiveHitZoneForWeapon,
   computeFallDamage,
   computeRecoilImpulse,
   computeSpread,
@@ -155,6 +156,8 @@ import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
+import { projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
+import { primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation, type WorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
@@ -368,7 +371,7 @@ import {
 import { HostTriggerAuthorityRegistry } from './host-trigger-authority';
 import { ShotTimingTelemetry } from './shot-timing-telemetry';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
-import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, remoteGrenadeForAction, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import {
   advanceRemoteHealthAuthority,
   admitAuthoritativeRemoteRespawn,
@@ -2197,8 +2200,7 @@ let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const killstreakRegisteredActors = new Set<string>();
 let displayedCareReward: Pass65KillstreakId | null = null;
-let supportDamageActivationId: string | null = null;
-let chopperDamageDealt = 0;
+const supportDamageDealtByActivation = new Map<string, number>();
 let adrenalineHudWasActive = false;
 let lastMatchCountdownCue: string | null = null;
 let overdriveState: OverdriveState = createOverdriveState(0);
@@ -5155,12 +5157,13 @@ function onNetworkMessage(message: GameMessage): void {
       const distance = validationOrigin.distanceTo(blastTargetPosition);
       if (distance > remoteExplosiveHitMaximumDistance(source)) return;
       if (source !== 'nuke' && activeWorldColliders().some((box) => segmentIntersectsBox(validationOrigin, blastTargetPosition, box))) return;
-      const maximumBaseDamage = maximumRemoteExplosiveBaseDamage(source, distance, targetStance);
+      const grenadeAuthority = source === 'grenade' ? remoteGrenadeAuthorities.get(message.by) : undefined;
+      const grenade = grenadeAuthority ? remoteGrenadeForAction(grenadeAuthority, message.actionNonce) : null;
+      const maximumBaseDamage = maximumRemoteExplosiveBaseDamage(source, distance, targetStance, grenade);
       if (!admitRemoteBaseDamage(message.damage, maximumBaseDamage)
         || Math.abs(message.damage - maximumBaseDamage) > 1e-6) return;
 
       if (source === 'grenade') {
-        const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
         if (!grenadeAuthority) return;
         const grenadeAdmission = admitRemoteGrenadeHit(grenadeAuthority, {
           actionNonce: message.actionNonce,
@@ -6150,17 +6153,21 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
   const sender = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const centre = window.mesh.getWorldPosition(new THREE.Vector3());
   const explosive = message.kind === 'explosive';
+  const grenadeAuthority = explosive ? remoteGrenadeAuthorities.get(message.by) : undefined;
+  const grenade = explosive && grenadeAuthority && Number.isFinite(message.actionNonce)
+    ? remoteGrenadeForAction(grenadeAuthority, message.actionNonce!)
+    : null;
+  const explosiveRadius = grenade === 'semtex' ? SEMTEX_HITL_CONTRACT.blastRadiusM : GRENADE_RADIUS;
   const senderOriginLimit = explosive ? 36 : 2.8;
   const shotDelta = centre.clone().sub(origin);
   const shotTrace = explosive ? null : traceWeaponPath(origin, shotDelta, shotDelta.length(), remote.snapshot.weapon);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)
     || origin.distanceTo(sender) > senderOriginLimit
-    || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
+    || explosive && origin.distanceTo(centre) > explosiveRadius + 0.5
     || !explosive && origin.distanceTo(centre) > 110
     || explosive && windowBreakPathBlocked(origin, centre, activeWorldColliders())
     || !explosive && !shotTrace?.reachedDistance) return;
   if (explosive && !localMultiplayerQa) {
-    const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
     if (!grenadeAuthority || !Number.isFinite(message.actionNonce)) return;
     const admission = admitRemoteGrenadeExplosion(grenadeAuthority, {
       actionNonce: message.actionNonce!,
@@ -7631,7 +7638,7 @@ function tryFire(now: number): void {
       }
     }
     if (result.playerId) {
-      const zone = result.hitZone ?? 'body';
+      const zone = effectiveHitZoneForWeapon(spec, result.hitZone ?? 'body');
       const damage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
       if (damage > 0) {
         const prior = hitDamage.get(result.playerId);
@@ -7646,7 +7653,7 @@ function tryFire(now: number): void {
     }
     if (result.targetId) {
       const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
-      const zone = practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body';
+      const zone = effectiveHitZoneForWeapon(spec, practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body');
       const targetDamage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
       if (targetDamage > 0) hitPracticeTarget(
           result.targetId,
@@ -8287,7 +8294,7 @@ function throwBotGrenade(
   const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
   const velocity = targetGround.clone().sub(origin).divideScalar(flightTime);
   velocity.y += 9 * flightTime;
-  const mesh = createGrenadePresentation();
+  const mesh = createGrenadePresentation('frag');
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
@@ -9131,7 +9138,7 @@ function throwGrenade(): void {
     nonce: randomNonce(),
   });
   localGrenadeActionSequence += 1;
-  const mesh = createGrenadePresentation();
+  const mesh = createGrenadePresentation(player.selectedGrenade === 'semtex' ? 'semtex' : 'frag');
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
@@ -9157,7 +9164,7 @@ function throwGrenade(): void {
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
-  const mesh = createGrenadePresentation();
+  const mesh = createGrenadePresentation(message.grenade === 'semtex' ? 'semtex' : 'frag');
   mesh.position.fromArray(message.origin);
   mesh.castShadow = true;
   scene.add(mesh);
@@ -9626,9 +9633,14 @@ function showHitmarker(headshot = false): void {
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
-function showDamageNumber(damage: number, zone: HitZone, healthBefore?: number): void {
+function showDamageNumber(
+  damage: number,
+  zone: HitZone,
+  healthBefore?: number,
+  worldAnchor?: SupportDamageScreenAnchor & Readonly<{ targetId: string }>,
+): void {
   const presentation = damageNumberPresentation(damage, zone, healthBefore);
-  if (!presentation) return;
+  if (!presentation || worldAnchor && !worldAnchor.visible) return;
   const root = element<HTMLElement>('#damage-numbers');
   root.dataset.lastDamage = String(presentation.amount);
   root.dataset.lastOverkill = String(presentation.overkill);
@@ -9638,7 +9650,16 @@ function showDamageNumber(damage: number, zone: HitZone, healthBefore?: number):
   row.textContent = presentation.label;
   row.dataset.damage = String(presentation.amount);
   row.classList.toggle('critical', presentation.critical);
-  row.style.setProperty('--damage-lane', String((root.childElementCount % 7) - 3));
+  if (worldAnchor) {
+    row.classList.add('support-hit', 'world-anchored');
+    row.dataset.targetId = worldAnchor.targetId;
+    row.dataset.anchorSource = 'authoritative-target-position';
+    row.textContent = `× ${presentation.label}`;
+    row.style.setProperty('--damage-screen-x', `${worldAnchor.xPx.toFixed(2)}px`);
+    row.style.setProperty('--damage-screen-y', `${worldAnchor.yPx.toFixed(2)}px`);
+  } else {
+    row.style.setProperty('--damage-lane', String((root.childElementCount % 7) - 3));
+  }
   root.append(row);
   while (root.childElementCount > 8) root.firstElementChild?.remove();
   window.setTimeout(() => row.remove(), presentation.durationMs);
@@ -9699,6 +9720,27 @@ function localKillstreakActorSnapshot(): KillstreakRecipientSnapshot['actors'][n
   return killstreakSnapshot.actors.find((actor) => actor.actorId === player.id) ?? null;
 }
 
+function preferredOwnedSupportEntity(): KillstreakRecipientSnapshot['entities'][number] | undefined {
+  const possession = localKillstreakActorSnapshot()?.possession;
+  const owned = killstreakSnapshot.entities.filter((entity) => (
+    (entity.kind === 'chopper' || entity.kind === 'drone')
+    && entity.ownerId === player.id
+    && entity.expiresInMs > 0
+  ));
+  if (possession) return owned.find((entity) => entity.id === possession.entityId);
+  return owned
+    .filter((entity) => entity.kind === 'chopper' || entity.mode === 'piloted')
+    .sort((left, right) => Math.hypot(
+      left.position[0] - player.position.x,
+      left.position[1] - player.position.y,
+      left.position[2] - player.position.z,
+    ) - Math.hypot(
+      right.position[0] - player.position.x,
+      right.position[1] - player.position.y,
+      right.position[2] - player.position.z,
+    ))[0] ?? owned[0];
+}
+
 function updateSupportStatusHud(): void {
   const actor = localKillstreakActorSnapshot();
   const adrenalineRemainingMs = Math.max(0, actor?.adrenalineRemainingMs ?? 0);
@@ -9711,86 +9753,141 @@ function updateSupportStatusHud(): void {
     adrenalineHudWasActive = adrenalineActive;
   }
 
-  const ownedChopper = killstreakSnapshot.entities.find((entity) => (
-    entity.kind === 'chopper' && entity.ownerId === player.id && entity.expiresInMs > 0
-  ));
+  const possession = actor?.possession;
+  const ownedSupport = preferredOwnedSupportEntity();
   const feedback = element<HTMLElement>('#support-combat-feedback');
-  feedback.hidden = !ownedChopper;
-  if (!ownedChopper) {
-    supportDamageActivationId = null;
-    chopperDamageDealt = 0;
-  } else if (supportDamageActivationId !== ownedChopper.activationId) {
-    supportDamageActivationId = ownedChopper.activationId;
-    chopperDamageDealt = 0;
+  feedback.hidden = !ownedSupport;
+  feedback.dataset.supportKind = ownedSupport?.kind ?? 'none';
+  feedback.dataset.possessed = String(Boolean(possession && ownedSupport?.id === possession.entityId));
+  const liveSupportActivations = new Set(killstreakSnapshot.entities
+    .filter((entity) => (entity.kind === 'chopper' || entity.kind === 'drone') && entity.ownerId === player.id && entity.expiresInMs > 0)
+    .map((entity) => entity.activationId));
+  for (const activationId of supportDamageDealtByActivation.keys()) {
+    if (!liveSupportActivations.has(activationId)) supportDamageDealtByActivation.delete(activationId);
   }
-  element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(chopperDamageDealt));
+  if (ownedSupport) {
+    const platformName = ownedSupport.kind === 'chopper'
+      ? 'CHOPPER GUNNER'
+      : ownedSupport.mode === 'swarm' ? 'HUNTER DRONE SWARM' : 'PILOTED HUNTER DRONE';
+    element<HTMLElement>('#support-platform-name').textContent = platformName;
+    element<HTMLElement>('#support-platform-mode').textContent = possession ? 'PLAYER GUN · AI FLIGHT' : 'AUTONOMOUS · AI FLIGHT';
+    element<HTMLElement>('#support-platform-health').textContent = String(Math.max(0, Math.round(ownedSupport.health)));
+    element<HTMLElement>('#support-platform-ammo').textContent = ownedSupport.magazine === null ? 'BELT' : String(ownedSupport.magazine);
+    element<HTMLElement>('#support-platform-time').textContent = (ownedSupport.expiresInMs / 1_000).toFixed(1);
+    element<HTMLElement>('#support-control-action').textContent = possession
+      ? 'F EXIT · AI FLIGHT CONTINUES'
+      : ownedSupport.mode === 'swarm' ? 'AUTONOMOUS TARGETING' : 'F ENTER · AI FLIGHT CONTINUES';
+  }
+  element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
+    ownedSupport ? supportDamageDealtByActivation.get(ownedSupport.activationId) ?? 0 : 0,
+  ));
 }
 
-function updateCarePackagePrompt(): void {
-  const prompt = element<HTMLElement>('#support-interaction-prompt');
-  const promptLabel = prompt.querySelector<HTMLElement>('span');
-  const possession = localKillstreakActorSnapshot()?.possession;
-  if (!player.alive) {
-    prompt.hidden = true;
-    return;
+function selectedFInteraction(now = performance.now()): InteractionCandidate | null {
+  if (!player.alive || matchState.phase !== 'active') return null;
+  const candidates: InteractionCandidate[] = [];
+  const actor = localKillstreakActorSnapshot();
+  if (actor?.possession) {
+    candidates.push({
+      kind: 'support-exit',
+      targetId: actor.possession.entityId,
+      proximityM: 0,
+      prompt: actor.possession.kind === 'chopper-gunner' ? 'EXIT CHOPPER GUNNER' : 'EXIT DRONE - AUTONOMOUS CONTROL',
+    });
+  } else {
+    for (const entity of killstreakSnapshot.entities) {
+      if (entity.ownerId !== player.id || entity.expiresInMs <= 0) continue;
+      const proximity = Math.hypot(
+        entity.position[0] - player.position.x,
+        entity.position[1] - player.position.y,
+        entity.position[2] - player.position.z,
+      );
+      if (entity.kind === 'drone' && entity.mode === 'piloted') {
+        candidates.push({ kind: 'support-enter-drone', targetId: entity.id, proximityM: proximity, prompt: 'ENTER DRONE - FIRST PERSON' });
+      } else if (entity.kind === 'chopper') {
+        candidates.push({ kind: 'support-enter-chopper', targetId: entity.id, proximityM: proximity, prompt: 'ENTER CHOPPER GUNNER - FIRST PERSON' });
+      }
+    }
   }
-  if (possession?.kind === 'piloted-drone') {
-    if (promptLabel) promptLabel.textContent = 'AUTONOMOUS DRONE CONTROL';
-    prompt.hidden = false;
-    return;
+
+  const playerEye = { x: player.position.x, y: player.position.y + 1.1, z: player.position.z };
+  for (const crate of killstreakSnapshot.entities) {
+    if (crate.kind !== 'care-crate' || (crate.phase !== 'landed' && crate.phase !== 'capturing')) continue;
+    const proximity = Math.hypot(crate.position[0] - player.position.x, crate.position[2] - player.position.z);
+    const lineOfSight = proximity <= 2.75 && !activeWorldColliders().some((box) => segmentIntersectsBox(
+      playerEye,
+      { x: crate.position[0], y: crate.position[1] + 0.45, z: crate.position[2] },
+      box,
+    ));
+    candidates.push({ kind: 'care-package', targetId: crate.id, proximityM: proximity, prompt: 'COLLECT KILLSTREAK', enabled: lineOfSight });
   }
-  const standaloneDrone = killstreakSnapshot.entities.find((entity) => (
-    entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === player.id
-  ));
-  if (standaloneDrone) {
-    if (promptLabel) promptLabel.textContent = 'ENTER DRONE · FIRST PERSON';
-    prompt.hidden = false;
-    return;
+
+  const door = interactiveWorldRuntime?.nearestDoor(player.position);
+  if (door) candidates.push({ kind: 'shed-door', targetId: door.placementId, proximityM: door.distance, prompt: 'OPEN / CLOSE DOOR', enabled: door.distance <= 2.35 });
+
+  const railgun = railgunPickupNearby();
+  const station = nearbyGunRangeWeaponStation();
+  const drop = !railgun && !station
+    ? nearestDeathDrop(
+      deathDrops.map((entity) => entity.drop).filter((entry) => deathDropWeaponAvailable(entry, now)),
+      player.position,
+      DEATH_DROP_INTERACTION_RANGE,
+      now,
+      'weapon',
+    )
+    : null;
+  if (railgun) candidates.push({ kind: 'weapon-pickup', targetId: 'railgun', proximityM: 0, prompt: `PICK UP ${WEAPONS.railgun.name.toUpperCase()}` });
+  else if (station) candidates.push({ kind: 'weapon-pickup', targetId: `station:${station.weapon}`, proximityM: 0, prompt: `${rangePrimaryUnlocked && station.weapon === player.primaryWeapon ? 'REFILL' : 'EQUIP'} ${WEAPONS[station.weapon].name.toUpperCase()}` });
+  else if (drop) candidates.push({ kind: 'weapon-pickup', targetId: drop.id, proximityM: Math.hypot(drop.position.x - player.position.x, drop.position.y - player.position.y, drop.position.z - player.position.z), prompt: `${drop.weapon === player.primaryWeapon ? 'REPLENISH' : 'PICK UP'} ${WEAPONS[drop.weapon].name.toUpperCase()}` });
+  return primaryInteraction(candidates);
+}
+
+function updateFInteractionPrompt(now = performance.now()): void {
+  const selected = selectedFInteraction(now);
+  const supportPrompt = element<HTMLElement>('#support-interaction-prompt');
+  const pickupPrompt = element<HTMLElement>('#pickup-prompt');
+  const weaponPrompt = selected?.kind === 'weapon-pickup';
+  supportPrompt.hidden = !selected || weaponPrompt;
+  pickupPrompt.hidden = !selected || !weaponPrompt;
+  delete supportPrompt.dataset.interactionKind;
+  delete supportPrompt.dataset.targetId;
+  delete pickupPrompt.dataset.interactionKind;
+  delete pickupPrompt.dataset.targetId;
+  if (!selected) return;
+  const prompt = weaponPrompt ? pickupPrompt : supportPrompt;
+  prompt.dataset.interactionKind = selected.kind;
+  prompt.dataset.targetId = selected.targetId;
+  if (!weaponPrompt) {
+    const label = supportPrompt.querySelector<HTMLElement>('span');
+    if (label) label.textContent = selected.prompt;
   }
-  if (possession) {
-    prompt.hidden = true;
-    return;
-  }
-  const crate = killstreakSnapshot.entities
-    .filter((entity) => entity.kind === 'care-crate' && (entity.phase === 'landed' || entity.phase === 'capturing'))
-    .sort((left, right) => Math.hypot(left.position[0] - player.position.x, left.position[2] - player.position.z)
-      - Math.hypot(right.position[0] - player.position.x, right.position[2] - player.position.z))[0];
-  if (!crate) {
-    prompt.hidden = true;
-    return;
-  }
-  if (promptLabel) promptLabel.textContent = 'COLLECT KILLSTREAK';
-  const playerEye: [number, number, number] = [player.position.x, player.position.y + 1.1, player.position.z];
-  const distance = Math.hypot(crate.position[0] - player.position.x, crate.position[2] - player.position.z);
-  const lineOfSight = !activeWorldColliders().some((box) => segmentIntersectsBox(
-    { x: playerEye[0], y: playerEye[1], z: playerEye[2] },
-    { x: crate.position[0], y: crate.position[1] + 0.45, z: crate.position[2] },
-    box,
-  ));
-  prompt.hidden = distance > 2.75 || !lineOfSight;
 }
 
 function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
   if (event.ownerId !== player.id || event.damage <= 0) return;
-  const targetPosition = event.targetId === player.id
-    ? player.position.clone().add(new THREE.Vector3(0, 1, 0))
-    : bots.get(event.targetId)?.position.clone().add(new THREE.Vector3(0, 1, 0))
-      ?? remotes.get(event.targetId)?.target.clone().add(new THREE.Vector3(0, 1, 0));
+  const targetPosition = new THREE.Vector3(...event.targetPosition);
   if (targetPosition && (event.source === 'chopper' || event.source === 'piloted-drone' || event.source === 'drone-swarm')) {
     const drone = event.source === 'piloted-drone' || event.source === 'drone-swarm';
     spawnTracer(new THREE.Vector3(...event.origin), targetPosition, drone ? 0x52e8ff : 0xffc65c);
     audio.supportGun(drone ? 'drone' : 'chopper');
   }
+  const anchor = projectSupportDamageAnchor(targetPosition, camera, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   showHitmarker(false);
-  showDamageNumber(event.damage, 'body');
+  showDamageNumber(event.damage, 'body', undefined, { ...anchor, targetId: event.targetId });
   audio.hit(false);
-  if (event.source !== 'chopper') return;
-  if (supportDamageActivationId !== event.activationId) {
-    supportDamageActivationId = event.activationId;
-    chopperDamageDealt = 0;
+  supportDamageDealtByActivation.set(
+    event.activationId,
+    (supportDamageDealtByActivation.get(event.activationId) ?? 0) + event.damage,
+  );
+  const displayedSupport = preferredOwnedSupportEntity();
+  if (displayedSupport?.activationId === event.activationId) {
+    element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(
+      supportDamageDealtByActivation.get(event.activationId) ?? 0,
+    ));
   }
-  chopperDamageDealt += event.damage;
-  element<HTMLElement>('#chopper-damage-dealt').textContent = String(Math.round(chopperDamageDealt));
 }
 
 function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
@@ -10018,32 +10115,26 @@ function requestKillstreakControl(
   return true;
 }
 
-function interactWithKillstreakSupport(now = performance.now()): boolean {
-  const actor = localKillstreakActorSnapshot();
-  if (actor?.possession?.kind === 'piloted-drone') {
-    requestKillstreakControl(actor.possession.entityId, 'toggle-piloted-drone', {}, now);
-    addFeed('PILOTED DRONE · AUTONOMOUS CONTROL', 'gold');
-    return true;
+function interactWithSelectedKillstreakSupport(interaction: InteractionCandidate, now = performance.now()): boolean {
+  if (interaction.kind === 'support-exit') {
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (!possession || possession.entityId !== interaction.targetId) return false;
+    const action = possession.kind === 'chopper-gunner' ? 'toggle-chopper-gunner' : 'toggle-piloted-drone';
+    const accepted = requestKillstreakControl(possession.entityId, action, {}, now);
+    if (accepted) addFeed(possession.kind === 'chopper-gunner' ? 'CHOPPER GUNNER - AI CONTROL' : 'PILOTED DRONE - AUTONOMOUS CONTROL', 'gold');
+    return accepted;
   }
-  const standaloneDrone = killstreakSnapshot.entities.find((entity) => (
-    entity.kind === 'drone' && entity.mode === 'piloted' && entity.ownerId === player.id
-  ));
-  if (standaloneDrone) {
-    requestKillstreakControl(standaloneDrone.id, 'toggle-piloted-drone', {}, now);
-    addFeed('PILOTED DRONE · FIRST-PERSON CONTROL', 'gold');
-    return true;
+  if (interaction.kind === 'support-enter-drone' || interaction.kind === 'support-enter-chopper') {
+    const entity = killstreakSnapshot.entities.find((entry) => entry.id === interaction.targetId && entry.ownerId === player.id && entry.expiresInMs > 0);
+    if (!entity) return false;
+    const action = interaction.kind === 'support-enter-drone' ? 'toggle-piloted-drone' : 'toggle-chopper-gunner';
+    const accepted = requestKillstreakControl(entity.id, action, {}, now);
+    if (accepted) addFeed(interaction.kind === 'support-enter-drone' ? 'PILOTED DRONE - FIRST-PERSON CONTROL' : 'CHOPPER GUNNER - FIRST-PERSON CONTROL', 'gold');
+    return accepted;
   }
-  const chopper = killstreakSnapshot.entities.find((entity) => entity.kind === 'chopper' && entity.ownerId === player.id);
-  if (chopper) {
-    requestKillstreakControl(chopper.id, 'toggle-chopper-gunner', {}, now);
-    addFeed(chopper.gunController === 'ai' ? 'CHOPPER GUNNER · PLAYER CONTROL' : 'CHOPPER GUNNER · AI CONTROL', 'gold');
-    return true;
-  }
-  const crate = killstreakSnapshot.entities
-    .filter((entity) => entity.kind === 'care-crate' && (entity.phase === 'landed' || entity.phase === 'capturing'))
-    .sort((left, right) => Math.hypot(left.position[0] - player.position.x, left.position[2] - player.position.z)
-      - Math.hypot(right.position[0] - player.position.x, right.position[2] - player.position.z))[0];
-  if (!crate || Math.hypot(crate.position[0] - player.position.x, crate.position[2] - player.position.z) > 2.75) return false;
+  if (interaction.kind !== 'care-package') return false;
+  const crate = killstreakSnapshot.entities.find((entity) => entity.id === interaction.targetId && entity.kind === 'care-crate');
+  if (!crate || (crate.phase !== 'landed' && crate.phase !== 'capturing')) return false;
   if (network.role === 'client') {
     network.send({
       type: 'killstreak-care-capture-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
@@ -10052,8 +10143,20 @@ function interactWithKillstreakSupport(now = performance.now()): boolean {
     });
   } else killstreakRuntime.beginCareCapture(player.id, localContinuity, crate.id, now, killstreakWorldState());
   localCareCaptureCrateId = crate.id;
-  addFeed('CARE PACKAGE · SECURING', 'gold');
+  addFeed('CARE PACKAGE - SECURING', 'gold');
   return true;
+}
+
+function executePrimaryFInteraction(now = performance.now()): boolean {
+  const interaction = selectedFInteraction(now);
+  if (!interaction) return false;
+  if (interaction.kind === 'support-exit'
+    || interaction.kind === 'support-enter-drone'
+    || interaction.kind === 'support-enter-chopper'
+    || interaction.kind === 'care-package') return interactWithSelectedKillstreakSupport(interaction, now);
+  if (interaction.kind === 'shed-door') return interactWithShedDoor();
+  if (interaction.kind === 'weapon-pickup') return interactWithWeaponPickup(now);
+  return false;
 }
 
 function releaseCareCapture(now = performance.now()): void {
@@ -10120,15 +10223,30 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
 let lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
-  if (!possession) return;
+  if (!possession) {
+    killstreakPresentation.setFirstPersonEntity(null);
+    if (camera.near !== 0.08) {
+      camera.near = 0.08;
+      camera.updateProjectionMatrix();
+    }
+    return;
+  }
   const entity = killstreakSnapshot.entities.find((entry) => entry.id === possession.entityId);
-  if (!entity) return;
-  const root = killstreakPresentation.entityRoot(entity.id);
-  const position = root?.position ?? new THREE.Vector3(...entity.position);
-  camera.position.lerp(position.clone().add(new THREE.Vector3(0, possession.kind === 'chopper-gunner' ? -0.35 : 0.12, 0)), 0.5);
+  if (!entity) {
+    killstreakPresentation.setFirstPersonEntity(null);
+    return;
+  }
+  killstreakPresentation.setFirstPersonEntity(entity.id);
+  const position = killstreakPresentation.firstPersonCameraAnchor(entity.id) ?? new THREE.Vector3(...entity.position);
+  camera.position.copy(position);
+  if (camera.near !== 0.025) {
+    camera.near = 0.025;
+    camera.updateProjectionMatrix();
+  }
   camera.rotation.order = 'YXZ';
   camera.rotation.y = player.yaw;
   camera.rotation.x = player.pitch;
+  killstreakPresentation.alignFirstPersonCockpit(entity.id, camera.quaternion);
   weaponView.root.visible = false;
   if (now - lastKillstreakControlSentAt < 50) return;
   const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
@@ -10145,10 +10263,12 @@ function updateKillstreakPossession(now: number): void {
 
 function updatePass65KillstreakRuntime(now: number): void {
   if (!gameStarted) {
+    audio.syncChopperRotors([]);
     killstreakPresentation.clear();
     return;
   }
   if (matchState.phase === 'ended') {
+    audio.syncChopperRotors([]);
     killstreakPresentation.clear();
     return;
   }
@@ -10171,8 +10291,14 @@ function updatePass65KillstreakRuntime(now: number): void {
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
+  audio.syncChopperRotors(killstreakSnapshot.entities
+    .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0)
+    .map((entity) => ({
+      id: entity.id,
+      position: { x: entity.position[0], y: entity.position[1], z: entity.position[2] },
+      phase: entity.phase === 'inbound' || entity.phase === 'outbound' ? entity.phase : 'orbiting',
+    })));
   updateSupportStatusHud();
-  updateCarePackagePrompt();
   const possession = localKillstreakActorSnapshot()?.possession;
   document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
   weaponView.root.visible = !possession && player.alive;
@@ -12584,9 +12710,7 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
-  if (event.code === 'KeyF' && !event.repeat
-    && !interactWithKillstreakSupport()
-    && !interactWithShedDoor()) interactWithWeaponPickup();
+  if (event.code === 'KeyF' && !event.repeat) executePrimaryFInteraction();
   if (event.code === 'Tab') {
     event.preventDefault();
     updateRoster();
@@ -13463,6 +13587,7 @@ function frame(now: number, scheduleNext = true): void {
     updateRailgun(now);
     updateDmrThermal();
     updateDeathDrops(now);
+    updateFInteractionPrompt(now);
     updateCorpsePresentations(now);
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);

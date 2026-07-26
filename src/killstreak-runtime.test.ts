@@ -152,6 +152,23 @@ describe('host killstreak runtime', () => {
     expect(new Set(first.impactEvents.map((impact) => impact.ordinal)).size).toBe(CARPET_BOMBER_IMPACT_COUNT);
   });
 
+  it('replicates admitted placement X markers to both peers but keeps the carpet corridor owner-private', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    runtime.registerActor('observer', 1, 2, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 7);
+    runtime.activate({ ...intent('carpet-bomber', 3), anchor: [6, 0, -4] }, 1_000, DEFAULT_WORLD);
+    const owner = runtime.snapshotFor('owner', 1_001);
+    const observer = runtime.snapshotFor('observer', 1_001);
+    expect(owner.placementMarkers.map((marker) => marker.shape).sort()).toEqual(['corridor', 'ground-x']);
+    expect(observer.placementMarkers.map((marker) => marker.shape)).toEqual(['ground-x']);
+    expect(observer.placementMarkers[0]).toMatchObject({ anchor: [6, 0, -4], audience: 'all-combatants' });
+    expect(owner.placementMarkers.find((marker) => marker.shape === 'corridor')).toMatchObject({ audience: 'owner-only' });
+    runtime.advance(2_001, DEFAULT_WORLD);
+    expect(runtime.snapshotFor('owner', 2_001).placementMarkers).toEqual([]);
+    expect(runtime.snapshotFor('observer', 2_001).placementMarkers).toEqual([]);
+  });
+
   it('creates exactly 12 targetable 50-HP swarm drones with bounded host damage and 60-second expiry', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm']));
@@ -165,7 +182,8 @@ describe('host killstreak runtime', () => {
     expect(attacks.length).toBeGreaterThan(0);
     expect(attacks.length).toBeLessThanOrEqual(DRONE_SWARM_COUNT);
     expect(attacks.every((event) => event.targetId === 'enemy' || event.targetId === 'enemy-bot')).toBe(true);
-    expect(attacks.every((event) => event.damage === 1 && event.targetLifeId > 0)).toBe(true);
+    expect(attacks).toHaveLength(1);
+    expect(attacks.every((event) => event.damage > 1 && event.targetLifeId > 0)).toBe(true);
     expect(runtime.advance(1_000 + DRONE_SWARM_DURATION_MS, DEFAULT_WORLD).expiredEntityIds).toHaveLength(DRONE_SWARM_COUNT);
   });
 
@@ -230,6 +248,8 @@ describe('host killstreak runtime', () => {
     const publicBefore = runtime.snapshotFor(null, 1_000);
     expect(JSON.stringify(publicBefore)).not.toMatch(/rollUnit|seed/i);
     expect(publicBefore.entities[0].revealedReward).toBeNull();
+    expect(publicBefore.placementMarkers).toHaveLength(1);
+    expect(publicBefore.placementMarkers[0]).toMatchObject({ source: 'care-package', shape: 'ground-x', audience: 'all-combatants' });
     runtime.advance(7_100, DEFAULT_WORLD);
     expect(runtime.beginCareCapture('owner', 99, entityId, 7_100, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'identity-mismatch' });
     expect(runtime.beginCareCapture('owner', 1, entityId, 7_100, DEFAULT_WORLD).accepted).toBe(true);

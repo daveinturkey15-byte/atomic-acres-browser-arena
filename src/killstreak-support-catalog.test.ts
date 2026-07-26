@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CHOPPER_GUN_PROFILE,
   DRONE_GUN_PROFILE,
   DRONE_GUN_PROFILE_ID,
+  DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
   DRONE_PRESENTATION_FAMILY_ID,
   droneGunProfileFor,
   standaloneDroneController,
+  supportGunDamageAtDistance,
 } from './killstreak-support-catalog';
 
 describe('Pass 65 support catalog', () => {
@@ -17,15 +20,35 @@ describe('Pass 65 support catalog', () => {
     expect(droneGunProfileFor('swarm')).toBe(DRONE_GUN_PROFILE);
     expect(Object.isFrozen(DRONE_GUN_PROFILE)).toBe(true);
     expect(DRONE_GUN_PROFILE).toMatchObject({
+      damage: 12,
+      minimumDamage: 8,
+      falloffStartM: 18,
       magazineSize: 20,
-      rpm: 100,
+      rpm: 200,
       reloadMs: 1_400,
-      falloff: 'none',
+      falloff: 'linear',
       penetration: 'solid-occluded',
+      criticalHits: false,
     });
     expect(60_000 / DRONE_GUN_PROFILE.cadenceMs).toBe(DRONE_GUN_PROFILE.rpm);
-    const fullSwarmOpenExposureSeconds = 100 / (12 * DRONE_GUN_PROFILE.damage * (1_000 / DRONE_GUN_PROFILE.cadenceMs));
-    expect(fullSwarmOpenExposureSeconds).toBeCloseTo(5, 5);
+    expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 0)).toBe(12);
+    expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 45)).toBe(8);
+    expect(supportGunDamageAtDistance(DRONE_GUN_PROFILE, 46)).toBe(0);
+    const representativeDamage = supportGunDamageAtDistance(DRONE_GUN_PROFILE, 31.5);
+    const coordinatedSwarmOpenExposureSeconds = 100 / (representativeDamage * (1_000 / DRONE_SWARM_FIRE_LANE_INTERVAL_MS));
+    expect(coordinatedSwarmOpenExposureSeconds).toBeGreaterThan(4);
+    expect(coordinatedSwarmOpenExposureSeconds).toBeLessThan(6);
+  });
+
+  it('gives chopper fire a distinct non-critical authored profile', () => {
+    expect(CHOPPER_GUN_PROFILE).toMatchObject({
+      damage: 10,
+      minimumDamage: 7,
+      criticalHits: false,
+      penetration: 'solid-occluded',
+    });
+    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 0)).toBe(10);
+    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, CHOPPER_GUN_PROFILE.maximumRangeM)).toBe(7);
   });
 
   it('isolates the piloted sensor from gun and ballistic authority', () => {

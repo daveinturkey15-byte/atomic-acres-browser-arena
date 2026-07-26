@@ -6,10 +6,13 @@ import {
 } from './killstreak-catalog';
 import { parseKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 import {
+  CHOPPER_GUN_PROFILE,
   DRONE_GUN_PROFILE,
   DRONE_GUN_PROFILE_ID,
+  DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
+  supportGunDamageAtDistance,
   type DroneGunProfile,
 } from './killstreak-support-catalog';
 import { supportForwardFromYawPitch, supportYawForDirection } from './support-forward-axis';
@@ -71,6 +74,8 @@ export type KillstreakDamageEvent = Readonly<{
   ownerId: string;
   targetId: string;
   targetLifeId: number;
+  /** Host-admitted impact-time anchor used only for world-space feedback. */
+  targetPosition: SupportVec3;
   damage: number;
   origin: SupportVec3;
   atMs: number;
@@ -152,6 +157,8 @@ type DroneEntity = EntityBase & {
   gunProfileId: typeof DRONE_GUN_PROFILE_ID;
   nextSensorRefreshAtMs: number;
   sensorContacts: DroneSensorContact[];
+  /** Stable host-authored formation slot; null for the standalone drone. */
+  swarmOrdinal: number | null;
 };
 
 type CareCrateEntity = EntityBase & {
@@ -176,8 +183,25 @@ type CarpetBomberActivation = {
   createdAtMs: number;
   expiresAtMs: number;
   impacts: readonly SupportVec3[];
+  anchor: SupportVec3;
+  pathStart: SupportVec3;
+  pathEnd: SupportVec3;
   nextImpactOrdinal: number;
 };
+
+export type KillstreakPlacementMarkerSnapshot = Readonly<{
+  id: string;
+  activationId: string;
+  source: 'care-package' | 'carpet-bomber';
+  shape: 'ground-x' | 'corridor';
+  ownerId: string;
+  team: 0 | 1;
+  audience: 'all-combatants' | 'owner-only';
+  anchor: SupportVec3;
+  pathStart: SupportVec3 | null;
+  pathEnd: SupportVec3 | null;
+  expiresInMs: number;
+}>;
 
 type TimedActivation = {
   activationId: string;
@@ -266,6 +290,7 @@ export type KillstreakRecipientSnapshot = Readonly<{
   actors: readonly KillstreakActorSnapshot[];
   entities: readonly KillstreakEntitySnapshot[];
   sensorContacts: readonly DroneSensorContact[];
+  placementMarkers: readonly KillstreakPlacementMarkerSnapshot[];
 }>;
 
 export const CHOPPER_MOTION_VARIANCE = Object.freeze({
@@ -453,6 +478,7 @@ export class HostKillstreakRuntime {
   private readonly entities = new Map<string, HostSupportEntity>();
   private readonly carpetBombers = new Map<string, CarpetBomberActivation>();
   private readonly timedActivations = new Map<string, TimedActivation>();
+  private readonly swarmFireLanes = new Map<string, { nextAtMs: number; cursor: number }>();
   private revision = 0;
   private entityCounter = 0;
   private activationCounter = 0;
@@ -558,7 +584,7 @@ export class HostKillstreakRuntime {
     if (this.seenActivationRequestIds.has(intent.activationId)) return reject('duplicate-activation-id');
     const entityNeed = actualId === 'drone-swarm' ? DRONE_SWARM_COUNT
       : actualId === 'care-package' ? 2
-      : actualId === 'chopper' || actualId === 'piloted-drone' ? 1 : 0;
+      : actualId === 'chopper' || actualId === 'piloted-drone' || actualId === 'carpet-bomber' ? 1 : 0;
     if (this.entities.size + entityNeed > MAX_ACTIVE_SUPPORT_ENTITIES) return reject('support-entity-cap');
     if ([...this.entities.values()].some((entity) => entity.ownerId === actor.actorId
       && (actualId === 'chopper' && entity.kind === 'chopper'
@@ -619,10 +645,23 @@ export class HostKillstreakRuntime {
       entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
       const impacts = this.carpetImpactPattern(anchor, seed, world);
+      const groundAnchor: SupportVec3 = Object.freeze([anchor[0], world.bounds.floorY, anchor[2]] as const);
+      const aircraftId = this.nextEntityId('carpet-aircraft');
+      const top = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
+      const pathStart: SupportVec3 = Object.freeze([impacts[0][0], top, impacts[0][2]] as const);
+      const pathEnd: SupportVec3 = Object.freeze([impacts[impacts.length - 1][0], top, impacts[impacts.length - 1][2]] as const);
       this.carpetBombers.set(activationId, {
         activationId, ownerId: actor.actorId, team: actor.team,
-        createdAtMs: nowMs, expiresAtMs: nowMs + 12_000, impacts, nextImpactOrdinal: 0,
+        createdAtMs: nowMs, expiresAtMs: nowMs + 12_000, impacts,
+        anchor: groundAnchor, pathStart, pathEnd, nextImpactOrdinal: 0,
       });
+      this.entities.set(aircraftId, {
+        id: aircraftId, activationId, ownerId: actor.actorId, team: actor.team,
+        createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
+        position: [...pathStart], velocity: [0, 0, 0], attitude: [0, supportYawForDirection(pathEnd[0] - pathStart[0], pathEnd[2] - pathStart[2]), 0],
+        health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart: [...pathStart], routeEnd: [...pathEnd],
+      });
+      entityIds.push(aircraftId);
     } else if (actualId === 'chopper') {
       const id = this.nextEntityId('chopper');
       const centre: [number, number, number] = [
@@ -658,6 +697,7 @@ export class HostKillstreakRuntime {
         gunProfileId: DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId,
         nextSensorRefreshAtMs: nowMs,
         sensorContacts: [],
+        swarmOrdinal: null,
       });
       entityIds.push(id);
     } else if (actualId === 'drone-swarm') {
@@ -681,9 +721,11 @@ export class HostKillstreakRuntime {
           gunProfileId: DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId,
           nextSensorRefreshAtMs: Number.POSITIVE_INFINITY,
           sensorContacts: [],
+          swarmOrdinal: index,
         });
         entityIds.push(id);
       }
+      this.swarmFireLanes.set(activationId, { nextAtMs: nowMs + 500, cursor: 0 });
     } else {
       const definition = exactDefinition(actualId, this.catalog);
       this.timedActivations.set(activationId, {
@@ -993,9 +1035,28 @@ export class HostKillstreakRuntime {
     if (!owner) return;
     const target = entity.gunController === 'ai'
       ? this.nearestVisibleTarget(entity.position, owner.actorId, owner.team, world)
-      : this.aimedVisibleTarget(entity.position, entity.aimYaw, entity.aimPitch, owner.actorId, owner.team, world);
-    if (target) damageEvents.push(this.damageEvent(entity.activationId, 'chopper', owner.actorId, target, 8, entity.position, nowMs));
-    entity.nextShotAtMs = nowMs + 300;
+      : this.aimedVisibleTarget(
+        entity.position,
+        entity.aimYaw,
+        entity.aimPitch,
+        owner.actorId,
+        owner.team,
+        world,
+        CHOPPER_GUN_PROFILE.maximumRangeM,
+      );
+    if (target) {
+      const admittedDamage = supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, distance(entity.position, target.position));
+      if (admittedDamage > 0) damageEvents.push(this.damageEvent(
+        entity.activationId,
+        'chopper',
+        owner.actorId,
+        target,
+        admittedDamage,
+        entity.position,
+        nowMs,
+      ));
+    }
+    entity.nextShotAtMs = nowMs + CHOPPER_GUN_PROFILE.cadenceMs;
     entity.pendingPlayerFire = false;
   }
 
@@ -1050,15 +1111,18 @@ export class HostKillstreakRuntime {
             world,
             gunProfile.maximumRangeM,
           );
-          if (target) damageEvents.push(this.damageEvent(
-            entity.activationId,
-            'piloted-drone',
-            owner.actorId,
-            target,
-            gunProfile.damage,
-            entity.position,
-            nowMs,
-          ));
+          if (target) {
+            const admittedDamage = supportGunDamageAtDistance(gunProfile, distance(entity.position, target.position));
+            if (admittedDamage > 0) damageEvents.push(this.damageEvent(
+              entity.activationId,
+              'piloted-drone',
+              owner.actorId,
+              target,
+              admittedDamage,
+              entity.position,
+              nowMs,
+            ));
+          }
           entity.magazine -= 1;
         }
         entity.nextShotAtMs = nowMs + gunProfile.cadenceMs;
@@ -1088,13 +1152,17 @@ export class HostKillstreakRuntime {
           entity.position = next;
           entity.attitude = attitudeFromMotion(previous, next, entity.attitude);
         }
-        if (range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position) && nowMs >= entity.nextShotAtMs && entity.magazine > 0) {
-          damageEvents.push(this.damageEvent(
+        const canHit = range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position);
+        const canFireOwnGun = canHit && nowMs >= entity.nextShotAtMs && entity.magazine > 0;
+        const fireLaneAdmitted = entity.mode !== 'swarm' || this.claimSwarmFireLane(entity, nowMs, canFireOwnGun);
+        if (canFireOwnGun && fireLaneAdmitted) {
+          const admittedDamage = supportGunDamageAtDistance(gunProfile, range);
+          if (admittedDamage > 0) damageEvents.push(this.damageEvent(
             entity.activationId,
             entity.mode === 'piloted' ? 'piloted-drone' : 'drone-swarm',
             owner.actorId,
             target,
-            gunProfile.damage,
+            admittedDamage,
             entity.position,
             nowMs,
           ));
@@ -1113,6 +1181,17 @@ export class HostKillstreakRuntime {
       }
     }
     entity.revision += 1;
+  }
+
+  private claimSwarmFireLane(entity: DroneEntity, nowMs: number, canHit: boolean): boolean {
+    if (entity.mode !== 'swarm' || entity.swarmOrdinal === null) return true;
+    const lane = this.swarmFireLanes.get(entity.activationId);
+    if (!lane || nowMs < lane.nextAtMs || entity.swarmOrdinal !== lane.cursor) return false;
+    lane.cursor = (lane.cursor + 1) % DRONE_SWARM_COUNT;
+    // Rotate quickly past a covered/invalid member, but bound admitted hostile
+    // pressure to one meaningful shot per formation lane when a shot can land.
+    lane.nextAtMs = nowMs + (canHit ? DRONE_SWARM_FIRE_LANE_INTERVAL_MS : 80);
+    return canHit;
   }
 
   private updatePilotedDroneSensor(
@@ -1215,6 +1294,7 @@ export class HostKillstreakRuntime {
       ownerId,
       targetId: target.id,
       targetLifeId: target.lifeId,
+      targetPosition: Object.freeze([...target.position]) as unknown as SupportVec3,
       damage,
       origin: Object.freeze([...origin]) as unknown as SupportVec3,
       atMs: nowMs,
@@ -1225,6 +1305,11 @@ export class HostKillstreakRuntime {
     const entity = this.entities.get(entityId);
     if (!entity) return;
     this.entities.delete(entityId);
+    if (entity.kind === 'drone' && entity.mode === 'swarm'
+      && ![...this.entities.values()].some((candidate) => candidate.kind === 'drone'
+        && candidate.mode === 'swarm' && candidate.activationId === entity.activationId)) {
+      this.swarmFireLanes.delete(entity.activationId);
+    }
     const actor = this.actors.get(entity.ownerId);
     if (actor?.possession?.entityId === entityId) this.restoreActorControl(actor, false);
     if (entity.kind === 'chopper' && entity.gunController !== 'ai') entity.gunController = 'ai';
@@ -1283,6 +1368,35 @@ export class HostKillstreakRuntime {
         position: Object.freeze([...contact.position]) as unknown as SupportVec3,
       }))
       : [];
+    const placementMarkers: KillstreakPlacementMarkerSnapshot[] = [];
+    for (const entity of this.entities.values()) {
+      if (entity.kind !== 'care-crate' || (entity.phase !== 'inbound' && entity.phase !== 'descending')) continue;
+      placementMarkers.push(Object.freeze({
+        id: `${entity.activationId}:care-target`, activationId: entity.activationId, source: 'care-package', shape: 'ground-x',
+        ownerId: entity.ownerId, team: entity.team, audience: 'all-combatants',
+        anchor: Object.freeze([...entity.dropPosition]) as unknown as SupportVec3,
+        pathStart: null, pathEnd: null,
+        expiresInMs: Math.max(0, entity.descentStartsAtMs + CARE_CRATE_DESCENT_MS - nowMs),
+      }));
+    }
+    for (const activation of this.carpetBombers.values()) {
+      const prestrikeRemainingMs = Math.max(0, activation.createdAtMs + 1_000 - nowMs);
+      if (prestrikeRemainingMs <= 0) continue;
+      placementMarkers.push(Object.freeze({
+        id: `${activation.activationId}:carpet-target`, activationId: activation.activationId, source: 'carpet-bomber', shape: 'ground-x',
+        ownerId: activation.ownerId, team: activation.team, audience: 'all-combatants',
+        anchor: Object.freeze([...activation.anchor]) as unknown as SupportVec3,
+        pathStart: null, pathEnd: null, expiresInMs: prestrikeRemainingMs,
+      }));
+      if (activation.ownerId === recipientActorId) placementMarkers.push(Object.freeze({
+        id: `${activation.activationId}:carpet-corridor`, activationId: activation.activationId, source: 'carpet-bomber', shape: 'corridor',
+        ownerId: activation.ownerId, team: activation.team, audience: 'owner-only',
+        anchor: Object.freeze([...activation.anchor]) as unknown as SupportVec3,
+        pathStart: Object.freeze([...activation.pathStart]) as unknown as SupportVec3,
+        pathEnd: Object.freeze([...activation.pathEnd]) as unknown as SupportVec3,
+        expiresInMs: prestrikeRemainingMs,
+      }));
+    }
     return Object.freeze({
       schemaVersion: 1,
       matchEpoch: this.matchEpoch,
@@ -1290,6 +1404,7 @@ export class HostKillstreakRuntime {
       actors: Object.freeze(actors),
       entities: Object.freeze(entities),
       sensorContacts: Object.freeze(sensorContacts),
+      placementMarkers: Object.freeze(placementMarkers),
     });
   }
 }

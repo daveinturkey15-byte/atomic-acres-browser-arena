@@ -211,6 +211,15 @@ export function computeDamage(weapon: WeaponSpec, distance: number, zone: HitZon
   return Math.max(1, Math.round(base * multiplier));
 }
 
+/** Minigun impacts retain proxy geometry but never enter the critical-hit semantic/UI path. */
+export function effectiveHitZoneForWeapon(weapon: WeaponSpec, zone: HitZone): HitZone {
+  return weapon.id === 'minigun' && zone === 'head' ? 'body' : zone;
+}
+
+export function weaponCanCritical(weapon: WeaponSpec): boolean {
+  return weapon.id !== 'minigun' && weapon.headMultiplier > 1;
+}
+
 /** BO2-like bounded landing damage: normal jumps are safe; severe drops become lethal. */
 export function computeFallDamage(impactSpeed: number): number {
   const speed = Number.isFinite(impactSpeed) ? Math.max(0, impactSpeed) : 0;

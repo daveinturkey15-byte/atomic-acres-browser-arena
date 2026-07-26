@@ -11,7 +11,11 @@ import {
   type KillstreakActivationIntent,
   type KillstreakWorld,
 } from './killstreak-runtime';
-import { DRONE_GUN_PROFILE, DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
+import {
+  DRONE_GUN_PROFILE,
+  DRONE_GUN_PROFILE_ID,
+  DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
+} from './killstreak-support-catalog';
 
 const bounds = { minX: -40, maxX: 40, minZ: -45, maxZ: 45, floorY: 0, ceilingY: 40 } as const;
 const baseWorld = (overrides: Partial<KillstreakWorld> = {}): KillstreakWorld => ({
@@ -82,10 +86,10 @@ describe('Pass 65 killstreak blockers', () => {
     expect(pilot.advance(1_001 + DRONE_GUN_PROFILE.cadenceMs, baseWorld()).damageEvents).toHaveLength(1);
 
     const firstSwarm = swarm.advance(2_000, baseWorld()).damageEvents;
-    expect(firstSwarm).toHaveLength(DRONE_SWARM_COUNT);
-    expect(firstSwarm.every((event) => event.damage === DRONE_GUN_PROFILE.damage)).toBe(true);
-    expect(swarm.advance(2_000 + DRONE_GUN_PROFILE.cadenceMs - 1, baseWorld()).damageEvents).toHaveLength(0);
-    expect(swarm.advance(2_000 + DRONE_GUN_PROFILE.cadenceMs, baseWorld()).damageEvents).toHaveLength(DRONE_SWARM_COUNT);
+    expect(firstSwarm).toHaveLength(1);
+    expect(firstSwarm[0].damage).toBeGreaterThan(1);
+    expect(swarm.advance(2_000 + DRONE_SWARM_FIRE_LANE_INTERVAL_MS - 1, baseWorld()).damageEvents).toHaveLength(0);
+    expect(swarm.advance(2_000 + DRONE_SWARM_FIRE_LANE_INTERVAL_MS, baseWorld()).damageEvents).toHaveLength(1);
   });
 
   it('enforces piloted 2x20 ammo and swarm unlimited 20-round reload loops inside their hard lifetimes', () => {
@@ -119,18 +123,16 @@ describe('Pass 65 killstreak blockers', () => {
     earn(swarm, 15);
     swarm.activate(activation('drone-swarm', 5), 1_000, baseWorld());
     now = 2_000;
-    for (let reloadLoop = 0; reloadLoop < 2; reloadLoop += 1) {
-      for (let shot = 0; shot < 20; shot += 1) {
-        swarm.advance(now, baseWorld());
-        now += DRONE_GUN_PROFILE.cadenceMs;
-      }
-      expect(swarm.snapshotFor('owner', now).entities.every((entity) => entity.magazine === 0 && entity.reserveClips === null)).toBe(true);
-      now += DRONE_GUN_PROFILE.reloadMs;
-      swarm.advance(now, baseWorld());
-      expect(swarm.snapshotFor('owner', now).entities.every((entity) => entity.magazine === 20 && entity.reserveClips === null)).toBe(true);
-      now += 1;
+    let admittedSwarmShots = 0;
+    while (now < 59_000) {
+      admittedSwarmShots += swarm.advance(now, baseWorld()).damageEvents.length;
+      now += DRONE_SWARM_FIRE_LANE_INTERVAL_MS;
     }
-    expect(now).toBeLessThan(61_000);
+    const swarmSnapshot = swarm.snapshotFor('owner', now).entities;
+    expect(admittedSwarmShots).toBeGreaterThan(DRONE_GUN_PROFILE.magazineSize);
+    expect(swarmSnapshot.every((entity) => entity.reserveClips === null && entity.magazine !== null
+      && entity.magazine >= 0 && entity.magazine <= 20)).toBe(true);
+    expect(swarmSnapshot.reduce((spent, entity) => spent + (20 - (entity.magazine ?? 20)), 0)).toBeGreaterThan(0);
   });
 
   it('reveals only living hostiles through walls to the pilot while bullets remain solid-occluded', () => {

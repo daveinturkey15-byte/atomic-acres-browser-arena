@@ -79,6 +79,9 @@ describe('remote hit admission', () => {
   it('keeps ordinary grenade damage outside its real radius at zero', () => {
     expect(maximumRemoteExplosiveBaseDamage('grenade', 8.1, 'stand')).toBeGreaterThan(0);
     expect(maximumRemoteExplosiveBaseDamage('grenade', 16.1, 'stand')).toBe(0);
+    expect(maximumRemoteExplosiveBaseDamage('grenade', 0, 'stand', 'semtex')).toBe(95);
+    expect(maximumRemoteExplosiveBaseDamage('grenade', 0, 'prone', 'semtex')).toBeCloseTo(39.9, 5);
+    expect(maximumRemoteExplosiveBaseDamage('grenade', 4.26, 'stand', 'semtex')).toBe(0);
     expect(maximumRemoteExplosiveBaseDamage('tri-pass', 12, 'stand')).toBeGreaterThan(0);
   });
 

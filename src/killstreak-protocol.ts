@@ -5,6 +5,7 @@ import type {
   KillstreakActivationIntent,
   KillstreakControlIntent,
   KillstreakDamageEvent,
+  KillstreakPlacementMarkerSnapshot,
   KillstreakRecipientSnapshot,
 } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
@@ -183,15 +184,34 @@ function isSensorContact(value: unknown): value is DroneSensorContact {
     && value.throughWall === true;
 }
 
+function isPlacementMarker(value: unknown): value is KillstreakPlacementMarkerSnapshot {
+  if (!object(value) || !exactKeys(value, [
+    'id', 'activationId', 'source', 'shape', 'ownerId', 'team', 'audience', 'anchor', 'pathStart', 'pathEnd', 'expiresInMs',
+  ]) || typeof value.id !== 'string' || value.id.length > 120 || !activationId(value.activationId)
+    || (value.source !== 'care-package' && value.source !== 'carpet-bomber')
+    || (value.shape !== 'ground-x' && value.shape !== 'corridor')
+    || !actorId(value.ownerId) || (value.team !== 0 && value.team !== 1)
+    || (value.audience !== 'all-combatants' && value.audience !== 'owner-only')
+    || !vec3(value.anchor) || !finite(value.expiresInMs, 0, 60_000)) return false;
+  if (value.shape === 'ground-x') return value.pathStart === null && value.pathEnd === null;
+  return value.source === 'carpet-bomber' && value.audience === 'owner-only' && vec3(value.pathStart) && vec3(value.pathEnd);
+}
+
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {
-  if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities', 'sensorContacts'])
+  if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities', 'sensorContacts', 'placementMarkers'])
     || value.schemaVersion !== 1 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
     || !Array.isArray(value.actors) || value.actors.length > 6 || !value.actors.every(isActorSnapshot)
     || !Array.isArray(value.entities) || value.entities.length > 32 || !value.entities.every(isEntitySnapshot)
-    || !Array.isArray(value.sensorContacts) || value.sensorContacts.length > 16 || !value.sensorContacts.every(isSensorContact)) return false;
+    || !Array.isArray(value.sensorContacts) || value.sensorContacts.length > 16 || !value.sensorContacts.every(isSensorContact)
+    || !Array.isArray(value.placementMarkers) || value.placementMarkers.length > 8 || !value.placementMarkers.every(isPlacementMarker)) return false;
   return new Set(value.actors.map((entry) => (entry as { actorId: string }).actorId)).size === value.actors.length
     && new Set(value.entities.map((entry) => (entry as { id: string }).id)).size === value.entities.length
     && new Set(value.sensorContacts.map((entry) => (entry as DroneSensorContact).id)).size === value.sensorContacts.length;
+}
+
+function placementMarkersMatchRecipient(snapshot: KillstreakRecipientSnapshot, recipientId: string | null): boolean {
+  return snapshot.placementMarkers.every((marker) => marker.audience === 'all-combatants'
+    || marker.audience === 'owner-only' && recipientId === marker.ownerId);
 }
 
 function sensorCapabilityMatchesRecipient(snapshot: KillstreakRecipientSnapshot, recipientId: string | null): boolean {
@@ -205,12 +225,13 @@ function sensorCapabilityMatchesRecipient(snapshot: KillstreakRecipientSnapshot,
 
 function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
   return object(value)
-    && exactKeys(value, ['resultId', 'activationId', 'source', 'ownerId', 'targetId', 'targetLifeId', 'damage', 'origin', 'atMs'])
+    && exactKeys(value, ['resultId', 'activationId', 'source', 'ownerId', 'targetId', 'targetLifeId', 'targetPosition', 'damage', 'origin', 'atMs'])
     && typeof value.resultId === 'string' && /^ks-result-[0-9]+-[0-9]+$/.test(value.resultId)
     && activationId(value.activationId)
     && ids.has(String(value.source))
     && actorId(value.ownerId) && actorId(value.targetId)
     && safeCounter(value.targetLifeId)
+    && vec3(value.targetPosition)
     && finite(value.damage, 0.01, 1_000)
     && vec3(value.origin)
     && finite(value.atMs, 0, Number.MAX_SAFE_INTEGER);
@@ -252,6 +273,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && actorId(value.by) && (value.forPlayerId === null || actorId(value.forPlayerId))
       && isRecipientSnapshot(value.snapshot)
       && sensorCapabilityMatchesRecipient(value.snapshot, value.forPlayerId)
+      && placementMarkersMatchRecipient(value.snapshot, value.forPlayerId)
       && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
   if (value.type === 'killstreak-damage-result') {

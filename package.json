@@ -5,6 +5,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "author:blender-arena": "node scripts/blender/run-authoring.mjs arena",
     "author:blender-drone": "node scripts/blender/run-authoring.mjs drone",
+    "author:blender-semtex": "node scripts/blender/run-authoring.mjs semtex",
     "author:rustworks-tower": "node scripts/blender/run-authoring.mjs tower",
     "assets:compress:quality": "node scripts/assets/compress-quality-glbs.mjs",
     "baseline:generate": "tsx scripts/qa/generate-pass25a-baselines.ts",

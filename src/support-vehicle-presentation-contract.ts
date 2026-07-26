@@ -3,6 +3,16 @@ import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak
 import { SUPPORT_FORWARD_AXIS } from './support-forward-axis';
 export { SUPPORT_FORWARD_AXIS } from './support-forward-axis';
 
+export const SUPPORT_WEAPON_FEEDBACK_CONTRACT = Object.freeze([
+  'report',
+  'gun-recoil',
+  'muzzle-flash',
+  'tracer',
+  'impact',
+  'owner-hit-confirm',
+  'owner-damage-number',
+] as const);
+
 export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
   forwardAxis: SUPPORT_FORWARD_AXIS,
   drone: Object.freeze({
@@ -12,14 +22,17 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
       'drone-body', 'drone-optic', 'drone-mounted-gun', 'drone-gun-muzzle-socket',
       'drone-first-person-camera-socket', 'drone-rotors',
     ]),
-    weaponFeedback: Object.freeze(['report', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number']),
+    weaponFeedback: SUPPORT_WEAPON_FEEDBACK_CONTRACT,
   }),
   chopper: Object.freeze({
     requiredNodes: Object.freeze([
       'chopper-main-rotor', 'chopper-tail-rotor', 'chopper-player-gun', 'chopper-gun-muzzle-socket',
+      'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
+      'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
+      'chopper-first-person-rotor',
     ]),
     requiredAudio: Object.freeze(['chopper-low-loop', 'chopper-gun-report']),
-    requiredWeaponFeedback: Object.freeze(['gun-recoil', 'muzzle-flash', 'tracer', 'impact']),
+    requiredWeaponFeedback: SUPPORT_WEAPON_FEEDBACK_CONTRACT,
   }),
   aircraft: Object.freeze({
     requiredNodes: Object.freeze(['care-aircraft-nose', 'care-aircraft-forward-socket']),

@@ -5,7 +5,11 @@ import type { KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
 
-const snapshot = (count: number, sensorContacts: KillstreakRecipientSnapshot['sensorContacts'] = []): KillstreakRecipientSnapshot => ({
+const snapshot = (
+  count: number,
+  sensorContacts: KillstreakRecipientSnapshot['sensorContacts'] = [],
+  placementMarkers: KillstreakRecipientSnapshot['placementMarkers'] = [],
+): KillstreakRecipientSnapshot => ({
   schemaVersion: 1,
   matchEpoch: 1,
   revision: 1,
@@ -32,6 +36,7 @@ const snapshot = (count: number, sensorContacts: KillstreakRecipientSnapshot['se
     revision: 1,
   })),
   sensorContacts,
+  placementMarkers,
 });
 
 describe('killstreak presentation', () => {
@@ -44,7 +49,7 @@ describe('killstreak presentation', () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
     presentation.sync(snapshot(4), 1_000);
-    expect(presentation.telemetry()).toEqual({ entities: 4, impactFlashes: 0, sensorContacts: 0, bounded: true });
+    expect(presentation.telemetry()).toEqual({ entities: 4, impactFlashes: 0, sensorContacts: 0, placementMarkers: 0, bounded: true });
     expect(presentation.root.getObjectByName('chopper-sleek-cockpit-canopy')).toBeDefined();
     expect(presentation.root.getObjectByName('pass65-care-package-aircraft')).toBeDefined();
     expect(presentation.root.getObjectByName('care-package-parachute')).toBeDefined();
@@ -60,6 +65,22 @@ describe('killstreak presentation', () => {
     expect(supportForwardAlignment(chopper, 'chopper-player-gun', 'chopper-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
+    expect(presentation.firstPersonCameraAnchor('ks-1-swarm-drone-1')).not.toBeNull();
+    presentation.setFirstPersonEntity('ks-1-swarm-drone-1');
+    expect(chopper.visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(false);
+    expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(true);
+    const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0.8, 0, 'YXZ'));
+    presentation.alignFirstPersonCockpit('ks-1-swarm-drone-1', cameraQuaternion);
+    const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
+      .getWorldQuaternion(new THREE.Quaternion());
+    expect(cockpitWorldQuaternion.angleTo(cameraQuaternion)).toBeLessThan(1e-6);
+    presentation.setFirstPersonEntity(null);
+    expect(chopper.visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
+    expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(false);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
     expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
     expect(carePackage.getObjectByName('care-package-crate')!.userData)
@@ -108,6 +129,23 @@ describe('killstreak presentation', () => {
     const presentation = new KillstreakPresentation(new THREE.Scene());
     presentation.sync(snapshot(40), 1_000);
     expect(presentation.telemetry()).toMatchObject({ entities: 32, bounded: true });
+    presentation.dispose();
+  });
+
+  it('presents host-admitted ground X markers to peers and the carpet corridor only when supplied to its owner', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    presentation.sync(snapshot(0, [], [{
+      id: 'ks-activation-7-1:carpet-target', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'ground-x',
+      ownerId: 'owner', team: 0, audience: 'all-combatants', anchor: [2, 0, 3], pathStart: null, pathEnd: null, expiresInMs: 900,
+    }, {
+      id: 'ks-activation-7-1:carpet-corridor', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'corridor',
+      ownerId: 'owner', team: 0, audience: 'owner-only', anchor: [2, 0, 3], pathStart: [-15, 18, -8], pathEnd: [18, 18, 12], expiresInMs: 900,
+    }]), 1_000);
+    expect(presentation.telemetry().placementMarkers).toBe(2);
+    expect(presentation.root.getObjectByName('support-placement-ground-x')?.userData.audience).toBe('all-combatants');
+    expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor')).toBeDefined();
+    presentation.sync(snapshot(0), 2_000);
+    expect(presentation.telemetry().placementMarkers).toBe(0);
     presentation.dispose();
   });
 });

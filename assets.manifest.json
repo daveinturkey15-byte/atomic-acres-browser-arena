@@ -30,6 +30,25 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-semtex-bundle-2026-07-26",
+      "kind": "original-project-blender-ordnance-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-semtex-bundle.py",
+      "generatedAsOf": "2026-07-26",
+      "license": "Original project work",
+      "files": "public/assets/original/**/semtex-bundle-*",
+      "sourceBlend": "source-assets/blender/semtex-bundle.blend",
+      "sourceBlendSha256": "ebe43f9e4e453e19b76bdab06d1d91ccff5527864c2484d09f5bebc60682f427",
+      "sourceScript": "scripts/blender/create-semtex-bundle.py",
+      "sourceScriptSha256": "1065a4bbdd3fed79ecdeb304792413c032c08629b94e511a74da3d03253314c9",
+      "sourceProvenance": "source-assets/blender/semtex-bundle.provenance.json",
+      "sourceProvenanceSha256": "b1d868ebfba6e9a126795004727fc84919efbbda94a2068a286a8d248e8e1faf",
+      "preview": "docs/assets/pass65-ordnance/semtex-bundle-review.png",
+      "format": "Three decreasing optimized glTF 2.0 binary LODs with embedded WebP PBR maps and retained lossless source PNG maps",
+      "modifications": "Project-original four-block red Semtex bundle with woven retaining bands, pressure adhesive, steel detonator, fuse, braided wire, arming lamp, and held/world presentation sockets. Runtime collision, sticking, fuse, damage, and multiplayer authority remain TypeScript-owned.",
+      "attributionRequired": false
+    },
+    {
       "id": "atomic-acres-aesthetic-overhaul-2026-07-22",
       "kind": "original-project-complete-blender-environment",
       "creator": "Atomic Acres project / Jigglyclaw",

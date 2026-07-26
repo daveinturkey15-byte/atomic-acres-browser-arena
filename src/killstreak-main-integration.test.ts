@@ -28,10 +28,14 @@ describe('Pass 65 playable killstreak integration', () => {
   });
 
   it('routes F to gun-only chopper handoff, autonomous/manual drone toggle, care capture, or shed interaction before weapon pickup', () => {
-    expect(source).toContain("requestKillstreakControl(chopper.id, 'toggle-chopper-gunner'");
-    expect(source).toContain("requestKillstreakControl(actor.possession.entityId, 'toggle-piloted-drone'");
+    expect(source).toContain("import { primaryInteraction, type InteractionCandidate } from './interaction-arbitration'");
+    expect(source).toContain('function selectedFInteraction(');
+    expect(source).toContain('function executePrimaryFInteraction(');
+    expect(source).toContain("if (event.code === 'KeyF' && !event.repeat) executePrimaryFInteraction()");
+    expect(source).toContain("interaction.kind === 'support-enter-chopper'");
+    expect(source).toContain("interaction.kind === 'support-enter-drone'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
-    expect(source).toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)\) interactWithWeaponPickup\(\)/);
+    expect(source).not.toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)/);
   });
 
   it('applies the exact Adrenaline stage to damage, movement and reload duration', () => {

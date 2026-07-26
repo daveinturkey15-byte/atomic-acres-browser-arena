@@ -58,7 +58,7 @@ export const SEMTEX_HITL_CONTRACT = Object.freeze({
   damageResolution: 'exactly-once',
 } as const);
 
-/** Pure balance oracle for the future host-owned Semtex reducer. */
+/** Pure balance oracle shared by local and host-admitted remote Semtex damage. */
 export function semtexBlastDamage(distanceM: number, prone: boolean): number {
   if (!Number.isFinite(distanceM) || distanceM < 0 || distanceM > SEMTEX_HITL_CONTRACT.blastRadiusM) return 0;
   const alpha = distanceM / SEMTEX_HITL_CONTRACT.blastRadiusM;

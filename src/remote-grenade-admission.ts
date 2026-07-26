@@ -2,6 +2,8 @@ import { MULTIPLAYER_PROTOCOL_VERSION, type GrenadeId, type GrenadeThrowMessage,
 
 export const REMOTE_GRENADE_MIN_FUSE_MS = 1_800;
 export const REMOTE_GRENADE_MAX_FUSE_MS = 3_400;
+export const REMOTE_SEMTEX_MIN_FUSE_MS = 900;
+export const REMOTE_SEMTEX_MAX_FUSE_MS = 5_200;
 export const REMOTE_GRENADE_MAX_TRAVEL = 36;
 const REMOTE_GRENADE_ORIGIN_TOLERANCE = 2.4;
 const REMOTE_GRENADE_MAX_VELOCITY = 20;
@@ -66,7 +68,7 @@ export function admitRemoteGrenadeThrow(
     return { accepted: false, state };
   }
   const activeActions = Object.fromEntries(Object.entries(state.actions)
-    .filter(([, action]) => now - action.thrownAt <= REMOTE_GRENADE_MAX_FUSE_MS));
+    .filter(([, action]) => now - action.thrownAt <= REMOTE_SEMTEX_MAX_FUSE_MS));
   return {
     accepted: true,
     state: {
@@ -101,7 +103,9 @@ export function admitRemoteGrenadeExplosion(
   const action = state.actions[input.actionNonce];
   if (!action || !Number.isFinite(input.now)) return { accepted: false, state };
   const age = input.now - action.thrownAt;
-  if (age < REMOTE_GRENADE_MIN_FUSE_MS || age > REMOTE_GRENADE_MAX_FUSE_MS) return { accepted: false, state };
+  const minimumFuseMs = action.grenade === 'semtex' ? REMOTE_SEMTEX_MIN_FUSE_MS : REMOTE_GRENADE_MIN_FUSE_MS;
+  const maximumFuseMs = action.grenade === 'semtex' ? REMOTE_SEMTEX_MAX_FUSE_MS : REMOTE_GRENADE_MAX_FUSE_MS;
+  if (age < minimumFuseMs || age > maximumFuseMs) return { accepted: false, state };
   if (Math.hypot(
     input.explosionOrigin[0] - action.origin[0],
     input.explosionOrigin[1] - action.origin[1],
@@ -132,7 +136,7 @@ export function admitRemoteGrenadeHit(
   }>,
 ): { accepted: boolean; state: RemoteGrenadeAuthorityState } {
   const action = state.actions[input.actionNonce];
-  if (!action || action.grenade !== 'frag' || input.target.length === 0 || action.targets.includes(input.target)) {
+  if (!action || (action.grenade !== 'frag' && action.grenade !== 'semtex') || input.target.length === 0 || action.targets.includes(input.target)) {
     return { accepted: false, state };
   }
   const explosion = admitRemoteGrenadeExplosion(state, input);
@@ -146,4 +150,8 @@ export function admitRemoteGrenadeHit(
     accepted: true,
     state: { ...explosion.state, actions: { ...explosion.state.actions, [input.actionNonce]: nextAction } },
   };
+}
+
+export function remoteGrenadeForAction(state: RemoteGrenadeAuthorityState, actionNonce: number): GrenadeId | null {
+  return state.actions[actionNonce]?.grenade ?? null;
 }

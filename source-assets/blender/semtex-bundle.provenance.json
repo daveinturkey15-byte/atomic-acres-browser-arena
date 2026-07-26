@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "id": "atomic-acres-semtex-bundle-v1",
+  "title": "Semtex bundle ordnance family",
+  "creator": "Atomic Acres project",
+  "owner": "Atomic Acres project",
+  "created": "2026-07-26",
+  "license": "Project-original; no third-party meshes, textures, brands, or commercial-game assets",
+  "sourceBlend": {
+    "path": "source-assets/blender/semtex-bundle.blend",
+    "sha256": "ebe43f9e4e453e19b76bdab06d1d91ccff5527864c2484d09f5bebc60682f427"
+  },
+  "generator": {
+    "path": "scripts/blender/create-semtex-bundle.py",
+    "sha256": "1065a4bbdd3fed79ecdeb304792413c032c08629b94e511a74da3d03253314c9"
+  },
+  "worldGlbs": [
+    {
+      "path": "public/assets/original/models/ordnance/semtex-bundle-lod0.glb",
+      "sha256": "fa83a5c4ff4f5d0d83f70f41cf1836038ba67ca8f2ff4d082e36e086cc17295b",
+      "lod": 0,
+      "bytes": 63636,
+      "triangles": 2092
+    },
+    {
+      "path": "public/assets/original/models/ordnance/semtex-bundle-lod1.glb",
+      "sha256": "7bd0569c88fade19a71af0f04efcb06412a730b112e290ff97dde1511dc777e5",
+      "lod": 1,
+      "bytes": 54932,
+      "triangles": 1240
+    },
+    {
+      "path": "public/assets/original/models/ordnance/semtex-bundle-lod2.glb",
+      "sha256": "c66ffdc04fa4ddd9a3e537f601d443737fc36da33fdcaac97a808edb9801d084",
+      "lod": 2,
+      "bytes": 50944,
+      "triangles": 644
+    }
+  ],
+  "pbrMaps": {
+    "albedo": {
+      "path": "public/assets/original/textures/ordnance/semtex-bundle-albedo.png",
+      "sha256": "0da721de0c0a5681d714a27c1fe8f263a9b9872198f94b1a7fbd6cfc470ded3b",
+      "width": 256,
+      "height": 256
+    },
+    "normal": {
+      "path": "public/assets/original/textures/ordnance/semtex-bundle-normal.png",
+      "sha256": "62f57f9dd5eedb62a95435060c878ae558951ff09e9c4ce677c03641d6b3519c",
+      "width": 256,
+      "height": 256
+    },
+    "orm": {
+      "path": "public/assets/original/textures/ordnance/semtex-bundle-orm.png",
+      "sha256": "14dc7c94dce8e89ab04daa664bc4637070382aeb92e85ed4518eb43f0b8a8c0f",
+      "width": 256,
+      "height": 256
+    },
+    "emissive": {
+      "path": "public/assets/original/textures/ordnance/semtex-bundle-emissive.png",
+      "sha256": "53c7d6c057d902b7d56205ae4aa69ae4050352962ba614a5f417604788c75f78",
+      "width": 256,
+      "height": 256
+    }
+  },
+  "review": {
+    "path": "docs/assets/pass65-ordnance/semtex-bundle-review.png",
+    "sha256": "72d2a2d8fe44f0e2ac952d44098818db088bfdc1635b4f7bc45b679e6fd529d1",
+    "width": 512,
+    "height": 512,
+    "cameraId": "front-quarter"
+  },
+  "requiredNodes": [
+    "semtex-bundle-root",
+    "semtex-block-1",
+    "semtex-block-2",
+    "semtex-block-3",
+    "semtex-block-4",
+    "semtex-wrap-band-horizontal",
+    "semtex-wrap-band-vertical",
+    "semtex-detonator",
+    "semtex-fuse",
+    "semtex-wire",
+    "semtex-sticky-pad",
+    "semtex-held-socket",
+    "semtex-world-socket"
+  ],
+  "presentationOnly": true,
+  "gameplayAuthority": "TypeScript host authority; visual meshes have no gameplay raycast or collider authority",
+  "reproducibility": {
+    "command": "npm run author:blender-semtex",
+    "cleanFactoryStartup": true,
+    "pythonHashSeed": 0,
+    "contract": "Required semantic nodes, strictly decreasing LOD topology, PBR map set, dimensions, and provenance hashes are mechanically revalidated after every generation."
+  }
+}

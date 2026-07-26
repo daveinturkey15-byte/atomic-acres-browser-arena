@@ -1,6 +1,10 @@
 import type { WeaponId } from '../protocol';
 import { parseWeaponDefinitions, type WeaponDefinition } from './weapon-schema';
 
+export const MINIGUN_PRE_PASS65_BASE_DAMAGE = 15;
+export const MINIGUN_PRE_PASS65_MINIMUM_DAMAGE = 11.25;
+export const MINIGUN_PASS65_DAMAGE_MULTIPLIER = 0.75;
+
 /** Pass 64 insertion order is observable through Object.keys/Object.values consumers. */
 export const LEGACY_WEAPON_ENUMERATION_ORDER = Object.freeze([
   'carbine',
@@ -196,7 +200,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   {
     id: 'minigun', displayName: 'M134 Minigun', slot: 'primary', family: 'lmg',
     fireKind: 'hitscan', fireMode: 'automatic', rpm: 1_200, pellets: 1, spinUpMs: 1_200, movementMultiplier: 0.8,
-    damage: { policy: 'standard', base: 15, minimum: 11.25, falloffStartM: 24, falloffEndM: 74, headMultiplier: 1, limbMultiplier: 0.85 },
+    damage: { policy: 'standard', base: MINIGUN_PRE_PASS65_BASE_DAMAGE * MINIGUN_PASS65_DAMAGE_MULTIPLIER, minimum: MINIGUN_PRE_PASS65_MINIMUM_DAMAGE * MINIGUN_PASS65_DAMAGE_MULTIPLIER, falloffStartM: 24, falloffEndM: 74, headMultiplier: 1, limbMultiplier: 0.85 },
     spread: { hipRadians: 0.026, adsMultiplier: 0.7, movementMultiplier: 1.8, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.72, sustainedPerShot: 0.0012, maximumRadians: 0.06 },
     recoil: { pitchRadians: 0.008, yawRadians: 0.008, recoveryPerSecond: 14, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.86, proneMultiplier: 0.72, deterministicPatternId: 'minigun-pattern-v1' },
     ammo: { magazine: 240, reserve: 480, reloadSeconds: 5.4, emptyReloadSeconds: 5.8, switchSeconds: 1.05 },

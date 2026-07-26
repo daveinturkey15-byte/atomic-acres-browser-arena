@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
+import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
+import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
 const MAX_SENSOR_CONTACTS = 16;
+const MAX_PLACEMENT_MARKERS = 8;
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
 const HUNTER_DRONE_TARGET_MAX_DIMENSION = 1.45;
 
@@ -107,6 +109,35 @@ function presentationSocket(name: string, position: readonly [number, number, nu
   return result;
 }
 
+function isFirstPersonCockpitNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== root) {
+    if (cursor.userData.firstPersonCockpit === true) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== root) {
+    if (cursor.userData.firstPersonOnly === true) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean): void {
+  root.visible = true;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    if (node.userData.supportBaseVisible === undefined) node.userData.supportBaseVisible = node.visible;
+    node.visible = possessed
+      ? isFirstPersonCockpitNode(root, node)
+      : node.userData.supportBaseVisible === true && !isFirstPersonOnlyNode(root, node);
+  });
+}
+
 function buildChopper(): PresentedEntity {
   const root = new THREE.Group();
   root.name = 'pass65-chopper-gunner';
@@ -130,6 +161,54 @@ function buildChopper(): PresentedEntity {
   gun.rotation.x = Math.PI / 2;
   gun.position.set(0, -0.58, -0.72);
   const gunMuzzle = presentationSocket('chopper-gun-muzzle-socket', [0, -0.58, -1.24]);
+  const cameraSocket = presentationSocket('chopper-first-person-camera-socket', [0, 0.18, -1.22]);
+  const cockpit = new THREE.Group();
+  cockpit.name = 'chopper-first-person-cockpit';
+  cockpit.userData.firstPersonCockpit = true;
+  cockpit.position.copy(cameraSocket.position);
+  const dashboard = mesh(new THREE.BoxGeometry(0.82, 0.13, 0.16), 0x071215, 'chopper-cockpit-dashboard-3d');
+  dashboard.position.set(0, -0.165, -0.35);
+  dashboard.rotation.x = -0.16;
+  const cockpitRailLeft = mesh(new THREE.BoxGeometry(0.035, 0.48, 0.035), 0x2a555e, 'chopper-cockpit-rail-left');
+  cockpitRailLeft.position.set(-0.47, 0.02, -0.27);
+  cockpitRailLeft.rotation.z = -0.18;
+  const cockpitRailRight = cockpitRailLeft.clone();
+  cockpitRailRight.name = 'chopper-cockpit-rail-right';
+  cockpitRailRight.position.x = 0.47;
+  cockpitRailRight.rotation.z = 0.18;
+  const displayMaterial = (colour: number) => new THREE.MeshStandardMaterial({
+    color: colour,
+    emissive: colour,
+    emissiveIntensity: 2.2,
+    roughness: 0.28,
+    metalness: 0.18,
+    toneMapped: false,
+  });
+  const cyanDisplay = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.055, 0.012), displayMaterial(0x41ddff));
+  cyanDisplay.name = 'chopper-cockpit-display-cyan';
+  cyanDisplay.position.set(-0.19, -0.125, -0.44);
+  const greenDisplay = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.055, 0.012), displayMaterial(0x5dff9b));
+  greenDisplay.name = 'chopper-cockpit-display-green';
+  greenDisplay.position.set(0.19, -0.125, -0.44);
+  const firstPersonRotor = new THREE.Group();
+  firstPersonRotor.name = 'chopper-first-person-rotor';
+  firstPersonRotor.userData.firstPersonOnly = true;
+  // Keep the translucent tips forward of the near plane throughout rotation;
+  // they remain visible overhead without ever sweeping through the camera.
+  firstPersonRotor.position.set(0, 0.44, -1.35);
+  const rotorBlurMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7ddde3,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const firstBladeA = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.012, 0.035), rotorBlurMaterial);
+  firstBladeA.name = 'chopper-first-person-rotor-blade-a';
+  const firstBladeB = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 2.2), rotorBlurMaterial.clone());
+  firstBladeB.name = 'chopper-first-person-rotor-blade-b';
+  firstPersonRotor.add(firstBladeA, firstBladeB);
+  cockpit.add(dashboard, cockpitRailLeft, cockpitRailRight, cyanDisplay, greenDisplay, firstPersonRotor);
   const rotor = new THREE.Group();
   rotor.name = 'chopper-main-rotor';
   rotor.position.y = 0.85;
@@ -151,10 +230,10 @@ function buildChopper(): PresentedEntity {
     skid.position.set(side * 0.58, -0.67, 0.15);
     return skid;
   });
-  root.add(fuselage, canopy, glareshield, tail, fin, gun, gunMuzzle, rotor, tailRotor, ...skids);
+  root.add(fuselage, canopy, glareshield, tail, fin, gun, gunMuzzle, cameraSocket, cockpit, rotor, tailRotor, ...skids);
   root.userData.forwardAxis = [0, 0, -1];
   root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];
-  root.userData.weaponFeedback = ['gun-recoil', 'muzzle-flash', 'tracer', 'impact'];
+  root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
   root.scale.setScalar(0.82);
   return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixer: null });
 }
@@ -193,7 +272,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     root.userData.presentationFamilyId = DRONE_PRESENTATION_FAMILY_ID;
     root.userData.gunProfileId = DRONE_GUN_PROFILE_ID;
     root.userData.forwardAxis = [0, 0, -1];
-    root.userData.weaponFeedback = ['report', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number'];
+    root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
     markSharedPresentationAsset(root);
     const mixer = new THREE.AnimationMixer(root);
     const propellers = hunterDroneAnimations.find((clip) => clip.name === 'Drone_Propellers_Loop');
@@ -206,7 +285,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
   root.userData.presentationFamilyId = DRONE_PRESENTATION_FAMILY_ID;
   root.userData.gunProfileId = DRONE_GUN_PROFILE_ID;
   root.userData.forwardAxis = [0, 0, -1];
-  root.userData.weaponFeedback = ['report', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number'];
+  root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
   // Standalone and swarm drones deliberately share the same machine family;
   // control mode changes no geometry, gun profile, socket, or forward axis.
   const body = mesh(new THREE.CapsuleGeometry(0.22, 0.42, 5, 12), 0x28383d, 'drone-body');
@@ -292,6 +371,67 @@ function buildDroneSensorSilhouette(index: number): THREE.Group {
   return root;
 }
 
+function placementMarkerMaterial(opacity: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color: 0xff253f,
+    transparent: true,
+    opacity,
+    depthTest: true,
+    depthWrite: false,
+    toneMapped: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+}
+
+function buildPlacementMarker(marker: KillstreakPlacementMarkerSnapshot): THREE.Group {
+  const root = new THREE.Group();
+  root.name = `support-placement-${marker.shape}`;
+  root.userData.presentationOnly = true;
+  root.userData.markerId = marker.id;
+  root.userData.activationId = marker.activationId;
+  root.userData.source = marker.source;
+  root.userData.audience = marker.audience;
+  root.raycast = () => undefined;
+  if (marker.shape === 'ground-x') {
+    root.position.fromArray(marker.anchor);
+    root.position.y += 0.055;
+    for (const angle of [Math.PI / 4, -Math.PI / 4]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.035, 0.34), placementMarkerMaterial(0.88));
+      bar.name = 'support-target-x-bar';
+      bar.rotation.y = angle;
+      bar.renderOrder = 18;
+      bar.raycast = () => undefined;
+      root.add(bar);
+    }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.5, 2.68, 48), placementMarkerMaterial(0.58));
+    ring.name = 'support-target-x-ring';
+    ring.rotation.x = -Math.PI / 2;
+    ring.renderOrder = 18;
+    ring.raycast = () => undefined;
+    root.add(ring);
+  } else if (marker.pathStart && marker.pathEnd) {
+    const start = new THREE.Vector3(...marker.pathStart);
+    const end = new THREE.Vector3(...marker.pathEnd);
+    const delta = end.clone().sub(start);
+    const length = Math.max(0.1, Math.hypot(delta.x, delta.z));
+    root.position.copy(start).lerp(end, 0.5);
+    root.position.y = marker.anchor[1] + 0.065;
+    root.rotation.y = -Math.atan2(delta.z, delta.x);
+    const corridor = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 5.8), placementMarkerMaterial(0.32));
+    corridor.name = 'carpet-bomber-flight-corridor';
+    corridor.renderOrder = 17;
+    corridor.raycast = () => undefined;
+    const centre = new THREE.Mesh(new THREE.BoxGeometry(length, 0.045, 0.18), placementMarkerMaterial(0.92));
+    centre.name = 'carpet-bomber-flight-centreline';
+    centre.renderOrder = 18;
+    centre.raycast = () => undefined;
+    root.add(corridor, centre);
+  }
+  return root;
+}
+
 function disposeRoot(root: THREE.Object3D): void {
   root.removeFromParent();
   root.traverse((node) => {
@@ -310,6 +450,8 @@ export class KillstreakPresentation {
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
+  private firstPersonEntityId: string | null = null;
+  private readonly placementMarkers = new Map<string, THREE.Group>();
 
   constructor(
     scene: THREE.Scene,
@@ -350,6 +492,7 @@ export class KillstreakPresentation {
         this.root.add(presented.root);
         presented.root.position.fromArray(entity.position);
       }
+      setSupportFirstPersonVisibility(presented.root, entity.id === this.firstPersonEntityId);
       presented.target.fromArray(entity.position);
       presented.root.position.lerp(presented.target, 0.38);
       presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
@@ -357,6 +500,8 @@ export class KillstreakPresentation {
       if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
       const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');
       if (tailRotor) tailRotor.rotation.x += 1.35;
+      const firstPersonRotor = presented.root.getObjectByName('chopper-first-person-rotor');
+      if (firstPersonRotor) firstPersonRotor.rotation.y += 0.92;
       const canopy = presented.root.getObjectByName('care-package-parachute');
       if (canopy) canopy.visible = entity.phase === 'inbound' || entity.phase === 'descending';
       presented.root.userData.health = entity.health;
@@ -364,6 +509,7 @@ export class KillstreakPresentation {
       presented.root.userData.gunController = entity.gunController;
     }
     this.syncSensorContacts(snapshot.sensorContacts);
+    this.syncPlacementMarkers(snapshot.placementMarkers);
     for (let index = this.impactFlashes.length - 1; index >= 0; index -= 1) {
       const flash = this.impactFlashes[index];
       const remaining = THREE.MathUtils.clamp((flash.expiresAt - nowMs) / 420, 0, 1);
@@ -390,6 +536,22 @@ export class KillstreakPresentation {
     }
   }
 
+  private syncPlacementMarkers(markers: readonly KillstreakPlacementMarkerSnapshot[]): void {
+    const admitted = markers.filter((marker) => marker.expiresInMs > 0).slice(0, MAX_PLACEMENT_MARKERS);
+    const liveIds = new Set(admitted.map((marker) => marker.id));
+    for (const [id, root] of this.placementMarkers) {
+      if (liveIds.has(id)) continue;
+      this.retireRoot(root);
+      this.placementMarkers.delete(id);
+    }
+    for (const marker of admitted) {
+      if (this.placementMarkers.has(marker.id)) continue;
+      const root = buildPlacementMarker(marker);
+      this.placementMarkers.set(marker.id, root);
+      this.root.add(root);
+    }
+  }
+
   presentImpacts(impacts: readonly KillstreakImpactEvent[], nowMs: number): void {
     for (const impact of impacts.slice(0, Math.max(0, MAX_IMPACT_FLASHES - this.impactFlashes.length))) {
       const flash = new THREE.Mesh(
@@ -408,24 +570,55 @@ export class KillstreakPresentation {
     return this.entities.get(id)?.root ?? null;
   }
 
-  telemetry(): Readonly<{ entities: number; impactFlashes: number; sensorContacts: number; bounded: boolean }> {
+  setFirstPersonEntity(id: string | null): void {
+    this.firstPersonEntityId = id;
+    for (const [entityId, presented] of this.entities) setSupportFirstPersonVisibility(presented.root, entityId === id);
+  }
+
+  firstPersonCameraAnchor(id: string): THREE.Vector3 | null {
+    const root = this.entities.get(id)?.root;
+    if (!root) return null;
+    const socket = root.getObjectByName('drone-first-person-camera-socket')
+      ?? root.getObjectByName('chopper-first-person-camera-socket');
+    if (!socket) return null;
+    root.updateMatrixWorld(true);
+    const anchor = socket.getWorldPosition(new THREE.Vector3());
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(socket.getWorldQuaternion(new THREE.Quaternion()));
+    return anchor.addScaledVector(forward, 0.08);
+  }
+
+  alignFirstPersonCockpit(id: string, cameraWorldQuaternion: THREE.Quaternion): void {
+    const root = this.entities.get(id)?.root;
+    const cockpit = root?.getObjectByName('chopper-first-person-cockpit');
+    if (!root || !cockpit) return;
+    root.updateWorldMatrix(true, false);
+    const inverseParent = root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
+  }
+
+  telemetry(): Readonly<{ entities: number; impactFlashes: number; sensorContacts: number; placementMarkers: number; bounded: boolean }> {
     return Object.freeze({
       entities: this.entities.size,
       impactFlashes: this.impactFlashes.length,
       sensorContacts: this.visibleSensorContacts,
+      placementMarkers: this.placementMarkers.size,
       bounded: this.entities.size <= MAX_PRESENTED_ENTITIES
         && this.impactFlashes.length <= MAX_IMPACT_FLASHES
-        && this.visibleSensorContacts <= MAX_SENSOR_CONTACTS,
+        && this.visibleSensorContacts <= MAX_SENSOR_CONTACTS
+        && this.placementMarkers.size <= MAX_PLACEMENT_MARKERS,
     });
   }
 
   clear(): void {
+    this.firstPersonEntityId = null;
     for (const presented of this.entities.values()) this.retireRoot(presented.root);
     this.entities.clear();
     for (const flash of this.impactFlashes) this.retireRoot(flash.root);
     this.impactFlashes.length = 0;
     this.visibleSensorContacts = 0;
     for (const silhouette of this.sensorSilhouettes) silhouette.visible = false;
+    for (const root of this.placementMarkers.values()) this.retireRoot(root);
+    this.placementMarkers.clear();
   }
 
   dispose(): void {

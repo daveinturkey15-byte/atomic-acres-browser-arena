@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { MULTIPLAYER_PROTOCOL_VERSION, type GrenadeThrowMessage, type PlayerSnapshot } from './protocol';
 import {
   REMOTE_GRENADE_MIN_FUSE_MS,
+  REMOTE_SEMTEX_MIN_FUSE_MS,
   admitRemoteGrenadeExplosion,
   admitRemoteGrenadeHit,
   admitRemoteGrenadeThrow,
   createRemoteGrenadeAuthorityState,
   replenishRemoteGrenadeAuthorityState,
   resetRemoteGrenadeAuthorityState,
+  remoteGrenadeForAction,
 } from './remote-grenade-admission';
 
 const sender: PlayerSnapshot = {
@@ -87,6 +89,24 @@ describe('remote grenade authority', () => {
     }).accepted).toBe(true);
     expect(admitRemoteGrenadeExplosion(explosion.state, {
       actionNonce: 12, explosionOrigin: [5, 0.2, -8], now: 3_000,
+    }).accepted).toBe(false);
+  });
+
+  it('admits Semtex as the selected grenade with its impact-fuse window and exactly-once targets', () => {
+    const semtexSender = { ...sender, grenade: 'semtex' as const };
+    const semtexThrow = { ...thrown(22), grenade: 'semtex' as const };
+    const admitted = admitRemoteGrenadeThrow(createRemoteGrenadeAuthorityState('semtex'), semtexThrow, semtexSender, 1_000);
+    expect(admitted.accepted).toBe(true);
+    expect(remoteGrenadeForAction(admitted.state, 22)).toBe('semtex');
+    expect(admitRemoteGrenadeHit(admitted.state, {
+      actionNonce: 22, explosionOrigin: [1, 0.2, -3], target: 'host', now: 1_000 + REMOTE_SEMTEX_MIN_FUSE_MS - 1,
+    }).accepted).toBe(false);
+    const hit = admitRemoteGrenadeHit(admitted.state, {
+      actionNonce: 22, explosionOrigin: [1, 0.2, -3], target: 'host', now: 1_000 + REMOTE_SEMTEX_MIN_FUSE_MS,
+    });
+    expect(hit.accepted).toBe(true);
+    expect(admitRemoteGrenadeHit(hit.state, {
+      actionNonce: 22, explosionOrigin: [1, 0.2, -3], target: 'host', now: 2_100,
     }).accepted).toBe(false);
   });
 });

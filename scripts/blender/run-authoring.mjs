@@ -76,6 +76,33 @@ if (target === 'arena') {
     ]);
   }
   run(process.execPath, ['scripts/blender/finalize-hunter-drone-assets.mjs']);
+} else if (target === 'semtex') {
+  mkdirSync('public/assets/original/models/ordnance', { recursive: true });
+  mkdirSync('artifacts/blender-semtex/optimized', { recursive: true });
+  run(blenderCommand, [
+    '--background',
+    '--factory-startup',
+    '--python',
+    'scripts/blender/create-semtex-bundle.py',
+  ]);
+  for (const lod of [0, 1, 2]) {
+    run(process.execPath, [
+      gltfTransformCli,
+      'webp',
+      `artifacts/blender-semtex/raw/semtex-bundle-lod${lod}.glb`,
+      `artifacts/blender-semtex/optimized/semtex-bundle-lod${lod}-webp.glb`,
+      '--lossless', 'true',
+      '--formats', 'png',
+    ]);
+    run(process.execPath, [
+      gltfTransformCli,
+      'meshopt',
+      `artifacts/blender-semtex/optimized/semtex-bundle-lod${lod}-webp.glb`,
+      `public/assets/original/models/ordnance/semtex-bundle-lod${lod}.glb`,
+      '--level', 'high',
+    ]);
+  }
+  run(process.execPath, ['scripts/blender/finalize-semtex-bundle-assets.mjs']);
 } else {
   console.error(`Unknown authoring target: ${target ?? '<missing>'}`);
   process.exit(2);

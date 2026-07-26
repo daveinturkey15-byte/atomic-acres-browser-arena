@@ -69,7 +69,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(byId['ak-47']).toMatchObject({ displayName: 'AK-47', family: 'assault-rifle' });
     expect(byId.minigun).toMatchObject({
       displayName: 'M134 Minigun', movementMultiplier: 0.8, spinUpMs: 1200,
-      damage: { base: 15, minimum: 11.25, headMultiplier: 1 },
+      damage: { base: 11.25, minimum: 8.4375, headMultiplier: 1 },
     });
     expect(byId['m14-ebr']).toMatchObject({
       displayName: 'M14 EBR', optic: { kind: 'thermal-smoke-only', magnification: 2.5 },

@@ -21,8 +21,11 @@ describe('support vehicle authored orientation contract', () => {
 
   it('requires the shared drone family and complete gun/HUD feedback vocabulary', () => {
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.weaponFeedback).toEqual([
-      'report', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number',
+      'report', 'gun-recoil', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number',
     ]);
+    expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredWeaponFeedback).toEqual(
+      SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.weaponFeedback,
+    );
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.visualFamilyId).toBe('hunter-drone-visual-family-v1');
     expect(SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.gunProfileId).toBe('drone-gun-standard-v1');
     expect(missingSupportNodes(new THREE.Group(), SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes))
