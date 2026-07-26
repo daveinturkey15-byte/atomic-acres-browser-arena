@@ -104,4 +104,37 @@ describe('CharacterPhysics', () => {
     expect(active.currentStance()).toBe('stand');
     expect(active.eyePosition().y).toBeCloseTo(1.7, 2);
   });
+
+  it('reconciles revisioned dynamic door/panel colliders without rebuilding the world', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    active.teleportEye({ x: 0, y: 1.7, z: 0 });
+    active.syncDynamicColliders([{
+      id: 'shed-a:door-south',
+      bounds: { minX: 0.8, maxX: 1.0, minZ: -2, maxZ: 2, minY: 0, maxY: 2.4 },
+    }]);
+    expect(active.dynamicColliderCount()).toBe(1);
+    let blocked = active.eyePosition();
+    for (let frame = 0; frame < 80; frame += 1) {
+      blocked = active.move({ x: 0.04, y: -0.01, z: 0 }, 1 / 120).position;
+    }
+    expect(blocked.x).toBeLessThan(0.43);
+
+    active.syncDynamicColliders([]);
+    expect(active.dynamicColliderCount()).toBe(0);
+    let released = active.eyePosition();
+    for (let frame = 0; frame < 80; frame += 1) {
+      released = active.move({ x: 0.04, y: -0.01, z: 0 }, 1 / 120).position;
+    }
+    expect(released.x).toBeGreaterThan(2);
+  });
+
+  it('rejects duplicate or non-canonical dynamic collider identities', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    const boundsA: Box2 = { minX: 0, maxX: 1, minZ: 0, maxZ: 1 };
+    expect(() => active!.syncDynamicColliders([
+      { id: 'shed-a:door', bounds: boundsA },
+      { id: 'shed-a:door', bounds: boundsA },
+    ])).toThrow(/unique canonical/);
+    expect(() => active!.syncDynamicColliders([{ id: '../unsafe', bounds: boundsA }])).toThrow(/unique canonical/);
+  });
 });

@@ -44,12 +44,54 @@ export type CharacterMoveResult = {
   appliedDelta: Point3;
 };
 
+export type DynamicWorldCollider = Readonly<{
+  id: string;
+  bounds: Box2;
+}>;
+
+function boxRotation(box: Box2): { x: number; y: number; z: number; w: number } {
+  if (!box.rotation) return { x: 0, y: 0, z: 0, w: 1 };
+  const [x, y, z] = box.rotation;
+  const [sx, cx] = [Math.sin(x / 2), Math.cos(x / 2)];
+  const [sy, cy] = [Math.sin(y / 2), Math.cos(y / 2)];
+  const [sz, cz] = [Math.sin(z / 2), Math.cos(z / 2)];
+  return {
+    x: sx * cy * cz + cx * sy * sz,
+    y: cx * sy * cz - sx * cy * sz,
+    z: cx * cy * sz + sx * sy * cz,
+    w: cx * cy * cz - sx * sy * sz,
+  };
+}
+
+function boxShape(box: Box2): Readonly<{
+  centre: Point3;
+  halfExtents: Point3;
+  rotation: Readonly<{ x: number; y: number; z: number; w: number }>;
+}> {
+  const minY = box.minY ?? 0;
+  const maxY = box.maxY ?? 8;
+  return Object.freeze({
+    centre: Object.freeze({
+      x: (box.minX + box.maxX) / 2,
+      y: (minY + maxY) / 2,
+      z: (box.minZ + box.maxZ) / 2,
+    }),
+    halfExtents: Object.freeze({
+      x: Math.max(0.01, (box.maxX - box.minX) / 2),
+      y: Math.max(0.01, (maxY - minY) / 2),
+      z: Math.max(0.01, (box.maxZ - box.minZ) / 2),
+    }),
+    rotation: Object.freeze(boxRotation(box)),
+  });
+}
+
 /** Rapier-backed kinematic FPS character with stairs, slopes, sliding and ground snap. */
 export class CharacterPhysics {
   readonly world: RapierTypes.World;
   private readonly body: RapierTypes.RigidBody;
   private readonly collider: RapierTypes.Collider;
   private readonly controller: RapierTypes.KinematicCharacterController;
+  private readonly dynamicColliders = new Map<string, RapierTypes.Collider>();
   private stance: Stance = 'stand';
 
   private constructor(
@@ -57,6 +99,7 @@ export class CharacterPhysics {
     body: RapierTypes.RigidBody,
     collider: RapierTypes.Collider,
     private readonly makeCapsule: (halfHeight: number, radius: number) => RapierTypes.Shape,
+    private readonly makeCuboidDescriptor: (halfX: number, halfY: number, halfZ: number) => RapierTypes.ColliderDesc,
   ) {
     this.world = world;
     this.body = body;
@@ -103,28 +146,10 @@ export class CharacterPhysics {
     );
 
     for (const box of [...worldBoundaryColliders(bounds), ...colliders]) {
-      const minY = box.minY ?? 0;
-      const maxY = box.maxY ?? 8;
-      const halfX = Math.max(0.01, (box.maxX - box.minX) / 2);
-      const halfY = Math.max(0.01, (maxY - minY) / 2);
-      const halfZ = Math.max(0.01, (box.maxZ - box.minZ) / 2);
-      const descriptor = RAPIER.ColliderDesc.cuboid(halfX, halfY, halfZ).setTranslation(
-        (box.minX + box.maxX) / 2,
-        (minY + maxY) / 2,
-        (box.minZ + box.maxZ) / 2,
-      );
-      if (box.rotation) {
-        const [x, y, z] = box.rotation;
-        const [sx, cx] = [Math.sin(x / 2), Math.cos(x / 2)];
-        const [sy, cy] = [Math.sin(y / 2), Math.cos(y / 2)];
-        const [sz, cz] = [Math.sin(z / 2), Math.cos(z / 2)];
-        descriptor.setRotation({
-          x: sx * cy * cz + cx * sy * sz,
-          y: cx * sy * cz - sx * cy * sz,
-          z: cx * cy * sz + sx * sy * cz,
-          w: cx * cy * cz - sx * sy * sz,
-        });
-      }
+      const shape = boxShape(box);
+      const descriptor = RAPIER.ColliderDesc.cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
+        .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)
+        .setRotation(shape.rotation);
       world.createCollider(descriptor);
     }
 
@@ -135,7 +160,13 @@ export class CharacterPhysics {
         .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL),
       body,
     );
-    const physics = new CharacterPhysics(world, body, collider, (halfHeight, radius) => new RAPIER.Capsule(halfHeight, radius));
+    const physics = new CharacterPhysics(
+      world,
+      body,
+      collider,
+      (halfHeight, radius) => new RAPIER.Capsule(halfHeight, radius),
+      (halfX, halfY, halfZ) => RAPIER.ColliderDesc.cuboid(halfX, halfY, halfZ),
+    );
     physics.teleportEye({ x: 0, y: 1.7, z: 0 });
     return physics;
   }
@@ -197,6 +228,60 @@ export class CharacterPhysics {
     return this.stance;
   }
 
+  /**
+   * Reconciles one revisioned dynamic collision view without rebuilding the
+   * Rapier world. Doors and authored shed panels therefore move/disappear in
+   * the same simulation tick as their ballistic authority.
+   */
+  syncDynamicColliders(entries: readonly DynamicWorldCollider[]): void {
+    const ids = entries.map((entry) => entry.id);
+    if (new Set(ids).size !== ids.length || ids.some((id) => !/^[a-z0-9][a-z0-9:-]{0,127}$/.test(id))) {
+      throw new TypeError('Dynamic collider IDs must be unique canonical identifiers');
+    }
+    const retained = new Set(ids);
+    for (const [id, collider] of this.dynamicColliders) {
+      if (retained.has(id)) continue;
+      this.world.removeCollider(collider, true);
+      this.dynamicColliders.delete(id);
+    }
+    for (const entry of entries) {
+      const shape = boxShape(entry.bounds);
+      let collider = this.dynamicColliders.get(entry.id);
+      if (!collider) {
+        collider = this.world.createCollider(
+          this.makeCuboidDescriptor(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
+            .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)
+            .setRotation(shape.rotation),
+        );
+        this.dynamicColliders.set(entry.id, collider);
+        continue;
+      }
+      const cuboid = collider.shape;
+      if ('halfExtents' in cuboid) {
+        const halfExtents = cuboid.halfExtents as { x: number; y: number; z: number };
+        if (Math.abs(halfExtents.x - shape.halfExtents.x) > 1e-6
+          || Math.abs(halfExtents.y - shape.halfExtents.y) > 1e-6
+          || Math.abs(halfExtents.z - shape.halfExtents.z) > 1e-6) {
+          this.world.removeCollider(collider, true);
+          collider = this.world.createCollider(
+            this.makeCuboidDescriptor(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
+              .setTranslation(shape.centre.x, shape.centre.y, shape.centre.z)
+              .setRotation(shape.rotation),
+          );
+          this.dynamicColliders.set(entry.id, collider);
+          continue;
+        }
+      }
+      collider.setTranslation(shape.centre);
+      collider.setRotation(shape.rotation);
+    }
+    this.world.propagateModifiedBodyPositionsToColliders();
+  }
+
+  dynamicColliderCount(): number {
+    return this.dynamicColliders.size;
+  }
+
   move(desiredDelta: Point3, dt: number): CharacterMoveResult {
     this.world.timestep = dt;
     this.controller.computeColliderMovement(this.collider, desiredDelta);
@@ -226,6 +311,7 @@ export class CharacterPhysics {
   }
 
   dispose(): void {
+    this.dynamicColliders.clear();
     this.world.free();
   }
 }
