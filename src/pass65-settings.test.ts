@@ -18,10 +18,42 @@ describe('Pass 65 settings contract', () => {
     expect(Object.keys(settings.audio.mutes).sort()).toEqual([...AUDIO_BUS_IDS].sort());
   });
 
-  it('uses Performance on constrained machines and makes Max meaningfully fixed', () => {
+  it('uses Performance on constrained machines and keeps Max available to internal benchmarks', () => {
     expect(createDefaultPass65Settings({ hardwareConcurrency: 4, deviceMemoryGb: 4 }).graphics.preset).toBe('performance');
     const max = normalizePass65Settings({ graphics: { preset: 'max' } });
     expect(resolveGraphicsRuntime(max.graphics)).toMatchObject({ renderProfile: 'blender', renderScale: 1, adaptive: false, shadows: true });
+  });
+
+  it('migrates legacy persisted High and Max presets into the simplified public Quality choice', () => {
+    const legacyHigh = parsePass65Settings(JSON.stringify({
+      version: 1,
+      graphics: { schemaVersion: 1, preset: 'high', renderScale: 0.9, adaptiveResolution: true, targetFps: 165, shadows: 'high' },
+    }));
+    const legacyMax = parsePass65Settings(JSON.stringify({
+      version: 1,
+      graphics: { schemaVersion: 1, preset: 'max', renderScale: 1, adaptiveResolution: false, targetFps: 240, shadows: 'high' },
+    }));
+    expect(legacyHigh.graphics).toMatchObject({ preset: 'high', targetFps: 165 });
+    expect(legacyMax.graphics).toMatchObject({ preset: 'high', targetFps: 240 });
+  });
+
+  it('accepts display-aware adaptive targets beyond 144 and clamps hostile storage', () => {
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', targetFps: 240 } }).graphics.targetFps).toBe(240);
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', targetFps: 999 } }).graphics.targetFps).toBe(360);
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', targetFps: -10 } }).graphics.targetFps).toBe(30);
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', targetFps: 143.7 } }).graphics.targetFps).toBe(144);
+  });
+
+  it('retains a custom 240 FPS target across a later-session storage read', () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+    const settings = normalizePass65Settings({ graphics: { preset: 'custom', targetFps: 240 } });
+    expect(writePass65Settings(storage, settings)).toBe(true);
+    expect(parsePass65Settings([...values.values()][0] ?? null).graphics).toMatchObject({ preset: 'custom', targetFps: 240 });
   });
 
   it('recovers corrupt storage and clamps every numeric boundary', () => {
@@ -32,7 +64,7 @@ describe('Pass 65 settings contract', () => {
       accessibility: { damageFlashScale: 12, weaponMotionScale: -2 },
     });
     expect(settings.graphics.renderScale).toBe(1);
-    expect(settings.graphics.targetFps).toBe(60);
+    expect(settings.graphics.targetFps).toBe(77);
     expect(settings.audio.gains.master).toBe(100);
     expect(settings.audio.mutes.master).toBe(true);
     expect(settings.audio.gains.movement).toBe(0);

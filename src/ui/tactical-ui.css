@@ -1,4 +1,4 @@
-@layer legacy, pass64.tokens, pass64.shell, pass64.components, pass64.states, pass64.bright, pass64.accessibility;
+@layer legacy, pass64.tokens, pass64.shell, pass64.components, pass64.states, pass64.bright, pass65.hitl, pass64.accessibility;
 
 @layer pass64.tokens {
   :root {
@@ -32,6 +32,29 @@
     --coral: var(--ui-coral);
     --ink: var(--ui-deep);
     --panel: var(--ui-panel);
+  }
+}
+
+/* The catalog contribution currently appends an unlayered four-column
+   `.menu-tabs` rule in style.css. Keep this narrowly scoped compatibility
+   bridge until that legacy rule is removed by its single writer. */
+#menu .command-rail .menu-tabs {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 900px) {
+  #menu .command-rail .menu-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  #menu .command-rail .menu-tabs button {
+    padding-inline: 5px;
+    text-align: center;
+  }
+
+  #menu .command-rail .menu-tabs button i {
+    display: none;
   }
 }
 
@@ -2437,6 +2460,244 @@
 
   .critical b {
     color: var(--ui-coral) !important;
+  }
+}
+
+@layer pass65.hitl {
+  /* Round-one HITL correction: preserve tactical hierarchy without the bright
+     full-card treatment that made the live HUD read like menu chrome. */
+  .command-body {
+    grid-template-columns: 214px minmax(0, 1fr);
+  }
+
+  .menu-tabs button {
+    min-height: 76px;
+    padding-left: 45px;
+  }
+
+  .menu-tabs button span {
+    font-size: 19px;
+  }
+
+  .menu-tabs button small,
+  .menu-tabs button i {
+    font-size: 10px;
+  }
+
+  .graphics-preset-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.55fr) minmax(280px, 1fr);
+    gap: 18px;
+    align-items: end;
+  }
+
+  .graphics-preset-row > label {
+    display: grid;
+    gap: 8px;
+    color: var(--ui-muted);
+    font: 800 11px/1 var(--ui-copy);
+    letter-spacing: 0.11em;
+  }
+
+  .graphics-preset-row select {
+    min-height: 44px;
+    padding-inline: 12px;
+    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text);
+    font: 900 14px/1 var(--ui-copy);
+  }
+
+  .graphics-preset-row p {
+    margin: 0;
+    color: var(--ui-muted);
+    font: 650 11px/1.5 var(--ui-copy);
+  }
+
+  .advanced-settings {
+    margin-top: 14px;
+    border: 1px solid var(--ui-line);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .advanced-settings summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    color: var(--ui-text);
+    font: 900 13px/1 var(--ui-copy);
+    letter-spacing: 0.09em;
+  }
+
+  .advanced-settings summary small {
+    color: var(--ui-cyan);
+    font: 800 9px/1 var(--ui-copy);
+    letter-spacing: 0.12em;
+  }
+
+  .advanced-settings[open] summary {
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  .advanced-graphics-grid {
+    padding: 14px;
+  }
+
+  .advanced-graphics-grid label {
+    min-width: 0;
+    font-size: 10px;
+  }
+
+  #graphics-target-fps {
+    width: 100%;
+    accent-color: var(--ui-cyan);
+  }
+
+  #graphics-target-fps-help {
+    max-width: 28ch;
+    color: var(--ui-muted);
+    font: 650 9px/1.35 var(--ui-copy);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  #hud {
+    --hud-ink: #eefaf8;
+    --hud-muted: #a6bdc0;
+    --hud-panel: rgba(3, 12, 17, 0.82);
+    --hud-panel-soft: rgba(4, 16, 22, 0.68);
+    color: var(--hud-ink);
+  }
+
+  #matchbar,
+  .hud-map-console,
+  .hud-operator-console,
+  #weapon-block,
+  #support-block {
+    border: 0;
+    background: linear-gradient(112deg, var(--hud-panel), var(--hud-panel-soft));
+    color: var(--hud-ink);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  }
+
+  #matchbar { border-left: 3px solid var(--ui-cyan); }
+  .hud-map-console { border-top: 2px solid rgba(86, 225, 221, 0.7); }
+  .hud-operator-console { border-left: 3px solid var(--ui-cyan); }
+  #weapon-block { border-bottom: 3px solid var(--ui-cyan); }
+  #support-block { border-right: 3px solid var(--ui-amber); }
+
+  #objective,
+  #fps-counter,
+  #network-strip span,
+  #map-heading,
+  #location-label,
+  #combat-stats,
+  .support-list b,
+  #pause-hint {
+    border: 0;
+    background: rgba(3, 12, 17, 0.68);
+    color: var(--hud-muted);
+  }
+
+  #objective {
+    border-left: 2px solid var(--ui-amber);
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  .tiny,
+  #health-block span,
+  #equipment-block span,
+  #equipment-block small,
+  .support-heading span,
+  .support-help,
+  #room-hud {
+    color: var(--hud-muted);
+    font-size: 9px;
+  }
+
+  #timer,
+  #health-block b,
+  #weapon-name,
+  #weapon-block #ammo,
+  .support-name,
+  #map-heading,
+  #location-label {
+    color: var(--hud-ink);
+  }
+
+  .support-list b {
+    min-height: 34px;
+    border-left: 2px solid rgba(166, 189, 192, 0.2);
+  }
+
+  .support-list b.ready {
+    border-left-color: var(--ui-amber);
+    background: linear-gradient(90deg, rgba(255, 187, 72, 0.19), rgba(3, 12, 17, 0.72));
+  }
+
+  .support-name { font-size: 12px; }
+  .support-state { color: var(--hud-muted); font-size: 9px; }
+
+  #support-combat-feedback,
+  #adrenaline-hud,
+  #support-interaction-prompt {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 10px 16px;
+    border-top: 2px solid var(--ui-cyan);
+    background: linear-gradient(180deg, rgba(3, 13, 18, 0.9), rgba(3, 13, 18, 0.66));
+    color: var(--hud-ink);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  #support-combat-feedback { top: 18%; }
+  #adrenaline-hud { top: 24%; border-color: var(--ui-amber); }
+  #support-interaction-prompt { bottom: 20%; grid-template-columns: auto auto; align-items: center; }
+  #support-combat-feedback small,
+  #adrenaline-hud small,
+  #support-interaction-prompt span { color: var(--hud-muted); font: 800 9px/1 var(--ui-copy); letter-spacing: 0.12em; }
+  #support-combat-feedback strong,
+  #adrenaline-hud strong { font: 900 22px/1 var(--ui-display); letter-spacing: 0.08em; }
+  #support-interaction-prompt kbd { padding: 7px 10px; background: var(--ui-cyan); color: #061014; font: 900 14px/1 var(--ui-copy); }
+
+  #countdown {
+    isolation: isolate;
+    color: #fff5ce;
+    text-shadow: 0 0 16px rgba(255, 190, 72, 0.82), 0 7px 25px rgba(0, 0, 0, 0.72);
+    animation: pass65CountdownBeat 680ms cubic-bezier(.16, .82, .24, 1);
+  }
+
+  #countdown::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 50% auto auto 50%;
+    width: 1.35em;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%) rotate(45deg);
+    border: 2px solid rgba(86, 225, 221, 0.72);
+    box-shadow: 0 0 0 7px rgba(86, 225, 221, 0.08);
+  }
+
+  @keyframes pass65CountdownBeat {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.42); filter: blur(6px); }
+    38% { opacity: 1; transform: translate(-50%, -50%) scale(0.94); filter: blur(0); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  @media (max-width: 900px) {
+    .command-body { grid-template-columns: 1fr; }
+    .graphics-preset-row { grid-template-columns: 1fr; }
+    .advanced-settings summary { align-items: flex-start; flex-direction: column; }
   }
 }
 

@@ -13,7 +13,8 @@ export type GraphicsSettings = Readonly<{
   preset: GraphicsPreset;
   renderScale: number;
   adaptiveResolution: boolean;
-  targetFps: 60 | 90 | 120 | 144;
+  /** Adaptive-quality target, not an output frame limiter. */
+  targetFps: number;
   shadows: ShadowQuality;
 }>;
 
@@ -61,7 +62,8 @@ type CapabilityHints = Readonly<{
   forceCompatibility?: boolean;
 }>;
 
-const TARGET_FPS = new Set([60, 90, 120, 144]);
+export const MIN_GRAPHICS_TARGET_FPS = 30;
+export const MAX_GRAPHICS_TARGET_FPS = 360;
 const PRESETS = new Set<GraphicsPreset>(['performance', 'high', 'max', 'custom']);
 
 function finiteNumber(value: unknown, fallback: number): number {
@@ -123,7 +125,7 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   const preset = PRESETS.has(rawGraphics.preset as GraphicsPreset) ? rawGraphics.preset as GraphicsPreset : defaults.graphics.preset;
   const base = preset === 'custom' ? defaults.graphics : presetGraphics(preset);
   const targetCandidate = finiteNumber(rawGraphics.targetFps, base.targetFps);
-  const targetFps = (TARGET_FPS.has(targetCandidate) ? targetCandidate : base.targetFps) as GraphicsSettings['targetFps'];
+  const targetFps = Math.round(clamp(targetCandidate, MIN_GRAPHICS_TARGET_FPS, MAX_GRAPHICS_TARGET_FPS));
   const graphics: GraphicsSettings = Object.freeze({
     schemaVersion: 1,
     preset,
@@ -159,7 +161,23 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
 export function parsePass65Settings(serialized: string | null, capabilities: CapabilityHints = {}): Pass65Settings {
   if (!serialized) return createDefaultPass65Settings(capabilities);
   try {
-    return normalizePass65Settings(JSON.parse(serialized), capabilities);
+    const decoded = JSON.parse(serialized) as unknown;
+    if (decoded && typeof decoded === 'object') {
+      const record = decoded as { graphics?: unknown };
+      if (record.graphics && typeof record.graphics === 'object') {
+        const graphics = record.graphics as { preset?: unknown };
+        // Max was a Pass 65 pre-HITL public preset. The simplified player
+        // surface folds it deterministically into Quality while the internal
+        // benchmark can still construct a Max snapshot directly.
+        if (graphics.preset === 'max') {
+          return normalizePass65Settings({
+            ...record,
+            graphics: { ...graphics, preset: 'high' },
+          }, capabilities);
+        }
+      }
+    }
+    return normalizePass65Settings(decoded, capabilities);
   } catch {
     return createDefaultPass65Settings(capabilities);
   }

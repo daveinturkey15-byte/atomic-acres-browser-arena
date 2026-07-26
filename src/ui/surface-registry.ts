@@ -50,6 +50,9 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'weapon', rootElementId: 'weapon-block', renderer: 'match-hud', critical: true },
   { id: 'equipment', rootElementId: 'equipment-block', renderer: 'match-hud', critical: true },
   { id: 'support', rootElementId: 'support-block', renderer: 'match-hud', critical: true },
+  { id: 'support-combat-feedback', rootElementId: 'support-combat-feedback', renderer: 'match-hud', critical: true },
+  { id: 'adrenaline-status', rootElementId: 'adrenaline-hud', renderer: 'match-hud', critical: true },
+  { id: 'support-interaction', rootElementId: 'support-interaction-prompt', renderer: 'match-hud', critical: true },
   { id: 'overdrive', rootElementId: 'overdrive-hud', renderer: 'match-hud', critical: true },
   { id: 'power-announcement', rootElementId: 'power-announcement', renderer: 'match-hud', critical: true },
   { id: 'room-state', rootElementId: 'room-hud', renderer: 'match-hud', critical: true },
@@ -65,7 +68,8 @@ export const UI_STATE_INVENTORY = Object.freeze([
   'countdown', 'live', 'dead', 'respawning', 'match-ended', 'returned-lobby',
   'modal-open', 'chat-typing', 'loading', 'error', 'reduced-motion', 'reduced-sensory',
   'pointer-lock-requesting', 'pointer-lock-denied', 'focus-suspended', 'paused-match',
-  'killstreak-possession', 'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
+  'killstreak-possession', 'chopper-gunner', 'adrenaline-active', 'care-package-nearby',
+  'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
 ] as const);
 
 export const UI_REVIEW_VIEWPORTS = Object.freeze([

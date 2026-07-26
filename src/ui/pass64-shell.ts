@@ -181,14 +181,21 @@ function optionsPanelMarkup(): string {
       <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
     </div>
     <section id="graphics-settings" class="settings-section" aria-labelledby="graphics-settings-title">
-      <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: HIGH</span></header>
-      <div class="settings-grid">
-        <label>PRESET<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="high">HIGH</option><option value="max">MAX</option><option value="custom">CUSTOM</option></select></label>
-        <label>RENDER SCALE<input id="graphics-render-scale" type="range" min="0.5" max="2" step="0.05" value="1"><small id="graphics-render-scale-value">100%</small></label>
-        <label>TARGET FPS<select id="graphics-target-fps"><option value="60">60 FPS</option><option value="90">90 FPS</option><option value="120">120 FPS</option><option value="144">144 FPS</option></select></label>
-        <label>SHADOWS<select id="graphics-shadows"><option value="off">OFF</option><option value="high">HIGH</option></select></label>
-        <label class="setting-check"><input id="graphics-adaptive" type="checkbox" checked> ADAPTIVE QUALITY</label>
+      <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: QUALITY</span></header>
+      <div class="graphics-preset-row">
+        <label>GRAPHICS MODE<select id="graphics-profile"><option value="high">QUALITY</option><option value="performance">PERFORMANCE</option><option value="custom">CUSTOM</option></select></label>
+        <p>Quality is the balanced default. Performance reduces presentation cost. Editing any advanced control saves the mode as Custom.</p>
       </div>
+      <details id="advanced-graphics" class="advanced-settings">
+        <summary><span>ADVANCED GRAPHICS</span><small>WEBGPU PRESENTATION CONTROLS</small></summary>
+        <div class="settings-grid advanced-graphics-grid">
+          <label>RENDER SCALE<input id="graphics-render-scale" type="range" min="0.5" max="2" step="0.05" value="1"><small id="graphics-render-scale-value">100%</small></label>
+          <label>ADAPTIVE TARGET <small>30-360 FPS</small><input id="graphics-target-fps" type="range" min="30" max="360" step="1" value="144" list="graphics-target-fps-marks" aria-describedby="graphics-target-fps-help"><small id="graphics-target-fps-help">Adaptive-quality target; browser/display cadence remains authoritative.</small></label>
+          <datalist id="graphics-target-fps-marks"><option value="60"></option><option value="120"></option><option value="144"></option><option value="240"></option><option value="360"></option></datalist>
+          <label>SHADOWS<select id="graphics-shadows"><option value="off">OFF</option><option value="high">HIGH</option></select></label>
+          <label class="setting-check"><input id="graphics-adaptive" type="checkbox" checked> ADAPTIVE QUALITY</label>
+        </div>
+      </details>
     </section>
     <section id="audio-settings" class="settings-section" aria-labelledby="audio-settings-title">
       <header><b id="audio-settings-title">AUDIO BUSES</b><span>INDEPENDENT VOLUME + MUTE</span></header>
@@ -287,6 +294,13 @@ function hudMarkup(): string {
       <div class="support-list">${fieldSupportRowsMarkup()}</div>
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </aside>
+    <section id="support-combat-feedback" hidden aria-live="polite" data-support-kind="chopper">
+      <small>CHOPPER GUNNER // DAMAGE DEALT</small><strong><span id="chopper-damage-dealt">0</span> DMG</strong>
+    </section>
+    <section id="adrenaline-hud" hidden aria-live="polite">
+      <small>ADRENALINE ACTIVE</small><strong><span id="adrenaline-time">15.0</span>S</strong>
+    </section>
+    <div id="support-interaction-prompt" hidden><kbd>F</kbd><span>COLLECT KILLSTREAK</span></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="damage-numbers" aria-live="polite" aria-label="Damage dealt"></div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope"><div class="scope-ring"></div><div class="scope-reticle"><i></i><b></b><span></span><em></em></div><small>3×</small></div>

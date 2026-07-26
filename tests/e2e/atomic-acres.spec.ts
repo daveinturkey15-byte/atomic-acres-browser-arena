@@ -883,8 +883,8 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toHaveValue('performance');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'HIGH', 'MAX', 'CUSTOM']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(3);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'CUSTOM']);
     await expect(page.locator('#audio-settings')).toBeVisible();
     await expect(page.locator('#accessibility-settings')).toBeVisible();
     expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
@@ -2615,8 +2615,8 @@ test.describe('performance and stability', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=quality');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'HIGH', 'MAX', 'CUSTOM']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(3);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'CUSTOM']);
     await startSolo(page);
     await page.waitForTimeout(1_000);
     const state = await debug(page);

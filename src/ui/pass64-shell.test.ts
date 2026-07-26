@@ -44,4 +44,28 @@ describe('Pass 65 command shell', () => {
     expect(markup).toContain('<option value="smoke">Smoke</option>');
     expect(markup).toContain('<option value="flash">Flash</option>');
   });
+
+  it('exposes three simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
+    expect([...presetMarkup.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)]
+      .map((match) => [match[1], match[2]])).toEqual([
+      ['high', 'QUALITY'],
+      ['performance', 'PERFORMANCE'],
+      ['custom', 'CUSTOM'],
+    ]);
+    expect(markup).toContain('id="advanced-graphics"');
+    expect(markup).toContain('ADVANCED GRAPHICS');
+    expect(markup).toContain('id="graphics-target-fps" type="range" min="30" max="360"');
+    expect(markup.indexOf('id="advanced-graphics"')).toBeLessThan(markup.indexOf('id="graphics-render-scale"'));
+  });
+
+  it('registers dedicated visual hooks for support feedback and crate collection', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(markup).toContain('id="chopper-damage-dealt"');
+    expect(markup).toContain('id="adrenaline-hud"');
+    expect(markup).toContain('id="adrenaline-time"');
+    expect(markup).toContain('id="support-interaction-prompt"');
+    expect(markup).toContain('<kbd>F</kbd><span>COLLECT KILLSTREAK</span>');
+  });
 });

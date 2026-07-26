@@ -120,6 +120,26 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(opener).toBeFocused();
   });
 
+  test('keeps the simple graphics choice separate from collapsed advanced WebGPU controls', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'CUSTOM']);
+    await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#graphics-target-fps')).toBeHidden();
+    await page.locator('#advanced-graphics summary').click();
+    await expect(page.locator('#graphics-target-fps')).toBeVisible();
+    await expect(page.locator('#graphics-target-fps')).toHaveAttribute('max', '360');
+    await expect(page.locator('#graphics-target-fps-marks option[value="240"]')).toHaveCount(1);
+    const layout = await page.evaluate(() => ({
+      pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      panelOverflowX: document.querySelector<HTMLElement>('#menu-panel-options')!.scrollWidth
+        - document.querySelector<HTMLElement>('#menu-panel-options')!.clientWidth,
+      labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
+    }));
+    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 11 });
+  });
+
   test('animates the live arena preview when motion is allowed', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
