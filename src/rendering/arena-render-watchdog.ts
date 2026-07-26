@@ -13,6 +13,7 @@ export type ArenaRenderLivenessAudit = Readonly<{
   renderableDescendants: number;
   visibleRenderableDescendants: number;
   cameraLayerRenderableDescendants: number;
+  submissionExpected: boolean;
   calls: number;
   triangles: number;
   reasons: readonly string[];
@@ -64,6 +65,7 @@ export function auditArenaRenderLiveness(
   eligible = true,
   camera?: THREE.Camera,
   presentationRoot: THREE.Group = root,
+  submissionExpected = true,
 ): ArenaRenderLivenessAudit {
   let renderableDescendants = 0;
   let visibleRenderableDescendants = 0;
@@ -90,7 +92,7 @@ export function auditArenaRenderLiveness(
     if (activeDefinitionRoots !== 1) reasons.push('definition-root-count');
     if (visibleRenderableDescendants === 0) reasons.push('selected-world-empty');
     else if (cameraLayerRenderableDescendants === 0) reasons.push('selected-world-out-of-camera-layer');
-    if (renderInfo.calls === 0) reasons.push('renderer-submission-empty');
+    if (submissionExpected && renderInfo.calls === 0) reasons.push('renderer-submission-empty');
   }
   return {
     arenaId,
@@ -103,6 +105,7 @@ export function auditArenaRenderLiveness(
     renderableDescendants,
     visibleRenderableDescendants,
     cameraLayerRenderableDescendants,
+    submissionExpected,
     calls: renderInfo.calls,
     triangles: renderInfo.triangles,
     reasons,

@@ -114,4 +114,34 @@ describe('selected arena render watchdog', () => {
     expect(audit.reasons).toEqual(['selected-world-out-of-camera-layer', 'renderer-submission-empty']);
     expect(audit.cameraLayerRenderableDescendants).toBe(0);
   });
+
+  it('keeps structural auditing active while an intentional backpressure skip suppresses the draw assertion', () => {
+    const { scene, root } = authoritativeTerminal();
+    const audit = auditArenaRenderLiveness(
+      scene,
+      root,
+      'skyline-terminal',
+      { calls: 0, triangles: 0, points: 0, lines: 0 },
+      true,
+      undefined,
+      root,
+      false,
+    );
+    expect(audit.submissionExpected).toBe(false);
+    expect(audit.reasons).toEqual([]);
+
+    root.removeFromParent();
+    const detached = auditArenaRenderLiveness(
+      scene,
+      root,
+      'skyline-terminal',
+      { calls: 0, triangles: 0, points: 0, lines: 0 },
+      true,
+      undefined,
+      root,
+      false,
+    );
+    expect(detached.reasons).toContain('selected-root-detached');
+    expect(detached.reasons).not.toContain('renderer-submission-empty');
+  });
 });

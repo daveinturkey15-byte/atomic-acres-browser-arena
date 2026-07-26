@@ -10612,6 +10612,8 @@ function monitorSelectedArenaRender(now: number): void {
   // authority stays on the procedural root. Audit both halves of that
   // contract instead of exempting the map whose art can actually disappear.
   const eligible = arenaSelectionReady && !renderSubmissionPaused;
+  const presentationBeforeAudit = renderRuntime.presentationTelemetry(now);
+  const submissionExpected = !presentationBeforeAudit.backpressureActive;
   let presentationRoot = selectedArenaPresentationRoot();
   let audit = auditArenaRenderLiveness(
     scene,
@@ -10621,6 +10623,7 @@ function monitorSelectedArenaRender(now: number): void {
     eligible,
     camera,
     presentationRoot,
+    submissionExpected,
   );
   if (eligible && audit.reasons.length > 0) {
     let restored = false;
@@ -10655,6 +10658,7 @@ function monitorSelectedArenaRender(now: number): void {
       eligible,
       camera,
       presentationRoot,
+      submissionExpected,
     );
     if (selectedArena.id === 'atomic-acres' && presentationRoot !== arena.root && audit.reasons.length > 0) {
       // A broken quality root must degrade to the already-resident gameplay
@@ -10673,6 +10677,7 @@ function monitorSelectedArenaRender(now: number): void {
         eligible,
         camera,
         presentationRoot,
+        submissionExpected,
       );
     }
   }
