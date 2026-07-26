@@ -13516,6 +13516,7 @@ const debugWindow = window as Window & {
     damageFromRemote: (amount: number, cause?: KillCause['kind']) => void;
     damageRemoteAuthoritatively: (amount: number, playerId?: string) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
     earnSupport: (eliminations: number) => void;
+    activateKillstreak: (id: Pass65KillstreakId, anchor?: [number, number, number]) => boolean;
     forceBotGrenade: (fuseMs?: number) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -13921,6 +13922,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lowHealthActive: lowHealthFeedbackState.active,
       lowHealthOpacity: Number(lowHealthVignette.style.getPropertyValue('--low-health-opacity') || 0),
     },
+    killstreak: killstreakSnapshot,
     fieldSupport: {
       streak: fieldSupport.streak,
       rewardCycle: fieldSupport.rewardCycle,
@@ -14979,6 +14981,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   earnSupport: (eliminations: number) => {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
   },
+  activateKillstreak: (id: Pass65KillstreakId, anchor) => requestKillstreakActivation(id, performance.now(), anchor),
   forceBotGrenade: (fuseMs = 1_100) => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     return bot ? throwBotGrenade(bot, performance.now(), fuseMs) : false;

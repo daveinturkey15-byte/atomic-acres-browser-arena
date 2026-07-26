@@ -75,6 +75,12 @@ try {
     ],
   });
   page = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
+  await page.addInitScript(() => {
+    localStorage.setItem('atomic-acres:killstreak-loadout:v1', JSON.stringify({
+      schemaVersion: 1,
+      slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm'],
+    }));
+  });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
@@ -115,6 +121,22 @@ try {
         && state?.render?.runtime?.presentation?.status === 'healthy'
         && document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 30_000 });
+    const killstreakStress = await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(15);
+      return {
+        chopper: api.activateKillstreak('chopper'),
+        droneSwarm: api.activateKillstreak('drone-swarm'),
+      };
+    });
+    if (!killstreakStress.chopper || !killstreakStress.droneSwarm) {
+      throw new Error(`${arenaId} could not stage the chopper plus drone-swarm stress overlap: ${JSON.stringify(killstreakStress)}`);
+    }
+    await page.waitForFunction(() => {
+      const entities = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.killstreak?.entities ?? [];
+      return entities.some((entity) => entity.kind === 'chopper')
+        && entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length >= 5;
+    }, undefined, { timeout: 5_000 });
     const canvasClip = await page.locator('#game').boundingBox();
     if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
       throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
@@ -169,6 +191,14 @@ try {
           runtime: state.render.runtime,
           watchdog: state.render.playableScene.renderWatchdog,
           gpuRetirement: state.interactiveWorld.gpuRetirement,
+          killstreak: {
+            revision: state.killstreak.revision,
+            entities: state.killstreak.entities.map((entity) => ({
+              kind: entity.kind,
+              mode: entity.mode,
+              phase: entity.phase,
+            })),
+          },
           smokePresentation: state.dmrThermal.smokePresentation,
           residency: api.sampleRendererResidency(),
         };
@@ -267,6 +297,7 @@ try {
       arenaId,
       requestedDurationMs: durationMs,
       actualDurationMs: samples.at(-1).atMs - samples[0].atMs,
+      killstreakStress,
       samples: samples.length,
       distinctScreenshots: screenshotHashes.size,
       first: samples[0],
