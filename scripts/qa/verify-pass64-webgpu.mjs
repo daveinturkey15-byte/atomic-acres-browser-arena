@@ -335,7 +335,10 @@ try {
     receipts.push({ arenaId, scripts: arenaChunks, errors: uniqueErrors, overview, composition, performanceBudget, ...evidence, roi });
     await page.close();
   }
-  const switchPage = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  // The Pass 64 UAF reproduced reliably at Dave's 2560-class owner-play load,
+  // not at the old low-resolution switch smoke. Keep this lifecycle stress at
+  // the frozen primary HITL resolution so memory/transient pressure is real.
+  const switchPage = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
   const switchScripts = [];
   const switchErrors = [];
   switchPage.on('pageerror', (error) => switchErrors.push(error.message));
@@ -402,7 +405,11 @@ try {
   }
   if (switchErrors.length > 0) throw new Error(`Gameplay arena switches emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
   const presentationSoak = [];
-  for (const arenaId of ['rustworks-1v1', 'gun-range', 'skyline-terminal', 'atomic-acres', 'rustworks-1v1']) {
+  for (const arenaId of [
+    'rustworks-1v1', 'gun-range',
+    'rustworks-1v1', 'gun-range',
+    'skyline-terminal', 'atomic-acres', 'rustworks-1v1',
+  ]) {
     await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
     await switchPage.evaluate(() => {
       window.__ATOMIC_ACRES_DEBUG__.startSolo();
@@ -460,6 +467,9 @@ try {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.gameStarted === false && !document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 15_000 });
+  }
+  if (switchErrors.length > 0) {
+    throw new Error(`Repeated gameplay presentation soak emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
   }
   await switchPage.close();
   const multiplayerPages = await Promise.all(['host', 'guest'].map(async (role) => {

@@ -53,8 +53,8 @@ export function classifyPresentationFreshness(input: Readonly<{
 }>): PresentationFreshnessTelemetry['status'] {
   if (input.deviceLost) return 'device-lost';
   if (input.completionFailures > 0) return 'failed';
+  if (input.submissionSequence > input.completedSequence && input.pendingForMs > input.stallThresholdMs) return 'stalled';
   if (input.submissionSequence === 0 || input.completedSequence === 0) return 'warming';
-  if (input.pendingForMs > input.stallThresholdMs) return 'stalled';
   return 'healthy';
 }
 
@@ -69,6 +69,38 @@ export function shouldBackpressureWebGpuSubmissions(
     && Number.isFinite(thresholdMs)
     && thresholdMs >= 0
     && now - pendingSince >= thresholdMs;
+}
+
+export async function awaitSubmissionCompletionTarget(input: Readonly<{
+  targetSequence: number;
+  completedSequence: () => number;
+  createProbe: () => Promise<void> | null;
+  failure: () => string | null;
+  timeoutMs: number;
+}>): Promise<void> {
+  if (input.completedSequence() >= input.targetSequence) return;
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutHandle = setTimeout(
+      () => reject(new Error(`WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`)),
+      input.timeoutMs,
+    );
+  });
+  try {
+    while (input.completedSequence() < input.targetSequence) {
+      const before = input.completedSequence();
+      const probe = input.createProbe();
+      if (!probe) throw new Error('WebGPU queue completion probing is unavailable');
+      await Promise.race([probe, timeout]);
+      const failure = input.failure();
+      if (failure) throw new Error(`WebGPU queue completion failed: ${failure}`);
+      if (input.completedSequence() <= before) {
+        throw new Error(`WebGPU queue completion probe did not advance beyond submission ${before}`);
+      }
+    }
+  } finally {
+    if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+  }
 }
 
 export type RenderInfoSnapshot = Readonly<{
@@ -493,8 +525,9 @@ export class WebGpuRenderRuntime {
     const queue = this.device.queue;
     if (!queue?.onSubmittedWorkDone) return null;
     const sequence = this.submissionSequence;
+    if (sequence <= this.completedSequence) return Promise.resolve();
     const startedAt = now;
-    this.pendingCompletionStartedAt = startedAt;
+    this.pendingCompletionStartedAt ??= startedAt;
     this.nextCompletionProbeAt = now + WebGpuRenderRuntime.COMPLETION_PROBE_INTERVAL_MS;
     const probe = queue.onSubmittedWorkDone()
       .then(() => {
@@ -510,7 +543,7 @@ export class WebGpuRenderRuntime {
       .finally(() => {
         if (this.completionProbe === probe) {
           this.completionProbe = null;
-          this.pendingCompletionStartedAt = null;
+          if (this.completedSequence >= this.submissionSequence) this.pendingCompletionStartedAt = null;
         }
       });
     this.completionProbe = probe;
@@ -614,13 +647,13 @@ export class WebGpuRenderRuntime {
 
   async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
     await this.compile(root, camera, scene);
-    this.renderPipeline.render();
+    this.submitFrame(performance.now(), true);
     await this.waitForSubmittedWork();
   }
 
   compileAndRenderImmediate(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
     void this.renderer.compileAsync(root, camera, scene);
-    this.renderPipeline.render();
+    this.submitFrame(performance.now(), true);
   }
 
   submitFrame(now = performance.now(), force = false): boolean {
@@ -630,6 +663,7 @@ export class WebGpuRenderRuntime {
       now,
       WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
     )) {
+      this.scheduleCompletionProbe(now, true);
       this.skippedSubmissions += 1;
       return false;
     }
@@ -665,19 +699,14 @@ export class WebGpuRenderRuntime {
   }
 
   async waitForSubmittedWork(timeoutMs = 4_000): Promise<void> {
-    const now = performance.now();
-    const probe = this.scheduleCompletionProbe(now, true)
-      ?? this.device.queue?.onSubmittedWorkDone?.()
-      ?? Promise.resolve();
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    const timeout = new Promise<never>((_resolve, reject) => {
-      timeoutHandle = setTimeout(() => reject(new Error(`WebGPU queue completion exceeded ${timeoutMs} ms`)), timeoutMs);
+    const targetSequence = this.submissionSequence;
+    await awaitSubmissionCompletionTarget({
+      targetSequence,
+      completedSequence: () => this.completedSequence,
+      createProbe: () => this.scheduleCompletionProbe(performance.now(), true),
+      failure: () => this.lastFailure,
+      timeoutMs,
     });
-    try {
-      await Promise.race([probe, timeout]);
-    } finally {
-      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
-    }
   }
 
   dispose(): void {

@@ -736,11 +736,17 @@ const maximumAnisotropy = renderRuntime.maximumAnisotropy();
 
 function requestStaticShadowRefresh(value = true): void {
   renderRuntime.requestShadowUpdate(value);
-  renderRuntime.configureLightShadows(
-    scene,
-    activeRenderConfig.shadowMode === 'dynamic',
-    value,
-  );
+  // Three's WebGPU ShadowNode clears `needsUpdate` after rendering. Avoid a
+  // full-scene traversal on every frame merely to repeat that clear; traverse
+  // only when a real refresh/configuration is requested. WebGL retains its
+  // renderer-level flag plus the per-light schedule for parity.
+  if (value || renderRuntime.backend === 'webgl2') {
+    renderRuntime.configureLightShadows(
+      scene,
+      activeRenderConfig.shadowMode === 'dynamic',
+      value,
+    );
+  }
 }
 let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);

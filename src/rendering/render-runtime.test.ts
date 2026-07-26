@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
+  awaitSubmissionCompletionTarget,
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
   resolveRenderRuntimeRequest,
@@ -51,6 +52,7 @@ describe('Pass 64 render runtime boundary', () => {
     expect(classify({ submissionSequence: 0, completedSequence: 0 })).toBe('warming');
     expect(classify()).toBe('healthy');
     expect(classify({ pendingForMs: 1_501 })).toBe('stalled');
+    expect(classify({ submissionSequence: 1, completedSequence: 0, pendingForMs: 2_000 })).toBe('stalled');
     expect(classify({ completionFailures: 1 })).toBe('failed');
     expect(classify({ deviceLost: true, completionFailures: 1 })).toBe('device-lost');
   });
@@ -92,5 +94,32 @@ describe('Pass 64 render runtime boundary', () => {
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
     expect(shouldBackpressureWebGpuSubmissions(800, 2_300, 250)).toBe(true);
+  });
+
+  it('fences the captured submission target even when an existing probe covers only older work', async () => {
+    let completed = 0;
+    let probes = 0;
+    await awaitSubmissionCompletionTarget({
+      targetSequence: 5,
+      completedSequence: () => completed,
+      createProbe: () => Promise.resolve().then(() => {
+        probes += 1;
+        completed = probes === 1 ? 2 : 5;
+      }),
+      failure: () => null,
+      timeoutMs: 1_000,
+    });
+    expect(probes).toBe(2);
+    expect(completed).toBe(5);
+  });
+
+  it('fails closed when a queue completion probe resolves without advancing its target', async () => {
+    await expect(awaitSubmissionCompletionTarget({
+      targetSequence: 1,
+      completedSequence: () => 0,
+      createProbe: () => Promise.resolve(),
+      failure: () => null,
+      timeoutMs: 1_000,
+    })).rejects.toThrow('did not advance');
   });
 });
