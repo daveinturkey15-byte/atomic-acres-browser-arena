@@ -29,8 +29,12 @@ Create complete, positional and bounded audio without inventing gameplay authori
 
 ## Validate
 
-Read [references/audio-budget-contract.md](references/audio-budget-contract.md), then run:
+Read [references/audio-budget-contract.md](references/audio-budget-contract.md), then from this skill directory run both contract fixtures:
+
+`node scripts/verify-audio-catalog.mjs scripts/fixtures/known-good.json`
+
+`node scripts/verify-audio-catalog.mjs scripts/fixtures/incomplete.json`
+
+The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
 
 `node scripts/verify-audio-catalog.mjs <audio-manifest.json>`
-
-The known-good fixture must pass and the incomplete fixture must fail.

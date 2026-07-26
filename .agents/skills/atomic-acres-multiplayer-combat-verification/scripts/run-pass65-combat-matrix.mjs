@@ -31,6 +31,8 @@ const requiredScenarios = [
   'ordnance-duplicate-stale',
   'support-reward-forgery',
   'shed-revision-forgery',
+  'late-join-repair',
+  'match-end-cleanup',
   'reconnect-rematch-repair',
   'pose-history-dynamic-geometry',
   'exactly-once-outcomes'
@@ -47,6 +49,7 @@ check(Array.isArray(report?.acceptance?.falsifierIds) && report.acceptance.falsi
 
 const profiles = Array.isArray(report?.impairmentManifest?.profiles) ? report.impairmentManifest.profiles : [];
 check(idOk(report?.impairmentManifest?.version), 'impairment manifest version invalid');
+check(shaOk(report?.impairmentManifest?.sha256), 'impairment manifest digest invalid');
 check(profiles.length > 0, 'impairment profiles missing');
 const profileIds = profiles.map(profile => profile?.id);
 check(new Set(profileIds).size === profileIds.length, 'impairment profile IDs must be unique');

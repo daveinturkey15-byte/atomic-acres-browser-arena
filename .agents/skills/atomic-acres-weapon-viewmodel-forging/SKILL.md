@@ -28,8 +28,14 @@ Build authored first-person presentation without moving gameplay authority.
 
 ## Validate
 
-Read [references/asset-animation-contract.md](references/asset-animation-contract.md), then run:
+Read [references/asset-animation-contract.md](references/asset-animation-contract.md), then from this skill directory run both contract fixtures:
+
+`node scripts/verify-viewmodel-assets.mjs scripts/fixtures/known-good.json`
+
+`node scripts/verify-viewmodel-assets.mjs scripts/fixtures/incomplete.json`
+
+The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
 
 `node scripts/verify-viewmodel-assets.mjs <viewmodel-manifest.json>`
 
-The known-good fixture must pass and the incomplete fixture must fail. A capture index is evidence only when it matches the exact source/build identity.
+A capture index is evidence only when it matches the exact source/build identity.

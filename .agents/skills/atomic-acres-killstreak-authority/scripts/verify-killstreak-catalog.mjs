@@ -71,6 +71,23 @@ for (const def of definitions) {
 
 const swarm = definitions.find(item => item.id === 'drone-swarm-entity');
 const pilot = definitions.find(item => item.id === 'piloted-drone-entity');
+const chopper = definitions.find(item => item.id === 'chopper-entity');
+const carpetBomber = definitions.find(item => item.id === 'carpet-bomber-entity');
+const adrenaline = catalog.find(item => item.id === 'adrenaline');
+const chopperCatalog = catalog.find(item => item.id === 'chopper');
+const carpetBomberCatalog = catalog.find(item => item.id === 'carpet-bomber');
+check(Boolean(adrenaline) && adrenaline.durationMs === 15000, 'Adrenaline duration must be 15000ms');
+check(Boolean(chopper) && chopper.durationMs === 30000, 'Chopper duration must be 30000ms');
+check(Boolean(chopperCatalog) && chopperCatalog.supportDefinitionId === 'chopper-entity', 'Chopper catalog binding invalid');
+check(Boolean(carpetBomber), 'Carpet Bomber definition missing');
+check(Boolean(carpetBomberCatalog) && carpetBomberCatalog.supportDefinitionId === 'carpet-bomber-entity', 'Carpet Bomber catalog binding invalid');
+if (carpetBomber) {
+  check(carpetBomber.kind === 'aircraft', 'Carpet Bomber must use the aircraft support kind');
+  check(carpetBomber.bombCount === 20, 'Carpet Bomber must schedule exactly 20 impacts');
+  check(carpetBomber.ingressPolicy === 'host-seeded-random-valid', 'Carpet Bomber ingress policy invalid');
+  check(carpetBomber.pathPolicy === 'bounded-zigzag-strip', 'Carpet Bomber path policy invalid');
+  check(carpetBomber.maximumProjectiles >= carpetBomber.bombCount, 'Carpet Bomber projectile cap is below its impact count');
+}
 check(Boolean(swarm), 'drone swarm definition missing');
 check(Boolean(pilot), 'piloted drone definition missing');
 if (swarm) {

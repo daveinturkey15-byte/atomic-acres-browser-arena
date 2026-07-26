@@ -4,14 +4,15 @@
     "id": "DEC-13",
     "status": "FROZEN",
     "duplicatesAllowed": false,
-    "catalogIds": ["adrenaline", "care-package", "chopper", "piloted-drone", "drone-swarm", "nuke", "tri-pass"]
+    "catalogIds": ["adrenaline", "care-package", "chopper", "carpet-bomber", "piloted-drone", "drone-swarm", "nuke", "tri-pass"]
   },
   "catalog": [
-    { "id": "adrenaline", "cost": 3, "tier": "low", "availability": "selectable", "carePackageWeightUnits": 3900, "supportDefinitionId": null, "authorityPolicy": "host", "presentationId": "adrenaline-view", "evidenceIds": ["R501"] },
+    { "id": "adrenaline", "cost": 3, "tier": "low", "availability": "selectable", "carePackageWeightUnits": 3900, "durationMs": 15000, "supportDefinitionId": null, "authorityPolicy": "host", "presentationId": "adrenaline-view", "evidenceIds": ["R501"] },
     { "id": "care-package", "cost": 5, "tier": "mid", "availability": "selectable", "carePackageWeightUnits": 0, "supportDefinitionId": "care-package-entity", "authorityPolicy": "host", "presentationId": "care-view", "evidenceIds": ["R502"] },
-    { "id": "chopper", "cost": 8, "tier": "high", "availability": "selectable", "carePackageWeightUnits": 3000, "supportDefinitionId": "chopper-entity", "authorityPolicy": "host", "presentationId": "chopper-view", "evidenceIds": ["R504"] },
-    { "id": "piloted-drone", "cost": 8, "tier": "high", "availability": "selectable", "carePackageWeightUnits": 2000, "supportDefinitionId": "piloted-drone-entity", "authorityPolicy": "host", "presentationId": "pilot-view", "evidenceIds": ["R507"] },
-    { "id": "drone-swarm", "cost": 15, "tier": "top", "availability": "selectable", "carePackageWeightUnits": 1000, "supportDefinitionId": "drone-swarm-entity", "authorityPolicy": "host", "presentationId": "swarm-view", "evidenceIds": ["R506"] },
+    { "id": "chopper", "cost": 8, "tier": "high", "availability": "selectable", "carePackageWeightUnits": 2500, "supportDefinitionId": "chopper-entity", "authorityPolicy": "host", "presentationId": "chopper-view", "evidenceIds": ["R504"] },
+    { "id": "carpet-bomber", "cost": 8, "tier": "high", "availability": "selectable", "carePackageWeightUnits": 1500, "supportDefinitionId": "carpet-bomber-entity", "authorityPolicy": "host", "presentationId": "carpet-bomber-view", "evidenceIds": ["R505"] },
+    { "id": "piloted-drone", "cost": 8, "tier": "high", "availability": "selectable", "carePackageWeightUnits": 1800, "supportDefinitionId": "piloted-drone-entity", "authorityPolicy": "host", "presentationId": "pilot-view", "evidenceIds": ["R507"] },
+    { "id": "drone-swarm", "cost": 15, "tier": "top", "availability": "selectable", "carePackageWeightUnits": 200, "supportDefinitionId": "drone-swarm-entity", "authorityPolicy": "host", "presentationId": "swarm-view", "evidenceIds": ["R506"] },
     { "id": "nuke", "cost": 20, "tier": "top", "availability": "care-only", "carePackageWeightUnits": 100, "supportDefinitionId": null, "authorityPolicy": "host", "presentationId": "nuke-view", "evidenceIds": ["R512"] },
     { "id": "tri-pass", "cost": 8, "tier": "high", "availability": "retired", "carePackageWeightUnits": 0, "supportDefinitionId": null, "authorityPolicy": "host", "presentationId": "tri-pass-retired-view", "evidenceIds": ["R500"] }
   ],
@@ -21,7 +22,8 @@
   ],
   "supportDefinitions": [
     { "id": "care-package-entity", "kind": "parachute-crate", "authority": "host", "maximumEntities": 2, "maximumActiveVoices": 8, "maximumProjectiles": 0, "pooled": true, "prewarmed": true, "provenanceId": "care-assets" },
-    { "id": "chopper-entity", "kind": "chopper", "authority": "host", "maximumEntities": 1, "maximumActiveVoices": 12, "maximumProjectiles": 64, "pooled": true, "prewarmed": true, "provenanceId": "chopper-assets" },
+    { "id": "chopper-entity", "kind": "chopper", "authority": "host", "durationMs": 30000, "maximumEntities": 1, "maximumActiveVoices": 12, "maximumProjectiles": 64, "pooled": true, "prewarmed": true, "provenanceId": "chopper-assets" },
+    { "id": "carpet-bomber-entity", "kind": "aircraft", "authority": "host", "bombCount": 20, "ingressPolicy": "host-seeded-random-valid", "pathPolicy": "bounded-zigzag-strip", "maximumEntities": 1, "maximumActiveVoices": 12, "maximumProjectiles": 20, "pooled": true, "prewarmed": true, "provenanceId": "carpet-bomber-assets" },
     { "id": "drone-swarm-entity", "kind": "drone", "authority": "host", "count": 12, "health": 50, "magazine": 20, "reserveClips": null, "durationMs": 60000, "gunProfileId": "drone-gun-v1", "navRequired": true, "targeting": "host-los-smoke-cover", "maximumEntities": 12, "maximumActiveVoices": 24, "maximumProjectiles": 96, "pooled": true, "prewarmed": true, "provenanceId": "swarm-assets" },
     { "id": "piloted-drone-entity", "kind": "drone", "authority": "host", "count": 1, "health": 50, "magazine": 20, "reserveClips": 1, "fuelMs": 30000, "gunProfileId": "drone-gun-v1", "sensor": { "presentationOnly": true, "revealPolicy": "living-hostiles-only" }, "maximumEntities": 1, "maximumActiveVoices": 8, "maximumProjectiles": 40, "pooled": true, "prewarmed": true, "provenanceId": "pilot-assets" }
   ]

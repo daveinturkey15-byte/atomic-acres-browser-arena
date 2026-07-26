@@ -57,12 +57,19 @@ for (const entry of entries) {
   check(new Set(requiredActions).size === requiredActions.length, `${label}: requiredActions duplicate`);
   for (const action of requiredActions) {
     check(clips.filter(clip => clip?.action === action).length === 1, `${label}: action ${action} must have one clip`);
+    check(captures.filter(item => item?.action === action).length === 1, `${label}: action ${action} must have one capture`);
     const capture = captures.find(item => item?.action === action);
     check(Boolean(capture), `${label}: action ${action} capture missing`);
     if (capture) {
+      check(idOk(capture.weaponId), `${label}: action ${action} weapon ID missing or invalid`);
       check(/^[a-f0-9]{40}$/.test(capture.sourceSha ?? ''), `${label}: action ${action} source SHA invalid`);
       check(typeof capture.buildId === 'string' && capture.buildId.length > 0, `${label}: action ${action} build ID missing`);
       check(capture.backend === 'webgpu', `${label}: action ${action} backend must be webgpu`);
+      check(idOk(capture.profile), `${label}: action ${action} profile missing or invalid`);
+      check(Number.isInteger(capture.viewport?.width) && capture.viewport.width >= 320 && capture.viewport.width <= 7680, `${label}: action ${action} viewport width invalid`);
+      check(Number.isInteger(capture.viewport?.height) && capture.viewport.height >= 200 && capture.viewport.height <= 4320, `${label}: action ${action} viewport height invalid`);
+      check(finite(capture.viewport?.dpr, 0.5, 4), `${label}: action ${action} viewport DPR invalid`);
+      check(finite(capture.clockMs, 0, 86400000), `${label}: action ${action} deterministic clock missing or invalid`);
       check(Number.isInteger(capture.seed), `${label}: action ${action} seed missing`);
     }
   }

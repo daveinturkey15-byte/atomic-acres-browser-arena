@@ -52,6 +52,12 @@ for (const weapon of weapons) {
   check(finite(damage.falloffStartM, 0, 1000) && finite(damage.falloffEndM, damage.falloffStartM ?? 1001, 2000), `${label}: invalid falloff`);
   check(finite(damage.headMultiplier, 0, 10) && finite(damage.limbMultiplier, 0, 10), `${label}: invalid hit multipliers`);
 
+  const handling = weapon?.handling ?? {};
+  check(finite(handling.hipSpreadDeg, 0, 45), `${label}: invalid hip spread`);
+  check(finite(handling.adsSpreadDeg, 0, handling.hipSpreadDeg ?? -1), `${label}: invalid ADS spread`);
+  check(finite(handling.recoilPitchDeg, 0, 45) && finite(handling.recoilYawDeg, 0, 45), `${label}: invalid recoil`);
+  check(finite(handling.recoveryMs, 0, 10000), `${label}: invalid recoil recovery`);
+
   const ammo = weapon?.ammo ?? {};
   check(Number.isInteger(ammo.magazine) && ammo.magazine > 0 && ammo.magazine <= 2000, `${label}: invalid magazine`);
   check(Number.isInteger(ammo.reserve) && ammo.reserve >= 0 && ammo.reserve <= 10000, `${label}: invalid reserve`);
@@ -59,7 +65,9 @@ for (const weapon of weapons) {
 
   const penetration = weapon?.penetration ?? {};
   check(finite(penetration.power, 0, 1000), `${label}: invalid penetration power`);
+  check(finite(penetration.retentionPerSurface, 0, 1), `${label}: invalid penetration retention`);
   check(Number.isInteger(penetration.maximumSurfaces) && penetration.maximumSurfaces >= 0 && penetration.maximumSurfaces <= 16, `${label}: invalid surface cap`);
+  check(idOk(weapon?.opticPolicyId), `${label}: optic policy missing or invalid`);
 
   for (const policy of ['loadout', 'bot', 'drop', 'replay', 'telemetry']) {
     check(typeof weapon?.policies?.[policy] === 'string' && weapon.policies[policy].length > 0, `${label}: missing ${policy} policy`);

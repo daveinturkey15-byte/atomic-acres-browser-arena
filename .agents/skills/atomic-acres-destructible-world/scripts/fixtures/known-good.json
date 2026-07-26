@@ -12,6 +12,25 @@
       "authority": "host",
       "revisioned": true,
       "verticalSlicePassed": true,
+      "collisionPolicyId": "shed-collision-v1",
+      "materialPolicyId": "corrugated-steel-v1",
+      "damageThresholds": {
+        "dent": 10,
+        "perforate": 25,
+        "detach": 100
+      },
+      "preauthoredChunkIds": [
+        "shed-wall-north",
+        "shed-wall-south",
+        "shed-wall-east",
+        "shed-wall-west",
+        "shed-roof-left",
+        "shed-roof-right"
+      ],
+      "lods": [
+        {"id": "shed-lod0", "maxDistanceM": 25, "triangleBudget": 12000},
+        {"id": "shed-lod1", "maxDistanceM": 100, "triangleBudget": 3000}
+      ],
       "placements": [
         {"arenaId": "nuke-town", "count": 2},
         {"arenaId": "rustrig", "count": 2}

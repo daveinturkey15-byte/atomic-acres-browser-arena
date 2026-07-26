@@ -26,12 +26,12 @@
         { "action": "reload" }, { "action": "empty-reload" }, { "action": "melee" }
       ],
       "captures": [
-        { "action": "equip", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
-        { "action": "idle", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
-        { "action": "fire", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
-        { "action": "reload", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
-        { "action": "empty-reload", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
-        { "action": "melee", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 }
+        { "action": "equip", "weaponId": "a4-vanguard", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "profile": "quality", "viewport": { "width": 1920, "height": 1080, "dpr": 1 }, "clockMs": 0, "seed": 1 },
+        { "action": "idle", "weaponId": "a4-vanguard", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "profile": "quality", "viewport": { "width": 1920, "height": 1080, "dpr": 1 }, "clockMs": 1000, "seed": 1 },
+        { "action": "fire", "weaponId": "a4-vanguard", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "profile": "quality", "viewport": { "width": 1920, "height": 1080, "dpr": 1 }, "clockMs": 2000, "seed": 1 },
+        { "action": "reload", "weaponId": "a4-vanguard", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "profile": "quality", "viewport": { "width": 1920, "height": 1080, "dpr": 1 }, "clockMs": 3000, "seed": 1 },
+        { "action": "empty-reload", "weaponId": "a4-vanguard", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "profile": "quality", "viewport": { "width": 1920, "height": 1080, "dpr": 1 }, "clockMs": 4000, "seed": 1 },
+        { "action": "melee", "weaponId": "a4-vanguard", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "profile": "quality", "viewport": { "width": 1920, "height": 1080, "dpr": 1 }, "clockMs": 5000, "seed": 1 }
       ],
       "budgets": { "lod0Triangles": 90000, "draws": 12, "decodedTextureBytes": 67108864 },
       "genericFallbackAllowed": false

@@ -16,7 +16,9 @@
       "requiredActions": ["idle", "fire"],
       "allowedTransitions": [{ "from": "sprint", "to": "ads-in" }],
       "clips": [{ "action": "idle" }],
-      "captures": [],
+      "captures": [
+        { "action": "idle", "sourceSha": "bad", "buildId": "", "backend": "webgl", "seed": 1 }
+      ],
       "budgets": { "lod0Triangles": 999999, "draws": 0, "decodedTextureBytes": -1 },
       "genericFallbackAllowed": true
     }

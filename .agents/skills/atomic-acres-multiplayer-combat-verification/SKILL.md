@@ -30,8 +30,14 @@ Attack named falsifiers against one immutable candidate identity; never turn imp
 
 ## Validate
 
-Read [references/chaos-matrix.md](references/chaos-matrix.md), then run:
+Read [references/chaos-matrix.md](references/chaos-matrix.md), then from this skill directory run both contract fixtures:
+
+`node scripts/run-pass65-combat-matrix.mjs scripts/fixtures/known-good.json`
+
+`node scripts/run-pass65-combat-matrix.mjs scripts/fixtures/incomplete.json`
+
+The first command must exit zero and the second must exit nonzero. For a candidate matrix result, run:
 
 `node scripts/run-pass65-combat-matrix.mjs <matrix-result.json>`
 
-This staging runner validates a completed deterministic matrix manifest. The known-good fixture must pass and the incomplete fixture must fail. After B1, replace its result loader with bounded test-group orchestration while retaining fail-closed evidence checks.
+This staging runner validates a completed deterministic matrix manifest. After B1, replace its result loader with bounded test-group orchestration while retaining fail-closed evidence checks.

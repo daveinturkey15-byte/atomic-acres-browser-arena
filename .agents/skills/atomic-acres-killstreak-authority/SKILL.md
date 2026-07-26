@@ -30,8 +30,12 @@ Keep support selection data-driven and every shared outcome host-authored.
 
 ## Validate
 
-Read [references/support-authority-contract.md](references/support-authority-contract.md), then run:
+Read [references/support-authority-contract.md](references/support-authority-contract.md), then from this skill directory run both contract fixtures:
+
+`node scripts/verify-killstreak-catalog.mjs scripts/fixtures/known-good.json`
+
+`node scripts/verify-killstreak-catalog.mjs scripts/fixtures/incomplete.json`
+
+The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
 
 `node scripts/verify-killstreak-catalog.mjs <support-manifest.json>`
-
-The validator must pass the known-good fixture and reject the incomplete fixture before a catalog interface is trusted.

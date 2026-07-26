@@ -43,6 +43,14 @@ for (const object of objects) {
   check(object?.authority === 'host', `${label}: authority must be host`);
   check(object?.revisioned === true, `${label}: state must be revisioned`);
   check(object?.verticalSlicePassed === true, `${label}: vertical slice gate not passed`);
+  check(idOk(object?.collisionPolicyId), `${label}: collision policy ID missing or invalid`);
+  check(idOk(object?.materialPolicyId), `${label}: material policy ID missing or invalid`);
+
+  const thresholds = object?.damageThresholds ?? {};
+  check(finite(thresholds.dent, 0, 1000000), `${label}: dent threshold invalid`);
+  check(finite(thresholds.perforate, 0, 1000000), `${label}: perforate threshold invalid`);
+  check(finite(thresholds.detach, 0, 1000000), `${label}: detach threshold invalid`);
+  check(thresholds.dent < thresholds.perforate && thresholds.perforate < thresholds.detach, `${label}: damage thresholds must increase dent < perforate < detach`);
 
   const placements = Array.isArray(object?.placements) ? object.placements : [];
   const placementMap = new Map(placements.map(item => [item?.arenaId, item?.count]));
@@ -72,6 +80,23 @@ for (const object of objects) {
   check(Number.isInteger(debris.maxMajorChunks) && debris.maxMajorChunks >= 1 && debris.maxMajorChunks <= 16, `${label}: major debris cap invalid`);
   check(debris.hostSimulated === true, `${label}: major debris must be host simulated`);
   check(debris.shotWakeFlat === true && debris.contactNudgeNonFlat === true, `${label}: debris wake/nudge behavior incomplete`);
+  const chunkIds = Array.isArray(object?.preauthoredChunkIds) ? object.preauthoredChunkIds : [];
+  check(chunkIds.length === debris.maxMajorChunks, `${label}: pre-authored chunk count must equal the major debris cap`);
+  check(chunkIds.every(idOk) && new Set(chunkIds).size === chunkIds.length, `${label}: pre-authored chunk IDs missing, invalid or duplicated`);
+
+  const lods = Array.isArray(object?.lods) ? object.lods : [];
+  check(lods.length >= 2 && lods.length <= 8, `${label}: bounded LOD definitions missing`);
+  check(new Set(lods.map(lod => lod?.id)).size === lods.length, `${label}: LOD IDs must be unique`);
+  for (let index = 0; index < lods.length; index += 1) {
+    const lod = lods[index] ?? {};
+    check(idOk(lod.id), `${label}: invalid LOD ID`);
+    check(finite(lod.maxDistanceM, 0.01, 10000), `${label}: ${lod.id ?? '<invalid-lod>'} distance invalid`);
+    check(Number.isInteger(lod.triangleBudget) && lod.triangleBudget >= 1 && lod.triangleBudget <= 10000000, `${label}: ${lod.id ?? '<invalid-lod>'} triangle budget invalid`);
+    if (index > 0) {
+      check(lod.maxDistanceM > lods[index - 1]?.maxDistanceM, `${label}: LOD distances must increase`);
+      check(lod.triangleBudget <= lods[index - 1]?.triangleBudget, `${label}: LOD triangle budgets must not increase with distance`);
+    }
+  }
 
   const persistence = object?.persistence ?? {};
   check(persistence.lateJoin === true, `${label}: late-join reconstruction missing`);

@@ -38,6 +38,7 @@ check(events.length > 0, 'events must be a non-empty array');
 const eventIds = events.map(event => event?.id);
 check(new Set(eventIds).size === eventIds.length, 'event IDs must be unique');
 for (const family of requiredFamilies) check(events.some(event => event?.family === family), `missing event family ${family}`);
+for (const bus of requiredBuses.filter(bus => bus !== 'master')) check(events.some(event => event?.bus === bus), `missing event on bus ${bus}`);
 
 for (const event of events) {
   const label = idOk(event?.id) ? event.id : '<invalid-id>';

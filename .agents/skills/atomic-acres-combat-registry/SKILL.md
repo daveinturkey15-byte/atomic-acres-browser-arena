@@ -30,7 +30,13 @@ Keep combat definitions typed, exhaustive, host-authoritative, and presentation-
 
 ## Validate
 
-Read [references/coverage-contract.md](references/coverage-contract.md) before changing registry shape. Run:
+Read [references/coverage-contract.md](references/coverage-contract.md) before changing registry shape. From this skill directory, run both contract fixtures:
+
+`node scripts/verify-combat-registry.mjs scripts/fixtures/known-good.json`
+
+`node scripts/verify-combat-registry.mjs scripts/fixtures/incomplete.json`
+
+The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
 
 `node scripts/verify-combat-registry.mjs <combat-manifest.json>`
 
