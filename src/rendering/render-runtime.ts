@@ -388,7 +388,10 @@ export class WebGpuRenderRuntime {
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
-  private static readonly PRESENTATION_STALL_MS = 1_500;
+  // Cold shader/shadow compilation on the frozen owner hardware can retire in
+  // ~2.4 s. Backpressure still stops new work at 250 ms; four seconds matches
+  // the explicit queue-fence timeout and distinguishes cold work from a hang.
+  private static readonly PRESENTATION_STALL_MS = 4_000;
 
   private constructor(
     renderer: WebGPURenderer,
