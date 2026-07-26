@@ -135,6 +135,15 @@ export type BallisticTrace = Readonly<{
   stoppedBy?: BallisticSurface;
 }>;
 
+/**
+ * Dynamic aperture authority. The query receives the exact world-space entry
+ * point used by the trace; presentation must consume the same canonical region.
+ */
+export type BallisticApertureQuery = (
+  surface: BallisticSurface,
+  entryPoint: Point3,
+) => boolean;
+
 type SurfaceInterval = Readonly<{
   surface: BallisticSurface;
   entryDistance: number;
@@ -227,6 +236,7 @@ export function traceBallisticPath(
   requestedDistance: number,
   profile: WeaponPenetrationProfile,
   surfaces: readonly BallisticSurface[],
+  apertureQuery?: BallisticApertureQuery,
 ): BallisticTrace {
   const directionMagnitude = Math.hypot(direction.x, direction.y, direction.z);
   const targetDistance = Math.max(0, Number.isFinite(requestedDistance) ? requestedDistance : 0);
@@ -241,6 +251,11 @@ export function traceBallisticPath(
   const intervals = surfaces
     .map((surface) => surfaceInterval(origin, unit, targetDistance, surface))
     .filter((entry): entry is SurfaceInterval => entry !== null)
+    .filter((entry) => !apertureQuery?.(entry.surface, {
+      x: origin.x + unit.x * entry.entryDistance,
+      y: origin.y + unit.y * entry.entryDistance,
+      z: origin.z + unit.z * entry.entryDistance,
+    }))
     .sort((a, b) => a.entryDistance - b.entryDistance || a.exitDistance - b.exitDistance || a.surface.id.localeCompare(b.surface.id));
   const initialEnergy = Math.max(0, profile.penetrationPower * profile.fmjMultiplier);
   let energy = initialEnergy;

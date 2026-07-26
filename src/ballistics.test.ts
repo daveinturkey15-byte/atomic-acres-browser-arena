@@ -135,6 +135,21 @@ describe('shared wall-penetration authority', () => {
     expect(traceBallisticPath(origin, direction, 10, WEAPONS.sniper.penetration, [unknown]).reachedDistance).toBe(false);
   });
 
+  it('passes only through a canonical dynamic aperture at the exact entry point', () => {
+    const sheet = surface('reinforced', 5, 0.08, 'shed-sheet');
+    const blocked = traceBallisticPath(origin, direction, 10, WEAPONS.carbine.penetration, [sheet], () => false);
+    const aperture = traceBallisticPath(origin, direction, 10, WEAPONS.carbine.penetration, [sheet], (candidate, entry) => (
+      candidate.id === 'shed-sheet' && Math.hypot(entry.y - 1.5, entry.z) <= 0.1
+    ));
+    const outside = traceBallisticPath(
+      { ...origin, y: 1.8 }, direction, 10, WEAPONS.carbine.penetration, [sheet],
+      (_candidate, entry) => Math.hypot(entry.y - 1.5, entry.z) <= 0.1,
+    );
+    expect(blocked.reachedDistance).toBe(false);
+    expect(aperture).toMatchObject({ reachedDistance: true, impacts: [] });
+    expect(outside.reachedDistance).toBe(false);
+  });
+
   it('classifies every current additional-map shot blocker with unique authority', () => {
     for (const build of [buildArena, buildRustworks1v1, buildGunRange, buildSkylineTerminal]) {
       const arena = build(new THREE.Scene());
