@@ -278,29 +278,28 @@ function snapshotDescriptor(
   issues: WeaponSchemaIssue[],
 ): PropertyDescriptor | null {
   try {
-    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
-    if (!descriptor) {
+    const first = Reflect.getOwnPropertyDescriptor(value, key);
+    const second = Reflect.getOwnPropertyDescriptor(value, key);
+    if (!first || !second) {
       snapshotFailure(issues, path, 'own property descriptor');
       return null;
     }
-    return descriptor;
+    const firstIsData = Object.hasOwn(first, 'value');
+    const secondIsData = Object.hasOwn(second, 'value');
+    const stable = firstIsData === secondIsData
+      && first.configurable === second.configurable
+      && first.enumerable === second.enumerable
+      && (firstIsData
+        ? first.writable === second.writable && Object.is(first.value, second.value)
+        : first.get === second.get && first.set === second.set);
+    if (!stable) {
+      issue(issues, path, 'cross-field', 'own property descriptor changed during snapshot');
+      return null;
+    }
+    return first;
   } catch {
     snapshotFailure(issues, path, 'own property descriptor');
     return null;
-  }
-}
-
-function snapshotPropertyValue(
-  value: object,
-  key: PropertyKey,
-  path: string,
-  issues: WeaponSchemaIssue[],
-): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
-  try {
-    return Object.freeze({ ok: true, value: Reflect.get(value, key, value) });
-  } catch {
-    snapshotFailure(issues, path, 'property value');
-    return Object.freeze({ ok: false });
   }
 }
 
@@ -311,9 +310,13 @@ function snapshotArray(
   active: WeakSet<object>,
   depth: number,
 ): unknown[] {
-  const lengthResult = snapshotPropertyValue(value, 'length', `${path}.length`, issues);
-  if (!lengthResult.ok) return [];
-  const length = lengthResult.value;
+  const lengthDescriptor = snapshotDescriptor(value, 'length', `${path}.length`, issues);
+  if (!lengthDescriptor) return [];
+  if (!Object.hasOwn(lengthDescriptor, 'value')) {
+    issue(issues, `${path}.length`, 'type', 'accessor properties are forbidden');
+    return [];
+  }
+  const length = lengthDescriptor.value;
   if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > MAX_SNAPSHOT_ARRAY_LENGTH) {
     issue(
       issues,
@@ -349,9 +352,7 @@ function snapshotArray(
       issue(issues, propertyPath, 'type', 'accessor properties are forbidden');
       continue;
     }
-    const property = snapshotPropertyValue(value, key, propertyPath, issues);
-    if (!property.ok) continue;
-    snapshot[index] = snapshotValue(property.value, propertyPath, issues, active, depth + 1);
+    snapshot[index] = snapshotValue(descriptor.value, propertyPath, issues, active, depth + 1);
   }
   return snapshot;
 }
@@ -382,9 +383,7 @@ function snapshotRecord(
       issue(issues, propertyPath, 'type', 'accessor properties are forbidden');
       continue;
     }
-    const property = snapshotPropertyValue(value, key, propertyPath, issues);
-    if (!property.ok) continue;
-    snapshot[key] = snapshotValue(property.value, propertyPath, issues, active, depth + 1);
+    snapshot[key] = snapshotValue(descriptor.value, propertyPath, issues, active, depth + 1);
   }
   return snapshot;
 }

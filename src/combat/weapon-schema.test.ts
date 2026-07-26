@@ -385,12 +385,55 @@ describe('weapon schema strict object parsing', () => {
     ['getOwnPropertyDescriptor', (target: any) => new Proxy(target, {
       getOwnPropertyDescriptor: () => { throw new Error('descriptor'); },
     })],
-    ['get', (target: any) => new Proxy(target, { get: () => { throw new Error('get'); } })],
   ])('normalizes a throwing Proxy %s trap into WeaponSchemaValidationError', (_name, proxied) => {
     const input = proxied(validWeapon());
     expect(() => validateWeaponDefinition(input)).not.toThrow();
     expect(validateWeaponDefinition(input).length).toBeGreaterThan(0);
     expectSchemaFailure(() => parseWeaponDefinition(input));
+  });
+
+  it('never invokes a throwing Proxy get trap after descriptor snapshotting', () => {
+    let getCalls = 0;
+    const input = new Proxy(validWeapon(), {
+      get: () => {
+        getCalls += 1;
+        throw new Error('get must not run');
+      },
+    });
+
+    expect(validateWeaponDefinition(input)).toEqual([]);
+    const parsed = parseWeaponDefinition(input);
+    expect(getCalls).toBe(0);
+    expect(validateWeaponDefinition(parsed)).toEqual([]);
+  });
+
+  it('rejects a Proxy that inconsistently masks a configurable accessor as data', () => {
+    const target = validWeapon();
+    let getterReads = 0;
+    let descriptorReads = 0;
+    Object.defineProperty(target, 'rpm', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        getterReads += 1;
+        return 650;
+      },
+    });
+    const input = new Proxy(target, {
+      getOwnPropertyDescriptor: (proxiedTarget, key) => {
+        const actual = Reflect.getOwnPropertyDescriptor(proxiedTarget, key);
+        if (key !== 'rpm' || !actual) return actual;
+        descriptorReads += 1;
+        if (descriptorReads % 2 === 0) return actual;
+        return { configurable: true, enumerable: true, writable: true, value: 650 };
+      },
+    });
+
+    expect(validateWeaponDefinition(input)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: '$.rpm', code: 'cross-field' }),
+    ]));
+    expectSchemaFailure(() => parseWeaponDefinition(input));
+    expect(getterReads).toBe(0);
   });
 
   it('caps validation work and issue sorting for a non-index array-property flood', () => {
