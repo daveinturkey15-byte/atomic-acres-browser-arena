@@ -40,6 +40,10 @@ Proposed project-local package:
     agents/openai.yaml
     references/chaos-matrix.md
     scripts/run-pass65-combat-matrix.mjs
+  atomic-acres-webgpu-frame-pacing/
+    SKILL.md
+    agents/openai.yaml
+    scripts/verify-webgpu-frame-pacing-policy.mjs
   atomic-acres-owner-feedback-gate/
     SKILL.md
     agents/openai.yaml
@@ -262,12 +266,31 @@ Reconcile any Atomic Acres owner correction, HITL observation, regression, missi
 
 `verify-owner-feedback-ledger.mjs` fails duplicate, skipped, malformed, unowned, unscoped or unmapped feedback IDs, unknown planning references, stale latest-ID metadata and missing repository routing rules. Its self-test deliberately mutates a known-good ledger and must prove those defects are rejected.
 
-## 9. Skill validation and forward testing
+## 9. `atomic-acres-webgpu-frame-pacing`
+
+### Trigger description
+
+Prevent or diagnose Atomic Acres native-WebGPU freezes, frame-tail regressions, active-frame canvas readbacks, pause-backdrop capture, GPU queue/device errors, or Atomic Acres versus Terminal performance drift. Use for renderer-loop, menu lifecycle, arena streaming, performance and exact-SHA owner-hardware QA work.
+
+### Core workflow
+
+1. Prohibit presented game-canvas readback/copy during active native-WebGPU gameplay.
+2. Use CSS compositor blur for WebGPU pauses; permit only one pause-open 2D copy on the explicit WebGL2 compatibility route.
+3. Run the fail-closed policy mutation verifier and both menu/multiplayer lifecycle gates.
+4. Run installed Chrome at native WebGPU, Quality, 2560x1440 on a clean exact SHA with alternating fresh-context Atomic Acres and Terminal trials.
+5. Gate p50/p95/p99/max, counts over 20/33/50/100 ms, Long Tasks, queue completion, device loss, uncaptured errors and browser/page/request errors.
+6. Preserve the receipt/digest and require Dave's headed HITL on the unchanged candidate before publish.
+
+### Validator responsibilities
+
+`verify-webgpu-frame-pacing-policy.mjs` validates the exact evidence contract and repository source wiring, and its self-test mutates readback, compositor, source identity, browser/backend, viewport, comparator, metric, Long Task, lifecycle, HITL and package/index controls. It must fail closed when any mutation escapes.
+
+## 10. Skill validation and forward testing
 
 When the repo gate opens:
 
 1. Confirm the project-local skill location and repo conventions.
-2. Initialize each real skill with the canonical `skill-creator` script; do not copy this document verbatim into six oversized files.
+2. Initialize each real skill with the canonical `skill-creator` script; do not copy this document verbatim into oversized skill files.
 3. Generate matching `agents/openai.yaml` metadata from the final skill text.
 4. Implement only reusable references/scripts that the repo actually needs.
 5. Run `quick_validate.py` on every folder.
