@@ -104,11 +104,11 @@ describe('first-person anatomical presentation', () => {
     expect(state.armsVisible).toBe(true);
   });
 
-  it('keeps a detailed passive knife present and yields its arc to an accepted shot', () => {
+  it('never floats a passive knife beside a firearm', () => {
     const camera = new THREE.PerspectiveCamera();
     const presentation = new WeaponPresentation(camera, false);
     const initial = presentation.presentationState();
-    expect(initial.passiveKnifeVisible).toBe(true);
+    expect(initial.passiveKnifeVisible).toBe(false);
     expect(initial.passiveKnifeModel).toBe(true);
     expect(presentation.root.getObjectByName('field-knife-blade')).toBeInstanceOf(THREE.Mesh);
 
@@ -118,7 +118,24 @@ describe('first-person anatomical presentation', () => {
     const fired = presentation.presentationState();
     expect(fired.shotsPresented).toBe(1);
     expect(fired.knifeVisible).toBe(false);
-    expect(fired.passiveKnifeVisible).toBe(true);
+    expect(fired.passiveKnifeVisible).toBe(false);
+  });
+
+  it('keeps every visible arm mesh opaque throughout ADS', async () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    await presentation.load();
+    for (let frame = 0; frame < 180; frame += 1) presentation.update({ ...REST_POSE, ads: true });
+    const arms = presentation.root.getObjectByName('first-person-arms');
+    expect(arms?.visible).toBe(true);
+    arms?.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of materials) {
+        expect(material.transparent).toBe(false);
+        expect(material.opacity).toBe(1);
+        expect(material.depthWrite).toBe(true);
+      }
+    });
   });
 
   it('rotates the authored minigun barrel cluster before the first legal shot', async () => {

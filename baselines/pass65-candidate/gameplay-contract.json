@@ -3263,18 +3263,18 @@
           "color": 16773018,
           "crouchRecoilMultiplier": 0.86,
           "crouchSpreadMultiplier": 0.82,
-          "damage": 20,
+          "damage": 15,
           "falloffEnd": 74,
           "falloffStart": 24,
           "fireKind": "hitscan",
           "flashlight": null,
-          "headMultiplier": 1.35,
+          "headMultiplier": 1,
           "hipSpread": 0.026,
           "id": "minigun",
           "limbMultiplier": 0.85,
           "mag": 240,
           "maximumSpread": 0.06,
-          "minimumDamage": 15,
+          "minimumDamage": 11.25,
           "movementMultiplier": 0.8,
           "movementSpreadMultiplier": 1.8,
           "muzzleFlashScale": 1.25,
@@ -3490,7 +3490,7 @@
           "name": "TAC-15 Explosive Crossbow",
           "optic": {
             "kind": "standard",
-            "magnification": 1.35,
+            "magnification": 1.5,
             "solidOcclusion": "required"
           },
           "pellets": 1,
@@ -3975,7 +3975,9 @@
       "pass65-protocol-v7-arsenal-and-real-weapon-names",
       "pass65-curated-and-three-custom-loadouts",
       "pass65-single-selected-grenade-and-corpse-refill",
-      "pass65-coherent-pellet-shotgun-rebalance"
+      "pass65-coherent-pellet-shotgun-rebalance",
+      "pass65-hitl-minigun-no-crit-and-25-percent-damage-reduction",
+      "pass65-hitl-crossbow-compact-1.5x-optic"
     ]
   }
 }

@@ -12,6 +12,7 @@ import {
   PILOTED_DRONE_SENSOR_PROFILE,
   type DroneGunProfile,
 } from './killstreak-support-catalog';
+import { supportForwardFromYawPitch, supportYawForDirection } from './support-forward-axis';
 
 export const ADRENALINE_DURATION_MS = 15_000;
 export const ADRENALINE_DAMAGE_MULTIPLIER = 1.1;
@@ -375,11 +376,11 @@ export function chopperRoutePose(
   const seconds = clamp((nowMs - createdAtMs) / 1_000, 0, CHOPPER_DURATION_MS / 1_000);
   const phase = (salt: number) => unit(seed, salt) * Math.PI * 2;
   const pitch = clamp(
-    -Math.atan2(dy, horizontal) + Math.sin(seconds * 0.43 + phase(21)) * 0.025,
+    Math.atan2(dy, horizontal) + Math.sin(seconds * 0.43 + phase(21)) * 0.025,
     -CHOPPER_MOTION_VARIANCE.maximumPitchRadians,
     CHOPPER_MOTION_VARIANCE.maximumPitchRadians,
   );
-  const yaw = Math.atan2(dx, dz);
+  const yaw = supportYawForDirection(dx, dz);
   const bank = clamp(
     Math.sin(seconds * 0.36 + phase(22)) * 0.11 + Math.sin(seconds * 0.17 + phase(23)) * 0.05,
     -CHOPPER_MOTION_VARIANCE.maximumBankRadians,
@@ -424,8 +425,8 @@ function attitudeFromMotion(
   const horizontal = Math.hypot(dx, dz);
   if (horizontal < 1e-5 && Math.abs(dy) < 1e-5) return [...fallback];
   return [
-    clamp(-Math.atan2(dy, Math.max(0.001, horizontal)), -0.35, 0.35),
-    horizontal >= 1e-5 ? Math.atan2(dx, dz) : fallback[1],
+    clamp(Math.atan2(dy, Math.max(0.001, horizontal)), -0.35, 0.35),
+    horizontal >= 1e-5 ? supportYawForDirection(dx, dz, fallback[1]) : fallback[1],
     fallback[2],
   ];
 }
@@ -1011,7 +1012,7 @@ export class HostKillstreakRuntime {
       return;
     }
     if (entity.mode === 'piloted') {
-      const forward: [number, number, number] = [Math.sin(entity.yaw), Math.sin(entity.pitch), Math.cos(entity.yaw)];
+      const forward = supportForwardFromYawPitch(entity.yaw, entity.pitch);
       const speed = 10 * entity.thrust;
       const desired: [number, number, number] = [
         clamp(entity.position[0] + forward[0] * speed * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
@@ -1103,11 +1104,7 @@ export class HostKillstreakRuntime {
       entity.nextSensorRefreshAtMs = nowMs + PILOTED_DRONE_SENSOR_PROFILE.refreshMs;
       return;
     }
-    const direction: SupportVec3 = [
-      Math.sin(entity.yaw) * Math.cos(entity.pitch),
-      Math.sin(entity.pitch),
-      Math.cos(entity.yaw) * Math.cos(entity.pitch),
-    ];
+    const direction = supportForwardFromYawPitch(entity.yaw, entity.pitch);
     const minimumDot = Math.cos(PILOTED_DRONE_SENSOR_PROFILE.forwardConeDegrees / 2 * Math.PI / 180);
     entity.sensorContacts = hostileTargets(world, owner.actorId, owner.team)
       .filter((target) => {
@@ -1148,7 +1145,7 @@ export class HostKillstreakRuntime {
     world: KillstreakWorld,
     maximumRange = Number.POSITIVE_INFINITY,
   ): KillstreakTarget | null {
-    const direction = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)] as const;
+    const direction = supportForwardFromYawPitch(yaw, pitch);
     return hostileTargets(world, ownerId, team).filter((target) => {
       if (!lineOfSight(world, origin, target.position)) return false;
       const delta = [target.position[0] - origin[0], target.position[1] - origin[1], target.position[2] - origin[2]] as const;

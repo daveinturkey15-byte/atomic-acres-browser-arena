@@ -477,6 +477,7 @@ export class WeaponPresentation {
     this.passiveKnife.rotation.set(-0.28, -0.12, 0.78);
     this.passiveKnife.scale.setScalar(0.24);
     this.passiveKnife.add(passiveKnifeModel);
+    this.passiveKnife.visible = false;
     this.root.add(this.passiveKnife);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
     this.muzzleLight.position.set(0, 0.08, -1.15);
@@ -1018,15 +1019,18 @@ export class WeaponPresentation {
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
     this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
     const arms = this.root.getObjectByName('first-person-arms');
-    const armAdsOpacity = 1 - THREE.MathUtils.smoothstep(this.adsBlend, 0.72, 0.98);
     if (arms) {
       arms.position.y = THREE.MathUtils.lerp(-0.075, -0.19, this.adsBlend);
       arms.scale.setScalar(THREE.MathUtils.lerp(1, 0.82, this.adsBlend));
       arms.traverse((node) => {
         if (!(node instanceof THREE.Mesh)) return;
         const material = node.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
-        material.opacity = armAdsOpacity;
-        material.depthWrite = armAdsOpacity > 0.45;
+        // Do not alpha-fade anatomy in ADS. The previous fade made opaque arms
+        // look ghosted/see-through and exposed internal overlap. Pose and scale
+        // own the ADS clearance while every visible arm mesh remains opaque.
+        material.transparent = false;
+        material.opacity = 1;
+        material.depthWrite = true;
       });
     }
 
@@ -1185,13 +1189,10 @@ export class WeaponPresentation {
       meleeProgress: meleeActive ? meleeProgress : null,
     });
     this.meleeRig.visible = meleeActive;
-    this.passiveKnife.visible = !meleeActive && this.adsBlend < 0.78;
-    if (this.passiveKnife.visible) {
-      const passivePhase = performance.now() * 0.0017;
-      this.passiveKnife.position.y = -0.48 + Math.sin(passivePhase) * 0.008 * (1 - this.adsBlend);
-      this.passiveKnife.rotation.z = 0.78 + Math.sin(passivePhase * 0.7) * 0.018;
-    }
-    if (arms) arms.visible = !meleeActive && armAdsOpacity > 0.02;
+    // A knife is an action presentation, never a permanent off-hand prop. The
+    // old passive clone read as a floating knife beside every firearm.
+    this.passiveKnife.visible = false;
+    if (arms) arms.visible = !meleeActive;
     if (activeModel) activeModel.visible = !meleeActive;
     if (meleeActive) {
       const contact = THREE.MathUtils.smoothstep(meleeProgress, 0.12, 0.48);

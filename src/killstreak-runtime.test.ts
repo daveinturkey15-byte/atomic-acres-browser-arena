@@ -188,6 +188,12 @@ describe('host killstreak runtime', () => {
   });
 
   it('gives the piloted drone exactly two 20-round magazines and rejects forged control', () => {
+    const firstPersonForwardWorld: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: DEFAULT_WORLD.targets.map((target) => target.id === 'enemy'
+        ? { ...target, position: [0, 1.7, -12] as const }
+        : target),
+    };
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'piloted-drone', 'tri-pass', 'chopper', 'nuke']));
     runtime.registerActor('other', 1, 9, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
@@ -200,7 +206,11 @@ describe('host killstreak runtime', () => {
     expect(runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'pilot-control', yawQ: 0, pitchQ: 0, thrustQ: 1, verticalQ: 1, fire: true,
     }, 1_001).accepted).toBe(true);
-    expect(runtime.advance(1_001, DEFAULT_WORLD).damageEvents).toHaveLength(1);
+    const before = runtime.snapshotFor('owner', 1_001).entities[0].position;
+    expect(runtime.advance(1_017, firstPersonForwardWorld).damageEvents).toHaveLength(1);
+    runtime.advance(1_033, firstPersonForwardWorld);
+    const after = runtime.snapshotFor('owner', 1_033).entities[0].position;
+    expect(after[2]).toBeLessThan(before[2]);
     expect(runtime.snapshotFor('owner', 1_001).entities[0].magazine).toBe(19);
     expect(runtime.control({ by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'exit-piloted-drone' }, 1_002).accepted).toBe(true);
     expect(runtime.snapshotFor('owner', 1_002).actors.find((actor) => actor.actorId === 'owner')?.possession).toBeNull();

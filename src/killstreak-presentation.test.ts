@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { KillstreakPresentation } from './killstreak-presentation';
 import type { KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
+import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
 
 const snapshot = (count: number, sensorContacts: KillstreakRecipientSnapshot['sensorContacts'] = []): KillstreakRecipientSnapshot => ({
   schemaVersion: 1,
@@ -44,12 +45,40 @@ describe('killstreak presentation', () => {
     expect(presentation.root.getObjectByName('care-package-parachute')).toBeDefined();
     expect(presentation.root.getObjectByName('pass65-swarm-drone')).toBeDefined();
     const chopper = presentation.root.getObjectByName('pass65-chopper-gunner') as THREE.Group;
+    const drone = presentation.root.getObjectByName('pass65-swarm-drone') as THREE.Group;
+    const aircraft = presentation.root.getObjectByName('pass65-care-package-aircraft') as THREE.Group;
     expect(chopper.rotation.x).toBeCloseTo(0.02);
     expect(chopper.rotation.z).toBeCloseTo(-0.04);
+    expect(missingSupportNodes(chopper, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredNodes)).toEqual([]);
+    expect(missingSupportNodes(drone, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.drone.requiredNodes)).toEqual([]);
+    expect(missingSupportNodes(aircraft, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.aircraft.requiredNodes)).toEqual([]);
+    expect(supportForwardAlignment(chopper, 'chopper-player-gun', 'chopper-gun-muzzle-socket')).toBeCloseTo(1, 6);
+    expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
+    expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
     presentation.sync(snapshot(0), 1_100);
     expect(presentation.telemetry().entities).toBe(0);
     presentation.dispose();
     expect(scene.getObjectByName('pass65-killstreak-presentations')).toBeUndefined();
+  });
+
+  it('uses the exact same visual and gun family for standalone and swarm drones', () => {
+    const scene = new THREE.Scene();
+    const presentation = new KillstreakPresentation(scene);
+    const swarmSnapshot = snapshot(4);
+    const droneEntity = swarmSnapshot.entities[3]!;
+    presentation.sync({ ...swarmSnapshot, entities: [{ ...droneEntity, id: 'standalone', mode: 'piloted' }] }, 1_000);
+    const standalone = presentation.root.getObjectByName('pass65-piloted-drone') as THREE.Group;
+    expect(standalone.userData).toMatchObject({
+      presentationFamilyId: 'hunter-drone-visual-family-v1',
+      gunProfileId: DRONE_GUN_PROFILE_ID,
+    });
+    expect(standalone.getObjectByName('drone-mounted-gun')).toBeDefined();
+    presentation.sync({ ...swarmSnapshot, entities: [{ ...droneEntity, id: 'swarm', mode: 'swarm' }] }, 1_016);
+    const swarm = presentation.root.getObjectByName('pass65-swarm-drone') as THREE.Group;
+    expect(swarm.userData.presentationFamilyId).toBe(standalone.userData.presentationFamilyId);
+    expect(swarm.userData.gunProfileId).toBe(standalone.userData.gunProfileId);
+    expect(swarm.getObjectByName('drone-mounted-gun')).toBeDefined();
+    presentation.dispose();
   });
 
   it('renders only host-admitted piloted-drone sensor contacts through depth', () => {

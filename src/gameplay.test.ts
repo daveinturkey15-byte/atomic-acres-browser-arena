@@ -58,7 +58,7 @@ describe('headshot damage contract', () => {
     }
     expect(WEAPONS.scattergun.headMultiplier).toBe(1.35);
     expect(WEAPONS['mini-uzi'].headMultiplier).toBe(1.45);
-    expect(WEAPONS.minigun.headMultiplier).toBe(1.35);
+    expect(WEAPONS.minigun.headMultiplier).toBe(1);
     expect(WEAPONS['m14-ebr'].headMultiplier).toBe(1.7);
     expect(WEAPONS['slug-shotgun'].headMultiplier).toBe(1.35);
     expect(WEAPONS['explosive-crossbow'].headMultiplier).toBe(1);

@@ -4,7 +4,9 @@ import {
   DRONE_GUN_PROFILE_ID,
   DRONE_SUPPORT_DEFINITIONS,
   PILOTED_DRONE_SENSOR_PROFILE,
+  DRONE_PRESENTATION_FAMILY_ID,
   droneGunProfileFor,
+  standaloneDroneController,
 } from './killstreak-support-catalog';
 
 describe('Pass 65 support catalog', () => {
@@ -37,5 +39,14 @@ describe('Pass 65 support catalog', () => {
       changesBallisticAuthority: false,
     });
     expect(DRONE_SUPPORT_DEFINITIONS.swarm.sensorProfileId).toBeNull();
+  });
+
+  it('reuses one visual/gun family while the standalone deployment selects AI or owner control', () => {
+    expect(DRONE_SUPPORT_DEFINITIONS.piloted.presentationFamilyId).toBe(DRONE_PRESENTATION_FAMILY_ID);
+    expect(DRONE_SUPPORT_DEFINITIONS.swarm.presentationFamilyId).toBe(DRONE_PRESENTATION_FAMILY_ID);
+    expect(DRONE_SUPPORT_DEFINITIONS.piloted.controllerOptions).toEqual(['ai', 'owner-player']);
+    expect(DRONE_SUPPORT_DEFINITIONS.swarm.controllerOptions).toEqual(['ai']);
+    expect(standaloneDroneController('ai')).toBe('ai');
+    expect(standaloneDroneController('owner-player')).toBe('owner-player');
   });
 });

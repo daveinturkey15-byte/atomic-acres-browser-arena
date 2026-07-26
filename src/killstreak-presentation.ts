@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
+import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
@@ -33,6 +34,14 @@ function mesh(geometry: THREE.BufferGeometry, colour: number, name: string): THR
   return result;
 }
 
+function presentationSocket(name: string, position: readonly [number, number, number]): THREE.Group {
+  const result = new THREE.Group();
+  result.name = name;
+  result.position.set(...position);
+  result.userData.presentationOnly = true;
+  return result;
+}
+
 function buildChopper(): PresentedEntity {
   const root = new THREE.Group();
   root.name = 'pass65-chopper-gunner';
@@ -55,6 +64,7 @@ function buildChopper(): PresentedEntity {
   const gun = mesh(new THREE.CylinderGeometry(0.08, 0.11, 0.95, 10), 0x0b1012, 'chopper-player-gun');
   gun.rotation.x = Math.PI / 2;
   gun.position.set(0, -0.58, -0.72);
+  const gunMuzzle = presentationSocket('chopper-gun-muzzle-socket', [0, -0.58, -1.24]);
   const rotor = new THREE.Group();
   rotor.name = 'chopper-main-rotor';
   rotor.position.y = 0.85;
@@ -62,13 +72,24 @@ function buildChopper(): PresentedEntity {
   const bladeA = mesh(new THREE.BoxGeometry(5.6, 0.035, 0.13), 0x121a1d, 'chopper-rotor-blade-a');
   const bladeB = mesh(new THREE.BoxGeometry(0.13, 0.035, 5.6), 0x121a1d, 'chopper-rotor-blade-b');
   rotor.add(hub, bladeA, bladeB);
+  const tailRotor = new THREE.Group();
+  tailRotor.name = 'chopper-tail-rotor';
+  tailRotor.position.set(0.12, 0.42, 3.05);
+  tailRotor.rotation.z = Math.PI / 2;
+  tailRotor.add(
+    mesh(new THREE.BoxGeometry(0.8, 0.025, 0.07), 0x121a1d, 'chopper-tail-rotor-blade-a'),
+    mesh(new THREE.BoxGeometry(0.07, 0.025, 0.8), 0x121a1d, 'chopper-tail-rotor-blade-b'),
+  );
   const skids = [-1, 1].map((side) => {
     const skid = mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.15, 6), 0x778580, `chopper-skid-${side}`);
     skid.rotation.x = Math.PI / 2;
     skid.position.set(side * 0.58, -0.67, 0.15);
     return skid;
   });
-  root.add(fuselage, canopy, glareshield, tail, fin, gun, rotor, ...skids);
+  root.add(fuselage, canopy, glareshield, tail, fin, gun, gunMuzzle, rotor, tailRotor, ...skids);
+  root.userData.forwardAxis = [0, 0, -1];
+  root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];
+  root.userData.weaponFeedback = ['gun-recoil', 'muzzle-flash', 'tracer', 'impact'];
   root.scale.setScalar(0.82);
   return Object.freeze({ root, rotor, target: new THREE.Vector3() });
 }
@@ -90,7 +111,9 @@ function buildCareAircraft(): PresentedEntity {
   tailFin.position.set(0, 0.42, 2.15);
   const cargoLight = mesh(new THREE.SphereGeometry(0.08, 8, 6), 0x7fe6e0, 'care-aircraft-cargo-light');
   cargoLight.position.set(0, -0.45, -0.15);
-  root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight);
+  const forwardSocket = presentationSocket('care-aircraft-forward-socket', [0, 0, -2.6]);
+  root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight, forwardSocket);
+  root.userData.forwardAxis = [0, 0, -1];
   root.scale.setScalar(0.9);
   return Object.freeze({ root, rotor: null, target: new THREE.Vector3() });
 }
@@ -99,10 +122,27 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
   const root = new THREE.Group();
   root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
   root.userData.pass65KillstreakPresentation = true;
-  const body = mesh(new THREE.SphereGeometry(mode === 'piloted' ? 0.34 : 0.24, 10, 7), mode === 'piloted' ? 0x2f707c : 0x28383d, 'drone-body');
-  body.scale.set(1.2, 0.45, 1);
+  root.userData.presentationFamilyId = DRONE_PRESENTATION_FAMILY_ID;
+  root.userData.gunProfileId = DRONE_GUN_PROFILE_ID;
+  root.userData.forwardAxis = [0, 0, -1];
+  root.userData.weaponFeedback = ['report', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number'];
+  // Standalone and swarm drones deliberately share the same machine family;
+  // control mode changes no geometry, gun profile, socket, or forward axis.
+  const body = mesh(new THREE.CapsuleGeometry(0.22, 0.42, 5, 12), 0x28383d, 'drone-body');
+  body.rotation.x = Math.PI / 2;
+  body.scale.set(1.18, 0.82, 1);
   const eye = mesh(new THREE.SphereGeometry(0.08, 8, 6), 0xff5f4b, 'drone-optic');
-  eye.position.z = -0.29;
+  eye.position.set(0, 0.035, -0.43);
+  const gun = new THREE.Group();
+  gun.name = 'drone-mounted-gun';
+  gun.position.set(0, -0.19, -0.12);
+  const gunReceiver = mesh(new THREE.BoxGeometry(0.16, 0.12, 0.28), 0x11191c, 'drone-gun-receiver');
+  const gunBarrel = mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.42, 10), 0x090d0f, 'drone-gun-barrel');
+  gunBarrel.rotation.x = Math.PI / 2;
+  gunBarrel.position.z = -0.3;
+  gun.add(gunReceiver, gunBarrel);
+  const muzzleSocket = presentationSocket('drone-gun-muzzle-socket', [0, -0.19, -0.56]);
+  const cameraSocket = presentationSocket('drone-first-person-camera-socket', [0, 0.035, -0.34]);
   const rotor = new THREE.Group();
   rotor.name = 'drone-rotors';
   for (const x of [-0.42, 0.42]) for (const z of [-0.34, 0.34]) {
@@ -114,7 +154,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     disc.position.set(x, 0.08, z);
     rotor.add(arm, disc);
   }
-  root.add(body, eye, rotor);
+  root.add(body, eye, gun, muzzleSocket, cameraSocket, rotor);
   return Object.freeze({ root, rotor, target: new THREE.Vector3() });
 }
 
@@ -229,6 +269,8 @@ export class KillstreakPresentation {
       presented.root.position.lerp(presented.target, 0.38);
       presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
       if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
+      const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');
+      if (tailRotor) tailRotor.rotation.x += 1.35;
       const canopy = presented.root.getObjectByName('care-package-parachute');
       if (canopy) canopy.visible = entity.phase === 'inbound' || entity.phase === 'descending';
       presented.root.userData.health = entity.health;

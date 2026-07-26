@@ -196,7 +196,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   {
     id: 'minigun', displayName: 'M134 Minigun', slot: 'primary', family: 'lmg',
     fireKind: 'hitscan', fireMode: 'automatic', rpm: 1_200, pellets: 1, spinUpMs: 1_200, movementMultiplier: 0.8,
-    damage: { policy: 'standard', base: 20, minimum: 15, falloffStartM: 24, falloffEndM: 74, headMultiplier: 1.35, limbMultiplier: 0.85 },
+    damage: { policy: 'standard', base: 15, minimum: 11.25, falloffStartM: 24, falloffEndM: 74, headMultiplier: 1, limbMultiplier: 0.85 },
     spread: { hipRadians: 0.026, adsMultiplier: 0.7, movementMultiplier: 1.8, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.72, sustainedPerShot: 0.0012, maximumRadians: 0.06 },
     recoil: { pitchRadians: 0.008, yawRadians: 0.008, recoveryPerSecond: 14, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.86, proneMultiplier: 0.72, deterministicPatternId: 'minigun-pattern-v1' },
     ammo: { magazine: 240, reserve: 480, reloadSeconds: 5.4, emptyReloadSeconds: 5.8, switchSeconds: 1.05 },
@@ -254,7 +254,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     ammo: { magazine: 1, reserve: 8, reloadSeconds: 2.45, emptyReloadSeconds: 2.45, switchSeconds: 0.58 },
     penetration: { calibreLabel: 'explosive bolt', power: 0, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
     effects: { tracerColorHex: 0xff724f, muzzleFlashScale: 0.2, reportGain: 0.5, flashlight: null },
-    optic: { kind: 'standard', magnification: 1.35, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
+    optic: { kind: 'standard', magnification: 1.5, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
     policies: { loadout: 'eligible', bot: 'never', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-projectile-v1' },
     modelSetId: 'explosive-crossbow-model-set-v1', presentationId: 'explosive-crossbow-family-view-v1', audioId: 'explosive-crossbow-audio-v1', provenanceId: 'explosive-crossbow-procedural-cc0-v1', evidenceIds: ['r223-explosive-crossbow', 'r232-explosive-crossbow'],
   },

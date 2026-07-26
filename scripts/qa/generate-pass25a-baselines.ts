@@ -50,6 +50,8 @@ const contract = {
       'pass65-curated-and-three-custom-loadouts',
       'pass65-single-selected-grenade-and-corpse-refill',
       'pass65-coherent-pellet-shotgun-rebalance',
+      'pass65-hitl-minigun-no-crit-and-25-percent-damage-reduction',
+      'pass65-hitl-crossbow-compact-1.5x-optic',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,

@@ -112,6 +112,6 @@ test('bounds M14 smoke thermal, pre-shot minigun spool/audio, and passive knife 
     window.__ATOMIC_ACRES_DEBUG__ as unknown as PresentationDebug
   ).snapshot());
   expect(settled.audio.minigunDrive).toMatchObject({ active: false, starts: 1, stops: 1, phase: 'idle' });
-  expect(settled.weaponPresentation).toMatchObject({ passiveKnifeVisible: true, passiveKnifeModel: true });
+  expect(settled.weaponPresentation).toMatchObject({ passiveKnifeVisible: false, passiveKnifeModel: true });
   expect(pageErrors).toEqual([]);
 });

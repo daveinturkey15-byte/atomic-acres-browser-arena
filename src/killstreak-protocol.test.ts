@@ -75,7 +75,7 @@ describe('killstreak protocol', () => {
       bounds: { minX: -20, maxX: 20, minZ: -20, maxZ: 20, floorY: 0, ceilingY: 20 },
       targets: [
         { id: 'owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
-        { id: 'enemy', kind: 'player', team: 1, lifeId: 2, alive: true, position: [0, 1.7, 8] },
+        { id: 'enemy', kind: 'player', team: 1, lifeId: 2, alive: true, position: [0, 1.7, -8] },
       ],
       hasLineOfSight: () => false,
     });
@@ -83,7 +83,7 @@ describe('killstreak protocol', () => {
       bounds: { minX: -20, maxX: 20, minZ: -20, maxZ: 20, floorY: 0, ceilingY: 20 },
       targets: [
         { id: 'owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
-        { id: 'enemy', kind: 'player', team: 1, lifeId: 2, alive: true, position: [0, 1.7, 8] },
+        { id: 'enemy', kind: 'player', team: 1, lifeId: 2, alive: true, position: [0, 1.7, -8] },
       ],
       hasLineOfSight: () => false,
     });

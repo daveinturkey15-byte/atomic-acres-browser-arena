@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "releaseGate": "fail-closed-until-every-entry-is-release-ready",
+  "sourcePolicy": [
+    "original-project-blender-source",
+    "commissioned-with-project-rights",
+    "public-domain",
+    "cc0",
+    "compatible-license-with-redistribution-rights"
+  ],
+  "forbiddenReleaseFallbacks": [
+    "shared-generic-hero-model",
+    "runtime-procedural-hero-weapon",
+    "unrigged-or-see-through-first-person-arms",
+    "missing-pbr-map-set",
+    "missing-source-or-license-provenance"
+  ],
+  "requiredPbrMaps": ["baseColor", "normal", "roughness", "metallic"],
+  "requiredSockets": ["rightGrip", "leftGrip", "magazine", "muzzle", "eject", "optic"],
+  "requiredCoreActions": ["equip", "unequip", "idle", "walk", "sprint", "ads-in", "ads-out", "fire", "dry-fire", "reload", "empty-reload", "melee", "inspect"],
+  "requirements": {
+    "firstPersonLodCount": 2,
+    "worldLodCount": 3,
+    "uvSets": 1,
+    "tangents": true,
+    "sourceBlendRequiredForOriginalWork": true,
+    "sha256RequiredForEveryDeliverable": true,
+    "contactSheetStates": ["hip", "ads", "fire", "reload", "world", "drop", "lod-transition"]
+  },
+  "operatorArms": {
+    "id": "pass65-first-person-operator-arms",
+    "releaseState": "blocked",
+    "currentRuntimeSource": "runtime procedural lathe/box/capsule anatomy",
+    "observedCandidate": "public/assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb",
+    "blockers": [
+      "current runtime arms are not a dedicated authored skeleton",
+      "licensed candidate is explicitly rejected by the current framing and grip gate",
+      "complete grip/action animation corpus is absent"
+    ]
+  },
+  "supportVehicles": [
+    {
+      "id": "hunter-drone-visual-family-v1",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "shared runtime procedural capsule/rotor/gun presentation",
+      "blockers": [
+        "needs one Blender-authored source family shared by standalone and swarm modes",
+        "needs first-person camera, mounted-gun, fire, tracer, impact, world and LOD action corpus",
+        "needs complete PBR maps and provenance"
+      ]
+    },
+    {
+      "id": "chopper-gunner-vehicle-v1",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural chopper presentation",
+      "blockers": [
+        "needs Blender-authored body/cockpit/rotor/gun source and LODs",
+        "needs rotor, gun recoil/fire, muzzle/tracer/impact and quiet-loop action corpus",
+        "needs complete PBR maps and provenance"
+      ]
+    },
+    {
+      "id": "support-aircraft-family-v1",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural aircraft presentation",
+      "blockers": [
+        "needs Blender-authored care/carpet aircraft source and LODs",
+        "needs validated negative-Z forward axis and cargo/bomb sockets",
+        "needs complete PBR maps and provenance"
+      ]
+    }
+  ],
+  "weapons": [
+    { "id": "carbine", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared Rifle.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "smg", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared P90.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "lmg", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "scattergun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared Shotgun.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "sniper", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural derivative; shared Rifle.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "railgun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural derivative; shared Rifle.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "pistol", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared Pistol.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "magnum", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "machine-pistol", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "mini-uzi", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural SMG derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "mp5", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural SMG derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "m4a1", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "ak-47", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "minigun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "m14-ebr", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural precision-rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "slug-shotgun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural shotgun derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "flashlight-pistol", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
+    { "id": "explosive-crossbow", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative with added limbs/string", "blockers": ["must be a total Blender-authored redesign", "needs dedicated compact 1.5x optic", "no unique world/drop/first-person LODs or action corpus"] }
+  ]
+}

@@ -29,6 +29,7 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
     delete copy.damage;
     delete copy.spread;
   }
+  if (copy.id === 'minigun') delete copy.damage;
   if (copy.id === 'magnum') delete copy.penetration.calibreLabel;
   return copy;
 }
@@ -48,7 +49,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     expectDeepFrozen(WEAPON_CATALOG);
   });
 
-  it('preserves Pass 64 mechanics except for approved names, effects, caliber correction, and pellet-shotgun tuning', () => {
+  it('preserves Pass 64 mechanics except for approved names, effects, caliber, shotgun, and minigun tuning', () => {
     const currentById = new Map(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
     for (const baseline of combatOracle.weapons) {
       expect(compatibilityProjection(currentById.get(baseline.id) as unknown as Record<string, any>))
@@ -66,7 +67,10 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(byId.mp5).toMatchObject({ displayName: 'MP5', family: 'smg' });
     expect(byId.m4a1).toMatchObject({ displayName: 'M4A1', family: 'assault-rifle' });
     expect(byId['ak-47']).toMatchObject({ displayName: 'AK-47', family: 'assault-rifle' });
-    expect(byId.minigun).toMatchObject({ displayName: 'M134 Minigun', movementMultiplier: 0.8, spinUpMs: 1200 });
+    expect(byId.minigun).toMatchObject({
+      displayName: 'M134 Minigun', movementMultiplier: 0.8, spinUpMs: 1200,
+      damage: { base: 15, minimum: 11.25, headMultiplier: 1 },
+    });
     expect(byId['m14-ebr']).toMatchObject({
       displayName: 'M14 EBR', optic: { kind: 'thermal-smoke-only', magnification: 2.5 },
     });
@@ -76,8 +80,26 @@ describe('Pass 65 canonical weapon catalog', () => {
       effects: { reportGain: 1.4, flashlight: { kind: 'always-on', solidOcclusion: 'required' } },
     });
     expect(byId['explosive-crossbow']).toMatchObject({
-      displayName: 'TAC-15 Explosive Crossbow', fireKind: 'projectile', policies: { authority: 'host-projectile-v1' },
+      displayName: 'TAC-15 Explosive Crossbow', fireKind: 'projectile',
+      optic: { kind: 'standard', magnification: 1.5 },
+      policies: { authority: 'host-projectile-v1' },
     });
+  });
+
+  it('keeps the Uzi materially distinct from both shipped SMG comparators', () => {
+    const byId = Object.fromEntries(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
+    const uzi = byId['mini-uzi'];
+    for (const comparator of [byId.smg, byId.mp5]) {
+      expect(uzi.rpm).toBeGreaterThan(comparator.rpm);
+      expect(uzi.damage.minimum).toBeLessThan(comparator.damage.minimum);
+      expect(uzi.damage.falloffStartM).toBeLessThan(comparator.damage.falloffStartM);
+      expect(uzi.damage.falloffEndM).toBeLessThan(comparator.damage.falloffEndM);
+      expect(uzi.penetration.power).toBeLessThan(comparator.penetration.power);
+      expect(uzi.recoil.yawRadians).toBeGreaterThan(comparator.recoil.yawRadians);
+      expect(uzi.audioId).not.toBe(comparator.audioId);
+      expect(uzi.presentationId).not.toBe(comparator.presentationId);
+      expect(uzi.modelSetId).not.toBe(comparator.modelSetId);
+    }
   });
 
   it('canonically ranks the Glock 18 as the weakest-damage and highest-sustained-recoil loadout secondary', () => {

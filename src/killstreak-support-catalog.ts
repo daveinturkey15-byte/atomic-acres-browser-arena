@@ -40,6 +40,9 @@ export const PILOTED_DRONE_SENSOR_PROFILE = Object.freeze({
 } as const);
 
 export type DroneSupportMode = 'piloted' | 'swarm';
+export type StandaloneDroneController = 'ai' | 'owner-player';
+
+export const DRONE_PRESENTATION_FAMILY_ID = 'hunter-drone-visual-family-v1' as const;
 
 export type DroneSupportDefinition = Readonly<{
   mode: DroneSupportMode;
@@ -48,6 +51,8 @@ export type DroneSupportDefinition = Readonly<{
   reservePolicy: 'two-magazines-total' | 'unlimited-reloads-until-expiry';
   lifetimeMs: number;
   sensorProfileId: typeof PILOTED_DRONE_SENSOR_PROFILE.id | null;
+  presentationFamilyId: typeof DRONE_PRESENTATION_FAMILY_ID;
+  controllerOptions: readonly StandaloneDroneController[];
 }>;
 
 export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneSupportDefinition>> = Object.freeze({
@@ -58,6 +63,8 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
     reservePolicy: 'two-magazines-total',
     lifetimeMs: 30_000,
     sensorProfileId: PILOTED_DRONE_SENSOR_PROFILE.id,
+    presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,
+    controllerOptions: Object.freeze(['ai', 'owner-player'] as const),
   }),
   swarm: Object.freeze({
     mode: 'swarm',
@@ -66,6 +73,8 @@ export const DRONE_SUPPORT_DEFINITIONS: Readonly<Record<DroneSupportMode, DroneS
     reservePolicy: 'unlimited-reloads-until-expiry',
     lifetimeMs: 60_000,
     sensorProfileId: null,
+    presentationFamilyId: DRONE_PRESENTATION_FAMILY_ID,
+    controllerOptions: Object.freeze(['ai'] as const),
   }),
 });
 
@@ -75,4 +84,11 @@ export function droneGunProfileFor(mode: DroneSupportMode): DroneGunProfile {
     throw new Error(`${mode} drone references an unknown gun profile`);
   }
   return DRONE_GUN_PROFILE;
+}
+
+export function standaloneDroneController(requested: StandaloneDroneController): StandaloneDroneController {
+  if (!DRONE_SUPPORT_DEFINITIONS.piloted.controllerOptions.includes(requested)) {
+    throw new Error(`standalone drone controller ${requested} is not selectable`);
+  }
+  return requested;
 }

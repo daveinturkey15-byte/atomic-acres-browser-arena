@@ -17,6 +17,8 @@ export type HitReactionState = {
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const finite = (value: number, fallback = 0): number => Number.isFinite(value) ? value : fallback;
+export const ADS_IN_RESPONSE_PER_SECOND = 22;
+export const ADS_OUT_RESPONSE_PER_SECOND = 18;
 
 /** Converts a base vertical field of view into a true angular magnification. */
 export function magnifiedFovDegrees(baseFovDegrees: number, magnification: number): number {
@@ -31,7 +33,7 @@ export function advanceAdsBlend(current: number, ads: boolean, dt: number, weapo
   if (weapon === 'sniper') return ads ? 1 : 0;
   const safeCurrent = clamp01(finite(current));
   const safeDt = Math.max(0, finite(dt));
-  const blend = 1 - Math.exp(-(ads ? 18 : 15) * safeDt);
+  const blend = 1 - Math.exp(-(ads ? ADS_IN_RESPONSE_PER_SECOND : ADS_OUT_RESPONSE_PER_SECOND) * safeDt);
   return clamp01(safeCurrent + ((ads ? 1 : 0) - safeCurrent) * blend);
 }
 

@@ -42,6 +42,15 @@ describe('weapon presentation state', () => {
     expect(advanceAdsBlend(0, true, 1 / 120, 'carbine')).toBeLessThan(1);
   });
 
+  it('settles ordinary ADS past ninety percent within 120ms and exits within 140ms', () => {
+    let inBlend = 0;
+    for (let frame = 0; frame < 8; frame += 1) inBlend = advanceAdsBlend(inBlend, true, 0.015, 'carbine');
+    expect(inBlend).toBeGreaterThan(0.9);
+    let outBlend = 1;
+    for (let frame = 0; frame < 10; frame += 1) outBlend = advanceAdsBlend(outBlend, false, 0.014, 'carbine');
+    expect(outBlend).toBeLessThan(0.1);
+  });
+
   it('returns bounded presentation-only hit reactions', () => {
     expect(hitReactionAt(0, 'body').envelope).toBe(0);
     expect(hitReactionAt(140, 'head').envelope).toBeGreaterThan(0.5);
