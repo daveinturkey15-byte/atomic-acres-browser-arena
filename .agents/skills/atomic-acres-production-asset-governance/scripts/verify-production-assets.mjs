@@ -15,9 +15,14 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npmCli = process.env.npm_execpath;
+const npmExecutable = npmCli ? process.execPath : process.platform === 'win32' ? 'npm.cmd' : 'npm';
 for (const gate of REQUIRED_GATES) {
-  const result = spawnSync(npmExecutable, ['run', gate], { stdio: 'inherit', shell: false });
+  const args = npmCli ? [npmCli, 'run', gate] : ['run', gate];
+  const result = spawnSync(npmExecutable, args, {
+    stdio: 'inherit',
+    shell: !npmCli && process.platform === 'win32',
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     console.error(`Pass 65 production asset governance BLOCKED by ${gate}`);
