@@ -626,10 +626,13 @@ try {
       window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
     });
     try {
-      await switchPage.waitForFunction(() => {
-        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-        return state?.gameStarted === true && document.querySelector('#menu')?.classList.contains('hidden');
-      }, undefined, { timeout: 15_000 });
+      // Poll only cheap, user-visible lifecycle state. Repeated full debug
+      // snapshots traverse both resident arena roots and can themselves stall
+      // a warmed LRU cycle enough to falsify this deployment deadline.
+      await switchPage.waitForFunction((expectedArena) => (
+        document.documentElement.dataset.gameplayArena === expectedArena
+          && document.querySelector('#menu')?.classList.contains('hidden') === true
+      ), arenaId, { timeout: 15_000 });
     } catch (error) {
       const stalled = await switchPage.evaluate(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -749,10 +752,9 @@ try {
       residency: after.residency,
     });
     await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
-    await switchPage.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return state?.gameStarted === false && !document.querySelector('#menu')?.classList.contains('hidden');
-    }, undefined, { timeout: 15_000 });
+    await switchPage.waitForFunction(() => (
+      document.querySelector('#menu')?.classList.contains('hidden') === false
+    ), undefined, { timeout: 15_000 });
   }
   if (gameplayResidencyBaselines.size !== gameplayCycle.length
     || [...gameplayResidencyVisits.values()].some((visits) => visits !== 2)) {
