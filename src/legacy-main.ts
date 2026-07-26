@@ -58,7 +58,7 @@ import {
   type MenuLifecycleEvent,
   type PointerLockRequestSource,
 } from './ui/menu-lifecycle';
-import { MenuPreviewVideoController } from './ui/menu-preview-video';
+import { MenuPreviewVideoController, menuPreviewVideoDefinition } from './ui/menu-preview-video';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
@@ -747,6 +747,10 @@ const menuPreviewVideoController = new MenuPreviewVideoController({
   motion: menuPreviewMotion,
 });
 const matchPauseBackdrop = element<HTMLElement>('#match-pause-backdrop');
+const deploymentTransition = element<HTMLElement>('#deployment-transition');
+const deploymentTransitionPoster = element<HTMLImageElement>('#deployment-transition-poster');
+const deploymentTransitionTitle = element<HTMLElement>('#deployment-transition-title');
+const deploymentTransitionStatus = element<HTMLElement>('#deployment-transition-status');
 const matchPauseFrameFallback = element<HTMLCanvasElement>('#match-pause-frame-fallback');
 const matchPauseFrameFallbackContextValue = matchPauseFrameFallback.getContext('2d', { alpha: false });
 if (!matchPauseFrameFallbackContextValue) throw new Error('Canvas2D pause-only fallback is unavailable');
@@ -2875,6 +2879,10 @@ function clearGameplayInput(): void {
 function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   statusEl.textContent = text;
   statusEl.dataset.kind = kind;
+  if (menuLifecycle.surface === 'deploying') {
+    deploymentTransitionStatus.textContent = text;
+    deploymentTransition.dataset.statusKind = kind;
+  }
 }
 
 function selectLobbyCodeForManualCopy(code: string): void {
@@ -6538,9 +6546,10 @@ function spawnPoint(): THREE.Vector3 {
 function syncMenuLifecyclePresentation(): void {
   const menuVisible = menuLifecycle.surface !== 'hidden';
   const pausedMatch = menuLifecycle.surface === 'paused-match';
+  const deploying = menuLifecycle.surface === 'deploying';
   menu.classList.toggle('hidden', !menuVisible);
-  menu.inert = !menuVisible;
-  menu.setAttribute('aria-hidden', String(!menuVisible));
+  menu.inert = !menuVisible || deploying;
+  menu.setAttribute('aria-hidden', String(!menuVisible || deploying));
   menu.dataset.lifecycleSurface = menuLifecycle.surface;
   menu.dataset.lifecycleReason = menuLifecycle.reason;
   menu.dataset.pointerLock = menuLifecycle.pointerLock;
@@ -6551,9 +6560,26 @@ function syncMenuLifecyclePresentation(): void {
   document.documentElement.dataset.pointerLockLifecycle = menuLifecycle.pointerLock;
   menuShowcase.dataset.menuContext = pausedMatch ? 'paused-match' : 'pre-match';
   matchPauseBackdrop.hidden = !pausedMatch;
+  deploymentTransition.hidden = !deploying;
+  deploymentTransition.setAttribute('aria-hidden', String(!deploying));
+  deploymentTransition.dataset.active = String(deploying);
   menuPreviewFrame.hidden = menuLifecycle.surface !== 'pre-match';
   resumeButton.hidden = !pausedMatch;
   mainMenuButton.hidden = !pausedMatch;
+}
+
+function prepareDeploymentTransition(): void {
+  const preview = menuPreviewVideoDefinition(selectedArena.id);
+  deploymentTransitionPoster.src = preview.poster;
+  deploymentTransitionPoster.width = preview.width;
+  deploymentTransitionPoster.height = preview.height;
+  deploymentTransitionTitle.textContent = selectedArena.displayName.toUpperCase();
+  deploymentTransitionStatus.textContent = `Preparing ${selectedArena.displayName} authoritative arena state…`;
+  deploymentTransition.dataset.arena = selectedArena.id;
+  deploymentTransition.dataset.presentation = preview.presentationId;
+  deploymentTransition.dataset.media = 'cached-static-poster';
+  deploymentTransition.dataset.liveRender = 'false';
+  deploymentTransition.dataset.statusKind = 'ok';
 }
 
 function applyMenuLifecycle(event: MenuLifecycleEvent): void {
@@ -6857,6 +6883,9 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   const requiredName = requirePlayerName();
   if (!requiredName) return;
   matchStartPreparing = true;
+  prepareDeploymentTransition();
+  applyMenuLifecycle({ type: 'match-start' });
+  syncMenuPreviewCanvasPlacement();
   try {
   const requestedArenaId = selectedArena.id;
   if (!gameplayArenaPrepared || arena.id !== requestedArenaId) {
@@ -6900,8 +6929,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   lastGameplayPresentedFrame = 0;
   resetMatchPauseBackdrop();
-  applyMenuLifecycle({ type: 'match-start' });
-  syncMenuPreviewCanvasPlacement();
   hidePrivateLobbyPresentation();
   syncArenaSelectionUi();
   bestStreakThisMatch = 0;
@@ -6987,8 +7014,12 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   }
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
-    await renderRuntime.compile(scene, camera);
-    await settleWebGpuPresentation('Initial match');
+    if (renderRuntime.backend === 'webgpu') {
+      await renderRuntime.compile(scene, camera);
+      await settleWebGpuPresentation('Initial match');
+    } else {
+      await renderRuntime.compileAndRender(scene, camera, scene);
+    }
   } finally {
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
@@ -7042,7 +7073,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
-  respawn(requestLock, false, undefined, 'match-start');
+  respawn(false, false, undefined, 'match-start');
   addFeed(`Welcome to ${arena.label}`, 'gold');
   if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
   if (mode !== 'solo') {
@@ -7058,6 +7089,10 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     if (mode === 'host') broadcastOverdriveState(matchStartedAt);
   }
   renderTextChat();
+  deploymentTransition.dataset.readyAt = performance.now().toFixed(3);
+  applyMenuLifecycle({ type: 'match-ready' });
+  syncMenuPreviewCanvasPlacement();
+  if (requestLock) requestGamePointerLock('match-start');
   } catch (error) {
     gameStarted = false;
     clearBots();
@@ -13125,7 +13160,8 @@ function applyArenaLightingForSelection(): void {
 }
 
 function menuPreviewShouldBeActive(): boolean {
-  return !gameStarted
+  return menuLifecycle.surface === 'pre-match'
+    && !gameStarted
     && !menu.classList.contains('hidden')
     && !element<HTMLElement>('#menu-panel-deploy').hidden;
 }

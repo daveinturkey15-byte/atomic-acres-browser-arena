@@ -6,9 +6,22 @@ function events(...sequence: MenuLifecycleEvent[]) {
 }
 
 describe('active-match menu and pointer-lock lifecycle', () => {
-  it('hides the menu once when a match starts and ignores transient-null/rejected lock requests', () => {
+  it('holds the deployment surface until match-ready and ignores premature pointer requests', () => {
+    const deploying = events(
+      { type: 'match-start' },
+      { type: 'pointer-request', source: 'match-start' },
+    );
+    expect(deploying).toMatchObject({
+      surface: 'deploying',
+      pointerLock: 'unlocked',
+      reason: 'match-start',
+      visibilityChangeCount: 0,
+      pointerRequestCount: 0,
+    });
+
     const state = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pointer-request', source: 'match-start' },
       { type: 'pointer-lost', focusTransition: false, overlay: null, pauseAllowed: true },
       { type: 'pointer-rejected' },
@@ -24,6 +37,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
 
     const rejected = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pointer-request', source: 'match-start' },
       { type: 'pointer-rejected' },
     );
@@ -40,6 +54,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
   it('opens pause only after a focused loss from an acquired lock', () => {
     const paused = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pointer-request', source: 'match-start' },
       { type: 'pointer-acquired' },
       { type: 'pointer-lost', focusTransition: false, overlay: null, pauseAllowed: true },
@@ -56,6 +71,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
   it('keeps focus loss, chat, targeting, death and match end from opening pause', () => {
     const base = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pointer-request', source: 'match-start' },
       { type: 'pointer-acquired' },
     );
@@ -79,6 +95,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
   it('closes pause before a resume request and never bounces open when that request rejects', () => {
     const resumed = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pointer-request', source: 'match-start' },
       { type: 'pointer-acquired' },
       { type: 'pointer-lost', focusTransition: false, overlay: null, pauseAllowed: true },
@@ -100,6 +117,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
   it('holds an intentional pause if a stale request acquires after the pause opened', () => {
     const raced = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pointer-request', source: 'canvas' },
       { type: 'pause-requested', reason: 'escape' },
       { type: 'pointer-acquired' },
@@ -116,6 +134,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
   it('preserves the paused menu across focus changes and restores pre-match preview ownership', () => {
     const paused = events(
       { type: 'match-start' },
+      { type: 'match-ready' },
       { type: 'pause-requested', reason: 'debug-pause' },
       { type: 'focus-lost' },
       { type: 'focus-gained' },
@@ -131,10 +150,12 @@ describe('active-match menu and pointer-lock lifecycle', () => {
     for (let start = 0; start < 20; start += 1) {
       state = reduceMenuLifecycle(state, { type: 'match-start' });
       expect(state).toMatchObject({
-        surface: 'hidden',
+        surface: 'deploying',
         matchStartCount: start + 1,
         pauseOpenCount: 0,
       });
+      state = reduceMenuLifecycle(state, { type: 'match-ready' });
+      expect(state).toMatchObject({ surface: 'hidden', pauseOpenCount: 0 });
 
       if (start % 3 === 0) {
         state = reduceMenuLifecycle(state, { type: 'pointer-request', source: 'match-start' });
@@ -154,6 +175,7 @@ describe('active-match menu and pointer-lock lifecycle', () => {
     expect(state).toMatchObject({
       surface: 'pre-match',
       matchStartCount: 20,
+      matchReadyCount: 20,
       pauseOpenCount: 0,
       visibilityChangeCount: 40,
     });

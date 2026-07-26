@@ -1,4 +1,4 @@
-export type MenuSurface = 'pre-match' | 'hidden' | 'paused-match' | 'error';
+export type MenuSurface = 'pre-match' | 'deploying' | 'hidden' | 'paused-match' | 'error';
 
 export type PointerLockPhase = 'unlocked' | 'requesting' | 'locked' | 'denied' | 'focus-suspended';
 
@@ -7,6 +7,7 @@ export type PointerLockRequestSource = 'match-start' | 'respawn' | 'resume' | 'c
 export type MenuLifecycleReason =
   | 'initial'
   | 'match-start'
+  | 'match-ready'
   | 'pointer-request'
   | 'pointer-acquired'
   | 'pointer-rejected'
@@ -30,6 +31,7 @@ export type MenuLifecycleState = Readonly<{
   transitionCount: number;
   visibilityChangeCount: number;
   matchStartCount: number;
+  matchReadyCount: number;
   pauseOpenCount: number;
   pointerRequestCount: number;
   pointerRejectCount: number;
@@ -37,6 +39,7 @@ export type MenuLifecycleState = Readonly<{
 
 export type MenuLifecycleEvent =
   | Readonly<{ type: 'match-start' }>
+  | Readonly<{ type: 'match-ready' }>
   | Readonly<{ type: 'pointer-request'; source: PointerLockRequestSource }>
   | Readonly<{ type: 'pointer-acquired' }>
   | Readonly<{ type: 'pointer-rejected' }>
@@ -62,6 +65,7 @@ export const INITIAL_MENU_LIFECYCLE_STATE: MenuLifecycleState = Object.freeze({
   transitionCount: 0,
   visibilityChangeCount: 0,
   matchStartCount: 0,
+  matchReadyCount: 0,
   pauseOpenCount: 0,
   pointerRequestCount: 0,
   pointerRejectCount: 0,
@@ -103,15 +107,25 @@ export function reduceMenuLifecycle(
 ): MenuLifecycleState {
   if (event.type === 'match-start') {
     return transition(current, {
-      surface: 'hidden',
+      surface: 'deploying',
       pointerLock: 'unlocked',
       reason: 'match-start',
       requestSource: null,
       matchStartCount: current.matchStartCount + 1,
     });
   }
+  if (event.type === 'match-ready') {
+    if (current.surface !== 'deploying') return transition(current, {});
+    return transition(current, {
+      surface: 'hidden',
+      pointerLock: 'unlocked',
+      reason: 'match-ready',
+      requestSource: null,
+      matchReadyCount: current.matchReadyCount + 1,
+    });
+  }
   if (event.type === 'pointer-request') {
-    if (current.surface === 'pre-match' || current.surface === 'error') return transition(current, {});
+    if (current.surface === 'pre-match' || current.surface === 'deploying' || current.surface === 'error') return transition(current, {});
     return transition(current, {
       surface: 'hidden',
       pointerLock: 'requesting',
@@ -121,7 +135,7 @@ export function reduceMenuLifecycle(
     });
   }
   if (event.type === 'pointer-acquired') {
-    if (current.surface === 'pre-match' || current.surface === 'error') return transition(current, {});
+    if (current.surface === 'pre-match' || current.surface === 'deploying' || current.surface === 'error') return transition(current, {});
     if (current.surface === 'paused-match') {
       return transition(current, {
         surface: 'paused-match',
@@ -147,7 +161,7 @@ export function reduceMenuLifecycle(
     });
   }
   if (event.type === 'pointer-lost') {
-    if (current.surface === 'pre-match' || current.surface === 'error') return transition(current, {});
+    if (current.surface === 'pre-match' || current.surface === 'deploying' || current.surface === 'error') return transition(current, {});
     if (event.overlay) {
       return transition(current, {
         surface: 'hidden',
@@ -181,7 +195,7 @@ export function reduceMenuLifecycle(
     });
   }
   if (event.type === 'focus-lost') {
-    if (current.surface === 'pre-match' || current.surface === 'error') return transition(current, {});
+    if (current.surface === 'pre-match' || current.surface === 'deploying' || current.surface === 'error') return transition(current, {});
     return transition(current, {
       surface: current.surface === 'paused-match' ? 'paused-match' : 'hidden',
       pointerLock: 'focus-suspended',
@@ -199,7 +213,7 @@ export function reduceMenuLifecycle(
     });
   }
   if (event.type === 'pause-requested') {
-    if (current.surface === 'pre-match' || current.surface === 'error') return transition(current, {});
+    if (current.surface === 'pre-match' || current.surface === 'deploying' || current.surface === 'error') return transition(current, {});
     return transition(current, {
       surface: 'paused-match',
       pointerLock: 'unlocked',

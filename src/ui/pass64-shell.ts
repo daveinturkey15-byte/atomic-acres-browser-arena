@@ -13,7 +13,7 @@ import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './releas
 import { PASS65_HITL_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
-import { menuPreviewVideoMarkup } from './menu-preview-video';
+import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -246,6 +246,21 @@ function menuMarkup(model: Pass64ShellViewModel): string {
   </section>`;
 }
 
+function deploymentTransitionMarkup(): string {
+  const preview = menuPreviewVideoDefinition('atomic-acres');
+  return `<section id="deployment-transition" hidden aria-hidden="true" aria-live="polite" aria-busy="true" data-arena="atomic-acres" data-media="cached-static-poster" data-live-render="false">
+    <img id="deployment-transition-poster" src="${preview.poster}" width="${preview.width}" height="${preview.height}" alt="" decoding="async" fetchpriority="high">
+    <div class="deployment-transition-scrim" aria-hidden="true"></div>
+    <div class="deployment-transition-console">
+      <small id="deployment-transition-kicker">THE BIG ONE // DEPLOYMENT STREAM</small>
+      <strong id="deployment-transition-title">NUKE TOWN</strong>
+      <span id="deployment-transition-status">Preparing authoritative arena state…</span>
+      <i aria-hidden="true"><b></b></i>
+      <em>PRERECORDED POSTER HELD · ZERO LIVE PREVIEW RENDERING · GAMEPLAY CLOCK PAUSED</em>
+    </div>
+  </section>`;
+}
+
 function chatMarkup(): string {
   return `<section id="text-chat" hidden aria-label="Room text chat" data-open="false" data-visible="false">
     <header><strong>ROOM CHAT</strong><small id="text-chat-hint">ENTER TO CHAT</small></header>
@@ -329,6 +344,7 @@ export function renderPass64Shell(model: Pass64ShellViewModel): string {
     <div id="nuke-flash" hidden></div>
     <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
     ${menuMarkup(model)}
+    ${deploymentTransitionMarkup()}
     ${chatMarkup()}
     ${releaseHistoryDialogMarkup()}
     ${projectMapDialogMarkup()}

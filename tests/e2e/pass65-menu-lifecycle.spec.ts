@@ -134,7 +134,16 @@ async function lifecycle(page: Page): Promise<Record<string, any>> {
 async function startFromMenu(page: Page): Promise<void> {
   await page.locator('#player-name').fill('PASS65 QA');
   await page.locator('#solo').click();
+  const transition = page.locator('#deployment-transition');
+  await expect(transition).toBeVisible();
+  await expect(transition).toHaveAttribute('data-live-render', 'false');
+  await expect(transition).toHaveAttribute('data-media', 'cached-static-poster');
+  await expect(page.locator('#menu')).toHaveAttribute('data-lifecycle-surface', 'deploying');
+  await expect(page.locator('#menu-preview-video')).toHaveJSProperty('paused', true);
   await expect(page.locator('#menu')).toBeHidden();
+  await expect(transition).toBeHidden();
+  await expect.poll(async () => (await lifecycle(page)).matchReadyCount).toBe(1);
+  expect(Number(await transition.getAttribute('data-ready-at'))).toBeGreaterThan(0);
   await expect.poll(async () => (await lifecycle(page)).visibilityChangeCount).toBe(1);
 }
 
