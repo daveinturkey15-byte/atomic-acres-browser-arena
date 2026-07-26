@@ -33,6 +33,7 @@ import {
 export type InteractiveWorldCollisionView = Readonly<{
   revision: number;
   movementColliders: readonly Box2[];
+  dynamicColliders: readonly Readonly<{ id: string; bounds: Box2 }>[];
   ballisticSurfaces: readonly BallisticSurface[];
 }>;
 
@@ -249,6 +250,7 @@ export class InteractiveWorldRuntime {
 
   private rebuildCollisionView(): InteractiveWorldCollisionView {
     const movementColliders: Box2[] = [];
+    const dynamicColliders: Array<Readonly<{ id: string; bounds: Box2 }>> = [];
     const ballisticSurfaces: BallisticSurface[] = [];
     for (const shed of this.sheds) {
       for (const surface of shed.definition.surfaces) {
@@ -256,6 +258,7 @@ export class InteractiveWorldRuntime {
         if (!surfaceState || surfaceState.stage === 'detached') continue;
         const bounds = surfaceBounds(surfaceFrame(surface, shed.placement, shed.state));
         movementColliders.push(bounds);
+        dynamicColliders.push(Object.freeze({ id: `${shed.placement.id}:${surface.id}`, bounds }));
         ballisticSurfaces.push(Object.freeze({
           id: `${shed.placement.id}:${surface.id}`,
           name: `destructible shed ${surface.id}`,
@@ -272,6 +275,7 @@ export class InteractiveWorldRuntime {
       for (const body of shed.state.majorDebris) {
         const bounds = majorDebrisBounds(shed, body);
         movementColliders.push(bounds);
+        dynamicColliders.push(Object.freeze({ id: `${shed.placement.id}:debris:${body.chunkId}`, bounds }));
         ballisticSurfaces.push(Object.freeze({
           id: `${shed.placement.id}:debris:${body.chunkId}`,
           name: `destructible shed debris ${body.chunkId}`,
@@ -285,6 +289,7 @@ export class InteractiveWorldRuntime {
     return Object.freeze({
       revision: worldRevision(this.sheds),
       movementColliders: Object.freeze(movementColliders),
+      dynamicColliders: Object.freeze(dynamicColliders),
       ballisticSurfaces: Object.freeze(ballisticSurfaces),
     });
   }

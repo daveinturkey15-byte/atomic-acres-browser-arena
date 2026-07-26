@@ -30,6 +30,7 @@ describe('shared interactive-world runtime adapter', () => {
     const collision = runtime.collisions();
     expect(collision.revision).toBe(0);
     expect(collision.movementColliders).toHaveLength(FIELD_SHED_DEFINITION.surfaces.length);
+    expect(collision.dynamicColliders.map((entry) => entry.id)).toEqual(collision.ballisticSurfaces.map((surface) => surface.id));
     expect(collision.ballisticSurfaces).toHaveLength(FIELD_SHED_DEFINITION.surfaces.length);
     expect(runtime.collisionSnapshot()).toMatchObject({
       arenaId: 'atomic-acres',
