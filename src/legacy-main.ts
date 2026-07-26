@@ -7004,7 +7004,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     await renderRuntime.compile(scene, camera);
     await settleWebGpuPresentation('Initial match');
   } finally {
-    if (matchActiveOverdrivePrewarm) overdriveRoot.visible = false;
     renderSubmissionPaused = priorRenderSubmissionPaused;
   }
   gameStarted = true;
@@ -7037,7 +7036,8 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   overdriveSpawns = 0;
   overdrivePickups = 0;
   overdriveExpiries = 0;
-  overdriveRoot.visible = false;
+  overdriveRoot.visible = selectedArena.overdrive;
+  overdriveRoot.scale.setScalar(0.0001);
   element<HTMLElement>('#overdrive-hud').hidden = true;
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt);
@@ -10609,11 +10609,11 @@ function updateOverdrive(now: number): void {
     overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
   }
 
-  // Keep the already-compiled presentation resident at sub-pixel scale during
-  // active play. Toggling a never-submitted material tree visible at the timed
-  // spawn caused every WebGPU client to discover/upload it on the same frame.
-  // Scaling the resident tree is allocation-free and removes that synchronized hitch.
-  overdriveRoot.visible = gameStarted && matchState.phase === 'active';
+  // Keep the already-submitted presentation resident at sub-pixel scale for
+  // the whole deployed match, including the countdown. Toggling this Atomic-
+  // only tree at ENGAGE forced a cold WebGPU scene rebuild on the first live
+  // combat frame; scaling it is allocation-free and preserves the warm cache.
+  overdriveRoot.visible = gameStarted;
   overdriveRoot.scale.setScalar(overdriveState.available ? 1 : 0.0001);
   if (overdriveRoot.visible && overdriveState.available) {
     overdriveRoot.position.set(
