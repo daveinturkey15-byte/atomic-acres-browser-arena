@@ -3604,31 +3604,67 @@
             "eliminations": 3,
             "id": "scout-sweep",
             "name": "Scout Sweep",
-            "repeatable": true
+            "repeatable": false
+          },
+          {
+            "eliminations": 3,
+            "id": "adrenaline",
+            "name": "Adrenaline Boost",
+            "repeatable": false
+          },
+          {
+            "eliminations": 4,
+            "id": "care-package",
+            "name": "Care Package",
+            "repeatable": false
           },
           {
             "eliminations": 5,
             "id": "yardhawk",
             "name": "Yardhawk",
-            "repeatable": true
+            "repeatable": false
+          },
+          {
+            "eliminations": 5,
+            "id": "piloted-drone",
+            "name": "Piloted Drone",
+            "repeatable": false
           },
           {
             "eliminations": 7,
             "id": "tri-pass",
             "name": "Tri-Pass Strike",
-            "repeatable": true
+            "repeatable": false
+          },
+          {
+            "eliminations": 7,
+            "id": "carpet-bomber",
+            "name": "Carpet Bomber",
+            "repeatable": false
           },
           {
             "eliminations": 8,
             "id": "hunter-swarm",
             "name": "Hunter Swarm",
-            "repeatable": true
+            "repeatable": false
+          },
+          {
+            "eliminations": 8,
+            "id": "chopper",
+            "name": "Chopper Gunner",
+            "repeatable": false
+          },
+          {
+            "eliminations": 15,
+            "id": "drone-swarm",
+            "name": "Drone Swarm",
+            "repeatable": false
           },
           {
             "eliminations": 15,
             "id": "nuke",
             "name": "Nuke",
-            "repeatable": true
+            "repeatable": false
           }
         ],
         "triPass": {

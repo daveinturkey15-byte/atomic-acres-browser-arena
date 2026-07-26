@@ -17,6 +17,7 @@ import { createHouseArchitecture } from './house-navigation';
 import { BOT_GRENADE_COOLDOWN_MS, BOT_GRENADE_MAX_RANGE, BOT_GRENADE_MIN_RANGE, BOT_WEAPON_POOL, SOLO_BOT_COUNT } from './bot-ai';
 import { ARENA_SELECTIONS } from './map-selection';
 import {
+  FIELD_SUPPORT,
   HUNTER_SWARM_BLAST_RADIUS,
   HUNTER_SWARM_COUNT,
   HUNTER_SWARM_DIRECT_DAMAGE,
@@ -51,16 +52,6 @@ const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'com
 // UI card order is a presentation choice. Keep the frozen Pass 62 gameplay
 // contract order stable so a naming/menu pass cannot rewrite benchmark bytes.
 const GAMEPLAY_CONTRACT_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const;
-// Historical benchmark evidence only. Pass 65's live selection and reward
-// eligibility remain exclusively catalog-derived; this snapshot keeps the
-// approved rollback contract byte-exact for regression comparison.
-const PASS62_BENCHMARK_FIELD_SUPPORT = [
-  { id: 'scout-sweep', name: 'Scout Sweep', eliminations: 3, repeatable: true },
-  { id: 'yardhawk', name: 'Yardhawk', eliminations: 5, repeatable: true },
-  { id: 'tri-pass', name: 'Tri-Pass Strike', eliminations: 7, repeatable: true },
-  { id: 'hunter-swarm', name: 'Hunter Swarm', eliminations: 8, repeatable: true },
-  { id: 'nuke', name: 'Nuke', eliminations: 15, repeatable: true },
-] as const;
 const movementContexts = {
   walk: { crouched: false, prone: false, ads: false, sprinting: false, grounded: true },
   sprint: { crouched: false, prone: false, ads: false, sprinting: true, grounded: true },
@@ -130,7 +121,7 @@ export function buildGameplayContract(): Record<string, unknown> {
         maximumActive: MAX_DEATH_DROPS,
       },
       fieldSupport: {
-        rewards: PASS62_BENCHMARK_FIELD_SUPPORT,
+        rewards: FIELD_SUPPORT,
         triPass: { blastRadius: TRI_PASS_BLAST_RADIUS, maximumDamage: TRI_PASS_MAX_DAMAGE },
         hunterSwarm: {
           count: HUNTER_SWARM_COUNT,
