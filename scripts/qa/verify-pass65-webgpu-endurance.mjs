@@ -29,6 +29,10 @@ const arenaSequence = [
   'skyline-terminal',
   'atomic-acres',
   'rustworks-1v1',
+  'gun-range',
+  'atomic-acres',
+  'skyline-terminal',
+  'rustworks-1v1',
   'rustworks-1v1',
 ];
 
