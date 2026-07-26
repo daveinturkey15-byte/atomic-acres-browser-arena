@@ -31,24 +31,159 @@ export const SOUND_EVENT_FAMILIES = Object.freeze([
 ] as const);
 
 export type SoundEventFamily = (typeof SOUND_EVENT_FAMILIES)[number];
-export type SoundDeliveryPolicy = 'listener-local' | 'world-spatial' | 'global-nonspatial';
-export type SoundVariantMode = 'fixed' | 'parameterized' | 'round-robin' | 'seeded-choice';
+
+export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
+  'weapon.report.local',
+  'weapon.report.world',
+  'weapon.reload-mechanic',
+  'weapon.dry-fire',
+  'weapon.reload-handling',
+  'weapon.switch',
+  'interaction.weapon-pickup',
+  'weapon.melee-swing',
+  'weapon.melee-world',
+  'combat.hit-confirm',
+  'combat.kill-confirm',
+  'combat.damage-taken',
+  'combat.near-miss',
+  'world.projectile-impact',
+  'world.window-break',
+  'movement.footstep.local',
+  'movement.land.local',
+  'ordnance.grenade-bounce',
+  'ordnance.grenade-out-of-bounds-impact',
+  'ordnance.frag-fuse-beep',
+  'ordnance.frag-explosion',
+  'ambience.zone-transition',
+  'support.scout-sweep',
+  'support.inbound',
+  'support.hunter-launch',
+  'support.legacy-explosion',
+  'pickup.overdrive-claimed',
+  'pickup.overdrive-available',
+  'pickup.overdrive-expired',
+  'support.nuke-warning',
+  'support.nuke-detonation',
+  'weapon.report.pass65-local',
+  'weapon.report.pass65-world',
+  'weapon.extended-foley',
+  'weapon.minigun-drive',
+  'movement.footstep.world',
+  'movement.land.world',
+  'player.low-health-breathing',
+  'player.low-health-heartbeat',
+  'ordnance.grenade-prime-throw',
+  'ordnance.smoke-release',
+  'ordnance.smoke-loop',
+  'ordnance.flash-detonation',
+  'ordnance.flash-recovery',
+  'ordnance.crossbow-launch',
+  'ordnance.crossbow-impact',
+  'ordnance.crossbow-fuse-beep',
+  'ordnance.crossbow-explosion',
+  'support.adrenaline-state',
+  'support.care-aircraft',
+  'support.care-crate-descent',
+  'support.care-capture',
+  'support.chopper-rotor',
+  'support.chopper-gun',
+  'support.chopper-damage',
+  'support.carpet-aircraft',
+  'support.carpet-bomb',
+  'support.drone-rotor',
+  'support.drone-gun',
+  'support.drone-damage',
+  'support.drone-possession',
+  'support.drone-sensor',
+  'interaction.pickup',
+  'shed.door-motion',
+  'shed.damage',
+  'shed.debris-impact',
+  'ui.feedback',
+  'announcement.match',
+  'announcement.killstreak',
+  'ambience.arena-bed',
+  'ambience.menu-helicopter',
+  'music.menu',
+  'music.game',
+] as const);
+
+export type SoundEventId = (typeof REQUIRED_SOUND_EVENT_IDS)[number];
+
+export const SOUND_DELIVERY_POLICIES = Object.freeze([
+  'listener-local', 'world-spatial', 'global-nonspatial',
+] as const);
+export const SOUND_VARIANT_MODES = Object.freeze([
+  'fixed', 'parameterized', 'round-robin', 'seeded-choice',
+] as const);
+export const SOUND_EVENT_COVERAGE_STATUSES = Object.freeze([
+  'implemented', 'partial', 'planned',
+] as const);
+export const SOUND_LIFECYCLE_OWNERS = Object.freeze([
+  'audio-session',
+  'ui-root',
+  'menu-route',
+  'player-life',
+  'match-epoch',
+  'arena-generation',
+  'projectile-entity',
+  'support-activation',
+  'support-entity',
+  'shed-entity',
+] as const);
+export const SOUND_CONCURRENCY_SCOPES = Object.freeze([
+  'global', 'per-listener', 'per-source',
+] as const);
+export const SOUND_CONCURRENCY_OVERFLOW_POLICIES = Object.freeze([
+  'drop-newest', 'coalesce', 'steal-oldest', 'lowest-priority-then-farthest-then-oldest',
+] as const);
+export const SOUND_PROVENANCE_POLICIES = Object.freeze([
+  'repository-procedural-original', 'manifested-original-or-compatible-license',
+] as const);
+export const SOUND_PROVENANCE_STATUSES = Object.freeze([
+  'verified-existing-source', 'required-before-runtime',
+] as const);
+export const SOUND_PROVENANCE_DIGEST_AUTHORITIES = Object.freeze([
+  'git-blob-at-release-sha', 'assets-manifest-sha256',
+] as const);
+export const SOUND_AGGREGATE_VOICE_POOL_IDS = Object.freeze([
+  'local-transient',
+  'world-transient',
+  'world-dense-transient',
+  'world-continuous',
+  'global-cue',
+  'listener-continuous',
+  'menu-continuous',
+  'game-music',
+] as const);
+
+export type SoundDeliveryPolicy = (typeof SOUND_DELIVERY_POLICIES)[number];
+export type SoundVariantMode = (typeof SOUND_VARIANT_MODES)[number];
 /** Emitter coverage only; policy fields on partial/planned rows do not claim runtime integration or acceptance. */
-export type SoundEventCoverageStatus = 'implemented' | 'partial' | 'planned';
-export type SoundLifecycleOwner =
-  | 'audio-session'
-  | 'ui-root'
-  | 'menu-route'
-  | 'player-life'
-  | 'match-epoch'
-  | 'arena-generation'
-  | 'projectile-entity'
-  | 'support-activation'
-  | 'support-entity'
-  | 'shed-entity';
+export type SoundEventCoverageStatus = (typeof SOUND_EVENT_COVERAGE_STATUSES)[number];
+export type SoundLifecycleOwner = (typeof SOUND_LIFECYCLE_OWNERS)[number];
+export type SoundConcurrencyScope = (typeof SOUND_CONCURRENCY_SCOPES)[number];
+export type SoundConcurrencyOverflowPolicy = (typeof SOUND_CONCURRENCY_OVERFLOW_POLICIES)[number];
+export type SoundProvenancePolicy = (typeof SOUND_PROVENANCE_POLICIES)[number];
+export type SoundProvenanceStatus = (typeof SOUND_PROVENANCE_STATUSES)[number];
+export type SoundProvenanceDigestAuthority = (typeof SOUND_PROVENANCE_DIGEST_AUTHORITIES)[number];
+export type SoundAggregateVoicePoolId = (typeof SOUND_AGGREGATE_VOICE_POOL_IDS)[number];
+
+export const SOUND_AGGREGATE_VOICE_POOLS: Readonly<Record<SoundAggregateVoicePoolId, Readonly<{
+  maximumVoices: number;
+}>>> = Object.freeze({
+  'local-transient': Object.freeze({ maximumVoices: 16 }),
+  'world-transient': Object.freeze({ maximumVoices: 24 }),
+  'world-dense-transient': Object.freeze({ maximumVoices: 12 }),
+  'world-continuous': Object.freeze({ maximumVoices: 12 }),
+  'global-cue': Object.freeze({ maximumVoices: 4 }),
+  'listener-continuous': Object.freeze({ maximumVoices: 4 }),
+  'menu-continuous': Object.freeze({ maximumVoices: 2 }),
+  'game-music': Object.freeze({ maximumVoices: 1 }),
+});
 
 export type SoundEventInventoryEntry = Readonly<{
-  id: string;
+  id: SoundEventId;
   family: SoundEventFamily;
   bus: AudioBusId;
   delivery: SoundDeliveryPolicy;
@@ -59,20 +194,17 @@ export type SoundEventInventoryEntry = Readonly<{
     genericFallbackRationale: string | null;
   }>;
   provenance: Readonly<{
-    policy: 'repository-procedural-original' | 'manifested-original-or-compatible-license';
-    status: 'verified-existing-source' | 'required-before-runtime';
+    policy: SoundProvenancePolicy;
+    status: SoundProvenanceStatus;
     sourceIdentity: string;
-    digestAuthority: 'git-blob-at-release-sha' | 'assets-manifest-sha256';
+    digestAuthority: SoundProvenanceDigestAuthority;
   }>;
   concurrency: Readonly<{
-    scope: 'global' | 'per-listener' | 'per-source';
+    scope: SoundConcurrencyScope;
     maximumVoices: number;
     cooldownMs: number;
-    overflow:
-      | 'drop-newest'
-      | 'coalesce'
-      | 'steal-oldest'
-      | 'lowest-priority-then-farthest-then-oldest';
+    overflow: SoundConcurrencyOverflowPolicy;
+    aggregatePoolId: SoundAggregateVoicePoolId;
   }>;
   lifecycleOwner: SoundLifecycleOwner;
   coverage: Readonly<{
@@ -87,7 +219,7 @@ export type SoundEventInventoryEntry = Readonly<{
 }>;
 
 type ExistingEventInput = Readonly<{
-  id: string;
+  id: SoundEventId;
   family: SoundEventFamily;
   bus: AudioBusId;
   delivery: SoundDeliveryPolicy;
@@ -104,7 +236,7 @@ type ExistingEventInput = Readonly<{
 }>;
 
 type PlannedEventInput = Readonly<{
-  id: string;
+  id: SoundEventId;
   family: SoundEventFamily;
   bus: AudioBusId;
   delivery: SoundDeliveryPolicy;
@@ -118,11 +250,92 @@ type PlannedEventInput = Readonly<{
   coverageDetail: string;
 }>;
 
+export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze(['unlock', 'telemetry'] as const);
+
+export type RuntimeSoundCallsiteContractEntry = Readonly<{
+  sourcePath: string;
+  emitterSymbol: string;
+  argumentSignature: string;
+  occurrences: number;
+  eventIds: readonly SoundEventId[];
+}>;
+
+function runtimeCallsite(
+  emitterSymbol: string,
+  argumentSignature: string,
+  occurrences: number,
+  eventIds: readonly SoundEventId[],
+): RuntimeSoundCallsiteContractEntry {
+  return Object.freeze({
+    sourcePath: 'src/legacy-main.ts',
+    emitterSymbol,
+    argumentSignature,
+    occurrences,
+    eventIds: Object.freeze([...eventIds]),
+  });
+}
+
+export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteContractEntry, 'eventIds'>): string {
+  return `${entry.sourcePath}#audio.${entry.emitterSymbol}(${entry.argumentSignature})`;
+}
+
+/**
+ * Independent Pass 64 semantic-callsite oracle. The verifier test parses every
+ * non-test runtime TypeScript file and groups calls by path, emitter, normalized
+ * AST argument text, and occurrence count. Moving or changing a call therefore
+ * requires an explicit contract edit without pinning brittle line numbers.
+ * Identical no-argument calls remain count-bound until runtime emitters accept a
+ * stable event ID; relocating one while preserving the same count is the known
+ * residual risk and must be closed when the audio runtime is integrated.
+ */
+export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
+  runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
+  runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
+  runtimeCallsite('empty', '', 2, ['weapon.dry-fire']),
+  runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
+  runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
+  runtimeCallsite('footstep', 'classifyFootstepSurface(player.position),currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
+  runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
+  runtimeCallsite('grenadeBounce', 'Math.abs(incoming)', 1, ['ordnance.grenade-bounce']),
+  runtimeCallsite('grenadeFuseBeep', 'fuseRemainingMs,now', 1, ['ordnance.frag-fuse-beep']),
+  runtimeCallsite('hit', 'false', 2, ['combat.hit-confirm']),
+  runtimeCallsite('hit', 'headshot', 2, ['combat.hit-confirm']),
+  runtimeCallsite('hit', "hit.zone === 'head'", 1, ['combat.hit-confirm']),
+  runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
+  runtimeCallsite('hunterLaunch', 'index', 1, ['support.hunter-launch']),
+  runtimeCallsite('impact', "'glass',point.distanceTo(camera.position)", 1, ['world.window-break']),
+  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position)', 3, ['world.projectile-impact']),
+  runtimeCallsite('impact', 'surface,point.distanceTo(player.position)', 1, ['world.projectile-impact']),
+  runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
+  runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
+  runtimeCallsite('melee', '', 2, ['weapon.melee-swing', 'weapon.melee-world']),
+  runtimeCallsite('nearMiss', 'nearMissStrength(player.position, origin, visibleEnd)', 2, ['combat.near-miss']),
+  runtimeCallsite('nukeDetonation', '', 1, ['support.nuke-detonation']),
+  runtimeCallsite('nukeWarning', '', 1, ['support.nuke-warning']),
+  runtimeCallsite('overdriveAvailable', '', 1, ['pickup.overdrive-available']),
+  runtimeCallsite('overdriveExpire', '', 1, ['pickup.overdrive-expired']),
+  runtimeCallsite('overdrivePickup', '', 1, ['pickup.overdrive-claimed']),
+  runtimeCallsite('railgunReport', '!local,origin.distanceTo(camera.position)', 1, ['weapon.report.local', 'weapon.report.world']),
+  runtimeCallsite('railgunReport', 'true,origin.distanceTo(camera.position)', 1, ['weapon.report.world']),
+  runtimeCallsite('reload', '', 1, ['weapon.reload-handling']),
+  runtimeCallsite('scoutSweep', '', 1, ['support.scout-sweep']),
+  runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
+  runtimeCallsite('shot', 'bot.weapon,true', 1, ['weapon.report.world']),
+  runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 2, ['weapon.report.world']),
+  runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
+  runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
+  runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
+  runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
+  runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
+  runtimeCallsite('weaponSwitch', '', 4, ['weapon.switch', 'interaction.weapon-pickup']),
+]);
+
 const LOCAL_FEEDBACK = Object.freeze({
   scope: 'per-listener' as const,
   maximumVoices: 4,
   cooldownMs: 0,
   overflow: 'steal-oldest' as const,
+  aggregatePoolId: 'local-transient' as const,
 });
 
 const LOCAL_CRITICAL = Object.freeze({
@@ -130,6 +343,7 @@ const LOCAL_CRITICAL = Object.freeze({
   maximumVoices: 2,
   cooldownMs: 80,
   overflow: 'drop-newest' as const,
+  aggregatePoolId: 'local-transient' as const,
 });
 
 const WORLD_TRANSIENT = Object.freeze({
@@ -137,6 +351,7 @@ const WORLD_TRANSIENT = Object.freeze({
   maximumVoices: 24,
   cooldownMs: 0,
   overflow: 'lowest-priority-then-farthest-then-oldest' as const,
+  aggregatePoolId: 'world-transient' as const,
 });
 
 const WORLD_DENSE_TRANSIENT = Object.freeze({
@@ -144,13 +359,15 @@ const WORLD_DENSE_TRANSIENT = Object.freeze({
   maximumVoices: 12,
   cooldownMs: 25,
   overflow: 'lowest-priority-then-farthest-then-oldest' as const,
+  aggregatePoolId: 'world-dense-transient' as const,
 });
 
 const WORLD_LOOP = Object.freeze({
   scope: 'per-source' as const,
-  maximumVoices: 12,
+  maximumVoices: 1,
   cooldownMs: 0,
   overflow: 'lowest-priority-then-farthest-then-oldest' as const,
+  aggregatePoolId: 'world-continuous' as const,
 });
 
 const GLOBAL_CUE = Object.freeze({
@@ -158,13 +375,31 @@ const GLOBAL_CUE = Object.freeze({
   maximumVoices: 2,
   cooldownMs: 120,
   overflow: 'steal-oldest' as const,
+  aggregatePoolId: 'global-cue' as const,
 });
 
-const SINGLETON_LOOP = Object.freeze({
+const LOCAL_LOOP = Object.freeze({
   scope: 'per-listener' as const,
   maximumVoices: 1,
   cooldownMs: 0,
   overflow: 'steal-oldest' as const,
+  aggregatePoolId: 'listener-continuous' as const,
+});
+
+const MENU_LOOP = Object.freeze({
+  scope: 'per-listener' as const,
+  maximumVoices: 1,
+  cooldownMs: 0,
+  overflow: 'steal-oldest' as const,
+  aggregatePoolId: 'menu-continuous' as const,
+});
+
+const GAME_MUSIC_LOOP = Object.freeze({
+  scope: 'per-listener' as const,
+  maximumVoices: 1,
+  cooldownMs: 0,
+  overflow: 'steal-oldest' as const,
+  aggregatePoolId: 'game-music' as const,
 });
 
 function freezeEntry(entry: SoundEventInventoryEntry): SoundEventInventoryEntry {
@@ -491,7 +726,7 @@ const events: SoundEventInventoryEntry[] = [
   plannedEvent({
     id: 'weapon.minigun-drive', family: 'weapon-foley', bus: 'sfx', delivery: 'listener-local',
     variants: ['spin-up', 'sustain-loop', 'spin-down', 'overheat'], contractRefs: ['R228', 'R236', 'R307', 'R308'],
-    concurrency: SINGLETON_LOOP, lifecycleOwner: 'player-life',
+    concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
     coverageDetail: 'The rotary drive loop must follow authoritative spin state and stop on switch, death, rematch, or disposal.',
   }),
   plannedEvent({
@@ -509,13 +744,13 @@ const events: SoundEventInventoryEntry[] = [
   plannedEvent({
     id: 'player.low-health-breathing', family: 'player-state', bus: 'sfx', delivery: 'listener-local',
     variants: ['threshold', 'severe', 'critical'], contractRefs: ['R103', 'R305', 'R307', 'R308'],
-    concurrency: SINGLETON_LOOP, lifecycleOwner: 'player-life',
+    concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
     coverageDetail: 'One generation-owned breathing loop must intensify with health and stop on recovery, death, rematch, or reduced-sensory suppression.',
   }),
   plannedEvent({
     id: 'player.low-health-heartbeat', family: 'player-state', bus: 'sfx', delivery: 'listener-local',
     variants: ['threshold', 'severe', 'critical'], contractRefs: ['R103', 'R305', 'R307', 'R308'],
-    concurrency: SINGLETON_LOOP, lifecycleOwner: 'player-life',
+    concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
     coverageDetail: 'Heartbeat cadence is a bounded local loop under the same health and sensory lifecycle as breathing.',
   }),
   plannedEvent({
@@ -545,7 +780,7 @@ const events: SoundEventInventoryEntry[] = [
   plannedEvent({
     id: 'ordnance.flash-recovery', family: 'ordnance', bus: 'sfx', delivery: 'listener-local',
     variants: ['reduced-sensory', 'standard'], contractRefs: ['R212', 'R215', 'R305', 'R307', 'R308'],
-    concurrency: SINGLETON_LOOP, lifecycleOwner: 'player-life',
+    concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
     coverageDetail: 'Any local recovery/ringing cue must use remaining host duration, respect sensory controls, and never restart after replay.',
   }),
   plannedEvent({
@@ -717,51 +952,54 @@ const events: SoundEventInventoryEntry[] = [
   plannedEvent({
     id: 'ambience.menu-helicopter', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
     spatialProfileId: 'menu-preview-aircraft-v1', variants: ['cockpit-idle', 'flyby-near', 'flyby-far'],
-    contractRefs: ['R112-R114', 'R307', 'R308'], concurrency: SINGLETON_LOOP, lifecycleOwner: 'menu-route',
+    contractRefs: ['R112-R113', 'R307', 'R308'], concurrency: MENU_LOOP, lifecycleOwner: 'menu-route',
     coverageDetail: 'Menu-preview aircraft audio follows the active preview route and stops across route/arena changes or reduced-sensory teardown.',
   }),
   plannedEvent({
     id: 'music.menu', family: 'music', bus: 'menu-music', delivery: 'global-nonspatial',
-    variants: ['menu-main', 'menu-lobby'], contractRefs: ['R303', 'R307', 'R308'], concurrency: SINGLETON_LOOP,
+    variants: ['menu-main', 'menu-lobby'], contractRefs: ['R303', 'R307', 'R308'], concurrency: MENU_LOOP,
     lifecycleOwner: 'menu-route', coverageDetail: 'Menu music requires manifested stems, autoplay recovery, crossfade ownership, and route disposal.',
   }),
   plannedEvent({
     id: 'music.game', family: 'music', bus: 'game-music', delivery: 'global-nonspatial',
     variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'],
-    contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: SINGLETON_LOOP, lifecycleOwner: 'arena-generation',
+    contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
 ];
 
 export const SOUND_EVENT_INVENTORY: readonly SoundEventInventoryEntry[] = Object.freeze(events);
-export const REQUIRED_SOUND_EVENT_IDS: readonly string[] = Object.freeze(events.map((event) => event.id));
 export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '16d5f51f82a65d9e469cb85b6f16300a5a9ccb224cba802fd8abec658b82618b';
+export const SOUND_EVENT_INVENTORY_SHA256 = 'f9e6b43a667d0ce109e3503811178b3c3d6f080b7228ada2c83835b1ef12cc45';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
-  requiredIds?: readonly string[];
-  requiredFamilies?: readonly SoundEventFamily[];
   observedRuntimeEmitterSymbols?: readonly string[];
 }>;
+
+function includesAllowedValue(registry: readonly string[], value: unknown): boolean {
+  return typeof value === 'string' && registry.includes(value);
+}
 
 export function verifySoundEventInventory(
   inventory: readonly SoundEventInventoryEntry[],
   options: SoundEventInventoryVerificationOptions = {},
 ): readonly string[] {
   const errors: string[] = [];
-  const requiredIds = options.requiredIds ?? REQUIRED_SOUND_EVENT_IDS;
-  const requiredFamilies = options.requiredFamilies ?? SOUND_EVENT_FAMILIES;
+  const requiredIds = REQUIRED_SOUND_EVENT_IDS;
+  const requiredFamilies = SOUND_EVENT_FAMILIES;
+  const runtimeCallsiteContract = CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT;
   const ids = inventory.map((event) => event.id);
-  const idSet = new Set(ids);
+  const idSet = new Set<string>(ids);
+  const eventById = new Map(inventory.map((event) => [event.id, event] as const));
 
   for (const id of new Set(requiredIds)) {
     if (!idSet.has(id)) errors.push(`missing sound event: ${id}`);
   }
   for (const id of idSet) {
-    if (!requiredIds.includes(id)) errors.push(`unregistered sound event: ${id}`);
+    if (!(requiredIds as readonly string[]).includes(id)) errors.push(`unregistered sound event: ${id}`);
   }
   for (const id of new Set(ids.filter((candidate, index) => ids.indexOf(candidate) !== index))) {
     errors.push(`duplicate sound event: ${id}`);
@@ -769,6 +1007,51 @@ export function verifySoundEventInventory(
 
   for (const family of requiredFamilies) {
     if (!inventory.some((event) => event.family === family)) errors.push(`missing sound-event family: ${family}`);
+  }
+
+  const declaredPoolIds = Object.keys(SOUND_AGGREGATE_VOICE_POOLS);
+  for (const poolId of SOUND_AGGREGATE_VOICE_POOL_IDS) {
+    const maximumVoices = SOUND_AGGREGATE_VOICE_POOLS[poolId]?.maximumVoices;
+    if (!declaredPoolIds.includes(poolId)) errors.push(`missing aggregate voice pool: ${poolId}`);
+    if (!Number.isSafeInteger(maximumVoices) || maximumVoices < 1) {
+      errors.push(`aggregate voice pool ${poolId} must have a positive safe-integer cap`);
+    }
+  }
+  for (const poolId of declaredPoolIds) {
+    if (!includesAllowedValue(SOUND_AGGREGATE_VOICE_POOL_IDS, poolId)) errors.push(`unregistered aggregate voice pool: ${poolId}`);
+  }
+
+  const callsiteKeys = new Set<string>();
+  const callsiteEventIds = new Set<SoundEventId>();
+  for (const callsite of runtimeCallsiteContract) {
+    const identity = runtimeSoundCallsiteIdentity(callsite);
+    if (callsiteKeys.has(identity)) errors.push(`duplicate runtime sound callsite: ${identity}`);
+    callsiteKeys.add(identity);
+    if (!callsite.sourcePath.startsWith('src/') || !callsite.sourcePath.endsWith('.ts')) {
+      errors.push(`runtime sound callsite has invalid source path: ${identity}`);
+    }
+    if (!callsite.emitterSymbol.trim()) errors.push(`runtime sound callsite has no emitter: ${identity}`);
+    if (!Number.isSafeInteger(callsite.occurrences) || callsite.occurrences < 1) {
+      errors.push(`runtime sound callsite has invalid occurrence count: ${identity}`);
+    }
+    if (callsite.eventIds.length === 0) errors.push(`runtime sound callsite has no semantic event: ${identity}`);
+    for (const eventId of callsite.eventIds) {
+      callsiteEventIds.add(eventId);
+      const event = eventById.get(eventId);
+      if (!event) {
+        errors.push(`runtime sound callsite references missing event: ${identity} -> ${eventId}`);
+      } else {
+        if (event.coverage.status === 'planned') errors.push(`runtime sound callsite references planned event: ${identity} -> ${eventId}`);
+        if (!event.source.runtimeEmitterSymbols.includes(callsite.emitterSymbol)) {
+          errors.push(`runtime sound callsite emitter mismatch: ${identity} -> ${eventId}`);
+        }
+      }
+    }
+  }
+  for (const event of inventory) {
+    if (event.coverage.status !== 'planned' && !callsiteEventIds.has(event.id)) {
+      errors.push(`current sound event has no semantic callsite: ${event.id}`);
+    }
   }
 
   const coveredEmitterSymbols = new Set(inventory.flatMap((event) => event.source.runtimeEmitterSymbols));
@@ -779,9 +1062,26 @@ export function verifySoundEventInventory(
   for (const event of inventory) {
     const prefix = `${event.id}:`;
     if (!event.id || !/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(event.id)) errors.push(`${prefix} invalid stable ID`);
-    if (!SOUND_EVENT_FAMILIES.includes(event.family)) errors.push(`${prefix} unknown family ${String(event.family)}`);
-    if (!AUDIO_BUS_IDS.includes(event.bus)) errors.push(`${prefix} unknown bus ${String(event.bus)}`);
+    if (!includesAllowedValue(SOUND_EVENT_FAMILIES, event.family)) errors.push(`${prefix} unknown family ${String(event.family)}`);
+    if (!includesAllowedValue(AUDIO_BUS_IDS, event.bus)) errors.push(`${prefix} unknown bus ${String(event.bus)}`);
     if (event.bus === 'master') errors.push(`${prefix} events cannot route directly to the master control bus`);
+    if (!includesAllowedValue(SOUND_DELIVERY_POLICIES, event.delivery)) errors.push(`${prefix} unknown delivery ${String(event.delivery)}`);
+    if (!includesAllowedValue(SOUND_VARIANT_MODES, event.variants.mode)) errors.push(`${prefix} unknown variant mode ${String(event.variants.mode)}`);
+    if (!includesAllowedValue(SOUND_LIFECYCLE_OWNERS, event.lifecycleOwner)) errors.push(`${prefix} unknown lifecycle owner ${String(event.lifecycleOwner)}`);
+    if (!includesAllowedValue(SOUND_CONCURRENCY_SCOPES, event.concurrency.scope)) errors.push(`${prefix} unknown concurrency scope ${String(event.concurrency.scope)}`);
+    if (!includesAllowedValue(SOUND_CONCURRENCY_OVERFLOW_POLICIES, event.concurrency.overflow)) {
+      errors.push(`${prefix} unknown concurrency overflow ${String(event.concurrency.overflow)}`);
+    }
+    if (!includesAllowedValue(SOUND_EVENT_COVERAGE_STATUSES, event.coverage.status)) errors.push(`${prefix} unknown coverage status ${String(event.coverage.status)}`);
+    if (!includesAllowedValue(SOUND_PROVENANCE_POLICIES, event.provenance.policy)) errors.push(`${prefix} unknown provenance policy ${String(event.provenance.policy)}`);
+    if (!includesAllowedValue(SOUND_PROVENANCE_STATUSES, event.provenance.status)) errors.push(`${prefix} unknown provenance status ${String(event.provenance.status)}`);
+    if (!includesAllowedValue(SOUND_PROVENANCE_DIGEST_AUTHORITIES, event.provenance.digestAuthority)) {
+      errors.push(`${prefix} unknown provenance digest authority ${String(event.provenance.digestAuthority)}`);
+    }
+    const aggregatePoolId = event.concurrency.aggregatePoolId;
+    if (!includesAllowedValue(SOUND_AGGREGATE_VOICE_POOL_IDS, aggregatePoolId)) {
+      errors.push(`${prefix} unknown aggregate voice pool ${String(aggregatePoolId)}`);
+    }
     if (event.delivery === 'world-spatial' && !event.spatialProfileId) errors.push(`${prefix} world-spatial delivery requires a profile`);
     if (event.delivery !== 'world-spatial' && event.spatialProfileId !== null) errors.push(`${prefix} non-spatial delivery cannot name a spatial profile`);
     if (event.variants.ids.length === 0) errors.push(`${prefix} requires at least one variant`);
@@ -797,7 +1097,19 @@ export function verifySoundEventInventory(
     if (!Number.isSafeInteger(event.concurrency.cooldownMs) || event.concurrency.cooldownMs < 0) {
       errors.push(`${prefix} cooldownMs must be a non-negative safe integer`);
     }
-    if (!event.lifecycleOwner) errors.push(`${prefix} lifecycle owner is missing`);
+    if (event.concurrency.scope === 'per-source' && event.concurrency.maximumVoices !== 1) {
+      errors.push(`${prefix} per-source concurrency must allow exactly one voice`);
+    }
+    if (includesAllowedValue(SOUND_AGGREGATE_VOICE_POOL_IDS, aggregatePoolId)) {
+      const pool = SOUND_AGGREGATE_VOICE_POOLS[aggregatePoolId];
+      if (event.concurrency.maximumVoices > pool.maximumVoices) {
+        errors.push(`${prefix} maximumVoices exceeds aggregate pool ${aggregatePoolId} cap ${pool.maximumVoices}`);
+      }
+      if (aggregatePoolId === 'world-continuous'
+        && (event.concurrency.scope !== 'per-source' || event.concurrency.maximumVoices !== 1)) {
+        errors.push(`${prefix} world-continuous voices require a one-voice per-source policy`);
+      }
+    }
     if (event.source.contractRefs.length === 0) errors.push(`${prefix} requirement/evidence reference is missing`);
     if (event.source.contractRefs.some((ref) => !/^R\d{3}(?:-R\d{3})?$/.test(ref))) {
       errors.push(`${prefix} has an invalid requirement/evidence reference`);
