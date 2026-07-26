@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RailgunPresentation } from './railgun-presentation';
+import { RAILGUN_BOLT_PRESENTATION, RailgunPresentation } from './railgun-presentation';
+import type { RailgunAuthorityState } from './railgun-authority';
 
 vi.mock('./art-kit', () => ({
   buildWeaponModel: () => {
@@ -36,7 +37,24 @@ describe('railgun presentation', () => {
     expect(presentation.telemetry()).toMatchObject({ activeBeams: 1, beamPresentations: 1 });
     const beam = scene.getObjectByName('railgun-massive-beam-1') as THREE.Group;
     expect(beam.visible).toBe(true);
-    expect(beam.getObjectByName('railgun-beam-bloom')?.scale.y).toBeCloseTo(180);
+    const core = beam.getObjectByName('railgun-beam-core') as THREE.Mesh;
+    const bloom = beam.getObjectByName('railgun-beam-bloom') as THREE.Mesh;
+    expect(core.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.coreRadiusM, y: 180 });
+    expect(bloom.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.haloRadiusM, y: 180 });
+    expect((core.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
+    expect((bloom.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
+    expect(presentation.telemetry()).toMatchObject({
+      lastBeamLengthM: 180,
+      visibleDurationMs: 900,
+      poolCapacity: 6,
+      throughGeometry: true,
+    });
+
+    const hiddenWorld = { status: 'held', pickupPosition: null } as RailgunAuthorityState;
+    presentation.updateWorld(hiddenWorld, 1_000 + RAILGUN_BOLT_PRESENTATION.visibleDurationMs - 1);
+    expect(presentation.telemetry().activeBeams).toBe(1);
+    presentation.updateWorld(hiddenWorld, 1_000 + RAILGUN_BOLT_PRESENTATION.visibleDurationMs + 1);
+    expect(presentation.telemetry().activeBeams).toBe(0);
   });
 
   it('keeps neon-blue enemy silhouettes in the 3D scene through depth and reuses DOM markers', () => {

@@ -247,7 +247,21 @@ try {
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
     await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true, undefined, { timeout: 5_000 });
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
-    await Promise.all(peers.map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7, undefined, { timeout: 15_000 })));
+    await Promise.all(peers.map((page) => page.waitForFunction(() => {
+      const railgun = window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun;
+      return railgun.roundsRemaining === 7 && railgun.presentation.beamPresentations >= 1;
+    }, undefined, { timeout: 15_000 })));
+    joined.railgunPeerBoltEvidence = await Promise.all(labelledPages.map(async ([label, page]) => ({
+      label,
+      presentation: (await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation)),
+    })));
+    joined.railgunPeerBoltReplicated = joined.railgunPeerBoltEvidence.every(({ presentation }) => presentation.beamPresentations >= 1
+      && presentation.lastBeamLengthM >= 179.5
+      && presentation.visibleDurationMs >= 900
+      && presentation.coreRadiusM >= 0.14
+      && presentation.haloRadiusM >= 0.62
+      && presentation.poolCapacity === 6
+      && presentation.throughGeometry === true);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
     joined.railgunImmediateRepeatBlocked = await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining === 7);
     await guest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(false));
@@ -264,7 +278,7 @@ try {
     const beforeRedeploy = await Promise.all([host, guest].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
     await guest.evaluate(() => {
       if (document.pointerLockElement) void document.exitPointerLock();
-      document.querySelector('#menu')?.classList.remove('hidden');
+      window.__ATOMIC_ACRES_DEBUG__.openMenu();
     });
     await guest.click('[data-menu-tab="kit"]');
     await guest.click('[data-kit-id="runner"]');
@@ -307,7 +321,7 @@ try {
   if (errors.length || results.length !== cycles || results.some((result) => result.hostMode !== 'host' || result.guestMode !== 'client'
     || !result.hostStartReadinessCommitted || !result.rematchReset || !result.secondReady || !result.secondMatchStarted || !result.regenSmallDamageSurvived || !result.guestRedeployNoCombatEffects
     || !result.sanitizedDiagnosticRetained || !result.automaticDiagnosticsCompleted || !result.railgunGuestClaimed || !result.railgunImmediateRepeatBlocked
-    || !result.railgunReplicatedTwoShots || !result.railgunDroppedOnRedeploy || result.railgunReliableStateMirrors < 1
+    || !result.railgunReplicatedTwoShots || !result.railgunPeerBoltReplicated || !result.railgunDroppedOnRedeploy || result.railgunReliableStateMirrors < 1
     || !result.leaveObserved || !result.rejoinGraceObserved
     || result.hostNetwork.stateChannels < 1 || result.guestNetwork.stateChannels < 1
     || result.hostNetwork.stateChannelReliable !== false || result.hostNetwork.stateChannelOrdered !== false

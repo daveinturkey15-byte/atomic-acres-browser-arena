@@ -8,6 +8,15 @@ export type RailgunThermalContact = Readonly<{
   position: THREE.Vector3;
 }>;
 
+export const RAILGUN_BOLT_PRESENTATION = Object.freeze({
+  minimumLengthM: 180,
+  visibleDurationMs: 900,
+  coreRadiusM: 0.14,
+  haloRadiusM: 0.62,
+  poolCapacity: 6,
+  throughGeometry: true,
+});
+
 export class RailgunPresentation {
   readonly root = new THREE.Group();
   private readonly weapon: THREE.Group;
@@ -19,6 +28,7 @@ export class RailgunPresentation {
   private readonly beams: Array<{ root: THREE.Group; core: THREE.Mesh; bloom: THREE.Mesh; expiresAt: number }> = [];
   private beamCursor = 0;
   private beamPresentations = 0;
+  private lastBeamLengthM = 0;
   private visibleThermalContacts = 0;
 
   constructor(scene: THREE.Scene, thermalRoot: HTMLElement, flattenMaterials: boolean) {
@@ -57,7 +67,7 @@ export class RailgunPresentation {
     this.thermalWorldRoot.visible = false;
     this.beamRoot.name = 'railgun-replicated-beams';
     this.beamRoot.userData.presentationOnly = true;
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < RAILGUN_BOLT_PRESENTATION.poolCapacity; index += 1) {
       const beam = new THREE.Group();
       beam.name = `railgun-massive-beam-${index + 1}`;
       beam.visible = false;
@@ -67,6 +77,7 @@ export class RailgunPresentation {
         color: 0xc9fbff,
         transparent: true,
         opacity: 0.94,
+        depthTest: false,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         toneMapped: false,
@@ -74,15 +85,18 @@ export class RailgunPresentation {
       const bloom = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
         color: 0x25cfff,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.38,
+        depthTest: false,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         toneMapped: false,
       }));
       core.name = 'railgun-beam-core';
       bloom.name = 'railgun-beam-bloom';
-      core.renderOrder = 7;
-      bloom.renderOrder = 6;
+      core.renderOrder = 18;
+      bloom.renderOrder = 17;
+      core.frustumCulled = false;
+      bloom.frustumCulled = false;
       beam.add(core, bloom);
       this.beamRoot.add(beam);
       this.beams.push({ root: beam, core, bloom, expiresAt: 0 });
@@ -107,11 +121,12 @@ export class RailgunPresentation {
     const beam = this.beams[this.beamCursor++ % this.beams.length];
     beam.root.position.copy(start).addScaledVector(delta, 0.5);
     beam.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
-    beam.core.scale.set(0.1, length, 0.1);
-    beam.bloom.scale.set(0.42, length, 0.42);
+    beam.core.scale.set(RAILGUN_BOLT_PRESENTATION.coreRadiusM, length, RAILGUN_BOLT_PRESENTATION.coreRadiusM);
+    beam.bloom.scale.set(RAILGUN_BOLT_PRESENTATION.haloRadiusM, length, RAILGUN_BOLT_PRESENTATION.haloRadiusM);
     beam.root.visible = true;
-    beam.expiresAt = now + 240;
+    beam.expiresAt = now + RAILGUN_BOLT_PRESENTATION.visibleDurationMs;
     this.beamPresentations += 1;
+    this.lastBeamLengthM = length;
   }
 
   private updateBeams(now: number): void {
@@ -122,9 +137,10 @@ export class RailgunPresentation {
         beam.root.visible = false;
         continue;
       }
-      const fade = THREE.MathUtils.clamp(remaining / 240, 0, 1);
-      (beam.core.material as THREE.MeshBasicMaterial).opacity = 0.94 * fade;
-      (beam.bloom.material as THREE.MeshBasicMaterial).opacity = 0.3 * Math.sqrt(fade);
+      const fade = THREE.MathUtils.clamp(remaining / RAILGUN_BOLT_PRESENTATION.visibleDurationMs, 0, 1);
+      const attack = THREE.MathUtils.smoothstep(1 - fade, 0, 0.08);
+      (beam.core.material as THREE.MeshBasicMaterial).opacity = 0.94 * fade * attack;
+      (beam.bloom.material as THREE.MeshBasicMaterial).opacity = 0.38 * Math.sqrt(fade) * attack;
     }
   }
 
@@ -202,7 +218,21 @@ export class RailgunPresentation {
     }
   }
 
-  telemetry(): Readonly<{ worldVisible: boolean; thermalActive: boolean; thermalContacts: number; worldSilhouettes: number; activeBeams: number; beamPresentations: number; modelId: string }> {
+  telemetry(): Readonly<{
+    worldVisible: boolean;
+    thermalActive: boolean;
+    thermalContacts: number;
+    worldSilhouettes: number;
+    activeBeams: number;
+    beamPresentations: number;
+    lastBeamLengthM: number;
+    visibleDurationMs: number;
+    coreRadiusM: number;
+    haloRadiusM: number;
+    poolCapacity: number;
+    throughGeometry: boolean;
+    modelId: string;
+  }> {
     return {
       worldVisible: this.root.visible,
       thermalActive: !this.thermalRoot.hidden,
@@ -210,6 +240,12 @@ export class RailgunPresentation {
       worldSilhouettes: this.thermalWorldContacts.filter((contact) => contact.visible).length,
       activeBeams: this.beams.filter((beam) => beam.root.visible).length,
       beamPresentations: this.beamPresentations,
+      lastBeamLengthM: this.lastBeamLengthM,
+      visibleDurationMs: RAILGUN_BOLT_PRESENTATION.visibleDurationMs,
+      coreRadiusM: RAILGUN_BOLT_PRESENTATION.coreRadiusM,
+      haloRadiusM: RAILGUN_BOLT_PRESENTATION.haloRadiusM,
+      poolCapacity: this.beams.length,
+      throughGeometry: RAILGUN_BOLT_PRESENTATION.throughGeometry,
       modelId: String(this.weapon.userData.weaponModelId ?? 'railgun-authored-v1'),
     };
   }

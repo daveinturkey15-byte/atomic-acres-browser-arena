@@ -5581,9 +5581,12 @@ function renderRemoteShot(message: ShotMessage): void {
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-  spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   if (message.weapon === 'railgun') {
-    railgunPresentation.presentBeam(remoteMuzzle ?? origin, visibleEnd, performance.now());
+    const visualStart = remoteMuzzle ?? origin;
+    const mapSpanningEnd = visualStart.clone().addScaledVector(direction, Math.max(180, trace.travelDistance));
+    railgunPresentation.presentBeam(visualStart, mapSpanningEnd, performance.now());
+  } else {
+    spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   }
   if (remoteOperator) fireOperator(remoteOperator);
   let impactAudioPlayed = false;
@@ -7087,9 +7090,8 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
 
 function presentRailgunShot(origin: THREE.Vector3, direction: THREE.Vector3, local: boolean): void {
   const start = local ? weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin : origin;
-  const end = origin.clone().addScaledVector(direction, 180);
+  const end = start.clone().addScaledVector(direction, 180);
   railgunPresentation.presentBeam(start, end, performance.now());
-  spawnTracer(start, end, WEAPONS.railgun.color);
   if (local) {
     const recoil = computeRecoilImpulse(WEAPONS.railgun, 0, 0.5, { ads: adsHeld, crouched: player.stance === 'crouch', prone: player.stance === 'prone' });
     recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);

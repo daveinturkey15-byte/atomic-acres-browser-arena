@@ -44,7 +44,16 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot());
   expect(first.railgun).toMatchObject({ roundsRemaining: 7, adsResetRequired: true, rechamberPresentationActive: true });
-  expect(first.railgun.presentation).toMatchObject({ beamPresentations: 1, thermalActive: false });
+  expect(first.railgun.presentation).toMatchObject({
+    beamPresentations: 1,
+    activeBeams: 1,
+    lastBeamLengthM: 180,
+    visibleDurationMs: 900,
+    coreRadiusM: 0.14,
+    haloRadiusM: 0.62,
+    poolCapacity: 6,
+    throughGeometry: true,
+  });
   expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 8, pressureDuration: 0.62 });
   expect(first.textChat.adsHeld).toBe(false);
   expect(first.railgun.thermalVisible).toBe(false);
