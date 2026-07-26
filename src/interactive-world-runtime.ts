@@ -19,6 +19,7 @@ import {
   type DestructibleShedDefinition,
   type SheetSurfaceDefinition,
   type ShedMutationResult,
+  type ShedArenaId,
   type ShedPlacement,
   type ShedState,
   type WorldCollisionSnapshot,
@@ -58,6 +59,32 @@ export type InteractiveWorldStateEnvelope = Readonly<{
   hashAlgorithm: 'sha256';
   hash: string;
 }>;
+
+const SHED_ARENA_IDS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'] as const);
+
+export function isInteractiveWorldStateEnvelope(value: unknown): value is InteractiveWorldStateEnvelope {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const envelope = value as Partial<InteractiveWorldStateEnvelope> & Record<string, unknown>;
+  if (Object.keys(envelope).sort().join('|') !== ['arenaId', 'matchEpoch', 'revision', 'schemaVersion', 'sheds', 'hashAlgorithm', 'hash'].sort().join('|')
+    || envelope.schemaVersion !== 1
+    || !SHED_ARENA_IDS.includes(envelope.arenaId as typeof SHED_ARENA_IDS[number])
+    || !Number.isSafeInteger(envelope.matchEpoch) || Number(envelope.matchEpoch) < 1
+    || !Number.isSafeInteger(envelope.revision) || Number(envelope.revision) < 0
+    || envelope.hashAlgorithm !== 'sha256'
+    || typeof envelope.hash !== 'string' || !/^[a-f0-9]{64}$/.test(envelope.hash)
+    || !Array.isArray(envelope.sheds) || envelope.sheds.length > 8
+    || !envelope.sheds.every(isShedState)) return false;
+  const states = envelope.sheds as ShedState[];
+  if (new Set(states.map((state) => state.placementId)).size !== states.length
+    || states.some((state) => state.arenaId !== envelope.arenaId || state.matchEpoch !== envelope.matchEpoch)
+    || states.reduce((sum, state) => sum + state.revision, 0) !== envelope.revision) return false;
+  return createWorldCollisionSnapshot(
+    envelope.arenaId as ShedArenaId,
+    `${envelope.arenaId}-static-v65`,
+    states,
+    envelope.matchEpoch,
+  ).hash === envelope.hash;
+}
 
 type RuntimeShed = {
   placement: ShedPlacement;
@@ -279,12 +306,13 @@ export class InteractiveWorldRuntime {
       this.arenaId,
       `${this.arenaId}-static-v65`,
       this.sheds.map((shed) => shed.state),
+      this.matchEpoch,
     );
   }
 
   stateEnvelope(): InteractiveWorldStateEnvelope {
     const sheds = Object.freeze(this.sheds.map((shed) => shed.state));
-    const snapshot = createWorldCollisionSnapshot(this.arenaId, `${this.arenaId}-static-v65`, sheds);
+    const snapshot = createWorldCollisionSnapshot(this.arenaId, `${this.arenaId}-static-v65`, sheds, this.matchEpoch);
     return Object.freeze({
       schemaVersion: 1,
       arenaId: this.arenaId,
@@ -298,26 +326,16 @@ export class InteractiveWorldRuntime {
 
   applyAuthoritativeEnvelope(value: unknown): boolean {
     if (!value || typeof value !== 'object') return false;
-    const envelope = value as Partial<InteractiveWorldStateEnvelope> & Record<string, unknown>;
-    const keys = Object.keys(envelope).sort();
-    if (keys.join('|') !== ['arenaId', 'matchEpoch', 'revision', 'schemaVersion', 'sheds', 'hashAlgorithm', 'hash'].sort().join('|')
-      || envelope.schemaVersion !== 1
-      || envelope.arenaId !== this.arenaId
+    if (!isInteractiveWorldStateEnvelope(value)) return false;
+    const envelope = value;
+    if (envelope.arenaId !== this.arenaId
       || envelope.matchEpoch !== this.matchEpoch
-      || !Number.isSafeInteger(envelope.revision)
-      || envelope.hashAlgorithm !== 'sha256'
-      || typeof envelope.hash !== 'string'
-      || !/^[a-f0-9]{64}$/.test(envelope.hash)
-      || !Array.isArray(envelope.sheds)
-      || envelope.sheds.length !== this.sheds.length
-      || !envelope.sheds.every(isShedState)) return false;
+      || envelope.sheds.length !== this.sheds.length) return false;
     const states = envelope.sheds as ShedState[];
     if (new Set(states.map((state) => state.placementId)).size !== states.length
       || states.some((state) => state.arenaId !== this.arenaId || state.matchEpoch !== this.matchEpoch)
       || states.reduce((sum, state) => sum + state.revision, 0) !== envelope.revision
       || Number(envelope.revision) < worldRevision(this.sheds)) return false;
-    const candidateHash = createWorldCollisionSnapshot(this.arenaId, `${this.arenaId}-static-v65`, states).hash;
-    if (candidateHash !== envelope.hash) return false;
     for (const shed of this.sheds) {
       const state = states.find((candidate) => candidate.placementId === shed.placement.id);
       if (!state || state.shedId !== shed.definition.id) return false;

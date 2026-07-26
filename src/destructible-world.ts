@@ -704,10 +704,12 @@ export function createWorldCollisionSnapshot(
   arenaId: ShedArenaId,
   staticDefinitionId: string,
   sheds: readonly ShedState[],
+  emptyMatchEpoch = 0,
 ): WorldCollisionSnapshot {
   if (!validId(staticDefinitionId)) throw new TypeError('Invalid static world definition id');
   if (sheds.some((shed) => shed.arenaId !== arenaId)) throw new TypeError('Shed arena mismatch');
-  const matchEpoch = sheds[0]?.matchEpoch ?? 0;
+  const matchEpoch = sheds[0]?.matchEpoch ?? emptyMatchEpoch;
+  if (!finiteInteger(matchEpoch, sheds.length > 0 ? 1 : 0)) throw new TypeError('Invalid world collision epoch');
   if (sheds.some((shed) => shed.matchEpoch !== matchEpoch)) throw new TypeError('Shed epoch mismatch');
   const revision = sheds.reduce((sum, shed) => sum + shed.revision, 0);
   const body = Object.freeze({
