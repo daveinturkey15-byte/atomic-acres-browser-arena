@@ -37,6 +37,14 @@ const windowMs = boundedInteger(
 const warmupMs = boundedInteger('PASS65_FRAME_PACING_WARMUP_MS', 3_000, 2_000, 30_000);
 const repeats = boundedInteger('PASS65_FRAME_PACING_REPEATS', 2, 1, 4);
 const headed = process.env.PASS65_FRAME_PACING_HEADED === '1';
+const gtaoValues = new Set(['off', 'low', 'high', 'ultra'] as const);
+type GtaoQuality = 'off' | 'low' | 'high' | 'ultra';
+const requestedGtao = (process.env.PASS65_FRAME_PACING_GTAO ?? 'off').toLowerCase();
+if (!gtaoValues.has(requestedGtao as GtaoQuality)) {
+  throw new Error(`PASS65_FRAME_PACING_GTAO must be off, low, high or ultra; received ${requestedGtao}`);
+}
+const gtaoQuality = requestedGtao as GtaoQuality;
+const requestedGraphicsPreset = gtaoQuality === 'off' ? 'high' : 'custom';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
   process.env.PASS64_CHROME_PATH,
@@ -192,11 +200,11 @@ function runtimeIssues(finalState: unknown): readonly string[] {
 }
 
 async function installInstrumentation(context: BrowserContext): Promise<void> {
-  await context.addInitScript(() => {
+  await context.addInitScript((graphics: { preset: 'high' | 'custom'; ambientOcclusion: GtaoQuality }) => {
     try {
       localStorage.setItem('atomic-acres-pass65-settings-v1', JSON.stringify({
         version: 1,
-        graphics: { schemaVersion: 1, preset: 'high' },
+        graphics: { schemaVersion: 1, preset: graphics.preset, ambientOcclusion: graphics.ambientOcclusion },
       }));
       localStorage.setItem('atomic-acres-render-profile', 'blender');
     } catch { /* The originless bootstrap document has no storage; the navigated localhost document does. */ }
@@ -246,7 +254,7 @@ async function installInstrumentation(context: BrowserContext): Promise<void> {
     } catch {
       gate.observerSupported = false;
     }
-  });
+  }, { preset: requestedGraphicsPreset, ambientOcclusion: gtaoQuality });
 }
 
 async function waitForRafDuration(page: Page, durationMs: number): Promise<void> {
@@ -385,9 +393,10 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
       issues.push(`menu-eagerly-prepared-gameplay:${JSON.stringify({ gameplayArena: before.gameplayArena, streaming: before.streaming })}`);
     }
     if (before.renderProfile !== 'blender'
-      || before.graphicsPreset?.requestedPreset !== 'high'
-      || before.graphicsPreset?.effectivePreset !== 'high'
-      || before.displayedGraphicsPreset !== 'high') {
+      || before.graphicsPreset?.requestedPreset !== requestedGraphicsPreset
+      || before.graphicsPreset?.effectivePreset !== requestedGraphicsPreset
+      || before.graphicsPreset?.ambientOcclusion?.quality !== gtaoQuality
+      || before.displayedGraphicsPreset !== requestedGraphicsPreset) {
       issues.push(`quality-profile-not-active:${JSON.stringify({ renderProfile: before.renderProfile, graphics: before.graphicsPreset, displayed: before.displayedGraphicsPreset })}`);
     }
     const deploymentStartedAt = await page.evaluate(() => {
@@ -582,7 +591,7 @@ try {
     for (const arenaId of order) sequence.push({ repeat, arenaId });
   }
   for (const { repeat, arenaId } of sequence) {
-    console.log(`[pass65-frame-pacing] trial=${arenaId}-r${repeat + 1} window=${windowMs}ms quality=high viewport=2560x1440`);
+    console.log(`[pass65-frame-pacing] trial=${arenaId}-r${repeat + 1} window=${windowMs}ms preset=${requestedGraphicsPreset} gtao=${gtaoQuality} viewport=2560x1440`);
     trials.push(await runTrial(browser, repeat, arenaId));
   }
 } catch (error) {
@@ -646,7 +655,8 @@ const receipt = {
   configuration: {
     viewport: VIEWPORT,
     deviceScaleFactor: 1,
-    graphicsPreset: 'Quality/high',
+    graphicsPreset: requestedGraphicsPreset === 'high' ? 'Quality/high' : 'Custom',
+    gtaoQuality,
     renderProfile: 'blender',
     backend: 'webgpu-required',
     bots: 'frozen-after-explicit-solo-deployment',

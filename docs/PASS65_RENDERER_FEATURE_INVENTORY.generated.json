@@ -149,6 +149,19 @@
       ]
     },
     {
+      "key": "graphics.ambientOcclusion",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false,
+      "runtimeConsumer": "ambient-occlusion",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "ao(sceneDepth, sceneNormal, camera)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.ambientOcclusion"
+        }
+      ]
+    },
+    {
       "key": "graphics.reflectionQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
@@ -358,6 +371,7 @@
         "shadowResolution": "medium",
         "shadowUpdateMode": "static",
         "indirectLighting": "low",
+        "ambientOcclusion": "off",
         "reflectionQuality": "low",
         "volumetricQuality": "low",
         "smokeQuality": "low",
@@ -383,6 +397,14 @@
         "shadowMapSize": 1024,
         "shadowUpdateMode": "static",
         "indirectLightScale": 0.62,
+        "ambientOcclusion": {
+          "quality": "off",
+          "enabled": false,
+          "resolutionScale": 0,
+          "samples": 0,
+          "radius": 0,
+          "strength": 0
+        },
         "reflectionScale": 0.62,
         "volumetricScale": 0.5,
         "maximumAnisotropy": 4,
@@ -436,6 +458,7 @@
         "shadowResolution": "high",
         "shadowUpdateMode": "static",
         "indirectLighting": "high",
+        "ambientOcclusion": "off",
         "reflectionQuality": "high",
         "volumetricQuality": "high",
         "smokeQuality": "high",
@@ -461,6 +484,14 @@
         "shadowMapSize": 2048,
         "shadowUpdateMode": "static",
         "indirectLightScale": 1,
+        "ambientOcclusion": {
+          "quality": "off",
+          "enabled": false,
+          "resolutionScale": 0,
+          "samples": 0,
+          "radius": 0,
+          "strength": 0
+        },
         "reflectionScale": 1,
         "volumetricScale": 0.8,
         "maximumAnisotropy": 8,
@@ -514,6 +545,7 @@
         "shadowResolution": "high",
         "shadowUpdateMode": "dynamic",
         "indirectLighting": "high",
+        "ambientOcclusion": "ultra",
         "reflectionQuality": "high",
         "volumetricQuality": "ultra",
         "smokeQuality": "ultra",
@@ -539,6 +571,14 @@
         "shadowMapSize": 2048,
         "shadowUpdateMode": "dynamic",
         "indirectLightScale": 1,
+        "ambientOcclusion": {
+          "quality": "ultra",
+          "enabled": true,
+          "resolutionScale": 0.75,
+          "samples": 16,
+          "radius": 0.25,
+          "strength": 0.62
+        },
         "reflectionScale": 1,
         "volumetricScale": 1,
         "maximumAnisotropy": 16,
@@ -1178,24 +1218,28 @@
     },
     {
       "id": "ambient-contact-effects",
-      "title": "Ambient/contact shading",
-      "availability": "unsupported",
-      "owner": "src/atomic-signal.ts (WebGL2 compatibility only)",
+      "title": "WebGPU ground-truth ambient occlusion",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
       "sourceProbes": [
         {
-          "path": "src/atomic-signal.ts",
-          "symbol": "contactShadowStrength"
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "ao(sceneDepth, sceneNormal, camera)"
         }
       ],
-      "pipelineIds": [],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
       "control": {
-        "kind": "unsupported",
-        "settingKeys": [],
-        "effectiveValue": "Unavailable on the required WebGPU route",
-        "rationale": "The existing screen-space contact effect belongs to the isolated WebGL2 compatibility post path. It is not exposed until a TSL depth implementation passes parity and performance gates."
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.ambientOcclusion"
+        ],
+        "effectiveValue": "Off, Low, High or Ultra GTAO from the principal scene depth buffer",
+        "rationale": "The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale. Performance and default Quality keep it off after the native transition stress falsified always-on GTAO."
       },
-      "budget": "Zero WebGPU texture samples allocated to this unsupported feature.",
-      "verifier": "src/atomic-signal.test.ts + WebGPU no-legacy-post traversal gate",
+      "budget": "At most one view-normal MRT attachment plus one GTAO red-channel target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.",
+      "verifier": "src/rendering/pass64-tsl-scene.test.ts + scripts/qa/verify-pass64-webgpu.mjs",
       "authorityAffecting": false
     },
     {
@@ -1357,10 +1401,10 @@
   ],
   "summary": {
     "total": 28,
-    "active": 21,
-    "unsupported": 7,
-    "adjustable": 14,
+    "active": 22,
+    "unsupported": 6,
+    "adjustable": 15,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "b82643ab1260a36d23ab4cde8b842ee412e635f540a23b8e791860ed7ff90a44"
+  "inventorySha256": "ba15ec1365d8c869e6fd0b6bf4b8850de5cdc6f0f57b4a59ad9eb78be5d0a6c0"
 }

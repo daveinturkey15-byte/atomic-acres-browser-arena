@@ -54,6 +54,14 @@ export type GraphicsRuntime = Readonly<{
   shadowMapSize: 1024 | 2048;
   shadowUpdateMode: GraphicsSettings['shadowUpdateMode'];
   indirectLightScale: number;
+  ambientOcclusion: Readonly<{
+    quality: GraphicsSettings['ambientOcclusion'];
+    enabled: boolean;
+    resolutionScale: number;
+    samples: number;
+    radius: number;
+    strength: number;
+  }>;
   reflectionScale: number;
   volumetricScale: number;
   maximumAnisotropy: GraphicsSettings['anisotropy'];
@@ -223,6 +231,13 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
   const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
   const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
   const antialiasSamples = settings.antiAliasing === 'msaa-4x' ? 4 : settings.antiAliasing === 'msaa-2x' ? 2 : 0;
+  const ambientOcclusion = settings.ambientOcclusion === 'off'
+    ? Object.freeze({ quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 })
+    : settings.ambientOcclusion === 'low'
+      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42 })
+      : settings.ambientOcclusion === 'high'
+        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52 })
+        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62 });
   if (forceCompatibility) {
     return Object.freeze({
       requestedPreset: settings.preset,
@@ -237,6 +252,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       shadowMapSize: 1024,
       shadowUpdateMode: 'static',
       indirectLightScale: 0.45,
+      ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 }),
       reflectionScale: 0,
       volumetricScale: 0.4,
       maximumAnisotropy: 1,
@@ -260,6 +276,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     shadowMapSize: settings.shadowResolution === 'high' ? 2048 : 1024,
     shadowUpdateMode: settings.shadowUpdateMode,
     indirectLightScale: lightingScale(settings.indirectLighting),
+    ambientOcclusion,
     reflectionScale: lightingScale(settings.reflectionQuality),
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,

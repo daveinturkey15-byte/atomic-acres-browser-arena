@@ -244,11 +244,11 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/killstreak-presentation.test.ts + src/killstreak-runtime.test.ts',
   }),
   feature({
-    id: 'ambient-contact-effects', title: 'Ambient/contact shading', availability: 'unsupported', owner: 'src/atomic-signal.ts (WebGL2 compatibility only)',
-    sourceProbes: [{ path: 'src/atomic-signal.ts', symbol: 'contactShadowStrength' }], pipelineIds: [],
-    control: control('unsupported', [], 'Unavailable on the required WebGPU route', 'The existing screen-space contact effect belongs to the isolated WebGL2 compatibility post path. It is not exposed until a TSL depth implementation passes parity and performance gates.'),
-    budget: 'Zero WebGPU texture samples allocated to this unsupported feature.',
-    verifier: 'src/atomic-signal.test.ts + WebGPU no-legacy-post traversal gate',
+    id: 'ambient-contact-effects', title: 'WebGPU ground-truth ambient occlusion', availability: 'active', owner: 'src/rendering/pass64-tsl-scene.ts',
+    sourceProbes: [{ path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'ao(sceneDepth, sceneNormal, camera)' }], pipelineIds: ['pass64.hdr-grade-grain.tsl.v1'],
+    control: control('setting', ['graphics.ambientOcclusion'], 'Off, Low, High or Ultra GTAO from the principal scene depth buffer', 'The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale. Performance and default Quality keep it off after the native transition stress falsified always-on GTAO.'),
+    budget: 'At most one view-normal MRT attachment plus one GTAO red-channel target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.',
+    verifier: 'src/rendering/pass64-tsl-scene.test.ts + scripts/qa/verify-pass64-webgpu.mjs',
   }),
   feature({
     id: 'frame-cap', title: 'Frame-rate cap', availability: 'active', owner: 'src/pass65-settings.ts + src/legacy-main.ts',

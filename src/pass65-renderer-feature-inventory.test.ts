@@ -24,7 +24,6 @@ describe('Pass 65 renderer feature inventory', () => {
     const unsupported = PASS65_RENDERER_FEATURES.filter(({ availability }) => availability === 'unsupported');
     expect(unsupported.map(({ id }) => id).sort()).toEqual([
       'ai-upscaling-frame-generation',
-      'ambient-contact-effects',
       'depth-of-field',
       'hardware-ray-tracing',
       'motion-blur',

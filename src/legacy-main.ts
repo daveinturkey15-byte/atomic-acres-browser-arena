@@ -1787,6 +1787,7 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     else pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
       principalSamples: graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1,
       volumetricScale: graphicsRuntime.volumetricScale,
+      ambientOcclusion: graphicsRuntime.ambientOcclusion,
       post: graphicsRuntime.post,
     });
     appliedTslArenaDefinitions += 1;

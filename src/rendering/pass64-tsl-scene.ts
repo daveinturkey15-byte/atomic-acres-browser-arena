@@ -6,6 +6,7 @@ import {
   type RenderPipeline,
 } from 'three/webgpu';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
+import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import {
   abs,
@@ -17,6 +18,9 @@ import {
   mix,
   max,
   pass,
+  mrt,
+  normalView,
+  output,
   positionLocal,
   positionWorld,
   screenUV,
@@ -36,12 +40,16 @@ import type { GraphicsRuntime } from '../pass65-settings';
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
   volumetricScale: number;
+  ambientOcclusion: GraphicsRuntime['ambientOcclusion'];
   post: GraphicsRuntime['post'];
 }>;
 
 const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
   principalSamples: 4,
   volumetricScale: 1,
+  ambientOcclusion: Object.freeze({
+    quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+  }),
   post: Object.freeze({
     bloomStrength: 0.14,
     exposureScale: 1,
@@ -64,6 +72,15 @@ export type Pass64TslSceneSystems = Readonly<{
   depthAwareBloom: true;
   bloomGraphId: 'pass64.full-scene-depth-tested-bloom.v1';
   bloomOcclusionSource: 'authoritative-scene-depth';
+  ambientOcclusion: Readonly<{
+    graphId: 'pass65.webgpu-gtao-depth.v1';
+    quality: GraphicsRuntime['ambientOcclusion']['quality'];
+    enabled: boolean;
+    resolutionScale: number;
+    samples: number;
+    radius: number;
+    strength: number;
+  }>;
   compiledPipelineIds: readonly string[];
   applyDefinition(definition: ArenaVisualDefinition): void;
   setReviewCamera(camera: ArenaReviewCamera): void;
@@ -375,10 +392,27 @@ function configureHdrPipeline(
   camera: THREE.Camera,
   definition: ArenaVisualDefinition,
   graphics: Pass65TslGraphicsOptions,
-): Readonly<{ scenePass: ReturnType<typeof pass>; applyDefinition(next: ArenaVisualDefinition): void }> {
+): Readonly<{
+  scenePass: ReturnType<typeof pass>;
+  applyDefinition(next: ArenaVisualDefinition): void;
+  dispose(): void;
+}> {
   const scenePass = pass(scene, camera, { samples: graphics.principalSamples });
+  if (graphics.ambientOcclusion.enabled) scenePass.setMRT(mrt({ output, normal: normalView }));
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
+  const sceneNormal = graphics.ambientOcclusion.enabled ? scenePass.getTextureNode('normal') : null;
+  const gtaoPass = sceneNormal ? ao(sceneDepth, sceneNormal, camera) : null;
+  if (gtaoPass) {
+    gtaoPass.resolutionScale = graphics.ambientOcclusion.resolutionScale;
+    gtaoPass.samples.value = graphics.ambientOcclusion.samples;
+    gtaoPass.radius.value = graphics.ambientOcclusion.radius;
+    gtaoPass.scale.value = 0.5;
+    gtaoPass.thickness.value = 1;
+    gtaoPass.distanceExponent.value = 1;
+    gtaoPass.distanceFallOff.value = 1;
+    gtaoPass.useTemporalFiltering = false;
+  }
   const saturation = uniform(definition.colorPipeline.grade.saturation);
   const contrast = uniform(definition.colorPipeline.grade.contrast);
   // Definition strength is authored in 8-bit output steps. Convert it before
@@ -400,7 +434,10 @@ function configureHdrPipeline(
   // allowing the low-resolution bloom chain to smear across their silhouettes.
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
   const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
-  const hdrWithBloom = contrasted.add(emissiveBloom.rgb.mul(depthEdgeGuard));
+  const contactOcclusion = gtaoPass
+    ? mix(float(1), gtaoPass.getTextureNode().r, float(graphics.ambientOcclusion.strength))
+    : float(1);
+  const hdrWithBloom = contrasted.mul(contactOcclusion).add(emissiveBloom.rgb.mul(depthEdgeGuard));
   const vignetteDistance = dot(screenUV.sub(0.5), screenUV.sub(0.5));
   const vignetteFalloff = smoothstep(0.12, 0.5, vignetteDistance).mul(vignette).mul(0.42);
   const postColor = hdrWithBloom.add(orderedDither).mul(float(1).sub(vignetteFalloff));
@@ -412,6 +449,9 @@ function configureHdrPipeline(
       saturation.value = next.colorPipeline.grade.saturation;
       contrast.value = next.colorPipeline.grade.contrast;
       grain.value = next.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale;
+    },
+    dispose() {
+      gtaoPass?.dispose();
     },
   };
 }
@@ -461,6 +501,7 @@ export function createPass64TslSceneSystems(
     bloomStrength: graphics.post.bloomStrength,
     filmGrainScale: graphics.post.filmGrainScale,
     vignetteStrength: graphics.post.vignetteStrength,
+    ambientOcclusion: Object.freeze({ ...graphics.ambientOcclusion }),
   };
   setAnimationTime(root, 0);
   const compiledPipelineIds = Object.freeze(TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId));
@@ -471,6 +512,10 @@ export function createPass64TslSceneSystems(
     depthAwareBloom: true,
     bloomGraphId: 'pass64.full-scene-depth-tested-bloom.v1',
     bloomOcclusionSource: 'authoritative-scene-depth',
+    ambientOcclusion: Object.freeze({
+      graphId: 'pass65.webgpu-gtao-depth.v1',
+      ...graphics.ambientOcclusion,
+    }),
     compiledPipelineIds,
     applyDefinition: (nextDefinition) => {
       activeDefinition = nextDefinition;
@@ -494,6 +539,7 @@ export function createPass64TslSceneSystems(
     },
     dispose: () => {
       disposeRoot(root);
+      hdr.dispose();
       scenePass.dispose();
     },
   });

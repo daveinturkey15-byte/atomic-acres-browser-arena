@@ -39,8 +39,13 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(audit.compiledPipelineIds).toHaveLength(7);
     expect(audit.nodeMaterialPipelineIds).toHaveLength(6);
     expect(systems.principalHdrTarget.samples).toBe(4);
+    expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output']);
     expect(systems.bloomSamples).toBe(0);
     expect(systems.depthAwareBloom).toBe(true);
+    expect(systems.ambientOcclusion).toEqual({
+      graphId: 'pass65.webgpu-gtao-depth.v1',
+      quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+    });
     expect(() => assertRuntimeTslTraversal(audit)).not.toThrow();
     const rustDefinition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
     systems.applyDefinition(rustDefinition);
@@ -92,6 +97,9 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
       principalSamples: 2,
       volumetricScale: 0.5,
+      ambientOcclusion: {
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+      },
       post: {
         bloomStrength: 0,
         exposureScale: 0.9,
@@ -101,12 +109,16 @@ describe('Pass 64 authored TSL pipeline set', () => {
       },
     });
     expect(systems.principalHdrTarget.samples).toBe(2);
+    expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output', 'normal']);
     expect(systems.root.userData.pass65AdvancedGraphics).toEqual({
       principalSamples: 2,
       volumetricScale: 0.5,
       bloomStrength: 0,
       filmGrainScale: 0,
       vignetteStrength: 0.35,
+      ambientOcclusion: {
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+      },
     });
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(48);

@@ -3,6 +3,7 @@ export type ShadowResolution = 'medium' | 'high';
 export type ShadowUpdateMode = 'static' | 'dynamic';
 export type QualityTier = 'low' | 'high' | 'ultra';
 export type LightingTier = 'off' | 'low' | 'high';
+export type AmbientOcclusionQuality = 'off' | 'low' | 'high' | 'ultra';
 export type BloomQuality = 'off' | 'subtle' | 'cinematic';
 export type ToneMappingMode = 'aces' | 'agx' | 'neutral';
 export type GeometryDetail = 'reduced' | 'full';
@@ -24,6 +25,7 @@ export type AdvancedGraphicsValues = Readonly<{
   shadowResolution: ShadowResolution;
   shadowUpdateMode: ShadowUpdateMode;
   indirectLighting: LightingTier;
+  ambientOcclusion: AmbientOcclusionQuality;
   reflectionQuality: LightingTier;
   volumetricQuality: QualityTier;
   anisotropy: 1 | 2 | 4 | 8 | 16;
@@ -46,6 +48,7 @@ export type GraphicsRuntimeConsumer =
   | 'arena-stream'
   | 'shadow-runtime'
   | 'arena-lighting'
+  | 'ambient-occlusion'
   | 'material-refinement'
   | 'atmosphere-runtime'
   | 'presentation-budget'
@@ -165,6 +168,12 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     applyMode: 'arena-reload', runtimeConsumer: 'arena-lighting',
   }),
   control({
+    key: 'ambientOcclusion', id: 'graphics-ambient-occlusion', category: 'lighting', label: 'Contact shadows (GTAO)',
+    description: 'Adds bounded WebGPU ground-truth ambient occlusion from the scene depth buffer. Higher tiers increase samples and resolution.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH'], ['ultra', 'ULTRA']),
+    applyMode: 'arena-reload', runtimeConsumer: 'ambient-occlusion',
+  }),
+  control({
     key: 'reflectionQuality', id: 'graphics-reflections', category: 'lighting', label: 'Specular response',
     description: 'Scales bounded PBR environment/specular response on authored materials.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
@@ -253,6 +262,7 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   shadowResolution: runtimeEvidence('src/legacy-main.ts', 'Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize)', 'settings.graphics.shadowMapSize + arena visual receipt'),
   shadowUpdateMode: runtimeEvidence('src/legacy-main.ts', "activeRenderConfig.shadowMode === 'dynamic'", 'render.shadowMode + render.shadowAutoUpdate'),
   indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
+  ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
   reflectionQuality: runtimeEvidence('src/graphics-refinement.ts', 'effectivePbrRoughness', 'render.graphicsRefinement.reflectionScale'),
   volumetricQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const volumetricScale = THREE.MathUtils.clamp', 'render.atomicSignal.advancedGraphics.volumetricScale'),
   smokeQuality: runtimeEvidence('src/legacy-main.ts', 'smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale)', 'settings.graphics.smokeScale + smoke presentation telemetry'),
@@ -303,21 +313,21 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'm
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 120, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    indirectLighting: 'low', reflectionQuality: 'low', volumetricQuality: 'low', smokeQuality: 'low',
+    indirectLighting: 'low', ambientOcclusion: 'off', reflectionQuality: 'low', volumetricQuality: 'low', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
     exposure: 1, toneMapping: 'aces', filmGrain: 0.1, vignette: 0.08,
   }),
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 60, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    indirectLighting: 'high', reflectionQuality: 'high', volumetricQuality: 'high', smokeQuality: 'high',
+    indirectLighting: 'high', ambientOcclusion: 'off', reflectionQuality: 'high', volumetricQuality: 'high', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmGrain: 0.32, vignette: 0.16,
   }),
   max: Object.freeze({
     renderScale: 1.25, adaptiveResolution: false, targetFps: 60, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    indirectLighting: 'high', reflectionQuality: 'high', volumetricQuality: 'ultra', smokeQuality: 'ultra',
+    indirectLighting: 'high', ambientOcclusion: 'ultra', reflectionQuality: 'high', volumetricQuality: 'ultra', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmGrain: 0.4, vignette: 0.18,
   }),

@@ -132,7 +132,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#graphics-target-fps')).toBeVisible();
     await expect(page.locator('#graphics-target-fps')).toHaveAttribute('max', '360');
     await expect(page.locator('#graphics-target-fps-marks option[value="240"]')).toHaveCount(1);
-    await expect(page.locator('[data-graphics-setting]')).toHaveCount(21);
+    await expect(page.locator('[data-graphics-setting]')).toHaveCount(22);
     await expect(page.locator('[data-graphics-capability][aria-disabled="true"]')).toHaveCount(6);
     await expect(page.locator('#graphics-frame-rate-limit')).toHaveAttribute('max', '361');
     await expect(page.locator('#graphics-frame-rate-limit-value')).toHaveText('UNCAPPED');
@@ -141,7 +141,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         advancedGraphicsRegistry: { registeredKeys: string[]; controls: Array<{ runtimeConsumer: string }> };
       }
     ).advancedGraphicsRegistry);
-    expect(registry.registeredKeys).toHaveLength(21);
+    expect(registry.registeredKeys).toHaveLength(22);
     expect(registry.controls.every(({ runtimeConsumer }) => runtimeConsumer.length > 0)).toBe(true);
     const layout = await page.evaluate(() => ({
       pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,

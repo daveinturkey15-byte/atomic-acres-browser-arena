@@ -19,12 +19,15 @@ describe('Pass 65 settings contract', () => {
     expect(settings.graphics).toMatchObject({
       schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 60,
       frameRateLimit: 0, antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high',
-      shadowResolution: 'high', indirectLighting: 'high', volumetricQuality: 'high',
+      shadowResolution: 'high', indirectLighting: 'high', ambientOcclusion: 'off', volumetricQuality: 'high',
       anisotropy: 8, bloomQuality: 'cinematic', toneMapping: 'aces',
     });
     expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({
       renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 4,
       shadowMapSize: 2048, maximumAnisotropy: 8,
+      ambientOcclusion: {
+        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+      },
     });
     expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
     expect(Object.keys(settings.audio.mutes).sort()).toEqual([...AUDIO_BUS_IDS].sort());
@@ -36,6 +39,7 @@ describe('Pass 65 settings contract', () => {
     expect(resolveGraphicsRuntime(max.graphics)).toMatchObject({
       renderProfile: 'blender', renderScale: 1.25, adaptive: false, shadows: true,
       shadowUpdateMode: 'dynamic', maximumAnisotropy: 16,
+      ambientOcclusion: { quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16 },
     });
   });
 
@@ -101,7 +105,19 @@ describe('Pass 65 settings contract', () => {
     const settings = normalizePass65Settings({ graphics: { preset: 'max' } });
     expect(resolveGraphicsRuntime(settings.graphics, true)).toMatchObject({
       requestedPreset: 'max', effectivePreset: 'performance', renderProfile: 'compat', renderScale: 0.2,
+      ambientOcclusion: { quality: 'off', enabled: false, samples: 0 },
     });
+  });
+
+  it('normalizes and resolves every bounded WebGPU GTAO tier', () => {
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'invented' } }).graphics.ambientOcclusion)
+      .toBe('off');
+    expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'off' } }).graphics).ambientOcclusion)
+      .toEqual({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 });
+    expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'low' } }).graphics).ambientOcclusion)
+      .toEqual({ quality: 'low', enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42 });
+    expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'ultra' } }).graphics).ambientOcclusion)
+      .toEqual({ quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62 });
   });
 
   it('canonicalizes custom supersampling to the renderer-supported 125% ceiling', () => {

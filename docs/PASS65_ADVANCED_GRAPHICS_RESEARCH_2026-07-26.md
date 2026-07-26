@@ -34,6 +34,7 @@ The Pass 65 translation is therefore:
 | Geometry detail | Reduced/full presentation stream with unchanged gameplay geometry | render profile / arena stream |
 | Shadows | Off/on, 1024/2048 map, static/dynamic update schedule | render runtime and light schedule |
 | Indirect light | Scales authored hemisphere, ambient and fill contribution | arena lighting |
+| Contact shadows (GTAO) | Off/Low/High/Ultra depth-and-normal WebGPU GTAO with bounded samples/resolution | TSL HDR pipeline and exact disposal telemetry |
 | Specular response | Scales PBR environment and material response | graphics refinement |
 | Volumetrics | Scales deterministic mist/smoke/dust opacity and draw ranges | TSL atmosphere |
 | Smoke presentation | One/two/three cards with a nonzero visibility floor | semantic smoke pool |
@@ -50,7 +51,7 @@ All advanced changes intentionally rebuild the arena renderer. This keeps target
 The menu surfaces the reason for each unavailable path:
 
 - hardware ray tracing and path tracing: no browser/Three.js acceleration-structure implementation;
-- SSGI and SSR: upstream experimental nodes have not passed normal/depth/MRT, temporal, disposal and representative-hardware gates;
+- SSGI and SSR: unlike the now-integrated bounded GTAO contact pass, these broader upstream experimental nodes have not passed temporal, material-MRT, disposal and representative-hardware gates;
 - depth of field: first-person weapon depth, focus transitions and accessibility are unverified;
 - motion blur: no verified velocity MRT or reduced-motion contract;
 - vendor AI upscaling, Ray Reconstruction and frame generation: native vendor APIs are outside this browser renderer.

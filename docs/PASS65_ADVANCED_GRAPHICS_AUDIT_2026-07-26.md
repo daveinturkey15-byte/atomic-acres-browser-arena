@@ -7,9 +7,17 @@ Scope: the player-visible Quality / Performance / Custom surface and every contr
 ## Outcome
 
 - The top-level surface remains exactly Quality, Performance, and Custom. Advanced Graphics remains collapsed and registry-generated.
-- All 21 Advanced Graphics controls now have a checked runtime source probe and an effective telemetry path in `PASS65_RENDERER_FEATURE_INVENTORY.generated.md` and JSON.
+- All 22 Advanced Graphics controls now have a checked runtime source probe and an effective telemetry path in `PASS65_RENDERER_FEATURE_INVENTORY.generated.md` and JSON.
 - The generator and tests fail closed for missing controls, stale generated evidence, missing source files, or missing runtime symbols.
 - Unsupported WebGPU features remain labelled unavailable instead of becoming decorative controls: hardware ray tracing/path tracing, SSGI, SSR, depth of field, motion blur, and vendor AI upscaling/frame generation.
+
+### Native WebGPU GTAO contact shading
+
+The installed Three.js r185 build includes a real WebGPU GTAO node. Pass 65 now exposes `Off / Low / High / Ultra` instead of leaving ambient contact shading in the compatibility-only gap. The pass consumes the principal scene depth plus an explicitly owned view-normal MRT attachment; tiers select bounded `8 / 12 / 16` sample budgets and `0.35 / 0.5 / 0.75` resolution scales. Performance and default Quality allocate neither the normal attachment nor GTAO target; Custom can opt into any tier and the internal Max review profile uses Ultra. The GTAO node and target dispose at the same generation-fenced arena boundary as the principal HDR pass.
+
+The first native RTX 5080 multi-arena soak with GTAO High enabled did not lose the device, but it failed the 15-second Atomic input-ready transition after the fourth deployment while the identical no-GTAO control passed all eight deployments. That falsifier overrides the aspirational “all High by default” preference: GTAO remains a real, showcased Custom option but is not silently enabled in the stability-first Quality preset.
+
+This does not relabel experimental SSGI, SSR, ray tracing or vendor-native reconstruction as complete. Those remain unavailable until their separate temporal/material/accessibility and hardware gates are real.
 
 ## Defects corrected
 
@@ -51,11 +59,11 @@ Verify: `src/graphics-refinement.test.ts` proves distinct High, Low, and Off rou
 
 ## Verification
 
-- Focused graphics suite: 45 tests passed across 8 files.
-- Full unit suite: 1,318 tests passed across 190 files.
+- Focused GTAO/settings/inventory suite: 31 tests passed across 6 files.
+- Full unit suite: 1,332 tests passed across 193 files.
 - TypeScript application and Worker lint: passed.
 - Production build: passed.
-- Generated renderer inventory check: passed, SHA-256 `c5e8a3814f350ab8521c02915fef37f6576f0359f23dee53b668264dd3b5b45e`.
+- Generated renderer inventory check: passed, SHA-256 `ba15ec1365d8c869e6fd0b6bf4b8850de5cdc6f0f57b4a59ad9eb78be5d0a6c0`.
 
 ## Residual review boundary
 
