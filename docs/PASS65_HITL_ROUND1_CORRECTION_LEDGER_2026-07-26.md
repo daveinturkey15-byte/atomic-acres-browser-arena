@@ -1,6 +1,6 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
-<!-- owner-feedback-ledger-version: 1; latest-id: HF-068 -->
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-072 -->
 
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
@@ -97,6 +97,10 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-066 | P1 | Care Package and Carpet Bomber targeting creates a large host-admitted red ground `X` visible to all relevant players; the carpet-bomb caller additionally sees a large red world-space payload corridor across the map before commit. | Support targeting/presentation/protocol | Anchor/path protocol validation, host/guest world-coordinate equality, caller/peer visibility policy, depth/terrain projection, map bounds, cancel/commit/expiry teardown and two-peer captures. | Care Package + Carpet Bomber | IMPLEMENTED |
 | HF-067 | P1 | The Railgun retains the requested unmistakable map-spanning bolt/laser through buildings and map geometry, visible to the shooter and every peer along the authoritative penetration path. Existing damage/rechamber tests alone are insufficient. | Railgun presentation/network | Local and two-peer shot capture, 180m+ beam length/radius/duration/material assertions, through-building depth/penetration alignment, remote replication, pool/expiry and audio synchronization. | Railgun on supported maps | IMPLEMENTED |
 | HF-068 | P1 | Chopper/Drone support damage numbers and hit feedback appear over the actual damaged enemy's projected world location, never at the caller's current reticle; behind-camera/off-screen targets do not create misleading centre-screen markers. | Support HUD/presentation | Authoritative target-ID/position event binding, moving-target projection tests, caller aim deliberately offset from victim, off-screen/behind-camera suppression or edge policy, multi-hit accumulation and two-peer capture across chopper, piloted/autonomous drone and swarm. | Support damage HUD | IMPLEMENTED |
+| HF-069 | P0 | Every independently falsifiable outcome in the attached Pass 65 specification and every subsequent correction in this Codex conversation is represented once, including scope words, negations and supersessions, and reaches an executable owner and evidence path; no prompt may be silently ignored or accepted from prose alone. | Specification/integration governance | Generate the prompt-to-feedback-to-planning-to-canonical-owner-to-test-to-artifact graph, prove set equality and exact source identities, and run deliberately omitted, duplicated, stale-supersession and missing-evidence mutations. A missing outcome, orphan owner, unexercised falsifier or disguised OPEN P0/P1 item fails candidate construction. | Whole Pass 65 repository and HITL candidate | OPEN |
+| HF-070 | P1 | Every user-meaningful supported WebGPU/TSL presentation feature is available through the appropriate Quality, Performance or Custom/Advanced Graphics path and is deliberately showcased in the scenes it affects; every visible control changes a real runtime consumer and unsupported capabilities remain honestly unavailable with a reason. | Graphics research/settings/renderer | Prove canonical feature-inventory to UI to normalizer to apply-mode to scene/runtime consumer to telemetry to persistence set equality, synthetic add/rename/retire failures, capability-clamp reasons and deterministic before/after captures for every control. An orphan, no-op, unshowcased active feature or decorative option fails. | Options, all arenas and representative WebGPU hardware | OPEN |
+| HF-071 | P1 | All requested gameplay features are complete production implementations with canonical typed ownership, host authority where shared, versioned protocol and persistence, bounded resources, documentation and regression tests; placeholders, one-point fallbacks, no-op interactions and one-off mirrors do not satisfy the request. | Gameplay architecture/integration | Trace every gameplay requirement through catalog/authority/protocol/persistence/presentation/audio/bot/telemetry/test consumers, run future-ID and malformed/reordered/reconnect mutations, and exercise the complete all-map/two-peer lifecycle and stress matrix at the exact candidate SHA. Any missing consumer, fallback path, authority divergence, crash or freeze fails. | All gameplay systems, maps and peer modes | OPEN |
+| HF-072 | P1 | Graphics, models, rigs, animations, materials, textures, effects and audio reach a coherent release-grade authored quality bar, are well structured and documented, and are refined enough for owner delight rather than merely being mechanically present. | Asset forge/art direction/visual QA | Require editable Blender or licence-vetted source, complete provenance/PBR/LOD/socket/action/budget validators, deterministic near/mid/far and action contact sheets, independent visual red-team review and final owner HITL on the immutable candidate. Generic procedural hero assets, inconsistent texel/material quality, missing states or self-attested taste fail. | All first-person, character, vehicle, weapon, world, HUD and preview presentation | OPEN |
 
 ### 3A. Planning-requirement projection
 
@@ -126,6 +130,10 @@ The feedback IDs remain the correction source; these ranges bind each row back t
 | HF-066 | R502, R505, R510, R609 |
 | HF-067 | R109, R232, R236, R601, R608 |
 | HF-068 | R504, R506, R507, R510, R609 |
+| HF-069 | R005, R111, R600, R608, R611, R613 |
+| HF-070 | R100, R111, R300-R302, R307, R308, R608, R610, R613 |
+| HF-071 | R200-R205, R220-R236, R400-R413, R500-R512, R600-R610, R613 |
+| HF-072 | R008, R105-R115, R236, R300, R402, R608, R613 |
 
 ## 4. Canonical contract supersessions
 
