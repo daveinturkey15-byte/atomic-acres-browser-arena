@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { buildWeaponModel } from './art-kit';
-import type { RailgunAuthorityState } from './railgun-authority';
+import {
+  RAILGUN_BEAM_LENGTH_M,
+  isRailgunBeamAuthority,
+  type RailgunAuthorityState,
+  type RailgunBeamAuthority,
+  type RailgunShotResultMessage,
+} from './railgun-authority';
 
 export type RailgunThermalContact = Readonly<{
   id: string;
@@ -9,12 +15,11 @@ export type RailgunThermalContact = Readonly<{
 }>;
 
 export const RAILGUN_BOLT_PRESENTATION = Object.freeze({
-  minimumLengthM: 180,
+  minimumLengthM: RAILGUN_BEAM_LENGTH_M,
   visibleDurationMs: 900,
   coreRadiusM: 0.14,
   haloRadiusM: 0.62,
   poolCapacity: 6,
-  throughGeometry: true,
 });
 
 export class RailgunPresentation {
@@ -25,10 +30,12 @@ export class RailgunPresentation {
   private readonly thermalWorldContacts: THREE.Group[] = [];
   private readonly thermalDomContacts: HTMLElement[] = [];
   private readonly beamRoot = new THREE.Group();
-  private readonly beams: Array<{ root: THREE.Group; core: THREE.Mesh; bloom: THREE.Mesh; expiresAt: number }> = [];
+  private readonly beams: Array<{ root: THREE.Group; core: THREE.Mesh; bloom: THREE.Mesh; expiresAt: number; authorityKey: string | null }> = [];
+  private readonly acceptedBeamKeys = new Set<string>();
   private beamCursor = 0;
   private beamPresentations = 0;
   private lastBeamLengthM = 0;
+  private lastAcceptedBeam: RailgunBeamAuthority | null = null;
   private visibleThermalContacts = 0;
 
   constructor(scene: THREE.Scene, thermalRoot: HTMLElement, flattenMaterials: boolean) {
@@ -99,7 +106,7 @@ export class RailgunPresentation {
       bloom.frustumCulled = false;
       beam.add(core, bloom);
       this.beamRoot.add(beam);
-      this.beams.push({ root: beam, core, bloom, expiresAt: 0 });
+      this.beams.push({ root: beam, core, bloom, expiresAt: 0, authorityKey: null });
     }
     scene.add(this.root, this.thermalWorldRoot, this.beamRoot);
   }
@@ -113,11 +120,20 @@ export class RailgunPresentation {
     this.root.rotation.y = now * 0.00055;
   }
 
-  /** Presentation hook shared by local and replicated railgun shot paths. */
-  presentBeam(start: THREE.Vector3, end: THREE.Vector3, now: number): void {
+  /** The only beam admission hook: a host-accepted result with canonical endpoints. */
+  presentAcceptedResult(result: RailgunShotResultMessage, now: number): boolean {
+    const authority = result.beam;
+    if (result.status === 'rejected' || result.reason !== 'accepted' || !isRailgunBeamAuthority(authority)
+      || authority.generation !== result.generation || authority.shotId !== result.shotId) return false;
+    const authorityKey = `${authority.generation}:${authority.shotId}`;
+    if (this.acceptedBeamKeys.has(authorityKey)) return false;
+    const start = new THREE.Vector3(...authority.start);
+    const end = new THREE.Vector3(...authority.end);
     const delta = end.clone().sub(start);
     const length = delta.length();
-    if (!Number.isFinite(length) || length < 0.05) return;
+    if (!Number.isFinite(length) || Math.abs(length - RAILGUN_BEAM_LENGTH_M) > 1e-4) return false;
+    this.acceptedBeamKeys.add(authorityKey);
+    while (this.acceptedBeamKeys.size > 128) this.acceptedBeamKeys.delete(this.acceptedBeamKeys.values().next().value!);
     const beam = this.beams[this.beamCursor++ % this.beams.length];
     beam.root.position.copy(start).addScaledVector(delta, 0.5);
     beam.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
@@ -125,8 +141,19 @@ export class RailgunPresentation {
     beam.bloom.scale.set(RAILGUN_BOLT_PRESENTATION.haloRadiusM, length, RAILGUN_BOLT_PRESENTATION.haloRadiusM);
     beam.root.visible = true;
     beam.expiresAt = now + RAILGUN_BOLT_PRESENTATION.visibleDurationMs;
+    beam.authorityKey = authorityKey;
+    beam.root.userData.authorityKey = authorityKey;
+    beam.root.userData.authoritativeStart = [...authority.start];
+    beam.root.userData.authoritativeEnd = [...authority.end];
     this.beamPresentations += 1;
     this.lastBeamLengthM = length;
+    this.lastAcceptedBeam = Object.freeze({
+      generation: authority.generation,
+      shotId: authority.shotId,
+      start: Object.freeze([...authority.start]) as unknown as readonly [number, number, number],
+      end: Object.freeze([...authority.end]) as unknown as readonly [number, number, number],
+    });
+    return true;
   }
 
   private updateBeams(now: number): void {
@@ -135,6 +162,7 @@ export class RailgunPresentation {
       const remaining = beam.expiresAt - now;
       if (remaining <= 0) {
         beam.root.visible = false;
+        beam.authorityKey = null;
         continue;
       }
       const fade = THREE.MathUtils.clamp(remaining / RAILGUN_BOLT_PRESENTATION.visibleDurationMs, 0, 1);
@@ -231,8 +259,21 @@ export class RailgunPresentation {
     haloRadiusM: number;
     poolCapacity: number;
     throughGeometry: boolean;
+    lastAcceptedBeam: Readonly<{
+      generation: number;
+      shotId: string;
+      start: readonly [number, number, number];
+      end: readonly [number, number, number];
+      lengthM: number;
+    }> | null;
     modelId: string;
   }> {
+    const throughGeometry = this.beams.every(({ core, bloom }) => {
+      const coreMaterial = core.material as THREE.MeshBasicMaterial;
+      const bloomMaterial = bloom.material as THREE.MeshBasicMaterial;
+      return coreMaterial.depthTest === false && coreMaterial.depthWrite === false
+        && bloomMaterial.depthTest === false && bloomMaterial.depthWrite === false;
+    });
     return {
       worldVisible: this.root.visible,
       thermalActive: !this.thermalRoot.hidden,
@@ -245,8 +286,28 @@ export class RailgunPresentation {
       coreRadiusM: RAILGUN_BOLT_PRESENTATION.coreRadiusM,
       haloRadiusM: RAILGUN_BOLT_PRESENTATION.haloRadiusM,
       poolCapacity: this.beams.length,
-      throughGeometry: RAILGUN_BOLT_PRESENTATION.throughGeometry,
+      throughGeometry,
+      lastAcceptedBeam: this.lastAcceptedBeam ? Object.freeze({
+        generation: this.lastAcceptedBeam.generation,
+        shotId: this.lastAcceptedBeam.shotId,
+        start: Object.freeze([...this.lastAcceptedBeam.start]) as unknown as readonly [number, number, number],
+        end: Object.freeze([...this.lastAcceptedBeam.end]) as unknown as readonly [number, number, number],
+        lengthM: this.lastBeamLengthM,
+      }) : null,
       modelId: String(this.weapon.userData.weaponModelId ?? 'railgun-authored-v1'),
     };
+  }
+
+  resetBeams(): void {
+    for (const beam of this.beams) {
+      beam.root.visible = false;
+      beam.expiresAt = 0;
+      beam.authorityKey = null;
+    }
+    this.acceptedBeamKeys.clear();
+    this.beamCursor = 0;
+    this.beamPresentations = 0;
+    this.lastBeamLengthM = 0;
+    this.lastAcceptedBeam = null;
   }
 }

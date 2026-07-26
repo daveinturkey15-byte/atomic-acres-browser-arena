@@ -7,6 +7,7 @@ export const RAILGUN_RECHAMBER_MS = 1_500;
 export const RAILGUN_TOTAL_ROUNDS = 8;
 export const RAILGUN_PROCESSED_SHOT_LIMIT = 64;
 export const RAILGUN_STATE_RESYNC_MS = 1_000;
+export const RAILGUN_BEAM_LENGTH_M = 180;
 
 export type RailgunSpawnSite = Readonly<{
   id: 'aqua-front' | 'aqua-rear' | 'coral-front' | 'coral-rear';
@@ -267,6 +268,52 @@ export type RailgunShotOutcome = Readonly<{
   distanceMeters: number;
 }>;
 
+export type RailgunBeamAuthority = Readonly<{
+  generation: number;
+  shotId: string;
+  start: readonly [number, number, number];
+  end: readonly [number, number, number];
+}>;
+
+export function createRailgunBeamAuthority(
+  generation: number,
+  shotId: string,
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+): RailgunBeamAuthority {
+  const magnitude = Math.hypot(direction[0], direction[1], direction[2]);
+  if (!Number.isSafeInteger(generation) || generation < 0
+    || shotId.length < 8 || shotId.length > 128
+    || !isVector3(origin) || !isVector3(direction)
+    || magnitude < 0.96 || magnitude > 1.04) throw new Error('invalid authoritative railgun beam');
+  const normalized = [direction[0] / magnitude, direction[1] / magnitude, direction[2] / magnitude] as const;
+  return Object.freeze({
+    generation,
+    shotId,
+    start: Object.freeze([...origin]) as unknown as readonly [number, number, number],
+    end: Object.freeze([
+      origin[0] + normalized[0] * RAILGUN_BEAM_LENGTH_M,
+      origin[1] + normalized[1] * RAILGUN_BEAM_LENGTH_M,
+      origin[2] + normalized[2] * RAILGUN_BEAM_LENGTH_M,
+    ]) as unknown as readonly [number, number, number],
+  });
+}
+
+export function isRailgunBeamAuthority(value: unknown): value is RailgunBeamAuthority {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const beam = value as Partial<RailgunBeamAuthority>;
+  if (Object.keys(value).some((key) => key !== 'generation' && key !== 'shotId' && key !== 'start' && key !== 'end')
+    || !Number.isSafeInteger(beam.generation) || Number(beam.generation) < 0
+    || typeof beam.shotId !== 'string' || beam.shotId.length < 8 || beam.shotId.length > 128
+    || !isVector3(beam.start) || !isVector3(beam.end)) return false;
+  const length = Math.hypot(
+    beam.end[0] - beam.start[0],
+    beam.end[1] - beam.start[1],
+    beam.end[2] - beam.start[2],
+  );
+  return Math.abs(length - RAILGUN_BEAM_LENGTH_M) <= 1e-4;
+}
+
 /** Host-authored result. Clients never infer railgun damage from their own raycast. */
 export type RailgunShotResultMessage = Readonly<{
   type: 'railgun-shot-result';
@@ -278,6 +325,7 @@ export type RailgunShotResultMessage = Readonly<{
   status: 'accepted-hit' | 'accepted-miss' | 'rejected';
   reason: RailgunShotResult['reason'];
   outcomes: readonly RailgunShotOutcome[];
+  beam: RailgunBeamAuthority | null;
   nonce: number;
 }>;
 
@@ -321,12 +369,19 @@ export function isRailgunProtocolMessage(value: unknown, protocolVersion: number
   if (message.type === 'railgun-shot-result') {
     const outcomes = message.outcomes;
     const reasons = new Set<RailgunShotResult['reason']>(['accepted', 'not-holder', 'not-ready', 'empty', 'invalid', 'duplicate']);
+    const accepted = message.status === 'accepted-hit' || message.status === 'accepted-miss';
+    const beam = message.beam;
     return typeof message.forPlayerId === 'string' && validPlayerId(message.forPlayerId)
       && Number.isSafeInteger(message.generation) && Number(message.generation) >= 0
       && typeof message.shotId === 'string' && message.shotId.length >= 8 && message.shotId.length <= 128
       && (message.status === 'accepted-hit' || message.status === 'accepted-miss' || message.status === 'rejected')
       && reasons.has(message.reason as RailgunShotResult['reason'])
+      && (accepted
+        ? message.reason === 'accepted' && isRailgunBeamAuthority(beam)
+          && beam.generation === message.generation && beam.shotId === message.shotId
+        : message.reason !== 'accepted' && beam === null)
       && Array.isArray(outcomes) && outcomes.length <= 1
+      && (message.status === 'accepted-hit' ? outcomes.length === 1 : outcomes.length === 0)
       && outcomes.every((outcome) => {
         if (!outcome || typeof outcome !== 'object') return false;
         const candidate = outcome as Partial<RailgunShotOutcome>;

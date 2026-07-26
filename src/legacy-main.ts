@@ -425,6 +425,7 @@ import {
   type SmokeVolumePresentationLease,
 } from './smoke-volume-presentation';
 import {
+  RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
@@ -433,6 +434,7 @@ import {
   advanceRailgunAuthority,
   advanceRailgunChamber,
   claimRailgun,
+  createRailgunBeamAuthority,
   createRailgunAuthorityState,
   dropRailgun,
   fireRailgun,
@@ -440,6 +442,7 @@ import {
   railgunStateResyncDue,
   railgunThermalTargetEligible,
   type RailgunAuthorityState,
+  type RailgunBeamAuthority,
   type RailgunClaimRequestMessage,
   type RailgunShotRequestMessage,
   type RailgunShotResultMessage,
@@ -5673,16 +5676,12 @@ function renderRemoteShot(message: ShotMessage): void {
     audio.shot(message.weapon, true, origin.distanceTo(camera.position));
     return;
   }
-  const trace = traceWeaponPath(origin, direction, message.weapon === 'railgun' ? 220 : 50, message.weapon);
+  const trace = traceWeaponPath(origin, direction, message.weapon === 'railgun' ? RAILGUN_BEAM_LENGTH_M : 50, message.weapon);
   applyInteractiveWorldBallisticTrace(trace, origin, direction, message.weapon);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-  if (message.weapon === 'railgun') {
-    const visualStart = remoteMuzzle ?? origin;
-    const mapSpanningEnd = visualStart.clone().addScaledVector(direction, Math.max(180, trace.travelDistance));
-    railgunPresentation.presentBeam(visualStart, mapSpanningEnd, performance.now());
-  } else {
+  if (message.weapon !== 'railgun') {
     spawnTracer(remoteMuzzle ?? origin, visibleEnd, WEAPONS[message.weapon].color);
   }
   if (remoteOperator) fireOperator(remoteOperator);
@@ -5702,8 +5701,7 @@ function renderRemoteShot(message: ShotMessage): void {
     }
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
-  if (message.weapon === 'railgun') audio.railgunReport(true, origin.distanceTo(camera.position));
-  else audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+  if (message.weapon !== 'railgun') audio.shot(message.weapon, true, origin.distanceTo(camera.position));
 }
 
 function showDamageDirection(attacker: string, damage = 12, now = performance.now()): void {
@@ -6943,6 +6941,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   presentedShotResults.clear();
   processedShotResults.clear();
   processedRailgunShotResults.clear();
+  railgunPresentation.resetBeams();
   authoritativeShotAdmissions.clear();
   for (const key of Object.keys(shotProtocolTelemetry)) delete shotProtocolTelemetry[key];
   localSnapshotRateState = createSnapshotRateState(performance.now());
@@ -7143,6 +7142,7 @@ function initializeRailgunForMatch(activeAtHostTimeMs: number): void {
   railgunRechamberPresentationActive = false;
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
+  railgunPresentation.resetBeams();
   railgunClaimAudit = createRailgunClaimAudit();
   railgunPresentation.updateWorld(railgunState, performance.now());
   if (network.role === 'host') broadcastRailgunState();
@@ -7214,7 +7214,7 @@ function selectRailgunTarget(shooterId: string, shooterTeam: Team, origin: THREE
   let selected: { target: RailgunTarget; distance: number } | null = null;
   for (const target of railgunTargets(shooterId, shooterTeam)) {
     const alongRay = target.position.clone().sub(origin).dot(ray.direction);
-    if (alongRay < 0.1 || alongRay > 220) continue;
+    if (alongRay < 0.1 || alongRay > RAILGUN_BEAM_LENGTH_M) continue;
     const closest = ray.at(alongRay, new THREE.Vector3());
     if (closest.distanceToSquared(target.position) > 0.62 ** 2) continue;
     if (!selected || alongRay < selected.distance) selected = { target, distance: alongRay };
@@ -7262,19 +7262,20 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
   return { target: target.id, damage: applied.damageApplied, resultingHealth: applied.healthAfter, died: applied.died, distanceMeters: distance };
 }
 
-function presentRailgunShot(origin: THREE.Vector3, direction: THREE.Vector3, local: boolean): void {
-  const start = local ? weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin : origin;
-  const end = start.clone().addScaledVector(direction, 180);
-  railgunPresentation.presentBeam(start, end, performance.now());
-  if (local) {
-    const recoil = computeRecoilImpulse(WEAPONS.railgun, 0, 0.5, { ads: adsHeld, crouched: player.stance === 'crouch', prone: player.stance === 'prone' });
-    recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
-    recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
-    weaponView.fire(recoil.pitch);
-    weaponView.reload();
-    railgunRechamberPresentationActive = true;
-  }
-  audio.railgunReport(!local, origin.distanceTo(camera.position));
+function presentLocalRailgunTrigger(): void {
+  const recoil = computeRecoilImpulse(WEAPONS.railgun, 0, 0.5, { ads: adsHeld, crouched: player.stance === 'crouch', prone: player.stance === 'prone' });
+  recoilCamera.pitch = Math.min(0.16, recoilCamera.pitch + recoil.pitch);
+  recoilVisual = Math.min(0.24, recoilVisual + recoil.pitch * 4.2);
+  weaponView.fire(recoil.pitch);
+  weaponView.reload();
+  railgunRechamberPresentationActive = true;
+}
+
+function presentAuthoritativeRailgunResult(message: RailgunShotResultMessage, local: boolean): boolean {
+  const presented = railgunPresentation.presentAcceptedResult(message, performance.now());
+  if (!presented || !message.beam) return false;
+  audio.railgunReport(!local, new THREE.Vector3(...message.beam.start).distanceTo(camera.position));
+  return true;
 }
 
 function railgunResult(
@@ -7284,10 +7285,11 @@ function railgunResult(
   status: RailgunShotResultMessage['status'],
   reason: RailgunShotResultMessage['reason'],
   outcomes: RailgunShotResultMessage['outcomes'],
+  beam: RailgunBeamAuthority | null,
 ): RailgunShotResultMessage {
   return {
     type: 'railgun-shot-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id, forPlayerId: shooterId, generation, shotId, status, reason, outcomes, nonce: randomNonce(),
+    by: player.id, forPlayerId: shooterId, generation, shotId, status, reason, outcomes, beam, nonce: randomNonce(),
   };
 }
 
@@ -7306,13 +7308,13 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
   const expectedOrigin = remote ? new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z) : null;
   if (!remote || !health?.alive || request.generation !== railgunState.generation || !expectedOrigin
     || origin.distanceTo(expectedOrigin) > 2.5 || direction.length() < 0.96 || direction.length() > 1.04) {
-    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', 'invalid', []);
+    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', 'invalid', [], null);
     network.sendToPlayer(request.by, rejected);
     return rejected;
   }
   const fired = fireRailgun(railgunState, request.by, request.shotId, performance.now());
   if (!fired.accepted) {
-    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', fired.reason, []);
+    const rejected = railgunResult(request.by, request.generation, request.shotId, 'rejected', fired.reason, [], null);
     network.sendToPlayer(request.by, rejected);
     return rejected;
   }
@@ -7321,7 +7323,8 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
   const normalized = direction.normalize();
   const target = selectRailgunTarget(request.by, remote.snapshot.team, origin, normalized);
   const outcome = target ? applyAuthoritativeRailgunDamage(request.by, target.target, target.distance) : null;
-  const result = railgunResult(request.by, request.generation, request.shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : []);
+  const beam = createRailgunBeamAuthority(request.generation, request.shotId, request.origin, normalized.toArray() as [number, number, number]);
+  const result = railgunResult(request.by, request.generation, request.shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : [], beam);
   resolvedRailgunShots.set(cacheKey, result);
   while (resolvedRailgunShots.size > 64) resolvedRailgunShots.delete(resolvedRailgunShots.keys().next().value!);
   const visual: ShotMessage = {
@@ -7329,6 +7332,7 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
     direction: request.direction as [number, number, number], pelletDirections: [request.direction as [number, number, number]], nonce: request.nonce,
   };
   applyKillstreakEntityShot(request.by, remote.snapshot.team, origin, [normalized], 'railgun');
+  presentAuthoritativeRailgunResult(result, false);
   renderRemoteShot(visual);
   network.send(visual, request.by);
   network.send(result);
@@ -7341,6 +7345,7 @@ function acceptRailgunShotResult(message: RailgunShotResultMessage): void {
   if (processedRailgunShotResults.has(resultKey)) return;
   processedRailgunShotResults.add(resultKey);
   while (processedRailgunShotResults.size > 512) processedRailgunShotResults.delete(processedRailgunShotResults.values().next().value!);
+  presentAuthoritativeRailgunResult(message, message.forPlayerId === player.id);
   for (const outcome of message.outcomes) {
     if (outcome.target !== player.id || !player.alive) continue;
     reconcileLocalAuthoritativeHealth(outcome.resultingHealth, outcome.damage, message.forPlayerId, 1, { kind: 'gun', weapon: 'railgun' });
@@ -7366,7 +7371,7 @@ function tryFireRailgun(now: number): void {
   const shotId = `${localConnectionEpoch}:rail:${localShotSeq++}`;
   railgunAdsResetRequired = true;
   adsHeld = false;
-  presentRailgunShot(origin, direction, true);
+  presentLocalRailgunTrigger();
   roundShotsFired += 1;
   if (network.role === 'client') {
     localRailgunPendingUntilHostTimeMs = hostNow + RAILGUN_RECHAMBER_MS;
@@ -7383,7 +7388,7 @@ function tryFireRailgun(now: number): void {
   if (!fired.accepted) return;
   applyRailgunState(fired.state);
   broadcastRailgunState();
-  applyInteractiveWorldBallisticTrace(traceWeaponPath(origin, direction, 180, 'railgun'), origin, direction, 'railgun');
+  applyInteractiveWorldBallisticTrace(traceWeaponPath(origin, direction, RAILGUN_BEAM_LENGTH_M, 'railgun'), origin, direction, 'railgun');
   applyKillstreakEntityShot(player.id, player.team, origin, [direction], 'railgun', now);
   const target = selectRailgunTarget(player.id, player.team, origin, direction);
   const outcome = target ? applyAuthoritativeRailgunDamage(player.id, target.target, target.distance) : null;
@@ -7394,8 +7399,10 @@ function tryFireRailgun(now: number): void {
     roundHitShots += 1;
     roundDamageDealt += outcome.damage;
   }
+  const beam = createRailgunBeamAuthority(railgunState.generation, shotId, origin.toArray() as [number, number, number], direction.toArray() as [number, number, number]);
+  const result = railgunResult(player.id, railgunState.generation, shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : [], beam);
+  presentAuthoritativeRailgunResult(result, true);
   if (network.role === 'host') {
-    const result = railgunResult(player.id, railgunState.generation, shotId, outcome ? 'accepted-hit' : 'accepted-miss', 'accepted', outcome ? [outcome] : []);
     const visual: ShotMessage = {
       type: 'shot', by: player.id, weapon: 'railgun', origin: origin.toArray() as [number, number, number],
       direction: direction.toArray() as [number, number, number], pelletDirections: [direction.toArray() as [number, number, number]], nonce: randomNonce(),
@@ -13330,6 +13337,7 @@ function resetForMode(): void {
   railgunClaimAudit = createRailgunClaimAudit();
   resolvedRailgunShots.clear();
   processedRailgunShotResults.clear();
+  railgunPresentation.resetBeams();
   railgunPresentation.updateWorld(railgunState, performance.now());
   railgunPresentation.updateThermal(camera, [], false);
   authorizedRemoteRedeploys.clear();

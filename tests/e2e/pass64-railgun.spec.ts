@@ -54,16 +54,28 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
     poolCapacity: 6,
     throughGeometry: true,
   });
+  const acceptedBeam = first.railgun.presentation.lastAcceptedBeam;
+  expect(acceptedBeam).toMatchObject({ generation: first.railgun.generation, lengthM: 180 });
+  expect(acceptedBeam.shotId).toMatch(/:rail:\d+$/);
+  expect(Math.hypot(
+    acceptedBeam.end[0] - acceptedBeam.start[0],
+    acceptedBeam.end[1] - acceptedBeam.start[1],
+    acceptedBeam.end[2] - acceptedBeam.start[2],
+  )).toBeCloseTo(180, 5);
   expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 8, pressureDuration: 0.62 });
   expect(first.textChat.adsHeld).toBe(false);
   expect(first.railgun.thermalVisible).toBe(false);
 
+  const presentationCountBeforeBlockedShot = first.railgun.presentation.beamPresentations;
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
   ).__ATOMIC_ACRES_DEBUG__.fireOnce());
   expect(await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining)).toBe(7);
+  expect(await page.evaluate(() => (
+    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation.beamPresentations)).toBe(presentationCountBeforeBlockedShot);
 
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: any }

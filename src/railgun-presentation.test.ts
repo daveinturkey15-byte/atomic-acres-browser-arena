@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RAILGUN_BOLT_PRESENTATION, RailgunPresentation } from './railgun-presentation';
-import type { RailgunAuthorityState } from './railgun-authority';
+import { createRailgunBeamAuthority, type RailgunAuthorityState, type RailgunShotResultMessage } from './railgun-authority';
 
 vi.mock('./art-kit', () => ({
   buildWeaponModel: () => {
@@ -30,10 +30,16 @@ describe('railgun presentation', () => {
   beforeEach(() => vi.stubGlobal('document', { createElement: () => new FakeElement() }));
   afterEach(() => vi.unstubAllGlobals());
 
-  it('presents a massive pooled beam for local and replicated shot hooks', () => {
+  it('presents only a host-accepted identity on its exact authoritative ray and derives depth bypass from the live materials', () => {
     const scene = new THREE.Scene();
     const presentation = new RailgunPresentation(scene, new FakeElement() as unknown as HTMLElement, true);
-    presentation.presentBeam(new THREE.Vector3(), new THREE.Vector3(0, 0, -180), 1_000);
+    const authority = createRailgunBeamAuthority(3, 'shot-authority-0001', [3, 2, 7], [0.6, 0, -0.8]);
+    const accepted: RailgunShotResultMessage = {
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'shooter', generation: 3,
+      shotId: authority.shotId, status: 'accepted-miss', reason: 'accepted', outcomes: [], beam: authority, nonce: 1,
+    };
+    expect(presentation.presentAcceptedResult(accepted, 1_000)).toBe(true);
+    expect(presentation.presentAcceptedResult(accepted, 1_001)).toBe(false);
     expect(presentation.telemetry()).toMatchObject({ activeBeams: 1, beamPresentations: 1 });
     const beam = scene.getObjectByName('railgun-massive-beam-1') as THREE.Group;
     expect(beam.visible).toBe(true);
@@ -43,18 +49,53 @@ describe('railgun presentation', () => {
     expect(bloom.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.haloRadiusM, y: 180 });
     expect((core.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((bloom.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
+    const expectedDirection = new THREE.Vector3(...authority.end).sub(new THREE.Vector3(...authority.start)).normalize();
+    const renderedDirection = new THREE.Vector3(0, 1, 0).applyQuaternion(beam.quaternion).normalize();
+    expect(renderedDirection.distanceTo(expectedDirection)).toBeLessThan(1e-6);
+    expect(beam.position.distanceTo(new THREE.Vector3(...authority.start).add(new THREE.Vector3(...authority.end)).multiplyScalar(0.5))).toBeLessThan(1e-6);
     expect(presentation.telemetry()).toMatchObject({
       lastBeamLengthM: 180,
       visibleDurationMs: 900,
       poolCapacity: 6,
       throughGeometry: true,
+      lastAcceptedBeam: {
+        generation: 3,
+        shotId: 'shot-authority-0001',
+        start: authority.start,
+        end: authority.end,
+        lengthM: 180,
+      },
     });
+    (core.material as THREE.MeshBasicMaterial).depthTest = true;
+    expect(presentation.telemetry().throughGeometry).toBe(false);
+    (core.material as THREE.MeshBasicMaterial).depthTest = false;
 
     const hiddenWorld = { status: 'held', pickupPosition: null } as RailgunAuthorityState;
     presentation.updateWorld(hiddenWorld, 1_000 + RAILGUN_BOLT_PRESENTATION.visibleDurationMs - 1);
     expect(presentation.telemetry().activeBeams).toBe(1);
     presentation.updateWorld(hiddenWorld, 1_000 + RAILGUN_BOLT_PRESENTATION.visibleDurationMs + 1);
     expect(presentation.telemetry().activeBeams).toBe(0);
+    presentation.resetBeams();
+    expect(presentation.telemetry()).toMatchObject({ activeBeams: 0, beamPresentations: 0, lastAcceptedBeam: null });
+  });
+
+  it('never presents a rejected or identity-mismatched result', () => {
+    const scene = new THREE.Scene();
+    const presentation = new RailgunPresentation(scene, new FakeElement() as unknown as HTMLElement, true);
+    const rejected: RailgunShotResultMessage = {
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'shooter', generation: 3,
+      shotId: 'shot-rejected-0001', status: 'rejected', reason: 'not-ready', outcomes: [], beam: null, nonce: 1,
+    };
+    expect(presentation.presentAcceptedResult(rejected, 1_000)).toBe(false);
+    const authority = createRailgunBeamAuthority(3, 'shot-accepted-0002', [0, 1, 0], [0, 0, -1]);
+    expect(presentation.presentAcceptedResult({
+      ...rejected,
+      status: 'accepted-miss',
+      reason: 'accepted',
+      shotId: 'different-shot-0002',
+      beam: authority,
+    }, 1_001)).toBe(false);
+    expect(presentation.telemetry()).toMatchObject({ activeBeams: 0, beamPresentations: 0, lastAcceptedBeam: null });
   });
 
   it('keeps neon-blue enemy silhouettes in the 3D scene through depth and reuses DOM markers', () => {
