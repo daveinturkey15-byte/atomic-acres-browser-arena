@@ -16,6 +16,7 @@ import {
   resetShedState,
   resumeShedDoorWhenClear,
   shedApertureContainsWorldPoint,
+  synchronizeMajorShedDebris,
   type DestructibleShedDefinition,
   type SheetSurfaceDefinition,
   type ShedMutationResult,
@@ -25,6 +26,7 @@ import {
   type WorldCollisionSnapshot,
   type QuantizedVector,
 } from './destructible-world';
+import type { MajorDebrisBodyDefinition, MajorDebrisBodySnapshot } from './physics';
 import {
   DestructibleShedPresentation,
   FIELD_SHED_DEFINITION,
@@ -113,6 +115,14 @@ function transformPoint(point: Point3, placement: ShedPlacement): Point3 {
     y: placement.position.y + rotated.y,
     z: placement.position.z + rotated.z,
   };
+}
+
+function inverseTransformPoint(point: Point3, placement: ShedPlacement): Point3 {
+  return rotateY({
+    x: point.x - placement.position.x,
+    y: point.y - placement.position.y,
+    z: point.z - placement.position.z,
+  }, -placement.yaw);
 }
 
 function doorFrameAt(surface: SheetSurfaceDefinition, angleQ: number): SurfaceFrame {
@@ -480,6 +490,101 @@ export class InteractiveWorldRuntime {
       surfaceId: request.surfaceId,
       damageQ: request.damageQ,
     }));
+  }
+
+  majorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] {
+    return Object.freeze(this.sheds.flatMap((shed) => shed.state.majorDebris.map((body) => {
+      const localPosition = {
+        x: body.poseQ.position.xQ / 1_000,
+        y: body.poseQ.position.yQ / 1_000,
+        z: body.poseQ.position.zQ / 1_000,
+      };
+      const localRotation = new THREE.Quaternion(
+        body.poseQ.rotation.xQ / SHED_PANEL_COORD_Q,
+        body.poseQ.rotation.yQ / SHED_PANEL_COORD_Q,
+        body.poseQ.rotation.zQ / SHED_PANEL_COORD_Q,
+        body.poseQ.rotation.wQ / SHED_PANEL_COORD_Q,
+      ).normalize();
+      const yawRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), shed.placement.yaw);
+      const rotation = yawRotation.multiply(localRotation);
+      const linearVelocity = rotateY({
+        x: body.velocityQ.xQ / 1_000,
+        y: body.velocityQ.yQ / 1_000,
+        z: body.velocityQ.zQ / 1_000,
+      }, shed.placement.yaw);
+      const angularVelocity = rotateY({
+        x: body.angularVelocityQ.xQ / 1_000,
+        y: body.angularVelocityQ.yQ / 1_000,
+        z: body.angularVelocityQ.zQ / 1_000,
+      }, shed.placement.yaw);
+      return Object.freeze({
+        id: `${shed.placement.id}:debris:${body.chunkId}`,
+        position: Object.freeze(transformPoint(localPosition, shed.placement)),
+        rotation: Object.freeze({ x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }),
+        halfExtents: Object.freeze({ x: 0.625, y: 0.06, z: 0.875 }),
+        linearVelocity: Object.freeze(linearVelocity),
+        angularVelocity: Object.freeze(angularVelocity),
+        sleeping: body.sleeping,
+      });
+    })));
+  }
+
+  adoptMajorDebrisPhysics(snapshots: readonly MajorDebrisBodySnapshot[]): boolean {
+    if (!this.hostAuthority || snapshots.length > 18) return false;
+    let changed = false;
+    for (const shed of this.sheds) {
+      const bodies = shed.state.majorDebris.map((body) => {
+        const id = `${shed.placement.id}:debris:${body.chunkId}`;
+        const snapshot = snapshots.find((candidate) => candidate.id === id);
+        if (!snapshot) return null;
+        const localPosition = inverseTransformPoint(snapshot.position, shed.placement);
+        const worldRotation = new THREE.Quaternion(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w).normalize();
+        const inverseYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -shed.placement.yaw);
+        const localRotation = inverseYaw.multiply(worldRotation).normalize();
+        const linearVelocity = rotateY(snapshot.linearVelocity, -shed.placement.yaw);
+        const angularVelocity = rotateY(snapshot.angularVelocity, -shed.placement.yaw);
+        return Object.freeze({
+          chunkId: body.chunkId,
+          poseQ: Object.freeze({
+            position: Object.freeze({
+              xQ: Math.round(localPosition.x * 1_000),
+              yQ: Math.round(localPosition.y * 1_000),
+              zQ: Math.round(localPosition.z * 1_000),
+            }),
+            rotation: Object.freeze({
+              xQ: Math.round(localRotation.x * SHED_PANEL_COORD_Q),
+              yQ: Math.round(localRotation.y * SHED_PANEL_COORD_Q),
+              zQ: Math.round(localRotation.z * SHED_PANEL_COORD_Q),
+              wQ: Math.round(localRotation.w * SHED_PANEL_COORD_Q),
+            }),
+          }),
+          velocityQ: Object.freeze({
+            xQ: Math.round(linearVelocity.x * 1_000),
+            yQ: Math.round(linearVelocity.y * 1_000),
+            zQ: Math.round(linearVelocity.z * 1_000),
+          }),
+          angularVelocityQ: Object.freeze({
+            xQ: Math.round(angularVelocity.x * 1_000),
+            yQ: Math.round(angularVelocity.y * 1_000),
+            zQ: Math.round(angularVelocity.z * 1_000),
+          }),
+          sleeping: snapshot.sleeping,
+          flat: snapshot.flat,
+        });
+      });
+      if (bodies.some((body) => body === null)) return false;
+      const result = synchronizeMajorShedDebris(shed.state, {
+        isHost: true,
+        expectedRevision: shed.state.revision,
+        bodies: bodies as ShedState['majorDebris'],
+      });
+      if (!result.accepted) return false;
+      if (result.state !== shed.state) {
+        this.commit(shed, result);
+        changed = true;
+      }
+    }
+    return changed || snapshots.length === 0;
   }
 
   readonly apertureQuery: BallisticApertureQuery = (surface, point) => {

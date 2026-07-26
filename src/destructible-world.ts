@@ -649,6 +649,31 @@ export function impulseMajorShedDebris(
   return { accepted: true, reason: 'accepted', state: withRevision(state, { majorDebris }) };
 }
 
+export function synchronizeMajorShedDebris(
+  state: ShedState,
+  request: Readonly<{
+    isHost: boolean;
+    expectedRevision: number;
+    bodies: readonly MajorDebrisState[];
+  }>,
+): ShedMutationResult {
+  if (!request.isHost) return { accepted: false, reason: 'not-host', state };
+  if (request.expectedRevision !== state.revision) return { accepted: false, reason: 'stale-revision', state };
+  if (request.bodies.length > SHED_MAX_MAJOR_CHUNKS
+    || !request.bodies.every(isMajorDebrisState)
+    || !unique(request.bodies.map((body) => body.chunkId))
+    || request.bodies.some((body) => !state.detachedChunkIds.includes(body.chunkId))
+    || request.bodies.length !== state.majorDebris.length
+    || state.majorDebris.some((body) => !request.bodies.some((candidate) => candidate.chunkId === body.chunkId))) {
+    return { accepted: false, reason: 'invalid-impact', state };
+  }
+  const majorDebris = Object.freeze([...request.bodies].sort((left, right) => left.chunkId.localeCompare(right.chunkId)));
+  if (canonicalSha256(majorDebris) === canonicalSha256([...state.majorDebris].sort((left, right) => left.chunkId.localeCompare(right.chunkId)))) {
+    return { accepted: true, reason: 'accepted', state };
+  }
+  return { accepted: true, reason: 'accepted', state: withRevision(state, { majorDebris }) };
+}
+
 export function apertureContainsPanelPoint(aperture: BallisticAperture, uQ: number, vQ: number): boolean {
   if (!Number.isFinite(uQ) || !Number.isFinite(vQ)) return false;
   const du = (uQ - aperture.uQ) / aperture.radiusUQ;

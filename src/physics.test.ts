@@ -137,4 +137,42 @@ describe('CharacterPhysics', () => {
     ])).toThrow(/unique canonical/);
     expect(() => active!.syncDynamicColliders([{ id: '../unsafe', bounds: boundsA }])).toThrow(/unique canonical/);
   });
+
+  it('bounds, wakes, impulses, snapshots, and removes host-simulated major debris', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    active.teleportEye({ x: -5, y: 1.7, z: -5 });
+    active.syncMajorDebrisBodies([{
+      id: 'shed-a:debris:chunk-west',
+      position: { x: 0, y: 0.18, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      halfExtents: { x: 0.55, y: 0.08, z: 0.7 },
+      linearVelocity: { x: 0, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0, z: 0 },
+      sleeping: true,
+    }]);
+    expect(active.majorDebrisBodyCount()).toBe(1);
+    expect(active.majorDebrisSnapshots()[0]).toMatchObject({ id: 'shed-a:debris:chunk-west', sleeping: true });
+    expect(active.applyMajorDebrisImpulse('shed-a:debris:chunk-west', { x: 12, y: 1, z: 0 })).toBe(true);
+    for (let frame = 0; frame < 30; frame += 1) active.move({ x: 0, y: -0.01, z: 0 }, 1 / 120);
+    const moved = active.majorDebrisSnapshots()[0]!;
+    expect(moved.sleeping).toBe(false);
+    expect(moved.position.x).toBeGreaterThan(0.1);
+    expect(active.applyMajorDebrisImpulse('shed-a:debris:chunk-west', { x: 100, y: 0, z: 0 })).toBe(false);
+    active.syncMajorDebrisBodies([]);
+    expect(active.majorDebrisBodyCount()).toBe(0);
+  });
+
+  it('rejects arena-wide major debris cap overflow', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    const entries = Array.from({ length: 19 }, (_, index) => ({
+      id: `shed-a:debris:chunk-${index}`,
+      position: { x: 0, y: 1, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      halfExtents: { x: 0.5, y: 0.1, z: 0.5 },
+      linearVelocity: { x: 0, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0, z: 0 },
+      sleeping: true,
+    }));
+    expect(() => active!.syncMajorDebrisBodies(entries)).toThrow(/exceed cap/);
+  });
 });

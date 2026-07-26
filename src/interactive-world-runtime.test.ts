@@ -106,6 +106,21 @@ describe('shared interactive-world runtime adapter', () => {
     expect(after.ballisticSurfaces.some((surface) => surface.destructibleSurface?.surfaceId === 'wall-west')).toBe(false);
     expect(after.ballisticSurfaces.some((surface) => surface.majorDebris?.chunkId === 'chunk-west')).toBe(true);
     expect(runtime.telemetry()).toMatchObject({ detachedChunks: 1, awakeMajorBodies: 1, presentationDraws: 5 });
+    const physicsBody = runtime.majorDebrisPhysicsBodies()[0]!;
+    expect(physicsBody.id).toBe('atomic-shed-vertical-slice:debris:chunk-west');
+    const priorDebris = after.ballisticSurfaces.find((surface) => surface.majorDebris?.chunkId === 'chunk-west')!;
+    expect(runtime.adoptMajorDebrisPhysics([{
+      id: physicsBody.id,
+      position: { ...physicsBody.position, x: physicsBody.position.x + 1 },
+      rotation: physicsBody.rotation,
+      linearVelocity: { x: 1, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0.2, z: 0 },
+      sleeping: false,
+      flat: false,
+    }])).toBe(true);
+    const movedDebris = runtime.collisions().ballisticSurfaces.find((surface) => surface.majorDebris?.chunkId === 'chunk-west')!;
+    expect((movedDebris.bounds.minX + movedDebris.bounds.maxX) / 2)
+      .toBeCloseTo((priorDebris.bounds.minX + priorDebris.bounds.maxX) / 2 + 1);
     runtime.dispose();
   });
 
