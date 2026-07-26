@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   awaitSubmissionCompletionTarget,
+  centeredReadbackRegion,
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
   pendingCompletionStartAfterProgress,
@@ -108,6 +109,11 @@ describe('Pass 64 render runtime boundary', () => {
       completedSequence: 22,
       submissionSequence: 22,
     })).toBeNull();
+  });
+
+  it('samples the center of a render target rather than a screen-space corner', () => {
+    expect(centeredReadbackRegion(2_560, 1_440)).toEqual({ x: 1_248, y: 688, width: 64, height: 64 });
+    expect(centeredReadbackRegion(32, 20)).toEqual({ x: 0, y: 0, width: 32, height: 20 });
   });
 
   it('fences the captured submission target even when an existing probe covers only older work', async () => {

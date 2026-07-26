@@ -79,6 +79,21 @@ export function pendingCompletionStartAfterProgress(input: Readonly<{
   return input.completedSequence >= input.submissionSequence ? null : input.completedAt;
 }
 
+export function centeredReadbackRegion(
+  targetWidth: number,
+  targetHeight: number,
+  maximumDimension = 64,
+): Readonly<{ x: number; y: number; width: number; height: number }> {
+  const width = Math.max(1, Math.min(Math.floor(targetWidth), maximumDimension));
+  const height = Math.max(1, Math.min(Math.floor(targetHeight), maximumDimension));
+  return Object.freeze({
+    x: Math.max(0, Math.floor((targetWidth - width) / 2)),
+    y: Math.max(0, Math.floor((targetHeight - height) / 2)),
+    width,
+    height,
+  });
+}
+
 export async function awaitSubmissionCompletionTarget(input: Readonly<{
   targetSequence: number;
   completedSequence: () => number;
@@ -720,10 +735,12 @@ export class WebGpuRenderRuntime {
 
   async readRenderTargetPixels(
     target: THREE.RenderTarget,
+    x: number,
+    y: number,
     width: number,
     height: number,
   ): Promise<ArrayBufferView> {
-    return this.renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+    return this.renderer.readRenderTargetPixelsAsync(target, x, y, width, height);
   }
 
   async waitForSubmittedWork(timeoutMs = 4_000): Promise<void> {

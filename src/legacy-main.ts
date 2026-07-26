@@ -4,7 +4,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
+import { centeredReadbackRegion, LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
@@ -11170,7 +11170,7 @@ const debugWindow = window as Window & {
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
-    readbackWebGpuFrame: () => Promise<{ bytes: number; hash: string }>;
+    readbackWebGpuFrame: () => Promise<{ bytes: number; hash: string; x: number; y: number; width: number; height: number }>;
     sampleRendererResidency: () => ReturnType<typeof estimateRendererResidency>;
     sampleArenaPerformanceBudget: () => Promise<ArenaPerformanceBudgetSample>;
     setRenderPaused: (paused: boolean) => void;
@@ -12455,16 +12455,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     submitWebGpuFrame(performance.now(), true);
     await flushWebGpuFrames();
     const target = pass64TslSystems.principalHdrTarget;
-    const width = Math.max(1, Math.min(target.width, 64));
-    const height = Math.max(1, Math.min(target.height, 64));
-    const pixels = await renderRuntime.readRenderTargetPixels(target, width, height);
+    const { x, y, width, height } = centeredReadbackRegion(target.width, target.height);
+    const pixels = await renderRuntime.readRenderTargetPixels(target, x, y, width, height);
     const bytes = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
     let hash = 0x811c9dc5;
     for (const byte of bytes) {
       hash ^= byte;
       hash = Math.imul(hash, 0x01000193);
     }
-    return { bytes: bytes.byteLength, hash: (hash >>> 0).toString(16).padStart(8, '0') };
+    return { bytes: bytes.byteLength, hash: (hash >>> 0).toString(16).padStart(8, '0'), x, y, width, height };
   },
   sampleRendererResidency: estimateRendererResidency,
   sampleArenaPerformanceBudget,
