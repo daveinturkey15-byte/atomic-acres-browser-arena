@@ -65,7 +65,7 @@ type MotionVarianceEnvelope = Readonly<{
   maximumAngularAcceleration: number;
 }>;
 
-type MenuHelicopterPreviewDefinition = Readonly<{
+type OfflineMenuHelicopterRenderDefinition = Readonly<{
   arenaId: CatalogId;
   splineId: CatalogId;
   safeFlightVolumeId: CatalogId;
@@ -76,7 +76,7 @@ type MenuHelicopterPreviewDefinition = Readonly<{
   reducedMotionPoseId: CatalogId;
 }>;
 
-type CatPreviewDefinition = Readonly<{
+type OfflineCatPreviewRenderDefinition = Readonly<{
   arenaId: 'gun-range';
   bodyPathId: CatalogId;
   headLookTrackId: CatalogId;
@@ -86,6 +86,30 @@ type CatPreviewDefinition = Readonly<{
   maximumAngularVelocity: number;
   deterministicCaptureSeed: number;
   reducedMotionPoseId: CatalogId;
+}>;
+
+type MenuPreviewMediaDefinition = Readonly<{
+  arenaId: CatalogId;
+  offlineRenderRecipeId: CatalogId;
+  webmAssetId: CatalogId;
+  mp4AssetId: CatalogId;
+  posterAssetId: CatalogId;
+  durationMs: number;
+  loop: true;
+  muted: true;
+  preload: 'metadata';
+  reducedMotionPresentation: 'poster';
+  sourceSha256: string;
+  mediaSha256: Readonly<{ webm: string; mp4: string; poster: string }>;
+}>;
+
+type MenuPreviewRuntimeTelemetry = Readonly<{
+  selectedArenaId: CatalogId;
+  mediaGeneration: number;
+  sourceKind: 'webm' | 'mp4' | 'poster';
+  arenaConstructionCountBeforeDeploy: 0;
+  gameplayPipelineCompileCountBeforeDeploy: 0;
+  webgpuSubmissionCountBeforeDeploy: 0;
 }>;
 
 type ChopperMotionVarianceDefinition = Readonly<{
@@ -103,7 +127,7 @@ const pass65ChannelIdentity = Object.freeze({
 });
 ```
 
-Menu motion is presentation-only: a seeded PRNG selects occasional targets and a band-limited/critically damped interpolator reaches them without per-frame `Math.random()`, discontinuities or flight-volume escape. Normal sessions may derive a fresh non-secret seed for variety; deterministic capture always supplies the recorded seed. Pitch, yaw, bank, speed and altitude remain coupled like aircraft motion rather than independent noise. Reduced motion keeps a strong static/near-static composition.
+Menu choreography is authored and rendered offline: a seeded PRNG selects occasional targets and a band-limited/critically damped interpolator reaches them without per-frame `Math.random()`, discontinuities or flight-volume escape. Pitch, yaw, bank, speed and altitude remain coupled like aircraft motion rather than independent noise. The checked-in recipe, seed, source digest, compressed WebM/MP4 outputs and poster are provenance evidence. Runtime map selection swaps only bounded local media by generation token; it does not instantiate the renderer, construct an arena, compile a gameplay pipeline, submit a WebGPU frame or run preview physics. Reduced motion uses the equally informative poster. Arena streaming and compilation begin only after an explicit deploy action owns the loading transition.
 
 The cockpit is an authored asset contract with canopy/frame/instrument silhouette, coherent glass and interior/exterior material response, LODs, source/licence digest and review cameras; it cannot be a hollow primitive shell hidden at most angles. Cat choreography owns separate body and look-at tracks, deliberate points of interest, comfortable acceleration/angular bounds, clean loop closure and an expressive reduced-motion pose.
 
@@ -248,6 +272,20 @@ type WeaponPresentationDefinition = Readonly<{
   drawBudget: number;
   provenanceId: string;
 }>;
+
+type RailgunBoltPresentationDefinition = Readonly<{
+  id: 'railgun-map-bolt-v1';
+  minimumLengthM: 180;
+  minimumVisibleMs: 420;
+  coreDiameterM: number;
+  haloDiameterM: number;
+  coreDepthPolicy: 'authoritative-path';
+  haloDepthPolicy: 'visible-through-solid-geometry';
+  audience: 'shooter-and-all-peers';
+  endpointPolicy: 'authoritative-penetration-path';
+  pooledInstances: number;
+  audioProfileId: WeaponAudioProfileId;
+}>;
 ```
 
 Authority boundary:
@@ -256,6 +294,7 @@ Authority boundary:
 - Authoritative fire, ammo consumption, reload completion and switch completion use canonical action state.
 - Camera-centred ray and host-resolved shot geometry never derive from animated muzzle pose.
 - The verifier checks only capability-applicable required actions and rejects both missing actions and forbidden transitions such as sprint-while-ADS.
+- A Railgun shot creates one bounded pooled core/halo bolt aligned to the authoritative penetration path. Its halo remains unmistakable through buildings/map geometry for shooter and peers; local and replicated presentations share length, duration, endpoints and audio timing. Ordinary weapon tracers do not inherit this through-solid policy.
 
 ## 4. Loadout v2
 
@@ -289,7 +328,24 @@ type DeploymentSelection = Readonly<{
   secondary: SecondaryWeaponId;
   grenade: GrenadeId;
 }>;
+
+type BotArsenalProjection = Readonly<{
+  sourceWeaponIds: readonly WeaponId[]; // every shipped definition with botPolicy === 'eligible'
+  sourceGrenadeIds: readonly GrenadeId[]; // every shipped grenade definition
+  weaponCyclePolicy: 'seeded-shuffle-bag-no-avoidable-repeat';
+  grenadeCyclePolicy: 'seeded-shuffle-bag-no-avoidable-repeat';
+  rejectMissingCatalogIds: true;
+}>;
+
+type AtomicSoloReinforcementPolicy = Readonly<{
+  initialBotCount: 2;
+  additionalBotEveryDefeats: 10;
+  maximumBotCount: 6;
+  resetOnMatchEpoch: true;
+}>;
 ```
+
+Bot eligibility is a projection of the canonical weapon and grenade catalogs, not a copied roster. Synthetic add-two/rename/retire mutations must either update the bot projection automatically or fail. Atomic Acres solo reinforcement boundaries are verified at 9/10/19/20/29/30/39/40 defeated bots; sibling arenas retain their own explicit policies.
 
 Migration transaction:
 
@@ -604,6 +660,31 @@ type BombState = SupportEntityBase & Readonly<{
 }>;
 
 type SupportEntityState = AircraftState | CrateState | ChopperState | DroneState | BombState;
+
+type SupportTargetTelegraphState = Readonly<{
+  activationId: ActivationId;
+  ownerId: string;
+  matchEpoch: MatchEpoch;
+  kind: 'care-package' | 'carpet-bomber';
+  phase: 'preview' | 'admitted' | 'committed' | 'cancelled' | 'expired';
+  groundAnchorQ: QuantizedVector;
+  carpetCorridorQ: Readonly<{ start: QuantizedVector; end: QuantizedVector; halfWidthQ: number }> | null;
+  revision: Revision;
+  expiresAtMs: number;
+}>;
+
+type SupportDamageFeedback = Readonly<{
+  resultId: string;
+  activationId: ActivationId;
+  sourceEntityId: EntityId;
+  sourceKind: 'chopper' | 'piloted-drone' | 'autonomous-drone' | 'drone-swarm';
+  targetActorId: string;
+  targetLifeId: LifeId;
+  targetPositionQ: QuantizedVector;
+  damageQ: number;
+  killed: boolean;
+  admittedAtTick: number;
+}>;
 ```
 
 Every union is strictly parsed with finite quantized bounds, allowlisted phases, pattern/length-validated dynamic IDs, allowlisted definition IDs and per-kind array/entity maxima. Each state must match the referenced definition's kind and bounds. Relationship policy is queried authoritatively rather than assuming two teams. Target IDs and other hidden acquisition state remain host-only unless a recipient-specific presentation snapshot needs them.
@@ -616,6 +697,8 @@ Reliable events:
 - Possession entered/exited.
 - Chopper gun control entered/exited while flight remains AI-owned.
 - Damage/death/score canonical result.
+- Host-admitted support target telegraph created/committed/cancelled/expired.
+- Target-bound support damage feedback carrying the admitted victim identity and position.
 
 Lossy bounded snapshots:
 
@@ -631,6 +714,10 @@ Chopper navigation, route pose, no-fly recovery and motion variance remain host-
 Unconsumed earned rewards belong to the match epoch, not the life that crossed the cost threshold. Death clears per-life progress and earned-this-life markers but retains every available reward and claimed care reward through any number of respawns until exactly-once consumption or epoch reset.
 
 Every support vehicle uses one asset-authored axis conversion. At each moving route sample its canonical forward vector must face admitted velocity within the frozen angular tolerance; individual abilities cannot add ad-hoc sign flips. Care Package presentation includes a visible aircraft, visible descent parachute and range/LOS-derived `F to collect killstreak` prompt bound to the same host capture state.
+
+Care Package and Carpet Bomber selection display a large world-ground red `X` after host admission to all relevant peers. Carpet Bomber additionally displays the caller-only red payload corridor across the admitted map-bounded route before commit. Shape, outline/pulse and HUD label keep both telegraphs readable without colour alone. Cancel, rejection, commit, expiry, rematch and arena disposal remove them exactly once; clients never infer their own authoritative target from a cursor decal.
+
+Chopper and drone weapon damage uses the canonical support gun profile and combat-result reducer; no placeholder one-damage fallback exists. The caller HUD projects feedback from the matching living target's authoritative `targetPositionQ`, deliberately independent of current aim. Behind-camera or off-screen victims are suppressed or receive an explicit edge treatment and never become a misleading centre-reticle number. Duplicate/reordered results coalesce by result ID without losing distinct targets.
 
 Swarm and standalone drone definitions reference the same `assetFamilyId` and immutable `DroneGunProfileId`. Standalone deployment admits an explicit `host-ai | first-person-owner-control` choice. Only control mode, reserve, lifetime and sensor policy may differ; muzzle socket, weapon action, report, tracer, impact and owner hit/damage feedback remain one shared presentation contract.
 
@@ -701,6 +788,38 @@ type DroneControlIntent = Readonly<{
 ```
 
 Host clamps rate, deltas, thrust, turn, vertical acceleration, fire cadence, ammo, reload, collision, arena bounds and no-fly geometry. Exit is idempotent and restores player control once under every terminal condition.
+
+## 11A. Shared interaction arbitration
+
+```ts
+type InteractionKind =
+  | 'support-control-toggle'
+  | 'care-package-collect'
+  | 'door-open-close'
+  | 'weapon-pickup';
+
+type InteractionCandidate = Readonly<{
+  id: string;
+  kind: InteractionKind;
+  actorId: string;
+  matchEpoch: MatchEpoch;
+  lifeId: LifeId;
+  priority: number;
+  distanceQ: number;
+  requiresLineOfSight: boolean;
+  eligible: boolean;
+  prompt: string;
+  actionSequence: ActionSequence;
+}>;
+
+type InteractionResolution = Readonly<{
+  winner: InteractionCandidate | null;
+  orderedCandidateIds: readonly string[];
+  reason: 'priority' | 'distance' | 'stable-id' | 'none';
+}>;
+```
+
+All features submit candidates to one resolver once per frame; only its winner may render a prompt or consume the debounced `F` edge. Active owner support enter/exit has the highest priority and is evaluated before nearby crate, door and weapon candidates. Remaining ties resolve by explicit priority, range/LOS, distance and stable ID. Menu/focus loss, death, life change, possession teardown and rematch clear the held-key latch so one press can never trigger two actions.
 
 ## 12. Dynamic world collision
 

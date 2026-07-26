@@ -1,5 +1,7 @@
 # Pass 65 HITL Round 1 Correction Ledger
 
+<!-- owner-feedback-ledger-version: 1; latest-id: HF-068 -->
+
 Status: **BLOCKING CORRECTION WAVE — NOT APPROVED, NOT PUBLISHABLE**
 
 This ledger is the authoritative translation of Dave's first local Pass 65 review and the immediately following corrections. It supplements the 99-row frozen planning matrix without renumbering that release contract. Every item below must map back to one or more existing planning requirements before a replacement `S0` preview is offered.
@@ -82,6 +84,48 @@ This ledger is the authoritative translation of Dave's first local Pass 65 revie
 | HF-053 | P0 | Performance/Quality/Custom may change presentation budgets only; visible gameplay geometry and authoritative collision remain semantically identical. Atomic's invisible kitchen collision in Performance is a release blocker. | Renderer/arena authority | Semantic geometry↔collider manifest set equality across profiles, deterministic paired captures/rays/navigation/LOS, synthetic hide/substitute mutation failure and all-map suite. | All maps/profiles | OPEN |
 | HF-054 | P0 | Support activation and interaction paths may not synchronously compile/decode/allocate enough work to freeze gameplay. | Performance/runtime | Prewarm/pool inventory, activation-frame long-task trace, allocation/construction counters, bounded queue/backpressure and repeated mixed-support stress. | All support-enabled maps | OPEN |
 | HF-055 | P1 | Standalone drone deployment offers an explicit autonomous-AI or first-person owner-control choice while retaining the approved standalone health, ammunition, fuel and sensor rules. | Support authority/UI | Mode-selection admission, AI/manual transition policy, input isolation, same gun profile, control restoration and all death/disconnect/destruction/fuel terminal cases under two-peer tests. | Piloted Drone | OPEN |
+| HF-056 | P0 | Every arena-selection preview is a distinct prerecorded compressed video, never a live map render. Nuke Town, Terminal and RustRig retain the authored helicopter/cockpit choreography and Gun Range retains the authored cat POV, but runtime menu browsing performs zero arena construction, gameplay compile, WebGPU submission or live preview physics. | Preview media + lifecycle/performance | Per-map WebM/MP4/poster/provenance set equality, codec/fallback/reduced-motion checks, rapid A→B→C switch race, decode budget and runtime telemetry proving zero menu renderer submissions/arena construction before explicit deploy. | All menu previews | OPEN |
+| HF-057 | P1 | Advanced Graphics uses Cyberpunk-class feature categories as research inspiration but exposes only original, technically supported WebGPU/TSL controls that actually change the renderer or scene; no decorative toggle is allowed. | Graphics research + renderer/settings | Primary-source research receipt, canonical feature-inventory→UI→normalizer→apply→runtime-telemetry set equality, synthetic add/rename/retire mutations, capability reasons and before/after deterministic captures for every shipped control. | Options + all arenas | OPEN |
+| HF-058 | P1 | Semtex must read immediately as an authored wrapped bundle of explosive charges with its own held, thrown, stuck and world silhouettes, not a recoloured generic grenade. | Ordnance asset forge | Blender/editable-source or licence-vetted source, UV/tangent/PBR/LOD/provenance/action/socket validator and held/flight/world/attached deterministic captures. | Semtex | OPEN |
+| HF-059 | P0 | Piloted Drone, autonomous Drone and Chopper Gunner apply their authored support-weapon damage rather than a placeholder one-point hit, and owner-control uses an unobstructed first-person camera plus dedicated readable HUD. | Support combat/possession/HUD | Damage boundary and TTK matrix, no literal/fallback `1` path, camera near-plane/asset-occlusion sweep, HUD viewport matrix, input/exit/death/disconnect restoration and two-peer authority evidence. | Drone + Chopper Gunner | OPEN |
+| HF-060 | P0 | `F` is globally arbitrated: while controlling a drone/chopper it always enters/exits that support before any nearby door, care package, weapon or other interaction; otherwise exactly one deterministic prompt/action wins. | Input/interaction coordinator | Candidate collection and explicit priority/tie-break tests for every overlapping pair, held-key debounce, range/LOS changes, death/menu/focus cleanup and two-peer exactly-once admission. Competing feature-local `F` listeners fail. | All interactions | OPEN |
+| HF-061 | P1 | Bots cycle through the complete canonical shipped weapon roster, including newly added weapons, and through all four grenade families. Future catalog additions auto-enrol or fail rather than waiting for owner feedback. | Bot/combat registry | Catalog-derived weapon/grenade set equality, deterministic no-avoidable-duplicate cycles, synthetic add-two/rename/retire mutation, per-fire-kind bot behavior and all-grenade authority/presentation tests. | Bot-enabled maps | OPEN |
+| HF-062 | P1 | Atomic Acres solo reinforcements advance once per ten defeated bots rather than every five, retain the existing initial count and hard cap, and do not silently alter sibling-map bot rules. | Bot/match rules | Threshold tests at 9/10/19/20/29/30/39/40 deaths, cap and non-finite cases, rematch reset, UI rules label and sibling-map negative matrix. | Atomic Acres solo | OPEN |
+| HF-063 | P1 | The in-match menu uses a blurred capture of the last valid gameplay frame and contains no retired Nuke Town placeholder screenshot or unrelated image. | Menu lifecycle/HUD | Exact source-canvas/frame/hash telemetry, capture-before-hide ordering, cross-origin/failure fallback, stale-age bound, pause/resume/map-switch tests and screenshot inspection. | In-match menu | OPEN |
+| HF-064 | P0 | Starting/joining a match must not immediately bounce the player back to the menu and require Resume; lifecycle ownership keeps the deployment transition hidden until active play is ready. | Match lifecycle | Twenty solo starts plus host/guest joins, menu event/state trace, focus/pointer-lock variants and assertion that no unsolicited menu-open transition occurs between countdown and active play. | All match starts | OPEN |
+| HF-065 | P0 | Atomic Acres remains materially choppier than Terminal on the owner machine despite continuity passing; smoothness is judged by tail latency and long frames, not average FPS alone. | Performance/arena forge | Same-build foreground native-WebGPU Atomic↔Terminal trace with p50/p95/p99/max presentation and CPU frame time, >20/33/50/100ms counts, long tasks, queue latency, compile/decode/upload events, movement/combat/support phases and bounded deltas. | Atomic Acres vs Terminal | OPEN |
+| HF-066 | P1 | Care Package and Carpet Bomber targeting creates a large host-admitted red ground `X` visible to all relevant players; the carpet-bomb caller additionally sees a large red world-space payload corridor across the map before commit. | Support targeting/presentation/protocol | Anchor/path protocol validation, host/guest world-coordinate equality, caller/peer visibility policy, depth/terrain projection, map bounds, cancel/commit/expiry teardown and two-peer captures. | Care Package + Carpet Bomber | OPEN |
+| HF-067 | P1 | The Railgun retains the requested unmistakable map-spanning bolt/laser through buildings and map geometry, visible to the shooter and every peer along the authoritative penetration path. Existing damage/rechamber tests alone are insufficient. | Railgun presentation/network | Local and two-peer shot capture, 180m+ beam length/radius/duration/material assertions, through-building depth/penetration alignment, remote replication, pool/expiry and audio synchronization. | Railgun on supported maps | OPEN |
+| HF-068 | P1 | Chopper/Drone support damage numbers and hit feedback appear over the actual damaged enemy's projected world location, never at the caller's current reticle; behind-camera/off-screen targets do not create misleading centre-screen markers. | Support HUD/presentation | Authoritative target-ID/position event binding, moving-target projection tests, caller aim deliberately offset from victim, off-screen/behind-camera suppression or edge policy, multi-hit accumulation and two-peer capture across chopper, piloted/autonomous drone and swarm. | Support damage HUD | OPEN |
+
+### 3A. Planning-requirement projection
+
+The feedback IDs remain the correction source; these ranges bind each row back to the frozen 99-row planning matrix without duplicating implementation state.
+
+| Feedback IDs | Planning requirements |
+|---|---|
+| HF-001–HF-004 | R307, R608, R610 |
+| HF-005–HF-007 | R109, R304, R305, R609 |
+| HF-008–HF-011 | R108, R109, R112–R115, R504, R608 |
+| HF-012–HF-013 | R111, R302, R303, R605 |
+| HF-014–HF-020 | R233–R235, R305, R500, R502, R504–R507, R510–R512 |
+| HF-021–HF-026 | R104–R109, R220–R232, R236, R608 |
+| HF-027–HF-031 | R300, R301, R306, R613 |
+| HF-032–HF-038 | R110, R111, R234, R307, R400–R413, R605, R610 |
+| HF-039–HF-040 | R233, R236, R504, R509, R510 |
+| HF-041–HF-044 | R004, R005, R006, R606, R607, R610, R613 |
+| HF-045–HF-051 | R108, R109, R304, R501–R507, R510, R608, R609 |
+| HF-052–HF-055 | R307, R504, R507, R510, R605, R610 |
+| HF-056 | R112–R114, R307, R608–R610 |
+| HF-057 | R100, R111, R300, R307, R308, R610, R613 |
+| HF-058 | R108, R233, R236, R608 |
+| HF-059–HF-060 | R504, R507, R510, R609, R610 |
+| HF-061–HF-062 | R104, R232, R236, R605, R613 |
+| HF-063–HF-064 | R307, R609, R610 |
+| HF-065 | R606, R610 |
+| HF-066 | R502, R505, R510, R609 |
+| HF-067 | R109, R232, R236, R601, R608 |
+| HF-068 | R504, R506, R507, R510, R609 |
 
 ## 4. Canonical contract supersessions
 
@@ -95,6 +139,9 @@ These corrections are authoritative and must be reflected without creating a sec
 6. Renderer quality profiles are presentation-only. They may reduce texture resolution, shadow/particle/decal/LOD budgets or non-authoritative minor debris, but may not remove/substitute semantic structures while retaining their colliders, or otherwise change cover, LOS, navigation, movement, ballistics or target visibility.
 7. Every support asset declares and validates its modelling-axis conversion once. Route code uses the canonical forward axis; ad-hoc sign flips in individual abilities are forbidden.
 8. Drone visual and weapon identity are shared by catalog projection, not copy-pasted: Swarm and standalone variants reference the same asset family and `DroneGunProfileId`; variant policy may change control mode, reserve and lifetime only where already frozen.
+9. Runtime map previews supersede the earlier live-render interpretation of R112–R114: authored paths remain offline video-generation inputs and evidence, while the shipped menu plays prerecorded compressed media and submits no gameplay frames.
+10. Atomic Acres reinforcement cadence is one added opponent per ten defeated bots, starting from the existing two and capped at six; the old fifth-death wording is retired.
+11. Support HUD damage feedback is target-bound world projection. Centre-reticle damage numbers remain valid for the player's own camera-centred firearm hit only, not remote/AI support damage.
 
 ## 5. Execution waves and merge order
 

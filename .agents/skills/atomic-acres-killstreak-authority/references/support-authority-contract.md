@@ -25,6 +25,9 @@ Every manifest and nested definition uses exact key allowlists and enum membersh
 - Piloted Drone has 50 HP, 30 seconds fuel and exactly two 20-round magazines. It alone owns the 50m/90-degree/250ms presentation-only wall sensor, which never grants ballistic authority.
 - Swarm and piloted variants reference the identical externally pinned, digest-verified drone gun profile. Every armed support reserves at least one loaded magazine per active entity; Chopper's canonical cap is exactly 64.
 - Swarm and standalone drones also reference one canonical authored asset family. Standalone activation requires an explicit autonomous-AI or first-person owner-control selection; this choice never mutates the shared weapon definition.
+- Care Package and Carpet Bomber target selection produces one host-admitted quantized ground anchor. All relevant peers see a large outlined/pulsed X bound to that anchor; the Carpet caller alone also sees the admitted map-bounded payload corridor before commit. Cancel, reject, commit, expiry, rematch and arena disposal remove presentation exactly once.
+- Chopper, standalone drone and Swarm damage is resolved from the immutable support gun profile and canonical combat reducer; a literal/fallback one-damage path fails. Recipient feedback includes result ID, victim actor/life and authoritative target position so the HUD projects over the damaged target. Caller-reticle placement, duplicate replay and misleading behind-camera centre markers fail.
+- All `F` interactions enter one deterministic arbiter. Active support gun/possession enter-exit outranks nearby care capture, door and weapon candidates; only one prompt and debounced action may win. Feature-local key listeners are forbidden.
 
 ## Decision and evidence binding
 

@@ -1,7 +1,7 @@
 # Pass 65 Project-Skill Package Specification
 
-State: design only; no skill has been installed or added to the game repository.
-Activation gate: Pass 64 live/frozen, classifier-safe P0 merged, then skill creation/validation inside the runtime integration PR because `.agents/skills/**` is currently full-impact rather than process-only.
+State: project-local skill package is present on the Pass 65 integration lineage; each skill remains usable only to the extent that its current validator and forward-test evidence pass.
+Activation gate: skills and their validators are full-impact Pass 65 work. They must travel with the exact candidate and cannot be cited from an unrelated branch or older SHA.
 Design rule: each skill stays narrow, concise, executable, and tied to project-local validators. Shared release controls remain in the existing release/arena/HUD skills.
 
 ## 1. Package layout
@@ -40,6 +40,10 @@ Proposed project-local package:
     agents/openai.yaml
     references/chaos-matrix.md
     scripts/run-pass65-combat-matrix.mjs
+  atomic-acres-owner-feedback-gate/
+    SKILL.md
+    agents/openai.yaml
+    scripts/verify-owner-feedback-ledger.mjs
 ```
 
 Only create a resource when it is executable or prevents repeated rediscovery. Do not add README, changelog, or duplicated prose.
@@ -238,7 +242,27 @@ Verify or red-team Atomic Acres multiplayer combat, inventory, weapons, grenades
 
 `run-pass65-combat-matrix.mjs` should provide bounded named groups, exact source/build identity, timeout/cleanup, state-hash summaries, requirement/falsifier IDs, artifact paths and a nonzero exit on missing evidence or threshold failure.
 
-## 8. Skill validation and forward testing
+## 8. `atomic-acres-owner-feedback-gate`
+
+### Trigger description
+
+Reconcile any Atomic Acres owner correction, HITL observation, regression, missing specification item or durable future-facing rule. Use before implementing new feedback and again after integration so no chat statement is treated as implicitly covered.
+
+### Core workflow
+
+1. Atomize each statement without dropping corrections, negations, `all`/future scope or `still`/regression evidence.
+2. Add stable `HF-###` rows with priority, one accountable lane, map/mode scope, falsifier/evidence and lifecycle state.
+3. Map every feedback ID exactly once to the planning matrix and record explicit supersessions.
+4. Update canonical catalogs/contracts before downstream mirrors.
+5. Keep `OPEN`, `IMPLEMENTED`, `VERIFIED` and `HITL` distinct.
+6. Run the ledger verifier, negative self-test and affected domain/runtime evidence.
+7. Hand off exact source identity, evidence, assumptions, unknowns and remaining falsifiers; never infer publish authority.
+
+### Validator responsibilities
+
+`verify-owner-feedback-ledger.mjs` fails duplicate, skipped, malformed, unowned, unscoped or unmapped feedback IDs, unknown planning references, stale latest-ID metadata and missing repository routing rules. Its self-test deliberately mutates a known-good ledger and must prove those defects are rejected.
+
+## 9. Skill validation and forward testing
 
 When the repo gate opens:
 

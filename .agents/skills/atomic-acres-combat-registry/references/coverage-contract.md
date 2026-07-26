@@ -10,6 +10,10 @@ F01 must update this validator-owned oracle, including the reviewed optic kind, 
 
 Each pinned weapon must have exactly one definition and one coverage row for gameplay, protocol, loadout, range, bots, drops, replay, presentation, audio, penetration, telemetry, tests and provenance. A candidate cannot redefine either completeness set.
 
+## Bot projection contract
+
+The pinned oracle protects the reviewed baseline, while runtime bot eligibility is still derived from the canonical definitions rather than copied into another list. The exact bot weapon set is every shipped definition with `botPolicy === 'eligible'`; the exact bot grenade set is every shipped grenade definition. A deterministic seeded shuffle bag covers each eligible member before an avoidable repeat. The verifier injects synthetic future weapon and grenade definitions through the canonical loader and requires bot projection/behavior coverage to expand automatically, then mutates rename/retire policy and rejects stale mirrors. Candidate-owned `requiredBotIds` arrays are forbidden.
+
 ## F01 typed target
 
 - Spread and recoil angles are radians. Spread declares hip, ADS, movement, explicit stand/crouch/prone multipliers, sustained and maximum values. Recoil declares pitch/yaw radians, `recoveryPerSecond`, explicit stand/crouch/prone plus ADS multipliers, and a deterministic pattern ID.
@@ -30,4 +34,4 @@ Every defined object is closed: unknown keys, missing required keys, unknown dis
 
 ## Integration rule
 
-The JSON fixtures are deterministic schema probes. After F01/F03 integration, bind the loader to the canonical TypeScript registry and retain the independent roster/channel oracles and adversarial mutations. Do not copy candidate IDs into the oracle at runtime.
+The JSON fixtures are deterministic schema probes. After F01/F03 integration, bind the loader to the canonical TypeScript registry and retain the independent frozen-baseline/channel oracles plus adversarial catalog-projection mutations. Do not copy candidate-declared required IDs into the oracle or maintain a hand-authored runtime bot list.

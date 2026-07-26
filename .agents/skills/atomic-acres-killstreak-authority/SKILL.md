@@ -15,7 +15,7 @@ Keep support selection data-driven and every shared outcome host-authored.
 4. Reference strict per-kind support definitions for health, hitbox, immutable gun profile, ammo/reload, lifetime/fuel, targeting, sensor, navigation, audio/effects and budgets.
 5. Model activation with host-owned ID, seed, canonical time, life/epoch/revision and idempotent consume.
 6. Simulate stateful support on the host fixed step. Use reliable lifecycle/results and bounded lossy pose snapshots.
-7. Route support hits, deaths, rewards and score through the canonical combat-result path; bind targetable entities to pose-history hit proxies.
+7. Route support hits, deaths, rewards and score through the canonical combat-result path; bind targetable entities to pose-history hit proxies and target-world-position feedback rather than the caller reticle.
 8. Test exact costs, counts, HP, magazines, durations, probabilities, LOS/smoke/cover, nav recovery, possession exits, cleanup and forged client claims.
 9. Run fixed-seed delay/loss/duplication/reorder/reconnect/late-join/rematch scenarios and compare canonical result counts/state hashes.
 
@@ -29,6 +29,9 @@ Keep support selection data-driven and every shared outcome host-authored.
 - Future content: additions, ID/display renames, retirement, cost changes and base-weight changes must rerun the projection. Adversarial tests must add at least two future entries, prove exactly-once enrollment/reachability, and reject stale mirrors. A future care-only row auto-enrolls without changing slots; a future selectable row must also be placed by an explicitly updated slot receipt.
 - Visibility: hard cover and semantic smoke govern AI support; the piloted wall sensor is presentation-only and cannot authorize a shot.
 - Drone variants: the standalone and Swarm definitions reference one canonical authored asset family and immutable drone gun profile. Standalone deployment requires an admitted `autonomous | first-person-owner-control` mode choice; variant rules may differ only in the frozen control, reserve, lifetime and sensor fields.
+- Targeting presentation: Care Package and Carpet Bomber use one host-admitted ground anchor displayed as a large shared X. Carpet adds a caller-only map-bounded payload corridor before commit; every cancel/reject/commit/expiry path disposes both exactly once.
+- Damage presentation: chopper and every drone variant use the canonical non-placeholder gun profile. Feedback carries authoritative target ID/life/position and projects over that target, with explicit off-screen/behind-camera policy; it never uses the caller's current reticle as a substitute.
+- Interaction: support enter/exit submits the highest-priority candidate to the shared `F` arbiter. Support code must not install a raw competing key listener, and overlap with care packages, doors and weapon pickups must remain exactly once.
 - Definition integrity: reject unknown keys/enums, orphan definitions, contradictory targetability/health/hitbox, entity caps below counts, projectile caps below loaded ammunition and gun-profile digest drift.
 - Accessibility: sensory reduction may change local flash/audio/outline presentation, never host targeting or damage.
 - Performance: pool, prewarm, cap and dispose entities, poses, projectiles, bombs, effects, lights, audio and navigation work.
