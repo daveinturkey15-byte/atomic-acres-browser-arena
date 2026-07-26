@@ -1,8 +1,9 @@
 """Generate the four original Pass 65 menu preview master clips in Blender.
 
 The shipped web videos are transcoded from the generated PNG master sequences
-by ffmpeg. Everything in the frame is built from Blender primitives; the
-script does not import any external image, model, map, or franchise asset.
+by ffmpeg. Arena geometry is built from project primitives and the three
+helicopter clips append the approved project-original Pass 65 cockpit source.
+The script does not import any external image, model, map, or franchise asset.
 
 Run from the repository root with Blender 5.1 or newer:
 
@@ -23,6 +24,7 @@ from mathutils import Vector
 ROOT = Path(__file__).resolve().parents[2]
 MASTER_DIR = ROOT / "source-assets" / "menu" / "pass65-preview-masters"
 MASTER_DIR.mkdir(parents=True, exist_ok=True)
+CHOPPER_SOURCE = ROOT / "source-assets" / "blender" / "pass65-chopper-gunner.blend"
 FRAME_ROOT = ROOT / "artifacts" / "pass65" / "menu-preview-master-frames"
 FRAME_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -334,43 +336,76 @@ def build_gun_range(mats) -> None:
     add_point_light("range-key-amber", (0, -29, 6.4), (1.0, 0.24, 0.02), 1000, 2.2)
 
 
-def animate_rotor(rotor, final_frame: int) -> None:
+def animate_rotor(rotor, final_frame: int, axis: int = 1) -> None:
     rotor.rotation_mode = "XYZ"
-    rotor.rotation_euler[1] = 0
-    driver = rotor.driver_add("rotation_euler", 1).driver
+    rotor.rotation_euler[axis] = 0
+    driver = rotor.driver_add("rotation_euler", axis).driver
     driver.expression = f"frame * {math.tau * 38 / max(1, final_frame):.12f}"
 
 
-def add_helicopter_cockpit(rig, mats) -> None:
-    dash = cube("sleek-cockpit-glareshield", (0, -0.27, -1.20), (0.56, 0.06, 0.08), mats["steel"], bevel=0.045)
-    dash.rotation_euler[0] = math.radians(-7)
-    parent(dash, rig)
-    for x, panel_mat in [(-0.33, mats["green"]), (0.0, mats["cyan"]), (0.33, mats["green"])]:
-        panel = cube("three-dimensional-cockpit-hud", (x, -0.22, -1.08), (0.105, 0.02, 0.05), panel_mat, bevel=0.018)
-        panel.rotation_euler[0] = math.radians(-7)
-        parent(panel, rig)
-    for x in (-0.45, 0.45):
-        strut = cube("canopy-frame", (x, 0.08, -1.20), (0.022, 0.42, 0.022), mats["steel"], bevel=0.012)
-        strut.rotation_euler[0] = math.radians(-18)
-        strut.rotation_euler[2] = math.radians(-13 * math.copysign(1, x))
-        parent(strut, rig)
-    centre = cube("canopy-centre-spine", (0, 0.43, -1.28), (0.014, 0.16, 0.018), mats["steel"], bevel=0.01)
-    centre.rotation_euler[0] = math.radians(-6)
-    parent(centre, rig)
-    mast = cylinder("visible-main-rotor-mast", (0, 0.55, -1.12), 0.045, 0.28, mats["steel"], vertices=16)
-    mast.rotation_euler[0] = math.pi / 2
-    parent(mast, rig)
-    rotor = bpy.data.objects.new("visible-spinning-main-rotor", None)
-    bpy.context.collection.objects.link(rotor)
-    rotor.location = (0, 0.69, -1.12)
-    parent(rotor, rig)
-    blade_a = cube("rotor-blade-a", (0, 0, 0), (2.3, 0.025, 0.035), mats["black"], bevel=0.018)
-    blade_b = cube("rotor-blade-b", (0, 0, 0), (0.035, 0.025, 2.3), mats["black"], bevel=0.018)
-    parent(blade_a, rotor)
-    parent(blade_b, rotor)
-    animate_rotor(rotor, FINAL_FRAME)
-    add_point_light("cockpit-green-fill", (-0.58, -0.10, -0.74), (0.03, 1.0, 0.28), 12, 0.35).parent = rig
-    add_point_light("cockpit-blue-fill", (0.62, -0.09, -0.72), (0.03, 0.58, 1.0), 11, 0.35).parent = rig
+def object_tree(root) -> list[bpy.types.Object]:
+    result: list[bpy.types.Object] = []
+    stack = [root]
+    while stack:
+        item = stack.pop()
+        result.append(item)
+        stack.extend(item.children)
+    return result
+
+
+def add_authored_helicopter_cockpit(rig) -> None:
+    """Append the approved LOD0 cockpit and reproduce runtime cockpit-only visibility."""
+    if not CHOPPER_SOURCE.is_file():
+        raise RuntimeError(f"approved authored chopper source missing: {CHOPPER_SOURCE}")
+    with bpy.data.libraries.load(str(CHOPPER_SOURCE), link=False) as (source, destination):
+        destination.objects = list(source.objects)
+    loaded = [obj for obj in destination.objects if obj is not None]
+    for obj in loaded:
+        if not obj.users_collection:
+            bpy.context.collection.objects.link(obj)
+    lod0 = next((
+        obj for obj in loaded
+        if obj.get("asset_id") == "chopper-gunner-vehicle-v1" and obj.get("quality_tier") == "LOD0"
+    ), None)
+    if lod0 is None:
+        raise RuntimeError("approved chopper source has no chopper-gunner-vehicle-v1 LOD0 root")
+    lod0_tree = set(object_tree(lod0))
+    cockpit = next((
+        obj for obj in lod0_tree
+        if obj.get("canonical_node_name") == "chopper-first-person-cockpit"
+        or obj.name == "chopper-first-person-cockpit"
+    ), None)
+    camera_socket = next((
+        obj for obj in lod0_tree
+        if obj.get("canonical_node_name") == "chopper-first-person-camera-socket"
+        or obj.name == "chopper-first-person-camera-socket"
+    ), None)
+    first_person_rotor = next((
+        obj for obj in lod0_tree
+        if obj.get("canonical_node_name") == "chopper-first-person-rotor"
+        or obj.name == "chopper-first-person-rotor"
+    ), None)
+    if cockpit is None or camera_socket is None or first_person_rotor is None:
+        raise RuntimeError("approved chopper source is missing cockpit, camera, or first-person rotor semantics")
+    cockpit_tree = set(object_tree(cockpit))
+    for obj in lod0_tree:
+        if obj.type == "MESH":
+            obj.hide_render = obj not in cockpit_tree
+            obj.hide_viewport = obj not in cockpit_tree
+    for obj in loaded:
+        if obj not in lod0_tree:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    lod0.parent = rig
+    lod0.rotation_mode = "XYZ"
+    lod0.rotation_euler = (math.radians(-90), 0, 0)
+    rotated_socket = lod0.rotation_euler.to_matrix() @ Vector(camera_socket.location)
+    lod0.location = -rotated_socket
+    # The acceptance camera carries a slight downward pilot gaze. Preserve that
+    # composition while the map-orbit rig itself remains the authoritative view.
+    lod0.location.y += 0.055
+    lod0["offline_preview_source"] = "source-assets/blender/pass65-chopper-gunner.blend"
+    lod0["offline_preview_visibility"] = "first-person-cockpit-only"
+    animate_rotor(first_person_rotor, FINAL_FRAME, axis=2)
 
 
 def camera_keyframe(rig, frame: int, position: Vector, look_at: Vector, bank: float) -> None:
@@ -505,7 +540,7 @@ def add_camera_rig(kind: str, mats):
     if kind == "cat":
         add_cat_pov(rig, mats)
     else:
-        add_helicopter_cockpit(rig, mats)
+        add_authored_helicopter_cockpit(rig)
     return rig
 
 
@@ -543,9 +578,11 @@ def render(map_name: str) -> None:
         bpy.ops.render.render(animation=True)
 
 
+# Pass 65 vehicle refreshes intentionally leave the accepted Gun Range cat
+# master untouched. Regenerating it remains an explicit, opt-in authoring act.
 requested_arenas = tuple(filter(None, os.environ.get(
     "AA_PREVIEW_ARENAS",
-    "atomic-acres,skyline-terminal,rustworks-1v1,gun-range",
+    "atomic-acres,skyline-terminal,rustworks-1v1",
 ).split(",")))
 for arena in requested_arenas:
     render(arena)

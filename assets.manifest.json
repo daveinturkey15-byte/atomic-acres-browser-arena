@@ -68,6 +68,171 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-pass65-support-aircraft-family-2026-07-26",
+      "kind": "original-project-blender-support-aircraft-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass65-support-vehicles.py",
+      "generatedAsOf": "2026-07-26",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
+          "sha256": "3efe7f742a6c37da770504f5d7cf036bac1c154f081b578450897ac38c01c1a3",
+          "lod": 0,
+          "triangles": 4972,
+          "bytes": 155428
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
+          "sha256": "f3a0192a674f88830f2dfdef82ca17bd4256e5c33dd73887267285b1d8565fed",
+          "lod": 1,
+          "triangles": 4672,
+          "bytes": 151320
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
+          "sha256": "cf3abb0f126f1ec3cd86bf49fe94cc065665fead9c1442b93b1f0d4137a4b6d0",
+          "lod": 2,
+          "triangles": 4328,
+          "bytes": 150556
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
+          "sha256": "8d6cf7322f81584b9e1b10977c14dea38b19019c70ab2157642d76273c9d36b2",
+          "lod": 0,
+          "triangles": 6844,
+          "bytes": 162676
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
+          "sha256": "5a98dbc942ef62cf1bb18db63ce695a5d1a658ce1a30de78a64d7dea62066f75",
+          "lod": 1,
+          "triangles": 6044,
+          "bytes": 155820
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
+          "sha256": "74b5dc4c51f5acd161f1a650145338c6c3bdcc1f1b585230ecf62973af314100",
+          "lod": 2,
+          "triangles": 4116,
+          "bytes": 148748
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-crate-lod0.glb",
+          "sha256": "7eb35d28741d9effe8c6e5869767bb4c86235bbf573e60ea7eb8f5b6a774bb12",
+          "lod": 0,
+          "triangles": 1300,
+          "bytes": 107980
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-crate-lod1.glb",
+          "sha256": "ca0a8bd4d811f5c39725a3a9d7710f31ceb037680f08fc49edbf5ff013b9daf4",
+          "lod": 1,
+          "triangles": 828,
+          "bytes": 103724
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-support-aircraft-albedo.png",
+          "sha256": "5146c85eacb76e3c1cf55a50d3efe3a2bafa01b36298652437b41ba75fcc29b9",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-support-aircraft-normal.png",
+          "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-support-aircraft-orm.png",
+          "sha256": "81558c4fa073553817382a13b74ffb4a00a90749c6bdc33c6f546773eee424bf",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-support-aircraft-emissive.png",
+          "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+          "width": 512,
+          "height": 512
+        }
+      ],
+      "sourceBlend": "source-assets/blender/pass65-support-aircraft-family.blend",
+      "sourceBlendSha256": "7b2339e31bf4380ab09018c627ee6d26deb81e7f2148f68dae97694b74adf261",
+      "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
+      "sourceScriptSha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b",
+      "sourceProvenance": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
+      "sourceProvenanceSha256": "f2993dd6ad68d462c51e936324b68b01de6b7c3c509d9a11fea880b415ddf61b",
+      "preview": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
+      "format": "Distinct Care transport and Carpet bomber three-LOD GLBs plus two-LOD parachute crate, embedded WebP PBR maps, semantic cargo/bomb sockets and authored actions",
+      "modifications": "Project-original fixed-wing support family with correct local -Z forward contract, animated propellers/engines/doors/bay/racks and a visible parachute crate. Runtime gameplay authority remains TypeScript-owned.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass65-chopper-gunner-2026-07-26",
+      "kind": "original-project-blender-support-vehicle-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass65-support-vehicles.py",
+      "generatedAsOf": "2026-07-26",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
+          "sha256": "0c1819b004f44593d4a6b90393e77837d77e67b52217576797a3ab46b5e16e1e",
+          "lod": 0,
+          "triangles": 72900,
+          "bytes": 793408
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
+          "sha256": "c9be76818848b6dfd22887d6f33ce125d514f74a86858304f6fe174ca00126b8",
+          "lod": 1,
+          "triangles": 30564,
+          "bytes": 532228
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
+          "sha256": "d161b2b5c3cdb1bfe78750f00f30eac22af0468e20fd2bff7f767ef1b4dac973",
+          "lod": 2,
+          "triangles": 18020,
+          "bytes": 398788
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
+          "sha256": "bc729d8572e00ce6fbf712543071556a15e7ed970fea279c9582cf8f2199c6a3",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-chopper-normal.png",
+          "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-chopper-orm.png",
+          "sha256": "81558c4fa073553817382a13b74ffb4a00a90749c6bdc33c6f546773eee424bf",
+          "width": 512,
+          "height": 512
+        },
+        {
+          "path": "public/assets/original/textures/support/pass65-chopper-emissive.png",
+          "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+          "width": 512,
+          "height": 512
+        }
+      ],
+      "sourceBlend": "source-assets/blender/pass65-chopper-gunner.blend",
+      "sourceBlendSha256": "194b2a1879f11c175a306fbc04f65c284e1f2eddf920a82ebe1aa2fe10268443",
+      "sourceScript": "scripts/blender/create-pass65-support-vehicles.py",
+      "sourceScriptSha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b",
+      "sourceProvenance": "source-assets/blender/pass65-chopper-gunner.provenance.json",
+      "sourceProvenanceSha256": "7eac4c15f0e1bc3988ad79d05bdf7a3ac71246f6484c5961eb1796b52e57a068",
+      "preview": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
+      "format": "Three strict decreasing optimized self-contained glTF 2.0 binary LODs with embedded WebP PBR maps, authored cockpit/HUD/rotors/gun/sockets and nine animation clips",
+      "modifications": "Project-original support helicopter, cockpit and presentation feedback corpus. Runtime gameplay authority remains TypeScript-owned; procedural geometry is non-release fallback only.",
+      "attributionRequired": false
+    },
+    {
       "id": "atomic-acres-pass65-explosive-crossbow-2026-07-26",
       "kind": "original-project-blender-weapon-family",
       "creator": "Atomic Acres project",
@@ -149,11 +314,11 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate_pass65_menu_previews.py",
-      "sourceScriptSha256": "b30660db7ccb8a3e3f3c60c4537dd0aab9da78d1cf395d00e4c377cb753068b5",
+      "sourceScriptSha256": "bf8220c9eb59b93bc89bb02080593bbe7237a1af81f91beebab0ccada7cdbd1b",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "bf845928db07462990121a86b9bef0f00d1279e6171f56b9c3b9eefefa5ab058",
+      "sourceProvenanceSha256": "6728af02a7d2f96bc642604299fef91dbf6ac3f753e6470233eed314cf4b3eea",
       "format": "Four 960x540 eight-second 24 FPS loops, each shipped as VP9/Opus WebM, H.264/AAC MP4 and WebP poster",
-      "modifications": "Project-original Blender primitive scenes record three helicopter cockpit flyovers and one cat first-person range prowl. The helicopter clips include deterministic bounded flight variation, visible spinning rotor geometry, a modeled dashboard and quiet synthesized rotor harmonics. The cat clip includes beveled feline silhouette ears with inset pinnae, articulated forelegs, palms, toes and embedded pads, plus animated illuminated targets. No downloaded model, texture, video, sampled audio, logo or extracted game asset is used.",
+      "modifications": "Project-original Blender scenes record three flyovers through the Blender-authored chopper-gunner LOD0 cockpit and one protected cat first-person range prowl. The helicopter clips include deterministic bounded flight variation, visible spinning first-person rotor geometry, a modeled cyan/green glass cockpit and quiet synthesized rotor harmonics. The byte-identical cat clip retains clearer ears and paws plus animated illuminated targets. No downloaded model, texture, video, sampled audio, logo or extracted game asset is used.",
       "attributionRequired": false
     },
     {

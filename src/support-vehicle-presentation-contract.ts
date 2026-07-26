@@ -29,13 +29,27 @@ export const SUPPORT_VEHICLE_PRESENTATION_CONTRACT = Object.freeze({
       'chopper-main-rotor', 'chopper-tail-rotor', 'chopper-player-gun', 'chopper-gun-muzzle-socket',
       'chopper-first-person-camera-socket', 'chopper-first-person-cockpit',
       'chopper-cockpit-dashboard-3d', 'chopper-cockpit-display-cyan', 'chopper-cockpit-display-green',
-      'chopper-first-person-rotor',
+      'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring', 'chopper-first-person-rotor',
     ]),
     requiredAudio: Object.freeze(['chopper-low-loop', 'chopper-gun-report']),
     requiredWeaponFeedback: SUPPORT_WEAPON_FEEDBACK_CONTRACT,
   }),
   aircraft: Object.freeze({
-    requiredNodes: Object.freeze(['care-aircraft-nose', 'care-aircraft-forward-socket']),
+    requiredNodes: Object.freeze(['care-aircraft-nose', 'care-aircraft-forward-socket', 'care-aircraft-cargo-socket']),
+    careRequiredNodes: Object.freeze([
+      'care-aircraft-fuselage', 'care-aircraft-main-wing', 'care-aircraft-cargo-bay',
+      'care-aircraft-cargo-socket', 'care-aircraft-forward-socket',
+    ]),
+    carpetRequiredNodes: Object.freeze([
+      'carpet-aircraft-fuselage', 'carpet-aircraft-main-wing', 'carpet-aircraft-bomb-bay',
+      'carpet-aircraft-bomb-socket', 'carpet-aircraft-forward-socket',
+    ]),
+  }),
+  careCrate: Object.freeze({
+    requiredNodes: Object.freeze([
+      'care-package-crate', 'care-package-straps', 'care-package-parachute',
+      'care-parachute-lines', 'care-crate-landing-socket',
+    ]),
   }),
 } as const);
 

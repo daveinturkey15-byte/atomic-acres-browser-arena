@@ -39,7 +39,8 @@ describe('third-party asset provenance', () => {
   it('manifests every bundled file with its exact checksum and local license record', () => {
     const manifest = JSON.parse(readFileSync('assets.manifest.json', 'utf8')) as Manifest;
     expect(manifest.schemaVersion).toBeGreaterThanOrEqual(3);
-    const thirdPartyAssets = manifest.assets.filter((asset) => Array.isArray(asset.files));
+    const thirdPartyAssets = manifest.assets.filter((asset) => Array.isArray(asset.files)
+      && asset.files.every((record) => record.path.startsWith('public/assets/third-party/')));
     const records = thirdPartyAssets.flatMap((asset) => asset.files as ManifestFile[]);
     const shipped = filesBelow('public/assets/third-party');
     expect(records.map((record) => record.path).sort()).toEqual(shipped);

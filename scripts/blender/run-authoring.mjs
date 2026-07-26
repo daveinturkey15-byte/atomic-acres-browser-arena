@@ -59,6 +59,36 @@ function authorOperatorArms() {
   );
 }
 
+function authorSupportVehicles() {
+  mkdirSync('public/assets/original/models/support', { recursive: true });
+  run(blenderCommand, [
+    '--background',
+    '--factory-startup',
+    '--python',
+    'scripts/blender/create-pass65-support-vehicles.py',
+  ]);
+  for (const lod of [0, 1, 2]) {
+    optimizeGlb(
+      `artifacts/blender-support-vehicles/raw/chopper/pass65-chopper-gunner-lod${lod}.glb`,
+      `public/assets/original/models/support/pass65-chopper-gunner-lod${lod}.glb`,
+    );
+    optimizeGlb(
+      `artifacts/blender-support-vehicles/raw/aircraft/pass65-care-aircraft-lod${lod}.glb`,
+      `public/assets/original/models/support/pass65-care-aircraft-lod${lod}.glb`,
+    );
+    optimizeGlb(
+      `artifacts/blender-support-vehicles/raw/aircraft/pass65-carpet-aircraft-lod${lod}.glb`,
+      `public/assets/original/models/support/pass65-carpet-aircraft-lod${lod}.glb`,
+    );
+  }
+  for (const lod of [0, 1]) {
+    optimizeGlb(
+      `artifacts/blender-support-vehicles/raw/aircraft/pass65-care-crate-lod${lod}.glb`,
+      `public/assets/original/models/support/pass65-care-crate-lod${lod}.glb`,
+    );
+  }
+}
+
 if (target === 'arena') {
   run(npxCommand, [
     'vite-node',
@@ -142,6 +172,9 @@ if (target === 'arena') {
   authorCrossbow();
   authorOperatorArms();
   run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
+} else if (target === 'support-vehicles') {
+  authorSupportVehicles();
+  run(process.execPath, ['scripts/blender/finalize-pass65-support-vehicle-assets.mjs']);
 } else {
   console.error(`Unknown authoring target: ${target ?? '<missing>'}`);
   process.exit(2);

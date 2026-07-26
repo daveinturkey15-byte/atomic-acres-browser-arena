@@ -107,7 +107,6 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
     expect(manifest.supportVehicles.find((entry) => entry.id === 'hunter-drone-visual-family-v1')).toMatchObject({
       releaseState: 'release-ready',
     });
-    expect(manifest.supportVehicles.filter((entry) => entry.id !== 'hunter-drone-visual-family-v1')
-      .every((entry) => entry.releaseState === 'blocked')).toBe(true);
+    expect(manifest.supportVehicles.every((entry) => entry.releaseState === 'release-ready')).toBe(true);
   });
 });

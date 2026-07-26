@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { HUNTER_DRONE_ASSET, KillstreakPresentation, hunterDronePresentationTelemetry } from './killstreak-presentation';
+import {
+  HUNTER_DRONE_ASSET,
+  SUPPORT_VEHICLE_ASSETS,
+  KillstreakPresentation,
+  hunterDronePresentationTelemetry,
+  supportAircraftPresentationVariant,
+  supportVehiclePresentationTelemetry,
+} from './killstreak-presentation';
 import type { KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
@@ -15,7 +22,10 @@ const snapshot = (
   revision: 1,
   actors: [],
   entities: Array.from({ length: count }, (_, index) => ({
-    id: `ks-1-swarm-drone-${index + 1}`,
+    id: index === 0 ? 'ks-1-chopper-1'
+      : index === 1 ? 'ks-1-care-aircraft-2'
+        : index === 2 ? 'ks-1-care-3'
+          : `ks-1-swarm-drone-${index + 1}`,
     activationId: `activation-${index + 1}`,
     ownerId: 'owner',
     team: 0,
@@ -45,6 +55,36 @@ describe('killstreak presentation', () => {
     expect(hunterDronePresentationTelemetry()).toMatchObject({ state: 'idle', asset: HUNTER_DRONE_ASSET });
   });
 
+  it('pins the exact authored chopper, Care, Carpet, and parachute-crate LOD set', () => {
+    expect(SUPPORT_VEHICLE_ASSETS).toEqual({
+      chopper: [
+        './assets/original/models/support/pass65-chopper-gunner-lod0.glb',
+        './assets/original/models/support/pass65-chopper-gunner-lod1.glb',
+        './assets/original/models/support/pass65-chopper-gunner-lod2.glb',
+      ],
+      care: [
+        './assets/original/models/support/pass65-care-aircraft-lod0.glb',
+        './assets/original/models/support/pass65-care-aircraft-lod1.glb',
+        './assets/original/models/support/pass65-care-aircraft-lod2.glb',
+      ],
+      carpet: [
+        './assets/original/models/support/pass65-carpet-aircraft-lod0.glb',
+        './assets/original/models/support/pass65-carpet-aircraft-lod1.glb',
+        './assets/original/models/support/pass65-carpet-aircraft-lod2.glb',
+      ],
+      crate: [
+        './assets/original/models/support/pass65-care-crate-lod0.glb',
+        './assets/original/models/support/pass65-care-crate-lod1.glb',
+      ],
+    });
+    expect(supportVehiclePresentationTelemetry()).toMatchObject({
+      state: 'idle', loadedAssets: [], readyFamilies: [], maxConcurrentDecodes: 2,
+    });
+    expect(supportAircraftPresentationVariant('ks-9-care-aircraft-12')).toBe('care');
+    expect(supportAircraftPresentationVariant('ks-9-carpet-aircraft-13')).toBe('carpet');
+    expect(supportAircraftPresentationVariant('malformed-aircraft')).toBeNull();
+  });
+
   it('renders a sleek chopper/care/drone vocabulary and retires stale entities', () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
@@ -54,6 +94,8 @@ describe('killstreak presentation', () => {
       impactFlashes: 0,
       sensorContacts: 0,
       placementMarkers: 0,
+      prewarmed: 6,
+      prewarmedAuthoredSupportFamilies: [],
       markerDetails: [],
       bounded: true,
     });
@@ -72,15 +114,15 @@ describe('killstreak presentation', () => {
     expect(supportForwardAlignment(chopper, 'chopper-player-gun', 'chopper-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
-    expect(presentation.firstPersonCameraAnchor('ks-1-swarm-drone-1')).not.toBeNull();
-    presentation.setFirstPersonEntity('ks-1-swarm-drone-1');
+    expect(presentation.firstPersonCameraAnchor('ks-1-chopper-1')).not.toBeNull();
+    presentation.setFirstPersonEntity('ks-1-chopper-1');
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(false);
     expect((chopper.getObjectByName('chopper-cockpit-dashboard-3d') as THREE.Mesh).visible).toBe(true);
     expect((chopper.getObjectByName('chopper-cockpit-display-cyan') as THREE.Mesh).visible).toBe(true);
     expect((chopper.getObjectByName('chopper-first-person-rotor-blade-a') as THREE.Mesh).visible).toBe(true);
     const cameraQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.12, 0.8, 0, 'YXZ'));
-    presentation.alignFirstPersonCockpit('ks-1-swarm-drone-1', cameraQuaternion);
+    presentation.alignFirstPersonCockpit('ks-1-chopper-1', cameraQuaternion);
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
       .getWorldQuaternion(new THREE.Quaternion());
     expect(cockpitWorldQuaternion.angleTo(cameraQuaternion)).toBeLessThan(1e-6);

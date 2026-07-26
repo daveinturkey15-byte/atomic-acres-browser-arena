@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "id": "chopper-gunner-vehicle-v1",
+  "title": "Pass 65 Chopper Gunner authored vehicle and first-person cockpit",
+  "creator": "Atomic Acres project",
+  "owner": "Atomic Acres project",
+  "created": "2026-07-26",
+  "license": "Project-original; no third-party meshes or textures",
+  "blenderVersion": "5.1.2",
+  "generator": {
+    "path": "scripts/blender/create-pass65-support-vehicles.py",
+    "sha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b"
+  },
+  "runtimeForwardAxis": "-Z",
+  "blenderAuthoringForwardAxis": "-Y converted to glTF -Z by Y-up export",
+  "presentationOnly": true,
+  "inspirationBoundary": "Original stylized near-future support helicopter. No copied commercial-game geometry, texture, logo, HUD, animation, UI, or audio.",
+  "sourceBlend": {
+    "path": "source-assets/blender/pass65-chopper-gunner.blend",
+    "sha256": "194b2a1879f11c175a306fbc04f65c284e1f2eddf920a82ebe1aa2fe10268443"
+  },
+  "sharedConsumers": [
+    "menu-prerecorded-map-preview",
+    "ai-flown-chopper-gunner",
+    "player-optional-chopper-gunner"
+  ],
+  "worldGlbs": [
+    {
+      "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
+      "sha256": "0c1819b004f44593d4a6b90393e77837d77e67b52217576797a3ab46b5e16e1e",
+      "lod": 0,
+      "triangles": 72900,
+      "bytes": 793408
+    },
+    {
+      "path": "public/assets/original/models/support/pass65-chopper-gunner-lod1.glb",
+      "sha256": "c9be76818848b6dfd22887d6f33ce125d514f74a86858304f6fe174ca00126b8",
+      "lod": 1,
+      "triangles": 30564,
+      "bytes": 532228
+    },
+    {
+      "path": "public/assets/original/models/support/pass65-chopper-gunner-lod2.glb",
+      "sha256": "d161b2b5c3cdb1bfe78750f00f30eac22af0468e20fd2bff7f767ef1b4dac973",
+      "lod": 2,
+      "triangles": 18020,
+      "bytes": 398788
+    }
+  ],
+  "firstPersonGlb": {
+    "path": "public/assets/original/models/support/pass65-chopper-gunner-lod0.glb",
+    "sha256": "0c1819b004f44593d4a6b90393e77837d77e67b52217576797a3ab46b5e16e1e",
+    "lod": 0,
+    "triangles": 72900,
+    "bytes": 793408
+  },
+  "pbrMaps": {
+    "baseColor": {
+      "path": "public/assets/original/textures/support/pass65-chopper-albedo.png",
+      "sha256": "bc729d8572e00ce6fbf712543071556a15e7ed970fea279c9582cf8f2199c6a3",
+      "width": 512,
+      "height": 512
+    },
+    "normal": {
+      "path": "public/assets/original/textures/support/pass65-chopper-normal.png",
+      "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4",
+      "width": 512,
+      "height": 512
+    },
+    "orm": {
+      "path": "public/assets/original/textures/support/pass65-chopper-orm.png",
+      "sha256": "81558c4fa073553817382a13b74ffb4a00a90749c6bdc33c6f546773eee424bf",
+      "width": 512,
+      "height": 512
+    },
+    "emissive": {
+      "path": "public/assets/original/textures/support/pass65-chopper-emissive.png",
+      "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+      "width": 512,
+      "height": 512
+    }
+  },
+  "requiredNodes": [
+    "chopper-fuselage",
+    "chopper-sleek-cockpit-canopy",
+    "chopper-first-person-cockpit",
+    "chopper-cockpit-dashboard-3d",
+    "chopper-cockpit-display-cyan",
+    "chopper-cockpit-display-green",
+    "chopper-cockpit-hud-glass",
+    "chopper-cockpit-hud-target-ring",
+    "chopper-first-person-camera-socket",
+    "chopper-main-rotor",
+    "chopper-tail-rotor",
+    "chopper-first-person-rotor",
+    "chopper-player-gun",
+    "chopper-gun-muzzle-socket",
+    "chopper-forward-socket",
+    "chopper-muzzle-flash",
+    "chopper-tracer-action",
+    "chopper-impact-action"
+  ],
+  "sockets": [
+    "chopper-first-person-camera-socket",
+    "chopper-gun-muzzle-socket",
+    "chopper-forward-socket"
+  ],
+  "animationClips": [
+    "Chopper_Main_Rotor_Loop",
+    "Chopper_Tail_Rotor_Loop",
+    "Chopper_Cockpit_Rotor_Loop",
+    "Chopper_Gun_Recoil",
+    "Chopper_Gun_Fire",
+    "Chopper_Muzzle_Flash",
+    "Chopper_Tracer_Pulse",
+    "Chopper_Impact_Pulse",
+    "Chopper_Quiet_Loop"
+  ],
+  "review": {
+    "acceptedFirstPersonFrame": {
+      "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+      "sha256": "a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f",
+      "cameraId": "accepted-first-person-instruments",
+      "width": 960,
+      "height": 540
+    },
+    "renders": [
+      {
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-exterior-front-quarter.png",
+        "sha256": "b78fe48ba377b5afd43f9cfac02cf8b86c6e2c93d63a3a5388aa745a23f71965",
+        "cameraId": "exterior-front-quarter",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-rotor-gun-profile.png",
+        "sha256": "5ea53e939df7b5c6c4df0109421e23b387e7ce566818173cc2c9e962a6dff0b7",
+        "cameraId": "rotor-gun-profile",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-cockpit-glass-closeup.png",
+        "sha256": "28619a0ee5628f878bb83bd70421ccd6ffb0333718b7f69298e3b0e5025529b7",
+        "cameraId": "cockpit-glass-closeup",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+        "sha256": "a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f",
+        "cameraId": "accepted-first-person-instruments",
+        "width": 960,
+        "height": 540
+      }
+    ],
+    "contactSheet": {
+      "path": "docs/assets/pass65-vehicles/chopper/pass65-chopper-contact-sheet.png",
+      "sha256": "056d7f526a02e2595bdd1b324d8c3b4493fc1e0675baab9674d881bdf6ec4558",
+      "cameraId": "accepted-contact-sheet",
+      "width": 1024,
+      "height": 1024
+    },
+    "acceptance": "parent visual gate APPROVE after 960x540 original-resolution inspection"
+  },
+  "runtimeAudit": {
+    "lods": [
+      {
+        "lod": 0,
+        "triangles": 72900,
+        "bytes": 793408,
+        "meshNodes": 196,
+        "materials": 21,
+        "images": 4,
+        "animations": [
+          "Chopper_Gun_Fire",
+          "Chopper_Quiet_Loop",
+          "Chopper_Cockpit_Rotor_Loop",
+          "Chopper_Main_Rotor_Loop",
+          "Chopper_Gun_Recoil",
+          "Chopper_Impact_Pulse",
+          "Chopper_Muzzle_Flash",
+          "Chopper_Tracer_Pulse",
+          "Chopper_Tail_Rotor_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 1,
+        "triangles": 30564,
+        "bytes": 532228,
+        "meshNodes": 188,
+        "materials": 21,
+        "images": 4,
+        "animations": [
+          "Chopper_Gun_Fire",
+          "Chopper_Quiet_Loop",
+          "Chopper_Cockpit_Rotor_Loop",
+          "Chopper_Main_Rotor_Loop",
+          "Chopper_Gun_Recoil",
+          "Chopper_Impact_Pulse",
+          "Chopper_Muzzle_Flash",
+          "Chopper_Tracer_Pulse",
+          "Chopper_Tail_Rotor_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 2,
+        "triangles": 18020,
+        "bytes": 398788,
+        "meshNodes": 98,
+        "materials": 21,
+        "images": 4,
+        "animations": [
+          "Chopper_Gun_Fire",
+          "Chopper_Quiet_Loop",
+          "Chopper_Cockpit_Rotor_Loop",
+          "Chopper_Main_Rotor_Loop",
+          "Chopper_Gun_Recoil",
+          "Chopper_Impact_Pulse",
+          "Chopper_Muzzle_Flash",
+          "Chopper_Tracer_Pulse",
+          "Chopper_Tail_Rotor_Loop"
+        ],
+        "externalUris": 0
+      }
+    ],
+    "compressedGeometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
+    "embeddedTextureDelivery": "quality-100 EXT_texture_webp in each GLB; standalone project-owned PNG source maps retained",
+    "externalUris": 0
+  },
+  "authorityBoundary": "Presentation only. Flight, targeting, damage, collision, duration, ownership and replication remain TypeScript authoritative.",
+  "determinism": {
+    "command": "npm run author:blender-support-vehicles",
+    "cleanFactoryStartup": true,
+    "pythonHashSeed": 0
+  }
+}

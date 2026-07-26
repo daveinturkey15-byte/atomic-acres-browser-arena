@@ -11,6 +11,66 @@ const MAX_SENSOR_CONTACTS = 16;
 const MAX_PLACEMENT_MARKERS = 8;
 export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
 const HUNTER_DRONE_TARGET_MAX_DIMENSION = 1.45;
+export const SUPPORT_VEHICLE_ASSETS = Object.freeze({
+  chopper: Object.freeze([
+    './assets/original/models/support/pass65-chopper-gunner-lod0.glb',
+    './assets/original/models/support/pass65-chopper-gunner-lod1.glb',
+    './assets/original/models/support/pass65-chopper-gunner-lod2.glb',
+  ]),
+  care: Object.freeze([
+    './assets/original/models/support/pass65-care-aircraft-lod0.glb',
+    './assets/original/models/support/pass65-care-aircraft-lod1.glb',
+    './assets/original/models/support/pass65-care-aircraft-lod2.glb',
+  ]),
+  carpet: Object.freeze([
+    './assets/original/models/support/pass65-carpet-aircraft-lod0.glb',
+    './assets/original/models/support/pass65-carpet-aircraft-lod1.glb',
+    './assets/original/models/support/pass65-carpet-aircraft-lod2.glb',
+  ]),
+  crate: Object.freeze([
+    './assets/original/models/support/pass65-care-crate-lod0.glb',
+    './assets/original/models/support/pass65-care-crate-lod1.glb',
+  ]),
+} as const);
+type SupportVehicleAssetFamily = keyof typeof SUPPORT_VEHICLE_ASSETS;
+type SupportAircraftVariant = Extract<SupportVehicleAssetFamily, 'care' | 'carpet'>;
+type LoadedSupportVehicleLod = Readonly<{
+  scene: THREE.Group;
+  animations: readonly THREE.AnimationClip[];
+  sourceMaxDimension: number;
+  asset: string;
+}>;
+type SupportVehicleTemplate = Readonly<{ family: SupportVehicleAssetFamily; lods: readonly LoadedSupportVehicleLod[] }>;
+const SUPPORT_VEHICLE_LOAD_TIMEOUT_MS = 20_000;
+const SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES = 2;
+const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFamily, number>> = Object.freeze({
+  chopper: 6.2,
+  care: 10.2,
+  carpet: 10.8,
+  crate: 3.2,
+});
+const SUPPORT_VEHICLE_REQUIRED_NODES: Readonly<Record<SupportVehicleAssetFamily, readonly string[]>> = Object.freeze({
+  chopper: Object.freeze([
+    'chopper-fuselage', 'chopper-sleek-cockpit-canopy', 'chopper-first-person-cockpit',
+    'chopper-cockpit-dashboard-3d', 'chopper-cockpit-hud-glass', 'chopper-cockpit-hud-target-ring',
+    'chopper-first-person-camera-socket', 'chopper-main-rotor', 'chopper-tail-rotor',
+    'chopper-first-person-rotor', 'chopper-player-gun', 'chopper-gun-muzzle-socket',
+  ]),
+  care: Object.freeze(['care-aircraft-fuselage', 'care-aircraft-main-wing', 'care-aircraft-cargo-socket', 'care-aircraft-forward-socket']),
+  carpet: Object.freeze(['carpet-aircraft-fuselage', 'carpet-aircraft-main-wing', 'carpet-aircraft-bomb-socket', 'carpet-aircraft-forward-socket']),
+  crate: Object.freeze(['care-package-crate', 'care-package-parachute', 'care-parachute-lines', 'care-crate-landing-socket']),
+});
+const SUPPORT_VEHICLE_LOOP_ACTIONS: Readonly<Record<SupportVehicleAssetFamily, readonly string[]>> = Object.freeze({
+  chopper: Object.freeze(['Chopper_Main_Rotor_Loop', 'Chopper_Tail_Rotor_Loop', 'Chopper_Cockpit_Rotor_Loop', 'Chopper_Quiet_Loop']),
+  care: Object.freeze(['Care_Aircraft_Propellers_Loop', 'Care_Aircraft_Quiet_Loop']),
+  carpet: Object.freeze(['Carpet_Aircraft_Engine_Loop', 'Carpet_Aircraft_Quiet_Loop']),
+  crate: Object.freeze(['Care_Parachute_Sway_Loop', 'Care_Parachute_Lines_Loop']),
+});
+
+const supportVehicleTemplates = new Map<SupportVehicleAssetFamily, SupportVehicleTemplate>();
+let supportVehicleLoadState: 'idle' | 'loading' | 'ready' | 'fallback' = 'idle';
+let supportVehicleLoadPromise: Promise<void> | null = null;
+const supportVehicleLoadFailures = new Map<SupportVehicleAssetFamily, string>();
 
 let hunterDroneTemplate: THREE.Group | null = null;
 let hunterDroneAnimations: readonly THREE.AnimationClip[] = [];
@@ -72,11 +132,123 @@ export function hunterDronePresentationTelemetry(): Readonly<{
   });
 }
 
+function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = globalThis.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`${asset}: bounded load exceeded ${SUPPORT_VEHICLE_LOAD_TIMEOUT_MS}ms`));
+    }, SUPPORT_VEHICLE_LOAD_TIMEOUT_MS);
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(asset, (gltf) => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timer);
+      const scene = gltf.scene;
+      scene.updateMatrixWorld(true);
+      const size = new THREE.Box3().setFromObject(scene).getSize(new THREE.Vector3());
+      const sourceMaxDimension = Math.max(size.x, size.y, size.z);
+      if (!(sourceMaxDimension > 0)) {
+        reject(new Error(`${asset}: authored scene has no measurable geometry`));
+        return;
+      }
+      markSharedPresentationAsset(scene);
+      resolve(Object.freeze({ scene, animations: Object.freeze([...gltf.animations]), sourceMaxDimension, asset }));
+    }, undefined, (error) => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timer);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    });
+  });
+}
+
+async function allSettledBounded<T>(
+  items: readonly T[],
+  maximumConcurrency: number,
+  task: (item: T) => Promise<void>,
+): Promise<PromiseSettledResult<void>[]> {
+  const results = new Array<PromiseSettledResult<void>>(items.length);
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      try {
+        await task(items[index]!);
+        results[index] = { status: 'fulfilled', value: undefined };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  };
+  await Promise.allSettled(Array.from(
+    { length: Math.min(items.length, Math.max(1, maximumConcurrency)) },
+    worker,
+  ));
+  return results;
+}
+
+export function loadSupportVehiclePresentations(): Promise<void> {
+  if (supportVehicleLoadPromise) return supportVehicleLoadPromise;
+  supportVehicleLoadState = 'loading';
+  supportVehicleLoadPromise = (async () => {
+    const families = Object.keys(SUPPORT_VEHICLE_ASSETS) as SupportVehicleAssetFamily[];
+    const results = await allSettledBounded(families, SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES, async (family) => {
+      // LODs within a family are sequential, so the global cap is also the
+      // exact maximum number of simultaneous Meshopt/GLTF decode jobs.
+      const lods: LoadedSupportVehicleLod[] = [];
+      for (const asset of SUPPORT_VEHICLE_ASSETS[family]) lods.push(await loadSupportVehicleLod(asset));
+      const missing = SUPPORT_VEHICLE_REQUIRED_NODES[family].filter((name) => lods[0]?.scene.getObjectByName(name) === undefined);
+      if (missing.length > 0) throw new Error(`${family}: authored LOD0 missing ${missing.join(', ')}`);
+      if (new Set(lods.map((lod) => lod.asset)).size !== SUPPORT_VEHICLE_ASSETS[family].length) {
+        throw new Error(`${family}: runtime asset set is not exact`);
+      }
+      supportVehicleTemplates.set(family, Object.freeze({ family, lods: Object.freeze(lods) }));
+    });
+    for (const [index, result] of results.entries()) {
+      if (result.status === 'fulfilled') continue;
+      const family = families[index]!;
+      supportVehicleLoadFailures.set(family, result.reason instanceof Error ? result.reason.message : String(result.reason));
+    }
+    supportVehicleLoadState = supportVehicleTemplates.size === Object.keys(SUPPORT_VEHICLE_ASSETS).length ? 'ready' : 'fallback';
+    if (supportVehicleLoadState === 'fallback') {
+      console.warn('[Arena] One or more authored support vehicles are unavailable; explicit non-release fallbacks remain active.', Object.fromEntries(supportVehicleLoadFailures));
+    }
+  })();
+  return supportVehicleLoadPromise;
+}
+
+export function supportVehiclePresentationTelemetry(): Readonly<{
+  state: typeof supportVehicleLoadState;
+  requiredAssets: readonly string[];
+  loadedAssets: readonly string[];
+  readyFamilies: readonly string[];
+  maxConcurrentDecodes: number;
+  failures: Readonly<Record<string, string>>;
+}> {
+  return Object.freeze({
+    state: supportVehicleLoadState,
+    requiredAssets: Object.freeze(Object.values(SUPPORT_VEHICLE_ASSETS).flat()),
+    loadedAssets: Object.freeze([...supportVehicleTemplates.values()].flatMap((template) => template.lods.map((lod) => lod.asset)).sort()),
+    readyFamilies: Object.freeze([...supportVehicleTemplates.keys()].sort()),
+    maxConcurrentDecodes: SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES,
+    failures: Object.freeze(Object.fromEntries(supportVehicleLoadFailures)),
+  });
+}
+
+export function supportAircraftPresentationVariant(entityId: string): SupportAircraftVariant | null {
+  if (entityId.includes('-care-aircraft-')) return 'care';
+  if (entityId.includes('-carpet-aircraft-')) return 'carpet';
+  return null;
+}
+
 type PresentedEntity = Readonly<{
   root: THREE.Group;
   rotor: THREE.Object3D | null;
   target: THREE.Vector3;
-  mixer: THREE.AnimationMixer | null;
+  mixers: readonly THREE.AnimationMixer[];
+  authored: boolean;
 }>;
 
 type PresentedPlacementMarker = {
@@ -111,6 +283,8 @@ export type KillstreakPresentationTelemetry = Readonly<{
   impactFlashes: number;
   sensorContacts: number;
   placementMarkers: number;
+  prewarmed: number;
+  prewarmedAuthoredSupportFamilies: readonly string[];
   markerDetails: readonly KillstreakPlacementMarkerTelemetry[];
   bounded: boolean;
 }>;
@@ -174,7 +348,62 @@ function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean):
   });
 }
 
-function buildChopper(): PresentedEntity {
+function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): PresentedEntity | null {
+  const template = supportVehicleTemplates.get(family);
+  if (!template) return null;
+  const runtimeName = family === 'chopper' ? 'pass65-chopper-gunner'
+    : family === 'care' ? 'pass65-care-package-aircraft'
+      : family === 'carpet' ? 'pass65-carpet-bomber-aircraft'
+        : 'pass65-care-package';
+  const root = new THREE.Group();
+  root.name = runtimeName;
+  root.userData.pass65KillstreakPresentation = true;
+  root.userData.presentationSource = 'project-original-blender-glb';
+  root.userData.presentationFamily = family;
+  root.userData.assetPaths = [...SUPPORT_VEHICLE_ASSETS[family]];
+  root.userData.forwardAxis = [0, 0, -1];
+  root.userData.authoredSharedAsset = true;
+  const lod = new THREE.LOD();
+  lod.name = `${runtimeName}-authored-lods`;
+  const mixers: THREE.AnimationMixer[] = [];
+  for (const [index, source] of template.lods.entries()) {
+    const level = source.scene.clone(true);
+    level.name = `${runtimeName}-authored-lod${index}`;
+    level.scale.setScalar(SUPPORT_VEHICLE_TARGET_DIMENSIONS[family] / Math.max(0.001, source.sourceMaxDimension));
+    level.userData.presentationAsset = source.asset;
+    const cockpit = level.getObjectByName('chopper-first-person-cockpit');
+    if (cockpit) cockpit.userData.firstPersonCockpit = true;
+    const firstPersonRotor = level.getObjectByName('chopper-first-person-rotor');
+    if (firstPersonRotor) firstPersonRotor.userData.firstPersonOnly = true;
+    markSharedPresentationAsset(level);
+    lod.addLevel(level, [0, 34, 68][index] ?? index * 34);
+    const mixer = new THREE.AnimationMixer(level);
+    for (const clipName of SUPPORT_VEHICLE_LOOP_ACTIONS[family]) {
+      const clip = source.animations.find((candidate) => candidate.name === clipName);
+      if (clip) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
+    }
+    mixers.push(mixer);
+  }
+  root.add(lod);
+  if (family === 'chopper') {
+    root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];
+    root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
+  }
+  if (family === 'crate') {
+    root.userData.interactable = true;
+    root.userData.interactionPrompt = 'F TO COLLECT KILLSTREAK';
+    for (const level of lod.levels) {
+      const crate = level.object.getObjectByName('care-package-crate');
+      if (!crate) continue;
+      crate.userData.interactable = true;
+      crate.userData.interactionPrompt = 'F TO COLLECT KILLSTREAK';
+    }
+  }
+  markSharedPresentationAsset(root);
+  return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze(mixers), authored: true });
+}
+
+function buildProceduralChopperFallback(): PresentedEntity {
   const root = new THREE.Group();
   root.name = 'pass65-chopper-gunner';
   root.userData.pass65KillstreakPresentation = true;
@@ -226,6 +455,18 @@ function buildChopper(): PresentedEntity {
   const greenDisplay = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.055, 0.012), displayMaterial(0x5dff9b));
   greenDisplay.name = 'chopper-cockpit-display-green';
   greenDisplay.position.set(0.19, -0.125, -0.44);
+  const hudGlass = new THREE.Mesh(
+    new THREE.BoxGeometry(0.58, 0.30, 0.012),
+    material(0x3bd9e8, { emissive: 0x0c6872, transparent: true, opacity: 0.22 }),
+  );
+  hudGlass.name = 'chopper-cockpit-hud-glass';
+  hudGlass.position.set(0, 0.02, -0.56);
+  const hudTargetRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.08, 0.006, 6, 20),
+    new THREE.MeshBasicMaterial({ color: 0x65ff9b, toneMapped: false }),
+  );
+  hudTargetRing.name = 'chopper-cockpit-hud-target-ring';
+  hudTargetRing.position.set(0, 0.02, -0.57);
   const firstPersonRotor = new THREE.Group();
   firstPersonRotor.name = 'chopper-first-person-rotor';
   firstPersonRotor.userData.firstPersonOnly = true;
@@ -244,7 +485,7 @@ function buildChopper(): PresentedEntity {
   const firstBladeB = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 2.2), rotorBlurMaterial.clone());
   firstBladeB.name = 'chopper-first-person-rotor-blade-b';
   firstPersonRotor.add(firstBladeA, firstBladeB);
-  cockpit.add(dashboard, cockpitRailLeft, cockpitRailRight, cyanDisplay, greenDisplay, firstPersonRotor);
+  cockpit.add(dashboard, cockpitRailLeft, cockpitRailRight, cyanDisplay, greenDisplay, hudGlass, hudTargetRing, firstPersonRotor);
   const rotor = new THREE.Group();
   rotor.name = 'chopper-main-rotor';
   rotor.position.y = 0.85;
@@ -270,14 +511,17 @@ function buildChopper(): PresentedEntity {
   root.userData.forwardAxis = [0, 0, -1];
   root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];
   root.userData.weaponFeedback = [...SUPPORT_WEAPON_FEEDBACK_CONTRACT];
+  root.userData.presentationSource = 'procedural-non-release-fallback';
   root.scale.setScalar(0.82);
-  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixer: null });
+  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
 }
 
-function buildCareAircraft(): PresentedEntity {
+function buildProceduralAircraftFallback(variant: SupportAircraftVariant = 'care'): PresentedEntity {
   const root = new THREE.Group();
-  root.name = 'pass65-care-package-aircraft';
+  root.name = variant === 'care' ? 'pass65-care-package-aircraft' : 'pass65-carpet-bomber-aircraft';
   root.userData.pass65KillstreakPresentation = true;
+  root.userData.presentationSource = 'procedural-non-release-fallback';
+  root.userData.presentationFamily = variant;
   const fuselage = mesh(new THREE.CapsuleGeometry(0.52, 3.6, 6, 12), 0x34464a, 'care-aircraft-fuselage');
   fuselage.rotation.x = Math.PI / 2;
   const nose = mesh(new THREE.SphereGeometry(0.49, 12, 8), 0x64787a, 'care-aircraft-nose');
@@ -291,11 +535,12 @@ function buildCareAircraft(): PresentedEntity {
   tailFin.position.set(0, 0.42, 2.15);
   const cargoLight = mesh(new THREE.SphereGeometry(0.08, 8, 6), 0x7fe6e0, 'care-aircraft-cargo-light');
   cargoLight.position.set(0, -0.45, -0.15);
+  const cargoSocket = presentationSocket('care-aircraft-cargo-socket', [0, -0.48, -0.12]);
   const forwardSocket = presentationSocket('care-aircraft-forward-socket', [0, 0, -2.6]);
-  root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight, forwardSocket);
+  root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight, cargoSocket, forwardSocket);
   root.userData.forwardAxis = [0, 0, -1];
   root.scale.setScalar(0.9);
-  return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixer: null });
+  return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
 }
 
 function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
@@ -313,7 +558,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     const mixer = new THREE.AnimationMixer(root);
     const propellers = hunterDroneAnimations.find((clip) => clip.name === 'Drone_Propellers_Loop');
     if (propellers) mixer.clipAction(propellers).play();
-    return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixer });
+    return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixers: Object.freeze([mixer]), authored: true });
   }
   const root = new THREE.Group();
   root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
@@ -351,15 +596,17 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     rotor.add(arm, disc);
   }
   root.add(body, eye, gun, muzzleSocket, cameraSocket, rotor);
-  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixer: null });
+  root.userData.presentationSource = 'procedural-non-release-fallback';
+  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
 }
 
-function buildCareCrate(): PresentedEntity {
+function buildProceduralCareCrateFallback(): PresentedEntity {
   const root = new THREE.Group();
   root.name = 'pass65-care-package';
   root.userData.pass65KillstreakPresentation = true;
   root.userData.interactable = true;
   root.userData.interactionPrompt = 'F TO COLLECT KILLSTREAK';
+  root.userData.presentationSource = 'procedural-non-release-fallback';
   const crate = mesh(new THREE.BoxGeometry(1.05, 0.75, 1.05), 0x4e604d, 'care-package-crate');
   crate.userData.interactable = true;
   crate.userData.interactionPrompt = 'F TO COLLECT KILLSTREAK';
@@ -369,14 +616,17 @@ function buildCareCrate(): PresentedEntity {
   canopy.position.y = 2.4;
   canopy.scale.y = 0.45;
   root.add(crate, straps, canopy);
-  return Object.freeze({ root, rotor: canopy, target: new THREE.Vector3(), mixer: null });
+  return Object.freeze({ root, rotor: canopy, target: new THREE.Vector3(), mixers: Object.freeze([]), authored: false });
 }
 
 function createPresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntity {
-  if (entity.kind === 'aircraft') return buildCareAircraft();
-  if (entity.kind === 'chopper') return buildChopper();
+  if (entity.kind === 'aircraft') {
+    const variant = supportAircraftPresentationVariant(entity.id);
+    return variant ? buildAuthoredSupportVehicle(variant) ?? buildProceduralAircraftFallback(variant) : buildProceduralAircraftFallback();
+  }
+  if (entity.kind === 'chopper') return buildAuthoredSupportVehicle('chopper') ?? buildProceduralChopperFallback();
   if (entity.kind === 'drone') return buildDrone(entity.mode);
-  return buildCareCrate();
+  return buildAuthoredSupportVehicle('crate') ?? buildProceduralCareCrateFallback();
 }
 
 function buildDroneSensorSilhouette(index: number): THREE.Group {
@@ -472,6 +722,7 @@ function buildPlacementMarker(marker: KillstreakPlacementMarkerSnapshot): THREE.
 
 function disposeRoot(root: THREE.Object3D): void {
   root.removeFromParent();
+  if (root.userData.authoredSharedAsset === true) return;
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
     node.geometry.dispose();
@@ -484,7 +735,7 @@ export class KillstreakPresentation {
   readonly root = new THREE.Group();
   private readonly entities = new Map<string, PresentedEntity>();
   private readonly impactFlashes: Array<{ root: THREE.Mesh; expiresAt: number }> = [];
-  private readonly prewarmed: PresentedEntity[];
+  private readonly prewarmed: PresentedEntity[] = [];
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -501,18 +752,35 @@ export class KillstreakPresentation {
     scene.add(this.root);
     // Keep one instance of every material/geometry vocabulary resident so the
     // first earned streak does not discover shaders on a live combat frame.
-    this.prewarmed = [buildChopper(), buildCareAircraft(), buildDrone('piloted'), buildDrone('swarm'), buildCareCrate()];
+    this.installPrewarmedVocabulary();
+    this.sensorRoot.name = 'piloted-drone-through-wall-sensor';
+    this.sensorRoot.userData.presentationOnly = true;
+    this.sensorSilhouettes = Array.from({ length: MAX_SENSOR_CONTACTS }, (_, index) => buildDroneSensorSilhouette(index));
+    this.sensorRoot.add(...this.sensorSilhouettes);
+    this.root.add(this.sensorRoot);
+  }
+
+  private installPrewarmedVocabulary(): void {
+    const vocabulary = [
+      buildAuthoredSupportVehicle('chopper') ?? buildProceduralChopperFallback(),
+      buildAuthoredSupportVehicle('care') ?? buildProceduralAircraftFallback('care'),
+      buildAuthoredSupportVehicle('carpet') ?? buildProceduralAircraftFallback('carpet'),
+      buildDrone('piloted'), buildDrone('swarm'),
+      buildAuthoredSupportVehicle('crate') ?? buildProceduralCareCrateFallback(),
+    ];
+    this.prewarmed.push(...vocabulary);
     for (const entry of this.prewarmed) {
       entry.root.name = `prewarmed-${entry.root.name}`;
       entry.root.userData.prewarmed = true;
       entry.root.scale.setScalar(0.0001);
       this.root.add(entry.root);
     }
-    this.sensorRoot.name = 'piloted-drone-through-wall-sensor';
-    this.sensorRoot.userData.presentationOnly = true;
-    this.sensorSilhouettes = Array.from({ length: MAX_SENSOR_CONTACTS }, (_, index) => buildDroneSensorSilhouette(index));
-    this.sensorRoot.add(...this.sensorSilhouettes);
-    this.root.add(this.sensorRoot);
+  }
+
+  prewarmAuthoredAssets(): void {
+    for (const entry of this.prewarmed) this.retireRoot(entry.root);
+    this.prewarmed.length = 0;
+    this.installPrewarmedVocabulary();
   }
 
   sync(snapshot: KillstreakRecipientSnapshot, nowMs: number): void {
@@ -535,14 +803,20 @@ export class KillstreakPresentation {
       presented.target.fromArray(entity.position);
       presented.root.position.lerp(presented.target, 0.38);
       presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
-      presented.mixer?.setTime(nowMs / 1_000);
-      if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
-      const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');
-      if (tailRotor) tailRotor.rotation.x += 1.35;
-      const firstPersonRotor = presented.root.getObjectByName('chopper-first-person-rotor');
-      if (firstPersonRotor) firstPersonRotor.rotation.y += 0.92;
-      const canopy = presented.root.getObjectByName('care-package-parachute');
-      if (canopy) canopy.visible = entity.phase === 'inbound' || entity.phase === 'descending';
+      for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);
+      if (!presented.authored) {
+        if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
+        const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');
+        if (tailRotor) tailRotor.rotation.x += 1.35;
+        const firstPersonRotor = presented.root.getObjectByName('chopper-first-person-rotor');
+        if (firstPersonRotor) firstPersonRotor.rotation.y += 0.92;
+      }
+      const parachuteVisible = entity.phase === 'inbound' || entity.phase === 'descending';
+      presented.root.traverse((node) => {
+        if (node.name === 'care-package-parachute' || node.name === 'care-parachute-lines') {
+          node.visible = parachuteVisible;
+        }
+      });
       presented.root.userData.health = entity.health;
       presented.root.userData.phase = entity.phase;
       presented.root.userData.gunController = entity.gunController;
@@ -714,6 +988,11 @@ export class KillstreakPresentation {
       impactFlashes: this.impactFlashes.length,
       sensorContacts: this.visibleSensorContacts,
       placementMarkers: this.placementMarkers.size,
+      prewarmed: this.prewarmed.length,
+      prewarmedAuthoredSupportFamilies: Object.freeze(this.prewarmed
+        .filter((entry) => entry.root.userData.presentationSource === 'project-original-blender-glb')
+        .map((entry) => String(entry.root.userData.presentationFamily))
+        .sort()),
       markerDetails: Object.freeze(markerDetails),
       bounded: this.entities.size <= MAX_PRESENTED_ENTITIES
         && this.impactFlashes.length <= MAX_IMPACT_FLASHES

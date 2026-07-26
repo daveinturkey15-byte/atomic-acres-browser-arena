@@ -68,7 +68,7 @@ import {
   type KillstreakRecipientSnapshot,
   type KillstreakWorld,
 } from './killstreak-runtime';
-import { KillstreakPresentation, loadHunterDronePresentation } from './killstreak-presentation';
+import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
 import type {
   KillstreakActivateIntentMessage,
@@ -15051,6 +15051,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     killstreak: killstreakSnapshot,
     killstreakPresentation: killstreakPresentation.telemetry(),
+    supportVehiclePresentation: supportVehiclePresentationTelemetry(),
     supportDamageFeedback: supportDamageFeedbackTelemetry.snapshot(),
     fieldSupport: {
       streak: fieldSupport.streak,
@@ -16324,7 +16325,9 @@ async function prepareSharedGameplayAssets(): Promise<void> {
       prepareMenuWeaponAsset(),
       loadGrenadePresentation(),
       loadHunterDronePresentation(),
+      loadSupportVehiclePresentations(),
     ]);
+    killstreakPresentation.prewarmAuthoredAssets();
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.

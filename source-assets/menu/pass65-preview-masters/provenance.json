@@ -6,27 +6,35 @@
   "license": "Original project work",
   "generator": {
     "path": "scripts/assets/generate_pass65_menu_previews.py",
-    "sha256": "b30660db7ccb8a3e3f3c60c4537dd0aab9da78d1cf395d00e4c377cb753068b5",
+    "sha256": "bf8220c9eb59b93bc89bb02080593bbe7237a1af81f91beebab0ccada7cdbd1b",
     "blender": "5.1.2"
+  },
+  "authoredCockpit": {
+    "assetId": "chopper-gunner-vehicle-v1",
+    "path": "source-assets/blender/pass65-chopper-gunner.blend",
+    "sha256": "194b2a1879f11c175a306fbc04f65c284e1f2eddf920a82ebe1aa2fe10268443",
+    "qualityTier": "LOD0",
+    "evidence": "docs/assets/pass65-vehicles/chopper/pass65-chopper-first-person-instruments-16x9.png",
+    "evidenceSha256": "a09ec4d7344a369546fde3179b17012badf434681a37f9e8bab663a142ca3b8f"
   },
   "sources": [
     {
       "arenaId": "atomic-acres",
       "path": "source-assets/menu/pass65-preview-masters/atomic-acres.blend",
-      "sha256": "6a37116ccbc42f6e64fcefeb7d64053f0548f36a3d96bc6da6d11ef729daacfc",
-      "composition": "Original helicopter cockpit flyover of the Nuke Town theatre"
+      "sha256": "862f53a45a79838f01319c670c7a471978bbb28220da7c8199573d666c315f49",
+      "composition": "Original authored-helicopter cockpit flyover of the Nuke Town theatre"
     },
     {
       "arenaId": "skyline-terminal",
       "path": "source-assets/menu/pass65-preview-masters/skyline-terminal.blend",
-      "sha256": "5c97073b201fa5676d89191a3ad5f91d3b32682f677e4093c20740be023950cd",
-      "composition": "Original helicopter cockpit flyover of the Terminal theatre"
+      "sha256": "eea374813b49d5706ded67089b7421e2b37bdfdaa31bd9166747452a2969ba5d",
+      "composition": "Original authored-helicopter cockpit flyover of the Terminal theatre"
     },
     {
       "arenaId": "rustworks-1v1",
       "path": "source-assets/menu/pass65-preview-masters/rustworks-1v1.blend",
-      "sha256": "3e9fbee4dddbe93c9e77a2e788d7148c7e47f217ef6a2d500617b5f0cc57d79b",
-      "composition": "Original helicopter cockpit flyover of the RustRig theatre"
+      "sha256": "29ac8eb72ce24b88a03502fc12fd121595fd3f687a108cab4ae05998ba99e9a2",
+      "composition": "Original authored-helicopter cockpit flyover of the RustRig theatre"
     },
     {
       "arenaId": "gun-range",
@@ -40,23 +48,59 @@
     "dimensions": "960x540",
     "frameRate": 24,
     "durationSeconds": 8,
-    "motion": "Deterministic authored paths with bounded helicopter altitude, gaze, pitch and bank variation; animated main rotor; animated range targets; authored feline ears with loop-safe twitches; articulated paws with loop-safe foreleg motion",
-    "audio": "Project-generated low rotor harmonics for helicopter clips and a quieter tonal cat-range ambience; no sampled audio"
+    "motion": "Deterministic authored paths with bounded helicopter altitude, gaze, pitch and bank variation; animated authored first-person rotor; animated range targets; authored feline ears with loop-safe twitches; articulated paws with loop-safe foreleg motion",
+    "audio": "Project-generated low rotor harmonic for helicopter clips and a quieter tonal cat-range ambience; no sampled audio"
   },
   "runtimeFiles": [
-    { "path": "public/assets/original/menu-previews/atomic-acres.mp4", "sha256": "fae6ce1f11c8dc37c64c3d6a52ae03ddcfc041b4fe4e89b015f69d9d90fbf8d6" },
-    { "path": "public/assets/original/menu-previews/atomic-acres.webm", "sha256": "f3f6892bdfdbd7035d79d325b879eaf8f06deb4b41c10133106f7821d1a2094d" },
-    { "path": "public/assets/original/menu-previews/atomic-acres.webp", "sha256": "049627554b2b11bf31de1891cc11074cb1c8769b4894f13f7bd6fff44b566021" },
-    { "path": "public/assets/original/menu-previews/gun-range.mp4", "sha256": "3de2c28899d32ee48b8a023613305690d59227b1e64189ffafaf1aa0b447fc13" },
-    { "path": "public/assets/original/menu-previews/gun-range.webm", "sha256": "708bdf00af28906a8ce7b1605dc1c534c854c537fb82fecab62173dbce1e9885" },
-    { "path": "public/assets/original/menu-previews/gun-range.webp", "sha256": "23479fe37b290d909e21d0c3015e49f3b09a244d51d986b67c665136fce210fe" },
-    { "path": "public/assets/original/menu-previews/rustworks-1v1.mp4", "sha256": "6c49ae0f24e518be3d3e1eb9fa829cd927c13453743de1aab24019428141b476" },
-    { "path": "public/assets/original/menu-previews/rustworks-1v1.webm", "sha256": "0a926ec863b9461993f71f71f71c5722c559a0f4424f96ceae8a7ba99e8e65d8" },
-    { "path": "public/assets/original/menu-previews/rustworks-1v1.webp", "sha256": "24bbe73c6762c39b615f1d8e0ce5e5cc756340f12e0b02c685e0e057e448a379" },
-    { "path": "public/assets/original/menu-previews/skyline-terminal.mp4", "sha256": "5b19a4df3f5ccc0230dd702d8eef7242eb5ead8f6866adfcad8b18855766b1b1" },
-    { "path": "public/assets/original/menu-previews/skyline-terminal.webm", "sha256": "3dfe84b94c8640aaafbfd1ec5bb6e744691ced9c46d55023e5dede15e5068096" },
-    { "path": "public/assets/original/menu-previews/skyline-terminal.webp", "sha256": "45351bfc2b32bc923c2d982dad37bb644732bd8bb8c4f5f70f1830a362027ec3" }
+    {
+      "path": "public/assets/original/menu-previews/atomic-acres.mp4",
+      "sha256": "702f9a5e582cc6eaf256d010e1a76f61ed841a4749460ea44f07984d88adf828"
+    },
+    {
+      "path": "public/assets/original/menu-previews/atomic-acres.webm",
+      "sha256": "282d702182aa497868a8071ef2db629c2d91eb9c51fa3b539a3909dea817fec8"
+    },
+    {
+      "path": "public/assets/original/menu-previews/atomic-acres.webp",
+      "sha256": "c2ab761209e91da0d8211f097bbab2179505713ba13f0466d0b463290e3c6373"
+    },
+    {
+      "path": "public/assets/original/menu-previews/gun-range.mp4",
+      "sha256": "3de2c28899d32ee48b8a023613305690d59227b1e64189ffafaf1aa0b447fc13"
+    },
+    {
+      "path": "public/assets/original/menu-previews/gun-range.webm",
+      "sha256": "708bdf00af28906a8ce7b1605dc1c534c854c537fb82fecab62173dbce1e9885"
+    },
+    {
+      "path": "public/assets/original/menu-previews/gun-range.webp",
+      "sha256": "23479fe37b290d909e21d0c3015e49f3b09a244d51d986b67c665136fce210fe"
+    },
+    {
+      "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
+      "sha256": "1cfce72f9a5dd50888828224aa411a7dd0c78964bfafb3e835773b07166ee08b"
+    },
+    {
+      "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
+      "sha256": "d4d7e80b501a32355898bfed8e81e413500816a8e432b841aa532bd4e1d3346c"
+    },
+    {
+      "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
+      "sha256": "fa995e053ab5d469086e6e1226c37c2c7b72fc207a9d0f99ec218f881440b27a"
+    },
+    {
+      "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
+      "sha256": "bc3882edc580110fb6d60d4456da092bd37dd0d371ec1ad77a0ed66122a2406a"
+    },
+    {
+      "path": "public/assets/original/menu-previews/skyline-terminal.webm",
+      "sha256": "eefe49c88735a5d2fce383a946dedbe7419879311a9ec2a68e8a5eaf2814bdcd"
+    },
+    {
+      "path": "public/assets/original/menu-previews/skyline-terminal.webp",
+      "sha256": "a2e01b092553cff6c33aecf3d675b0cb1dc0738ba2a9f2887b53f26d8c953f9e"
+    }
   ],
   "externalAssets": [],
-  "notes": "All visible geometry, materials, animation and audio are authored by the project generator from Blender primitives. The menu runtime decodes only the selected prerecorded clip and does not submit the gameplay renderer while maps are browsed."
+  "notes": "Three helicopter previews use the project-original Blender-authored chopper-gunner LOD0 cockpit; the protected Gun Range cat master and runtime files are byte-identical to the accepted build. The menu runtime decodes only the selected prerecorded clip and does not submit the gameplay renderer while maps are browsed."
 }

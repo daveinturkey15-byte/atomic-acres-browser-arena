@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "id": "support-aircraft-family-v1",
+  "title": "Pass 65 Care Package and Carpet Bomber support aircraft family",
+  "creator": "Atomic Acres project",
+  "owner": "Atomic Acres project",
+  "created": "2026-07-26",
+  "license": "Project-original; no third-party meshes or textures",
+  "blenderVersion": "5.1.2",
+  "generator": {
+    "path": "scripts/blender/create-pass65-support-vehicles.py",
+    "sha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b"
+  },
+  "runtimeForwardAxis": "-Z",
+  "blenderAuthoringForwardAxis": "-Y converted to glTF -Z by Y-up export",
+  "presentationOnly": true,
+  "inspirationBoundary": "Original stylized fixed-wing support family. No copied commercial-game geometry, texture, logo, animation, UI, or audio.",
+  "sourceBlend": {
+    "path": "source-assets/blender/pass65-support-aircraft-family.blend",
+    "sha256": "7b2339e31bf4380ab09018c627ee6d26deb81e7f2148f68dae97694b74adf261"
+  },
+  "variants": {
+    "care": {
+      "worldGlbs": [
+        {
+          "path": "public/assets/original/models/support/pass65-care-aircraft-lod0.glb",
+          "sha256": "3efe7f742a6c37da770504f5d7cf036bac1c154f081b578450897ac38c01c1a3",
+          "lod": 0,
+          "triangles": 4972,
+          "bytes": 155428
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-aircraft-lod1.glb",
+          "sha256": "f3a0192a674f88830f2dfdef82ca17bd4256e5c33dd73887267285b1d8565fed",
+          "lod": 1,
+          "triangles": 4672,
+          "bytes": 151320
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-aircraft-lod2.glb",
+          "sha256": "cf3abb0f126f1ec3cd86bf49fe94cc065665fead9c1442b93b1f0d4137a4b6d0",
+          "lod": 2,
+          "triangles": 4328,
+          "bytes": 150556
+        }
+      ],
+      "requiredNodes": [
+        "care-aircraft-fuselage",
+        "care-aircraft-nose",
+        "care-aircraft-main-wing",
+        "care-aircraft-cargo-bay",
+        "care-aircraft-cargo-door",
+        "care-aircraft-cargo-socket",
+        "care-aircraft-forward-socket",
+        "care-aircraft-propeller-0",
+        "care-aircraft-propeller-1",
+        "care-aircraft-propeller-2",
+        "care-aircraft-propeller-3"
+      ],
+      "sockets": [
+        "care-aircraft-cargo-socket",
+        "care-aircraft-forward-socket"
+      ],
+      "animationClips": [
+        "Care_Aircraft_Propellers_Loop",
+        "Care_Cargo_Door_Open",
+        "Care_Cargo_Drop_Pulse",
+        "Care_Aircraft_Quiet_Loop"
+      ]
+    },
+    "carpet": {
+      "worldGlbs": [
+        {
+          "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
+          "sha256": "8d6cf7322f81584b9e1b10977c14dea38b19019c70ab2157642d76273c9d36b2",
+          "lod": 0,
+          "triangles": 6844,
+          "bytes": 162676
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
+          "sha256": "5a98dbc942ef62cf1bb18db63ce695a5d1a658ce1a30de78a64d7dea62066f75",
+          "lod": 1,
+          "triangles": 6044,
+          "bytes": 155820
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
+          "sha256": "74b5dc4c51f5acd161f1a650145338c6c3bdcc1f1b585230ecf62973af314100",
+          "lod": 2,
+          "triangles": 4116,
+          "bytes": 148748
+        }
+      ],
+      "requiredNodes": [
+        "carpet-aircraft-fuselage",
+        "carpet-aircraft-nose",
+        "carpet-aircraft-main-wing",
+        "carpet-aircraft-bomb-bay",
+        "carpet-aircraft-bomb-door-left",
+        "carpet-aircraft-bomb-door-right",
+        "carpet-aircraft-bomb-rack",
+        "carpet-aircraft-bomb-socket",
+        "carpet-aircraft-forward-socket",
+        "carpet-aircraft-fan-0",
+        "carpet-aircraft-fan-1",
+        "carpet-aircraft-fan-2",
+        "carpet-aircraft-fan-3"
+      ],
+      "sockets": [
+        "carpet-aircraft-bomb-socket",
+        "carpet-aircraft-forward-socket"
+      ],
+      "animationClips": [
+        "Carpet_Aircraft_Engine_Loop",
+        "Carpet_Bomb_Bay_Open",
+        "Carpet_Bomb_Rack_Pulse",
+        "Carpet_Aircraft_Quiet_Loop"
+      ]
+    },
+    "parachuteCrate": {
+      "worldGlbs": [
+        {
+          "path": "public/assets/original/models/support/pass65-care-crate-lod0.glb",
+          "sha256": "7eb35d28741d9effe8c6e5869767bb4c86235bbf573e60ea7eb8f5b6a774bb12",
+          "lod": 0,
+          "triangles": 1300,
+          "bytes": 107980
+        },
+        {
+          "path": "public/assets/original/models/support/pass65-care-crate-lod1.glb",
+          "sha256": "ca0a8bd4d811f5c39725a3a9d7710f31ceb037680f08fc49edbf5ff013b9daf4",
+          "lod": 1,
+          "triangles": 828,
+          "bytes": 103724
+        }
+      ],
+      "requiredNodes": [
+        "care-package-crate",
+        "care-package-straps",
+        "care-package-parachute",
+        "care-parachute-lines",
+        "care-crate-landing-socket"
+      ],
+      "sockets": [
+        "care-crate-landing-socket"
+      ],
+      "animationClips": [
+        "Care_Parachute_Sway_Loop",
+        "Care_Parachute_Lines_Loop",
+        "Care_Parachute_Collapse"
+      ]
+    }
+  },
+  "pbrMaps": {
+    "baseColor": {
+      "path": "public/assets/original/textures/support/pass65-support-aircraft-albedo.png",
+      "sha256": "5146c85eacb76e3c1cf55a50d3efe3a2bafa01b36298652437b41ba75fcc29b9",
+      "width": 512,
+      "height": 512
+    },
+    "normal": {
+      "path": "public/assets/original/textures/support/pass65-support-aircraft-normal.png",
+      "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4",
+      "width": 512,
+      "height": 512
+    },
+    "orm": {
+      "path": "public/assets/original/textures/support/pass65-support-aircraft-orm.png",
+      "sha256": "81558c4fa073553817382a13b74ffb4a00a90749c6bdc33c6f546773eee424bf",
+      "width": 512,
+      "height": 512
+    },
+    "emissive": {
+      "path": "public/assets/original/textures/support/pass65-support-aircraft-emissive.png",
+      "sha256": "ed9974eee6effb11d2b86bc2d58405054dc1ffdc1202458759221419a4bf0c71",
+      "width": 512,
+      "height": 512
+    }
+  },
+  "review": {
+    "renders": [
+      {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-front-quarter.png",
+        "sha256": "31bf2964de4057a6c09300666283e142ce0ad1332881b734f7c94f7e72d3ff2c",
+        "cameraId": "care-front-quarter",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-cargo-parachute.png",
+        "sha256": "80e802405608322cd2a101d700881717bb503ace00ca2850a4d1bce169deb158",
+        "cameraId": "care-cargo-parachute",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-front-quarter.png",
+        "sha256": "8fb9ab54df9ee5e0711afa702cf9ca79aa41d22dd6df65e6e73b8fd8a6c162a3",
+        "cameraId": "carpet-front-quarter",
+        "width": 512,
+        "height": 512
+      },
+      {
+        "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-bomb-bay.png",
+        "sha256": "68dab4cc96677818e2f47d8e23f8ce7b3d4c70f30cfe1729c4da971415ba4fd8",
+        "cameraId": "carpet-bomb-bay",
+        "width": 512,
+        "height": 512
+      }
+    ],
+    "contactSheet": {
+      "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
+      "sha256": "d002204c74ca9572a422a03fca589ed7bc62c4f27715a712654b5676e1dc8e54",
+      "cameraId": "aircraft-contact-sheet",
+      "width": 1024,
+      "height": 1024
+    }
+  },
+  "runtimeAudit": {
+    "careLods": [
+      {
+        "lod": 0,
+        "triangles": 4972,
+        "bytes": 155428,
+        "meshNodes": 34,
+        "materials": 7,
+        "images": 4,
+        "animations": [
+          "Care_Cargo_Door_Open",
+          "Care_Cargo_Drop_Pulse",
+          "Care_Aircraft_Quiet_Loop",
+          "Care_Aircraft_Propellers_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 1,
+        "triangles": 4672,
+        "bytes": 151320,
+        "meshNodes": 34,
+        "materials": 7,
+        "images": 4,
+        "animations": [
+          "Care_Cargo_Door_Open",
+          "Care_Cargo_Drop_Pulse",
+          "Care_Aircraft_Quiet_Loop",
+          "Care_Aircraft_Propellers_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 2,
+        "triangles": 4328,
+        "bytes": 150556,
+        "meshNodes": 26,
+        "materials": 7,
+        "images": 4,
+        "animations": [
+          "Care_Cargo_Door_Open",
+          "Care_Cargo_Drop_Pulse",
+          "Care_Aircraft_Quiet_Loop",
+          "Care_Aircraft_Propellers_Loop"
+        ],
+        "externalUris": 0
+      }
+    ],
+    "carpetLods": [
+      {
+        "lod": 0,
+        "triangles": 6844,
+        "bytes": 162676,
+        "meshNodes": 48,
+        "materials": 6,
+        "images": 4,
+        "animations": [
+          "Carpet_Bomb_Bay_Open",
+          "Carpet_Bomb_Rack_Pulse",
+          "Carpet_Aircraft_Engine_Loop",
+          "Carpet_Aircraft_Quiet_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 1,
+        "triangles": 6044,
+        "bytes": 155820,
+        "meshNodes": 44,
+        "materials": 6,
+        "images": 4,
+        "animations": [
+          "Carpet_Bomb_Bay_Open",
+          "Carpet_Bomb_Rack_Pulse",
+          "Carpet_Aircraft_Engine_Loop",
+          "Carpet_Aircraft_Quiet_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 2,
+        "triangles": 4116,
+        "bytes": 148748,
+        "meshNodes": 26,
+        "materials": 5,
+        "images": 4,
+        "animations": [
+          "Carpet_Bomb_Bay_Open",
+          "Carpet_Bomb_Rack_Pulse",
+          "Carpet_Aircraft_Engine_Loop",
+          "Carpet_Aircraft_Quiet_Loop"
+        ],
+        "externalUris": 0
+      }
+    ],
+    "crateLods": [
+      {
+        "lod": 0,
+        "triangles": 1300,
+        "bytes": 107980,
+        "meshNodes": 16,
+        "materials": 4,
+        "images": 4,
+        "animations": [
+          "Care_Parachute_Sway_Loop",
+          "Care_Parachute_Collapse",
+          "Care_Parachute_Lines_Loop"
+        ],
+        "externalUris": 0
+      },
+      {
+        "lod": 1,
+        "triangles": 828,
+        "bytes": 103724,
+        "meshNodes": 12,
+        "materials": 4,
+        "images": 4,
+        "animations": [
+          "Care_Parachute_Sway_Loop",
+          "Care_Parachute_Collapse",
+          "Care_Parachute_Lines_Loop"
+        ],
+        "externalUris": 0
+      }
+    ],
+    "compressedGeometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
+    "embeddedTextureDelivery": "quality-100 EXT_texture_webp in each GLB; standalone project-owned PNG source maps retained",
+    "externalUris": 0
+  },
+  "authorityBoundary": "Presentation only. Target markers, corridor ownership, flight, drops, impacts, damage, collision, interaction and replication remain TypeScript authoritative.",
+  "determinism": {
+    "command": "npm run author:blender-support-vehicles",
+    "cleanFactoryStartup": true,
+    "pythonHashSeed": 0
+  }
+}
