@@ -939,7 +939,7 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#selected-kit-summary')).toContainText('Circuit Runner');
     await page.reload();
     await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
-    await expect(page.locator('#selected-kit-summary')).toContainText('Vectorline SMG');
+    await expect(page.locator('#selected-kit-summary')).toContainText('FN P90');
     await startSolo(page);
     await page.waitForFunction(
       () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
@@ -1689,7 +1689,7 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#nuke-warning')).toBeHidden({ timeout: 8_000 });
   });
 
-  test('makes the strengthened Model 12 decisive at close range', async ({ page }) => {
+  test('makes the strengthened Remington 870 decisive at close range', async ({ page }) => {
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
         setBotsFrozen: (frozen: boolean) => void;

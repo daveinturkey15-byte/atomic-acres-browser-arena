@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import combatOracle from '../../.agents/skills/atomic-acres-combat-registry/scripts/fixtures/known-good.json';
 import { MULTIPLAYER_PROTOCOL_VERSION, WEAPON_IDS } from '../protocol';
-import { LEGACY_WEAPON_ENUMERATION_ORDER, WEAPON_CATALOG } from './weapon-catalog';
+import {
+  LEGACY_WEAPON_ENUMERATION_ORDER,
+  WEAPON_CATALOG,
+  sustainedRecoilBurden,
+  sustainedRecoilRanking,
+} from './weapon-catalog';
 import { validateWeaponDefinitions } from './weapon-schema';
 
 function expectDeepFrozen(value: unknown): void {
@@ -24,6 +29,7 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
     delete copy.damage;
     delete copy.spread;
   }
+  if (copy.id === 'magnum') delete copy.penetration.calibreLabel;
   return copy;
 }
 
@@ -42,7 +48,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     expectDeepFrozen(WEAPON_CATALOG);
   });
 
-  it('preserves Pass 64 mechanics except for explicitly approved names, effects, and pellet-shotgun tuning', () => {
+  it('preserves Pass 64 mechanics except for approved names, effects, caliber correction, and pellet-shotgun tuning', () => {
     const currentById = new Map(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
     for (const baseline of combatOracle.weapons) {
       expect(compatibilityProjection(currentById.get(baseline.id) as unknown as Record<string, any>))
@@ -55,6 +61,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(byId.carbine.displayName).toBe('HK416');
     expect(byId.smg.displayName).toBe('FN P90');
     expect(byId['machine-pistol'].displayName).toBe('Glock 18');
+    expect(byId.magnum).toMatchObject({ displayName: 'Desert Eagle .50 AE', penetration: { calibreLabel: '.50 AE' } });
     expect(byId['mini-uzi']).toMatchObject({ displayName: 'Mini Uzi', rpm: 1050, family: 'smg' });
     expect(byId.mp5).toMatchObject({ displayName: 'MP5', family: 'smg' });
     expect(byId.m4a1).toMatchObject({ displayName: 'M4A1', family: 'assault-rifle' });
@@ -71,6 +78,15 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(byId['explosive-crossbow']).toMatchObject({
       displayName: 'TAC-15 Explosive Crossbow', fireKind: 'projectile', policies: { authority: 'host-projectile-v1' },
     });
+  });
+
+  it('canonically ranks the Glock 18 as the weakest-damage and highest-sustained-recoil loadout secondary', () => {
+    const eligibleSecondaries = WEAPON_CATALOG.filter((definition) =>
+      definition.slot === 'secondary' && definition.policies.loadout === 'eligible');
+    const machinePistol = eligibleSecondaries.find((definition) => definition.id === 'machine-pistol')!;
+    expect(machinePistol.damage.base).toBe(Math.min(...eligibleSecondaries.map((definition) => definition.damage.base)));
+    expect(sustainedRecoilRanking(eligibleSecondaries)[0]).toMatchObject({ weaponId: 'machine-pistol' });
+    expect(sustainedRecoilBurden(machinePistol)).toBeGreaterThan(0);
   });
 
   it('retains special pickup and entitlement-only metadata', () => {

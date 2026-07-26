@@ -194,7 +194,7 @@ function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHei
   } else if (id === 'sniper' || id === 'railgun') {
     const magazine = addBox('straight-magazine', [0.22, 0.42, 0.19], [0, -0.26, -0.06], grip, [0.09, 0, 0]); magazine.userData.originalAnimatedPart = true;
     const bolt = addBox('bolt-or-slide', [0.18, 0.07, 0.24], [0.12, 0.04, -0.02], accent); bolt.userData.restZ = bolt.position.z;
-    addCylinder('longline-scope-body', 0.115, 0.62, [0, sightHeight, -0.25], gunmetal, 18);
+    addCylinder('m40a5-scope-body', 0.115, 0.62, [0, sightHeight, -0.25], gunmetal, 18);
     addCylinder('scope-rear-lens', 0.094, 0.009, [0, sightHeight, 0.065], lens, 20);
     addCylinder('scope-front-lens', 0.102, 0.009, [0, sightHeight, -0.565], lens, 20);
     addBox('scope-turret', [0.12, 0.1, 0.12], [0, sightHeight + 0.15, -0.25], accent);

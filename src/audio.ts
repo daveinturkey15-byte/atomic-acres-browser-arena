@@ -335,7 +335,7 @@ export class ArenaAudio {
       delay: 0.025,
     }, this.ambience);
     if (weapon === 'carbine') {
-      // Original M86 pressure and yard-reflection layers; short enough to stay readable at full RPM.
+      // Original HK416 pressure and yard-reflection layers; short enough to stay readable at full RPM.
       this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', this.weapons, 0.008);
       this.noise({ duration: 0.14, volume: 0.046 * attenuation, filter: 'bandpass', frequency: 830, q: 0.62, delay: 0.058 }, this.ambience);
       if (!remote) this.noise({ duration: 0.022, volume: 0.046, filter: 'highpass', frequency: 4200, q: 0.55, delay: 0.043 }, this.feedback);

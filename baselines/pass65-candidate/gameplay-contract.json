@@ -2982,7 +2982,7 @@
           "optic": null,
           "pellets": 1,
           "penetration": {
-            "caliber": ".44 magnum",
+            "caliber": ".50 AE",
             "energyFalloffEnd": 82,
             "energyFalloffStart": 30,
             "fmjMultiplier": 1.08,
@@ -3575,8 +3575,8 @@
           "id": "marksman",
           "role": "PRECISION / LONG RANGE",
           "sidearm": "machine-pistol",
-          "summary": "One-headshot Longline precision backed by a compact full-auto G18-style sidearm.",
-          "title": "Longline Marksman",
+          "summary": "One-headshot M40A5 precision backed by a compact full-auto Glock 18 sidearm.",
+          "title": "M40A5 Marksman",
           "traits": [
             "Range 5",
             "Control 2",

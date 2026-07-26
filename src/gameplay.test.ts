@@ -251,7 +251,7 @@ describe('weapon tuning', () => {
     expect(Math.hypot(...Object.values(sampleWeaponPellet(auto, 0, auto.maximumSpread, 1, 0.5)))).toBeGreaterThan(0);
   });
 
-  it('gives the Longline sniper an exact one-headshot two-body-shot lethality contract', () => {
+  it('gives the M40A5 sniper an exact one-headshot two-body-shot lethality contract', () => {
     const sniper = WEAPONS.sniper;
     const body = computeDamage(sniper, 90, 'body');
     const head = computeDamage(sniper, 90, 'head');

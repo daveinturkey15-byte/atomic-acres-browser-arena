@@ -556,7 +556,7 @@ export class ArenaNetwork {
         return;
       }
       if (payload.type === 'overdrive-claim' || payload.type === 'hit'
-        || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'state-feedback' || payload.type === 'melee'
+        || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'trigger-state' || payload.type === 'state-feedback' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
         || payload.type === 'lobby-ready' || payload.type === 'lobby-team' || payload.type === 'lobby-handicap'
         || payload.type === 'lobby-balance' || payload.type === 'redeploy-request' || payload.type === 'clock-ping'

@@ -465,7 +465,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     const rubber = MAT.rubber();
     const accent = new THREE.MeshStandardMaterial({ color: 0x789f54, roughness: 0.5, metalness: 0.32 });
 
-    // The Mastiff is an original belt-fed support weapon, not a stretched
+    // The M249 is an original belt-fed support-weapon treatment, not a stretched
     // rifle. Suppress the inherited magazine and optic silhouette, then add a
     // heavier receiver, box feed, heat shield, carry handle and folded bipod.
     const inheritedDetails = new Set([
@@ -694,7 +694,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
   };
 
   if (id === 'carbine') {
-    // Original M86 vertical-slice silhouette: compact receiver, ventilated fore-end,
+    // Original HK416 vertical-slice silhouette: compact receiver, ventilated fore-end,
     // skeleton stock and a physically aligned low reflex optic.
     part(root, roundedBox('receiver', [0.235, 0.22, 0.62], metal, 0.035), [0, 0, -0.12]);
     part(root, roundedBox('upper-receiver', [0.205, 0.095, 0.57], dark, 0.025), [0, 0.115, -0.13]);
@@ -788,7 +788,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('grip-socket-r', [0.035, -0.135, 0.045]);
     addSocket('support-socket-l', [-0.035, -0.17, -0.57]);
   } else if (id === 'smg') {
-    // Original Vectorline SMG: vertically layered receiver, forward heat cage,
+    // Original FN P90 treatment: vertically layered receiver, forward heat cage,
     // compact aperture sights and an exposed side charging tab.
     part(root, roundedBox('receiver', [0.22, 0.225, 0.45], metal, 0.04), [0, 0, -0.12]);
     part(root, roundedBox('tall-rear-housing', [0.205, 0.25, 0.2], dark, 0.035), [0, 0.075, 0.09]);
@@ -836,7 +836,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('grip-socket-r', [0.03, -0.13, 0.02]);
     addSocket('support-socket-l', [-0.03, -0.16, -0.47]);
   } else if (pistolFamily) {
-    // Original Aster/G18-style pistol family: compact stepped slide, open-frame
+    // Original Glock 17/Glock 18 treatment: compact stepped slide, open-frame
     // trigger guard and a high-contrast sight channel. The full-auto marksman
     // derivative uses an extended magazine and selector without a new asset.
     const frame = roundedBox('pistol-frame', [0.21, 0.16, 0.5], metal, 0.035, 3);
@@ -901,7 +901,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
     addSocket('grip-socket-r', [0.03, -0.2, 0.08]);
     addSocket('support-socket-l', [-0.09, -0.1, -0.12]);
   } else {
-    // Original Model 12: warm laminated furniture, perforated heat shield,
+    // Original Remington 870 treatment: warm laminated furniture, perforated heat shield,
     // shell saddle and a physically aligned ghost-ring sight.
     const wood = new THREE.MeshStandardMaterial({ color: 0xb98a57, roughness: 0.78, metalness: 0.04 });
     part(root, roundedBox('rounded-receiver', [0.225, 0.225, 0.5], metal, 0.055), [0, 0, -0.05]);

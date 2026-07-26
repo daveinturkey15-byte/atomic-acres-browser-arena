@@ -14,6 +14,7 @@ import {
   recordGrenadeKill,
   replenishGrenadeFromCorpse,
   smokeBlocksTargetAcquisition,
+  shouldResolveFlashAgainstBots,
   spawnGrenadeInventory,
   spendSelectedGrenade,
   targetAcquisitionAllowed,
@@ -58,6 +59,12 @@ describe('Pass 65 ordnance rules', () => {
     expect(hostile.accepted).toBe(true);
     expect(friendly.intensity).toBeCloseTo(hostile.intensity * 0.5);
     expect(calculateFlashExposure({ ...base, friendly: false, solidOccluded: true }).intensity).toBe(0);
+  });
+
+  it('lets the host resolve admitted guest flash against bots without client-side AI mutation', () => {
+    expect(shouldResolveFlashAgainstBots('host', 'remote')).toBe(true);
+    expect(shouldResolveFlashAgainstBots('offline', 'player')).toBe(true);
+    expect(shouldResolveFlashAgainstBots('client', 'remote')).toBe(false);
   });
 
   it('arms an attached explosive bolt after 1250ms and detonates at most once', () => {

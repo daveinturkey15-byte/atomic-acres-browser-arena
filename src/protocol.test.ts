@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
-import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage, type TriggerStateMessage } from './protocol';
 import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DELAY_MS } from './railgun-authority';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
@@ -88,6 +88,27 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...request, direction: [0, 0, -0.5] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], damage: 401 }] })).toBe(false);
     expect(isGameMessage({ ...result, outcomes: [{ ...result.outcomes[0], rawDamage: 30 }] })).toBe(false);
+  });
+
+  it('strictly validates reliable trigger edges without trusting a client timestamp', () => {
+    const trigger = {
+      type: 'trigger-state' as const,
+      protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'abc',
+      connectionEpoch: 'connection_epoch_abc',
+      lifeId: 3,
+      actionSequence: 7,
+      weapon: 'minigun' as const,
+      pressed: true,
+      nonce: 43,
+    } satisfies TriggerStateMessage;
+    expect(isGameMessage(trigger)).toBe(true);
+    expect(messageBelongsToPlayer(trigger, 'abc')).toBe(true);
+    expect(isHostAuthorityMessage(trigger)).toBe(false);
+    expect(isGameMessage({ ...trigger, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
+    expect(isGameMessage({ ...trigger, actionSequence: -1 })).toBe(false);
+    expect(isGameMessage({ ...trigger, actionSequence: 1_000_000_001 })).toBe(false);
+    expect(isGameMessage({ ...trigger, pressed: 'yes' })).toBe(false);
   });
 
   it('requires action-correlated typed hit authority and earned support metadata', () => {

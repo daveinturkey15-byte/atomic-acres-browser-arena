@@ -128,7 +128,7 @@ describe('palette static batching', () => {
 });
 
 describe('attached weapon draw-call batching', () => {
-  it('builds the Mastiff LMG with a distinct heavy support-weapon silhouette', () => {
+  it('builds the M249 SAW with a distinct heavy support-weapon silhouette', () => {
     const lmg = buildWeaponModel('lmg', false, false);
     expect(lmg.name).toBe('lmg-original-weapon');
     for (const detail of ['lmg-heavy-receiver', 'lmg-box-magazine', 'lmg-carry-handle', 'lmg-bipod', 'lmg-heat-shield', 'bolt-or-slide']) {

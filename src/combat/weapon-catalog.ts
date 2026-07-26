@@ -122,7 +122,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.026, adsMultiplier: 0.3, movementMultiplier: 1.5, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.68, sustainedPerShot: 0.006, maximumRadians: 0.06 },
     recoil: { pitchRadians: 0.05, yawRadians: 0.012, recoveryPerSecond: 8, adsMultiplier: 0.74, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.68, deterministicPatternId: 'magnum-pattern-v1' },
     ammo: { magazine: 6, reserve: 30, reloadSeconds: 1.75, emptyReloadSeconds: 2, switchSeconds: 0.34 },
-    penetration: { calibreLabel: '.44 magnum', power: 4.7, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 82, minimumEnergyRetention: 0.4, minimumWallDamageMultiplier: 0.3, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '.50 AE', power: 4.7, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 82, minimumEnergyRetention: 0.4, minimumWallDamageMultiplier: 0.3, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xffd36a, muzzleFlashScale: 1.12, reportGain: 1.2, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'never', bot: 'never', drop: 'never', range: { kind: 'entitlement-only', entitlementPolicyId: 'dhv-x-sidearm-v1' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -262,3 +262,25 @@ const RAW_B1_WEAPON_DEFINITIONS = [
 
 /** Canonical, schema-validated B1 definitions. Target metadata remains inert until its owning migration. */
 export const WEAPON_CATALOG: readonly WeaponDefinition[] = parseWeaponDefinitions(RAW_B1_WEAPON_DEFINITIONS);
+
+export type SustainedRecoilRank = Readonly<{
+  weaponId: WeaponId;
+  burden: number;
+}>;
+
+/** Angular impulse per second, normalized by authored recovery rate. */
+export function sustainedRecoilBurden(definition: WeaponDefinition): number {
+  const angularImpulse = Math.hypot(definition.recoil.pitchRadians, definition.recoil.yawRadians);
+  return angularImpulse * (definition.rpm / 60) / definition.recoil.recoveryPerSecond;
+}
+
+export function sustainedRecoilRanking(
+  definitions: readonly WeaponDefinition[] = WEAPON_CATALOG,
+): readonly SustainedRecoilRank[] {
+  return Object.freeze(definitions
+    .map((definition) => Object.freeze({
+      weaponId: definition.id as WeaponId,
+      burden: sustainedRecoilBurden(definition),
+    }))
+    .sort((left, right) => right.burden - left.burden || left.weaponId.localeCompare(right.weaponId)));
+}

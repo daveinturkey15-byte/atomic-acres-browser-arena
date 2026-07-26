@@ -138,6 +138,17 @@ export type FlashExposure = Readonly<{
   durationMs: number;
 }>;
 
+export type FlashOwnerKind = 'player' | 'remote' | 'bot';
+export type FlashSimulationRole = 'offline' | 'host' | 'client';
+
+export function shouldResolveFlashAgainstBots(
+  role: FlashSimulationRole,
+  ownerKind: FlashOwnerKind,
+): boolean {
+  return role !== 'client'
+    && (ownerKind === 'player' || ownerKind === 'remote' || ownerKind === 'bot');
+}
+
 export function calculateFlashExposure(input: Readonly<{
   origin: Vec3;
   eyes: Vec3;
@@ -244,4 +255,3 @@ export function explosiveBoltBlastDamage(distanceM: number): number {
   return EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE
     + (EXPLOSIVE_BOLT_BLAST_MIN_DAMAGE - EXPLOSIVE_BOLT_BLAST_MAX_DAMAGE) * alpha;
 }
-

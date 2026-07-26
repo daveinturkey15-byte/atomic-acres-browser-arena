@@ -117,13 +117,24 @@ export type ShotRequestMessage = {
   weapon: WeaponId;
   /** Trigger time in the host monotonic domain. */
   fireTimeMs: number;
-  /** Host-domain time at which this continuous trigger hold began. */
+  /** Client prediction telemetry only. Spin authority uses host-received trigger edges. */
   triggerStartedAtMs: number;
   /** Host-world time represented by remote target presentation when the trigger fired. */
   targetViewTimeMs: number;
   origin: [number, number, number];
   direction: [number, number, number];
   pelletDirections: [number, number, number][];
+  nonce: number;
+};
+export type TriggerStateMessage = {
+  type: 'trigger-state';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  connectionEpoch: string;
+  lifeId: number;
+  actionSequence: number;
+  weapon: WeaponId;
+  pressed: boolean;
   nonce: number;
 };
 export type ShotOutcome = {
@@ -324,7 +335,7 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage;
@@ -416,6 +427,16 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Array.isArray(msg.pelletDirections) && msg.pelletDirections.length >= 1 && msg.pelletDirections.length <= 12
         && msg.pelletDirections.every(isNormalizedDirection)
         && Number.isFinite(msg.nonce);
+    case 'trigger-state':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.connectionEpoch === 'string' && msg.connectionEpoch.length >= 8 && msg.connectionEpoch.length <= 128
+        && /^[a-zA-Z0-9_-]+$/.test(msg.connectionEpoch)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
+        && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && weapons.has(msg.weapon as WeaponId)
+        && typeof msg.pressed === 'boolean'
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'shot-result':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -706,6 +727,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
       return message.playerId === playerId;
     case 'shot':
     case 'shot-request':
+    case 'trigger-state':
     case 'shot-result':
     case 'state-feedback':
     case 'melee':

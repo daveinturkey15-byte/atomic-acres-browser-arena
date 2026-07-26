@@ -3,6 +3,7 @@ import {
   MAX_AUTHORITATIVE_REWIND_MS,
   MAX_CLOCK_UNCERTAINTY_ALLOWANCE_MS,
   admitAuthoritativeShot,
+  canonicalShotDirection,
   createAuthoritativeShotAdmissionState,
   freezeAuthoredBulletRecord,
   freezeAuthoredShotTimeline,
@@ -21,6 +22,7 @@ const context = (overrides: Partial<AuthoritativeShotAdmissionContext> = {}): Au
   expectedLifeId: 4,
   clockUncertaintyMs: 0,
   shooterDiedAtHostTimeMs: null,
+  hostTriggerState: null,
   ...overrides,
 });
 const request = (
@@ -110,19 +112,44 @@ describe('host-authored bullet admission', () => {
       context({ expectedLifeId: 5 })).reason).toBe('life-mismatch');
   });
 
-  it('enforces the M134 spin-up on the host-authored trigger timeline', () => {
+  it('enforces M134 spin-up from host receipt time and ignores a forged client hold age', () => {
     const minigunner: PlayerSnapshot = {
       ...sender,
       primary: 'minigun',
       secondary: 'pistol',
       weapon: 'minigun',
     };
-    const early = request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 802 });
-    expect(admitAuthoritativeShot(early, minigunner, 2_050, createAuthoritativeShotAdmissionState(), context()).reason)
+    const forgedOldClientHold = request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 0 });
+    const lateHostPress = {
+      connectionEpoch: 'connection-1', lifeId: 4, weapon: 'minigun' as const,
+      pressed: true, pressedAtHostTimeMs: 1_900, highestActionSequence: 0,
+    };
+    expect(admitAuthoritativeShot(forgedOldClientHold, minigunner, 2_050, createAuthoritativeShotAdmissionState(),
+      context({ hostTriggerState: lateHostPress })).reason)
       .toBe('spin-up');
-    const ready = request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 801 });
-    const admitted = admitAuthoritativeShot(ready, minigunner, 2_050, createAuthoritativeShotAdmissionState(), context());
+    const hostReady = { ...lateHostPress, pressedAtHostTimeMs: 800 };
+    const admitted = admitAuthoritativeShot(
+      request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 1_999 }),
+      minigunner,
+      2_050,
+      createAuthoritativeShotAdmissionState(),
+      context({ hostTriggerState: hostReady }),
+    );
     expect(admitted.accepted, admitted.reason).toBe(true);
+    expect(admitAuthoritativeShot(
+      request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 0 }),
+      minigunner,
+      2_050,
+      createAuthoritativeShotAdmissionState(),
+      context({ hostTriggerState: { ...hostReady, pressed: false, pressedAtHostTimeMs: null } }),
+    ).reason).toBe('spin-up');
+  });
+
+  it('uses the first authored projectile ray as the canonical crossbow direction', () => {
+    const base: [number, number, number] = [0, 0, -1];
+    const spreadRay: [number, number, number] = [0.08, 0, -0.9967948636];
+    expect(canonicalShotDirection('explosive-crossbow', base, [spreadRay])).toBe(spreadRay);
+    expect(canonicalShotDirection('machine-pistol', base, [spreadRay])).toBe(base);
   });
 
   it('freezes immutable fire and target-view times before hit or miss evaluation', () => {

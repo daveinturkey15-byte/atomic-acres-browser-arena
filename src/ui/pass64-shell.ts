@@ -275,7 +275,7 @@ function hudMarkup(): string {
     </section>
     <section class="hud-weapon-console" aria-label="Weapon and ammunition">
       <div id="weapon-block">
-        <span id="weapon-name">M86 CARBINE</span>
+        <span id="weapon-name">${WEAPONS.carbine.name.toUpperCase()}</span>
         <div class="ammo-row"><b id="ammo">30</b><div class="reserve-stack"><small>RESERVE</small><span><i>/</i><em id="reserve">120</em></span></div></div>
         <small id="reload-state"></small>
         <small id="railgun-status" hidden></small>
@@ -289,7 +289,7 @@ function hudMarkup(): string {
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
     <div id="damage-numbers" aria-live="polite" aria-label="Damage dealt"></div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope"><div class="scope-ring"></div><div class="scope-reticle"><i></i><b></b><span></span><em></em></div><small>3×</small></div>
-    <div id="railgun-thermal" hidden aria-label="Railgun thermal scope" aria-live="off"><span>VX-8 THERMAL · HOSTILES</span></div>
+    <div id="railgun-thermal" hidden aria-label="Railgun thermal scope" aria-live="off"><span>${WEAPONS.railgun.name.toUpperCase()} THERMAL · HOSTILES</span></div>
     <div id="killfeed" aria-live="polite" aria-label="Match events"></div>
     <div id="damage-feeds" aria-label="Damage activity"><section class="damage-feed done" aria-label="Damage dealt"><div id="damage-done-feed" aria-live="polite"></div></section><section class="damage-feed taken" aria-label="Damage received"><div id="damage-taken-feed" aria-live="assertive"></div></section></div>
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>

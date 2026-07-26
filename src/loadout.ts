@@ -46,12 +46,12 @@ export const FIELD_KITS: readonly FieldKit[] = [
   },
   {
     id: 'marksman',
-    title: 'Longline Marksman',
+    title: 'M40A5 Marksman',
     weapon: 'sniper',
     sidearm: 'machine-pistol',
     grenade: 'smoke',
     role: 'PRECISION / LONG RANGE',
-    summary: 'One-headshot Longline precision backed by a compact full-auto G18-style sidearm.',
+    summary: 'One-headshot M40A5 precision backed by a compact full-auto Glock 18 sidearm.',
     traits: ['Range 5', 'Control 2', 'Mobility 2'],
   },
 ] as const;

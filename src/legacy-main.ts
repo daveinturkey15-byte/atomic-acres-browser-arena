@@ -251,6 +251,7 @@ import {
   EXPLOSIVE_BOLT_MAX_LIFE_MS,
   explosiveBoltBlastDamage,
   calculateFlashExposure,
+  shouldResolveFlashAgainstBots,
   smokeBlocksTargetAcquisition,
   type SmokeVolume,
 } from './combat/ordnance';
@@ -341,6 +342,7 @@ import {
   MAX_AUTHORITATIVE_REWIND_MS,
   MAX_SHOT_FIRE_AGE_MS,
   admitAuthoritativeShot,
+  canonicalShotDirection,
   createAuthoritativeShotAdmissionState,
   freezeAuthoredBulletRecord,
   freezeAuthoredShotTimeline,
@@ -348,6 +350,7 @@ import {
   type AuthoredShotTimeline,
   type AuthoritativeShotAdmissionState,
 } from './authoritative-shot';
+import { HostTriggerAuthorityRegistry } from './host-trigger-authority';
 import { ShotTimingTelemetry } from './shot-timing-telemetry';
 import { admitRemoteSupportActivation, admitRemoteSupportHit, createRemoteSupportAuthorityState, recordRemoteSupportDeath, recordRemoteSupportElimination, type RemoteSupportAuthorityState } from './remote-support-authority';
 import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, replenishRemoteGrenadeAuthorityState, resetRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
@@ -399,7 +402,6 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
-import { loadImportedWeaponAssets } from './weapon-model';
 import { WeaponPresentation } from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
@@ -464,6 +466,7 @@ import {
   StateMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
+  TriggerStateMessage,
   WEAPON_IDS,
   WeaponId,
   WindowBreakMessage,
@@ -576,6 +579,7 @@ type GrenadeEntity = {
   actionNonce: number;
   ownerKind: 'player' | 'bot' | 'remote';
   ownerId: string;
+  ownerTeam: Team;
 };
 
 type RuntimeSmokeVolume = SmokeVolume & Readonly<{ mesh: THREE.Mesh }>;
@@ -981,7 +985,6 @@ camera.layers.enable(VIEWMODEL_RENDER_LAYER);
 let skyMaterial: THREE.ShaderMaterial | null = null;
 
 let riggedOperatorLoadError: string | null = null;
-let importedWeaponLoadError: string | null = null;
 type BootstrapStage =
   | 'loading-module-assets'
   | 'measuring-display'
@@ -1013,18 +1016,13 @@ const displayCadencePromise = new Promise<number>((resolve) => {
   };
   requestAnimationFrame(sample);
 });
-const [operatorLoad, weaponLoad] = await Promise.allSettled([
+const [operatorLoad] = await Promise.allSettled([
   loadRiggedOperatorAsset(),
-  loadImportedWeaponAssets(),
 ]);
 bootstrapStage = 'measuring-display';
 if (operatorLoad.status === 'rejected') {
   riggedOperatorLoadError = operatorLoad.reason instanceof Error ? operatorLoad.reason.message : String(operatorLoad.reason);
   console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
-}
-if (weaponLoad.status === 'rejected') {
-  importedWeaponLoadError = weaponLoad.reason instanceof Error ? weaponLoad.reason.message : String(weaponLoad.reason);
-  console.error('[Nuke Town weapon asset load failed]', importedWeaponLoadError);
 }
 const detectedDisplayFrameMs = await displayCadencePromise;
 bootstrapStage = 'module-ready';
@@ -2124,6 +2122,7 @@ const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplo
 const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
 const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const hostTriggerAuthorities = new HostTriggerAuthorityRegistry();
 const authorizedRemoteRedeploys = new Map<string, {
   primary: PrimaryWeaponId;
   secondary: SidearmWeaponId;
@@ -2270,6 +2269,9 @@ function handicapOutgoingDamage(attackerId: string, damage: number, weapon?: Wea
   return applyDhvWeaponOutgoingDamage(damage, dhv, weapon === 'magnum');
 }
 let triggerHeld = false;
+let localTriggerActionSequence = 0;
+let transmittedTriggerHeld = false;
+let transmittedTriggerWeapon: WeaponId | null = null;
 let spinUpWeapon: WeaponId | null = null;
 let spinUpStartedAtPerformanceMs: number | null = null;
 let spinUpStartedAtHostTimeMs: number | null = null;
@@ -2580,6 +2582,58 @@ function playerSimulationEnabled(): boolean {
     && !localKillstreakActorSnapshot()?.possession;
 }
 
+function resetLocalSpinUp(): void {
+  spinUpWeapon = null;
+  spinUpStartedAtPerformanceMs = null;
+  spinUpStartedAtHostTimeMs = null;
+}
+
+function sendLocalTriggerEdge(pressed: boolean, weapon: WeaponId): void {
+  if (network.role !== 'client') return;
+  const message: TriggerStateMessage = {
+    type: 'trigger-state',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    connectionEpoch: localConnectionEpoch,
+    lifeId: localContinuity,
+    actionSequence: localTriggerActionSequence,
+    weapon,
+    pressed,
+    nonce: randomNonce(),
+  };
+  localTriggerActionSequence += 1;
+  network.send(message);
+}
+
+function syncLocalTriggerAuthority(held: boolean): void {
+  if (network.role !== 'client') {
+    transmittedTriggerHeld = false;
+    transmittedTriggerWeapon = null;
+    return;
+  }
+  const weaponChanged = transmittedTriggerHeld && transmittedTriggerWeapon !== player.weapon;
+  if (transmittedTriggerHeld && (!held || weaponChanged) && transmittedTriggerWeapon) {
+    sendLocalTriggerEdge(false, transmittedTriggerWeapon);
+    transmittedTriggerHeld = false;
+    transmittedTriggerWeapon = null;
+  }
+  if (!held || !gameStarted || !player.alive || matchState.phase !== 'active') return;
+  if (!transmittedTriggerHeld) {
+    // The reliable state commit and following edge share the ordered event lane,
+    // so the host admits the current weapon/life before starting its hold clock.
+    network.sendStateCommitReliably(createStateMessage());
+    sendLocalTriggerEdge(true, player.weapon);
+    transmittedTriggerHeld = true;
+    transmittedTriggerWeapon = player.weapon;
+  }
+}
+
+function setLocalTriggerHeld(held: boolean): void {
+  triggerHeld = held;
+  syncLocalTriggerAuthority(held);
+  if (!held) resetLocalSpinUp();
+}
+
 function interruptReload(force = false, now = performance.now()): void {
   if (!player.reloadState) {
     weaponView.cancelReload();
@@ -2599,10 +2653,7 @@ function clearGameplayInput(): void {
   gamepadSprint = false;
   mouseTriggerHeld = false;
   mouseAdsHeld = false;
-  triggerHeld = false;
-  spinUpWeapon = null;
-  spinUpStartedAtPerformanceMs = null;
-  spinUpStartedAtHostTimeMs = null;
+  setLocalTriggerHeld(false);
   adsHeld = false;
   currentSprinting = false;
   jumpQueuedAt = -10_000;
@@ -2812,7 +2863,7 @@ function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   bootstrapStage = 'failed';
   bootstrapError = message;
-  triggerHeld = false;
+  setLocalTriggerHeld(false);
   setStatus(`Game paused: ${message}`, 'error');
   applyMenuLifecycle({ type: 'fatal-error' });
   const banner = element<HTMLElement>('#banner');
@@ -3098,6 +3149,10 @@ function resetPrivateLobbyState(): void {
   localDhv = 10;
   localResumeToken = '';
   localConnectionEpoch = randomLobbyCredential();
+  localTriggerActionSequence = 0;
+  transmittedTriggerHeld = false;
+  transmittedTriggerWeapon = null;
+  hostTriggerAuthorities.clear('match-reset');
   lobbyArenaSyncPromise = Promise.resolve();
   hostLobbyMembers.clear();
   hostLobbyTokens.clear();
@@ -3169,6 +3224,9 @@ function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   localConnectionEpoch = randomLobbyCredential();
+  localTriggerActionSequence = 0;
+  transmittedTriggerHeld = false;
+  transmittedTriggerWeapon = null;
   const message: LobbyJoinMessage = {
     type: 'lobby-join',
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
@@ -3202,7 +3260,10 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
     hostDisconnectedAt.delete(message.playerId);
     const priorConnectionEpoch = hostLobbyConnectionEpochs.get(message.playerId);
     hostLobbyConnectionEpochs.set(message.playerId, message.connectionEpoch);
-    if (priorConnectionEpoch !== message.connectionEpoch) authoritativeShotAdmissions.delete(message.playerId);
+    if (priorConnectionEpoch !== message.connectionEpoch) {
+      authoritativeShotAdmissions.delete(message.playerId);
+      hostTriggerAuthorities.reset(message.playerId, 'connection-epoch');
+    }
     const restored = { ...existing, name: message.name, connected: true, pingMs: message.playerId === player.id ? 0 : existing.pingMs };
     hostLobbyMembers.set(message.playerId, restored);
     network.setPlayerTeam(message.playerId, restored.team);
@@ -3218,6 +3279,7 @@ function admitLobbyJoin(message: LobbyJoinMessage): void {
     hostLobbyTokens.set(message.playerId, message.resumeToken);
     hostLobbyConnectionEpochs.set(message.playerId, message.connectionEpoch);
     authoritativeShotAdmissions.delete(message.playerId);
+    hostTriggerAuthorities.reset(message.playerId, 'connection-epoch');
     hostLobbyMembers.set(message.playerId, {
       id: message.playerId,
       name: message.name,
@@ -4478,6 +4540,23 @@ function onNetworkMessage(message: GameMessage): void {
     });
     return;
   }
+  if (message.type === 'trigger-state') {
+    if (network.role !== 'host' || message.by === player.id) return;
+    const sender = remotes.get(message.by);
+    const health = remoteHealthAuthorities.get(message.by);
+    const admission = hostTriggerAuthorities.admit(message, sender?.snapshot, performance.now(), {
+      expectedConnectionEpoch: hostLobbyConnectionEpochs.get(message.by) ?? '',
+      expectedLifeId: sender?.continuity ?? -1,
+      shooterAlive: health?.alive ?? false,
+    });
+    recordMatchDiagnostic('trigger-authority', admission.accepted ? 'accepted' : 'rejected', {
+      actorId: message.by,
+      weaponOrEffect: message.weapon,
+      reason: admission.reason,
+      modifiers: [message.pressed ? 'pressed' : 'released', `sequence:${message.actionSequence}`],
+    }, `trigger-${message.actionSequence}`);
+    return;
+  }
   if (message.type === 'state-feedback') {
     if (network.role === 'client' && message.forPlayerId === player.id && message.by === privateLobbySnapshot?.hostId) {
       outboundFeedbackSequenceGaps = message.sequenceGaps;
@@ -4577,10 +4656,12 @@ function onNetworkMessage(message: GameMessage): void {
         if (respawnAdmission.respawned) {
           remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
           remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
+          hostTriggerAuthorities.reset(incoming.id, 'respawn');
         }
         if (redeployed) {
           remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
           remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
+          hostTriggerAuthorities.reset(incoming.id, 'respawn');
         }
         const authoritativeHealth = respawnAdmission.state;
         remoteHealthAuthorities.set(incoming.id, authoritativeHealth);
@@ -4619,6 +4700,7 @@ function onNetworkMessage(message: GameMessage): void {
         && !respawned) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
+      if (network.role === 'host') hostTriggerAuthorities.resetIfWeaponChanged(admittedIncoming.id, admittedIncoming.weapon);
       remote.claimEligibleAt = movement.claimEligibleAt;
       const coreDistance = Math.hypot(admittedIncoming.x - overdriveState.position.x, admittedIncoming.z - overdriveState.position.z);
       if (movement.resynchronized && coreDistance <= OVERDRIVE_PICKUP_RADIUS + 3) remote.claimRequiresCoreExit = true;
@@ -4725,7 +4807,7 @@ function onNetworkMessage(message: GameMessage): void {
     const admission = admitRemoteGrenadeThrow(state, message, sender.snapshot, performance.now());
     if (!admission.accepted) return;
     remoteGrenadeAuthorities.set(message.by, admission.state);
-    presentRemoteGrenade(message);
+    presentRemoteGrenade(message, sender.snapshot.team);
     if (network.role === 'host') network.send(message);
     return;
   }
@@ -5068,6 +5150,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     expectedLifeId: sender?.continuity ?? -1,
     clockUncertaintyMs: peerTimingStates.get(request.by)?.uncertaintyMs ?? 0,
     shooterDiedAtHostTimeMs: shooterHealth?.diedAtHostTimeMs ?? null,
+    hostTriggerState: hostTriggerAuthorities.stateFor(request.by) ?? null,
   });
   const resolutionTrace = (outcome: string, resolvedAtHostTimeMs: number, appliedRewindMs: number): ShotResolutionTrace => ({
     shotSeq: request.shotSeq,
@@ -5120,7 +5203,8 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   authoritativeShotAdmissions.set(request.by, admission.state);
   const visualShot: ShotMessage = {
     type: 'shot', by: request.by, weapon: request.weapon, origin: request.origin,
-    direction: request.direction, pelletDirections: request.pelletDirections, nonce: request.nonce,
+    direction: canonicalShotDirection(request.weapon, request.direction, request.pelletDirections),
+    pelletDirections: request.pelletDirections, nonce: request.nonce,
   };
   const shooterRewind = reconstructShooterPoseAtFireTime(sender.positionHistory, request.fireTimeMs, request.lifeId);
   if (!shooterRewind.pose) {
@@ -5146,7 +5230,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       request.by,
       sender.snapshot.team,
       new THREE.Vector3(...request.origin),
-      new THREE.Vector3(...request.direction),
+      new THREE.Vector3(...visualShot.direction),
       true,
       request.nonce,
       receivedAt,
@@ -5757,7 +5841,7 @@ function updateDeathDrops(now: number): void {
   prompt.hidden = !nearbyRailgun && !nearby && !nearbyStation;
   if (nearbyRailgun) {
     prompt.querySelector<HTMLElement>('span')!.textContent = 'PICK UP';
-    prompt.querySelector<HTMLElement>('strong')!.textContent = 'VX-8 RAILGUN';
+    prompt.querySelector<HTMLElement>('strong')!.textContent = WEAPONS.railgun.name.toUpperCase();
   } else if (nearbyStation) {
     const replenish = rangePrimaryUnlocked && nearbyStation.weapon === player.primaryWeapon;
     prompt.querySelector<HTMLElement>('span')!.textContent = replenish ? 'REFILL' : 'EQUIP';
@@ -5984,6 +6068,7 @@ function processDeath(message: DeathMessage): void {
   // Capture the canonical live rig state before authoritative item drops mutate
   // the holder back to their primary weapon.
   const fallenOperatorSource = corpseSource(message.victim);
+  if (network.role === 'host') hostTriggerAuthorities.reset(message.victim, 'death');
   const deathSource = message.cause.kind === 'gun'
     ? message.cause.weapon
     : message.cause.kind === 'killstreak'
@@ -6085,6 +6170,7 @@ function removeRemote(id: string, reason: string): void {
   remotes.delete(id);
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
+  hostTriggerAuthorities.reset(id, 'disconnect');
   admittedRemoteShots.delete(id);
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
@@ -6545,6 +6631,10 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   localPositionHistory.length = 0;
   localShotSeq = 0;
   localWeaponSequences.clear();
+  localTriggerActionSequence = 0;
+  transmittedTriggerHeld = false;
+  transmittedTriggerWeapon = null;
+  hostTriggerAuthorities.clear('match-reset');
   resolvedShotRequests.clear();
   presentedShotResults.clear();
   processedShotResults.clear();
@@ -6660,7 +6750,7 @@ function syncRailgunHolderPresentation(previous: RailgunAuthorityState, next: Ra
     player.switchingUntil = performance.now() + 420;
     weaponView.setWeapon('railgun');
     audio.weaponSwitch();
-    addFeed(`VX-8 RAILGUN ACQUIRED · ${RAILGUN_TOTAL_ROUNDS} FINITE ROUNDS`, 'gold');
+    addFeed(`${WEAPONS.railgun.name.toUpperCase()} ACQUIRED · ${RAILGUN_TOTAL_ROUNDS} FINITE ROUNDS`, 'gold');
   } else if (previous.holderId === player.id && next.holderId !== player.id && player.weapon === 'railgun') {
     player.weapon = player.primaryWeapon;
     player.switchingUntil = performance.now() + 280;
@@ -6754,7 +6844,7 @@ function dropHeldRailgun(holderId: string, position: THREE.Vector3): boolean {
   const dropped = dropRailgun(railgunState, holderId, [bounded.x, bounded.y, bounded.z]);
   if (!dropped.dropped) return false;
   applyRailgunState(dropped.state);
-  addFeed('VX-8 RAILGUN DROPPED · AMMO PRESERVED', 'gold');
+  addFeed(`${WEAPONS.railgun.name.toUpperCase()} DROPPED · AMMO PRESERVED`, 'gold');
   recordMatchDiagnostic('railgun-drop', 'accepted', { actorId: holderId, weaponOrEffect: 'railgun', position: [bounded.x, bounded.y, bounded.z], reason: 'holder-lifecycle-drop' });
   broadcastRailgunState();
   return true;
@@ -7039,9 +7129,8 @@ function switchWeapon(index: number): void {
     weaponView.cancelReload();
   }
   player.weapon = id;
-  spinUpWeapon = null;
-  spinUpStartedAtPerformanceMs = null;
-  spinUpStartedAtHostTimeMs = null;
+  resetLocalSpinUp();
+  syncLocalTriggerAuthority(triggerHeld);
   player.switchingUntil = performance.now() + 360;
   player.sustainedShots = 0;
   weaponView.setWeapon(id);
@@ -7300,7 +7389,11 @@ function tryFire(now: number): void {
     by: player.id,
     weapon: player.weapon,
     origin: origin.toArray() as [number, number, number],
-    direction: baseDirection.toArray() as [number, number, number],
+    direction: canonicalShotDirection(
+      player.weapon,
+      baseDirection.toArray() as [number, number, number],
+      pelletDirections,
+    ),
     pelletDirections,
     timing: nextCombatTiming(),
     nonce: randomNonce(),
@@ -7882,6 +7975,7 @@ function throwBotGrenade(
     actionNonce: randomNonce(),
     ownerKind: 'bot',
     ownerId: bot.id,
+    ownerTeam: bot.team,
   });
   bot.grenadeActive = true;
   bot.nextGrenadeAt = now + BOT_GRENADE_COOLDOWN_MS;
@@ -8686,10 +8780,11 @@ function throwGrenade(): void {
     actionNonce,
     ownerKind: 'player',
     ownerId: player.id,
+    ownerTeam: player.team,
   });
 }
 
-function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>): void {
+function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
   const mesh = createGrenadePresentation();
   mesh.position.fromArray(message.origin);
   mesh.castShadow = true;
@@ -8706,6 +8801,7 @@ function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-thr
     actionNonce: message.actionNonce,
     ownerKind: 'remote',
     ownerId: message.by,
+    ownerTeam,
   });
 }
 
@@ -8762,30 +8858,23 @@ function spawnSmokeVolume(point: THREE.Vector3, now: number, actionNonce: number
   }));
 }
 
-function grenadeOwnerTeam(entity: GrenadeEntity): Team | null {
-  if (entity.ownerKind === 'player') return player.team;
-  if (entity.ownerKind === 'remote') return remotes.get(entity.ownerId)?.snapshot.team ?? null;
-  return bots.get(entity.ownerId)?.team ?? null;
-}
-
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: number): void {
   const eyes = player.position;
   const solidOccluded = activeWorldColliders().some((box) => segmentIntersectsBox(point, eyes, box));
   const lookDirection = camera.getWorldDirection(new THREE.Vector3());
-  const ownerTeam = grenadeOwnerTeam(entity);
   const exposure = calculateFlashExposure({
     origin: point,
     eyes,
     lookDirection,
     maximumRadiusM: 14,
     solidOccluded,
-    friendly: ownerTeam !== null && ownerTeam === player.team,
+    friendly: entity.ownerTeam === player.team,
   });
   if (exposure.accepted) {
     flashExposureStrength = Math.max(flashExposureStrength, exposure.intensity);
     flashExposureUntil = Math.max(flashExposureUntil, now + exposure.durationMs);
   }
-  if (entity.ownerKind !== 'player') return;
+  if (!shouldResolveFlashAgainstBots(network.role, entity.ownerKind)) return;
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const botEyes = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
@@ -8797,7 +8886,7 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
       lookDirection: botLook,
       maximumRadiusM: 14,
       solidOccluded: botOccluded,
-      friendly: bot.team === player.team,
+      friendly: bot.team === entity.ownerTeam,
     });
     if (botExposure.accepted) bot.root.userData.flashBlindedUntil = now + botExposure.durationMs;
   }
@@ -11503,12 +11592,14 @@ function updateHud(now: number): void {
   const railgunRechamberRemainingMs = Math.max(0, railgunState.chamberReadyAtHostTimeMs - currentHostTimeMs());
   if (!railgunStatus.hidden) {
     railgunStatus.textContent = railgunState.roundsRemaining <= 0
-      ? 'VX-8 DEPLETED · NO RESUPPLY'
+      ? `${WEAPONS.railgun.name.toUpperCase()} DEPLETED · NO RESUPPLY`
       : player.weapon !== 'railgun'
-        ? `SIDEARM ACTIVE · VX-8 ${railgunState.roundsRemaining} ROUNDS`
+        ? `SIDEARM ACTIVE · ${WEAPONS.railgun.name.toUpperCase()} ${railgunState.roundsRemaining} ROUNDS`
         : railgunRechamberRemainingMs > 0
-          ? `VX-8 RECHAMBER ${Math.ceil(railgunRechamberRemainingMs / 100) / 10}s`
-          : railgunAdsResetRequired ? 'VX-8 RELEASE ADS' : 'VX-8 THERMAL READY';
+          ? `${WEAPONS.railgun.name.toUpperCase()} RECHAMBER ${Math.ceil(railgunRechamberRemainingMs / 100) / 10}s`
+          : railgunAdsResetRequired
+            ? `${WEAPONS.railgun.name.toUpperCase()} RELEASE ADS`
+            : `${WEAPONS.railgun.name.toUpperCase()} THERMAL READY`;
   }
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
@@ -11798,7 +11889,7 @@ function pollGamepad(dt: number): void {
     gamepadLookRate = { yaw: 0, pitch: 0 };
     gamepadSprint = false;
     previousGamepadButtons = [];
-    triggerHeld = mouseTriggerHeld;
+    setLocalTriggerHeld(mouseTriggerHeld);
     adsHeld = admittedAdsHeld(debugAdsOverride ?? mouseAdsHeld);
     return;
   }
@@ -11817,12 +11908,7 @@ function pollGamepad(dt: number): void {
   const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
   gamepadSprint = canControlPlayer && Boolean(buttons[10]);
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
-  triggerHeld = mouseTriggerHeld || padTriggerActive;
-  if (!triggerHeld) {
-    spinUpWeapon = null;
-    spinUpStartedAtPerformanceMs = null;
-    spinUpStartedAtHostTimeMs = null;
-  }
+  setLocalTriggerHeld(mouseTriggerHeld || padTriggerActive);
   gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
   gamepadLookRate = integrateGamepadLookRate(
     gamepadLookRate,
@@ -11961,18 +12047,13 @@ canvas.addEventListener('mousedown', (event) => {
   }
   if (event.button !== 0) return;
   mouseTriggerHeld = true;
-  triggerHeld = true;
+  setLocalTriggerHeld(true);
   tryFire(performance.now());
 });
 window.addEventListener('mouseup', (event) => {
   if (event.button === 0) mouseTriggerHeld = false;
   if (event.button === 2) mouseAdsHeld = false;
-  triggerHeld = mouseTriggerHeld;
-  if (!triggerHeld) {
-    spinUpWeapon = null;
-    spinUpStartedAtPerformanceMs = null;
-    spinUpStartedAtHostTimeMs = null;
-  }
+  setLocalTriggerHeld(mouseTriggerHeld);
   adsHeld = admittedAdsHeld(mouseAdsHeld);
 });
 document.addEventListener('pointerlockchange', () => {
@@ -13467,7 +13548,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     operatorAsset: {
       ready: riggedOperatorAssetReady(),
       error: riggedOperatorLoadError,
-      weaponError: importedWeaponLoadError,
     },
     player: {
       team: player.team,
@@ -14568,9 +14648,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   openMenu: () => openActiveMatchPause('debug-pause'),
   fireOnce: () => {
     debugInputUnlocked = true;
-    triggerHeld = true;
+    setLocalTriggerHeld(true);
     tryFire(performance.now());
-    triggerHeld = false;
+    setLocalTriggerHeld(false);
     debugInputUnlocked = false;
   },
   throwGrenade: () => throwGrenade(),
