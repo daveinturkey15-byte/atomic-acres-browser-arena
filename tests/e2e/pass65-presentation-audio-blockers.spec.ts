@@ -17,6 +17,13 @@ type PresentationSnapshot = {
     targetPolicy: string;
     occlusionPolicy: string;
     smokeVolumes: number;
+    smokeAuthority: {
+      role: string;
+      activeVolumes: number;
+      activeCorridors: number;
+      rememberedShots: number;
+      rejectedNotHost: number;
+    };
     smokePresentation: { capacity: number; active: number; liveDisposals: number };
   };
   audio: {
@@ -33,6 +40,7 @@ type PresentationDebug = {
   setAds(held: boolean): void;
   setTriggerHeld(held: boolean): void;
   stageSmokeVolume(distance?: number): string;
+  fireOnce(): void;
 };
 
 async function readyAndDeploy(page: Page): Promise<void> {
@@ -83,8 +91,15 @@ test('bounds M14 smoke thermal, pre-shot minigun spool/audio, and passive knife 
   ))).toMatchObject({
     contacts: 1,
     smokeVolumes: 1,
+    smokeAuthority: { role: 'host', activeVolumes: 1, activeCorridors: 0, rejectedNotHost: 0 },
     smokePresentation: { capacity: 12, active: 1, liveDisposals: 0 },
   });
+  await page.evaluate(() => (
+    window.__ATOMIC_ACRES_DEBUG__ as unknown as PresentationDebug
+  ).fireOnce());
+  await expect.poll(async () => page.evaluate(() => (
+    (window.__ATOMIC_ACRES_DEBUG__ as unknown as PresentationDebug).snapshot().dmrThermal.smokeAuthority
+  ))).toMatchObject({ activeVolumes: 1, activeCorridors: 1, rememberedShots: 1 });
 
   await page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__ as unknown as PresentationDebug;

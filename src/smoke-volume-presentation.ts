@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { SMOKE_VOLUME_LIFETIME_MS } from './smoke-authority';
 
 export const SMOKE_PRESENTATION_CARD_COUNT = 3;
-export const SMOKE_PRESENTATION_LIFETIME_MS = 12_000;
+export const SMOKE_PRESENTATION_LIFETIME_MS = SMOKE_VOLUME_LIFETIME_MS;
 export const SMOKE_PRESENTATION_GROW_MS = 900;
 export const SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY = 12;
 

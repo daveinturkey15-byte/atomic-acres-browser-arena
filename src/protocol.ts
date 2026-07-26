@@ -39,6 +39,11 @@ import {
   type InteractiveWorldProtocolMessage,
   type InteractiveWorldSnapshotMessage,
 } from './interactive-world-protocol';
+import {
+  isSmokeProtocolMessage,
+  type SmokeProtocolMessage,
+  type SmokeStateMessage,
+} from './smoke-protocol';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
@@ -341,7 +346,7 @@ export type ChatHistoryMessage = {
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
-  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage;
+  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -391,6 +396,7 @@ const shotRejectReasons = new Set<ShotRejectReason>([
 export function isGameMessage(value: unknown): value is GameMessage {
   if (isKillstreakProtocolMessage(value)) return true;
   if (isInteractiveWorldProtocolMessage(value)) return true;
+  if (isSmokeProtocolMessage(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
@@ -721,6 +727,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (!playerId) return false;
   if (isKillstreakProtocolMessage(message)) return killstreakMessageBelongsToPlayer(message, playerId);
   if (isInteractiveWorldProtocolMessage(message)) return message.by === playerId;
+  if (isSmokeProtocolMessage(message)) return message.by === playerId;
   switch (message.type) {
     case 'join':
     case 'state':
@@ -779,6 +786,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
 export function isHostAuthorityMessage(message: GameMessage): boolean {
   return isKillstreakProtocolMessage(message) && isKillstreakHostAuthorityMessage(message)
     || message.type === 'interactive-world-snapshot'
+    || message.type === 'smoke-state'
     || message.type === 'lobby-config'
     || message.type === 'lobby-state'
     || message.type === 'lobby-start'
@@ -795,9 +803,9 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'bot-damage';
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage {
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage {
   return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state'
-    || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot';
+    || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot' || message.type === 'smoke-state';
 }
 
 export function sanitizeName(value: string): string {

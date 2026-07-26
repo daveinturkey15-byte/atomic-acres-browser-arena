@@ -267,7 +267,6 @@ import {
   calculateFlashExposure,
   shouldResolveFlashAgainstBots,
   smokeBlocksTargetAcquisition,
-  type SmokeCorridor,
   type SmokeVolume,
 } from './combat/ordnance';
 import {
@@ -437,10 +436,17 @@ import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentat
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import { DMR_THERMAL_MAGNIFICATION, DmrThermalPresentation, type DmrThermalContact } from './dmr-thermal-presentation';
 import {
-  SMOKE_PRESENTATION_LIFETIME_MS,
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
 } from './smoke-volume-presentation';
+import {
+  SMOKE_AUTHORITY_SCHEMA_VERSION,
+  SmokeAuthority,
+  type SmokeAuthoritySnapshot,
+  type SmokeCorridorSnapshot,
+  type SmokeShotSegment,
+} from './smoke-authority';
+import type { SmokeStateMessage } from './smoke-protocol';
 import {
   RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
@@ -625,7 +631,8 @@ type GrenadeEntity = {
 };
 
 type RuntimeSmokeVolume = Omit<SmokeVolume, 'corridors'> & {
-  corridors: SmokeCorridor[];
+  corridors: SmokeCorridorSnapshot[];
+  observedCorridorIds: Set<string>;
   presentationLease: SmokeVolumePresentationLease;
 };
 
@@ -2243,6 +2250,9 @@ let dormantBotsPrewarmed = false;
 let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
 const smokeVolumes: RuntimeSmokeVolume[] = [];
+let smokeAuthority = new SmokeAuthority(interactiveWorldMatchEpoch, 'host');
+let lastSmokeStateBroadcastRevision = -1;
+let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 const explosiveBolts: ExplosiveBoltEntity[] = [];
 let flashExposureUntil = 0;
 let flashExposureStrength = 0;
@@ -4697,10 +4707,22 @@ function handleInteractiveWorldMessage(message: GameMessage): boolean {
   return true;
 }
 
+function handleSmokeAuthorityMessage(message: GameMessage): boolean {
+  if (message.type !== 'smoke-state') return false;
+  if (network.role !== 'client'
+    || message.by !== privateLobbySnapshot?.hostId
+    || message.snapshot.matchEpoch !== interactiveWorldMatchEpoch) return true;
+  if (smokeAuthority.applyAuthoritativeSnapshot(message.snapshot)) {
+    synchronizeSmokePresentation(message.snapshot, currentHostTimeMs());
+  }
+  return true;
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
   if (handleInteractiveWorldMessage(message)) return;
+  if (handleSmokeAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
@@ -4929,6 +4951,7 @@ function onNetworkMessage(message: GameMessage): void {
         broadcastOverdriveState(performance.now());
         broadcastRailgunState();
         broadcastInteractiveWorldState(true);
+        broadcastSmokeState(true);
       }
     }
     if (incoming.seq > remote.snapshot.seq) {
@@ -5135,6 +5158,13 @@ function onNetworkMessage(message: GameMessage): void {
     actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
     admittedRemoteShots.set(message.by, actions);
     if (network.role === 'host') {
+      admitAuthoritativeSmokeShot(
+        `legacy:${interactiveWorldMatchEpoch}:${message.by}:${message.nonce}`,
+        new THREE.Vector3(...message.origin),
+        message.pelletDirections.map((entry) => new THREE.Vector3(...entry)),
+        message.weapon,
+        now,
+      );
       network.send(message);
       applyKillstreakEntityShot(
         message.by,
@@ -5521,6 +5551,11 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     finish('rejected', 'bad-origin', admission.appliedRewindMs);
     return;
   }
+  const admittedSmokeSegments = traceAuthoritativeSmokeShotSegments(
+    new THREE.Vector3(...request.origin),
+    request.pelletDirections.map((entry) => new THREE.Vector3(...entry)),
+    request.weapon,
+  );
   const actions = admittedRemoteShots.get(request.by) ?? new Map<number, AdmittedRemoteShot>();
   for (const [nonce, action] of actions) {
     const lifetimeMs = action.message.weapon === 'explosive-crossbow' ? EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000 : 1_000;
@@ -5661,6 +5696,11 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       penetrationMultiplier: hit.penetrationMultiplier,
     });
   }
+  admitAuthoritativeSmokeSegments(
+    request.shotId,
+    admittedSmokeSegments,
+    performance.now(),
+  );
   finish(outcomes.length > 0 ? 'accepted-hit' : 'accepted-miss', 'none', admission.appliedRewindMs, outcomes);
 }
 
@@ -7095,6 +7135,11 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     ? killstreakMatchEpoch + 1
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000);
   interactiveWorldMatchEpoch = killstreakMatchEpoch;
+  smokeVolumePresentationPool.clear();
+  smokeVolumes.length = 0;
+  smokeAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  lastSmokeStateBroadcastRevision = -1;
+  lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
   interactiveWorldTick = 0;
   lastInteractiveWorldBroadcastRevision = -1;
   if (interactiveWorldRuntime) {
@@ -7916,6 +7961,7 @@ function tryFire(now: number): void {
     distanceMeters: number;
   }>();
   const pelletDirections: [number, number, number][] = [];
+  const localSmokeShotSegments: SmokeShotSegment[] = [];
   let impactAudioPlayed = false;
   const presentedSurfaceIds = new Set<string>();
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -7943,9 +7989,13 @@ function tryFire(now: number): void {
     }
     if (projectileShot) continue;
     const result = castShot(origin, direction, player.weapon, true);
-    if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
-    punchSmokeCorridors(origin, authoritativeEnd, now);
+    localSmokeShotSegments.push(Object.freeze({
+      pelletIndex: pellet,
+      start: Object.freeze({ x: origin.x, y: origin.y, z: origin.z }),
+      end: Object.freeze({ x: authoritativeEnd.x, y: authoritativeEnd.y, z: authoritativeEnd.z }),
+    }));
+    if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     spawnTracer(visualStart, authoritativeEnd, spec.color);
     for (const impact of result.ballisticTrace?.impacts ?? []) {
@@ -8035,6 +8085,13 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: randomNonce(),
   };
+  if (!projectileShot && network.role !== 'client') {
+    admitAuthoritativeSmokeSegments(
+      `local:${interactiveWorldMatchEpoch}:${player.id}:${shot.nonce}`,
+      localSmokeShotSegments,
+      now,
+    );
+  }
   if (projectileShot) {
     if (network.role !== 'client') {
       const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
@@ -8609,7 +8666,7 @@ function botHasLineOfSight(bot: BotPlayer, targetPosition = player.position): bo
   const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
   if (performance.now() < Number(bot.root.userData.flashBlindedUntil ?? 0)) return false;
   return !activeWorldColliders().some((box) => segmentIntersectsBox(origin, target, box))
-    && !smokeBlocksTargetAcquisition(origin, target, smokeVolumes, performance.now());
+    && !smokeBlocksTargetAcquisition(origin, target, smokeVolumes, currentHostTimeMs());
 }
 
 function activeBotGrenadeCount(): number {
@@ -9562,40 +9619,136 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
   return broken;
 }
 
-function spawnSmokeVolume(point: THREE.Vector3, now: number, actionNonce: number): void {
+function synchronizeSmokePresentation(snapshot: SmokeAuthoritySnapshot, nowHostTimeMs: number): void {
+  const existingById = new Map(smokeVolumes.map((volume) => [volume.id, volume]));
+  const activeIds = new Set(snapshot.volumes.map((volume) => volume.id));
+  for (const existing of smokeVolumes) {
+    if (!activeIds.has(existing.id)) smokeVolumePresentationPool.release(existing.presentationLease);
+  }
+  const synchronized: RuntimeSmokeVolume[] = [];
+  for (const volume of snapshot.volumes) {
+    const existing = existingById.get(volume.id);
+    const presentationLease = existing?.presentationLease ?? smokeVolumePresentationPool.emit(
+      volume.centre,
+      volume.startsAtMs,
+      volume.expiresAtMs,
+      volume.radiusM,
+    );
+    const observedCorridorIds = existing?.observedCorridorIds ?? new Set<string>();
+    for (const corridor of volume.corridors) {
+      if (observedCorridorIds.has(corridor.id)) continue;
+      const direction = new THREE.Vector3(
+        corridor.end.x - corridor.start.x,
+        corridor.end.y - corridor.start.y,
+        corridor.end.z - corridor.start.z,
+      );
+      smokeVolumePresentationPool.disturb(presentationLease, direction, 0.82, corridor.createdAtHostTimeMs);
+    }
+    observedCorridorIds.clear();
+    for (const corridor of volume.corridors) observedCorridorIds.add(corridor.id);
+    const runtime: RuntimeSmokeVolume = {
+      id: volume.id,
+      centre: volume.centre,
+      radiusM: volume.radiusM,
+      startsAtMs: volume.startsAtMs,
+      expiresAtMs: volume.expiresAtMs,
+      corridors: [...volume.corridors],
+      observedCorridorIds,
+      presentationLease,
+    };
+    smokeVolumePresentationPool.update(presentationLease, nowHostTimeMs);
+    synchronized.push(runtime);
+  }
+  smokeVolumes.splice(0, smokeVolumes.length, ...synchronized);
+}
+
+function smokeStateMessage(nowHostTimeMs = currentHostTimeMs()): SmokeStateMessage {
+  return {
+    type: 'smoke-state',
+    schemaVersion: SMOKE_AUTHORITY_SCHEMA_VERSION,
+    by: player.id,
+    snapshot: smokeAuthority.snapshot(nowHostTimeMs),
+    nonce: randomNonce(),
+  };
+}
+
+function broadcastSmokeState(forceReliable = false, nowHostTimeMs = currentHostTimeMs()): void {
+  if (network.role !== 'host' || !gameStarted) return;
+  const message = smokeStateMessage(nowHostTimeMs);
+  const repairDue = message.snapshot.volumes.length > 0 && nowHostTimeMs - lastSmokeStateBroadcastAt >= 250;
+  if (!forceReliable && message.snapshot.revision === lastSmokeStateBroadcastRevision && !repairDue) return;
+  network.send(message);
+  if (forceReliable) network.sendStateCommitReliably(message);
+  lastSmokeStateBroadcastRevision = message.snapshot.revision;
+  lastSmokeStateBroadcastAt = nowHostTimeMs;
+}
+
+function spawnSmokeVolume(point: THREE.Vector3, nowHostTimeMs: number, actionNonce: number, ownerId: string): string | null {
+  if (network.role === 'client') return null;
   const centre = point.clone().add(new THREE.Vector3(0, 1.25, 0));
-  const expiresAtMs = now + SMOKE_PRESENTATION_LIFETIME_MS;
-  const presentationLease = smokeVolumePresentationPool.emit(centre, now, expiresAtMs, 4.2);
-  smokeVolumes.push({
-    id: `smoke-${actionNonce}`,
-    centre: Object.freeze({ x: centre.x, y: centre.y, z: centre.z }),
-    radiusM: 4.2,
-    startsAtMs: now,
-    expiresAtMs,
-    corridors: [],
-    presentationLease,
+  const accepted = smokeAuthority.registerVolume({
+    matchEpoch: interactiveWorldMatchEpoch,
+    ownerId,
+    actionNonce,
+    centre,
+    startsAtHostTimeMs: nowHostTimeMs,
+  });
+  if (!accepted) return null;
+  const snapshot = smokeAuthority.snapshot(nowHostTimeMs);
+  synchronizeSmokePresentation(snapshot, nowHostTimeMs);
+  broadcastSmokeState(true, nowHostTimeMs);
+  return `smoke-${ownerId}-${actionNonce}`;
+}
+
+function traceAuthoritativeSmokeShotSegments(
+  origin: THREE.Vector3,
+  directions: readonly THREE.Vector3[],
+  weapon: WeaponId,
+): SmokeShotSegment[] {
+  return directions.slice(0, 12).map((rawDirection, pelletIndex) => {
+    const direction = rawDirection.clone().normalize();
+    const requestedDistance = weapon === 'railgun' ? RAILGUN_BEAM_LENGTH_M : 110;
+    const trace = traceWeaponPath(origin, direction, requestedDistance, weapon);
+    const end = origin.clone().addScaledVector(direction, trace.travelDistance);
+    return Object.freeze({
+      pelletIndex,
+      start: Object.freeze({ x: origin.x, y: origin.y, z: origin.z }),
+      end: Object.freeze({ x: end.x, y: end.y, z: end.z }),
+    });
   });
 }
 
-function punchSmokeCorridors(start: THREE.Vector3, end: THREE.Vector3, now: number): number {
-  const delta = end.clone().sub(start);
-  if (delta.lengthSq() < 1e-8) return 0;
-  let punched = 0;
-  for (const smoke of smokeVolumes) {
-    if (now < smoke.startsAtMs || now >= smoke.expiresAtMs) continue;
-    const centre = new THREE.Vector3(smoke.centre.x, smoke.centre.y, smoke.centre.z);
-    if (segmentSphereFraction(start, delta, centre, smoke.radiusM) === null) continue;
-    smoke.corridors.push(Object.freeze({
-      start: Object.freeze({ x: start.x, y: start.y, z: start.z }),
-      end: Object.freeze({ x: end.x, y: end.y, z: end.z }),
-      radiusM: 0.42,
-      expiresAtMs: now + 900,
-    }));
-    if (smoke.corridors.length > 8) smoke.corridors.splice(0, smoke.corridors.length - 8);
-    smokeVolumePresentationPool.disturb(smoke.presentationLease, delta, 0.82, now);
-    punched += 1;
-  }
-  return punched;
+function admitAuthoritativeSmokeSegments(
+  shotResultId: string,
+  segments: readonly SmokeShotSegment[],
+  nowHostTimeMs: number,
+): number {
+  if (network.role === 'client') return 0;
+  const result = smokeAuthority.admitShot({
+    matchEpoch: interactiveWorldMatchEpoch,
+    shotResultId,
+    resolvedAtHostTimeMs: nowHostTimeMs,
+    segments,
+  });
+  if (!result.accepted || result.createdCorridorIds.length === 0) return 0;
+  synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
+  broadcastSmokeState(false, nowHostTimeMs);
+  return result.createdCorridorIds.length;
+}
+
+function admitAuthoritativeSmokeShot(
+  shotResultId: string,
+  origin: THREE.Vector3,
+  directions: readonly THREE.Vector3[],
+  weapon: WeaponId,
+  nowHostTimeMs: number,
+): number {
+  if (weapon === 'explosive-crossbow') return 0;
+  return admitAuthoritativeSmokeSegments(
+    shotResultId,
+    traceAuthoritativeSmokeShotSegments(origin, directions, weapon),
+    nowHostTimeMs,
+  );
 }
 
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: number): void {
@@ -9634,19 +9787,10 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
 }
 
 function updateOrdnanceVolumes(now: number): void {
-  for (let index = smokeVolumes.length - 1; index >= 0; index -= 1) {
-    const smoke = smokeVolumes[index];
-    for (let corridorIndex = smoke.corridors.length - 1; corridorIndex >= 0; corridorIndex -= 1) {
-      if (now >= smoke.corridors[corridorIndex]!.expiresAtMs) smoke.corridors.splice(corridorIndex, 1);
-    }
-    const remaining = smoke.expiresAtMs - now;
-    if (remaining <= 0) {
-      smokeVolumePresentationPool.release(smoke.presentationLease);
-      smokeVolumes.splice(index, 1);
-      continue;
-    }
-    smokeVolumePresentationPool.update(smoke.presentationLease, now);
-  }
+  const nowHostTimeMs = currentHostTimeMs();
+  const authorityChanged = smokeAuthority.advance(nowHostTimeMs);
+  synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
+  broadcastSmokeState(authorityChanged, nowHostTimeMs);
   const overlay = element<HTMLElement>('#ordnance-flash');
   const remainingFlash = flashExposureUntil - now;
   if (remainingFlash <= 0) {
@@ -9667,7 +9811,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const afterPresentationDetach = performance.now();
   if (entity.grenade === 'smoke') {
     audio.coverImpact(point.distanceTo(player.position));
-    spawnSmokeVolume(point, afterPresentationDetach, entity.actionNonce);
+    spawnSmokeVolume(point, afterPresentationDetach, entity.actionNonce, entity.ownerId);
     return;
   }
   if (entity.grenade === 'flash') {
@@ -11809,6 +11953,9 @@ function clearGrenades(): void {
   explosiveBolts.length = 0;
   smokeVolumePresentationPool.clear();
   smokeVolumes.length = 0;
+  smokeAuthority.reset(interactiveWorldMatchEpoch, network.role === 'client' ? 'replica' : 'host');
+  lastSmokeStateBroadcastRevision = -1;
+  lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
   flashExposureUntil = 0;
   flashExposureStrength = 0;
   const flash = element<HTMLElement>('#ordnance-flash');
@@ -14557,6 +14704,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       magnification: DMR_THERMAL_MAGNIFICATION,
       cameraFov: camera.fov,
       smokeVolumes: smokeVolumes.length,
+      smokeAuthority: smokeAuthority.telemetry(currentHostTimeMs()),
       smokePresentation: smokeVolumePresentationPool.telemetry(),
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
@@ -15882,8 +16030,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const direction = camera.getWorldDirection(new THREE.Vector3());
     const point = camera.position.clone().addScaledVector(direction, THREE.MathUtils.clamp(distance, 1.5, 8));
     const actionNonce = randomNonce();
-    spawnSmokeVolume(point, performance.now(), actionNonce);
-    return `smoke-${actionNonce}`;
+    return spawnSmokeVolume(point, currentHostTimeMs(), actionNonce, player.id) ?? '';
   },
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),
