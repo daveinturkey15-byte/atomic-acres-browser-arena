@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { stableStringify } from '../../src/canonical-state';
@@ -6,9 +7,14 @@ import { GOLDEN_REPLAYS, runGameplayReplay } from '../../src/gameplay-replay';
 
 const root = resolve(process.cwd());
 const baselineDirectory = resolve(root, 'baselines/pass25a');
-const contractPath = resolve(baselineDirectory, 'gameplay-contract.json');
-const replayPath = resolve(baselineDirectory, 'golden-replays.json');
+const candidateDirectory = resolve(root, 'baselines/pass65-candidate');
+const contractPath = resolve(candidateDirectory, 'gameplay-contract.json');
+const replayPath = resolve(candidateDirectory, 'golden-replays.json');
 const checkOnly = process.argv.includes('--check');
+const frozenBaselineDigests = Object.freeze({
+  'gameplay-contract.json': '50bc46196b6874eb216ed651e14933847b4db779a23481c3bbca42ef9d9bf18c',
+  'golden-replays.json': 'f88b9da639cf9a0f332303c832dae98949d80a9e2f57848249088a5c629309c3',
+});
 
 async function main(): Promise<void> {
 const packageLock = JSON.parse(await readFile(resolve(root, 'package-lock.json'), 'utf8')) as {
@@ -21,9 +27,10 @@ const dependencies = Object.fromEntries(dependencyNames.map((name) => [name, pac
 const contract = {
   metadata: {
     schemaVersion: 3,
-    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through the Pass 65 arsenal slice',
-    baseSourceRevision: '6af362af721f892900b7a92ae4221ef12c84cce9',
-    approvedDeltas: [
+    baseline: 'Pass 65 pre-HITL arsenal candidate compared against the frozen Pass 25A oracle',
+    baseSourceRevision: '5075a52d80c6db69a97ed53acc2df5368728371a',
+    candidateStatus: 'pre-hitl-not-approved',
+    specifiedDeltas: [
       'scattergun-strength',
       'tri-pass-strength',
       'spawn-safety',
@@ -52,9 +59,10 @@ const contract = {
 const replays = {
   metadata: {
     schemaVersion: 3,
-    baseline: 'Pass 62 rollback roster plus the owner-approved Pass 65 pellet-shotgun rebalance',
-    baseSourceRevision: '6af362af721f892900b7a92ae4221ef12c84cce9',
-    approvedDeltas: ['pass65-coherent-pellet-shotgun-rebalance'],
+    baseline: 'Pass 65 pre-HITL deterministic replay candidate compared against the frozen Pass 25A oracle',
+    baseSourceRevision: '5075a52d80c6db69a97ed53acc2df5368728371a',
+    candidateStatus: 'pre-hitl-not-approved',
+    specifiedDeltas: ['pass65-coherent-pellet-shotgun-rebalance'],
     fixedSeedPrefix: 'pass25a:',
   },
   replays: Object.fromEntries(Object.entries(GOLDEN_REPLAYS).map(([name, commands]) => {
@@ -73,7 +81,7 @@ const replays = {
 async function verify(path: string, value: unknown): Promise<void> {
   const expected = `${stableStringify(value, 2)}\n`;
   if (!checkOnly) {
-    await mkdir(baselineDirectory, { recursive: true });
+    await mkdir(candidateDirectory, { recursive: true });
     await writeFile(path, expected, 'utf8');
     console.log(`wrote ${path}`);
     return;
@@ -84,6 +92,17 @@ async function verify(path: string, value: unknown): Promise<void> {
   console.log(`verified ${path}`);
 }
 
+async function verifyFrozenBaseline(): Promise<void> {
+  for (const [name, expected] of Object.entries(frozenBaselineDigests)) {
+    const path = resolve(baselineDirectory, name);
+    const normalized = (await readFile(path, 'utf8')).replaceAll('\r\n', '\n');
+    const actual = createHash('sha256').update(normalized).digest('hex');
+    if (actual !== expected) throw new Error(`Frozen Pass 25A baseline drift: ${path} (${actual} != ${expected})`);
+    console.log(`verified frozen ${path}`);
+  }
+}
+
+await verifyFrozenBaseline();
 await verify(contractPath, contract);
 await verify(replayPath, replays);
 }
