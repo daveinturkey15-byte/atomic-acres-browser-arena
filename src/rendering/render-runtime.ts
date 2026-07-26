@@ -71,6 +71,14 @@ export function shouldBackpressureWebGpuSubmissions(
     && now - pendingSince >= thresholdMs;
 }
 
+export function pendingCompletionStartAfterProgress(input: Readonly<{
+  completedAt: number;
+  completedSequence: number;
+  submissionSequence: number;
+}>): number | null {
+  return input.completedSequence >= input.submissionSequence ? null : input.completedAt;
+}
+
 export async function awaitSubmissionCompletionTarget(input: Readonly<{
   targetSequence: number;
   completedSequence: () => number;
@@ -539,6 +547,15 @@ export class WebGpuRenderRuntime {
         this.completedSequence = Math.max(this.completedSequence, sequence);
         this.lastCompletedAt = completedAt;
         this.lastCompletionLatencyMs = Math.max(0, completedAt - startedAt);
+        // A continuously busy queue is healthy when its completion frontier is
+        // advancing. Measure pending age from the latest progress, not from the
+        // moment any backlog first appeared, or long play is misclassified as
+        // a stall despite regular completed frames.
+        this.pendingCompletionStartedAt = pendingCompletionStartAfterProgress({
+          completedAt,
+          completedSequence: this.completedSequence,
+          submissionSequence: this.submissionSequence,
+        });
       })
       .catch((error: unknown) => {
         this.completionFailures += 1;

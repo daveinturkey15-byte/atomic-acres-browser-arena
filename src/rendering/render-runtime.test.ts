@@ -4,6 +4,7 @@ import {
   awaitSubmissionCompletionTarget,
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
+  pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
   shouldBackpressureWebGpuSubmissions,
   webGpuRenderInfoSnapshot,
@@ -94,6 +95,19 @@ describe('Pass 64 render runtime boundary', () => {
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
     expect(shouldBackpressureWebGpuSubmissions(800, 2_300, 250)).toBe(true);
+  });
+
+  it('restarts pending age when the completion frontier advances and clears it when caught up', () => {
+    expect(pendingCompletionStartAfterProgress({
+      completedAt: 4_250,
+      completedSequence: 19,
+      submissionSequence: 22,
+    })).toBe(4_250);
+    expect(pendingCompletionStartAfterProgress({
+      completedAt: 4_300,
+      completedSequence: 22,
+      submissionSequence: 22,
+    })).toBeNull();
   });
 
   it('fences the captured submission target even when an existing probe covers only older work', async () => {
