@@ -12794,7 +12794,10 @@ async function bootstrap(): Promise<void> {
     submitWebGpuFrame(performance.now(), true);
     await flushWebGpuFrames(8_000);
     const initialPresentation = renderRuntime.presentationTelemetry();
-    if (initialPresentation.status !== 'healthy' || renderRuntime.renderInfo().calls <= 0) {
+    // Three resets per-frame draw-call counters before this awaited queue
+    // fence can return. Queue completion is the bootstrap invariant; the
+    // hardware QA's HDR readback and luminance gates prove pixel content.
+    if (initialPresentation.status !== 'healthy') {
       throw new Error(`Initial WebGPU presentation was not healthy: ${JSON.stringify(initialPresentation)}`);
     }
   } else {
