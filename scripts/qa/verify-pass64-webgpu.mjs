@@ -385,9 +385,9 @@ try {
     if (receipt.traversal.legacyShaderMaterials.length !== 0 || receipt.duplicateArenaRoots) {
       throw new Error(`${arenaId} switch introduced a duplicate arena or legacy shader material`);
     }
-    const expectedResidentRoots = Math.min(switchIndex + 2, 4);
-    if (switchState.streaming.cachePolicy !== 'bounded-canonical-detached-roots'
-      || switchState.streaming.canonicalCacheBound !== 4
+    const expectedResidentRoots = Math.min(switchIndex + 2, 2);
+    if (switchState.streaming.cachePolicy !== 'fenced-two-arena-lru'
+      || switchState.streaming.canonicalCacheBound !== 2
       || switchState.streaming.residentArenaRoots !== expectedResidentRoots
       || !switchState.streaming.residentArenaIds.includes(arenaId)
       || switchState.streaming.transition.phase !== 'idle'

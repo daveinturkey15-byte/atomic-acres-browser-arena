@@ -883,10 +883,14 @@ function disposeDetachedRootResources(root: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh)) return;
-    geometries.add(node.geometry);
-    const entries = Array.isArray(node.material) ? node.material : [node.material];
-    entries.forEach((material) => materials.add(material));
+    if (node instanceof THREE.Mesh) {
+      geometries.add(node.geometry);
+      const entries = Array.isArray(node.material) ? node.material : [node.material];
+      entries.forEach((material) => materials.add(material));
+    }
+    if (node instanceof THREE.PointLight || node instanceof THREE.SpotLight || node instanceof THREE.DirectionalLight) {
+      node.shadow.map?.dispose();
+    }
   });
   geometries.forEach((geometry) => geometry.dispose());
   materials.forEach((material) => material.dispose());
@@ -1285,6 +1289,7 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'skyline-terminal': buildSkylineTerminal,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
+const ARENA_CACHE_BOUND = 2;
 const arenaConstructionHistory: ArenaId[] = [];
 const arenaRetirementInventory = {
   roots: 0,
@@ -1318,10 +1323,46 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
 
 function ensureArenaConstructed(arenaId: ArenaId): ArenaMap {
   const cached = arenaCache.get(arenaId);
-  if (cached) return cached;
+  if (cached) {
+    // Map insertion order is the LRU order. Touching a cached arena keeps the
+    // current and most-recently-used roots while older GPU-heavy roots retire.
+    arenaCache.delete(arenaId);
+    arenaCache.set(arenaId, cached);
+    return cached;
+  }
   const candidate = constructArena(arenaId);
   arenaCache.set(arenaId, candidate);
   return candidate;
+}
+
+function retireArenaAfterGpuFence(arenaId: ArenaId, candidate: ArenaMap): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  let shadowMaps = 0;
+  candidate.root.traverse((node) => {
+    if (node instanceof THREE.Mesh) {
+      geometries.add(node.geometry);
+      const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of nodeMaterials) {
+        materials.add(material);
+        const record = material as THREE.Material & Record<string, unknown>;
+        for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap']) {
+          if (record[key] instanceof THREE.Texture) textures.add(record[key] as THREE.Texture);
+        }
+      }
+    }
+    if (node instanceof THREE.PointLight || node instanceof THREE.SpotLight || node instanceof THREE.DirectionalLight) {
+      if (node.shadow.map) shadowMaps += 1;
+    }
+  });
+  arenaRetirementInventory.roots += 1;
+  arenaRetirementInventory.geometries += geometries.size;
+  arenaRetirementInventory.materials += materials.size;
+  arenaRetirementInventory.shadowMaps += shadowMaps;
+  arenaRetirementInventory.texturesDeferredToSharedCache += textures.size;
+  arenaCache.delete(arenaId);
+  scheduleDeferredGpuRetirement(candidate.root);
 }
 
 function disposeRetiredArena(arenaId: ArenaId, candidate: ArenaMap): void {
@@ -1392,17 +1433,21 @@ function disposeArenaPresentationRoot(root: THREE.Group): void {
 }
 
 async function retireAllArenasExcept(arenaId: ArenaId): Promise<void> {
-  // Keep one bounded, detached root per canonical arena. Pass 64 disposed and
-  // rebuilt every previous map here, which forced repeated WebGPU compilation
-  // and allowed stale generations to race buffer destruction. Four canonical
-  // roots are a fixed cache, not an unbounded content leak; the renderer owns
-  // final teardown on page exit.
+  // Keep the selected and one most-recent arena. A four-root cache avoided the
+  // original use-after-destroy race but retained enough material/pipeline state
+  // to exhaust Dawn during repeated 2560x1440 switches. Evictions now occur
+  // only after the selected root compiled and the prior GPU queue was fenced.
   for (const [candidateId, candidate] of arenaCache) {
     if (candidateId === arenaId) continue;
     candidate.root.removeFromParent();
     candidate.root.visible = false;
   }
-  if (arenaCache.size > Object.keys(arenaFactories).length) {
+  while (arenaCache.size > ARENA_CACHE_BOUND) {
+    const oldest = [...arenaCache].find(([candidateId]) => candidateId !== arenaId);
+    if (!oldest) break;
+    retireArenaAfterGpuFence(oldest[0], oldest[1]);
+  }
+  if (arenaCache.size > ARENA_CACHE_BOUND) {
     throw new Error(`Arena cache exceeded canonical bound: ${arenaCache.size}`);
   }
 }
@@ -13897,8 +13942,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         constructedArenaIds: [...new Set(arenaConstructionHistory)],
         residentArenaIds: [...arenaCache.keys()],
         residentArenaRoots: arenaCache.size,
-        cachePolicy: 'bounded-canonical-detached-roots',
-        canonicalCacheBound: Object.keys(arenaFactories).length,
+        cachePolicy: 'fenced-two-arena-lru',
+        canonicalCacheBound: ARENA_CACHE_BOUND,
         selectedOnlyResident: arenaCache.size === 1 && arenaCache.has(selectedArena.id),
         transition: {
           generation: arenaTransitionGeneration,
