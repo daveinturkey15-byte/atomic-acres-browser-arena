@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
 
@@ -31,7 +32,7 @@ export function loadHunterDronePresentation(): Promise<void> {
   if (hunterDroneLoadPromise) return hunterDroneLoadPromise;
   hunterDroneLoadState = 'loading';
   hunterDroneLoadPromise = new Promise((resolve) => {
-    new GLTFLoader().load(HUNTER_DRONE_ASSET, (gltf) => {
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(HUNTER_DRONE_ASSET, (gltf) => {
       const root = gltf.scene;
       root.updateMatrixWorld(true);
       const size = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());

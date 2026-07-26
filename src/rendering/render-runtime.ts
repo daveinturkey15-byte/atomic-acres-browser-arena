@@ -439,7 +439,7 @@ export class WebGpuRenderRuntime {
   // Queue completion resolves in frontiers rather than per-frame. Bound the
   // unresolved frontier so a cold arena/support shader compile cannot enqueue
   // dozens of expensive frames before the age-based backpressure engages.
-  private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 4;
+  private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 2;
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
   // ~2.4 s. Backpressure still stops new work at 250 ms; four seconds matches
   // the explicit queue-fence timeout and distinguishes cold work from a hang.
