@@ -368,6 +368,32 @@ describe('weapon schema bounds and cross-field rules', () => {
     companions.policies.range = { kind: 'companion-sidearm', primaryIds: ['carbine', 'carbine'] };
     issueAt(companions, '$.policies.range.primaryIds[1]', 'duplicate');
   });
+
+  it('rejects sparse evidence and companion ID arrays at the parse boundary', () => {
+    const evidence = validWeapon();
+    evidence.evidenceIds = new Array(1);
+    issueAt(evidence, '$.evidenceIds[0]', 'missing-key');
+    expect(() => parseWeaponDefinition(evidence)).toThrow(WeaponSchemaValidationError);
+
+    const companions = validWeapon();
+    companions.slot = 'secondary';
+    companions.policies.range = { kind: 'companion-sidearm', primaryIds: new Array(1) };
+    issueAt(companions, '$.policies.range.primaryIds[0]', 'missing-key');
+    expect(() => parseWeaponDefinition(companions)).toThrow(WeaponSchemaValidationError);
+  });
+
+  it('rejects enumerable non-index properties on schema-owned arrays', () => {
+    const weapon = validWeapon();
+    weapon.evidenceIds.candidate = 'undeclared';
+    issueAt(weapon, '$.evidenceIds.candidate', 'unknown-key');
+
+    const definitions = [validWeapon()];
+    (definitions as any).candidate = true;
+    expect(validateWeaponDefinitions(definitions)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: '$.candidate', code: 'unknown-key' }),
+    ]));
+    expect(() => parseWeaponDefinitions(definitions)).toThrow(WeaponSchemaValidationError);
+  });
 });
 
 describe('weapon definition collection parsing', () => {
@@ -405,6 +431,14 @@ describe('weapon definition collection parsing', () => {
     expect(validateWeaponDefinitions(Array.from({ length: 129 }, validWeapon))).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: '$', code: 'bounds' }),
     ]));
+  });
+
+  it('rejects a sparse definition collection instead of returning a sparse catalog', () => {
+    const definitions = new Array(1);
+    expect(validateWeaponDefinitions(definitions)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: '$[0]', code: 'missing-key' }),
+    ]));
+    expect(() => parseWeaponDefinitions(definitions)).toThrow(WeaponSchemaValidationError);
   });
 });
 

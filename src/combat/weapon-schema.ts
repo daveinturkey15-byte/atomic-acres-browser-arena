@@ -321,6 +321,31 @@ function displayName(value: unknown, path: string, issues: WeaponSchemaIssue[]):
   }
 }
 
+function validateDenseArray(
+  value: readonly unknown[],
+  path: string,
+  issues: WeaponSchemaIssue[],
+): void {
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index)) {
+      issue(issues, `${path}[${index}]`, 'missing-key', 'sparse array slots are forbidden');
+    }
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (!Object.getOwnPropertyDescriptor(value, key)?.enumerable) continue;
+    if (typeof key === 'symbol') {
+      issue(issues, `${path}[${String(key)}]`, 'unknown-key', 'non-index array properties are forbidden');
+      continue;
+    }
+    const index = Number(key);
+    const isDeclaredIndex = Number.isSafeInteger(index)
+      && index >= 0
+      && index < value.length
+      && String(index) === key;
+    if (!isDeclaredIndex) issue(issues, `${path}.${key}`, 'unknown-key', 'non-index array properties are forbidden');
+  }
+}
+
 function uniqueIdentifierArray(
   value: unknown,
   path: string,
@@ -335,12 +360,16 @@ function uniqueIdentifierArray(
   if (value.length < minimum || value.length > maximum) {
     issue(issues, path, 'bounds', `must contain between ${minimum} and ${maximum} entries`);
   }
+  if (value.length > maximum) return;
+  validateDenseArray(value, path, issues);
   const seen = new Set<string>();
-  value.forEach((entry, index) => {
-    if (!identifier(entry, `${path}[${index}]`, issues)) return;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index)) continue;
+    const entry = value[index];
+    if (!identifier(entry, `${path}[${index}]`, issues)) continue;
     if (seen.has(entry)) issue(issues, `${path}[${index}]`, 'duplicate', `duplicates ${entry}`);
     seen.add(entry);
-  });
+  }
 }
 
 function validateDamage(value: unknown, path: string, issues: WeaponSchemaIssue[]): void {
@@ -784,7 +813,12 @@ export function validateWeaponDefinitions(value: unknown): readonly WeaponSchema
   if (value.length < 1 || value.length > MAX_DEFINITION_COUNT) {
     issue(issues, '$', 'bounds', `must contain between 1 and ${MAX_DEFINITION_COUNT} definitions`);
   }
-  value.forEach((entry, index) => collectWeaponDefinitionIssues(entry, `$[${index}]`, issues));
+  if (value.length > MAX_DEFINITION_COUNT) return sortedIssues(issues);
+  validateDenseArray(value, '$', issues);
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index)) continue;
+    collectWeaponDefinitionIssues(value[index], `$[${index}]`, issues);
+  }
 
   const uniqueFields = [
     'id',
@@ -795,8 +829,10 @@ export function validateWeaponDefinitions(value: unknown): readonly WeaponSchema
   ] as const;
   for (const field of uniqueFields) {
     const firstIndexByValue = new Map<string, number>();
-    value.forEach((entry, index) => {
-      if (!isRecord(entry) || typeof entry[field] !== 'string') return;
+    for (let index = 0; index < value.length; index += 1) {
+      if (!Object.hasOwn(value, index)) continue;
+      const entry = value[index];
+      if (!isRecord(entry) || typeof entry[field] !== 'string') continue;
       const previousIndex = firstIndexByValue.get(entry[field]);
       if (previousIndex !== undefined) {
         issue(
@@ -808,11 +844,13 @@ export function validateWeaponDefinitions(value: unknown): readonly WeaponSchema
       } else {
         firstIndexByValue.set(entry[field], index);
       }
-    });
+    }
   }
   const firstPatternIndex = new Map<string, number>();
-  value.forEach((entry, index) => {
-    if (!isRecord(entry) || !isRecord(entry.recoil) || typeof entry.recoil.deterministicPatternId !== 'string') return;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index)) continue;
+    const entry = value[index];
+    if (!isRecord(entry) || !isRecord(entry.recoil) || typeof entry.recoil.deterministicPatternId !== 'string') continue;
     const pattern = entry.recoil.deterministicPatternId;
     const previousIndex = firstPatternIndex.get(pattern);
     if (previousIndex !== undefined) {
@@ -825,7 +863,7 @@ export function validateWeaponDefinitions(value: unknown): readonly WeaponSchema
     } else {
       firstPatternIndex.set(pattern, index);
     }
-  });
+  }
   return sortedIssues(issues);
 }
 
