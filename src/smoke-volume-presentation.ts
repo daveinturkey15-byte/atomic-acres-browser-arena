@@ -103,6 +103,9 @@ export class SmokeVolumePresentation {
   private startsAtMs = 0;
   private expiresAtMs = 0;
   private radiusM = 0;
+  private disturbedAtMs = Number.NEGATIVE_INFINITY;
+  private disturbance = 0;
+  private readonly disturbanceDirection = new THREE.Vector3();
   private readonly envelope: MutableSmokePresentationEnvelope = {
     active: false, growth: 0, coreOpacity: 0, edgeOpacity: 0, lifetimeProgress: 0,
   };
@@ -153,6 +156,11 @@ export class SmokeVolumePresentation {
     this.startsAtMs = startsAtMs;
     this.expiresAtMs = expiresAtMs;
     this.radiusM = Math.max(0, radiusM);
+    this.disturbedAtMs = Number.NEGATIVE_INFINITY;
+    this.disturbance = 0;
+    this.core.position.set(0, 0, 0);
+    this.cards.position.set(0, 0, 0);
+    this.cards.rotation.z = 0;
     this.root.position.set(position.x, position.y, position.z);
     this.update(startsAtMs);
   }
@@ -165,9 +173,22 @@ export class SmokeVolumePresentation {
     this.root.scale.setScalar(this.radiusM * envelope.growth);
     this.root.rotation.y = envelope.lifetimeProgress * Math.PI * 0.42;
     this.root.rotation.z = Math.sin(envelope.lifetimeProgress * Math.PI * 2) * 0.035;
-    this.coreMaterial.opacity = envelope.coreOpacity;
-    this.edgeMaterial.opacity = envelope.edgeOpacity;
+    const disturbanceAge = Math.max(0, nowMs - this.disturbedAtMs);
+    const disturbancePulse = disturbanceAge < 900 ? this.disturbance * (1 - disturbanceAge / 900) : 0;
+    this.core.position.copy(this.disturbanceDirection).multiplyScalar(disturbancePulse * 0.28);
+    this.cards.position.copy(this.disturbanceDirection).multiplyScalar(-disturbancePulse * 0.18);
+    this.cards.rotation.z = disturbancePulse * 0.14;
+    this.coreMaterial.opacity = envelope.coreOpacity * (1 - disturbancePulse * 0.34);
+    this.edgeMaterial.opacity = envelope.edgeOpacity * (1 - disturbancePulse * 0.16);
     return true;
+  }
+
+  disturb(direction: Readonly<{ x: number; y: number; z: number }>, strength: number, nowMs: number): void {
+    if (!this.active || this.disposed) return;
+    this.disturbanceDirection.set(direction.x, direction.y, direction.z);
+    if (this.disturbanceDirection.lengthSq() > 1e-8) this.disturbanceDirection.normalize();
+    this.disturbance = clamp01(strength);
+    this.disturbedAtMs = nowMs;
   }
 
   deactivate(): void {
@@ -175,6 +196,9 @@ export class SmokeVolumePresentation {
     this.root.visible = false;
     this.coreMaterial.opacity = 0;
     this.edgeMaterial.opacity = 0;
+    this.core.position.set(0, 0, 0);
+    this.cards.position.set(0, 0, 0);
+    this.cards.rotation.z = 0;
   }
 
   isActive(): boolean {
@@ -255,6 +279,16 @@ export class SmokeVolumePresentationPool {
   release(lease: SmokeVolumePresentationLease): void {
     const slot = this.slots[lease.slot];
     if (slot?.generation === lease.generation) slot.presentation.deactivate();
+  }
+
+  disturb(
+    lease: SmokeVolumePresentationLease,
+    direction: Readonly<{ x: number; y: number; z: number }>,
+    strength: number,
+    nowMs: number,
+  ): void {
+    const slot = this.slots[lease.slot];
+    if (slot?.generation === lease.generation) slot.presentation.disturb(direction, strength, nowMs);
   }
 
   clear(): void {

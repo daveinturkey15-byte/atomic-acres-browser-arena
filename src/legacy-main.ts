@@ -256,6 +256,7 @@ import {
   calculateFlashExposure,
   shouldResolveFlashAgainstBots,
   smokeBlocksTargetAcquisition,
+  type SmokeCorridor,
   type SmokeVolume,
 } from './combat/ordnance';
 import {
@@ -594,7 +595,10 @@ type GrenadeEntity = {
   attachedTargetLifeId: number | null;
 };
 
-type RuntimeSmokeVolume = SmokeVolume & Readonly<{ presentationLease: SmokeVolumePresentationLease }>;
+type RuntimeSmokeVolume = Omit<SmokeVolume, 'corridors'> & {
+  corridors: SmokeCorridor[];
+  presentationLease: SmokeVolumePresentationLease;
+};
 
 type ExplosiveBoltEntity = {
   mesh: THREE.Group;
@@ -7459,6 +7463,7 @@ function tryFire(now: number): void {
     const result = castShot(origin, direction, player.weapon, true);
     if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
+    punchSmokeCorridors(origin, authoritativeEnd, now);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     spawnTracer(visualStart, authoritativeEnd, spec.color);
     for (const impact of result.ballisticTrace?.impacts ?? []) {
@@ -9017,14 +9022,36 @@ function spawnSmokeVolume(point: THREE.Vector3, now: number, actionNonce: number
   const centre = point.clone().add(new THREE.Vector3(0, 1.25, 0));
   const expiresAtMs = now + SMOKE_PRESENTATION_LIFETIME_MS;
   const presentationLease = smokeVolumePresentationPool.emit(centre, now, expiresAtMs, 4.2);
-  smokeVolumes.push(Object.freeze({
+  smokeVolumes.push({
     id: `smoke-${actionNonce}`,
     centre: Object.freeze({ x: centre.x, y: centre.y, z: centre.z }),
     radiusM: 4.2,
     startsAtMs: now,
     expiresAtMs,
+    corridors: [],
     presentationLease,
-  }));
+  });
+}
+
+function punchSmokeCorridors(start: THREE.Vector3, end: THREE.Vector3, now: number): number {
+  const delta = end.clone().sub(start);
+  if (delta.lengthSq() < 1e-8) return 0;
+  let punched = 0;
+  for (const smoke of smokeVolumes) {
+    if (now < smoke.startsAtMs || now >= smoke.expiresAtMs) continue;
+    const centre = new THREE.Vector3(smoke.centre.x, smoke.centre.y, smoke.centre.z);
+    if (segmentSphereFraction(start, delta, centre, smoke.radiusM) === null) continue;
+    smoke.corridors.push(Object.freeze({
+      start: Object.freeze({ x: start.x, y: start.y, z: start.z }),
+      end: Object.freeze({ x: end.x, y: end.y, z: end.z }),
+      radiusM: 0.42,
+      expiresAtMs: now + 900,
+    }));
+    if (smoke.corridors.length > 8) smoke.corridors.splice(0, smoke.corridors.length - 8);
+    smokeVolumePresentationPool.disturb(smoke.presentationLease, delta, 0.82, now);
+    punched += 1;
+  }
+  return punched;
 }
 
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: number): void {
@@ -9065,6 +9092,9 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
 function updateOrdnanceVolumes(now: number): void {
   for (let index = smokeVolumes.length - 1; index >= 0; index -= 1) {
     const smoke = smokeVolumes[index];
+    for (let corridorIndex = smoke.corridors.length - 1; corridorIndex >= 0; corridorIndex -= 1) {
+      if (now >= smoke.corridors[corridorIndex]!.expiresAtMs) smoke.corridors.splice(corridorIndex, 1);
+    }
     const remaining = smoke.expiresAtMs - now;
     if (remaining <= 0) {
       smokeVolumePresentationPool.release(smoke.presentationLease);

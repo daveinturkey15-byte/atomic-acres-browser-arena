@@ -78,10 +78,22 @@ export type SmokeVolume = Readonly<{
   radiusM: number;
   startsAtMs: number;
   expiresAtMs: number;
+  corridors?: readonly SmokeCorridor[];
+}>;
+
+export type SmokeCorridor = Readonly<{
+  start: Vec3;
+  end: Vec3;
+  radiusM: number;
+  expiresAtMs: number;
 }>;
 
 function dot(a: Vec3, b: Vec3): number {
   return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }
 
 function subtract(a: Vec3, b: Vec3): Vec3 {
@@ -105,6 +117,28 @@ function segmentIntersectsSphere(start: Vec3, end: Vec3, centre: Vec3, radius: n
   return lengthSquared(subtract(nearest, centre)) <= radius * radius;
 }
 
+function nearestPointOnSegment(start: Vec3, end: Vec3, point: Vec3): Vec3 {
+  const segment = subtract(end, start);
+  const denominator = lengthSquared(segment);
+  const alpha = denominator > 1e-9 ? clamp01(dot(subtract(point, start), segment) / denominator) : 0;
+  return {
+    x: start.x + segment.x * alpha,
+    y: start.y + segment.y * alpha,
+    z: start.z + segment.z * alpha,
+  };
+}
+
+function smokeCorridorOpensRay(observer: Vec3, target: Vec3, volume: SmokeVolume, nowMs: number): boolean {
+  return (volume.corridors ?? []).some((corridor) => (
+    nowMs < corridor.expiresAtMs
+    && corridor.radiusM > 0
+    && lengthSquared(subtract(
+      nearestPointOnSegment(observer, target, volume.centre),
+      nearestPointOnSegment(corridor.start, corridor.end, volume.centre),
+    )) <= corridor.radiusM * corridor.radiusM
+  ));
+}
+
 export function smokeBlocksTargetAcquisition(
   observer: Vec3,
   target: Vec3,
@@ -116,6 +150,7 @@ export function smokeBlocksTargetAcquisition(
     && nowMs < volume.expiresAtMs
     && volume.radiusM > 0
     && segmentIntersectsSphere(observer, target, volume.centre, volume.radiusM)
+    && !smokeCorridorOpensRay(observer, target, volume, nowMs)
   ));
 }
 

@@ -49,6 +49,18 @@ describe('Pass 65 ordnance rules', () => {
     expect(targetAcquisitionAllowed({ observer, target, smokeVolumes: smoke, nowMs: 500, thermalSmokeOnly: true, solidOccluded: true })).toBe(false);
   });
 
+  it('opens a short-lived sight corridor along an admitted bullet path through smoke', () => {
+    const observer = { x: 0, y: 1, z: 0 };
+    const target = { x: 10, y: 1, z: 0 };
+    const volume = {
+      id: 's1', centre: { x: 5, y: 1, z: 0 }, radiusM: 2, startsAtMs: 100, expiresAtMs: 10_000,
+      corridors: [{ start: observer, end: target, radiusM: 0.42, expiresAtMs: 1_400 }],
+    };
+    expect(smokeBlocksTargetAcquisition(observer, target, [volume], 1_000)).toBe(false);
+    expect(smokeBlocksTargetAcquisition(observer, { x: 10, y: 1, z: 1.2 }, [volume], 1_000)).toBe(true);
+    expect(smokeBlocksTargetAcquisition(observer, target, [volume], 1_401)).toBe(true);
+  });
+
   it('bounds flash by distance, facing, solid cover, and friendly attenuation', () => {
     const base = {
       origin: { x: 0, y: 1.5, z: -2 }, eyes: { x: 0, y: 1.5, z: 0 },
