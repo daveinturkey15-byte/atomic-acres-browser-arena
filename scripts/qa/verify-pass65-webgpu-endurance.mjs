@@ -35,6 +35,8 @@ const arenaSequence = [
   'rustworks-1v1',
   'rustworks-1v1',
 ];
+const doorResetProbeDetachVisit = arenaSequence.length - 2;
+const doorResetProbeRestoreVisit = arenaSequence.length - 1;
 
 function digest(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
@@ -125,6 +127,51 @@ try {
         && state?.render?.runtime?.presentation?.status === 'healthy'
         && document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 30_000 });
+    let doorResetProbe = null;
+    if (visit === doorResetProbeDetachVisit) {
+      doorResetProbe = await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const before = api.snapshot();
+        const shed = before.interactiveWorld?.envelope?.sheds?.[0];
+        if (!shed) return { phase: 'detach', accepted: false, reason: 'no-shed' };
+        const accepted = api.damageShed(shed.placementId, 'door-south', 220);
+        const after = api.snapshot();
+        const next = after.interactiveWorld.envelope.sheds.find((entry) => entry.placementId === shed.placementId);
+        return {
+          phase: 'detach',
+          accepted,
+          placementId: shed.placementId,
+          matchEpoch: next?.matchEpoch ?? null,
+          doorStage: next?.surfaces.find((surface) => surface.surfaceId === 'door-south')?.stage ?? null,
+        };
+      });
+      if (!doorResetProbe.accepted || doorResetProbe.doorStage !== 'detached') {
+        throw new Error(`RustRig door-reset probe could not stage a detached door: ${JSON.stringify(doorResetProbe)}`);
+      }
+    } else if (visit === doorResetProbeRestoreVisit) {
+      // The previous circuit deliberately left a detached, bufferless door on
+      // this same arena runtime. Give its next-epoch intact replacement a full
+      // presentation interval: the Three r185 stale-vertex-buffer regression
+      // used to fail here, before the ordinary stress samples began.
+      await page.waitForTimeout(sampleIntervalMs);
+      doorResetProbe = await page.evaluate(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+        const shed = state.interactiveWorld?.envelope?.sheds?.[0];
+        return {
+          phase: 'restore',
+          placementId: shed?.placementId ?? null,
+          matchEpoch: shed?.matchEpoch ?? null,
+          doorStage: shed?.surfaces.find((surface) => surface.surfaceId === 'door-south')?.stage ?? null,
+          uncapturedErrors: state.render.runtime.uncapturedErrors,
+          presentationStatus: state.render.runtime.presentation.status,
+        };
+      });
+      if (doorResetProbe.doorStage !== 'intact'
+        || doorResetProbe.uncapturedErrors !== 0
+        || doorResetProbe.presentationStatus !== 'healthy') {
+        throw new Error(`RustRig detached-door reset did not render safely: ${JSON.stringify(doorResetProbe)}`);
+      }
+    }
     const killstreakStress = await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       api.earnSupport(15);
@@ -302,6 +349,7 @@ try {
       requestedDurationMs: durationMs,
       actualDurationMs: samples.at(-1).atMs - samples[0].atMs,
       killstreakStress,
+      doorResetProbe,
       samples: samples.length,
       distinctScreenshots: screenshotHashes.size,
       first: samples[0],
