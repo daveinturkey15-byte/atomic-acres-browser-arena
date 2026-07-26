@@ -49,6 +49,16 @@ export function arenaShadowVolume(arenaId: ArenaId): ArenaShadowVolume {
   return { ...SHADOW_VOLUMES[arenaId] };
 }
 
+/**
+ * Reflection quality must remain visible on WebGPU even when no environment
+ * map is available. Raising PBR roughness attenuates direct-light specular
+ * response without inventing SSR or changing authored base colour/metalness.
+ */
+export function effectivePbrRoughness(authoredRoughness: number, transparent: boolean, reflectionScale: number): number {
+  const authored = THREE.MathUtils.clamp(authoredRoughness, transparent ? 0.04 : 0.12, 1);
+  return THREE.MathUtils.lerp(1, authored, THREE.MathUtils.clamp(reflectionScale, 0, 1));
+}
+
 export function graphicsEffectsBudget(profile: RenderProfile, pixelRatioCap: number): GraphicsEffectsBudget {
   if (profile === 'compat') {
     return {
@@ -194,7 +204,7 @@ export class GraphicsRefinementSystem {
         if (!(material instanceof THREE.MeshStandardMaterial) || this.refined.has(material)) continue;
         this.refined.add(material);
         this.refinedMaterials += 1;
-        material.roughness = THREE.MathUtils.clamp(material.roughness, material.transparent ? 0.04 : 0.12, 1);
+        material.roughness = effectivePbrRoughness(material.roughness, material.transparent, this.reflectionScale);
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0, 1);
         const authoredEnvironmentIntensity = material.transparent
           ? Math.max(material.envMapIntensity, 0.48)

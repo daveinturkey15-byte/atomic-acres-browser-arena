@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import {
+  AdaptiveQualityController,
+  adaptiveShadowsEnabled,
+  classifyDisplayFrameMs,
+  configuredAdaptiveQualityLevels,
+} from './adaptive-quality';
 
 describe('adaptive quality controller', () => {
   it('can downshift from measured GPU queue latency without trusting rAF cadence', () => {
@@ -14,11 +19,20 @@ describe('adaptive quality controller', () => {
     });
   });
 
-  it('retains authored shadows throughout the Quality ladder and never enables them in Performance', () => {
+  it('retains explicitly authored shadows throughout every non-compatibility ladder', () => {
     expect(adaptiveShadowsEnabled('blender', true, 1)).toBe(true);
     expect(adaptiveShadowsEnabled('blender', true, 0.75)).toBe(true);
-    expect(adaptiveShadowsEnabled('blender', true, 0.65)).toBe(true);
-    expect(adaptiveShadowsEnabled('performance', true, 0.75)).toBe(false);
+    expect(adaptiveShadowsEnabled('performance', true, 0.5)).toBe(true);
+    expect(adaptiveShadowsEnabled('performance', false, 0.75)).toBe(false);
+    expect(adaptiveShadowsEnabled('compat', true, 0.2)).toBe(false);
+  });
+
+  it('never constructs an adaptive tier above the selected Custom render scale', () => {
+    expect(configuredAdaptiveQualityLevels('performance', 0.75, true)).toEqual([0.55, 0.65, 0.75]);
+    expect(configuredAdaptiveQualityLevels('blender', 1, true)).toEqual([0.65, 0.75, 0.85, 1]);
+    expect(configuredAdaptiveQualityLevels('performance', 0.5, true)).toEqual([0.5]);
+    expect(configuredAdaptiveQualityLevels('performance', 1.25, true)).toEqual([0.91, 1.09, 1.25]);
+    expect(configuredAdaptiveQualityLevels('blender', 0.9, false)).toEqual([0.9]);
   });
 
   it('keeps Quality Graphics within its authored resolution ladder', () => {

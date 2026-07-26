@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "releasePass": "PASS 65",
   "candidateName": "THE BIG ONE",
   "scope": "active WebGPU presentation features plus explicitly requested but unavailable renderer controls",
@@ -9,133 +9,287 @@
       "key": "graphics.preset",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "preset-resolver"
+      "runtimeConsumer": "preset-resolver",
+      "runtimeEvidence": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "resolveDisplayedGraphicsPreset",
+          "telemetryPath": "settings.displayedGraphicsPreset + render.profile"
+        }
+      ]
     },
     {
       "key": "graphics.renderScale",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "adaptive-quality"
+      "runtimeConsumer": "adaptive-quality",
+      "runtimeEvidence": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "resolveActiveGraphicsConfig",
+          "telemetryPath": "render.pixelRatio + render.adaptive.pixelRatioCap"
+        }
+      ]
     },
     {
       "key": "graphics.adaptiveResolution",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "adaptive-quality"
+      "runtimeConsumer": "adaptive-quality",
+      "runtimeEvidence": [
+        {
+          "path": "src/adaptive-quality.ts",
+          "symbol": "configuredAdaptiveQualityLevels",
+          "telemetryPath": "render.adaptive.enabled + render.adaptive.levels"
+        }
+      ]
     },
     {
       "key": "graphics.targetFps",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "adaptive-quality"
+      "runtimeConsumer": "adaptive-quality",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "1_000 / graphicsRuntime.targetFps",
+          "telemetryPath": "settings.graphics.targetFps + render.adaptive.targetFrameMs"
+        }
+      ]
     },
     {
       "key": "graphics.frameRateLimit",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "frame-scheduler"
+      "runtimeConsumer": "frame-scheduler",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "presentationFrameDue",
+          "telemetryPath": "settings.graphics.frameRateLimit + render.framePacing"
+        }
+      ]
     },
     {
       "key": "graphics.antiAliasing",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "renderer-init"
+      "runtimeConsumer": "renderer-init",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "pass(scene, camera, { samples: graphics.principalSamples })",
+          "telemetryPath": "render.atomicSignal.principalHdrSamples"
+        }
+      ]
     },
     {
       "key": "graphics.geometryDetail",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "arena-stream"
+      "runtimeConsumer": "arena-stream",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "const reducedRenderMode = activeRenderConfig.reducedPresentationDetail",
+          "telemetryPath": "render.reducedMode + render.representation"
+        }
+      ]
     },
     {
       "key": "graphics.shadows",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "shadow-runtime"
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "renderRuntime.configureShadows",
+          "telemetryPath": "render.authoredShadows + render.shadows"
+        }
+      ]
     },
     {
       "key": "graphics.shadowResolution",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "shadow-runtime"
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize)",
+          "telemetryPath": "settings.graphics.shadowMapSize + arena visual receipt"
+        }
+      ]
     },
     {
       "key": "graphics.shadowUpdateMode",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "shadow-runtime"
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "activeRenderConfig.shadowMode === 'dynamic'",
+          "telemetryPath": "render.shadowMode + render.shadowAutoUpdate"
+        }
+      ]
     },
     {
       "key": "graphics.indirectLighting",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "arena-lighting"
+      "runtimeConsumer": "arena-lighting",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "graphicsRuntime.indirectLightScale",
+          "telemetryPath": "settings.graphics.indirectLightScale + render.lighting"
+        }
+      ]
     },
     {
       "key": "graphics.reflectionQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "material-refinement"
+      "runtimeConsumer": "material-refinement",
+      "runtimeEvidence": [
+        {
+          "path": "src/graphics-refinement.ts",
+          "symbol": "effectivePbrRoughness",
+          "telemetryPath": "render.graphicsRefinement.reflectionScale"
+        }
+      ]
     },
     {
       "key": "graphics.volumetricQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "atmosphere-runtime"
+      "runtimeConsumer": "atmosphere-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const volumetricScale = THREE.MathUtils.clamp",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.volumetricScale"
+        }
+      ]
     },
     {
       "key": "graphics.smokeQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "smoke-presentation"
+      "runtimeConsumer": "smoke-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale)",
+          "telemetryPath": "settings.graphics.smokeScale + smoke presentation telemetry"
+        }
+      ]
     },
     {
       "key": "graphics.particleQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "presentation-budget"
+      "runtimeConsumer": "presentation-budget",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "budget.particleDensityScale * graphicsRuntime.particleScale",
+          "telemetryPath": "settings.graphics.particleScale + render.graphicsRefinement.budget"
+        }
+      ]
     },
     {
       "key": "graphics.anisotropy",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "material-refinement"
+      "runtimeConsumer": "material-refinement",
+      "runtimeEvidence": [
+        {
+          "path": "src/graphics-refinement.ts",
+          "symbol": "texture.anisotropy = anisotropy",
+          "telemetryPath": "render.graphicsRefinement.requestedAnisotropy"
+        }
+      ]
     },
     {
       "key": "graphics.decalQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "presentation-budget"
+      "runtimeConsumer": "presentation-budget",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "budget.decalLifetimeScale * graphicsRuntime.decalScale",
+          "telemetryPath": "settings.graphics.decalScale + impact presentation budget"
+        }
+      ]
     },
     {
       "key": "graphics.bloomQuality",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "hdr-pipeline"
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "bloom(sceneColor, graphics.post.bloomStrength",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.bloomStrength"
+        }
+      ]
     },
     {
       "key": "graphics.exposure",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "hdr-pipeline"
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "authoredExposure * graphicsRuntime.post.exposureScale",
+          "telemetryPath": "settings.graphics.post.exposureScale + renderer exposure"
+        }
+      ]
     },
     {
       "key": "graphics.toneMapping",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "hdr-pipeline"
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "graphicsRuntime.post.toneMapping",
+          "telemetryPath": "settings.graphics.post.toneMapping + documentElement.dataset.graphicsToneMapping"
+        }
+      ]
     },
     {
       "key": "graphics.filmGrain",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "hdr-pipeline"
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "graphics.post.filmGrainScale",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.filmGrainScale"
+        }
+      ]
     },
     {
       "key": "graphics.vignette",
       "applyMode": "arena-reload",
       "authorityAffecting": false,
-      "runtimeConsumer": "hdr-pipeline"
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const vignette = uniform(graphics.post.vignetteStrength)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.vignetteStrength"
+        }
+      ]
     },
     {
       "key": "accessibility.reducedMotion",
@@ -163,6 +317,32 @@
       "authorityAffecting": false
     }
   ],
+  "advancedGraphicsTrace": {
+    "registry": {
+      "path": "src/graphics-settings-registry.ts",
+      "symbol": "ADVANCED_GRAPHICS_CONTROLS"
+    },
+    "ui": {
+      "path": "src/ui/advanced-graphics-controls.ts",
+      "symbol": "bindAdvancedGraphicsControls"
+    },
+    "normalization": {
+      "path": "src/graphics-settings-registry.ts",
+      "symbol": "normalizeAdvancedGraphicsValues"
+    },
+    "persistence": {
+      "path": "src/pass65-settings.ts",
+      "symbol": "writePass65Settings"
+    },
+    "runtime": {
+      "path": "src/pass65-settings-inventory.ts",
+      "symbol": "runtimeEvidence"
+    },
+    "telemetry": {
+      "path": "src/legacy-main.ts",
+      "symbol": "advancedGraphicsRegistry"
+    }
+  },
   "profiles": {
     "performance": {
       "requested": {

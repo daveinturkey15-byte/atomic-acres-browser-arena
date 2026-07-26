@@ -7,6 +7,8 @@ import {
   parsePass65Settings,
   presentationFrameDue,
   resolveAccessibilityRuntime,
+  resolveActiveGraphicsConfig,
+  resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
   writePass65Settings,
 } from './pass65-settings';
@@ -106,6 +108,38 @@ describe('Pass 65 settings contract', () => {
     const settings = normalizePass65Settings({ graphics: { preset: 'custom', renderScale: 2 } });
     expect(settings.graphics.renderScale).toBe(1.25);
     expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ renderScale: 1.25, reason: null });
+  });
+
+  it('keeps Custom controls independent when reduced geometry is selected', () => {
+    const settings = normalizePass65Settings({
+      graphics: {
+        preset: 'custom', geometryDetail: 'reduced', renderScale: 1.25,
+        shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
+      },
+    });
+    const runtime = resolveGraphicsRuntime(settings.graphics);
+    expect(runtime).toMatchObject({
+      requestedPreset: 'custom', effectivePreset: 'custom', renderProfile: 'performance',
+      renderScale: 1.25, shadows: true, shadowMapSize: 2048, shadowUpdateMode: 'dynamic',
+    });
+    expect(resolveActiveGraphicsConfig(runtime, runtime.renderProfile)).toMatchObject({
+      reducedPresentationDetail: true, pixelRatioCap: 1.25, shadows: true,
+      shadowMapSize: 2048, shadowMode: 'dynamic',
+    });
+    expect(resolveDisplayedGraphicsPreset(settings.graphics.preset)).toBe('custom');
+  });
+
+  it('keeps explicit renderer review overrides bounded and truthfully labelled', () => {
+    const settings = normalizePass65Settings({ graphics: { preset: 'custom', renderScale: 1.25, shadows: 'high' } });
+    const runtime = resolveGraphicsRuntime(settings.graphics);
+    expect(resolveActiveGraphicsConfig(runtime, 'performance', 'performance')).toMatchObject({
+      pixelRatioCap: 0.75, shadows: false, shadowMode: 'off',
+    });
+    expect(resolveActiveGraphicsConfig(runtime, 'blender', 'blender')).toMatchObject({
+      pixelRatioCap: 1, shadows: true,
+    });
+    expect(resolveDisplayedGraphicsPreset('custom', 'performance')).toBe('performance');
+    expect(resolveDisplayedGraphicsPreset('custom', 'blender')).toBe('high');
   });
 
   it('keeps adaptive target and output frame limiter separate beyond 144 FPS', () => {

@@ -52,6 +52,12 @@ export type GraphicsRuntimeConsumer =
   | 'smoke-presentation'
   | 'hdr-pipeline';
 
+export type GraphicsRuntimeEvidence = Readonly<{
+  path: string;
+  symbol: string;
+  telemetryPath: string;
+}>;
+
 export type GraphicsSelectOption = Readonly<{ value: string; label: string }>;
 
 type GraphicsControlBase = Readonly<{
@@ -226,6 +232,40 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
   }),
 ]);
 
+const runtimeEvidence = (
+  path: string,
+  symbol: string,
+  telemetryPath: string,
+): readonly GraphicsRuntimeEvidence[] => Object.freeze([Object.freeze({ path, symbol, telemetryPath })]);
+
+/**
+ * Fail-closed source and telemetry trace for every player-visible control.
+ * Registry tests verify every path/symbol and reject missing or extra keys.
+ */
+export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvancedKey, readonly GraphicsRuntimeEvidence[]>> = Object.freeze({
+  renderScale: runtimeEvidence('src/pass65-settings.ts', 'resolveActiveGraphicsConfig', 'render.pixelRatio + render.adaptive.pixelRatioCap'),
+  adaptiveResolution: runtimeEvidence('src/adaptive-quality.ts', 'configuredAdaptiveQualityLevels', 'render.adaptive.enabled + render.adaptive.levels'),
+  targetFps: runtimeEvidence('src/legacy-main.ts', '1_000 / graphicsRuntime.targetFps', 'settings.graphics.targetFps + render.adaptive.targetFrameMs'),
+  frameRateLimit: runtimeEvidence('src/legacy-main.ts', 'presentationFrameDue', 'settings.graphics.frameRateLimit + render.framePacing'),
+  antiAliasing: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'pass(scene, camera, { samples: graphics.principalSamples })', 'render.atomicSignal.principalHdrSamples'),
+  geometryDetail: runtimeEvidence('src/legacy-main.ts', 'const reducedRenderMode = activeRenderConfig.reducedPresentationDetail', 'render.reducedMode + render.representation'),
+  shadows: runtimeEvidence('src/legacy-main.ts', 'renderRuntime.configureShadows', 'render.authoredShadows + render.shadows'),
+  shadowResolution: runtimeEvidence('src/legacy-main.ts', 'Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize)', 'settings.graphics.shadowMapSize + arena visual receipt'),
+  shadowUpdateMode: runtimeEvidence('src/legacy-main.ts', "activeRenderConfig.shadowMode === 'dynamic'", 'render.shadowMode + render.shadowAutoUpdate'),
+  indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
+  reflectionQuality: runtimeEvidence('src/graphics-refinement.ts', 'effectivePbrRoughness', 'render.graphicsRefinement.reflectionScale'),
+  volumetricQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const volumetricScale = THREE.MathUtils.clamp', 'render.atomicSignal.advancedGraphics.volumetricScale'),
+  smokeQuality: runtimeEvidence('src/legacy-main.ts', 'smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale)', 'settings.graphics.smokeScale + smoke presentation telemetry'),
+  particleQuality: runtimeEvidence('src/legacy-main.ts', 'budget.particleDensityScale * graphicsRuntime.particleScale', 'settings.graphics.particleScale + render.graphicsRefinement.budget'),
+  anisotropy: runtimeEvidence('src/graphics-refinement.ts', 'texture.anisotropy = anisotropy', 'render.graphicsRefinement.requestedAnisotropy'),
+  decalQuality: runtimeEvidence('src/legacy-main.ts', 'budget.decalLifetimeScale * graphicsRuntime.decalScale', 'settings.graphics.decalScale + impact presentation budget'),
+  bloomQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'bloom(sceneColor, graphics.post.bloomStrength', 'render.atomicSignal.advancedGraphics.bloomStrength'),
+  exposure: runtimeEvidence('src/legacy-main.ts', 'authoredExposure * graphicsRuntime.post.exposureScale', 'settings.graphics.post.exposureScale + renderer exposure'),
+  toneMapping: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.post.toneMapping', 'settings.graphics.post.toneMapping + documentElement.dataset.graphicsToneMapping'),
+  filmGrain: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'graphics.post.filmGrainScale', 'render.atomicSignal.advancedGraphics.filmGrainScale'),
+  vignette: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const vignette = uniform(graphics.post.vignetteStrength)', 'render.atomicSignal.advancedGraphics.vignetteStrength'),
+});
+
 export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = Object.freeze([
   Object.freeze({
     id: 'path-tracing', category: 'lighting', label: 'Path tracing / hardware ray tracing', state: 'unavailable',
@@ -335,6 +375,9 @@ export function validateAdvancedGraphicsRegistry(): readonly string[] {
   if (new Set(ids).size !== ids.length) issues.push('duplicate-dom-id');
   const expectedKeys = Object.keys(GRAPHICS_PRESET_VALUES.high).sort();
   if (JSON.stringify([...keys].sort()) !== JSON.stringify(expectedKeys)) issues.push('preset-registry-key-drift');
+  if (JSON.stringify(Object.keys(ADVANCED_GRAPHICS_RUNTIME_EVIDENCE).sort()) !== JSON.stringify(expectedKeys)) {
+    issues.push('runtime-evidence-key-drift');
+  }
   for (const preset of Object.values(GRAPHICS_PRESET_VALUES)) {
     if (Object.keys(preset).length !== keys.length) issues.push('incomplete-preset');
     if (JSON.stringify(normalizeAdvancedGraphicsValues(preset, preset)) !== JSON.stringify(preset)) issues.push('noncanonical-preset');
@@ -342,6 +385,9 @@ export function validateAdvancedGraphicsRegistry(): readonly string[] {
   for (const definition of ADVANCED_GRAPHICS_CONTROLS) {
     if (!definition.runtimeConsumer || !definition.description || definition.applyMode !== 'arena-reload') {
       issues.push(`incomplete-control:${definition.key}`);
+    }
+    if ((ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[definition.key]?.length ?? 0) === 0) {
+      issues.push(`missing-runtime-evidence:${definition.key}`);
     }
   }
   return Object.freeze(issues);

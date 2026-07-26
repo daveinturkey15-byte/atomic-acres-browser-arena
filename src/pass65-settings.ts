@@ -1,4 +1,4 @@
-import type { RenderProfile } from './render-profile';
+import { renderProfileConfig, type RenderProfile, type RenderProfileConfig } from './render-profile';
 import { AUDIO_BUS_IDS, type AudioBusId } from './audio-buses';
 import {
   GRAPHICS_PRESET_VALUES,
@@ -256,7 +256,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     targetFps: settings.targetFps,
     frameRateLimit: settings.frameRateLimit,
     antialiasSamples,
-    shadows: settings.shadows === 'high' && settings.geometryDetail !== 'reduced',
+    shadows: settings.shadows === 'high',
     shadowMapSize: settings.shadowResolution === 'high' ? 2048 : 1024,
     shadowUpdateMode: settings.shadowUpdateMode,
     indirectLightScale: lightingScale(settings.indirectLighting),
@@ -275,6 +275,47 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     }),
     reason: null,
   });
+}
+
+/**
+ * Resolves the concrete presentation configuration after an optional review
+ * route override. Advanced controls remain independent in Custom: selecting
+ * reduced geometry must not silently cap render scale or disable shadows.
+ */
+export function resolveActiveGraphicsConfig(
+  runtime: GraphicsRuntime,
+  renderProfile: RenderProfile,
+  queryRenderProfile: RenderProfile | null = null,
+): RenderProfileConfig {
+  const compatibility = renderProfile === 'compat';
+  const forcedPerformance = queryRenderProfile === 'performance';
+  const forcedQuality = queryRenderProfile === 'blender';
+  const shadows = !compatibility && (forcedQuality || (!forcedPerformance && runtime.shadows));
+  const pixelRatioCap = compatibility
+    ? 0.2
+    : forcedPerformance
+      ? Math.min(0.75, runtime.renderScale)
+      : forcedQuality
+        ? 1
+        : runtime.renderScale;
+  return Object.freeze({
+    ...renderProfileConfig(renderProfile),
+    pixelRatioCap,
+    antialias: !compatibility && runtime.antialiasSamples > 0,
+    shadows,
+    shadowMapSize: compatibility ? 0 : runtime.shadowMapSize,
+    shadowMode: shadows ? runtime.shadowUpdateMode : 'off',
+  });
+}
+
+/** Public preset label after an explicit renderer review route is applied. */
+export function resolveDisplayedGraphicsPreset(
+  requestedPreset: GraphicsPreset,
+  queryRenderProfile: RenderProfile | null = null,
+): GraphicsPreset {
+  if (queryRenderProfile === 'performance' || queryRenderProfile === 'compat') return 'performance';
+  if (queryRenderProfile === 'blender' || requestedPreset === 'max') return 'high';
+  return requestedPreset;
 }
 
 /**

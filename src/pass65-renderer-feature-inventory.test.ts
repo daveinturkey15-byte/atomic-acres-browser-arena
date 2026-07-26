@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  PASS65_ADVANCED_GRAPHICS_TRACE,
   PASS65_RENDERER_FEATURES,
   pass65RendererFeatureInventoryReport,
   validatePass65RendererFeatureInventory,
@@ -34,10 +35,21 @@ describe('Pass 65 renderer feature inventory', () => {
   });
 
   it('probes real owners and symbols for every inventory row', () => {
+    for (const [stage, probe] of Object.entries(PASS65_ADVANCED_GRAPHICS_TRACE)) {
+      expect(existsSync(probe.path), `${stage}: ${probe.path}`).toBe(true);
+      expect(readFileSync(probe.path, 'utf8'), `${stage}: ${probe.symbol}`).toContain(probe.symbol);
+    }
     for (const feature of PASS65_RENDERER_FEATURES) {
       for (const probe of feature.sourceProbes) {
         expect(existsSync(probe.path), `${feature.id}: ${probe.path}`).toBe(true);
         expect(readFileSync(probe.path, 'utf8'), `${feature.id}: ${probe.symbol}`).toContain(probe.symbol);
+      }
+    }
+    for (const setting of pass65RendererFeatureInventoryReport().settings.filter(({ key }) => key.startsWith('graphics.'))) {
+      expect(setting.runtimeEvidence?.length, setting.key).toBeGreaterThan(0);
+      for (const probe of setting.runtimeEvidence ?? []) {
+        expect(existsSync(probe.path), `${setting.key}: ${probe.path}`).toBe(true);
+        expect(readFileSync(probe.path, 'utf8'), `${setting.key}: ${probe.symbol}`).toContain(probe.symbol);
       }
     }
   });

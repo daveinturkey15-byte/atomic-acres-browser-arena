@@ -31,6 +31,15 @@ export type RendererFeatureDefinition = Readonly<{
   authorityAffecting: false;
 }>;
 
+export const PASS65_ADVANCED_GRAPHICS_TRACE = Object.freeze({
+  registry: Object.freeze({ path: 'src/graphics-settings-registry.ts', symbol: 'ADVANCED_GRAPHICS_CONTROLS' }),
+  ui: Object.freeze({ path: 'src/ui/advanced-graphics-controls.ts', symbol: 'bindAdvancedGraphicsControls' }),
+  normalization: Object.freeze({ path: 'src/graphics-settings-registry.ts', symbol: 'normalizeAdvancedGraphicsValues' }),
+  persistence: Object.freeze({ path: 'src/pass65-settings.ts', symbol: 'writePass65Settings' }),
+  runtime: Object.freeze({ path: 'src/pass65-settings-inventory.ts', symbol: 'runtimeEvidence' }),
+  telemetry: Object.freeze({ path: 'src/legacy-main.ts', symbol: 'advancedGraphicsRegistry' }),
+});
+
 function control(
   kind: RendererFeatureControlKind,
   settingKeys: readonly string[],
@@ -329,6 +338,9 @@ export function validatePass65RendererFeatureInventory(
   for (const definition of PASS65_SETTING_DEFINITIONS.filter(({ key }) => key.startsWith('graphics.') || key.startsWith('accessibility.'))) {
     if (!mappedSettings.has(definition.key)) issues.push(`unmapped-presentation-setting:${definition.key}`);
   }
+  for (const [stage, probe] of Object.entries(PASS65_ADVANCED_GRAPHICS_TRACE)) {
+    if (!probe.path || !probe.symbol) issues.push(`incomplete-advanced-graphics-trace:${stage}`);
+  }
   return Object.freeze(issues);
 }
 
@@ -346,12 +358,13 @@ function presetSnapshot(preset: Exclude<GraphicsPreset, 'custom'>) {
 
 export function pass65RendererFeatureInventoryReport() {
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     releasePass: 'PASS 65',
     candidateName: 'THE BIG ONE',
     scope: 'active WebGPU presentation features plus explicitly requested but unavailable renderer controls',
     generatedBy: 'npx tsx scripts/qa/generate-pass65-renderer-feature-inventory.ts',
     settings: Object.freeze(PASS65_SETTING_DEFINITIONS.filter(({ key }) => key.startsWith('graphics.') || key.startsWith('accessibility.'))),
+    advancedGraphicsTrace: PASS65_ADVANCED_GRAPHICS_TRACE,
     profiles: Object.freeze({
       performance: presetSnapshot('performance'),
       high: presetSnapshot('high'),

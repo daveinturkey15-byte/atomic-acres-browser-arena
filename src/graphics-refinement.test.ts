@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   arenaEnvironmentScale,
   arenaShadowVolume,
+  effectivePbrRoughness,
   GraphicsRefinementSystem,
   graphicsEffectsBudget,
   SELECTIVE_BLOOM_LAYER,
@@ -51,14 +52,32 @@ describe('Pass 62 graphics refinement budgets', () => {
   it('applies requested anisotropy and reflection scaling to real material properties', () => {
     const scene = new THREE.Scene();
     const texture = new THREE.Texture();
-    const material = new THREE.MeshStandardMaterial({ map: texture, metalness: 0.8, envMapIntensity: 1 });
+    const material = new THREE.MeshStandardMaterial({ map: texture, metalness: 0.8, roughness: 0.24, envMapIntensity: 1 });
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
     scene.add(mesh);
     const refinement = new GraphicsRefinementSystem(null, scene, 'blender', false, 1, 16, 0.62);
     refinement.refine(scene, 8);
     expect(texture.anisotropy).toBe(8);
     expect(material.envMapIntensity).toBeCloseTo(0.62);
+    expect(material.roughness).toBeCloseTo(0.5288);
     expect(refinement.telemetry()).toMatchObject({ requestedAnisotropy: 16, reflectionScale: 0.62 });
     refinement.dispose();
+  });
+
+  it('keeps reflection tiers visibly distinct on WebGPU without an environment map', () => {
+    expect(effectivePbrRoughness(0.24, false, 1)).toBeCloseTo(0.24);
+    expect(effectivePbrRoughness(0.24, false, 0.62)).toBeCloseTo(0.5288);
+    expect(effectivePbrRoughness(0.24, false, 0)).toBe(1);
+
+    const scene = new THREE.Scene();
+    const material = new THREE.MeshStandardMaterial({ metalness: 0.72, roughness: 0.24 });
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
+    const webGpuRefinement = new GraphicsRefinementSystem(null, scene, 'blender', true, 1, 8, 0);
+    webGpuRefinement.refine(scene, 8);
+    expect(scene.environment).toBeNull();
+    expect(material.roughness).toBe(1);
+    expect(material.envMapIntensity).toBe(0);
+    expect(webGpuRefinement.telemetry()).toMatchObject({ environmentEnabled: false, reflectionScale: 0 });
+    webGpuRefinement.dispose();
   });
 });

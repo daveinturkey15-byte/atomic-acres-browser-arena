@@ -21,6 +21,7 @@ describe('Pass 65 setting inventory', () => {
     ]);
     expect(graphics.every(({ applyMode }) => applyMode === 'arena-reload')).toBe(true);
     expect(graphics.slice(1).every(({ runtimeConsumer }) => typeof runtimeConsumer === 'string' && runtimeConsumer.length > 0)).toBe(true);
+    expect(graphics.every(({ runtimeEvidence }) => (runtimeEvidence?.length ?? 0) > 0)).toBe(true);
     expect(accessibility).toHaveLength(5);
     expect(accessibility.every(({ applyMode }) => applyMode === 'live')).toBe(true);
   });

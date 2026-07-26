@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
-import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
+import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
@@ -178,7 +178,9 @@ import {
   normalizePass65Settings,
   parsePass65Settings,
   presentationFrameDue,
+  resolveActiveGraphicsConfig,
   resolveAccessibilityRuntime,
+  resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
   writePass65Settings,
   type GraphicsPreset,
@@ -449,7 +451,7 @@ import {
   type RailgunStateMessage,
 } from './railgun-authority';
 import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
-import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
+import { RENDER_PROFILE_STORAGE_KEY, resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import {
   BotDamageMessage,
@@ -832,19 +834,8 @@ const renderProfile: RenderProfile = resolveRenderProfile(
   explicitRenderQuery ? window.location.search : '',
   queryRenderProfile ?? graphicsRuntime.renderProfile,
 );
-const activeRenderConfig = Object.freeze({
-  ...renderProfileConfig(renderProfile),
-  pixelRatioCap: renderProfile === 'compat' ? 0.2
-    : renderProfile === 'performance' ? Math.min(0.75, graphicsRuntime.renderScale)
-      : queryRenderProfile === 'blender' ? 1 : graphicsRuntime.renderScale,
-  antialias: renderProfile !== 'compat' && graphicsRuntime.antialiasSamples > 0,
-  shadows: renderProfile === 'blender' && (queryRenderProfile === 'blender' || graphicsRuntime.shadows),
-  shadowMapSize: renderProfile === 'compat' ? 0 : graphicsRuntime.shadowMapSize,
-  shadowMode: renderProfile === 'compat' || !graphicsRuntime.shadows ? 'off' : graphicsRuntime.shadowUpdateMode,
-});
-const displayedGraphicsPreset: GraphicsPreset = renderProfile === 'performance' || renderProfile === 'compat'
-  ? 'performance'
-  : pass65Settings.graphics.preset === 'performance' ? 'high' : pass65Settings.graphics.preset;
+const activeRenderConfig = resolveActiveGraphicsConfig(graphicsRuntime, renderProfile, queryRenderProfile);
+const displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
 let activeLighting = arenaLightingProfile(
   renderProfile,
@@ -1132,16 +1123,11 @@ const displayCadencePromise = new Promise<number>((resolve) => {
 bootstrapStage = 'measuring-display';
 const detectedDisplayFrameMs = await displayCadencePromise;
 bootstrapStage = 'module-ready';
-const configuredAdaptiveLevels = graphicsRuntime.adaptive && renderProfile !== 'compat'
-  ? [...new Set((renderProfile === 'performance'
-      ? [0.55, 0.65, activeRenderConfig.pixelRatioCap]
-      : [
-          Math.max(0.5, activeRenderConfig.pixelRatioCap * 0.65),
-          Math.max(0.5, activeRenderConfig.pixelRatioCap * 0.75),
-          Math.max(0.5, activeRenderConfig.pixelRatioCap * 0.85),
-          activeRenderConfig.pixelRatioCap,
-        ]).map((level) => Number(level.toFixed(2))))]
-  : [activeRenderConfig.pixelRatioCap];
+const configuredAdaptiveLevels = configuredAdaptiveQualityLevels(
+  renderProfile,
+  activeRenderConfig.pixelRatioCap,
+  graphicsRuntime.adaptive,
+);
 const adaptiveQuality = new AdaptiveQualityController({
   profile: renderProfile,
   targetFrameMs: Math.max(detectedDisplayFrameMs, 1_000 / graphicsRuntime.targetFps),

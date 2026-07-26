@@ -1,5 +1,9 @@
 import { AUDIO_BUS_IDS } from './pass65-settings';
-import { ADVANCED_GRAPHICS_CONTROLS } from './graphics-settings-registry';
+import {
+  ADVANCED_GRAPHICS_CONTROLS,
+  ADVANCED_GRAPHICS_RUNTIME_EVIDENCE,
+  type GraphicsRuntimeEvidence,
+} from './graphics-settings-registry';
 
 export type SettingApplyMode = 'live' | 'pipeline-rebuild' | 'arena-reload';
 
@@ -8,17 +12,24 @@ export type SettingDefinition = Readonly<{
   applyMode: SettingApplyMode;
   authorityAffecting: false;
   runtimeConsumer?: string;
+  runtimeEvidence?: readonly GraphicsRuntimeEvidence[];
 }>;
 
 const graphicsSettings: readonly SettingDefinition[] = Object.freeze([
   Object.freeze({
     key: 'graphics.preset', applyMode: 'arena-reload', authorityAffecting: false, runtimeConsumer: 'preset-resolver',
+    runtimeEvidence: Object.freeze([Object.freeze({
+      path: 'src/pass65-settings.ts',
+      symbol: 'resolveDisplayedGraphicsPreset',
+      telemetryPath: 'settings.displayedGraphicsPreset + render.profile',
+    })]),
   }),
   ...ADVANCED_GRAPHICS_CONTROLS.map((definition): SettingDefinition => Object.freeze({
     key: `graphics.${definition.key}`,
     applyMode: definition.applyMode,
     authorityAffecting: false,
     runtimeConsumer: definition.runtimeConsumer,
+    runtimeEvidence: ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[definition.key],
   })),
 ]);
 
@@ -54,6 +65,7 @@ export function validatePass65SettingDefinitions(): readonly string[] {
   }
   for (const definition of graphicsSettings) {
     if (!definition.runtimeConsumer) issues.push(`orphan-graphics-setting:${definition.key}`);
+    if ((definition.runtimeEvidence?.length ?? 0) === 0) issues.push(`missing-runtime-evidence:${definition.key}`);
   }
   return Object.freeze(issues);
 }

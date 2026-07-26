@@ -17,10 +17,11 @@ export type AdaptiveQualityTelemetry = {
 };
 
 export function adaptiveShadowsEnabled(profile: RenderProfile, authoredShadows: boolean, pixelRatioCap: number): boolean {
-  // Shadows are part of the Quality presentation contract, not a disposable
-  // post effect. The controller sheds bloom, contact shading, fog, particles,
-  // decals, IBL and resolution first; Performance/Compatibility remain shadow-free.
-  return profile === 'blender' && authoredShadows && pixelRatioCap >= 0.65;
+  // Shadows are an explicit player choice, not a disposable post effect. The
+  // controller sheds bloom, contact shading, fog, particles, decals, IBL and
+  // resolution first. Performance stays shadow-free through its preset, while
+  // Custom may independently combine reduced geometry with authored shadows.
+  return profile !== 'compat' && authoredShadows && Number.isFinite(pixelRatioCap) && pixelRatioCap > 0;
 }
 
 type AdaptiveQualityOptions = {
@@ -39,6 +40,26 @@ const LEVELS: Record<RenderProfile, readonly number[]> = {
   blender: [0.65, 0.75, 0.85, 1],
   compat: [0.2],
 };
+
+/**
+ * Builds adaptive tiers whose maximum is always the player's selected render
+ * scale. This prevents Custom low-scale configurations from upshifting above
+ * their own cap while preserving the established 0.55/0.65/0.75 Performance
+ * and 0.65/0.75/0.85/1.0 Quality tiers at the public preset defaults.
+ */
+export function configuredAdaptiveQualityLevels(
+  profile: RenderProfile,
+  pixelRatioCap: number,
+  enabled: boolean,
+): readonly number[] {
+  const cap = Number.isFinite(pixelRatioCap) && pixelRatioCap > 0 ? pixelRatioCap : LEVELS[profile].at(-1) ?? 1;
+  if (!enabled || profile === 'compat') return Object.freeze([cap]);
+  const ratios = profile === 'performance' ? [0.73, 0.87, 1] : [0.65, 0.75, 0.85, 1];
+  const minimum = Math.min(0.5, cap);
+  return Object.freeze([...new Set(ratios.map((ratio) => (
+    Number(Math.min(cap, Math.max(minimum, cap * ratio)).toFixed(2))
+  )))].sort((left, right) => left - right));
+}
 
 function percentile(sorted: readonly number[], fraction: number): number {
   if (sorted.length === 0) return 0;
