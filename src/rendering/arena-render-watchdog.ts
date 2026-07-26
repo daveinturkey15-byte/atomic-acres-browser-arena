@@ -4,6 +4,7 @@ import type { RenderInfoSnapshot } from './render-runtime';
 
 export type ArenaRenderLivenessAudit = Readonly<{
   arenaId: ArenaId;
+  presentationRootName: string;
   eligible: boolean;
   rootAttached: boolean;
   rootVisible: boolean;
@@ -62,21 +63,22 @@ export function auditArenaRenderLiveness(
   renderInfo: RenderInfoSnapshot,
   eligible = true,
   camera?: THREE.Camera,
+  presentationRoot: THREE.Group = root,
 ): ArenaRenderLivenessAudit {
   let renderableDescendants = 0;
   let visibleRenderableDescendants = 0;
   let cameraLayerRenderableDescendants = 0;
-  root.traverse((node) => {
+  presentationRoot.traverse((node) => {
     if (!renderable(node) || !materialVisible(node)) return;
     if (node instanceof THREE.InstancedMesh && node.count <= 0) return;
     renderableDescendants += 1;
-    if (visibleThroughRoot(node, root)) {
+    if (visibleThroughRoot(node, presentationRoot)) {
       visibleRenderableDescendants += 1;
       if (!camera || camera.layers.test(node.layers)) cameraLayerRenderableDescendants += 1;
     }
   });
-  const rootAttached = root.parent === scene;
-  const rootVisible = root.visible;
+  const rootAttached = presentationRoot.parent === scene;
+  const rootVisible = presentationRoot.visible;
   const definitionMatches = root.userData.arenaVisualDefinitionId === arenaId
     && root.userData.authoritativeArenaId === arenaId;
   const activeDefinitionRoots = scene.children.filter((node) => node.userData.arenaVisualDefinitionId !== undefined).length;
@@ -92,6 +94,7 @@ export function auditArenaRenderLiveness(
   }
   return {
     arenaId,
+    presentationRootName: presentationRoot.name,
     eligible,
     rootAttached,
     rootVisible,

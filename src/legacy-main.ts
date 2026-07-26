@@ -593,6 +593,7 @@ function element<T extends HTMLElement>(selector: string): T {
 
 const canvas = element<HTMLCanvasElement>('#game');
 const menu = element<HTMLElement>('#menu');
+menu.dataset.context = 'deployment';
 const menuShowcase = element<HTMLElement>('#menu-showcase');
 const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
 const menuPreviewLabel = element<HTMLElement>('#menu-preview-label');
@@ -662,11 +663,11 @@ const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
     });
 if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
 const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
-function submitWebGpuFrame(): void {
-  if (renderRuntime.backend === 'webgpu') renderRuntime.submitFrame();
+function submitWebGpuFrame(now = performance.now()): void {
+  if (renderRuntime.backend === 'webgpu') renderRuntime.submitFrame(now);
 }
-async function flushWebGpuFrames(): Promise<void> {
-  if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork();
+async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
+  if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
 }
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 renderRuntime.configureOutput(activeLighting.exposure);
@@ -1042,12 +1043,19 @@ function disposeArenaPresentationRoot(root: THREE.Group): void {
 }
 
 async function retireAllArenasExcept(arenaId: ArenaId): Promise<void> {
-  await flushWebGpuFrames();
-  for (const [candidateId, candidate] of [...arenaCache]) {
-    if (candidateId !== arenaId) disposeRetiredArena(candidateId, candidate);
+  // Keep one bounded, detached root per canonical arena. Pass 64 disposed and
+  // rebuilt every previous map here, which forced repeated WebGPU compilation
+  // and allowed stale generations to race buffer destruction. Four canonical
+  // roots are a fixed cache, not an unbounded content leak; the renderer owns
+  // final teardown on page exit.
+  for (const [candidateId, candidate] of arenaCache) {
+    if (candidateId === arenaId) continue;
+    candidate.root.removeFromParent();
+    candidate.root.visible = false;
   }
-  if (arenaId !== 'atomic-acres') retireAtomicPresentation();
-  if (arenaId !== 'rustworks-1v1') rustworksQualityLoadPromise = null;
+  if (arenaCache.size > Object.keys(arenaFactories).length) {
+    throw new Error(`Arena cache exceeded canonical bound: ${arenaCache.size}`);
+  }
 }
 
 let arena: ArenaMap = ensureArenaConstructed(selectedArena.id);
@@ -1130,11 +1138,11 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
-async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group): Promise<void> {
+async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group, fence = true): Promise<void> {
   // Never retire buffers or post targets while the prior WebGPU submission can
   // still reference them. The awaited queue fence makes map-switch disposal a
   // real lifecycle boundary instead of a use-after-destroy race.
-  if (renderRuntime.backend === 'webgpu') await flushWebGpuFrames();
+  if (renderRuntime.backend === 'webgpu' && fence) await flushWebGpuFrames();
   arenaVisualReceipt = await arenaVisualStream.adoptGameplayRoot(arenaId, root);
   const module = await loadArenaVisualModule(arenaId);
   activeArenaVisualDefinition = module.definition;
@@ -1831,6 +1839,14 @@ let lastPlayerSpawnAudit: {
   population: number;
 } | null = null;
 let debugRenderPaused = new URLSearchParams(window.location.search).get('renderPaused') === '1';
+let renderSubmissionPaused = false;
+let arenaTransitionGeneration = 0;
+let arenaTransitionPhase: 'idle' | 'fencing' | 'preparing' | 'committing' | 'rolling-back' | 'failed' = 'idle';
+let arenaTransitionStartedAt: number | null = null;
+let arenaTransitionCompletedAt: number | null = null;
+let arenaTransitionFailure: string | null = null;
+let lastArenaRenderAuditAt = -Infinity;
+const ARENA_RENDER_AUDIT_INTERVAL_MS = 250;
 let debugShadowProbe: THREE.Mesh | null = null;
 const debugCaptureCameraPosition = new THREE.Vector3();
 let debugCaptureCameraYaw = 0;
@@ -10024,15 +10040,27 @@ requestAnimationFrame(animateMenuPreview);
 
 async function performArenaSelection(id: ArenaId): Promise<void> {
   if (gameStarted || !arenaSelectionReady || id === selectedArena.id) return;
+  arenaTransitionGeneration += 1;
   const nextSelection = arenaSelection(id);
   const previousSelection = selectedArena;
   const previousArena = arena;
   const previousPhysics = characterPhysics;
   let nextPhysics: CharacterPhysics | null = null;
+  let committed = false;
   arenaSelectionReady = false;
+  renderSubmissionPaused = true;
+  arenaTransitionPhase = 'fencing';
+  arenaTransitionStartedAt = performance.now();
+  arenaTransitionCompletedAt = null;
+  arenaTransitionFailure = null;
   syncArenaSelectionUi();
   setStatus(`Loading ${nextSelection.displayName} collision…`);
   try {
+    // A map generation may only replace renderer-visible authority once every
+    // earlier WebGPU submission has completed. This prevents the old root's
+    // buffers from being detached or destroyed while the queue still uses it.
+    await flushWebGpuFrames();
+    arenaTransitionPhase = 'preparing';
     const nextArena = ensureArenaConstructed(nextSelection.id);
     latestArenaPerformanceBudgetSample = null;
     if (localArenaSwitchQaDelayMs > 0) {
@@ -10044,7 +10072,7 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     arena = nextArena;
     botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
-    await configurePlayableArenaVisuals(selectedArena.id, arena.root);
+    await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
     await ensureSelectedQualityPresentation(selectedArena.id);
     setArenaPresentationVisibility();
     matchState = createMatch(performance.now(), selectedArena.matchRules);
@@ -10054,34 +10082,67 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
+    arenaTransitionPhase = 'committing';
+    renderRuntime.resetRenderInfo();
+    if (renderRuntime.backend === 'webgpu') submitWebGpuFrame();
+    else atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+    await flushWebGpuFrames();
+    const presentationRoot = selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible
+      ? arenaArtRoot
+      : arena.root;
+    const readiness = auditArenaRenderLiveness(
+      scene,
+      arena.root,
+      selectedArena.id,
+      renderRuntime.renderInfo(),
+      true,
+      camera,
+      presentationRoot,
+    );
+    if (readiness.reasons.length > 0) {
+      throw new Error(`Map presentation failed readiness: ${readiness.reasons.join(', ')}`);
+    }
+    await retireAllArenasExcept(selectedArena.id);
+    renderHighScores();
+    committed = true;
     try {
       previousPhysics?.dispose();
     } catch (disposeError) {
       console.warn('[Nuke Town previous map physics disposal failed]', disposeError);
     }
     setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
-    await retireAllArenasExcept(selectedArena.id);
-    renderHighScores();
   } catch (error) {
     console.error('[Nuke Town map selection failed]', error);
-    if (nextPhysics) nextPhysics.dispose();
+    arenaTransitionPhase = 'rolling-back';
+    arenaTransitionFailure = error instanceof Error ? error.message : String(error);
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
     arena = previousArena;
     botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
-    await configurePlayableArenaVisuals(selectedArena.id, arena.root);
-    await retireAllArenasExcept(selectedArena.id);
-    setArenaPresentationVisibility();
-    matchState = createMatch(performance.now(), selectedArena.matchRules);
-    lastPlayerSpawnIndex = -1;
-    lastPlayerSpawnAudit = null;
-    recentDeathPositions.length = 0;
-    lastBotSpawnAudit.clear();
-    respawn(false);
-    setArenaMenuCamera();
-    setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
+    try {
+      await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
+      await ensureSelectedQualityPresentation(selectedArena.id);
+      await retireAllArenasExcept(selectedArena.id);
+      setArenaPresentationVisibility();
+      matchState = createMatch(performance.now(), selectedArena.matchRules);
+      lastPlayerSpawnIndex = -1;
+      lastPlayerSpawnAudit = null;
+      recentDeathPositions.length = 0;
+      lastBotSpawnAudit.clear();
+      respawn(false);
+      setArenaMenuCamera();
+      setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
+    } catch (rollbackError) {
+      arenaTransitionPhase = 'failed';
+      arenaTransitionFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      showFatalError(new Error(`Map switch rollback failed: ${arenaTransitionFailure}`));
+    }
   } finally {
+    if (!committed && nextPhysics && nextPhysics !== characterPhysics) nextPhysics.dispose();
+    renderSubmissionPaused = false;
+    if (arenaTransitionPhase !== 'failed') arenaTransitionPhase = 'idle';
+    arenaTransitionCompletedAt = performance.now();
     arenaSelectionReady = true;
     syncArenaSelectionUi();
     if (network.role !== 'offline' || privateLobbySnapshot) renderPrivateLobby();
@@ -10330,6 +10391,8 @@ window.addEventListener('beforeunload', () => {
   network.close();
   pass64TslSystems?.dispose();
   arenaVisualStream.dispose();
+  retireAtomicPresentation();
+  for (const [arenaId, cachedArena] of [...arenaCache]) disposeRetiredArena(arenaId, cachedArena);
   renderRuntime.dispose();
 });
 
@@ -10359,18 +10422,42 @@ function refreshStaticShadowsForDynamicCasters(now: number): void {
   staticShadowDynamicRefreshes += 1;
 }
 
+function selectedArenaPresentationRoot(): THREE.Group {
+  if (selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible) return arenaArtRoot;
+  return arena.root;
+}
+
 function monitorSelectedArenaRender(now: number): void {
-  // Atomic Acres' quality GLB intentionally replaces the procedural gameplay
-  // root visually. Every other selected arena must retain a drawable exact
-  // authority root even if atmosphere and the DOM HUD are still rendering.
-  // During the atomic switch transaction selectedArena/arena deliberately
-  // advance before the detached presentation root is validated and adopted.
-  // Audit only after that boundary commits; stable play remains fail-closed.
-  const eligible = arenaSelectionReady
-    && !(selectedArena.id === 'atomic-acres' && blenderArenaActive);
-  let audit = auditArenaRenderLiveness(scene, arena.root, selectedArena.id, renderRuntime.renderInfo(), eligible, camera);
+  if (now - lastArenaRenderAuditAt < ARENA_RENDER_AUDIT_INTERVAL_MS) return;
+  lastArenaRenderAuditAt = now;
+  // Visual authority may be a quality-art root while collision/raycast
+  // authority stays on the procedural root. Audit both halves of that
+  // contract instead of exempting the map whose art can actually disappear.
+  const eligible = arenaSelectionReady && !renderSubmissionPaused;
+  let presentationRoot = selectedArenaPresentationRoot();
+  let audit = auditArenaRenderLiveness(
+    scene,
+    arena.root,
+    selectedArena.id,
+    renderRuntime.renderInfo(),
+    eligible,
+    camera,
+    presentationRoot,
+  );
   if (eligible && audit.reasons.length > 0) {
-    const restored = arenaVisualStream.restoreGameplayRoot(selectedArena.id, arena.root);
+    let restored = false;
+    if (presentationRoot !== arena.root) {
+      if (presentationRoot.parent !== scene) {
+        scene.add(presentationRoot);
+        restored = true;
+      }
+      if (!presentationRoot.visible) {
+        presentationRoot.visible = true;
+        restored = true;
+      }
+    } else {
+      restored = arenaVisualStream.restoreGameplayRoot(selectedArena.id, arena.root);
+    }
     if (restored) {
       arenaRenderWatchdog.recordRecovery(audit.reasons.join(','));
       requestStaticShadowRefresh();
@@ -10381,11 +10468,43 @@ function monitorSelectedArenaRender(now: number): void {
       if (selectedArena.id === 'skyline-terminal') applyAdditionalMapPresentationProfile(arena.root, renderProfile);
       if (selectedArena.id === 'rustworks-1v1') applyRustworksPresentationProfile(arena.root, renderProfile);
     }
-    audit = auditArenaRenderLiveness(scene, arena.root, selectedArena.id, renderRuntime.renderInfo(), eligible, camera);
+    presentationRoot = selectedArenaPresentationRoot();
+    audit = auditArenaRenderLiveness(
+      scene,
+      arena.root,
+      selectedArena.id,
+      renderRuntime.renderInfo(),
+      eligible,
+      camera,
+      presentationRoot,
+    );
+    if (selectedArena.id === 'atomic-acres' && presentationRoot !== arena.root && audit.reasons.length > 0) {
+      // A broken quality root must degrade to the already-resident gameplay
+      // presentation rather than leave HUD/audio running over a blank canvas.
+      presentationRoot.visible = false;
+      blenderArenaActive = false;
+      qualityAssetStreaming.atomicAcres = 'fallback';
+      arena.root.visible = true;
+      presentationRoot = arena.root;
+      arenaRenderWatchdog.recordRecovery(`quality-root-fallback:${audit.reasons.join(',')}`);
+      audit = auditArenaRenderLiveness(
+        scene,
+        arena.root,
+        selectedArena.id,
+        renderRuntime.renderInfo(),
+        eligible,
+        camera,
+        presentationRoot,
+      );
+    }
+  }
+  const presentation = renderRuntime.presentationTelemetry(now);
+  if (eligible && (presentation.status === 'stalled' || presentation.status === 'device-lost' || presentation.status === 'failed')) {
+    throw new Error(`Renderer presentation ${presentation.status}: ${presentation.lastFailure ?? `${Math.round(presentation.pendingForMs)} ms pending`}`);
   }
   const watchdog = arenaRenderWatchdog.observe(audit, now);
-  if (watchdog.fatal && watchdog.consecutiveInvalidFrames === 3) {
-    console.error('[Pass 64 arena render watchdog fatal]', watchdog);
+  if (watchdog.fatal) {
+    throw new Error(`Arena presentation lost (${audit.reasons.join(', ')})`);
   }
 }
 
@@ -10467,10 +10586,10 @@ function frame(now: number, scheduleNext = true): void {
       camera.updateMatrixWorld(true);
     }
     refreshStaticShadowsForDynamicCasters(now);
-    if (!debugRenderPaused && !webglContextLost && document.visibilityState === 'visible') {
+    if (!debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
       if (renderRuntime.backend === 'webgpu') {
         renderRuntime.resetRenderInfo();
-        submitWebGpuFrame();
+        submitWebGpuFrame(now);
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
       }
@@ -10959,7 +11078,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         constructedArenaIds: [...new Set(arenaConstructionHistory)],
         residentArenaIds: [...arenaCache.keys()],
         residentArenaRoots: arenaCache.size,
+        cachePolicy: 'bounded-canonical-detached-roots',
+        canonicalCacheBound: Object.keys(arenaFactories).length,
         selectedOnlyResident: arenaCache.size === 1 && arenaCache.has(selectedArena.id),
+        transition: {
+          generation: arenaTransitionGeneration,
+          phase: arenaTransitionPhase,
+          startedAt: arenaTransitionStartedAt,
+          completedAt: arenaTransitionCompletedAt,
+          failure: arenaTransitionFailure,
+          renderSubmissionPaused,
+        },
         retirement: { ...arenaRetirementInventory },
         atomicAuxiliaryRoots: [arenaArtRoot, worldIdentityPresentation?.root, neighbourhoodLifeRoot]
           .filter((root): root is THREE.Group => root !== null && root !== undefined && root.parent !== null).length,

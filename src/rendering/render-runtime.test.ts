@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRenderRuntimeRequest } from './render-runtime';
+import { classifyPresentationFreshness, resolveRenderRuntimeRequest } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
 describe('Pass 64 render runtime boundary', () => {
@@ -29,5 +29,22 @@ describe('Pass 64 render runtime boundary', () => {
   it('accepts only an entirely verified inventory', () => {
     const verified = TSL_MIGRATION_INVENTORY.map((entry) => ({ ...entry, status: 'verified' as const }));
     expect(() => assertTslCutoverReady(verified)).not.toThrow();
+  });
+
+  it('classifies queue completion freshness independently of simulation cadence', () => {
+    const classify = (overrides: Partial<Parameters<typeof classifyPresentationFreshness>[0]> = {}) => classifyPresentationFreshness({
+      deviceLost: false,
+      completionFailures: 0,
+      submissionSequence: 12,
+      completedSequence: 11,
+      pendingForMs: 50,
+      stallThresholdMs: 1_500,
+      ...overrides,
+    });
+    expect(classify({ submissionSequence: 0, completedSequence: 0 })).toBe('warming');
+    expect(classify()).toBe('healthy');
+    expect(classify({ pendingForMs: 1_501 })).toBe('stalled');
+    expect(classify({ completionFailures: 1 })).toBe('failed');
+    expect(classify({ deviceLost: true, completionFailures: 1 })).toBe('device-lost');
   });
 });

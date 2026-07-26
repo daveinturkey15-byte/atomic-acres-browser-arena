@@ -24,7 +24,36 @@ export type RenderRuntimeTelemetry = Readonly<{
   bloomSamples: number | null;
   renderPipelineApi: 'legacy-direct' | 'three-r185-render-pipeline';
   deviceLost: boolean;
+  presentation: PresentationFreshnessTelemetry;
 }>;
+
+export type PresentationFreshnessTelemetry = Readonly<{
+  status: 'synchronous' | 'warming' | 'healthy' | 'stalled' | 'device-lost' | 'failed';
+  submissionSequence: number;
+  completedSequence: number;
+  lastSubmittedAt: number | null;
+  lastCompletedAt: number | null;
+  pendingSince: number | null;
+  pendingForMs: number;
+  lastCompletionLatencyMs: number | null;
+  completionFailures: number;
+  lastFailure: string | null;
+}>;
+
+export function classifyPresentationFreshness(input: Readonly<{
+  deviceLost: boolean;
+  completionFailures: number;
+  submissionSequence: number;
+  completedSequence: number;
+  pendingForMs: number;
+  stallThresholdMs: number;
+}>): PresentationFreshnessTelemetry['status'] {
+  if (input.deviceLost) return 'device-lost';
+  if (input.completionFailures > 0) return 'failed';
+  if (input.submissionSequence === 0 || input.completedSequence === 0) return 'warming';
+  if (input.pendingForMs > input.stallThresholdMs) return 'stalled';
+  return 'healthy';
+}
 
 export type RenderInfoSnapshot = Readonly<{
   calls: number;
@@ -92,6 +121,23 @@ export class LegacyWebGlRenderRuntime {
       bloomSamples: targets?.bloomSamples ?? null,
       renderPipelineApi: 'legacy-direct',
       deviceLost: gl.isContextLost(),
+      presentation: this.presentationTelemetry(),
+    };
+  }
+
+  presentationTelemetry(): PresentationFreshnessTelemetry {
+    const lost = this.renderer.getContext().isContextLost();
+    return {
+      status: lost ? 'device-lost' : 'synchronous',
+      submissionSequence: 0,
+      completedSequence: 0,
+      lastSubmittedAt: null,
+      lastCompletedAt: null,
+      pendingSince: null,
+      pendingForMs: 0,
+      lastCompletionLatencyMs: null,
+      completionFailures: 0,
+      lastFailure: lost ? 'WebGL context lost' : null,
     };
   }
 
@@ -242,6 +288,18 @@ export class WebGpuRenderRuntime {
   private readonly device: GpuDeviceShape;
   private principalHdrSamples: number | null = null;
   private bloomSamples: number | null = null;
+  private submissionSequence = 0;
+  private completedSequence = 0;
+  private lastSubmittedAt: number | null = null;
+  private lastCompletedAt: number | null = null;
+  private pendingCompletionStartedAt: number | null = null;
+  private completionProbe: Promise<void> | null = null;
+  private lastCompletionLatencyMs: number | null = null;
+  private completionFailures = 0;
+  private lastFailure: string | null = null;
+  private nextCompletionProbeAt = 0;
+  private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
+  private static readonly PRESENTATION_STALL_MS = 1_500;
 
   private constructor(
     renderer: WebGPURenderer,
@@ -265,7 +323,13 @@ export class WebGpuRenderRuntime {
     this.deviceClass = identity.deviceClass;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
-    void identity.device.lost?.then(() => { this.deviceLost = true; });
+    void identity.device.lost?.then((info) => {
+      this.deviceLost = true;
+      const record = info as { reason?: unknown; message?: unknown } | undefined;
+      const reason = record?.reason === undefined ? 'unknown' : String(record.reason);
+      const message = record?.message === undefined ? '' : `: ${String(record.message)}`;
+      this.lastFailure = `WebGPU device lost (${reason})${message}`;
+    });
   }
 
   static async create(parameters: Readonly<{
@@ -325,7 +389,64 @@ export class WebGpuRenderRuntime {
       bloomSamples: this.bloomSamples,
       renderPipelineApi: 'three-r185-render-pipeline',
       deviceLost: this.deviceLost,
+      presentation: this.presentationTelemetry(),
     };
+  }
+
+  presentationTelemetry(now = performance.now()): PresentationFreshnessTelemetry {
+    const pendingForMs = this.pendingCompletionStartedAt === null
+      ? 0
+      : Math.max(0, now - this.pendingCompletionStartedAt);
+    const status = classifyPresentationFreshness({
+      deviceLost: this.deviceLost,
+      completionFailures: this.completionFailures,
+      submissionSequence: this.submissionSequence,
+      completedSequence: this.completedSequence,
+      pendingForMs,
+      stallThresholdMs: WebGpuRenderRuntime.PRESENTATION_STALL_MS,
+    });
+    return {
+      status,
+      submissionSequence: this.submissionSequence,
+      completedSequence: this.completedSequence,
+      lastSubmittedAt: this.lastSubmittedAt,
+      lastCompletedAt: this.lastCompletedAt,
+      pendingSince: this.pendingCompletionStartedAt,
+      pendingForMs,
+      lastCompletionLatencyMs: this.lastCompletionLatencyMs,
+      completionFailures: this.completionFailures,
+      lastFailure: this.lastFailure,
+    };
+  }
+
+  private scheduleCompletionProbe(now: number, force = false): Promise<void> | null {
+    if (this.completionProbe) return this.completionProbe;
+    if (!force && now < this.nextCompletionProbeAt) return null;
+    const queue = this.device.queue;
+    if (!queue?.onSubmittedWorkDone) return null;
+    const sequence = this.submissionSequence;
+    const startedAt = now;
+    this.pendingCompletionStartedAt = startedAt;
+    this.nextCompletionProbeAt = now + WebGpuRenderRuntime.COMPLETION_PROBE_INTERVAL_MS;
+    const probe = queue.onSubmittedWorkDone()
+      .then(() => {
+        const completedAt = performance.now();
+        this.completedSequence = Math.max(this.completedSequence, sequence);
+        this.lastCompletedAt = completedAt;
+        this.lastCompletionLatencyMs = Math.max(0, completedAt - startedAt);
+      })
+      .catch((error: unknown) => {
+        this.completionFailures += 1;
+        this.lastFailure = error instanceof Error ? error.message : String(error);
+      })
+      .finally(() => {
+        if (this.completionProbe === probe) {
+          this.completionProbe = null;
+          this.pendingCompletionStartedAt = null;
+        }
+      });
+    this.completionProbe = probe;
+    return probe;
   }
 
   assertCandidateReady(): void {
@@ -419,9 +540,12 @@ export class WebGpuRenderRuntime {
     this.renderPipeline.render();
   }
 
-  submitFrame(): void {
+  submitFrame(now = performance.now()): void {
     this.renderer.info.reset();
     this.renderPipeline.render();
+    this.submissionSequence += 1;
+    this.lastSubmittedAt = now;
+    this.scheduleCompletionProbe(now);
   }
 
   resetRenderInfo(): void {
@@ -445,8 +569,20 @@ export class WebGpuRenderRuntime {
     return this.renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
   }
 
-  async waitForSubmittedWork(): Promise<void> {
-    await this.device.queue?.onSubmittedWorkDone?.();
+  async waitForSubmittedWork(timeoutMs = 4_000): Promise<void> {
+    const now = performance.now();
+    const probe = this.scheduleCompletionProbe(now, true)
+      ?? this.device.queue?.onSubmittedWorkDone?.()
+      ?? Promise.resolve();
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(`WebGPU queue completion exceeded ${timeoutMs} ms`)), timeoutMs);
+    });
+    try {
+      await Promise.race([probe, timeout]);
+    } finally {
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+    }
   }
 
   dispose(): void {

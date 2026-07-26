@@ -339,12 +339,18 @@ try {
     return state?.weaponReady === true && state?.bootstrap?.stage === 'ready';
   }, undefined, { timeout: 60_000 });
   const switchReceipts = [];
-  for (const arenaId of ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres']) {
+  const switchSequence = ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres'];
+  for (const [switchIndex, arenaId] of switchSequence.entries()) {
     await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
     await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
     const switchState = await switchPage.evaluate(() => {
       const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return { arenaId: state.arenaSelection.id, streaming: state.arenaSelection.streaming, playableScene: state.render.playableScene };
+      return {
+        arenaId: state.arenaSelection.id,
+        streaming: state.arenaSelection.streaming,
+        playableScene: state.render.playableScene,
+        runtime: state.render.runtime,
+      };
     });
     if (switchState.arenaId !== arenaId || switchState.playableScene.arena.arenaId !== arenaId
       || switchState.playableScene.authoritativeArenaRoots !== 1) {
@@ -359,15 +365,22 @@ try {
     if (receipt.traversal.legacyShaderMaterials.length !== 0 || receipt.duplicateArenaRoots) {
       throw new Error(`${arenaId} switch introduced a duplicate arena or legacy shader material`);
     }
-    if (!switchState.streaming.selectedOnlyResident || switchState.streaming.residentArenaRoots !== 1
-      || switchState.streaming.residentArenaIds[0] !== arenaId
+    const expectedResidentRoots = Math.min(switchIndex + 2, 4);
+    if (switchState.streaming.cachePolicy !== 'bounded-canonical-detached-roots'
+      || switchState.streaming.canonicalCacheBound !== 4
+      || switchState.streaming.residentArenaRoots !== expectedResidentRoots
+      || !switchState.streaming.residentArenaIds.includes(arenaId)
+      || switchState.streaming.transition.phase !== 'idle'
+      || switchState.streaming.transition.failure !== null
+      || switchState.streaming.transition.renderSubmissionPaused
+      || switchState.runtime.presentation.status !== 'healthy'
       || receipt.appliedArenaVisualPolicy.definitionId !== arenaId
       || receipt.actualArenaVisualPolicy.definitionId !== arenaId
       || receipt.actualArenaVisualPolicy.atmosphereDefinitionId !== arenaId
       || JSON.stringify(receipt.actualArenaVisualPolicy.atmosphere) !== JSON.stringify(receipt.appliedArenaVisualPolicy.atmosphere)
       || receipt.actualArenaVisualPolicy.practicals.definitionId !== arenaId
       || !receipt.budgetAudit.pass) {
-      throw new Error(`${arenaId} switch retained an arena or failed definition policy/budget gates: ${JSON.stringify(switchState)}`);
+      throw new Error(`${arenaId} switch violated the bounded-cache, presentation-freshness, definition, or budget gates: ${JSON.stringify(switchState)}`);
     }
     switchReceipts.push({ ...receipt, streaming: switchState.streaming });
   }
@@ -378,6 +391,66 @@ try {
     throw new Error(`Gameplay arena switch did not lazily request all four definition modules: ${JSON.stringify(requestedArenaModules)}`);
   }
   if (switchErrors.length > 0) throw new Error(`Gameplay arena switches emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
+  const presentationSoak = [];
+  for (const arenaId of ['rustworks-1v1', 'gun-range', 'skyline-terminal', 'atomic-acres', 'rustworks-1v1']) {
+    await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
+    await switchPage.evaluate(() => {
+      window.__ATOMIC_ACRES_DEBUG__.startSolo();
+      window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+    });
+    await switchPage.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === true && document.querySelector('#menu')?.classList.contains('hidden');
+    }, undefined, { timeout: 15_000 });
+    await switchPage.waitForTimeout(arenaId === 'rustworks-1v1' ? 2_500 : 1_250);
+    const before = await switchPage.evaluate(async () => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const state = api.snapshot();
+      const [x, y, z] = state.player.position;
+      api.setCaptureCameraPose(x, y, z, 0, 0);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return {
+        state: api.snapshot(),
+        menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
+        readback: await api.readbackWebGpuFrame(),
+      };
+    });
+    const after = await switchPage.evaluate(async () => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const [x, y, z] = api.snapshot().player.position;
+      api.setCaptureCameraPose(x, y, z, 1.2, 0);
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      const result = {
+        state: api.snapshot(),
+        menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
+        readback: await api.readbackWebGpuFrame(),
+      };
+      api.setCaptureCameraPose(null);
+      return result;
+    });
+    if (!after.state.gameStarted || !after.menuHidden
+      || before.state.render.runtime.presentation.status !== 'healthy'
+      || after.state.render.runtime.presentation.status !== 'healthy'
+      || after.state.render.runtime.presentation.completedSequence <= before.state.render.runtime.presentation.completedSequence
+      || after.state.frameCount <= before.state.frameCount
+      || after.readback.hash === before.readback.hash) {
+      throw new Error(`${arenaId} gameplay presentation did not remain fresh: ${JSON.stringify({ before, after })}`);
+    }
+    presentationSoak.push({
+      arenaId,
+      frameDelta: after.state.frameCount - before.state.frameCount,
+      completionDelta: after.state.render.runtime.presentation.completedSequence
+        - before.state.render.runtime.presentation.completedSequence,
+      beforeHash: before.readback.hash,
+      afterHash: after.readback.hash,
+      presentationStatus: after.state.render.runtime.presentation.status,
+    });
+    await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
+    await switchPage.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.gameStarted === false && !document.querySelector('#menu')?.classList.contains('hidden');
+    }, undefined, { timeout: 15_000 });
+  }
   await switchPage.close();
   const multiplayerPages = await Promise.all(['host', 'guest'].map(async (role) => {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
@@ -468,6 +541,7 @@ try {
     rendererPolicy: 'webgpu-default-fail-closed-webgl-explicit-compatibility',
     arenaRetirementPolicy: 'single-authoritative-gameplay-root',
     switchReceipts,
+    presentationSoak,
     requestedArenaModules,
     twoPeerWebGpu,
     receipts,
