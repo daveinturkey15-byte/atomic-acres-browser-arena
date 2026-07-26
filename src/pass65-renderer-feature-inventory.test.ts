@@ -34,6 +34,21 @@ describe('Pass 65 renderer feature inventory', () => {
     expect(unsupported.every(({ control }) => control.kind === 'unsupported' && control.settingKeys.length === 0)).toBe(true);
   });
 
+  it('binds menu choreography to prerecorded media with zero runtime renderer ownership', () => {
+    const preview = PASS65_RENDERER_FEATURES.find(({ id }) => id === 'menu-preview-motion');
+    expect(preview).toMatchObject({
+      owner: 'src/ui/menu-preview-video.ts + offline authored media',
+      sourceProbes: expect.arrayContaining([
+        { path: 'src/ui/menu-preview-video.ts', symbol: 'class MenuPreviewVideoController' },
+        { path: 'src/ui/menu-preview-video.ts', symbol: 'rendererSubmissions: 0' },
+      ]),
+      verifier: 'src/ui/menu-preview-video.test.ts + tests/e2e/pass65-preview-choreography.spec.ts',
+    });
+    expect(preview?.owner).not.toContain('menu-preview-camera');
+    expect(preview?.control.effectiveValue).toContain('prerecorded compressed video');
+    expect(preview?.budget).toContain('zero menu-preview arena constructions or WebGPU submissions');
+  });
+
   it('probes real owners and symbols for every inventory row', () => {
     for (const [stage, probe] of Object.entries(PASS65_ADVANCED_GRAPHICS_TRACE)) {
       expect(existsSync(probe.path), `${stage}: ${probe.path}`).toBe(true);

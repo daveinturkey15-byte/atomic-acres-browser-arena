@@ -1081,15 +1081,15 @@
       "id": "menu-preview-motion",
       "title": "Helicopter and cat menu-preview choreography",
       "availability": "active",
-      "owner": "src/ui/menu-preview-camera.ts",
+      "owner": "src/ui/menu-preview-video.ts + offline authored media",
       "sourceProbes": [
         {
-          "path": "src/ui/menu-preview-camera.ts",
-          "symbol": "menuPreviewPose"
+          "path": "src/ui/menu-preview-video.ts",
+          "symbol": "class MenuPreviewVideoController"
         },
         {
-          "path": "src/ui/menu-preview-camera.ts",
-          "symbol": "MENU_PREVIEW_VISIT_SEED_SLOTS = 64"
+          "path": "src/ui/menu-preview-video.ts",
+          "symbol": "rendererSubmissions: 0"
         }
       ],
       "pipelineIds": [],
@@ -1099,11 +1099,11 @@
           "accessibility.reducedMotion",
           "accessibility.reducedSensoryEffects"
         ],
-        "effectiveValue": "Seeded bounded motion or deterministic static reduced-motion pose",
-        "rationale": "The same arena renderer is reused; preview cameras are presentation-only and cannot mutate gameplay authority."
+        "effectiveValue": "Distinct prerecorded compressed video, or its deterministic poster under reduced motion",
+        "rationale": "Menu browsing owns no arena renderer: helicopter and cat paths are authored offline, while the runtime switches one bounded media decoder and reports zero renderer submissions."
       },
-      "budget": "One active preview camera path, 64 visit-seed slots, and a bounded 256-track cache.",
-      "verifier": "src/ui/menu-preview-camera.test.ts + tests/e2e/pass64-hud-menu.spec.ts",
+      "budget": "One selected video decoder, detached stale sources, one poster fallback, and zero menu-preview arena constructions or WebGPU submissions.",
+      "verifier": "src/ui/menu-preview-video.test.ts + tests/e2e/pass65-preview-choreography.spec.ts",
       "authorityAffecting": false
     },
     {
@@ -1362,5 +1362,5 @@
     "adjustable": 14,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "c5e8a3814f350ab8521c02915fef37f6576f0359f23dee53b668264dd3b5b45e"
+  "inventorySha256": "b82643ab1260a36d23ab4cde8b842ee412e635f540a23b8e791860ed7ff90a44"
 }

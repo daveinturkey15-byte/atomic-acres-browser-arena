@@ -210,14 +210,14 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/weapon-presentation.test.ts + src/pass65-settings.test.ts',
   }),
   feature({
-    id: 'menu-preview-motion', title: 'Helicopter and cat menu-preview choreography', availability: 'active', owner: 'src/ui/menu-preview-camera.ts',
+    id: 'menu-preview-motion', title: 'Helicopter and cat menu-preview choreography', availability: 'active', owner: 'src/ui/menu-preview-video.ts + offline authored media',
     sourceProbes: [
-      { path: 'src/ui/menu-preview-camera.ts', symbol: 'menuPreviewPose' },
-      { path: 'src/ui/menu-preview-camera.ts', symbol: 'MENU_PREVIEW_VISIT_SEED_SLOTS = 64' },
+      { path: 'src/ui/menu-preview-video.ts', symbol: 'class MenuPreviewVideoController' },
+      { path: 'src/ui/menu-preview-video.ts', symbol: 'rendererSubmissions: 0' },
     ], pipelineIds: [],
-    control: control('setting', ['accessibility.reducedMotion', 'accessibility.reducedSensoryEffects'], 'Seeded bounded motion or deterministic static reduced-motion pose', 'The same arena renderer is reused; preview cameras are presentation-only and cannot mutate gameplay authority.'),
-    budget: 'One active preview camera path, 64 visit-seed slots, and a bounded 256-track cache.',
-    verifier: 'src/ui/menu-preview-camera.test.ts + tests/e2e/pass64-hud-menu.spec.ts',
+    control: control('setting', ['accessibility.reducedMotion', 'accessibility.reducedSensoryEffects'], 'Distinct prerecorded compressed video, or its deterministic poster under reduced motion', 'Menu browsing owns no arena renderer: helicopter and cat paths are authored offline, while the runtime switches one bounded media decoder and reports zero renderer submissions.'),
+    budget: 'One selected video decoder, detached stale sources, one poster fallback, and zero menu-preview arena constructions or WebGPU submissions.',
+    verifier: 'src/ui/menu-preview-video.test.ts + tests/e2e/pass65-preview-choreography.spec.ts',
   }),
   feature({
     id: 'destructible-shed-presentation', title: 'Destructible shed holes, dents, doors and debris', availability: 'active', owner: 'src/destructible-shed-presentation.ts',
