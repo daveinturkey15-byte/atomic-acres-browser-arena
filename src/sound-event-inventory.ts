@@ -290,9 +290,11 @@ export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteCon
  */
 export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
   runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
+  runtimeCallsite('coverImpact', 'point.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
   runtimeCallsite('empty', '', 2, ['weapon.dry-fire']),
-  runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
+  runtimeCallsite('explosion', 'afterPresentationDetach', 2, ['ordnance.frag-explosion']),
+  runtimeCallsite('explosion', 'now', 1, ['support.legacy-explosion']),
   runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
   runtimeCallsite('footstep', 'classifyFootstepSurface(player.position),currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
@@ -321,7 +323,8 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('scoutSweep', '', 1, ['support.scout-sweep']),
   runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
   runtimeCallsite('shot', 'bot.weapon,true', 1, ['weapon.report.world']),
-  runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 2, ['weapon.report.world']),
+  runtimeCallsite('shot', "'explosive-crossbow',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
+  runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
@@ -486,9 +489,18 @@ export const PASS64_WEAPON_AUDIO_VARIANTS = Object.freeze([
   'lmg',
   'scattergun',
   'sniper',
+  'mini-uzi',
+  'mp5',
+  'm4a1',
+  'ak-47',
+  'minigun',
+  'm14-ebr',
+  'slug-shotgun',
   'pistol',
   'machine-pistol',
   'magnum',
+  'flashlight-pistol',
+  'explosive-crossbow',
   'railgun',
 ] as const);
 
@@ -973,7 +985,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = 'f9e6b43a667d0ce109e3503811178b3c3d6f080b7228ada2c83835b1ef12cc45';
+export const SOUND_EVENT_INVENTORY_SHA256 = '61399d2590421ed546241de33db417bcd137caa42d6f2bf72af5c4bb7a71f12c';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

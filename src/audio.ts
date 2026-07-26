@@ -3,6 +3,11 @@ import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 import { presentationRandom } from './runtime-random';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
+
+const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
+  WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
+) as Record<WeaponId, number>);
 
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 export const GRENADE_FUSE_BEEP_START_MS = 1_450;
@@ -119,22 +124,25 @@ export class ArenaAudio {
   shot(weapon: WeaponId, remote = false, distance = 0): void {
     this.unlock();
     if (!this.context || !this.weapons) return;
-    const attenuation = weapon === 'railgun'
+    const spatialAttenuation = weapon === 'railgun'
       ? railgunReportAttenuation(remote, distance)
       : remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
+    const attenuation = spatialAttenuation * WEAPON_REPORT_GAIN[weapon];
     const profile = weapon === 'railgun'
       ? RAILGUN_REPORT_PROFILE
-      : weapon === 'scattergun'
+      : weapon === 'explosive-crossbow'
+      ? { body: 116, bodyEnd: 54, duration: 0.11, crack: 840, noise: 0.045, lowpass: 1600, tail: 290, tailDuration: 0.14 }
+      : weapon === 'scattergun' || weapon === 'slug-shotgun'
       ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
-      : weapon === 'sniper'
+      : weapon === 'sniper' || weapon === 'm14-ebr'
         ? { body: 62, bodyEnd: 24, duration: 0.26, crack: 2920, noise: 0.3, lowpass: 2400, tail: 330, tailDuration: 0.42 }
-      : weapon === 'lmg'
+      : weapon === 'lmg' || weapon === 'minigun'
         ? { body: 88, bodyEnd: 34, duration: 0.17, crack: 1540, noise: 0.29, lowpass: 2500, tail: 440, tailDuration: 0.26 }
-      : weapon === 'smg'
+      : weapon === 'smg' || weapon === 'mini-uzi' || weapon === 'mp5'
         ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
         : weapon === 'machine-pistol'
           ? { body: 168, bodyEnd: 72, duration: 0.078, crack: 2280, noise: 0.14, lowpass: 3900, tail: 720, tailDuration: 0.1 }
-          : weapon === 'magnum'
+          : weapon === 'magnum' || weapon === 'flashlight-pistol'
             ? { body: 64, bodyEnd: 22, duration: 0.24, crack: 2840, noise: 0.32, lowpass: 2500, tail: 340, tailDuration: 0.38 }
           : weapon === 'pistol'
             ? { body: 182, bodyEnd: 76, duration: 0.105, crack: 2380, noise: 0.18, lowpass: 4100, tail: 690, tailDuration: 0.14 }
@@ -153,7 +161,7 @@ export class ArenaAudio {
       duration: 0.028,
       volume: 0.17 * attenuation,
       filter: 'highpass',
-      frequency: weapon === 'scattergun' ? 1400 : weapon === 'sniper' ? 1250 : 2400,
+      frequency: weapon === 'scattergun' || weapon === 'slug-shotgun' ? 1400 : weapon === 'sniper' || weapon === 'm14-ebr' ? 1250 : 2400,
       q: 0.4,
     }, this.weapons);
     this.noise({

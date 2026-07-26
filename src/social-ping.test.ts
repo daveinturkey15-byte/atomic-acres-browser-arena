@@ -4,7 +4,7 @@ import { admitTeamPing, createTeamPingAdmissionState, pingMatchesBoundTeam, shou
 
 const sender: PlayerSnapshot = {
   id: 'aqua-1', name: 'Aqua', team: 0, x: 0, y: 1.7, z: 0, yaw: 0, pitch: 0,
-  hp: 100, kills: 0, deaths: 0, primary: 'carbine', weapon: 'carbine', seq: 1,
+  hp: 100, kills: 0, deaths: 0, primary: 'carbine', secondary: 'pistol', grenade: 'frag', weapon: 'carbine', seq: 1,
 };
 const ping = (overrides: Partial<TeamPingMessage> = {}): TeamPingMessage => ({
   type: 'ping', by: sender.id, team: sender.team, kind: 'enemy', position: [2, 1.7, -3], nonce: 10, ...overrides,

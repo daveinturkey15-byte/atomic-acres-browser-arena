@@ -8,7 +8,7 @@ const sender: PlayerSnapshot = {
   id: 'peer-a', name: 'Peer A', team: 1,
   x: 2, y: 1.7, z: 3, yaw: 0, pitch: 0,
   hp: 100, kills: 0, deaths: 0,
-  primary: 'carbine', weapon: 'carbine', stance: 'stand', seq: 1,
+  primary: 'carbine', secondary: 'pistol', grenade: 'frag', weapon: 'carbine', stance: 'stand', seq: 1,
 };
 
 function shotEvents(count: number): Array<NetworkEvent<ShotMessage>> {

@@ -1,5 +1,6 @@
 import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
+import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { ARENA_SELECTIONS } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
@@ -43,6 +44,28 @@ function fieldKitCardsMarkup(): string {
     <i>${kit.traits.join(' · ')}</i>
     <em>SELECTED</em>
   </button>`).join('');
+}
+
+function customPresetCardsMarkup(): string {
+  const cards = [1, 2, 3].map((index) => `<button type="button" class="kit-card custom-kit-card" data-custom-preset-id="custom-${index}" aria-pressed="false">
+    <span>CUSTOM LOADOUT // 0${index}</span>
+    <strong data-custom-name>Custom ${index}</strong>
+    <b data-custom-equipment>CONFIGURE PRIMARY · SECONDARY · GRENADE</b>
+    <p>Persistent operator-defined equipment. Changes queue safely for the next deployment.</p>
+    <i>1 primary · 1 secondary · 1 grenade</i><em>SELECTED</em>
+  </button>`).join('');
+  return `${cards}<button id="loadout-manage" type="button" class="kit-card manage-kit-card" aria-controls="loadout-manager" aria-expanded="false">
+    <span>LOADOUT ADMIN</span><strong>Manage/Rename</strong><b>EDIT THE THREE CUSTOM SLOTS</b>
+    <p>Rename a preset and choose its canonical equipment without creating extra slots.</p>
+    <i>Sanitized · migrated · persistent</i>
+  </button>`;
+}
+
+function weaponOptionsMarkup(slot: 'primary' | 'secondary'): string {
+  return WEAPON_CATALOG
+    .filter((weapon) => weapon.slot === slot && weapon.policies.loadout === 'eligible')
+    .map((weapon) => `<option value="${weapon.id}">${weapon.displayName}</option>`)
+    .join('');
 }
 
 function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
@@ -122,8 +145,20 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
 
 function fieldKitPanelMarkup(): string {
   return `<div id="menu-panel-kit" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-kit" data-menu-panel="kit" hidden>
-    <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose the primary and issued sidearm.</span></div><small>Changes made mid-life queue for the next deployment.</small></div>
-    <div class="kit-grid">${fieldKitCardsMarkup()}</div>
+    <div class="kit-heading"><div><b>FIELD KIT</b><span>Choose a curated kit or one of exactly three custom presets.</span></div><small>One primary · one secondary · one selected grenade. Mid-life changes queue for redeploy.</small></div>
+    <div class="kit-grid curated-kit-grid">${fieldKitCardsMarkup()}</div>
+    <div class="kit-grid custom-kit-grid">${customPresetCardsMarkup()}</div>
+    <section id="loadout-manager" class="loadout-manager" hidden aria-label="Manage and rename custom loadouts">
+      <header><span>MANAGE / RENAME</span><strong>THREE CUSTOM SLOTS</strong></header>
+      <div class="loadout-manager-grid">
+        <label>SLOT<select id="loadout-manage-preset"><option value="custom-1">Custom 1</option><option value="custom-2">Custom 2</option><option value="custom-3">Custom 3</option></select></label>
+        <label>NAME<input id="loadout-preset-name" type="text" maxlength="32" autocomplete="off"></label>
+        <label>PRIMARY<select id="loadout-primary">${weaponOptionsMarkup('primary')}</select></label>
+        <label>SECONDARY<select id="loadout-secondary">${weaponOptionsMarkup('secondary')}</select></label>
+        <label>GRENADE<select id="loadout-grenade"><option value="frag">Frag</option><option value="smoke">Smoke</option><option value="flash">Flash</option></select></label>
+        <button id="loadout-save" type="button">SAVE PRESET</button>
+      </div>
+    </section>
   </div>`;
 }
 
@@ -194,7 +229,7 @@ function hudMarkup(): string {
     <section class="hud-operator-console" aria-label="Operator condition">
       <div id="health-block"><div><span>VITALS</span><b id="health">100</b></div><div class="health-track"><i id="health-fill"></i></div></div>
       <div id="combat-stats" aria-label="Match damage"><span>DEALT <b id="damage-dealt">0</b></span><span>TAKEN <b id="damage-taken">0</b></span></div>
-      <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×2</b><small>V KNIFE · G THROW</small></div>
+      <div id="equipment-block"><span id="stance">STANDING</span><b id="grenades">FRAG ×1</b><small>V KNIFE · G THROW</small></div>
       <div id="room-hud"></div>
     </section>
     <section class="hud-weapon-console" aria-label="Weapon and ammunition">
@@ -235,7 +270,7 @@ function hudMarkup(): string {
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
   return `<canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
     <div id="color-grade"></div><div id="film-grain"></div>
-    <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div>
+    <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div><div id="ordnance-flash" hidden></div>
     <div id="nuke-flash" hidden></div>
     <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
     ${menuMarkup(model)}

@@ -50,12 +50,18 @@ describe('headshot damage contract', () => {
     expect(computeDamage(WEAPONS.magnum, 10, 'body')).toBe(0);
     expect(computeDamage(WEAPONS.magnum, 10, 'limb')).toBe(0);
   });
-  it('uses exactly 1.5× head damage for every firearm', () => {
+  it('preserves the legacy 1.5× baseline and pins deliberate specialist exceptions', () => {
     expect(HEADSHOT_DAMAGE_MULTIPLIER).toBe(1.5);
     expect(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER).toBe(3);
-    for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== 'sniper' && entry.id !== 'magnum' && entry.id !== 'railgun')) {
-      expect(weapon.headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
+    for (const id of ['carbine', 'smg', 'lmg', 'pistol', 'machine-pistol', 'mp5', 'm4a1', 'ak-47', 'flashlight-pistol'] as const) {
+      expect(WEAPONS[id].headMultiplier).toBe(HEADSHOT_DAMAGE_MULTIPLIER);
     }
+    expect(WEAPONS.scattergun.headMultiplier).toBe(1.35);
+    expect(WEAPONS['mini-uzi'].headMultiplier).toBe(1.45);
+    expect(WEAPONS.minigun.headMultiplier).toBe(1.35);
+    expect(WEAPONS['m14-ebr'].headMultiplier).toBe(1.7);
+    expect(WEAPONS['slug-shotgun'].headMultiplier).toBe(1.35);
+    expect(WEAPONS['explosive-crossbow'].headMultiplier).toBe(1);
     expect(WEAPONS.sniper.headMultiplier).toBe(SNIPER_HEADSHOT_DAMAGE_MULTIPLIER);
     expect(computeDamage(WEAPONS.railgun, 220, 'head')).toBe(50);
     expect(computeDamage(WEAPONS.railgun, 220, 'body')).toBe(50);
@@ -236,7 +242,7 @@ describe('weapon tuning', () => {
 
   it('gives the marksman a bounded full-auto G18 sidearm', () => {
     const auto = WEAPONS['machine-pistol'];
-    expect(auto.name).toBe('G18 AUTO');
+    expect(auto.name).toBe('Glock 18');
     expect(auto.automatic).toBe(true);
     expect(auto.rpm).toBeGreaterThan(WEAPONS.smg.rpm);
     expect(auto.damage).toBeLessThan(WEAPONS.pistol.damage);
@@ -264,12 +270,12 @@ describe('weapon tuning', () => {
     );
   });
 
-  it('applies the owner-approved close-range Model 12 damage increase without changing cadence or pellet count', () => {
+  it('uses coherent per-pellet Remington 870 damage without changing cadence or pellet count', () => {
     const shotgun = WEAPONS.scattergun;
-    expect(shotgun.damage).toBe(17);
-    expect(shotgun.minimumDamage).toBe(7);
+    expect(shotgun.damage).toBe(12);
+    expect(shotgun.minimumDamage).toBe(5);
     expect(shotgun.pellets).toBe(9);
-    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(153);
+    expect(computeDamage(shotgun, 5, 'body') * shotgun.pellets).toBe(108);
     expect(shotgun.rpm).toBe(82);
   });
 

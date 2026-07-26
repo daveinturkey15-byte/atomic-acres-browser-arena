@@ -68,21 +68,25 @@ export type GameplayReplayResult = {
   shotSchedule: string[];
 };
 
-// Golden replays are the immutable Pass 62 rollback lane. Candidate-only
-// special weapons have independent authority/replay gates until promoted.
-const weaponIds = (Object.keys(WEAPONS) as WeaponId[]).filter((id) => id !== 'railgun');
+// Golden replays remain the immutable Pass 62 rollback lane. Pass 65 weapons
+// are operable in property tests but use focused contracts rather than silently
+// expanding the historical command trace and state bytes.
+const benchmarkWeaponIds = Object.freeze([
+  'carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'magnum', 'machine-pistol',
+] as const satisfies readonly WeaponId[]);
+const allReplayWeaponIds = Object.freeze(Object.keys(WEAPONS) as WeaponId[]);
 const stepSeconds = 1 / SIMULATION_HZ;
 const stepMs = 1_000 / SIMULATION_HZ;
 const rounded = (value: number): number => Number(value.toFixed(9));
 
 export function createGameplayReplayState(seed = 'atomic-acres-pass24'): { state: GameplayReplayState; rng: DeterministicRng } {
   const rng = createRandomStreams(seed).gameplay;
-  const ammo = Object.fromEntries(weaponIds.map((id) => [id, WEAPONS[id].mag])) as Record<WeaponId, number>;
-  const reserve = Object.fromEntries(weaponIds.map((id) => [id, WEAPONS[id].reserve])) as Record<WeaponId, number>;
-  // Keep the candidate operable in property tests without changing the
-  // enumerable Pass 62 golden-state bytes.
-  Object.defineProperty(ammo, 'railgun', { value: WEAPONS.railgun.mag, writable: true, enumerable: false });
-  Object.defineProperty(reserve, 'railgun', { value: 0, writable: true, enumerable: false });
+  const ammo = Object.fromEntries(benchmarkWeaponIds.map((id) => [id, WEAPONS[id].mag])) as Record<WeaponId, number>;
+  const reserve = Object.fromEntries(benchmarkWeaponIds.map((id) => [id, WEAPONS[id].reserve])) as Record<WeaponId, number>;
+  for (const id of allReplayWeaponIds.filter((candidate) => !benchmarkWeaponIds.includes(candidate as typeof benchmarkWeaponIds[number]))) {
+    Object.defineProperty(ammo, id, { value: WEAPONS[id].mag, writable: true, enumerable: false });
+    Object.defineProperty(reserve, id, { value: id === 'railgun' ? 0 : WEAPONS[id].reserve, writable: true, enumerable: false });
+  }
   return {
     rng,
     state: {
@@ -215,7 +219,7 @@ export function applyReplayCommand(state: GameplayReplayState, rng: Deterministi
       state.lastShotAt = -1_000_000_000;
       state.sustainedShots = 0;
       state.recoil = { pitch: 0, yaw: 0 };
-      for (const id of weaponIds) {
+      for (const id of allReplayWeaponIds) {
         state.ammo[id] = WEAPONS[id].mag;
         state.reserve[id] = WEAPONS[id].reserve;
       }
@@ -249,7 +253,7 @@ export const GOLDEN_REPLAYS: Readonly<Record<string, readonly ReplayCommand[]>> 
     { type: 'move', ticks: 120, x: 0.6, z: 1, context: { stance: 'stand', ads: false, sprinting: true, grounded: true } },
     { type: 'move', ticks: 90, x: -1, z: 0, context: { stance: 'crouch', ads: false, sprinting: false, grounded: true } },
   ],
-  weaponCycle: weaponIds.flatMap((weapon) => [
+  weaponCycle: benchmarkWeaponIds.flatMap((weapon) => [
     { type: 'switch', weapon } as const,
     { type: 'fire', distance: 18, zone: 'body', context: { stance: 'stand', ads: true, sprinting: false } } as const,
     { type: 'wait', ticks: Math.ceil((60_000 / WEAPONS[weapon].rpm) / stepMs) } as const,

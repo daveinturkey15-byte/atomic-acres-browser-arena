@@ -47,14 +47,21 @@ describe('shared wall-penetration authority', () => {
     for (const weapon of Object.values(WEAPONS)) {
       const profile = weapon.penetration;
       expect(profile.caliber.length, weapon.id).toBeGreaterThan(2);
-      expect(profile.penetrationPower, weapon.id).toBeGreaterThan(0);
+      if (weapon.fireKind === 'projectile') {
+        expect(profile.penetrationPower, weapon.id).toBe(0);
+        expect(profile.maxPenetratedSurfaces, weapon.id).toBe(0);
+        expect(profile.minimumEnergyRetention, weapon.id).toBe(0);
+        expect(profile.minimumWallDamageMultiplier, weapon.id).toBe(0);
+      } else {
+        expect(profile.penetrationPower, weapon.id).toBeGreaterThan(0);
+        expect(profile.maxPenetratedSurfaces, weapon.id).toBeGreaterThanOrEqual(1);
+        expect(profile.minimumEnergyRetention, weapon.id).toBeGreaterThan(0);
+        expect(profile.minimumWallDamageMultiplier, weapon.id).toBeGreaterThan(0);
+      }
       expect(profile.fmjMultiplier, weapon.id).toBeGreaterThanOrEqual(1);
       expect(profile.energyFalloffEnd, weapon.id).toBeGreaterThan(profile.energyFalloffStart);
-      expect(profile.minimumEnergyRetention, weapon.id).toBeGreaterThan(0);
       expect(profile.minimumEnergyRetention, weapon.id).toBeLessThanOrEqual(1);
-      expect(profile.minimumWallDamageMultiplier, weapon.id).toBeGreaterThan(0);
       expect(profile.minimumWallDamageMultiplier, weapon.id).toBeLessThanOrEqual(1);
-      expect(profile.maxPenetratedSurfaces, weapon.id).toBeGreaterThanOrEqual(1);
     }
   });
 

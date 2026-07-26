@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { GrenadeThrowMessage, PlayerSnapshot } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, type GrenadeThrowMessage, type PlayerSnapshot } from './protocol';
 import {
   REMOTE_GRENADE_MIN_FUSE_MS,
   admitRemoteGrenadeExplosion,
@@ -13,30 +13,31 @@ import {
 const sender: PlayerSnapshot = {
   id: 'guest', name: 'Guest', team: 1, x: 1, y: 1.7, z: 2,
   yaw: 0, pitch: 0, stance: 'stand', hp: 100, kills: 0, deaths: 0,
-  primary: 'carbine', weapon: 'carbine', seq: 4,
+  primary: 'carbine', secondary: 'pistol', grenade: 'frag', weapon: 'carbine', seq: 4,
 };
 const thrown = (nonce: number): GrenadeThrowMessage => ({
-  type: 'grenade-throw', by: sender.id, origin: [1, 1.7, 2], velocity: [0, 5.2, -13],
-  actionNonce: nonce, nonce: nonce + 10,
+  type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+  by: sender.id, grenade: 'frag', lifeId: 4, actionSequence: nonce,
+  origin: [1, 1.7, 2], velocity: [0, 5.2, -13], actionNonce: nonce, nonce: nonce + 10,
 });
 
 describe('remote grenade authority', () => {
-  it('admits only two bounded throws per life', () => {
+  it('admits only one bounded selected-grenade throw per life', () => {
     let state = createRemoteGrenadeAuthorityState();
     const first = admitRemoteGrenadeThrow(state, thrown(1), sender, 100);
     expect(first.accepted).toBe(true); state = first.state;
     const duplicate = admitRemoteGrenadeThrow(state, thrown(1), sender, 200);
     expect(duplicate.accepted).toBe(false);
     const second = admitRemoteGrenadeThrow(state, thrown(2), sender, 300);
-    expect(second.accepted).toBe(true); state = second.state;
+    expect(second.accepted).toBe(false); state = second.state;
     expect(admitRemoteGrenadeThrow(state, thrown(3), sender, 400).accepted).toBe(false);
-    expect(resetRemoteGrenadeAuthorityState().remaining).toBe(2);
+    expect(resetRemoteGrenadeAuthorityState().remaining).toBe(1);
   });
 
   it('restores scavenged capacity without exceeding the authoritative cap', () => {
     const depleted = { ...createRemoteGrenadeAuthorityState(), remaining: 0 };
     expect(replenishRemoteGrenadeAuthorityState(depleted).remaining).toBe(1);
-    expect(replenishRemoteGrenadeAuthorityState(depleted, 99).remaining).toBe(2);
+    expect(replenishRemoteGrenadeAuthorityState(depleted, 99).remaining).toBe(1);
     expect(replenishRemoteGrenadeAuthorityState(depleted, 0)).toBe(depleted);
   });
 

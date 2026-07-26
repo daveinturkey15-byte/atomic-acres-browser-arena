@@ -7,7 +7,8 @@ import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DEL
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
   x: 0, y: 1.7, z: 2, yaw: 0, pitch: 0,
-  hp: 100, kills: 2, deaths: 1, primary: 'carbine' as const, weapon: 'carbine' as const, seq: 4,
+  hp: 100, kills: 2, deaths: 1, primary: 'carbine' as const, secondary: 'pistol' as const,
+  grenade: 'frag' as const, weapon: 'carbine' as const, seq: 4,
 };
 const state = (snapshot: any = player) => ({ type: 'state' as const, player: snapshot, hostTimeMs: 1_000, continuity: 1, rateHz: 40 as const });
 
@@ -51,6 +52,7 @@ describe('network protocol guards', () => {
       weaponSequence: 11,
       weapon: 'carbine' as const,
       fireTimeMs: 2_500,
+      triggerStartedAtMs: 2_500,
       targetViewTimeMs: 2_420,
       origin: [0, 1.6, 2] as [number, number, number],
       direction: [0, 0, -1] as [number, number, number],
@@ -93,11 +95,16 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', actionNonce: 3, nonce: 6 })).toBe(false);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'tri-pass', origin: [1, 0, 2], actionNonce: 3, supportNonce: 2, nonce: 6 })).toBe(true);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'tri-pass', origin: [1, 0, 2], actionNonce: 3, nonce: 6 })).toBe(false);
+    expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 60, kind: 'explosive', explosiveSource: 'explosive-crossbow', origin: [1, 0, 2], actionNonce: 3, nonce: 6 })).toBe(true);
     expect(isGameMessage({ type: 'hit', by: 'a', target: 'b', damage: 80, kind: 'explosive', explosiveSource: 'magic', origin: [1, 0, 2], actionNonce: 3, supportNonce: 2, nonce: 6 })).toBe(false);
     const activation: SupportActivateMessage = { type: 'support-activate', by: 'a', source: 'nuke', activationNonce: 7, effectOrigins: [], targetIds: [], nonce: 8 };
     expect(isGameMessage(activation)).toBe(true);
     expect(messageBelongsToPlayer(activation, 'a')).toBe(true);
-    const grenadeThrow: GrenadeThrowMessage = { type: 'grenade-throw', by: 'a', origin: [0, 1.7, 0], velocity: [0, 5.2, -13], actionNonce: 9, nonce: 10 };
+    const grenadeThrow: GrenadeThrowMessage = {
+      type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'a', grenade: 'frag', lifeId: 2, actionSequence: 0,
+      origin: [0, 1.7, 0], velocity: [0, 5.2, -13], actionNonce: 9, nonce: 10,
+    };
     expect(isGameMessage(grenadeThrow)).toBe(true);
     expect(messageBelongsToPlayer(grenadeThrow, 'a')).toBe(true);
   });
@@ -135,7 +142,11 @@ describe('network protocol guards', () => {
   });
 
   it('validates replicated pickup and breakable-window messages', () => {
-    const pickup = { type: 'pickup', by: 'abc', dropId: 'death-77', weapon: 'sniper', mode: 'weapon', position: [1, 1.7, 2] as [number, number, number], nonce: 77 } as const;
+    const pickup = {
+      type: 'pickup', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: 'abc', dropId: 'death-77',
+      weapon: 'sniper', mode: 'weapon', selectedGrenade: 'frag', grenadeGranted: 0,
+      position: [1, 1.7, 2] as [number, number, number], nonce: 77,
+    } as const;
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;
     expect(isGameMessage(pickup)).toBe(true);
     expect(isGameMessage({ ...pickup, mode: 'scavenge' })).toBe(true);
@@ -163,12 +174,15 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...state, activeRemainingMs: 30_001 })).toBe(false);
     expect(isGameMessage({ ...state, nextSpawnInMs: 120_001 })).toBe(false);
     expect(isGameMessage({ ...state, position: [0, Number.NaN, 0] })).toBe(false);
-    const redeploy: RedeployRequestMessage = { type: 'redeploy-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: 'abc', primary: 'smg', nonce: 92 };
+    const redeploy: RedeployRequestMessage = {
+      type: 'redeploy-request', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: 'abc',
+      primary: 'smg', secondary: 'pistol', grenade: 'flash', nonce: 92,
+    };
     expect(isGameMessage(redeploy)).toBe(true);
     expect(messageBelongsToPlayer(redeploy, 'abc')).toBe(true);
     const redeployCommit: RedeployCommitMessage = {
       type: 'redeploy-commit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-      by: 'host', target: 'abc', primary: 'smg', hostTimeMs: 1_500, nonce: 93,
+      by: 'host', target: 'abc', primary: 'smg', secondary: 'pistol', grenade: 'flash', hostTimeMs: 1_500, nonce: 93,
     };
     expect(isGameMessage(redeployCommit)).toBe(true);
     expect(isHostAuthorityMessage(redeployCommit)).toBe(true);
@@ -195,10 +209,10 @@ describe('network protocol guards', () => {
     expect(isGameMessage({ ...shot, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION - 1 })).toBe(false);
   });
 
-  it('admits the machine pistol only as the sniper sidearm in snapshots', () => {
-    expect(isPlayerSnapshot({ ...player, primary: 'sniper', weapon: 'machine-pistol' })).toBe(true);
-    expect(isPlayerSnapshot({ ...player, primary: 'carbine', weapon: 'machine-pistol' })).toBe(false);
-    expect(isPlayerSnapshot({ ...player, primary: 'sniper', weapon: 'pistol' })).toBe(false);
+  it('admits only the explicitly selected sidearm in snapshots', () => {
+    expect(isPlayerSnapshot({ ...player, primary: 'sniper', secondary: 'machine-pistol', weapon: 'machine-pistol' })).toBe(true);
+    expect(isPlayerSnapshot({ ...player, primary: 'carbine', secondary: 'pistol', weapon: 'machine-pistol' })).toBe(false);
+    expect(isPlayerSnapshot({ ...player, primary: 'sniper', secondary: 'machine-pistol', weapon: 'pistol' })).toBe(false);
   });
 
   it('binds persistent-score replication to the established player id and bounded schema', () => {

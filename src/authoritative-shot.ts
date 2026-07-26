@@ -92,6 +92,9 @@ export function admitAuthoritativeShot(
     return reject('sequence-gap');
   }
   if (sender.weapon !== request.weapon) return reject('weapon-mismatch');
+  if (request.fireTimeMs - request.triggerStartedAtMs + AUTHORED_CADENCE_TOLERANCE_MS < WEAPONS[request.weapon].spinUpMs) {
+    return reject('spin-up');
+  }
   if (request.pelletDirections.length !== WEAPONS[request.weapon].pellets) return reject('invalid-pellets');
   if (fireAgeMs > MAX_SHOT_FIRE_AGE_MS + clockUncertaintyAllowanceMs) return reject('stale');
   if (fireAgeMs < -MAX_FUTURE_SHOT_MS - clockUncertaintyAllowanceMs) return reject('future');

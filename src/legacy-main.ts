@@ -55,7 +55,21 @@ import {
 } from './ui/menu-preview-camera';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { copyTextWithFallback } from './clipboard';
-import { FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
+import { fieldKitById, type FieldKitId } from './loadout';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
+import {
+  LOADOUT_STORAGE_SCHEMA_VERSION,
+  createDefaultCustomPresets,
+  createLoadoutItemEligibility,
+  loadLoadoutStorageV2,
+  migrateLegacyFieldKitStorageV1,
+  sanitizeLoadoutPresetName,
+  writeLoadoutStorageV2Transaction,
+  type GrenadeId as LoadoutGrenadeId,
+  type LoadoutPresetId,
+  type LoadoutStorageV2,
+  type SelectedLoadoutRef,
+} from './loadout-preset-schema';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, grenadeFuseBeepIntervalMs } from './audio';
@@ -191,6 +205,16 @@ import {
   type TriPassTargeting,
 } from './field-support';
 import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
+import {
+  EXPLOSIVE_BOLT_BLAST_RADIUS_M,
+  EXPLOSIVE_BOLT_ARM_DELAY_MS,
+  EXPLOSIVE_BOLT_DIRECT_DAMAGE,
+  EXPLOSIVE_BOLT_MAX_LIFE_MS,
+  explosiveBoltBlastDamage,
+  calculateFlashExposure,
+  smokeBlocksTargetAcquisition,
+  type SmokeVolume,
+} from './combat/ordnance';
 import {
   DEATH_DROP_INTERACTION_RANGE,
   DEATH_DROP_SCAVENGE_RANGE,
@@ -383,6 +407,9 @@ import {
   PickupMessage,
   PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
+  SidearmWeaponId,
+  GRENADE_IDS,
+  GrenadeId,
   RedeployCommitMessage,
   RedeployRequestMessage,
   ShotMessage,
@@ -391,6 +418,7 @@ import {
   StateMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
+  WEAPON_IDS,
   WeaponId,
   WindowBreakMessage,
 } from './protocol';
@@ -492,6 +520,7 @@ type BotPlayer = {
 };
 
 type GrenadeEntity = {
+  grenade: GrenadeId;
   mesh: THREE.Object3D;
   velocity: THREE.Vector3;
   angularVelocity: THREE.Vector3;
@@ -501,6 +530,23 @@ type GrenadeEntity = {
   actionNonce: number;
   ownerKind: 'player' | 'bot' | 'remote';
   ownerId: string;
+};
+
+type RuntimeSmokeVolume = SmokeVolume & Readonly<{ mesh: THREE.Mesh }>;
+
+type ExplosiveBoltEntity = {
+  mesh: THREE.Group;
+  velocity: THREE.Vector3;
+  ownerId: string;
+  ownerTeam: Team;
+  authority: boolean;
+  spawnedAt: number;
+  expiresAt: number;
+  impactedAt: number | null;
+  detonatesAt: number;
+  targetId: string | null;
+  targetLifeId: number | null;
+  actionNonce: number;
 };
 
 type YardhawkEntity = {
@@ -1511,6 +1557,13 @@ function retireAtomicPresentation(): void {
   qualityAssetStreaming.atomicAcres = 'idle';
 }
 
+function createWeaponCapacityRegistry(kind: 'mag' | 'reserve'): Record<WeaponId, number> {
+  return Object.fromEntries(WEAPON_IDS.map((weapon) => [
+    weapon,
+    weapon === 'railgun' ? 0 : WEAPONS[weapon][kind],
+  ])) as Record<WeaponId, number>;
+}
+
 const player = {
   id: createPlayerId(),
   name: 'Player',
@@ -1524,15 +1577,17 @@ const player = {
   deaths: 0,
   weapon: 'carbine' as WeaponId,
   primaryWeapon: 'carbine' as PrimaryWeaponId,
-  ammo: { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag, railgun: 0 } as Record<WeaponId, number>,
-  reserve: { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve, railgun: 0 } as Record<WeaponId, number>,
+  secondaryWeapon: 'pistol' as SidearmWeaponId,
+  selectedGrenade: 'frag' as GrenadeId,
+  ammo: createWeaponCapacityRegistry('mag'),
+  reserve: createWeaponCapacityRegistry('reserve'),
   reloadState: null as ReloadState | null,
   switchingUntil: 0,
   lastShotAt: 0,
   nextShotAt: 0,
   sustainedShots: 0,
   stance: 'stand' as Stance,
-  grenades: 2,
+  grenades: 1,
   lastMeleeAt: -10_000,
   alive: true,
   invulnerableUntil: 0,
@@ -1546,6 +1601,11 @@ const dormantBots = new Map<string, BotPlayer>();
 let dormantBotsPrewarmed = false;
 let soloBotDeaths = 0;
 const grenades: GrenadeEntity[] = [];
+const smokeVolumes: RuntimeSmokeVolume[] = [];
+const explosiveBolts: ExplosiveBoltEntity[] = [];
+let flashExposureUntil = 0;
+let flashExposureStrength = 0;
+let localGrenadeActionSequence = 0;
 const remoteSupportPresentations: RemoteSupportPresentation[] = [];
 let botWeaponAssignments: PrimaryWeaponId[] = [];
 let botGrenadeThrows = 0;
@@ -1671,7 +1731,13 @@ const admittedRemoteExplosions = new Map<string, Map<number, AdmittedRemoteExplo
 const remoteSupportAuthorities = new Map<string, RemoteSupportAuthorityState>();
 const remoteGrenadeAuthorities = new Map<string, RemoteGrenadeAuthorityState>();
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
-const authorizedRemoteRedeploys = new Map<string, { primary: PrimaryWeaponId; expiresAt: number; nonce: number }>();
+const authorizedRemoteRedeploys = new Map<string, {
+  primary: PrimaryWeaponId;
+  secondary: SidearmWeaponId;
+  grenade: GrenadeId;
+  expiresAt: number;
+  nonce: number;
+}>();
 const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
@@ -1798,8 +1864,8 @@ function memberDhv(id: string): Dhv {
     ?? (id === player.id ? localDhv : 10);
 }
 
-function handicapSidearm(primary: PrimaryWeaponId, dhv = localDhv): WeaponId {
-  return dhv === 'X' ? 'magnum' : deployedWeapons(primary)[1];
+function handicapSidearm(_primary: PrimaryWeaponId, dhv = localDhv): WeaponId {
+  return dhv === 'X' ? 'magnum' : player.secondaryWeapon;
 }
 
 function handicapLoadout(primary: PrimaryWeaponId, dhv = localDhv): readonly [PrimaryWeaponId, WeaponId] {
@@ -1811,6 +1877,9 @@ function handicapOutgoingDamage(attackerId: string, damage: number, weapon?: Wea
   return applyDhvWeaponOutgoingDamage(damage, dhv, weapon === 'magnum');
 }
 let triggerHeld = false;
+let spinUpWeapon: WeaponId | null = null;
+let spinUpStartedAtPerformanceMs: number | null = null;
+let spinUpStartedAtHostTimeMs: number | null = null;
 let targetHits = 0;
 let rangeScore = 0;
 let rangeShotsFired = 0;
@@ -2115,6 +2184,9 @@ function clearGameplayInput(): void {
   mouseTriggerHeld = false;
   mouseAdsHeld = false;
   triggerHeld = false;
+  spinUpWeapon = null;
+  spinUpStartedAtPerformanceMs = null;
+  spinUpStartedAtHostTimeMs = null;
   adsHeld = false;
   currentSprinting = false;
   jumpQueuedAt = -10_000;
@@ -3065,6 +3137,8 @@ function acceptLobbyState(message: LobbyStateMessage): void {
 function authorizeRedeploy(message: RedeployCommitMessage, now = performance.now()): void {
   authorizedRemoteRedeploys.set(message.target, {
     primary: message.primary,
+    secondary: message.secondary,
+    grenade: message.grenade,
     expiresAt: now + 5_000,
     nonce: message.nonce,
   });
@@ -3075,7 +3149,7 @@ function acceptRedeployCommit(message: RedeployCommitMessage): void {
   processedNonces.add(message.nonce);
   authorizeRedeploy(message);
   if (message.target === player.id) {
-    applyLocalClassRedeploy(message.primary, true);
+    applyLocalClassRedeploy({ primary: message.primary, secondary: message.secondary, grenade: message.grenade }, true);
     authorizedRemoteRedeploys.delete(player.id);
   }
   trimNonceSet();
@@ -3125,6 +3199,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
           const commit: RedeployCommitMessage = {
             type: 'redeploy-commit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
             by: player.id, target: message.by, primary: message.primary,
+            secondary: message.secondary, grenade: message.grenade,
             hostTimeMs: now, nonce: randomNonce(),
           };
           authorizeRedeploy(commit, now);
@@ -3132,7 +3207,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
           recordMatchDiagnostic('field-kit-redeploy', 'accepted', {
             actorId: message.by,
             reason: 'host-authoritative-noncombat-redeploy',
-            modifiers: [`primary:${message.primary}`],
+            modifiers: [`primary:${message.primary}`, `secondary:${message.secondary}`, `grenade:${message.grenade}`],
           });
           trimNonceSet();
         }
@@ -3335,7 +3410,88 @@ element<HTMLInputElement>('#player-name').addEventListener('input', () => {
 });
 
 const weaponView = new WeaponPresentation(camera, reducedRenderMode);
-let selectedFieldKit: FieldKitId = parseFieldKitSelection(localStorage.getItem(FIELD_KIT_STORAGE_KEY));
+const loadoutEligibility = createLoadoutItemEligibility(WEAPON_CATALOG);
+const baseCustomPresets = createDefaultCustomPresets(
+  { primary: 'm4a1', secondary: 'pistol', grenade: 'frag' },
+  loadoutEligibility,
+);
+const defaultCustomPresets = Object.freeze(baseCustomPresets.map((preset) => Object.freeze({
+  ...preset,
+  ...(preset.id === 'custom-2'
+    ? { primary: 'mp5', secondary: 'machine-pistol', grenade: 'smoke' }
+    : preset.id === 'custom-3'
+      ? { primary: 'm14-ebr', secondary: 'flashlight-pistol', grenade: 'flash' }
+      : {}),
+})));
+const fallbackLoadoutState: LoadoutStorageV2 = Object.freeze({
+  schemaVersion: LOADOUT_STORAGE_SCHEMA_VERSION,
+  selected: Object.freeze({ kind: 'curated', kitId: 'balanced' }),
+  customPresets: defaultCustomPresets,
+});
+const loadoutMigration = migrateLegacyFieldKitStorageV1(localStorage, defaultCustomPresets, loadoutEligibility);
+const loadedLoadoutState = loadLoadoutStorageV2(localStorage, loadoutEligibility);
+let loadoutState: LoadoutStorageV2 = loadedLoadoutState.ok
+  ? loadedLoadoutState.value
+  : loadoutMigration.ok
+    ? loadoutMigration.value
+    : fallbackLoadoutState;
+let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
+  ? loadoutState.selected.presetId
+  : 'custom-1';
+
+type CombatLoadoutSelection = Readonly<{
+  primary: PrimaryWeaponId;
+  secondary: SidearmWeaponId;
+  grenade: GrenadeId;
+}>;
+
+function activeLoadoutSelection(state = loadoutState): CombatLoadoutSelection {
+  const selected = state.selected;
+  if (selected.kind === 'curated') {
+    const kit = fieldKitById(selected.kitId);
+    return Object.freeze({ primary: kit.weapon, secondary: kit.sidearm, grenade: kit.grenade });
+  }
+  const preset = state.customPresets.find((entry) => entry.id === selected.presetId)
+    ?? state.customPresets[0]!;
+  return Object.freeze({
+    primary: preset.primary as PrimaryWeaponId,
+    secondary: preset.secondary as SidearmWeaponId,
+    grenade: preset.grenade as GrenadeId,
+  });
+}
+
+function selectedLoadoutLabel(state = loadoutState): string {
+  const selected = state.selected;
+  if (selected.kind === 'curated') return fieldKitById(selected.kitId).title;
+  return state.customPresets.find((entry) => entry.id === selected.presetId)?.displayName ?? 'Custom 1';
+}
+
+function loadoutMatchesPlayer(selection: CombatLoadoutSelection): boolean {
+  return player.primaryWeapon === selection.primary
+    && player.secondaryWeapon === selection.secondary
+    && player.selectedGrenade === selection.grenade;
+}
+
+function persistLoadoutState(candidate: LoadoutStorageV2): boolean {
+  const result = writeLoadoutStorageV2Transaction(localStorage, candidate, loadoutEligibility);
+  if (!result.ok) {
+    setStatus(`Loadout could not be saved (${result.phase}).`, 'warn');
+    return false;
+  }
+  loadoutState = result.value;
+  return true;
+}
+
+function applyMenuLoadoutImmediately(): void {
+  if (gameStarted) return;
+  const selection = activeLoadoutSelection();
+  player.primaryWeapon = selection.primary;
+  player.secondaryWeapon = selection.secondary;
+  player.selectedGrenade = selection.grenade;
+  player.grenades = 1;
+  player.weapon = selection.primary;
+  weaponView.setWeapon(player.weapon, true);
+}
 
 function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
   if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
@@ -3353,39 +3509,110 @@ function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
   queueMicrotask(syncMenuPreviewCanvasPlacement);
 }
 
+function renderCustomLoadoutEditor(): void {
+  const editor = document.querySelector<HTMLElement>('#loadout-manager');
+  if (!editor) return;
+  const preset = loadoutState.customPresets.find((entry) => entry.id === managedPresetId) ?? loadoutState.customPresets[0];
+  if (!preset) return;
+  element<HTMLSelectElement>('#loadout-manage-preset').value = preset.id;
+  element<HTMLInputElement>('#loadout-preset-name').value = preset.displayName;
+  element<HTMLSelectElement>('#loadout-primary').value = preset.primary;
+  element<HTMLSelectElement>('#loadout-secondary').value = preset.secondary;
+  element<HTMLSelectElement>('#loadout-grenade').value = preset.grenade;
+}
+
 function renderFieldKitSelection(): void {
   const summary = element<HTMLElement>('#selected-kit-summary');
   const redeploy = element<HTMLButtonElement>('#field-kit-redeploy');
-  redeploy.textContent = 'REDEPLOY NOW WITH SELECTED FIELD KIT';
+  redeploy.textContent = 'REDEPLOY NOW WITH SELECTED LOADOUT';
   if (selectedArena.id === 'gun-range') {
     redeploy.hidden = true;
     summary.dataset.rangeArmory = 'true';
     const equipped = rangePrimaryUnlocked ? WEAPONS[player.primaryWeapon].name : 'Service Pistol';
-    summary.innerHTML = `<span>RANGE ARMORY</span><strong>PICK UP YOUR WEAPON INSIDE</strong><b>${equipped} · PRESS F AT A BENCH</b>`;
+    summary.replaceChildren();
+    const label = document.createElement('span');
+    label.textContent = 'RANGE ARMORY';
+    const title = document.createElement('strong');
+    title.textContent = 'PICK UP YOUR WEAPON INSIDE';
+    const detail = document.createElement('b');
+    detail.textContent = `${equipped} · PRESS F AT A BENCH`;
+    summary.append(label, title, detail);
     return;
   }
   delete summary.dataset.rangeArmory;
-  const kit = fieldKitById(selectedFieldKit);
-  const queued = gameStarted && player.primaryWeapon !== kit.weapon;
+  const selection = activeLoadoutSelection();
+  const queued = gameStarted && !loadoutMatchesPlayer(selection);
   redeploy.hidden = !queued || !player.alive || matchFinished;
   redeploy.disabled = !queued || !player.alive || matchFinished;
-  element<HTMLElement>('#selected-kit-summary').innerHTML = `<span>${queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE FIELD KIT'}</span><strong>${kit.title}</strong><b>${WEAPONS[kit.weapon].name} · ${WEAPONS[kit.sidearm].name}</b>`;
+  const status = document.createElement('span');
+  status.textContent = queued ? 'QUEUED NEXT DEPLOYMENT' : 'ACTIVE LOADOUT';
+  const title = document.createElement('strong');
+  title.textContent = selectedLoadoutLabel();
+  const equipment = document.createElement('b');
+  equipment.textContent = `${WEAPONS[selection.primary].name} · ${WEAPONS[selection.secondary].name} · ${selection.grenade.toUpperCase()}`;
+  summary.replaceChildren(status, title, equipment);
   document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((card) => {
-    const selected = card.dataset.kitId === selectedFieldKit;
+    const selected = loadoutState.selected.kind === 'curated' && card.dataset.kitId === loadoutState.selected.kitId;
     card.classList.toggle('selected', selected);
     card.setAttribute('aria-pressed', String(selected));
   });
+  document.querySelectorAll<HTMLButtonElement>('[data-custom-preset-id]').forEach((card) => {
+    const presetId = card.dataset.customPresetId as LoadoutPresetId;
+    const preset = loadoutState.customPresets.find((entry) => entry.id === presetId);
+    const selected = loadoutState.selected.kind === 'custom' && loadoutState.selected.presetId === presetId;
+    card.classList.toggle('selected', selected);
+    card.setAttribute('aria-pressed', String(selected));
+    const label = card.querySelector<HTMLElement>('[data-custom-name]');
+    const equipmentLabel = card.querySelector<HTMLElement>('[data-custom-equipment]');
+    if (label && preset) label.textContent = preset.displayName;
+    if (equipmentLabel && preset) {
+      equipmentLabel.textContent = `${WEAPONS[preset.primary as WeaponId].name} · ${WEAPONS[preset.secondary as WeaponId].name} · ${preset.grenade.toUpperCase()}`;
+    }
+  });
+  renderCustomLoadoutEditor();
 }
 
 function chooseFieldKit(id: string): void {
-  selectedFieldKit = fieldKitById(id).id;
-  localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
-  if (!gameStarted) {
-    player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
-    player.weapon = player.primaryWeapon;
-    weaponView.setWeapon(player.weapon, true);
-  }
+  const kitId = fieldKitById(id).id;
+  const candidate = { ...loadoutState, selected: { kind: 'curated', kitId } as SelectedLoadoutRef };
+  if (!persistLoadoutState(candidate)) return;
+  applyMenuLoadoutImmediately();
   renderFieldKitSelection();
+}
+
+function chooseCustomPreset(presetId: LoadoutPresetId): void {
+  if (!loadoutState.customPresets.some((preset) => preset.id === presetId)) return;
+  managedPresetId = presetId;
+  const candidate = { ...loadoutState, selected: { kind: 'custom', presetId } as SelectedLoadoutRef };
+  if (!persistLoadoutState(candidate)) return;
+  applyMenuLoadoutImmediately();
+  renderFieldKitSelection();
+}
+
+function saveManagedPreset(): void {
+  const current = loadoutState.customPresets.find((entry) => entry.id === managedPresetId);
+  if (!current) return;
+  const primary = element<HTMLSelectElement>('#loadout-primary').value;
+  const secondary = element<HTMLSelectElement>('#loadout-secondary').value;
+  const grenade = element<HTMLSelectElement>('#loadout-grenade').value;
+  if (!loadoutEligibility.primaryIds.includes(primary)
+    || !loadoutEligibility.secondaryIds.includes(secondary)
+    || !GRENADE_IDS.includes(grenade as GrenadeId)) return;
+  const updated = Object.freeze({
+    ...current,
+    displayName: sanitizeLoadoutPresetName(element<HTMLInputElement>('#loadout-preset-name').value, managedPresetId),
+    primary,
+    secondary,
+    grenade: grenade as LoadoutGrenadeId,
+  });
+  const candidate = {
+    ...loadoutState,
+    customPresets: loadoutState.customPresets.map((preset) => preset.id === managedPresetId ? updated : preset),
+  };
+  if (!persistLoadoutState(candidate)) return;
+  applyMenuLoadoutImmediately();
+  renderFieldKitSelection();
+  setStatus(`${updated.displayName} saved.`, 'ok');
 }
 
 document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
@@ -3409,14 +3636,31 @@ document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button)
 document.querySelectorAll<HTMLButtonElement>('[data-kit-id]').forEach((button) => {
   button.addEventListener('click', () => chooseFieldKit(button.dataset.kitId ?? 'balanced'));
 });
+document.querySelectorAll<HTMLButtonElement>('[data-custom-preset-id]').forEach((button) => {
+  button.addEventListener('click', () => chooseCustomPreset(button.dataset.customPresetId as LoadoutPresetId));
+});
+const loadoutManageButton = element<HTMLButtonElement>('#loadout-manage');
+loadoutManageButton.addEventListener('click', () => {
+  const manager = element<HTMLElement>('#loadout-manager');
+  manager.hidden = !manager.hidden;
+  loadoutManageButton.setAttribute('aria-expanded', String(!manager.hidden));
+  if (!manager.hidden) renderCustomLoadoutEditor();
+});
+element<HTMLSelectElement>('#loadout-manage-preset').addEventListener('change', (event) => {
+  managedPresetId = (event.currentTarget as HTMLSelectElement).value as LoadoutPresetId;
+  renderCustomLoadoutEditor();
+});
+element<HTMLButtonElement>('#loadout-save').addEventListener('click', saveManagedPreset);
 element<HTMLButtonElement>('#field-kit-redeploy').addEventListener('click', () => {
-  const kit = fieldKitById(selectedFieldKit);
-  if (!gameStarted || !player.alive || matchFinished || selectedArena.id === 'gun-range' || player.primaryWeapon === kit.weapon) return;
+  const selection = activeLoadoutSelection();
+  if (!gameStarted || !player.alive || matchFinished || selectedArena.id === 'gun-range' || loadoutMatchesPlayer(selection)) return;
   const message: RedeployRequestMessage = {
     type: 'redeploy-request' as const,
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id,
-    primary: kit.weapon,
+    primary: selection.primary,
+    secondary: selection.secondary,
+    grenade: selection.grenade,
     nonce: randomNonce(),
   };
   if (network.role === 'client') {
@@ -3431,14 +3675,18 @@ element<HTMLButtonElement>('#field-kit-redeploy').addEventListener('click', () =
     processedNonces.add(message.nonce);
     const commit: RedeployCommitMessage = {
       type: 'redeploy-commit', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-      by: player.id, target: player.id, primary: kit.weapon,
+      by: player.id, target: player.id, primary: selection.primary,
+      secondary: selection.secondary, grenade: selection.grenade,
       hostTimeMs: performance.now(), nonce: randomNonce(),
     };
     network.send(commit);
   }
-  applyLocalClassRedeploy(kit.weapon, true);
+  applyLocalClassRedeploy(selection, true);
 });
-player.primaryWeapon = fieldKitById(selectedFieldKit).weapon;
+const initialLoadoutSelection = activeLoadoutSelection();
+player.primaryWeapon = initialLoadoutSelection.primary;
+player.secondaryWeapon = initialLoadoutSelection.secondary;
+player.selectedGrenade = initialLoadoutSelection.grenade;
 player.weapon = player.primaryWeapon;
 renderFieldKitSelection();
 
@@ -3558,6 +3806,8 @@ function snapshot(): PlayerSnapshot {
     kills: player.kills,
     deaths: player.deaths,
     primary: player.primaryWeapon,
+    secondary: player.secondaryWeapon,
+    grenade: player.selectedGrenade,
     weapon: player.weapon,
     stance: player.stance,
     seq: ++player.seq,
@@ -3747,7 +3997,7 @@ function onNetworkMessage(message: GameMessage): void {
       remote = createRemote(initialIncoming);
       remotes.set(incoming.id, remote);
       if (!remoteSupportAuthorities.has(incoming.id)) remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
-      if (!remoteGrenadeAuthorities.has(incoming.id)) remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+      if (!remoteGrenadeAuthorities.has(incoming.id)) remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
       if (!retainedHealth) remoteHealthAuthorities.set(incoming.id, initialHealth);
       if (network.role === 'host') network.send({ type: 'join', player: initialIncoming });
       addFeed(`${initialIncoming.name} entered the test block`, initialIncoming.team === 0 ? 'aqua' : 'coral');
@@ -3763,7 +4013,9 @@ function onNetworkMessage(message: GameMessage): void {
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
       const redeployed = redeployAuthorization !== undefined
         && redeployAuthorization.expiresAt >= now
-        && redeployAuthorization.primary === incoming.primary;
+        && redeployAuthorization.primary === incoming.primary
+        && redeployAuthorization.secondary === incoming.secondary
+        && redeployAuthorization.grenade === incoming.grenade;
       if (redeployAuthorization && redeployAuthorization.expiresAt < now) authorizedRemoteRedeploys.delete(incoming.id);
       let admittedIncoming = incoming;
       let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0 || redeployed;
@@ -3776,11 +4028,11 @@ function onNetworkMessage(message: GameMessage): void {
         const respawnAdmission = admitAuthoritativeRemoteRespawn(health, incoming.hp, now);
         if (respawnAdmission.respawned) {
           remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
-          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
         }
         if (redeployed) {
           remoteSupportAuthorities.set(incoming.id, createRemoteSupportAuthorityState());
-          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState());
+          remoteGrenadeAuthorities.set(incoming.id, createRemoteGrenadeAuthorityState(incoming.grenade));
         }
         const authoritativeHealth = respawnAdmission.state;
         remoteHealthAuthorities.set(incoming.id, authoritativeHealth);
@@ -3815,6 +4067,8 @@ function onNetworkMessage(message: GameMessage): void {
       if (admittedIncoming.team !== remote.snapshot.team) return;
       if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
       if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+      if ((admittedIncoming.secondary !== remote.snapshot.secondary || admittedIncoming.grenade !== remote.snapshot.grenade)
+        && !respawned) return;
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
       remote.claimEligibleAt = movement.claimEligibleAt;
@@ -3941,7 +4195,10 @@ function onNetworkMessage(message: GameMessage): void {
     remoteShotAdmissions.set(message.by, admission.nextState);
     const now = performance.now();
     const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
-    for (const [nonce, action] of actions) if (now - action.receivedAt > 1_000) actions.delete(nonce);
+    for (const [nonce, action] of actions) {
+      const lifetimeMs = action.message.weapon === 'explosive-crossbow' ? EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000 : 1_000;
+      if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
+    }
     actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
     admittedRemoteShots.set(message.by, actions);
     if (network.role === 'host') network.send(message);
@@ -4006,9 +4263,35 @@ function onNetworkMessage(message: GameMessage): void {
     if (message.kind === 'shot') {
       const action = admittedRemoteShots.get(message.by)?.get(message.actionNonce);
       if (!action) { recordRemoteHitAdmission('shot-missing-action'); return; }
-      if (now - action.receivedAt > 1_000) { recordRemoteHitAdmission('shot-expired-action'); return; }
+      const actionAgeMs = now - action.receivedAt;
+      const actionLifetimeMs = action.message.weapon === 'explosive-crossbow' ? EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000 : 1_000;
+      if (actionAgeMs > actionLifetimeMs) { recordRemoteHitAdmission('shot-expired-action'); return; }
       if (action.targets.has(message.target)) { recordRemoteHitAdmission('shot-duplicate-target'); return; }
-      if (action.message.weapon !== attacker.snapshot.weapon) { recordRemoteHitAdmission('shot-weapon-mismatch'); return; }
+      if (action.message.weapon === 'explosive-crossbow') {
+        if (network.role === 'host') {
+          recordRemoteHitAdmission('shot-projectile-host-authority-only');
+          return;
+        }
+        if (actionAgeMs < EXPLOSIVE_BOLT_ARM_DELAY_MS - 150
+          || Math.abs(message.damage - EXPLOSIVE_BOLT_DIRECT_DAMAGE) > 1e-6
+          || !message.origin) {
+          recordRemoteHitAdmission('shot-projectile-invalid');
+          return;
+        }
+        const impact = new THREE.Vector3(...message.origin);
+        if (!pointInsideBounds(impact, arena.bounds, 0)
+          || impact.distanceTo(blastTargetPosition) > 1.15) {
+          recordRemoteHitAdmission('shot-projectile-path-mismatch');
+          return;
+        }
+        action.targets.add(message.target);
+        recordRemoteHitAdmission('shot-projectile-admitted');
+        admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(
+          EXPLOSIVE_BOLT_DIRECT_DAMAGE,
+          overdriveDamageMultiplier(overdriveState, message.by, now),
+        ), 'explosive-crossbow');
+      } else {
+        if (action.message.weapon !== attacker.snapshot.weapon) { recordRemoteHitAdmission('shot-weapon-mismatch'); return; }
       const derivedDamage = deriveRemoteShotBaseDamage(
         action.message.weapon,
         action.message.origin,
@@ -4034,6 +4317,7 @@ function onNetworkMessage(message: GameMessage): void {
         Math.min(derivedDamage, message.damage),
         overdriveDamageMultiplier(overdriveState, message.by, now),
       ), action.message.weapon);
+      }
     } else if (message.kind === 'melee') {
       const action = admittedRemoteMelees.get(message.by)?.get(message.actionNonce);
       if (!action || now - action.receivedAt > 1_000 || action.targets.has(message.target)) return;
@@ -4066,6 +4350,13 @@ function onNetworkMessage(message: GameMessage): void {
         });
         if (!grenadeAdmission.accepted) return;
         remoteGrenadeAuthorities.set(message.by, grenadeAdmission.state);
+      } else if (source === 'explosive-crossbow') {
+        if (network.role === 'host') return;
+        const projectile = admittedRemoteShots.get(message.by)?.get(message.actionNonce);
+        const actionAgeMs = projectile ? now - projectile.receivedAt : Number.POSITIVE_INFINITY;
+        if (!projectile || projectile.message.weapon !== 'explosive-crossbow'
+          || actionAgeMs < EXPLOSIVE_BOLT_ARM_DELAY_MS - 150
+          || actionAgeMs > EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000) return;
       } else {
         const supportNonce = message.supportNonce;
         const authority = remoteSupportAuthorities.get(message.by);
@@ -4131,12 +4422,16 @@ function sendAuthoritativeHit(
   const health = remoteHealthAuthorities.get(timedMessage.target);
   if (!remote || !health) return;
   const now = performance.now();
-  const attackerWeapon = remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon;
+  const admittedWeapon = admittedRemoteShots.get(timedMessage.by)?.get(timedMessage.actionNonce)?.message.weapon;
+  const attackerWeapon = admittedWeapon ?? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon;
   const poweredDamage = resolveRemotePoweredDamage(
     timedMessage.damage,
     overdriveDamageMultiplier(overdriveState, timedMessage.by, now),
   );
-  const outgoingHandicapped = handicapOutgoingDamage(timedMessage.by, poweredDamage, timedMessage.kind === 'shot' ? attackerWeapon : undefined);
+  const damageWeapon = timedMessage.kind === 'shot' || timedMessage.explosiveSource === 'explosive-crossbow'
+    ? attackerWeapon
+    : undefined;
+  const outgoingHandicapped = handicapOutgoingDamage(timedMessage.by, poweredDamage, damageWeapon);
   const targetDhv = memberDhv(timedMessage.target);
   const result = applyAuthoritativeRemoteDamage(
     health,
@@ -4152,7 +4447,7 @@ function sendAuthoritativeHit(
   recordDamageEvent({
     actorId: timedMessage.by,
     targetId: timedMessage.target,
-    weaponOrEffect: timedMessage.kind === 'shot' ? remotes.get(timedMessage.by)?.snapshot.weapon ?? player.weapon : timedMessage.explosiveSource ?? timedMessage.kind,
+    weaponOrEffect: timedMessage.kind === 'shot' ? attackerWeapon : timedMessage.explosiveSource ?? timedMessage.kind,
     healthBefore: result.healthBefore,
     healthAfter: result.healthAfter,
     damageRequested: result.damageRequested,
@@ -4269,8 +4564,6 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     type: 'shot', by: request.by, weapon: request.weapon, origin: request.origin,
     direction: request.direction, pelletDirections: request.pelletDirections, nonce: request.nonce,
   };
-  renderRemoteShot(visualShot);
-  network.send(request, request.by);
   const shooterRewind = reconstructShooterPoseAtFireTime(sender.positionHistory, request.fireTimeMs, request.lifeId);
   if (!shooterRewind.pose) {
     const reason = shooterRewind.reason === 'continuity-mismatch' ? 'continuity-mismatch' : 'missing-history';
@@ -4282,6 +4575,31 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     finish('rejected', 'bad-origin', admission.appliedRewindMs);
     return;
   }
+  const actions = admittedRemoteShots.get(request.by) ?? new Map<number, AdmittedRemoteShot>();
+  for (const [nonce, action] of actions) {
+    const lifetimeMs = action.message.weapon === 'explosive-crossbow' ? EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000 : 1_000;
+    if (receivedAt - action.receivedAt > lifetimeMs) actions.delete(nonce);
+  }
+  actions.set(visualShot.nonce, { message: visualShot, receivedAt, targets: new Set() });
+  admittedRemoteShots.set(request.by, actions);
+  network.send(visualShot, request.by);
+  if (request.weapon === 'explosive-crossbow') {
+    spawnExplosiveBolt(
+      request.by,
+      sender.snapshot.team,
+      new THREE.Vector3(...request.origin),
+      new THREE.Vector3(...request.direction),
+      true,
+      request.nonce,
+      receivedAt,
+    );
+    const operator = sender.root.userData.operator as THREE.Group | undefined;
+    if (operator) fireOperator(operator);
+    audio.shot('explosive-crossbow', true, new THREE.Vector3(...request.origin).distanceTo(camera.position));
+    finish('accepted-miss', 'none', admission.appliedRewindMs);
+    return;
+  }
+  renderRemoteShot(visualShot);
 
   const targetPoses: Array<{ id: string; x: number; y: number; z: number; yaw: number; stance: Stance }> = [];
   if (player.alive && areCombatantsHostile(request.by, sender.snapshot.team, player.id, player.team)) {
@@ -4470,6 +4788,17 @@ function renderRemoteShot(message: ShotMessage): void {
   const origin = new THREE.Vector3(...message.origin);
   if (!pointInsideBounds(origin, arena.bounds, 0.44)) return;
   const direction = new THREE.Vector3(...message.direction).normalize();
+  if (message.weapon === 'explosive-crossbow') {
+    const ownerTeam = message.by === player.id
+      ? player.team
+      : remotes.get(message.by)?.snapshot.team;
+    if (ownerTeam === undefined) return;
+    spawnExplosiveBolt(message.by, ownerTeam, origin, direction, false, message.nonce);
+    const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
+    if (remoteOperator) fireOperator(remoteOperator);
+    audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+    return;
+  }
   const trace = traceWeaponPath(origin, direction, message.weapon === 'railgun' ? 220 : 50, message.weapon);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
@@ -4691,10 +5020,13 @@ function interactWithDeathDrop(now = performance.now()): boolean {
   audio.weaponSwitch();
   const pickup: PickupMessage = {
     type: 'pickup',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id,
     dropId: drop.id,
     weapon: drop.weapon,
     mode: 'weapon',
+    selectedGrenade: player.selectedGrenade,
+    grenadeGranted: 0,
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
@@ -4723,7 +5055,7 @@ function autoScavengeDeathDrop(now: number): boolean {
     drop,
     { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
     WEAPONS[activeWeapon].reserve,
-    2,
+    1,
     now,
   );
   if (!result.scavenged) return false;
@@ -4732,10 +5064,13 @@ function autoScavengeDeathDrop(now: number): boolean {
   player.grenades = result.inventory.grenades;
   const pickup: PickupMessage = {
     type: 'pickup',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id,
     dropId: drop.id,
     weapon: drop.weapon,
     mode: 'scavenge',
+    selectedGrenade: player.selectedGrenade,
+    grenadeGranted: result.grenadeGranted as 0 | 1,
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
@@ -4746,7 +5081,7 @@ function autoScavengeDeathDrop(now: number): boolean {
     position: player.position.toArray(),
     reason: `ammo:${result.ammoGranted};grenade:${result.grenadeGranted}`,
   });
-  const gains = [result.ammoGranted > 0 ? `+${result.ammoGranted} ${WEAPONS[activeWeapon].name.toUpperCase()} AMMO` : '', result.grenadeGranted > 0 ? '+1 FRAG' : ''].filter(Boolean).join(' · ');
+  const gains = [result.ammoGranted > 0 ? `+${result.ammoGranted} ${WEAPONS[activeWeapon].name.toUpperCase()} AMMO` : '', result.grenadeGranted > 0 ? `+1 ${player.selectedGrenade.toUpperCase()}` : ''].filter(Boolean).join(' · ');
   addFeed(`SCAVENGED ${gains}`, 'gold');
   if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
   else removeDeathDrop(entity);
@@ -4804,16 +5139,21 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   const validDropDistance = message.mode === 'scavenge'
     ? horizontalDropDistance <= DEATH_DROP_SCAVENGE_RANGE + 0.5 && Math.abs(position.y - dropPosition.y) <= 2.5
     : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
+  const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
+  const expectedGrenadeGranted = message.mode === 'scavenge' && grenadeAuthority?.remaining === 0 ? 1 : 0;
   if (!pointInsideBounds(position, arena.bounds, 0.44)
     || position.distanceTo(senderPosition) > 2.8
     || !validDropDistance
     || message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)
-    || message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)) return;
+    || message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)
+    || message.selectedGrenade !== remote.snapshot.grenade
+    || message.grenadeGranted !== expectedGrenadeGranted) return;
   processedNonces.add(message.nonce);
   if (message.mode === 'scavenge') {
     entity.drop = { ...entity.drop, ammoConsumedAt: now };
-    const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
-    if (grenadeAuthority) remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
+    if (grenadeAuthority && message.grenadeGranted === 1) {
+      remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
+    }
   } else {
     entity.drop = { ...entity.drop, weaponConsumedAt: now };
     authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
@@ -5413,7 +5753,7 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
 function respawn(
   requestLock = true,
   forceNewLife = false,
-  deploymentWeaponOverride?: PrimaryWeaponId,
+  deploymentOverride?: CombatLoadoutSelection,
   pointerLockSource: PointerLockRequestSource = 'respawn',
 ): void {
   if (!player.alive || forceNewLife) {
@@ -5439,7 +5779,7 @@ function respawn(
   lastDamageAt = -10_000;
   lastFallDamage = 0;
   lastFallImpactSpeed = 0;
-  player.grenades = 2;
+  player.grenades = 1;
   player.reloadState = null;
   player.alive = true;
   respawnEndsAt = 0;
@@ -5454,9 +5794,12 @@ function respawn(
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
   footstepAccumulator = { distance: 0, side: 0 };
+  const deployment = deploymentOverride ?? activeLoadoutSelection();
+  player.selectedGrenade = deployment.grenade;
   if (selectedArena.id === 'gun-range') {
     rangePrimaryUnlocked = false;
     player.primaryWeapon = 'carbine';
+    player.secondaryWeapon = 'pistol';
     const sidearm = handicapSidearm(player.primaryWeapon);
     player.weapon = sidearm;
     player.ammo[sidearm] = WEAPONS[sidearm].mag;
@@ -5464,9 +5807,9 @@ function respawn(
     player.switchingUntil = 0;
     weaponView.setWeapon(sidearm, true);
   } else {
-    const deploymentWeapon = deploymentWeaponOverride ?? fieldKitById(selectedFieldKit).weapon;
-    player.primaryWeapon = deploymentWeapon;
-    for (const weapon of handicapLoadout(deploymentWeapon)) {
+    player.primaryWeapon = deployment.primary;
+    player.secondaryWeapon = deployment.secondary;
+    for (const weapon of handicapLoadout(deployment.primary)) {
       player.ammo[weapon] = WEAPONS[weapon].mag;
       player.reserve[weapon] = WEAPONS[weapon].reserve;
     }
@@ -5482,11 +5825,11 @@ function respawn(
   network.send(createStateMessage());
 }
 
-function applyLocalClassRedeploy(primary: PrimaryWeaponId, requestLock: boolean): void {
+function applyLocalClassRedeploy(selection: CombatLoadoutSelection, requestLock: boolean): void {
   if (!gameStarted || matchFinished || !player.alive || selectedArena.id === 'gun-range') return;
   dropHeldRailgun(player.id, player.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
-  respawn(requestLock, true, primary);
-  setStatus(`Redeployed with ${WEAPONS[primary].name} without a combat death.`, 'ok');
+  respawn(requestLock, true, selection);
+  setStatus(`Redeployed with ${WEAPONS[selection.primary].name} without a combat death.`, 'ok');
 }
 
 function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtLocalMonoMs?: number): void {
@@ -6006,6 +6349,9 @@ function switchWeapon(index: number): void {
     weaponView.cancelReload();
   }
   player.weapon = id;
+  spinUpWeapon = null;
+  spinUpStartedAtPerformanceMs = null;
+  spinUpStartedAtHostTimeMs = null;
   player.switchingUntil = performance.now() + 360;
   player.sustainedShots = 0;
   weaponView.setWeapon(id);
@@ -6065,6 +6411,15 @@ function tryFire(now: number): void {
   }
   const spec = WEAPONS[player.weapon];
   if (!triggerHeld && spec.automatic) return;
+  if (spec.spinUpMs > 0) {
+    if (spinUpWeapon !== player.weapon || spinUpStartedAtPerformanceMs === null || spinUpStartedAtHostTimeMs === null) {
+      spinUpWeapon = player.weapon;
+      spinUpStartedAtPerformanceMs = now;
+      spinUpStartedAtHostTimeMs = currentHostTimeMs();
+      return;
+    }
+    if (now - spinUpStartedAtPerformanceMs < spec.spinUpMs) return;
+  }
   if (now < player.switchingUntil) return;
   if (player.reloadState) {
     // An empty magazine must finish its automatic reload even if the player
@@ -6143,6 +6498,7 @@ function tryFire(now: number): void {
   const presentedSurfaceIds = new Set<string>();
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  const projectileShot = spec.fireKind === 'projectile';
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
     const sample = sampleWeaponPellet(spec, pellet, spread, gameplayRandom(), gameplayRandom());
     const direction = baseDirection.clone()
@@ -6163,6 +6519,7 @@ function tryFire(now: number): void {
         moving,
       };
     }
+    if (projectileShot) continue;
     const result = castShot(origin, direction, player.weapon, true);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
@@ -6240,6 +6597,26 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: randomNonce(),
   };
+  if (projectileShot) {
+    if (network.role !== 'client') {
+      const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
+      for (const [nonce, action] of actions) {
+        const lifetimeMs = action.message.weapon === 'explosive-crossbow' ? EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000 : 1_000;
+        if (now - action.receivedAt > lifetimeMs) actions.delete(nonce);
+      }
+      actions.set(shot.nonce, { message: shot, receivedAt: now, targets: new Set() });
+      admittedRemoteShots.set(player.id, actions);
+    }
+    spawnExplosiveBolt(
+      player.id,
+      player.team,
+      origin,
+      new THREE.Vector3(...pelletDirections[0]!),
+      network.role !== 'client',
+      shot.nonce,
+      now,
+    );
+  }
   if (network.role === 'client') {
     const weaponSequence = localWeaponSequences.get(player.weapon) ?? 0;
     const request = freezeAuthoredBulletRecord({
@@ -6251,6 +6628,9 @@ function tryFire(now: number): void {
       weaponSequence,
       weapon: player.weapon,
       fireTimeMs: shotTimeline!.fireTimeMs,
+      triggerStartedAtMs: spec.spinUpMs > 0 && spinUpWeapon === player.weapon && spinUpStartedAtHostTimeMs !== null
+        ? spinUpStartedAtHostTimeMs
+        : shotTimeline!.fireTimeMs,
       targetViewTimeMs: shotTimeline!.targetViewTimeMs,
       origin: shot.origin, direction: shot.direction, pelletDirections: shot.pelletDirections,
       nonce: shot.nonce,
@@ -6724,7 +7104,9 @@ function acceptHostedBotState(message: BotStateMessage): void {
 function botHasLineOfSight(bot: BotPlayer, targetPosition = player.position): boolean {
   const origin = { x: bot.position.x, y: bot.position.y + 1.42, z: bot.position.z };
   const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
-  return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
+  if (performance.now() < Number(bot.root.userData.flashBlindedUntil ?? 0)) return false;
+  return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box))
+    && !smokeBlocksTargetAcquisition(origin, target, smokeVolumes, performance.now());
 }
 
 function activeBotGrenadeCount(): number {
@@ -6757,6 +7139,7 @@ function throwBotGrenade(
   mesh.castShadow = true;
   scene.add(mesh);
   grenades.push({
+    grenade: 'frag',
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(7.6, 5.8, 9.4),
@@ -7322,6 +7705,203 @@ function melee(): void {
   });
 }
 
+type ExplosiveBoltTarget = Readonly<{
+  id: string;
+  team: Team;
+  lifeId: number;
+  kind: 'player' | 'remote' | 'bot';
+  position: THREE.Vector3;
+}>;
+
+function explosiveBoltTargets(ownerId: string, ownerTeam: Team): ExplosiveBoltTarget[] {
+  const targets: ExplosiveBoltTarget[] = [];
+  if (player.id !== ownerId && player.alive && areCombatantsHostile(ownerId, ownerTeam, player.id, player.team)) {
+    targets.push({ id: player.id, team: player.team, lifeId: localContinuity, kind: 'player', position: player.position.clone().add(new THREE.Vector3(0, -0.62, 0)) });
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.id === ownerId || remote.snapshot.hp <= 0
+      || !areCombatantsHostile(ownerId, ownerTeam, remote.snapshot.id, remote.snapshot.team)) continue;
+    targets.push({
+      id: remote.snapshot.id,
+      team: remote.snapshot.team,
+      lifeId: remote.continuity,
+      kind: 'remote',
+      position: remote.target.clone().add(new THREE.Vector3(0, 1, 0)),
+    });
+  }
+  for (const bot of bots.values()) {
+    if (bot.id === ownerId || !bot.alive || !areCombatantsHostile(ownerId, ownerTeam, bot.id, bot.team)) continue;
+    targets.push({ id: bot.id, team: bot.team, lifeId: bot.continuity, kind: 'bot', position: bot.position.clone().add(new THREE.Vector3(0, 1, 0)) });
+  }
+  return targets;
+}
+
+function segmentSphereFraction(start: THREE.Vector3, delta: THREE.Vector3, centre: THREE.Vector3, radius: number): number | null {
+  const denominator = delta.lengthSq();
+  if (denominator < 1e-9) return null;
+  const alpha = THREE.MathUtils.clamp(centre.clone().sub(start).dot(delta) / denominator, 0, 1);
+  const nearest = start.clone().addScaledVector(delta, alpha);
+  return nearest.distanceToSquared(centre) <= radius * radius ? alpha : null;
+}
+
+function createExplosiveBoltMesh(): THREE.Group {
+  const root = new THREE.Group();
+  root.name = 'tac15-explosive-bolt';
+  const shaftMaterial = new THREE.MeshStandardMaterial({ color: 0x29363b, roughness: 0.42, metalness: 0.72 });
+  const armedMaterial = new THREE.MeshBasicMaterial({ color: 0xff8b48, toneMapped: false });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.72, 8), shaftMaterial);
+  shaft.rotation.x = Math.PI / 2;
+  root.add(shaft);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.16, 8), armedMaterial);
+  tip.rotation.x = -Math.PI / 2;
+  tip.position.z = -0.42;
+  root.add(tip);
+  root.userData.presentationOnly = true;
+  return root;
+}
+
+function spawnExplosiveBolt(
+  ownerId: string,
+  ownerTeam: Team,
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  authority: boolean,
+  actionNonce: number,
+  now = performance.now(),
+): void {
+  const normalized = direction.clone().normalize();
+  const mesh = createExplosiveBoltMesh();
+  mesh.position.copy(origin);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), normalized);
+  scene.add(mesh);
+  explosiveBolts.push({
+    mesh,
+    velocity: normalized.multiplyScalar(36),
+    ownerId,
+    ownerTeam,
+    authority,
+    spawnedAt: now,
+    expiresAt: now + EXPLOSIVE_BOLT_MAX_LIFE_MS,
+    impactedAt: null,
+    detonatesAt: now + EXPLOSIVE_BOLT_MAX_LIFE_MS,
+    targetId: null,
+    targetLifeId: null,
+    actionNonce,
+  });
+}
+
+function disposeExplosiveBolt(entity: ExplosiveBoltEntity): void {
+  scene.remove(entity.mesh);
+  entity.mesh.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    node.geometry.dispose();
+    if (Array.isArray(node.material)) node.material.forEach((material) => material.dispose());
+    else node.material.dispose();
+  });
+}
+
+function applyExplosiveBoltTargetDamage(
+  bolt: ExplosiveBoltEntity,
+  target: ExplosiveBoltTarget,
+  damage: number,
+  kind: 'direct' | 'blast',
+  origin: THREE.Vector3,
+): void {
+  if (damage <= 0) return;
+  const boundedDamage = Math.min(100, damage);
+  const cause: KillCause = { kind: 'gun', weapon: 'explosive-crossbow' };
+  if (target.kind === 'player') {
+    const authoredDamage = handicapOutgoingDamage(bolt.ownerId, resolveRemotePoweredDamage(
+      boundedDamage,
+      overdriveDamageMultiplier(overdriveState, bolt.ownerId, performance.now()),
+    ), 'explosive-crossbow');
+    applyDamage(authoredDamage, bolt.ownerId, 1, false, cause, true);
+    return;
+  }
+  if (target.kind === 'bot') {
+    const bot = bots.get(target.id);
+    const authoredDamage = handicapOutgoingDamage(bolt.ownerId, resolveRemotePoweredDamage(
+      boundedDamage,
+      overdriveDamageMultiplier(overdriveState, bolt.ownerId, performance.now()),
+    ), 'explosive-crossbow');
+    if (bot) applyBotDamage(bot, authoredDamage, 'body', cause, bolt.ownerId, { distanceMeters: origin.distanceTo(target.position) });
+    return;
+  }
+  const hit: HitMessage = kind === 'direct'
+    ? {
+        type: 'hit', by: bolt.ownerId, target: target.id, damage: boundedDamage, kind: 'shot',
+        origin: origin.toArray() as [number, number, number], actionNonce: bolt.actionNonce, nonce: randomNonce(),
+      }
+    : {
+        type: 'hit', by: bolt.ownerId, target: target.id, damage: boundedDamage, kind: 'explosive',
+        explosiveSource: 'explosive-crossbow', origin: origin.toArray() as [number, number, number],
+        actionNonce: bolt.actionNonce, nonce: randomNonce(),
+      };
+  sendAuthoritativeHit(hit, { hitZone: 'body', distanceMeters: origin.distanceTo(target.position) });
+}
+
+function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): void {
+  const point = bolt.mesh.position.clone();
+  disposeExplosiveBolt(bolt);
+  spawnGrenadeExplosionVisual(point, now);
+  audio.explosion(now);
+  if (!bolt.authority) return;
+  for (const target of explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)) {
+    if (target.id === bolt.targetId && target.lifeId !== bolt.targetLifeId) continue;
+    const direct = target.id === bolt.targetId && target.lifeId === bolt.targetLifeId;
+    if (direct) applyExplosiveBoltTargetDamage(bolt, target, EXPLOSIVE_BOLT_DIRECT_DAMAGE, 'direct', point);
+    const distance = target.position.distanceTo(point);
+    if (distance > EXPLOSIVE_BOLT_BLAST_RADIUS_M) continue;
+    const blocked = !direct && arena.colliders.some((box) => segmentIntersectsBox(point, target.position, box));
+    if (blocked) continue;
+    applyExplosiveBoltTargetDamage(bolt, target, explosiveBoltBlastDamage(distance), 'blast', point);
+  }
+}
+
+function updateExplosiveBolts(dt: number, now: number): void {
+  for (let index = explosiveBolts.length - 1; index >= 0; index -= 1) {
+    const bolt = explosiveBolts[index];
+    if (bolt.impactedAt === null) {
+      const start = bolt.mesh.position.clone();
+      const delta = bolt.velocity.clone().multiplyScalar(dt);
+      const worldCollision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
+      let targetHit: ExplosiveBoltTarget | null = null;
+      let targetFraction = 2;
+      for (const target of explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)) {
+        const fraction = segmentSphereFraction(start, delta, target.position, 0.58);
+        if (fraction !== null && fraction < targetFraction) {
+          targetHit = target;
+          targetFraction = fraction;
+        }
+      }
+      const worldFraction = worldCollision?.time ?? 2;
+      if (targetHit && targetFraction <= worldFraction) {
+        bolt.mesh.position.copy(targetHit.position);
+        bolt.targetId = targetHit.id;
+        bolt.targetLifeId = targetHit.lifeId;
+        bolt.impactedAt = now;
+        bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
+        bolt.velocity.set(0, 0, 0);
+      } else if (worldCollision) {
+        bolt.mesh.position.copy(start).addScaledVector(delta, worldCollision.time);
+        bolt.impactedAt = now;
+        bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
+        bolt.velocity.set(0, 0, 0);
+      } else {
+        bolt.mesh.position.add(delta);
+      }
+    } else if (bolt.targetId !== null && bolt.targetLifeId !== null) {
+      const target = explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)
+        .find((candidate) => candidate.id === bolt.targetId && candidate.lifeId === bolt.targetLifeId);
+      if (target) bolt.mesh.position.copy(target.position);
+    }
+    if (now >= bolt.detonatesAt || now >= bolt.expiresAt || !pointInsideBounds(bolt.mesh.position, arena.bounds, 0)) {
+      explosiveBolts.splice(index, 1);
+      detonateExplosiveBoltEntity(bolt, now);
+    }
+  }
+}
+
 function throwGrenade(): void {
   if (!rangeGrenadesAllowed(selectedArena.id)) {
     addFeed('GRENADES LOCKED ON THE GUN RANGE');
@@ -7336,19 +7916,24 @@ function throwGrenade(): void {
   const velocity = direction.clone().multiplyScalar(13).add(new THREE.Vector3(0, 5.2, 0));
   const actionNonce = randomNonce();
   network.send({
-    type: 'grenade-throw', by: player.id,
+    type: 'grenade-throw', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id,
+    grenade: player.selectedGrenade,
+    lifeId: localContinuity,
+    actionSequence: localGrenadeActionSequence,
     origin: origin.toArray() as [number, number, number],
     velocity: velocity.toArray() as [number, number, number],
     actionNonce,
     timing: nextCombatTiming(),
     nonce: randomNonce(),
   });
+  localGrenadeActionSequence += 1;
   const mesh = createGrenadePresentation();
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
   const thrownAt = performance.now();
   grenades.push({
+    grenade: player.selectedGrenade,
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
@@ -7368,6 +7953,7 @@ function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-thr
   scene.add(mesh);
   const receivedAt = performance.now();
   grenades.push({
+    grenade: message.grenade,
     mesh,
     velocity: new THREE.Vector3(...message.velocity),
     angularVelocity: new THREE.Vector3(8.4, 5.2, 10.8),
@@ -7409,6 +7995,101 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
   return broken;
 }
 
+function spawnSmokeVolume(point: THREE.Vector3, now: number, actionNonce: number): void {
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xaeb8b3,
+    transparent: true,
+    opacity: 0.2,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), material);
+  mesh.name = 'smoke-grenade-volume-presentation';
+  mesh.position.copy(point).add(new THREE.Vector3(0, 1.25, 0));
+  mesh.scale.setScalar(0.12);
+  mesh.renderOrder = 20;
+  scene.add(mesh);
+  smokeVolumes.push(Object.freeze({
+    id: `smoke-${actionNonce}`,
+    centre: Object.freeze({ x: mesh.position.x, y: mesh.position.y, z: mesh.position.z }),
+    radiusM: 4.2,
+    startsAtMs: now,
+    expiresAtMs: now + 12_000,
+    mesh,
+  }));
+}
+
+function grenadeOwnerTeam(entity: GrenadeEntity): Team | null {
+  if (entity.ownerKind === 'player') return player.team;
+  if (entity.ownerKind === 'remote') return remotes.get(entity.ownerId)?.snapshot.team ?? null;
+  return bots.get(entity.ownerId)?.team ?? null;
+}
+
+function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: number): void {
+  const eyes = player.position;
+  const solidOccluded = arena.colliders.some((box) => segmentIntersectsBox(point, eyes, box));
+  const lookDirection = camera.getWorldDirection(new THREE.Vector3());
+  const ownerTeam = grenadeOwnerTeam(entity);
+  const exposure = calculateFlashExposure({
+    origin: point,
+    eyes,
+    lookDirection,
+    maximumRadiusM: 14,
+    solidOccluded,
+    friendly: ownerTeam !== null && ownerTeam === player.team,
+  });
+  if (exposure.accepted) {
+    flashExposureStrength = Math.max(flashExposureStrength, exposure.intensity);
+    flashExposureUntil = Math.max(flashExposureUntil, now + exposure.durationMs);
+  }
+  if (entity.ownerKind !== 'player') return;
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    const botEyes = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
+    const botOccluded = arena.colliders.some((box) => segmentIntersectsBox(point, botEyes, box));
+    const botLook = new THREE.Vector3(Math.sin(bot.root.rotation.y), 0, -Math.cos(bot.root.rotation.y));
+    const botExposure = calculateFlashExposure({
+      origin: point,
+      eyes: botEyes,
+      lookDirection: botLook,
+      maximumRadiusM: 14,
+      solidOccluded: botOccluded,
+      friendly: bot.team === player.team,
+    });
+    if (botExposure.accepted) bot.root.userData.flashBlindedUntil = now + botExposure.durationMs;
+  }
+}
+
+function updateOrdnanceVolumes(now: number): void {
+  for (let index = smokeVolumes.length - 1; index >= 0; index -= 1) {
+    const smoke = smokeVolumes[index];
+    const age = now - smoke.startsAtMs;
+    const remaining = smoke.expiresAtMs - now;
+    if (remaining <= 0) {
+      scene.remove(smoke.mesh);
+      smoke.mesh.geometry.dispose();
+      (smoke.mesh.material as THREE.Material).dispose();
+      smokeVolumes.splice(index, 1);
+      continue;
+    }
+    const grow = Math.min(1, Math.max(0.12, age / 900));
+    smoke.mesh.scale.setScalar(smoke.radiusM * grow);
+    const material = smoke.mesh.material as THREE.MeshBasicMaterial;
+    material.opacity = 0.08 + Math.min(0.18, grow * 0.18) * Math.min(1, remaining / 2_000);
+    smoke.mesh.rotation.y += 0.0015;
+  }
+  const overlay = element<HTMLElement>('#ordnance-flash');
+  const remainingFlash = flashExposureUntil - now;
+  if (remainingFlash <= 0) {
+    flashExposureStrength = 0;
+    overlay.hidden = true;
+    overlay.style.opacity = '0';
+  } else {
+    overlay.hidden = false;
+    overlay.style.opacity = String(Math.min(1, flashExposureStrength * Math.min(1, remainingFlash / 550)));
+  }
+}
+
 function explodeGrenade(entity: GrenadeEntity): void {
   const started = performance.now();
   const point = entity.mesh.position.clone();
@@ -7416,6 +8097,17 @@ function explodeGrenade(entity: GrenadeEntity): void {
   else scene.remove(entity.mesh);
   releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
+  if (entity.grenade === 'smoke') {
+    audio.coverImpact(point.distanceTo(player.position));
+    spawnSmokeVolume(point, afterPresentationDetach, entity.actionNonce);
+    return;
+  }
+  if (entity.grenade === 'flash') {
+    audio.explosion(afterPresentationDetach);
+    spawnImpactFlash(point, 'metal');
+    applyFlashGrenade(point, entity, afterPresentationDetach);
+    return;
+  }
   audio.explosion(afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
@@ -7478,6 +8170,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
 }
 
 function updateGrenades(dt: number, now: number): void {
+  updateOrdnanceVolumes(now);
   for (let index = grenades.length - 1; index >= 0; index -= 1) {
     const grenade = grenades[index];
     const fuseRemainingMs = grenade.explodeAt - now;
@@ -8724,6 +9417,19 @@ function clearGrenades(): void {
     disposeGrenadePresentation(grenade.mesh);
   }
   grenades.length = 0;
+  for (const bolt of explosiveBolts) disposeExplosiveBolt(bolt);
+  explosiveBolts.length = 0;
+  for (const smoke of smokeVolumes) {
+    scene.remove(smoke.mesh);
+    smoke.mesh.geometry.dispose();
+    (smoke.mesh.material as THREE.Material).dispose();
+  }
+  smokeVolumes.length = 0;
+  flashExposureUntil = 0;
+  flashExposureStrength = 0;
+  const flash = element<HTMLElement>('#ordnance-flash');
+  flash.hidden = true;
+  flash.style.opacity = '0';
 }
 
 function clearFieldSupport(): void {
@@ -8767,7 +9473,7 @@ function clearFieldSupport(): void {
   admittedRemoteMelees.clear();
   admittedRemoteExplosions.clear();
   for (const id of remotes.keys()) remoteSupportAuthorities.set(id, createRemoteSupportAuthorityState());
-  for (const id of remotes.keys()) remoteGrenadeAuthorities.set(id, createRemoteGrenadeAuthorityState());
+  for (const [id, remote] of remotes) remoteGrenadeAuthorities.set(id, createRemoteGrenadeAuthorityState(remote.snapshot.grenade));
   for (const id of remotes.keys()) remoteHealthAuthorities.set(id, createRemoteHealthAuthorityState(true));
   updateFieldSupportHud();
 }
@@ -8789,7 +9495,14 @@ function updatePhysics(dt: number): void {
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
-  const profile = movementProfile({ crouched, prone, ads: adsHeld, sprinting: currentSprinting, grounded: playerGrounded });
+  const profile = movementProfile({
+    crouched,
+    prone,
+    ads: adsHeld,
+    sprinting: currentSprinting,
+    grounded: playerGrounded,
+    equippedMovementMultiplier: WEAPONS[player.weapon].movementMultiplier,
+  });
   const integrated = integrateHorizontalVelocity(
     { x: player.velocity.x, z: player.velocity.z },
     { x: input.x, z: input.z },
@@ -9639,7 +10352,7 @@ function updateHud(now: number): void {
       : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
   reloadStateElement.classList.toggle('active', player.reloadState !== null || player.weapon === 'railgun' && railgunRechamberRemainingMs > 0);
   element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
-  element<HTMLElement>('#grenades').textContent = `FRAG ×${player.grenades}`;
+  element<HTMLElement>('#grenades').textContent = `${player.selectedGrenade.toUpperCase()} ×${player.grenades}`;
   updateFieldSupportHud();
   element<HTMLElement>('#health-block').classList.toggle('critical', player.hp <= 30);
   if (!element<HTMLElement>('#roster').hidden) updateRoster();
@@ -9802,6 +10515,11 @@ function pollGamepad(dt: number): void {
   gamepadSprint = canControlPlayer && Boolean(buttons[10]);
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   triggerHeld = mouseTriggerHeld || padTriggerActive;
+  if (!triggerHeld) {
+    spinUpWeapon = null;
+    spinUpStartedAtPerformanceMs = null;
+    spinUpStartedAtHostTimeMs = null;
+  }
   gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
   gamepadLookRate = integrateGamepadLookRate(
     gamepadLookRate,
@@ -9946,6 +10664,11 @@ window.addEventListener('mouseup', (event) => {
   if (event.button === 0) mouseTriggerHeld = false;
   if (event.button === 2) mouseAdsHeld = false;
   triggerHeld = mouseTriggerHeld;
+  if (!triggerHeld) {
+    spinUpWeapon = null;
+    spinUpStartedAtPerformanceMs = null;
+    spinUpStartedAtHostTimeMs = null;
+  }
   adsHeld = admittedAdsHeld(mouseAdsHeld);
 });
 document.addEventListener('pointerlockchange', () => {
@@ -10349,7 +11072,7 @@ function resetForMode(): void {
   player.kills = 0;
   player.deaths = 0;
   player.hp = 100;
-  player.grenades = 2;
+  player.grenades = 1;
   player.reloadState = null;
   player.sustainedShots = 0;
   player.stance = 'stand';
@@ -10396,13 +11119,16 @@ function resetForMode(): void {
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
   rangePrimaryUnlocked = false;
-  player.primaryWeapon = selectedArena.id === 'gun-range' ? 'carbine' : fieldKitById(selectedFieldKit).weapon;
+  const menuLoadout = activeLoadoutSelection();
+  player.primaryWeapon = selectedArena.id === 'gun-range' ? 'carbine' : menuLoadout.primary;
+  player.secondaryWeapon = selectedArena.id === 'gun-range' ? 'pistol' : menuLoadout.secondary;
+  player.selectedGrenade = menuLoadout.grenade;
   player.weapon = selectedArena.id === 'gun-range' ? 'pistol' : player.primaryWeapon;
   player.switchingUntil = 0;
   weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
-  player.ammo = { carbine: WEAPONS.carbine.mag, smg: WEAPONS.smg.mag, lmg: WEAPONS.lmg.mag, scattergun: WEAPONS.scattergun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag, magnum: WEAPONS.magnum.mag, 'machine-pistol': WEAPONS['machine-pistol'].mag, railgun: 0 };
-  player.reserve = { carbine: WEAPONS.carbine.reserve, smg: WEAPONS.smg.reserve, lmg: WEAPONS.lmg.reserve, scattergun: WEAPONS.scattergun.reserve, sniper: WEAPONS.sniper.reserve, pistol: WEAPONS.pistol.reserve, magnum: WEAPONS.magnum.reserve, 'machine-pistol': WEAPONS['machine-pistol'].reserve, railgun: 0 };
+  player.ammo = createWeaponCapacityRegistry('mag');
+  player.reserve = createWeaponCapacityRegistry('reserve');
 }
 
 function returnToMainMenu(): void {
@@ -10738,6 +11464,7 @@ function frame(now: number, scheduleNext = true): void {
     updateTargets(now);
     updateBots(frameDt, now);
     updateGrenades(frameDt, now);
+    updateExplosiveBolts(frameDt, now);
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
     updateOverdrive(now);
@@ -11394,6 +12121,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       deaths: player.deaths,
       weapon: player.weapon,
       primaryWeapon: player.primaryWeapon,
+      secondaryWeapon: player.secondaryWeapon,
+      selectedGrenade: player.selectedGrenade,
       equippedWeapons: selectedArena.id === 'gun-range'
         ? [rangePrimaryUnlocked ? player.primaryWeapon : null, handicapSidearm(player.primaryWeapon)]
         : handicapLoadout(player.primaryWeapon),
@@ -12479,16 +13208,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),
   equipKit: (id: FieldKitId) => {
-    const kit = fieldKitById(id);
-    selectedFieldKit = kit.id;
-    localStorage.setItem(FIELD_KIT_STORAGE_KEY, serializeFieldKitSelection(selectedFieldKit));
-    player.primaryWeapon = kit.weapon;
-    player.weapon = kit.weapon;
-    player.ammo[kit.weapon] = WEAPONS[kit.weapon].mag;
-    player.reserve[kit.weapon] = WEAPONS[kit.weapon].reserve;
-    player.nextShotAt = 0;
-    weaponView.setWeapon(player.weapon, true);
-    renderFieldKitSelection();
+    chooseFieldKit(id);
   },
   equipWeapon: (weapon: WeaponId) => {
     if (PRIMARY_WEAPON_IDS.includes(weapon as PrimaryWeaponId)) {
@@ -12507,7 +13227,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
   },
   setGrenades: (count: number) => {
-    if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(2, Math.floor(count)));
+    if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(1, Math.floor(count)));
   },
   reload: () => reload(),
   melee: () => {

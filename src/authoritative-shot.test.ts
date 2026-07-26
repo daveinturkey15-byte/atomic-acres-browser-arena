@@ -13,7 +13,8 @@ import { MULTIPLAYER_PROTOCOL_VERSION, type PlayerSnapshot, type ShotRequestMess
 
 const sender: PlayerSnapshot = {
   id: 'guest', name: 'Guest', team: 1, x: 0, y: 1.7, z: 0, yaw: 0, pitch: 0,
-  hp: 100, kills: 0, deaths: 0, primary: 'sniper', weapon: 'machine-pistol', seq: 10,
+  hp: 100, kills: 0, deaths: 0, primary: 'sniper', secondary: 'machine-pistol', grenade: 'frag',
+  weapon: 'machine-pistol', seq: 10,
 };
 const context = (overrides: Partial<AuthoritativeShotAdmissionContext> = {}): AuthoritativeShotAdmissionContext => ({
   expectedConnectionEpoch: 'connection-1',
@@ -33,6 +34,7 @@ const request = (
   targetViewTimeMs: fireTimeMs - 60, origin: [0, 1.7, 0], direction: [0, 0, -1],
   pelletDirections: [[0, 0, -1]], nonce: shotSeq + 1,
   ...overrides,
+  triggerStartedAtMs: overrides.triggerStartedAtMs ?? fireTimeMs,
 });
 
 describe('host-authored bullet admission', () => {
@@ -106,6 +108,21 @@ describe('host-authored bullet admission', () => {
       context({ expectedConnectionEpoch: 'connection-2' })).reason).toBe('connection-epoch-mismatch');
     expect(admitAuthoritativeShot(request(0, 1_000), sender, 1_100, createAuthoritativeShotAdmissionState(),
       context({ expectedLifeId: 5 })).reason).toBe('life-mismatch');
+  });
+
+  it('enforces the M134 spin-up on the host-authored trigger timeline', () => {
+    const minigunner: PlayerSnapshot = {
+      ...sender,
+      primary: 'minigun',
+      secondary: 'pistol',
+      weapon: 'minigun',
+    };
+    const early = request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 802 });
+    expect(admitAuthoritativeShot(early, minigunner, 2_050, createAuthoritativeShotAdmissionState(), context()).reason)
+      .toBe('spin-up');
+    const ready = request(0, 2_000, { weapon: 'minigun', triggerStartedAtMs: 801 });
+    const admitted = admitAuthoritativeShot(ready, minigunner, 2_050, createAuthoritativeShotAdmissionState(), context());
+    expect(admitted.accepted, admitted.reason).toBe(true);
   });
 
   it('freezes immutable fire and target-view times before hit or miss evaluation', () => {

@@ -9,6 +9,7 @@ import {
 import { AUTHORITATIVE_HIT_PROXIES, hitProxyRootTransform } from './hit-proxies';
 import type { ExplosiveSource, WeaponId } from './protocol';
 import { applyPenetrationDamage } from './ballistics';
+import { explosiveBoltBlastDamage } from './combat/ordnance';
 
 type ShotTarget = Readonly<{
   x: number;
@@ -153,6 +154,7 @@ export function maximumRemoteShotBaseDamage(weapon: WeaponId): number {
 export function maximumRemoteExplosiveBaseDamage(source: ExplosiveSource, distance: number, stance: Stance): number {
   if (!Number.isFinite(distance) || distance < 0) return 0;
   if (source === 'grenade') return Math.min(100, grenadeDamage(distance));
+  if (source === 'explosive-crossbow') return Math.min(100, explosiveBoltBlastDamage(distance));
   if (source === 'yardhawk') {
     if (distance > 3.2) return 0;
     return Math.min(100, Math.max(1, Math.round(200 * (1 - distance / 3.2))));

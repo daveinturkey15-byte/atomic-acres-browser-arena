@@ -36,6 +36,7 @@ export const REMOTE_EXPLOSIVE_HIT_MARGIN = 1.3;
 
 export function remoteExplosiveHitMaximumDistance(source?: ExplosiveSource): number {
   if (source === 'grenade') return GRENADE_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
+  if (source === 'explosive-crossbow') return 3.5 + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'tri-pass') return TRI_PASS_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'hunter-swarm') return HUNTER_SWARM_BLAST_RADIUS + REMOTE_EXPLOSIVE_HIT_MARGIN;
   if (source === 'nuke') return Number.POSITIVE_INFINITY;

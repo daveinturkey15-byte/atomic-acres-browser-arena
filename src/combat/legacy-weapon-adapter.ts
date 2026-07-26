@@ -1,7 +1,7 @@
 import type { WeaponPenetrationProfile } from '../ballistics';
 import type { WeaponId } from '../protocol';
 import { LEGACY_WEAPON_ENUMERATION_ORDER, WEAPON_CATALOG } from './weapon-catalog';
-import type { WeaponDefinition } from './weapon-schema';
+import type { WeaponDefinition, WeaponEffectsProfile, WeaponFireKind, WeaponOpticProfile } from './weapon-schema';
 
 export type LegacyWeaponSpec = Readonly<{
   id: WeaponId;
@@ -30,8 +30,16 @@ export type LegacyWeaponSpec = Readonly<{
   crouchRecoilMultiplier: number;
   proneRecoilMultiplier: number;
   switchSeconds: number;
+  spinUpMs: number;
+  movementMultiplier: number;
   automatic: boolean;
   color: number;
+  muzzleFlashScale: number;
+  reportGain: number;
+  flashlight: WeaponEffectsProfile['flashlight'];
+  fireKind: WeaponFireKind;
+  optic: WeaponOpticProfile | null;
+  projectileId: string | null;
   penetration: WeaponPenetrationProfile;
 }>;
 
@@ -81,8 +89,9 @@ function assertExactLegacyRoster(definitions: readonly WeaponDefinition[]): void
 }
 
 /**
- * Projects only fields already consumed by Pass 64. Schema-only policy,
- * deterministic recoil, empty-reload, and presentation metadata stay inert.
+ * Projects the canonical schema into the compact registry consumed by the live
+ * runtime. Policy, provenance, and deterministic presentation identifiers stay
+ * in the canonical catalog rather than being duplicated here.
  */
 export function adaptWeaponDefinitionToLegacy(definition: WeaponDefinition): LegacyWeaponSpec {
   return Object.freeze({
@@ -112,8 +121,16 @@ export function adaptWeaponDefinitionToLegacy(definition: WeaponDefinition): Leg
     crouchRecoilMultiplier: definition.recoil.crouchMultiplier,
     proneRecoilMultiplier: definition.recoil.proneMultiplier,
     switchSeconds: definition.ammo.switchSeconds,
+    spinUpMs: definition.spinUpMs,
+    movementMultiplier: definition.movementMultiplier,
     automatic: definition.fireMode === 'automatic',
     color: definition.effects.tracerColorHex,
+    muzzleFlashScale: definition.effects.muzzleFlashScale,
+    reportGain: definition.effects.reportGain,
+    flashlight: definition.effects.flashlight,
+    fireKind: definition.fireKind,
+    optic: definition.optic,
+    projectileId: definition.projectileId,
     penetration: Object.freeze({
       caliber: definition.penetration.calibreLabel,
       penetrationPower: definition.penetration.power,

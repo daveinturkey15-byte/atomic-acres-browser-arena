@@ -28,14 +28,25 @@ import {
 } from './railgun-authority';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 6;
-export type PrimaryWeaponId = 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper';
-export type SidearmWeaponId = 'pistol' | 'machine-pistol' | 'magnum';
+export const MULTIPLAYER_PROTOCOL_VERSION = 7;
+export type PrimaryWeaponId =
+  | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
+  | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
+export type SidearmWeaponId =
+  | 'pistol' | 'machine-pistol' | 'magnum' | 'flashlight-pistol' | 'explosive-crossbow';
 export type SpecialWeaponId = 'railgun';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
+export type GrenadeId = 'frag' | 'smoke' | 'flash';
 
-export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
-export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, 'pistol', 'machine-pistol', 'magnum', 'railgun']);
+export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
+  'carbine', 'smg', 'lmg', 'scattergun', 'sniper',
+  'mini-uzi', 'mp5', 'm4a1', 'ak-47', 'minigun', 'm14-ebr', 'slug-shotgun',
+]);
+export const SIDEARM_WEAPON_IDS: readonly SidearmWeaponId[] = Object.freeze([
+  'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
+]);
+export const GRENADE_IDS: readonly GrenadeId[] = Object.freeze(['frag', 'smoke', 'flash']);
+export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, ...SIDEARM_WEAPON_IDS, 'railgun']);
 export const MAX_MATCH_SCORE_ENTRIES = 10;
 
 export type PlayerSnapshot = {
@@ -51,6 +62,8 @@ export type PlayerSnapshot = {
   kills: number;
   deaths: number;
   primary: PrimaryWeaponId;
+  secondary: SidearmWeaponId;
+  grenade: GrenadeId;
   weapon: WeaponId;
   stance?: 'stand' | 'crouch' | 'prone';
   seq: number;
@@ -76,7 +89,7 @@ export type ShotMessage = {
   nonce: number;
 };
 export type ShotRejectReason = 'none' | 'protocol-mismatch' | 'unknown-sender' | 'duplicate' | 'sequence-gap'
-  | 'weapon-mismatch' | 'cadence' | 'stale' | 'future' | 'invalid-direction' | 'invalid-pellets'
+  | 'weapon-mismatch' | 'cadence' | 'spin-up' | 'stale' | 'future' | 'invalid-direction' | 'invalid-pellets'
   | 'bad-origin' | 'missing-history' | 'continuity-mismatch' | 'connection-epoch-mismatch'
   | 'life-mismatch' | 'shooter-dead' | 'invalid-timeline' | 'obstructed' | 'malformed';
 export type ShotRequestMessage = {
@@ -91,6 +104,8 @@ export type ShotRequestMessage = {
   weapon: WeaponId;
   /** Trigger time in the host monotonic domain. */
   fireTimeMs: number;
+  /** Host-domain time at which this continuous trigger hold began. */
+  triggerStartedAtMs: number;
   /** Host-world time represented by remote target presentation when the trigger fired. */
   targetViewTimeMs: number;
   origin: [number, number, number];
@@ -145,15 +160,19 @@ export type MeleeMessage = {
 };
 export type GrenadeThrowMessage = {
   type: 'grenade-throw';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
+  grenade: GrenadeId;
+  lifeId: number;
+  actionSequence: number;
   origin: [number, number, number];
   velocity: [number, number, number];
   actionNonce: number;
   timing?: CombatTiming;
   nonce: number;
 };
-export type ExplosiveSource = 'grenade' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
-export type OffensiveSupportSource = Exclude<ExplosiveSource, 'grenade'>;
+export type ExplosiveSource = 'grenade' | 'explosive-crossbow' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
+export type OffensiveSupportSource = Exclude<ExplosiveSource, 'grenade' | 'explosive-crossbow'>;
 export type HitMessage = {
   type: 'hit';
   by: string;
@@ -188,10 +207,13 @@ export type BotDamageMessage = {
 };
 export type PickupMessage = {
   type: 'pickup';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
   dropId: string;
   weapon: PrimaryWeaponId;
   mode: 'scavenge' | 'weapon';
+  selectedGrenade: GrenadeId;
+  grenadeGranted: 0 | 1;
   position: [number, number, number];
   nonce: number;
 };
@@ -249,11 +271,12 @@ export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; non
 export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dhv; nonce: number };
 export type RedeployRequestMessage = {
   type: 'redeploy-request'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
-  by: string; primary: PrimaryWeaponId; nonce: number;
+  by: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId; nonce: number;
 };
 export type RedeployCommitMessage = {
   type: 'redeploy-commit'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
-  by: string; target: string; primary: PrimaryWeaponId; hostTimeMs: number; nonce: number;
+  by: string; target: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId;
+  hostTimeMs: number; nonce: number;
 };
 export type LobbyConfigMessage = { type: 'lobby-config'; by: string; config: PrivateMatchConfig; nonce: number };
 export type LobbyBalanceMessage = { type: 'lobby-balance'; by: string; nonce: number };
@@ -294,6 +317,8 @@ export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDama
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
+const sidearmWeapons = new Set<SidearmWeaponId>(SIDEARM_WEAPON_IDS);
+const grenades = new Set<GrenadeId>(GRENADE_IDS);
 const offensiveSupportSources = new Set<OffensiveSupportSource>(['yardhawk', 'tri-pass', 'hunter-swarm', 'nuke']);
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
@@ -308,8 +333,10 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && ['kills', 'deaths', 'seq'].every((key) => Number.isSafeInteger(p[key]) && Number(p[key]) >= 0)
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
+    && sidearmWeapons.has(p.secondary as SidearmWeaponId)
+    && grenades.has(p.grenade as GrenadeId)
     && weapons.has(p.weapon as WeaponId)
-    && (p.weapon === p.primary || p.weapon === (p.primary === 'sniper' ? 'machine-pistol' : 'pistol') || p.weapon === 'magnum' || p.weapon === 'railgun');
+    && (p.weapon === p.primary || p.weapon === p.secondary || p.weapon === 'magnum' || p.weapon === 'railgun');
 }
 
 function isOptionalCombatTiming(value: unknown): boolean {
@@ -328,7 +355,7 @@ function isNormalizedDirection(value: unknown): value is [number, number, number
 
 const shotRejectReasons = new Set<ShotRejectReason>([
   'none', 'protocol-mismatch', 'unknown-sender', 'duplicate', 'sequence-gap', 'weapon-mismatch', 'cadence',
-  'stale', 'future', 'invalid-direction', 'invalid-pellets', 'bad-origin', 'missing-history',
+  'spin-up', 'stale', 'future', 'invalid-direction', 'invalid-pellets', 'bad-origin', 'missing-history',
   'continuity-mismatch', 'connection-epoch-mismatch', 'life-mismatch', 'shooter-dead',
   'invalid-timeline', 'obstructed', 'malformed',
 ]);
@@ -363,6 +390,9 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && Number.isSafeInteger(msg.weaponSequence) && Number(msg.weaponSequence) >= 0
         && weapons.has(msg.weapon as WeaponId)
         && Number.isFinite(msg.fireTimeMs) && Number(msg.fireTimeMs) >= 0
+        && Number.isFinite(msg.triggerStartedAtMs) && Number(msg.triggerStartedAtMs) >= 0
+        && Number(msg.triggerStartedAtMs) <= Number(msg.fireTimeMs)
+        && Number(msg.fireTimeMs) - Number(msg.triggerStartedAtMs) <= 10_000
         && Number.isFinite(msg.targetViewTimeMs) && Number(msg.targetViewTimeMs) >= 0
         && Number(msg.targetViewTimeMs) <= Number(msg.fireTimeMs)
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
@@ -414,7 +444,11 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
     case 'grenade-throw':
-      return typeof msg.by === 'string'
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && grenades.has(msg.grenade as GrenadeId)
+        && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
+        && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Array.isArray(msg.velocity) && msg.velocity.length === 3 && msg.velocity.every(Number.isFinite)
         && Number.isFinite(msg.actionNonce)
@@ -427,13 +461,16 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.kind !== 'explosive' || Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite))
         && (msg.kind === 'explosive'
           ? msg.explosiveSource === 'grenade'
+            || msg.explosiveSource === 'explosive-crossbow'
             || msg.explosiveSource === 'yardhawk'
             || msg.explosiveSource === 'tri-pass'
             || msg.explosiveSource === 'hunter-swarm'
             || msg.explosiveSource === 'nuke'
           : msg.explosiveSource === undefined)
         && Number.isFinite(msg.actionNonce)
-        && (msg.kind === 'explosive' && msg.explosiveSource !== 'grenade'
+        && (msg.kind === 'explosive'
+          && msg.explosiveSource !== 'grenade'
+          && msg.explosiveSource !== 'explosive-crossbow'
           ? Number.isFinite(msg.supportNonce)
           : msg.supportNonce === undefined)
         && isOptionalCombatTiming(msg.timing)
@@ -481,10 +518,13 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && new Set(msg.bots.map((bot) => bot.id)).size === msg.bots.length
         && Number.isFinite(msg.nonce);
     case 'pickup':
-      return typeof msg.by === 'string'
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string'
         && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
         && primaryWeapons.has(msg.weapon as PrimaryWeaponId)
         && (msg.mode === 'scavenge' || msg.mode === 'weapon')
+        && grenades.has(msg.selectedGrenade as GrenadeId)
+        && (msg.grenadeGranted === 0 || msg.grenadeGranted === 1)
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
         && Number.isFinite(msg.nonce);
     case 'window-break':
@@ -548,12 +588,17 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'redeploy-request':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
-        && primaryWeapons.has(msg.primary as PrimaryWeaponId) && Number.isFinite(msg.nonce);
+        && primaryWeapons.has(msg.primary as PrimaryWeaponId)
+        && sidearmWeapons.has(msg.secondary as SidearmWeaponId)
+        && grenades.has(msg.grenade as GrenadeId)
+        && Number.isFinite(msg.nonce);
     case 'redeploy-commit':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.target === 'string' && msg.target.length > 0 && msg.target.length <= 80
         && primaryWeapons.has(msg.primary as PrimaryWeaponId)
+        && sidearmWeapons.has(msg.secondary as SidearmWeaponId)
+        && grenades.has(msg.grenade as GrenadeId)
         && Number.isFinite(msg.hostTimeMs) && Number(msg.hostTimeMs) >= 0
         && Number.isFinite(msg.nonce);
     case 'railgun-claim-request':

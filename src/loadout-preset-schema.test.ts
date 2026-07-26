@@ -42,8 +42,12 @@ const fixturePath = fileURLToPath(new URL(
   '../.agents/skills/atomic-acres-combat-registry/scripts/fixtures/known-good.json',
   import.meta.url,
 ));
-const weaponFixture = JSON.parse(readFileSync(fixturePath, 'utf8')) as { weapons: unknown };
-const ELIGIBILITY = createLoadoutItemEligibility(weaponFixture.weapons);
+const weaponFixture = JSON.parse(readFileSync(fixturePath, 'utf8')) as { weapons: Array<Record<string, any>> };
+const migratedWeaponFixture = { weapons: weaponFixture.weapons.map((weapon) => ({
+  ...weapon,
+  effects: { ...weapon.effects, muzzleFlashScale: 1, reportGain: 1, flashlight: null },
+})) };
+const ELIGIBILITY = createLoadoutItemEligibility(migratedWeaponFixture.weapons);
 const decisionReceiptPath = fileURLToPath(new URL('../docs/PASS65_DECISION_RECEIPTS.json', import.meta.url));
 const decisionReceipts = JSON.parse(readFileSync(decisionReceiptPath, 'utf8')) as {
   receipts: Array<{
@@ -176,7 +180,9 @@ describe('frozen DEC-01 loadout surface contract', () => {
   });
 
   it('refuses an F01 catalog without both eligible weapon slots', () => {
-    const fixture = structuredClone(weaponFixture) as { weapons: Array<{ policies: { loadout: string } }> };
+    const fixture = structuredClone(migratedWeaponFixture) as unknown as {
+      weapons: Array<{ policies: { loadout: string } }>;
+    };
     for (const weapon of fixture.weapons) weapon.policies.loadout = 'never';
     expect(() => createLoadoutItemEligibility(fixture.weapons)).toThrow(LoadoutEligibilityError);
   });

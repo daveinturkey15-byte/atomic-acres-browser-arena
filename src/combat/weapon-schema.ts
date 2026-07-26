@@ -1,4 +1,4 @@
-export const WEAPON_SCHEMA_VERSION = 1 as const;
+export const WEAPON_SCHEMA_VERSION = 2 as const;
 export const WEAPON_MATERIAL_POLICY_ID = 'pass64-ballistic-materials-v1' as const;
 
 export const WEAPON_SLOTS = Object.freeze(['primary', 'secondary', 'special'] as const);
@@ -83,6 +83,16 @@ export type WeaponPenetrationProfile = Readonly<{
 
 export type WeaponEffectsProfile = Readonly<{
   tracerColorHex: number;
+  muzzleFlashScale: number;
+  reportGain: number;
+  flashlight: null | Readonly<{
+    kind: 'always-on';
+    colorHex: number;
+    intensity: number;
+    rangeM: number;
+    coneAngleRadians: number;
+    solidOcclusion: 'required';
+  }>;
 }>;
 
 export type StandardWeaponOptic = Readonly<{
@@ -739,9 +749,29 @@ function validatePenetration(value: unknown, path: string, issues: WeaponSchemaI
 }
 
 function validateEffects(value: unknown, path: string, issues: WeaponSchemaIssue[]): void {
-  const effects = exactRecord(value, path, ['tracerColorHex'], issues);
+  const effects = exactRecord(value, path, ['tracerColorHex', 'muzzleFlashScale', 'reportGain', 'flashlight'], issues);
   if (!effects) return;
   boundedInteger(effects.tracerColorHex, 0, 0xffffff, `${path}.tracerColorHex`, issues);
+  boundedNumber(effects.muzzleFlashScale, 0.1, 4, `${path}.muzzleFlashScale`, issues);
+  boundedNumber(effects.reportGain, 0.1, 2, `${path}.reportGain`, issues);
+  if (effects.flashlight === null) return;
+  const flashlight = exactRecord(
+    effects.flashlight,
+    `${path}.flashlight`,
+    ['kind', 'colorHex', 'intensity', 'rangeM', 'coneAngleRadians', 'solidOcclusion'],
+    issues,
+  );
+  if (!flashlight) return;
+  if (flashlight.kind !== 'always-on') {
+    issue(issues, `${path}.flashlight.kind`, 'unsupported-value', 'must equal always-on');
+  }
+  boundedInteger(flashlight.colorHex, 0, 0xffffff, `${path}.flashlight.colorHex`, issues);
+  boundedNumber(flashlight.intensity, 0.1, 40, `${path}.flashlight.intensity`, issues);
+  boundedNumber(flashlight.rangeM, 1, 40, `${path}.flashlight.rangeM`, issues);
+  boundedNumber(flashlight.coneAngleRadians, 0.05, Math.PI / 2, `${path}.flashlight.coneAngleRadians`, issues);
+  if (flashlight.solidOcclusion !== 'required') {
+    issue(issues, `${path}.flashlight.solidOcclusion`, 'unsupported-value', 'must equal required');
+  }
 }
 
 function validateOptic(value: unknown, path: string, issues: WeaponSchemaIssue[]): void {

@@ -25,11 +25,14 @@ function expectDeepFrozen(value: unknown): void {
   for (const entry of Object.values(value)) expectDeepFrozen(entry);
 }
 
-describe('Pass 64 legacy weapon adapter', () => {
-  it('matches the independent nine-weapon baseline byte-for-value and order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(6);
-    expect(Object.keys(LEGACY_WEAPONS)).toEqual(legacyBaseline.legacyEnumerationOrder);
-    expect(LEGACY_WEAPONS).toEqual(legacyBaseline.weapons);
+describe('Pass 65 runtime weapon adapter', () => {
+  it('projects the complete protocol-v7 roster in canonical order', () => {
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(7);
+    expect(Object.keys(LEGACY_WEAPONS)).toEqual(WEAPON_CATALOG.map((weapon) => weapon.id));
+    expect(Object.keys(LEGACY_WEAPONS).slice(0, 9)).toEqual(legacyBaseline.legacyEnumerationOrder);
+    expect(LEGACY_WEAPONS.carbine).toMatchObject({ id: 'carbine', name: 'HK416', damage: 31, mag: 30 });
+    expect(LEGACY_WEAPONS.minigun).toMatchObject({ spinUpMs: 1200, movementMultiplier: 0.8, mag: 240 });
+    expect(LEGACY_WEAPONS['explosive-crossbow']).toMatchObject({ fireKind: 'projectile', projectileId: 'explosive-bolt-v1' });
     expect(WEAPONS).toBe(LEGACY_WEAPONS);
   });
 
@@ -39,7 +42,7 @@ describe('Pass 64 legacy weapon adapter', () => {
 
   it('rejects missing, duplicate, unknown, and reordered catalogs without a fallback', () => {
     expect(() => adaptWeaponCatalogToLegacy(WEAPON_CATALOG.slice(0, -1)))
-      .toThrow(/missing machine-pistol/);
+      .toThrow(/missing explosive-crossbow/);
 
     const duplicate = [...WEAPON_CATALOG.slice(0, -1), WEAPON_CATALOG[0]];
     expect(() => adaptWeaponCatalogToLegacy(duplicate)).toThrow(/duplicate weapon id "carbine"/);
@@ -56,16 +59,12 @@ describe('Pass 64 legacy weapon adapter', () => {
     expect(() => adaptWeaponCatalogToLegacy(reordered)).toThrow(/weapon 5 must be "railgun"/);
   });
 
-  it('keeps F01-only metadata inert in the legacy projection', () => {
+  it('keeps policy, provenance, and non-runtime identifiers inert in the runtime projection', () => {
     const original = WEAPON_CATALOG[0];
     const metadataVariant: WeaponDefinition = {
       ...original,
-      spinUpMs: 250,
-      movementMultiplier: 0.75,
-      spread: { ...original.spread, proneMultiplier: 0.1 },
       recoil: { ...original.recoil, deterministicPatternId: 'metadata-only-pattern-v2' },
       ammo: { ...original.ammo, emptyReloadSeconds: 2.5 },
-      optic: null,
       policies: { ...original.policies, loadout: 'curated-only' },
       modelSetId: 'metadata-only-model-v2',
       presentationId: 'metadata-only-presentation-v2',

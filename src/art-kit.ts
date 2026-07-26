@@ -363,9 +363,91 @@ function finalizeWeaponGeometryLod(root: THREE.Group, flattenMaterials: boolean)
   return root;
 }
 
+const PROCEDURAL_WEAPON_BASE: Partial<Record<WeaponId, WeaponId>> = {
+  'mini-uzi': 'smg',
+  mp5: 'smg',
+  m4a1: 'carbine',
+  'ak-47': 'carbine',
+  minigun: 'lmg',
+  'm14-ebr': 'sniper',
+  'slug-shotgun': 'scattergun',
+  'flashlight-pistol': 'pistol',
+  'explosive-crossbow': 'pistol',
+};
+
+function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMaterials: boolean): THREE.Group {
+  const root = buildWeaponModel(baseId, flattenMaterials, false);
+  root.name = `${id}-procedural-family-weapon`;
+  root.userData.weaponModelId = `${id}-procedural-family-v1`;
+  root.userData.weaponFinishId = weaponFinishProfile(id).id;
+  root.userData.assetPolicy = 'family-derived-procedural-no-bespoke-claim';
+  const metal = MAT.gunmetal(id);
+  const dark = MAT.dark();
+  const accent = flattenMaterials
+    ? new THREE.MeshBasicMaterial({ color: 0xb8d9dc })
+    : new THREE.MeshStandardMaterial({ color: 0xb8d9dc, roughness: 0.34, metalness: 0.62 });
+
+  if (id === 'mini-uzi') {
+    part(root, roundedBox('mini-uzi-compact-stock', [0.16, 0.17, 0.22], dark, 0.025, 2), [0, 0.01, 0.36]);
+  } else if (id === 'mp5') {
+    part(root, roundedBox('mp5-diode-sight', [0.08, 0.075, 0.1], accent, 0.018, 2), [0, 0.22, -0.12]);
+  } else if (id === 'm4a1') {
+    part(root, roundedBox('m4a1-handguard', [0.22, 0.16, 0.58], dark, 0.028, 3), [0, 0, -0.62]);
+  } else if (id === 'ak-47') {
+    part(root, roundedBox('ak-gas-tube', [0.14, 0.11, 0.72], metal, 0.025, 3), [0, 0.13, -0.68]);
+  } else if (id === 'minigun') {
+    const inheritedBarrel = root.getObjectByName('lmg-long-barrel');
+    if (inheritedBarrel) inheritedBarrel.visible = false;
+    const cluster = new THREE.Group();
+    cluster.name = 'minigun-barrel-cluster';
+    cluster.position.set(0, 0.005, -1.35);
+    root.add(cluster);
+    for (let index = 0; index < 6; index += 1) {
+      const angle = index / 6 * Math.PI * 2;
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 1.18, 10), dark);
+      barrel.name = `minigun-barrel-${index}`;
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(Math.cos(angle) * 0.085, Math.sin(angle) * 0.085, -0.1);
+      cluster.add(barrel);
+    }
+    part(root, roundedBox('minigun-ammo-drum', [0.48, 0.48, 0.44], dark, 0.12, 5), [0, -0.3, -0.22]);
+    part(root, roundedBox('minigun-carry-frame', [0.52, 0.08, 0.9], metal, 0.025, 2), [0, 0.25, -0.55]);
+  } else if (id === 'm14-ebr') {
+    part(root, roundedBox('m14-thermal-optic', [0.14, 0.12, 0.36], accent, 0.025, 3), [0, 0.29, -0.18]);
+  } else if (id === 'slug-shotgun') {
+    part(root, roundedBox('slug-saddle', [0.05, 0.16, 0.36], accent, 0.012, 2), [-0.15, 0.02, -0.03]);
+  } else if (id === 'flashlight-pistol') {
+    const lamp = new THREE.Group();
+    lamp.name = 'always-on-flashlight';
+    lamp.position.set(0, -0.12, -0.34);
+    root.add(lamp);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.26, 14), dark);
+    tube.rotation.x = Math.PI / 2;
+    lamp.add(tube);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16), new THREE.MeshBasicMaterial({ color: 0xeaffff, toneMapped: false }));
+    lens.position.z = -0.135;
+    lamp.add(lens);
+  } else if (id === 'explosive-crossbow') {
+    const inheritedFlash = root.getObjectByName('world-muzzle-flash');
+    if (inheritedFlash) inheritedFlash.visible = false;
+    part(root, roundedBox('bolt-rail', [0.08, 0.07, 0.9], dark, 0.018, 2), [0, 0.09, -0.48]);
+    for (const side of [-1, 1]) {
+      part(root, roundedBox(side < 0 ? 'crossbow-limb-left' : 'crossbow-limb-right', [0.62, 0.055, 0.06], metal, 0.018, 3), [side * 0.31, 0.09, -0.72], [0, side * 0.18, 0]);
+    }
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1.22, 6), accent);
+    string.name = 'crossbow-string';
+    string.rotation.z = Math.PI / 2;
+    string.position.set(0, 0.09, -0.66);
+    root.add(string);
+  }
+  return root;
+}
+
 export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferImported = true): THREE.Group {
   const imported = preferImported && id !== 'lmg' ? createImportedWeaponModel(id, flattenMaterials) : null;
   if (imported) return imported;
+  const proceduralBase = PROCEDURAL_WEAPON_BASE[id];
+  if (proceduralBase) return buildProceduralWeaponVariant(id, proceduralBase, flattenMaterials);
   if (id === 'lmg') {
     const root = buildWeaponModel('carbine', flattenMaterials, false);
     root.name = 'lmg-original-weapon';
@@ -1025,6 +1107,15 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   pistol: [-0.06, -0.15, 0.03],
   magnum: [-0.06, -0.15, 0.03],
   'machine-pistol': [-0.06, -0.15, 0.03],
+  'mini-uzi': [-0.03, -0.16, -0.16],
+  mp5: [-0.03, -0.16, -0.16],
+  m4a1: [-0.035, -0.17, -0.21],
+  'ak-47': [-0.035, -0.17, -0.21],
+  minigun: [-0.06, -0.13, -0.3],
+  'm14-ebr': [-0.035, -0.095, -0.21],
+  'slug-shotgun': [-0.03, -0.025, 0.29],
+  'flashlight-pistol': [-0.06, -0.15, 0.03],
+  'explosive-crossbow': [-0.06, -0.12, -0.25],
 };
 
 /** Rotate one animated bone toward a world-space target without rewriting bind offsets. */

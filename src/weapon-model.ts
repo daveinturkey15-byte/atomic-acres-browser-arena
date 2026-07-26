@@ -17,8 +17,22 @@ const URLS: Record<WeaponId, string> = {
   pistol: './assets/third-party/quaternius/animated-guns/Pistol.glb',
   magnum: './assets/third-party/quaternius/animated-guns/Pistol.glb',
   'machine-pistol': './assets/third-party/quaternius/animated-guns/Pistol.glb',
+  'mini-uzi': './assets/third-party/quaternius/animated-guns/P90.glb',
+  mp5: './assets/third-party/quaternius/animated-guns/P90.glb',
+  m4a1: './assets/third-party/quaternius/animated-guns/Rifle.glb',
+  'ak-47': './assets/third-party/quaternius/animated-guns/Rifle.glb',
+  minigun: './assets/third-party/quaternius/animated-guns/Rifle.glb',
+  'm14-ebr': './assets/third-party/quaternius/animated-guns/Rifle.glb',
+  'slug-shotgun': './assets/third-party/quaternius/animated-guns/Shotgun.glb',
+  'flashlight-pistol': './assets/third-party/quaternius/animated-guns/Pistol.glb',
+  'explosive-crossbow': './assets/third-party/quaternius/animated-guns/Pistol.glb',
 };
-const LENGTHS: Record<WeaponId, number> = { carbine: 1.35, lmg: 1.7, smg: 0.92, scattergun: 1.3, sniper: 1.55, railgun: 1.72, pistol: 0.48, magnum: 0.62, 'machine-pistol': 0.5 };
+const LENGTHS: Record<WeaponId, number> = {
+  carbine: 1.35, lmg: 1.7, smg: 0.92, scattergun: 1.3, sniper: 1.55, railgun: 1.72,
+  pistol: 0.48, magnum: 0.62, 'machine-pistol': 0.5,
+  'mini-uzi': 0.72, mp5: 0.86, m4a1: 1.3, 'ak-47': 1.38, minigun: 1.82,
+  'm14-ebr': 1.52, 'slug-shotgun': 1.32, 'flashlight-pistol': 0.58, 'explosive-crossbow': 0.94,
+};
 const PRESENTATION_YAW: Record<WeaponId, number> = {
   carbine: 0,
   lmg: 0,
@@ -29,6 +43,15 @@ const PRESENTATION_YAW: Record<WeaponId, number> = {
   pistol: Math.PI / 2,
   magnum: Math.PI / 2,
   'machine-pistol': Math.PI / 2,
+  'mini-uzi': 0,
+  mp5: 0,
+  m4a1: 0,
+  'ak-47': 0,
+  minigun: 0,
+  'm14-ebr': 0,
+  'slug-shotgun': 0,
+  'flashlight-pistol': Math.PI / 2,
+  'explosive-crossbow': Math.PI / 2,
 };
 const PRESENTATION_ROLL: Record<WeaponId, number> = {
   carbine: -0.12,
@@ -40,6 +63,15 @@ const PRESENTATION_ROLL: Record<WeaponId, number> = {
   pistol: -0.06,
   magnum: -0.06,
   'machine-pistol': -0.06,
+  'mini-uzi': -0.1,
+  mp5: -0.1,
+  m4a1: -0.12,
+  'ak-47': -0.12,
+  minigun: -0.12,
+  'm14-ebr': -0.1,
+  'slug-shotgun': -0.08,
+  'flashlight-pistol': -0.06,
+  'explosive-crossbow': -0.06,
 };
 const assets = new Map<WeaponId, WeaponAsset>();
 let loadPromise: Promise<void> | null = null;
@@ -90,6 +122,15 @@ const SOCKETS: Record<WeaponId, {
   pistol: { muzzle: [0, 0.105, -0.58], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
   magnum: { muzzle: [0, 0.105, -0.72], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
   'machine-pistol': { muzzle: [0, 0.105, -0.58], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
+  'mini-uzi': { muzzle: [0, 0.005, -0.82], eject: [0.14, 0.06, -0.04], right: [0.03, -0.13, 0.02], left: [-0.03, -0.08, -0.39], reload: [-0.14, -0.16, -0.08], sight: 'smg-aperture' },
+  mp5: { muzzle: [0, 0.005, -0.92], eject: [0.14, 0.06, -0.04], right: [0.03, -0.13, 0.02], left: [-0.03, -0.08, -0.43], reload: [-0.14, -0.16, -0.08], sight: 'smg-aperture' },
+  m4a1: { muzzle: [0, 0.005, -1.2], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
+  'ak-47': { muzzle: [0, 0.005, -1.3], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'optic-reticle' },
+  minigun: { muzzle: [0, 0.005, -1.98], eject: [0.16, 0.065, -0.12], right: [-0.1, -0.15, 0.42], left: [-0.45, -0.09, 0.68], reload: [-0.24, -0.3, -0.24], sight: 'optic-reticle' },
+  'm14-ebr': { muzzle: [0, 0.005, -1.52], eject: [0.145, 0.055, -0.07], right: [-0.1, -0.135, 0.43], left: [-0.43, -0.07, 0.47], reload: [-0.13, -0.18, -0.08], sight: 'sniper-scope' },
+  'slug-shotgun': { muzzle: [0, 0.005, -1.24], eject: [0.14, 0.045, -0.03], right: [0.03, -0.14, 0.12], left: [-0.03, -0.025, -0.55], reload: [-0.18, -0.14, 0.02], sight: 'ghost-ring' },
+  'flashlight-pistol': { muzzle: [0, 0.105, -0.64], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.12], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
+  'explosive-crossbow': { muzzle: [0, 0.105, -0.98], eject: [0.125, 0.13, -0.08], right: [0.03, -0.2, 0.08], left: [-0.09, -0.1, -0.3], reload: [-0.12, -0.06, 0], sight: 'pistol-rear-sight' },
 };
 
 function createPass31DetailKit(id: WeaponId, flattenMaterials: boolean, sightHeight: number): THREE.Group {

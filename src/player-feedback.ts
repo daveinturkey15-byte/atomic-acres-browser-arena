@@ -11,6 +11,15 @@ export const THIRD_PERSON_WEAPON_SCALE: Readonly<Record<WeaponId, number>> = Obj
   pistol: 0.54,
   magnum: 0.54,
   'machine-pistol': 0.54,
+  'mini-uzi': 0.52,
+  mp5: 0.51,
+  m4a1: 0.47,
+  'ak-47': 0.46,
+  minigun: 0.4,
+  'm14-ebr': 0.45,
+  'slug-shotgun': 0.46,
+  'flashlight-pistol': 0.54,
+  'explosive-crossbow': 0.5,
 });
 
 export type DamageNumberPresentation = Readonly<{

@@ -57,6 +57,15 @@ const WEAPON_HAND_ROTATIONS: Record<WeaponId, HandRotationSet> = {
   pistol: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
   magnum: { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
   'machine-pistol': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+  'mini-uzi': { left: [-0.36, 0.14, -0.22], right: [-0.18, -0.02, 0.16] },
+  mp5: { left: [-0.36, 0.14, -0.22], right: [-0.18, -0.02, 0.16] },
+  m4a1: { left: [-0.32, 0.12, -0.22], right: [-0.22, -0.06, 0.26] },
+  'ak-47': { left: [-0.32, 0.12, -0.22], right: [-0.22, -0.06, 0.26] },
+  minigun: { left: [-0.31, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
+  'm14-ebr': { left: [-0.3, 0.1, -0.2], right: [-0.22, -0.06, 0.24] },
+  'slug-shotgun': { left: [-0.26, 0.08, -0.16], right: [-0.14, -0.04, 0.12] },
+  'flashlight-pistol': { left: [-0.5, 0.2, -0.32], right: [-0.24, 0.02, 0.1] },
+  'explosive-crossbow': { left: [-0.42, 0.14, -0.24], right: [-0.24, 0.02, 0.1] },
 };
 
 const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
@@ -69,6 +78,15 @@ const VIEWMODEL_GRIP_OFFSETS: Record<WeaponId, HandRotationSet> = {
   pistol: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
   magnum: { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
   'machine-pistol': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
+  'mini-uzi': { left: [-0.055, -0.02, 0.02], right: [0.08, -0.025, 0.015] },
+  mp5: { left: [-0.055, -0.02, 0.02], right: [0.08, -0.025, 0.015] },
+  m4a1: { left: [-0.06, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
+  'ak-47': { left: [-0.06, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
+  minigun: { left: [-0.065, -0.03, 0.02], right: [0.08, -0.025, 0.015] },
+  'm14-ebr': { left: [-0.055, -0.02, 0.015], right: [0.08, -0.025, 0.015] },
+  'slug-shotgun': { left: [-0.055, -0.025, 0.015], right: [0.08, -0.025, 0.015] },
+  'flashlight-pistol': { left: [0.035, -0.02, 0.04], right: [0.07, -0.025, 0.015] },
+  'explosive-crossbow': { left: [-0.015, -0.025, 0.03], right: [0.07, -0.025, 0.015] },
 };
 
 const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
@@ -81,6 +99,15 @@ const RELOAD_HAND_ROTATIONS: Record<WeaponId, [number, number, number]> = {
   pistol: [-0.92, 0.42, -0.68],
   magnum: [-0.92, 0.42, -0.68],
   'machine-pistol': [-0.92, 0.42, -0.68],
+  'mini-uzi': [-0.82, 0.38, -0.58],
+  mp5: [-0.82, 0.38, -0.58],
+  m4a1: [-0.72, 0.32, -0.5],
+  'ak-47': [-0.72, 0.32, -0.5],
+  minigun: [-0.78, 0.35, -0.54],
+  'm14-ebr': [-0.76, 0.34, -0.52],
+  'slug-shotgun': [-0.58, 0.18, -0.42],
+  'flashlight-pistol': [-0.92, 0.42, -0.68],
+  'explosive-crossbow': [-0.72, 0.28, -0.48],
 };
 
 const MELEE_PRESENTATION_MS = 620;
@@ -105,6 +132,8 @@ export class WeaponPresentation {
   private grenadeStart = 0;
   private readonly muzzleLight: THREE.PointLight;
   private readonly muzzleFlash: THREE.Group;
+  private readonly weaponFlashlight: THREE.SpotLight;
+  private readonly weaponFlashlightTarget: THREE.Object3D;
   private readonly casings: ViewCasing[] = [];
   private readonly smokes: ViewSmoke[] = [];
   private readonly smokePositions = new Float32Array(24);
@@ -432,6 +461,19 @@ export class WeaponPresentation {
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
 
+    this.weaponFlashlight = new THREE.SpotLight(0xeaffff, 0, 18, 0.42, 0.34, 1.5);
+    this.weaponFlashlight.name = 'always-on-solid-occluded-weapon-flashlight';
+    this.weaponFlashlight.position.set(0.05, -0.08, -0.3);
+    this.weaponFlashlight.castShadow = !flattenMaterials;
+    this.weaponFlashlight.shadow.mapSize.set(512, 512);
+    this.weaponFlashlight.shadow.camera.near = 0.1;
+    this.weaponFlashlight.shadow.camera.far = 18;
+    this.weaponFlashlightTarget = new THREE.Object3D();
+    this.weaponFlashlightTarget.name = 'weapon-flashlight-target';
+    this.weaponFlashlightTarget.position.set(0, 0, -12);
+    this.weaponFlashlight.target = this.weaponFlashlightTarget;
+    camera.add(this.weaponFlashlight, this.weaponFlashlightTarget);
+
     this.muzzleFlash = new THREE.Group();
     this.muzzleFlash.position.set(0, 0.08, -1.15);
     const flashMaterial = new THREE.MeshBasicMaterial({
@@ -522,6 +564,15 @@ export class WeaponPresentation {
         pistol: new Set(),
         magnum: new Set(),
         'machine-pistol': new Set(),
+        'mini-uzi': new Set(['smg-stock-rod', 'wire-stock-pad', 'mini-uzi-compact-stock']),
+        mp5: new Set(['smg-stock-rod', 'wire-stock-pad']),
+        m4a1: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
+        'ak-47': new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
+        minigun: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
+        'm14-ebr': new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
+        'slug-shotgun': new Set(['stock', 'stock-cheek-panel']),
+        'flashlight-pistol': new Set(),
+        'explosive-crossbow': new Set(),
       };
       model.traverse((node) => {
         if (firstPersonHidden[id].has(node.name)) node.visible = false;
@@ -563,6 +614,12 @@ export class WeaponPresentation {
       this.muzzleLight.position.copy(muzzleSocket.position);
       this.muzzleFlash.position.copy(muzzleSocket.position);
     }
+    const flashlight = WEAPONS[id].flashlight;
+    this.weaponFlashlight.visible = flashlight !== null && !this.flattenMaterials;
+    this.weaponFlashlight.intensity = flashlight?.intensity ?? 0;
+    this.weaponFlashlight.distance = flashlight?.rangeM ?? 0;
+    this.weaponFlashlight.angle = flashlight?.coneAngleRadians ?? 0.42;
+    if (flashlight) this.weaponFlashlight.color.setHex(flashlight.colorHex);
   }
 
   private ejectCasing(shell: boolean): void {
@@ -591,7 +648,7 @@ export class WeaponPresentation {
     this.shotsPresented += 1;
     this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
     this.shotStarted = performance.now();
-    this.muzzleLight.intensity = this.flattenMaterials ? 0 : this.active === 'scattergun' ? 7.2 : 4.8;
+    this.muzzleLight.intensity = this.flattenMaterials ? 0 : 4.8 * WEAPONS[this.active].muzzleFlashScale;
     this.muzzleFlash.visible = true;
     this.muzzleFlash.scale.setScalar(profile.flashScale);
     this.muzzleFlash.rotation.z = (this.shotsPresented * 2.399963229728653) % Math.PI;

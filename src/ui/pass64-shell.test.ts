@@ -27,4 +27,21 @@ describe('Pass 64 command shell', () => {
       'gun-range',
     ]);
   });
+
+  it('renders four curated kits, exactly three custom slots, and one explicit manager', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect([...markup.matchAll(/data-kit-id="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      'balanced', 'runner', 'breacher', 'marksman',
+    ]);
+    expect([...markup.matchAll(/data-custom-preset-id="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      'custom-1', 'custom-2', 'custom-3',
+    ]);
+    expect(markup.match(/id="loadout-manage"/g)).toHaveLength(1);
+    expect(markup).toContain('id="loadout-primary"');
+    expect(markup).toContain('id="loadout-secondary"');
+    expect(markup).toContain('id="loadout-grenade"');
+    expect(markup).toContain('<option value="frag">Frag</option>');
+    expect(markup).toContain('<option value="smoke">Smoke</option>');
+    expect(markup).toContain('<option value="flash">Flash</option>');
+  });
 });

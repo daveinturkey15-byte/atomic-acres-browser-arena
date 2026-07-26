@@ -71,7 +71,7 @@ function validWeapon(): any {
       minimumWallDamageMultiplier: 0.34,
       maximumSurfaces: 2,
     },
-    effects: { tracerColorHex: 0xffd166 },
+    effects: { tracerColorHex: 0xffd166, muzzleFlashScale: 1, reportGain: 1, flashlight: null },
     optic: null,
     projectileId: null,
     policies: {
@@ -130,8 +130,12 @@ describe('weapon schema valid definitions', () => {
       '../../.agents/skills/atomic-acres-combat-registry/scripts/fixtures/known-good.json',
       import.meta.url,
     ));
-    const manifest = JSON.parse(readFileSync(fixturePath, 'utf8')) as { weapons: unknown };
-    const parsed = parseWeaponDefinitions(manifest.weapons);
+    const manifest = JSON.parse(readFileSync(fixturePath, 'utf8')) as { weapons: Array<Record<string, any>> };
+    const migratedV2 = manifest.weapons.map((weapon) => ({
+      ...weapon,
+      effects: { ...weapon.effects, muzzleFlashScale: 1, reportGain: 1, flashlight: null },
+    }));
+    const parsed = parseWeaponDefinitions(migratedV2);
 
     expect(parsed.map((weapon) => weapon.id)).toEqual([
       'carbine',

@@ -40,6 +40,7 @@ export type MovementContext = {
   ads: boolean;
   sprinting: boolean;
   grounded: boolean;
+  equippedMovementMultiplier?: number;
 };
 
 export type MovementProfile = {
@@ -53,7 +54,11 @@ export type MovementProfile = {
 
 export function movementProfile(context: MovementContext): MovementProfile {
   const prone = context.prone === true;
-  const maxSpeed = prone ? 1.55 : context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15;
+  const authoredMultiplier = Number.isFinite(context.equippedMovementMultiplier)
+    ? Math.max(0.1, Math.min(1.5, context.equippedMovementMultiplier!))
+    : 1;
+  const maxSpeed = (prone ? 1.55 : context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15)
+    * authoredMultiplier;
   const groundAcceleration = prone ? 17 : context.crouched ? 36 : context.sprinting ? 54 : context.ads ? 40 : 48;
   return {
     maxSpeed,

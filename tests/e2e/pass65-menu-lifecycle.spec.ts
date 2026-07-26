@@ -85,6 +85,46 @@ async function setHarness(page: Page, patch: Partial<{ mode: PointerLockMode; lo
 }
 
 test.describe('Pass 65 active-match menu lifecycle', () => {
+  test('persists exactly three custom loadouts with primary, secondary, and one grenade', async ({ page }) => {
+    await ready(page);
+    await page.locator('[data-menu-tab="kit"]').click();
+    await expect(page.locator('[data-kit-id]')).toHaveCount(4);
+    await expect(page.locator('[data-custom-preset-id]')).toHaveCount(3);
+    await expect(page.locator('#loadout-manage')).toHaveCount(1);
+
+    await page.locator('#loadout-manage').click();
+    await expect(page.locator('#loadout-manager')).toBeVisible();
+    await page.locator('#loadout-manage-preset').selectOption('custom-2');
+    await page.locator('#loadout-preset-name').fill('Night Ops');
+    await page.locator('#loadout-primary').selectOption('minigun');
+    await page.locator('#loadout-secondary').selectOption('explosive-crossbow');
+    await page.locator('#loadout-grenade').selectOption('smoke');
+    await page.locator('#loadout-save').click();
+    await page.locator('[data-custom-preset-id="custom-2"]').click();
+
+    const selected = page.locator('[data-custom-preset-id="custom-2"]');
+    await expect(selected).toHaveAttribute('aria-pressed', 'true');
+    await expect(selected.locator('[data-custom-name]')).toHaveText('Night Ops');
+    await expect(selected.locator('[data-custom-equipment]')).toContainText('M134 Minigun');
+    await expect(selected.locator('[data-custom-equipment]')).toContainText('TAC-15 Explosive Crossbow');
+    await expect(selected.locator('[data-custom-equipment]')).toContainText('SMOKE');
+    expect(await page.evaluate(() => {
+      const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player as Record<string, unknown>;
+      return {
+        primary: player.primaryWeapon,
+        secondary: player.secondaryWeapon,
+        grenade: player.selectedGrenade,
+        grenades: player.grenades,
+      };
+    })).toEqual({ primary: 'minigun', secondary: 'explosive-crossbow', grenade: 'smoke', grenades: 1 });
+
+    await page.reload();
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true);
+    await page.locator('[data-menu-tab="kit"]').click();
+    await expect(page.locator('[data-custom-preset-id="custom-2"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-custom-preset-id="custom-2"] [data-custom-name]')).toHaveText('Night Ops');
+  });
+
   test('keeps pre-match helo/cat preview ownership and reduced-motion accessibility', async ({ page }) => {
     await ready(page, true);
     await expect(page.locator('#menu')).toHaveAttribute('data-lifecycle-surface', 'pre-match');

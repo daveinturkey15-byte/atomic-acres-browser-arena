@@ -21,8 +21,8 @@ const dependencies = Object.fromEntries(dependencyNames.map((name) => [name, pac
 const contract = {
   metadata: {
     schemaVersion: 3,
-    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through Pass 62',
-    baseSourceRevision: '72c313c494853ed1ee4673f06a8f064330ac9efc',
+    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through the Pass 65 arsenal slice',
+    baseSourceRevision: '6af362af721f892900b7a92ae4221ef12c84cce9',
     approvedDeltas: [
       'scattergun-strength',
       'tri-pass-strength',
@@ -39,6 +39,10 @@ const contract = {
       'pass60-overdrive-two-times-thirty-seconds',
       'pass60-atomic-acres-collision-completion',
       'pass62-open-house-interior-routes',
+      'pass65-protocol-v7-arsenal-and-real-weapon-names',
+      'pass65-curated-and-three-custom-loadouts',
+      'pass65-single-selected-grenade-and-corpse-refill',
+      'pass65-coherent-pellet-shotgun-rebalance',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,
@@ -48,8 +52,9 @@ const contract = {
 const replays = {
   metadata: {
     schemaVersion: 3,
-    baseline: 'Pass 24 approved gameplay feel plus owner-approved deltas through Pass 60',
-    baseSourceRevision: '3a1ead06bfdede4b3d6c96f9ecde228520c04ccf',
+    baseline: 'Pass 62 rollback roster plus the owner-approved Pass 65 pellet-shotgun rebalance',
+    baseSourceRevision: '6af362af721f892900b7a92ae4221ef12c84cce9',
+    approvedDeltas: ['pass65-coherent-pellet-shotgun-rebalance'],
     fixedSeedPrefix: 'pass25a:',
   },
   replays: Object.fromEntries(Object.entries(GOLDEN_REPLAYS).map(([name, commands]) => {

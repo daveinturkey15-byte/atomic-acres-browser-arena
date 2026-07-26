@@ -14,7 +14,7 @@ export type WeaponFamilyPresentation = {
   requiredDetails: string[];
 };
 
-const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
+const BASE_PROFILES: Record<'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper' | 'railgun' | 'pistol' | 'magnum' | 'machine-pistol', WeaponFamilyPresentation> = {
   carbine: {
     sightHeight: 0.215, adsX: -0.36, adsY: 0.251, adsZ: -0.04, projectionCorrection: 0,
     flashScale: 1, recoilTranslation: 0.13, recoilRotation: 0.18,
@@ -69,6 +69,19 @@ const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
     actionTravel: 0.11, smokeBase: 1,
     requiredDetails: ['pistol-rear-sight', 'pistol-front-sight', 'pistol-magazine', 'pistol-slide', 'pistol-trigger-guard', 'auto-selector', 'machine-pistol-compensator', 'machine-pistol-charging-wings'],
   },
+};
+
+const PROFILES: Record<WeaponId, WeaponFamilyPresentation> = {
+  ...BASE_PROFILES,
+  'mini-uzi': { ...BASE_PROFILES.smg, flashScale: 0.82, recoilTranslation: 0.11, requiredDetails: [...BASE_PROFILES.smg.requiredDetails, 'mini-uzi-compact-stock'] },
+  mp5: { ...BASE_PROFILES.smg, flashScale: 0.72, recoilTranslation: 0.09, requiredDetails: [...BASE_PROFILES.smg.requiredDetails, 'mp5-diode-sight'] },
+  m4a1: { ...BASE_PROFILES.carbine, flashScale: 0.96, requiredDetails: [...BASE_PROFILES.carbine.requiredDetails, 'm4a1-handguard'] },
+  'ak-47': { ...BASE_PROFILES.carbine, flashScale: 1.16, recoilTranslation: 0.17, requiredDetails: [...BASE_PROFILES.carbine.requiredDetails, 'ak-gas-tube'] },
+  minigun: { ...BASE_PROFILES.lmg, flashScale: 1.25, recoilTranslation: 0.18, smokeBase: 2.2, requiredDetails: ['minigun-barrel-cluster', 'minigun-ammo-drum', 'minigun-carry-frame', 'bolt-or-slide'] },
+  'm14-ebr': { ...BASE_PROFILES.sniper, flashScale: 1.08, recoilTranslation: 0.18, requiredDetails: [...BASE_PROFILES.sniper.requiredDetails, 'm14-thermal-optic'] },
+  'slug-shotgun': { ...BASE_PROFILES.scattergun, flashScale: 1.32, recoilTranslation: 0.23, requiredDetails: [...BASE_PROFILES.scattergun.requiredDetails, 'slug-saddle'] },
+  'flashlight-pistol': { ...BASE_PROFILES.pistol, flashScale: 1.3, recoilTranslation: 0.15, smokeBase: 1.5, requiredDetails: [...BASE_PROFILES.pistol.requiredDetails, 'always-on-flashlight'] },
+  'explosive-crossbow': { ...BASE_PROFILES.pistol, sightHeight: 0.2, flashScale: 0, recoilTranslation: 0.05, smokeBase: 0, requiredDetails: ['crossbow-limb-left', 'crossbow-limb-right', 'crossbow-string', 'bolt-rail'] },
 };
 
 export function weaponFamilyPresentation(weapon: WeaponId): WeaponFamilyPresentation {
