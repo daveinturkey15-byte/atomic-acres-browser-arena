@@ -62,6 +62,28 @@ describe('shared interactive-world runtime adapter', () => {
     runtime.dispose();
   });
 
+  it('binds a remote interaction to the requested shed instead of retargeting it', () => {
+    const eastPlacement: ShedPlacement = Object.freeze({
+      ...placement,
+      id: 'atomic-shed-east-slice',
+      position: { x: 12, y: 0, z: 0 },
+    });
+    const runtime = new InteractiveWorldRuntime('atomic-acres', 8, [placement, eastPlacement], true);
+    expect(runtime.nearestDoor({ x: 0, y: 1.1, z: 3 })?.placementId).toBe(placement.id);
+    const spoofed = runtime.interactDoor({
+      placementId: eastPlacement.id,
+      actorId: 'player-a',
+      actorAlive: true,
+      actorPosition: { x: 0, y: 1.1, z: 3 },
+      sequence: 1,
+      tick: 100,
+      hasLineOfSight: () => true,
+    });
+    expect(spoofed).toMatchObject({ accepted: false, reason: 'out-of-range' });
+    expect(runtime.stateEnvelope().sheds.every((shed) => shed.door.phase === 'closed')).toBe(true);
+    runtime.dispose();
+  });
+
   it('admits a bullet aperture and makes the exact visible region pass the trace', () => {
     const runtime = new InteractiveWorldRuntime('atomic-acres', 9, [placement], true);
     const north = runtime.collisions().ballisticSurfaces.find((surface) => surface.destructibleSurface?.surfaceId === 'wall-north')!;

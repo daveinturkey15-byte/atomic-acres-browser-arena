@@ -53,6 +53,12 @@ export type InteractiveWorldRuntimeTelemetry = Readonly<{
   presentationDraws: number;
 }>;
 
+export type InteractiveWorldDoorCandidate = Readonly<{
+  placementId: string;
+  centre: Point3;
+  distance: number;
+}>;
+
 export type InteractiveWorldStateEnvelope = Readonly<{
   schemaVersion: 1;
   arenaId: ShedPlacement['arenaId'];
@@ -376,6 +382,55 @@ export class InteractiveWorldRuntime {
     return changed;
   }
 
+  nearestDoor(actorPosition: Point3): InteractiveWorldDoorCandidate | null {
+    let nearest: InteractiveWorldDoorCandidate | null = null;
+    for (const shed of this.sheds) {
+      const doorDefinition = shed.definition.surfaces.find((surface) => surface.id === shed.definition.doorSurfaceId)!;
+      const centre = surfaceFrame(doorDefinition, shed.placement, shed.state).centre;
+      const distance = Math.hypot(
+        centre.x - actorPosition.x,
+        centre.y - actorPosition.y,
+        centre.z - actorPosition.z,
+      );
+      if (!nearest || distance < nearest.distance) {
+        nearest = Object.freeze({ placementId: shed.placement.id, centre: Object.freeze({ ...centre }), distance });
+      }
+    }
+    return nearest;
+  }
+
+  interactDoor(request: Readonly<{
+    placementId: string;
+    actorId: string;
+    actorAlive: boolean;
+    actorPosition: Point3;
+    sequence: number;
+    tick: number;
+    hasLineOfSight: (from: Point3, to: Point3, collision: InteractiveWorldCollisionView) => boolean;
+  }>): ShedMutationResult | null {
+    const shed = this.sheds.find((candidate) => candidate.placement.id === request.placementId);
+    if (!shed) return null;
+    const doorDefinition = shed.definition.surfaces.find((surface) => surface.id === shed.definition.doorSurfaceId)!;
+    const centre = surfaceFrame(doorDefinition, shed.placement, shed.state).centre;
+    const distance = Math.hypot(
+      centre.x - request.actorPosition.x,
+      centre.y - request.actorPosition.y,
+      centre.z - request.actorPosition.z,
+    );
+    const result = admitShedDoorInteraction(shed.state, {
+      isHost: this.hostAuthority,
+      matchEpoch: this.matchEpoch,
+      expectedRevision: shed.state.revision,
+      actorId: request.actorId,
+      actorAlive: request.actorAlive,
+      sequence: request.sequence,
+      distance,
+      hasLineOfSight: request.hasLineOfSight(request.actorPosition, centre, this.collisionView),
+      tick: request.tick,
+    });
+    return this.commit(shed, result);
+  }
+
   interactNearestDoor(request: Readonly<{
     actorId: string;
     actorAlive: boolean;
@@ -384,30 +439,12 @@ export class InteractiveWorldRuntime {
     tick: number;
     hasLineOfSight: (from: Point3, to: Point3, collision: InteractiveWorldCollisionView) => boolean;
   }>): ShedMutationResult | null {
-    let nearest: { shed: RuntimeShed; centre: Point3; distance: number } | null = null;
-    for (const shed of this.sheds) {
-      const doorDefinition = shed.definition.surfaces.find((surface) => surface.id === shed.definition.doorSurfaceId)!;
-      const centre = surfaceFrame(doorDefinition, shed.placement, shed.state).centre;
-      const distance = Math.hypot(
-        centre.x - request.actorPosition.x,
-        centre.y - request.actorPosition.y,
-        centre.z - request.actorPosition.z,
-      );
-      if (!nearest || distance < nearest.distance) nearest = { shed, centre, distance };
-    }
+    const nearest = this.nearestDoor(request.actorPosition);
     if (!nearest) return null;
-    const result = admitShedDoorInteraction(nearest.shed.state, {
-      isHost: this.hostAuthority,
-      matchEpoch: this.matchEpoch,
-      expectedRevision: nearest.shed.state.revision,
-      actorId: request.actorId,
-      actorAlive: request.actorAlive,
-      sequence: request.sequence,
-      distance: nearest.distance,
-      hasLineOfSight: request.hasLineOfSight(request.actorPosition, nearest.centre, this.collisionView),
-      tick: request.tick,
+    return this.interactDoor({
+      ...request,
+      placementId: nearest.placementId,
     });
-    return this.commit(nearest.shed, result);
   }
 
   blockDoor(request: Readonly<{
