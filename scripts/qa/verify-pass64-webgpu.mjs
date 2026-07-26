@@ -164,7 +164,28 @@ try {
     });
     if (!overview.selected) throw new Error(`${arenaId} deterministic overview camera is missing`);
     await page.waitForTimeout(350);
-    const performanceBudget = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
+    let performanceBudget;
+    try {
+      performanceBudget = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
+    } catch (error) {
+      const failureState = await page.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const state = api?.snapshot();
+        return {
+          bootstrap: state?.bootstrap,
+          gameStarted: state?.gameStarted,
+          matchPhase: state?.matchPhase,
+          menuLifecycle: state?.menuLifecycle,
+          frameCount: state?.frameCount,
+          framePacing: state?.render?.framePacing,
+          adaptiveQuality: state?.render?.adaptiveQuality,
+          runtime: state?.render?.runtime,
+          playableScene: state?.render?.playableScene,
+          residency: api?.sampleRendererResidency(),
+        };
+      }).catch((snapshotError) => ({ snapshotError: String(snapshotError) }));
+      throw new Error(`${arenaId} hardware performance sampler failed: ${String(error)}; state=${JSON.stringify(failureState)}`);
+    }
     const evidence = await page.evaluate(async () => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       const state = api.snapshot();
