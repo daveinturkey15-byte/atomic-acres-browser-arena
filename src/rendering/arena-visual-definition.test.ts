@@ -20,6 +20,7 @@ describe('Pass 64 arena visual definitions', () => {
       expect(definition.reviewCameras.some((camera) => camera.purpose === 'light-occlusion')).toBe(true);
       expect(definition.budgets.maximumDrawCalls).toBeGreaterThan(0);
       expect(definition.budgets.maximumShadowMapPixels).toBeGreaterThan(0);
+      expect(definition.budgets.maximumTransientBytes).toBeGreaterThanOrEqual(256 * 1024 * 1024);
     }
   });
 

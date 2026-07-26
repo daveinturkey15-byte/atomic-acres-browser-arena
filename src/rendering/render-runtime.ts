@@ -383,6 +383,7 @@ export class WebGpuRenderRuntime {
   private completionFailures = 0;
   private lastFailure: string | null = null;
   private skippedSubmissions = 0;
+  private lastSubmittedRenderInfo: RenderInfoSnapshot = Object.freeze({ calls: 0, triangles: 0, points: 0, lines: 0 });
   private lightShadowAutoUpdate = true;
   private lightShadowNeedsUpdate = false;
   private nextCompletionProbeAt = 0;
@@ -672,6 +673,10 @@ export class WebGpuRenderRuntime {
     }
     this.renderer.info.reset();
     this.renderPipeline.render();
+    // Three clears its public per-frame counters while asynchronous WebGPU
+    // work retires. Capture the admitted submission synchronously so a later
+    // queue fence cannot turn a real frame into a false zero-draw receipt.
+    this.lastSubmittedRenderInfo = Object.freeze(webGpuRenderInfoSnapshot(this.renderer.info.render));
     this.submissionSequence += 1;
     this.lastSubmittedAt = now;
     this.scheduleCompletionProbe(now);
@@ -680,13 +685,13 @@ export class WebGpuRenderRuntime {
 
   resetRenderInfo(): void {
     this.renderer.info.reset();
+    this.lastSubmittedRenderInfo = Object.freeze({ calls: 0, triangles: 0, points: 0, lines: 0 });
   }
 
   renderInfo(): RenderInfoSnapshot {
-    // Three's common renderer keeps `render.calls` cumulative for the entire
-    // process; only `drawCalls` is reset per frame. Treating the cumulative
-    // value as frame liveness let one old good frame mask a frozen canvas.
-    return webGpuRenderInfoSnapshot(this.renderer.info.render);
+    // This is the most recent admitted frame, not cumulative lifetime calls.
+    // Intentional backpressure skips do not erase its liveness evidence.
+    return { ...this.lastSubmittedRenderInfo };
   }
 
   webGlVersion(): null {

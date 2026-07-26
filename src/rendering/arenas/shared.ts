@@ -25,7 +25,9 @@ export function budgets(overrides: Partial<ArenaVisualBudgets> = {}): ArenaVisua
     maximumShadowLights: 3,
     maximumShadowMapPixels: 6 * 2048 * 2048,
     maximumPostTextureSamples: 28,
-    maximumTransientBytes: 192 * 1024 * 1024,
+    // A 2560x1440 High frame with 4x principal HDR MSAA, depth, resolved HDR,
+    // and the conservative bloom-chain allowance is 225 MiB.
+    maximumTransientBytes: 256 * 1024 * 1024,
     cpuFrameP95Ms: 16.7,
     gpuFrameP95Ms: 16.7,
     ...overrides,
