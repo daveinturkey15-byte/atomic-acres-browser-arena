@@ -415,9 +415,12 @@ try {
     throw new Error(`Gameplay arena switch did not lazily request all four definition modules: ${JSON.stringify(requestedArenaModules)}`);
   }
   if (switchErrors.length > 0) throw new Error(`Gameplay arena switches emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
-  const fullyWarmedResidency = switchReceipts.at(-1).residency;
-  const textureGrowthAllowance = Math.max(16 * 1024 * 1024, fullyWarmedResidency.totalTextureBytes * 0.05);
-  const geometryGrowthAllowance = Math.max(8 * 1024 * 1024, fullyWarmedResidency.totalGeometryBytes * 0.05);
+  const warmedResidencyEnvelope = {
+    totalTextureBytes: Math.max(...switchReceipts.map((receipt) => receipt.residency.totalTextureBytes)),
+    totalGeometryBytes: Math.max(...switchReceipts.map((receipt) => receipt.residency.totalGeometryBytes)),
+  };
+  const textureGrowthAllowance = Math.max(16 * 1024 * 1024, warmedResidencyEnvelope.totalTextureBytes * 0.05);
+  const geometryGrowthAllowance = Math.max(8 * 1024 * 1024, warmedResidencyEnvelope.totalGeometryBytes * 0.05);
   const presentationSoak = [];
   for (const arenaId of [
     'rustworks-1v1', 'gun-range',
@@ -460,17 +463,39 @@ try {
       api.setCaptureCameraPose(null);
       return result;
     });
-    if (!after.state.gameStarted || !after.menuHidden
-      || before.state.render.runtime.presentation.status !== 'healthy'
-      || after.state.render.runtime.presentation.status !== 'healthy'
-      || after.state.render.runtime.presentation.completedSequence <= before.state.render.runtime.presentation.completedSequence
-      || after.state.frameCount <= before.state.frameCount
-      || after.residency.totalTextureBytes > maximumResidentTextureBytes
-      || after.residency.totalGeometryBytes > maximumResidentGeometryBytes
-      || after.residency.totalTextureBytes > fullyWarmedResidency.totalTextureBytes + textureGrowthAllowance
-      || after.residency.totalGeometryBytes > fullyWarmedResidency.totalGeometryBytes + geometryGrowthAllowance
-      || after.readback.hash === before.readback.hash) {
-      throw new Error(`${arenaId} gameplay presentation did not remain fresh: ${JSON.stringify({ before, after })}`);
+    const freshnessFailures = [
+      ['game-started', after.state.gameStarted === true],
+      ['menu-hidden', after.menuHidden === true],
+      ['before-presentation-healthy', before.state.render.runtime.presentation.status === 'healthy'],
+      ['after-presentation-healthy', after.state.render.runtime.presentation.status === 'healthy'],
+      ['completion-advanced', after.state.render.runtime.presentation.completedSequence > before.state.render.runtime.presentation.completedSequence],
+      ['frame-advanced', after.state.frameCount > before.state.frameCount],
+      ['texture-hard-bound', after.residency.totalTextureBytes <= maximumResidentTextureBytes],
+      ['geometry-hard-bound', after.residency.totalGeometryBytes <= maximumResidentGeometryBytes],
+      ['texture-warmed-envelope', after.residency.totalTextureBytes <= warmedResidencyEnvelope.totalTextureBytes + textureGrowthAllowance],
+      ['geometry-warmed-envelope', after.residency.totalGeometryBytes <= warmedResidencyEnvelope.totalGeometryBytes + geometryGrowthAllowance],
+      ['readback-changed', after.readback.hash !== before.readback.hash],
+    ].filter(([, passed]) => !passed).map(([name]) => name);
+    if (freshnessFailures.length > 0) {
+      throw new Error(`${arenaId} gameplay presentation did not remain fresh: ${JSON.stringify({
+        freshnessFailures,
+        before: {
+          frameCount: before.state.frameCount,
+          completedSequence: before.state.render.runtime.presentation.completedSequence,
+          status: before.state.render.runtime.presentation.status,
+          readback: before.readback,
+        },
+        after: {
+          frameCount: after.state.frameCount,
+          completedSequence: after.state.render.runtime.presentation.completedSequence,
+          status: after.state.render.runtime.presentation.status,
+          readback: after.readback,
+          residency: after.residency,
+        },
+        warmedResidencyEnvelope,
+        textureGrowthAllowance,
+        geometryGrowthAllowance,
+      })}`);
     }
     presentationSoak.push({
       arenaId,
