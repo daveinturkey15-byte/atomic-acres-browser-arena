@@ -26,6 +26,6 @@ Freeze maximum active voices, loops, reusable chains, per-bus voices, per-profil
 
 Require the exact arena set `atomic-acres`, `skyline-terminal`, `rustworks-1v1`, and `gun-range`, each with distinct ambience. Reject missing buses/events/provenance, out-of-range settings, invalid spatial bounds, unbounded concurrency, duplicate IDs or variants, identical ambience everywhere, authority overclaims, or evidence from a different source/build.
 
-All variant and evidence paths resolve relative to the catalog file. Require contained, bounded, non-empty regular files and compare each declared SHA-256 with the actual bytes; lexical traversal and real-path/symlink escape both fail.
+All variant and evidence paths resolve relative to the catalog file. Require contained, bounded, non-empty regular files and compare each declared SHA-256 with the actual bytes; lexical traversal and real-path/symlink escape both fail. Parse every payload as canonical UTF-8 JSON with an exact schema-version-3 metadata shape. Variant metadata must reproduce its event policy, provenance, variant identity and source path; arena, spatial and lifecycle metadata must reproduce every semantic field and its artifact path. A valid file and digest from another parent is substitution, not evidence.
 
-Run `node scripts/verify-audio-catalog.mjs --self-test` after fixture checks. Its adversarial mutations must all be rejected before the validator can guard a candidate.
+Run `node scripts/verify-audio-catalog.mjs --self-test` after fixture checks. Its adversarial mutations and exhaustive pairwise permutations across every payload identity class must all be rejected before the validator can guard a candidate.

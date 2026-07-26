@@ -1,6 +1,10 @@
 {
   "fixtureOnly": true,
-  "kind": "hardware-baseline",
-  "id": "pass64-high",
-  "sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "hardware-baseline",
+    "preset": "high",
+    "sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "comparedCandidateSourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
 }

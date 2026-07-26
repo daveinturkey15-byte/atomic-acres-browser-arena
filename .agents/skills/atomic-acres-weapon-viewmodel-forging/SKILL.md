@@ -23,7 +23,7 @@ Build authored first-person presentation without moving gameplay authority.
 - Accessibility: idle/sway/flash intensity is scalable and never changes the shot ray, hit timing, recoil authority, or multiplayer state.
 - Performance: every asset has LOD, triangle, draw, decoded-texture, skeleton and transient-effect budgets; preload/pool hitch-sensitive content.
 - Renderer: use node/TSL-compatible WebGPU materials; no `ShaderMaterial`, `RawShaderMaterial`, `onBeforeCompile`, or silent fallback in an approved candidate.
-- Provenance: require source, license, non-empty derivative notes, and a recomputed digest for every model, texture, animation and generated asset. Resolve paths inside the manifest directory and require bounded regular files.
+- Provenance: require source, license, non-empty derivative notes, and a recomputed digest for every model, texture, animation and generated asset. Resolve paths inside the manifest directory, require bounded regular files, and bind parsed payload metadata to the exact skeleton, collection/LOD, weapon, action, clock tick and root capture identity.
 - Quality: primitive/debug and shared generic substitute assets cannot enter an approved preview.
 
 ## Validate
@@ -40,4 +40,4 @@ The first command must exit zero, the second must exit nonzero, and the self-tes
 
 `node scripts/verify-viewmodel-assets.mjs <viewmodel-manifest.json>`
 
-A capture index is evidence only when it matches the one exact root capture identity. Every action requires its own contained path and byte-distinct digest. The staging validator enforces strict nested schemas, exact capability/action/socket/semantic-part and transition oracles for `a4-vanguard`, unique and disjoint semantic/socket node mappings, required action markers, ordered decreasing first/world LODs, explicit approval for any cross-weapon asset sharing, measured budgets and release fallback prohibition.
+A capture index is evidence only when it matches the one exact root capture identity. Every action requires its own contained path and byte-distinct digest, with an embedded machine-readable metadata block bound to weapon/action/tick. The staging validator enforces strict nested schemas, exact capability/action/socket/semantic-part and transition oracles for `a4-vanguard`, exact independent ID-to-node mappings, metadata-bound skeleton/LOD payloads, required action markers, ordered decreasing first/world LODs, explicit approval for any cross-weapon asset sharing, measured budgets and release fallback prohibition.

@@ -1,4 +1,19 @@
-ATOMIC ACRES AUDIO FIXTURE
-event=music.menu
-variant=music-menu-a
-fixtureOnly=true
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "music.menu",
+  "family": "music",
+  "bus": "menu-music",
+  "delivery": "listener-local",
+  "spatialProfileId": null,
+  "maxConcurrent": 1,
+  "priority": 55,
+  "cooldownMs": 0,
+  "owner": "menu-route",
+  "evidenceId": "audio-menu-music",
+  "variantId": "music-menu-a",
+  "source": "fixture-payloads/audio/variants/music-menu-a.txt",
+  "license": "project-owned",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

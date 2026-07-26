@@ -1,7 +1,12 @@
 {
   "fixtureOnly": true,
-  "kind": "network-matrix-cell",
-  "id": "support-reward-forgery",
-  "profileId": "moderate-chaos",
-  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "network-matrix-cell",
+    "scenarioId": "support-reward-forgery",
+    "profileId": "moderate-chaos",
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "buildId": "pass65-candidate-001",
+    "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
 }

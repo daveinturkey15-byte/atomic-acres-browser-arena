@@ -11,7 +11,7 @@
     "state": "frozen",
     "artifact": {
       "path": "fixture-payloads/acceptance/frozen-manifest.json",
-      "sha256": "5d4dc564a623efd41dc1283d8e1bc72800bc1bb3fffeeca73cfaacc47ae35b3e"
+      "sha256": "836dc90831cc41243757761b108f01dd093fcb8b632f7d6dc8523a0980dddcd0"
     },
     "requirementIds": [
       "R203",
@@ -122,7 +122,7 @@
       "commandOrFixture": "fixtures/scenarios/solo-host-bots.json",
       "artifact": {
         "path": "fixture-payloads/network/solo-host-bots.json",
-        "sha256": "1fc7c8396293fa8a964c9c7610751bbe4e89150177f4e0ffa512ecdc8933e5b3"
+        "sha256": "f3f260df6cabde56dcbecc3897ebfefa1220904703da8f7d7db9c496cc5db396"
       },
       "events": {
         "originalEvents": 5000,
@@ -177,7 +177,7 @@
       "commandOrFixture": "fixtures/scenarios/two-peer-private.json",
       "artifact": {
         "path": "fixture-payloads/network/two-peer-private.json",
-        "sha256": "fac3313ed251bd65eb333937248aa193c16e42ce9929efd07c6d9692a32babe0"
+        "sha256": "d2e32c3f08dad9a251a8ccb71db21b360743168e0f6bf7110dd290e26158d424"
       },
       "events": {
         "originalEvents": 5000,
@@ -232,7 +232,7 @@
       "commandOrFixture": "fixtures/scenarios/host-guest-bot.json",
       "artifact": {
         "path": "fixture-payloads/network/host-guest-bot.json",
-        "sha256": "b1aebb527ae4e406178f528bc634150f9c2e4751836ab5cd1ffe6f393bc1d72c"
+        "sha256": "0c52cff1f559421a5e8dfb4f8d15ecbf9d57455cf0b9e0a3b36bbf9ba775d0a6"
       },
       "events": {
         "originalEvents": 5000,
@@ -287,7 +287,7 @@
       "commandOrFixture": "fixtures/scenarios/life-action-revision-races.json",
       "artifact": {
         "path": "fixture-payloads/network/life-action-revision-races.json",
-        "sha256": "434ab86b61fddc937274564c8a1759e23dab3c8c670bd96dbe600cf6fdb836d8"
+        "sha256": "f482de9b8a675cf36802841267354de058a40d96e88f122f98b35bff38697ee6"
       },
       "events": {
         "originalEvents": 5000,
@@ -344,7 +344,7 @@
       "commandOrFixture": "fixtures/scenarios/weapon-command-forgery.json",
       "artifact": {
         "path": "fixture-payloads/network/weapon-command-forgery.json",
-        "sha256": "95d7cf00f7638de9b1b22b486f93bc30040aaf6e6200e4a8ba2d7c6ef326487d"
+        "sha256": "dc6918475558054b5bb1c7f9b79ce1ef3786ce362370426987bfb2b3a163964a"
       },
       "events": {
         "originalEvents": 5000,
@@ -403,7 +403,7 @@
       "commandOrFixture": "fixtures/scenarios/ordnance-duplicate-stale.json",
       "artifact": {
         "path": "fixture-payloads/network/ordnance-duplicate-stale.json",
-        "sha256": "e20aa1abcfce55bc4a14d442fc363e9c244bcbd650021d5a584e22c9438dfea6"
+        "sha256": "b0a7fd6078f33ada46956ed6504253747bf19c848b65bbcec5fd05add82120f8"
       },
       "events": {
         "originalEvents": 5000,
@@ -464,7 +464,7 @@
       "commandOrFixture": "fixtures/scenarios/support-reward-forgery.json",
       "artifact": {
         "path": "fixture-payloads/network/support-reward-forgery.json",
-        "sha256": "98f9176cc798a18932eee7fe32b4809a717aaf6b6d625d7313a9e90f3c5a42d5"
+        "sha256": "6bb0d5dae5d03ca2b37a164cb1d9c60e4ef02f7ec228634efaf89880dd35bf7a"
       },
       "events": {
         "originalEvents": 5000,
@@ -525,7 +525,7 @@
       "commandOrFixture": "fixtures/scenarios/shed-revision-forgery.json",
       "artifact": {
         "path": "fixture-payloads/network/shed-revision-forgery.json",
-        "sha256": "a6a00ca2ade7ba6c718b1d91956f91ca6519b3b80572739f6f68fa9daf420afb"
+        "sha256": "664cc3ca3af2ddd3ae8e19844855b0b0d41456032c374d1917b4ac913d2452f8"
       },
       "events": {
         "originalEvents": 5000,
@@ -586,7 +586,7 @@
       "commandOrFixture": "fixtures/scenarios/late-join-repair.json",
       "artifact": {
         "path": "fixture-payloads/network/late-join-repair.json",
-        "sha256": "3e280f6ed7619a572ad75cf1f0f86af0f2e4e9ec10c8a10ddda4b86c3432c29f"
+        "sha256": "4bbf5ba88145231bddfcf68a7d4ae7297f7fe5ea2a14e922f541a627bf6a7357"
       },
       "events": {
         "originalEvents": 5000,
@@ -645,7 +645,7 @@
       "commandOrFixture": "fixtures/scenarios/match-end-cleanup.json",
       "artifact": {
         "path": "fixture-payloads/network/match-end-cleanup.json",
-        "sha256": "a7b1cfedbeb6af67a01b9bbb563798449c255faa4fc32c7a63dde77b2fb9cda6"
+        "sha256": "9f53f44d9b5cb002cb3ee01623e293f8b9e3312187be10ffd5bf9589e4b1168b"
       },
       "events": {
         "originalEvents": 5000,
@@ -704,7 +704,7 @@
       "commandOrFixture": "fixtures/scenarios/reconnect-rematch-repair.json",
       "artifact": {
         "path": "fixture-payloads/network/reconnect-rematch-repair.json",
-        "sha256": "2eb3367c39656b61d8877e91daf593e3e9347888680cb5545b2bea3fe1922dde"
+        "sha256": "c67461f8c66fd2760e795ab4bbd6e338111bf7e3709439ab418bd375ce107d76"
       },
       "events": {
         "originalEvents": 5000,
@@ -763,7 +763,7 @@
       "commandOrFixture": "fixtures/scenarios/pose-history-dynamic-geometry.json",
       "artifact": {
         "path": "fixture-payloads/network/pose-history-dynamic-geometry.json",
-        "sha256": "c4926a9cb439d28c056733a89b72d42bd5f30a515d9de1a4c64cc022ea3466fd"
+        "sha256": "077d107a79524bc4331c2a6bb95c9dd4929150362573c7f07c10273e665a32ff"
       },
       "events": {
         "originalEvents": 5000,
@@ -822,7 +822,7 @@
       "commandOrFixture": "fixtures/scenarios/exactly-once-outcomes.json",
       "artifact": {
         "path": "fixture-payloads/network/exactly-once-outcomes.json",
-        "sha256": "acd51c6c23538357baa5416757a0ae0d5e58ac4e8014bda8532660960f8ecfec"
+        "sha256": "d0de2bd628e2874a1a2ac85db11da72234070af39a9aa48557e83bf3c60956e4"
       },
       "events": {
         "originalEvents": 5000,
@@ -868,7 +868,7 @@
       "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "artifact": {
         "path": "fixture-payloads/hardware/high.json",
-        "sha256": "a00533220a1af3d148a6dc3bc227bf5180098df11ba68d12d60d772bbb76cfb5"
+        "sha256": "b9a4771ed29e42c12b4922be1ab3cbba2a7300b201b2ba44de5c4eb99835a0e0"
       },
       "os": {
         "name": "Windows",
@@ -905,7 +905,7 @@
         "sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact": {
           "path": "fixture-payloads/hardware/pass64-high.json",
-          "sha256": "6c9f83c388f12b754c8fec0a0822048e418cff08ae710eb8b53b2ff6e0e00918"
+          "sha256": "76cc9be34a21f5358e04e409e86afe33ff1fa0131639d9abe2f50614cd8cc7a2"
         },
         "cpuP95Ms": 5,
         "gpuOrProxyP95Ms": 7,
@@ -937,7 +937,7 @@
       "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "artifact": {
         "path": "fixture-payloads/hardware/max.json",
-        "sha256": "270543a3e48a154c5d177a9a480eeeef539d0f89f45a6b02147064ccddd759fe"
+        "sha256": "96afe383990a06b3fb1fff091741220c339d6cdb09d52f1c4d9afc9f81e5ba28"
       },
       "os": {
         "name": "Windows",
@@ -974,7 +974,7 @@
         "sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "artifact": {
           "path": "fixture-payloads/hardware/pass64-max.json",
-          "sha256": "f2b769fea9e0b0dcb81bf4afad35e8369986b9262bd3bb63a07bfa960c4bf98e"
+          "sha256": "8a1b586027ef841eec4283af726f83f59c0a27a6e1ad505e1290cba27bc1452d"
         },
         "cpuP95Ms": 6,
         "gpuOrProxyP95Ms": 8,

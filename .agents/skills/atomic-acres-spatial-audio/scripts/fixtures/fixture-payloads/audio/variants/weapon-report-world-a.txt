@@ -1,4 +1,19 @@
-ATOMIC ACRES AUDIO FIXTURE
-event=weapon.report.world
-variant=weapon-report-world-a
-fixtureOnly=true
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "weapon.report.world",
+  "family": "weapon-report",
+  "bus": "sfx",
+  "delivery": "world-spatial",
+  "spatialProfileId": "weapon-world",
+  "maxConcurrent": 6,
+  "priority": 220,
+  "cooldownMs": 0,
+  "owner": "audio-session",
+  "evidenceId": "audio-weapon-world",
+  "variantId": "weapon-report-world-a",
+  "source": "fixture-payloads/audio/variants/weapon-report-world-a.txt",
+  "license": "project-owned",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

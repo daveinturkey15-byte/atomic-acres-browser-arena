@@ -1,4 +1,19 @@
-ATOMIC ACRES AUDIO FIXTURE
-event=shed.debris-impact
-variant=shed-debris-impact-a
-fixtureOnly=true
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "shed.debris-impact",
+  "family": "interactive-world",
+  "bus": "sfx",
+  "delivery": "world-spatial",
+  "spatialProfileId": "world-object",
+  "maxConcurrent": 4,
+  "priority": 145,
+  "cooldownMs": 30,
+  "owner": "shed-entity",
+  "evidenceId": "audio-shed-debris",
+  "variantId": "shed-debris-impact-a",
+  "source": "fixture-payloads/audio/variants/shed-debris-impact-a.txt",
+  "license": "project-owned",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

@@ -1,7 +1,13 @@
 {
+  "schemaVersion": 3,
   "fixtureOnly": true,
   "kind": "spatial-audio-evidence",
-  "id": "ordnance.frag-explosion",
+  "eventId": "ordnance.frag-explosion",
   "sourceAzimuthDeg": 55,
-  "observedPan": 0.72
+  "observedPan": 0.72,
+  "openGain": 0.9,
+  "occludedGain": 0.4,
+  "openLowPassHz": 19000,
+  "occludedLowPassHz": 2600,
+  "artifactPath": "fixture-payloads/audio/spatial/ordnance-frag-explosion.json"
 }

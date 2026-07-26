@@ -88,7 +88,7 @@
           "id": "weapon-report-world-a",
           "source": "fixture-payloads/audio/variants/weapon-report-world-a.txt",
           "license": "project-owned",
-          "sha256": "d1119a6ed83cfc598c769ab9532e5ba9ce429f7b285a133db5b6bf7d36a31087",
+          "sha256": "ba3cd73b3e1a40bd9164fa719d65b7bdb57f993abdee2fba99e4810f536956ad",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -109,7 +109,7 @@
           "id": "weapon-foley-a",
           "source": "fixture-payloads/audio/variants/weapon-foley-a.txt",
           "license": "project-owned",
-          "sha256": "34214a4944930e81ac4a9a1baf234672232e5ce64416c3fcf3109238082d7b92",
+          "sha256": "4beed2afb25bf4e5f237179578f0d8d15edee06706edb5019e09532174873dbd",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -130,7 +130,7 @@
           "id": "hit-confirm-a",
           "source": "fixture-payloads/audio/variants/hit-confirm-a.txt",
           "license": "project-owned",
-          "sha256": "3e0aba69e660473b9b321b49fca6ddc93eba36ddfa390dde9d23bf07650f146c",
+          "sha256": "3e09a26fbfe13a8bb41c9ae1a2b06a7c26bc2e663b98ff5ebb2ef28e6a2f9716",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -151,7 +151,7 @@
           "id": "world-impact-a",
           "source": "fixture-payloads/audio/variants/world-impact-a.txt",
           "license": "cc0",
-          "sha256": "9afe21f11f4fd5781e14bd03258f097ed539f87abb4b8de7984d385418162b99",
+          "sha256": "879aa96567ea564d580cc4028dcd082d20ae7b418431bdf1bb4decb55822f665",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -172,7 +172,7 @@
           "id": "footstep-world-dirt-a",
           "source": "fixture-payloads/audio/variants/footstep-world-dirt-a.txt",
           "license": "cc0",
-          "sha256": "386adfec8fc0dda4d67fc6711153e05d987df53725498bd182897c0992dbab40",
+          "sha256": "c9d31821a7acd673a1256b40f5788931526349a14174318ad5e6479371448ea1",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -193,7 +193,7 @@
           "id": "low-health-breath-a",
           "source": "fixture-payloads/audio/variants/low-health-breath-a.txt",
           "license": "project-owned",
-          "sha256": "fd736b294ce3966fb715ecd19448402e5693690a0e2475072cec7ef6e323b878",
+          "sha256": "925569456ceb1424f18b3d1f5350757594fd8385dab5ee1f42549d0cbb0ab080",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -214,7 +214,7 @@
           "id": "frag-explosion-a",
           "source": "fixture-payloads/audio/variants/frag-explosion-a.txt",
           "license": "project-owned",
-          "sha256": "e040fcfd97ef3706a2fe2e1d578bae949bdb67d085faea2c23380f2c412944cc",
+          "sha256": "7eae42dd2458dce1258c394fb5a277e7b2b3f7337b6ef62a185c4590218f148b",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -235,7 +235,7 @@
           "id": "drone-rotor-a",
           "source": "fixture-payloads/audio/variants/drone-rotor-a.txt",
           "license": "project-owned",
-          "sha256": "e5e3213c21deb4aceb13535b38ab414b7fd3879dc596769f4c72ef39bf83065c",
+          "sha256": "3199f9a1ea2f4f92142ebaa490b59d65d3cb3a2c81d080ccdab77d6a0d34e3fd",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -256,7 +256,7 @@
           "id": "weapon-pickup-a",
           "source": "fixture-payloads/audio/variants/weapon-pickup-a.txt",
           "license": "project-owned",
-          "sha256": "17f998914d4d169a75a18c29210c6fc11d34c1834e07809940c9b99b876fa77d",
+          "sha256": "27e599f2de7d14f5a81941dd137e6e99447c1d3173c05cd84851d6baaacc2daa",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -277,7 +277,7 @@
           "id": "shed-door-motion-a",
           "source": "fixture-payloads/audio/variants/shed-door-motion-a.txt",
           "license": "project-owned",
-          "sha256": "6ae53e10e0a2ffa05dc6107ca61bc58a1fe03e3e07e0146816200bdd0e942573",
+          "sha256": "6a40d58fdc13603e5000f1817d4cc2c5809c58bc7b34f78950e351ec39d0611a",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -298,7 +298,7 @@
           "id": "shed-debris-impact-a",
           "source": "fixture-payloads/audio/variants/shed-debris-impact-a.txt",
           "license": "project-owned",
-          "sha256": "89d5f090467e6886355606e73f29a30089c19e094ed4be8e8bfb78a8ca53f619",
+          "sha256": "9a790cbfa471efd9e28aef595671d4c91099f367e14aa8552a08a4fa54dd5e4d",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -319,28 +319,28 @@
           "id": "atomic-acres.wind",
           "source": "fixture-payloads/audio/variants/atomic-acres-wind.txt",
           "license": "project-owned",
-          "sha256": "2ef73954df0957313bfe89c00f24979aaeb4cd3e23c8923d35616a892ae999c6",
+          "sha256": "c63217f5c89f4290075c84764e6f8d8b2b3fcd45aa42cba2f5cd1fb2c127e190",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         },
         {
           "id": "skyline-terminal.apron",
           "source": "fixture-payloads/audio/variants/skyline-terminal-apron.txt",
           "license": "project-owned",
-          "sha256": "8215b3f002f2e851e93d37217f79254e70cafc6c2394d8fb1409132639908758",
+          "sha256": "12a86156277b8c8dcfe4c09694180239600ce1220dfa7b1ef2768fce5e11e352",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         },
         {
           "id": "rustworks-1v1.machinery",
           "source": "fixture-payloads/audio/variants/rustworks-1v1-machinery.txt",
           "license": "project-owned",
-          "sha256": "02fbb08b853744ee4c67ec4335cbd9cdd995ff8cc17c02fb5297e55188cba8f8",
+          "sha256": "0224a8dd8c0c9dbe7f0b2fd7bab7779390a48b26bb834c050b1a41dbf2c41fef",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         },
         {
           "id": "gun-range.ventilation",
           "source": "fixture-payloads/audio/variants/gun-range-ventilation.txt",
           "license": "project-owned",
-          "sha256": "4f689caf95f79c63eeee2cc75f29daa8141db21a17fb2a3d63b933438f65c806",
+          "sha256": "3f3598ac90bb43045e55b0aca5743cef485c3e5ee4327d33e4408bd79d14d4e8",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -361,7 +361,7 @@
           "id": "ui-feedback-a",
           "source": "fixture-payloads/audio/variants/ui-feedback-a.txt",
           "license": "project-owned",
-          "sha256": "fc20da4d79eab92313d52b1d3a049ad2f2da0ee8cbd66aaa257bd6d522e05e0d",
+          "sha256": "2b02179e146439b56e0b11e60e75c211792181fc00fa8e7e3fa337b7789a8757",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -382,7 +382,7 @@
           "id": "announcement-match-a",
           "source": "fixture-payloads/audio/variants/announcement-match-a.txt",
           "license": "project-owned",
-          "sha256": "5840c6ac6900528842a84b5b9a88605e413c688b669c771aab40e8342fb2e672",
+          "sha256": "ab395ad0c3a0333e8ce24eab416e13f65c27947282bb33ec8f96357ec2fcba5a",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -403,7 +403,7 @@
           "id": "music-menu-a",
           "source": "fixture-payloads/audio/variants/music-menu-a.txt",
           "license": "project-owned",
-          "sha256": "adb03f526091626de0cf8782b731f9815feab5bfa90e4ddadaedfcb47e097374",
+          "sha256": "1d41461574862db9e6a2f3db857af23649746119215adb6162f097a2590cfcac",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -424,7 +424,7 @@
           "id": "music-game-a",
           "source": "fixture-payloads/audio/variants/music-game-a.txt",
           "license": "project-owned",
-          "sha256": "893b7a3ec4060dd64dfee5030b4fbef6a342c1e6130df477b3e09aab03121285",
+          "sha256": "0cf56db017715c8b658915824b5f6cef68adc9bf86c008ded4bad06dc3a478a6",
           "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
         }
       ]
@@ -624,7 +624,7 @@
       "settledSourceCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/arenas/atomic-acres.json",
-        "sha256": "c48f61abe8b7a579c169b5fba6220461ca76caf1e9409b0ca9dfbb7a62bdc331"
+        "sha256": "17a8d22343c1a4dedb04f2cf51e916023c2e3f40db6c686b52ad1fa125362675"
       }
     },
     {
@@ -635,7 +635,7 @@
       "settledSourceCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/arenas/skyline-terminal.json",
-        "sha256": "a66358fc68a4a63b40cc4d36ea49c6ea9959691f01a434e4200cde852c53d76f"
+        "sha256": "8d5e6d7394c64b6a4a1ccb0f4dae4051673914ece54402ec59eeba333c5976b0"
       }
     },
     {
@@ -646,7 +646,7 @@
       "settledSourceCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/arenas/rustworks-1v1.json",
-        "sha256": "578b6fe47fd7a051ee9c7cb581623278492e6993b5cd69b46789e2b922b73a2b"
+        "sha256": "3f8fa422a689ef8669c19f4b01e1fb07ed8813d8c346db0bf53c2bb7bf66911e"
       }
     },
     {
@@ -657,7 +657,7 @@
       "settledSourceCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/arenas/gun-range.json",
-        "sha256": "bf23bea9aac09f3925d129e25cfbacfe7c1ca8ce0912da7264fd720508d747be"
+        "sha256": "8081f548c0b6d00f65aa0846c58d0d1f9c3b165839450f3c8c03790206693ec8"
       }
     }
   ],
@@ -679,7 +679,7 @@
       "occludedLowPassHz": 2400,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/weapon-report-world.json",
-        "sha256": "9ac030790f28c016240627925c9d57b3e4b4a40b6b7684ceaf70ed69d1d88133"
+        "sha256": "838c54a086145e633881a753a5c470daec794a8412dd57e94a3259299221b36e"
       }
     },
     {
@@ -692,7 +692,7 @@
       "occludedLowPassHz": 2200,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/world-projectile-impact.json",
-        "sha256": "daffd145a7eac374b4b5b79c945e7ecc4566d50e02095ed18eaa252ccad90671"
+        "sha256": "0277f03885a06576bba572056c2a8c232cc3349bf36b9f55be9c2d1265107ff1"
       }
     },
     {
@@ -705,7 +705,7 @@
       "occludedLowPassHz": 1800,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/movement-footstep-world.json",
-        "sha256": "d4aab953661c41127ce897d8df1c0600f68dd043aa741fb8381b3985d3e6ee83"
+        "sha256": "50e070170cd7204976e5be8725068a7e1c6845265f451487f9e38006cc00f1a7"
       }
     },
     {
@@ -718,7 +718,7 @@
       "occludedLowPassHz": 2600,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/ordnance-frag-explosion.json",
-        "sha256": "c19a8a18c3aab9e4889a59af56618d97091f6e08093a973a3654c021efd2bd12"
+        "sha256": "b1837c50d915a580b11598eebed4955b077b992c01bfe2706726d5e2408ac8ff"
       }
     },
     {
@@ -731,7 +731,7 @@
       "occludedLowPassHz": 2300,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/support-drone-rotor.json",
-        "sha256": "adaa264ae0e895bc33f0c6ce4e40c1cf152be4a2410bc2534126594f6843fcb1"
+        "sha256": "b0a3b22ccde826c48c95238ab440b85cf69e87088278c6fafff8c0bff6a659ca"
       }
     },
     {
@@ -744,7 +744,7 @@
       "occludedLowPassHz": 1600,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/shed-door-motion.json",
-        "sha256": "a032311725a73117fa0138d385df71116e53657c4c84e1b8eb4612d0a934cf7f"
+        "sha256": "1abb6d4c2b159c4de204b51ac03cdfd2cf316115efe2f060936a8590fb4d9248"
       }
     },
     {
@@ -757,7 +757,7 @@
       "occludedLowPassHz": 1700,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/shed-debris-impact.json",
-        "sha256": "cac0d3aabaaef32b26bacadeaad79a8902f7d6219a3a2efb51a0ba1c454be4c5"
+        "sha256": "d903c65377a4bde3304566a24cbd3e85e63a988a7be475df85533c84d7287631"
       }
     },
     {
@@ -770,7 +770,7 @@
       "occludedLowPassHz": 2000,
       "artifact": {
         "path": "fixture-payloads/audio/spatial/ambience-arena-bed.json",
-        "sha256": "3605280bed16efaba87ed0cc9d3fc9bcd281700864b292878704f6b09166468e"
+        "sha256": "7a32600568c1f74f4dae564f32755d5a5acbae7713534605b10a025d05654299"
       }
     }
   ],
@@ -783,7 +783,7 @@
       "errorCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/lifecycle/arena-switch.json",
-        "sha256": "3a67dd5ca47034605f01118b1b0e78b48fb894e00302d40f44a826eef7799c9f"
+        "sha256": "640af2963adc48a8f5f21247ebe1d14682277b7843c3cdc24e2264a0707418b6"
       }
     },
     {
@@ -794,7 +794,7 @@
       "errorCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/lifecycle/rematch.json",
-        "sha256": "f22f2991bf3dec9b4fc7a3bc390da3c9c7c1479e11035e2e9f8349889c2bb5ea"
+        "sha256": "5986efc3484abbae60f8caae89b4b73ad5eb82fe52cc5456059c95bd0a00e17c"
       }
     },
     {
@@ -805,7 +805,7 @@
       "errorCount": 0,
       "artifact": {
         "path": "fixture-payloads/audio/lifecycle/suspend-resume.json",
-        "sha256": "8275ec603aa151234d3fcd72bc10f3fc24d40e81daa344d09e3192a56b8bc9e6"
+        "sha256": "ff24bb4487e628969a1227f97554c285797c1f2e0b95595db4cbea42625aa379"
       }
     }
   ]

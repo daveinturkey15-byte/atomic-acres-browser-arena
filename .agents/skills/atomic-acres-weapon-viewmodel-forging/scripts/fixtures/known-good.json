@@ -32,7 +32,7 @@
       "skeleton": {
         "id": "aa-first-person-v1",
         "url": "fixture-payloads/viewmodel/assets/aa-first-person-v1-skeleton.txt",
-        "sha256": "7204565c86bfbcf62e4bd0f02213af2a6b5eba906a3902d38aaf7af78d54b6e7",
+        "sha256": "ffc9796a3fac1621f3600cf1ae1a2a6eca4be789ef4b1618df0201df4c4d9654",
         "source": "original Blender source",
         "license": "project-owned",
         "boneCount": 64,
@@ -50,7 +50,7 @@
         {
           "level": 0,
           "url": "fixture-payloads/viewmodel/assets/a4-vanguard-first-person-lod0.txt",
-          "sha256": "3638797210f310abda89b4207ed39f6a1670ba1c432d7696c5cb9f0fd10d45ca",
+          "sha256": "8d0662aff72cb285d211ca64e04a6cc2c3bbc882df3fa387b4a031220c1fdbd0",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 90000,
@@ -62,7 +62,7 @@
         {
           "level": 1,
           "url": "fixture-payloads/viewmodel/assets/a4-vanguard-first-person-lod1.txt",
-          "sha256": "372ba169a1ad4eceef0d0da600a8230bf6736de447cfa8ad88ae01af05382ac5",
+          "sha256": "b0362b2f9a43ce8debe41202989b0eadda2ecc2df8af89c1fdd630bb42e3764d",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 45000,
@@ -76,7 +76,7 @@
         {
           "level": 0,
           "url": "fixture-payloads/viewmodel/assets/a4-vanguard-world-lod0.txt",
-          "sha256": "36601811d576d303ff2b9fcd131b5dcb707cc1aef2b785e3bc95b2a5846ab562",
+          "sha256": "f12c491efa3e89564ed3408231c177f24ac05fd7bcc1d480dce036d50f1bfce7",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 40000,
@@ -88,7 +88,7 @@
         {
           "level": 1,
           "url": "fixture-payloads/viewmodel/assets/a4-vanguard-world-lod1.txt",
-          "sha256": "46fbd2c68f9a0d4de8256d2a2131f92725eb83445db2db2649ea1ece8219f914",
+          "sha256": "166f3187697c6047d48cae99e1468c2b9a64e7fde3b3ef15c83b3da8d24b811b",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 18000,
@@ -396,7 +396,7 @@
           "clockTick": 0,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/equip.svg",
-            "sha256": "a6e1d0d40d31cb43bfa4abebab81e4ab239a963786b56d5044f284fdc03ff825"
+            "sha256": "d818b9b89ac6417de573356e3036953b207da9c7b0cc1fced7cc181e5cca9188"
           }
         },
         {
@@ -405,7 +405,7 @@
           "clockTick": 1,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/unequip.svg",
-            "sha256": "16b8307532f505db7f1c16fec32da2d3baf506f62360bb09b1d902b6a26b04a9"
+            "sha256": "d231c5ef5e72dc8098767089cf24cd3765b894e0bfdade754fcdc17b44eecd65"
           }
         },
         {
@@ -414,7 +414,7 @@
           "clockTick": 2,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/idle.svg",
-            "sha256": "f6e2caf26691b45c720498044fb77416a80d78565970d1782489cc10b5db27f2"
+            "sha256": "bbf77d135ae0d02698421891fdd213d4fb97e6d30ef6329224f438577cf359b9"
           }
         },
         {
@@ -423,7 +423,7 @@
           "clockTick": 3,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/idle-variant.svg",
-            "sha256": "ca0fcbd95b9967bfc44bd8d14d194fb1519ba5916d748caccf400107ec9bac50"
+            "sha256": "31758bac06aeb37049fbc5c075415801e94017283b3807267707e096f87bf7fc"
           }
         },
         {
@@ -432,7 +432,7 @@
           "clockTick": 4,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/walk.svg",
-            "sha256": "ea3a6e7908104b85d9b9f264a250fff227305518a00d288bcb30ce92d79bfe3c"
+            "sha256": "c3fc62e982b23f4080e5762b8d83b7884fd47d2aea03754a7acda8b50c6dd1a3"
           }
         },
         {
@@ -441,7 +441,7 @@
           "clockTick": 5,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/sprint.svg",
-            "sha256": "693ebd87468025d7bd19f3932252f679f897f6d95355789c5c0f6445ba015f04"
+            "sha256": "3bcbcdefd275e3db72e7512eea7e93f02a6e5c2cf438afd824bd30fa6dc3fdcb"
           }
         },
         {
@@ -450,7 +450,7 @@
           "clockTick": 6,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/ads-in.svg",
-            "sha256": "6fc6f095e33b5b6d1fedcd08ea7275ffa3217fcdaa01cf00502a7334a6ab7ddc"
+            "sha256": "f303a36e0e96f0d673ad2ea83bb2bd1513b2be1e2d8bc51801ba814c3b4d8124"
           }
         },
         {
@@ -459,7 +459,7 @@
           "clockTick": 7,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/ads-out.svg",
-            "sha256": "b0f16164d64947e69ea98123371b44b6bb7c2d1d08680fb22759cf56ea123e7a"
+            "sha256": "abd631917f3174484ce7ff6cda72edf3602a347aa8ff7a0bc38036e8fe3a5706"
           }
         },
         {
@@ -468,7 +468,7 @@
           "clockTick": 8,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/fire.svg",
-            "sha256": "7886281e864b5ce5f1a04fd9dd06f4da772b818dcd9296aa9623e7ec0ac78334"
+            "sha256": "33bf8da7101a7bbe02ebc14ea232cbe6a0b4f22c857af822ce7b0f575f2c69bd"
           }
         },
         {
@@ -477,7 +477,7 @@
           "clockTick": 9,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/dry-fire.svg",
-            "sha256": "ed890a408c34e881e9b9d5b3e521eb5d68e21b8cbd15e217ff146e197fadd4fc"
+            "sha256": "5b83279d06e45c2a72c588bde9bdc9d216bc54c1bf8db1b30a6e9b93d7273376"
           }
         },
         {
@@ -486,7 +486,7 @@
           "clockTick": 10,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/reload.svg",
-            "sha256": "75d062fae7cb93b3d5856d2db25ff36106c6271f5d81e229b8e0c3059eb62f9d"
+            "sha256": "b34d186b68795d0d0ceadcbad5c6cb134adf17c6bc4a29829d6043a46664e67d"
           }
         },
         {
@@ -495,7 +495,7 @@
           "clockTick": 11,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/empty-reload.svg",
-            "sha256": "06a3461f8dafbe69030e0e77ddadf75396372fc87cc92aec01dea8d68d530e82"
+            "sha256": "10385ddeaa4e5d40cda47f47c63df28d50dc4092f1476626a2eb9a0d4fabb5a2"
           }
         },
         {
@@ -504,7 +504,7 @@
           "clockTick": 12,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/melee.svg",
-            "sha256": "e2c1b4ac6c4cda06170930cba4fe24438fe9ad28d2958b4fcc24c4156556406e"
+            "sha256": "331d68d07dffbb8e9533d3910b1e8d2e56240c1d241f21b33d46d4fb3bf02d5e"
           }
         },
         {
@@ -513,7 +513,7 @@
           "clockTick": 13,
           "artifact": {
             "path": "fixture-payloads/viewmodel/captures/inspect.svg",
-            "sha256": "99aa867083536fadb74228437ef20db35911695d7e5c71e59b18489a8a693e62"
+            "sha256": "1efe8e47384175d9e69bbd32ae550fc2955322f79ce6ba0b08d83d82f63312c6"
           }
         }
       ],

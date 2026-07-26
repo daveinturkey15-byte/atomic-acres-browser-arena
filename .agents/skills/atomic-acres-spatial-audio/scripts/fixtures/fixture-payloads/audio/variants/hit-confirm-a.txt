@@ -1,4 +1,19 @@
-ATOMIC ACRES AUDIO FIXTURE
-event=combat.hit-confirm
-variant=hit-confirm-a
-fixtureOnly=true
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "combat.hit-confirm",
+  "family": "combat-feedback",
+  "bus": "ui",
+  "delivery": "listener-local",
+  "spatialProfileId": null,
+  "maxConcurrent": 4,
+  "priority": 230,
+  "cooldownMs": 10,
+  "owner": "player-life",
+  "evidenceId": "audio-hit-confirm",
+  "variantId": "hit-confirm-a",
+  "source": "fixture-payloads/audio/variants/hit-confirm-a.txt",
+  "license": "project-owned",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

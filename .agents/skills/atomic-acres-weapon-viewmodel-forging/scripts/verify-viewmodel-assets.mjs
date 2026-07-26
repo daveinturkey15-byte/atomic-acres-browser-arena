@@ -10,10 +10,13 @@ const CAPABILITY_ENUM = Object.freeze(['standard-firearm', 'automatic', 'detacha
 const WEAPON_ORACLE = Object.freeze({
   'a4-vanguard': Object.freeze({
     presentationId: 'a4-vanguard-view',
+    skeletonId: 'aa-first-person-v1',
     capabilities: Object.freeze(['standard-firearm', 'automatic', 'detachable-magazine', 'casing-ejection', 'optic', 'melee']),
     actions: Object.freeze(['equip', 'unequip', 'idle', 'idle-variant', 'walk', 'sprint', 'ads-in', 'ads-out', 'fire', 'dry-fire', 'reload', 'empty-reload', 'melee', 'inspect']),
     sockets: Object.freeze(['rightGrip', 'leftGrip', 'knife', 'muzzle', 'optic', 'magazine', 'eject']),
     semanticParts: Object.freeze(['arms', 'hands', 'weapon', 'magazine', 'muzzle', 'eject']),
+    semanticNodes: Object.freeze({ arms: 'Arms', hands: 'Hands', weapon: 'A4Vanguard', magazine: 'Magazine', muzzle: 'MuzzleDevice', eject: 'EjectionPort' }),
+    socketNodes: Object.freeze({ rightGrip: 'SocketRightGrip', leftGrip: 'SocketLeftGrip', knife: 'SocketKnife', muzzle: 'SocketMuzzle', optic: 'SocketOptic', magazine: 'SocketMagazine', eject: 'SocketEject' }),
   }),
 });
 const TRANSITION_ORACLE = Object.freeze([
@@ -42,6 +45,12 @@ const exactArray = (actual, expected) => Array.isArray(actual) && actual.length 
 const safeArtifactPath = value => typeof value === 'string' && value.length >= 3 && value.length <= 240
   && !path.isAbsolute(value) && !value.includes('\\') && !value.split('/').includes('..')
   && /^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(value);
+
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (plainObject(value)) return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
 
 function exactKeys(value, required, allowed, label, failures) {
   if (!plainObject(value)) {
@@ -106,26 +115,69 @@ function validateFileEvidence(relativePath, expectedDigest, artifactRoot, maxByt
     failures.push(`${label} file size/type invalid`);
     return;
   }
-  let actualDigest;
+  let bytes;
   try {
-    actualDigest = crypto.createHash('sha256').update(fs.readFileSync(realFile)).digest('hex');
+    bytes = fs.readFileSync(realFile);
   } catch {
     failures.push(`${label} file unreadable`);
     return;
   }
-  if (actualDigest !== expectedDigest) failures.push(`${label} digest mismatch`);
+  const actualDigest = crypto.createHash('sha256').update(bytes).digest('hex');
+  if (actualDigest !== expectedDigest) {
+    failures.push(`${label} digest mismatch`);
+    return;
+  }
+  return bytes;
 }
 
-function validateArtifact(value, label, artifactRoot, failures) {
+function validateJsonPayloadMetadata(bytes, expectedMetadata, label, failures) {
+  let document;
+  try {
+    document = JSON.parse(bytes.toString('utf8'));
+  } catch {
+    failures.push(`${label} payload must be JSON`);
+    return;
+  }
+  if (!plainObject(document) || !plainObject(document.metadata) || canonical(document.metadata) !== canonical(expectedMetadata)) {
+    failures.push(`${label} payload metadata differs from parent identity`);
+  }
+}
+
+function validateCaptureArtifact(value, label, artifactRoot, expectedMetadata, failures) {
   if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
-  validateFileEvidence(value.path, value.sha256, artifactRoot, MAX_CAPTURE_BYTES, label, failures);
+  const bytes = validateFileEvidence(value.path, value.sha256, artifactRoot, MAX_CAPTURE_BYTES, label, failures);
+  if (!bytes) return;
+  const matches = [...bytes.toString('utf8').matchAll(/<metadata id="pass65-capture">([\s\S]*?)<\/metadata>/g)];
+  if (matches.length !== 1) {
+    failures.push(`${label} requires one machine-readable capture metadata block`);
+    return;
+  }
+  let metadata;
+  try {
+    metadata = JSON.parse(matches[0][1]);
+  } catch {
+    failures.push(`${label} capture metadata must be JSON`);
+    return;
+  }
+  if (!plainObject(metadata) || canonical(metadata) !== canonical(expectedMetadata)) failures.push(`${label} capture metadata differs from parent identity`);
 }
 
-function validateAsset(asset, label, artifactRoot, failures) {
+function validateAsset(asset, label, artifactRoot, identity, failures) {
   const keys = ['level', 'url', 'sha256', 'source', 'license', 'derivativeNotes', 'triangles', 'draws', 'decodedTextureBytes', 'sharedAssetApprovalId'];
   if (!exactKeys(asset, keys, keys, label, failures)) return;
   if (!uint(asset.level, 0, 8)) failures.push(`${label} identity invalid`);
-  validateFileEvidence(asset.url, asset.sha256, artifactRoot, MAX_ASSET_BYTES, label, failures);
+  const bytes = validateFileEvidence(asset.url, asset.sha256, artifactRoot, MAX_ASSET_BYTES, label, failures);
+  if (bytes) validateJsonPayloadMetadata(bytes, {
+    schemaVersion: identity.schemaVersion,
+    kind: 'viewmodel-lod',
+    presentationId: identity.presentationId,
+    weaponId: identity.weaponId,
+    collection: identity.collection,
+    level: asset.level,
+    triangles: asset.triangles,
+    draws: asset.draws,
+    decodedTextureBytes: asset.decodedTextureBytes,
+  }, label, failures);
   if (typeof asset.source !== 'string' || asset.source.trim().length === 0 || asset.source.length > 500 || typeof asset.license !== 'string' || asset.license.trim().length === 0 || asset.license.length > 200 || typeof asset.derivativeNotes !== 'string' || asset.derivativeNotes.trim().length === 0 || asset.derivativeNotes.length > 500) failures.push(`${label} provenance invalid`);
   if (!uint(asset.triangles, 1, 250000) || !uint(asset.draws, 1, 64) || !uint(asset.decodedTextureBytes, 1, 536870912)) failures.push(`${label} measured budget fields invalid`);
   if (asset.sharedAssetApprovalId !== null && !/^approval-[a-z0-9-]{3,64}$/.test(asset.sharedAssetApprovalId)) failures.push(`${label} shared asset approval invalid`);
@@ -168,8 +220,18 @@ export function validateViewmodelManifest(manifest, artifactRoot) {
 
     const skeletonKeys = ['id', 'url', 'sha256', 'source', 'license', 'derivativeNotes', 'boneCount'];
     if (exactKeys(entry.skeleton, skeletonKeys, skeletonKeys, `${label}.skeleton`, failures)) {
-      if (!idOk(entry.skeleton.id) || typeof entry.skeleton.source !== 'string' || entry.skeleton.source.trim().length === 0 || entry.skeleton.source.length > 500 || typeof entry.skeleton.license !== 'string' || entry.skeleton.license.trim().length === 0 || entry.skeleton.license.length > 200 || typeof entry.skeleton.derivativeNotes !== 'string' || entry.skeleton.derivativeNotes.trim().length === 0 || entry.skeleton.derivativeNotes.length > 500 || !uint(entry.skeleton.boneCount, 1, 256)) failures.push(`${label} skeleton invalid`);
-      validateFileEvidence(entry.skeleton.url, entry.skeleton.sha256, artifactRoot, MAX_ASSET_BYTES, `${label}.skeleton`, failures);
+      if (!idOk(entry.skeleton.id) || entry.skeleton.id !== oracle?.skeletonId || typeof entry.skeleton.source !== 'string' || entry.skeleton.source.trim().length === 0 || entry.skeleton.source.length > 500 || typeof entry.skeleton.license !== 'string' || entry.skeleton.license.trim().length === 0 || entry.skeleton.license.length > 200 || typeof entry.skeleton.derivativeNotes !== 'string' || entry.skeleton.derivativeNotes.trim().length === 0 || entry.skeleton.derivativeNotes.length > 500 || !uint(entry.skeleton.boneCount, 1, 256)) failures.push(`${label} skeleton invalid`);
+      const skeletonBytes = validateFileEvidence(entry.skeleton.url, entry.skeleton.sha256, artifactRoot, MAX_ASSET_BYTES, `${label}.skeleton`, failures);
+      if (skeletonBytes && oracle) validateJsonPayloadMetadata(skeletonBytes, {
+        schemaVersion: manifest.schemaVersion,
+        kind: 'viewmodel-skeleton',
+        presentationId: entry.id,
+        weaponId: entry.weaponId,
+        skeletonId: entry.skeleton.id,
+        boneCount: entry.skeleton.boneCount,
+        semanticNodes: oracle.semanticNodes,
+        socketNodes: oracle.socketNodes,
+      }, `${label}.skeleton`, failures);
     }
     const accessibilityKeys = ['motionScaleMin', 'motionScaleMax', 'adsMotionScaleMax'];
     if (exactKeys(entry.accessibility, accessibilityKeys, accessibilityKeys, `${label}.accessibility`, failures)) {
@@ -180,7 +242,12 @@ export function validateViewmodelManifest(manifest, artifactRoot) {
       const lods = Array.isArray(collection) ? collection : [];
       if (lods.length < 2) failures.push(`${label}.${collectionName} requires at least two LODs`);
       for (const [lodIndex, asset] of lods.entries()) {
-        validateAsset(asset, `${label}.${collectionName}[${lodIndex}]`, artifactRoot, failures);
+        validateAsset(asset, `${label}.${collectionName}[${lodIndex}]`, artifactRoot, {
+          schemaVersion: manifest.schemaVersion,
+          presentationId: entry.id,
+          weaponId: entry.weaponId,
+          collection: collectionName === 'firstPersonLods' ? 'first-person' : 'world',
+        }, failures);
         if (asset?.level !== lodIndex) failures.push(`${label}.${collectionName} LOD levels must be ordered from zero`);
         if (lodIndex > 0) {
           const previous = lods[lodIndex - 1];
@@ -198,6 +265,7 @@ export function validateViewmodelManifest(manifest, artifactRoot) {
     for (const [partIndex, part] of semanticParts.entries()) {
       if (!exactKeys(part, semanticKeys, semanticKeys, `${label}.semanticParts[${partIndex}]`, failures)) continue;
       if (!idOk(part.id) || !nodeNameOk(part.nodeName)) failures.push(`${label}.semanticParts[${partIndex}] invalid`);
+      if (oracle && part.nodeName !== oracle.semanticNodes[part.id]) failures.push(`${label}.semanticParts[${partIndex}] node mapping differs from independent oracle`);
     }
     const socketKeys = ['id', 'nodeName'];
     const sockets = Array.isArray(entry.sockets) ? entry.sockets : [];
@@ -205,6 +273,7 @@ export function validateViewmodelManifest(manifest, artifactRoot) {
     for (const [socketIndex, socket] of sockets.entries()) {
       if (!exactKeys(socket, socketKeys, socketKeys, `${label}.sockets[${socketIndex}]`, failures)) continue;
       if (!socketOk(socket.id) || !nodeNameOk(socket.nodeName)) failures.push(`${label}.sockets[${socketIndex}] invalid`);
+      if (oracle && socket.nodeName !== oracle.socketNodes[socket.id]) failures.push(`${label}.sockets[${socketIndex}] node mapping differs from independent oracle`);
     }
     const semanticNodeNames = semanticParts.map(part => part?.nodeName?.toLowerCase());
     const socketNodeNames = sockets.map(socket => socket?.nodeName?.toLowerCase());
@@ -245,7 +314,15 @@ export function validateViewmodelManifest(manifest, artifactRoot) {
       const captureLabel = `${label}.captures[${captureIndex}]`;
       if (!exactKeys(capture, captureKeys, captureKeys, captureLabel, failures)) continue;
       if (capture.weaponId !== entry.weaponId || !ACTION_ENUM.includes(capture.action) || capture.action !== oracle?.actions[captureIndex] || !uint(capture.clockTick, 0, 1000000)) failures.push(`${captureLabel} weapon/action/tick invalid`);
-      validateArtifact(capture.artifact, `${captureLabel}.artifact`, artifactRoot, failures);
+      validateCaptureArtifact(capture.artifact, `${captureLabel}.artifact`, artifactRoot, {
+        schemaVersion: manifest.schemaVersion,
+        kind: 'viewmodel-capture',
+        presentationId: entry.id,
+        weaponId: capture.weaponId,
+        action: capture.action,
+        clockTick: capture.clockTick,
+        captureIdentity: manifest.captureIdentity,
+      }, failures);
     }
     if (new Set(captures.map(capture => capture?.clockTick)).size !== captures.length) failures.push(`${label} capture ticks must be unique`);
     if (new Set(captures.map(capture => capture?.artifact?.path)).size !== captures.length || new Set(captures.map(capture => capture?.artifact?.sha256)).size !== captures.length) failures.push(`${label} every action requires an independent capture path and digest`);
@@ -282,7 +359,7 @@ function runSelfTest() {
   const fixtureRoot = path.dirname(fixturePath);
   const fixture = readJson(fixturePath);
   const baseline = validateViewmodelManifest(fixture, fixtureRoot);
-  if (baseline.length) return [`known-good fixture failed before mutations: ${baseline.join('; ')}`];
+  if (baseline.length) return { escaped: [`known-good fixture failed before mutations: ${baseline.join('; ')}`], total: 0 };
   const mutations = [
     ['64-hex Git SHA', value => { value.captureIdentity.sourceSha = 'a'.repeat(64); }],
     ['unknown nested key', value => { value.presentations[0].clips[0].selfAttested = true; }],
@@ -305,6 +382,7 @@ function runSelfTest() {
     ['capture digest drift', value => { value.presentations[0].captures[0].artifact.sha256 = 'e'.repeat(64); }],
     ['shared action capture artifact', value => { value.presentations[0].captures[1].artifact = structuredClone(value.presentations[0].captures[0].artifact); }],
     ['all actions share capture artifact', value => { const artifact = structuredClone(value.presentations[0].captures[0].artifact); for (const capture of value.presentations[0].captures) capture.artifact = structuredClone(artifact); }],
+    ['skeleton identity drift', value => { value.presentations[0].skeleton.id = 'other-skeleton'; }],
     ['skeleton derivative notes missing', value => { delete value.presentations[0].skeleton.derivativeNotes; }],
     ['skeleton artifact missing', value => { value.presentations[0].skeleton.url = 'fixture-payloads/viewmodel/assets/missing.txt'; }],
     ['skeleton artifact traversal', value => { value.presentations[0].skeleton.url = '../outside.glb'; }],
@@ -318,24 +396,70 @@ function runSelfTest() {
     ['missing fire marker', value => { value.presentations[0].clips.find(clip => clip.action === 'fire').markers = []; }],
     ['fallback enabled', value => { value.presentations[0].fallbackPolicy = 'allow-generic'; }],
   ];
+  const fixturePresentation = fixture.presentations[0];
+  for (let first = 0; first < fixturePresentation.captures.length; first += 1) {
+    for (let second = first + 1; second < fixturePresentation.captures.length; second += 1) {
+      mutations.push([`capture artifact permutation ${first}/${second}`, value => {
+        const captures = value.presentations[0].captures;
+        [captures[first].artifact, captures[second].artifact] = [captures[second].artifact, captures[first].artifact];
+      }]);
+    }
+  }
+  for (let first = 0; first < fixturePresentation.semanticParts.length; first += 1) {
+    for (let second = first + 1; second < fixturePresentation.semanticParts.length; second += 1) {
+      mutations.push([`semantic node permutation ${first}/${second}`, value => {
+        const parts = value.presentations[0].semanticParts;
+        [parts[first].nodeName, parts[second].nodeName] = [parts[second].nodeName, parts[first].nodeName];
+      }]);
+    }
+  }
+  for (let first = 0; first < fixturePresentation.sockets.length; first += 1) {
+    for (let second = first + 1; second < fixturePresentation.sockets.length; second += 1) {
+      mutations.push([`socket node permutation ${first}/${second}`, value => {
+        const sockets = value.presentations[0].sockets;
+        [sockets[first].nodeName, sockets[second].nodeName] = [sockets[second].nodeName, sockets[first].nodeName];
+      }]);
+    }
+  }
+  const lodLocations = [['firstPersonLods', 0], ['firstPersonLods', 1], ['worldLods', 0], ['worldLods', 1]];
+  for (let first = 0; first < lodLocations.length; first += 1) {
+    for (let second = first + 1; second < lodLocations.length; second += 1) {
+      mutations.push([`LOD artifact permutation ${first}/${second}`, value => {
+        const [firstCollection, firstIndex] = lodLocations[first];
+        const [secondCollection, secondIndex] = lodLocations[second];
+        const firstAsset = value.presentations[0][firstCollection][firstIndex];
+        const secondAsset = value.presentations[0][secondCollection][secondIndex];
+        [firstAsset.url, secondAsset.url] = [secondAsset.url, firstAsset.url];
+        [firstAsset.sha256, secondAsset.sha256] = [secondAsset.sha256, firstAsset.sha256];
+      }]);
+    }
+  }
+  for (const [collection, index] of lodLocations) {
+    mutations.push([`skeleton/${collection}[${index}] artifact substitution`, value => {
+      const skeleton = value.presentations[0].skeleton;
+      const asset = value.presentations[0][collection][index];
+      [skeleton.url, asset.url] = [asset.url, skeleton.url];
+      [skeleton.sha256, asset.sha256] = [asset.sha256, skeleton.sha256];
+    }]);
+  }
   const escaped = [];
   for (const [label, mutate] of mutations) {
     const candidate = structuredClone(fixture);
     mutate(candidate);
     if (validateViewmodelManifest(candidate, fixtureRoot).length === 0) escaped.push(label);
   }
-  return escaped;
+  return { escaped, total: mutations.length };
 }
 
 const args = process.argv.slice(2);
 if (args[0] === '--self-test') {
-  const escaped = runSelfTest();
+  const { escaped, total } = runSelfTest();
   if (escaped.length) {
     console.error(`FAIL viewmodel-assets self-test escaped=${escaped.length}`);
     for (const label of escaped) console.error(`- ${label}`);
     process.exit(1);
   }
-  console.log('PASS viewmodel-assets self-test mutations=33');
+  console.log(`PASS viewmodel-assets self-test mutations=${total}`);
   process.exit(0);
 }
 const input = args[0];

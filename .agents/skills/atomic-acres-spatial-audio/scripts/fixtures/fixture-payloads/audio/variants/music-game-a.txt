@@ -1,4 +1,19 @@
-ATOMIC ACRES AUDIO FIXTURE
-event=music.game
-variant=music-game-a
-fixtureOnly=true
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "music.game",
+  "family": "music",
+  "bus": "game-music",
+  "delivery": "listener-local",
+  "spatialProfileId": null,
+  "maxConcurrent": 1,
+  "priority": 60,
+  "cooldownMs": 0,
+  "owner": "match-epoch",
+  "evidenceId": "audio-game-music",
+  "variantId": "music-game-a",
+  "source": "fixture-payloads/audio/variants/music-game-a.txt",
+  "license": "project-owned",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

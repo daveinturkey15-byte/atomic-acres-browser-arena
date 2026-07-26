@@ -25,7 +25,7 @@ Attack named falsifiers against one immutable candidate identity; never turn imp
 - Authority: derive outcomes from numeric event evidence. Host/client hashes and canonical exactly-once counts must converge after repair; stale life/epoch/revision/action data fails closed.
 - Accessibility: verify keyboard/focus, reduced sensory modes and non-color/non-audio alternatives without changing shared outcomes.
 - Performance: CI/SwiftShader proves compatibility only; RTX proof requires timestamped native hardware/backend identity and frozen absolute/delta thresholds.
-- Provenance: evidence and asset records carry immutable digests and exact source/build/environment identities. Resolve each relative evidence path inside the manifest directory, require a bounded regular file, and recompute SHA-256 from its bytes.
+- Provenance: evidence and asset records carry immutable digests and exact source/build/environment identities. Resolve each relative evidence path inside the manifest directory, require a bounded regular file, recompute SHA-256 from its bytes, and parse its metadata to bind the payload to the exact acceptance, scenario/profile, hardware-preset, or baseline parent.
 - Release: runtime/release-shell change after HITL invalidates approval; production needs workflow, Pages, receipt, byte and rendered-route agreement.
 
 ## Validate
@@ -44,4 +44,4 @@ The first command must exit zero, the second must exit nonzero, and the self-tes
 
 This staging runner validates a completed deterministic matrix manifest against an independent 13-scenario oracle and the exact scenario/profile cross product. It distinguishes 40-hex Git SHAs from 64-hex SHA-256 digests, requires numeric late-join and match-end repair evidence, and checks High plus Max native-hardware receipts against frozen baseline/threshold arithmetic. After B1, replace its result loader with bounded test-group orchestration while retaining these fail-closed evidence checks.
 
-Artifact paths are relative to the matrix JSON directory. Missing files, traversal, symlink escape, empty/oversized evidence, or digest drift fail validation.
+Artifact paths are relative to the matrix JSON directory. Each JSON payload has machine-readable metadata that must exactly equal its parent identity; swapping otherwise byte-valid scenario, High/Max, baseline, or acceptance artifacts fails validation. Missing files, traversal, symlink escape, empty/oversized evidence, or digest drift also fail.

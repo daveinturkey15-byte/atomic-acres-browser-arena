@@ -1,7 +1,19 @@
 {
   "fixtureOnly": true,
-  "kind": "hardware-receipt",
-  "id": "high",
-  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "backend": "webgpu"
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "hardware-receipt",
+    "preset": "high",
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "backend": "webgpu",
+    "settingsHash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "sceneIds": [
+      "atomic-acres",
+      "skyline-terminal",
+      "rustworks-1v1",
+      "gun-range",
+      "combined-stress"
+    ]
+  }
 }

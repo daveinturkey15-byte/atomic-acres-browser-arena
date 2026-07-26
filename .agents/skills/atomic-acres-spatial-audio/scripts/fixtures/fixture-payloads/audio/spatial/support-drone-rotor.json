@@ -1,7 +1,13 @@
 {
+  "schemaVersion": 3,
   "fixtureOnly": true,
   "kind": "spatial-audio-evidence",
-  "id": "support.drone-rotor",
+  "eventId": "support.drone-rotor",
   "sourceAzimuthDeg": -65,
-  "observedPan": -0.78
+  "observedPan": -0.78,
+  "openGain": 0.75,
+  "occludedGain": 0.32,
+  "openLowPassHz": 17500,
+  "occludedLowPassHz": 2300,
+  "artifactPath": "fixture-payloads/audio/spatial/support-drone-rotor.json"
 }

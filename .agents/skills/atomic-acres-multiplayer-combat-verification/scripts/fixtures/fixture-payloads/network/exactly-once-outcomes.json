@@ -1,7 +1,12 @@
 {
   "fixtureOnly": true,
-  "kind": "network-matrix-cell",
-  "id": "exactly-once-outcomes",
-  "profileId": "moderate-chaos",
-  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "network-matrix-cell",
+    "scenarioId": "exactly-once-outcomes",
+    "profileId": "moderate-chaos",
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "buildId": "pass65-candidate-001",
+    "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
 }

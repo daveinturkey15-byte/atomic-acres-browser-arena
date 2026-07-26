@@ -1,6 +1,14 @@
-ATOMIC ACRES VIEWMODEL ASSET FIXTURE
-weapon=a4-vanguard
-collection=first-person
-lod=0
-triangles=90000
-fixtureOnly=true
+{
+  "fixtureOnly": true,
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "viewmodel-lod",
+    "presentationId": "a4-vanguard-view",
+    "weaponId": "a4-vanguard",
+    "collection": "first-person",
+    "level": 0,
+    "triangles": 90000,
+    "draws": 12,
+    "decodedTextureBytes": 67108864
+  }
+}
