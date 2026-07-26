@@ -13,6 +13,7 @@ import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './releas
 import { PASS65_HITL_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import './advanced-graphics.css';
+import { menuPreviewVideoMarkup } from './menu-preview-video';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -93,17 +94,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       </header>
       <aside id="menu-showcase" aria-hidden="true">
         <canvas id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="renderer-canvas" data-capture-status="empty"></canvas>
-        <div id="menu-preview-frame" data-frame="helicopter" data-arena="atomic-acres" data-motion="orbit">
-          <div class="preview-helicopter" data-cockpit-asset="pass65-sleek-cockpit-v1" data-asset-owner="atomic-acres-original">
-            <i class="cockpit-spine"></i><i class="cockpit-strut cockpit-strut-left"></i><i class="cockpit-strut cockpit-strut-right"></i>
-            <span class="cockpit-canopy-glass"></span>
-            <span class="cockpit-glareshield"><em></em><em></em><em></em><strong>AA // NAV</strong></span>
-            <b id="menu-preview-flight-data">ALT 018 // SPD 064</b>
-          </div>
-          <div class="preview-cat"><i></i><i></i><b></b><b></b><span>CAT-CAM</span></div>
-          <div class="preview-reticle"><i></i><b></b></div>
-        </div>
-        <div class="showcase-telemetry"><span id="menu-preview-label">HELO FLYOVER // NUKE TOWN</span><b id="menu-preview-motion">LIVE ORBIT</b></div>
+        ${menuPreviewVideoMarkup()}
+        <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
         <div class="map-selector-heading"><span>THEATRE INDEX</span><small>Four deployable spaces · choose before launch</small></div>

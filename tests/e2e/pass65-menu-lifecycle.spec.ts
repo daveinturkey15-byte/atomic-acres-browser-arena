@@ -131,7 +131,9 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
     await expect(page.locator('#menu')).toHaveAttribute('aria-hidden', 'false');
     await expect(page.locator('#menu-preview-frame')).toBeVisible();
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-motion', 'static');
-    await expect(page.locator('#menu-showcase > #game')).toBeVisible();
+    await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
+    await expect(page.locator('#menu-preview-poster')).toBeVisible();
+    await expect(page.locator('#menu-preview-video source')).toHaveCount(0);
     await expect(page.locator('#match-pause-backdrop')).toBeHidden();
     await expect(page.locator('img[src*="atomic-acres-menu-squad-joke"]')).toHaveCount(0);
   });

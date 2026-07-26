@@ -77,4 +77,14 @@ describe('Pass 65 command shell', () => {
     expect(markup).toContain('id="support-interaction-prompt"');
     expect(markup).toContain('<kbd>F</kbd><span>COLLECT KILLSTREAK</span>');
   });
+
+  it('ships a prerecorded menu preview surface instead of renderer-owned showcase geometry', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(markup).toContain('id="menu-preview-video"');
+    expect(markup).toContain('id="menu-preview-poster"');
+    expect(markup).toContain('autoplay loop muted playsinline preload="metadata"');
+    expect(markup).toContain('data-renderer-submissions="0"');
+    expect(markup).not.toContain('class="preview-helicopter"');
+    expect(markup).not.toContain('class="preview-cat"');
+  });
 });

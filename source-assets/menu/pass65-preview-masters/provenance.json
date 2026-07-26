@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "assetId": "atomic-acres-pass65-prerecorded-menu-previews-2026-07-26",
+  "generatedAt": "2026-07-26",
+  "creator": "Atomic Acres project",
+  "license": "Original project work",
+  "generator": {
+    "path": "scripts/assets/generate_pass65_menu_previews.py",
+    "sha256": "7a82af438a40674fcb82ddb9d2d19c979b1b545de7664e639388f54ba0b45a4f",
+    "blender": "5.1.2"
+  },
+  "sources": [
+    {
+      "arenaId": "atomic-acres",
+      "path": "source-assets/menu/pass65-preview-masters/atomic-acres.blend",
+      "sha256": "6a37116ccbc42f6e64fcefeb7d64053f0548f36a3d96bc6da6d11ef729daacfc",
+      "composition": "Original helicopter cockpit flyover of the Nuke Town theatre"
+    },
+    {
+      "arenaId": "skyline-terminal",
+      "path": "source-assets/menu/pass65-preview-masters/skyline-terminal.blend",
+      "sha256": "5c97073b201fa5676d89191a3ad5f91d3b32682f677e4093c20740be023950cd",
+      "composition": "Original helicopter cockpit flyover of the Terminal theatre"
+    },
+    {
+      "arenaId": "rustworks-1v1",
+      "path": "source-assets/menu/pass65-preview-masters/rustworks-1v1.blend",
+      "sha256": "3e9fbee4dddbe93c9e77a2e788d7148c7e47f217ef6a2d500617b5f0cc57d79b",
+      "composition": "Original helicopter cockpit flyover of the RustRig theatre"
+    },
+    {
+      "arenaId": "gun-range",
+      "path": "source-assets/menu/pass65-preview-masters/gun-range.blend",
+      "sha256": "f681075ab3b963754202f1a6ca9993aa31acfb7db6cb2ab0dabce8374b04680d",
+      "composition": "Original cat first-person prowl through the illuminated moving-target range"
+    }
+  ],
+  "render": {
+    "masterFrames": "192 PNG frames per arena (intermediate frames intentionally excluded from git)",
+    "dimensions": "960x540",
+    "frameRate": 24,
+    "durationSeconds": 8,
+    "motion": "Deterministic authored paths with bounded helicopter altitude, gaze, pitch and bank variation; animated main rotor; animated range targets; cat ears and paws",
+    "audio": "Project-generated low rotor harmonics for helicopter clips and a quieter tonal cat-range ambience; no sampled audio"
+  },
+  "runtimeFiles": [
+    { "path": "public/assets/original/menu-previews/atomic-acres.mp4", "sha256": "fae6ce1f11c8dc37c64c3d6a52ae03ddcfc041b4fe4e89b015f69d9d90fbf8d6" },
+    { "path": "public/assets/original/menu-previews/atomic-acres.webm", "sha256": "f3f6892bdfdbd7035d79d325b879eaf8f06deb4b41c10133106f7821d1a2094d" },
+    { "path": "public/assets/original/menu-previews/atomic-acres.webp", "sha256": "049627554b2b11bf31de1891cc11074cb1c8769b4894f13f7bd6fff44b566021" },
+    { "path": "public/assets/original/menu-previews/gun-range.mp4", "sha256": "232aaebe4ddce666c43f4ac36da2fc9713933d2cd0b8f027dfcd5af8db001f05" },
+    { "path": "public/assets/original/menu-previews/gun-range.webm", "sha256": "842cd51d05e7b9dd6fde9c808d21da9da8e43a4a75cd0a21cd9038d735194fe7" },
+    { "path": "public/assets/original/menu-previews/gun-range.webp", "sha256": "00e476fd509bd94ad75abdc7e2af16c6c81fe667bf1f629a3fa53e3a51c65288" },
+    { "path": "public/assets/original/menu-previews/rustworks-1v1.mp4", "sha256": "6c49ae0f24e518be3d3e1eb9fa829cd927c13453743de1aab24019428141b476" },
+    { "path": "public/assets/original/menu-previews/rustworks-1v1.webm", "sha256": "0a926ec863b9461993f71f71f71c5722c559a0f4424f96ceae8a7ba99e8e65d8" },
+    { "path": "public/assets/original/menu-previews/rustworks-1v1.webp", "sha256": "24bbe73c6762c39b615f1d8e0ce5e5cc756340f12e0b02c685e0e057e448a379" },
+    { "path": "public/assets/original/menu-previews/skyline-terminal.mp4", "sha256": "5b19a4df3f5ccc0230dd702d8eef7242eb5ead8f6866adfcad8b18855766b1b1" },
+    { "path": "public/assets/original/menu-previews/skyline-terminal.webm", "sha256": "3dfe84b94c8640aaafbfd1ec5bb6e744691ced9c46d55023e5dede15e5068096" },
+    { "path": "public/assets/original/menu-previews/skyline-terminal.webp", "sha256": "45351bfc2b32bc923c2d982dad37bb644732bd8bb8c4f5f70f1830a362027ec3" }
+  ],
+  "externalAssets": [],
+  "notes": "All visible geometry, materials, animation and audio are authored by the project generator from Blender primitives. The menu runtime decodes only the selected prerecorded clip and does not submit the gameplay renderer while maps are browsed."
+}

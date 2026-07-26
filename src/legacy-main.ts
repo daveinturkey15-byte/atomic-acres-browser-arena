@@ -58,12 +58,7 @@ import {
   type MenuLifecycleEvent,
   type PointerLockRequestSource,
 } from './ui/menu-lifecycle';
-import {
-  MENU_PREVIEW_VISIT_SEED_SLOTS,
-  menuPreviewDefinition,
-  menuPreviewPose,
-  menuPreviewVisitSeed,
-} from './ui/menu-preview-camera';
+import { MenuPreviewVideoController } from './ui/menu-preview-video';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
@@ -162,7 +157,7 @@ import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation, type WorldIdentityPresentation } from './world-identity-presentation';
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
-import { addNeighbourhoodLife, loadArenaArt, updateArenaArt, type ArenaArtResult } from './environment-assets';
+import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
 import { RUSTWORKS_BLENDER_ASSET, loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
@@ -735,9 +730,17 @@ const lowHealthVignette = element<HTMLElement>('#low-health-vignette');
 menu.dataset.context = 'deployment';
 const menuShowcase = element<HTMLElement>('#menu-showcase');
 const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
+const menuPreviewVideo = element<HTMLVideoElement>('#menu-preview-video');
+const menuPreviewPoster = element<HTMLImageElement>('#menu-preview-poster');
 const menuPreviewLabel = element<HTMLElement>('#menu-preview-label');
 const menuPreviewMotion = element<HTMLElement>('#menu-preview-motion');
-const menuPreviewFlightData = element<HTMLElement>('#menu-preview-flight-data');
+const menuPreviewVideoController = new MenuPreviewVideoController({
+  frame: menuPreviewFrame,
+  video: menuPreviewVideo,
+  poster: menuPreviewPoster,
+  label: menuPreviewLabel,
+  motion: menuPreviewMotion,
+});
 const matchPauseBackdrop = element<HTMLCanvasElement>('#match-pause-backdrop');
 const matchPauseBackdropContextValue = matchPauseBackdrop.getContext('2d', { alpha: false, willReadFrequently: true });
 if (!matchPauseBackdropContextValue) throw new Error('Canvas2D match pause backdrop is unavailable');
@@ -746,13 +749,7 @@ const resumeButton = element<HTMLButtonElement>('#resume');
 const mainMenuButton = element<HTMLButtonElement>('#main-menu');
 const canvasHomeAnchor = document.createComment('game-canvas-home');
 canvas.after(canvasHomeAnchor);
-const fixedMenuPreviewTimeRaw = new URLSearchParams(window.location.search).get('previewTime');
-const fixedMenuPreviewTimeMs = fixedMenuPreviewTimeRaw === null ? null : Number(fixedMenuPreviewTimeRaw);
 const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
-let menuPreviewStartedAt = performance.now();
-let menuPreviewVisitSerial = 0;
-let menuPreviewSeed = menuPreviewVisitSeed(configuredRuntimeSeed, menuPreviewVisitSerial);
-let menuPreviewActive = false;
 let menuLifecycle = INITIAL_MENU_LIFECYCLE_STATE;
 let lastGameplayPresentedFrame = 0;
 let lastGameplayBackdropFrame = 0;
@@ -803,8 +800,22 @@ let accessibilityRuntime = resolveAccessibilityRuntime(pass65Settings.accessibil
   reducedMotion: reducedMotionMedia.matches,
   reducedTransparency: reducedTransparencyMedia.matches,
 });
+function configureMenuPreviewAudio(settings: Pass65Settings = pass65Settings): void {
+  const masterGain = settings.audio.gains.master / 100;
+  const menuGain = settings.audio.gains['menu-music'] / 100;
+  menuPreviewVideoController.configureAudio(0.22 * masterGain * menuGain, (
+    settings.audio.mutes.master
+    || settings.audio.mutes['menu-music']
+    || accessibilityRuntime.reducedSensory
+  ));
+}
 audio.configure(pass65Settings.audio);
-const unlockAudioFromGesture = (event: Event) => { if (event.isTrusted) audio.unlock(); };
+configureMenuPreviewAudio();
+const unlockAudioFromGesture = (event: Event) => {
+  if (!event.isTrusted) return;
+  audio.unlock();
+  menuPreviewVideoController.unlockAudio();
+};
 window.addEventListener('pointerdown', unlockAudioFromGesture, { passive: true });
 window.addEventListener('keydown', unlockAudioFromGesture);
 
@@ -1078,6 +1089,7 @@ type BootstrapStage =
   | 'loading-module-assets'
   | 'measuring-display'
   | 'module-ready'
+  | 'menu-video-ready'
   | 'loading-gameplay-assets'
   | 'prewarming-combat-tracers'
   | 'prewarming-combat-impacts'
@@ -1092,6 +1104,7 @@ type BootstrapStage =
   | 'prewarming-overdrive'
   | 'finalizing'
   | 'verifying-first-presentation'
+  | 'gameplay-assets-ready'
   | 'ready'
   | 'failed';
 let bootstrapStage: BootstrapStage = 'loading-module-assets';
@@ -1107,14 +1120,7 @@ const displayCadencePromise = new Promise<number>((resolve) => {
   };
   requestAnimationFrame(sample);
 });
-const [operatorLoad] = await Promise.allSettled([
-  loadRiggedOperatorAsset(),
-]);
 bootstrapStage = 'measuring-display';
-if (operatorLoad.status === 'rejected') {
-  riggedOperatorLoadError = operatorLoad.reason instanceof Error ? operatorLoad.reason.message : String(operatorLoad.reason);
-  console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
-}
 const detectedDisplayFrameMs = await displayCadencePromise;
 bootstrapStage = 'module-ready';
 const configuredAdaptiveLevels = graphicsRuntime.adaptive && renderProfile !== 'compat'
@@ -1463,7 +1469,43 @@ async function retireAllArenasExcept(arenaId: ArenaId): Promise<void> {
   }
 }
 
-let arena: ArenaMap = ensureArenaConstructed(selectedArena.id);
+function createDormantMenuArena(arenaId: ArenaId): ArenaMap {
+  const root = new THREE.Group();
+  root.name = 'Dormant menu arena placeholder';
+  root.visible = false;
+  root.userData.menuOnlyPlaceholder = true;
+  return {
+    id: arenaId,
+    label: arenaSelection(arenaId).displayName,
+    root,
+    colliders: [],
+    physicsColliders: [],
+    raycastMeshes: [],
+    shotSurfaces: [],
+    spawns: { 0: [], 1: [] },
+    patrolPoints: [],
+    targets: [],
+    houses: [],
+    breakableWindows: [],
+    physicalCover: [],
+    bounds: { minX: -1, maxX: 1, minZ: -1, maxZ: 1, minY: 0, maxY: 2 },
+    houseTelemetry: {
+      houses: 0,
+      groundRooms: 0,
+      upperRooms: 0,
+      doors: 0,
+      windows: 0,
+      ramps: 0,
+      wallMaterialVariants: 0,
+      pbrMaterialFamilies: 0,
+    },
+  };
+}
+
+// The menu owns prerecorded media. Do not construct, stream, compile, upload,
+// or submit any gameplay arena until the player explicitly deploys.
+let arena: ArenaMap = createDormantMenuArena(selectedArena.id);
+let gameplayArenaPrepared = false;
 let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
 let interactiveWorldTick = 0;
@@ -1588,7 +1630,6 @@ function stepInteractiveWorldAuthority(): void {
   broadcastInteractiveWorldState();
 }
 
-interactiveWorldRuntime = createInteractiveWorldRuntime(selectedArena.id, interactiveWorldMatchEpoch, true);
 let worldIdentityPresentation: WorldIdentityPresentation | null = null;
 let neighbourhoodLifeRoot: THREE.Group | null = null;
 
@@ -1599,9 +1640,8 @@ function ensureAtomicWorldPresentation(): void {
   if (!neighbourhoodLifeRoot) neighbourhoodLifeRoot = addNeighbourhoodLife(scene, reducedWorldDetail);
 }
 
-if (selectedArena.id === 'atomic-acres') ensureAtomicWorldPresentation();
 const arenaVisualStream = new ArenaVisualStreamController(scene);
-let arenaVisualReceipt: ArenaVisualSwitchReceipt = await arenaVisualStream.adoptGameplayRoot(selectedArena.id, arena.root);
+let arenaVisualReceipt: ArenaVisualSwitchReceipt | null = null;
 const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
 let pass64TslSystems: Pass64TslSceneSystems | null = null;
 let appliedTslArenaDefinitions = 0;
@@ -1696,8 +1736,6 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   activeArenaReviewExposure = null;
   activeArenaReviewHud = null;
 }
-await configurePlayableArenaVisuals(selectedArena.id, arena.root);
-
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
   const staticSurfaces = activeArena.shotSurfaces.filter(
@@ -2014,7 +2052,6 @@ async function ensureAtomicAuthoredPresentation(): Promise<THREE.Group | null> {
     qualityAssetStreaming.atomicAcres = 'ready';
     bindAtomicPresentationRaycasts(art.root, authority);
     graphicsRefinement.refine(art.root, maximumAnisotropy);
-    await renderRuntime.compile(scene, camera);
     return art.root;
   });
   return atomicAuthoredLoadPromise;
@@ -2039,7 +2076,6 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       qualityAssetStreaming.atomicAcres = 'ready';
       bindAtomicPresentationRaycasts(art.root, authority);
       graphicsRefinement.refine(art.root, maximumAnisotropy);
-      await renderRuntime.compile(scene, camera);
       return art.root;
     } catch (error) {
       markBlenderArenaFallback(error);
@@ -2052,7 +2088,6 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       qualityAssetStreaming.atomicAcres = 'fallback';
       bindAtomicPresentationRaycasts(fallback.root, authority);
       graphicsRefinement.refine(fallback.root, maximumAnisotropy);
-      await renderRuntime.compile(scene, camera);
       return fallback.root;
     }
   })();
@@ -2072,7 +2107,6 @@ async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null>
     setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
     qualityAssetStreaming.rustworks = 'ready';
     graphicsRefinement.refine(root, maximumAnisotropy);
-    await renderRuntime.compile(scene, camera);
     return root;
   }).catch((error) => {
     markRustworksBlenderFallback(error);
@@ -6765,6 +6799,14 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   if (!requiredName) return;
   matchStartPreparing = true;
   try {
+  const requestedArenaId = selectedArena.id;
+  if (!gameplayArenaPrepared || arena.id !== requestedArenaId) {
+    setStatus(`Streaming ${selectedArena.displayName} gameplay for deployment…`);
+    await activateArenaSelection(requestedArenaId, true);
+    if (!gameplayArenaPrepared || arena.id !== requestedArenaId) {
+      throw new Error(`Selected arena ${requestedArenaId} did not commit before match start`);
+    }
+  }
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
   fieldSupport = createFieldSupportState(frozenKillstreakLoadout);
@@ -12486,6 +12528,7 @@ function applyAccessibilitySettings(): void {
   });
   document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
   document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
+  configureMenuPreviewAudio();
   damageFlash.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
   element<HTMLElement>('#accessibility-effective').textContent = accessibilityRuntime.reducedSensory
     ? `REDUCED SENSORY · ${accessibilityRuntime.reasons.join(' + ') || 'PLAYER'}`
@@ -12541,6 +12584,7 @@ for (const id of AUDIO_BUS_IDS) {
     }, capabilityHints);
     audio.configure(next.audio);
     persistPass65Settings(next);
+    configureMenuPreviewAudio(next);
   };
   gain.addEventListener('input', apply);
   mute.addEventListener('change', apply);
@@ -12937,108 +12981,43 @@ function menuPreviewShouldBeActive(): boolean {
 
 function syncMenuPreviewCanvasPlacement(): void {
   const active = menuPreviewShouldBeActive();
-  if (active && canvas.parentElement !== menuShowcase) {
-    menuShowcase.insertBefore(canvas, menuPreviewFrame);
-  } else if (!active && canvas.parentElement === menuShowcase && canvasHomeAnchor.parentNode) {
+  if (canvas.parentElement === menuShowcase && canvasHomeAnchor.parentNode) {
     canvasHomeAnchor.parentNode.insertBefore(canvas, canvasHomeAnchor);
   }
-  menuPreviewActive = active;
+  menuPreviewVideoController.setActive(active);
   menuShowcase.dataset.previewActive = String(active);
-  document.documentElement.dataset.menuPreview = active ? 'live-arena' : 'inactive';
+  document.documentElement.dataset.menuPreview = active ? 'prerecorded-video' : 'inactive';
   if (!active) {
     camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
     camera.updateProjectionMatrix();
   }
 }
 
-function applyMenuPreviewCamera(now: number): boolean {
-  if (!menuPreviewActive || debugCaptureCameraActive) return false;
-  const reducedMotion = accessibilityRuntime.reducedMotion;
-  const elapsedMs = Number.isFinite(fixedMenuPreviewTimeMs)
-    ? Math.max(0, fixedMenuPreviewTimeMs ?? 0)
-    : Math.max(0, now - menuPreviewStartedAt);
-  const pose = menuPreviewPose(selectedArena.id, elapsedMs, reducedMotion, menuPreviewSeed);
-  const definition = menuPreviewDefinition(selectedArena.id);
-  camera.position.set(...pose.position);
-  camera.lookAt(...pose.target);
-  camera.rotateZ(pose.bankRadians);
-  camera.fov = pose.fov;
-  const bounds = menuShowcase.getBoundingClientRect();
-  if (bounds.width > 0 && bounds.height > 0) camera.aspect = bounds.width / bounds.height;
-  camera.updateProjectionMatrix();
-  camera.updateMatrixWorld(true);
-  menuPreviewFrame.dataset.frame = definition.frame;
-  menuPreviewFrame.dataset.arena = selectedArena.id;
-  menuPreviewFrame.dataset.motion = reducedMotion || Number.isFinite(fixedMenuPreviewTimeMs) ? 'static' : 'orbit';
-  menuPreviewFrame.dataset.phase = pose.phase.toFixed(6);
-  menuPreviewFrame.dataset.pathProgress = pose.pathProgress.toFixed(6);
-  menuPreviewFrame.dataset.presentation = pose.presentationId;
-  menuPreviewFrame.dataset.moment = pose.momentLabel;
-  menuPreviewFrame.dataset.pitch = pose.variance.pitchDegrees.toFixed(3);
-  menuPreviewFrame.dataset.yaw = pose.variance.yawDegrees.toFixed(3);
-  menuPreviewFrame.dataset.bank = pose.variance.bankDegrees.toFixed(3);
-  menuPreviewFrame.dataset.altitudeOffset = pose.variance.altitudeM.toFixed(3);
-  menuPreviewFrame.dataset.speedScale = pose.variance.speedScale.toFixed(4);
-  menuPreviewFrame.dataset.visit = String(menuPreviewVisitSerial);
-  menuPreviewLabel.textContent = definition.label;
-  menuPreviewMotion.textContent = definition.frame === 'cat'
-    ? reducedMotion ? 'FIRST-PERSON HOLD' : `FIRST-PERSON PROWL // ${pose.momentLabel}`
-    : reducedMotion ? 'STABILIZED HOLD' : 'SEEDED PILOTED ORBIT';
-  menuPreviewFlightData.textContent = definition.frame === 'cat'
-    ? 'CAT POV // SOFT STEP'
-    : `ALT ${Math.round(pose.position[1]).toString().padStart(3, '0')} // SPD ${Math.round(64 * pose.variance.speedScale).toString().padStart(3, '0')}`;
-  return true;
-}
-
 function setArenaMenuCamera(): void {
-  menuPreviewVisitSerial = (menuPreviewVisitSerial + 1) % MENU_PREVIEW_VISIT_SEED_SLOTS;
-  menuPreviewSeed = menuPreviewVisitSeed(configuredRuntimeSeed, menuPreviewVisitSerial);
-  menuPreviewStartedAt = performance.now();
+  menuPreviewVideoController.select(selectedArena.id, accessibilityRuntime.reducedMotion);
   syncMenuPreviewCanvasPlacement();
-  if (applyMenuPreviewCamera(menuPreviewStartedAt)) return;
-  const centreX = (arena.bounds.minX + arena.bounds.maxX) / 2;
-  const centreZ = (arena.bounds.minZ + arena.bounds.maxZ) / 2;
-  if (selectedArena.id === 'gun-range') {
-    camera.position.set(17, 5.35, 17.5);
-    camera.lookAt(0, 1.65, -28);
-  } else if (selectedArena.id === 'rustworks-1v1') {
-    // Keep the tall tower on the unobstructed right side of the deployment panel.
-    camera.position.set(18, 20, -28);
-    camera.lookAt(centreX + 14, 5.8, centreZ);
-  } else if (selectedArena.id === 'skyline-terminal') {
-    // Compose the facade, jetbridge and aircraft from the open apron. The old
-    // high concourse camera could sit behind dark roof/soffit geometry and
-    // leave the deploy-menu preview black even after selection completed.
-    camera.position.set(29, 10.5, 27);
-    camera.lookAt(1.5, 3.35, -6);
-  } else {
-    camera.position.set(centreX, 31, centreZ - 22);
-    camera.lookAt(centreX, 0.8, centreZ);
-  }
-  camera.fov = 65;
-  camera.updateProjectionMatrix();
 }
 
 const menuPreviewObserver = new MutationObserver(syncMenuPreviewCanvasPlacement);
 menuPreviewObserver.observe(menu, { attributes: true, attributeFilter: ['class'] });
 menuPreviewObserver.observe(element<HTMLElement>('#menu-panel-deploy'), { attributes: true, attributeFilter: ['hidden'] });
-reducedMotionMedia.addEventListener('change', () => applyMenuPreviewCamera(performance.now()));
+reducedMotionMedia.addEventListener('change', () => setArenaMenuCamera());
 syncMenuLifecyclePresentation();
 syncMenuPreviewCanvasPlacement();
-function animateMenuPreview(now: number): void {
-  applyMenuPreviewCamera(now);
-  requestAnimationFrame(animateMenuPreview);
-}
-requestAnimationFrame(animateMenuPreview);
 
-async function performArenaSelection(id: ArenaId): Promise<void> {
-  if (gameStarted || matchStartPreparing || !arenaSelectionReady || id === selectedArena.id) return;
+async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): Promise<void> {
+  if (gameStarted
+    || matchStartPreparing && !allowWhilePreparing
+    || !arenaSelectionReady
+    || gameplayArenaPrepared && id === arena.id) return;
   arenaTransitionGeneration += 1;
   const nextSelection = arenaSelection(id);
-  const previousSelection = selectedArena;
+  const previousSelection = gameplayArenaPrepared ? arenaSelection(arena.id) : selectedArena;
   const previousArena = arena;
   const previousPhysics = characterPhysics;
   const previousInteractiveWorldRuntime = interactiveWorldRuntime;
+  const hadPreparedArena = gameplayArenaPrepared;
+  let nextArena: ArenaMap | null = null;
   let nextPhysics: CharacterPhysics | null = null;
   let nextInteractiveWorldRuntime: InteractiveWorldRuntime | null = null;
   let committed = false;
@@ -13049,14 +13028,15 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
   arenaTransitionCompletedAt = null;
   arenaTransitionFailure = null;
   syncArenaSelectionUi();
-  setStatus(`Loading ${nextSelection.displayName} collision…`);
+  setStatus(`Preparing ${nextSelection.displayName} deployment assets…`);
   try {
+    await prepareSharedGameplayAssets();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
     // buffers from being detached or destroyed while the queue still uses it.
     await flushWebGpuFrames();
     arenaTransitionPhase = 'preparing';
-    const nextArena = ensureArenaConstructed(nextSelection.id);
+    nextArena = ensureArenaConstructed(nextSelection.id);
     nextInteractiveWorldRuntime = createInteractiveWorldRuntime(
       nextSelection.id,
       interactiveWorldMatchEpoch,
@@ -13080,6 +13060,15 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     document.documentElement.dataset.arenaId = selectedArena.id;
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
     await ensureSelectedQualityPresentation(selectedArena.id);
+    materialCompatibility = tuneMaterialsForAtomicSignal(
+      scene,
+      weaponView.root,
+      renderProfile,
+      maximumAnisotropy,
+    );
+    graphicsRefinement.refine(scene, maximumAnisotropy);
+    await waitForPendingArtTextures();
+    batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
     matchState = createMatch(performance.now(), selectedArena.matchRules);
     lastPlayerSpawnIndex = -1;
@@ -13118,6 +13107,9 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     await retireAllArenasExcept(selectedArena.id);
     renderHighScores();
     committed = true;
+    gameplayArenaPrepared = true;
+    bootstrapStage = 'ready';
+    document.documentElement.dataset.gameplayArena = selectedArena.id;
     previousInteractiveWorldRuntime?.dispose();
     try {
       previousPhysics?.dispose();
@@ -13133,6 +13125,10 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     selectedArena = previousSelection;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
+    gameplayArenaPrepared = hadPreparedArena;
+    document.documentElement.dataset.gameplayArena = hadPreparedArena
+      ? previousArena.id
+      : 'deferred-until-deployment';
     if (interactiveWorldRuntime) {
       scene.add(interactiveWorldRuntime.root);
       interactiveWorldRuntime.root.visible = true;
@@ -13141,7 +13137,14 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     document.documentElement.dataset.arenaId = selectedArena.id;
-    try {
+    if (!hadPreparedArena) {
+      arenaVisualReceipt = null;
+      nextArena?.root.removeFromParent();
+      if (nextArena) nextArena.root.visible = false;
+      arenaTransitionPhase = 'failed';
+      setArenaMenuCamera();
+      setStatus(`${nextSelection.displayName} deployment preparation failed. Choose a map and retry.`, 'warn');
+    } else try {
       await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
       await ensureSelectedQualityPresentation(selectedArena.id);
       await retireAllArenasExcept(selectedArena.id);
@@ -13180,18 +13183,30 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
   }
 }
 
-function activateArenaSelection(id: ArenaId): Promise<void> {
+function activateArenaSelection(id: ArenaId, allowWhilePreparing = false): Promise<void> {
   const queued = arenaSelectionTask
     .catch(() => undefined)
-    .then(() => performArenaSelection(id));
+    .then(() => performArenaSelection(id, allowWhilePreparing));
   arenaSelectionTask = queued;
   return queued;
+}
+
+function stageMenuArenaSelection(id: ArenaId): void {
+  if (gameStarted || matchStartPreparing || !arenaSelectionReady || network.role !== 'offline' || privateLobbySnapshot) return;
+  const nextSelection = arenaSelection(id);
+  if (nextSelection.id === selectedArena.id) return;
+  selectedArena = nextSelection;
+  document.documentElement.dataset.menuArenaId = selectedArena.id;
+  syncArenaSelectionUi();
+  setArenaMenuCamera();
+  renderHighScores();
+  setStatus(`${selectedArena.displayName} selected · prerecorded preview ready · gameplay streams on deployment.`);
 }
 
 for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[data-arena-id]')) {
   button.addEventListener('click', () => {
     const id = button.dataset.arenaId as ArenaId | undefined;
-    if (id) void activateArenaSelection(id);
+    if (id) stageMenuArenaSelection(id);
   });
 }
 
@@ -13426,6 +13441,7 @@ window.addEventListener('beforeunload', () => {
   persistRoomIdentityForCloseTabRejoin();
   matchDiagnosticUploader.flushForPageLifecycle();
   network.close();
+  menuPreviewVideoController.dispose();
   pass64TslSystems?.dispose();
   arenaVisualStream.dispose();
   retireAtomicPresentation();
@@ -13614,7 +13630,8 @@ function frame(now: number, scheduleNext = true): void {
       camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
       camera.updateMatrixWorld(true);
     }
-    if (!debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
+    const rendererFrameEligible = gameStarted && menuLifecycle.surface === 'hidden' || debugCaptureCameraActive;
+    if (rendererFrameEligible && !debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
       let frameSubmitted = false;
       if (renderRuntime.backend === 'webgpu') {
         frameSubmitted = submitWebGpuFrame(now);
@@ -14608,7 +14625,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     activeImpactParticles: impactPresentation.activeParticles(),
     activeImpactMarks: impactPresentation.activeMarks(),
     activeTracers: tracerPool.activeCount(),
-    originalArtLoaded: blenderArenaActive || scene.getObjectByName('original-arena-art') !== undefined,
+    originalArtLoaded: gameplayArenaPrepared
+      ? blenderArenaActive || scene.getObjectByName('original-arena-art') !== undefined
+      : menuPreviewVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA || menuPreviewPoster.naturalWidth > 0,
     arenaZone: classifyArenaZone(player.position.x, player.position.z),
     worldIdentity: routeIdentityTelemetry(),
     worldIdentityPresentation: {
@@ -14728,14 +14747,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       towerNdc: new THREE.Vector3(0, 6, 0).project(camera).toArray(),
     },
     menuPreview: {
-      active: menuPreviewActive,
+      ...menuPreviewVideoController.snapshot(),
       frame: menuPreviewFrame.dataset.frame,
       arena: menuPreviewFrame.dataset.arena,
       motion: menuPreviewFrame.dataset.motion,
-      phase: menuPreviewFrame.dataset.phase,
+      phase: menuPreviewVideo.currentTime.toFixed(3),
       canvasParent: canvas.parentElement?.id ?? null,
       context: menuShowcase.dataset.menuContext,
       label: menuPreviewLabel.textContent,
+      videoPaused: menuPreviewVideo.paused,
+      videoReadyState: menuPreviewVideo.readyState,
+      videoCurrentSrc: menuPreviewVideo.currentSrc,
+      rendererEvidence: {
+        renderCalls: renderRuntime.renderInfo().calls,
+        presentation: renderRuntime.presentationTelemetry(),
+        gameplayArenaPrepared,
+        arenaConstructionCount: arenaConstructionHistory.length,
+      },
     },
     render: {
       profile: renderProfile,
@@ -15628,154 +15656,105 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
 
 };
 
-async function bootstrap(): Promise<void> {
-  const soloButton = element<HTMLButtonElement>('#solo');
-  const hostButton = element<HTMLButtonElement>('#host');
-  const joinButton = element<HTMLButtonElement>('#join');
-  soloButton.disabled = true;
-  hostButton.disabled = true;
-  joinButton.disabled = true;
-  bootstrapStage = 'loading-gameplay-assets';
-  setStatus('Loading authored arena art, weapons and advanced collision…');
+let menuWeaponAssetPromise: Promise<void> | null = null;
+let sharedGameplayAssetsPromise: Promise<void> | null = null;
 
-  const physicsPromise = CharacterPhysics.create(arena.physicsColliders, arena.bounds);
-  const weaponPromise = weaponView.load((loaded, total) => {
-    setStatus(`Loading authored weapons ${loaded}/${total}…`);
+async function prepareMenuWeaponAsset(): Promise<void> {
+  if (menuWeaponAssetPromise) return menuWeaponAssetPromise;
+  menuWeaponAssetPromise = weaponView.load().then(() => {
+    // Decoding the shared viewmodel after the video menu becomes interactive
+    // preserves legacy readiness consumers without compiling or submitting a
+    // selected gameplay arena.
+    weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
+  }).catch((error) => {
+    menuWeaponAssetPromise = null;
+    throw error;
   });
-  const artPromise: Promise<ArenaArtResult | null> = selectedArena.id !== 'atomic-acres'
-    ? Promise.resolve(null)
-    : renderProfile === 'blender'
-    ? (async () => {
-        qualityAssetStreaming.eagerQualityGlbs += 1;
-        try {
-          arenaVisualStream.recordSelectedAssetRequest('atomic-acres', BLENDER_ARENA_ASSET);
-          const art = await loadBlenderArena(scene, arena, (loaded, total) => {
-            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
-            setStatus(`Loading Quality Graphics arena ${percent}%…`);
-          });
-          blenderArenaActive = true;
-          qualityAssetStreaming.atomicAcres = 'ready';
-          return art;
-        } catch (error) {
-          markBlenderArenaFallback(error);
-          qualityAssetStreaming.atomicAcres = 'fallback';
-          console.error('[Nuke Town Quality Graphics asset load failed; using authored fallback]', error);
-          return loadArenaArt(scene, (loaded, total) => {
-            setStatus(`Quality Graphics fallback ${loaded}/${total}…`);
-          }, false);
-        }
-      })()
-    : loadArenaArt(scene, (loaded, total) => {
-        setStatus(`Loading authored arena models ${loaded}/${total}…`);
-      }, reducedWorldDetail);
-  const rustworksArtPromise = renderProfile === 'blender' && selectedArena.id === 'rustworks-1v1'
-    ? (qualityAssetStreaming.eagerQualityGlbs += 1,
-      arenaVisualStream.recordSelectedAssetRequest('rustworks-1v1', RUSTWORKS_BLENDER_ASSET),
-      loadRustworksBlenderTower(arena.root)).then((root) => {
-        // The retired GLB remains hidden; procedural geometry owns visibility and collision.
-        setRustworksProceduralPresentationVisible(arena.root, true);
-        setRustworksQualityPresentationActive(selectedArena.id === 'rustworks-1v1', renderProfile);
-        qualityAssetStreaming.rustworks = 'ready';
-        return root;
-      }).catch((error) => {
-        markRustworksBlenderFallback(error);
-        qualityAssetStreaming.rustworks = 'fallback';
-        console.error('[RustRig Blender tower asset load failed; keeping procedural tower]', error);
-        applyRustworksPresentationProfile(arena.root, renderProfile);
-        setRustworksProceduralPresentationVisible(arena.root, true);
-        return null;
-      })
-    : Promise.resolve(null).then((value) => {
-        if (selectedArena.id === 'rustworks-1v1') {
-          applyRustworksPresentationProfile(arena.root, renderProfile);
-          setRustworksProceduralPresentationVisible(arena.root, true);
-        }
-        return value;
-      });
-  const grenadePromise = loadGrenadePresentation();
-  const hunterDronePromise = loadHunterDronePresentation();
-  const [physics, , art] = await Promise.all([
-    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise, hunterDronePromise,
-  ]);
-  characterPhysics = physics;
-  syncInteractiveWorldPhysics(true);
-  arenaArtRoot = art?.root ?? null;
-  // First-person geometry is composited after world depth is cleared. Contact
-  // retreat still keeps it visually tucked near walls, while floor/wall depth
-  // can no longer cut holes through hands and weapons in prone/crouch poses.
-  weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
-  bootstrapStage = 'prewarming-combat-tracers';
-  await tracerPool.prewarm(renderRuntime, camera);
-  bootstrapStage = 'prewarming-combat-impacts';
-  await impactPresentation.prewarm(renderRuntime, camera);
-  bootstrapStage = 'prewarming-grenade-explosion';
-  await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
-  bootstrapStage = 'prewarming-support-explosion';
-  await supportExplosionPresentation.prewarm(renderRuntime, camera);
-  bootstrapStage = 'prewarming-death-drops';
-  await deathDropPresentationPool.prewarm(renderRuntime, camera);
-  bootstrapStage = 'prewarming-nuke';
-  await prewarmNukePresentation();
-  bootstrapStage = 'binding-world';
-  if (selectedArena.id === 'atomic-acres' && art) bindAtomicPresentationRaycasts(art.root, arena);
-  materialCompatibility = tuneMaterialsForAtomicSignal(
-    scene,
-    weaponView.root,
-    renderProfile,
-    maximumAnisotropy,
-  );
-  graphicsRefinement.refine(scene, maximumAnisotropy);
-  bootstrapStage = 'waiting-for-authored-textures';
-  await waitForPendingArtTextures();
-  bootstrapStage = 'compiling-scene';
-  await renderRuntime.compile(scene, camera);
-  bootstrapStage = 'batching-static-meshes';
-  const arenaRoot = arena.root;
-  if (selectedArena.id === 'rustworks-1v1' && renderProfile === 'blender') {
-    enhanceRustworksQualityMaterials(arenaRoot, renderProfile);
-  } else if (!(selectedArena.id === 'atomic-acres' && blenderArenaActive)
-    && !(renderRuntime.backend === 'webgl2' && selectedArena.id === 'skyline-terminal')) {
-    batchStaticMeshes(arenaRoot, arenaRoot, () => '', staticMaterialMode);
-  }
-  if (selectedArena.id === 'atomic-acres' && !blenderArenaActive) {
-    const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
-    if (art) batchStaticMeshes(art.root, art.root, () => '', decorativeMaterialMode);
-  }
-  const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
-  if (neighbourhoodLifeRoot) batchStaticMeshes(neighbourhoodLifeRoot, neighbourhoodLifeRoot, () => '', lifeMaterialMode);
-  bootstrapStage = 'prewarming-overdrive';
-  await prewarmOverdrivePresentation();
-  bootstrapStage = 'finalizing';
-  if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh();
-  weaponView.setWeapon(player.weapon, true);
-  setArenaPresentationVisibility();
-  respawn();
-  weaponView.root.visible = false;
-  setArenaMenuCamera();
-
-  // Scene compilation alone does not prove that WebGPU can submit and retire
-  // the first complete frame. Do that while bootstrap still owns the loading
-  // surface so the runtime watchdog only arms after a real presentation fence.
-  bootstrapStage = 'verifying-first-presentation';
-  renderRuntime.resetRenderInfo();
-  if (renderRuntime.backend === 'webgpu') {
-    await settleWebGpuPresentation('Initial arena');
-    const initialPresentation = renderRuntime.presentationTelemetry();
-    // Three resets per-frame draw-call counters before this awaited queue
-    // fence can return. Queue completion is the bootstrap invariant; the
-    // hardware QA's HDR readback and luminance gates prove pixel content.
-    if (initialPresentation.status !== 'healthy') {
-      throw new Error(`Initial WebGPU presentation was not healthy: ${JSON.stringify(initialPresentation)}`);
-    }
-  } else {
-    atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
-  }
-
-  arenaSelectionReady = true;
-  syncArenaSelectionUi();
-  setStatus(`${selectedArena.displayName} ready · ${selectedArena.rulesLabel}.`);
-  bootstrapStage = 'ready';
-  requestAnimationFrame(frame);
+  return menuWeaponAssetPromise;
 }
 
-void bootstrap().catch(showFatalError);
+function batchPresentationRootOnce(root: THREE.Group, materialMode: typeof staticMaterialMode): void {
+  if (root.userData.pass65StaticBatchReady === true) return;
+  batchStaticMeshes(root, root, () => '', materialMode);
+  root.userData.pass65StaticBatchReady = true;
+}
+
+function batchSelectedArenaPresentation(): void {
+  const arenaRoot = arena.root;
+  if (selectedArena.id === 'rustworks-1v1' && renderProfile === 'blender') {
+    if (arenaRoot.userData.pass65StaticBatchReady !== true) {
+      enhanceRustworksQualityMaterials(arenaRoot, renderProfile);
+      arenaRoot.userData.pass65StaticBatchReady = true;
+    }
+  } else if (!(selectedArena.id === 'atomic-acres' && blenderArenaActive)
+    && !(renderRuntime.backend === 'webgl2' && selectedArena.id === 'skyline-terminal')) {
+    batchPresentationRootOnce(arenaRoot, staticMaterialMode);
+  }
+  if (selectedArena.id === 'atomic-acres' && !blenderArenaActive && arenaArtRoot) {
+    const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+    batchPresentationRootOnce(arenaArtRoot, decorativeMaterialMode);
+  }
+  if (neighbourhoodLifeRoot) {
+    const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+    batchPresentationRootOnce(neighbourhoodLifeRoot, lifeMaterialMode);
+  }
+}
+
+async function prepareSharedGameplayAssets(): Promise<void> {
+  if (sharedGameplayAssetsPromise) return sharedGameplayAssetsPromise;
+  sharedGameplayAssetsPromise = (async () => {
+    bootstrapStage = 'loading-gameplay-assets';
+    const operatorPromise = loadRiggedOperatorAsset().catch((error: unknown) => {
+      riggedOperatorLoadError = error instanceof Error ? error.message : String(error);
+      console.error('[Nuke Town operator asset load failed]', riggedOperatorLoadError);
+    });
+    await Promise.all([
+      operatorPromise,
+      prepareMenuWeaponAsset(),
+      loadGrenadePresentation(),
+      loadHunterDronePresentation(),
+    ]);
+    // First-person geometry is composited after world depth is cleared. Contact
+    // retreat still keeps it tucked near walls without world geometry cutting
+    // holes through hands and weapons.
+    weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
+    bootstrapStage = 'prewarming-combat-tracers';
+    await tracerPool.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-combat-impacts';
+    await impactPresentation.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-grenade-explosion';
+    await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-support-explosion';
+    await supportExplosionPresentation.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-death-drops';
+    await deathDropPresentationPool.prewarm(renderRuntime, camera);
+    bootstrapStage = 'prewarming-nuke';
+    await prewarmNukePresentation();
+    bootstrapStage = 'prewarming-overdrive';
+    await prewarmOverdrivePresentation();
+    weaponView.setWeapon(player.weapon, true);
+    weaponView.root.visible = false;
+    bootstrapStage = 'gameplay-assets-ready';
+  })().catch((error) => {
+    sharedGameplayAssetsPromise = null;
+    throw error;
+  });
+  return sharedGameplayAssetsPromise;
+}
+
+function bootstrapMenuPreview(): void {
+  document.documentElement.dataset.gameplayArena = 'deferred-until-deployment';
+  arenaSelectionReady = true;
+  syncArenaSelectionUi();
+  setArenaMenuCamera();
+  setStatus(`${selectedArena.displayName} preview ready · gameplay streams only when you deploy.`);
+  bootstrapStage = 'menu-video-ready';
+  requestAnimationFrame(frame);
+  window.setTimeout(() => {
+    void prepareMenuWeaponAsset().then(() => {
+      if (bootstrapStage === 'menu-video-ready') bootstrapStage = 'ready';
+    }).catch(showFatalError);
+  }, 0);
+}
+
+bootstrapMenuPreview();

@@ -1,8 +1,21 @@
-import { mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const BASE_QUERY = '?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off';
+
+type PreviewEvidence = {
+  arenaId: string;
+  generation: number;
+  sourceCount: number;
+  mediaState: string;
+  videoCurrentSrc: string;
+  videoPaused: boolean;
+  rendererEvidence: {
+    renderCalls: number;
+    presentation: { submissionSequence: number };
+    gameplayArenaPrepared: boolean;
+    arenaConstructionCount: number;
+  };
+};
 
 async function stubExternalBoards(page: Page): Promise<void> {
   await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({
@@ -24,134 +37,111 @@ async function stubExternalBoards(page: Page): Promise<void> {
 
 async function waitForPreview(page: Page): Promise<void> {
   await page.waitForFunction(() => {
-    const debug = window.__ATOMIC_ACRES_DEBUG__;
-    const snapshot = debug?.snapshot();
-    const frame = document.querySelector<HTMLElement>('#menu-preview-frame');
-    return snapshot?.weaponReady === true
-      && snapshot.bootstrap.stage === 'ready'
-      && Number(frame?.dataset.visit) > 0
-      && Boolean(frame?.dataset.presentation);
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    const preview = snapshot?.menuPreview as PreviewEvidence | undefined;
+    return (snapshot?.bootstrap.stage === 'menu-video-ready' || snapshot?.bootstrap.stage === 'ready')
+      && preview?.sourceCount === 2
+      && Boolean(document.querySelector('#menu-preview-video'));
   }, undefined, { timeout: 30_000 });
 }
 
-async function cameraPosition(page: Page): Promise<number[]> {
-  return page.evaluate(() => (
-    window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }
-  ).position);
+async function previewEvidence(page: Page): Promise<PreviewEvidence> {
+  return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview as PreviewEvidence);
 }
 
-function travel(from: readonly number[], to: readonly number[]): number {
-  return Math.hypot(...to.map((value, index) => value - (from[index] ?? 0)));
-}
-
-async function capture(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  const directory = resolve(process.cwd(), 'artifacts/pass65/preview-choreography');
-  mkdirSync(directory, { recursive: true });
-  const path = resolve(directory, `${name}.png`);
-  await page.screenshot({ path, animations: 'disabled' });
-  await testInfo.attach(name, { path, contentType: 'image/png' });
-}
-
-test.describe('Pass 65 menu preview choreography', () => {
+test.describe('Pass 65 prerecorded menu previews', () => {
   test.beforeEach(async ({ page }) => stubExternalBoards(page));
 
-  test('advances a bounded seeded helicopter pose without console errors', async ({ page }) => {
+  test('browses all map videos with zero gameplay construction or renderer submissions', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
-    await page.goto(`/${BASE_QUERY}&seed=pass65-live-preview`);
+    await page.goto(`/${BASE_QUERY}`);
     await waitForPreview(page);
-    const before = await page.evaluate(() => {
-      const frame = document.querySelector<HTMLElement>('#menu-preview-frame')!;
-      return {
-        position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
-        phase: Number(frame.dataset.phase),
-        pitch: Number(frame.dataset.pitch),
-        yaw: Number(frame.dataset.yaw),
-        bank: Number(frame.dataset.bank),
-        altitude: Number(frame.dataset.altitudeOffset),
-        speed: Number(frame.dataset.speedScale),
-        cockpit: document.querySelector<HTMLElement>('.preview-helicopter')?.dataset.cockpitAsset,
-      };
-    });
-    await page.waitForTimeout(500);
-    const after = await page.evaluate(() => {
-      const frame = document.querySelector<HTMLElement>('#menu-preview-frame')!;
-      return {
-        position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
-        phase: Number(frame.dataset.phase),
-      };
-    });
-    expect(errors).toEqual([]);
-    expect(after.phase - before.phase).toBeGreaterThan(0.1);
-    expect(travel(before.position, after.position)).toBeGreaterThan(0.2);
-    expect(Math.abs(before.pitch)).toBeLessThanOrEqual(0.9);
-    expect(Math.abs(before.yaw)).toBeLessThanOrEqual(1.4);
-    expect(Math.abs(before.bank)).toBeLessThanOrEqual(2.3);
-    expect(Math.abs(before.altitude)).toBeLessThanOrEqual(0.85);
-    expect(before.speed).toBeGreaterThanOrEqual(0.92);
-    expect(before.speed).toBeLessThanOrEqual(1.08);
-    expect(before.cockpit).toBe('pass65-sleek-cockpit-v1');
-  });
+    const before = await previewEvidence(page);
 
-  test('captures every deterministic helicopter and cat composition at 1440p', async ({ page }, testInfo) => {
-    await page.setViewportSize({ width: 2560, height: 1440 });
-    await page.goto(`/${BASE_QUERY}&seed=pass65-capture&previewTime=6500`);
-    await waitForPreview(page);
-    let firstAtomicVisit = 0;
-    let firstAtomicFlightSignature = '';
     for (const [arenaId, frame, presentation] of [
-      ['atomic-acres', 'helicopter', 'menu-helo-nuke-town-v1'],
-      ['skyline-terminal', 'helicopter', 'menu-helo-terminal-v1'],
-      ['rustworks-1v1', 'helicopter', 'menu-helo-rustrig-v1'],
-      ['gun-range', 'cat', 'menu-cat-gun-range-v1'],
+      ['skyline-terminal', 'helicopter', 'menu-video-helo-terminal-v1'],
+      ['rustworks-1v1', 'helicopter', 'menu-video-helo-rustrig-v1'],
+      ['gun-range', 'cat', 'menu-video-cat-gun-range-v1'],
+      ['atomic-acres', 'helicopter', 'menu-video-helo-nuke-town-v1'],
     ] as const) {
       await page.locator(`.map-card[data-arena-id="${arenaId}"]`).click();
-      await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-arena', arenaId);
-      await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', frame);
-      await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-presentation', presentation);
-      if (arenaId === 'atomic-acres') {
-        const frameData = page.locator('#menu-preview-frame');
-        firstAtomicVisit = Number(await frameData.getAttribute('data-visit'));
-        firstAtomicFlightSignature = await frameData.evaluate((element) => [
-          element.dataset.pitch,
-          element.dataset.yaw,
-          element.dataset.bank,
-          element.dataset.altitudeOffset,
-        ].join(':'));
-      }
-      await capture(page, testInfo, `${arenaId}-preview-2560x1440`);
+      const frameLocator = page.locator('#menu-preview-frame');
+      await expect(frameLocator).toHaveAttribute('data-arena', arenaId);
+      await expect(frameLocator).toHaveAttribute('data-frame', frame);
+      await expect(frameLocator).toHaveAttribute('data-presentation', presentation);
+      await expect(page.locator('#menu-preview-video source')).toHaveCount(2);
+      const current = await previewEvidence(page);
+      expect(current.arenaId).toBe(arenaId);
+      expect(current.rendererEvidence.gameplayArenaPrepared).toBe(false);
+      expect(current.rendererEvidence.arenaConstructionCount).toBe(0);
     }
-    await expect(page.locator('#menu-preview-motion')).toContainText('FIRST-PERSON PROWL');
 
-    await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
-    const frameData = page.locator('#menu-preview-frame');
-    await expect(frameData).toHaveAttribute('data-arena', 'atomic-acres');
-    await expect.poll(async () => Number(await frameData.getAttribute('data-visit'))).toBeGreaterThan(firstAtomicVisit);
-    await expect.poll(async () => frameData.evaluate((element) => [
-      element.dataset.pitch,
-      element.dataset.yaw,
-      element.dataset.bank,
-      element.dataset.altitudeOffset,
-    ].join(':'))).not.toBe(firstAtomicFlightSignature);
+    const after = await previewEvidence(page);
+    expect(errors).toEqual([]);
+    expect(after.generation).toBeGreaterThan(before.generation);
+    expect(after.rendererEvidence.renderCalls).toBe(before.rendererEvidence.renderCalls);
+    expect(after.rendererEvidence.presentation.submissionSequence)
+      .toBe(before.rendererEvidence.presentation.submissionSequence);
   });
 
-  test('holds useful helicopter and cat compositions under reduced motion', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(`/${BASE_QUERY}&seed=pass65-reduced-motion`);
+  test('protects the final selected source from stale rapid-switch media events', async ({ page }) => {
+    await page.goto(`/${BASE_QUERY}`);
     await waitForPreview(page);
-    const helicopterBefore = await cameraPosition(page);
-    await page.waitForTimeout(350);
-    expect(await cameraPosition(page)).toEqual(helicopterBefore);
-    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-motion', 'static');
-    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-moment', 'STABILIZED SHOWCASE');
+    for (const arenaId of ['skyline-terminal', 'atomic-acres', 'rustworks-1v1', 'gun-range'] as const) {
+      await page.locator(`.map-card[data-arena-id="${arenaId}"]`).click();
+    }
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-arena', 'gun-range');
+    await expect.poll(async () => (await previewEvidence(page)).videoCurrentSrc, { timeout: 15_000 })
+      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)$/);
+    await page.waitForTimeout(400);
+    const final = await previewEvidence(page);
+    expect(final.arenaId).toBe('gun-range');
+    expect(final.sourceCount).toBe(2);
+    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)$/);
+    expect(final.rendererEvidence.arenaConstructionCount).toBe(0);
+  });
 
+  test('uses poster-only playback under reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(`/${BASE_QUERY}`);
+    await page.waitForFunction(() => {
+      const stage = window.__ATOMIC_ACRES_DEBUG__?.snapshot().bootstrap.stage;
+      return stage === 'menu-video-ready' || stage === 'ready';
+    });
     await page.locator('.map-card[data-arena-id="gun-range"]').click();
-    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'cat');
-    const catBefore = await cameraPosition(page);
-    await page.waitForTimeout(350);
-    expect(await cameraPosition(page)).toEqual(catBefore);
-    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-moment', 'CURIOUS RANGE WATCH');
-    await expect(page.locator('#menu-preview-motion')).toHaveText('FIRST-PERSON HOLD');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-motion', 'static');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-media-state', 'reduced-motion-poster');
+    const evidence = await previewEvidence(page);
+    expect(evidence.arenaId).toBe('gun-range');
+    expect(evidence.sourceCount).toBe(0);
+    expect(evidence.videoPaused).toBe(true);
+    expect(evidence.rendererEvidence.gameplayArenaPrepared).toBe(false);
+    expect(evidence.rendererEvidence.arenaConstructionCount).toBe(0);
+  });
+
+  test('constructs exactly the selected arena only after explicit deployment', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto(`/${BASE_QUERY}`);
+    await waitForPreview(page);
+    await page.locator('.map-card[data-arena-id="gun-range"]').click();
+    await page.locator('#player-name').fill('Preview QA');
+    await page.locator('#solo').click();
+    await expect.poll(async () => {
+      const snapshot = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+      const preview = snapshot.menuPreview as PreviewEvidence;
+      return {
+        gameStarted: snapshot.gameStarted,
+        prepared: preview.rendererEvidence.gameplayArenaPrepared,
+        constructions: preview.rendererEvidence.arenaConstructionCount,
+        arena: preview.arenaId,
+      };
+    }, { timeout: 75_000 }).toEqual({
+      gameStarted: true,
+      prepared: true,
+      constructions: 1,
+      arena: 'gun-range',
+    });
   });
 });

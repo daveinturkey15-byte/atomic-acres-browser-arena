@@ -69,7 +69,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       { id: 'gun-range', route: 'gun-range' },
     ]);
 
-    await expect(page.locator('#menu-showcase > #game')).toBeVisible();
+    await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
+    await expect(page.locator('#menu-preview-video')).toBeVisible();
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
     await expect(page.locator('#menu-preview-label')).toContainText('NUKE TOWN');
 
@@ -171,7 +172,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('html')).toHaveAttribute('data-graphics-frame-rate-limit', '240');
   });
 
-  test('animates the live arena preview when motion is allowed', async ({ page }) => {
+  test('plays prerecorded media without moving or submitting the gameplay renderer', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
     page.on('console', (message) => {
@@ -180,24 +181,23 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud-motion');
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
     const before = await page.evaluate(() => ({
-      position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
+      renderer: window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.rendererEvidence,
       motion: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.motion,
-      phase: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.phase,
+      phase: Number(window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.phase),
       parent: document.querySelector<HTMLCanvasElement>('#game')?.parentElement?.id,
     }));
     await page.waitForTimeout(350);
     const after = await page.evaluate(() => ({
-      position: (window.__ATOMIC_ACRES_DEBUG__.snapshot().menuCamera as { position: number[] }).position,
-      phase: document.querySelector<HTMLElement>('#menu-preview-frame')?.dataset.phase,
+      renderer: window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.rendererEvidence,
+      phase: Number(window.__ATOMIC_ACRES_DEBUG__.snapshot().menuPreview.phase),
     }));
-    const travel = Math.hypot(...after.position.map((value, index) => value - before.position[index]!));
-    expect(before.motion).toBe('orbit');
-    expect(before.parent).toBe('menu-showcase');
+    expect(before.motion).toBe('video');
+    expect(before.parent).toBe('app');
     expect(runtimeErrors).toEqual([]);
-    expect(before.phase).toMatch(/^-?\d+\.\d+$/);
-    expect(after.phase).toMatch(/^-?\d+\.\d+$/);
-    expect(Number(after.phase) - Number(before.phase)).toBeGreaterThan(0.05);
-    expect(travel).toBeGreaterThan(0.05);
+    expect(after.phase - before.phase).toBeGreaterThan(0.05);
+    expect(after.renderer.renderCalls).toBe(before.renderer.renderCalls);
+    expect(after.renderer.presentation.submissionSequence).toBe(before.renderer.presentation.submissionSequence);
+    expect(after.renderer.arenaConstructionCount).toBe(0);
   });
 
   for (const viewport of reviewViewports) {
@@ -222,7 +222,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
           withinViewport: rect.left >= -1 && rect.right <= innerWidth + 1 && rect.top >= -1 && rect.bottom <= innerHeight + 1,
           mapWithinMenu: mapRect.left >= rect.left - 1 && mapRect.right <= rect.right + 1,
           showcaseInsideWorkspace: workspace.contains(showcase),
-          rendererInsideShowcase: showcase.querySelector(':scope > #game') !== null,
+          rendererInsideShowcase: showcase.contains(document.querySelector('#game')),
+          previewVideoInsideShowcase: showcase.contains(document.querySelector('#menu-preview-video')),
           previewFrameVisible: getComputedStyle(document.querySelector<HTMLElement>('#menu-preview-frame')!).display !== 'none',
           mapDetailFontPx: Number.parseFloat(mapDetail.fontSize),
           mapHeadingFontPx: Number.parseFloat(heading.fontSize),
@@ -235,7 +236,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(layout.withinViewport).toBe(true);
       expect(layout.mapWithinMenu).toBe(true);
       expect(layout.showcaseInsideWorkspace).toBe(true);
-      expect(layout.rendererInsideShowcase).toBe(true);
+      expect(layout.rendererInsideShowcase).toBe(false);
+      expect(layout.previewVideoInsideShowcase).toBe(true);
       expect(layout.previewFrameVisible).toBe(true);
       expect(layout.mapDetailFontPx).toBeGreaterThanOrEqual(9);
       expect(layout.mapHeadingFontPx).toBeGreaterThanOrEqual(15);
@@ -302,7 +304,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     expect(contract.status).toContain('ready');
     expect(contract.controls).toBeGreaterThanOrEqual(8);
     expect(contract.previewMotion).toBe('static');
-    expect(contract.rendererParent).toBe('menu-showcase');
+    expect(contract.rendererParent).toBe('app');
   });
 
   test('preserves the critical live-match HUD across the review viewport matrix', async ({ page }, testInfo) => {

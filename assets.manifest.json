@@ -103,6 +103,22 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-pass65-prerecorded-menu-previews-2026-07-26",
+      "kind": "original-project-prerecorded-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate_pass65_menu_previews.py",
+      "generatedAsOf": "2026-07-26",
+      "license": "Original project work",
+      "files": "public/assets/original/menu-previews/*",
+      "sourceScript": "scripts/assets/generate_pass65_menu_previews.py",
+      "sourceScriptSha256": "7a82af438a40674fcb82ddb9d2d19c979b1b545de7664e639388f54ba0b45a4f",
+      "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
+      "sourceProvenanceSha256": "1c6d8af867b59f52c0f41ac2d5a775ab8725161d1e47b69593a8f81577e03497",
+      "format": "Four 960x540 eight-second 24 FPS loops, each shipped as VP9/Opus WebM, H.264/AAC MP4 and WebP poster",
+      "modifications": "Project-original Blender primitive scenes record three helicopter cockpit flyovers and one cat first-person range prowl. The helicopter clips include deterministic bounded flight variation, visible spinning rotor geometry, a modeled dashboard and quiet synthesized rotor harmonics. The cat clip includes clearer ears and paws plus animated illuminated targets. No downloaded model, texture, video, sampled audio, logo or extracted game asset is used.",
+      "attributionRequired": false
+    },
+    {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
       "kind": "third-party-rigged-operator-and-derived-first-person-arms",
       "creator": "Quaternius (@Quaternius)",
