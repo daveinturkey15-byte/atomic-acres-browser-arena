@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPresentationFreshness, resolveRenderRuntimeRequest } from './render-runtime';
+import { classifyPresentationFreshness, resolveRenderRuntimeRequest, webGpuRenderInfoSnapshot } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 
 describe('Pass 64 render runtime boundary', () => {
@@ -46,5 +46,22 @@ describe('Pass 64 render runtime boundary', () => {
     expect(classify({ pendingForMs: 1_501 })).toBe('stalled');
     expect(classify({ completionFailures: 1 })).toBe('failed');
     expect(classify({ deviceLost: true, completionFailures: 1 })).toBe('device-lost');
+  });
+
+  it('uses current-frame WebGPU draw calls instead of cumulative lifetime render calls', () => {
+    const commonRendererMetrics = {
+      calls: 9_999,
+      drawCalls: 0,
+      frameCalls: 0,
+      triangles: 0,
+      points: 0,
+      lines: 0,
+    };
+    expect(webGpuRenderInfoSnapshot(commonRendererMetrics)).toEqual({
+      calls: 0,
+      triangles: 0,
+      points: 0,
+      lines: 0,
+    });
   });
 });

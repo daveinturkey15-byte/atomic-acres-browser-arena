@@ -658,6 +658,7 @@ const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
     })
   : await LegacyWebGlRenderRuntime.create({
       canvas,
+      alpha: false,
       antialias: activeRenderConfig.antialias,
       powerPreference: 'high-performance',
     });

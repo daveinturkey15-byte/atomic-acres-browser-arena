@@ -18,6 +18,7 @@ export type RenderRuntimeTelemetry = Readonly<{
   adapterClass: string;
   deviceClass: string | null;
   softwareAdapter: boolean;
+  canvasAlphaMode: 'opaque';
   canvasAntialias: boolean;
   canvasSamples: number;
   principalHdrSamples: number | null;
@@ -61,6 +62,20 @@ export type RenderInfoSnapshot = Readonly<{
   points: number;
   lines: number;
 }>;
+
+export function webGpuRenderInfoSnapshot(render: Readonly<{
+  drawCalls: number;
+  triangles: number;
+  points: number;
+  lines: number;
+}>): RenderInfoSnapshot {
+  return {
+    calls: render.drawCalls,
+    triangles: render.triangles,
+    points: render.points,
+    lines: render.lines,
+  };
+}
 
 export type ShadowRuntimeState = Readonly<{
   enabled: boolean;
@@ -115,6 +130,7 @@ export class LegacyWebGlRenderRuntime {
       adapterClass: gl.constructor.name || 'WebGL2RenderingContext',
       deviceClass: null,
       softwareAdapter: /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic render driver/i.test(this.adapterLabel),
+      canvasAlphaMode: 'opaque',
       canvasAntialias: gl.getContextAttributes()?.antialias ?? false,
       canvasSamples: Number(gl.getParameter(gl.SAMPLES) ?? 0),
       principalHdrSamples: targets?.principalHdrSamples ?? null,
@@ -348,6 +364,10 @@ export class WebGpuRenderRuntime {
     const module = await import('three/webgpu');
     const renderer = new module.WebGPURenderer({
       canvas: parameters.canvas,
+      // The game canvas is a fully opaque presentation surface. Pass 64's
+      // implicit transparent default exposed the CSS backdrop as a flat brown
+      // field whenever the WebGPU swapchain stopped presenting useful color.
+      alpha: false,
       antialias: parameters.antialias,
       samples: parameters.samples,
       powerPreference: 'high-performance',
@@ -383,6 +403,7 @@ export class WebGpuRenderRuntime {
       adapterClass: this.adapterClass,
       deviceClass: this.deviceClass,
       softwareAdapter: this.softwareAdapter,
+      canvasAlphaMode: 'opaque',
       canvasAntialias: this.canvasAntialias,
       canvasSamples: this.canvasSamples,
       principalHdrSamples: this.principalHdrSamples,
@@ -553,8 +574,10 @@ export class WebGpuRenderRuntime {
   }
 
   renderInfo(): RenderInfoSnapshot {
-    const { calls, triangles, points, lines } = this.renderer.info.render;
-    return { calls, triangles, points, lines };
+    // Three's common renderer keeps `render.calls` cumulative for the entire
+    // process; only `drawCalls` is reset per frame. Treating the cumulative
+    // value as frame liveness let one old good frame mask a frozen canvas.
+    return webGpuRenderInfoSnapshot(this.renderer.info.render);
   }
 
   webGlVersion(): null {
