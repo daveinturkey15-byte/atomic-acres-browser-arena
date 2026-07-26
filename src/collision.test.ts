@@ -11,6 +11,7 @@ import {
   segmentIntersectsBox,
   shortestAngleDelta,
   sweepSphereAgainstBoxes,
+  sphereIntersectsBox,
   type Box2,
 } from './collision';
 
@@ -25,6 +26,14 @@ describe('arena collision', () => {
   it('detects circle overlap against an axis-aligned wall', () => {
     expect(circleIntersectsBox(0.7, 0, 0.4, wall)).toBe(true);
     expect(circleIntersectsBox(0, 0, 0.4, wall)).toBe(false);
+  });
+
+  it('detects support-flight sphere overlap against axis-aligned and oriented solids', () => {
+    expect(sphereIntersectsBox({ x: 1.1, y: 1.5, z: 0 }, 0.25, wall)).toBe(true);
+    expect(sphereIntersectsBox({ x: 0.5, y: 1.5, z: 0 }, 0.25, wall)).toBe(false);
+    expect(sphereIntersectsBox({ x: 0, y: 0.8, z: 0 }, 0.25, {
+      minX: -1, maxX: 1, minY: -0.1, maxY: 0.1, minZ: -1, maxZ: 1, rotation: [0, 0, Math.PI / 2],
+    })).toBe(true);
   });
 
   it('slides on the free axis rather than cancelling all motion', () => {

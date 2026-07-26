@@ -5,6 +5,13 @@ import {
   type Pass65KillstreakId,
 } from './killstreak-catalog';
 import { parseKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
+import {
+  DRONE_GUN_PROFILE,
+  DRONE_GUN_PROFILE_ID,
+  DRONE_SUPPORT_DEFINITIONS,
+  PILOTED_DRONE_SENSOR_PROFILE,
+  type DroneGunProfile,
+} from './killstreak-support-catalog';
 
 export const ADRENALINE_DURATION_MS = 15_000;
 export const ADRENALINE_DAMAGE_MULTIPLIER = 1.1;
@@ -12,12 +19,15 @@ export const ADRENALINE_MOVEMENT_MULTIPLIER = 1.1;
 export const ADRENALINE_RELOAD_DURATION_MULTIPLIER = 0.9;
 export const CHOPPER_DURATION_MS = 30_000;
 export const CHOPPER_HEALTH = 800;
-export const PILOTED_DRONE_DURATION_MS = 30_000;
-export const DRONE_SWARM_DURATION_MS = 60_000;
+export const PILOTED_DRONE_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.piloted.lifetimeMs;
+export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs;
 export const DRONE_SWARM_COUNT = 12;
 export const DRONE_HEALTH = 50;
-export const DRONE_MAGAZINE_SIZE = 20;
+export const DRONE_MAGAZINE_SIZE = DRONE_GUN_PROFILE.magazineSize;
 export const PILOTED_DRONE_RESERVE_CLIPS = 1;
+export const CARE_AIRCRAFT_DURATION_MS = 7_000;
+export const CARE_AIRCRAFT_DROP_DELAY_MS = 800;
+export const CARE_CRATE_DESCENT_MS = 5_200;
 export const CARPET_BOMBER_IMPACT_COUNT = 20;
 export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
 export const MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP = 64;
@@ -38,7 +48,19 @@ export type KillstreakWorld = Readonly<{
   targets: readonly KillstreakTarget[];
   areHostile?: (ownerId: string, ownerTeam: 0 | 1, target: KillstreakTarget) => boolean;
   hasLineOfSight?: (from: SupportVec3, to: SupportVec3) => boolean;
+  /** Resolves against arena static/dynamic solids, ceilings, portals and no-fly data. */
+  resolveFlightPosition?: (from: SupportVec3, desired: SupportVec3, radius: number) => SupportVec3;
   isFlightPositionValid?: (position: SupportVec3) => boolean;
+}>;
+
+export type DroneSensorContact = Readonly<{
+  id: string;
+  kind: 'player' | 'bot';
+  team: 0 | 1;
+  lifeId: number;
+  position: SupportVec3;
+  relation: 'hostile';
+  throughWall: true;
 }>;
 
 export type KillstreakDamageEvent = Readonly<{
@@ -85,8 +107,18 @@ type EntityBase = {
   expiresAtMs: number;
   position: [number, number, number];
   velocity: [number, number, number];
+  /** Host-authored pitch, yaw, bank used by every recipient presentation. */
+  attitude: [number, number, number];
   health: number;
   revision: number;
+};
+
+type AircraftEntity = EntityBase & {
+  kind: 'aircraft';
+  phase: 'inbound' | 'active' | 'outbound';
+  seed: number;
+  routeStart: [number, number, number];
+  routeEnd: [number, number, number];
 };
 
 type ChopperEntity = EntityBase & {
@@ -116,19 +148,25 @@ type DroneEntity = EntityBase & {
   thrust: number;
   vertical: number;
   pendingPlayerFire: boolean;
+  gunProfileId: typeof DRONE_GUN_PROFILE_ID;
+  nextSensorRefreshAtMs: number;
+  sensorContacts: DroneSensorContact[];
 };
 
 type CareCrateEntity = EntityBase & {
   kind: 'care-crate';
   phase: 'inbound' | 'descending' | 'landed' | 'capturing';
   dropPosition: [number, number, number];
+  descentStartPosition: [number, number, number];
+  descentStartsAtMs: number;
+  aircraftId: string;
   reward: Pass65KillstreakId;
   rollUnit: number;
   captureActorId: string | null;
   captureStartedAtMs: number | null;
 };
 
-export type HostSupportEntity = ChopperEntity | DroneEntity | CareCrateEntity;
+export type HostSupportEntity = AircraftEntity | ChopperEntity | DroneEntity | CareCrateEntity;
 
 type CarpetBomberActivation = {
   activationId: string;
@@ -203,15 +241,17 @@ export type KillstreakEntitySnapshot = Readonly<{
   activationId: string;
   ownerId: string;
   team: 0 | 1;
-  kind: 'chopper' | 'drone' | 'care-crate';
+  kind: 'aircraft' | 'chopper' | 'drone' | 'care-crate';
   mode: 'piloted' | 'swarm' | null;
   phase: string;
   position: SupportVec3;
   velocity: SupportVec3;
+  attitude: SupportVec3;
   health: number;
   expiresInMs: number;
   magazine: number | null;
   reserveClips: number | null;
+  gunProfileId: typeof DRONE_GUN_PROFILE_ID | null;
   gunController: 'ai' | 'owner-player' | null;
   captureProgress: number | null;
   revealedReward: Pass65KillstreakId | null;
@@ -224,7 +264,16 @@ export type KillstreakRecipientSnapshot = Readonly<{
   revision: number;
   actors: readonly KillstreakActorSnapshot[];
   entities: readonly KillstreakEntitySnapshot[];
+  sensorContacts: readonly DroneSensorContact[];
 }>;
+
+export const CHOPPER_MOTION_VARIANCE = Object.freeze({
+  maximumPitchRadians: 0.12,
+  maximumYawOffsetRadians: 0.14,
+  maximumBankRadians: 0.18,
+  maximumAltitudeOffsetM: 1.25,
+  maximumRadiusScaleDelta: 0.045,
+} as const);
 
 function hashText(value: string): number {
   let hash = 0x811c9dc5;
@@ -274,6 +323,111 @@ function actorPosition(world: KillstreakWorld, actorId: string): SupportVec3 | n
 
 function exactDefinition(id: string, catalog: KillstreakCatalog<string>) {
   return catalog.definitions.find((definition) => definition.id === id);
+}
+
+type SupportBounds = KillstreakWorld['bounds'];
+
+export type ChopperRoutePose = Readonly<{
+  position: SupportVec3;
+  attitude: SupportVec3;
+}>;
+
+function chopperPositionAt(
+  seed: number,
+  createdAtMs: number,
+  nowMs: number,
+  routeCentre: SupportVec3,
+  bounds: SupportBounds,
+): [number, number, number] {
+  const seconds = clamp((nowMs - createdAtMs) / 1_000, 0, CHOPPER_DURATION_MS / 1_000);
+  const progress = seconds / (CHOPPER_DURATION_MS / 1_000);
+  const phase = (salt: number) => unit(seed, salt) * Math.PI * 2;
+  const directionVariance = Math.sin(seconds * 0.61 + phase(11)) * 0.09
+    + Math.sin(seconds * 0.23 + phase(12)) * 0.045;
+  const angle = progress * Math.PI * 2 * 1.35 + phase(10) + directionVariance;
+  const radiusX = Math.max(2, (bounds.maxX - bounds.minX) * 0.36)
+    * (1 + Math.sin(seconds * 0.31 + phase(13)) * CHOPPER_MOTION_VARIANCE.maximumRadiusScaleDelta);
+  const radiusZ = Math.max(2, (bounds.maxZ - bounds.minZ) * 0.36)
+    * (1 + Math.sin(seconds * 0.27 + phase(14)) * CHOPPER_MOTION_VARIANCE.maximumRadiusScaleDelta);
+  const altitudeVariance = Math.sin(seconds * 0.47 + phase(15)) * 0.8
+    + Math.sin(seconds * 0.19 + phase(16)) * 0.45;
+  return [
+    clamp(routeCentre[0] + Math.cos(angle) * radiusX, bounds.minX + 1, bounds.maxX - 1),
+    clamp(routeCentre[1] + altitudeVariance, bounds.floorY + 6, bounds.ceilingY - 1),
+    clamp(routeCentre[2] + Math.sin(angle) * radiusZ, bounds.minZ + 1, bounds.maxZ - 1),
+  ];
+}
+
+/** Pure host route pose used for deterministic two-peer convergence evidence. */
+export function chopperRoutePose(
+  seed: number,
+  createdAtMs: number,
+  nowMs: number,
+  routeCentre: SupportVec3,
+  bounds: SupportBounds,
+): ChopperRoutePose {
+  const position = chopperPositionAt(seed, createdAtMs, nowMs, routeCentre, bounds);
+  const next = chopperPositionAt(seed, createdAtMs, Math.min(createdAtMs + CHOPPER_DURATION_MS, nowMs + 50), routeCentre, bounds);
+  const dx = next[0] - position[0];
+  const dy = next[1] - position[1];
+  const dz = next[2] - position[2];
+  const horizontal = Math.max(0.001, Math.hypot(dx, dz));
+  const seconds = clamp((nowMs - createdAtMs) / 1_000, 0, CHOPPER_DURATION_MS / 1_000);
+  const phase = (salt: number) => unit(seed, salt) * Math.PI * 2;
+  const pitch = clamp(
+    -Math.atan2(dy, horizontal) + Math.sin(seconds * 0.43 + phase(21)) * 0.025,
+    -CHOPPER_MOTION_VARIANCE.maximumPitchRadians,
+    CHOPPER_MOTION_VARIANCE.maximumPitchRadians,
+  );
+  const yaw = Math.atan2(dx, dz);
+  const bank = clamp(
+    Math.sin(seconds * 0.36 + phase(22)) * 0.11 + Math.sin(seconds * 0.17 + phase(23)) * 0.05,
+    -CHOPPER_MOTION_VARIANCE.maximumBankRadians,
+    CHOPPER_MOTION_VARIANCE.maximumBankRadians,
+  );
+  return Object.freeze({
+    position: Object.freeze(position),
+    attitude: Object.freeze([pitch, yaw, bank] as const),
+  });
+}
+
+function clampFlightPosition(position: SupportVec3, world: KillstreakWorld, radius: number): [number, number, number] {
+  return [
+    clamp(position[0], world.bounds.minX + radius, world.bounds.maxX - radius),
+    clamp(position[1], world.bounds.floorY + radius, world.bounds.ceilingY - radius),
+    clamp(position[2], world.bounds.minZ + radius, world.bounds.maxZ - radius),
+  ];
+}
+
+function resolveFlightPosition(
+  from: SupportVec3,
+  desired: SupportVec3,
+  radius: number,
+  world: KillstreakWorld,
+): [number, number, number] {
+  const clamped = clampFlightPosition(desired, world, radius);
+  const resolved = world.resolveFlightPosition?.(from, clamped, radius) ?? clamped;
+  if (!finiteTuple(resolved)) return [...from];
+  const bounded = clampFlightPosition(resolved, world, radius);
+  if (world.isFlightPositionValid?.(bounded) === false) return [...from];
+  return bounded;
+}
+
+function attitudeFromMotion(
+  from: SupportVec3,
+  to: SupportVec3,
+  fallback: SupportVec3,
+): [number, number, number] {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const dz = to[2] - from[2];
+  const horizontal = Math.hypot(dx, dz);
+  if (horizontal < 1e-5 && Math.abs(dy) < 1e-5) return [...fallback];
+  return [
+    clamp(-Math.atan2(dy, Math.max(0.001, horizontal)), -0.35, 0.35),
+    horizontal >= 1e-5 ? Math.atan2(dx, dz) : fallback[1],
+    fallback[2],
+  ];
 }
 
 export function adrenalineModifiers(activeUntilMs: number, nowMs: number): Readonly<{
@@ -404,7 +558,8 @@ export class HostKillstreakRuntime {
     if (!fromCare && !actor.available.has(actualId)) return reject('reward-not-earned');
     if (this.seenActivationRequestIds.has(intent.activationId)) return reject('duplicate-activation-id');
     const entityNeed = actualId === 'drone-swarm' ? DRONE_SWARM_COUNT
-      : actualId === 'chopper' || actualId === 'piloted-drone' || actualId === 'care-package' ? 1 : 0;
+      : actualId === 'care-package' ? 2
+      : actualId === 'chopper' || actualId === 'piloted-drone' ? 1 : 0;
     if (this.entities.size + entityNeed > MAX_ACTIVE_SUPPORT_ENTITIES) return reject('support-entity-cap');
     if ([...this.entities.values()].some((entity) => entity.ownerId === actor.actorId
       && (actualId === 'chopper' && entity.kind === 'chopper'
@@ -427,15 +582,42 @@ export class HostKillstreakRuntime {
       const rollUnit = seed % this.catalog.carePackagePool.totalWeightUnits;
       const reward = rewardForCarePackageUnit(this.catalog, rollUnit) as Pass65KillstreakId;
       const id = this.nextEntityId('care');
+      const aircraftId = this.nextEntityId('care-aircraft');
       const top = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
+      const direction = unit(seed, 31) < 0.5 ? -1 : 1;
+      const lateral = (unit(seed, 32) - 0.5) * 2.4;
+      const routeStart: [number, number, number] = [
+        clamp(anchor[0] - direction * 18, world.bounds.minX + 1.5, world.bounds.maxX - 1.5),
+        top,
+        clamp(anchor[2] + lateral, world.bounds.minZ + 1.5, world.bounds.maxZ - 1.5),
+      ];
+      const routeEnd: [number, number, number] = [
+        clamp(anchor[0] + direction * 90, world.bounds.minX + 1.5, world.bounds.maxX - 1.5),
+        top,
+        clamp(anchor[2] - lateral, world.bounds.minZ + 1.5, world.bounds.maxZ - 1.5),
+      ];
+      const dropProgress = CARE_AIRCRAFT_DROP_DELAY_MS / CARE_AIRCRAFT_DURATION_MS;
+      const dropEased = dropProgress * dropProgress * (3 - 2 * dropProgress);
+      const descentStartPosition: [number, number, number] = [
+        routeStart[0] + (routeEnd[0] - routeStart[0]) * dropEased,
+        routeStart[1] + Math.sin(dropProgress * Math.PI + unit(seed, 33) * Math.PI) * 0.28 - 0.9,
+        routeStart[2] + (routeEnd[2] - routeStart[2]) * dropEased,
+      ];
+      this.entities.set(aircraftId, {
+        id: aircraftId, activationId, ownerId: actor.actorId, team: actor.team,
+        createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
+        position: routeStart, velocity: [0, 0, 0], attitude: [0, direction > 0 ? Math.PI / 2 : -Math.PI / 2, 0],
+        health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart, routeEnd,
+      });
       this.entities.set(id, {
         id, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + 60_000,
-        position: [anchor[0], top, anchor[2]], velocity: [0, 0, 0], health: 100, revision: 0,
+        position: [...routeStart], velocity: [0, 0, 0], attitude: [0, 0, 0], health: 100, revision: 0,
         kind: 'care-crate', phase: 'inbound', dropPosition: [anchor[0], world.bounds.floorY + 0.45, anchor[2]],
+        descentStartPosition, descentStartsAtMs: nowMs + CARE_AIRCRAFT_DROP_DELAY_MS, aircraftId,
         reward, rollUnit, captureActorId: null, captureStartedAtMs: null,
       });
-      entityIds.push(id);
+      entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
       const impacts = this.carpetImpactPattern(anchor, seed, world);
       this.carpetBombers.set(activationId, {
@@ -452,25 +634,31 @@ export class HostKillstreakRuntime {
       const chopper: ChopperEntity = {
         id, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + CHOPPER_DURATION_MS,
-        position: [centre[0], centre[1], centre[2]], velocity: [0, 0, 0], health: CHOPPER_HEALTH, revision: 0,
+        position: [centre[0], centre[1], centre[2]], velocity: [0, 0, 0], attitude: [0, 0, 0], health: CHOPPER_HEALTH, revision: 0,
         kind: 'chopper', phase: 'inbound', seed, routeCentre: centre, gunController: 'ai',
         nextShotAtMs: nowMs + 600, aimYaw: 0, aimPitch: 0, pendingPlayerFire: false,
       };
-      chopper.position = this.chopperRoutePosition(chopper, nowMs, world);
+      const pose = chopperRoutePose(seed, nowMs, nowMs, centre, world.bounds);
+      chopper.position = resolveFlightPosition(centre, pose.position, 1.25, world);
+      chopper.attitude = attitudeFromMotion(centre, chopper.position, pose.attitude);
       this.entities.set(id, chopper);
       entityIds.push(id);
     } else if (actualId === 'piloted-drone') {
       this.restoreActorControl(actor, true);
       const id = this.nextEntityId('pilot-drone');
       const spawn: [number, number, number] = [anchor[0], Math.min(world.bounds.ceilingY - 1, anchor[1] + 2.5), anchor[2]];
+      const admittedSpawn = resolveFlightPosition(anchor, spawn, 0.35, world);
       this.entities.set(id, {
         id, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + PILOTED_DRONE_DURATION_MS,
-        position: spawn, velocity: [0, 0, 0], health: DRONE_HEALTH, revision: 0,
+        position: admittedSpawn, velocity: [0, 0, 0], attitude: [0, 0, 0], health: DRONE_HEALTH, revision: 0,
         kind: 'drone', mode: 'piloted', phase: 'active', seed,
         magazine: DRONE_MAGAZINE_SIZE, reserveClips: PILOTED_DRONE_RESERVE_CLIPS,
         reloadCompletesAtMs: null, nextShotAtMs: nowMs, targetId: null,
         yaw: 0, pitch: 0, thrust: 0, vertical: 0, pendingPlayerFire: false,
+        gunProfileId: DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId,
+        nextSensorRefreshAtMs: nowMs,
+        sensorContacts: [],
       });
       actor.possession = Object.freeze({ kind: 'piloted-drone', entityId: id });
       entityIds.push(id);
@@ -483,14 +671,18 @@ export class HostKillstreakRuntime {
           Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 2, anchor[1] + 4 + index % 3)),
           clamp(anchor[2] + Math.sin(angle) * 4, world.bounds.minZ + 0.5, world.bounds.maxZ - 0.5),
         ];
+        const admittedSpawn = resolveFlightPosition(anchor, spawn, 0.35, world);
         this.entities.set(id, {
           id, activationId, ownerId: actor.actorId, team: actor.team,
           createdAtMs: nowMs, expiresAtMs: nowMs + DRONE_SWARM_DURATION_MS,
-          position: spawn, velocity: [0, 0, 0], health: DRONE_HEALTH, revision: 0,
+          position: admittedSpawn, velocity: [0, 0, 0], attitude: [0, angle + Math.PI / 2, 0], health: DRONE_HEALTH, revision: 0,
           kind: 'drone', mode: 'swarm', phase: 'active', seed: seed ^ index,
           magazine: DRONE_MAGAZINE_SIZE, reserveClips: null,
           reloadCompletesAtMs: null, nextShotAtMs: nowMs + 500 + index * 35, targetId: null,
           yaw: 0, pitch: 0, thrust: 0, vertical: 0, pendingPlayerFire: false,
+          gunProfileId: DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId,
+          nextSensorRefreshAtMs: Number.POSITIVE_INFINITY,
+          sensorContacts: [],
         });
         entityIds.push(id);
       }
@@ -524,26 +716,6 @@ export class HostKillstreakRuntime {
     ], world);
   }
 
-  private chopperRoutePosition(entity: ChopperEntity, nowMs: number, world: KillstreakWorld): [number, number, number] {
-    const seconds = clamp((nowMs - entity.createdAtMs) / 1_000, 0, CHOPPER_DURATION_MS / 1_000);
-    const progress = seconds / (CHOPPER_DURATION_MS / 1_000);
-    const phase = (salt: number) => unit(entity.seed, salt) * Math.PI * 2;
-    const directionVariance = Math.sin(seconds * 0.61 + phase(11)) * 0.09
-      + Math.sin(seconds * 0.23 + phase(12)) * 0.045;
-    const angle = progress * Math.PI * 2 * 1.35 + phase(10) + directionVariance;
-    const radiusX = Math.max(2, (world.bounds.maxX - world.bounds.minX) * 0.36)
-      * (1 + Math.sin(seconds * 0.31 + phase(13)) * 0.035);
-    const radiusZ = Math.max(2, (world.bounds.maxZ - world.bounds.minZ) * 0.36)
-      * (1 + Math.sin(seconds * 0.27 + phase(14)) * 0.035);
-    const altitudeVariance = Math.sin(seconds * 0.47 + phase(15)) * 0.8
-      + Math.sin(seconds * 0.19 + phase(16)) * 0.45;
-    return [
-      clamp(entity.routeCentre[0] + Math.cos(angle) * radiusX, world.bounds.minX + 1, world.bounds.maxX - 1),
-      clamp(entity.routeCentre[1] + altitudeVariance, world.bounds.floorY + 6, world.bounds.ceilingY - 1),
-      clamp(entity.routeCentre[2] + Math.sin(angle) * radiusZ, world.bounds.minZ + 1, world.bounds.maxZ - 1),
-    ];
-  }
-
   private carpetImpactPattern(anchor: SupportVec3, seed: number, world: KillstreakWorld): readonly SupportVec3[] {
     const angle = unit(seed, 1) * Math.PI * 2;
     const forward: readonly [number, number] = [Math.cos(angle), Math.sin(angle)];
@@ -563,6 +735,7 @@ export class HostKillstreakRuntime {
     const actor = this.actors.get(intent.by);
     const reject = (reason: string) => Object.freeze({ accepted: false, reason });
     if (!actor) return reject('unknown-actor');
+    if (!Number.isFinite(nowMs)) return reject('invalid-time');
     if (intent.matchEpoch !== this.matchEpoch || intent.lifeId !== actor.lifeId) return reject('identity-mismatch');
     if (!Number.isSafeInteger(intent.sequence) || intent.sequence <= actor.lastControlSequence) return reject('replayed-sequence');
     const entity = this.entities.get(intent.entityId);
@@ -602,6 +775,7 @@ export class HostKillstreakRuntime {
         entity.thrust = clamp(intent.thrustQ ?? entity.thrust, -1, 1);
         entity.vertical = clamp(intent.verticalQ ?? entity.vertical, -1, 1);
         entity.pendingPlayerFire ||= intent.fire === true;
+        entity.nextSensorRefreshAtMs = Math.min(entity.nextSensorRefreshAtMs, nowMs);
       } else return reject('wrong-entity-kind');
       entity.revision += 1;
     }
@@ -660,7 +834,9 @@ export class HostKillstreakRuntime {
 
   damageEntity(entityId: string, damage: number): Readonly<{ applied: boolean; destroyed: boolean; health: number }> {
     const entity = this.entities.get(entityId);
-    if (!entity || !Number.isFinite(damage) || damage <= 0) return Object.freeze({ applied: false, destroyed: false, health: entity?.health ?? 0 });
+    if (!entity || entity.kind === 'aircraft' || entity.kind === 'care-crate' || !Number.isFinite(damage) || damage <= 0) {
+      return Object.freeze({ applied: false, destroyed: false, health: entity?.health ?? 0 });
+    }
     entity.health = Math.max(0, entity.health - damage);
     entity.revision += 1;
     const destroyed = entity.health === 0;
@@ -700,7 +876,8 @@ export class HostKillstreakRuntime {
         this.expireEntity(entity.id);
         continue;
       }
-      if (entity.kind === 'care-crate') this.advanceCareCrate(entity, nowMs, world);
+      if (entity.kind === 'aircraft') this.advanceAircraft(entity, nowMs, dt, world);
+      else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, nowMs, dt, world);
       else if (entity.kind === 'chopper') this.advanceChopper(entity, nowMs, dt, world, damageEvents);
       else this.advanceDrone(entity, nowMs, dt, world, damageEvents);
     }
@@ -711,17 +888,57 @@ export class HostKillstreakRuntime {
     });
   }
 
-  private advanceCareCrate(entity: CareCrateEntity, nowMs: number, world: KillstreakWorld): void {
-    const elapsed = nowMs - entity.createdAtMs;
-    if (elapsed < 800) entity.phase = 'inbound';
-    else if (elapsed < 6_000) {
+  private advanceAircraft(entity: AircraftEntity, nowMs: number, dt: number, world: KillstreakWorld): void {
+    const progress = clamp((nowMs - entity.createdAtMs) / CARE_AIRCRAFT_DURATION_MS, 0, 1);
+    entity.phase = progress < 0.12 ? 'inbound' : progress > 0.82 ? 'outbound' : 'active';
+    const eased = progress * progress * (3 - 2 * progress);
+    const desired: SupportVec3 = [
+      entity.routeStart[0] + (entity.routeEnd[0] - entity.routeStart[0]) * eased,
+      entity.routeStart[1] + Math.sin(progress * Math.PI + unit(entity.seed, 33) * Math.PI) * 0.28,
+      entity.routeStart[2] + (entity.routeEnd[2] - entity.routeStart[2]) * eased,
+    ];
+    const previous: SupportVec3 = [...entity.position];
+    const next = resolveFlightPosition(previous, desired, 1.25, world);
+    const inverseDt = dt > 0 ? 1 / dt : 0;
+    entity.velocity = [
+      (next[0] - previous[0]) * inverseDt,
+      (next[1] - previous[1]) * inverseDt,
+      (next[2] - previous[2]) * inverseDt,
+    ];
+    entity.position = next;
+    entity.attitude = attitudeFromMotion(previous, next, entity.attitude);
+    entity.revision += 1;
+  }
+
+  private advanceCareCrate(entity: CareCrateEntity, nowMs: number, dt: number, world: KillstreakWorld): void {
+    const previous: SupportVec3 = [...entity.position];
+    if (nowMs < entity.descentStartsAtMs) {
+      entity.phase = 'inbound';
+      const aircraft = this.entities.get(entity.aircraftId);
+      if (aircraft?.kind === 'aircraft') {
+        entity.position = [aircraft.position[0], aircraft.position[1] - 0.9, aircraft.position[2]];
+      }
+    } else if (nowMs < entity.descentStartsAtMs + CARE_CRATE_DESCENT_MS) {
       entity.phase = 'descending';
-      const progress = clamp((elapsed - 800) / 5_200, 0, 1);
-      entity.position[1] = entity.position[1] + (entity.dropPosition[1] - entity.position[1]) * progress;
+      const rawProgress = clamp((nowMs - entity.descentStartsAtMs) / CARE_CRATE_DESCENT_MS, 0, 1);
+      const progress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+      entity.position = [
+        entity.descentStartPosition[0] + (entity.dropPosition[0] - entity.descentStartPosition[0]) * progress,
+        entity.descentStartPosition[1] + (entity.dropPosition[1] - entity.descentStartPosition[1]) * progress,
+        entity.descentStartPosition[2] + (entity.dropPosition[2] - entity.descentStartPosition[2]) * progress,
+      ];
     } else if (entity.phase !== 'capturing') {
       entity.phase = 'landed';
       entity.position = [...entity.dropPosition];
     }
+    const inverseDt = dt > 0 ? 1 / dt : 0;
+    entity.velocity = [
+      (entity.position[0] - previous[0]) * inverseDt,
+      (entity.position[1] - previous[1]) * inverseDt,
+      (entity.position[2] - previous[2]) * inverseDt,
+    ];
+    entity.attitude = [0, entity.attitude[1], 0];
+    entity.revision += 1;
     if (entity.phase !== 'capturing' || !entity.captureActorId || entity.captureStartedAtMs === null) return;
     const captureActor = this.actors.get(entity.captureActorId);
     const position = actorPosition(world, entity.captureActorId);
@@ -747,17 +964,18 @@ export class HostKillstreakRuntime {
   ): void {
     const elapsed = clamp((nowMs - entity.createdAtMs) / CHOPPER_DURATION_MS, 0, 1);
     entity.phase = elapsed < 0.08 ? 'inbound' : elapsed > 0.9 ? 'outbound' : 'orbiting';
-    const next = this.chopperRoutePosition(entity, nowMs, world);
-    if (world.isFlightPositionValid?.(next) !== false) {
-      const inverseDt = dt > 0 ? 1 / dt : 0;
-      entity.velocity = [
-        (next[0] - entity.position[0]) * inverseDt,
-        (next[1] - entity.position[1]) * inverseDt,
-        (next[2] - entity.position[2]) * inverseDt,
-      ];
-      entity.position = next;
-      entity.revision += 1;
-    }
+    const pose = chopperRoutePose(entity.seed, entity.createdAtMs, nowMs, entity.routeCentre, world.bounds);
+    const previous: SupportVec3 = [...entity.position];
+    const next = resolveFlightPosition(previous, pose.position, 1.25, world);
+    const inverseDt = dt > 0 ? 1 / dt : 0;
+    entity.velocity = [
+      (next[0] - previous[0]) * inverseDt,
+      (next[1] - previous[1]) * inverseDt,
+      (next[2] - previous[2]) * inverseDt,
+    ];
+    entity.position = next;
+    entity.attitude = attitudeFromMotion(previous, next, pose.attitude);
+    entity.revision += 1;
     const shouldFire = entity.gunController === 'ai' ? nowMs >= entity.nextShotAtMs : entity.pendingPlayerFire && nowMs >= entity.nextShotAtMs;
     if (!shouldFire || damageEvents.length >= MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP) return;
     const owner = this.actors.get(entity.ownerId);
@@ -779,36 +997,57 @@ export class HostKillstreakRuntime {
   ): void {
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
+    if (entity.gunProfileId !== DRONE_GUN_PROFILE_ID) throw new Error(`unknown drone gun profile ${entity.gunProfileId}`);
+    const gunProfile: DroneGunProfile = DRONE_GUN_PROFILE;
+    if (entity.mode === 'piloted') this.updatePilotedDroneSensor(entity, owner, nowMs, world);
     if (entity.phase === 'reloading') {
       if (entity.reloadCompletesAtMs !== null && nowMs >= entity.reloadCompletesAtMs) {
         if (entity.reserveClips === null || entity.reserveClips > 0) {
           if (entity.reserveClips !== null) entity.reserveClips -= 1;
-          entity.magazine = DRONE_MAGAZINE_SIZE;
+          entity.magazine = gunProfile.magazineSize;
         }
         entity.reloadCompletesAtMs = null;
         entity.phase = 'active';
+        entity.revision += 1;
       }
       return;
     }
     if (entity.mode === 'piloted') {
       const forward: [number, number, number] = [Math.sin(entity.yaw), Math.sin(entity.pitch), Math.cos(entity.yaw)];
       const speed = 10 * entity.thrust;
-      const next: [number, number, number] = [
+      const desired: [number, number, number] = [
         clamp(entity.position[0] + forward[0] * speed * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
         clamp(entity.position[1] + (forward[1] * Math.abs(speed) + entity.vertical * 7) * dt, world.bounds.floorY + 0.5, world.bounds.ceilingY - 0.5),
         clamp(entity.position[2] + forward[2] * speed * dt, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
       ];
-      if (world.isFlightPositionValid?.(next) !== false) {
-        entity.velocity = [(next[0] - entity.position[0]) / Math.max(dt, 0.001), (next[1] - entity.position[1]) / Math.max(dt, 0.001), (next[2] - entity.position[2]) / Math.max(dt, 0.001)];
-        entity.position = next;
-      }
+      const previous: SupportVec3 = [...entity.position];
+      const next = resolveFlightPosition(previous, desired, 0.35, world);
+      entity.velocity = [(next[0] - previous[0]) / Math.max(dt, 0.001), (next[1] - previous[1]) / Math.max(dt, 0.001), (next[2] - previous[2]) / Math.max(dt, 0.001)];
+      entity.position = next;
+      entity.attitude = [entity.pitch, entity.yaw, 0];
       if (entity.pendingPlayerFire && nowMs >= entity.nextShotAtMs) {
-        const target = this.aimedVisibleTarget(entity.position, entity.yaw, entity.pitch, owner.actorId, owner.team, world);
-        if (target && entity.magazine > 0) {
-          damageEvents.push(this.damageEvent(entity.activationId, 'piloted-drone', owner.actorId, target, 6, entity.position, nowMs));
+        if (entity.magazine > 0) {
+          const target = this.aimedVisibleTarget(
+            entity.position,
+            entity.yaw,
+            entity.pitch,
+            owner.actorId,
+            owner.team,
+            world,
+            gunProfile.maximumRangeM,
+          );
+          if (target) damageEvents.push(this.damageEvent(
+            entity.activationId,
+            'piloted-drone',
+            owner.actorId,
+            target,
+            gunProfile.damage,
+            entity.position,
+            nowMs,
+          ));
           entity.magazine -= 1;
         }
-        entity.nextShotAtMs = nowMs + 150;
+        entity.nextShotAtMs = nowMs + gunProfile.cadenceMs;
         entity.pendingPlayerFire = false;
       }
     } else {
@@ -824,24 +1063,28 @@ export class HostKillstreakRuntime {
         const dz = target.position[2] - entity.position[2];
         const range = Math.max(0.001, Math.hypot(dx, dy, dz));
         if (range > 7) {
-          const next: [number, number, number] = [
+          const desired: [number, number, number] = [
             clamp(entity.position[0] + dx / range * 8 * dt, world.bounds.minX + 0.35, world.bounds.maxX - 0.35),
             clamp(entity.position[1] + dy / range * 8 * dt, world.bounds.floorY + 1, world.bounds.ceilingY - 0.5),
             clamp(entity.position[2] + dz / range * 8 * dt, world.bounds.minZ + 0.35, world.bounds.maxZ - 0.35),
           ];
-          if (world.isFlightPositionValid?.(next) !== false) entity.position = next;
+          const previous: SupportVec3 = [...entity.position];
+          const next = resolveFlightPosition(previous, desired, 0.35, world);
+          entity.velocity = [(next[0] - previous[0]) / Math.max(dt, 0.001), (next[1] - previous[1]) / Math.max(dt, 0.001), (next[2] - previous[2]) / Math.max(dt, 0.001)];
+          entity.position = next;
+          entity.attitude = attitudeFromMotion(previous, next, entity.attitude);
         }
-        if (range <= 28 && lineOfSight(world, entity.position, target.position) && nowMs >= entity.nextShotAtMs && entity.magazine > 0) {
-          damageEvents.push(this.damageEvent(entity.activationId, 'drone-swarm', owner.actorId, target, 1, entity.position, nowMs));
+        if (range <= gunProfile.maximumRangeM && lineOfSight(world, entity.position, target.position) && nowMs >= entity.nextShotAtMs && entity.magazine > 0) {
+          damageEvents.push(this.damageEvent(entity.activationId, 'drone-swarm', owner.actorId, target, gunProfile.damage, entity.position, nowMs));
           entity.magazine -= 1;
-          entity.nextShotAtMs = nowMs + 600;
+          entity.nextShotAtMs = nowMs + gunProfile.cadenceMs;
         }
       }
     }
     if (entity.magazine === 0 && entity.reloadCompletesAtMs === null) {
       if (entity.reserveClips === null || entity.reserveClips > 0) {
         entity.phase = 'reloading';
-        entity.reloadCompletesAtMs = nowMs + 1_400;
+        entity.reloadCompletesAtMs = nowMs + gunProfile.reloadMs;
       } else {
         const actor = this.actors.get(entity.ownerId);
         if (actor?.possession?.entityId === entity.id) this.restoreActorControl(actor, false);
@@ -850,18 +1093,69 @@ export class HostKillstreakRuntime {
     entity.revision += 1;
   }
 
+  private updatePilotedDroneSensor(
+    entity: DroneEntity,
+    owner: ActorAuthorityState,
+    nowMs: number,
+    world: KillstreakWorld,
+  ): void {
+    if (entity.mode !== 'piloted' || nowMs < entity.nextSensorRefreshAtMs) return;
+    if (owner.possession?.kind !== 'piloted-drone' || owner.possession.entityId !== entity.id) {
+      entity.sensorContacts.length = 0;
+      entity.nextSensorRefreshAtMs = nowMs + PILOTED_DRONE_SENSOR_PROFILE.refreshMs;
+      return;
+    }
+    const direction: SupportVec3 = [
+      Math.sin(entity.yaw) * Math.cos(entity.pitch),
+      Math.sin(entity.pitch),
+      Math.cos(entity.yaw) * Math.cos(entity.pitch),
+    ];
+    const minimumDot = Math.cos(PILOTED_DRONE_SENSOR_PROFILE.forwardConeDegrees / 2 * Math.PI / 180);
+    entity.sensorContacts = hostileTargets(world, owner.actorId, owner.team)
+      .filter((target) => {
+        const dx = target.position[0] - entity.position[0];
+        const dy = target.position[1] - entity.position[1];
+        const dz = target.position[2] - entity.position[2];
+        const range = Math.hypot(dx, dy, dz);
+        if (range <= 0.001 || range > PILOTED_DRONE_SENSOR_PROFILE.maximumRangeM) return false;
+        return (dx * direction[0] + dy * direction[1] + dz * direction[2]) / range >= minimumDot;
+      })
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .filter((target, index, targets) => index === 0 || target.id !== targets[index - 1].id)
+      .slice(0, 16)
+      .map((target) => Object.freeze({
+        id: target.id,
+        kind: target.kind,
+        team: target.team,
+        lifeId: target.lifeId,
+        position: Object.freeze([...target.position]) as unknown as SupportVec3,
+        relation: 'hostile' as const,
+        throughWall: true as const,
+      }));
+    entity.nextSensorRefreshAtMs = nowMs + PILOTED_DRONE_SENSOR_PROFILE.refreshMs;
+  }
+
   private nearestVisibleTarget(origin: SupportVec3, ownerId: string, team: 0 | 1, world: KillstreakWorld): KillstreakTarget | null {
     return hostileTargets(world, ownerId, team)
       .filter((target) => lineOfSight(world, origin, target.position))
       .sort((left, right) => distance(origin, left.position) - distance(origin, right.position) || left.id.localeCompare(right.id))[0] ?? null;
   }
 
-  private aimedVisibleTarget(origin: SupportVec3, yaw: number, pitch: number, ownerId: string, team: 0 | 1, world: KillstreakWorld): KillstreakTarget | null {
+  private aimedVisibleTarget(
+    origin: SupportVec3,
+    yaw: number,
+    pitch: number,
+    ownerId: string,
+    team: 0 | 1,
+    world: KillstreakWorld,
+    maximumRange = Number.POSITIVE_INFINITY,
+  ): KillstreakTarget | null {
     const direction = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)] as const;
     return hostileTargets(world, ownerId, team).filter((target) => {
       if (!lineOfSight(world, origin, target.position)) return false;
       const delta = [target.position[0] - origin[0], target.position[1] - origin[1], target.position[2] - origin[2]] as const;
       const length = Math.max(0.001, Math.hypot(...delta));
+      if (length > maximumRange) return false;
       const dot = (delta[0] * direction[0] + delta[1] * direction[1] + delta[2] * direction[2]) / length;
       return dot >= Math.cos(8 * Math.PI / 180);
     }).sort((left, right) => distance(origin, left.position) - distance(origin, right.position))[0] ?? null;
@@ -949,16 +1243,35 @@ export class HostKillstreakRuntime {
         phase: entity.phase,
         position: Object.freeze([...entity.position]) as unknown as SupportVec3,
         velocity: Object.freeze([...entity.velocity]) as unknown as SupportVec3,
+        attitude: Object.freeze([...entity.attitude]) as unknown as SupportVec3,
         health: entity.health,
         expiresInMs: Math.max(0, entity.expiresAtMs - nowMs),
         magazine: entity.kind === 'drone' ? entity.magazine : null,
         reserveClips: entity.kind === 'drone' ? entity.reserveClips : null,
+        gunProfileId: entity.kind === 'drone' ? entity.gunProfileId : null,
         gunController: entity.kind === 'chopper' ? entity.gunController === 'ai' ? 'ai' : 'owner-player' : null,
         captureProgress,
         revealedReward: null,
         revision: entity.revision,
       });
     });
-    return Object.freeze({ schemaVersion: 1, matchEpoch: this.matchEpoch, revision: this.revision, actors: Object.freeze(actors), entities: Object.freeze(entities) });
+    const recipient = recipientActorId ? this.actors.get(recipientActorId) : null;
+    const sensorEntity = recipient?.possession?.kind === 'piloted-drone'
+      ? this.entities.get(recipient.possession.entityId)
+      : null;
+    const sensorContacts = sensorEntity?.kind === 'drone' && sensorEntity.mode === 'piloted'
+      ? sensorEntity.sensorContacts.map((contact) => Object.freeze({
+        ...contact,
+        position: Object.freeze([...contact.position]) as unknown as SupportVec3,
+      }))
+      : [];
+    return Object.freeze({
+      schemaVersion: 1,
+      matchEpoch: this.matchEpoch,
+      revision: this.revision,
+      actors: Object.freeze(actors),
+      entities: Object.freeze(entities),
+      sensorContacts: Object.freeze(sensorContacts),
+    });
   }
 }

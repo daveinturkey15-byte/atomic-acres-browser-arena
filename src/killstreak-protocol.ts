@@ -1,11 +1,13 @@
 import { PASS65_KILLSTREAK_CATALOG, validateKillstreakLoadout, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
 import type { CombatTiming } from './network-fairness';
 import type {
+  DroneSensorContact,
   KillstreakActivationIntent,
   KillstreakControlIntent,
   KillstreakDamageEvent,
   KillstreakRecipientSnapshot,
 } from './killstreak-runtime';
+import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 
 export type KillstreakLoadoutIntentMessage = Readonly<{
   type: 'killstreak-loadout-intent';
@@ -97,6 +99,10 @@ function vec3(value: unknown): value is readonly [number, number, number] {
   return Array.isArray(value) && value.length === 3 && value.every((entry) => finite(entry, -10_000, 10_000));
 }
 
+function attitude(value: unknown): value is readonly [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every((entry) => finite(entry, -Math.PI, Math.PI));
+}
+
 function timing(value: unknown): boolean {
   if (value === undefined) return true;
   return object(value)
@@ -136,31 +142,65 @@ function isActorSnapshot(value: unknown): boolean {
 
 function isEntitySnapshot(value: unknown): boolean {
   if (!object(value) || !exactKeys(value, [
-    'id', 'activationId', 'ownerId', 'team', 'kind', 'mode', 'phase', 'position', 'velocity', 'health', 'expiresInMs',
-    'magazine', 'reserveClips', 'gunController', 'captureProgress', 'revealedReward', 'revision',
+    'id', 'activationId', 'ownerId', 'team', 'kind', 'mode', 'phase', 'position', 'velocity', 'attitude', 'health', 'expiresInMs',
+    'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'captureProgress', 'revealedReward', 'revision',
   ]) || !hostEntityId(value.id) || !activationId(value.activationId) || !actorId(value.ownerId)
     || (value.team !== 0 && value.team !== 1)
-    || (value.kind !== 'chopper' && value.kind !== 'drone' && value.kind !== 'care-crate')
-    || !vec3(value.position) || !vec3(value.velocity)
+    || (value.kind !== 'aircraft' && value.kind !== 'chopper' && value.kind !== 'drone' && value.kind !== 'care-crate')
+    || !vec3(value.position) || !vec3(value.velocity) || !attitude(value.attitude)
     || !finite(value.health, 0, 800) || !finite(value.expiresInMs, 0, 60_000)
     || typeof value.phase !== 'string' || value.phase.length === 0 || value.phase.length > 24
     || !safeCounter(value.revision)) return false;
   if (value.kind === 'drone') {
     if (value.mode !== 'piloted' && value.mode !== 'swarm') return false;
-    if (!safeCounter(value.magazine, 20) || !(value.reserveClips === null || safeCounter(value.reserveClips, 1))) return false;
-  } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null) return false;
-  if (!(value.gunController === null || value.gunController === 'ai' || value.gunController === 'owner-player')) return false;
-  if (!(value.captureProgress === null || finite(value.captureProgress, 0, 1))) return false;
+    if (!safeCounter(value.magazine, 20)
+      || (value.mode === 'piloted' ? !safeCounter(value.reserveClips, 1) : value.reserveClips !== null)
+      || value.gunProfileId !== DRONE_GUN_PROFILE_ID) return false;
+  } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null || value.gunProfileId !== null) return false;
+  const phaseValid = value.kind === 'aircraft' ? value.phase === 'inbound' || value.phase === 'active' || value.phase === 'outbound'
+    : value.kind === 'chopper' ? value.phase === 'inbound' || value.phase === 'orbiting' || value.phase === 'outbound'
+    : value.kind === 'drone' ? value.phase === 'active' || value.phase === 'reloading'
+    : value.phase === 'inbound' || value.phase === 'descending' || value.phase === 'landed' || value.phase === 'capturing';
+  if (!phaseValid) return false;
+  if (value.kind === 'chopper') {
+    if (value.gunController !== 'ai' && value.gunController !== 'owner-player') return false;
+  } else if (value.gunController !== null) return false;
+  if (value.kind === 'care-crate') {
+    if (!(value.captureProgress === null || finite(value.captureProgress, 0, 1))) return false;
+  } else if (value.captureProgress !== null) return false;
   return value.revealedReward === null || ids.has(String(value.revealedReward));
 }
 
+function isSensorContact(value: unknown): value is DroneSensorContact {
+  return object(value)
+    && exactKeys(value, ['id', 'kind', 'team', 'lifeId', 'position', 'relation', 'throughWall'])
+    && actorId(value.id)
+    && (value.kind === 'player' || value.kind === 'bot')
+    && (value.team === 0 || value.team === 1)
+    && safeCounter(value.lifeId)
+    && vec3(value.position)
+    && value.relation === 'hostile'
+    && value.throughWall === true;
+}
+
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {
-  if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities'])
+  if (!object(value) || !exactKeys(value, ['schemaVersion', 'matchEpoch', 'revision', 'actors', 'entities', 'sensorContacts'])
     || value.schemaVersion !== 1 || !safeCounter(value.matchEpoch) || !safeCounter(value.revision)
     || !Array.isArray(value.actors) || value.actors.length > 6 || !value.actors.every(isActorSnapshot)
-    || !Array.isArray(value.entities) || value.entities.length > 32 || !value.entities.every(isEntitySnapshot)) return false;
+    || !Array.isArray(value.entities) || value.entities.length > 32 || !value.entities.every(isEntitySnapshot)
+    || !Array.isArray(value.sensorContacts) || value.sensorContacts.length > 16 || !value.sensorContacts.every(isSensorContact)) return false;
   return new Set(value.actors.map((entry) => (entry as { actorId: string }).actorId)).size === value.actors.length
-    && new Set(value.entities.map((entry) => (entry as { id: string }).id)).size === value.entities.length;
+    && new Set(value.entities.map((entry) => (entry as { id: string }).id)).size === value.entities.length
+    && new Set(value.sensorContacts.map((entry) => (entry as DroneSensorContact).id)).size === value.sensorContacts.length;
+}
+
+function sensorCapabilityMatchesRecipient(snapshot: KillstreakRecipientSnapshot, recipientId: string | null): boolean {
+  if (snapshot.sensorContacts.length === 0) return true;
+  if (!recipientId) return false;
+  const actor = snapshot.actors.find((entry) => entry.actorId === recipientId);
+  if (actor?.possession?.kind !== 'piloted-drone') return false;
+  return snapshot.entities.some((entity) => entity.id === actor.possession?.entityId
+    && entity.kind === 'drone' && entity.mode === 'piloted');
 }
 
 function isDamageEvent(value: unknown): value is KillstreakDamageEvent {
@@ -210,7 +250,9 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
   if (value.type === 'killstreak-state') {
     return exactKeys(value, ['type', 'by', 'forPlayerId', 'snapshot', 'nonce'])
       && actorId(value.by) && (value.forPlayerId === null || actorId(value.forPlayerId))
-      && isRecipientSnapshot(value.snapshot) && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
+      && isRecipientSnapshot(value.snapshot)
+      && sensorCapabilityMatchesRecipient(value.snapshot, value.forPlayerId)
+      && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
   if (value.type === 'killstreak-damage-result') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'nonce'])

@@ -64,6 +64,7 @@ import {
   type KillstreakWorld,
 } from './killstreak-runtime';
 import { KillstreakPresentation } from './killstreak-presentation';
+import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
 import type {
   KillstreakActivateIntentMessage,
   KillstreakControlIntentMessage,
@@ -9400,6 +9401,7 @@ function killstreakWorldState(): KillstreakWorld {
     alive: remote.snapshot.hp > 0,
     position: [remote.target.x, remote.target.y + 1.15, remote.target.z],
   });
+  const flightNavigation = PASS65_FLIGHT_NAVIGATION[selectedArena.id];
   return {
     bounds: {
       minX: arena.bounds.minX,
@@ -9407,7 +9409,7 @@ function killstreakWorldState(): KillstreakWorld {
       minZ: arena.bounds.minZ,
       maxZ: arena.bounds.maxZ,
       floorY: 0,
-      ceilingY: 42,
+      ceilingY: flightNavigation.ceilingY,
     },
     targets,
     areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
@@ -9416,6 +9418,17 @@ function killstreakWorldState(): KillstreakWorld {
       { x: to[0], y: to[1], z: to[2] },
       box,
     )),
+    resolveFlightPosition: (from, desired, radius) => {
+      const result = resolveSupportFlightStep({
+        definition: flightNavigation,
+        arenaBounds: arena.bounds,
+        solids: activeWorldColliders(),
+        from: { x: from[0], y: from[1], z: from[2] },
+        desired: { x: desired[0], y: desired[1], z: desired[2] },
+        radius,
+      });
+      return [result.position.x, result.position.y, result.position.z];
+    },
     isFlightPositionValid: (position) => pointInsideBounds({ x: position[0], y: position[1], z: position[2] }, arena.bounds, 0.35),
   };
 }
@@ -9483,7 +9496,7 @@ function applyKillstreakEntityShot(
     let nearest: { id: string; distance: number } | null = null;
     const entities = killstreakRuntime.snapshotFor(null, now).entities;
     for (const entity of entities) {
-      if (entity.kind === 'care-crate'
+      if ((entity.kind === 'care-crate' || entity.kind === 'aircraft')
         || !areCombatantsHostile(shooterId, shooterTeam, entity.ownerId, entity.team)
         || destroyed.has(entity.id)) continue;
       const centre = new THREE.Vector3(...entity.position);

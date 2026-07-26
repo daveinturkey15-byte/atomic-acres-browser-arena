@@ -333,6 +333,17 @@ export function sweepSphereAgainstBoxes(
   return best;
 }
 
+/** Exact sphere overlap against an authored axis-aligned or oriented box. */
+export function sphereIntersectsBox(point: Point3, radius: number, box: Box2): boolean {
+  if (!Number.isFinite(radius) || radius < 0) return false;
+  const frame = boxFrame(box);
+  const local = worldPointToLocal(frame, point);
+  const dx = Math.max(0, Math.abs(local.x) - frame.halfExtents.x);
+  const dy = Math.max(0, Math.abs(local.y) - frame.halfExtents.y);
+  const dz = Math.max(0, Math.abs(local.z) - frame.halfExtents.z);
+  return dx * dx + dy * dy + dz * dz < radius * radius;
+}
+
 export function circleIntersectsBox(x: number, z: number, radius: number, box: Box2): boolean {
   if (box.rotation) return circleIntersectsProjectedHull(x, z, radius, projectedHull(boxFrame(box)));
   const nearestX = Math.max(box.minX, Math.min(x, box.maxX));

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import type { KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
+import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
+const MAX_SENSOR_CONTACTS = 16;
 
 type PresentedEntity = Readonly<{
   root: THREE.Group;
@@ -72,6 +73,28 @@ function buildChopper(): PresentedEntity {
   return Object.freeze({ root, rotor, target: new THREE.Vector3() });
 }
 
+function buildCareAircraft(): PresentedEntity {
+  const root = new THREE.Group();
+  root.name = 'pass65-care-package-aircraft';
+  root.userData.pass65KillstreakPresentation = true;
+  const fuselage = mesh(new THREE.CapsuleGeometry(0.52, 3.6, 6, 12), 0x34464a, 'care-aircraft-fuselage');
+  fuselage.rotation.x = Math.PI / 2;
+  const nose = mesh(new THREE.SphereGeometry(0.49, 12, 8), 0x64787a, 'care-aircraft-nose');
+  nose.scale.set(0.86, 0.74, 1.18);
+  nose.position.z = -2.05;
+  const wing = mesh(new THREE.BoxGeometry(5.8, 0.11, 1.05), 0x26383c, 'care-aircraft-main-wing');
+  wing.position.z = 0.1;
+  const tailWing = mesh(new THREE.BoxGeometry(2.2, 0.08, 0.52), 0x26383c, 'care-aircraft-tail-wing');
+  tailWing.position.z = 2.05;
+  const tailFin = mesh(new THREE.BoxGeometry(0.1, 0.82, 0.72), 0xd5b84d, 'care-aircraft-tail-fin');
+  tailFin.position.set(0, 0.42, 2.15);
+  const cargoLight = mesh(new THREE.SphereGeometry(0.08, 8, 6), 0x7fe6e0, 'care-aircraft-cargo-light');
+  cargoLight.position.set(0, -0.45, -0.15);
+  root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight);
+  root.scale.setScalar(0.9);
+  return Object.freeze({ root, rotor: null, target: new THREE.Vector3() });
+}
+
 function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
   const root = new THREE.Group();
   root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
@@ -110,9 +133,38 @@ function buildCareCrate(): PresentedEntity {
 }
 
 function createPresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntity {
+  if (entity.kind === 'aircraft') return buildCareAircraft();
   if (entity.kind === 'chopper') return buildChopper();
   if (entity.kind === 'drone') return buildDrone(entity.mode);
   return buildCareCrate();
+}
+
+function buildDroneSensorSilhouette(index: number): THREE.Group {
+  const root = new THREE.Group();
+  root.name = `piloted-drone-hostile-sensor-${index + 1}`;
+  root.userData.presentationOnly = true;
+  const sensorMaterial = new THREE.MeshBasicMaterial({
+    name: 'piloted-drone-hostile-through-wall',
+    color: 0xff674f,
+    transparent: true,
+    opacity: 0.62,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const part = (name: string, geometry: THREE.BufferGeometry, position: readonly [number, number, number]) => {
+    const result = new THREE.Mesh(geometry, sensorMaterial);
+    result.name = name;
+    result.position.set(...position);
+    result.renderOrder = 90;
+    root.add(result);
+  };
+  part('drone-sensor-head', new THREE.SphereGeometry(0.2, 9, 6), [0, 0.68, 0]);
+  part('drone-sensor-torso', new THREE.CapsuleGeometry(0.27, 0.48, 3, 8), [0, 0.18, 0]);
+  part('drone-sensor-leg-left', new THREE.CapsuleGeometry(0.1, 0.56, 2, 6), [-0.14, -0.51, 0]);
+  part('drone-sensor-leg-right', new THREE.CapsuleGeometry(0.1, 0.56, 2, 6), [0.14, -0.51, 0]);
+  root.visible = false;
+  return root;
 }
 
 function disposeRoot(root: THREE.Object3D): void {
@@ -130,6 +182,9 @@ export class KillstreakPresentation {
   private readonly entities = new Map<string, PresentedEntity>();
   private readonly impactFlashes: Array<{ root: THREE.Mesh; expiresAt: number }> = [];
   private readonly prewarmed: PresentedEntity[];
+  private readonly sensorRoot = new THREE.Group();
+  private readonly sensorSilhouettes: THREE.Group[];
+  private visibleSensorContacts = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -140,13 +195,18 @@ export class KillstreakPresentation {
     scene.add(this.root);
     // Keep one instance of every material/geometry vocabulary resident so the
     // first earned streak does not discover shaders on a live combat frame.
-    this.prewarmed = [buildChopper(), buildDrone('piloted'), buildDrone('swarm'), buildCareCrate()];
+    this.prewarmed = [buildChopper(), buildCareAircraft(), buildDrone('piloted'), buildDrone('swarm'), buildCareCrate()];
     for (const entry of this.prewarmed) {
       entry.root.name = `prewarmed-${entry.root.name}`;
       entry.root.userData.prewarmed = true;
       entry.root.scale.setScalar(0.0001);
       this.root.add(entry.root);
     }
+    this.sensorRoot.name = 'piloted-drone-through-wall-sensor';
+    this.sensorRoot.userData.presentationOnly = true;
+    this.sensorSilhouettes = Array.from({ length: MAX_SENSOR_CONTACTS }, (_, index) => buildDroneSensorSilhouette(index));
+    this.sensorRoot.add(...this.sensorSilhouettes);
+    this.root.add(this.sensorRoot);
   }
 
   sync(snapshot: KillstreakRecipientSnapshot, nowMs: number): void {
@@ -167,10 +227,7 @@ export class KillstreakPresentation {
       }
       presented.target.fromArray(entity.position);
       presented.root.position.lerp(presented.target, 0.38);
-      const horizontal = Math.hypot(entity.velocity[0], entity.velocity[2]);
-      if (horizontal > 0.05) presented.root.rotation.y = Math.atan2(entity.velocity[0], entity.velocity[2]);
-      presented.root.rotation.x = THREE.MathUtils.clamp(-entity.velocity[1] * 0.012, -0.14, 0.14);
-      presented.root.rotation.z = entity.kind === 'chopper' ? Math.sin(nowMs * 0.00073 + entity.id.length) * 0.035 : 0;
+      presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
       if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
       const canopy = presented.root.getObjectByName('care-package-parachute');
       if (canopy) canopy.visible = entity.phase === 'inbound' || entity.phase === 'descending';
@@ -178,6 +235,7 @@ export class KillstreakPresentation {
       presented.root.userData.phase = entity.phase;
       presented.root.userData.gunController = entity.gunController;
     }
+    this.syncSensorContacts(snapshot.sensorContacts);
     for (let index = this.impactFlashes.length - 1; index >= 0; index -= 1) {
       const flash = this.impactFlashes[index];
       const remaining = THREE.MathUtils.clamp((flash.expiresAt - nowMs) / 420, 0, 1);
@@ -186,6 +244,21 @@ export class KillstreakPresentation {
       if (remaining > 0) continue;
       this.retireRoot(flash.root);
       this.impactFlashes.splice(index, 1);
+    }
+  }
+
+  private syncSensorContacts(contacts: readonly DroneSensorContact[]): void {
+    const admitted = contacts.slice(0, MAX_SENSOR_CONTACTS);
+    this.visibleSensorContacts = admitted.length;
+    for (const [index, silhouette] of this.sensorSilhouettes.entries()) {
+      const contact = admitted[index];
+      silhouette.visible = contact !== undefined;
+      if (!contact) continue;
+      silhouette.position.fromArray(contact.position);
+      silhouette.userData.contactId = contact.id;
+      silhouette.userData.contactLifeId = contact.lifeId;
+      silhouette.userData.relation = contact.relation;
+      silhouette.userData.throughWall = contact.throughWall;
     }
   }
 
@@ -207,11 +280,14 @@ export class KillstreakPresentation {
     return this.entities.get(id)?.root ?? null;
   }
 
-  telemetry(): Readonly<{ entities: number; impactFlashes: number; bounded: boolean }> {
+  telemetry(): Readonly<{ entities: number; impactFlashes: number; sensorContacts: number; bounded: boolean }> {
     return Object.freeze({
       entities: this.entities.size,
       impactFlashes: this.impactFlashes.length,
-      bounded: this.entities.size <= MAX_PRESENTED_ENTITIES && this.impactFlashes.length <= MAX_IMPACT_FLASHES,
+      sensorContacts: this.visibleSensorContacts,
+      bounded: this.entities.size <= MAX_PRESENTED_ENTITIES
+        && this.impactFlashes.length <= MAX_IMPACT_FLASHES
+        && this.visibleSensorContacts <= MAX_SENSOR_CONTACTS,
     });
   }
 
@@ -220,11 +296,14 @@ export class KillstreakPresentation {
     this.entities.clear();
     for (const flash of this.impactFlashes) this.retireRoot(flash.root);
     this.impactFlashes.length = 0;
+    this.visibleSensorContacts = 0;
+    for (const silhouette of this.sensorSilhouettes) silhouette.visible = false;
   }
 
   dispose(): void {
     this.clear();
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
+    this.retireRoot(this.sensorRoot);
     this.root.removeFromParent();
   }
 }

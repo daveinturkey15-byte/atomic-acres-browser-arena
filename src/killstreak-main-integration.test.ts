@@ -20,11 +20,18 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('event.targetLifeId !== localContinuity');
   });
 
+  it('feeds arena-owned portal/no-fly data and current static plus dynamic solids into support flight', () => {
+    expect(source).toContain('PASS65_FLIGHT_NAVIGATION[selectedArena.id]');
+    expect(source).toContain('resolveFlightPosition: (from, desired, radius)');
+    expect(source).toContain('resolveSupportFlightStep({');
+    expect(source).toContain('solids: activeWorldColliders()');
+  });
+
   it('routes F to gun-only chopper handoff, drone exit, or care capture before weapon pickup', () => {
     expect(source).toContain("requestKillstreakControl(chopper.id, 'toggle-chopper-gunner'");
     expect(source).toContain("requestKillstreakControl(actor.possession.entityId, 'exit-piloted-drone'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
-    expect(source).toContain("!interactWithKillstreakSupport()) interactWithWeaponPickup()");
+    expect(source).toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)\) interactWithWeaponPickup\(\)/);
   });
 
   it('applies the exact Adrenaline stage to damage, movement and reload duration', () => {
