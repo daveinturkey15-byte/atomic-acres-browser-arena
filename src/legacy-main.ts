@@ -439,7 +439,6 @@ import {
 import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
 import { RENDER_PROFILE_STORAGE_KEY, renderProfileConfig, resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
-import { admitStaticShadowDynamicRefresh } from './shadow-refresh';
 import {
   BotDamageMessage,
   BotStateMessage,
@@ -980,7 +979,6 @@ let webglContextLost = false;
 let webglContextLosses = 0;
 let webglContextRestorations = 0;
 let staticShadowDynamicRefreshes = 0;
-let lastStaticShadowRefreshAt = -Infinity;
 if (renderRuntime.backend === 'webgl2') {
   renderRuntime.renderer.domElement.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
@@ -1041,6 +1039,8 @@ type BootstrapStage =
   | 'measuring-display'
   | 'module-ready'
   | 'loading-gameplay-assets'
+  | 'prewarming-combat-tracers'
+  | 'prewarming-combat-impacts'
   | 'prewarming-grenade-explosion'
   | 'prewarming-support-explosion'
   | 'prewarming-death-drops'
@@ -1112,6 +1112,28 @@ function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   document.documentElement.dataset.adaptiveShadows = shadowsEnabled ? 'on' : 'off';
 }
 applyAdaptiveRenderBudget(adaptiveQuality.telemetry().pixelRatioCap);
+
+async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): Promise<void> {
+  if (renderRuntime.backend !== 'webgpu') return;
+  for (;;) {
+    submitWebGpuFrame(performance.now(), true);
+    await flushWebGpuFrames(12_000);
+    const presentation = renderRuntime.presentationTelemetry();
+    if (presentation.status !== 'healthy') {
+      throw new Error(`${label} presentation was not healthy: ${JSON.stringify(presentation)}`);
+    }
+    const completionLatencyMs = presentation.lastCompletionLatencyMs;
+    if (completionLatencyMs === null) throw new Error(`${label} presentation completed without a queue-latency sample`);
+    if (completionLatencyMs <= maximumLatencyMs) return;
+    const nextPixelRatio = adaptiveQuality.forceDownshift(
+      `${label} WebGPU queue latency ${Math.round(completionLatencyMs)}ms exceeded ${maximumLatencyMs}ms`,
+    );
+    if (nextPixelRatio === null) return;
+    applyAdaptiveRenderBudget(nextPixelRatio);
+    resize();
+    await renderRuntime.compile(scene, camera);
+  }
+}
 
 function buildSky(): void {
   if (renderRuntime.backend === 'webgl2') {
@@ -6746,6 +6768,20 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   };
   if (mode === 'solo') await spawnBots();
   else if (mode === 'host') await spawnBots(privateMatchConfig.hostedBotCount);
+  // Compile and retire the first complete gameplay presentation while the
+  // transition surface still owns the screen. Bot operators, the selected
+  // viewmodel and their textures do not exist in the menu-only bootstrap
+  // frame; admitting them after the clock starts caused a multi-second WebGPU
+  // stall that looked like a frozen match and tripped the fatal watchdog.
+  const priorRenderSubmissionPaused = renderSubmissionPaused;
+  renderSubmissionPaused = true;
+  try {
+    setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
+    await renderRuntime.compile(scene, camera);
+    await settleWebGpuPresentation('Initial match');
+  } finally {
+    renderSubmissionPaused = priorRenderSubmissionPaused;
+  }
   gameStarted = true;
   const matchStartedAt = performance.now();
   beginMatchDiagnostics(mode, matchStartedAt);
@@ -13136,32 +13172,6 @@ window.addEventListener('beforeunload', () => {
   renderRuntime.dispose();
 });
 
-function refreshStaticShadowsForDynamicCasters(now: number): void {
-  const castsVisibleShadow = (root: THREE.Object3D): boolean => {
-    if (!root.visible) return false;
-    let casts = false;
-    root.traverse((node) => {
-      if (!casts && node.visible && node instanceof THREE.Mesh && node.castShadow) casts = true;
-    });
-    return casts;
-  };
-  const hasDynamicCasters = !botsFrozen && [...bots.values()].some((bot) => bot.alive && castsVisibleShadow(bot.root))
-    || [...remotes.values()].some((remote) => castsVisibleShadow(remote.root))
-    || grenades.length > 0 || yardhawk !== null || strikeMissiles.length > 0 || hunterDrones.length > 0;
-  const admittedAt = admitStaticShadowDynamicRefresh({
-    shadowMode: activeRenderConfig.shadowMode,
-    shadowsEnabled: renderRuntime.shadowsEnabled(),
-    contextLost: webglContextLost,
-    hasDynamicCasters,
-    now,
-    lastRefreshAt: lastStaticShadowRefreshAt,
-  });
-  if (admittedAt === null) return;
-  requestStaticShadowRefresh();
-  lastStaticShadowRefreshAt = admittedAt;
-  staticShadowDynamicRefreshes += 1;
-}
-
 function selectedArenaPresentationRoot(): THREE.Group {
   if (selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible) return arenaArtRoot;
   return arena.root;
@@ -13335,7 +13345,6 @@ function frame(now: number, scheduleNext = true): void {
       camera.rotation.set(debugCaptureCameraPitch, debugCaptureCameraYaw, 0, 'YXZ');
       camera.updateMatrixWorld(true);
     }
-    refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
       let frameSubmitted = false;
       if (renderRuntime.backend === 'webgpu') {
@@ -15419,6 +15428,10 @@ async function bootstrap(): Promise<void> {
   // retreat still keeps it visually tucked near walls, while floor/wall depth
   // can no longer cut holes through hands and weapons in prone/crouch poses.
   weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
+  bootstrapStage = 'prewarming-combat-tracers';
+  await tracerPool.prewarm(renderRuntime, camera);
+  bootstrapStage = 'prewarming-combat-impacts';
+  await impactPresentation.prewarm(renderRuntime, camera);
   bootstrapStage = 'prewarming-grenade-explosion';
   await grenadeExplosionPresentation.prewarm(renderRuntime, camera);
   bootstrapStage = 'prewarming-support-explosion';
@@ -15470,8 +15483,7 @@ async function bootstrap(): Promise<void> {
   bootstrapStage = 'verifying-first-presentation';
   renderRuntime.resetRenderInfo();
   if (renderRuntime.backend === 'webgpu') {
-    submitWebGpuFrame(performance.now(), true);
-    await flushWebGpuFrames(8_000);
+    await settleWebGpuPresentation('Initial arena');
     const initialPresentation = renderRuntime.presentationTelemetry();
     // Three resets per-frame draw-call counters before this awaited queue
     // fence can return. Queue completion is the bootstrap invariant; the

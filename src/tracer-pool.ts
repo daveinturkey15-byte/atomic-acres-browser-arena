@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 export const MAX_TRACERS = 32;
 
@@ -9,6 +10,7 @@ export class TracerPool {
   private readonly colors = new Float32Array(MAX_TRACERS * 2 * 3);
   private readonly life = new Float32Array(MAX_TRACERS);
   private cursor = 0;
+  private wasPrewarmed = false;
 
   constructor(scene: THREE.Scene) {
     const geometry = new THREE.BufferGeometry();
@@ -26,6 +28,19 @@ export class TracerPool {
     this.lines.frustumCulled = false;
     this.lines.visible = false;
     scene.add(this.lines);
+  }
+
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+    if (this.wasPrewarmed) return;
+    const parentScene = this.lines.parent;
+    if (!(parentScene instanceof THREE.Scene)) throw new Error('Tracer presentation must be attached to a scene before prewarm');
+    this.lines.visible = true;
+    try {
+      await runtime.compileAndRender(this.lines, camera, parentScene);
+      this.wasPrewarmed = true;
+    } finally {
+      this.lines.visible = this.activeCount() > 0;
+    }
   }
 
   emit(start: THREE.Vector3, end: THREE.Vector3, color: number, lifetime = 0.085): void {

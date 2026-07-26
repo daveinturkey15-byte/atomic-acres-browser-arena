@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { presentationRandom } from './runtime-random';
 import type { ImpactSurface } from './combat-feedback';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 
 type Particle = {
   velocity: THREE.Vector3;
@@ -62,6 +63,7 @@ export class ImpactPresentation {
   private markCursor = 0;
   private particleDensityScale = 1;
   private decalLifetimeScale = 1;
+  private wasPrewarmed = false;
 
   constructor(scene: THREE.Scene, reducedDetail = false) {
     const geometry = new THREE.BufferGeometry();
@@ -108,6 +110,23 @@ export class ImpactPresentation {
     scene.add(this.marks);
     for (let index = 0; index < MAX_PARTICLES; index += 1) {
       this.particles.push({ velocity: new THREE.Vector3(), life: 0, maxLife: 0, color: new THREE.Color() });
+    }
+  }
+
+  async prewarm(runtime: PresentationPrewarmRuntime, camera: THREE.Camera): Promise<void> {
+    if (this.wasPrewarmed) return;
+    const parentScene = this.points.parent;
+    if (!(parentScene instanceof THREE.Scene) || this.marks.parent !== parentScene) {
+      throw new Error('Impact presentation must be attached to one scene before prewarm');
+    }
+    this.points.visible = true;
+    this.marks.visible = true;
+    try {
+      await runtime.compileAndRender(parentScene, camera, parentScene);
+      this.wasPrewarmed = true;
+    } finally {
+      this.points.visible = this.activeParticles() > 0;
+      this.marks.visible = this.activeMarks() > 0;
     }
   }
 

@@ -436,14 +436,20 @@ export class WebGpuRenderRuntime {
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
-  // Queue completion resolves in frontiers rather than per-frame. Bound the
-  // unresolved frontier so a cold arena/support shader compile cannot enqueue
-  // dozens of expensive frames before the age-based backpressure engages.
-  private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 2;
+  // Three's WebGPU renderer owns mutable bind-group, render-target and texture
+  // state. Never begin a second presentation while the prior GPU submission is
+  // unresolved: overlapping cold scene/viewmodel compilation caused both long
+  // gameplay freezes and `Texture already initialized` failures on the HITL
+  // browser. Queue completion still advances in frontiers, but admission is
+  // deliberately serialized at the renderer boundary.
+  private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 1;
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
   // ~2.4 s. Backpressure still stops new work at 250 ms; four seconds matches
   // the explicit queue-fence timeout and distinguishes cold work from a hang.
-  private static readonly PRESENTATION_STALL_MS = 4_000;
+  // Queue-latency adaptation handles bounded overload before gameplay. Keep
+  // the fatal fence for a genuinely non-progressing device, not a slow frame
+  // that can still retire and trigger a safe quality downshift.
+  private static readonly PRESENTATION_STALL_MS = 12_000;
 
   private constructor(
     renderer: WebGPURenderer,

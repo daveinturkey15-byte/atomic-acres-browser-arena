@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrameMs } from './adaptive-quality';
 
 describe('adaptive quality controller', () => {
+  it('can downshift from measured GPU queue latency without trusting rAF cadence', () => {
+    const controller = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1,
+    });
+    expect(controller.forceDownshift('GPU queue latency 800ms')).toBe(0.85);
+    expect(controller.telemetry()).toMatchObject({
+      pixelRatioCap: 0.85,
+      downshifts: 1,
+      lastReason: 'GPU queue latency 800ms',
+    });
+  });
+
   it('retains authored shadows throughout the Quality ladder and never enables them in Performance', () => {
     expect(adaptiveShadowsEnabled('blender', true, 1)).toBe(true);
     expect(adaptiveShadowsEnabled('blender', true, 0.75)).toBe(true);

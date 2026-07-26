@@ -127,6 +127,18 @@ export class AdaptiveQualityController {
     return null;
   }
 
+  forceDownshift(reason: string): number | null {
+    if (this.options.enabled === false || this.options.profile === 'compat' || this.tier <= 0) return null;
+    this.tier -= 1;
+    this.downshifts += 1;
+    this.overloadSamples = 0;
+    this.headroomSamples = 0;
+    this.samples.length = 0;
+    this.cooldownFrames = this.cooldownSamples;
+    this.lastReason = reason;
+    return this.levels[this.tier];
+  }
+
   telemetry(): AdaptiveQualityTelemetry {
     return {
       enabled: this.options.enabled !== false && this.options.profile !== 'compat',

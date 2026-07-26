@@ -29,8 +29,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'verifying-first-presentation'");
     expect(bootstrap.indexOf("bootstrapStage = 'verifying-first-presentation'"))
       .toBeLessThan(bootstrap.indexOf("bootstrapStage = 'ready'"));
-    expect(bootstrap).toContain('submitWebGpuFrame(performance.now(), true)');
-    expect(bootstrap).toContain('await flushWebGpuFrames(8_000)');
+    expect(bootstrap).toContain("await settleWebGpuPresentation('Initial arena')");
+    expect(source).toContain('submitWebGpuFrame(performance.now(), true)');
+    expect(source).toContain('await flushWebGpuFrames(12_000)');
+    expect(source).toContain('adaptiveQuality.forceDownshift(');
     expect(source).toContain("bootstrapStage = 'ready'");
   });
 
