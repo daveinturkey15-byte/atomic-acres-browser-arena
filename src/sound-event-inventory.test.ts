@@ -275,7 +275,7 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('b21ea9d5ba65a606758974d37ae96b25ad20eca8baa2b6f321e13bd04ccef041');
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('669896023d6de872d8a96e964fb4b2c6a7089b941fac2fa73b3b20aeab910901');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

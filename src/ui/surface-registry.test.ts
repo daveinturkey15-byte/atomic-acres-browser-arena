@@ -65,6 +65,17 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(tacticalCssSource).toContain('#railgun-thermal');
   });
 
+  it('registers the M14 smoke-only thermal scope as a critical rendered and styled HUD surface', () => {
+    expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'dmr-thermal')).toEqual({
+      id: 'dmr-thermal',
+      rootElementId: 'dmr-thermal',
+      renderer: 'match-hud',
+      critical: true,
+    });
+    expect(mainSource).toContain("element<HTMLElement>('#dmr-thermal')");
+    expect(tacticalCssSource).toContain('#dmr-thermal');
+  });
+
   it('registers one renderer-provenanced active-match pause backdrop', () => {
     expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'match-pause-backdrop')).toEqual({
       id: 'match-pause-backdrop',

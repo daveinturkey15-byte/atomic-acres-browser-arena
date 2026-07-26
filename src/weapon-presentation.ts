@@ -11,6 +11,12 @@ import { fireImportedWeapon, importedWeaponTelemetry, reloadImportedWeapon, upda
 import { WEAPONS } from './gameplay';
 import type { WeaponId } from './protocol';
 import { characterActionContract, measureCameraFraming, resolveSocketWorld, type CharacterActionContract } from './character-presentation-contract';
+import {
+  advanceMinigunSpool,
+  createMinigunSpoolState,
+  resetMinigunSpool,
+  type MinigunSpoolPhase,
+} from './minigun-spool';
 
 export type WeaponPose = {
   dt: number;
@@ -26,6 +32,8 @@ export type WeaponPose = {
   surfaceRetreat?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
   reloadProgress: number | null;
+  /** Presentation input only; host shot admission owns the legal spin-up tick. */
+  triggerHeld?: boolean;
 };
 
 type ViewCasing = { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; frames: number; active: boolean };
@@ -144,6 +152,7 @@ export class WeaponPresentation {
   private riggedArmDiagnostics: Array<Record<string, unknown>> = [];
   private readonly meleeKnife = new THREE.Group();
   private readonly meleeRig = new THREE.Group();
+  private readonly passiveKnife = new THREE.Group();
   private readonly brassGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.085, 7);
   private readonly shellGeometry = new THREE.CylinderGeometry(0.025, 0.025, 0.105, 8);
   private readonly brassMaterial = new THREE.MeshStandardMaterial({ color: 0xc8a65c, roughness: 0.3, metalness: 0.78 });
@@ -159,6 +168,7 @@ export class WeaponPresentation {
   private weaponHeat = 0;
   private shotsPresented = 0;
   private surfaceRetreat = 0;
+  private readonly minigunSpool = createMinigunSpoolState();
   private actionContract: CharacterActionContract = characterActionContract({
     weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
   });
@@ -457,6 +467,17 @@ export class WeaponPresentation {
     this.meleeRig.add(meleeUpperArm, meleeElbow, meleeForearm, meleeCuff, meleeHand, this.meleeKnife);
     this.meleeRig.visible = false;
     this.root.add(this.meleeRig);
+    const passiveKnifeModel = this.meleeKnife.clone(true);
+    passiveKnifeModel.name = 'passive-field-knife-model';
+    passiveKnifeModel.position.set(0, 0, 0);
+    passiveKnifeModel.rotation.set(0, 0, 0);
+    this.passiveKnife.name = 'passive-field-knife-presence';
+    this.passiveKnife.userData.presentationOnly = true;
+    this.passiveKnife.position.set(-0.52, -0.48, 0.08);
+    this.passiveKnife.rotation.set(-0.28, -0.12, 0.78);
+    this.passiveKnife.scale.setScalar(0.24);
+    this.passiveKnife.add(passiveKnifeModel);
+    this.root.add(this.passiveKnife);
     this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
@@ -603,6 +624,7 @@ export class WeaponPresentation {
   }
 
   setWeapon(id: WeaponId, immediate = false): void {
+    if (id !== this.active) resetMinigunSpool(this.minigunSpool);
     this.active = id;
     this.switchBlend = immediate ? 1 : 0;
     this.reloadLastProgress = 0;
@@ -641,6 +663,18 @@ export class WeaponPresentation {
   }
 
   fire(amount: number): void {
+    // A legal shot immediately owns the presentation. This does not change the
+    // melee cooldown/range result; it only prevents a stale knife arc from
+    // hiding a shot which authority already accepted.
+    if (this.meleeStart > 0 && this.debugMeleeProgress === null) {
+      this.meleeStart = 0;
+      this.meleePresentationFrames = 0;
+      this.meleeRig.visible = false;
+      const arms = this.root.getObjectByName('first-person-arms');
+      if (arms) arms.visible = true;
+      const model = this.models.get(this.active);
+      if (model) model.visible = true;
+    }
     const activeModel = this.models.get(this.active);
     if (activeModel) fireImportedWeapon(activeModel);
     const profile = weaponFamilyPresentation(this.active);
@@ -739,11 +773,21 @@ export class WeaponPresentation {
     return this.adsBlend;
   }
 
+  minigunSpoolFraction(): number {
+    return this.minigunSpool.fraction;
+  }
+
+  minigunSpoolPhase(): MinigunSpoolPhase {
+    return this.minigunSpool.phase;
+  }
+
   private sightReference(model: THREE.Object3D | undefined): THREE.Object3D | undefined {
     const sightName = this.active === 'carbine'
       ? 'optic-reticle'
       : this.active === 'sniper'
         ? 'sniper-scope'
+      : this.active === 'm14-ebr'
+        ? 'm14-thermal-optic'
       : this.active === 'lmg'
         ? 'lmg-aperture'
       : this.active === 'smg'
@@ -828,6 +872,9 @@ export class WeaponPresentation {
       surfaceRetreat: this.surfaceRetreat,
       riggedArms: this.riggedArmDiagnostics,
       knifeVisible: this.meleeRig.visible,
+      passiveKnifeVisible: this.passiveKnife.visible,
+      passiveKnifeModel: this.passiveKnife.getObjectByName('passive-field-knife-model') !== undefined,
+      minigunSpool: { ...this.minigunSpool },
       importedModel,
     };
   }
@@ -956,6 +1003,11 @@ export class WeaponPresentation {
     const actionEvents: WeaponActionEvent[] = [];
     const smoothing = (rate: number) => 1 - Math.exp(-rate * pose.dt);
     this.weaponHeat = advanceWeaponHeat(this.weaponHeat, false, pose.dt, this.active);
+    advanceMinigunSpool(this.minigunSpool, {
+      dt: pose.dt,
+      triggerHeld: pose.triggerHeld === true,
+      equipped: this.active === 'minigun',
+    });
     this.recoil = THREE.MathUtils.lerp(this.recoil, 0, smoothing(16));
     this.muzzleLight.intensity = THREE.MathUtils.lerp(this.muzzleLight.intensity, 0, smoothing(30));
     this.switchBlend = THREE.MathUtils.lerp(this.switchBlend, 1, smoothing(10));
@@ -1019,6 +1071,8 @@ export class WeaponPresentation {
 
     const activeModel = this.models.get(this.active);
     if (activeModel) updateImportedWeapon(activeModel, pose.dt);
+    const minigunBarrels = this.models.get('minigun')?.getObjectByName('minigun-barrel-cluster');
+    if (minigunBarrels) minigunBarrels.rotation.z = this.minigunSpool.angleRadians;
     const profile = weaponFamilyPresentation(this.active);
     const hipYaw = this.active === 'carbine'
       ? 0.18
@@ -1131,6 +1185,12 @@ export class WeaponPresentation {
       meleeProgress: meleeActive ? meleeProgress : null,
     });
     this.meleeRig.visible = meleeActive;
+    this.passiveKnife.visible = !meleeActive && this.adsBlend < 0.78;
+    if (this.passiveKnife.visible) {
+      const passivePhase = performance.now() * 0.0017;
+      this.passiveKnife.position.y = -0.48 + Math.sin(passivePhase) * 0.008 * (1 - this.adsBlend);
+      this.passiveKnife.rotation.z = 0.78 + Math.sin(passivePhase * 0.7) * 0.018;
+    }
     if (arms) arms.visible = !meleeActive && armAdsOpacity > 0.02;
     if (activeModel) activeModel.visible = !meleeActive;
     if (meleeActive) {

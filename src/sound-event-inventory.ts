@@ -285,6 +285,7 @@ export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteCon
 export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
   runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
   runtimeCallsite('coverImpact', 'point.distanceTo(player.position)', 1, ['world.projectile-impact']),
+  runtimeCallsite('crossbowFuseBeep', 'bolt.mesh.position,remainingMs,now', 1, ['ordnance.crossbow-fuse-beep']),
   runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
   runtimeCallsite('empty', '', 2, ['weapon.dry-fire']),
   runtimeCallsite('explosion', 'afterPresentationDetach', 2, ['ordnance.frag-explosion']),
@@ -305,6 +306,8 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
   runtimeCallsite('melee', '', 2, ['weapon.melee-swing', 'weapon.melee-world']),
+  runtimeCallsite('minigunDrive', "0,'idle',false", 1, ['weapon.minigun-drive']),
+  runtimeCallsite('minigunDrive', "weaponView.minigunSpoolFraction(),weaponView.minigunSpoolPhase(),gameStarted && player.alive && player.weapon === 'minigun'", 1, ['weapon.minigun-drive']),
   runtimeCallsite('nearMiss', 'nearMissStrength(player.position, origin, visibleEnd)', 2, ['combat.near-miss']),
   runtimeCallsite('nukeDetonation', '', 1, ['support.nuke-detonation']),
   runtimeCallsite('nukeWarning', '', 1, ['support.nuke-warning']),
@@ -733,11 +736,11 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R106', 'R109', 'R110', 'R236', 'R308'], concurrency: LOCAL_FEEDBACK,
     lifecycleOwner: 'player-life', coverageDetail: 'The expanded viewmodel action graph needs authored cue identities rather than generic fallbacks.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'weapon.minigun-drive', family: 'weapon-foley', bus: 'sfx', delivery: 'listener-local',
-    variants: ['spin-up', 'sustain-loop', 'spin-down', 'overheat'], contractRefs: ['R228', 'R236', 'R307', 'R308'],
+    variants: ['spin-up', 'sustain-loop', 'spin-down', 'overheat'], emitterSymbols: ['minigunDrive'], contractRefs: ['R228', 'R236', 'R307', 'R308'],
     concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
-    coverageDetail: 'The rotary drive loop must follow authoritative spin state and stop on switch, death, rematch, or disposal.',
+    coverageDetail: 'One bounded procedural rotary-drive voice follows presentation derived from the canonical trigger state and stops on release, switch, death, rematch, or disposal.',
   }),
   existingEvent({
     id: 'movement.footstep.world', family: 'movement', bus: 'movement', delivery: 'world-spatial',
@@ -805,11 +808,11 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R223', 'R232', 'R236', 'R307', 'R308'], concurrency: WORLD_DENSE_TRANSIENT,
     lifecycleOwner: 'projectile-entity', coverageDetail: 'The bolt attachment result selects the impact variant; clients do not invent it.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'ordnance.crossbow-fuse-beep', family: 'ordnance', bus: 'sfx', delivery: 'world-spatial',
-    spatialProfileId: 'small-ordnance-world-v1', variants: ['canonical-urgency'],
+    spatialProfileId: 'small-ordnance-world-v1', variants: ['canonical-urgency'], emitterSymbols: ['crossbowFuseBeep'],
     contractRefs: ['R223', 'R232', 'R236', 'R307', 'R308'], concurrency: WORLD_DENSE_TRANSIENT,
-    lifecycleOwner: 'projectile-entity', coverageDetail: 'Beeps derive from the one host-fixed detonation time and end on detonation, expiry, or disposal.',
+    lifecycleOwner: 'projectile-entity', coverageDetail: 'Positional beeps derive from the one host-fixed detonation time, begin only after impact, accelerate, and end on detonation, expiry, or disposal.',
   }),
   plannedEvent({
     id: 'ordnance.crossbow-explosion', family: 'ordnance', bus: 'sfx', delivery: 'world-spatial',
@@ -983,7 +986,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = 'b21ea9d5ba65a606758974d37ae96b25ad20eca8baa2b6f321e13bd04ccef041';
+export const SOUND_EVENT_INVENTORY_SHA256 = '669896023d6de872d8a96e964fb4b2c6a7089b941fac2fa73b3b20aeab910901';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

@@ -8,6 +8,8 @@ import type { ArenaId } from './map-selection';
 import type { LowHealthFeedbackPresentation } from './sensory-feedback';
 import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
+import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
+import type { MinigunSpoolPhase } from './minigun-spool';
 
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
@@ -36,6 +38,11 @@ export function railgunReportAttenuation(remote: boolean, distance: number): num
 export function grenadeFuseBeepIntervalMs(remainingMs: number): number {
   const bounded = Math.min(GRENADE_FUSE_BEEP_START_MS, Math.max(0, Number.isFinite(remainingMs) ? remainingMs : 0));
   return Math.round(90 + bounded * 0.19);
+}
+
+export function crossbowFuseBeepIntervalMs(remainingMs: number): number {
+  const bounded = Math.min(EXPLOSIVE_BOLT_ARM_DELAY_MS, Math.max(0, Number.isFinite(remainingMs) ? remainingMs : 0));
+  return Math.round(70 + bounded * 0.2);
 }
 
 export type ExplosionAudioGate = {
@@ -77,6 +84,12 @@ type SpatialFootstepChain = {
   busy: boolean;
 };
 
+type MinigunDriveLoop = {
+  source: OscillatorNode;
+  filter: BiquadFilterNode;
+  gain: GainNode;
+};
+
 /** Layered, original procedural arena mix. No sampled or proprietary game audio is used. */
 export class ArenaAudio {
   private context: AudioContext | null = null;
@@ -97,6 +110,16 @@ export class ArenaAudio {
   private lastZoneCueAt = -10_000;
   private lastGrenadeFuseBeepAt = Number.NEGATIVE_INFINITY;
   private grenadeFuseBeeps = 0;
+  private lastCrossbowFuseBeepAt = Number.NEGATIVE_INFINITY;
+  private crossbowFuseBeeps = 0;
+  private crossbowFuseLastRemainingMs = 0;
+  private crossbowFuseLastDistanceM = 0;
+  private minigunDriveLoop: MinigunDriveLoop | null = null;
+  private minigunDriveStarts = 0;
+  private minigunDriveStops = 0;
+  private minigunDriveFraction = 0;
+  private minigunDrivePhase: MinigunSpoolPhase = 'idle';
+  private minigunDriveLastUpdateAt = Number.NEGATIVE_INFINITY;
   private supportCuePlays = 0;
   private explosionAudioGate = createExplosionAudioGate();
   private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
@@ -154,6 +177,7 @@ export class ArenaAudio {
   }
 
   dispose(): void {
+    this.stopMinigunDrive();
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
     this.stopSources(this.lowHealthSources);
@@ -502,6 +526,108 @@ export class ArenaAudio {
     return true;
   }
 
+  crossbowFuseBeep(position: SpatialPoint, remainingMs: number, now = performance.now()): boolean {
+    if (!this.context || !this.weapons || !Number.isFinite(remainingMs) || remainingMs <= 0
+      || remainingMs > EXPLOSIVE_BOLT_ARM_DELAY_MS || now - this.lastCrossbowFuseBeepAt < 45) return false;
+    const contextNow = this.context.currentTime;
+    const urgency = 1 - remainingMs / EXPLOSIVE_BOLT_ARM_DELAY_MS;
+    const source = this.context.createOscillator();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    const panner = this.context.createPanner();
+    source.type = 'square';
+    source.frequency.setValueAtTime(860 + urgency * 720, contextNow);
+    source.frequency.exponentialRampToValueAtTime(760 + urgency * 820, contextNow + 0.048);
+    filter.type = 'bandpass';
+    filter.frequency.value = 1_600 + urgency * 1_000;
+    filter.Q.value = 1.25;
+    gain.gain.setValueAtTime(0.0001, contextNow);
+    gain.gain.exponentialRampToValueAtTime(0.055, contextNow + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, contextNow + 0.052);
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 1.4;
+    panner.maxDistance = 42;
+    panner.rolloffFactor = 1.25;
+    panner.positionX.value = position.x;
+    panner.positionY.value = position.y;
+    panner.positionZ.value = position.z;
+    source.connect(filter).connect(gain).connect(panner).connect(this.weapons);
+    const listenerDistance = Math.hypot(
+      position.x - this.listenerPosition.x,
+      position.y - this.listenerPosition.y,
+      position.z - this.listenerPosition.z,
+    );
+    if (!this.registerVoice(source, this.weapons, 5, true, listenerDistance)) {
+      filter.disconnect();
+      gain.disconnect();
+      panner.disconnect();
+      return false;
+    }
+    this.spatialChains += 1;
+    const voiceEnded = source.onended;
+    source.onended = (event) => {
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+      voiceEnded?.call(source, event);
+      filter.disconnect();
+      gain.disconnect();
+      panner.disconnect();
+    };
+    this.lastCrossbowFuseBeepAt = now;
+    this.crossbowFuseBeeps += 1;
+    this.crossbowFuseLastRemainingMs = remainingMs;
+    this.crossbowFuseLastDistanceM = listenerDistance;
+    source.start(contextNow);
+    source.stop(contextNow + 0.055);
+    return true;
+  }
+
+  minigunDrive(fraction: number, phase: MinigunSpoolPhase, active: boolean): void {
+    const boundedFraction = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
+    this.minigunDriveFraction = active ? boundedFraction : 0;
+    this.minigunDrivePhase = active ? phase : 'idle';
+    if (!active || boundedFraction <= 1e-4 || phase === 'idle') {
+      this.stopMinigunDrive();
+      return;
+    }
+    if (!this.context || !this.weapons) return;
+    if (!this.minigunDriveLoop) {
+      const source = this.context.createOscillator();
+      const filter = this.context.createBiquadFilter();
+      const gain = this.context.createGain();
+      source.type = 'sawtooth';
+      filter.type = 'lowpass';
+      filter.Q.value = 0.72;
+      gain.gain.value = 0.0001;
+      source.connect(filter).connect(gain).connect(this.weapons);
+      if (!this.registerVoice(source, this.weapons, 4)) {
+        filter.disconnect();
+        gain.disconnect();
+        return;
+      }
+      const loop = { source, filter, gain };
+      const voiceEnded = source.onended;
+      source.onended = (event) => {
+        voiceEnded?.call(source, event);
+        filter.disconnect();
+        gain.disconnect();
+        if (this.minigunDriveLoop === loop) this.minigunDriveLoop = null;
+      };
+      source.start(this.context.currentTime);
+      this.minigunDriveLoop = loop;
+      this.minigunDriveStarts += 1;
+    }
+    const now = this.context.currentTime;
+    const loop = this.minigunDriveLoop;
+    // Direct AudioParam values at a 30 Hz ceiling avoid accumulating hundreds
+    // of automation events per second during the authored 30-second window.
+    if (now - this.minigunDriveLastUpdateAt < 1 / 30) return;
+    this.minigunDriveLastUpdateAt = now;
+    loop.source.frequency.value = 44 + boundedFraction * 96;
+    loop.filter.frequency.value = 520 + boundedFraction * 1_700;
+    loop.gain.gain.value = 0.008 + boundedFraction * 0.036;
+  }
+
   explosion(now = performance.now()): boolean {
     const admission = admitExplosionAudioMix(this.explosionAudioGate, now);
     this.explosionAudioGate = admission.state;
@@ -591,6 +717,8 @@ export class ArenaAudio {
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
     ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
     grenadeFuse: { beeps: number; startMs: number };
+    crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
+    minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
     support: { cues: number };
     railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
@@ -606,6 +734,19 @@ export class ArenaAudio {
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
       ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
       grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
+      crossbowFuse: {
+        beeps: this.crossbowFuseBeeps,
+        lastRemainingMs: this.crossbowFuseLastRemainingMs,
+        lastDistanceM: this.crossbowFuseLastDistanceM,
+        startMs: EXPLOSIVE_BOLT_ARM_DELAY_MS,
+      },
+      minigunDrive: {
+        active: this.minigunDriveLoop !== null,
+        starts: this.minigunDriveStarts,
+        stops: this.minigunDriveStops,
+        fraction: this.minigunDriveFraction,
+        phase: this.minigunDrivePhase,
+      },
       support: { cues: this.supportCuePlays },
       railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
       runtime: {
@@ -694,6 +835,15 @@ export class ArenaAudio {
     try { source.stop(); } catch { /* already stopped */ }
     this.activeVoices.delete(source);
     source.disconnect();
+  }
+
+  private stopMinigunDrive(): void {
+    const loop = this.minigunDriveLoop;
+    if (!loop) return;
+    this.minigunDriveLoop = null;
+    this.minigunDriveStops += 1;
+    this.minigunDriveLastUpdateAt = Number.NEGATIVE_INFINITY;
+    this.stopSource(loop.source);
   }
 
   private stopSources(sources: AudioScheduledSourceNode[]): void {

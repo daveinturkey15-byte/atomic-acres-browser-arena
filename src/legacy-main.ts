@@ -89,7 +89,7 @@ import {
 } from './loadout-preset-schema';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
-import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, grenadeFuseBeepIntervalMs } from './audio';
+import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
   applyPenetrationDamage,
@@ -405,6 +405,12 @@ import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTeleme
 import { WeaponPresentation } from './weapon-presentation';
 import { magnifiedFovDegrees, viewmodelSurfaceRetreat } from './weapon-presentation-state';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
+import { DMR_THERMAL_MAGNIFICATION, DmrThermalPresentation, type DmrThermalContact } from './dmr-thermal-presentation';
+import {
+  SMOKE_PRESENTATION_LIFETIME_MS,
+  SmokeVolumePresentationPool,
+  type SmokeVolumePresentationLease,
+} from './smoke-volume-presentation';
 import {
   RAILGUN_DAMAGE,
   RAILGUN_RECHAMBER_MS,
@@ -582,7 +588,7 @@ type GrenadeEntity = {
   ownerTeam: Team;
 };
 
-type RuntimeSmokeVolume = SmokeVolume & Readonly<{ mesh: THREE.Mesh }>;
+type RuntimeSmokeVolume = SmokeVolume & Readonly<{ presentationLease: SmokeVolumePresentationLease }>;
 
 type ExplosiveBoltEntity = {
   mesh: THREE.Group;
@@ -594,6 +600,7 @@ type ExplosiveBoltEntity = {
   expiresAt: number;
   impactedAt: number | null;
   detonatesAt: number;
+  nextFuseBeepAt: number | null;
   targetId: string | null;
   targetLifeId: number | null;
   actionNonce: number;
@@ -980,6 +987,8 @@ const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
+const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
+const smokeVolumePresentationPool = new SmokeVolumePresentationPool(scene);
 const VIEWMODEL_RENDER_LAYER = 2;
 camera.layers.enable(VIEWMODEL_RENDER_LAYER);
 let skyMaterial: THREE.ShaderMaterial | null = null;
@@ -2537,6 +2546,7 @@ let respawnEndsAt = 0;
 let respawnTimer: ReturnType<typeof setTimeout> | null = null;
 let previousHudScores: [number, number] = [0, 0];
 let adsHeld = false;
+let dmrThermalActive = false;
 let mouseTriggerHeld = false;
 let mouseAdsHeld = false;
 let gamepadMove = { x: 0, y: 0 };
@@ -2655,6 +2665,10 @@ function clearGameplayInput(): void {
   mouseAdsHeld = false;
   setLocalTriggerHeld(false);
   adsHeld = false;
+  dmrThermalActive = false;
+  dmrThermalPresentation.update(camera, [], false);
+  hudRoot.classList.remove('dmr-thermal-active');
+  audio.minigunDrive(0, 'idle', false);
   currentSprinting = false;
   jumpQueuedAt = -10_000;
   player.velocity.x = 0;
@@ -7082,6 +7096,74 @@ function railgunThermalContacts(): RailgunThermalContact[] {
   ];
 }
 
+type RuntimeDmrThermalContact = {
+  id: string;
+  kind: 'player' | 'bot';
+  relation: 'friendly' | 'hostile';
+  position: THREE.Vector3;
+  living: boolean;
+  solidOccluded: boolean;
+};
+
+const dmrThermalContactBuffer: RuntimeDmrThermalContact[] = [];
+const dmrThermalContactCache = new Map<string, RuntimeDmrThermalContact>();
+
+function acquireDmrThermalContact(id: string, kind: 'player' | 'bot'): RuntimeDmrThermalContact {
+  const key = `${kind}:${id}`;
+  const cached = dmrThermalContactCache.get(key);
+  if (cached) return cached;
+  const created: RuntimeDmrThermalContact = {
+    id,
+    kind,
+    relation: 'hostile',
+    position: new THREE.Vector3(),
+    living: false,
+    solidOccluded: true,
+  };
+  dmrThermalContactCache.set(key, created);
+  return created;
+}
+
+function dmrThermalSolidOccluded(observer: THREE.Vector3, contact: THREE.Vector3): boolean {
+  for (const box of activeWorldColliders()) {
+    if (segmentIntersectsBox(observer, contact, box)) return true;
+  }
+  return false;
+}
+
+function dmrThermalContacts(): readonly DmrThermalContact[] {
+  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const observer = camera.position;
+  dmrThermalContactBuffer.length = 0;
+  for (const remote of remotes.values()) {
+    const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
+    contact.position.copy(remote.target);
+    contact.position.y += 1.05;
+    contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
+    contact.living = remote.snapshot.hp > 0;
+    contact.solidOccluded = dmrThermalSolidOccluded(observer, contact.position);
+    dmrThermalContactBuffer.push(contact);
+  }
+  for (const bot of bots.values()) {
+    const contact = acquireDmrThermalContact(bot.id, 'bot');
+    contact.position.copy(bot.position);
+    contact.position.y += 1.05;
+    contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
+    contact.living = bot.alive;
+    contact.solidOccluded = dmrThermalSolidOccluded(observer, contact.position);
+    dmrThermalContactBuffer.push(contact);
+  }
+  return dmrThermalContactBuffer;
+}
+
+function updateDmrThermal(): void {
+  if (!dmrThermalActive) {
+    dmrThermalPresentation.update(camera, [], false);
+    return;
+  }
+  dmrThermalPresentation.update(camera, dmrThermalContacts(), true);
+}
+
 function updateRailgun(now: number): void {
   if (network.role !== 'client') {
     const chambered = advanceRailgunChamber(railgunState, now);
@@ -8626,6 +8708,7 @@ function spawnExplosiveBolt(
     expiresAt: now + EXPLOSIVE_BOLT_MAX_LIFE_MS,
     impactedAt: null,
     detonatesAt: now + EXPLOSIVE_BOLT_MAX_LIFE_MS,
+    nextFuseBeepAt: null,
     targetId: null,
     targetLifeId: null,
     actionNonce,
@@ -8718,11 +8801,13 @@ function updateExplosiveBolts(dt: number, now: number): void {
         bolt.targetLifeId = targetHit.lifeId;
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
+        bolt.nextFuseBeepAt = now;
         bolt.velocity.set(0, 0, 0);
       } else if (worldCollision) {
         bolt.mesh.position.copy(start).addScaledVector(delta, worldCollision.time);
         bolt.impactedAt = now;
         bolt.detonatesAt = Math.min(bolt.expiresAt, now + EXPLOSIVE_BOLT_ARM_DELAY_MS);
+        bolt.nextFuseBeepAt = now;
         bolt.velocity.set(0, 0, 0);
       } else {
         bolt.mesh.position.add(delta);
@@ -8731,6 +8816,11 @@ function updateExplosiveBolts(dt: number, now: number): void {
       const target = explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)
         .find((candidate) => candidate.id === bolt.targetId && candidate.lifeId === bolt.targetLifeId);
       if (target) bolt.mesh.position.copy(target.position);
+    }
+    if (bolt.impactedAt !== null && bolt.nextFuseBeepAt !== null && now >= bolt.nextFuseBeepAt && now < bolt.detonatesAt) {
+      const remainingMs = bolt.detonatesAt - now;
+      audio.crossbowFuseBeep(bolt.mesh.position, remainingMs, now);
+      bolt.nextFuseBeepAt = now + crossbowFuseBeepIntervalMs(remainingMs);
     }
     if (now >= bolt.detonatesAt || now >= bolt.expiresAt || !pointInsideBounds(bolt.mesh.position, arena.bounds, 0)) {
       explosiveBolts.splice(index, 1);
@@ -8835,26 +8925,16 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
 }
 
 function spawnSmokeVolume(point: THREE.Vector3, now: number, actionNonce: number): void {
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xaeb8b3,
-    transparent: true,
-    opacity: 0.2,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), material);
-  mesh.name = 'smoke-grenade-volume-presentation';
-  mesh.position.copy(point).add(new THREE.Vector3(0, 1.25, 0));
-  mesh.scale.setScalar(0.12);
-  mesh.renderOrder = 20;
-  scene.add(mesh);
+  const centre = point.clone().add(new THREE.Vector3(0, 1.25, 0));
+  const expiresAtMs = now + SMOKE_PRESENTATION_LIFETIME_MS;
+  const presentationLease = smokeVolumePresentationPool.emit(centre, now, expiresAtMs, 4.2);
   smokeVolumes.push(Object.freeze({
     id: `smoke-${actionNonce}`,
-    centre: Object.freeze({ x: mesh.position.x, y: mesh.position.y, z: mesh.position.z }),
+    centre: Object.freeze({ x: centre.x, y: centre.y, z: centre.z }),
     radiusM: 4.2,
     startsAtMs: now,
-    expiresAtMs: now + 12_000,
-    mesh,
+    expiresAtMs,
+    presentationLease,
   }));
 }
 
@@ -8895,18 +8975,13 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
 function updateOrdnanceVolumes(now: number): void {
   for (let index = smokeVolumes.length - 1; index >= 0; index -= 1) {
     const smoke = smokeVolumes[index];
-    const age = now - smoke.startsAtMs;
     const remaining = smoke.expiresAtMs - now;
     if (remaining <= 0) {
-      scheduleDeferredGpuRetirement(smoke.mesh);
+      smokeVolumePresentationPool.release(smoke.presentationLease);
       smokeVolumes.splice(index, 1);
       continue;
     }
-    const grow = Math.min(1, Math.max(0.12, age / 900));
-    smoke.mesh.scale.setScalar(smoke.radiusM * grow);
-    const material = smoke.mesh.material as THREE.MeshBasicMaterial;
-    material.opacity = 0.08 + Math.min(0.18, grow * 0.18) * Math.min(1, remaining / 2_000);
-    smoke.mesh.rotation.y += 0.0015;
+    smokeVolumePresentationPool.update(smoke.presentationLease, now);
   }
   const overlay = element<HTMLElement>('#ordnance-flash');
   const remainingFlash = flashExposureUntil - now;
@@ -10672,9 +10747,7 @@ function clearGrenades(): void {
   grenades.length = 0;
   for (const bolt of explosiveBolts) disposeExplosiveBolt(bolt);
   explosiveBolts.length = 0;
-  for (const smoke of smokeVolumes) {
-    scheduleDeferredGpuRetirement(smoke.mesh);
-  }
+  smokeVolumePresentationPool.clear();
   smokeVolumes.length = 0;
   flashExposureUntil = 0;
   flashExposureStrength = 0;
@@ -10872,7 +10945,13 @@ function updatePhysics(dt: number): void {
     lateralSpeed: lateralSpeed * accessibilityRuntime.weaponMotionScale,
     reloadProgress: debugReloadProgress ?? (player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(player.reloadState, performance.now())),
     surfaceRetreat: currentViewmodelSurfaceRetreat(),
+    triggerHeld,
   });
+  audio.minigunDrive(
+    weaponView.minigunSpoolFraction(),
+    weaponView.minigunSpoolPhase(),
+    gameStarted && player.alive && player.weapon === 'minigun',
+  );
   for (const event of weaponActionEvents) {
     audio.weaponAction(player.weapon, event);
     weaponActionHistory.push(event);
@@ -10880,7 +10959,9 @@ function updatePhysics(dt: number): void {
   if (weaponActionHistory.length > 16) weaponActionHistory.splice(0, weaponActionHistory.length - 16);
   const aimingFov = player.weapon === 'sniper'
     ? magnifiedFovDegrees(preferredFov, 3)
-    : Math.max(55, preferredFov - 20);
+    : player.weapon === 'm14-ebr'
+      ? magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION)
+      : Math.max(55, preferredFov - 20);
   const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
   camera.fov = player.weapon === 'sniper' ? targetFov : damp(camera.fov, targetFov, 10, dt);
   camera.updateProjectionMatrix();
@@ -10891,7 +10972,13 @@ function updatePhysics(dt: number): void {
     && Math.abs(camera.fov - aimingFov) < 0.35;
   sniperScopeOverlay.hidden = !sniperScopeActive;
   hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
-  weaponView.root.visible = gameStarted && !sniperScopeActive && !debugCaptureViewmodelHidden;
+  dmrThermalActive = player.alive
+    && player.weapon === 'm14-ebr'
+    && adsHeld
+    && weaponView.adsProgress() >= 0.9
+    && Math.abs(camera.fov - aimingFov) < 0.35;
+  hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
+  weaponView.root.visible = gameStarted && !sniperScopeActive && !dmrThermalActive && !debugCaptureViewmodelHidden;
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
@@ -12889,6 +12976,7 @@ function frame(now: number, scheduleNext = true): void {
     updatePass65KillstreakRuntime(now);
     updateOverdrive(now);
     updateRailgun(now);
+    updateDmrThermal();
     updateDeathDrops(now);
     updateCorpsePresentations(now);
     impactPresentation.update(frameDt);
@@ -13324,6 +13412,8 @@ const debugWindow = window as Window & {
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
     fireOnce: () => void;
+    setTriggerHeld: (held: boolean) => void;
+    stageSmokeVolume: (distance?: number) => string;
     throwGrenade: () => void;
     switchWeapon: (index: number) => void;
     equipKit: (id: FieldKitId) => void;
@@ -13409,6 +13499,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       thermalVisible: !element<HTMLElement>('#railgun-thermal').hidden,
       presentation: railgunPresentation.telemetry(),
       claimAudit: { ...railgunClaimAudit },
+    },
+    dmrThermal: {
+      ...dmrThermalPresentation.telemetry(),
+      weapon: player.weapon,
+      magnification: DMR_THERMAL_MAGNIFICATION,
+      cameraFov: camera.fov,
+      smokeVolumes: smokeVolumes.length,
+      smokePresentation: smokeVolumePresentationPool.telemetry(),
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
     matchDiagnosticsUpload: matchDiagnosticUploader.telemetry(),
@@ -13529,9 +13627,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     random: runtimeRandomTelemetry(),
     aimAlignment: (() => {
       const canvasBounds = canvas.getBoundingClientRect();
-      const activeReticle = sniperScopeOverlay.hidden
-        ? element<HTMLElement>('#crosshair')
-        : element<HTMLElement>('.scope-reticle');
+      const activeReticle = dmrThermalActive
+        ? element<HTMLElement>('.dmr-thermal-reticle')
+        : sniperScopeOverlay.hidden
+          ? element<HTMLElement>('#crosshair')
+          : element<HTMLElement>('.scope-reticle');
       const reticleBounds = activeReticle.getBoundingClientRect();
       const direction = camera.getWorldDirection(new THREE.Vector3());
       const rayNdc = camera.position.clone().addScaledVector(direction, 100).project(camera);
@@ -14652,6 +14752,22 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     tryFire(performance.now());
     setLocalTriggerHeld(false);
     debugInputUnlocked = false;
+  },
+  setTriggerHeld: (held: boolean) => {
+    mouseTriggerHeld = held;
+    triggerHeld = held;
+    if (!held) {
+      spinUpWeapon = null;
+      spinUpStartedAtPerformanceMs = null;
+      spinUpStartedAtHostTimeMs = null;
+    }
+  },
+  stageSmokeVolume: (distance = 3) => {
+    const direction = camera.getWorldDirection(new THREE.Vector3());
+    const point = camera.position.clone().addScaledVector(direction, THREE.MathUtils.clamp(distance, 1.5, 8));
+    const actionNonce = randomNonce();
+    spawnSmokeVolume(point, performance.now(), actionNonce);
+    return `smoke-${actionNonce}`;
   },
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),

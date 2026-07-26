@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
+import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
 import { createImportedWeaponModel } from './weapon-model';
 import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
@@ -1284,6 +1285,22 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
   rig.weaponSocket.add(weapon);
   rig.weapon = weapon;
   rig.weaponId = weaponId;
+  if (weaponId === 'minigun') {
+    root.userData.operatorMinigunSpool = createMinigunSpoolState();
+    root.userData.operatorMinigunSpoolUpdatedAt = performance.now();
+    root.userData.operatorMinigunDriveUntil = 0;
+    root.userData.operatorMinigunSpoolTelemetry = {
+      fraction: 0,
+      phase: 'idle',
+      angleRadians: 0,
+      source: 'replicated-shot-window',
+    };
+  } else {
+    delete root.userData.operatorMinigunSpool;
+    delete root.userData.operatorMinigunSpoolUpdatedAt;
+    delete root.userData.operatorMinigunDriveUntil;
+    delete root.userData.operatorMinigunSpoolTelemetry;
+  }
 
   // A rigged swap is solved on the next presentation frame, after the mixer
   // restores the base animation. Solving here would use the previous weapon's
@@ -1292,12 +1309,14 @@ export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flatten
 }
 
 export function fireOperator(root: THREE.Group): void {
-  root.userData.operatorShotAt = performance.now();
+  const now = performance.now();
+  root.userData.operatorShotAt = now;
   fireRiggedOperator(root);
   const rig = operatorRig(root);
   if (rig?.weapon) {
     const flash = rig.weapon.getObjectByName('world-muzzle-flash');
     if (flash) flash.visible = true;
+    if (rig.weaponId === 'minigun') root.userData.operatorMinigunDriveUntil = now + 140;
   }
 }
 
@@ -1349,6 +1368,36 @@ export function poseOperator(
     entry.bone.quaternion.copy(entry.quaternion);
   }
   updateRiggedOperator(root, speed, stance);
+  if (rig.weaponId === 'minigun' && rig.weapon) {
+    const now = performance.now();
+    const state = (root.userData.operatorMinigunSpool as MinigunSpoolState | undefined)
+      ?? createMinigunSpoolState();
+    const lastUpdatedAt = Number(root.userData.operatorMinigunSpoolUpdatedAt ?? now);
+    advanceMinigunSpool(state, {
+      dt: Math.max(0, (now - lastUpdatedAt) / 1_000),
+      triggerHeld: now < Number(root.userData.operatorMinigunDriveUntil ?? 0),
+      equipped: true,
+    });
+    root.userData.operatorMinigunSpool = state;
+    root.userData.operatorMinigunSpoolUpdatedAt = now;
+    const barrels = rig.weapon.getObjectByName('minigun-barrel-cluster');
+    if (barrels) barrels.rotation.z = state.angleRadians;
+    const telemetry = (root.userData.operatorMinigunSpoolTelemetry ?? {
+      fraction: 0,
+      phase: 'idle',
+      angleRadians: 0,
+      source: 'replicated-shot-window',
+    }) as {
+      fraction: number;
+      phase: string;
+      angleRadians: number;
+      source: 'replicated-shot-window';
+    };
+    root.userData.operatorMinigunSpoolTelemetry = telemetry;
+    telemetry.fraction = state.fraction;
+    telemetry.phase = state.phase;
+    telemetry.angleRadians = state.angleRadians;
+  }
   const armBones = [
     rig.leftShoulderBone, rig.leftElbowBone, rig.leftWristBone,
     rig.rightShoulderBone, rig.rightElbowBone, rig.rightWristBone,

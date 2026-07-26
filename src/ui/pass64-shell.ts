@@ -290,6 +290,7 @@ function hudMarkup(): string {
     <div id="damage-numbers" aria-live="polite" aria-label="Damage dealt"></div>
     <div id="sniper-scope" hidden aria-label="3x sniper scope"><div class="scope-ring"></div><div class="scope-reticle"><i></i><b></b><span></span><em></em></div><small>3×</small></div>
     <div id="railgun-thermal" hidden aria-label="Railgun thermal scope" aria-live="off"><span>${WEAPONS.railgun.name.toUpperCase()} THERMAL · HOSTILES</span></div>
+    <div id="dmr-thermal" hidden aria-label="M14 EBR 2.5x smoke-penetrating thermal scope" aria-live="off"><span>${WEAPONS['m14-ebr'].name.toUpperCase()} · 2.5× THERMAL · FRIEND / FOE</span><div class="dmr-thermal-reticle"><i></i><b></b></div></div>
     <div id="killfeed" aria-live="polite" aria-label="Match events"></div>
     <div id="damage-feeds" aria-label="Damage activity"><section class="damage-feed done" aria-label="Damage dealt"><div id="damage-done-feed" aria-live="polite"></div></section><section class="damage-feed taken" aria-label="Damage received"><div id="damage-taken-feed" aria-live="assertive"></div></section></div>
     <div id="overdrive-hud" hidden><small>2× DAMAGE</small><strong id="overdrive-time">30.0</strong><span>OVERDRIVE</span></div>

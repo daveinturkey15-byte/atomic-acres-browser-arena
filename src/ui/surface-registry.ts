@@ -39,6 +39,7 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'aim', rootElementId: 'crosshair', renderer: 'match-hud', critical: true },
   { id: 'sniper-scope', rootElementId: 'sniper-scope', renderer: 'match-hud', critical: true },
   { id: 'railgun-thermal', rootElementId: 'railgun-thermal', renderer: 'match-hud', critical: true },
+  { id: 'dmr-thermal', rootElementId: 'dmr-thermal', renderer: 'match-hud', critical: true },
   { id: 'damage-numbers', rootElementId: 'damage-numbers', renderer: 'match-hud', critical: true },
   { id: 'combat-feed', rootElementId: 'killfeed', renderer: 'match-hud', critical: true },
   { id: 'damage-activity', rootElementId: 'damage-feeds', renderer: 'match-hud', critical: true },

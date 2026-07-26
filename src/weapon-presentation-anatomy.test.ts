@@ -104,6 +104,39 @@ describe('first-person anatomical presentation', () => {
     expect(state.armsVisible).toBe(true);
   });
 
+  it('keeps a detailed passive knife present and yields its arc to an accepted shot', () => {
+    const camera = new THREE.PerspectiveCamera();
+    const presentation = new WeaponPresentation(camera, false);
+    const initial = presentation.presentationState();
+    expect(initial.passiveKnifeVisible).toBe(true);
+    expect(initial.passiveKnifeModel).toBe(true);
+    expect(presentation.root.getObjectByName('field-knife-blade')).toBeInstanceOf(THREE.Mesh);
+
+    presentation.melee();
+    presentation.fire(0.02);
+    presentation.update({ ...REST_POSE });
+    const fired = presentation.presentationState();
+    expect(fired.shotsPresented).toBe(1);
+    expect(fired.knifeVisible).toBe(false);
+    expect(fired.passiveKnifeVisible).toBe(true);
+  });
+
+  it('rotates the authored minigun barrel cluster before the first legal shot', async () => {
+    const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(), false);
+    await presentation.load();
+    presentation.setWeapon('minigun', true);
+    const barrels = presentation.root.getObjectByName('minigun-barrel-cluster');
+    expect(barrels).toBeDefined();
+    const startingAngle = barrels!.rotation.z;
+    for (let frame = 0; frame < 12; frame += 1) {
+      presentation.update({ ...REST_POSE, triggerHeld: true });
+    }
+    expect(presentation.presentationState().minigunSpool).toMatchObject({ phase: 'spooling-up' });
+    expect(presentation.minigunSpoolFraction()).toBeGreaterThan(0);
+    expect(barrels!.rotation.z).not.toBe(startingAngle);
+    expect(presentation.presentationState().shotsPresented).toBe(0);
+  });
+
   it('keeps the complete articulated hand silhouette in the reduced presentation', () => {
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
     const presentation = new WeaponPresentation(camera, true);

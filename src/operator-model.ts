@@ -741,5 +741,6 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       } : null,
     } : null,
     supportGrip: root.userData.operatorGripTelemetry ?? null,
+    minigunSpool: root.userData.operatorMinigunSpoolTelemetry ?? null,
   };
 }
