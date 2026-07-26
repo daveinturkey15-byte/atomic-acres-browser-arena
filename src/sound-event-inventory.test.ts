@@ -252,7 +252,7 @@ describe('Pass 65 sound-event inventory', () => {
     for (const symbol of emitterSymbols) expect(audioSource).toMatch(new RegExp(`\\n  ${symbol}\\(`));
   });
 
-  it('pins current weapon variants and all four planned arena ambience identities', () => {
+  it('pins current weapon variants and all four implemented arena ambience identities', () => {
     expect(PASS64_WEAPON_AUDIO_VARIANTS).toEqual(WEAPON_IDS);
     const ambience = SOUND_EVENT_INVENTORY.find((event) => event.id === 'ambience.arena-bed');
     expect(ambience).toBeDefined();
@@ -275,7 +275,7 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('61399d2590421ed546241de33db417bcd137caa42d6f2bf72af5c4bb7a71f12c');
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('b21ea9d5ba65a606758974d37ae96b25ad20eca8baa2b6f321e13bd04ccef041');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

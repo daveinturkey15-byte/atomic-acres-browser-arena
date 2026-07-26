@@ -11,6 +11,9 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'deployment-shell', rootElementId: 'menu', renderer: 'main-shell', critical: true },
   { id: 'field-kit-panel', rootElementId: 'menu-panel-kit', renderer: 'main-shell', critical: true },
   { id: 'options-panel', rootElementId: 'menu-panel-options', renderer: 'main-shell', critical: true },
+  { id: 'graphics-settings', rootElementId: 'graphics-settings', renderer: 'main-shell', critical: true },
+  { id: 'audio-settings', rootElementId: 'audio-settings', renderer: 'main-shell', critical: true },
+  { id: 'accessibility-settings', rootElementId: 'accessibility-settings', renderer: 'main-shell', critical: true },
   { id: 'menu-showcase', rootElementId: 'menu-showcase', renderer: 'main-shell', critical: false },
   { id: 'match-pause-backdrop', rootElementId: 'match-pause-backdrop', renderer: 'main-shell', critical: true },
   { id: 'menu-meta-actions', rootElementId: 'menu-meta-actions', renderer: 'main-shell', critical: false },
@@ -58,7 +61,7 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
 export const UI_STATE_INVENTORY = Object.freeze([
   'offline', 'host', 'guest', 'reconnecting', 'syncing', 'waiting', 'ready',
   'countdown', 'live', 'dead', 'respawning', 'match-ended', 'returned-lobby',
-  'modal-open', 'chat-typing', 'loading', 'error', 'reduced-motion',
+  'modal-open', 'chat-typing', 'loading', 'error', 'reduced-motion', 'reduced-sensory',
   'pointer-lock-requesting', 'pointer-lock-denied', 'focus-suspended', 'paused-match',
   'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
 ] as const);

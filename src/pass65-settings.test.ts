@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest';
+import {
+  AUDIO_BUS_IDS,
+  createDefaultPass65Settings,
+  normalizePass65Settings,
+  parsePass65Settings,
+  resolveAccessibilityRuntime,
+  resolveGraphicsRuntime,
+  writePass65Settings,
+} from './pass65-settings';
+
+describe('Pass 65 settings contract', () => {
+  it('defaults capable machines to a real High configuration', () => {
+    const settings = createDefaultPass65Settings({ hardwareConcurrency: 16, deviceMemoryGb: 16 });
+    expect(settings.graphics).toEqual({ schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 60, shadows: 'high' });
+    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ renderProfile: 'blender', adaptive: true, shadows: true });
+    expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
+    expect(Object.keys(settings.audio.mutes).sort()).toEqual([...AUDIO_BUS_IDS].sort());
+  });
+
+  it('uses Performance on constrained machines and makes Max meaningfully fixed', () => {
+    expect(createDefaultPass65Settings({ hardwareConcurrency: 4, deviceMemoryGb: 4 }).graphics.preset).toBe('performance');
+    const max = normalizePass65Settings({ graphics: { preset: 'max' } });
+    expect(resolveGraphicsRuntime(max.graphics)).toMatchObject({ renderProfile: 'blender', renderScale: 1, adaptive: false, shadows: true });
+  });
+
+  it('recovers corrupt storage and clamps every numeric boundary', () => {
+    expect(parsePass65Settings('{bad')).toEqual(createDefaultPass65Settings());
+    const settings = normalizePass65Settings({
+      graphics: { preset: 'custom', renderScale: Number.POSITIVE_INFINITY, targetFps: 77, shadows: 'wat' },
+      audio: { gains: { master: 999, movement: -20 }, mutes: { master: true } },
+      accessibility: { damageFlashScale: 12, weaponMotionScale: -2 },
+    });
+    expect(settings.graphics.renderScale).toBe(1);
+    expect(settings.graphics.targetFps).toBe(60);
+    expect(settings.audio.gains.master).toBe(100);
+    expect(settings.audio.mutes.master).toBe(true);
+    expect(settings.audio.gains.movement).toBe(0);
+    expect(settings.accessibility).toMatchObject({ damageFlashScale: 1, weaponMotionScale: 0 });
+  });
+
+  it('applies the most restrictive accessibility source', () => {
+    const settings = createDefaultPass65Settings().accessibility;
+    expect(resolveAccessibilityRuntime(settings, { reducedMotion: true })).toMatchObject({
+      reducedSensory: true, reducedMotion: true, reducedDamageFlash: true, damageFlashScale: 0.2, weaponMotionScale: 0.35,
+    });
+    expect(resolveAccessibilityRuntime({ ...settings, reducedSensoryEffects: true }, { reducedMotion: false }).reasons)
+      .toContain('Reduced sensory effects');
+    expect(resolveAccessibilityRuntime({ ...settings, reducedDamageFlash: true }, { reducedMotion: false }))
+      .toMatchObject({ reducedSensory: false, reducedDamageFlash: true, damageFlashScale: 0.2, weaponMotionScale: 1 });
+  });
+
+  it('reports compatibility downgrades instead of silently pretending Max is active', () => {
+    const settings = normalizePass65Settings({ graphics: { preset: 'max' } });
+    expect(resolveGraphicsRuntime(settings.graphics, true)).toMatchObject({
+      requestedPreset: 'max', effectivePreset: 'performance', renderProfile: 'compat', renderScale: 0.2,
+    });
+  });
+
+  it('preserves a requested 200% custom scale but resolves it to the renderer safety cap', () => {
+    const settings = normalizePass65Settings({ graphics: { preset: 'custom', renderScale: 2 } });
+    expect(settings.graphics.renderScale).toBe(2);
+    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ renderScale: 1 });
+    expect(resolveGraphicsRuntime(settings.graphics).reason).toContain('safety-capped');
+  });
+
+  it('persists only a canonical read-back and rolls back a mismatched store', () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => { values.delete(key); },
+    };
+    const settings = createDefaultPass65Settings();
+    expect(writePass65Settings(storage, settings)).toBe(true);
+    const prior = [...values.values()][0];
+    let reads = 0;
+    const corruptingStorage = {
+      ...storage,
+      getItem: (key: string) => {
+        reads += 1;
+        return reads === 2 ? '{corrupt' : values.get(key) ?? null;
+      },
+    };
+    expect(writePass65Settings(corruptingStorage, settings)).toBe(false);
+    expect([...values.values()][0]).toBe(prior);
+
+    reads = 0;
+    const throwingStorage = {
+      ...storage,
+      getItem: (key: string) => {
+        reads += 1;
+        if (reads === 2) throw new Error('read-back unavailable');
+        return values.get(key) ?? null;
+      },
+    };
+    expect(writePass65Settings(throwingStorage, settings)).toBe(false);
+    expect([...values.values()][0]).toBe(prior);
+  });
+});

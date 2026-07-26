@@ -43,6 +43,15 @@ describe('Pass 65 sensory feedback', () => {
     expect(refreshed.pulses[0]!.strength).toBeGreaterThan(first.pulses[0]!.strength);
   });
 
+  it('keeps indicators camera-correct while the player turns during their lifetime', () => {
+    const state = recordDirectionalDamage(createDirectionalDamageState(), {
+      sourceId: 'remote:a', sourceType: 'remote', angleRadians: Math.PI / 2, cameraYawRadians: 0,
+      damage: 20, now: 10,
+    });
+    expect(directionalDamagePresentation(state, 20, 0)[0]).toMatchObject({ sector: 2, sourceType: 'remote' });
+    expect(directionalDamagePresentation(state, 20, Math.PI / 2)[0]).toMatchObject({ sector: 4, sourceType: 'remote' });
+  });
+
   it('uses low-health hysteresis and a slow non-strobing vignette', () => {
     let state = createLowHealthFeedbackState();
     let sample = sampleLowHealthFeedback(state, { health: LOW_HEALTH_ENTER_HP, alive: true, now: 1_000, reducedSensory: false });

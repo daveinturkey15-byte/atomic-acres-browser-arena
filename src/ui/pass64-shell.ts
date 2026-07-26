@@ -3,6 +3,7 @@ import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { ARENA_SELECTIONS } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
+import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
 
@@ -163,14 +164,42 @@ function fieldKitPanelMarkup(): string {
 }
 
 function optionsPanelMarkup(): string {
+  const audioBusLabels: Record<typeof AUDIO_BUS_IDS[number], string> = {
+    master: 'MASTER', sfx: 'SFX', movement: 'MOVEMENT', ui: 'UI', announcements: 'ANNOUNCEMENTS',
+    ambience: 'AMBIENCE', 'menu-music': 'MENU MUSIC', 'game-music': 'GAME MUSIC',
+  };
+  const audioRows = AUDIO_BUS_IDS.map((id) => `<label class="audio-setting-row" for="audio-${id}-gain"><span>${audioBusLabels[id]}</span><input id="audio-${id}-gain" data-audio-bus="${id}" type="range" min="0" max="100" step="1" value="100"><input id="audio-${id}-mute" data-audio-mute="${id}" type="checkbox"><small>MUTE</small></label>`).join('');
   return `<div id="menu-panel-options" class="menu-panel" role="tabpanel" aria-labelledby="menu-tab-options" data-menu-panel="options" hidden>
-    <div class="options-heading"><b>OPTIONS</b><span>Input and view settings apply immediately.</span></div>
+    <div class="options-heading"><b>OPTIONS</b><span>Settings persist locally. Graphics changes reload the renderer; audio and accessibility apply live.</span></div>
     <div class="settings-grid">
       <label>MOUSE SENSITIVITY<input id="sensitivity" type="range" min="0.6" max="2" step="0.05" value="1"></label>
       <label>CONTROLLER LOOK<input id="controller-sensitivity" type="range" min="0.5" max="1.8" step="0.05" value="1"></label>
       <label>FIELD OF VIEW<input id="field-of-view" type="range" min="70" max="100" step="1" value="82"></label>
-      <label>GRAPHICS<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="blender">QUALITY GRAPHICS</option></select></label>
     </div>
+    <section id="graphics-settings" class="settings-section" aria-labelledby="graphics-settings-title">
+      <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: HIGH</span></header>
+      <div class="settings-grid">
+        <label>PRESET<select id="graphics-profile"><option value="performance">PERFORMANCE</option><option value="high">HIGH</option><option value="max">MAX</option><option value="custom">CUSTOM</option></select></label>
+        <label>RENDER SCALE<input id="graphics-render-scale" type="range" min="0.5" max="2" step="0.05" value="1"><small id="graphics-render-scale-value">100%</small></label>
+        <label>TARGET FPS<select id="graphics-target-fps"><option value="60">60 FPS</option><option value="90">90 FPS</option><option value="120">120 FPS</option><option value="144">144 FPS</option></select></label>
+        <label>SHADOWS<select id="graphics-shadows"><option value="off">OFF</option><option value="high">HIGH</option></select></label>
+        <label class="setting-check"><input id="graphics-adaptive" type="checkbox" checked> ADAPTIVE QUALITY</label>
+      </div>
+    </section>
+    <section id="audio-settings" class="settings-section" aria-labelledby="audio-settings-title">
+      <header><b id="audio-settings-title">AUDIO BUSES</b><span>INDEPENDENT VOLUME + MUTE</span></header>
+      <div class="audio-settings-grid">${audioRows}</div>
+    </section>
+    <section id="accessibility-settings" class="settings-section" aria-labelledby="accessibility-settings-title">
+      <header><b id="accessibility-settings-title">ACCESSIBILITY</b><span id="accessibility-effective">STANDARD SENSORY</span></header>
+      <div class="settings-grid">
+        <label class="setting-check"><input id="reduced-motion" type="checkbox"> REDUCED MOTION</label>
+        <label class="setting-check"><input id="reduced-damage-flash" type="checkbox"> REDUCED DAMAGE FLASH</label>
+        <label class="setting-check"><input id="reduced-sensory-effects" type="checkbox"> REDUCED SENSORY EFFECTS</label>
+        <label>DAMAGE FLASH<input id="damage-flash-scale" type="range" min="0" max="1" step="0.05" value="1"></label>
+        <label>WEAPON MOTION<input id="weapon-motion-scale" type="range" min="0" max="1" step="0.05" value="1"></label>
+      </div>
+    </section>
     <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster · <b>ENTER</b> chat<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </div>`;
@@ -270,7 +299,7 @@ function hudMarkup(): string {
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
   return `<canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
     <div id="color-grade"></div><div id="film-grain"></div>
-    <div id="vignette"></div><div id="damage-flash"></div><div id="damage-direction"><i></i></div><div id="ordnance-flash" hidden></div>
+    <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div>
     <div id="nuke-flash" hidden></div>
     <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
     ${menuMarkup(model)}

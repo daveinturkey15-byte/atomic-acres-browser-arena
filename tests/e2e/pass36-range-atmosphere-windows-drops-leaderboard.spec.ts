@@ -191,7 +191,7 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
   test('Quality Graphics never re-enables the coplanar procedural arena root', async ({ page }) => {
     await page.goto('/?render=blender&signal=off&grass=off&mist=on&clouds=off&rays=off&multiplayerQa=1&seed=36035');
     await waitReady(page);
-    await expect(page.locator('#graphics-profile option[value="blender"]')).toHaveText('QUALITY GRAPHICS');
+    await expect(page.locator('#graphics-profile option[value="high"]')).toHaveText('HIGH');
     expect((await snapshot(page)).render.blenderEnvironment).toMatchObject({
       status: 'ready',
       proceduralRootActuallyVisible: false,

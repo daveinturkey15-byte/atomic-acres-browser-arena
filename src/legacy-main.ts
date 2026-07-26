@@ -144,7 +144,28 @@ import {
 } from './rustworks-quality';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
-import { advanceFootsteps, strideLength, type FootstepAccumulator } from './footsteps';
+import {
+  PASS65_SETTINGS_STORAGE_KEY,
+  AUDIO_BUS_IDS,
+  createDefaultPass65Settings,
+  normalizePass65Settings,
+  parsePass65Settings,
+  resolveAccessibilityRuntime,
+  resolveGraphicsRuntime,
+  writePass65Settings,
+  type GraphicsPreset,
+  type Pass65Settings,
+} from './pass65-settings';
+import { arenaFootstepSurface, AudioOcclusionBudget, FootstepEmitterRegistry, type FootstepMovement } from './spatial-audio';
+import {
+  createDirectionalDamageState,
+  createLowHealthFeedbackState,
+  directionalDamagePresentation,
+  recordDirectionalDamage,
+  sampleLowHealthFeedback,
+  type DirectionalDamageState,
+  type LowHealthFeedbackState,
+} from './sensory-feedback';
 import { FramePacingSampler } from './frame-pacing';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
@@ -646,6 +667,9 @@ function element<T extends HTMLElement>(selector: string): T {
 
 const canvas = element<HTMLCanvasElement>('#game');
 const menu = element<HTMLElement>('#menu');
+const damageDirectionIndicator = element<HTMLElement>('#damage-direction');
+const damageFlash = element<HTMLElement>('#damage-flash');
+const lowHealthVignette = element<HTMLElement>('#low-health-vignette');
 menu.dataset.context = 'deployment';
 const menuShowcase = element<HTMLElement>('#menu-showcase');
 const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
@@ -692,12 +716,50 @@ const strikeMapContextValue = strikeMapCanvas.getContext('2d');
 if (!strikeMapContextValue) throw new Error('Canvas2D tactical map is unavailable');
 const strikeMapContext: CanvasRenderingContext2D = strikeMapContextValue;
 const audio = new ArenaAudio();
+const capabilityHints = {
+  hardwareConcurrency: navigator.hardwareConcurrency,
+  deviceMemoryGb: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
+};
+let serializedPass65Settings: string | null = null;
+try { serializedPass65Settings = localStorage.getItem(PASS65_SETTINGS_STORAGE_KEY); } catch { /* Hardened storage falls back safely. */ }
+let pass65Settings: Pass65Settings = parsePass65Settings(serializedPass65Settings, capabilityHints);
+if (!serializedPass65Settings) {
+  let legacyProfile: string | null = null;
+  try { legacyProfile = localStorage.getItem(RENDER_PROFILE_STORAGE_KEY); } catch { /* Optional migration only. */ }
+  if (legacyProfile === 'performance' || legacyProfile === 'blender') {
+    pass65Settings = normalizePass65Settings({
+      ...createDefaultPass65Settings(capabilityHints),
+      graphics: { preset: legacyProfile === 'performance' ? 'performance' : 'high' },
+    }, capabilityHints);
+  }
+}
+const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
+const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
+const graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
+const reducedTransparencyMedia = window.matchMedia('(prefers-reduced-transparency: reduce)');
+let accessibilityRuntime = resolveAccessibilityRuntime(pass65Settings.accessibility, {
+  reducedMotion: reducedMotionMedia.matches,
+  reducedTransparency: reducedTransparencyMedia.matches,
+});
+audio.configure(pass65Settings.audio);
+const unlockAudioFromGesture = (event: Event) => { if (event.isTrusted) audio.unlock(); };
+window.addEventListener('pointerdown', unlockAudioFromGesture, { passive: true });
+window.addEventListener('keydown', unlockAudioFromGesture);
 
 const renderProfile: RenderProfile = resolveRenderProfile(
-  window.location.search,
-  localStorage.getItem(RENDER_PROFILE_STORAGE_KEY),
+  explicitRenderQuery ? window.location.search : '',
+  queryRenderProfile ?? graphicsRuntime.renderProfile,
 );
-const activeRenderConfig = renderProfileConfig(renderProfile);
+const activeRenderConfig = Object.freeze({
+  ...renderProfileConfig(renderProfile),
+  pixelRatioCap: renderProfile === 'compat' ? 0.2
+    : renderProfile === 'performance' ? Math.min(0.75, graphicsRuntime.renderScale)
+      : queryRenderProfile === 'blender' ? 1 : graphicsRuntime.renderScale,
+  shadows: renderProfile === 'blender' && (queryRenderProfile === 'blender' || graphicsRuntime.shadows),
+});
+const displayedGraphicsPreset: GraphicsPreset = renderProfile === 'performance' || renderProfile === 'compat'
+  ? 'performance'
+  : pass65Settings.graphics.preset === 'performance' ? 'high' : pass65Settings.graphics.preset;
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
 let activeLighting = arenaLightingProfile(
   renderProfile,
@@ -711,6 +773,10 @@ document.documentElement.classList.toggle('compat-render', renderProfile === 'co
 document.documentElement.classList.toggle('performance-render', renderProfile === 'performance');
 document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
+document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
+document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
+document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
+document.documentElement.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
 const runtimeRequest = resolveRenderRuntimeRequest(window.location.search);
 const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
   ? await WebGpuRenderRuntime.create({
@@ -868,10 +934,22 @@ if (weaponLoad.status === 'rejected') {
 }
 const detectedDisplayFrameMs = await displayCadencePromise;
 bootstrapStage = 'module-ready';
+const configuredAdaptiveLevels = graphicsRuntime.adaptive && renderProfile !== 'compat'
+  ? [...new Set((renderProfile === 'performance'
+      ? [0.55, 0.65, activeRenderConfig.pixelRatioCap]
+      : [
+          Math.max(0.5, activeRenderConfig.pixelRatioCap * 0.65),
+          Math.max(0.5, activeRenderConfig.pixelRatioCap * 0.75),
+          Math.max(0.5, activeRenderConfig.pixelRatioCap * 0.85),
+          activeRenderConfig.pixelRatioCap,
+        ]).map((level) => Number(level.toFixed(2))))]
+  : [activeRenderConfig.pixelRatioCap];
 const adaptiveQuality = new AdaptiveQualityController({
   profile: renderProfile,
-  targetFrameMs: detectedDisplayFrameMs,
+  targetFrameMs: Math.max(detectedDisplayFrameMs, 1_000 / graphicsRuntime.targetFps),
   initialPixelRatioCap: activeRenderConfig.pixelRatioCap,
+  enabled: graphicsRuntime.adaptive,
+  levels: configuredAdaptiveLevels,
 });
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, adaptiveQuality.telemetry().pixelRatioCap));
 let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
@@ -1005,6 +1083,7 @@ let sunLight: THREE.DirectionalLight;
 let fillLight: THREE.DirectionalLight;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
+audio.setArena(selectedArena.id);
 const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
   'atomic-acres': buildArena,
   'rustworks-1v1': buildRustworks1v1,
@@ -1908,7 +1987,18 @@ let deferredFireAt = 0;
 let lastGroundedAt = 0;
 let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
-let footstepAccumulator: FootstepAccumulator = { distance: 0, side: 0 };
+const footstepEmitters = new FootstepEmitterRegistry();
+const audioOcclusionBudget = new AudioOcclusionBudget();
+let directionalDamageState: DirectionalDamageState = createDirectionalDamageState();
+let lowHealthFeedbackState: LowHealthFeedbackState = createLowHealthFeedbackState();
+let lastSensoryPresentationAt = -Infinity;
+
+function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }>): boolean {
+  if (!audioOcclusionBudget.admit(frameCount)) return false;
+  const origin = { x: player.position.x, y: player.position.y, z: player.position.z };
+  const target = { x: source.x, y: source.y + 1.1, z: source.z };
+  return arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
+}
 let lastFrame = performance.now();
 let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
@@ -4828,13 +4918,42 @@ function renderRemoteShot(message: ShotMessage): void {
   else audio.shot(message.weapon, true, origin.distanceTo(camera.position));
 }
 
-function showDamageDirection(attacker: string): void {
+function showDamageDirection(attacker: string, damage = 12, now = performance.now()): void {
   const attackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
   if (!attackerPosition || attacker === player.id) return;
-  const indicator = element<HTMLElement>('#damage-direction');
-  indicator.style.setProperty('--damage-angle', `${sourceScreenAngle(player.position, player.yaw, attackerPosition)}rad`);
-  indicator.classList.remove('pulse');
-  requestAnimationFrame(() => indicator.classList.add('pulse'));
+  directionalDamageState = recordDirectionalDamage(directionalDamageState, {
+    sourceId: attacker,
+    sourceType: remotes.has(attacker) ? 'remote' : bots.has(attacker) ? 'bot' : 'world',
+    angleRadians: sourceScreenAngle(player.position, player.yaw, attackerPosition),
+    cameraYawRadians: player.yaw,
+    damage,
+    now,
+  });
+}
+
+function updateSensoryFeedback(now: number): void {
+  audio.updateListener(camera.position, player.yaw);
+  if (now - lastSensoryPresentationAt < 1000 / 30) return;
+  lastSensoryPresentationAt = now;
+  const directions = directionalDamagePresentation(directionalDamageState, now, player.yaw);
+  while (damageDirectionIndicator.childElementCount < directions.length) damageDirectionIndicator.append(document.createElement('i'));
+  while (damageDirectionIndicator.childElementCount > directions.length) damageDirectionIndicator.lastElementChild?.remove();
+  directions.forEach((direction, index) => {
+    const marker = damageDirectionIndicator.children.item(index) as HTMLElement;
+    marker.style.setProperty('--damage-angle', `${direction.angleRadians}rad`);
+    marker.style.setProperty('--damage-opacity', direction.opacity.toFixed(4));
+    marker.dataset.sector = String(direction.sector);
+    marker.dataset.sourceType = direction.sourceType;
+  });
+  const lowHealth = sampleLowHealthFeedback(lowHealthFeedbackState, {
+    health: player.hp,
+    alive: player.alive,
+    now,
+    reducedSensory: accessibilityRuntime.reducedSensory,
+  });
+  lowHealthFeedbackState = lowHealth.state;
+  lowHealthVignette.style.setProperty('--low-health-opacity', lowHealth.presentation.vignetteOpacity.toFixed(4));
+  audio.setLowHealthFeedback(lowHealth.presentation);
 }
 
 function scheduleLocalRespawn(now = performance.now()): void {
@@ -4876,9 +4995,11 @@ function applyDamage(
   else if (network.role === 'offline' || attacker === player.id) addFeed('DAMAGE TAKEN +' + Math.round(appliedDamage), 'coral', { damageTaken: appliedDamage });
   lastDamageAt = now;
   audio.damage();
-  showDamageDirection(attacker);
-  element<HTMLElement>('#damage-flash').classList.remove('pulse');
-  requestAnimationFrame(() => element<HTMLElement>('#damage-flash').classList.add('pulse'));
+  showDamageDirection(attacker, appliedDamage, now);
+  if (accessibilityRuntime.damageFlashScale > 0) {
+    damageFlash.classList.remove('pulse');
+    requestAnimationFrame(() => damageFlash.classList.add('pulse'));
+  }
   if (player.hp <= 0) {
     interruptReload(true, now);
     player.alive = false;
@@ -5440,6 +5561,7 @@ function removeRemote(id: string, reason: string): void {
   if (!remote) return;
   if (network.role === 'host') dropHeldRailgun(id, remote.target.clone().add(new THREE.Vector3(0, 0.3, 0)));
   scene.remove(remote.root);
+  footstepEmitters.reset(`remote:${id}`);
   remotes.delete(id);
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
@@ -5793,9 +5915,14 @@ function respawn(
   cameraHeightOffset = 0;
   cameraRoll = 0;
   jumpQueuedAt = -10_000;
-  footstepAccumulator = { distance: 0, side: 0 };
   const deployment = deploymentOverride ?? activeLoadoutSelection();
   player.selectedGrenade = deployment.grenade;
+  footstepEmitters.reset(`local:${player.id}`);
+  directionalDamageState = createDirectionalDamageState();
+  lowHealthFeedbackState = createLowHealthFeedbackState();
+  audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
+  damageDirectionIndicator.replaceChildren();
+  lowHealthVignette.style.setProperty('--low-health-opacity', '0');
   if (selectedArena.id === 'gun-range') {
     rangePrimaryUnlocked = false;
     player.primaryWeapon = 'carbine';
@@ -5945,7 +6072,6 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   respawn(requestLock, false, undefined, 'match-start');
   if (mode === 'solo') spawnBots();
   else if (mode === 'host') spawnBots(privateMatchConfig.hostedBotCount);
-  audio.unlock();
   addFeed(`Welcome to ${arena.label}`, 'gold');
   if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
   if (mode !== 'solo') {
@@ -7025,8 +7151,14 @@ function spawnEarnedBotReinforcement(): void {
 }
 
 function clearBots(): void {
-  for (const bot of bots.values()) scene.remove(bot.root);
-  for (const bot of dormantBots.values()) scene.remove(bot.root);
+  for (const bot of bots.values()) {
+    scene.remove(bot.root);
+    footstepEmitters.reset(`bot:${bot.id}`);
+  }
+  for (const bot of dormantBots.values()) {
+    scene.remove(bot.root);
+    footstepEmitters.reset(`bot:${bot.id}`);
+  }
   bots.clear();
   dormantBots.clear();
   dormantBotsPrewarmed = false;
@@ -7081,6 +7213,7 @@ function acceptHostedBotState(message: BotStateMessage): void {
       bot = bots.get(snapshot.id);
     }
     if (!bot || snapshot.seq <= Number(bot.root.userData.networkSeq ?? -1)) continue;
+    const priorPosition = bot.position.clone();
     bot.root.userData.networkSeq = snapshot.seq;
     bot.name = snapshot.name;
     bot.team = snapshot.team;
@@ -7094,10 +7227,28 @@ function acceptHostedBotState(message: BotStateMessage): void {
     bot.alive = snapshot.alive;
     bot.root.visible = snapshot.alive;
     setOperatorWeapon(bot.root, snapshot.weapon, flattenOperatorMaterials);
+    if (snapshot.alive) {
+      const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
+      const hostedFootsteps = footstepEmitters.sample({
+        actorId: `bot:${bot.id}`,
+        lifeId: snapshot.deaths,
+        continuityId: snapshot.deaths,
+        position: bot.position,
+        grounded: true,
+        stale: false,
+        movement: priorPosition.distanceTo(bot.position) > 0.55 ? 'sprint' : 'walk',
+        surface,
+        now: performance.now(),
+      });
+      for (const footstep of hostedFootsteps) audio.worldFootstep(footstep.position, footstep.surface, footstep.movement, isFootstepOccluded(footstep.position));
+    } else {
+      footstepEmitters.reset(`bot:${bot.id}`);
+    }
   }
   for (const [id, bot] of bots) {
     if (!id.startsWith('host-bot-') || incomingIds.has(id)) continue;
     scene.remove(bot.root);
+    footstepEmitters.reset(`bot:${id}`);
     bots.delete(id);
   }
 }
@@ -7260,6 +7411,7 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.continuity += 1;
+  footstepEmitters.reset(`bot:${bot.id}`);
   bot.positionHistory.length = 0;
   bot.hp = state.health;
   bot.alive = state.alive;
@@ -7581,6 +7733,19 @@ function updateBots(dt: number, now: number): void {
     const lookTarget = lineOfSight ? targetPosition : verticalRouteTarget ?? patrolTarget;
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
+    const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
+    const botFootsteps = footstepEmitters.sample({
+      actorId: `bot:${bot.id}`,
+      lifeId: bot.deaths,
+      continuityId: bot.continuity,
+      position: bot.position,
+      grounded: true,
+      stale: false,
+      movement: desiredDirection.lengthSq() > 0 && speed > 5.2 ? 'sprint' : 'walk',
+      surface: botSurface,
+      now,
+    });
+    for (const footstep of botFootsteps) audio.worldFootstep(footstep.position, footstep.surface, footstep.movement, isFootstepOccluded(footstep.position));
 
     const threwBotGrenade = madeTacticalDecision && shouldBotThrowGrenade({
       alive: bot.alive,
@@ -9576,15 +9741,21 @@ function updatePhysics(dt: number): void {
   if (movement.blockedZ && !movement.slopeAdjusted) player.velocity.z = movement.appliedDelta.z / Math.max(dt, 0.001);
 
   const moving = input.lengthSq() > 0 && playerGrounded;
-  const appliedHorizontalDistance = playerGrounded ? Math.hypot(movement.appliedDelta.x, movement.appliedDelta.z) : 0;
-  const footsteps = advanceFootsteps(
-    footstepAccumulator,
-    appliedHorizontalDistance,
-    strideLength(player.stance, currentSprinting),
-  );
-  footstepAccumulator = footsteps.state;
-  for (let index = 0; index < footsteps.emitted; index += 1) {
-    audio.footstep(classifyFootstepSurface(player.position), currentSprinting, crouched || prone);
+  const localSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(player.position));
+  const localMovement: FootstepMovement = prone ? 'prone' : crouched ? 'crouch' : currentSprinting ? 'sprint' : 'walk';
+  const localFootsteps = footstepEmitters.sample({
+    actorId: `local:${player.id}`,
+    lifeId: localContinuity,
+    continuityId: localContinuity,
+    position: player.position,
+    grounded: playerGrounded,
+    stale: false,
+    movement: localMovement,
+    surface: localSurface,
+    now,
+  });
+  for (let index = 0; index < localFootsteps.length; index += 1) {
+    audio.footstep(localSurface, currentSprinting, crouched || prone);
   }
   weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
@@ -9603,9 +9774,9 @@ function updatePhysics(dt: number): void {
     crouched,
     prone,
     ads: adsHeld,
-    phase: weaponBob,
-    landingImpulse,
-    lateralSpeed,
+    phase: weaponBob * accessibilityRuntime.weaponMotionScale,
+    landingImpulse: landingImpulse * accessibilityRuntime.weaponMotionScale,
+    lateralSpeed: lateralSpeed * accessibilityRuntime.weaponMotionScale,
     reloadProgress: debugReloadProgress ?? (player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(player.reloadState, performance.now())),
     surfaceRetreat: currentViewmodelSurfaceRetreat(),
   });
@@ -9629,10 +9800,10 @@ function updatePhysics(dt: number): void {
   hudRoot.classList.toggle('sniper-scope-active', sniperScopeActive);
   weaponView.root.visible = gameStarted && !sniperScopeActive && !debugCaptureViewmodelHidden;
   camera.position.copy(player.position);
-  camera.position.y += cameraHeightOffset - landingImpulse * 0.035;
+  camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
   camera.rotation.x = THREE.MathUtils.clamp(player.pitch - recoilCamera.pitch, -1.42, 1.42);
-  camera.rotation.z = cameraRoll;
+  camera.rotation.z = cameraRoll * accessibilityRuntime.weaponMotionScale;
 }
 
 function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
@@ -9677,6 +9848,7 @@ function updateRemotes(dt: number, now: number): void {
       renderedSnapshot.y - stanceEyeHeight(renderedSnapshot.stance),
       renderedSnapshot.z,
     );
+    const previousFootY = remote.root.position.y;
     const remainingDistance = remote.root.position.distanceTo(renderedTarget);
     remote.root.position.copy(renderedTarget);
     remote.root.rotation.y = renderedSnapshot.yaw;
@@ -9688,6 +9860,22 @@ function updateRemotes(dt: number, now: number): void {
     const operator = remote.root.userData.operator as THREE.Group;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch);
+    const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));
+    const expectedGround = botElevationAt(renderedTarget, previousFootY);
+    const remoteMovement: FootstepMovement = stance === 'prone' ? 'prone' : stance === 'crouch'
+      ? 'crouch' : remainingDistance / Math.max(dt, 0.001) > 5.2 ? 'sprint' : 'walk';
+    const footsteps = footstepEmitters.sample({
+      actorId: `remote:${id}`,
+      lifeId: renderedSnapshot.deaths,
+      continuityId: remote.continuity,
+      position: renderedTarget,
+      grounded: Math.abs(renderedTarget.y - expectedGround) <= 0.28,
+      stale: remote.renderedWorldAgeMs > 500,
+      movement: remoteMovement,
+      surface: remoteSurface,
+      now,
+    });
+    for (const footstep of footsteps) audio.worldFootstep(footstep.position, footstep.surface, footstep.movement, isFootstepOccluded(footstep.position));
   }
 }
 
@@ -10439,6 +10627,16 @@ const sensitivityInput = element<HTMLInputElement>('#sensitivity');
 const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
 const fovInput = element<HTMLInputElement>('#field-of-view');
 const graphicsProfileInput = element<HTMLSelectElement>('#graphics-profile');
+const graphicsRenderScaleInput = element<HTMLInputElement>('#graphics-render-scale');
+const graphicsRenderScaleValue = element<HTMLElement>('#graphics-render-scale-value');
+const graphicsAdaptiveInput = element<HTMLInputElement>('#graphics-adaptive');
+const graphicsTargetFpsInput = element<HTMLSelectElement>('#graphics-target-fps');
+const graphicsShadowsInput = element<HTMLSelectElement>('#graphics-shadows');
+const reducedMotionInput = element<HTMLInputElement>('#reduced-motion');
+const reducedDamageFlashInput = element<HTMLInputElement>('#reduced-damage-flash');
+const reducedSensoryEffectsInput = element<HTMLInputElement>('#reduced-sensory-effects');
+const damageFlashScaleInput = element<HTMLInputElement>('#damage-flash-scale');
+const weaponMotionScaleInput = element<HTMLInputElement>('#weapon-motion-scale');
 const storedRange = (key: string, fallback: number, minimum: number, maximum: number): number => {
   const parsed = Number(localStorage.getItem(key));
   return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
@@ -10449,9 +10647,51 @@ preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
 sensitivityInput.value = String(sensitivity);
 controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
-// Compatibility remains query-only for diagnostic QA; players choose only
-// Performance or the fully Blender-authored environment presentation.
-graphicsProfileInput.value = renderProfile === 'blender' ? 'blender' : 'performance';
+graphicsProfileInput.value = displayedGraphicsPreset;
+graphicsRenderScaleInput.value = String(pass65Settings.graphics.renderScale);
+graphicsRenderScaleValue.textContent = `${Math.round(pass65Settings.graphics.renderScale * 100)}%`;
+graphicsAdaptiveInput.checked = pass65Settings.graphics.adaptiveResolution;
+graphicsTargetFpsInput.value = String(pass65Settings.graphics.targetFps);
+graphicsShadowsInput.value = pass65Settings.graphics.shadows;
+reducedMotionInput.checked = pass65Settings.accessibility.reducedMotion;
+reducedDamageFlashInput.checked = pass65Settings.accessibility.reducedDamageFlash;
+reducedSensoryEffectsInput.checked = pass65Settings.accessibility.reducedSensoryEffects;
+damageFlashScaleInput.value = String(pass65Settings.accessibility.damageFlashScale);
+weaponMotionScaleInput.value = String(pass65Settings.accessibility.weaponMotionScale);
+element<HTMLElement>('#graphics-effective').textContent = `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
+
+function persistPass65Settings(next: Pass65Settings): void {
+  pass65Settings = next;
+  try { writePass65Settings(localStorage, next, capabilityHints); } catch { /* Runtime settings still apply without storage. */ }
+}
+
+function applyAccessibilitySettings(): void {
+  accessibilityRuntime = resolveAccessibilityRuntime(pass65Settings.accessibility, {
+    reducedMotion: reducedMotionMedia.matches,
+    reducedTransparency: reducedTransparencyMedia.matches,
+  });
+  document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
+  document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
+  damageFlash.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
+  element<HTMLElement>('#accessibility-effective').textContent = accessibilityRuntime.reducedSensory
+    ? `REDUCED SENSORY · ${accessibilityRuntime.reasons.join(' + ') || 'PLAYER'}`
+    : 'STANDARD SENSORY';
+}
+
+function persistGraphicsAndReload(graphics: Partial<Pass65Settings['graphics']>): void {
+  const preset = (graphics.preset ?? 'custom') as GraphicsPreset;
+  const merged = preset === 'custom'
+    ? { ...pass65Settings.graphics, ...graphics, preset }
+    : { preset };
+  const next = normalizePass65Settings({ ...pass65Settings, graphics: merged }, capabilityHints);
+  persistPass65Settings(next);
+  try { localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, next.graphics.preset === 'performance' ? 'performance' : 'blender'); } catch { /* Migration mirror only. */ }
+  const url = new URL(window.location.href);
+  url.searchParams.delete('render');
+  window.location.assign(url);
+}
+
+applyAccessibilitySettings();
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
@@ -10465,14 +10705,65 @@ fovInput.addEventListener('input', () => {
   localStorage.setItem('atomic-acres-fov', String(preferredFov));
 });
 graphicsProfileInput.addEventListener('change', () => {
-  const value = graphicsProfileInput.value;
-  const selected: RenderProfile = value === 'blender' ? 'blender' : 'performance';
-  localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, selected);
-  const next = new URL(window.location.href);
-  if (selected === 'performance') next.searchParams.delete('render');
-  else next.searchParams.set('render', selected);
-  window.location.assign(next);
+  persistGraphicsAndReload({ preset: graphicsProfileInput.value as GraphicsPreset });
 });
+graphicsRenderScaleInput.addEventListener('input', () => {
+  graphicsRenderScaleValue.textContent = `${Math.round(Number(graphicsRenderScaleInput.value) * 100)}%`;
+});
+graphicsRenderScaleInput.addEventListener('change', () => persistGraphicsAndReload({
+  preset: 'custom', renderScale: Number(graphicsRenderScaleInput.value),
+}));
+graphicsAdaptiveInput.addEventListener('change', () => persistGraphicsAndReload({ preset: 'custom', adaptiveResolution: graphicsAdaptiveInput.checked }));
+graphicsTargetFpsInput.addEventListener('change', () => persistGraphicsAndReload({
+  preset: 'custom', targetFps: Number(graphicsTargetFpsInput.value) as Pass65Settings['graphics']['targetFps'],
+}));
+graphicsShadowsInput.addEventListener('change', () => persistGraphicsAndReload({
+  preset: 'custom', shadows: graphicsShadowsInput.value as Pass65Settings['graphics']['shadows'],
+}));
+
+for (const id of AUDIO_BUS_IDS) {
+  const gain = element<HTMLInputElement>(`#audio-${id}-gain`);
+  const mute = element<HTMLInputElement>(`#audio-${id}-mute`);
+  gain.value = String(pass65Settings.audio.gains[id]);
+  mute.checked = pass65Settings.audio.mutes[id];
+  const apply = () => {
+    const next = normalizePass65Settings({
+      ...pass65Settings,
+      audio: {
+        schemaVersion: 1,
+        gains: { ...pass65Settings.audio.gains, [id]: Number(gain.value) },
+        mutes: { ...pass65Settings.audio.mutes, [id]: mute.checked },
+      },
+    }, capabilityHints);
+    audio.configure(next.audio);
+    persistPass65Settings(next);
+  };
+  gain.addEventListener('input', apply);
+  mute.addEventListener('change', apply);
+}
+
+function updateAccessibilityFromInputs(): void {
+  const next = normalizePass65Settings({
+    ...pass65Settings,
+    accessibility: {
+      reducedMotion: reducedMotionInput.checked,
+      reducedDamageFlash: reducedDamageFlashInput.checked,
+      reducedSensoryEffects: reducedSensoryEffectsInput.checked,
+      damageFlashScale: Number(damageFlashScaleInput.value),
+      weaponMotionScale: Number(weaponMotionScaleInput.value),
+    },
+  }, capabilityHints);
+  pass65Settings = next;
+  applyAccessibilitySettings();
+  persistPass65Settings(next);
+}
+for (const input of [reducedMotionInput, reducedDamageFlashInput, reducedSensoryEffectsInput, damageFlashScaleInput, weaponMotionScaleInput]) {
+  input.addEventListener(input.type === 'range' ? 'input' : 'change', updateAccessibilityFromInputs);
+}
+reducedMotionMedia.addEventListener('change', applyAccessibilitySettings);
+reducedTransparencyMedia.addEventListener('change', applyAccessibilitySettings);
+document.addEventListener('visibilitychange', () => { if (document.hidden) audio.suspend(); });
+window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
 const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
   'scout-sweep': 'SCOUT SWEEP',
@@ -10861,7 +11152,7 @@ function syncMenuPreviewCanvasPlacement(): void {
 
 function applyMenuPreviewCamera(now: number): boolean {
   if (!menuPreviewActive || debugCaptureCameraActive) return false;
-  const reducedMotion = reducedMotionMedia.matches;
+  const reducedMotion = accessibilityRuntime.reducedMotion;
   const elapsedMs = Number.isFinite(fixedMenuPreviewTimeMs)
     ? Math.max(0, fixedMenuPreviewTimeMs ?? 0)
     : Math.max(0, now - menuPreviewStartedAt);
@@ -10971,6 +11262,8 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
     arena = nextArena;
+    audio.setArena(selectedArena.id);
+    footstepEmitters.reset();
     botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
@@ -11019,6 +11312,8 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
     arena = previousArena;
+    audio.setArena(selectedArena.id);
+    footstepEmitters.reset();
     botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
     try {
@@ -11474,6 +11769,7 @@ function frame(now: number, scheduleNext = true): void {
     impactPresentation.update(frameDt);
     tracerPool.update(frameDt);
     updateRemotes(frameDt, now);
+    updateSensoryFeedback(now);
     if (selectedArena.id === 'atomic-acres') {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, now);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, now);
@@ -12289,7 +12585,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastExplosionAgeMs: lastGrenadeExplosionFrameAt > 0 ? Math.max(0, performance.now() - lastGrenadeExplosionFrameAt) : null,
       profile: { ...lastGrenadeExplosionProfile },
     },
-    audio: audio.telemetry(),
+    audio: { ...audio.telemetry(), occlusion: audioOcclusionBudget.telemetry() },
+    settings: {
+      requested: pass65Settings,
+      graphics: graphicsRuntime,
+      displayedGraphicsPreset,
+      accessibility: accessibilityRuntime,
+    },
+    sensory: {
+      directions: directionalDamagePresentation(directionalDamageState, performance.now(), player.yaw),
+      lowHealthActive: lowHealthFeedbackState.active,
+      lowHealthOpacity: Number(lowHealthVignette.style.getPropertyValue('--low-health-opacity') || 0),
+    },
     fieldSupport: {
       streak: fieldSupport.streak,
       rewardCycle: fieldSupport.rewardCycle,

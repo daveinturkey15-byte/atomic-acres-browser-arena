@@ -101,6 +101,12 @@ type DebugState = {
     ambience: { continuousSources: number; busGain: number };
     grenadeFuse: { beeps: number; startMs: number };
     support: { cues: number };
+    buses: Record<string, { configuredGain: number; muted: boolean; effectiveGain: number }>;
+  };
+  sensory: {
+    directions: Array<{ sourceId: string; sourceType: 'local' | 'remote' | 'bot' | 'world'; sector: number; opacity: number }>;
+    lowHealthActive: boolean;
+    lowHealthOpacity: number;
   };
   fieldSupport: {
     streak: number;
@@ -641,7 +647,7 @@ test.describe('boot and authored presentation', () => {
       { team: 0, authored: 12, valid: 12 },
       { team: 1, authored: 12, valid: 12 },
     ]);
-    await expect(page.locator('#graphics-profile')).toHaveValue('blender');
+    await expect(page.locator('#graphics-profile')).toHaveValue('high');
     await pageReadyAt(page, '/?render=performance&signal=on');
     const performanceState = await debug(page);
     expect(performanceState.render).toMatchObject({
@@ -765,7 +771,7 @@ test.describe('boot and authored presentation', () => {
       expect(cover.bounds.maxY! - cover.bounds.minY!).toBeGreaterThanOrEqual(3.5);
       expect(Math.max(cover.bounds.maxX - cover.bounds.minX, cover.bounds.maxZ - cover.bounds.minZ)).toBeGreaterThanOrEqual(10);
     }
-    await expect(page.locator('#graphics-profile')).toHaveValue('blender');
+    await expect(page.locator('#graphics-profile')).toHaveValue('high');
     await startSolo(page);
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
@@ -877,17 +883,31 @@ test.describe('boot and authored presentation', () => {
     await expect(page.locator('#field-of-view')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toBeVisible();
     await expect(page.locator('#graphics-profile')).toHaveValue('performance');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(2);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY GRAPHICS']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'HIGH', 'MAX', 'CUSTOM']);
+    await expect(page.locator('#audio-settings')).toBeVisible();
+    await expect(page.locator('#accessibility-settings')).toBeVisible();
+    expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
     await page.locator('#controller-sensitivity').evaluate((input) => {
       const slider = input as HTMLInputElement;
       slider.value = '1.45';
       slider.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    await page.locator('#audio-movement-gain').evaluate((input) => {
+      const slider = input as HTMLInputElement;
+      slider.value = '37';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#reduced-sensory-effects').check();
+    expect((await debug(page)).audio.buses.movement).toMatchObject({ configuredGain: 37, muted: false });
+    await expect(page.locator('html')).toHaveAttribute('data-reduced-sensory', 'true');
+    await expect(page.locator('#damage-flash')).toHaveCSS('--damage-flash-scale', '0.2');
     await page.reload();
     await pageReady(page);
     await page.getByRole('tab', { name: 'OPTIONS' }).click();
     await expect(page.locator('#controller-sensitivity')).toHaveValue('1.45');
+    await expect(page.locator('#audio-movement-gain')).toHaveValue('37');
+    await expect(page.locator('#reduced-sensory-effects')).toBeChecked();
     await expect(page.locator('.controls')).toContainText('crouch');
     await expect(page.locator('.controls')).toContainText('prone');
     await expect(page.locator('.controls')).toContainText('knife');
@@ -2416,12 +2436,15 @@ test.describe('solo mechanics', () => {
     await expect(page.locator('#crosshair i').first()).toHaveCSS('opacity', '0');
     await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(false));
 
-    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(40));
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(70));
     const damaged = await debug(page);
-    expect(damaged.player.hp).toBeLessThanOrEqual(60);
-    await expect(page.locator('#damage-direction')).toHaveClass(/pulse/);
+    expect(damaged.player.hp).toBeLessThanOrEqual(30);
+    expect(damaged.sensory.directions).toHaveLength(1);
+    expect(damaged.sensory.directions[0]).toMatchObject({ sourceType: 'bot' });
+    await expect(page.locator('#low-health-vignette')).not.toHaveCSS('opacity', '0');
     await page.waitForTimeout(5_700);
     expect((await debug(page)).player.hp).toBeGreaterThan(damaged.player.hp);
+    await expect(page.locator('#low-health-vignette')).toHaveCSS('opacity', '0');
   });
 });
 
@@ -2592,8 +2615,8 @@ test.describe('performance and stability', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await pageReadyAt(page, '/?render=quality');
-    await expect(page.locator('#graphics-profile option')).toHaveCount(2);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'QUALITY GRAPHICS']);
+    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['PERFORMANCE', 'HIGH', 'MAX', 'CUSTOM']);
     await startSolo(page);
     await page.waitForTimeout(1_000);
     const state = await debug(page);

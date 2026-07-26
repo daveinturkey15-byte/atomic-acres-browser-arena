@@ -1,15 +1,7 @@
-export const AUDIO_BUS_IDS = Object.freeze([
-  'master',
-  'sfx',
-  'movement',
-  'ui',
-  'announcements',
-  'ambience',
-  'menu-music',
-  'game-music',
-] as const);
+import { AUDIO_BUS_IDS, type AudioBusId } from './audio-buses';
 
-export type AudioBusId = (typeof AUDIO_BUS_IDS)[number];
+export { AUDIO_BUS_IDS };
+export type { AudioBusId };
 
 export const SOUND_EVENT_INVENTORY_SCHEMA_VERSION = 1 as const;
 
@@ -250,7 +242,9 @@ type PlannedEventInput = Readonly<{
   coverageDetail: string;
 }>;
 
-export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze(['unlock', 'telemetry'] as const);
+export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
+  'configure', 'dispose', 'suspend', 'telemetry', 'unlock', 'updateListener',
+] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{
   sourcePath: string;
@@ -296,7 +290,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('explosion', 'afterPresentationDetach', 2, ['ordnance.frag-explosion']),
   runtimeCallsite('explosion', 'now', 1, ['support.legacy-explosion']),
   runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
-  runtimeCallsite('footstep', 'classifyFootstepSurface(player.position),currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
+  runtimeCallsite('footstep', 'localSurface,currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeBounce', 'Math.abs(incoming)', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeFuseBeep', 'fuseRemainingMs,now', 1, ['ordnance.frag-fuse-beep']),
@@ -321,7 +315,10 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('railgunReport', 'true,origin.distanceTo(camera.position)', 1, ['weapon.report.world']),
   runtimeCallsite('reload', '', 1, ['weapon.reload-handling']),
   runtimeCallsite('scoutSweep', '', 1, ['support.scout-sweep']),
+  runtimeCallsite('setArena', 'selectedArena.id', 3, ['ambience.arena-bed']),
   runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
+  runtimeCallsite('setLowHealthFeedback', '{ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 }', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
+  runtimeCallsite('setLowHealthFeedback', 'lowHealth.presentation', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
   runtimeCallsite('shot', 'bot.weapon,true', 1, ['weapon.report.world']),
   runtimeCallsite('shot', "'explosive-crossbow',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
@@ -331,6 +328,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
   runtimeCallsite('weaponSwitch', '', 4, ['weapon.switch', 'interaction.weapon-pickup']),
+  runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),
 ]);
 
 const LOCAL_FEEDBACK = Object.freeze({
@@ -517,8 +515,8 @@ export const PASS65_PLANNED_WEAPON_AUDIO_ROLES = Object.freeze([
 ] as const);
 
 const IMPACT_SURFACE_VARIANTS = Object.freeze(['metal', 'concrete', 'wood', 'soil', 'glass'] as const);
-const FOOTSTEP_SURFACE_VARIANTS = Object.freeze(['asphalt', 'concrete', 'wood', 'soil'] as const);
-const FOOTSTEP_GAIT_VARIANTS = Object.freeze(['walk', 'sprint', 'crouch'] as const);
+const FOOTSTEP_SURFACE_VARIANTS = Object.freeze(['asphalt', 'concrete', 'wood', 'soil', 'metal', 'grass'] as const);
+const FOOTSTEP_GAIT_VARIANTS = Object.freeze(['walk', 'sprint', 'crouch', 'prone'] as const);
 const FOOTSTEP_VARIANTS = Object.freeze(FOOTSTEP_SURFACE_VARIANTS.flatMap((surface) =>
   FOOTSTEP_GAIT_VARIANTS.flatMap((gait) => [0, 1, 2, 3].map((cycle) => `${surface}.${gait}.cycle-${cycle}`))));
 
@@ -741,11 +739,11 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
     coverageDetail: 'The rotary drive loop must follow authoritative spin state and stop on switch, death, rematch, or disposal.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'movement.footstep.world', family: 'movement', bus: 'movement', delivery: 'world-spatial',
     spatialProfileId: 'footstep-world-v1', variants: FOOTSTEP_VARIANTS, variantMode: 'round-robin',
-    contractRefs: ['R104', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'player-life',
-    coverageDetail: 'Remote-player and bot footsteps require admitted grounded velocity/distance with discontinuity suppression and HRTF.',
+    emitterSymbols: ['worldFootstep'], contractRefs: ['R104', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'player-life',
+    coverageDetail: 'Remote-player and bot footsteps originate from admitted keyed travel, reset at discontinuities, and use bounded HRTF chains.',
   }),
   plannedEvent({
     id: 'movement.land.world', family: 'movement', bus: 'movement', delivery: 'world-spatial',
@@ -753,17 +751,17 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'player-life',
     coverageDetail: 'Remote and bot landing cues require admitted impact state and source position.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'player.low-health-breathing', family: 'player-state', bus: 'sfx', delivery: 'listener-local',
     variants: ['threshold', 'severe', 'critical'], contractRefs: ['R103', 'R305', 'R307', 'R308'],
-    concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
-    coverageDetail: 'One generation-owned breathing loop must intensify with health and stop on recovery, death, rematch, or reduced-sensory suppression.',
+    emitterSymbols: ['setLowHealthFeedback'], concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
+    coverageDetail: 'One life-owned procedural breathing loop intensifies with health and stops on recovery, death, rematch, or reduced-sensory suppression.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'player.low-health-heartbeat', family: 'player-state', bus: 'sfx', delivery: 'listener-local',
     variants: ['threshold', 'severe', 'critical'], contractRefs: ['R103', 'R305', 'R307', 'R308'],
-    concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
-    coverageDetail: 'Heartbeat cadence is a bounded local loop under the same health and sensory lifecycle as breathing.',
+    emitterSymbols: ['setLowHealthFeedback'], concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
+    coverageDetail: 'Heartbeat gain and cadence share the bounded life lifecycle and reduced-sensory teardown used by breathing.',
   }),
   plannedEvent({
     id: 'ordnance.grenade-prime-throw', family: 'ordnance', bus: 'sfx', delivery: 'listener-local',
@@ -949,17 +947,17 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R509', 'R308'], concurrency: GLOBAL_CUE, lifecycleOwner: 'match-epoch',
     coverageDetail: 'Killstreak announcements supplement HUD state and use admitted owner/team identity without custom-name audio.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'ambience.arena-bed', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
     spatialProfileId: 'arena-ambience-bed-v1',
     variants: [
-      'atomic-acres.wind', 'atomic-acres.insects', 'atomic-acres.transformer-hum',
-      'skyline-terminal.hvac', 'skyline-terminal.jet-wash', 'skyline-terminal.pa',
-      'rustworks-1v1.sea-wind', 'rustworks-1v1.machinery', 'rustworks-1v1.metal-creak',
-      'gun-range.ventilation', 'gun-range.electrical-room', 'gun-range.distant-report',
+      'atomic-acres.wind', 'atomic-acres.grid-hum',
+      'skyline-terminal.hvac', 'skyline-terminal.engine-wash',
+      'rustworks-1v1.duct', 'rustworks-1v1.stressed-metal',
+      'gun-range.ventilation', 'gun-range.ballast-buzz',
     ],
-    contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
-    coverageDetail: 'Every arena has three distinct source slots; stems require source/licence/digest before an arena can claim coverage.',
+    emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
+    coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
   }),
   plannedEvent({
     id: 'ambience.menu-helicopter', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
@@ -985,7 +983,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '61399d2590421ed546241de33db417bcd137caa42d6f2bf72af5c4bb7a71f12c';
+export const SOUND_EVENT_INVENTORY_SHA256 = 'b21ea9d5ba65a606758974d37ae96b25ad20eca8baa2b6f321e13bd04ccef041';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

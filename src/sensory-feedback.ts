@@ -6,6 +6,8 @@ export const LOW_HEALTH_EXIT_HP = 38;
 
 export type DirectionalDamagePulse = Readonly<{
   sourceId: string;
+  sourceType: 'local' | 'remote' | 'bot' | 'world';
+  worldBearingRadians: number;
   angleRadians: number;
   sector: number;
   strength: number;
@@ -18,6 +20,7 @@ export type DirectionalDamageState = Readonly<{
 
 export type DirectionalDamagePresentation = Readonly<{
   sourceId: string;
+  sourceType: DirectionalDamagePulse['sourceType'];
   angleRadians: number;
   sector: number;
   opacity: number;
@@ -44,18 +47,28 @@ function angleSector(angleRadians: number): number {
 
 export function recordDirectionalDamage(
   state: DirectionalDamageState,
-  input: Readonly<{ sourceId: string; angleRadians: number; damage: number; now: number }>,
+  input: Readonly<{
+    sourceId: string;
+    sourceType?: DirectionalDamagePulse['sourceType'];
+    angleRadians: number;
+    cameraYawRadians?: number;
+    damage: number;
+    now: number;
+  }>,
 ): DirectionalDamageState {
   if (!input.sourceId.trim() || !Number.isFinite(input.now) || input.now < 0 || !Number.isFinite(input.damage) || input.damage <= 0) {
     return state;
   }
   const angleRadians = normalizeAngle(input.angleRadians);
+  const worldBearingRadians = normalizeAngle(angleRadians - (input.cameraYawRadians ?? 0));
   const strength = Math.max(0.2, clamp01(input.damage / 45));
   const retained = state.pulses.filter((pulse) =>
     input.now - pulse.startedAt < DIRECTIONAL_DAMAGE_LIFETIME_MS && pulse.sourceId !== input.sourceId);
   const prior = state.pulses.find((pulse) => pulse.sourceId === input.sourceId);
   const pulse: DirectionalDamagePulse = Object.freeze({
     sourceId: input.sourceId,
+    sourceType: input.sourceType ?? 'world',
+    worldBearingRadians,
     angleRadians,
     sector: angleSector(angleRadians),
     strength: Math.max(strength, prior?.strength ?? 0),
@@ -70,16 +83,19 @@ export function recordDirectionalDamage(
 export function directionalDamagePresentation(
   state: DirectionalDamageState,
   now: number,
+  cameraYawRadians = 0,
 ): readonly DirectionalDamagePresentation[] {
   if (!Number.isFinite(now)) return Object.freeze([]);
   return Object.freeze(state.pulses.flatMap((pulse) => {
     const age = Math.max(0, now - pulse.startedAt);
     if (age >= DIRECTIONAL_DAMAGE_LIFETIME_MS) return [];
     const remaining = 1 - age / DIRECTIONAL_DAMAGE_LIFETIME_MS;
+    const angleRadians = normalizeAngle(pulse.worldBearingRadians + cameraYawRadians);
     return [Object.freeze({
       sourceId: pulse.sourceId,
-      angleRadians: pulse.angleRadians,
-      sector: pulse.sector,
+      sourceType: pulse.sourceType,
+      angleRadians,
+      sector: angleSector(angleRadians),
       opacity: clamp01(pulse.strength * remaining * remaining),
     })];
   }));
@@ -124,14 +140,16 @@ export function sampleLowHealthFeedback(
   const wave = 0.5 + Math.sin(phase) * 0.5;
   const baseOpacity = input.reducedSensory ? 0.055 : 0.08;
   const pulseOpacity = input.reducedSensory ? 0.025 : 0.095;
+  const breathingPeak = 0.025 + severity * 0.075;
+  const heartbeatPeak = 0.018 + severity * 0.062;
   return Object.freeze({
     state: nextState,
     presentation: Object.freeze({
       active: true,
       severity,
       vignetteOpacity: clamp01(baseOpacity + severity * (0.08 + wave * pulseOpacity)),
-      breathingGain: input.reducedSensory ? 0 : Number((0.025 + severity * 0.075).toFixed(4)),
-      heartbeatGain: input.reducedSensory ? 0 : Number((0.018 + severity * 0.062).toFixed(4)),
+      breathingGain: input.reducedSensory ? 0 : Number((breathingPeak * (0.65 + wave * 0.35)).toFixed(4)),
+      heartbeatGain: input.reducedSensory ? 0 : Number((heartbeatPeak * Math.pow(wave, 4)).toFixed(4)),
       pulseHz,
     }),
   });

@@ -4,6 +4,10 @@ import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
 import { presentationRandom } from './runtime-random';
 import { WEAPON_CATALOG } from './combat/weapon-catalog';
+import type { ArenaId } from './map-selection';
+import type { LowHealthFeedbackPresentation } from './sensory-feedback';
+import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
+import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
@@ -66,6 +70,13 @@ type NoiseOptions = {
   delay?: number;
 };
 
+type SpatialFootstepChain = {
+  filter: BiquadFilterNode;
+  gain: GainNode;
+  panner: PannerNode;
+  busy: boolean;
+};
+
 /** Layered, original procedural arena mix. No sampled or proprietary game audio is used. */
 export class ArenaAudio {
   private context: AudioContext | null = null;
@@ -73,7 +84,12 @@ export class ArenaAudio {
   private weapons: GainNode | null = null;
   private feedback: GainNode | null = null;
   private movement: GainNode | null = null;
+  private ui: GainNode | null = null;
+  private announcements: GainNode | null = null;
   private ambience: GainNode | null = null;
+  private readonly buses = new Map<AudioBusId, GainNode>();
+  private readonly busIdentity = new Map<AudioNode, AudioBusId>();
+  private audioSettings: AudioSettings | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private stepVariant = 0;
   private lastNearMissAt = -10_000;
@@ -84,6 +100,25 @@ export class ArenaAudio {
   private supportCuePlays = 0;
   private explosionAudioGate = createExplosionAudioGate();
   private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
+  private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number }>();
+  private nextVoiceId = 1;
+  private voicesDropped = 0;
+  private voicesStolen = 0;
+  private activeArena: ArenaId | null = null;
+  private arenaSources: AudioScheduledSourceNode[] = [];
+  private arenaNodes: AudioNode[] = [];
+  private lowHealthSources: AudioScheduledSourceNode[] = [];
+  private lowHealthGains: GainNode[] = [];
+  private lowHealthNodes: AudioNode[] = [];
+  private spatialChains = 0;
+  private footstepChains: SpatialFootstepChain[] = [];
+  private listenerPosition = { x: 0, y: 0, z: 0 };
+
+  configure(settings: AudioSettings): void {
+    this.audioSettings = settings;
+    if (!this.context) return;
+    for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
+  }
 
   unlock(): void {
     if (!this.context) {
@@ -97,13 +132,141 @@ export class ArenaAudio {
       this.master = this.context.createGain();
       this.master.gain.value = 0.34;
       this.master.connect(compressor).connect(this.context.destination);
-      this.weapons = this.createBus(0.78);
-      this.feedback = this.createBus(0.5);
-      this.movement = this.createBus(0.34);
-      this.ambience = this.createBus(0.12);
+      this.buses.set('master', this.master);
+      this.busIdentity.set(this.master, 'master');
+      this.weapons = this.createBus('sfx', 0.78);
+      this.feedback = this.weapons;
+      this.movement = this.createBus('movement', 0.34);
+      this.ui = this.createBus('ui', 0.42);
+      this.announcements = this.createBus('announcements', 0.5);
+      this.ambience = this.createBus('ambience', 0.12);
+      this.createBus('menu-music', 0.18);
+      this.createBus('game-music', 0.16);
       this.noiseBuffer = this.createNoiseBuffer(1.2);
+      for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
+      if (this.activeArena) this.startArenaBed(this.activeArena);
     }
     if (this.context.state === 'suspended') void this.context.resume();
+  }
+
+  suspend(): void {
+    if (this.context?.state === 'running') void this.context.suspend();
+  }
+
+  dispose(): void {
+    this.stopSources(this.arenaSources);
+    this.disconnectNodes(this.arenaNodes);
+    this.stopSources(this.lowHealthSources);
+    this.disconnectNodes(this.lowHealthNodes);
+    for (const source of [...this.activeVoices.keys()]) this.stopSource(source);
+    const context = this.context;
+    this.context = null;
+    this.master = null;
+    this.weapons = null;
+    this.feedback = null;
+    this.movement = null;
+    this.ui = null;
+    this.announcements = null;
+    this.ambience = null;
+    this.buses.clear();
+    this.busIdentity.clear();
+    for (const chain of this.footstepChains) {
+      chain.filter.disconnect();
+      chain.gain.disconnect();
+      chain.panner.disconnect();
+    }
+    this.footstepChains = [];
+    this.noiseBuffer = null;
+    if (context && context.state !== 'closed') void context.close();
+  }
+
+  setArena(arenaId: ArenaId): void {
+    if (this.activeArena === arenaId) return;
+    this.activeArena = arenaId;
+    this.stopSources(this.arenaSources);
+    this.disconnectNodes(this.arenaNodes);
+    this.startArenaBed(arenaId);
+  }
+
+  updateListener(position: SpatialPoint, yawRadians: number): void {
+    if (!this.context || !Number.isFinite(yawRadians)) return;
+    this.listenerPosition.x = position.x;
+    this.listenerPosition.y = position.y;
+    this.listenerPosition.z = position.z;
+    const listener = this.context.listener;
+    listener.positionX.value = position.x;
+    listener.positionY.value = position.y;
+    listener.positionZ.value = position.z;
+    listener.forwardX.value = -Math.sin(yawRadians);
+    listener.forwardY.value = 0;
+    listener.forwardZ.value = -Math.cos(yawRadians);
+    listener.upX.value = 0;
+    listener.upY.value = 1;
+    listener.upZ.value = 0;
+  }
+
+  worldFootstep(position: SpatialPoint, surface: SpatialFootstepSurface, movement: FootstepMovement, occluded = false): boolean {
+    if (!this.context || !this.noiseBuffer || !this.movement
+      || this.spatialChains + this.arenaSources.length >= AUDIO_RUNTIME_BUDGET.spatialVoices) {
+      this.voicesDropped += 1;
+      return false;
+    }
+    const now = this.context.currentTime;
+    const source = this.context.createBufferSource();
+    source.buffer = this.noiseBuffer;
+    const chain = this.acquireFootstepChain();
+    if (!chain) {
+      this.voicesDropped += 1;
+      return false;
+    }
+    const { filter, gain, panner } = chain;
+    filter.type = surface === 'soil' || surface === 'grass' ? 'lowpass' : 'bandpass';
+    const openFrequency = surface === 'metal' ? 1_900
+      : surface === 'concrete' ? 1_300
+        : surface === 'asphalt' ? 1_050
+          : surface === 'wood' ? 760
+            : surface === 'grass' ? 360 : 520;
+    filter.frequency.value = openFrequency * (occluded ? 0.45 : 1);
+    filter.Q.value = surface === 'metal' ? 1.4 : 0.8;
+    gain.gain.cancelScheduledValues(now);
+    const movementGain = movement === 'sprint' ? 0.048 : movement === 'crouch' || movement === 'prone' ? 0.016 : 0.032;
+    gain.gain.setValueAtTime(movementGain * (occluded ? 0.65 : 1), now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.085);
+    panner.positionX.value = position.x;
+    panner.positionY.value = position.y;
+    panner.positionZ.value = position.z;
+    source.connect(filter);
+    const listenerDistance = Math.hypot(
+      position.x - this.listenerPosition.x,
+      position.y - this.listenerPosition.y,
+      position.z - this.listenerPosition.z,
+    );
+    if (!this.registerVoice(source, this.movement, 3, true, listenerDistance)) {
+      chain.busy = false;
+      return false;
+    }
+    this.spatialChains += 1;
+    const previousEnded = source.onended;
+    source.onended = (event) => {
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+      chain.busy = false;
+      previousEnded?.call(source, event);
+    };
+    source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - 0.085), 0.085);
+    return true;
+  }
+
+  setLowHealthFeedback(presentation: LowHealthFeedbackPresentation): void {
+    if (!this.context || !this.noiseBuffer || !this.feedback) return;
+    if (!presentation.active || (presentation.breathingGain <= 0 && presentation.heartbeatGain <= 0)) {
+      this.stopSources(this.lowHealthSources);
+      this.lowHealthGains = [];
+      this.disconnectNodes(this.lowHealthNodes);
+      return;
+    }
+    if (this.lowHealthSources.length === 0) this.startLowHealthLoops();
+    if (this.lowHealthGains[0]) this.lowHealthGains[0].gain.value = presentation.breathingGain;
+    if (this.lowHealthGains[1]) this.lowHealthGains[1].gain.value = presentation.heartbeatGain;
   }
 
   setArenaZone(zone: ArenaZone): void {
@@ -122,7 +285,6 @@ export class ArenaAudio {
   }
 
   shot(weapon: WeaponId, remote = false, distance = 0): void {
-    this.unlock();
     if (!this.context || !this.weapons) return;
     const spatialAttenuation = weapon === 'railgun'
       ? railgunReportAttenuation(remote, distance)
@@ -206,15 +368,15 @@ export class ArenaAudio {
 
   hit(headshot = false): void {
     const cue = combatConfirmEnvelope(headshot ? 'head' : 'body');
-    this.tone(cue.frequencyHz[0], 0.045, headshot ? 0.11 : 0.075, 'sine', this.feedback);
-    this.tone(cue.frequencyHz[1], 0.028, headshot ? 0.07 : 0.035, 'triangle', this.feedback, 0.018);
+    this.tone(cue.frequencyHz[0], 0.045, headshot ? 0.11 : 0.075, 'sine', this.ui);
+    this.tone(cue.frequencyHz[1], 0.028, headshot ? 0.07 : 0.035, 'triangle', this.ui, 0.018);
   }
 
   kill(): void {
     const cue = combatConfirmEnvelope('kill');
-    this.tone(cue.frequencyHz[0], 0.06, 0.055, 'triangle', this.feedback);
-    this.tone(cue.frequencyHz[1], 0.075, 0.07, 'sine', this.feedback, 0.045);
-    this.tone(cue.frequencyHz[2], 0.09, 0.075, 'sine', this.feedback, 0.095);
+    this.tone(cue.frequencyHz[0], 0.06, 0.055, 'triangle', this.ui);
+    this.tone(cue.frequencyHz[1], 0.075, 0.07, 'sine', this.ui, 0.045);
+    this.tone(cue.frequencyHz[2], 0.09, 0.075, 'sine', this.ui, 0.095);
   }
 
   damage(): void {
@@ -288,7 +450,7 @@ export class ArenaAudio {
     this.sweep(135, 62, 0.11, 0.075, 'sawtooth', this.feedback);
   }
 
-  footstep(surface: FootstepSurface, sprinting = false, crouched = false): void {
+  footstep(surface: FootstepSurface | SpatialFootstepSurface, sprinting = false, crouched = false): void {
     this.stepVariant = (this.stepVariant + 1) % 4;
     const variation = [0.94, 1.04, 0.98, 1.08][this.stepVariant];
     const base = (sprinting ? 82 : crouched ? 54 : 68) * variation;
@@ -298,16 +460,20 @@ export class ArenaAudio {
         ? { frequency: 1_420, tone: 86, volume: 0.94 }
         : surface === 'wood'
           ? { frequency: 720, tone: 118, volume: 0.9 }
-          : { frequency: 430, tone: 48, volume: 0.78 };
+          : surface === 'metal'
+            ? { frequency: 1_900, tone: 142, volume: 0.98 }
+            : surface === 'grass'
+              ? { frequency: 330, tone: 42, volume: 0.7 }
+              : { frequency: 430, tone: 48, volume: 0.78 };
     this.noise({
       duration: sprinting ? 0.075 : 0.055,
       volume: (crouched ? 0.022 : sprinting ? 0.052 : 0.034) * profile.volume,
-      filter: surface === 'soil' ? 'lowpass' : 'bandpass',
+      filter: surface === 'soil' || surface === 'grass' ? 'lowpass' : 'bandpass',
       frequency: profile.frequency,
-      q: surface === 'concrete' ? 1.15 : 0.72,
+      q: surface === 'metal' ? 1.4 : surface === 'concrete' ? 1.15 : 0.72,
     }, this.movement);
     this.sweep(base + profile.tone * 0.2, Math.max(32, profile.tone * 0.48), sprinting ? 0.075 : 0.06, crouched ? 0.018 : 0.034, 'triangle', this.movement);
-    if (surface === 'wood') this.tone(profile.tone, 0.035, crouched ? 0.012 : 0.022, 'square', this.movement, 0.018);
+    if (surface === 'wood' || surface === 'metal') this.tone(profile.tone, 0.035, crouched ? 0.012 : 0.022, 'square', this.movement, 0.018);
     else if (surface === 'asphalt' || surface === 'concrete') {
       this.noise({ duration: 0.022, volume: crouched ? 0.008 : 0.014, filter: 'highpass', frequency: 2_800, q: 0.6, delay: 0.012 }, this.movement);
     }
@@ -330,7 +496,6 @@ export class ArenaAudio {
       || now - this.lastGrenadeFuseBeepAt < 55) return false;
     this.lastGrenadeFuseBeepAt = now;
     this.grenadeFuseBeeps += 1;
-    this.unlock();
     const urgency = 1 - remainingMs / GRENADE_FUSE_BEEP_START_MS;
     this.tone(920 + urgency * 360, 0.042, 0.052, 'square', this.feedback);
     this.tone(1_840 + urgency * 420, 0.028, 0.022, 'sine', this.feedback, 0.006);
@@ -341,7 +506,6 @@ export class ArenaAudio {
     const admission = admitExplosionAudioMix(this.explosionAudioGate, now);
     this.explosionAudioGate = admission.state;
     if (!admission.admitted) return false;
-    this.unlock();
     if (!this.weapons) return true;
     this.sweep(96, 24, 0.58, 0.29, 'sawtooth', this.weapons);
     this.noise({ duration: 0.64, volume: 0.42, filter: 'lowpass', frequency: 2100, q: 0.5 }, this.weapons);
@@ -350,74 +514,70 @@ export class ArenaAudio {
   }
 
   scoutSweep(): void {
-    this.unlock();
     this.supportCuePlays += 1;
-    for (let pulse = 0; pulse < 5; pulse += 1) {
-      const delay = pulse * 2.4;
-      this.sweep(420, 1_080, 0.18, 0.045, 'triangle', this.feedback, delay);
-      this.tone(1_320, 0.07, 0.028, 'sine', this.feedback, delay + 0.12);
-    }
+    this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
+      startFrequency: 420, endFrequency: 1_080, duration: 0.18, volume: 0.045, delay: pulse * 2.4,
+    })), 'triangle', this.announcements);
+    this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
+      startFrequency: 1_320, endFrequency: 1_320, duration: 0.07, volume: 0.028, delay: pulse * 2.4 + 0.12,
+    })), 'sine', this.announcements);
   }
 
   supportInbound(source: 'yardhawk' | 'tri-pass' | 'hunter-swarm'): void {
-    this.unlock();
     this.supportCuePlays += 1;
     if (source === 'tri-pass') {
       for (let index = 0; index < 3; index += 1) {
-        this.sweep(1_450 + index * 90, 180, 0.72, 0.055, 'sawtooth', this.feedback, index * 0.12);
+        this.sweep(1_450 + index * 90, 180, 0.72, 0.055, 'sawtooth', this.announcements, index * 0.12);
       }
       this.noise({ duration: 0.62, volume: 0.055, filter: 'bandpass', frequency: 2_100, q: 1.1 }, this.ambience);
       return;
     }
     if (source === 'hunter-swarm') {
-      for (let index = 0; index < 5; index += 1) this.sweep(980 + index * 65, 260, 0.44, 0.04, 'square', this.feedback, index * 0.07);
+      this.sweepSequence(Array.from({ length: 5 }, (_, index) => ({
+        startFrequency: 980 + index * 65, endFrequency: 260, duration: 0.44, volume: 0.04, delay: index * 0.07,
+      })), 'square', this.announcements);
       return;
     }
-    this.tone(1_180, 0.09, 0.055, 'square', this.feedback);
+    this.tone(1_180, 0.09, 0.055, 'square', this.announcements);
     this.sweep(1_600, 240, 0.5, 0.065, 'sawtooth', this.ambience, 0.08);
   }
 
   hunterLaunch(index: number): void {
-    this.unlock();
     const offset = Math.max(0, Math.min(4, Math.floor(index))) * 0.045;
     this.sweep(1_180 + index * 45, 230, 0.42, 0.052, 'sawtooth', this.feedback, offset);
     this.noise({ duration: 0.24, volume: 0.044, filter: 'bandpass', frequency: 1_600, q: 0.85, delay: offset }, this.ambience);
   }
 
   overdrivePickup(): void {
-    this.unlock();
-    this.sweep(180, 920, 0.42, 0.095, 'sawtooth', this.feedback);
-    this.tone(440, 0.2, 0.055, 'square', this.feedback, 0.08);
-    this.tone(660, 0.28, 0.05, 'triangle', this.feedback, 0.18);
+    this.sweep(180, 920, 0.42, 0.095, 'sawtooth', this.ui);
+    this.tone(440, 0.2, 0.055, 'square', this.ui, 0.08);
+    this.tone(660, 0.28, 0.05, 'triangle', this.ui, 0.18);
     this.tone(880, 0.34, 0.042, 'sine', this.ambience, 0.26);
   }
 
   overdriveAvailable(): void {
-    this.unlock();
-    this.tone(330, 0.16, 0.04, 'square', this.feedback);
-    this.tone(495, 0.2, 0.05, 'triangle', this.feedback, 0.12);
+    this.tone(330, 0.16, 0.04, 'square', this.announcements);
+    this.tone(495, 0.2, 0.05, 'triangle', this.announcements, 0.12);
     this.tone(660, 0.3, 0.06, 'sine', this.ambience, 0.25);
-    this.noise({ duration: 0.32, volume: 0.035, filter: 'bandpass', frequency: 1_850, q: 0.9, delay: 0.05 }, this.feedback);
+    this.noise({ duration: 0.32, volume: 0.035, filter: 'bandpass', frequency: 1_850, q: 0.9, delay: 0.05 }, this.announcements);
   }
 
   overdriveExpire(): void {
-    this.unlock();
-    this.sweep(720, 140, 0.34, 0.055, 'triangle', this.feedback);
+    this.sweep(720, 140, 0.34, 0.055, 'triangle', this.ui);
     this.tone(110, 0.22, 0.035, 'sine', this.ambience, 0.12);
   }
 
   nukeWarning(): void {
-    this.unlock();
-    for (let pulse = 0; pulse < 5; pulse += 1) {
-      const delay = pulse;
-      this.sweep(210 + pulse * 18, 96, 0.64, 0.075 + pulse * 0.008, 'sawtooth', this.feedback, delay);
-      this.tone(680 + pulse * 90, 0.12, 0.045, 'square', this.feedback, delay + 0.68);
-    }
+    this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
+      startFrequency: 210 + pulse * 18, endFrequency: 96, duration: 0.64, volume: 0.075 + pulse * 0.008, delay: pulse,
+    })), 'sawtooth', this.announcements);
+    this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
+      startFrequency: 680 + pulse * 90, endFrequency: 680 + pulse * 90, duration: 0.12, volume: 0.045, delay: pulse + 0.68,
+    })), 'square', this.announcements);
     this.sweep(42, 148, 4.85, 0.055, 'triangle', this.ambience, 0.05);
   }
 
   nukeDetonation(): void {
-    this.unlock();
     this.sweep(72, 14, 1.15, 0.36, 'sawtooth', this.weapons);
     this.sweep(34, 9, 2.6, 0.27, 'triangle', this.ambience, 0.04);
     this.noise({ duration: 1.05, volume: 0.46, filter: 'lowpass', frequency: 1_250, q: 0.45 }, this.weapons);
@@ -429,25 +589,284 @@ export class ArenaAudio {
 
   telemetry(): {
     explosionMix: ExplosionAudioGate & { coalesceMs: number };
-    ambience: { continuousSources: 0; busGain: number };
+    ambience: { continuousSources: number; busGain: number; arena: ArenaId | null };
     grenadeFuse: { beeps: number; startMs: number };
     support: { cues: number };
     railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
+    runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
+    buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
   } {
+    const buses = Object.fromEntries(AUDIO_BUS_IDS.map((id) => {
+      const configuredGain = this.audioSettings?.gains[id] ?? 100;
+      const muted = this.audioSettings?.mutes[id] ?? false;
+      const fallbackGain = this.busBaseGain(id) * (muted ? 0 : configuredGain / 100);
+      return [id, { configuredGain, muted, effectiveGain: this.buses.get(id)?.gain.value ?? fallbackGain }];
+    })) as Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
     return {
       explosionMix: { ...this.explosionAudioGate, coalesceMs: EXPLOSION_AUDIO_COALESCE_MS },
-      ambience: { continuousSources: 0, busGain: this.ambience?.gain.value ?? 0.12 },
+      ambience: { continuousSources: this.arenaSources.length, busGain: this.ambience?.gain.value ?? 0.12, arena: this.activeArena },
       grenadeFuse: { beeps: this.grenadeFuseBeeps, startMs: GRENADE_FUSE_BEEP_START_MS },
       support: { cues: this.supportCuePlays },
       railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
+      runtime: {
+        voices: this.activeVoices.size,
+        spatialChains: this.spatialChains + this.arenaSources.length,
+        spatialPoolSize: this.footstepChains.length,
+        stolen: this.voicesStolen,
+        dropped: this.voicesDropped,
+        globalCap: AUDIO_RUNTIME_BUDGET.globalVoices,
+        spatialCap: AUDIO_RUNTIME_BUDGET.spatialVoices,
+      },
+      buses,
     };
   }
 
-  private createBus(gainValue: number): GainNode {
+  private createBus(id: Exclude<AudioBusId, 'master'>, gainValue: number): GainNode {
     const bus = this.context!.createGain();
     bus.gain.value = gainValue;
     bus.connect(this.master!);
+    this.buses.set(id, bus);
+    this.busIdentity.set(bus, id);
     return bus;
+  }
+
+  private busBaseGain(id: AudioBusId): number {
+    if (id === 'master') return 0.34;
+    if (id === 'sfx') return 0.78;
+    if (id === 'movement') return 0.34;
+    if (id === 'ui') return 0.42;
+    if (id === 'announcements') return 0.5;
+    if (id === 'ambience') return 0.12;
+    if (id === 'menu-music') return 0.18;
+    return 0.16;
+  }
+
+  private applyBusSetting(id: AudioBusId): void {
+    const node = this.buses.get(id);
+    if (!node) return;
+    const muted = this.audioSettings?.mutes[id] ?? false;
+    const gain = this.audioSettings?.gains[id] ?? 100;
+    const scalar = muted ? 0 : Math.max(0, Math.min(1, gain / 100));
+    node.gain.setTargetAtTime(this.busBaseGain(id) * scalar, this.context?.currentTime ?? 0, 0.018);
+  }
+
+  private registerVoice(source: AudioScheduledSourceNode, destination: AudioNode, priority: number, spatial = false, distance = 0): boolean {
+    const bus = this.busIdentity.get(destination) ?? 'sfx';
+    const busCap = bus === 'master' ? AUDIO_RUNTIME_BUDGET.globalVoices : AUDIO_RUNTIME_BUDGET.perBus[bus];
+    const busVoices = [...this.activeVoices.entries()].filter(([, voice]) => voice.bus === bus);
+    const overGlobal = this.activeVoices.size >= AUDIO_RUNTIME_BUDGET.globalVoices;
+    const overBus = busVoices.length >= busCap;
+    const overSpatial = spatial && this.spatialChains >= AUDIO_RUNTIME_BUDGET.spatialVoices;
+    if (overSpatial) {
+      this.voicesDropped += 1;
+      source.disconnect();
+      return false;
+    }
+    if (overGlobal || overBus) {
+      const candidates = overBus ? busVoices : [...this.activeVoices.entries()];
+      const candidateId = String(this.nextVoiceId);
+      const selected = selectVoiceToSteal(
+        candidates.map(([, voice]) => ({
+          id: String(voice.id), priority: voice.priority, distance: voice.distance, startedAt: voice.startedAt,
+        })),
+        { id: candidateId, priority, distance, startedAt: this.context?.currentTime ?? 0 },
+        candidates.length,
+      );
+      const weakest = selected ? candidates.find(([, voice]) => String(voice.id) === selected.id) : undefined;
+      if (!weakest) {
+        this.voicesDropped += 1;
+        source.disconnect();
+        return false;
+      }
+      this.voicesStolen += 1;
+      this.stopSource(weakest[0]);
+    }
+    const voice = { id: this.nextVoiceId++, bus, startedAt: this.context?.currentTime ?? 0, priority, spatial, distance };
+    this.activeVoices.set(source, voice);
+    source.onended = () => {
+      this.activeVoices.delete(source);
+      source.disconnect();
+    };
+    return true;
+  }
+
+  private stopSource(source: AudioScheduledSourceNode): void {
+    try { source.stop(); } catch { /* already stopped */ }
+    this.activeVoices.delete(source);
+    source.disconnect();
+  }
+
+  private stopSources(sources: AudioScheduledSourceNode[]): void {
+    for (const source of sources.splice(0)) this.stopSource(source);
+  }
+
+  private disconnectNodes(nodes: AudioNode[]): void {
+    for (const node of nodes.splice(0)) node.disconnect();
+  }
+
+  private acquireFootstepChain(): SpatialFootstepChain | null {
+    const available = this.footstepChains.find((chain) => !chain.busy);
+    if (available) {
+      available.busy = true;
+      return available;
+    }
+    if (!this.context || !this.movement
+      || this.footstepChains.length + this.arenaSources.length >= AUDIO_RUNTIME_BUDGET.spatialVoices) return null;
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    const panner = this.context.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 1.5;
+    panner.maxDistance = 32;
+    panner.rolloffFactor = 1.4;
+    filter.connect(gain).connect(panner).connect(this.movement);
+    const chain = { filter, gain, panner, busy: true };
+    this.footstepChains.push(chain);
+    return chain;
+  }
+
+  private startArenaBed(arenaId: ArenaId): void {
+    if (!this.context || !this.ambience || !this.noiseBuffer) return;
+    const definition = ARENA_AUDIO_DEFINITIONS[arenaId];
+    const now = this.context.currentTime;
+    const tone = this.context.createOscillator();
+    const toneFilter = this.context.createBiquadFilter();
+    const toneGain = this.context.createGain();
+    const tonePanner = this.context.createPanner();
+    tone.type = arenaId === 'rustworks-1v1' ? 'sawtooth' : 'sine';
+    tone.frequency.value = definition.bedFrequencyHz;
+    toneFilter.type = 'lowpass';
+    toneFilter.frequency.value = definition.airFrequencyHz * 2;
+    toneGain.gain.value = 0.012;
+    tonePanner.panningModel = 'HRTF';
+    tonePanner.distanceModel = 'inverse';
+    tonePanner.refDistance = 8;
+    tonePanner.maxDistance = 90;
+    tonePanner.rolloffFactor = 0.45;
+    tonePanner.positionX.value = definition.bedPosition.x;
+    tonePanner.positionY.value = definition.bedPosition.y;
+    tonePanner.positionZ.value = definition.bedPosition.z;
+    tone.connect(toneFilter).connect(toneGain).connect(tonePanner).connect(this.ambience);
+    if (this.registerVoice(tone, this.ambience, 1)) {
+      tone.start(now);
+      this.arenaSources.push(tone);
+      this.arenaNodes.push(toneFilter, toneGain, tonePanner);
+    } else {
+      toneFilter.disconnect();
+      toneGain.disconnect();
+      tonePanner.disconnect();
+    }
+    const air = this.context.createBufferSource();
+    const airFilter = this.context.createBiquadFilter();
+    const airGain = this.context.createGain();
+    const airPanner = this.context.createPanner();
+    air.buffer = this.noiseBuffer;
+    air.loop = true;
+    airFilter.type = 'bandpass';
+    airFilter.frequency.value = definition.airFrequencyHz;
+    airFilter.Q.value = arenaId === 'gun-range' ? 2.1 : 0.7;
+    airGain.gain.value = 0.017;
+    airPanner.panningModel = 'HRTF';
+    airPanner.distanceModel = 'inverse';
+    airPanner.refDistance = 9;
+    airPanner.maxDistance = 100;
+    airPanner.rolloffFactor = 0.38;
+    airPanner.positionX.value = definition.airPosition.x;
+    airPanner.positionY.value = definition.airPosition.y;
+    airPanner.positionZ.value = definition.airPosition.z;
+    air.connect(airFilter).connect(airGain).connect(airPanner).connect(this.ambience);
+    if (this.registerVoice(air, this.ambience, 1)) {
+      air.start(now, presentationRandom() * this.noiseBuffer.duration);
+      this.arenaSources.push(air);
+      this.arenaNodes.push(airFilter, airGain, airPanner);
+    } else {
+      airFilter.disconnect();
+      airGain.disconnect();
+      airPanner.disconnect();
+    }
+  }
+
+  private startLowHealthLoops(): void {
+    if (!this.context || !this.feedback || !this.noiseBuffer) return;
+    const now = this.context.currentTime;
+    const breath = this.context.createBufferSource();
+    const breathFilter = this.context.createBiquadFilter();
+    const breathGain = this.context.createGain();
+    breath.buffer = this.noiseBuffer;
+    breath.loop = true;
+    breathFilter.type = 'bandpass';
+    breathFilter.frequency.value = 520;
+    breathFilter.Q.value = 0.8;
+    breathGain.gain.value = 0.0001;
+    breath.connect(breathFilter).connect(breathGain).connect(this.feedback);
+    if (this.registerVoice(breath, this.feedback, 5)) {
+      breath.start(now, presentationRandom() * this.noiseBuffer.duration);
+      this.lowHealthSources.push(breath);
+      this.lowHealthGains.push(breathGain);
+      this.lowHealthNodes.push(breathFilter, breathGain);
+    } else {
+      breathFilter.disconnect();
+      breathGain.disconnect();
+    }
+    const heartbeat = this.context.createOscillator();
+    const heartbeatGain = this.context.createGain();
+    heartbeat.type = 'sine';
+    heartbeat.frequency.value = 54;
+    heartbeatGain.gain.value = 0.0001;
+    heartbeat.connect(heartbeatGain).connect(this.feedback);
+    if (this.registerVoice(heartbeat, this.feedback, 5)) {
+      heartbeat.start(now);
+      this.lowHealthSources.push(heartbeat);
+      this.lowHealthGains.push(heartbeatGain);
+      this.lowHealthNodes.push(heartbeatGain);
+    } else {
+      heartbeatGain.disconnect();
+    }
+  }
+
+  private sweepSequence(
+    cues: readonly Readonly<{
+      startFrequency: number;
+      endFrequency: number;
+      duration: number;
+      volume: number;
+      delay: number;
+    }>[],
+    wave: OscillatorType,
+    destination: AudioNode | null,
+  ): void {
+    if (!this.context || !destination || cues.length === 0) return;
+    const now = this.context.currentTime;
+    const oscillator = this.context.createOscillator();
+    const gain = this.context.createGain();
+    oscillator.type = wave;
+    gain.gain.value = 0.0001;
+    oscillator.connect(gain).connect(destination);
+    let stopAt = now;
+    for (const cue of cues) {
+      const start = now + Math.max(0, cue.delay);
+      const duration = Math.max(0.008, cue.duration);
+      const end = start + duration;
+      const attackEnd = start + Math.min(0.008, duration * 0.25);
+      oscillator.frequency.setValueAtTime(Math.max(1, cue.startFrequency), start);
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, cue.endFrequency), end);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, cue.volume), attackEnd);
+      gain.gain.exponentialRampToValueAtTime(0.0001, end);
+      stopAt = Math.max(stopAt, end);
+    }
+    if (!this.registerVoice(oscillator, destination, 4)) {
+      gain.disconnect();
+      return;
+    }
+    const voiceEnded = oscillator.onended;
+    oscillator.onended = (event) => {
+      voiceEnded?.call(oscillator, event);
+      gain.disconnect();
+    };
+    oscillator.start(now);
+    oscillator.stop(stopAt + 0.005);
   }
 
   private createNoiseBuffer(duration: number): AudioBuffer {
@@ -464,7 +883,6 @@ export class ArenaAudio {
   }
 
   private noise(options: NoiseOptions, destination: AudioNode | null): void {
-    this.unlock();
     if (!this.context || !this.noiseBuffer || !destination) return;
     const now = this.context.currentTime + (options.delay ?? 0);
     const source = this.context.createBufferSource();
@@ -477,6 +895,17 @@ export class ArenaAudio {
     gain.gain.setValueAtTime(Math.max(0.0001, options.volume), now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + options.duration);
     source.connect(filter).connect(gain).connect(destination);
+    if (!this.registerVoice(source, destination, 3)) {
+      filter.disconnect();
+      gain.disconnect();
+      return;
+    }
+    const voiceEnded = source.onended;
+    source.onended = (event) => {
+      voiceEnded?.call(source, event);
+      filter.disconnect();
+      gain.disconnect();
+    };
     source.start(now, presentationRandom() * Math.max(0.001, this.noiseBuffer.duration - options.duration), options.duration);
   }
 
@@ -489,7 +918,6 @@ export class ArenaAudio {
     destination: AudioNode | null,
     delay = 0,
   ): void {
-    this.unlock();
     if (!this.context || !destination) return;
     const now = this.context.currentTime + delay;
     const oscillator = this.context.createOscillator();
@@ -500,6 +928,15 @@ export class ArenaAudio {
     gain.gain.setValueAtTime(Math.max(0.0001, volume), now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     oscillator.connect(gain).connect(destination);
+    if (!this.registerVoice(oscillator, destination, 3)) {
+      gain.disconnect();
+      return;
+    }
+    const voiceEnded = oscillator.onended;
+    oscillator.onended = (event) => {
+      voiceEnded?.call(oscillator, event);
+      gain.disconnect();
+    };
     oscillator.start(now);
     oscillator.stop(now + duration);
   }

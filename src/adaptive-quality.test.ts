@@ -68,4 +68,16 @@ describe('adaptive quality controller', () => {
     for (let index = 0; index < 100; index += 1) controller.record(80, false);
     expect(controller.telemetry()).toMatchObject({ samples: 0, downshifts: 0, pixelRatioCap: 1 });
   });
+
+  it('supports bounded user-selected ladders and a genuine fixed Max mode', () => {
+    const custom = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 90, initialPixelRatioCap: 0.9, levels: [0.6, 0.75, 0.9],
+    });
+    expect(custom.telemetry()).toMatchObject({ enabled: true, levels: [0.6, 0.75, 0.9], pixelRatioCap: 0.9 });
+    const fixed = new AdaptiveQualityController({
+      profile: 'blender', targetFrameMs: 1_000 / 60, initialPixelRatioCap: 1, enabled: false, levels: [1],
+    });
+    for (let index = 0; index < 200; index += 1) fixed.record(40, true);
+    expect(fixed.telemetry()).toMatchObject({ enabled: false, levels: [1], pixelRatioCap: 1, downshifts: 0 });
+  });
 });

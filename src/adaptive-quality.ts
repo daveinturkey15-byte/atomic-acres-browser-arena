@@ -27,6 +27,8 @@ type AdaptiveQualityOptions = {
   profile: RenderProfile;
   targetFrameMs: number;
   initialPixelRatioCap: number;
+  enabled?: boolean;
+  levels?: readonly number[];
   downshiftSamples?: number;
   upshiftSamples?: number;
   cooldownSamples?: number;
@@ -60,7 +62,8 @@ export class AdaptiveQualityController {
   private readonly cooldownSamples: number;
 
   constructor(private readonly options: AdaptiveQualityOptions) {
-    this.levels = LEVELS[options.profile];
+    const suppliedLevels = options.levels?.filter((level) => Number.isFinite(level) && level > 0 && level <= 2);
+    this.levels = suppliedLevels?.length ? Object.freeze([...new Set(suppliedLevels)].sort((left, right) => left - right)) : LEVELS[options.profile];
     const closest = this.levels.reduce((best, level, index) =>
       Math.abs(level - options.initialPixelRatioCap) < Math.abs(this.levels[best] - options.initialPixelRatioCap) ? index : best, 0);
     this.tier = closest;
@@ -70,7 +73,7 @@ export class AdaptiveQualityController {
   }
 
   record(frameMs: number, eligible: boolean): number | null {
-    if (this.options.profile === 'compat' || !eligible || !Number.isFinite(frameMs) || frameMs <= 0 || frameMs > 250) {
+    if (this.options.enabled === false || this.options.profile === 'compat' || !eligible || !Number.isFinite(frameMs) || frameMs <= 0 || frameMs > 250) {
       this.overloadSamples = 0;
       this.headroomSamples = 0;
       this.samples.length = 0;
@@ -126,7 +129,7 @@ export class AdaptiveQualityController {
 
   telemetry(): AdaptiveQualityTelemetry {
     return {
-      enabled: this.options.profile !== 'compat',
+      enabled: this.options.enabled !== false && this.options.profile !== 'compat',
       profile: this.options.profile,
       tier: this.tier,
       levels: this.levels,
