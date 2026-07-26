@@ -6,9 +6,9 @@ import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 
 const port = Number(process.env.PASS65_ENDURANCE_PORT ?? '44075');
-const sampleIntervalMs = Math.max(500, Number(process.env.PASS65_SAMPLE_INTERVAL_MS ?? '1_000'));
-const rustworksDurationMs = Math.max(10_000, Number(process.env.PASS65_RUSTWORKS_SOAK_MS ?? '45_000'));
-const otherArenaDurationMs = Math.max(5_000, Number(process.env.PASS65_MAP_SOAK_MS ?? '12_000'));
+const sampleIntervalMs = Math.max(500, Number(process.env.PASS65_SAMPLE_INTERVAL_MS ?? '1000'));
+const rustworksDurationMs = Math.max(10_000, Number(process.env.PASS65_RUSTWORKS_SOAK_MS ?? '45000'));
+const otherArenaDurationMs = Math.max(5_000, Number(process.env.PASS65_MAP_SOAK_MS ?? '12000'));
 const artifactRoot = 'artifacts/pass65/webgpu-endurance';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
