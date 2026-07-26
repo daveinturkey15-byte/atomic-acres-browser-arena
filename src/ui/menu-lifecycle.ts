@@ -29,6 +29,7 @@ export type MenuLifecycleState = Readonly<{
   eventCount: number;
   transitionCount: number;
   visibilityChangeCount: number;
+  matchStartCount: number;
   pauseOpenCount: number;
   pointerRequestCount: number;
   pointerRejectCount: number;
@@ -60,6 +61,7 @@ export const INITIAL_MENU_LIFECYCLE_STATE: MenuLifecycleState = Object.freeze({
   eventCount: 0,
   transitionCount: 0,
   visibilityChangeCount: 0,
+  matchStartCount: 0,
   pauseOpenCount: 0,
   pointerRequestCount: 0,
   pointerRejectCount: 0,
@@ -105,6 +107,7 @@ export function reduceMenuLifecycle(
       pointerLock: 'unlocked',
       reason: 'match-start',
       requestSource: null,
+      matchStartCount: current.matchStartCount + 1,
     });
   }
   if (event.type === 'pointer-request') {

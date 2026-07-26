@@ -125,4 +125,37 @@ describe('active-match menu and pointer-lock lifecycle', () => {
       surface: 'pre-match', pointerLock: 'unlocked', reason: 'return-pre-match',
     });
   });
+
+  it('survives twenty deployment starts without an unsolicited menu-open transition', () => {
+    let state = INITIAL_MENU_LIFECYCLE_STATE;
+    for (let start = 0; start < 20; start += 1) {
+      state = reduceMenuLifecycle(state, { type: 'match-start' });
+      expect(state).toMatchObject({
+        surface: 'hidden',
+        matchStartCount: start + 1,
+        pauseOpenCount: 0,
+      });
+
+      if (start % 3 === 0) {
+        state = reduceMenuLifecycle(state, { type: 'pointer-request', source: 'match-start' });
+        state = reduceMenuLifecycle(state, { type: 'pointer-rejected' });
+      } else if (start % 3 === 1) {
+        state = reduceMenuLifecycle(state, { type: 'pointer-request', source: 'match-start' });
+        state = reduceMenuLifecycle(state, {
+          type: 'pointer-lost', focusTransition: false, overlay: null, pauseAllowed: true,
+        });
+        state = reduceMenuLifecycle(state, { type: 'pointer-acquired' });
+      }
+
+      expect(state).toMatchObject({ surface: 'hidden', pauseOpenCount: 0 });
+      state = reduceMenuLifecycle(state, { type: 'return-pre-match' });
+    }
+
+    expect(state).toMatchObject({
+      surface: 'pre-match',
+      matchStartCount: 20,
+      pauseOpenCount: 0,
+      visibilityChangeCount: 40,
+    });
+  });
 });

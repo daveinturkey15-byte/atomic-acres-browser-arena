@@ -84,6 +84,10 @@ describe('Pass 65 command shell', () => {
     expect(markup).toContain('id="menu-preview-poster"');
     expect(markup).toContain('autoplay loop muted playsinline preload="metadata"');
     expect(markup).toContain('data-renderer-submissions="0"');
+    expect(markup).toContain('<div id="match-pause-backdrop"');
+    expect(markup).toContain('data-contract="game-canvas-css-compositor-v1"');
+    expect(markup).toContain('data-periodic-readback-count="0"');
+    expect(markup).not.toContain('<canvas id="match-pause-backdrop"');
     expect(markup).not.toContain('class="preview-helicopter"');
     expect(markup).not.toContain('class="preview-cat"');
   });

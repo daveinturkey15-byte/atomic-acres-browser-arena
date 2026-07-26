@@ -17,7 +17,13 @@
 #game{display:block;width:100%;height:100%;background:#c58f67}
 #webgpu-gameplay-blocked{position:fixed;inset:0;display:grid;place-content:center;gap:10px;padding:30px;background:radial-gradient(circle at 50% 35%,#233a40,#081013 68%);text-align:center}#webgpu-gameplay-blocked small{color:var(--aqua);font:800 10px/1 Inter;letter-spacing:.2em}#webgpu-gameplay-blocked h1{margin:0;color:var(--coral);font:900 clamp(50px,10vw,100px)/.85 'Barlow Condensed'}#webgpu-gameplay-blocked p{max-width:720px;color:#d5dfdb;font:600 13px/1.5 Inter}#webgpu-gameplay-blocked code{color:var(--aqua)}
 #app:has(#menu:not(.hidden)){background:#000}
-#app:has(#menu:not(.hidden))>:is(#game,#color-grade,#film-grain,#vignette){visibility:hidden}
+#app:has(#menu:not(.hidden):not([data-lifecycle-surface=paused-match]))>:is(#game,#color-grade,#film-grain,#vignette){visibility:hidden}
+#menu[data-lifecycle-surface=paused-match].pass64-command-deck.panel{background:rgba(238,243,238,.72);backdrop-filter:none}
+#menu[data-lifecycle-surface=paused-match] .command-header{background:rgba(255,255,255,.82)}
+#menu[data-lifecycle-surface=paused-match] .command-rail{background:rgba(235,240,234,.76)}
+#menu[data-lifecycle-surface=paused-match] .command-workspace{background:rgba(250,251,247,.56)}
+#menu[data-lifecycle-surface=paused-match] .arena-command{background:linear-gradient(140deg,rgba(255,255,255,.62),rgba(239,243,237,.4))}
+#menu[data-lifecycle-surface=paused-match] .deployment-manifest{background:rgba(245,247,242,.7)}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(circle at center,transparent 52%,rgba(4,9,11,.42) 100%);mix-blend-mode:multiply}
 #damage-flash{--damage-flash-scale:1;position:fixed;inset:0;z-index:8;pointer-events:none;opacity:0;background:radial-gradient(circle,transparent 35%,rgba(255,35,28,.8) 100%)}#damage-flash.pulse{animation:damage .42s ease-out}@keyframes damage{0%{opacity:calc(.9 * var(--damage-flash-scale))}100%{opacity:0}}
 #low-health-vignette{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:var(--low-health-opacity,0);background:radial-gradient(circle,transparent 45%,rgba(112,0,0,.88) 100%);transition:opacity .12s linear}

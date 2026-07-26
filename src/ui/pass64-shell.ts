@@ -93,7 +93,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
       </header>
       <aside id="menu-showcase" aria-hidden="true">
-        <canvas id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="renderer-canvas" data-capture-status="empty"></canvas>
+        <canvas id="match-pause-frame-fallback" aria-hidden="true" hidden width="1" height="1"></canvas>
         ${menuPreviewVideoMarkup()}
         <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
@@ -323,6 +323,7 @@ function hudMarkup(): string {
 
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
   return `<canvas id="game" aria-label="Nuke Town multiplayer arena"></canvas>
+    <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>
     <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div>
     <div id="nuke-flash" hidden></div>

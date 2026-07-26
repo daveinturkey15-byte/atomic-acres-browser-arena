@@ -76,16 +76,19 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(tacticalCssSource).toContain('#dmr-thermal');
   });
 
-  it('registers one renderer-provenanced active-match pause backdrop', () => {
+  it('registers one zero-readback compositor active-match pause backdrop', () => {
     expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'match-pause-backdrop')).toEqual({
       id: 'match-pause-backdrop',
       rootElementId: 'match-pause-backdrop',
       renderer: 'main-shell',
       critical: true,
     });
-    expect(generatedDialogSources).toContain('data-frame-provenance="renderer-canvas"');
+    expect(generatedDialogSources).toContain('data-frame-provenance="game-canvas-css-compositor"');
+    expect(generatedDialogSources).toContain('data-periodic-readback-count="0"');
+    expect(generatedDialogSources).not.toContain('<canvas id="match-pause-backdrop"');
     expect(generatedDialogSources).not.toContain('atomic-acres-menu-squad-joke.jpg');
-    expect(tacticalCssSource).toContain("#menu-showcase[data-menu-context='paused-match'] .match-pause-backdrop");
+    expect(tacticalCssSource).toContain('#match-pause-backdrop');
+    expect(mainSource).not.toContain('retainLatestGameplayBackdrop');
   });
 
   it('keeps canonical text and status colours above AA contrast on the primary panel', () => {

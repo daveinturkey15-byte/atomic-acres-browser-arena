@@ -741,10 +741,14 @@ const menuPreviewVideoController = new MenuPreviewVideoController({
   label: menuPreviewLabel,
   motion: menuPreviewMotion,
 });
-const matchPauseBackdrop = element<HTMLCanvasElement>('#match-pause-backdrop');
-const matchPauseBackdropContextValue = matchPauseBackdrop.getContext('2d', { alpha: false, willReadFrequently: true });
-if (!matchPauseBackdropContextValue) throw new Error('Canvas2D match pause backdrop is unavailable');
-const matchPauseBackdropContext: CanvasRenderingContext2D = matchPauseBackdropContextValue;
+const matchPauseBackdrop = element<HTMLElement>('#match-pause-backdrop');
+const matchPauseFrameFallback = element<HTMLCanvasElement>('#match-pause-frame-fallback');
+const matchPauseFrameFallbackContextValue = matchPauseFrameFallback.getContext('2d', { alpha: false });
+if (!matchPauseFrameFallbackContextValue) throw new Error('Canvas2D pause-only fallback is unavailable');
+const matchPauseFrameFallbackContext: CanvasRenderingContext2D = matchPauseFrameFallbackContextValue;
+const MATCH_PAUSE_BACKDROP_CONTRACT = 'game-canvas-css-compositor-v1';
+const MATCH_PAUSE_FALLBACK_MAX_WIDTH = 960;
+const MATCH_PAUSE_FALLBACK_MAX_HEIGHT = 540;
 const resumeButton = element<HTMLButtonElement>('#resume');
 const mainMenuButton = element<HTMLButtonElement>('#main-menu');
 const canvasHomeAnchor = document.createComment('game-canvas-home');
@@ -752,8 +756,10 @@ canvas.after(canvasHomeAnchor);
 const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 let menuLifecycle = INITIAL_MENU_LIFECYCLE_STATE;
 let lastGameplayPresentedFrame = 0;
-let lastGameplayBackdropFrame = 0;
-let lastGameplayBackdropCapturedAt = Number.NEGATIVE_INFINITY;
+let matchPauseBackdropPresentationCount = 0;
+let matchPauseBackdropFallbackCount = 0;
+let matchPauseSourceCaptureAttemptCount = 0;
+let matchPauseSourceCaptureCount = 0;
 const hudRoot = element<HTMLElement>('#hud');
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
@@ -6568,84 +6574,150 @@ function applyMenuLifecycle(event: MenuLifecycleEvent): void {
   syncMenuLifecyclePresentation();
 }
 
-function pauseBackdropPixelHash(width: number, height: number): { hash: string; signal: 'varied' | 'flat' } {
-  const pixels = matchPauseBackdropContext.getImageData(0, 0, width, height).data;
-  const pixelCount = Math.max(1, Math.floor(pixels.length / 4));
-  const stride = Math.max(1, Math.floor(pixelCount / (64 * 36)));
-  let hash = 0x811c9dc5;
-  let minimumLuma = 255;
-  let maximumLuma = 0;
-  for (let pixel = 0; pixel < pixelCount; pixel += stride) {
-    const index = pixel * 4;
-    const red = pixels[index] ?? 0;
-    const green = pixels[index + 1] ?? 0;
-    const blue = pixels[index + 2] ?? 0;
-    const alpha = pixels[index + 3] ?? 0;
-    const luma = Math.round(red * 0.2126 + green * 0.7152 + blue * 0.0722);
-    minimumLuma = Math.min(minimumLuma, luma);
-    maximumLuma = Math.max(maximumLuma, luma);
-    hash ^= red; hash = Math.imul(hash, 0x01000193);
-    hash ^= green; hash = Math.imul(hash, 0x01000193);
-    hash ^= blue; hash = Math.imul(hash, 0x01000193);
-    hash ^= alpha; hash = Math.imul(hash, 0x01000193);
-  }
-  return {
-    hash: (hash >>> 0).toString(16).padStart(8, '0'),
-    signal: maximumLuma - minimumLuma >= 4 ? 'varied' : 'flat',
-  };
+function resetMatchPauseBackdrop(): void {
+  matchPauseFrameFallback.hidden = true;
+  matchPauseFrameFallback.width = 1;
+  matchPauseFrameFallback.height = 1;
+  matchPauseBackdrop.dataset.frameProvenance = 'game-canvas-css-compositor';
+  matchPauseBackdrop.dataset.captureStatus = 'empty';
+  matchPauseBackdrop.dataset.captureReason = 'none';
+  matchPauseBackdrop.dataset.sourceCanvas = 'none';
+  matchPauseBackdrop.dataset.sourceArena = 'none';
+  matchPauseBackdrop.dataset.sourceFrame = '0';
+  matchPauseBackdrop.dataset.sourceSize = '0x0';
+  matchPauseBackdrop.dataset.captureSize = '0x0';
+  matchPauseBackdrop.dataset.heldAt = '0';
+  matchPauseBackdrop.dataset.capturedFromSurface = menuLifecycle.surface;
+  matchPauseBackdrop.dataset.capturedBeforeMenuVisible = 'false';
+  matchPauseBackdrop.dataset.contract = MATCH_PAUSE_BACKDROP_CONTRACT;
+  matchPauseBackdrop.dataset.periodicReadbackCount = '0';
+  matchPauseBackdrop.dataset.sourceCaptureAttemptCount = String(matchPauseSourceCaptureAttemptCount);
+  matchPauseBackdrop.dataset.sourceCaptureCount = String(matchPauseSourceCaptureCount);
+  matchPauseBackdrop.dataset.presentationCount = String(matchPauseBackdropPresentationCount);
+  matchPauseBackdrop.dataset.fallbackCount = String(matchPauseBackdropFallbackCount);
 }
 
-function retainLatestGameplayBackdrop(now: number, force = false): boolean {
-  // WebGL/WebGPU canvases without a preserved drawing buffer can read back as
-  // black later. Retain a bounded copy immediately after presentation instead.
-  if (!force && lastGameplayBackdropFrame > 0 && now - lastGameplayBackdropCapturedAt < 80) return true;
-  const sourceWidth = Math.max(1, canvas.width);
-  const sourceHeight = Math.max(1, canvas.height);
-  const scale = Math.min(1, 960 / sourceWidth, 540 / sourceHeight);
-  const width = Math.max(1, Math.round(sourceWidth * scale));
-  const height = Math.max(1, Math.round(sourceHeight * scale));
+function pauseBackdropCompositorSupported(): boolean {
   try {
-    if (matchPauseBackdrop.width !== width) matchPauseBackdrop.width = width;
-    if (matchPauseBackdrop.height !== height) matchPauseBackdrop.height = height;
-    matchPauseBackdropContext.drawImage(canvas, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height);
-    lastGameplayBackdropFrame = lastGameplayPresentedFrame;
-    lastGameplayBackdropCapturedAt = now;
-    matchPauseBackdrop.dataset.sourceCanvas = canvas.id;
-    matchPauseBackdrop.dataset.sourceArena = selectedArena.id;
-    matchPauseBackdrop.dataset.sourceFrame = String(lastGameplayBackdropFrame);
-    matchPauseBackdrop.dataset.sourceSize = `${sourceWidth}x${sourceHeight}`;
-    matchPauseBackdrop.dataset.captureSize = `${width}x${height}`;
-    return true;
-  } catch (error) {
-    console.warn('[Pass 65 retained gameplay frame failed]', error);
+    return CSS.supports('backdrop-filter', 'blur(1px)')
+      || CSS.supports('-webkit-backdrop-filter', 'blur(1px)');
+  } catch {
     return false;
   }
 }
 
-function captureActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+function presentPauseOnlyWebGlBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+  if (renderRuntime.backend !== 'webgl2' || !atomicSignal) return false;
+  const sourceWidth = Math.max(1, canvas.width);
+  const sourceHeight = Math.max(1, canvas.height);
+  const scale = Math.min(
+    1,
+    MATCH_PAUSE_FALLBACK_MAX_WIDTH / sourceWidth,
+    MATCH_PAUSE_FALLBACK_MAX_HEIGHT / sourceHeight,
+  );
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  matchPauseFrameFallback.width = width;
+  matchPauseFrameFallback.height = height;
+  // WebGL drawing buffers are not reliably preserved after presentation. One
+  // fresh pause-only submission keeps this copy current without any gameplay-
+  // loop polling or periodic GPU readback.
+  atomicSignal.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+  matchPauseSourceCaptureAttemptCount += 1;
+  matchPauseFrameFallbackContext.drawImage(canvas, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height);
+  matchPauseSourceCaptureCount += 1;
+  matchPauseBackdropPresentationCount += 1;
+  const heldAt = performance.now();
+  matchPauseFrameFallback.hidden = false;
+  matchPauseBackdrop.dataset.frameProvenance = 'pause-only-renderer-canvas';
+  matchPauseBackdrop.dataset.captureStatus = 'pause-snapshot';
+  matchPauseBackdrop.dataset.captureReason = reason;
+  matchPauseBackdrop.dataset.sourceCanvas = canvas.id;
+  matchPauseBackdrop.dataset.sourceArena = selectedArena.id;
+  matchPauseBackdrop.dataset.sourceFrame = String(lastGameplayPresentedFrame);
+  matchPauseBackdrop.dataset.sourceSize = `${sourceWidth}x${sourceHeight}`;
+  matchPauseBackdrop.dataset.captureSize = `${width}x${height}`;
+  matchPauseBackdrop.dataset.heldAt = heldAt.toFixed(3);
+  matchPauseBackdrop.dataset.capturedFromSurface = menuLifecycle.surface;
+  matchPauseBackdrop.dataset.capturedBeforeMenuVisible = String(
+    menuLifecycle.surface === 'hidden' && menu.classList.contains('hidden'),
+  );
+  matchPauseBackdrop.dataset.contract = MATCH_PAUSE_BACKDROP_CONTRACT;
+  matchPauseBackdrop.dataset.periodicReadbackCount = '0';
+  matchPauseBackdrop.dataset.sourceCaptureAttemptCount = String(matchPauseSourceCaptureAttemptCount);
+  matchPauseBackdrop.dataset.sourceCaptureCount = String(matchPauseSourceCaptureCount);
+  matchPauseBackdrop.dataset.presentationCount = String(matchPauseBackdropPresentationCount);
+  matchPauseBackdrop.dataset.fallbackCount = String(matchPauseBackdropFallbackCount);
+  menuPreviewLabel.textContent = `HELD GAMEPLAY // ${selectedArena.displayName}`;
+  menuPreviewMotion.textContent = 'PAUSE-ONLY FRAME // MATCH PAUSED';
+  return true;
+}
+
+function renderSafePauseBackdropFallback(reason: 'escape' | 'debug-pause', failure: unknown): void {
+  const heldAt = performance.now();
+  matchPauseBackdropFallbackCount += 1;
+  matchPauseFrameFallback.hidden = true;
+  matchPauseBackdrop.dataset.frameProvenance = 'generated-safe-fallback';
+  matchPauseBackdrop.dataset.captureStatus = 'fallback';
+  matchPauseBackdrop.dataset.captureReason = reason;
+  matchPauseBackdrop.dataset.sourceCanvas = 'none';
+  matchPauseBackdrop.dataset.sourceArena = selectedArena.id;
+  matchPauseBackdrop.dataset.sourceFrame = '0';
+  matchPauseBackdrop.dataset.sourceSize = '0x0';
+  matchPauseBackdrop.dataset.captureSize = '0x0';
+  matchPauseBackdrop.dataset.heldAt = heldAt.toFixed(3);
+  matchPauseBackdrop.dataset.capturedFromSurface = menuLifecycle.surface;
+  matchPauseBackdrop.dataset.capturedBeforeMenuVisible = String(
+    menuLifecycle.surface === 'hidden' && menu.classList.contains('hidden'),
+  );
+  matchPauseBackdrop.dataset.contract = MATCH_PAUSE_BACKDROP_CONTRACT;
+  matchPauseBackdrop.dataset.periodicReadbackCount = '0';
+  matchPauseBackdrop.dataset.sourceCaptureAttemptCount = String(matchPauseSourceCaptureAttemptCount);
+  matchPauseBackdrop.dataset.sourceCaptureCount = String(matchPauseSourceCaptureCount);
+  matchPauseBackdrop.dataset.presentationCount = String(matchPauseBackdropPresentationCount);
+  matchPauseBackdrop.dataset.fallbackCount = String(matchPauseBackdropFallbackCount);
+  menuPreviewLabel.textContent = `HELD GAMEPLAY UNAVAILABLE // ${selectedArena.displayName}`;
+  menuPreviewMotion.textContent = 'SAFE VISUAL FALLBACK';
+  console.warn('[Pass 65 menu backdrop used safe fallback]', failure);
+}
+
+function presentActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+  let pauseOnlyCaptureFailure: unknown = null;
   try {
-    if (lastGameplayBackdropFrame <= 0 && !retainLatestGameplayBackdrop(performance.now(), true)) {
-      throw new Error('No renderer-backed gameplay frame was retained');
+    if (lastGameplayPresentedFrame <= 0) throw new Error('No presented gameplay frame is available');
+    if (renderRuntime.backend === 'webgl2') {
+      try {
+        if (presentPauseOnlyWebGlBackdrop(reason)) return true;
+      } catch (error) {
+        pauseOnlyCaptureFailure = error;
+      }
     }
-    const sample = pauseBackdropPixelHash(matchPauseBackdrop.width, matchPauseBackdrop.height);
-    matchPauseBackdrop.dataset.frameProvenance = 'renderer-canvas';
-    matchPauseBackdrop.dataset.captureStatus = 'captured';
-    matchPauseBackdrop.dataset.captureReason = reason;
-    matchPauseBackdrop.dataset.capturedAt = lastGameplayBackdropCapturedAt.toFixed(3);
+    if (!pauseBackdropCompositorSupported()) throw new Error('CSS backdrop compositor is unavailable');
     const heldAt = performance.now();
-    matchPauseBackdrop.dataset.heldAt = heldAt.toFixed(3);
-    matchPauseBackdrop.dataset.sourceAgeMs = Math.max(0, heldAt - lastGameplayBackdropCapturedAt).toFixed(3);
-    matchPauseBackdrop.dataset.pixelHash = sample.hash;
-    matchPauseBackdrop.dataset.pixelSignal = sample.signal;
-    menuPreviewLabel.textContent = `HELD GAMEPLAY // ${selectedArena.displayName}`;
-    menuPreviewMotion.textContent = 'MATCH PAUSED';
-    return true;
-  } catch (error) {
-    matchPauseBackdrop.dataset.captureStatus = 'failed';
+    matchPauseBackdropPresentationCount += 1;
+    matchPauseFrameFallback.hidden = true;
+    matchPauseBackdrop.dataset.frameProvenance = 'game-canvas-css-compositor';
+    matchPauseBackdrop.dataset.captureStatus = 'compositor';
     matchPauseBackdrop.dataset.captureReason = reason;
     matchPauseBackdrop.dataset.sourceCanvas = canvas.id;
     matchPauseBackdrop.dataset.sourceArena = selectedArena.id;
-    console.warn('[Pass 65 menu backdrop capture failed]', error);
+    matchPauseBackdrop.dataset.sourceFrame = String(lastGameplayPresentedFrame);
+    matchPauseBackdrop.dataset.heldAt = heldAt.toFixed(3);
+    matchPauseBackdrop.dataset.capturedFromSurface = menuLifecycle.surface;
+    matchPauseBackdrop.dataset.capturedBeforeMenuVisible = String(
+      menuLifecycle.surface === 'hidden' && menu.classList.contains('hidden'),
+    );
+    matchPauseBackdrop.dataset.contract = MATCH_PAUSE_BACKDROP_CONTRACT;
+    matchPauseBackdrop.dataset.periodicReadbackCount = '0';
+    matchPauseBackdrop.dataset.sourceCaptureAttemptCount = String(matchPauseSourceCaptureAttemptCount);
+    matchPauseBackdrop.dataset.sourceCaptureCount = String(matchPauseSourceCaptureCount);
+    matchPauseBackdrop.dataset.presentationCount = String(matchPauseBackdropPresentationCount);
+    matchPauseBackdrop.dataset.fallbackCount = String(matchPauseBackdropFallbackCount);
+    menuPreviewLabel.textContent = `HELD GAMEPLAY // ${selectedArena.displayName}`;
+    menuPreviewMotion.textContent = 'CSS COMPOSITOR BLUR // MATCH PAUSED';
+    return true;
+  } catch (error) {
+    renderSafePauseBackdropFallback(reason, pauseOnlyCaptureFailure ?? error);
     return false;
   }
 }
@@ -6653,7 +6725,7 @@ function captureActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
 function openActiveMatchPause(reason: 'escape' | 'debug-pause'): void {
   if (!gameStarted || !player.alive || matchFinished || menuLifecycle.surface === 'paused-match') return;
   clearGameplayInput();
-  captureActiveMatchBackdrop(reason);
+  presentActiveMatchBackdrop(reason);
   applyMenuLifecycle({ type: 'pause-requested', reason });
   if (document.pointerLockElement === canvas) void document.exitPointerLock();
   requestAnimationFrame(() => resumeButton.focus({ preventScroll: true }));
@@ -6839,9 +6911,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   lastGameplayPresentedFrame = 0;
-  lastGameplayBackdropFrame = 0;
-  lastGameplayBackdropCapturedAt = Number.NEGATIVE_INFINITY;
-  matchPauseBackdrop.dataset.captureStatus = 'empty';
+  resetMatchPauseBackdrop();
   applyMenuLifecycle({ type: 'match-start' });
   syncMenuPreviewCanvasPlacement();
   hidePrivateLobbyPresentation();
@@ -12806,6 +12876,12 @@ window.addEventListener('mouseup', (event) => {
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement === canvas) {
+    if (!gameStarted || menuLifecycle.surface === 'pre-match' || menuLifecycle.surface === 'error') {
+      // A delayed browser grant from an obsolete match/request must never own
+      // input over a lobby or a deployment transition.
+      void document.exitPointerLock();
+      return;
+    }
     const pauseAlreadyOpen = menuLifecycle.surface === 'paused-match';
     applyMenuLifecycle({ type: 'pointer-acquired' });
     if (pauseAlreadyOpen) void document.exitPointerLock();
@@ -12819,7 +12895,7 @@ document.addEventListener('pointerlockchange', () => {
     && !focusTransition
     && overlay === null
     && pauseAllowed;
-  if (openingPause) captureActiveMatchBackdrop('escape');
+  if (openingPause) presentActiveMatchBackdrop('escape');
   applyMenuLifecycle({ type: 'pointer-lost', focusTransition, overlay, pauseAllowed });
   if (menuLifecycle.surface === 'paused-match') {
     requestAnimationFrame(() => resumeButton.focus({ preventScroll: true }));
@@ -13641,7 +13717,6 @@ function frame(now: number, scheduleNext = true): void {
       }
       if (frameSubmitted && gameStarted && menuLifecycle.surface === 'hidden') {
         lastGameplayPresentedFrame = frameCount;
-        retainLatestGameplayBackdrop(now);
       }
       monitorSelectedArenaRender(now);
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
@@ -14737,9 +14812,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         sourceFrame: Number(matchPauseBackdrop.dataset.sourceFrame ?? 0),
         sourceSize: matchPauseBackdrop.dataset.sourceSize ?? null,
         captureSize: matchPauseBackdrop.dataset.captureSize ?? null,
-        sourceAgeMs: Number(matchPauseBackdrop.dataset.sourceAgeMs ?? 0),
-        pixelHash: matchPauseBackdrop.dataset.pixelHash ?? null,
-        pixelSignal: matchPauseBackdrop.dataset.pixelSignal ?? null,
+        capturedFromSurface: matchPauseBackdrop.dataset.capturedFromSurface ?? null,
+        capturedBeforeMenuVisible: matchPauseBackdrop.dataset.capturedBeforeMenuVisible === 'true',
+        contract: matchPauseBackdrop.dataset.contract ?? null,
+        periodicReadbackCount: Number(matchPauseBackdrop.dataset.periodicReadbackCount ?? 0),
+        sourceCaptureAttemptCount: Number(matchPauseBackdrop.dataset.sourceCaptureAttemptCount ?? 0),
+        sourceCaptureCount: Number(matchPauseBackdrop.dataset.sourceCaptureCount ?? 0),
+        presentationCount: Number(matchPauseBackdrop.dataset.presentationCount ?? 0),
+        fallbackCount: Number(matchPauseBackdrop.dataset.fallbackCount ?? 0),
       },
     },
     menuCamera: {
