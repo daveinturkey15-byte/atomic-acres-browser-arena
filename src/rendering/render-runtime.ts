@@ -25,6 +25,8 @@ export type RenderRuntimeTelemetry = Readonly<{
   bloomSamples: number | null;
   renderPipelineApi: 'legacy-direct' | 'three-r185-render-pipeline';
   deviceLost: boolean;
+  uncapturedErrors: number;
+  lastUncapturedError: string | null;
   presentation: PresentationFreshnessTelemetry;
 }>;
 
@@ -147,6 +149,13 @@ export function webGpuRenderInfoSnapshot(render: Readonly<{
   };
 }
 
+export function formatWebGpuUncapturedError(event: unknown): string {
+  const record = event as { error?: { name?: unknown; message?: unknown } } | null;
+  const name = record?.error?.name === undefined ? 'GPUError' : String(record.error.name);
+  const message = record?.error?.message === undefined ? 'No validation message was provided' : String(record.error.message);
+  return `${name}: ${message}`;
+}
+
 export type ShadowRuntimeState = Readonly<{
   enabled: boolean;
   autoUpdate: boolean;
@@ -223,6 +232,8 @@ export class LegacyWebGlRenderRuntime {
       bloomSamples: targets?.bloomSamples ?? null,
       renderPipelineApi: 'legacy-direct',
       deviceLost: gl.isContextLost(),
+      uncapturedErrors: 0,
+      lastUncapturedError: null,
       presentation: this.presentationTelemetry(),
     };
   }
@@ -352,6 +363,8 @@ type WebGpuBackendShape = Readonly<{
 type GpuDeviceShape = Readonly<{
   lost?: Promise<unknown>;
   queue?: Readonly<{ onSubmittedWorkDone?: () => Promise<void> }>;
+  addEventListener?: (type: 'uncapturederror', listener: (event: unknown) => void) => void;
+  removeEventListener?: (type: 'uncapturederror', listener: (event: unknown) => void) => void;
   destroy?: () => void;
   constructor?: { name?: string };
 }>;
@@ -405,6 +418,15 @@ export class WebGpuRenderRuntime {
   private lastCompletionLatencyMs: number | null = null;
   private completionFailures = 0;
   private lastFailure: string | null = null;
+  private uncapturedErrors = 0;
+  private lastUncapturedError: string | null = null;
+  private readonly uncapturedErrorListener = (event: unknown): void => {
+    const message = formatWebGpuUncapturedError(event);
+    this.uncapturedErrors += 1;
+    this.lastUncapturedError = message;
+    this.completionFailures += 1;
+    this.lastFailure = `WebGPU uncaptured error: ${message}`;
+  };
   private skippedSubmissions = 0;
   private lastSubmittedRenderInfo: RenderInfoSnapshot = Object.freeze({ calls: 0, triangles: 0, points: 0, lines: 0 });
   private lightShadowAutoUpdate = true;
@@ -439,6 +461,7 @@ export class WebGpuRenderRuntime {
     this.deviceClass = identity.deviceClass;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
+    identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
       this.deviceLost = true;
       const record = info as { reason?: unknown; message?: unknown } | undefined;
@@ -510,6 +533,8 @@ export class WebGpuRenderRuntime {
       bloomSamples: this.bloomSamples,
       renderPipelineApi: 'three-r185-render-pipeline',
       deviceLost: this.deviceLost,
+      uncapturedErrors: this.uncapturedErrors,
+      lastUncapturedError: this.lastUncapturedError,
       presentation: this.presentationTelemetry(),
     };
   }
@@ -598,6 +623,7 @@ export class WebGpuRenderRuntime {
     }
     if (telemetry.softwareAdapter) throw new Error('WebGPU candidate verification failed closed: software/fallback adapter');
     if (telemetry.deviceLost) throw new Error('WebGPU candidate verification failed closed: device was lost');
+    if (telemetry.uncapturedErrors > 0) throw new Error(`WebGPU candidate verification failed closed: ${telemetry.lastUncapturedError}`);
   }
 
   setRenderTargetTelemetry(principalHdrSamples: number, bloomSamples: number): void {
@@ -697,6 +723,7 @@ export class WebGpuRenderRuntime {
 
   submitFrame(now = performance.now(), force = false): boolean {
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
+    if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
     if (!force && shouldBackpressureWebGpuSubmissions(
       this.pendingCompletionStartedAt,
       now,
@@ -755,6 +782,7 @@ export class WebGpuRenderRuntime {
   }
 
   dispose(): void {
+    this.device.removeEventListener?.('uncapturederror', this.uncapturedErrorListener);
     this.renderPipeline.dispose();
     this.renderer.dispose();
     this.device.destroy?.();

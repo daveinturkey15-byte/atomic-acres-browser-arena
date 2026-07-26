@@ -10,6 +10,7 @@ import {
   type ShedPlacement,
 } from './destructible-world';
 import {
+  DestructibleShedPresentation,
   FIELD_SHED_DEFINITION,
   createFieldShedPresentation,
 } from './destructible-shed-presentation';
@@ -68,6 +69,34 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(rims.count).toBe(1);
     expect(presentation.telemetry(impact.state)).toMatchObject({ activeDraws: 5, apertures: 1 });
     presentation.dispose();
+  });
+
+  it('hands replaced WebGPU geometry to the renderer fence instead of retaining it across rematches', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 12);
+    const retired: THREE.BufferGeometry[] = [];
+    const presentation = new DestructibleShedPresentation(
+      FIELD_SHED_DEFINITION,
+      placement,
+      initial,
+      (geometry) => retired.push(geometry),
+    );
+    const impact = applyShedSheetImpact(FIELD_SHED_DEFINITION, initial, {
+      isHost: true,
+      matchEpoch: 12,
+      expectedRevision: initial.revision,
+      surfaceId: 'wall-north',
+      uQ: 0,
+      vQ: 0,
+      radiusUQ: 700,
+      radiusVQ: 700,
+      damageQ: 60,
+      penetrationEnergyQ: 70,
+    });
+    presentation.sync(impact.state);
+    expect(retired).toHaveLength(2);
+    expect(presentation.telemetry(impact.state).retiredGeometries).toBe(0);
+    presentation.dispose();
+    retired.forEach((geometry) => geometry.dispose());
   });
 
   it('drives the door hinge only from canonical angle state', () => {

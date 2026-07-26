@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
 import type { WeaponId } from './protocol';
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 
@@ -249,6 +250,7 @@ export function createImportedWeaponModel(id: WeaponId, flattenMaterials: boolea
     if (Array.isArray(node.material)) node.material = node.material.map((material) => flattenMaterials ? flattenMaterial(material) : material.clone());
     else node.material = flattenMaterials ? flattenMaterial(node.material) : node.material.clone();
   });
+  cloneMeshGeometriesForOwner(visual, 'weapon-instance');
   presentation.add(visual);
   root.add(presentation);
 

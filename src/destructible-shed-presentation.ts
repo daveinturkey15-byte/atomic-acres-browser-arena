@@ -258,6 +258,7 @@ export class DestructibleShedPresentation {
     readonly definition: DestructibleShedDefinition,
     readonly placement: ShedPlacement,
     initialState: ShedState,
+    private readonly retireGeometryAfterFence?: (geometry: THREE.BufferGeometry) => void,
   ) {
     if (initialState.placementId !== placement.id || placement.definitionId !== definition.id) {
       throw new TypeError('Shed presentation identity mismatch');
@@ -338,14 +339,14 @@ export class DestructibleShedPresentation {
       staticGeometries.forEach((geometry) => geometry.dispose());
       const oldShellGeometry = this.shell.geometry;
       this.shell.geometry = shellGeometry;
-      if (oldShellGeometry.getAttribute('position')) this.retiredGeometries.add(oldShellGeometry);
+      if (oldShellGeometry.getAttribute('position')) this.retireGeometry(oldShellGeometry);
       else oldShellGeometry.dispose();
 
       const oldDoorGeometry = this.door.geometry;
       this.door.geometry = doorState.stage === 'detached'
         ? new THREE.BufferGeometry()
         : localPanelGeometry(doorDefinition, doorState);
-      if (oldDoorGeometry.getAttribute('position')) this.retiredGeometries.add(oldDoorGeometry);
+      if (oldDoorGeometry.getAttribute('position')) this.retireGeometry(oldDoorGeometry);
       else oldDoorGeometry.dispose();
       this.topologySignature = topologySignature;
     }
@@ -404,6 +405,11 @@ export class DestructibleShedPresentation {
     this.debris.instanceMatrix.needsUpdate = true;
     this.revision = state.revision;
     this.root.userData.worldRevision = state.revision;
+  }
+
+  private retireGeometry(geometry: THREE.BufferGeometry): void {
+    if (this.retireGeometryAfterFence) this.retireGeometryAfterFence(geometry);
+    else this.retiredGeometries.add(geometry);
   }
 
   telemetry(state: ShedState): ShedPresentationTelemetry {

@@ -1255,10 +1255,19 @@ function applyRiggedWeaponGrip(rig: Extract<OperatorRig, { rigged: true }>, weap
   };
 }
 
-export function setOperatorWeapon(root: THREE.Group, weaponId: WeaponId, flattenMaterials = false): void {
+export function setOperatorWeapon(
+  root: THREE.Group,
+  weaponId: WeaponId,
+  flattenMaterials = false,
+  retirePrevious?: (root: THREE.Object3D) => void,
+): void {
   const rig = operatorRig(root);
   if (!rig || rig.weaponId === weaponId && rig.weapon) return;
-  if (rig.weapon) rig.weaponSocket.remove(rig.weapon);
+  if (rig.weapon) {
+    const previous = rig.weapon;
+    rig.weaponSocket.remove(previous);
+    retirePrevious?.(previous);
+  }
   // Third-person mounting must use the socket-native authored model. Pass 16's
   // imported scene could place visible bounds metres away from WristR even
   // while the root socket itself was correct.

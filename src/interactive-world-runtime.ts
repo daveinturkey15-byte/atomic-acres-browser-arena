@@ -255,6 +255,7 @@ export class InteractiveWorldRuntime {
     placements: readonly ShedPlacement[],
     private hostAuthority: boolean,
     definition: DestructibleShedDefinition = FIELD_SHED_DEFINITION,
+    retireGeometryAfterFence?: (geometry: THREE.BufferGeometry) => void,
   ) {
     if (placements.some((placement) => placement.arenaId !== arenaId || placement.definitionId !== definition.id)) {
       throw new TypeError('Interactive-world placement does not match arena/definition');
@@ -266,7 +267,12 @@ export class InteractiveWorldRuntime {
     this.root.userData.dynamic = true;
     this.sheds = placements.map((placement) => {
       const state = createInitialShedState(definition, placement, matchEpoch);
-      const presentation = new DestructibleShedPresentation(definition, placement, state);
+      const presentation = new DestructibleShedPresentation(
+        definition,
+        placement,
+        state,
+        retireGeometryAfterFence,
+      );
       this.root.add(presentation.root);
       return { placement, definition, state, presentation };
     });

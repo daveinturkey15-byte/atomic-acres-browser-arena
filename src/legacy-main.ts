@@ -839,14 +839,19 @@ async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
 }
 
 type DeferredGpuRetirement = Readonly<{
+  kind: 'root';
   root: THREE.Object3D;
   disposeResources: boolean;
+}> | Readonly<{
+  kind: 'geometry';
+  geometry: THREE.BufferGeometry;
 }>;
 
 const deferredGpuRetirements: DeferredGpuRetirement[] = [];
 let gpuRetirementTask: Promise<void> | null = null;
 let gpuRetirementFences = 0;
 let gpuRetirementDisposedRoots = 0;
+let gpuRetirementDisposedGeometries = 0;
 let gpuRetirementFailures = 0;
 
 function disposeDetachedRootResources(root: THREE.Object3D): void {
@@ -879,8 +884,13 @@ async function drainDeferredGpuRetirements(): Promise<void> {
       return;
     }
     for (const retirement of batch) {
-      if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
-      gpuRetirementDisposedRoots += 1;
+      if (retirement.kind === 'geometry') {
+        retirement.geometry.dispose();
+        gpuRetirementDisposedGeometries += 1;
+      } else {
+        if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
+        gpuRetirementDisposedRoots += 1;
+      }
     }
   }
 }
@@ -888,7 +898,16 @@ async function drainDeferredGpuRetirements(): Promise<void> {
 function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = true): void {
   root.removeFromParent();
   root.visible = false;
-  deferredGpuRetirements.push(Object.freeze({ root, disposeResources }));
+  deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources }));
+  scheduleGpuRetirementDrain();
+}
+
+function scheduleDeferredGpuGeometryRetirement(geometry: THREE.BufferGeometry): void {
+  deferredGpuRetirements.push(Object.freeze({ kind: 'geometry', geometry }));
+  scheduleGpuRetirementDrain();
+}
+
+function scheduleGpuRetirementDrain(): void {
   if (gpuRetirementTask) return;
   gpuRetirementTask = drainDeferredGpuRetirements().finally(() => {
     gpuRetirementTask = null;
@@ -1334,6 +1353,8 @@ function createInteractiveWorldRuntime(
     matchEpoch,
     shedPlacementsForArena(arenaId),
     hostAuthority,
+    undefined,
+    scheduleDeferredGpuGeometryRetirement,
   );
   // Quality/Blender arena presentation may intentionally hide the procedural
   // arena root while retaining its collision authority. Interactive gameplay
@@ -2078,7 +2099,7 @@ let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
 const hunterDrones: HunterDroneEntity[] = [];
-const deferredSupportDisposals: THREE.Object3D[] = [];
+let supportPresentationRetirements = 0;
 let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
 let tacticalMapOpen = false;
@@ -4532,7 +4553,7 @@ function onNetworkMessage(message: GameMessage): void {
     processedNonces.add(message.nonce);
     applyRailgunState(claimed.state);
     remote.snapshot = { ...remote.snapshot, weapon: 'railgun' };
-    setOperatorWeapon(remote.root.userData.operator as THREE.Group, 'railgun', flattenOperatorMaterials);
+    setOperatorWeapon(remote.root.userData.operator as THREE.Group, 'railgun', flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     recordMatchDiagnostic('railgun-pickup', 'accepted', { actorId: message.by, weaponOrEffect: 'railgun', position: authoritative.toArray(), reason: 'host-authoritative-pickup' });
     broadcastRailgunState();
     trimNonceSet();
@@ -5896,7 +5917,7 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   } else {
     entity.drop = { ...entity.drop, weaponConsumedAt: now };
     authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
-    setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials);
+    setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
   }
   if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
   else removeDeathDrop(entity);
@@ -6178,7 +6199,7 @@ function removeRemote(id: string, reason: string): void {
   const remote = remotes.get(id);
   if (!remote) return;
   if (network.role === 'host') dropHeldRailgun(id, remote.target.clone().add(new THREE.Vector3(0, 0.3, 0)));
-  scene.remove(remote.root);
+  scheduleDeferredGpuRetirement(remote.root);
   footstepEmitters.reset(`remote:${id}`);
   remotes.delete(id);
   verifiedRemoteKills.delete(id);
@@ -6776,14 +6797,14 @@ function syncRailgunHolderPresentation(previous: RailgunAuthorityState, next: Ra
     const priorRemote = remotes.get(previous.holderId);
     if (priorRemote && priorRemote.snapshot.weapon === 'railgun') {
       priorRemote.snapshot = { ...priorRemote.snapshot, weapon: priorRemote.snapshot.primary };
-      setOperatorWeapon(priorRemote.root.userData.operator as THREE.Group, priorRemote.snapshot.primary, flattenOperatorMaterials);
+      setOperatorWeapon(priorRemote.root.userData.operator as THREE.Group, priorRemote.snapshot.primary, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     }
   }
   if (next.holderId && next.holderId !== player.id) {
     const remote = remotes.get(next.holderId);
     if (remote) {
       remote.snapshot = { ...remote.snapshot, weapon: 'railgun' };
-      setOperatorWeapon(remote.root.userData.operator as THREE.Group, 'railgun', flattenOperatorMaterials);
+      setOperatorWeapon(remote.root.userData.operator as THREE.Group, 'railgun', flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     }
   }
 }
@@ -7908,11 +7929,11 @@ function spawnEarnedBotReinforcement(): void {
 
 function clearBots(): void {
   for (const bot of bots.values()) {
-    scene.remove(bot.root);
+    scheduleDeferredGpuRetirement(bot.root);
     footstepEmitters.reset(`bot:${bot.id}`);
   }
   for (const bot of dormantBots.values()) {
-    scene.remove(bot.root);
+    scheduleDeferredGpuRetirement(bot.root);
     footstepEmitters.reset(`bot:${bot.id}`);
   }
   bots.clear();
@@ -7982,7 +8003,7 @@ function acceptHostedBotState(message: BotStateMessage): void {
     bot.deaths = snapshot.deaths;
     bot.alive = snapshot.alive;
     bot.root.visible = snapshot.alive;
-    setOperatorWeapon(bot.root, snapshot.weapon, flattenOperatorMaterials);
+    setOperatorWeapon(bot.root, snapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     if (snapshot.alive) {
       const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
       const hostedFootsteps = footstepEmitters.sample({
@@ -8003,7 +8024,7 @@ function acceptHostedBotState(message: BotStateMessage): void {
   }
   for (const [id, bot] of bots) {
     if (!id.startsWith('host-bot-') || incomingIds.has(id)) continue;
-    scene.remove(bot.root);
+    scheduleDeferredGpuRetirement(bot.root);
     footstepEmitters.reset(`bot:${id}`);
     bots.delete(id);
   }
@@ -10154,9 +10175,8 @@ function disposeSupportRoot(root: THREE.Object3D): void {
 }
 
 function retireSupportRoot(root: THREE.Object3D): void {
-  scene.remove(root);
-  root.visible = false;
-  deferredSupportDisposals.push(root);
+  supportPresentationRetirements += 1;
+  disposeSupportRoot(root);
 }
 
 function supportBlast(
@@ -10768,8 +10788,6 @@ function clearFieldSupport(): void {
   hunterDrones.length = 0;
   for (const effect of remoteSupportPresentations) for (const { root } of effect.roots) disposeSupportRoot(root);
   remoteSupportPresentations.length = 0;
-  for (const root of deferredSupportDisposals) disposeSupportRoot(root);
-  deferredSupportDisposals.length = 0;
   supportExplosionPresentation.clear();
   if (nukeSequence) nukeSequence = null;
   nukeShockwave.visible = false;
@@ -11037,7 +11055,7 @@ function updateRemotes(dt: number, now: number): void {
     remote.renderedWorldAgeMs = rendered?.renderedWorldAgeMs ?? 0;
     const stance = renderedSnapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
-    setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials);
+    setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch);
     const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));
     const expectedGround = botElevationAt(renderedTarget, previousFootY);
@@ -13580,6 +13598,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         draining: gpuRetirementTask !== null,
         fences: gpuRetirementFences,
         disposedRoots: gpuRetirementDisposedRoots,
+        disposedGeometries: gpuRetirementDisposedGeometries,
         failures: gpuRetirementFailures,
       },
     },
@@ -13872,7 +13891,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         ? { ...lastSupportExplosionProfile }
         : { source: null, audioMs: 0, visualMs: 0, targetDamageMs: 0, totalSyncMs: 0 },
       explosionFrameProfile: { ...lastSupportExplosionFrameProfile, sources: [...lastSupportExplosionFrameProfile.sources] },
-      retiredPresentationRoots: deferredSupportDisposals.length,
+      retiredPresentationRoots: supportPresentationRetirements,
+      pendingRetiredPresentationRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
       prewarmedNuke: {
         shockwaveInScene: nukeShockwave.parent === scene,
         prewarmed: nukePresentationPrewarmed,
@@ -14285,7 +14305,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (bot && weapon) {
       bot.weapon = weapon;
-      setOperatorWeapon(bot.root, weapon, flattenOperatorMaterials);
+      setOperatorWeapon(bot.root, weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     }
   },
   clearBots: () => clearBots(),

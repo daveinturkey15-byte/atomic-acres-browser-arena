@@ -5,6 +5,7 @@ import {
   centeredReadbackRegion,
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
+  formatWebGpuUncapturedError,
   pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
   shouldBackpressureWebGpuSubmissions,
@@ -74,6 +75,13 @@ describe('Pass 64 render runtime boundary', () => {
       points: 0,
       lines: 0,
     });
+  });
+
+  it('normalizes uncaptured WebGPU validation errors for fail-closed telemetry', () => {
+    expect(formatWebGpuUncapturedError({
+      error: { name: 'GPUValidationError', message: 'Buffer used while destroyed' },
+    })).toBe('GPUValidationError: Buffer used while destroyed');
+    expect(formatWebGpuUncapturedError({})).toBe('GPUError: No validation message was provided');
   });
 
   it('schedules static shadows on each WebGPU light instead of a WebGL-only renderer flag', () => {

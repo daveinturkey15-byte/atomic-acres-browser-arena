@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
@@ -501,6 +502,7 @@ export function createRiggedOperator(
       }
     } else node.material = materialForTeam(node.material, team, flattenMaterials, appearance);
   });
+  cloneMeshGeometriesForOwner(visual, 'operator-instance');
   if (flattenMaterials) mergeFlattenedOperatorMeshes(visual);
   const stancePivot = new THREE.Group();
   stancePivot.name = 'operator-stance-pivot';
