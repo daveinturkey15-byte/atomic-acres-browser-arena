@@ -16,7 +16,7 @@ const groups = [
   { name: 'pass35-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass35-explosion-tri-pass.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass36-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass36-range-atmosphere-windows-drops-leaderboard.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass37-contracts', timeoutMs: 900_000, args: ['tests/e2e/pass37-quality-bounds.spec.ts', '--project=chromium', '--workers=1'] },
-  { name: 'pass64-hud-contracts', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', '--project=chromium', '--workers=1'] },
+  { name: 'pass64-hud-contracts', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'capability-firefox', default: false, xvfb: true, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=firefox', '--workers=1', '--headed'] },
   { name: 'capability-webkit', default: false, args: ['tests/e2e/pass25a-capability.spec.ts', '--project=webkit-smoke', '--workers=1'] },

@@ -1609,20 +1609,25 @@
       linear-gradient(0deg, rgba(20, 35, 38, 0.56), transparent 37%);
   }
 
-  #menu-showcase .preview-poster {
+  #menu-showcase .match-pause-backdrop {
     position: absolute;
-    inset: 0;
+    inset: -10px;
     z-index: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 1;
-    object-fit: cover;
-    filter: saturate(0.92) contrast(1.04) brightness(0.9);
+    width: calc(100% + 20px);
+    height: calc(100% + 20px);
+    opacity: 0;
+    visibility: hidden;
+    filter: blur(8px) saturate(0.78) contrast(1.08) brightness(0.66);
     transition: opacity var(--ui-medium) ease;
   }
 
-  #menu-showcase[data-preview-active='true'] .preview-poster {
-    opacity: 0;
+  #menu-showcase[data-menu-context='paused-match'] .match-pause-backdrop {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  #menu-showcase[data-menu-context='paused-match'] #menu-preview-frame {
+    display: none;
   }
 
   #menu-showcase > #game {
@@ -1994,6 +1999,14 @@
   .menu-actions .primary,
   .lobby-actions .primary,
   .menu-actions #resume {
+    border-color: var(--ui-cyan);
+    background: var(--ui-cyan);
+    color: #ffffff;
+  }
+
+  .menu-actions #resume:hover {
+    border-color: #004f55;
+    background: #00575d;
     color: #ffffff;
   }
 

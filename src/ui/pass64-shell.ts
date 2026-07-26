@@ -54,7 +54,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
       </header>
       <aside id="menu-showcase" aria-hidden="true">
-        <img class="preview-poster" src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
+        <canvas id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="renderer-canvas" data-capture-status="empty"></canvas>
         <div id="menu-preview-frame" data-frame="helicopter" data-arena="atomic-acres" data-motion="orbit">
           <div class="preview-helicopter" data-cockpit-asset="pass65-sleek-cockpit-v1" data-asset-owner="atomic-acres-original">
             <i class="cockpit-spine"></i><i class="cockpit-strut cockpit-strut-left"></i><i class="cockpit-strut cockpit-strut-right"></i>

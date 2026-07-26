@@ -12,6 +12,7 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'field-kit-panel', rootElementId: 'menu-panel-kit', renderer: 'main-shell', critical: true },
   { id: 'options-panel', rootElementId: 'menu-panel-options', renderer: 'main-shell', critical: true },
   { id: 'menu-showcase', rootElementId: 'menu-showcase', renderer: 'main-shell', critical: false },
+  { id: 'match-pause-backdrop', rootElementId: 'match-pause-backdrop', renderer: 'main-shell', critical: true },
   { id: 'menu-meta-actions', rootElementId: 'menu-meta-actions', renderer: 'main-shell', critical: false },
   { id: 'arena-selector', rootElementId: 'map-selector', renderer: 'main-shell', critical: true },
   { id: 'field-kit', rootElementId: 'selected-kit-summary', renderer: 'main-shell', critical: true },
@@ -58,6 +59,7 @@ export const UI_STATE_INVENTORY = Object.freeze([
   'offline', 'host', 'guest', 'reconnecting', 'syncing', 'waiting', 'ready',
   'countdown', 'live', 'dead', 'respawning', 'match-ended', 'returned-lobby',
   'modal-open', 'chat-typing', 'loading', 'error', 'reduced-motion',
+  'pointer-lock-requesting', 'pointer-lock-denied', 'focus-suspended', 'paused-match',
   'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
 ] as const);
 

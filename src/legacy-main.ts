@@ -41,6 +41,12 @@ import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
 import {
+  INITIAL_MENU_LIFECYCLE_STATE,
+  reduceMenuLifecycle,
+  type MenuLifecycleEvent,
+  type PointerLockRequestSource,
+} from './ui/menu-lifecycle';
+import {
   MENU_PREVIEW_VISIT_SEED_SLOTS,
   menuPreviewDefinition,
   menuPreviewPose,
@@ -599,6 +605,12 @@ const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
 const menuPreviewLabel = element<HTMLElement>('#menu-preview-label');
 const menuPreviewMotion = element<HTMLElement>('#menu-preview-motion');
 const menuPreviewFlightData = element<HTMLElement>('#menu-preview-flight-data');
+const matchPauseBackdrop = element<HTMLCanvasElement>('#match-pause-backdrop');
+const matchPauseBackdropContextValue = matchPauseBackdrop.getContext('2d', { alpha: false, willReadFrequently: true });
+if (!matchPauseBackdropContextValue) throw new Error('Canvas2D match pause backdrop is unavailable');
+const matchPauseBackdropContext: CanvasRenderingContext2D = matchPauseBackdropContextValue;
+const resumeButton = element<HTMLButtonElement>('#resume');
+const mainMenuButton = element<HTMLButtonElement>('#main-menu');
 const canvasHomeAnchor = document.createComment('game-canvas-home');
 canvas.after(canvasHomeAnchor);
 const fixedMenuPreviewTimeRaw = new URLSearchParams(window.location.search).get('previewTime');
@@ -608,6 +620,10 @@ let menuPreviewStartedAt = performance.now();
 let menuPreviewVisitSerial = 0;
 let menuPreviewSeed = menuPreviewVisitSeed(configuredRuntimeSeed, menuPreviewVisitSerial);
 let menuPreviewActive = false;
+let menuLifecycle = INITIAL_MENU_LIFECYCLE_STATE;
+let lastGameplayPresentedFrame = 0;
+let lastGameplayBackdropFrame = 0;
+let lastGameplayBackdropCapturedAt = Number.NEGATIVE_INFINITY;
 const hudRoot = element<HTMLElement>('#hud');
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
@@ -2308,7 +2324,7 @@ function showFatalError(error: unknown): void {
   bootstrapError = message;
   triggerHeld = false;
   setStatus(`Game paused: ${message}`, 'error');
-  menu.classList.remove('hidden');
+  applyMenuLifecycle({ type: 'fatal-error' });
   const banner = element<HTMLElement>('#banner');
   banner.innerHTML = '<strong>SYSTEM PAUSED</strong><span>Reload the page to re-enter the test block.</span>';
   banner.hidden = false;
@@ -2406,7 +2422,7 @@ function closeTextChat(resumeControls: boolean): void {
   textChatInput.blur();
   markTextChatActivity();
   if (resumeControls && gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden')) {
-    requestGamePointerLock();
+    requestGamePointerLock('chat-close');
   }
 }
 
@@ -2993,9 +3009,7 @@ function returnPrivateMatchToLobby(asHost: boolean): void {
   hudRoot.hidden = true;
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;
-  menu.classList.remove('hidden');
-  element<HTMLButtonElement>('#resume').hidden = true;
-  element<HTMLButtonElement>('#main-menu').hidden = true;
+  applyMenuLifecycle({ type: 'return-pre-match' });
   setArenaMenuCamera();
   if (document.pointerLockElement) void document.exitPointerLock();
   // Both clocks form one lobby-start identity. Leaving either populated makes
@@ -5234,12 +5248,141 @@ function spawnPoint(): THREE.Vector3 {
   return selectedSpawn.point.clone();
 }
 
-function requestGamePointerLock(): void {
+function syncMenuLifecyclePresentation(): void {
+  const menuVisible = menuLifecycle.surface !== 'hidden';
+  const pausedMatch = menuLifecycle.surface === 'paused-match';
+  menu.classList.toggle('hidden', !menuVisible);
+  menu.inert = !menuVisible;
+  menu.setAttribute('aria-hidden', String(!menuVisible));
+  menu.dataset.lifecycleSurface = menuLifecycle.surface;
+  menu.dataset.lifecycleReason = menuLifecycle.reason;
+  menu.dataset.pointerLock = menuLifecycle.pointerLock;
+  menu.dataset.pointerRequestSource = menuLifecycle.requestSource ?? 'none';
+  menu.dataset.lifecycleEvents = String(menuLifecycle.eventCount);
+  menu.dataset.lifecycleTransitions = String(menuLifecycle.transitionCount);
+  document.documentElement.dataset.menuLifecycle = menuLifecycle.surface;
+  document.documentElement.dataset.pointerLockLifecycle = menuLifecycle.pointerLock;
+  menuShowcase.dataset.menuContext = pausedMatch ? 'paused-match' : 'pre-match';
+  matchPauseBackdrop.hidden = !pausedMatch;
+  menuPreviewFrame.hidden = menuLifecycle.surface !== 'pre-match';
+  resumeButton.hidden = !pausedMatch;
+  mainMenuButton.hidden = !pausedMatch;
+}
+
+function applyMenuLifecycle(event: MenuLifecycleEvent): void {
+  menuLifecycle = reduceMenuLifecycle(menuLifecycle, event);
+  syncMenuLifecyclePresentation();
+}
+
+function pauseBackdropPixelHash(width: number, height: number): { hash: string; signal: 'varied' | 'flat' } {
+  const pixels = matchPauseBackdropContext.getImageData(0, 0, width, height).data;
+  const pixelCount = Math.max(1, Math.floor(pixels.length / 4));
+  const stride = Math.max(1, Math.floor(pixelCount / (64 * 36)));
+  let hash = 0x811c9dc5;
+  let minimumLuma = 255;
+  let maximumLuma = 0;
+  for (let pixel = 0; pixel < pixelCount; pixel += stride) {
+    const index = pixel * 4;
+    const red = pixels[index] ?? 0;
+    const green = pixels[index + 1] ?? 0;
+    const blue = pixels[index + 2] ?? 0;
+    const alpha = pixels[index + 3] ?? 0;
+    const luma = Math.round(red * 0.2126 + green * 0.7152 + blue * 0.0722);
+    minimumLuma = Math.min(minimumLuma, luma);
+    maximumLuma = Math.max(maximumLuma, luma);
+    hash ^= red; hash = Math.imul(hash, 0x01000193);
+    hash ^= green; hash = Math.imul(hash, 0x01000193);
+    hash ^= blue; hash = Math.imul(hash, 0x01000193);
+    hash ^= alpha; hash = Math.imul(hash, 0x01000193);
+  }
+  return {
+    hash: (hash >>> 0).toString(16).padStart(8, '0'),
+    signal: maximumLuma - minimumLuma >= 4 ? 'varied' : 'flat',
+  };
+}
+
+function retainLatestGameplayBackdrop(now: number, force = false): boolean {
+  // WebGL/WebGPU canvases without a preserved drawing buffer can read back as
+  // black later. Retain a bounded copy immediately after presentation instead.
+  if (!force && lastGameplayBackdropFrame > 0 && now - lastGameplayBackdropCapturedAt < 80) return true;
+  const sourceWidth = Math.max(1, canvas.width);
+  const sourceHeight = Math.max(1, canvas.height);
+  const scale = Math.min(1, 960 / sourceWidth, 540 / sourceHeight);
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  try {
+    if (matchPauseBackdrop.width !== width) matchPauseBackdrop.width = width;
+    if (matchPauseBackdrop.height !== height) matchPauseBackdrop.height = height;
+    matchPauseBackdropContext.drawImage(canvas, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height);
+    lastGameplayBackdropFrame = lastGameplayPresentedFrame;
+    lastGameplayBackdropCapturedAt = now;
+    matchPauseBackdrop.dataset.sourceCanvas = canvas.id;
+    matchPauseBackdrop.dataset.sourceArena = selectedArena.id;
+    matchPauseBackdrop.dataset.sourceFrame = String(lastGameplayBackdropFrame);
+    matchPauseBackdrop.dataset.sourceSize = `${sourceWidth}x${sourceHeight}`;
+    matchPauseBackdrop.dataset.captureSize = `${width}x${height}`;
+    return true;
+  } catch (error) {
+    console.warn('[Pass 65 retained gameplay frame failed]', error);
+    return false;
+  }
+}
+
+function captureActiveMatchBackdrop(reason: 'escape' | 'debug-pause'): boolean {
+  try {
+    if (lastGameplayBackdropFrame <= 0 && !retainLatestGameplayBackdrop(performance.now(), true)) {
+      throw new Error('No renderer-backed gameplay frame was retained');
+    }
+    const sample = pauseBackdropPixelHash(matchPauseBackdrop.width, matchPauseBackdrop.height);
+    matchPauseBackdrop.dataset.frameProvenance = 'renderer-canvas';
+    matchPauseBackdrop.dataset.captureStatus = 'captured';
+    matchPauseBackdrop.dataset.captureReason = reason;
+    matchPauseBackdrop.dataset.capturedAt = lastGameplayBackdropCapturedAt.toFixed(3);
+    const heldAt = performance.now();
+    matchPauseBackdrop.dataset.heldAt = heldAt.toFixed(3);
+    matchPauseBackdrop.dataset.sourceAgeMs = Math.max(0, heldAt - lastGameplayBackdropCapturedAt).toFixed(3);
+    matchPauseBackdrop.dataset.pixelHash = sample.hash;
+    matchPauseBackdrop.dataset.pixelSignal = sample.signal;
+    menuPreviewLabel.textContent = `HELD GAMEPLAY // ${selectedArena.displayName}`;
+    menuPreviewMotion.textContent = 'MATCH PAUSED';
+    return true;
+  } catch (error) {
+    matchPauseBackdrop.dataset.captureStatus = 'failed';
+    matchPauseBackdrop.dataset.captureReason = reason;
+    matchPauseBackdrop.dataset.sourceCanvas = canvas.id;
+    matchPauseBackdrop.dataset.sourceArena = selectedArena.id;
+    console.warn('[Pass 65 menu backdrop capture failed]', error);
+    return false;
+  }
+}
+
+function openActiveMatchPause(reason: 'escape' | 'debug-pause'): void {
+  if (!gameStarted || !player.alive || matchFinished || menuLifecycle.surface === 'paused-match') return;
+  clearGameplayInput();
+  captureActiveMatchBackdrop(reason);
+  applyMenuLifecycle({ type: 'pause-requested', reason });
+  if (document.pointerLockElement === canvas) void document.exitPointerLock();
+  requestAnimationFrame(() => resumeButton.focus({ preventScroll: true }));
+}
+
+let pointerLockRequestSerial = 0;
+
+function requestGamePointerLock(source: PointerLockRequestSource = 'canvas'): void {
+  if (!gameStarted || !player.alive || matchFinished) return;
+  applyMenuLifecycle({ type: 'pointer-request', source });
+  const requestSerial = ++pointerLockRequestSerial;
+  const rejectRequest = (): void => {
+    if (requestSerial !== pointerLockRequestSerial || document.pointerLockElement === canvas) return;
+    if (menuLifecycle.pointerLock !== 'requesting') return;
+    applyMenuLifecycle({ type: 'pointer-rejected' });
+    setStatus('Mouse capture was blocked. Click the match to retry.', 'warn');
+  };
   try {
     const request = canvas.requestPointerLock();
-    if (request instanceof Promise) void request.catch(() => undefined);
+    if (request instanceof Promise) void request.catch(rejectRequest);
   } catch {
     // Browsers can reject pointer lock outside a user gesture (for example, auto-join smoke tests).
+    rejectRequest();
   }
 }
 
@@ -5265,7 +5408,12 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   return true;
 }
 
-function respawn(requestLock = true, forceNewLife = false, deploymentWeaponOverride?: PrimaryWeaponId): void {
+function respawn(
+  requestLock = true,
+  forceNewLife = false,
+  deploymentWeaponOverride?: PrimaryWeaponId,
+  pointerLockSource: PointerLockRequestSource = 'respawn',
+): void {
   if (!player.alive || forceNewLife) {
     localContinuity += 1;
     localPositionHistory.length = 0;
@@ -5328,7 +5476,7 @@ function respawn(requestLock = true, forceNewLife = false, deploymentWeaponOverr
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
-  if (gameStarted && requestLock) requestGamePointerLock();
+  if (gameStarted && requestLock) requestGamePointerLock(pointerLockSource);
   network.send(createStateMessage());
 }
 
@@ -5349,6 +5497,12 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
+  lastGameplayPresentedFrame = 0;
+  lastGameplayBackdropFrame = 0;
+  lastGameplayBackdropCapturedAt = Number.NEGATIVE_INFINITY;
+  matchPauseBackdrop.dataset.captureStatus = 'empty';
+  applyMenuLifecycle({ type: 'match-start' });
+  syncMenuPreviewCanvasPlacement();
   hidePrivateLobbyPresentation();
   syncArenaSelectionUi();
   bestStreakThisMatch = 0;
@@ -5433,7 +5587,6 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
   respawnEndsAt = 0;
-  menu.classList.add('hidden');
   hudRoot.hidden = false;
   element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
@@ -5444,7 +5597,7 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
-  respawn(requestLock);
+  respawn(requestLock, false, undefined, 'match-start');
   if (mode === 'solo') spawnBots();
   else if (mode === 'host') spawnBots(privateMatchConfig.hostedBotCount);
   audio.unlock();
@@ -8229,7 +8382,6 @@ function beginTriPassTargeting(): void {
   lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
   const overlay = element<HTMLElement>('#strike-map-overlay');
   overlay.hidden = false;
-  menu.classList.add('hidden');
   clearGameplayInput();
   drawStrikeMap();
   if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -8247,7 +8399,7 @@ function cancelTriPassTargeting(refund: boolean, reacquirePointer = true): void 
   element<HTMLElement>('#strike-hostile-count').textContent = 'ENEMIES LIVE · 0';
   element<HTMLElement>('#strike-map-overlay').hidden = true;
   updateFieldSupportHud();
-  if (reacquirePointer && gameStarted && player.alive && !matchFinished) requestGamePointerLock();
+  if (reacquirePointer && gameStarted && player.alive && !matchFinished) requestGamePointerLock('targeting-close');
 }
 
 function scheduleTriPassMissiles(points: readonly { x: number; z: number }[], confirmedAt: number): void {
@@ -9714,6 +9866,19 @@ window.addEventListener('keydown', (event) => {
     cancelTriPassTargeting(true);
     return;
   }
+  if (
+    event.code === 'Escape'
+    && !event.repeat
+    && gameStarted
+    && player.alive
+    && !matchFinished
+    && menuLifecycle.surface === 'hidden'
+    && document.pointerLockElement !== canvas
+  ) {
+    event.preventDefault();
+    openActiveMatchPause('escape');
+    return;
+  }
   if (gameplayInputEnabled()) keys.add(event.code);
   else if (event.code !== 'Tab') return;
   if (event.code === 'Space' && !event.repeat) {
@@ -9746,9 +9911,10 @@ window.addEventListener('keyup', (event) => {
 window.addEventListener('blur', () => {
   lastWindowBlurAt = performance.now();
   clearGameplayInput();
+  applyMenuLifecycle({ type: 'focus-lost' });
 });
 window.addEventListener('focus', () => {
-  if (gameStarted && player.alive && !matchFinished) menu.classList.add('hidden');
+  applyMenuLifecycle({ type: 'focus-gained' });
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;
@@ -9761,7 +9927,7 @@ canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 canvas.addEventListener('mousedown', (event) => {
   if (isTextChatTyping()) return;
   if (document.pointerLockElement !== canvas) {
-    requestGamePointerLock();
+    requestGamePointerLock('canvas');
     return;
   }
   if (event.button === 2) {
@@ -9781,33 +9947,30 @@ window.addEventListener('mouseup', (event) => {
   adsHeld = admittedAdsHeld(mouseAdsHeld);
 });
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement !== canvas) {
-    clearGameplayInput();
-    if (isTextChatTyping()) {
-      menu.classList.add('hidden');
-      return;
-    }
-    if (tacticalMapOpen) {
-      menu.classList.add('hidden');
-      return;
-    }
-    if (gameStarted && player.alive && !matchFinished) {
-      const focusTransition = !document.hasFocus() || performance.now() - lastWindowBlurAt < 300;
-      if (focusTransition) {
-        // Losing pointer lock because another tab/app took focus must not pause
-        // a host or guest. The canvas click handler recaptures controls on return.
-        menu.classList.add('hidden');
-        return;
-      }
-      element<HTMLButtonElement>('#resume').hidden = false;
-      element<HTMLButtonElement>('#main-menu').hidden = false;
-      menu.classList.remove('hidden');
-    }
-  } else {
-    element<HTMLButtonElement>('#resume').hidden = true;
-    element<HTMLButtonElement>('#main-menu').hidden = true;
-    menu.classList.add('hidden');
+  if (document.pointerLockElement === canvas) {
+    const pauseAlreadyOpen = menuLifecycle.surface === 'paused-match';
+    applyMenuLifecycle({ type: 'pointer-acquired' });
+    if (pauseAlreadyOpen) void document.exitPointerLock();
+    return;
   }
+  clearGameplayInput();
+  const overlay = isTextChatTyping() ? 'chat' : tacticalMapOpen ? 'tactical-map' : null;
+  const pauseAllowed = gameStarted && player.alive && !matchFinished;
+  const focusTransition = !document.hasFocus() || performance.now() - lastWindowBlurAt < 300;
+  const openingPause = menuLifecycle.pointerLock === 'locked'
+    && !focusTransition
+    && overlay === null
+    && pauseAllowed;
+  if (openingPause) captureActiveMatchBackdrop('escape');
+  applyMenuLifecycle({ type: 'pointer-lost', focusTransition, overlay, pauseAllowed });
+  if (menuLifecycle.surface === 'paused-match') {
+    requestAnimationFrame(() => resumeButton.focus({ preventScroll: true }));
+  }
+});
+document.addEventListener('pointerlockerror', () => {
+  if (menuLifecycle.pointerLock !== 'requesting') return;
+  applyMenuLifecycle({ type: 'pointer-rejected' });
+  setStatus('Mouse capture was blocked. Click the match to retry.', 'warn');
 });
 
 function syncArenaSelectionUi(): void {
@@ -10043,6 +10206,7 @@ const menuPreviewObserver = new MutationObserver(syncMenuPreviewCanvasPlacement)
 menuPreviewObserver.observe(menu, { attributes: true, attributeFilter: ['class'] });
 menuPreviewObserver.observe(element<HTMLElement>('#menu-panel-deploy'), { attributes: true, attributeFilter: ['hidden'] });
 reducedMotionMedia.addEventListener('change', () => applyMenuPreviewCamera(performance.now()));
+syncMenuLifecyclePresentation();
 syncMenuPreviewCanvasPlacement();
 function animateMenuPreview(now: number): void {
   applyMenuPreviewCamera(now);
@@ -10251,9 +10415,7 @@ function returnToMainMenu(): void {
   roomCard.hidden = true;
   roomCodeEl.textContent = '';
   element<HTMLElement>('#room-hud').textContent = '';
-  element<HTMLButtonElement>('#resume').hidden = true;
-  element<HTMLButtonElement>('#main-menu').hidden = true;
-  menu.classList.remove('hidden');
+  applyMenuLifecycle({ type: 'return-pre-match' });
   syncMatchReportDownloads();
   arenaSelectionReady = true;
   syncArenaSelectionUi();
@@ -10262,10 +10424,12 @@ function returnToMainMenu(): void {
   if (document.pointerLockElement) void document.exitPointerLock();
 }
 
-element<HTMLButtonElement>('#resume').addEventListener('click', () => {
-  if (gameStarted && player.alive && !matchFinished) requestGamePointerLock();
+resumeButton.addEventListener('click', () => {
+  if (!gameStarted || !player.alive || matchFinished) return;
+  applyMenuLifecycle({ type: 'resume' });
+  requestGamePointerLock('resume');
 });
-element<HTMLButtonElement>('#main-menu').addEventListener('click', returnToMainMenu);
+mainMenuButton.addEventListener('click', returnToMainMenu);
 element<HTMLButtonElement>('#menu-download-match-summary').addEventListener('click', downloadMatchSummary);
 element<HTMLButtonElement>('#menu-download-match-technical').addEventListener('click', downloadMatchDiagnostics);
 
@@ -10603,6 +10767,10 @@ function frame(now: number, scheduleNext = true): void {
         submitWebGpuFrame(now);
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
+      }
+      if (gameStarted && menuLifecycle.surface === 'hidden') {
+        lastGameplayPresentedFrame = frameCount;
+        retainLatestGameplayBackdrop(now);
       }
       monitorSelectedArenaRender(now);
       if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh(false);
@@ -11614,6 +11782,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     },
     weaponActionHistory: [...weaponActionHistory],
     menuVisible: !menu.classList.contains('hidden'),
+    menuLifecycle: {
+      ...menuLifecycle,
+      backdrop: {
+        visible: !matchPauseBackdrop.hidden,
+        provenance: matchPauseBackdrop.dataset.frameProvenance ?? null,
+        captureStatus: matchPauseBackdrop.dataset.captureStatus ?? null,
+        captureReason: matchPauseBackdrop.dataset.captureReason ?? null,
+        sourceCanvas: matchPauseBackdrop.dataset.sourceCanvas ?? null,
+        sourceArena: matchPauseBackdrop.dataset.sourceArena ?? null,
+        sourceFrame: Number(matchPauseBackdrop.dataset.sourceFrame ?? 0),
+        sourceSize: matchPauseBackdrop.dataset.sourceSize ?? null,
+        captureSize: matchPauseBackdrop.dataset.captureSize ?? null,
+        sourceAgeMs: Number(matchPauseBackdrop.dataset.sourceAgeMs ?? 0),
+        pixelHash: matchPauseBackdrop.dataset.pixelHash ?? null,
+        pixelSignal: matchPauseBackdrop.dataset.pixelSignal ?? null,
+      },
+    },
     menuCamera: {
       position: camera.position.toArray(),
       towerNdc: new THREE.Vector3(0, 6, 0).project(camera).toArray(),
@@ -11625,6 +11810,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       motion: menuPreviewFrame.dataset.motion,
       phase: menuPreviewFrame.dataset.phase,
       canvasParent: canvas.parentElement?.id ?? null,
+      context: menuShowcase.dataset.menuContext,
       label: menuPreviewLabel.textContent,
     },
     render: {
@@ -12260,10 +12446,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   sampleArenaPerformanceBudget,
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
-  openMenu: () => {
-    clearGameplayInput();
-    menu.classList.remove('hidden');
-  },
+  openMenu: () => openActiveMatchPause('debug-pause'),
   fireOnce: () => {
     debugInputUnlocked = true;
     triggerHeld = true;

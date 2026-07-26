@@ -47,7 +47,8 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(UI_STATE_INVENTORY).toEqual(expect.arrayContaining([
       'host', 'guest', 'reconnecting', 'syncing', 'ready', 'live', 'dead',
       'respawning', 'match-ended', 'returned-lobby', 'modal-open', 'chat-typing',
-      'error', 'reduced-motion', 'high-dpi',
+      'error', 'reduced-motion', 'pointer-lock-requesting', 'pointer-lock-denied',
+      'focus-suspended', 'paused-match', 'high-dpi',
     ]));
     expect(UI_REVIEW_VIEWPORTS.map(({ id }) => id)).toEqual(['laptop', 'desktop', 'ultrawide', 'narrow']);
   });
@@ -61,6 +62,18 @@ describe('Pass 64 typed UI surface contract', () => {
     });
     expect(mainSource).toContain("element<HTMLElement>('#railgun-thermal')");
     expect(tacticalCssSource).toContain('#railgun-thermal');
+  });
+
+  it('registers one renderer-provenanced active-match pause backdrop', () => {
+    expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'match-pause-backdrop')).toEqual({
+      id: 'match-pause-backdrop',
+      rootElementId: 'match-pause-backdrop',
+      renderer: 'main-shell',
+      critical: true,
+    });
+    expect(generatedDialogSources).toContain('data-frame-provenance="renderer-canvas"');
+    expect(generatedDialogSources).not.toContain('atomic-acres-menu-squad-joke.jpg');
+    expect(tacticalCssSource).toContain("#menu-showcase[data-menu-context='paused-match'] .match-pause-backdrop");
   });
 
   it('keeps canonical text and status colours above AA contrast on the primary panel', () => {
