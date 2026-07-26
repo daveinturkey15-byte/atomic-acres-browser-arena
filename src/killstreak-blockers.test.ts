@@ -16,6 +16,7 @@ import {
   DRONE_GUN_PROFILE_ID,
   DRONE_SWARM_FIRE_LANE_INTERVAL_MS,
 } from './killstreak-support-catalog';
+import { supportForwardFromYawPitch } from './support-forward-axis';
 
 const bounds = { minX: -40, maxX: 40, minZ: -45, maxZ: 45, floorY: 0, ceilingY: 40 } as const;
 const baseWorld = (overrides: Partial<KillstreakWorld> = {}): KillstreakWorld => ({
@@ -229,7 +230,17 @@ describe('Pass 65 killstreak blockers', () => {
     expect(runtime.damageEntity(aircraft.id, 999)).toMatchObject({ applied: false, destroyed: false });
     runtime.advance(2_000, baseWorld());
     const inFlight = runtime.snapshotFor(null, 2_000).entities;
-    expect(inFlight.find((entity) => entity.kind === 'aircraft')?.position).not.toEqual(aircraft.position);
+    const movedAircraft = inFlight.find((entity) => entity.kind === 'aircraft')!;
+    expect(movedAircraft.position).not.toEqual(aircraft.position);
+    const travel = [movedAircraft.position[0] - aircraft.position[0], movedAircraft.position[2] - aircraft.position[2]];
+    const travelLength = Math.hypot(...travel);
+    const initialForward = supportForwardFromYawPitch(aircraft.attitude[1], aircraft.attitude[0]);
+    const movedForward = supportForwardFromYawPitch(movedAircraft.attitude[1], movedAircraft.attitude[0]);
+    const horizontalAlignment = (forward: readonly [number, number, number]) => (
+      (forward[0] * travel[0] + forward[2] * travel[1]) / (Math.hypot(forward[0], forward[2]) * travelLength)
+    );
+    expect(horizontalAlignment(initialForward)).toBeGreaterThan(0.999);
+    expect(horizontalAlignment(movedForward)).toBeGreaterThan(0.999);
     expect(inFlight.find((entity) => entity.kind === 'care-crate')?.phase).toBe('descending');
     runtime.advance(1_000 + CARE_AIRCRAFT_DURATION_MS, baseWorld());
     const afterFlyover = runtime.snapshotFor(null, 1_000 + CARE_AIRCRAFT_DURATION_MS).entities;

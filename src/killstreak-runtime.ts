@@ -654,7 +654,8 @@ export class HostKillstreakRuntime {
       this.entities.set(aircraftId, {
         id: aircraftId, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
-        position: routeStart, velocity: [0, 0, 0], attitude: [0, direction > 0 ? Math.PI / 2 : -Math.PI / 2, 0],
+        position: routeStart, velocity: [0, 0, 0],
+        attitude: [0, supportYawForDirection(routeEnd[0] - routeStart[0], routeEnd[2] - routeStart[2]), 0],
         health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart, routeEnd,
       });
       this.entities.set(id, {
