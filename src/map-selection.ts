@@ -80,7 +80,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     soloBotCount: 1,
     maximumSoloBots: 1,
     multiplayer: true,
-    fieldSupport: false,
+    fieldSupport: true,
     overdrive: false,
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),

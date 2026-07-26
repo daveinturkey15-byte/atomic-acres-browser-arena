@@ -49,7 +49,14 @@ describe('killstreak presentation', () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
     presentation.sync(snapshot(4), 1_000);
-    expect(presentation.telemetry()).toEqual({ entities: 4, impactFlashes: 0, sensorContacts: 0, placementMarkers: 0, bounded: true });
+    expect(presentation.telemetry()).toEqual({
+      entities: 4,
+      impactFlashes: 0,
+      sensorContacts: 0,
+      placementMarkers: 0,
+      markerDetails: [],
+      bounded: true,
+    });
     expect(presentation.root.getObjectByName('chopper-sleek-cockpit-canopy')).toBeDefined();
     expect(presentation.root.getObjectByName('pass65-care-package-aircraft')).toBeDefined();
     expect(presentation.root.getObjectByName('care-package-parachute')).toBeDefined();
@@ -136,16 +143,65 @@ describe('killstreak presentation', () => {
     const presentation = new KillstreakPresentation(new THREE.Scene());
     presentation.sync(snapshot(0, [], [{
       id: 'ks-activation-7-1:carpet-target', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'ground-x',
-      ownerId: 'owner', team: 0, audience: 'all-combatants', anchor: [2, 0, 3], pathStart: null, pathEnd: null, expiresInMs: 900,
+      ownerId: 'owner', team: 0, audience: 'all-combatants', anchor: [2, 0, 3], pathStart: null, pathEnd: null, halfWidthM: null, expiresInMs: 900,
     }, {
       id: 'ks-activation-7-1:carpet-corridor', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'corridor',
-      ownerId: 'owner', team: 0, audience: 'owner-only', anchor: [2, 0, 3], pathStart: [-15, 18, -8], pathEnd: [18, 18, 12], expiresInMs: 900,
+      ownerId: 'owner', team: 0, audience: 'owner-only', anchor: [2, 0, 3], pathStart: [-15, 0, -8], pathEnd: [18, 0, 12], halfWidthM: 6.25, expiresInMs: 900,
     }]), 1_000);
-    expect(presentation.telemetry().placementMarkers).toBe(2);
+    const telemetry = presentation.telemetry();
+    expect(telemetry.placementMarkers).toBe(2);
+    expect(telemetry.markerDetails).toEqual([
+      expect.objectContaining({
+        id: 'ks-activation-7-1:carpet-corridor',
+        activationId: 'ks-activation-7-1',
+        source: 'carpet-bomber',
+        shape: 'corridor',
+        audience: 'owner-only',
+        anchor: [2, 0, 3],
+        pathStart: [-15, 0, -8],
+        pathEnd: [18, 0, 12],
+        halfWidthM: 6.25,
+        colourHexes: ['#ff253f'],
+        depthTest: true,
+        visible: true,
+      }),
+      expect.objectContaining({
+        id: 'ks-activation-7-1:carpet-target',
+        activationId: 'ks-activation-7-1',
+        source: 'carpet-bomber',
+        shape: 'ground-x',
+        audience: 'all-combatants',
+        anchor: [2, 0, 3],
+        halfWidthM: null,
+        worldPosition: [2, 0.055, 3],
+        colourHexes: ['#ff253f'],
+        depthTest: true,
+        visible: true,
+      }),
+    ]);
+    expect(telemetry.markerDetails[0]?.corridorLengthM).toBeCloseTo(Math.hypot(33, 20));
+    const targetBounds = telemetry.markerDetails[1]!.worldBounds;
+    expect(targetBounds.max[0]! - targetBounds.min[0]!).toBeGreaterThan(5);
+    expect(targetBounds.max[2]! - targetBounds.min[2]!).toBeGreaterThan(5);
     expect(presentation.root.getObjectByName('support-placement-ground-x')?.userData.audience).toBe('all-combatants');
     expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor')).toBeDefined();
-    presentation.sync(snapshot(0), 2_000);
+    // A stale network snapshot cannot keep a marker alive after its local
+    // deadline; no later host snapshot is required for teardown.
+    presentation.sync(snapshot(0, [], [{
+      id: 'ks-activation-7-1:carpet-target', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'ground-x',
+      ownerId: 'owner', team: 0, audience: 'all-combatants', anchor: [2, 0, 3], pathStart: null, pathEnd: null, halfWidthM: null, expiresInMs: 900,
+    }, {
+      id: 'ks-activation-7-1:carpet-corridor', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'corridor',
+      ownerId: 'owner', team: 0, audience: 'owner-only', anchor: [2, 0, 3], pathStart: [-15, 0, -8], pathEnd: [18, 0, 12], halfWidthM: 6.25, expiresInMs: 900,
+    }]), 2_000);
     expect(presentation.telemetry().placementMarkers).toBe(0);
+    presentation.sync({ ...snapshot(0, [], [{
+      id: 'care:target', activationId: 'care', source: 'care-package', shape: 'ground-x',
+      ownerId: 'owner', team: 0, audience: 'all-combatants', anchor: [0, 0, 0], pathStart: null, pathEnd: null, halfWidthM: null, expiresInMs: 900,
+    }]), revision: 2 }, 2_001);
+    expect(presentation.telemetry().placementMarkers).toBe(1);
+    presentation.clear();
+    expect(presentation.telemetry()).toMatchObject({ placementMarkers: 0, markerDetails: [] });
     presentation.dispose();
   });
 });

@@ -186,15 +186,17 @@ function isSensorContact(value: unknown): value is DroneSensorContact {
 
 function isPlacementMarker(value: unknown): value is KillstreakPlacementMarkerSnapshot {
   if (!object(value) || !exactKeys(value, [
-    'id', 'activationId', 'source', 'shape', 'ownerId', 'team', 'audience', 'anchor', 'pathStart', 'pathEnd', 'expiresInMs',
+    'id', 'activationId', 'source', 'shape', 'ownerId', 'team', 'audience', 'anchor', 'pathStart', 'pathEnd', 'halfWidthM', 'expiresInMs',
   ]) || typeof value.id !== 'string' || value.id.length > 120 || !activationId(value.activationId)
     || (value.source !== 'care-package' && value.source !== 'carpet-bomber')
     || (value.shape !== 'ground-x' && value.shape !== 'corridor')
     || !actorId(value.ownerId) || (value.team !== 0 && value.team !== 1)
     || (value.audience !== 'all-combatants' && value.audience !== 'owner-only')
     || !vec3(value.anchor) || !finite(value.expiresInMs, 0, 60_000)) return false;
-  if (value.shape === 'ground-x') return value.pathStart === null && value.pathEnd === null;
-  return value.source === 'carpet-bomber' && value.audience === 'owner-only' && vec3(value.pathStart) && vec3(value.pathEnd);
+  if (value.shape === 'ground-x') return value.audience === 'all-combatants'
+    && value.pathStart === null && value.pathEnd === null && value.halfWidthM === null;
+  return value.source === 'carpet-bomber' && value.audience === 'owner-only'
+    && vec3(value.pathStart) && vec3(value.pathEnd) && finite(value.halfWidthM, 0.1, 100);
 }
 
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {

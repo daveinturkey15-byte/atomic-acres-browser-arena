@@ -152,6 +152,72 @@ describe('host killstreak runtime', () => {
     expect(new Set(first.impactEvents.map((impact) => impact.ordinal)).size).toBe(CARPET_BOMBER_IMPACT_COUNT);
   });
 
+  it('contains every admitted payload inside its seeded mildly-wide corridor across seeds, bounds and surfaces', () => {
+    const boundsCases = [
+      { minX: -40, maxX: 40, minZ: -45, maxZ: 45, floorY: 0, ceilingY: 40 },
+      { minX: -28, maxX: 28, minZ: -22, maxZ: 22, floorY: 0, ceilingY: 30 },
+      { minX: -48, maxX: 48, minZ: -30, maxZ: 30, floorY: 0, ceilingY: 35 },
+    ] as const;
+    for (let matchEpoch = 1; matchEpoch <= 30; matchEpoch += 1) {
+      const bounds = boundsCases[matchEpoch % boundsCases.length]!;
+      const groundHeightAt = (x: number, z: number) => 0.6
+        + (x - bounds.minX) / (bounds.maxX - bounds.minX) * 0.7
+        + (z - bounds.minZ) / (bounds.maxZ - bounds.minZ) * 0.35;
+      const world: KillstreakWorld = { ...DEFAULT_WORLD, bounds, groundHeightAt };
+      const runtime = new HostKillstreakRuntime(matchEpoch);
+      runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+      earn(runtime, 7);
+      const anchor: readonly [number, number, number] = matchEpoch % 2 === 0
+        ? [bounds.maxX - 0.1, 99, bounds.minZ + 0.1]
+        : [bounds.minX + 0.1, -99, bounds.maxZ - 0.1];
+      expect(runtime.activate({
+        by: 'owner', matchEpoch, lifeId: 1, sequence: 1, slot: 3,
+        activationId: `activation-carpet-${matchEpoch}`, expectedId: 'carpet-bomber', anchor,
+      }, 1_000, world).accepted).toBe(true);
+      const corridor = runtime.snapshotFor('owner', 1_001).placementMarkers.find((marker) => marker.shape === 'corridor');
+      expect(corridor).toBeDefined();
+      expect(corridor?.audience).toBe('owner-only');
+      expect(corridor?.halfWidthM).toBeGreaterThan(3.5);
+      expect(corridor?.halfWidthM).toBeLessThan(7.5);
+      const start = corridor!.pathStart!;
+      const end = corridor!.pathEnd!;
+      const dx = end[0] - start[0];
+      const dz = end[2] - start[2];
+      const lengthSquared = dx * dx + dz * dz;
+      const result = runtime.advance(6_000, world);
+      expect(result.impactEvents).toHaveLength(CARPET_BOMBER_IMPACT_COUNT);
+      for (const impact of result.impactEvents) {
+        const relativeX = impact.position[0] - start[0];
+        const relativeZ = impact.position[2] - start[2];
+        const projection = (relativeX * dx + relativeZ * dz) / lengthSquared;
+        const perpendicular = Math.abs(relativeX * dz - relativeZ * dx) / Math.sqrt(lengthSquared);
+        expect(projection).toBeGreaterThanOrEqual(-1e-9);
+        expect(projection).toBeLessThanOrEqual(1 + 1e-9);
+        expect(perpendicular).toBeLessThanOrEqual(corridor!.halfWidthM! + 1e-9);
+        expect(impact.position[1]).toBeCloseTo(groundHeightAt(impact.position[0], impact.position[2]), 8);
+      }
+    }
+  });
+
+  it('ignores a forged placement Y and anchors the Care X plus crate to the host surface', () => {
+    const groundHeightAt = (x: number, z: number) => 2.25 + x * 0.01 - z * 0.005;
+    const world: KillstreakWorld = { ...DEFAULT_WORLD, groundHeightAt };
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    expect(runtime.activate({ ...intent('care-package', 1), anchor: [7, 999, -6] }, 1_000, world).accepted).toBe(true);
+    const marker = runtime.snapshotFor('owner', 1_001).placementMarkers[0]!;
+    const surfaceY = groundHeightAt(7, -6);
+    expect(marker).toMatchObject({
+      source: 'care-package', shape: 'ground-x', audience: 'all-combatants',
+      anchor: [7, surfaceY, -6], pathStart: null, pathEnd: null, halfWidthM: null,
+    });
+    runtime.advance(7_000, world);
+    const crate = runtime.snapshotFor('owner', 7_000).entities.find((entity) => entity.kind === 'care-crate');
+    expect(crate?.phase).toBe('landed');
+    expect(crate?.position).toEqual([7, surfaceY + 0.45, -6]);
+  });
+
   it('replicates admitted placement X markers to both peers but keeps the carpet corridor owner-private', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));

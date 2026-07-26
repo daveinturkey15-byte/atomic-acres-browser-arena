@@ -79,6 +79,42 @@ type PresentedEntity = Readonly<{
   mixer: THREE.AnimationMixer | null;
 }>;
 
+type PresentedPlacementMarker = {
+  root: THREE.Group;
+  snapshot: KillstreakPlacementMarkerSnapshot;
+  snapshotRevision: number;
+  expiresAtMs: number;
+};
+
+export type KillstreakPlacementMarkerTelemetry = Readonly<{
+  id: string;
+  activationId: string;
+  source: KillstreakPlacementMarkerSnapshot['source'];
+  shape: KillstreakPlacementMarkerSnapshot['shape'];
+  audience: KillstreakPlacementMarkerSnapshot['audience'];
+  ownerId: string;
+  anchor: readonly number[];
+  pathStart: readonly number[] | null;
+  pathEnd: readonly number[] | null;
+  halfWidthM: number | null;
+  worldPosition: readonly number[];
+  worldBounds: Readonly<{ min: readonly number[]; max: readonly number[] }>;
+  corridorLengthM: number | null;
+  meshNames: readonly string[];
+  colourHexes: readonly string[];
+  depthTest: boolean;
+  visible: boolean;
+}>;
+
+export type KillstreakPresentationTelemetry = Readonly<{
+  entities: number;
+  impactFlashes: number;
+  sensorContacts: number;
+  placementMarkers: number;
+  markerDetails: readonly KillstreakPlacementMarkerTelemetry[];
+  bounded: boolean;
+}>;
+
 export type KillstreakPresentationRetireRoot = (root: THREE.Object3D) => void;
 
 function material(color: number, options: { emissive?: number; transparent?: boolean; opacity?: number } = {}): THREE.MeshStandardMaterial {
@@ -419,7 +455,9 @@ function buildPlacementMarker(marker: KillstreakPlacementMarkerSnapshot): THREE.
     root.position.copy(start).lerp(end, 0.5);
     root.position.y = marker.anchor[1] + 0.065;
     root.rotation.y = -Math.atan2(delta.z, delta.x);
-    const corridor = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 5.8), placementMarkerMaterial(0.32));
+    const corridorWidthM = Math.max(0.2, (marker.halfWidthM ?? 0.1) * 2);
+    root.userData.halfWidthM = marker.halfWidthM;
+    const corridor = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, corridorWidthM), placementMarkerMaterial(0.32));
     corridor.name = 'carpet-bomber-flight-corridor';
     corridor.renderOrder = 17;
     corridor.raycast = () => undefined;
@@ -451,7 +489,8 @@ export class KillstreakPresentation {
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
   private firstPersonEntityId: string | null = null;
-  private readonly placementMarkers = new Map<string, THREE.Group>();
+  private readonly placementMarkers = new Map<string, PresentedPlacementMarker>();
+  private readonly locallyExpiredMarkerRevisions = new Map<string, number>();
 
   constructor(
     scene: THREE.Scene,
@@ -509,7 +548,7 @@ export class KillstreakPresentation {
       presented.root.userData.gunController = entity.gunController;
     }
     this.syncSensorContacts(snapshot.sensorContacts);
-    this.syncPlacementMarkers(snapshot.placementMarkers);
+    this.syncPlacementMarkers(snapshot.placementMarkers, snapshot.revision, nowMs);
     for (let index = this.impactFlashes.length - 1; index >= 0; index -= 1) {
       const flash = this.impactFlashes[index];
       const remaining = THREE.MathUtils.clamp((flash.expiresAt - nowMs) / 420, 0, 1);
@@ -536,18 +575,47 @@ export class KillstreakPresentation {
     }
   }
 
-  private syncPlacementMarkers(markers: readonly KillstreakPlacementMarkerSnapshot[]): void {
-    const admitted = markers.filter((marker) => marker.expiresInMs > 0).slice(0, MAX_PLACEMENT_MARKERS);
+  private syncPlacementMarkers(
+    markers: readonly KillstreakPlacementMarkerSnapshot[],
+    snapshotRevision: number,
+    nowMs: number,
+  ): void {
+    for (const [id, presented] of this.placementMarkers) {
+      if (nowMs < presented.expiresAtMs) continue;
+      this.retireRoot(presented.root);
+      this.placementMarkers.delete(id);
+      this.locallyExpiredMarkerRevisions.set(id, presented.snapshotRevision);
+    }
+    const markerIds = new Set(markers.map((marker) => marker.id));
+    for (const [id, expiredRevision] of this.locallyExpiredMarkerRevisions) {
+      if (!markerIds.has(id) || snapshotRevision > expiredRevision) this.locallyExpiredMarkerRevisions.delete(id);
+    }
+    const admitted = markers
+      .filter((marker) => marker.expiresInMs > 0 && this.locallyExpiredMarkerRevisions.get(marker.id) !== snapshotRevision)
+      .slice(0, MAX_PLACEMENT_MARKERS);
     const liveIds = new Set(admitted.map((marker) => marker.id));
-    for (const [id, root] of this.placementMarkers) {
+    for (const [id, presented] of this.placementMarkers) {
       if (liveIds.has(id)) continue;
-      this.retireRoot(root);
+      this.retireRoot(presented.root);
       this.placementMarkers.delete(id);
     }
     for (const marker of admitted) {
-      if (this.placementMarkers.has(marker.id)) continue;
+      const existing = this.placementMarkers.get(marker.id);
+      if (existing) {
+        existing.snapshot = marker;
+        if (existing.snapshotRevision !== snapshotRevision) {
+          existing.snapshotRevision = snapshotRevision;
+          existing.expiresAtMs = nowMs + marker.expiresInMs;
+        }
+        continue;
+      }
       const root = buildPlacementMarker(marker);
-      this.placementMarkers.set(marker.id, root);
+      this.placementMarkers.set(marker.id, {
+        root,
+        snapshot: marker,
+        snapshotRevision,
+        expiresAtMs: nowMs + marker.expiresInMs,
+      });
       this.root.add(root);
     }
   }
@@ -596,12 +664,57 @@ export class KillstreakPresentation {
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
   }
 
-  telemetry(): Readonly<{ entities: number; impactFlashes: number; sensorContacts: number; placementMarkers: number; bounded: boolean }> {
+  telemetry(): KillstreakPresentationTelemetry {
+    const markerDetails = [...this.placementMarkers.values()]
+      .sort((left, right) => left.snapshot.id.localeCompare(right.snapshot.id))
+      .map(({ root, snapshot }): KillstreakPlacementMarkerTelemetry => {
+        root.updateWorldMatrix(true, true);
+        const worldPosition = root.getWorldPosition(new THREE.Vector3()).toArray();
+        const worldBounds = new THREE.Box3().setFromObject(root);
+        const meshNames: string[] = [];
+        const colourHexes = new Set<string>();
+        let depthTest = true;
+        root.traverse((node) => {
+          if (!(node instanceof THREE.Mesh)) return;
+          meshNames.push(node.name);
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          for (const entry of materials) {
+            if ('color' in entry && entry.color instanceof THREE.Color) colourHexes.add(`#${entry.color.getHexString()}`);
+            depthTest &&= entry.depthTest;
+          }
+        });
+        const corridorLengthM = snapshot.pathStart && snapshot.pathEnd
+          ? Math.hypot(snapshot.pathEnd[0] - snapshot.pathStart[0], snapshot.pathEnd[2] - snapshot.pathStart[2])
+          : null;
+        return Object.freeze({
+          id: snapshot.id,
+          activationId: snapshot.activationId,
+          source: snapshot.source,
+          shape: snapshot.shape,
+          audience: snapshot.audience,
+          ownerId: snapshot.ownerId,
+          anchor: Object.freeze([...snapshot.anchor]),
+          pathStart: snapshot.pathStart ? Object.freeze([...snapshot.pathStart]) : null,
+          pathEnd: snapshot.pathEnd ? Object.freeze([...snapshot.pathEnd]) : null,
+          halfWidthM: snapshot.halfWidthM,
+          worldPosition: Object.freeze(worldPosition),
+          worldBounds: Object.freeze({
+            min: Object.freeze(worldBounds.min.toArray()),
+            max: Object.freeze(worldBounds.max.toArray()),
+          }),
+          corridorLengthM,
+          meshNames: Object.freeze(meshNames.sort()),
+          colourHexes: Object.freeze([...colourHexes].sort()),
+          depthTest,
+          visible: root.visible && root.parent !== null,
+        });
+      });
     return Object.freeze({
       entities: this.entities.size,
       impactFlashes: this.impactFlashes.length,
       sensorContacts: this.visibleSensorContacts,
       placementMarkers: this.placementMarkers.size,
+      markerDetails: Object.freeze(markerDetails),
       bounded: this.entities.size <= MAX_PRESENTED_ENTITIES
         && this.impactFlashes.length <= MAX_IMPACT_FLASHES
         && this.visibleSensorContacts <= MAX_SENSOR_CONTACTS
@@ -617,8 +730,9 @@ export class KillstreakPresentation {
     this.impactFlashes.length = 0;
     this.visibleSensorContacts = 0;
     for (const silhouette of this.sensorSilhouettes) silhouette.visible = false;
-    for (const root of this.placementMarkers.values()) this.retireRoot(root);
+    for (const presented of this.placementMarkers.values()) this.retireRoot(presented.root);
     this.placementMarkers.clear();
+    this.locallyExpiredMarkerRevisions.clear();
   }
 
   dispose(): void {

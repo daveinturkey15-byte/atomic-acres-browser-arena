@@ -31,6 +31,7 @@ describe('opening arena selection', () => {
       soloBotCount: 1,
       maximumSoloBots: 1,
       multiplayer: true,
+      fieldSupport: true,
       matchRules: { durationMs: 300_000, scoreLimit: null },
       rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
     });
@@ -49,6 +50,15 @@ describe('opening arena selection', () => {
       fieldSupport: true,
       overdrive: false,
       matchRules: { durationMs: 300_000, scoreLimit: null },
+    });
+  });
+
+  it('enables every killstreak arena except the dedicated gun range', () => {
+    expect(Object.fromEntries(ARENA_SELECTIONS.map((entry) => [entry.id, entry.fieldSupport]))).toEqual({
+      'atomic-acres': true,
+      'skyline-terminal': true,
+      'rustworks-1v1': true,
+      'gun-range': false,
     });
   });
 

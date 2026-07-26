@@ -52,6 +52,8 @@ export type KillstreakWorld = Readonly<{
   targets: readonly KillstreakTarget[];
   areHostile?: (ownerId: string, ownerTeam: 0 | 1, target: KillstreakTarget) => boolean;
   hasLineOfSight?: (from: SupportVec3, to: SupportVec3) => boolean;
+  /** Host-owned support-placement surface query. Client supplied Y is never authoritative. */
+  groundHeightAt?: (x: number, z: number) => number;
   /** Resolves against arena static/dynamic solids, ceilings, portals and no-fly data. */
   resolveFlightPosition?: (from: SupportVec3, desired: SupportVec3, radius: number) => SupportVec3;
   isFlightPositionValid?: (position: SupportVec3) => boolean;
@@ -186,8 +188,16 @@ type CarpetBomberActivation = {
   anchor: SupportVec3;
   pathStart: SupportVec3;
   pathEnd: SupportVec3;
+  halfWidthM: number;
   nextImpactOrdinal: number;
 };
+
+type CarpetImpactPlan = Readonly<{
+  impacts: readonly SupportVec3[];
+  pathStart: SupportVec3;
+  pathEnd: SupportVec3;
+  halfWidthM: number;
+}>;
 
 export type KillstreakPlacementMarkerSnapshot = Readonly<{
   id: string;
@@ -200,6 +210,7 @@ export type KillstreakPlacementMarkerSnapshot = Readonly<{
   anchor: SupportVec3;
   pathStart: SupportVec3 | null;
   pathEnd: SupportVec3 | null;
+  halfWidthM: number | null;
   expiresInMs: number;
 }>;
 
@@ -345,6 +356,11 @@ function lineOfSight(world: KillstreakWorld, from: SupportVec3, to: SupportVec3)
 
 function actorPosition(world: KillstreakWorld, actorId: string): SupportVec3 | null {
   return world.targets.find((target) => target.id === actorId && target.alive)?.position ?? null;
+}
+
+function supportGroundHeight(world: KillstreakWorld, x: number, z: number): number {
+  const queried = world.groundHeightAt?.(x, z);
+  return clamp(Number.isFinite(queried) ? queried! : world.bounds.floorY, world.bounds.floorY, world.bounds.ceilingY - 0.5);
 }
 
 function exactDefinition(id: string, catalog: KillstreakCatalog<string>) {
@@ -598,7 +614,10 @@ export class HostKillstreakRuntime {
     const activationId = this.nextActivationId();
     const seed = hashText(`${this.matchEpoch}:${activationId}:${actualId}`);
     const entityIds: string[] = [];
-    const anchor = finiteTuple(intent.anchor) ? this.clampAnchor(intent.anchor, world) : this.defaultAnchor(actor.actorId, world);
+    const requestedAnchor = finiteTuple(intent.anchor) ? this.clampAnchor(intent.anchor, world) : this.defaultAnchor(actor.actorId, world);
+    const anchor: [number, number, number] = actualId === 'care-package' || actualId === 'carpet-bomber'
+      ? [requestedAnchor[0], supportGroundHeight(world, requestedAnchor[0], requestedAnchor[2]), requestedAnchor[2]]
+      : requestedAnchor;
 
     if (actualId === 'adrenaline') {
       actor.adrenalineUntilMs = nowMs + ADRENALINE_DURATION_MS;
@@ -638,28 +657,31 @@ export class HostKillstreakRuntime {
         id, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + 60_000,
         position: [...routeStart], velocity: [0, 0, 0], attitude: [0, 0, 0], health: 100, revision: 0,
-        kind: 'care-crate', phase: 'inbound', dropPosition: [anchor[0], world.bounds.floorY + 0.45, anchor[2]],
+        kind: 'care-crate', phase: 'inbound', dropPosition: [anchor[0], anchor[1] + 0.45, anchor[2]],
         descentStartPosition, descentStartsAtMs: nowMs + CARE_AIRCRAFT_DROP_DELAY_MS, aircraftId,
         reward, rollUnit, captureActorId: null, captureStartedAtMs: null,
       });
       entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
-      const impacts = this.carpetImpactPattern(anchor, seed, world);
-      const groundAnchor: SupportVec3 = Object.freeze([anchor[0], world.bounds.floorY, anchor[2]] as const);
+      const plan = this.carpetImpactPattern(anchor, seed, world);
+      const impacts = plan.impacts;
+      const groundAnchor: SupportVec3 = Object.freeze([...anchor] as [number, number, number]);
       const aircraftId = this.nextEntityId('carpet-aircraft');
       const top = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
-      const pathStart: SupportVec3 = Object.freeze([impacts[0][0], top, impacts[0][2]] as const);
-      const pathEnd: SupportVec3 = Object.freeze([impacts[impacts.length - 1][0], top, impacts[impacts.length - 1][2]] as const);
+      const pathStart: SupportVec3 = plan.pathStart;
+      const pathEnd: SupportVec3 = plan.pathEnd;
       this.carpetBombers.set(activationId, {
         activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + 12_000, impacts,
-        anchor: groundAnchor, pathStart, pathEnd, nextImpactOrdinal: 0,
+        anchor: groundAnchor, pathStart, pathEnd, halfWidthM: plan.halfWidthM, nextImpactOrdinal: 0,
       });
+      const flightStart: SupportVec3 = Object.freeze([pathStart[0], top, pathStart[2]] as const);
+      const flightEnd: SupportVec3 = Object.freeze([pathEnd[0], top, pathEnd[2]] as const);
       this.entities.set(aircraftId, {
         id: aircraftId, activationId, ownerId: actor.actorId, team: actor.team,
         createdAtMs: nowMs, expiresAtMs: nowMs + CARE_AIRCRAFT_DURATION_MS,
-        position: [...pathStart], velocity: [0, 0, 0], attitude: [0, supportYawForDirection(pathEnd[0] - pathStart[0], pathEnd[2] - pathStart[2]), 0],
-        health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart: [...pathStart], routeEnd: [...pathEnd],
+        position: [...flightStart], velocity: [0, 0, 0], attitude: [0, supportYawForDirection(flightEnd[0] - flightStart[0], flightEnd[2] - flightStart[2]), 0],
+        health: 1, revision: 0, kind: 'aircraft', phase: 'inbound', seed, routeStart: [...flightStart], routeEnd: [...flightEnd],
       });
       entityIds.push(aircraftId);
     } else if (actualId === 'chopper') {
@@ -756,19 +778,61 @@ export class HostKillstreakRuntime {
     ], world);
   }
 
-  private carpetImpactPattern(anchor: SupportVec3, seed: number, world: KillstreakWorld): readonly SupportVec3[] {
+  private carpetImpactPattern(anchor: SupportVec3, seed: number, world: KillstreakWorld): CarpetImpactPlan {
     const angle = unit(seed, 1) * Math.PI * 2;
     const forward: readonly [number, number] = [Math.cos(angle), Math.sin(angle)];
     const side: readonly [number, number] = [-forward[1], forward[0]];
-    return Object.freeze(Array.from({ length: CARPET_BOMBER_IMPACT_COUNT }, (_, index) => {
+    const impacts = Object.freeze(Array.from({ length: CARPET_BOMBER_IMPACT_COUNT }, (_, index) => {
       const along = (index / (CARPET_BOMBER_IMPACT_COUNT - 1) - 0.5) * 34;
       const zigzag = (index % 2 === 0 ? -1 : 1) * (3.4 + unit(seed, index + 2) * 2.2);
+      const deltaX = forward[0] * along + side[0] * zigzag;
+      const deltaZ = forward[1] * along + side[1] * zigzag;
+      let boundaryScale = 1;
+      if (deltaX > 0) boundaryScale = Math.min(boundaryScale, (world.bounds.maxX - anchor[0]) / deltaX);
+      else if (deltaX < 0) boundaryScale = Math.min(boundaryScale, (world.bounds.minX - anchor[0]) / deltaX);
+      if (deltaZ > 0) boundaryScale = Math.min(boundaryScale, (world.bounds.maxZ - anchor[2]) / deltaZ);
+      else if (deltaZ < 0) boundaryScale = Math.min(boundaryScale, (world.bounds.minZ - anchor[2]) / deltaZ);
+      boundaryScale = clamp(boundaryScale, 0, 1);
+      const x = anchor[0] + deltaX * boundaryScale;
+      const z = anchor[2] + deltaZ * boundaryScale;
       return Object.freeze([
-        clamp(anchor[0] + forward[0] * along + side[0] * zigzag, world.bounds.minX, world.bounds.maxX),
-        world.bounds.floorY,
-        clamp(anchor[2] + forward[1] * along + side[1] * zigzag, world.bounds.minZ, world.bounds.maxZ),
+        x,
+        supportGroundHeight(world, x, z),
+        z,
       ] as const);
     }));
+    // Keep the corridor faithful to the seeded aircraft run. Clipping an
+    // impact at a map edge can move its projection slightly, so use the
+    // admitted payload's min/max forward projections for finite end caps.
+    const projections = impacts.map((impact) => (
+      (impact[0] - anchor[0]) * forward[0] + (impact[2] - anchor[2]) * forward[1]
+    ));
+    const minimumProjection = Math.min(...projections);
+    const maximumProjection = Math.max(...projections);
+    const start: SupportVec3 = Object.freeze([
+      anchor[0] + forward[0] * minimumProjection,
+      anchor[1],
+      anchor[2] + forward[1] * minimumProjection,
+    ] as const);
+    const end: SupportVec3 = Object.freeze([
+      anchor[0] + forward[0] * maximumProjection,
+      anchor[1],
+      anchor[2] + forward[1] * maximumProjection,
+    ] as const);
+    const dx = end[0] - start[0];
+    const dz = end[2] - start[2];
+    const length = Math.max(0.001, Math.hypot(dx, dz));
+    let maximumPerpendicular = 0;
+    for (const impact of impacts) {
+      const perpendicular = Math.abs((impact[0] - start[0]) * dz - (impact[2] - start[2]) * dx) / length;
+      maximumPerpendicular = Math.max(maximumPerpendicular, perpendicular);
+    }
+    return Object.freeze({
+      impacts,
+      pathStart: start,
+      pathEnd: end,
+      halfWidthM: Math.max(0.5, maximumPerpendicular + 0.35),
+    });
   }
 
   control(intent: KillstreakControlIntent, nowMs: number): Readonly<{ accepted: boolean; reason: string }> {
@@ -1374,8 +1438,9 @@ export class HostKillstreakRuntime {
       placementMarkers.push(Object.freeze({
         id: `${entity.activationId}:care-target`, activationId: entity.activationId, source: 'care-package', shape: 'ground-x',
         ownerId: entity.ownerId, team: entity.team, audience: 'all-combatants',
-        anchor: Object.freeze([...entity.dropPosition]) as unknown as SupportVec3,
+        anchor: Object.freeze([entity.dropPosition[0], entity.dropPosition[1] - 0.45, entity.dropPosition[2]]) as unknown as SupportVec3,
         pathStart: null, pathEnd: null,
+        halfWidthM: null,
         expiresInMs: Math.max(0, entity.descentStartsAtMs + CARE_CRATE_DESCENT_MS - nowMs),
       }));
     }
@@ -1387,6 +1452,7 @@ export class HostKillstreakRuntime {
         ownerId: activation.ownerId, team: activation.team, audience: 'all-combatants',
         anchor: Object.freeze([...activation.anchor]) as unknown as SupportVec3,
         pathStart: null, pathEnd: null, expiresInMs: prestrikeRemainingMs,
+        halfWidthM: null,
       }));
       if (activation.ownerId === recipientActorId) placementMarkers.push(Object.freeze({
         id: `${activation.activationId}:carpet-corridor`, activationId: activation.activationId, source: 'carpet-bomber', shape: 'corridor',
@@ -1394,6 +1460,7 @@ export class HostKillstreakRuntime {
         anchor: Object.freeze([...activation.anchor]) as unknown as SupportVec3,
         pathStart: Object.freeze([...activation.pathStart]) as unknown as SupportVec3,
         pathEnd: Object.freeze([...activation.pathEnd]) as unknown as SupportVec3,
+        halfWidthM: activation.halfWidthM,
         expiresInMs: prestrikeRemainingMs,
       }));
     }

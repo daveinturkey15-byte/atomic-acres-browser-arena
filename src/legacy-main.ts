@@ -151,7 +151,7 @@ import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
 import { damageNumberPresentation, roundStatSummary } from './player-feedback';
-import { projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
+import { SupportDamageFeedbackTelemetry, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
 import { primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation, type WorldIdentityPresentation } from './world-identity-presentation';
@@ -2244,6 +2244,7 @@ const appliedKillstreakDamageResults = new Set<string>();
 const killstreakRegisteredActors = new Set<string>();
 let displayedCareReward: Pass65KillstreakId | null = null;
 const supportDamageDealtByActivation = new Map<string, number>();
+const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
 let adrenalineHudWasActive = false;
 let lastMatchCountdownCue: string | null = null;
 let overdriveState: OverdriveState = createOverdriveState(0);
@@ -2287,6 +2288,8 @@ const hunterDrones: HunterDroneEntity[] = [];
 let supportPresentationRetirements = 0;
 let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
+type PointSupportTargeting = Readonly<{ id: 'care-package' | 'carpet-bomber' }>;
+let pointSupportTargeting: PointSupportTargeting | null = null;
 let tacticalMapOpen = false;
 let lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
 let triPassHostileMarkers: TriPassHostileMarker[] = [];
@@ -6906,6 +6909,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   appliedKillstreakDamageResults.clear();
   killstreakRegisteredActors.clear();
   killstreakPresentation.clear();
+  supportDamageFeedbackTelemetry.reset();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   lastGameplayPresentedFrame = 0;
@@ -9990,11 +9994,12 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
     spawnTracer(new THREE.Vector3(...event.origin), targetPosition, drone ? 0x52e8ff : 0xffc65c);
     audio.supportGun(drone ? 'drone' : 'chopper');
   }
-  const anchor = projectSupportDamageAnchor(targetPosition, camera, {
+  const viewport = {
     width: window.innerWidth,
     height: window.innerHeight,
-  });
-  showHitmarker(false);
+  };
+  const anchor = projectSupportDamageAnchor(targetPosition, camera, viewport);
+  supportDamageFeedbackTelemetry.record(event, anchor, viewport);
   showDamageNumber(event.damage, 'body', undefined, { ...anchor, targetId: event.targetId });
   audio.hit(false);
   supportDamageDealtByActivation.set(
@@ -10007,6 +10012,31 @@ function recordOwnerSupportDamage(event: KillstreakDamageEvent): void {
       supportDamageDealtByActivation.get(event.activationId) ?? 0,
     ));
   }
+}
+
+const supportPlacementRaycaster = new THREE.Raycaster();
+const supportPlacementRayOrigin = new THREE.Vector3();
+const supportPlacementRayDirection = new THREE.Vector3(0, -1, 0);
+
+function supportPlacementGroundHeightAt(x: number, z: number): number {
+  const floorY = arena.bounds.minY ?? 0;
+  const ceilingY = PASS65_FLIGHT_NAVIGATION[selectedArena.id].ceilingY;
+  let admittedHeight = floorY;
+  for (const box of activeWorldColliders()) {
+    if (x < box.minX || x > box.maxX || z < box.minZ || z > box.maxZ) continue;
+    const top = box.maxY ?? 4;
+    if (Number.isFinite(top)) admittedHeight = Math.max(admittedHeight, top);
+  }
+  const originY = Math.max(ceilingY + 8, (arena.bounds.maxY ?? ceilingY) + 8);
+  supportPlacementRayOrigin.set(x, originY, z);
+  supportPlacementRaycaster.set(supportPlacementRayOrigin, supportPlacementRayDirection);
+  supportPlacementRaycaster.near = 0;
+  supportPlacementRaycaster.far = originY - floorY + 2;
+  arena.root.updateWorldMatrix(true, true);
+  const hit = supportPlacementRaycaster.intersectObjects(arena.raycastMeshes, true)
+    .find((candidate) => candidate.point.y >= floorY - 0.05 && candidate.point.y <= ceilingY);
+  if (hit) admittedHeight = Math.max(admittedHeight, hit.point.y);
+  return THREE.MathUtils.clamp(admittedHeight, floorY, ceilingY - 0.5);
 }
 
 function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
@@ -10059,6 +10089,7 @@ function killstreakWorldState(): KillstreakWorld {
       { x: to[0], y: to[1], z: to[2] },
       box,
     )),
+    groundHeightAt: supportPlacementGroundHeightAt,
     resolveFlightPosition: (from, desired, radius) => {
       const result = resolveSupportFlightStep({
         definition: flightNavigation,
@@ -11106,11 +11137,22 @@ function drawStrikeMap(now = performance.now()): void {
   context.textBaseline = 'alphabetic';
   context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
   context.fillText('N', width / 2, 28);
-  element<HTMLElement>('#strike-target-count').textContent = `${points.length} / 3`;
+  const targetCount = pointSupportTargeting ? 1 : 3;
+  element<HTMLElement>('#strike-target-mode').textContent = pointSupportTargeting
+    ? pointSupportTargeting.id === 'care-package' ? 'CARE PACKAGE' : 'CARPET BOMBER'
+    : 'TRI-PASS';
+  element<HTMLElement>('#strike-target-instruction').textContent = pointSupportTargeting
+    ? 'SELECT DELIVERY AREA'
+    : 'SELECT THREE TARGETS';
+  element<HTMLElement>('#strike-target-help').innerHTML = pointSupportTargeting
+    ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>ESC</kbd> CANCELS AND REFUNDS'
+    : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
+  element<HTMLElement>('#strike-target-count').textContent = `${points.length} / ${targetCount}`;
   lastStrikeMapDrawAt = now;
 }
 
 function beginTriPassTargeting(): void {
+  pointSupportTargeting = null;
   triPassTargeting = createTriPassTargeting();
   tacticalMapOpen = true;
   lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
@@ -11121,13 +11163,26 @@ function beginTriPassTargeting(): void {
   if (document.pointerLockElement === canvas) document.exitPointerLock();
 }
 
-function cancelTriPassTargeting(refund: boolean, reacquirePointer = true): void {
-  const wasIncomplete = triPassTargeting !== null && !triPassTargeting.complete;
-  if (refund && wasIncomplete) {
-    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'tri-pass': true } };
-    addFeed('TRI-PASS TARGETING CANCELLED · REFUNDED', 'gold');
+function beginPointSupportTargeting(id: PointSupportTargeting['id']): void {
+  triPassTargeting = null;
+  pointSupportTargeting = Object.freeze({ id });
+  tacticalMapOpen = true;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
+  element<HTMLElement>('#strike-map-overlay').hidden = false;
+  clearGameplayInput();
+  drawStrikeMap();
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+}
+
+function cancelSupportTargeting(refund: boolean, reacquirePointer = true): void {
+  const refundId = pointSupportTargeting?.id
+    ?? (triPassTargeting !== null && !triPassTargeting.complete ? 'tri-pass' : null);
+  if (refund && refundId) {
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, [refundId]: true } };
+    addFeed(`${GAMEPAD_SUPPORT_LABELS[refundId]} TARGETING CANCELLED · REFUNDED`, 'gold');
   }
   triPassTargeting = null;
+  pointSupportTargeting = null;
   tacticalMapOpen = false;
   triPassHostileMarkers = [];
   element<HTMLElement>('#strike-hostile-count').textContent = 'ENEMIES LIVE · 0';
@@ -11182,18 +11237,38 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
     if (!anchor || !requestKillstreakActivation('tri-pass', confirmedAt, [anchor.x, 0.2, anchor.z])) {
       fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'tri-pass': true } };
       addFeed('TRI-PASS AUTHORITY REJECTED · REFUNDED', 'coral');
-      cancelTriPassTargeting(false);
+      cancelSupportTargeting(false);
       return true;
     }
     authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
     scheduleTriPassMissiles(next.points, confirmedAt);
-    cancelTriPassTargeting(false);
+    cancelSupportTargeting(false);
   }
   return true;
 }
 
+function registerPointSupportClick(clientX: number, clientY: number, confirmedAt = performance.now()): boolean {
+  const targeting = pointSupportTargeting;
+  if (!tacticalMapOpen || !targeting) return false;
+  const rect = strikeMapCanvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
+  const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
+  const point = tacticalMapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  if (!requestKillstreakActivation(targeting.id, confirmedAt, [point.x, 0, point.z])) {
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, [targeting.id]: true } };
+    addFeed(`${GAMEPAD_SUPPORT_LABELS[targeting.id]} AUTHORITY REJECTED · REFUNDED`, 'coral');
+    cancelSupportTargeting(false);
+    return true;
+  }
+  addFeed(targeting.id === 'care-package'
+    ? 'CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE'
+    : 'CARPET BOMBER · TARGET CONFIRMED · 20-IMPACT RUN INBOUND', 'gold');
+  cancelSupportTargeting(false);
+  return true;
+}
+
 strikeMapCanvas.addEventListener('click', (event) => {
-  registerTriPassClick(event.clientX, event.clientY);
+  if (!registerPointSupportClick(event.clientX, event.clientY)) registerTriPassClick(event.clientX, event.clientY);
 });
 
 function authorizeLocalOffensiveSupport(
@@ -11279,12 +11354,9 @@ function activateFieldSupport(id: FieldSupportId): void {
     if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
     addFeed('ADRENALINE BOOST · +10% DAMAGE / MOVE · -10% RELOAD · 15 SEC', 'gold');
   } else if (activatedId === 'care-package') {
-    if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) { refund(); return; }
-    addFeed('CARE PACKAGE · INBOUND · PRESS F TO SECURE', 'gold');
+    beginPointSupportTargeting('care-package');
   } else if (activatedId === 'carpet-bomber') {
-    const target = nearestSupportTarget()?.point ?? player.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 18);
-    if (!requestKillstreakActivation(activatedId, now, [target.x, target.y, target.z])) { refund(); return; }
-    addFeed('CARPET BOMBER · 20-IMPACT ZIGZAG RUN INBOUND', 'gold');
+    beginPointSupportTargeting('carpet-bomber');
   } else if (activatedId === 'piloted-drone') {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) { refund(); return; }
     addFeed('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · F EXITS', 'gold');
@@ -11533,7 +11605,7 @@ function clearFieldSupport(): void {
   nukeWarning.hidden = true;
   nukeFlash.hidden = true;
   nukeFlash.style.opacity = '0';
-  cancelTriPassTargeting(false, false);
+  cancelSupportTargeting(false, false);
   scoutSweepUntil = 0;
   yardhawkExplosions = 0;
   triPassLaunches = 0;
@@ -12800,7 +12872,7 @@ window.addEventListener('keydown', (event) => {
   if (isTextChatTyping()) return;
   if (tacticalMapOpen && event.code === 'Escape' && !event.repeat) {
     event.preventDefault();
-    cancelTriPassTargeting(true);
+    cancelSupportTargeting(true);
     return;
   }
   if (
@@ -14081,6 +14153,7 @@ const debugWindow = window as Window & {
     respawn: () => void;
     aimAtBot: (zone?: HitZone) => void;
     aimAtRemote: (zone?: HitZone) => void;
+    aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
     detonateGrenadeAtWindow: (index: number) => number;
     stageYardhawkWall: (team?: Team) => boolean;
@@ -14562,6 +14635,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lowHealthOpacity: Number(lowHealthVignette.style.getPropertyValue('--low-health-opacity') || 0),
     },
     killstreak: killstreakSnapshot,
+    killstreakPresentation: killstreakPresentation.telemetry(),
+    supportDamageFeedback: supportDamageFeedbackTelemetry.snapshot(),
     fieldSupport: {
       streak: fieldSupport.streak,
       rewardCycle: fieldSupport.rewardCycle,
@@ -14578,6 +14653,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : { active: false, phase: null },
       yardhawkExplosions,
       tacticalMapOpen,
+      targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
       tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
       tacticalHostiles: triPassHostileMarkers.map((marker) => ({
         id: marker.id,
@@ -15115,6 +15191,24 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     remote.root.position.copy(remote.target);
     remote.root.updateMatrixWorld(true);
   },
+  aimAtRemoteWithOffset: (yawOffset = 0, pitchOffset = 0) => {
+    const remote = remotes.values().next().value as RemotePlayer | undefined;
+    if (!remote || !Number.isFinite(yawOffset) || !Number.isFinite(pitchOffset)) return;
+    const targetOffset = hitProxyZoneCentre('body', remote.snapshot.stance ?? 'stand');
+    const target = remote.target.clone().add(new THREE.Vector3(...targetOffset));
+    const delta = target.sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z) + THREE.MathUtils.clamp(yawOffset, -Math.PI, Math.PI);
+    player.pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)) + pitchOffset,
+      -1.42,
+      1.42,
+    );
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    remote.root.position.copy(remote.target);
+    remote.root.updateMatrixWorld(true);
+  },
   stageWindow: (index: number, distance = 3) => {
     const window = arena.breakableWindows[Math.max(0, Math.min(arena.breakableWindows.length - 1, Math.floor(index)))];
     if (!window) return;
@@ -15426,7 +15520,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!next.complete) return false;
     authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
     scheduleTriPassMissiles(next.points, performance.now());
-    cancelTriPassTargeting(false);
+    cancelSupportTargeting(false);
     return true;
   },
   captureShadowProbeFrame: (horizontalOffset) => {
