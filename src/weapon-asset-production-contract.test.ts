@@ -5,7 +5,7 @@ import { WEAPON_IDS } from './protocol';
 type ProductionEntry = Readonly<{
   id: string;
   releaseState: 'blocked' | 'release-ready';
-  currentRuntimeSource: string;
+  currentRuntimeSource?: string;
   blockers?: readonly string[];
 }>;
 
@@ -52,6 +52,10 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
     expect(manifest.supportVehicles.map((entry) => entry.id)).toEqual([
       'hunter-drone-visual-family-v1', 'chopper-gunner-vehicle-v1', 'support-aircraft-family-v1',
     ]);
-    expect(manifest.supportVehicles.every((entry) => entry.releaseState === 'blocked')).toBe(true);
+    expect(manifest.supportVehicles.find((entry) => entry.id === 'hunter-drone-visual-family-v1')).toMatchObject({
+      releaseState: 'release-ready',
+    });
+    expect(manifest.supportVehicles.filter((entry) => entry.id !== 'hunter-drone-visual-family-v1')
+      .every((entry) => entry.releaseState === 'blocked')).toBe(true);
   });
 });

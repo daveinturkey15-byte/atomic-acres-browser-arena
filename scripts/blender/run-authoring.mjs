@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
 
 const target = process.argv[2];
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
@@ -11,6 +12,7 @@ const blenderCandidates = [
   'C:\\Program Files\\Blender Foundation\\Blender 4.3\\blender.exe',
 ].filter(Boolean);
 const blenderCommand = blenderCandidates.find((candidate) => existsSync(candidate)) ?? 'blender';
+const gltfTransformCli = path.join(process.cwd(), 'node_modules/@gltf-transform/cli/bin/cli.js');
 
 function run(command, args) {
   if (process.env.AUTHORING_DRY_RUN === '1') {
@@ -47,6 +49,33 @@ if (target === 'arena') {
     '--python',
     'scripts/blender/create-rustworks-central-tower.py',
   ]);
+} else if (target === 'drone') {
+  mkdirSync('public/assets/original/models/support', { recursive: true });
+  run(blenderCommand, [
+    '--background',
+    '--factory-startup',
+    '--python',
+    'scripts/blender/create-hunter-drone-family.py',
+  ]);
+  for (const lod of [0, 1, 2]) {
+    run(process.execPath, [
+      gltfTransformCli,
+      'optimize',
+      `artifacts/blender-drone/raw/hunter-drone-lod${lod}.glb`,
+      `public/assets/original/models/support/hunter-drone-lod${lod}.glb`,
+      '--compress', 'meshopt',
+      '--meshopt-level', 'high',
+      '--flatten', 'false',
+      '--join', 'false',
+      '--instance', 'false',
+      '--palette', 'false',
+      '--prune', 'false',
+      '--simplify', 'false',
+      '--texture-compress', 'webp',
+      '--texture-size', '512',
+    ]);
+  }
+  run(process.execPath, ['scripts/blender/finalize-hunter-drone-assets.mjs']);
 } else {
   console.error(`Unknown authoring target: ${target ?? '<missing>'}`);
   process.exit(2);

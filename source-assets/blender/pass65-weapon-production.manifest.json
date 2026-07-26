@@ -15,9 +15,35 @@
     "missing-pbr-map-set",
     "missing-source-or-license-provenance"
   ],
-  "requiredPbrMaps": ["baseColor", "normal", "roughness", "metallic"],
-  "requiredSockets": ["rightGrip", "leftGrip", "magazine", "muzzle", "eject", "optic"],
-  "requiredCoreActions": ["equip", "unequip", "idle", "walk", "sprint", "ads-in", "ads-out", "fire", "dry-fire", "reload", "empty-reload", "melee", "inspect"],
+  "requiredPbrMaps": [
+    "baseColor",
+    "normal",
+    "roughness",
+    "metallic"
+  ],
+  "requiredSockets": [
+    "rightGrip",
+    "leftGrip",
+    "magazine",
+    "muzzle",
+    "eject",
+    "optic"
+  ],
+  "requiredCoreActions": [
+    "equip",
+    "unequip",
+    "idle",
+    "walk",
+    "sprint",
+    "ads-in",
+    "ads-out",
+    "fire",
+    "dry-fire",
+    "reload",
+    "empty-reload",
+    "melee",
+    "inspect"
+  ],
   "requirements": {
     "firstPersonLodCount": 2,
     "worldLodCount": 3,
@@ -25,7 +51,15 @@
     "tangents": true,
     "sourceBlendRequiredForOriginalWork": true,
     "sha256RequiredForEveryDeliverable": true,
-    "contactSheetStates": ["hip", "ads", "fire", "reload", "world", "drop", "lod-transition"]
+    "contactSheetStates": [
+      "hip",
+      "ads",
+      "fire",
+      "reload",
+      "world",
+      "drop",
+      "lod-transition"
+    ]
   },
   "operatorArms": {
     "id": "pass65-first-person-operator-arms",
@@ -41,13 +75,202 @@
   "supportVehicles": [
     {
       "id": "hunter-drone-visual-family-v1",
-      "releaseState": "blocked",
-      "currentRuntimeSource": "shared runtime procedural capsule/rotor/gun presentation",
-      "blockers": [
-        "needs one Blender-authored source family shared by standalone and swarm modes",
-        "needs first-person camera, mounted-gun, fire, tracer, impact, world and LOD action corpus",
-        "needs complete PBR maps and provenance"
-      ]
+      "releaseState": "release-ready",
+      "sourceKind": "project-original-blender",
+      "owner": "Atomic Acres project",
+      "qualityTier": "hero-support-vehicle",
+      "materialFamily": "tactical-gunmetal-cyan-orange-pbr",
+      "textureDensity": "512px shared map set for a 2.23m authored vehicle",
+      "triangleRange": {
+        "lod0": [
+          9000,
+          12000
+        ],
+        "lod1": [
+          6500,
+          9000
+        ],
+        "lod2": [
+          4000,
+          6500
+        ]
+      },
+      "placeholderStatus": "forbidden-and-not-present",
+      "sharedConsumers": [
+        "standalone-piloted-drone",
+        "standalone-ai-drone",
+        "hunter-drone-swarm"
+      ],
+      "runtimeForwardAxis": "-Z",
+      "sourceBlend": {
+        "path": "source-assets/blender/hunter-drone-family.blend",
+        "sha256": "3f277b293e7ca6a60bb1c15f08ebca5233d492025fee1ef147fb5cdfc6458fe2"
+      },
+      "worldGlbs": [
+        {
+          "path": "public/assets/original/models/support/hunter-drone-lod0.glb",
+          "sha256": "1e6d828f2d4efa08b1a9e1b4ffe64cdf1ce4ce38fa4e9d99ae2985d24a554fb0",
+          "lod": 0,
+          "triangles": 10300,
+          "bytes": 194592
+        },
+        {
+          "path": "public/assets/original/models/support/hunter-drone-lod1.glb",
+          "sha256": "17e0ca5333a308da8e50f9a48ce111342250278fd5c031cb00b49617ca80283f",
+          "lod": 1,
+          "triangles": 7932,
+          "bytes": 179576
+        },
+        {
+          "path": "public/assets/original/models/support/hunter-drone-lod2.glb",
+          "sha256": "e03e56d125b4c4ee49040360dcd011d7e7618d38eddfb75e1dc20da295850a9a",
+          "lod": 2,
+          "triangles": 5740,
+          "bytes": 155344
+        }
+      ],
+      "firstPersonGlb": {
+        "path": "public/assets/original/models/support/hunter-drone-lod0.glb",
+        "sha256": "1e6d828f2d4efa08b1a9e1b4ffe64cdf1ce4ce38fa4e9d99ae2985d24a554fb0",
+        "lod": 0,
+        "triangles": 10300,
+        "bytes": 194592
+      },
+      "pbrMaps": {
+        "baseColor": {
+          "path": "public/assets/original/textures/support/hunter-drone-albedo.png",
+          "sha256": "40c94c78cb1a25db1a401db198609512a068cf47bb9c688477b674b3c56018cf",
+          "width": 512,
+          "height": 512
+        },
+        "normal": {
+          "path": "public/assets/original/textures/support/hunter-drone-normal.png",
+          "sha256": "2197cb3066c249f9263928444131f756c4324bf096dd50b614a9f0df85a16b73",
+          "width": 512,
+          "height": 512
+        },
+        "orm": {
+          "path": "public/assets/original/textures/support/hunter-drone-orm.png",
+          "sha256": "6b758408c2c9239f8beb77cab501f3ac5ad46bda395d998ab6b5cc76a13e8e29",
+          "width": 512,
+          "height": 512
+        },
+        "emissive": {
+          "path": "public/assets/original/textures/support/hunter-drone-emissive.png",
+          "sha256": "22e565672203c83c86323d152c90f449bb0fff02e2e1c3326ff1a4e60b6fd6f9",
+          "width": 512,
+          "height": 512
+        }
+      },
+      "provenance": {
+        "path": "source-assets/blender/hunter-drone-family.provenance.json",
+        "sha256": "ec489e7b9b6dad43ecf80cac587f050ca1142be811317a3d675d1ee98994d61e"
+      },
+      "sockets": [
+        "drone-gun-muzzle-socket",
+        "drone-first-person-camera-socket"
+      ],
+      "semanticNodes": [
+        "drone-body",
+        "drone-optic",
+        "drone-mounted-gun",
+        "drone-gun-muzzle-socket",
+        "drone-first-person-camera-socket",
+        "drone-rotors",
+        "drone-rotor-1",
+        "drone-rotor-2",
+        "drone-rotor-3",
+        "drone-rotor-4"
+      ],
+      "actions": [
+        "Drone_Propellers_Loop",
+        "Drone_Gun_Fire",
+        "Drone_Gun_Recoil"
+      ],
+      "review": {
+        "renders": [
+          {
+            "path": "docs/assets/pass65-drone/hunter-drone-front-quarter.png",
+            "sha256": "f279c075e7691311a58630bd59d28d91ca40f57545448a04cfb5742682f4baf6",
+            "cameraId": "front-quarter",
+            "width": 512,
+            "height": 512
+          },
+          {
+            "path": "docs/assets/pass65-drone/hunter-drone-rear-quarter.png",
+            "sha256": "becba6825e390fbdad452e16746491961632e864a58f7f5825a84b72a0adc3d3",
+            "cameraId": "rear-quarter",
+            "width": 512,
+            "height": 512
+          },
+          {
+            "path": "docs/assets/pass65-drone/hunter-drone-side-gun.png",
+            "sha256": "353e0158477eee8f787c271ef4d9917cdb980ac1beb6be1bacfa27f4bcb74816",
+            "cameraId": "side-gun",
+            "width": 512,
+            "height": 512
+          },
+          {
+            "path": "docs/assets/pass65-drone/hunter-drone-optic-closeup.png",
+            "sha256": "e38e8ff94afb43d05725229fe8bb26557023b5bce790ae97bac0dfd6ed4fde9a",
+            "cameraId": "optic-closeup",
+            "width": 512,
+            "height": 512
+          }
+        ],
+        "contactSheet": {
+          "path": "docs/assets/pass65-drone/hunter-drone-contact-sheet.png",
+          "sha256": "ff383c69d1b3db20c9427c4de4ca2650963164a01cd68baa01daa6ad9d32d2c8",
+          "width": 1024,
+          "height": 1024
+        }
+      },
+      "technicalAudit": {
+        "lods": [
+          {
+            "lod": 0,
+            "triangles": 10300,
+            "bytes": 194592,
+            "meshNodes": 58,
+            "materials": 7,
+            "images": 4,
+            "animations": [
+              "Drone_Gun_Recoil",
+              "Drone_Gun_Fire",
+              "Drone_Propellers_Loop"
+            ],
+            "externalUris": 0
+          },
+          {
+            "lod": 1,
+            "triangles": 7932,
+            "bytes": 179576,
+            "meshNodes": 54,
+            "materials": 7,
+            "images": 4,
+            "animations": [
+              "Drone_Gun_Recoil",
+              "Drone_Gun_Fire",
+              "Drone_Propellers_Loop"
+            ],
+            "externalUris": 0
+          },
+          {
+            "lod": 2,
+            "triangles": 5740,
+            "bytes": 155344,
+            "meshNodes": 42,
+            "materials": 5,
+            "images": 4,
+            "animations": [
+              "Drone_Gun_Recoil",
+              "Drone_Gun_Fire",
+              "Drone_Propellers_Loop"
+            ],
+            "externalUris": 0
+          }
+        ]
+      }
     },
     {
       "id": "chopper-gunner-vehicle-v1",
@@ -71,23 +294,151 @@
     }
   ],
   "weapons": [
-    { "id": "carbine", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared Rifle.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "smg", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared P90.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "lmg", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "scattergun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared Shotgun.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "sniper", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural derivative; shared Rifle.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "railgun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural derivative; shared Rifle.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "pistol", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural model; shared Pistol.glb is dormant", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "magnum", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "machine-pistol", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "mini-uzi", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural SMG derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "mp5", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural SMG derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "m4a1", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "ak-47", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "minigun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "m14-ebr", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural precision-rifle derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "slug-shotgun", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural shotgun derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "flashlight-pistol", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative", "blockers": ["no unique Blender hero asset/action corpus"] },
-    { "id": "explosive-crossbow", "releaseState": "blocked", "currentRuntimeSource": "runtime procedural pistol derivative with added limbs/string", "blockers": ["must be a total Blender-authored redesign", "needs dedicated compact 1.5x optic", "no unique world/drop/first-person LODs or action corpus"] }
+    {
+      "id": "carbine",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural model; shared Rifle.glb is dormant",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "smg",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural model; shared P90.glb is dormant",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "lmg",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural model",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "scattergun",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural model; shared Shotgun.glb is dormant",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "sniper",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural derivative; shared Rifle.glb is dormant",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "railgun",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural derivative; shared Rifle.glb is dormant",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "pistol",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural model; shared Pistol.glb is dormant",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "magnum",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural pistol derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "machine-pistol",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural pistol derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "mini-uzi",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural SMG derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "mp5",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural SMG derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "m4a1",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural rifle derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "ak-47",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural rifle derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "minigun",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural rifle derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "m14-ebr",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural precision-rifle derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "slug-shotgun",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural shotgun derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "flashlight-pistol",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural pistol derivative",
+      "blockers": [
+        "no unique Blender hero asset/action corpus"
+      ]
+    },
+    {
+      "id": "explosive-crossbow",
+      "releaseState": "blocked",
+      "currentRuntimeSource": "runtime procedural pistol derivative with added limbs/string",
+      "blockers": [
+        "must be a total Blender-authored redesign",
+        "needs dedicated compact 1.5x optic",
+        "no unique world/drop/first-person LODs or action corpus"
+      ]
+    }
   ]
 }
