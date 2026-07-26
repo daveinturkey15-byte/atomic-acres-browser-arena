@@ -652,7 +652,10 @@ export class WebGpuRenderRuntime {
   async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
     await this.compile(root, camera, scene);
     this.submitFrame(performance.now(), true);
-    await this.waitForSubmittedWork();
+    // Presentation-only effects prewarm behind the loading surface. Cold
+    // Chrome/driver shader creation can exceed the live four-second fence,
+    // especially when each QA page owns a fresh WebGPU device.
+    await this.waitForSubmittedWork(12_000);
   }
 
   compileAndRenderImmediate(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
