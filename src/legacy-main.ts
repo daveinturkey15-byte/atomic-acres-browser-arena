@@ -6781,7 +6781,7 @@ function applyRailgunState(next: RailgunAuthorityState, announce = false): void 
   railgunState = next;
   syncRailgunHolderPresentation(previous, next);
   if (next.holderId === player.id) localRailgunPendingUntilHostTimeMs = 0;
-  if (announce || next.announcementSent && !previous.announcementSent) addFeed('RAILGUN SPAWNED', 'gold');
+  if (announce || next.announcementSent && !previous.announcementSent) addFeed(`${WEAPONS.railgun.name.toUpperCase()} SPAWNED`, 'gold');
 }
 
 function broadcastRailgunState(reliableCommit = true): void {
@@ -9367,7 +9367,7 @@ function applyKillstreakEntityShot(
     applied = true;
     if (result.destroyed) {
       destroyed.add(nearest.id);
-      addFeed(`${weapon === 'railgun' ? 'RAILGUN' : spec.name.toUpperCase()} DESTROYED HOSTILE AIR SUPPORT`, 'gold');
+      addFeed(`${spec.name.toUpperCase()} DESTROYED HOSTILE AIR SUPPORT`, 'gold');
     }
   }
   if (applied) {
