@@ -1,36 +1,116 @@
 {
   "schemaVersion": 1,
+  "rosterOracleId": "pass64-b1-weapon-roster-v1",
   "weapons": [
     {
-      "id": "a4-vanguard",
-      "slot": "primary",
-      "family": "assault-rifle",
-      "fireKind": "hitscan",
-      "fireMode": "automatic",
-      "rpm": 700,
-      "pellets": 1,
-      "spinUpMs": 0,
-      "movementMultiplier": 1,
-      "damage": { "base": 30, "minimum": 20, "falloffStartM": 18, "falloffEndM": 55, "headMultiplier": 1.5, "limbMultiplier": 0.8 },
-      "handling": { "hipSpreadDeg": 1.8, "adsSpreadDeg": 0.35, "recoilPitchDeg": 1.2, "recoilYawDeg": 0.45, "recoveryMs": 140 },
-      "ammo": { "magazine": 30, "reserve": 120, "reloadSeconds": 2.2, "switchSeconds": 0.45 },
-      "penetration": { "power": 55, "retentionPerSurface": 0.72, "maximumSurfaces": 3 },
-      "opticPolicyId": "iron-sights-standard",
-      "projectileId": null,
-      "policies": { "loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded" },
-      "presentationId": "a4-vanguard-view",
-      "audioId": "a4-vanguard-audio",
-      "provenanceId": "a4-vanguard-source",
-      "testId": "a4-vanguard-tests"
+      "id": "carbine", "displayName": "M86 Carbine", "slot": "primary", "family": "assault-rifle", "fireKind": "hitscan", "fireMode": "automatic", "rpm": 650, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 31, "minimum": 20, "falloffStartM": 24, "falloffEndM": 72, "headMultiplier": 1.5, "limbMultiplier": 0.82},
+      "spread": {"hipRadians": 0.012, "adsMultiplier": 0.28, "movementMultiplier": 1.65, "standMultiplier": 1, "crouchMultiplier": 0.78, "proneMultiplier": 0.65, "sustainedPerShot": 0.0016, "maximumRadians": 0.045},
+      "recoil": {"pitchRadians": 0.016, "yawRadians": 0.006, "recoveryPerSecond": 12, "adsMultiplier": 0.72, "standMultiplier": 1, "crouchMultiplier": 0.84, "proneMultiplier": 0.65, "deterministicPatternId": "carbine-pattern-v1"},
+      "ammo": {"magazine": 30, "reserve": 120, "reloadSeconds": 1.8, "emptyReloadSeconds": 2.05, "switchSeconds": 0.48},
+      "penetration": {"calibreLabel": "5.56 mm", "power": 5.8, "fmjMultiplier": 1.12, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 20, "energyFalloffEndM": 76, "minimumEnergyRetention": 0.48, "minimumWallDamageMultiplier": 0.34, "maximumSurfaces": 2},
+      "optic": {"kind": "standard", "magnification": 1.25, "solidOcclusion": "required"}, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "carbine-model-set-v1", "presentationId": "carbine-view-v1", "audioId": "carbine-audio-v1", "provenanceId": "carbine-provenance-v1", "evidenceIds": ["r232-carbine"]
+    },
+    {
+      "id": "smg", "displayName": "Vectorline SMG", "slot": "primary", "family": "smg", "fireKind": "hitscan", "fireMode": "automatic", "rpm": 860, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 23, "minimum": 14, "falloffStartM": 15, "falloffEndM": 52, "headMultiplier": 1.5, "limbMultiplier": 0.8},
+      "spread": {"hipRadians": 0.018, "adsMultiplier": 0.42, "movementMultiplier": 1.45, "standMultiplier": 1, "crouchMultiplier": 0.82, "proneMultiplier": 0.72, "sustainedPerShot": 0.0021, "maximumRadians": 0.058},
+      "recoil": {"pitchRadians": 0.011, "yawRadians": 0.009, "recoveryPerSecond": 15, "adsMultiplier": 0.78, "standMultiplier": 1, "crouchMultiplier": 0.88, "proneMultiplier": 0.72, "deterministicPatternId": "smg-pattern-v1"},
+      "ammo": {"magazine": 32, "reserve": 128, "reloadSeconds": 1.5, "emptyReloadSeconds": 1.75, "switchSeconds": 0.4},
+      "penetration": {"calibreLabel": "9 mm", "power": 3.05, "fmjMultiplier": 1.08, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 8, "energyFalloffEndM": 38, "minimumEnergyRetention": 0.22, "minimumWallDamageMultiplier": 0.22, "maximumSurfaces": 1},
+      "optic": null, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "smg-model-set-v1", "presentationId": "smg-view-v1", "audioId": "smg-audio-v1", "provenanceId": "smg-provenance-v1", "evidenceIds": ["r232-smg"]
+    },
+    {
+      "id": "lmg", "displayName": "Mastiff 63 LMG", "slot": "primary", "family": "lmg", "fireKind": "hitscan", "fireMode": "automatic", "rpm": 720, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 27, "minimum": 18, "falloffStartM": 30, "falloffEndM": 82, "headMultiplier": 1.5, "limbMultiplier": 0.82},
+      "spread": {"hipRadians": 0.022, "adsMultiplier": 0.34, "movementMultiplier": 1.78, "standMultiplier": 1, "crouchMultiplier": 0.7, "proneMultiplier": 0.6, "sustainedPerShot": 0.0025, "maximumRadians": 0.064},
+      "recoil": {"pitchRadians": 0.019, "yawRadians": 0.01, "recoveryPerSecond": 10, "adsMultiplier": 0.76, "standMultiplier": 1, "crouchMultiplier": 0.8, "proneMultiplier": 0.6, "deterministicPatternId": "lmg-pattern-v1"},
+      "ammo": {"magazine": 62, "reserve": 186, "reloadSeconds": 3.25, "emptyReloadSeconds": 3.6, "switchSeconds": 0.78},
+      "penetration": {"calibreLabel": "7.62 mm", "power": 6.9, "fmjMultiplier": 1.14, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 30, "energyFalloffEndM": 90, "minimumEnergyRetention": 0.58, "minimumWallDamageMultiplier": 0.4, "maximumSurfaces": 2},
+      "optic": {"kind": "standard", "magnification": 1.25, "solidOcclusion": "required"}, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "lmg-model-set-v1", "presentationId": "lmg-view-v1", "audioId": "lmg-audio-v1", "provenanceId": "lmg-provenance-v1", "evidenceIds": ["r232-lmg"]
+    },
+    {
+      "id": "scattergun", "displayName": "Model 12 Scattergun", "slot": "primary", "family": "shotgun", "fireKind": "pellet", "fireMode": "semi", "rpm": 82, "pellets": 9, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 17, "minimum": 7, "falloffStartM": 8, "falloffEndM": 30, "headMultiplier": 1.5, "limbMultiplier": 0.88},
+      "spread": {"hipRadians": 0.068, "adsMultiplier": 0.72, "movementMultiplier": 1.22, "standMultiplier": 1, "crouchMultiplier": 0.88, "proneMultiplier": 0.8, "sustainedPerShot": 0.002, "maximumRadians": 0.09},
+      "recoil": {"pitchRadians": 0.052, "yawRadians": 0.012, "recoveryPerSecond": 8, "adsMultiplier": 0.84, "standMultiplier": 1, "crouchMultiplier": 0.9, "proneMultiplier": 0.8, "deterministicPatternId": "scattergun-pattern-v1"},
+      "ammo": {"magazine": 8, "reserve": 40, "reloadSeconds": 2.35, "emptyReloadSeconds": 2.7, "switchSeconds": 0.62},
+      "penetration": {"calibreLabel": "12 ga pellet", "power": 2.15, "fmjMultiplier": 1, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 4, "energyFalloffEndM": 20, "minimumEnergyRetention": 0.16, "minimumWallDamageMultiplier": 0.18, "maximumSurfaces": 1},
+      "optic": null, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "scattergun-model-set-v1", "presentationId": "scattergun-view-v1", "audioId": "scattergun-audio-v1", "provenanceId": "scattergun-provenance-v1", "evidenceIds": ["r232-scattergun"]
+    },
+    {
+      "id": "sniper", "displayName": "Longline 86", "slot": "primary", "family": "marksman", "fireKind": "hitscan", "fireMode": "semi", "rpm": 55, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 67, "minimum": 67, "falloffStartM": 96, "falloffEndM": 120, "headMultiplier": 3, "limbMultiplier": 0.9},
+      "spread": {"hipRadians": 0.052, "adsMultiplier": 0.05, "movementMultiplier": 1.8, "standMultiplier": 1, "crouchMultiplier": 0.72, "proneMultiplier": 0.52, "sustainedPerShot": 0.004, "maximumRadians": 0.07},
+      "recoil": {"pitchRadians": 0.072, "yawRadians": 0.016, "recoveryPerSecond": 6.5, "adsMultiplier": 0.6, "standMultiplier": 1, "crouchMultiplier": 0.76, "proneMultiplier": 0.52, "deterministicPatternId": "sniper-pattern-v1"},
+      "ammo": {"magazine": 5, "reserve": 25, "reloadSeconds": 2.6, "emptyReloadSeconds": 2.9, "switchSeconds": 0.68},
+      "penetration": {"calibreLabel": "7.62 mm", "power": 9.4, "fmjMultiplier": 1.16, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 58, "energyFalloffEndM": 120, "minimumEnergyRetention": 0.7, "minimumWallDamageMultiplier": 0.48, "maximumSurfaces": 3},
+      "optic": {"kind": "standard", "magnification": 4, "solidOcclusion": "required"}, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "sniper-model-set-v1", "presentationId": "sniper-view-v1", "audioId": "sniper-audio-v1", "provenanceId": "sniper-provenance-v1", "evidenceIds": ["r232-sniper"]
+    },
+    {
+      "id": "pistol", "displayName": "Aster 9 Service Pistol", "slot": "secondary", "family": "sidearm", "fireKind": "hitscan", "fireMode": "semi", "rpm": 420, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 36, "minimum": 22, "falloffStartM": 20, "falloffEndM": 58, "headMultiplier": 1.5, "limbMultiplier": 0.84},
+      "spread": {"hipRadians": 0.02, "adsMultiplier": 0.34, "movementMultiplier": 1.42, "standMultiplier": 1, "crouchMultiplier": 0.8, "proneMultiplier": 0.7, "sustainedPerShot": 0.0024, "maximumRadians": 0.052},
+      "recoil": {"pitchRadians": 0.021, "yawRadians": 0.008, "recoveryPerSecond": 14, "adsMultiplier": 0.74, "standMultiplier": 1, "crouchMultiplier": 0.86, "proneMultiplier": 0.7, "deterministicPatternId": "pistol-pattern-v1"},
+      "ammo": {"magazine": 15, "reserve": 60, "reloadSeconds": 1.35, "emptyReloadSeconds": 1.55, "switchSeconds": 0.28},
+      "penetration": {"calibreLabel": "9 mm", "power": 3.65, "fmjMultiplier": 1.08, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 12, "energyFalloffEndM": 48, "minimumEnergyRetention": 0.3, "minimumWallDamageMultiplier": 0.26, "maximumSurfaces": 1},
+      "optic": null, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "pistol-model-set-v1", "presentationId": "pistol-view-v1", "audioId": "pistol-audio-v1", "provenanceId": "pistol-provenance-v1", "evidenceIds": ["r232-pistol"]
+    },
+    {
+      "id": "machine-pistol", "displayName": "G18 AUTO", "slot": "secondary", "family": "sidearm", "fireKind": "hitscan", "fireMode": "automatic", "rpm": 900, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 18, "minimum": 11, "falloffStartM": 11, "falloffEndM": 34, "headMultiplier": 1.5, "limbMultiplier": 0.8},
+      "spread": {"hipRadians": 0.026, "adsMultiplier": 0.46, "movementMultiplier": 1.55, "standMultiplier": 1, "crouchMultiplier": 0.82, "proneMultiplier": 0.78, "sustainedPerShot": 0.0032, "maximumRadians": 0.072},
+      "recoil": {"pitchRadians": 0.014, "yawRadians": 0.012, "recoveryPerSecond": 13, "adsMultiplier": 0.82, "standMultiplier": 1, "crouchMultiplier": 0.9, "proneMultiplier": 0.78, "deterministicPatternId": "machine-pistol-pattern-v1"},
+      "ammo": {"magazine": 20, "reserve": 80, "reloadSeconds": 1.55, "emptyReloadSeconds": 1.75, "switchSeconds": 0.3},
+      "penetration": {"calibreLabel": "9 mm", "power": 2.75, "fmjMultiplier": 1.06, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 6, "energyFalloffEndM": 30, "minimumEnergyRetention": 0.18, "minimumWallDamageMultiplier": 0.2, "maximumSurfaces": 1},
+      "optic": null, "projectileId": null,
+      "policies": {"loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "machine-pistol-model-set-v1", "presentationId": "machine-pistol-view-v1", "audioId": "machine-pistol-audio-v1", "provenanceId": "machine-pistol-provenance-v1", "evidenceIds": ["r232-machine-pistol"]
+    },
+    {
+      "id": "magnum", "displayName": "DHV X Verdict Magnum", "slot": "secondary", "family": "sidearm", "fireKind": "hitscan", "fireMode": "semi", "rpm": 90, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "head-only", "base": 100, "minimum": 100, "falloffStartM": 120, "falloffEndM": 120, "headMultiplier": 1, "limbMultiplier": 0},
+      "spread": {"hipRadians": 0.026, "adsMultiplier": 0.3, "movementMultiplier": 1.5, "standMultiplier": 1, "crouchMultiplier": 0.8, "proneMultiplier": 0.68, "sustainedPerShot": 0.006, "maximumRadians": 0.06},
+      "recoil": {"pitchRadians": 0.05, "yawRadians": 0.012, "recoveryPerSecond": 8, "adsMultiplier": 0.74, "standMultiplier": 1, "crouchMultiplier": 0.84, "proneMultiplier": 0.68, "deterministicPatternId": "magnum-pattern-v1"},
+      "ammo": {"magazine": 6, "reserve": 30, "reloadSeconds": 1.75, "emptyReloadSeconds": 2, "switchSeconds": 0.34},
+      "penetration": {"calibreLabel": ".44 magnum", "power": 4.7, "fmjMultiplier": 1.08, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 30, "energyFalloffEndM": 82, "minimumEnergyRetention": 0.4, "minimumWallDamageMultiplier": 0.3, "maximumSurfaces": 1},
+      "optic": null, "projectileId": null,
+      "policies": {"loadout": "diagnostic-only", "bot": "never", "drop": "never", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-shot-v1"},
+      "modelSetId": "magnum-model-set-v1", "presentationId": "magnum-view-v1", "audioId": "magnum-audio-v1", "provenanceId": "magnum-provenance-v1", "evidenceIds": ["r232-magnum"]
+    },
+    {
+      "id": "railgun", "displayName": "VX-8 Railgun", "slot": "special", "family": "marksman", "fireKind": "hitscan", "fireMode": "semi", "rpm": 40, "pellets": 1, "spinUpMs": 0, "movementMultiplier": 1,
+      "damage": {"policy": "standard", "base": 50, "minimum": 50, "falloffStartM": 512, "falloffEndM": 512, "headMultiplier": 1, "limbMultiplier": 1},
+      "spread": {"hipRadians": 0.035, "adsMultiplier": 0, "movementMultiplier": 1, "standMultiplier": 1, "crouchMultiplier": 1, "proneMultiplier": 1, "sustainedPerShot": 0, "maximumRadians": 0.035},
+      "recoil": {"pitchRadians": 0.085, "yawRadians": 0, "recoveryPerSecond": 5.8, "adsMultiplier": 1, "standMultiplier": 1, "crouchMultiplier": 1, "proneMultiplier": 1, "deterministicPatternId": "railgun-pattern-v1"},
+      "ammo": {"magazine": 8, "reserve": 0, "reloadSeconds": 1.5, "emptyReloadSeconds": 1.75, "switchSeconds": 0.72},
+      "penetration": {"calibreLabel": "electromagnetic sabot", "power": 100000, "fmjMultiplier": 1, "materialPolicyId": "pass64-ballistic-materials-v1", "energyFalloffStartM": 512, "energyFalloffEndM": 513, "minimumEnergyRetention": 1, "minimumWallDamageMultiplier": 1, "maximumSurfaces": 64},
+      "optic": {"kind": "special-authority", "magnification": 2.5, "solidOcclusion": "required", "authorityPolicyId": "host-railgun-v1"}, "projectileId": null,
+      "policies": {"loadout": "never", "bot": "never", "drop": "map-pickup", "replay": "serialized", "telemetry": "bounded", "stance": "stand-crouch-prone", "authority": "host-railgun-v1"},
+      "modelSetId": "railgun-model-set-v1", "presentationId": "railgun-view-v1", "audioId": "railgun-audio-v1", "provenanceId": "railgun-provenance-v1", "evidenceIds": ["r232-railgun"]
     }
   ],
-  "mappings": {
-    "gameplay": ["a4-vanguard"], "protocol": ["a4-vanguard"], "loadout": ["a4-vanguard"],
-    "bots": ["a4-vanguard"], "drops": ["a4-vanguard"], "replay": ["a4-vanguard"],
-    "presentation": ["a4-vanguard"], "audio": ["a4-vanguard"], "penetration": ["a4-vanguard"],
-    "telemetry": ["a4-vanguard"], "tests": ["a4-vanguard"], "provenance": ["a4-vanguard"]
-  },
-  "provenance": [
-    { "id": "a4-vanguard-source", "source": "original Blender source", "license": "project-owned", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  "coverage": [
+    {"weaponId": "carbine", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+    {"weaponId": "smg", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+    {"weaponId": "lmg", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "3333333333333333333333333333333333333333333333333333333333333333"},
+    {"weaponId": "scattergun", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "4444444444444444444444444444444444444444444444444444444444444444"},
+    {"weaponId": "sniper", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "5555555555555555555555555555555555555555555555555555555555555555"},
+    {"weaponId": "pistol", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "6666666666666666666666666666666666666666666666666666666666666666"},
+    {"weaponId": "machine-pistol", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "7777777777777777777777777777777777777777777777777777777777777777"},
+    {"weaponId": "magnum", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "8888888888888888888888888888888888888888888888888888888888888888"},
+    {"weaponId": "railgun", "channels": ["gameplay", "protocol", "loadout", "bots", "drops", "replay", "presentation", "audio", "penetration", "telemetry", "tests", "provenance"], "evidenceSha256": "9999999999999999999999999999999999999999999999999999999999999999"}
   ]
 }

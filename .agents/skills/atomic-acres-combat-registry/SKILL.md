@@ -13,8 +13,8 @@ Keep combat definitions typed, exhaustive, host-authoritative, and presentation-
 2. Classify the change as schema, authority, balance, loadout, presentation identity, or a bounded combination.
 3. Change the canonical definition before adding runtime wiring. Keep catalog and reducer modules free of Three.js and WebAudio imports.
 4. Extend strict protocol parsing and clean version-mismatch behavior whenever an identity or replicated field changes.
-5. Cover gameplay, protocol, loadout, bots, drops, replay, presentation, audio, penetration, telemetry, tests, and provenance for every ID.
-6. Test boundary distances, recoil/spread, cadence, ammo/reload/switch, movement, modifier ordering, and physically ordered wall penetration.
+5. Compare definitions and coverage against validator-owned B1/F01 oracles; never let candidate data declare which IDs or channels are required.
+6. Test boundary distances, radians-based deterministic recoil/spread, cadence, tactical/empty reload, movement, modifier ordering, and physically ordered energy penetration.
 7. Compare role/TTK envelopes and actively challenge dominance, stale-life, replay, forged ammo/action, and missing-mapping falsifiers.
 8. Return the exact source and integrated SHAs, changed paths, tests, evidence, assumptions, unknowns, and residual falsifiers.
 
@@ -36,8 +36,10 @@ Read [references/coverage-contract.md](references/coverage-contract.md) before c
 
 `node scripts/verify-combat-registry.mjs scripts/fixtures/incomplete.json`
 
-The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
+`node scripts/verify-combat-registry.mjs --self-test`
+
+The first and third commands must exit zero and the second must exit nonzero. For a candidate manifest, run:
 
 `node scripts/verify-combat-registry.mjs <combat-manifest.json>`
 
-The validator must pass `scripts/fixtures/known-good.json` and reject `scripts/fixtures/incomplete.json`. Treat a missing mapping, unbounded number, illegal combination, or missing policy/evidence as a hard failure.
+Treat an unknown key, missing mapping, unbounded number, illegal union/cross-field combination, self-declared completeness set, or missing policy/evidence as a hard failure.

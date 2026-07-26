@@ -1,27 +1,33 @@
 {
   "schemaVersion": 1,
+  "rosterOracleId": "candidate-defined-roster",
   "weapons": [
     {
       "id": "broken-gun",
+      "displayName": "Broken",
       "slot": "primary",
-      "family": "assault-rifle",
-      "fireKind": "projectile",
-      "fireMode": "automatic",
+      "family": "laser",
+      "fireKind": "pellet",
+      "fireMode": "burst",
       "rpm": 0,
-      "pellets": 4,
+      "pellets": 13,
       "spinUpMs": -1,
-      "movementMultiplier": 3,
-      "damage": { "base": 20, "minimum": 40, "falloffStartM": 50, "falloffEndM": 10, "headMultiplier": 1, "limbMultiplier": 1 },
-      "ammo": { "magazine": 0, "reserve": -1, "reloadSeconds": 0, "switchSeconds": 0 },
-      "penetration": { "power": -1, "maximumSurfaces": 99 },
-      "projectileId": null,
+      "movementMultiplier": 0,
+      "damage": {"policy": "head-only", "base": -1, "minimum": 10},
+      "spread": {"hipSpreadDeg": 4},
+      "recoil": {"recoveryMs": 100},
+      "ammo": {"magazine": 0, "reserve": -1, "reloadSeconds": 2},
+      "penetration": {"power": 100001, "retentionPerSurface": 0.8, "maximumSurfaces": 65},
+      "optic": {"kind": "thermal-smoke-only", "magnification": 2.5, "solidOcclusion": "none"},
+      "projectileId": "contradiction",
       "policies": {},
+      "modelSetId": "",
       "presentationId": "",
       "audioId": "",
-      "provenanceId": "missing",
-      "testId": ""
+      "provenanceId": "",
+      "evidenceIds": []
     }
   ],
-  "mappings": { "gameplay": ["broken-gun"], "protocol": ["unknown-gun"] },
-  "provenance": []
+  "coverage": [{"weaponId": "broken-gun", "channels": ["gameplay"], "evidenceSha256": "bad"}],
+  "candidateRequiredWeaponIds": ["broken-gun"]
 }
