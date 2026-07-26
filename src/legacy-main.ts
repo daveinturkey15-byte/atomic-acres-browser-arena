@@ -852,6 +852,8 @@ const scheduledGpuRetirementRoots = new WeakSet<THREE.Object3D>();
 const scheduledGpuRetirementGeometries = new WeakSet<THREE.BufferGeometry>();
 let gpuRetirementTask: Promise<void> | null = null;
 let gpuRetirementFences = 0;
+let gpuRetirementScheduledRoots = 0;
+let gpuRetirementScheduledGeometries = 0;
 let gpuRetirementDisposedRoots = 0;
 let gpuRetirementDisposedGeometries = 0;
 let gpuRetirementFailures = 0;
@@ -900,6 +902,7 @@ async function drainDeferredGpuRetirements(): Promise<void> {
 function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = true): void {
   if (scheduledGpuRetirementRoots.has(root)) return;
   scheduledGpuRetirementRoots.add(root);
+  gpuRetirementScheduledRoots += 1;
   root.removeFromParent();
   root.visible = false;
   deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources }));
@@ -909,6 +912,7 @@ function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = 
 function scheduleDeferredGpuGeometryRetirement(geometry: THREE.BufferGeometry): void {
   if (scheduledGpuRetirementGeometries.has(geometry)) return;
   scheduledGpuRetirementGeometries.add(geometry);
+  gpuRetirementScheduledGeometries += 1;
   deferredGpuRetirements.push(Object.freeze({ kind: 'geometry', geometry }));
   scheduleGpuRetirementDrain();
 }
@@ -13631,9 +13635,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       collisionCacheRevision: activeWorldColliderCacheRevision,
       rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
       gpuRetirement: {
-        queuedRoots: deferredGpuRetirements.length,
+        queuedResources: deferredGpuRetirements.length,
+        queuedRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
+        queuedGeometries: deferredGpuRetirements.filter((entry) => entry.kind === 'geometry').length,
         draining: gpuRetirementTask !== null,
         fences: gpuRetirementFences,
+        scheduledRoots: gpuRetirementScheduledRoots,
+        scheduledGeometries: gpuRetirementScheduledGeometries,
         disposedRoots: gpuRetirementDisposedRoots,
         disposedGeometries: gpuRetirementDisposedGeometries,
         failures: gpuRetirementFailures,

@@ -29,6 +29,7 @@ const arenaSequence = [
   'skyline-terminal',
   'atomic-acres',
   'rustworks-1v1',
+  'rustworks-1v1',
 ];
 
 function digest(buffer) {
@@ -90,6 +91,7 @@ try {
   }, undefined, { timeout: 60_000 });
 
   const arenaReceipts = [];
+  const settledResidencyByArena = new Map();
   for (const [visit, arenaId] of arenaSequence.entries()) {
     activeContext = { visit, arenaId, phase: 'select-arena', sampleIndex: null };
     console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} phase=select`);
@@ -135,6 +137,9 @@ try {
         if (index % 4 === 0) {
           api.setGrenades(1);
           api.throwGrenade();
+          api.stageSmokeVolume(2.5);
+          api.stageSmokeVolume(3.5);
+          api.stageSmokeVolume(4.5);
         }
         if (index % 5 === 1) {
           api.equipWeapon('explosive-crossbow');
@@ -144,7 +149,11 @@ try {
           api.setAds(true);
           api.fireOnce();
         } else api.setAds(false);
-        if (index % 7 === 2 && state.interactiveWorld?.envelope?.placements?.length > 0) api.damageShed();
+        if (index % 7 === 2) {
+          for (const [shedIndex, shed] of (state.interactiveWorld?.envelope?.sheds ?? []).slice(0, 2).entries()) {
+            api.damageShed(shed.placementId, shedIndex === 0 ? 'wall-west' : 'wall-east', 220);
+          }
+        }
       }, sampleIndex);
       await page.waitForTimeout(sampleIntervalMs);
 
@@ -171,6 +180,7 @@ try {
       if (!sample.gameStarted || sample.arenaId !== arenaId
         || sample.transition.phase !== 'idle' || sample.transition.failure !== null || sample.transition.renderSubmissionPaused
         || sample.runtime.actualBackend !== 'webgpu' || sample.runtime.deviceLost
+        || sample.runtime.uncapturedErrors !== 0
         || sample.runtime.presentation.status !== 'healthy'
         || sample.watchdog.status !== 'healthy' || sample.watchdog.fatal
         || sample.gpuRetirement.failures !== 0
@@ -207,21 +217,51 @@ try {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.gameStarted === false && !document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 20_000 });
+    await page.waitForFunction(() => {
+      const gpu = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.interactiveWorld?.gpuRetirement;
+      return gpu?.queuedResources === 0
+        && gpu?.queuedRoots === 0
+        && gpu?.queuedGeometries === 0
+        && gpu?.draining === false
+        && gpu?.scheduledRoots === gpu?.disposedRoots
+        && gpu?.scheduledGeometries === gpu?.disposedGeometries;
+    }, undefined, { timeout: 20_000 });
     const afterReturn = await page.evaluate(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const state = api.snapshot();
       return {
         frameCount: state.frameCount,
         runtime: state.render.runtime,
         gpuRetirement: state.interactiveWorld.gpuRetirement,
+        pendingSupportRoots: state.fieldSupport.pendingRetiredPresentationRoots,
         smokePresentation: state.dmrThermal.smokePresentation,
+        residency: api.sampleRendererResidency(),
       };
     });
     if (afterReturn.runtime.presentation.status !== 'healthy'
+      || afterReturn.runtime.uncapturedErrors !== 0
       || afterReturn.gpuRetirement.failures !== 0
+      || afterReturn.gpuRetirement.queuedResources !== 0
+      || afterReturn.gpuRetirement.draining
+      || afterReturn.gpuRetirement.scheduledRoots !== afterReturn.gpuRetirement.disposedRoots
+      || afterReturn.gpuRetirement.scheduledGeometries !== afterReturn.gpuRetirement.disposedGeometries
+      || afterReturn.pendingSupportRoots !== 0
       || afterReturn.smokePresentation.liveDisposals !== 0
       || afterReturn.smokePresentation.active !== 0) {
       throw new Error(`${arenaId} menu return did not retire presentation safely: ${JSON.stringify(afterReturn)}`);
     }
+    const priorSettled = settledResidencyByArena.get(arenaId);
+    if (priorSettled && priorSettled.visit === visit - 1) {
+      const geometryTolerance = priorSettled.residency.totalGeometryBytes * 0.03 + 1_048_576;
+      const textureTolerance = priorSettled.residency.totalTextureBytes * 0.03 + 1_048_576;
+      if (afterReturn.residency.totalGeometryBytes > priorSettled.residency.totalGeometryBytes + geometryTolerance
+        || afterReturn.residency.totalTextureBytes > priorSettled.residency.totalTextureBytes + textureTolerance
+        || afterReturn.residency.activeGeometries > priorSettled.residency.activeGeometries + 8
+        || afterReturn.residency.activeTextures > priorSettled.residency.activeTextures + 4) {
+        throw new Error(`${arenaId} renderer residency did not plateau across a canonical revisit: ${JSON.stringify({ priorSettled, afterReturn })}`);
+      }
+    }
+    settledResidencyByArena.set(arenaId, { visit, residency: afterReturn.residency });
     arenaReceipts.push({
       visit,
       arenaId,
