@@ -36,6 +36,11 @@ export type BallisticSurface = Readonly<{
   material: BallisticMaterialId;
   classification: 'explicit' | 'rule' | 'fallback';
   breakableWindowId?: string;
+  destructibleSurface?: Readonly<{
+    definitionId: string;
+    placementId: string;
+    surfaceId: string;
+  }>;
 }>;
 
 type MaterialResistance = Readonly<{
