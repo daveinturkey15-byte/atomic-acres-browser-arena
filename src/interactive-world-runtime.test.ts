@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { traceBallisticPath, type WeaponPenetrationProfile } from './ballistics';
+import { circleIntersectsBox, isBlocked, segmentIntersectsBox } from './collision';
 import type { ShedPlacement } from './destructible-world';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-presentation';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
@@ -63,6 +64,23 @@ describe('shared interactive-world runtime adapter', () => {
     expect(runtime.root.getObjectByName('field-shed-door-hinge')!.rotation.y).toBeCloseTo(-Math.PI / 4);
     expect((runtime.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh).geometry).toBe(doorGeometry);
     expect(runtime.telemetry()).toMatchObject({ presentationRetiredGeometries: 0 });
+
+    // The 45-degree leaf occupies its visible diagonal, not the unrotated bounds
+    // centred on the same pose. Movement and LOS must agree on both probes.
+    expect(circleIntersectsBox(0.15, 2.97, 0.08, movingDoor.bounds)).toBe(true);
+    expect(isBlocked({ x: 0.15, y: 1.65, z: 2.97 }, [movingDoor.bounds], 0.08)).toBe(true);
+    expect(segmentIntersectsBox(
+      { x: -0.2, y: 1.1, z: 2.97 },
+      { x: 0.5, y: 1.1, z: 2.97 },
+      movingDoor.bounds,
+    )).toBe(true);
+    expect(circleIntersectsBox(0.4, 2.61, 0.08, movingDoor.bounds)).toBe(false);
+    expect(isBlocked({ x: 0.4, y: 1.65, z: 2.61 }, [movingDoor.bounds], 0.08)).toBe(false);
+    expect(segmentIntersectsBox(
+      { x: 0.4, y: 0.2, z: 2.61 },
+      { x: 0.4, y: 2, z: 2.61 },
+      movingDoor.bounds,
+    )).toBe(false);
     runtime.dispose();
   });
 
