@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=world.projectile-impact
+variant=world-impact-a
+fixtureOnly=true

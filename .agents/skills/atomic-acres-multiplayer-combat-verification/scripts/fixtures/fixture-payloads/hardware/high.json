@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "hardware-receipt",
+  "id": "high",
+  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "backend": "webgpu"
+}

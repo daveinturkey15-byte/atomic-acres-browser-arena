@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=ambience.arena-bed
+variant=skyline-terminal.apron
+fixtureOnly=true

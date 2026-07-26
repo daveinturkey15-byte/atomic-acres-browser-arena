@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "ordnance.frag-explosion",
+  "sourceAzimuthDeg": 55,
+  "observedPan": 0.72
+}

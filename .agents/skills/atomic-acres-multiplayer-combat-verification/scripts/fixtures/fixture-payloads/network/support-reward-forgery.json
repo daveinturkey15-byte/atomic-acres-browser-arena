@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "network-matrix-cell",
+  "id": "support-reward-forgery",
+  "profileId": "moderate-chaos",
+  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

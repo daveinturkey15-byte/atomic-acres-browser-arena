@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=combat.hit-confirm
+variant=hit-confirm-a
+fixtureOnly=true

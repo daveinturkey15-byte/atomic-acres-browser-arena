@@ -12,7 +12,7 @@ Every weapon, ordnance, impact, door, shed/debris, support entity, movement/foot
 
 - stable event ID and bus;
 - local or spatial policy;
-- variant/source IDs and provenance digests;
+- variant/source IDs, license, derivative notes and recomputed provenance digests;
 - concurrency, priority, cooldown and optional occlusion profile;
 - lifecycle/disposal owner and evidence ID.
 
@@ -25,5 +25,7 @@ Require finite positive reference distances, greater finite maximum distances, s
 Freeze maximum active voices, loops, reusable chains, per-bus voices, per-profile voices, occlusion queries/second and occlusion CPU p95. Global, bus, profile and event caps must agree arithmetically. Numeric before/after counts must settle after arena switches, rematches and audio suspend/resume.
 
 Require the exact arena set `atomic-acres`, `skyline-terminal`, `rustworks-1v1`, and `gun-range`, each with distinct ambience. Reject missing buses/events/provenance, out-of-range settings, invalid spatial bounds, unbounded concurrency, duplicate IDs or variants, identical ambience everywhere, authority overclaims, or evidence from a different source/build.
+
+All variant and evidence paths resolve relative to the catalog file. Require contained, bounded, non-empty regular files and compare each declared SHA-256 with the actual bytes; lexical traversal and real-path/symlink escape both fail.
 
 Run `node scripts/verify-audio-catalog.mjs --self-test` after fixture checks. Its adversarial mutations must all be rejected before the validator can guard a candidate.

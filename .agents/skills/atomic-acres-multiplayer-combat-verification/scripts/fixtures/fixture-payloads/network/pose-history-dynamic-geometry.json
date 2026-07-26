@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "network-matrix-cell",
+  "id": "pose-history-dynamic-geometry",
+  "profileId": "moderate-chaos",
+  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

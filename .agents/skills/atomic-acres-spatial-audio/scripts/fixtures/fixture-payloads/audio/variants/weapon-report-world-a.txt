@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=weapon.report.world
+variant=weapon-report-world-a
+fixtureOnly=true

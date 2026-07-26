@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "shed.debris-impact",
+  "sourceAzimuthDeg": -25,
+  "observedPan": -0.42
+}

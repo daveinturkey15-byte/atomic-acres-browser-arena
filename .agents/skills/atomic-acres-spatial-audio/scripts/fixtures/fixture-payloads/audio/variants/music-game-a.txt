@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=music.game
+variant=music-game-a
+fixtureOnly=true

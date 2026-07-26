@@ -1,0 +1,6 @@
+ATOMIC ACRES VIEWMODEL ASSET FIXTURE
+weapon=a4-vanguard
+collection=first-person
+lod=0
+triangles=90000
+fixtureOnly=true

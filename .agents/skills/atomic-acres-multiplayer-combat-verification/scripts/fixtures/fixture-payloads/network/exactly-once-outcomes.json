@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "network-matrix-cell",
+  "id": "exactly-once-outcomes",
+  "profileId": "moderate-chaos",
+  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

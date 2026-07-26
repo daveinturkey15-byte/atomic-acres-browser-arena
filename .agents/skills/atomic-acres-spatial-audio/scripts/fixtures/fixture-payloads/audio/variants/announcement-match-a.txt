@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=announcement.match
+variant=announcement-match-a
+fixtureOnly=true

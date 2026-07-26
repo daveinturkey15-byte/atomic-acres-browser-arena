@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "identity": {
     "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "buildId": "pass65-candidate-001",
@@ -9,100 +9,996 @@
   },
   "acceptance": {
     "state": "frozen",
-    "artifact": {"path": "artifacts/acceptance/pass-65.json", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-    "requirementIds": ["R203", "R204", "R223", "R228", "R233", "R234", "R307", "R403", "R405", "R408", "R410", "R411", "R502", "R503", "R504", "R506", "R510", "R601", "R602", "R603", "R607", "R610"],
-    "falsifierIds": ["F-R203-01", "F-R204-01", "F-R204-02", "F-R204-03", "F-R223-01", "F-R223-02", "F-R228-01", "F-R233-01", "F-R234-01", "F-R307-01", "F-R403-01", "F-R403-02", "F-R405-01", "F-R408-01", "F-R410-01", "F-R410-02", "F-R411-01", "F-R411-02", "F-R502-01", "F-R502-02", "F-R503-01", "F-R503-02", "F-R504-01", "F-R506-01", "F-R510-01", "F-R601-01", "F-R601-02", "F-R601-03", "F-R601-04", "F-R602-01", "F-R602-02", "F-R602-03", "F-R602-04", "F-R602-05", "F-R603-01", "F-R603-02", "F-R603-03", "F-R603-04", "F-R603-05", "F-R603-06", "F-R603-07", "F-R607-01", "F-R607-02", "F-R607-03", "F-R610-01", "F-R610-02"]
+    "artifact": {
+      "path": "fixture-payloads/acceptance/frozen-manifest.json",
+      "sha256": "5d4dc564a623efd41dc1283d8e1bc72800bc1bb3fffeeca73cfaacc47ae35b3e"
+    },
+    "requirementIds": [
+      "R203",
+      "R204",
+      "R223",
+      "R228",
+      "R233",
+      "R234",
+      "R307",
+      "R403",
+      "R405",
+      "R408",
+      "R410",
+      "R411",
+      "R502",
+      "R503",
+      "R504",
+      "R506",
+      "R510",
+      "R601",
+      "R602",
+      "R603",
+      "R607",
+      "R610"
+    ],
+    "falsifierIds": [
+      "F-R203-01",
+      "F-R204-01",
+      "F-R204-02",
+      "F-R204-03",
+      "F-R223-01",
+      "F-R223-02",
+      "F-R228-01",
+      "F-R233-01",
+      "F-R234-01",
+      "F-R307-01",
+      "F-R403-01",
+      "F-R403-02",
+      "F-R405-01",
+      "F-R408-01",
+      "F-R410-01",
+      "F-R410-02",
+      "F-R411-01",
+      "F-R411-02",
+      "F-R502-01",
+      "F-R502-02",
+      "F-R503-01",
+      "F-R503-02",
+      "F-R504-01",
+      "F-R506-01",
+      "F-R510-01",
+      "F-R601-01",
+      "F-R601-02",
+      "F-R601-03",
+      "F-R601-04",
+      "F-R602-01",
+      "F-R602-02",
+      "F-R602-03",
+      "F-R602-04",
+      "F-R602-05",
+      "F-R603-01",
+      "F-R603-02",
+      "F-R603-03",
+      "F-R603-04",
+      "F-R603-05",
+      "F-R603-06",
+      "F-R603-07",
+      "F-R607-01",
+      "F-R607-02",
+      "F-R607-03",
+      "F-R610-01",
+      "F-R610-02"
+    ]
   },
   "impairmentManifest": {
     "version": "pass65-chaos-v1",
     "sha256": "534893218b6eb477b541269b5e2e1b5cedd07958d3bdec7bfd19562a28a688e4",
     "profiles": [
-      {"id": "moderate-chaos", "delayMs": 80, "jitterMs": 30, "lossPermille": 30, "duplicatePermille": 20, "reorderPermille": 20, "seed": 65001, "durationSeconds": 120, "eventCount": 5000, "repairDeadlineMs": 3000}
+      {
+        "id": "moderate-chaos",
+        "delayMs": 80,
+        "jitterMs": 30,
+        "lossPermille": 30,
+        "duplicatePermille": 20,
+        "reorderPermille": 20,
+        "seed": 65001,
+        "durationSeconds": 120,
+        "eventCount": 5000,
+        "repairDeadlineMs": 3000
+      }
     ]
   },
   "results": [
     {
-      "profileId": "moderate-chaos", "scenarioId": "solo-host-bots", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R601", "R603"], "falsifierIds": ["F-R601-01", "F-R603-01"], "commandOrFixture": "fixtures/scenarios/solo-host-bots.json", "artifact": {"path": "artifacts/network/solo-host-bots.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0},
-      "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
-      "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "solo-host-bots",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R601",
+        "R603"
+      ],
+      "falsifierIds": [
+        "F-R601-01",
+        "F-R603-01"
+      ],
+      "commandOrFixture": "fixtures/scenarios/solo-host-bots.json",
+      "artifact": {
+        "path": "fixture-payloads/network/solo-host-bots.json",
+        "sha256": "1fc7c8396293fa8a964c9c7610751bbe4e89150177f4e0ffa512ecdc8933e5b3"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "two-peer-private", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R601", "R602"], "falsifierIds": ["F-R601-02", "F-R602-01"], "commandOrFixture": "fixtures/scenarios/two-peer-private.json", "artifact": {"path": "artifacts/network/two-peer-private.json", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "two-peer-private",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R601",
+        "R602"
+      ],
+      "falsifierIds": [
+        "F-R601-02",
+        "F-R602-01"
+      ],
+      "commandOrFixture": "fixtures/scenarios/two-peer-private.json",
+      "artifact": {
+        "path": "fixture-payloads/network/two-peer-private.json",
+        "sha256": "fac3313ed251bd65eb333937248aa193c16e42ce9929efd07c6d9692a32babe0"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "host-guest-bot", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R601", "R603"], "falsifierIds": ["F-R601-03", "F-R603-02"], "commandOrFixture": "fixtures/scenarios/host-guest-bot.json", "artifact": {"path": "artifacts/network/host-guest-bot.json", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "host-guest-bot",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R601",
+        "R603"
+      ],
+      "falsifierIds": [
+        "F-R601-03",
+        "F-R603-02"
+      ],
+      "commandOrFixture": "fixtures/scenarios/host-guest-bot.json",
+      "artifact": {
+        "path": "fixture-payloads/network/host-guest-bot.json",
+        "sha256": "b1aebb527ae4e406178f528bc634150f9c2e4751836ab5cd1ffe6f393bc1d72c"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "life-action-revision-races", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R602", "R603"], "falsifierIds": ["F-R602-02", "F-R603-03"], "commandOrFixture": "fixtures/scenarios/life-action-revision-races.json", "artifact": {"path": "artifacts/network/life-action-revision-races.json", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "life-action-revision-races",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R602",
+        "R603"
+      ],
+      "falsifierIds": [
+        "F-R602-02",
+        "F-R603-03"
+      ],
+      "commandOrFixture": "fixtures/scenarios/life-action-revision-races.json",
+      "artifact": {
+        "path": "fixture-payloads/network/life-action-revision-races.json",
+        "sha256": "434ab86b61fddc937274564c8a1759e23dab3c8c670bd96dbe600cf6fdb836d8"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "weapon-command-forgery", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R203", "R228", "R601"], "falsifierIds": ["F-R203-01", "F-R228-01", "F-R601-04"], "commandOrFixture": "fixtures/scenarios/weapon-command-forgery.json", "artifact": {"path": "artifacts/network/weapon-command-forgery.json", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "weapon-command-forgery",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R203",
+        "R228",
+        "R601"
+      ],
+      "falsifierIds": [
+        "F-R203-01",
+        "F-R228-01",
+        "F-R601-04"
+      ],
+      "commandOrFixture": "fixtures/scenarios/weapon-command-forgery.json",
+      "artifact": {
+        "path": "fixture-payloads/network/weapon-command-forgery.json",
+        "sha256": "95d7cf00f7638de9b1b22b486f93bc30040aaf6e6200e4a8ba2d7c6ef326487d"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "ordnance-duplicate-stale", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R223", "R233", "R602", "R603"], "falsifierIds": ["F-R223-01", "F-R233-01", "F-R602-03", "F-R603-04"], "commandOrFixture": "fixtures/scenarios/ordnance-duplicate-stale.json", "artifact": {"path": "artifacts/network/ordnance-duplicate-stale.json", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "ordnance-duplicate-stale",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R223",
+        "R233",
+        "R602",
+        "R603"
+      ],
+      "falsifierIds": [
+        "F-R223-01",
+        "F-R233-01",
+        "F-R602-03",
+        "F-R603-04"
+      ],
+      "commandOrFixture": "fixtures/scenarios/ordnance-duplicate-stale.json",
+      "artifact": {
+        "path": "fixture-payloads/network/ordnance-duplicate-stale.json",
+        "sha256": "e20aa1abcfce55bc4a14d442fc363e9c244bcbd650021d5a584e22c9438dfea6"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "support-reward-forgery", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R502", "R503", "R510", "R602", "R603"], "falsifierIds": ["F-R502-01", "F-R503-01", "F-R510-01", "F-R602-04", "F-R603-05"], "commandOrFixture": "fixtures/scenarios/support-reward-forgery.json", "artifact": {"path": "artifacts/network/support-reward-forgery.json", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "support-reward-forgery",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R502",
+        "R503",
+        "R510",
+        "R602",
+        "R603"
+      ],
+      "falsifierIds": [
+        "F-R502-01",
+        "F-R503-01",
+        "F-R510-01",
+        "F-R602-04",
+        "F-R603-05"
+      ],
+      "commandOrFixture": "fixtures/scenarios/support-reward-forgery.json",
+      "artifact": {
+        "path": "fixture-payloads/network/support-reward-forgery.json",
+        "sha256": "98f9176cc798a18932eee7fe32b4809a717aaf6b6d625d7313a9e90f3c5a42d5"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "shed-revision-forgery", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R403", "R405", "R408", "R410", "R411"], "falsifierIds": ["F-R403-01", "F-R405-01", "F-R408-01", "F-R410-01", "F-R411-01"], "commandOrFixture": "fixtures/scenarios/shed-revision-forgery.json", "artifact": {"path": "artifacts/network/shed-revision-forgery.json", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "shed-revision-forgery",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R403",
+        "R405",
+        "R408",
+        "R410",
+        "R411"
+      ],
+      "falsifierIds": [
+        "F-R403-01",
+        "F-R405-01",
+        "F-R408-01",
+        "F-R410-01",
+        "F-R411-01"
+      ],
+      "commandOrFixture": "fixtures/scenarios/shed-revision-forgery.json",
+      "artifact": {
+        "path": "fixture-payloads/network/shed-revision-forgery.json",
+        "sha256": "a6a00ca2ade7ba6c718b1d91956f91ca6519b3b80572739f6f68fa9daf420afb"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "late-join-repair", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R204", "R234", "R403", "R410", "R607"], "falsifierIds": ["F-R204-01", "F-R234-01", "F-R403-02", "F-R410-02", "F-R607-01"], "commandOrFixture": "fixtures/scenarios/late-join-repair.json", "artifact": {"path": "artifacts/network/late-join-repair.json", "sha256": "9999999999999999999999999999999999999999999999999999999999999999"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 2, "lateJoinRepairCount": 2, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "late-join-repair",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R204",
+        "R234",
+        "R403",
+        "R410",
+        "R607"
+      ],
+      "falsifierIds": [
+        "F-R204-01",
+        "F-R234-01",
+        "F-R403-02",
+        "F-R410-02",
+        "F-R607-01"
+      ],
+      "commandOrFixture": "fixtures/scenarios/late-join-repair.json",
+      "artifact": {
+        "path": "fixture-payloads/network/late-join-repair.json",
+        "sha256": "3e280f6ed7619a572ad75cf1f0f86af0f2e4e9ec10c8a10ddda4b86c3432c29f"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 2,
+        "lateJoinRepairCount": 2,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "match-end-cleanup", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R204", "R307", "R603", "R610"], "falsifierIds": ["F-R204-02", "F-R307-01", "F-R603-06", "F-R610-01"], "commandOrFixture": "fixtures/scenarios/match-end-cleanup.json", "artifact": {"path": "artifacts/network/match-end-cleanup.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 1, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "match-end-cleanup",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R204",
+        "R307",
+        "R603",
+        "R610"
+      ],
+      "falsifierIds": [
+        "F-R204-02",
+        "F-R307-01",
+        "F-R603-06",
+        "F-R610-01"
+      ],
+      "commandOrFixture": "fixtures/scenarios/match-end-cleanup.json",
+      "artifact": {
+        "path": "fixture-payloads/network/match-end-cleanup.json",
+        "sha256": "a7b1cfedbeb6af67a01b9bbb563798449c255faa4fc32c7a63dde77b2fb9cda6"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 1,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "reconnect-rematch-repair", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R204", "R602", "R607", "R610"], "falsifierIds": ["F-R204-03", "F-R602-05", "F-R607-02", "F-R610-02"], "commandOrFixture": "fixtures/scenarios/reconnect-rematch-repair.json", "artifact": {"path": "artifacts/network/reconnect-rematch-repair.json", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "reconnect-rematch-repair",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R204",
+        "R602",
+        "R607",
+        "R610"
+      ],
+      "falsifierIds": [
+        "F-R204-03",
+        "F-R602-05",
+        "F-R607-02",
+        "F-R610-02"
+      ],
+      "commandOrFixture": "fixtures/scenarios/reconnect-rematch-repair.json",
+      "artifact": {
+        "path": "fixture-payloads/network/reconnect-rematch-repair.json",
+        "sha256": "2eb3367c39656b61d8877e91daf593e3e9347888680cb5545b2bea3fe1922dde"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "pose-history-dynamic-geometry", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R411", "R504", "R506", "R607"], "falsifierIds": ["F-R411-02", "F-R504-01", "F-R506-01", "F-R607-03"], "commandOrFixture": "fixtures/scenarios/pose-history-dynamic-geometry.json", "artifact": {"path": "artifacts/network/pose-history-dynamic-geometry.json", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "pose-history-dynamic-geometry",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R411",
+        "R504",
+        "R506",
+        "R607"
+      ],
+      "falsifierIds": [
+        "F-R411-02",
+        "F-R504-01",
+        "F-R506-01",
+        "F-R607-03"
+      ],
+      "commandOrFixture": "fixtures/scenarios/pose-history-dynamic-geometry.json",
+      "artifact": {
+        "path": "fixture-payloads/network/pose-history-dynamic-geometry.json",
+        "sha256": "c4926a9cb439d28c056733a89b72d42bd5f30a515d9de1a4c64cc022ea3466fd"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     },
     {
-      "profileId": "moderate-chaos", "scenarioId": "exactly-once-outcomes", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "requirementIds": ["R223", "R502", "R503", "R603"], "falsifierIds": ["F-R223-02", "F-R502-02", "F-R503-02", "F-R603-07"], "commandOrFixture": "fixtures/scenarios/exactly-once-outcomes.json", "artifact": {"path": "artifacts/network/exactly-once-outcomes.json", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
-      "events": {"originalEvents": 5000, "droppedEvents": 150, "duplicatedDeliveries": 100, "reorderedDeliveries": 100, "deliveredEvents": 4950, "admittedEvents": 4800, "rejectedEvents": 150, "appliedOutcomes": 1000, "duplicateApplications": 0, "staleApplications": 0}, "repair": {"deadlineMs": 3000, "completedMs": 1200, "attempts": 1, "remainingDivergences": 0}, "stateHashes": {"hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}, "cleanup": {"initialResourceCount": 42, "expectedSettledCount": 10, "observedSettledCount": 10, "errorCount": 0, "staleCallbackCount": 0}, "lifecycle": {"lateJoinSnapshotCount": 0, "lateJoinRepairCount": 0, "matchEndTransitionCount": 0, "postMatchMutationCount": 0}
+      "profileId": "moderate-chaos",
+      "scenarioId": "exactly-once-outcomes",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "buildId": "pass65-candidate-001",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "requirementIds": [
+        "R223",
+        "R502",
+        "R503",
+        "R603"
+      ],
+      "falsifierIds": [
+        "F-R223-02",
+        "F-R502-02",
+        "F-R503-02",
+        "F-R603-07"
+      ],
+      "commandOrFixture": "fixtures/scenarios/exactly-once-outcomes.json",
+      "artifact": {
+        "path": "fixture-payloads/network/exactly-once-outcomes.json",
+        "sha256": "acd51c6c23538357baa5416757a0ae0d5e58ac4e8014bda8532660960f8ecfec"
+      },
+      "events": {
+        "originalEvents": 5000,
+        "droppedEvents": 150,
+        "duplicatedDeliveries": 100,
+        "reorderedDeliveries": 100,
+        "deliveredEvents": 4950,
+        "admittedEvents": 4800,
+        "rejectedEvents": 150,
+        "appliedOutcomes": 1000,
+        "duplicateApplications": 0,
+        "staleApplications": 0
+      },
+      "repair": {
+        "deadlineMs": 3000,
+        "completedMs": 1200,
+        "attempts": 1,
+        "remainingDivergences": 0
+      },
+      "stateHashes": {
+        "hostFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "clientFinalSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cleanup": {
+        "initialResourceCount": 42,
+        "expectedSettledCount": 10,
+        "observedSettledCount": 10,
+        "errorCount": 0,
+        "staleCallbackCount": 0
+      },
+      "lifecycle": {
+        "lateJoinSnapshotCount": 0,
+        "lateJoinRepairCount": 0,
+        "matchEndTransitionCount": 0,
+        "postMatchMutationCount": 0
+      }
     }
   ],
   "hardwareEvidence": [
     {
-      "preset": "high", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "artifact": {"path": "artifacts/hardware/high.json", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
-      "os": {"name": "Windows", "version": "11-24H2"}, "browser": {"name": "Chrome", "version": "stable-2026-07"}, "adapter": {"name": "NVIDIA-GeForce-RTX-5080", "vendorId": "10de", "deviceId": "2c02", "driverVersion": "591.86"}, "backend": "webgpu", "settingsHash": "3333333333333333333333333333333333333333333333333333333333333333", "resolution": {"width": 2560, "height": 1440, "dpr": 1}, "warmupSamples": 120, "measuredSamples": 1000, "gpuMetricKind": "gpu-time", "sceneIds": ["atomic-acres", "skyline-terminal", "rustworks-1v1", "gun-range", "combined-stress"],
-      "baseline": {"sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "artifact": {"path": "artifacts/hardware/pass64-high.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"}, "cpuP95Ms": 5, "gpuOrProxyP95Ms": 7, "frameP99Ms": 16, "memoryPeakMiB": 2000},
-      "thresholds": {"cpuP95MaxMs": 8, "gpuOrProxyP95MaxMs": 10, "frameP99MaxMs": 25, "memoryPeakMaxMiB": 3000, "cpuP95DeltaMaxMs": 3, "gpuOrProxyP95DeltaMaxMs": 3, "frameP99DeltaMaxMs": 8, "memoryPeakDeltaMaxMiB": 500},
-      "observed": {"cpuP95Ms": 6, "gpuOrProxyP95Ms": 8, "frameP99Ms": 18, "memoryPeakMiB": 2200, "deviceLossCount": 0, "uncapturedErrorCount": 0}
+      "preset": "high",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "artifact": {
+        "path": "fixture-payloads/hardware/high.json",
+        "sha256": "a00533220a1af3d148a6dc3bc227bf5180098df11ba68d12d60d772bbb76cfb5"
+      },
+      "os": {
+        "name": "Windows",
+        "version": "11-24H2"
+      },
+      "browser": {
+        "name": "Chrome",
+        "version": "stable-2026-07"
+      },
+      "adapter": {
+        "name": "NVIDIA-GeForce-RTX-5080",
+        "vendorId": "10de",
+        "deviceId": "2c02",
+        "driverVersion": "591.86"
+      },
+      "backend": "webgpu",
+      "settingsHash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "resolution": {
+        "width": 2560,
+        "height": 1440,
+        "dpr": 1
+      },
+      "warmupSamples": 120,
+      "measuredSamples": 1000,
+      "gpuMetricKind": "gpu-time",
+      "sceneIds": [
+        "atomic-acres",
+        "skyline-terminal",
+        "rustworks-1v1",
+        "gun-range",
+        "combined-stress"
+      ],
+      "baseline": {
+        "sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact": {
+          "path": "fixture-payloads/hardware/pass64-high.json",
+          "sha256": "6c9f83c388f12b754c8fec0a0822048e418cff08ae710eb8b53b2ff6e0e00918"
+        },
+        "cpuP95Ms": 5,
+        "gpuOrProxyP95Ms": 7,
+        "frameP99Ms": 16,
+        "memoryPeakMiB": 2000
+      },
+      "thresholds": {
+        "cpuP95MaxMs": 8,
+        "gpuOrProxyP95MaxMs": 10,
+        "frameP99MaxMs": 25,
+        "memoryPeakMaxMiB": 3000,
+        "cpuP95DeltaMaxMs": 3,
+        "gpuOrProxyP95DeltaMaxMs": 3,
+        "frameP99DeltaMaxMs": 8,
+        "memoryPeakDeltaMaxMiB": 500
+      },
+      "observed": {
+        "cpuP95Ms": 6,
+        "gpuOrProxyP95Ms": 8,
+        "frameP99Ms": 18,
+        "memoryPeakMiB": 2200,
+        "deviceLossCount": 0,
+        "uncapturedErrorCount": 0
+      }
     },
     {
-      "preset": "max", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "artifact": {"path": "artifacts/hardware/max.json", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
-      "os": {"name": "Windows", "version": "11-24H2"}, "browser": {"name": "Chrome", "version": "stable-2026-07"}, "adapter": {"name": "NVIDIA-GeForce-RTX-5080", "vendorId": "10de", "deviceId": "2c02", "driverVersion": "591.86"}, "backend": "webgpu", "settingsHash": "4444444444444444444444444444444444444444444444444444444444444444", "resolution": {"width": 2560, "height": 1440, "dpr": 1}, "warmupSamples": 120, "measuredSamples": 1000, "gpuMetricKind": "gpu-time", "sceneIds": ["atomic-acres", "skyline-terminal", "rustworks-1v1", "gun-range", "combined-stress"],
-      "baseline": {"sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "artifact": {"path": "artifacts/hardware/pass64-max.json", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"}, "cpuP95Ms": 6, "gpuOrProxyP95Ms": 8, "frameP99Ms": 18, "memoryPeakMiB": 2200},
-      "thresholds": {"cpuP95MaxMs": 10, "gpuOrProxyP95MaxMs": 13, "frameP99MaxMs": 30, "memoryPeakMaxMiB": 3500, "cpuP95DeltaMaxMs": 4, "gpuOrProxyP95DeltaMaxMs": 5, "frameP99DeltaMaxMs": 10, "memoryPeakDeltaMaxMiB": 700},
-      "observed": {"cpuP95Ms": 8, "gpuOrProxyP95Ms": 11, "frameP99Ms": 24, "memoryPeakMiB": 2700, "deviceLossCount": 0, "uncapturedErrorCount": 0}
+      "preset": "max",
+      "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "artifact": {
+        "path": "fixture-payloads/hardware/max.json",
+        "sha256": "270543a3e48a154c5d177a9a480eeeef539d0f89f45a6b02147064ccddd759fe"
+      },
+      "os": {
+        "name": "Windows",
+        "version": "11-24H2"
+      },
+      "browser": {
+        "name": "Chrome",
+        "version": "stable-2026-07"
+      },
+      "adapter": {
+        "name": "NVIDIA-GeForce-RTX-5080",
+        "vendorId": "10de",
+        "deviceId": "2c02",
+        "driverVersion": "591.86"
+      },
+      "backend": "webgpu",
+      "settingsHash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "resolution": {
+        "width": 2560,
+        "height": 1440,
+        "dpr": 1
+      },
+      "warmupSamples": 120,
+      "measuredSamples": 1000,
+      "gpuMetricKind": "gpu-time",
+      "sceneIds": [
+        "atomic-acres",
+        "skyline-terminal",
+        "rustworks-1v1",
+        "gun-range",
+        "combined-stress"
+      ],
+      "baseline": {
+        "sourceSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact": {
+          "path": "fixture-payloads/hardware/pass64-max.json",
+          "sha256": "f2b769fea9e0b0dcb81bf4afad35e8369986b9262bd3bb63a07bfa960c4bf98e"
+        },
+        "cpuP95Ms": 6,
+        "gpuOrProxyP95Ms": 8,
+        "frameP99Ms": 18,
+        "memoryPeakMiB": 2200
+      },
+      "thresholds": {
+        "cpuP95MaxMs": 10,
+        "gpuOrProxyP95MaxMs": 13,
+        "frameP99MaxMs": 30,
+        "memoryPeakMaxMiB": 3500,
+        "cpuP95DeltaMaxMs": 4,
+        "gpuOrProxyP95DeltaMaxMs": 5,
+        "frameP99DeltaMaxMs": 10,
+        "memoryPeakDeltaMaxMiB": 700
+      },
+      "observed": {
+        "cpuP95Ms": 8,
+        "gpuOrProxyP95Ms": 11,
+        "frameP99Ms": 24,
+        "memoryPeakMiB": 2700,
+        "deviceLossCount": 0,
+        "uncapturedErrorCount": 0
+      }
     }
   ]
 }

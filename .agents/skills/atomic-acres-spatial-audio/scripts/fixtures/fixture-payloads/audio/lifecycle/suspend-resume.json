@@ -1,0 +1,6 @@
+{
+  "fixtureOnly": true,
+  "kind": "audio-lifecycle-evidence",
+  "id": "suspend-resume",
+  "observedSettledNodes": 12
+}

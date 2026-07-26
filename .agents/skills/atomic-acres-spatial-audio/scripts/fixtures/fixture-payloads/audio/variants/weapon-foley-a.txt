@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=weapon.extended-foley
+variant=weapon-foley-a
+fixtureOnly=true

@@ -24,7 +24,7 @@ Freeze named profiles with delay/jitter, loss, duplication, reorder, seed, run d
 
 ## Evidence
 
-Each result names the exact oracle-owned requirement/falsifier IDs, source/build/environment, command or fixture, immutable artifact path/digest, numeric event counts, repair counters/timing, expected and observed state hashes, cleanup/lifecycle counters and derived pass/fail. Late-join and match-end scenarios additionally require numeric repair evidence. Candidate-authored `pass` booleans are not evidence. Timeouts, cleanup failures, missing evidence, divergence and threshold breaches return nonzero.
+Each result names the exact oracle-owned requirement/falsifier IDs, source/build/environment, command or fixture, immutable artifact path/digest, numeric event counts, repair counters/timing, expected and observed state hashes, cleanup/lifecycle counters and derived pass/fail. Relative artifact paths resolve from the matrix file directory and must remain contained after real-path resolution; validators recompute SHA-256 over bounded, non-empty regular files. Late-join and match-end scenarios additionally require numeric repair evidence. Candidate-authored `pass` booleans are not evidence. Timeouts, missing files, traversal or symlink escape, digest drift, cleanup failures, divergence and threshold breaches return nonzero.
 
 Hardware evidence additionally records exact High and Max receipts over all four arenas plus combined stress, OS, browser, adapter/backend, settings hash, resolution, warmup/sample counts and honest CPU/GPU-or-proxy metrics. Each metric carries frozen baseline, absolute and delta thresholds, and observed values that the validator compares numerically. Never label a queue proxy as GPU time.
 

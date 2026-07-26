@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=player.low-health-breathing
+variant=low-health-breath-a
+fixtureOnly=true

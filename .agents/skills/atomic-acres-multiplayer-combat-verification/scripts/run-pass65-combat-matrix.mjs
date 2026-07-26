@@ -35,6 +35,7 @@ const PROFILE_ORACLE = Object.freeze([Object.freeze({
 })]);
 const HARDWARE_PRESETS = Object.freeze(['high', 'max']);
 const HARDWARE_SCENES = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'combined-stress']);
+const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024;
 
 const exactRequirements = [...new Set(Object.values(SCENARIO_ORACLE).flatMap(([requirements]) => requirements))].sort();
 const exactFalsifiers = [...new Set(Object.values(SCENARIO_ORACLE).flatMap(([, falsifiers]) => falsifiers))].sort();
@@ -76,19 +77,80 @@ function exactKeys(value, required, allowed, label, failures) {
   return true;
 }
 
-function validateArtifact(value, label, failures) {
-  if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
-  if (!safeArtifactPath(value.path)) failures.push(`${label} path invalid`);
-  if (!sha256(value.sha256)) failures.push(`${label} digest invalid`);
+function containedBy(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative.length > 0 && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-function validateHardware(receipt, label, identity, failures) {
+function validateFileEvidence(relativePath, expectedDigest, artifactRoot, label, failures) {
+  if (!safeArtifactPath(relativePath)) {
+    failures.push(`${label} path invalid`);
+    return;
+  }
+  if (!sha256(expectedDigest)) {
+    failures.push(`${label} digest invalid`);
+    return;
+  }
+  if (typeof artifactRoot !== 'string' || artifactRoot.length === 0) {
+    failures.push(`${label} artifact root missing`);
+    return;
+  }
+  let realRoot;
+  try {
+    realRoot = fs.realpathSync(path.resolve(artifactRoot));
+  } catch {
+    failures.push(`${label} artifact root unreadable`);
+    return;
+  }
+  const candidate = path.resolve(realRoot, relativePath);
+  if (!containedBy(realRoot, candidate)) {
+    failures.push(`${label} escapes artifact root`);
+    return;
+  }
+  let realFile;
+  try {
+    realFile = fs.realpathSync(candidate);
+  } catch {
+    failures.push(`${label} file missing`);
+    return;
+  }
+  if (!containedBy(realRoot, realFile)) {
+    failures.push(`${label} resolves outside artifact root`);
+    return;
+  }
+  let stat;
+  try {
+    stat = fs.statSync(realFile);
+  } catch {
+    failures.push(`${label} file unreadable`);
+    return;
+  }
+  if (!stat.isFile() || stat.size < 1 || stat.size > MAX_EVIDENCE_BYTES) {
+    failures.push(`${label} file size/type invalid`);
+    return;
+  }
+  let actualDigest;
+  try {
+    actualDigest = crypto.createHash('sha256').update(fs.readFileSync(realFile)).digest('hex');
+  } catch {
+    failures.push(`${label} file unreadable`);
+    return;
+  }
+  if (actualDigest !== expectedDigest) failures.push(`${label} digest mismatch`);
+}
+
+function validateArtifact(value, label, artifactRoot, failures) {
+  if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
+  validateFileEvidence(value.path, value.sha256, artifactRoot, label, failures);
+}
+
+function validateHardware(receipt, label, identity, artifactRoot, failures) {
   const keys = ['preset', 'sourceSha', 'environmentHash', 'artifact', 'os', 'browser', 'adapter', 'backend', 'settingsHash', 'resolution', 'warmupSamples', 'measuredSamples', 'gpuMetricKind', 'sceneIds', 'baseline', 'thresholds', 'observed'];
   if (!exactKeys(receipt, keys, keys, label, failures)) return;
   if (!HARDWARE_PRESETS.includes(receipt.preset)) failures.push(`${label} preset invalid`);
   if (receipt.sourceSha !== identity.sourceSha || !sha40(receipt.sourceSha)) failures.push(`${label} source SHA mismatch`);
   if (receipt.environmentHash !== identity.environmentHash || !sha256(receipt.environmentHash)) failures.push(`${label} environment mismatch`);
-  validateArtifact(receipt.artifact, `${label}.artifact`, failures);
+  validateArtifact(receipt.artifact, `${label}.artifact`, artifactRoot, failures);
   exactKeys(receipt.os, ['name', 'version'], ['name', 'version'], `${label}.os`, failures);
   exactKeys(receipt.browser, ['name', 'version'], ['name', 'version'], `${label}.browser`, failures);
   exactKeys(receipt.adapter, ['name', 'vendorId', 'deviceId', 'driverVersion'], ['name', 'vendorId', 'deviceId', 'driverVersion'], `${label}.adapter`, failures);
@@ -108,7 +170,7 @@ function validateHardware(receipt, label, identity, failures) {
   const baselineKeys = ['sourceSha', 'artifact', ...metricKeys];
   if (exactKeys(receipt.baseline, baselineKeys, baselineKeys, `${label}.baseline`, failures)) {
     if (!sha40(receipt.baseline.sourceSha) || receipt.baseline.sourceSha === identity.sourceSha) failures.push(`${label} baseline source SHA invalid`);
-    validateArtifact(receipt.baseline.artifact, `${label}.baseline.artifact`, failures);
+    validateArtifact(receipt.baseline.artifact, `${label}.baseline.artifact`, artifactRoot, failures);
     for (const field of metricKeys) if (!finite(receipt.baseline[field], 0, field === 'memoryPeakMiB' ? 32768 : 1000)) failures.push(`${label} baseline ${field} invalid`);
   }
   const thresholdKeys = ['cpuP95MaxMs', 'gpuOrProxyP95MaxMs', 'frameP99MaxMs', 'memoryPeakMaxMiB', 'cpuP95DeltaMaxMs', 'gpuOrProxyP95DeltaMaxMs', 'frameP99DeltaMaxMs', 'memoryPeakDeltaMaxMiB'];
@@ -132,11 +194,11 @@ function validateHardware(receipt, label, identity, failures) {
   }
 }
 
-export function validateCombatMatrix(report) {
+export function validateCombatMatrix(report, artifactRoot) {
   const failures = [];
   const rootKeys = ['schemaVersion', 'identity', 'acceptance', 'impairmentManifest', 'results', 'hardwareEvidence'];
   if (!exactKeys(report, rootKeys, rootKeys, 'report', failures)) return failures;
-  if (report.schemaVersion !== 2) failures.push('schemaVersion must equal 2');
+  if (report.schemaVersion !== 3) failures.push('schemaVersion must equal 3');
 
   const identityKeys = ['sourceSha', 'buildId', 'environmentHash', 'worktreeState', 'buildState'];
   if (exactKeys(report.identity, identityKeys, identityKeys, 'identity', failures)) {
@@ -150,7 +212,7 @@ export function validateCombatMatrix(report) {
   const acceptanceKeys = ['state', 'artifact', 'requirementIds', 'falsifierIds'];
   if (exactKeys(report.acceptance, acceptanceKeys, acceptanceKeys, 'acceptance', failures)) {
     if (report.acceptance.state !== 'frozen') failures.push('acceptance state must be frozen');
-    validateArtifact(report.acceptance.artifact, 'acceptance.artifact', failures);
+    validateArtifact(report.acceptance.artifact, 'acceptance.artifact', artifactRoot, failures);
     if (!sameSet(report.acceptance.requirementIds, exactRequirements) || !report.acceptance.requirementIds?.every(requirementOk)) failures.push('acceptance requirement IDs must exactly equal the independent scenario union');
     if (!sameSet(report.acceptance.falsifierIds, exactFalsifiers) || !report.acceptance.falsifierIds?.every(falsifierOk)) failures.push('acceptance falsifier IDs must exactly equal the independent scenario union');
   }
@@ -186,7 +248,7 @@ export function validateCombatMatrix(report) {
     if (oracle && (!exactArray(result.requirementIds, oracle[0]) || !result.requirementIds.every(requirementOk))) failures.push(`${label} requirement evidence differs from scenario oracle`);
     if (oracle && (!exactArray(result.falsifierIds, oracle[1]) || !result.falsifierIds.every(falsifierOk))) failures.push(`${label} falsifier evidence differs from scenario oracle`);
     if (!safeArtifactPath(result.commandOrFixture)) failures.push(`${label} commandOrFixture path invalid`);
-    validateArtifact(result.artifact, `${label}.artifact`, failures);
+    validateArtifact(result.artifact, `${label}.artifact`, artifactRoot, failures);
 
     const eventKeys = ['originalEvents', 'droppedEvents', 'duplicatedDeliveries', 'reorderedDeliveries', 'deliveredEvents', 'admittedEvents', 'rejectedEvents', 'appliedOutcomes', 'duplicateApplications', 'staleApplications'];
     if (exactKeys(result.events, eventKeys, eventKeys, `${label}.events`, failures)) {
@@ -229,7 +291,7 @@ export function validateCombatMatrix(report) {
 
   const hardware = Array.isArray(report.hardwareEvidence) ? report.hardwareEvidence : [];
   if (!exactArray(hardware.map(receipt => receipt?.preset), HARDWARE_PRESETS)) failures.push('hardware evidence must contain exact ordered High and Max receipts');
-  for (const [index, receipt] of hardware.entries()) validateHardware(receipt, `hardwareEvidence[${index}]`, report.identity ?? {}, failures);
+  for (const [index, receipt] of hardware.entries()) validateHardware(receipt, `hardwareEvidence[${index}]`, report.identity ?? {}, artifactRoot, failures);
   return [...new Set(failures)].sort();
 }
 
@@ -239,8 +301,9 @@ function readJson(input) {
 
 function runSelfTest() {
   const fixturePath = fileURLToPath(new URL('./fixtures/known-good.json', import.meta.url));
+  const fixtureRoot = path.dirname(fixturePath);
   const good = readJson(fixturePath);
-  const baseline = validateCombatMatrix(good);
+  const baseline = validateCombatMatrix(good, fixtureRoot);
   if (baseline.length) return [`known-good fixture failed before mutations: ${baseline.join('; ')}`];
   const mutations = [
     ['64-hex Git SHA', report => { report.identity.sourceSha = 'a'.repeat(64); }],
@@ -250,6 +313,8 @@ function runSelfTest() {
     ['unrecomputed impairment digest', report => { report.impairmentManifest.profiles[0].delayMs += 1; }],
     ['acceptance subset gap', report => { report.acceptance.requirementIds.pop(); }],
     ['artifact traversal', report => { report.results[0].artifact.path = '../evidence.json'; }],
+    ['artifact missing', report => { report.results[0].artifact.path = 'fixture-payloads/network/missing.json'; }],
+    ['artifact digest drift', report => { report.results[0].artifact.sha256 = 'e'.repeat(64); }],
     ['inconsistent event arithmetic', report => { report.results[0].events.deliveredEvents += 1; }],
     ['truthy self-attestation field', report => { report.results[0].status = 'passed'; }],
     ['state hash divergence', report => { report.results[0].stateHashes.clientFinalSha256 = 'f'.repeat(64); }],
@@ -262,7 +327,7 @@ function runSelfTest() {
   for (const [label, mutate] of mutations) {
     const candidate = structuredClone(good);
     mutate(candidate);
-    if (validateCombatMatrix(candidate).length === 0) escaped.push(label);
+    if (validateCombatMatrix(candidate, fixtureRoot).length === 0) escaped.push(label);
   }
   return escaped;
 }
@@ -275,7 +340,7 @@ if (args[0] === '--self-test') {
     for (const label of escaped) console.error(`- ${label}`);
     process.exit(1);
   }
-  console.log('PASS pass65-combat-matrix self-test mutations=14');
+  console.log('PASS pass65-combat-matrix self-test mutations=16');
   process.exit(0);
 }
 if (args[0] === '--print-impairment-digest') {
@@ -294,7 +359,7 @@ try {
   console.error(`FAIL pass65-combat-matrix unreadable-json ${error.message}`);
   process.exit(2);
 }
-const failures = validateCombatMatrix(report);
+const failures = validateCombatMatrix(report, path.dirname(path.resolve(input)));
 if (failures.length) {
   console.error(`FAIL pass65-combat-matrix ${path.basename(input)} ${failures.length}`);
   for (const failure of failures) console.error(`- ${failure}`);

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,10 +28,13 @@ const MARKER_ORACLE = Object.freeze({
   reload: Object.freeze(['magazine-out', 'magazine-in']),
   'empty-reload': Object.freeze(['magazine-out', 'magazine-in', 'bolt-release']),
 });
+const MAX_ASSET_BYTES = 256 * 1024 * 1024;
+const MAX_CAPTURE_BYTES = 32 * 1024 * 1024;
 const sha40 = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const sha256 = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) && !/^0{64}$/.test(value);
 const idOk = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,79}$/.test(value);
 const socketOk = value => typeof value === 'string' && SOCKET_ENUM.includes(value);
+const nodeNameOk = value => typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,79}$/.test(value);
 const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
 const uint = (value, min = 0, max = Number.MAX_SAFE_INTEGER) => Number.isSafeInteger(value) && value >= min && value <= max;
 const plainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
@@ -50,26 +54,88 @@ function exactKeys(value, required, allowed, label, failures) {
   return true;
 }
 
-function validateArtifact(value, label, failures) {
-  if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
-  if (!safeArtifactPath(value.path)) failures.push(`${label} path invalid`);
-  if (!sha256(value.sha256)) failures.push(`${label} digest invalid`);
+function containedBy(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative.length > 0 && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-function validateAsset(asset, label, failures) {
-  const keys = ['level', 'url', 'sha256', 'source', 'license', 'triangles', 'draws', 'decodedTextureBytes', 'sharedAssetApprovalId'];
+function validateFileEvidence(relativePath, expectedDigest, artifactRoot, maxBytes, label, failures) {
+  if (!safeArtifactPath(relativePath)) {
+    failures.push(`${label} path invalid`);
+    return;
+  }
+  if (!sha256(expectedDigest)) {
+    failures.push(`${label} digest invalid`);
+    return;
+  }
+  if (typeof artifactRoot !== 'string' || artifactRoot.length === 0) {
+    failures.push(`${label} artifact root missing`);
+    return;
+  }
+  let realRoot;
+  try {
+    realRoot = fs.realpathSync(path.resolve(artifactRoot));
+  } catch {
+    failures.push(`${label} artifact root unreadable`);
+    return;
+  }
+  const candidate = path.resolve(realRoot, relativePath);
+  if (!containedBy(realRoot, candidate)) {
+    failures.push(`${label} escapes artifact root`);
+    return;
+  }
+  let realFile;
+  try {
+    realFile = fs.realpathSync(candidate);
+  } catch {
+    failures.push(`${label} file missing`);
+    return;
+  }
+  if (!containedBy(realRoot, realFile)) {
+    failures.push(`${label} resolves outside artifact root`);
+    return;
+  }
+  let stat;
+  try {
+    stat = fs.statSync(realFile);
+  } catch {
+    failures.push(`${label} file unreadable`);
+    return;
+  }
+  if (!stat.isFile() || stat.size < 1 || stat.size > maxBytes) {
+    failures.push(`${label} file size/type invalid`);
+    return;
+  }
+  let actualDigest;
+  try {
+    actualDigest = crypto.createHash('sha256').update(fs.readFileSync(realFile)).digest('hex');
+  } catch {
+    failures.push(`${label} file unreadable`);
+    return;
+  }
+  if (actualDigest !== expectedDigest) failures.push(`${label} digest mismatch`);
+}
+
+function validateArtifact(value, label, artifactRoot, failures) {
+  if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
+  validateFileEvidence(value.path, value.sha256, artifactRoot, MAX_CAPTURE_BYTES, label, failures);
+}
+
+function validateAsset(asset, label, artifactRoot, failures) {
+  const keys = ['level', 'url', 'sha256', 'source', 'license', 'derivativeNotes', 'triangles', 'draws', 'decodedTextureBytes', 'sharedAssetApprovalId'];
   if (!exactKeys(asset, keys, keys, label, failures)) return;
-  if (!uint(asset.level, 0, 8) || !safeArtifactPath(asset.url) || !sha256(asset.sha256)) failures.push(`${label} identity invalid`);
-  if (typeof asset.source !== 'string' || asset.source.trim().length === 0 || typeof asset.license !== 'string' || asset.license.trim().length === 0) failures.push(`${label} provenance invalid`);
+  if (!uint(asset.level, 0, 8)) failures.push(`${label} identity invalid`);
+  validateFileEvidence(asset.url, asset.sha256, artifactRoot, MAX_ASSET_BYTES, label, failures);
+  if (typeof asset.source !== 'string' || asset.source.trim().length === 0 || asset.source.length > 500 || typeof asset.license !== 'string' || asset.license.trim().length === 0 || asset.license.length > 200 || typeof asset.derivativeNotes !== 'string' || asset.derivativeNotes.trim().length === 0 || asset.derivativeNotes.length > 500) failures.push(`${label} provenance invalid`);
   if (!uint(asset.triangles, 1, 250000) || !uint(asset.draws, 1, 64) || !uint(asset.decodedTextureBytes, 1, 536870912)) failures.push(`${label} measured budget fields invalid`);
   if (asset.sharedAssetApprovalId !== null && !/^approval-[a-z0-9-]{3,64}$/.test(asset.sharedAssetApprovalId)) failures.push(`${label} shared asset approval invalid`);
 }
 
-export function validateViewmodelManifest(manifest) {
+export function validateViewmodelManifest(manifest, artifactRoot) {
   const failures = [];
   const rootKeys = ['schemaVersion', 'captureIdentity', 'presentations'];
   if (!exactKeys(manifest, rootKeys, rootKeys, 'manifest', failures)) return failures;
-  if (manifest.schemaVersion !== 2) failures.push('schemaVersion must equal 2');
+  if (manifest.schemaVersion !== 3) failures.push('schemaVersion must equal 3');
 
   const identityKeys = ['sourceSha', 'buildId', 'backend', 'profile', 'viewport', 'clock', 'seed'];
   if (exactKeys(manifest.captureIdentity, identityKeys, identityKeys, 'captureIdentity', failures)) {
@@ -100,9 +166,10 @@ export function validateViewmodelManifest(manifest) {
     if (entry.materialPath !== 'tsl' || entry.cameraRaySource !== 'camera-center' || entry.animationMarkerRole !== 'presentation-only') failures.push(`${label} renderer or authority boundary invalid`);
     if (entry.fallbackPolicy !== 'forbid-release') failures.push(`${label} fallback policy invalid`);
 
-    const skeletonKeys = ['id', 'url', 'sha256', 'source', 'license', 'boneCount'];
+    const skeletonKeys = ['id', 'url', 'sha256', 'source', 'license', 'derivativeNotes', 'boneCount'];
     if (exactKeys(entry.skeleton, skeletonKeys, skeletonKeys, `${label}.skeleton`, failures)) {
-      if (!idOk(entry.skeleton.id) || !safeArtifactPath(entry.skeleton.url) || !sha256(entry.skeleton.sha256) || typeof entry.skeleton.source !== 'string' || entry.skeleton.source.trim().length === 0 || typeof entry.skeleton.license !== 'string' || entry.skeleton.license.trim().length === 0 || !uint(entry.skeleton.boneCount, 1, 256)) failures.push(`${label} skeleton invalid`);
+      if (!idOk(entry.skeleton.id) || typeof entry.skeleton.source !== 'string' || entry.skeleton.source.trim().length === 0 || entry.skeleton.source.length > 500 || typeof entry.skeleton.license !== 'string' || entry.skeleton.license.trim().length === 0 || entry.skeleton.license.length > 200 || typeof entry.skeleton.derivativeNotes !== 'string' || entry.skeleton.derivativeNotes.trim().length === 0 || entry.skeleton.derivativeNotes.length > 500 || !uint(entry.skeleton.boneCount, 1, 256)) failures.push(`${label} skeleton invalid`);
+      validateFileEvidence(entry.skeleton.url, entry.skeleton.sha256, artifactRoot, MAX_ASSET_BYTES, `${label}.skeleton`, failures);
     }
     const accessibilityKeys = ['motionScaleMin', 'motionScaleMax', 'adsMotionScaleMax'];
     if (exactKeys(entry.accessibility, accessibilityKeys, accessibilityKeys, `${label}.accessibility`, failures)) {
@@ -113,7 +180,7 @@ export function validateViewmodelManifest(manifest) {
       const lods = Array.isArray(collection) ? collection : [];
       if (lods.length < 2) failures.push(`${label}.${collectionName} requires at least two LODs`);
       for (const [lodIndex, asset] of lods.entries()) {
-        validateAsset(asset, `${label}.${collectionName}[${lodIndex}]`, failures);
+        validateAsset(asset, `${label}.${collectionName}[${lodIndex}]`, artifactRoot, failures);
         if (asset?.level !== lodIndex) failures.push(`${label}.${collectionName} LOD levels must be ordered from zero`);
         if (lodIndex > 0) {
           const previous = lods[lodIndex - 1];
@@ -130,15 +197,20 @@ export function validateViewmodelManifest(manifest) {
     if (!oracle || !exactArray(semanticParts.map(part => part?.id), oracle.semanticParts)) failures.push(`${label} semantic parts differ from independent oracle`);
     for (const [partIndex, part] of semanticParts.entries()) {
       if (!exactKeys(part, semanticKeys, semanticKeys, `${label}.semanticParts[${partIndex}]`, failures)) continue;
-      if (!idOk(part.id) || typeof part.nodeName !== 'string' || part.nodeName.trim().length === 0) failures.push(`${label}.semanticParts[${partIndex}] invalid`);
+      if (!idOk(part.id) || !nodeNameOk(part.nodeName)) failures.push(`${label}.semanticParts[${partIndex}] invalid`);
     }
     const socketKeys = ['id', 'nodeName'];
     const sockets = Array.isArray(entry.sockets) ? entry.sockets : [];
     if (!oracle || !exactArray(sockets.map(socket => socket?.id), oracle.sockets)) failures.push(`${label} sockets differ from independent oracle`);
     for (const [socketIndex, socket] of sockets.entries()) {
       if (!exactKeys(socket, socketKeys, socketKeys, `${label}.sockets[${socketIndex}]`, failures)) continue;
-      if (!socketOk(socket.id) || typeof socket.nodeName !== 'string' || socket.nodeName.trim().length === 0) failures.push(`${label}.sockets[${socketIndex}] invalid`);
+      if (!socketOk(socket.id) || !nodeNameOk(socket.nodeName)) failures.push(`${label}.sockets[${socketIndex}] invalid`);
     }
+    const semanticNodeNames = semanticParts.map(part => part?.nodeName?.toLowerCase());
+    const socketNodeNames = sockets.map(socket => socket?.nodeName?.toLowerCase());
+    if (new Set(semanticNodeNames).size !== semanticNodeNames.length) failures.push(`${label} semantic node mappings must be unique`);
+    if (new Set(socketNodeNames).size !== socketNodeNames.length) failures.push(`${label} socket node mappings must be unique`);
+    if (semanticNodeNames.some(nodeName => socketNodeNames.includes(nodeName))) failures.push(`${label} semantic and socket node mappings must be disjoint`);
 
     const clips = Array.isArray(entry.clips) ? entry.clips : [];
     if (!oracle || !exactArray(clips.map(clip => clip?.action), oracle.actions)) failures.push(`${label} clip actions differ from independent action oracle`);
@@ -173,9 +245,10 @@ export function validateViewmodelManifest(manifest) {
       const captureLabel = `${label}.captures[${captureIndex}]`;
       if (!exactKeys(capture, captureKeys, captureKeys, captureLabel, failures)) continue;
       if (capture.weaponId !== entry.weaponId || !ACTION_ENUM.includes(capture.action) || capture.action !== oracle?.actions[captureIndex] || !uint(capture.clockTick, 0, 1000000)) failures.push(`${captureLabel} weapon/action/tick invalid`);
-      validateArtifact(capture.artifact, `${captureLabel}.artifact`, failures);
+      validateArtifact(capture.artifact, `${captureLabel}.artifact`, artifactRoot, failures);
     }
     if (new Set(captures.map(capture => capture?.clockTick)).size !== captures.length) failures.push(`${label} capture ticks must be unique`);
+    if (new Set(captures.map(capture => capture?.artifact?.path)).size !== captures.length || new Set(captures.map(capture => capture?.artifact?.sha256)).size !== captures.length) failures.push(`${label} every action requires an independent capture path and digest`);
 
     const budgetKeys = ['lod0Triangles', 'draws', 'decodedTextureBytes', 'skeletonBones', 'maxSocketErrorMm', 'maxGripErrorMm'];
     if (exactKeys(entry.budgets, budgetKeys, budgetKeys, `${label}.budgets`, failures)) {
@@ -205,8 +278,10 @@ export function validateViewmodelManifest(manifest) {
 function readJson(input) { return JSON.parse(fs.readFileSync(input, 'utf8')); }
 
 function runSelfTest() {
-  const fixture = readJson(fileURLToPath(new URL('./fixtures/known-good.json', import.meta.url)));
-  const baseline = validateViewmodelManifest(fixture);
+  const fixturePath = fileURLToPath(new URL('./fixtures/known-good.json', import.meta.url));
+  const fixtureRoot = path.dirname(fixturePath);
+  const fixture = readJson(fixturePath);
+  const baseline = validateViewmodelManifest(fixture, fixtureRoot);
   if (baseline.length) return [`known-good fixture failed before mutations: ${baseline.join('; ')}`];
   const mutations = [
     ['64-hex Git SHA', value => { value.captureIdentity.sourceSha = 'a'.repeat(64); }],
@@ -216,10 +291,28 @@ function runSelfTest() {
     ['missing action clip', value => { value.presentations[0].clips.pop(); }],
     ['missing semantic part', value => { value.presentations[0].semanticParts.pop(); }],
     ['missing socket', value => { value.presentations[0].sockets.pop(); }],
+    ['duplicate semantic node mapping', value => { value.presentations[0].semanticParts[1].nodeName = value.presentations[0].semanticParts[0].nodeName; }],
+    ['duplicate socket node mapping', value => { value.presentations[0].sockets[1].nodeName = value.presentations[0].sockets[0].nodeName; }],
+    ['all semantic node mappings identical', value => { const nodeName = value.presentations[0].semanticParts[0].nodeName; for (const part of value.presentations[0].semanticParts) part.nodeName = nodeName; }],
+    ['all socket node mappings identical', value => { const nodeName = value.presentations[0].sockets[0].nodeName; for (const socket of value.presentations[0].sockets) socket.nodeName = nodeName; }],
+    ['semantic socket node collision', value => { value.presentations[0].sockets[0].nodeName = value.presentations[0].semanticParts[0].nodeName; }],
     ['extra transition', value => { value.presentations[0].allowedTransitions.push({ from: 'fire', to: 'reload' }); }],
     ['forbidden transition', value => { value.presentations[0].allowedTransitions[0] = { from: 'sprint', to: 'ads-in' }; }],
     ['capture weapon mismatch', value => { value.presentations[0].captures[0].weaponId = 'other-weapon'; }],
     ['capture digest missing', value => { value.presentations[0].captures[0].artifact.sha256 = 'bad'; }],
+    ['capture artifact missing', value => { value.presentations[0].captures[0].artifact.path = 'fixture-payloads/viewmodel/captures/missing.svg'; }],
+    ['capture artifact traversal', value => { value.presentations[0].captures[0].artifact.path = '../outside.svg'; }],
+    ['capture digest drift', value => { value.presentations[0].captures[0].artifact.sha256 = 'e'.repeat(64); }],
+    ['shared action capture artifact', value => { value.presentations[0].captures[1].artifact = structuredClone(value.presentations[0].captures[0].artifact); }],
+    ['all actions share capture artifact', value => { const artifact = structuredClone(value.presentations[0].captures[0].artifact); for (const capture of value.presentations[0].captures) capture.artifact = structuredClone(artifact); }],
+    ['skeleton derivative notes missing', value => { delete value.presentations[0].skeleton.derivativeNotes; }],
+    ['skeleton artifact missing', value => { value.presentations[0].skeleton.url = 'fixture-payloads/viewmodel/assets/missing.txt'; }],
+    ['skeleton artifact traversal', value => { value.presentations[0].skeleton.url = '../outside.glb'; }],
+    ['skeleton digest drift', value => { value.presentations[0].skeleton.sha256 = 'e'.repeat(64); }],
+    ['LOD derivative notes missing', value => { delete value.presentations[0].firstPersonLods[0].derivativeNotes; }],
+    ['LOD artifact missing', value => { value.presentations[0].firstPersonLods[0].url = 'fixture-payloads/viewmodel/assets/missing.txt'; }],
+    ['LOD artifact traversal', value => { value.presentations[0].firstPersonLods[0].url = '../outside.glb'; }],
+    ['LOD digest drift', value => { value.presentations[0].firstPersonLods[0].sha256 = 'e'.repeat(64); }],
     ['LOD ordering regression', value => { value.presentations[0].firstPersonLods[1].triangles = value.presentations[0].firstPersonLods[0].triangles; }],
     ['duplicate generic asset', value => { value.presentations[0].worldLods[0].url = value.presentations[0].firstPersonLods[0].url; }],
     ['missing fire marker', value => { value.presentations[0].clips.find(clip => clip.action === 'fire').markers = []; }],
@@ -229,7 +322,7 @@ function runSelfTest() {
   for (const [label, mutate] of mutations) {
     const candidate = structuredClone(fixture);
     mutate(candidate);
-    if (validateViewmodelManifest(candidate).length === 0) escaped.push(label);
+    if (validateViewmodelManifest(candidate, fixtureRoot).length === 0) escaped.push(label);
   }
   return escaped;
 }
@@ -242,7 +335,7 @@ if (args[0] === '--self-test') {
     for (const label of escaped) console.error(`- ${label}`);
     process.exit(1);
   }
-  console.log('PASS viewmodel-assets self-test mutations=15');
+  console.log('PASS viewmodel-assets self-test mutations=33');
   process.exit(0);
 }
 const input = args[0];
@@ -257,7 +350,7 @@ try {
   console.error(`FAIL viewmodel-assets unreadable-json ${error.message}`);
   process.exit(2);
 }
-const failures = validateViewmodelManifest(manifest);
+const failures = validateViewmodelManifest(manifest, path.dirname(path.resolve(input)));
 if (failures.length) {
   console.error(`FAIL viewmodel-assets ${path.basename(input)} ${failures.length}`);
   for (const failure of failures) console.error(`- ${failure}`);

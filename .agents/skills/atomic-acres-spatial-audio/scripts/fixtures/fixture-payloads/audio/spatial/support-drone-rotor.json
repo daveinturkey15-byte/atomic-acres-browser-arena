@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "support.drone-rotor",
+  "sourceAzimuthDeg": -65,
+  "observedPan": -0.78
+}

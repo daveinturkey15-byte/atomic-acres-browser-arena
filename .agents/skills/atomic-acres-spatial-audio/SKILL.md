@@ -24,7 +24,7 @@ Create complete, positional and bounded audio without inventing gameplay authori
 - Accessibility: category mutes and reduced-sensory settings change only intended presentation while preserving non-audio equivalents for critical state.
 - Performance: hard-cap active voices, continuous loops, reusable chains, per-bus voices and occlusion queries/CPU; use deterministic stealing and complete disposal.
 - Privacy: never announce or replicate local custom loadout names or hidden support rewards through audio.
-- Provenance: manifest source, license, derivative notes and digest for every sample, stem and generated sound; never rip franchise audio.
+- Provenance: manifest source, license, non-empty derivative notes and digest for every sample, stem and generated sound; never rip franchise audio. Resolve contained files from the catalog directory and recompute SHA-256 from bounded bytes.
 - Coverage: every registered sound event declares bus, spatial policy, variants, concurrency/cooldown, provenance and evidence. A staging fixture proves the contract shape, not canonical runtime completeness.
 
 ## Validate
@@ -42,3 +42,5 @@ The first command must exit zero, the second must exit nonzero, and the self-tes
 `node scripts/verify-audio-catalog.mjs <audio-manifest.json>`
 
 Use `runtimeAuthority.state: "staging-contract"` for isolated contract fixtures. Claim `"canonical-runtime"` only when both F16 authority files exist in the validator's repository root. The validator then enforces the exact bus, family, staging-event, spatial-profile and arena oracles, numeric pan/occlusion and footstep evidence, monotonic rolloff, cap arithmetic and lifecycle settlement.
+
+Variant and evidence paths are relative to the catalog JSON directory. Missing files, traversal, symlink escape, empty/oversized payloads, or digest drift fail validation.

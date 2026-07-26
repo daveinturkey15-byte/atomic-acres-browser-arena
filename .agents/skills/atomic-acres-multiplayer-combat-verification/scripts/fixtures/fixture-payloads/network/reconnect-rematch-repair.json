@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "network-matrix-cell",
+  "id": "reconnect-rematch-repair",
+  "profileId": "moderate-chaos",
+  "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

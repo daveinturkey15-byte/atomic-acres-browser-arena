@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=shed.debris-impact
+variant=shed-debris-impact-a
+fixtureOnly=true

@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=movement.footstep.world
+variant=footstep-world-dirt-a
+fixtureOnly=true

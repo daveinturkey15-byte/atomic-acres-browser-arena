@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "movement.footstep.world",
+  "sourceAzimuthDeg": -50,
+  "observedPan": -0.7
+}

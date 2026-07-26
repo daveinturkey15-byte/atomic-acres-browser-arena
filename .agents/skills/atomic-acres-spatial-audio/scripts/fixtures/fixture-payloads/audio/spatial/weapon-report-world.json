@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "weapon.report.world",
+  "sourceAzimuthDeg": -35,
+  "observedPan": -0.55
+}

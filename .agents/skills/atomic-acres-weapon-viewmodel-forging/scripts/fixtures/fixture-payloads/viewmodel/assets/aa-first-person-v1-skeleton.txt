@@ -1,0 +1,4 @@
+ATOMIC ACRES SKELETON FIXTURE
+id=aa-first-person-v1
+bones=64
+fixtureOnly=true

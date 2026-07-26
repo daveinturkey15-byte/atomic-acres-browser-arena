@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "world.projectile-impact",
+  "sourceAzimuthDeg": 40,
+  "observedPan": 0.6
+}

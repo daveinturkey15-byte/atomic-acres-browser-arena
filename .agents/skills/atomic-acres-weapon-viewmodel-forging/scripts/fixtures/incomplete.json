@@ -1,32 +1,95 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "captureIdentity": {
     "sourceSha": "bad",
     "buildId": "",
     "backend": "webgl",
     "profile": "quality",
-    "viewport": { "width": 0, "height": 0, "dpr": 0 },
-    "clock": { "kind": "realtime", "originMs": -1, "stepMs": 0 },
+    "viewport": {
+      "width": 0,
+      "height": 0,
+      "dpr": 0
+    },
+    "clock": {
+      "kind": "realtime",
+      "originMs": -1,
+      "stepMs": 0
+    },
     "seed": -1
   },
   "presentations": [
     {
       "id": "broken-view",
       "weaponId": "a4-vanguard",
-      "capabilities": ["standard-firearm"],
-      "skeleton": { "id": "", "url": "generic.glb", "sha256": "bad", "source": "", "license": "", "boneCount": 0 },
+      "capabilities": [
+        "standard-firearm"
+      ],
+      "skeleton": {
+        "id": "",
+        "url": "generic.glb",
+        "sha256": "bad",
+        "source": "",
+        "license": "",
+        "boneCount": 0,
+        "derivativeNotes": ""
+      },
       "materialPath": "shader-material",
       "cameraRaySource": "animated-muzzle",
       "animationMarkerRole": "gameplay-authority",
-      "accessibility": { "motionScaleMin": 1, "motionScaleMax": 0, "adsMotionScaleMax": 2 },
+      "accessibility": {
+        "motionScaleMin": 1,
+        "motionScaleMax": 0,
+        "adsMotionScaleMax": 2
+      },
       "firstPersonLods": [],
       "worldLods": [],
-      "semanticParts": [{ "id": "weapon", "nodeName": "" }],
-      "sockets": [{ "id": "rightGrip", "nodeName": "" }],
-      "clips": [{ "action": "idle", "clipName": "", "normalizedDuration": 0, "additive": false, "priority": -1, "markers": [] }],
-      "allowedTransitions": [{ "from": "sprint", "to": "ads-in" }],
-      "captures": [{ "weaponId": "other-weapon", "action": "idle", "clockTick": -1, "artifact": { "path": "../capture.png", "sha256": "bad" } }],
-      "budgets": { "lod0Triangles": 0, "draws": 0, "decodedTextureBytes": 0, "skeletonBones": 0, "maxSocketErrorMm": -1, "maxGripErrorMm": -1 },
+      "semanticParts": [
+        {
+          "id": "weapon",
+          "nodeName": ""
+        }
+      ],
+      "sockets": [
+        {
+          "id": "rightGrip",
+          "nodeName": ""
+        }
+      ],
+      "clips": [
+        {
+          "action": "idle",
+          "clipName": "",
+          "normalizedDuration": 0,
+          "additive": false,
+          "priority": -1,
+          "markers": []
+        }
+      ],
+      "allowedTransitions": [
+        {
+          "from": "sprint",
+          "to": "ads-in"
+        }
+      ],
+      "captures": [
+        {
+          "weaponId": "other-weapon",
+          "action": "idle",
+          "clockTick": -1,
+          "artifact": {
+            "path": "../capture.png",
+            "sha256": "bad"
+          }
+        }
+      ],
+      "budgets": {
+        "lod0Triangles": 0,
+        "draws": 0,
+        "decodedTextureBytes": 0,
+        "skeletonBones": 0,
+        "maxSocketErrorMm": -1,
+        "maxGripErrorMm": -1
+      },
       "fallbackPolicy": "allow-generic"
     }
   ]

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,8 @@ const EVENT_IDS = EVENT_ORACLE.map(([id]) => id);
 const SPATIAL_EVENT_IDS = EVENT_ORACLE.filter(([, , , delivery]) => delivery === 'world-spatial').map(([id]) => id);
 const LIFECYCLE_ORACLE = Object.freeze(['arena-switch', 'rematch', 'suspend-resume']);
 const PROFILE_IDS = Object.freeze(['weapon-world', 'impact-world', 'footstep-world', 'explosion-world', 'support-air', 'world-object', 'ambience-wide']);
+const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024;
+const MAX_VARIANT_BYTES = 64 * 1024 * 1024;
 const sha256 = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) && !/^0{64}$/.test(value);
 const idOk = value => typeof value === 'string' && /^[a-z0-9][a-z0-9.-]{0,79}$/.test(value);
 const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
@@ -49,17 +52,78 @@ function exactKeys(value, required, allowed, label, failures) {
   return true;
 }
 
-function validateArtifact(value, label, failures) {
-  if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
-  if (!safeArtifactPath(value.path)) failures.push(`${label} path invalid`);
-  if (!sha256(value.sha256)) failures.push(`${label} digest invalid`);
+function containedBy(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative.length > 0 && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-export function validateAudioCatalog(catalog) {
+function validateFileEvidence(relativePath, expectedDigest, artifactRoot, maxBytes, label, failures) {
+  if (!safeArtifactPath(relativePath)) {
+    failures.push(`${label} path invalid`);
+    return;
+  }
+  if (!sha256(expectedDigest)) {
+    failures.push(`${label} digest invalid`);
+    return;
+  }
+  if (typeof artifactRoot !== 'string' || artifactRoot.length === 0) {
+    failures.push(`${label} artifact root missing`);
+    return;
+  }
+  let realRoot;
+  try {
+    realRoot = fs.realpathSync(path.resolve(artifactRoot));
+  } catch {
+    failures.push(`${label} artifact root unreadable`);
+    return;
+  }
+  const candidate = path.resolve(realRoot, relativePath);
+  if (!containedBy(realRoot, candidate)) {
+    failures.push(`${label} escapes artifact root`);
+    return;
+  }
+  let realFile;
+  try {
+    realFile = fs.realpathSync(candidate);
+  } catch {
+    failures.push(`${label} file missing`);
+    return;
+  }
+  if (!containedBy(realRoot, realFile)) {
+    failures.push(`${label} resolves outside artifact root`);
+    return;
+  }
+  let stat;
+  try {
+    stat = fs.statSync(realFile);
+  } catch {
+    failures.push(`${label} file unreadable`);
+    return;
+  }
+  if (!stat.isFile() || stat.size < 1 || stat.size > maxBytes) {
+    failures.push(`${label} file size/type invalid`);
+    return;
+  }
+  let actualDigest;
+  try {
+    actualDigest = crypto.createHash('sha256').update(fs.readFileSync(realFile)).digest('hex');
+  } catch {
+    failures.push(`${label} file unreadable`);
+    return;
+  }
+  if (actualDigest !== expectedDigest) failures.push(`${label} digest mismatch`);
+}
+
+function validateArtifact(value, label, artifactRoot, failures) {
+  if (!exactKeys(value, ['path', 'sha256'], ['path', 'sha256'], label, failures)) return;
+  validateFileEvidence(value.path, value.sha256, artifactRoot, MAX_EVIDENCE_BYTES, label, failures);
+}
+
+export function validateAudioCatalog(catalog, artifactRoot) {
   const failures = [];
   const rootKeys = ['schemaVersion', 'runtimeAuthority', 'buses', 'families', 'events', 'spatialProfiles', 'footsteps', 'arenas', 'budgets', 'spatialEvidence', 'lifecycleEvidence'];
   if (!exactKeys(catalog, rootKeys, rootKeys, 'catalog', failures)) return failures;
-  if (catalog.schemaVersion !== 2) failures.push('schemaVersion must equal 2');
+  if (catalog.schemaVersion !== 3) failures.push('schemaVersion must equal 3');
 
   const authorityKeys = ['registryPath', 'testPath', 'state'];
   if (exactKeys(catalog.runtimeAuthority, authorityKeys, authorityKeys, 'runtimeAuthority', failures)) {
@@ -104,8 +168,10 @@ export function validateAudioCatalog(catalog) {
     if (variants.length === 0) failures.push(`${label} variants missing`);
     for (const [variantIndex, variant] of variants.entries()) {
       const variantLabel = `${label}.variants[${variantIndex}]`;
-      if (!exactKeys(variant, ['id', 'source', 'license', 'sha256'], ['id', 'source', 'license', 'sha256'], variantLabel, failures)) continue;
-      if (!idOk(variant.id) || !safeArtifactPath(variant.source) || typeof variant.license !== 'string' || variant.license.trim().length === 0 || !sha256(variant.sha256)) failures.push(`${variantLabel} invalid`);
+      const variantKeys = ['id', 'source', 'license', 'derivativeNotes', 'sha256'];
+      if (!exactKeys(variant, variantKeys, variantKeys, variantLabel, failures)) continue;
+      if (!idOk(variant.id) || typeof variant.license !== 'string' || variant.license.trim().length === 0 || variant.license.length > 200 || typeof variant.derivativeNotes !== 'string' || variant.derivativeNotes.trim().length === 0 || variant.derivativeNotes.length > 500) failures.push(`${variantLabel} provenance invalid`);
+      validateFileEvidence(variant.source, variant.sha256, artifactRoot, MAX_VARIANT_BYTES, variantLabel, failures);
       globalVariantIds.push(variant.id);
     }
     if (new Set(variants.map(variant => variant?.id)).size !== variants.length) failures.push(`${label} variant IDs must be unique`);
@@ -160,7 +226,7 @@ export function validateAudioCatalog(catalog) {
     if (!exactKeys(arena, arenaKeys, arenaKeys, label, failures)) continue;
     if (arena.ambienceEventId !== 'ambience.arena-bed' || !ambienceVariants.has(arena.variantId)) failures.push(`${label} ambience identity invalid`);
     if (!uint(arena.sourceBudget, 1, 32) || arena.settledSourceCount !== 0) failures.push(`${label} source budget/settle count invalid`);
-    validateArtifact(arena.artifact, `${label}.artifact`, failures);
+    validateArtifact(arena.artifact, `${label}.artifact`, artifactRoot, failures);
   }
   if (new Set(arenas.map(arena => arena?.variantId)).size !== ARENA_ORACLE.length) failures.push('each arena requires a distinct ambience variant');
 
@@ -186,7 +252,7 @@ export function validateAudioCatalog(catalog) {
     if (!finite(evidence.sourceAzimuthDeg, -180, 180) || evidence.sourceAzimuthDeg === 0 || !finite(evidence.observedPan, -1, 1) || evidence.observedPan === 0 || Math.sign(evidence.sourceAzimuthDeg) !== Math.sign(evidence.observedPan)) failures.push(`${label} pan evidence invalid`);
     if (!finite(evidence.openGain, 0, 1) || !finite(evidence.occludedGain, 0, evidence.openGain) || evidence.occludedGain >= evidence.openGain) failures.push(`${label} occlusion gain evidence invalid`);
     if (!finite(evidence.openLowPassHz, 20, 24000) || !finite(evidence.occludedLowPassHz, 20, evidence.openLowPassHz) || evidence.occludedLowPassHz >= evidence.openLowPassHz) failures.push(`${label} occlusion low-pass evidence invalid`);
-    validateArtifact(evidence.artifact, `${label}.artifact`, failures);
+    validateArtifact(evidence.artifact, `${label}.artifact`, artifactRoot, failures);
   }
 
   const lifecycle = Array.isArray(catalog.lifecycleEvidence) ? catalog.lifecycleEvidence : [];
@@ -198,7 +264,7 @@ export function validateAudioCatalog(catalog) {
     if (!LIFECYCLE_ORACLE.includes(evidence.id)) failures.push(`${label} ID invalid`);
     for (const key of lifecycleKeys.slice(1, 5)) if (!uint(evidence[key], 0, 1000000)) failures.push(`${label}.${key} invalid`);
     if (evidence.observedSettledNodes !== evidence.expectedSettledNodes || evidence.observedSettledNodes > evidence.initialNodes || evidence.errorCount !== 0) failures.push(`${label} did not settle`);
-    validateArtifact(evidence.artifact, `${label}.artifact`, failures);
+    validateArtifact(evidence.artifact, `${label}.artifact`, artifactRoot, failures);
   }
   return [...new Set(failures)].sort();
 }
@@ -206,8 +272,10 @@ export function validateAudioCatalog(catalog) {
 function readJson(input) { return JSON.parse(fs.readFileSync(input, 'utf8')); }
 
 function runSelfTest() {
-  const fixture = readJson(fileURLToPath(new URL('./fixtures/known-good.json', import.meta.url)));
-  const baseline = validateAudioCatalog(fixture);
+  const fixturePath = fileURLToPath(new URL('./fixtures/known-good.json', import.meta.url));
+  const fixtureRoot = path.dirname(fixturePath);
+  const fixture = readJson(fixturePath);
+  const baseline = validateAudioCatalog(fixture, fixtureRoot);
   if (baseline.length) return [`known-good fixture failed before mutations: ${baseline.join('; ')}`];
   const mutations = [
     ['unknown nested key', value => { value.events[0].selfAttested = true; }],
@@ -219,7 +287,14 @@ function runSelfTest() {
     ['equal max/reference distance', value => { value.spatialProfiles[0].maxDistanceM = value.spatialProfiles[0].referenceDistanceM; }],
     ['remote footstep local', value => { value.events.find(event => event.id === 'movement.footstep.world').delivery = 'listener-local'; }],
     ['duplicate variant ID', value => { value.events[1].variants[0].id = value.events[0].variants[0].id; }],
+    ['variant derivative notes missing', value => { delete value.events[0].variants[0].derivativeNotes; }],
+    ['variant artifact missing', value => { value.events[0].variants[0].source = 'fixture-payloads/audio/variants/missing.txt'; }],
+    ['variant artifact traversal', value => { value.events[0].variants[0].source = '../outside.txt'; }],
+    ['variant digest drift', value => { value.events[0].variants[0].sha256 = 'e'.repeat(64); }],
     ['missing spatial evidence', value => { value.spatialEvidence.pop(); }],
+    ['evidence artifact missing', value => { value.spatialEvidence[0].artifact.path = 'fixture-payloads/audio/evidence/missing.json'; }],
+    ['evidence artifact traversal', value => { value.spatialEvidence[0].artifact.path = '../outside.json'; }],
+    ['evidence digest drift', value => { value.spatialEvidence[0].artifact.sha256 = 'e'.repeat(64); }],
     ['wrong pan sign', value => { value.spatialEvidence[0].observedPan *= -1; }],
     ['no occlusion attenuation', value => { value.spatialEvidence[0].occludedGain = value.spatialEvidence[0].openGain; }],
     ['bus cap inconsistency', value => { value.events[0].maxConcurrent = 64; }],
@@ -230,7 +305,7 @@ function runSelfTest() {
   for (const [label, mutate] of mutations) {
     const candidate = structuredClone(fixture);
     mutate(candidate);
-    if (validateAudioCatalog(candidate).length === 0) escaped.push(label);
+    if (validateAudioCatalog(candidate, fixtureRoot).length === 0) escaped.push(label);
   }
   return escaped;
 }
@@ -243,7 +318,7 @@ if (args[0] === '--self-test') {
     for (const label of escaped) console.error(`- ${label}`);
     process.exit(1);
   }
-  console.log('PASS audio-catalog self-test mutations=15');
+  console.log('PASS audio-catalog self-test mutations=22');
   process.exit(0);
 }
 const input = args[0];
@@ -258,7 +333,7 @@ try {
   console.error(`FAIL audio-catalog unreadable-json ${error.message}`);
   process.exit(2);
 }
-const failures = validateAudioCatalog(catalog);
+const failures = validateAudioCatalog(catalog, path.dirname(path.resolve(input)));
 if (failures.length) {
   console.error(`FAIL audio-catalog ${path.basename(input)} ${failures.length}`);
   for (const failure of failures) console.error(`- ${failure}`);

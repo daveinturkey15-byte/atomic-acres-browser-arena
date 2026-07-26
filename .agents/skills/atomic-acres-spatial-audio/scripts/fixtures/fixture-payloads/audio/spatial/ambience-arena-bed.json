@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "ambience.arena-bed",
+  "sourceAzimuthDeg": 20,
+  "observedPan": 0.3
+}

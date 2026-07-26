@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=shed.door-motion
+variant=shed-door-motion-a
+fixtureOnly=true

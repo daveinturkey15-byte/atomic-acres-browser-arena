@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=interaction.weapon-pickup
+variant=weapon-pickup-a
+fixtureOnly=true

@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "acceptance-manifest",
+  "id": "pass65-frozen-acceptance",
+  "requirements": 22,
+  "falsifiers": 46
+}

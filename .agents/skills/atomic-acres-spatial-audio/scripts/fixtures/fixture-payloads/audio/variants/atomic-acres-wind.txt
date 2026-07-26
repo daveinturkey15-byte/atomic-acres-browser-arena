@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=ambience.arena-bed
+variant=atomic-acres.wind
+fixtureOnly=true

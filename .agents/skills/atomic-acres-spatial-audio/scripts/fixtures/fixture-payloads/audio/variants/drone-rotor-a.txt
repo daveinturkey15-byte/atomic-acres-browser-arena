@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=support.drone-rotor
+variant=drone-rotor-a
+fixtureOnly=true

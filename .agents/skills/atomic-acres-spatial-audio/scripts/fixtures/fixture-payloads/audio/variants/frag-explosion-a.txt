@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=ordnance.frag-explosion
+variant=frag-explosion-a
+fixtureOnly=true

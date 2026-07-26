@@ -1,70 +1,812 @@
 {
-  "schemaVersion": 2,
-  "runtimeAuthority": {"registryPath": "src/sound-event-inventory.ts", "testPath": "src/sound-event-inventory.test.ts", "state": "staging-contract"},
+  "schemaVersion": 3,
+  "runtimeAuthority": {
+    "registryPath": "src/sound-event-inventory.ts",
+    "testPath": "src/sound-event-inventory.test.ts",
+    "state": "staging-contract"
+  },
   "buses": [
-    {"id": "master", "gain": 1, "muted": false, "maxVoices": 96},
-    {"id": "sfx", "gain": 0.9, "muted": false, "maxVoices": 40},
-    {"id": "movement", "gain": 0.85, "muted": false, "maxVoices": 16},
-    {"id": "ui", "gain": 0.8, "muted": false, "maxVoices": 8},
-    {"id": "announcements", "gain": 0.9, "muted": false, "maxVoices": 4},
-    {"id": "ambience", "gain": 0.65, "muted": false, "maxVoices": 10},
-    {"id": "menu-music", "gain": 0.55, "muted": false, "maxVoices": 1},
-    {"id": "game-music", "gain": 0.5, "muted": false, "maxVoices": 1}
+    {
+      "id": "master",
+      "gain": 1,
+      "muted": false,
+      "maxVoices": 96
+    },
+    {
+      "id": "sfx",
+      "gain": 0.9,
+      "muted": false,
+      "maxVoices": 40
+    },
+    {
+      "id": "movement",
+      "gain": 0.85,
+      "muted": false,
+      "maxVoices": 16
+    },
+    {
+      "id": "ui",
+      "gain": 0.8,
+      "muted": false,
+      "maxVoices": 8
+    },
+    {
+      "id": "announcements",
+      "gain": 0.9,
+      "muted": false,
+      "maxVoices": 4
+    },
+    {
+      "id": "ambience",
+      "gain": 0.65,
+      "muted": false,
+      "maxVoices": 10
+    },
+    {
+      "id": "menu-music",
+      "gain": 0.55,
+      "muted": false,
+      "maxVoices": 1
+    },
+    {
+      "id": "game-music",
+      "gain": 0.5,
+      "muted": false,
+      "maxVoices": 1
+    }
   ],
-  "families": ["weapon-report", "weapon-foley", "combat-feedback", "world-impact", "movement", "player-state", "ordnance", "support", "pickup-interaction", "interactive-world", "arena-ambience", "ui", "announcements", "music"],
+  "families": [
+    "weapon-report",
+    "weapon-foley",
+    "combat-feedback",
+    "world-impact",
+    "movement",
+    "player-state",
+    "ordnance",
+    "support",
+    "pickup-interaction",
+    "interactive-world",
+    "arena-ambience",
+    "ui",
+    "announcements",
+    "music"
+  ],
   "events": [
-    {"id": "weapon.report.world", "family": "weapon-report", "bus": "sfx", "delivery": "world-spatial", "spatialProfileId": "weapon-world", "maxConcurrent": 6, "priority": 220, "cooldownMs": 0, "owner": "audio-session", "evidenceId": "audio-weapon-world", "variants": [{"id": "weapon-report-world-a", "source": "audio/weapon-report-world-a.wav", "license": "project-owned", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"}]},
-    {"id": "weapon.extended-foley", "family": "weapon-foley", "bus": "sfx", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 2, "priority": 180, "cooldownMs": 10, "owner": "player-life", "evidenceId": "audio-weapon-foley", "variants": [{"id": "weapon-foley-a", "source": "audio/weapon-foley-a.wav", "license": "project-owned", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"}]},
-    {"id": "combat.hit-confirm", "family": "combat-feedback", "bus": "ui", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 4, "priority": 230, "cooldownMs": 10, "owner": "player-life", "evidenceId": "audio-hit-confirm", "variants": [{"id": "hit-confirm-a", "source": "audio/hit-confirm-a.wav", "license": "project-owned", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"}]},
-    {"id": "world.projectile-impact", "family": "world-impact", "bus": "sfx", "delivery": "world-spatial", "spatialProfileId": "impact-world", "maxConcurrent": 6, "priority": 150, "cooldownMs": 15, "owner": "match-epoch", "evidenceId": "audio-world-impact", "variants": [{"id": "world-impact-a", "source": "audio/world-impact-a.wav", "license": "cc0", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"}]},
-    {"id": "movement.footstep.world", "family": "movement", "bus": "movement", "delivery": "world-spatial", "spatialProfileId": "footstep-world", "maxConcurrent": 12, "priority": 110, "cooldownMs": 80, "owner": "player-life", "evidenceId": "audio-remote-footstep", "variants": [{"id": "footstep-world-dirt-a", "source": "audio/footstep-world-dirt-a.wav", "license": "cc0", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"}]},
-    {"id": "player.low-health-breathing", "family": "player-state", "bus": "sfx", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 1, "priority": 210, "cooldownMs": 500, "owner": "player-life", "evidenceId": "audio-low-health", "variants": [{"id": "low-health-breath-a", "source": "audio/low-health-breath-a.wav", "license": "project-owned", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"}]},
-    {"id": "ordnance.frag-explosion", "family": "ordnance", "bus": "sfx", "delivery": "world-spatial", "spatialProfileId": "explosion-world", "maxConcurrent": 4, "priority": 240, "cooldownMs": 90, "owner": "match-epoch", "evidenceId": "audio-frag", "variants": [{"id": "frag-explosion-a", "source": "audio/frag-explosion-a.wav", "license": "project-owned", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"}]},
-    {"id": "support.drone-rotor", "family": "support", "bus": "sfx", "delivery": "world-spatial", "spatialProfileId": "support-air", "maxConcurrent": 4, "priority": 190, "cooldownMs": 0, "owner": "support-entity", "evidenceId": "audio-drone", "variants": [{"id": "drone-rotor-a", "source": "audio/drone-rotor-a.wav", "license": "project-owned", "sha256": "8888888888888888888888888888888888888888888888888888888888888888"}]},
-    {"id": "interaction.weapon-pickup", "family": "pickup-interaction", "bus": "ui", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 2, "priority": 170, "cooldownMs": 20, "owner": "player-life", "evidenceId": "audio-pickup", "variants": [{"id": "weapon-pickup-a", "source": "audio/weapon-pickup-a.wav", "license": "project-owned", "sha256": "9999999999999999999999999999999999999999999999999999999999999999"}]},
-    {"id": "shed.door-motion", "family": "interactive-world", "bus": "sfx", "delivery": "world-spatial", "spatialProfileId": "world-object", "maxConcurrent": 2, "priority": 130, "cooldownMs": 40, "owner": "shed-entity", "evidenceId": "audio-shed-door", "variants": [{"id": "shed-door-motion-a", "source": "audio/shed-door-motion-a.wav", "license": "project-owned", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]},
-    {"id": "shed.debris-impact", "family": "interactive-world", "bus": "sfx", "delivery": "world-spatial", "spatialProfileId": "world-object", "maxConcurrent": 4, "priority": 145, "cooldownMs": 30, "owner": "shed-entity", "evidenceId": "audio-shed-debris", "variants": [{"id": "shed-debris-impact-a", "source": "audio/shed-debris-impact-a.wav", "license": "project-owned", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]},
-    {"id": "ambience.arena-bed", "family": "arena-ambience", "bus": "ambience", "delivery": "world-spatial", "spatialProfileId": "ambience-wide", "maxConcurrent": 4, "priority": 40, "cooldownMs": 0, "owner": "arena-generation", "evidenceId": "audio-arena-bed", "variants": [
-      {"id": "atomic-acres.wind", "source": "audio/atomic-acres-wind.ogg", "license": "project-owned", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-      {"id": "skyline-terminal.apron", "source": "audio/skyline-terminal-apron.ogg", "license": "project-owned", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
-      {"id": "rustworks-1v1.machinery", "source": "audio/rustworks-machinery.ogg", "license": "project-owned", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
-      {"id": "gun-range.ventilation", "source": "audio/gun-range-ventilation.ogg", "license": "project-owned", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}
-    ]},
-    {"id": "ui.feedback", "family": "ui", "bus": "ui", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 2, "priority": 160, "cooldownMs": 30, "owner": "ui-root", "evidenceId": "audio-ui", "variants": [{"id": "ui-feedback-a", "source": "audio/ui-feedback-a.wav", "license": "project-owned", "sha256": "1212121212121212121212121212121212121212121212121212121212121212"}]},
-    {"id": "announcement.match", "family": "announcements", "bus": "announcements", "delivery": "global-nonspatial", "spatialProfileId": null, "maxConcurrent": 2, "priority": 250, "cooldownMs": 500, "owner": "match-epoch", "evidenceId": "audio-announcement", "variants": [{"id": "announcement-match-a", "source": "audio/announcement-match-a.wav", "license": "project-owned", "sha256": "1313131313131313131313131313131313131313131313131313131313131313"}]},
-    {"id": "music.menu", "family": "music", "bus": "menu-music", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 1, "priority": 55, "cooldownMs": 0, "owner": "menu-route", "evidenceId": "audio-menu-music", "variants": [{"id": "music-menu-a", "source": "audio/music-menu-a.ogg", "license": "project-owned", "sha256": "1414141414141414141414141414141414141414141414141414141414141414"}]},
-    {"id": "music.game", "family": "music", "bus": "game-music", "delivery": "listener-local", "spatialProfileId": null, "maxConcurrent": 1, "priority": 60, "cooldownMs": 0, "owner": "match-epoch", "evidenceId": "audio-game-music", "variants": [{"id": "music-game-a", "source": "audio/music-game-a.ogg", "license": "project-owned", "sha256": "1515151515151515151515151515151515151515151515151515151515151515"}]}
+    {
+      "id": "weapon.report.world",
+      "family": "weapon-report",
+      "bus": "sfx",
+      "delivery": "world-spatial",
+      "spatialProfileId": "weapon-world",
+      "maxConcurrent": 6,
+      "priority": 220,
+      "cooldownMs": 0,
+      "owner": "audio-session",
+      "evidenceId": "audio-weapon-world",
+      "variants": [
+        {
+          "id": "weapon-report-world-a",
+          "source": "fixture-payloads/audio/variants/weapon-report-world-a.txt",
+          "license": "project-owned",
+          "sha256": "d1119a6ed83cfc598c769ab9532e5ba9ce429f7b285a133db5b6bf7d36a31087",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "weapon.extended-foley",
+      "family": "weapon-foley",
+      "bus": "sfx",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 2,
+      "priority": 180,
+      "cooldownMs": 10,
+      "owner": "player-life",
+      "evidenceId": "audio-weapon-foley",
+      "variants": [
+        {
+          "id": "weapon-foley-a",
+          "source": "fixture-payloads/audio/variants/weapon-foley-a.txt",
+          "license": "project-owned",
+          "sha256": "34214a4944930e81ac4a9a1baf234672232e5ce64416c3fcf3109238082d7b92",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "combat.hit-confirm",
+      "family": "combat-feedback",
+      "bus": "ui",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 4,
+      "priority": 230,
+      "cooldownMs": 10,
+      "owner": "player-life",
+      "evidenceId": "audio-hit-confirm",
+      "variants": [
+        {
+          "id": "hit-confirm-a",
+          "source": "fixture-payloads/audio/variants/hit-confirm-a.txt",
+          "license": "project-owned",
+          "sha256": "3e0aba69e660473b9b321b49fca6ddc93eba36ddfa390dde9d23bf07650f146c",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "world.projectile-impact",
+      "family": "world-impact",
+      "bus": "sfx",
+      "delivery": "world-spatial",
+      "spatialProfileId": "impact-world",
+      "maxConcurrent": 6,
+      "priority": 150,
+      "cooldownMs": 15,
+      "owner": "match-epoch",
+      "evidenceId": "audio-world-impact",
+      "variants": [
+        {
+          "id": "world-impact-a",
+          "source": "fixture-payloads/audio/variants/world-impact-a.txt",
+          "license": "cc0",
+          "sha256": "9afe21f11f4fd5781e14bd03258f097ed539f87abb4b8de7984d385418162b99",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "movement.footstep.world",
+      "family": "movement",
+      "bus": "movement",
+      "delivery": "world-spatial",
+      "spatialProfileId": "footstep-world",
+      "maxConcurrent": 12,
+      "priority": 110,
+      "cooldownMs": 80,
+      "owner": "player-life",
+      "evidenceId": "audio-remote-footstep",
+      "variants": [
+        {
+          "id": "footstep-world-dirt-a",
+          "source": "fixture-payloads/audio/variants/footstep-world-dirt-a.txt",
+          "license": "cc0",
+          "sha256": "386adfec8fc0dda4d67fc6711153e05d987df53725498bd182897c0992dbab40",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "player.low-health-breathing",
+      "family": "player-state",
+      "bus": "sfx",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 1,
+      "priority": 210,
+      "cooldownMs": 500,
+      "owner": "player-life",
+      "evidenceId": "audio-low-health",
+      "variants": [
+        {
+          "id": "low-health-breath-a",
+          "source": "fixture-payloads/audio/variants/low-health-breath-a.txt",
+          "license": "project-owned",
+          "sha256": "fd736b294ce3966fb715ecd19448402e5693690a0e2475072cec7ef6e323b878",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "ordnance.frag-explosion",
+      "family": "ordnance",
+      "bus": "sfx",
+      "delivery": "world-spatial",
+      "spatialProfileId": "explosion-world",
+      "maxConcurrent": 4,
+      "priority": 240,
+      "cooldownMs": 90,
+      "owner": "match-epoch",
+      "evidenceId": "audio-frag",
+      "variants": [
+        {
+          "id": "frag-explosion-a",
+          "source": "fixture-payloads/audio/variants/frag-explosion-a.txt",
+          "license": "project-owned",
+          "sha256": "e040fcfd97ef3706a2fe2e1d578bae949bdb67d085faea2c23380f2c412944cc",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "support.drone-rotor",
+      "family": "support",
+      "bus": "sfx",
+      "delivery": "world-spatial",
+      "spatialProfileId": "support-air",
+      "maxConcurrent": 4,
+      "priority": 190,
+      "cooldownMs": 0,
+      "owner": "support-entity",
+      "evidenceId": "audio-drone",
+      "variants": [
+        {
+          "id": "drone-rotor-a",
+          "source": "fixture-payloads/audio/variants/drone-rotor-a.txt",
+          "license": "project-owned",
+          "sha256": "e5e3213c21deb4aceb13535b38ab414b7fd3879dc596769f4c72ef39bf83065c",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "interaction.weapon-pickup",
+      "family": "pickup-interaction",
+      "bus": "ui",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 2,
+      "priority": 170,
+      "cooldownMs": 20,
+      "owner": "player-life",
+      "evidenceId": "audio-pickup",
+      "variants": [
+        {
+          "id": "weapon-pickup-a",
+          "source": "fixture-payloads/audio/variants/weapon-pickup-a.txt",
+          "license": "project-owned",
+          "sha256": "17f998914d4d169a75a18c29210c6fc11d34c1834e07809940c9b99b876fa77d",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "shed.door-motion",
+      "family": "interactive-world",
+      "bus": "sfx",
+      "delivery": "world-spatial",
+      "spatialProfileId": "world-object",
+      "maxConcurrent": 2,
+      "priority": 130,
+      "cooldownMs": 40,
+      "owner": "shed-entity",
+      "evidenceId": "audio-shed-door",
+      "variants": [
+        {
+          "id": "shed-door-motion-a",
+          "source": "fixture-payloads/audio/variants/shed-door-motion-a.txt",
+          "license": "project-owned",
+          "sha256": "6ae53e10e0a2ffa05dc6107ca61bc58a1fe03e3e07e0146816200bdd0e942573",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "shed.debris-impact",
+      "family": "interactive-world",
+      "bus": "sfx",
+      "delivery": "world-spatial",
+      "spatialProfileId": "world-object",
+      "maxConcurrent": 4,
+      "priority": 145,
+      "cooldownMs": 30,
+      "owner": "shed-entity",
+      "evidenceId": "audio-shed-debris",
+      "variants": [
+        {
+          "id": "shed-debris-impact-a",
+          "source": "fixture-payloads/audio/variants/shed-debris-impact-a.txt",
+          "license": "project-owned",
+          "sha256": "89d5f090467e6886355606e73f29a30089c19e094ed4be8e8bfb78a8ca53f619",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "ambience.arena-bed",
+      "family": "arena-ambience",
+      "bus": "ambience",
+      "delivery": "world-spatial",
+      "spatialProfileId": "ambience-wide",
+      "maxConcurrent": 4,
+      "priority": 40,
+      "cooldownMs": 0,
+      "owner": "arena-generation",
+      "evidenceId": "audio-arena-bed",
+      "variants": [
+        {
+          "id": "atomic-acres.wind",
+          "source": "fixture-payloads/audio/variants/atomic-acres-wind.txt",
+          "license": "project-owned",
+          "sha256": "2ef73954df0957313bfe89c00f24979aaeb4cd3e23c8923d35616a892ae999c6",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        },
+        {
+          "id": "skyline-terminal.apron",
+          "source": "fixture-payloads/audio/variants/skyline-terminal-apron.txt",
+          "license": "project-owned",
+          "sha256": "8215b3f002f2e851e93d37217f79254e70cafc6c2394d8fb1409132639908758",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        },
+        {
+          "id": "rustworks-1v1.machinery",
+          "source": "fixture-payloads/audio/variants/rustworks-1v1-machinery.txt",
+          "license": "project-owned",
+          "sha256": "02fbb08b853744ee4c67ec4335cbd9cdd995ff8cc17c02fb5297e55188cba8f8",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        },
+        {
+          "id": "gun-range.ventilation",
+          "source": "fixture-payloads/audio/variants/gun-range-ventilation.txt",
+          "license": "project-owned",
+          "sha256": "4f689caf95f79c63eeee2cc75f29daa8141db21a17fb2a3d63b933438f65c806",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "ui.feedback",
+      "family": "ui",
+      "bus": "ui",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 2,
+      "priority": 160,
+      "cooldownMs": 30,
+      "owner": "ui-root",
+      "evidenceId": "audio-ui",
+      "variants": [
+        {
+          "id": "ui-feedback-a",
+          "source": "fixture-payloads/audio/variants/ui-feedback-a.txt",
+          "license": "project-owned",
+          "sha256": "fc20da4d79eab92313d52b1d3a049ad2f2da0ee8cbd66aaa257bd6d522e05e0d",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "announcement.match",
+      "family": "announcements",
+      "bus": "announcements",
+      "delivery": "global-nonspatial",
+      "spatialProfileId": null,
+      "maxConcurrent": 2,
+      "priority": 250,
+      "cooldownMs": 500,
+      "owner": "match-epoch",
+      "evidenceId": "audio-announcement",
+      "variants": [
+        {
+          "id": "announcement-match-a",
+          "source": "fixture-payloads/audio/variants/announcement-match-a.txt",
+          "license": "project-owned",
+          "sha256": "5840c6ac6900528842a84b5b9a88605e413c688b669c771aab40e8342fb2e672",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "music.menu",
+      "family": "music",
+      "bus": "menu-music",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 1,
+      "priority": 55,
+      "cooldownMs": 0,
+      "owner": "menu-route",
+      "evidenceId": "audio-menu-music",
+      "variants": [
+        {
+          "id": "music-menu-a",
+          "source": "fixture-payloads/audio/variants/music-menu-a.txt",
+          "license": "project-owned",
+          "sha256": "adb03f526091626de0cf8782b731f9815feab5bfa90e4ddadaedfcb47e097374",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    },
+    {
+      "id": "music.game",
+      "family": "music",
+      "bus": "game-music",
+      "delivery": "listener-local",
+      "spatialProfileId": null,
+      "maxConcurrent": 1,
+      "priority": 60,
+      "cooldownMs": 0,
+      "owner": "match-epoch",
+      "evidenceId": "audio-game-music",
+      "variants": [
+        {
+          "id": "music-game-a",
+          "source": "fixture-payloads/audio/variants/music-game-a.txt",
+          "license": "project-owned",
+          "sha256": "893b7a3ec4060dd64dfee5030b4fbef6a342c1e6130df477b3e09aab03121285",
+          "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+        }
+      ]
+    }
   ],
   "spatialProfiles": [
-    {"id": "weapon-world", "referenceDistanceM": 1, "maxDistanceM": 120, "rolloff": 1, "coneInnerDeg": 180, "coneOuterDeg": 300, "voiceCap": 16, "stealPolicy": "lowest-priority", "rolloffSamples": [{"distanceM": 1, "gain": 1}, {"distanceM": 40, "gain": 0.35}, {"distanceM": 120, "gain": 0.02}]},
-    {"id": "impact-world", "referenceDistanceM": 1, "maxDistanceM": 80, "rolloff": 1.2, "coneInnerDeg": 180, "coneOuterDeg": 300, "voiceCap": 16, "stealPolicy": "oldest", "rolloffSamples": [{"distanceM": 1, "gain": 1}, {"distanceM": 30, "gain": 0.28}, {"distanceM": 80, "gain": 0.02}]},
-    {"id": "footstep-world", "referenceDistanceM": 1, "maxDistanceM": 42, "rolloff": 1.4, "coneInnerDeg": 180, "coneOuterDeg": 270, "voiceCap": 12, "stealPolicy": "oldest", "rolloffSamples": [{"distanceM": 1, "gain": 1}, {"distanceM": 15, "gain": 0.3}, {"distanceM": 42, "gain": 0.01}]},
-    {"id": "explosion-world", "referenceDistanceM": 2, "maxDistanceM": 220, "rolloff": 0.8, "coneInnerDeg": 180, "coneOuterDeg": 360, "voiceCap": 8, "stealPolicy": "lowest-priority", "rolloffSamples": [{"distanceM": 2, "gain": 1}, {"distanceM": 80, "gain": 0.4}, {"distanceM": 220, "gain": 0.03}]},
-    {"id": "support-air", "referenceDistanceM": 4, "maxDistanceM": 400, "rolloff": 0.7, "coneInnerDeg": 180, "coneOuterDeg": 320, "voiceCap": 8, "stealPolicy": "lowest-priority", "rolloffSamples": [{"distanceM": 4, "gain": 1}, {"distanceM": 150, "gain": 0.42}, {"distanceM": 400, "gain": 0.04}]},
-    {"id": "world-object", "referenceDistanceM": 1, "maxDistanceM": 60, "rolloff": 1.1, "coneInnerDeg": 120, "coneOuterDeg": 240, "voiceCap": 8, "stealPolicy": "quietest", "rolloffSamples": [{"distanceM": 1, "gain": 1}, {"distanceM": 20, "gain": 0.32}, {"distanceM": 60, "gain": 0.02}]},
-    {"id": "ambience-wide", "referenceDistanceM": 10, "maxDistanceM": 500, "rolloff": 0.4, "coneInnerDeg": 180, "coneOuterDeg": 360, "voiceCap": 8, "stealPolicy": "quietest", "rolloffSamples": [{"distanceM": 10, "gain": 1}, {"distanceM": 200, "gain": 0.55}, {"distanceM": 500, "gain": 0.08}]}
+    {
+      "id": "weapon-world",
+      "referenceDistanceM": 1,
+      "maxDistanceM": 120,
+      "rolloff": 1,
+      "coneInnerDeg": 180,
+      "coneOuterDeg": 300,
+      "voiceCap": 16,
+      "stealPolicy": "lowest-priority",
+      "rolloffSamples": [
+        {
+          "distanceM": 1,
+          "gain": 1
+        },
+        {
+          "distanceM": 40,
+          "gain": 0.35
+        },
+        {
+          "distanceM": 120,
+          "gain": 0.02
+        }
+      ]
+    },
+    {
+      "id": "impact-world",
+      "referenceDistanceM": 1,
+      "maxDistanceM": 80,
+      "rolloff": 1.2,
+      "coneInnerDeg": 180,
+      "coneOuterDeg": 300,
+      "voiceCap": 16,
+      "stealPolicy": "oldest",
+      "rolloffSamples": [
+        {
+          "distanceM": 1,
+          "gain": 1
+        },
+        {
+          "distanceM": 30,
+          "gain": 0.28
+        },
+        {
+          "distanceM": 80,
+          "gain": 0.02
+        }
+      ]
+    },
+    {
+      "id": "footstep-world",
+      "referenceDistanceM": 1,
+      "maxDistanceM": 42,
+      "rolloff": 1.4,
+      "coneInnerDeg": 180,
+      "coneOuterDeg": 270,
+      "voiceCap": 12,
+      "stealPolicy": "oldest",
+      "rolloffSamples": [
+        {
+          "distanceM": 1,
+          "gain": 1
+        },
+        {
+          "distanceM": 15,
+          "gain": 0.3
+        },
+        {
+          "distanceM": 42,
+          "gain": 0.01
+        }
+      ]
+    },
+    {
+      "id": "explosion-world",
+      "referenceDistanceM": 2,
+      "maxDistanceM": 220,
+      "rolloff": 0.8,
+      "coneInnerDeg": 180,
+      "coneOuterDeg": 360,
+      "voiceCap": 8,
+      "stealPolicy": "lowest-priority",
+      "rolloffSamples": [
+        {
+          "distanceM": 2,
+          "gain": 1
+        },
+        {
+          "distanceM": 80,
+          "gain": 0.4
+        },
+        {
+          "distanceM": 220,
+          "gain": 0.03
+        }
+      ]
+    },
+    {
+      "id": "support-air",
+      "referenceDistanceM": 4,
+      "maxDistanceM": 400,
+      "rolloff": 0.7,
+      "coneInnerDeg": 180,
+      "coneOuterDeg": 320,
+      "voiceCap": 8,
+      "stealPolicy": "lowest-priority",
+      "rolloffSamples": [
+        {
+          "distanceM": 4,
+          "gain": 1
+        },
+        {
+          "distanceM": 150,
+          "gain": 0.42
+        },
+        {
+          "distanceM": 400,
+          "gain": 0.04
+        }
+      ]
+    },
+    {
+      "id": "world-object",
+      "referenceDistanceM": 1,
+      "maxDistanceM": 60,
+      "rolloff": 1.1,
+      "coneInnerDeg": 120,
+      "coneOuterDeg": 240,
+      "voiceCap": 8,
+      "stealPolicy": "quietest",
+      "rolloffSamples": [
+        {
+          "distanceM": 1,
+          "gain": 1
+        },
+        {
+          "distanceM": 20,
+          "gain": 0.32
+        },
+        {
+          "distanceM": 60,
+          "gain": 0.02
+        }
+      ]
+    },
+    {
+      "id": "ambience-wide",
+      "referenceDistanceM": 10,
+      "maxDistanceM": 500,
+      "rolloff": 0.4,
+      "coneInnerDeg": 180,
+      "coneOuterDeg": 360,
+      "voiceCap": 8,
+      "stealPolicy": "quietest",
+      "rolloffSamples": [
+        {
+          "distanceM": 10,
+          "gain": 1
+        },
+        {
+          "distanceM": 200,
+          "gain": 0.55
+        },
+        {
+          "distanceM": 500,
+          "gain": 0.08
+        }
+      ]
+    }
   ],
-  "footsteps": {"keyedBy": ["actor", "life", "continuity"], "groundedTravelSegments": 40, "groundedEmissions": 40, "airborneTravelSegments": 12, "airborneEmissions": 0, "discontinuityCount": 6, "discontinuityEmissions": 0, "remoteActorTravelSegments": 24, "remoteSpatialEmissions": 24},
+  "footsteps": {
+    "keyedBy": [
+      "actor",
+      "life",
+      "continuity"
+    ],
+    "groundedTravelSegments": 40,
+    "groundedEmissions": 40,
+    "airborneTravelSegments": 12,
+    "airborneEmissions": 0,
+    "discontinuityCount": 6,
+    "discontinuityEmissions": 0,
+    "remoteActorTravelSegments": 24,
+    "remoteSpatialEmissions": 24
+  },
   "arenas": [
-    {"id": "atomic-acres", "ambienceEventId": "ambience.arena-bed", "variantId": "atomic-acres.wind", "sourceBudget": 4, "settledSourceCount": 0, "artifact": {"path": "artifacts/audio/atomic-acres.json", "sha256": "1616161616161616161616161616161616161616161616161616161616161616"}},
-    {"id": "skyline-terminal", "ambienceEventId": "ambience.arena-bed", "variantId": "skyline-terminal.apron", "sourceBudget": 4, "settledSourceCount": 0, "artifact": {"path": "artifacts/audio/skyline-terminal.json", "sha256": "1717171717171717171717171717171717171717171717171717171717171717"}},
-    {"id": "rustworks-1v1", "ambienceEventId": "ambience.arena-bed", "variantId": "rustworks-1v1.machinery", "sourceBudget": 4, "settledSourceCount": 0, "artifact": {"path": "artifacts/audio/rustworks-1v1.json", "sha256": "1818181818181818181818181818181818181818181818181818181818181818"}},
-    {"id": "gun-range", "ambienceEventId": "ambience.arena-bed", "variantId": "gun-range.ventilation", "sourceBudget": 4, "settledSourceCount": 0, "artifact": {"path": "artifacts/audio/gun-range.json", "sha256": "1919191919191919191919191919191919191919191919191919191919191919"}}
+    {
+      "id": "atomic-acres",
+      "ambienceEventId": "ambience.arena-bed",
+      "variantId": "atomic-acres.wind",
+      "sourceBudget": 4,
+      "settledSourceCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/arenas/atomic-acres.json",
+        "sha256": "c48f61abe8b7a579c169b5fba6220461ca76caf1e9409b0ca9dfbb7a62bdc331"
+      }
+    },
+    {
+      "id": "skyline-terminal",
+      "ambienceEventId": "ambience.arena-bed",
+      "variantId": "skyline-terminal.apron",
+      "sourceBudget": 4,
+      "settledSourceCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/arenas/skyline-terminal.json",
+        "sha256": "a66358fc68a4a63b40cc4d36ea49c6ea9959691f01a434e4200cde852c53d76f"
+      }
+    },
+    {
+      "id": "rustworks-1v1",
+      "ambienceEventId": "ambience.arena-bed",
+      "variantId": "rustworks-1v1.machinery",
+      "sourceBudget": 4,
+      "settledSourceCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/arenas/rustworks-1v1.json",
+        "sha256": "578b6fe47fd7a051ee9c7cb581623278492e6993b5cd69b46789e2b922b73a2b"
+      }
+    },
+    {
+      "id": "gun-range",
+      "ambienceEventId": "ambience.arena-bed",
+      "variantId": "gun-range.ventilation",
+      "sourceBudget": 4,
+      "settledSourceCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/arenas/gun-range.json",
+        "sha256": "bf23bea9aac09f3925d129e25cfbacfe7c1ca8ce0912da7264fd720508d747be"
+      }
+    }
   ],
-  "budgets": {"maxActiveVoices": 96, "maxLoops": 16, "maxReusableChains": 32, "maxOcclusionQueriesPerSecond": 240, "occlusionCpuP95Ms": 1.5},
+  "budgets": {
+    "maxActiveVoices": 96,
+    "maxLoops": 16,
+    "maxReusableChains": 32,
+    "maxOcclusionQueriesPerSecond": 240,
+    "occlusionCpuP95Ms": 1.5
+  },
   "spatialEvidence": [
-    {"eventId": "weapon.report.world", "sourceAzimuthDeg": -35, "observedPan": -0.55, "openGain": 0.8, "occludedGain": 0.35, "openLowPassHz": 18000, "occludedLowPassHz": 2400, "artifact": {"path": "artifacts/audio/spatial-weapon.json", "sha256": "2121212121212121212121212121212121212121212121212121212121212121"}},
-    {"eventId": "world.projectile-impact", "sourceAzimuthDeg": 40, "observedPan": 0.6, "openGain": 0.7, "occludedGain": 0.3, "openLowPassHz": 17000, "occludedLowPassHz": 2200, "artifact": {"path": "artifacts/audio/spatial-impact.json", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"}},
-    {"eventId": "movement.footstep.world", "sourceAzimuthDeg": -50, "observedPan": -0.7, "openGain": 0.6, "occludedGain": 0.2, "openLowPassHz": 16000, "occludedLowPassHz": 1800, "artifact": {"path": "artifacts/audio/spatial-footstep.json", "sha256": "2323232323232323232323232323232323232323232323232323232323232323"}},
-    {"eventId": "ordnance.frag-explosion", "sourceAzimuthDeg": 55, "observedPan": 0.72, "openGain": 0.9, "occludedGain": 0.4, "openLowPassHz": 19000, "occludedLowPassHz": 2600, "artifact": {"path": "artifacts/audio/spatial-frag.json", "sha256": "2424242424242424242424242424242424242424242424242424242424242424"}},
-    {"eventId": "support.drone-rotor", "sourceAzimuthDeg": -65, "observedPan": -0.78, "openGain": 0.75, "occludedGain": 0.32, "openLowPassHz": 17500, "occludedLowPassHz": 2300, "artifact": {"path": "artifacts/audio/spatial-drone.json", "sha256": "2525252525252525252525252525252525252525252525252525252525252525"}},
-    {"eventId": "shed.door-motion", "sourceAzimuthDeg": 30, "observedPan": 0.48, "openGain": 0.55, "occludedGain": 0.18, "openLowPassHz": 15000, "occludedLowPassHz": 1600, "artifact": {"path": "artifacts/audio/spatial-door.json", "sha256": "2626262626262626262626262626262626262626262626262626262626262626"}},
-    {"eventId": "shed.debris-impact", "sourceAzimuthDeg": -25, "observedPan": -0.42, "openGain": 0.65, "occludedGain": 0.22, "openLowPassHz": 15500, "occludedLowPassHz": 1700, "artifact": {"path": "artifacts/audio/spatial-debris.json", "sha256": "2727272727272727272727272727272727272727272727272727272727272727"}},
-    {"eventId": "ambience.arena-bed", "sourceAzimuthDeg": 20, "observedPan": 0.3, "openGain": 0.5, "occludedGain": 0.25, "openLowPassHz": 14000, "occludedLowPassHz": 2000, "artifact": {"path": "artifacts/audio/spatial-ambience.json", "sha256": "2828282828282828282828282828282828282828282828282828282828282828"}}
+    {
+      "eventId": "weapon.report.world",
+      "sourceAzimuthDeg": -35,
+      "observedPan": -0.55,
+      "openGain": 0.8,
+      "occludedGain": 0.35,
+      "openLowPassHz": 18000,
+      "occludedLowPassHz": 2400,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/weapon-report-world.json",
+        "sha256": "9ac030790f28c016240627925c9d57b3e4b4a40b6b7684ceaf70ed69d1d88133"
+      }
+    },
+    {
+      "eventId": "world.projectile-impact",
+      "sourceAzimuthDeg": 40,
+      "observedPan": 0.6,
+      "openGain": 0.7,
+      "occludedGain": 0.3,
+      "openLowPassHz": 17000,
+      "occludedLowPassHz": 2200,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/world-projectile-impact.json",
+        "sha256": "daffd145a7eac374b4b5b79c945e7ecc4566d50e02095ed18eaa252ccad90671"
+      }
+    },
+    {
+      "eventId": "movement.footstep.world",
+      "sourceAzimuthDeg": -50,
+      "observedPan": -0.7,
+      "openGain": 0.6,
+      "occludedGain": 0.2,
+      "openLowPassHz": 16000,
+      "occludedLowPassHz": 1800,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/movement-footstep-world.json",
+        "sha256": "d4aab953661c41127ce897d8df1c0600f68dd043aa741fb8381b3985d3e6ee83"
+      }
+    },
+    {
+      "eventId": "ordnance.frag-explosion",
+      "sourceAzimuthDeg": 55,
+      "observedPan": 0.72,
+      "openGain": 0.9,
+      "occludedGain": 0.4,
+      "openLowPassHz": 19000,
+      "occludedLowPassHz": 2600,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/ordnance-frag-explosion.json",
+        "sha256": "c19a8a18c3aab9e4889a59af56618d97091f6e08093a973a3654c021efd2bd12"
+      }
+    },
+    {
+      "eventId": "support.drone-rotor",
+      "sourceAzimuthDeg": -65,
+      "observedPan": -0.78,
+      "openGain": 0.75,
+      "occludedGain": 0.32,
+      "openLowPassHz": 17500,
+      "occludedLowPassHz": 2300,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/support-drone-rotor.json",
+        "sha256": "adaa264ae0e895bc33f0c6ce4e40c1cf152be4a2410bc2534126594f6843fcb1"
+      }
+    },
+    {
+      "eventId": "shed.door-motion",
+      "sourceAzimuthDeg": 30,
+      "observedPan": 0.48,
+      "openGain": 0.55,
+      "occludedGain": 0.18,
+      "openLowPassHz": 15000,
+      "occludedLowPassHz": 1600,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/shed-door-motion.json",
+        "sha256": "a032311725a73117fa0138d385df71116e53657c4c84e1b8eb4612d0a934cf7f"
+      }
+    },
+    {
+      "eventId": "shed.debris-impact",
+      "sourceAzimuthDeg": -25,
+      "observedPan": -0.42,
+      "openGain": 0.65,
+      "occludedGain": 0.22,
+      "openLowPassHz": 15500,
+      "occludedLowPassHz": 1700,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/shed-debris-impact.json",
+        "sha256": "cac0d3aabaaef32b26bacadeaad79a8902f7d6219a3a2efb51a0ba1c454be4c5"
+      }
+    },
+    {
+      "eventId": "ambience.arena-bed",
+      "sourceAzimuthDeg": 20,
+      "observedPan": 0.3,
+      "openGain": 0.5,
+      "occludedGain": 0.25,
+      "openLowPassHz": 14000,
+      "occludedLowPassHz": 2000,
+      "artifact": {
+        "path": "fixture-payloads/audio/spatial/ambience-arena-bed.json",
+        "sha256": "3605280bed16efaba87ed0cc9d3fc9bcd281700864b292878704f6b09166468e"
+      }
+    }
   ],
   "lifecycleEvidence": [
-    {"id": "arena-switch", "initialNodes": 72, "expectedSettledNodes": 12, "observedSettledNodes": 12, "errorCount": 0, "artifact": {"path": "artifacts/audio/lifecycle-arena-switch.json", "sha256": "2929292929292929292929292929292929292929292929292929292929292929"}},
-    {"id": "rematch", "initialNodes": 70, "expectedSettledNodes": 12, "observedSettledNodes": 12, "errorCount": 0, "artifact": {"path": "artifacts/audio/lifecycle-rematch.json", "sha256": "3030303030303030303030303030303030303030303030303030303030303030"}},
-    {"id": "suspend-resume", "initialNodes": 68, "expectedSettledNodes": 12, "observedSettledNodes": 12, "errorCount": 0, "artifact": {"path": "artifacts/audio/lifecycle-suspend-resume.json", "sha256": "3131313131313131313131313131313131313131313131313131313131313131"}}
+    {
+      "id": "arena-switch",
+      "initialNodes": 72,
+      "expectedSettledNodes": 12,
+      "observedSettledNodes": 12,
+      "errorCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/lifecycle/arena-switch.json",
+        "sha256": "3a67dd5ca47034605f01118b1b0e78b48fb894e00302d40f44a826eef7799c9f"
+      }
+    },
+    {
+      "id": "rematch",
+      "initialNodes": 70,
+      "expectedSettledNodes": 12,
+      "observedSettledNodes": 12,
+      "errorCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/lifecycle/rematch.json",
+        "sha256": "f22f2991bf3dec9b4fc7a3bc390da3c9c7c1479e11035e2e9f8349889c2bb5ea"
+      }
+    },
+    {
+      "id": "suspend-resume",
+      "initialNodes": 68,
+      "expectedSettledNodes": 12,
+      "observedSettledNodes": 12,
+      "errorCount": 0,
+      "artifact": {
+        "path": "fixture-payloads/audio/lifecycle/suspend-resume.json",
+        "sha256": "8275ec603aa151234d3fcd72bc10f3fc24d40e81daa344d09e3192a56b8bc9e6"
+      }
+    }
   ]
 }

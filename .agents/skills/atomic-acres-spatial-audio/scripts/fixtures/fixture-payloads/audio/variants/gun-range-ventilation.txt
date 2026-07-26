@@ -1,0 +1,4 @@
+ATOMIC ACRES AUDIO FIXTURE
+event=ambience.arena-bed
+variant=gun-range.ventilation
+fixtureOnly=true

@@ -1,0 +1,7 @@
+{
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "id": "shed.door-motion",
+  "sourceAzimuthDeg": 30,
+  "observedPan": 0.48
+}

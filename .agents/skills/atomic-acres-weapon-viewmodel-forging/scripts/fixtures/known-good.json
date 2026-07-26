@@ -1,152 +1,521 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "captureIdentity": {
     "sourceSha": "1111111111111111111111111111111111111111",
     "buildId": "preview-1",
     "backend": "webgpu",
     "profile": "high",
-    "viewport": { "width": 1920, "height": 1080, "dpr": 1 },
-    "clock": { "kind": "fixed-step", "originMs": 0, "stepMs": 1000 },
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1
+    },
+    "clock": {
+      "kind": "fixed-step",
+      "originMs": 0,
+      "stepMs": 1000
+    },
     "seed": 1
   },
   "presentations": [
     {
       "id": "a4-vanguard-view",
       "weaponId": "a4-vanguard",
-      "capabilities": ["standard-firearm", "automatic", "detachable-magazine", "casing-ejection", "optic", "melee"],
+      "capabilities": [
+        "standard-firearm",
+        "automatic",
+        "detachable-magazine",
+        "casing-ejection",
+        "optic",
+        "melee"
+      ],
       "skeleton": {
         "id": "aa-first-person-v1",
-        "url": "assets/viewmodels/aa-first-person-v1.glb",
-        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "url": "fixture-payloads/viewmodel/assets/aa-first-person-v1-skeleton.txt",
+        "sha256": "7204565c86bfbcf62e4bd0f02213af2a6b5eba906a3902d38aaf7af78d54b6e7",
         "source": "original Blender source",
         "license": "project-owned",
-        "boneCount": 64
+        "boneCount": 64,
+        "derivativeNotes": "Deterministic project-owned staging fixture derived only from the named original source."
       },
       "materialPath": "tsl",
       "cameraRaySource": "camera-center",
       "animationMarkerRole": "presentation-only",
-      "accessibility": { "motionScaleMin": 0, "motionScaleMax": 1, "adsMotionScaleMax": 0.5 },
+      "accessibility": {
+        "motionScaleMin": 0,
+        "motionScaleMax": 1,
+        "adsMotionScaleMax": 0.5
+      },
       "firstPersonLods": [
         {
           "level": 0,
-          "url": "assets/viewmodels/a4-vanguard-fp-lod0.glb",
-          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "url": "fixture-payloads/viewmodel/assets/a4-vanguard-first-person-lod0.txt",
+          "sha256": "3638797210f310abda89b4207ed39f6a1670ba1c432d7696c5cb9f0fd10d45ca",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 90000,
           "draws": 12,
           "decodedTextureBytes": 67108864,
-          "sharedAssetApprovalId": null
+          "sharedAssetApprovalId": null,
+          "derivativeNotes": "Deterministic project-owned staging fixture derived only from the named original source."
         },
         {
           "level": 1,
-          "url": "assets/viewmodels/a4-vanguard-fp-lod1.glb",
-          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "url": "fixture-payloads/viewmodel/assets/a4-vanguard-first-person-lod1.txt",
+          "sha256": "372ba169a1ad4eceef0d0da600a8230bf6736de447cfa8ad88ae01af05382ac5",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 45000,
           "draws": 8,
           "decodedTextureBytes": 33554432,
-          "sharedAssetApprovalId": null
+          "sharedAssetApprovalId": null,
+          "derivativeNotes": "Deterministic project-owned staging fixture derived only from the named original source."
         }
       ],
       "worldLods": [
         {
           "level": 0,
-          "url": "assets/viewmodels/a4-vanguard-world-lod0.glb",
-          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "url": "fixture-payloads/viewmodel/assets/a4-vanguard-world-lod0.txt",
+          "sha256": "36601811d576d303ff2b9fcd131b5dcb707cc1aef2b785e3bc95b2a5846ab562",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 40000,
           "draws": 8,
           "decodedTextureBytes": 33554432,
-          "sharedAssetApprovalId": null
+          "sharedAssetApprovalId": null,
+          "derivativeNotes": "Deterministic project-owned staging fixture derived only from the named original source."
         },
         {
           "level": 1,
-          "url": "assets/viewmodels/a4-vanguard-world-lod1.glb",
-          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "url": "fixture-payloads/viewmodel/assets/a4-vanguard-world-lod1.txt",
+          "sha256": "46fbd2c68f9a0d4de8256d2a2131f92725eb83445db2db2649ea1ece8219f914",
           "source": "original Blender source",
           "license": "project-owned",
           "triangles": 18000,
           "draws": 5,
           "decodedTextureBytes": 16777216,
-          "sharedAssetApprovalId": null
+          "sharedAssetApprovalId": null,
+          "derivativeNotes": "Deterministic project-owned staging fixture derived only from the named original source."
         }
       ],
       "semanticParts": [
-        { "id": "arms", "nodeName": "Arms" },
-        { "id": "hands", "nodeName": "Hands" },
-        { "id": "weapon", "nodeName": "A4Vanguard" },
-        { "id": "magazine", "nodeName": "Magazine" },
-        { "id": "muzzle", "nodeName": "MuzzleDevice" },
-        { "id": "eject", "nodeName": "EjectionPort" }
+        {
+          "id": "arms",
+          "nodeName": "Arms"
+        },
+        {
+          "id": "hands",
+          "nodeName": "Hands"
+        },
+        {
+          "id": "weapon",
+          "nodeName": "A4Vanguard"
+        },
+        {
+          "id": "magazine",
+          "nodeName": "Magazine"
+        },
+        {
+          "id": "muzzle",
+          "nodeName": "MuzzleDevice"
+        },
+        {
+          "id": "eject",
+          "nodeName": "EjectionPort"
+        }
       ],
       "sockets": [
-        { "id": "rightGrip", "nodeName": "SocketRightGrip" },
-        { "id": "leftGrip", "nodeName": "SocketLeftGrip" },
-        { "id": "knife", "nodeName": "SocketKnife" },
-        { "id": "muzzle", "nodeName": "SocketMuzzle" },
-        { "id": "optic", "nodeName": "SocketOptic" },
-        { "id": "magazine", "nodeName": "SocketMagazine" },
-        { "id": "eject", "nodeName": "SocketEject" }
+        {
+          "id": "rightGrip",
+          "nodeName": "SocketRightGrip"
+        },
+        {
+          "id": "leftGrip",
+          "nodeName": "SocketLeftGrip"
+        },
+        {
+          "id": "knife",
+          "nodeName": "SocketKnife"
+        },
+        {
+          "id": "muzzle",
+          "nodeName": "SocketMuzzle"
+        },
+        {
+          "id": "optic",
+          "nodeName": "SocketOptic"
+        },
+        {
+          "id": "magazine",
+          "nodeName": "SocketMagazine"
+        },
+        {
+          "id": "eject",
+          "nodeName": "SocketEject"
+        }
       ],
       "clips": [
-        { "action": "equip", "clipName": "equip-clip", "normalizedDuration": 1, "additive": false, "priority": 10, "markers": [] },
-        { "action": "unequip", "clipName": "unequip-clip", "normalizedDuration": 1, "additive": false, "priority": 10, "markers": [] },
-        { "action": "idle", "clipName": "idle-clip", "normalizedDuration": 1, "additive": false, "priority": 1, "markers": [] },
-        { "action": "idle-variant", "clipName": "idle-variant-clip", "normalizedDuration": 1, "additive": true, "priority": 2, "markers": [] },
-        { "action": "walk", "clipName": "walk-clip", "normalizedDuration": 1, "additive": false, "priority": 3, "markers": [] },
-        { "action": "sprint", "clipName": "sprint-clip", "normalizedDuration": 1, "additive": false, "priority": 4, "markers": [] },
-        { "action": "ads-in", "clipName": "ads-in-clip", "normalizedDuration": 0.25, "additive": false, "priority": 8, "markers": [] },
-        { "action": "ads-out", "clipName": "ads-out-clip", "normalizedDuration": 0.25, "additive": false, "priority": 8, "markers": [] },
-        { "action": "fire", "clipName": "fire-clip", "normalizedDuration": 0.12, "additive": true, "priority": 20, "markers": [{ "id": "muzzle", "normalizedTime": 0.25 }] },
-        { "action": "dry-fire", "clipName": "dry-fire-clip", "normalizedDuration": 0.2, "additive": true, "priority": 20, "markers": [] },
-        { "action": "reload", "clipName": "reload-clip", "normalizedDuration": 1.8, "additive": false, "priority": 15, "markers": [{ "id": "magazine-out", "normalizedTime": 0.25 }, { "id": "magazine-in", "normalizedTime": 0.7 }] },
-        { "action": "empty-reload", "clipName": "empty-reload-clip", "normalizedDuration": 2.2, "additive": false, "priority": 15, "markers": [{ "id": "magazine-out", "normalizedTime": 0.2 }, { "id": "magazine-in", "normalizedTime": 0.6 }, { "id": "bolt-release", "normalizedTime": 0.85 }] },
-        { "action": "melee", "clipName": "melee-clip", "normalizedDuration": 0.7, "additive": false, "priority": 25, "markers": [] },
-        { "action": "inspect", "clipName": "inspect-clip", "normalizedDuration": 2.5, "additive": false, "priority": 5, "markers": [] }
+        {
+          "action": "equip",
+          "clipName": "equip-clip",
+          "normalizedDuration": 1,
+          "additive": false,
+          "priority": 10,
+          "markers": []
+        },
+        {
+          "action": "unequip",
+          "clipName": "unequip-clip",
+          "normalizedDuration": 1,
+          "additive": false,
+          "priority": 10,
+          "markers": []
+        },
+        {
+          "action": "idle",
+          "clipName": "idle-clip",
+          "normalizedDuration": 1,
+          "additive": false,
+          "priority": 1,
+          "markers": []
+        },
+        {
+          "action": "idle-variant",
+          "clipName": "idle-variant-clip",
+          "normalizedDuration": 1,
+          "additive": true,
+          "priority": 2,
+          "markers": []
+        },
+        {
+          "action": "walk",
+          "clipName": "walk-clip",
+          "normalizedDuration": 1,
+          "additive": false,
+          "priority": 3,
+          "markers": []
+        },
+        {
+          "action": "sprint",
+          "clipName": "sprint-clip",
+          "normalizedDuration": 1,
+          "additive": false,
+          "priority": 4,
+          "markers": []
+        },
+        {
+          "action": "ads-in",
+          "clipName": "ads-in-clip",
+          "normalizedDuration": 0.25,
+          "additive": false,
+          "priority": 8,
+          "markers": []
+        },
+        {
+          "action": "ads-out",
+          "clipName": "ads-out-clip",
+          "normalizedDuration": 0.25,
+          "additive": false,
+          "priority": 8,
+          "markers": []
+        },
+        {
+          "action": "fire",
+          "clipName": "fire-clip",
+          "normalizedDuration": 0.12,
+          "additive": true,
+          "priority": 20,
+          "markers": [
+            {
+              "id": "muzzle",
+              "normalizedTime": 0.25
+            }
+          ]
+        },
+        {
+          "action": "dry-fire",
+          "clipName": "dry-fire-clip",
+          "normalizedDuration": 0.2,
+          "additive": true,
+          "priority": 20,
+          "markers": []
+        },
+        {
+          "action": "reload",
+          "clipName": "reload-clip",
+          "normalizedDuration": 1.8,
+          "additive": false,
+          "priority": 15,
+          "markers": [
+            {
+              "id": "magazine-out",
+              "normalizedTime": 0.25
+            },
+            {
+              "id": "magazine-in",
+              "normalizedTime": 0.7
+            }
+          ]
+        },
+        {
+          "action": "empty-reload",
+          "clipName": "empty-reload-clip",
+          "normalizedDuration": 2.2,
+          "additive": false,
+          "priority": 15,
+          "markers": [
+            {
+              "id": "magazine-out",
+              "normalizedTime": 0.2
+            },
+            {
+              "id": "magazine-in",
+              "normalizedTime": 0.6
+            },
+            {
+              "id": "bolt-release",
+              "normalizedTime": 0.85
+            }
+          ]
+        },
+        {
+          "action": "melee",
+          "clipName": "melee-clip",
+          "normalizedDuration": 0.7,
+          "additive": false,
+          "priority": 25,
+          "markers": []
+        },
+        {
+          "action": "inspect",
+          "clipName": "inspect-clip",
+          "normalizedDuration": 2.5,
+          "additive": false,
+          "priority": 5,
+          "markers": []
+        }
       ],
       "allowedTransitions": [
-        { "from": "equip", "to": "idle" },
-        { "from": "idle", "to": "idle-variant" },
-        { "from": "idle-variant", "to": "idle" },
-        { "from": "idle", "to": "walk" },
-        { "from": "walk", "to": "idle" },
-        { "from": "idle", "to": "sprint" },
-        { "from": "sprint", "to": "idle" },
-        { "from": "idle", "to": "ads-in" },
-        { "from": "ads-in", "to": "ads-out" },
-        { "from": "ads-out", "to": "idle" },
-        { "from": "idle", "to": "fire" },
-        { "from": "fire", "to": "idle" },
-        { "from": "idle", "to": "dry-fire" },
-        { "from": "dry-fire", "to": "idle" },
-        { "from": "idle", "to": "reload" },
-        { "from": "reload", "to": "idle" },
-        { "from": "idle", "to": "empty-reload" },
-        { "from": "empty-reload", "to": "idle" },
-        { "from": "idle", "to": "melee" },
-        { "from": "melee", "to": "idle" },
-        { "from": "idle", "to": "inspect" },
-        { "from": "inspect", "to": "idle" },
-        { "from": "idle", "to": "unequip" }
+        {
+          "from": "equip",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "idle-variant"
+        },
+        {
+          "from": "idle-variant",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "walk"
+        },
+        {
+          "from": "walk",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "sprint"
+        },
+        {
+          "from": "sprint",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "ads-in"
+        },
+        {
+          "from": "ads-in",
+          "to": "ads-out"
+        },
+        {
+          "from": "ads-out",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "fire"
+        },
+        {
+          "from": "fire",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "dry-fire"
+        },
+        {
+          "from": "dry-fire",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "reload"
+        },
+        {
+          "from": "reload",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "empty-reload"
+        },
+        {
+          "from": "empty-reload",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "melee"
+        },
+        {
+          "from": "melee",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "inspect"
+        },
+        {
+          "from": "inspect",
+          "to": "idle"
+        },
+        {
+          "from": "idle",
+          "to": "unequip"
+        }
       ],
       "captures": [
-        { "weaponId": "a4-vanguard", "action": "equip", "clockTick": 0, "artifact": { "path": "artifacts/viewmodel/equip.png", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" } },
-        { "weaponId": "a4-vanguard", "action": "unequip", "clockTick": 1, "artifact": { "path": "artifacts/viewmodel/unequip.png", "sha256": "2222222222222222222222222222222222222222222222222222222222222222" } },
-        { "weaponId": "a4-vanguard", "action": "idle", "clockTick": 2, "artifact": { "path": "artifacts/viewmodel/idle.png", "sha256": "3333333333333333333333333333333333333333333333333333333333333333" } },
-        { "weaponId": "a4-vanguard", "action": "idle-variant", "clockTick": 3, "artifact": { "path": "artifacts/viewmodel/idle-variant.png", "sha256": "4444444444444444444444444444444444444444444444444444444444444444" } },
-        { "weaponId": "a4-vanguard", "action": "walk", "clockTick": 4, "artifact": { "path": "artifacts/viewmodel/walk.png", "sha256": "5555555555555555555555555555555555555555555555555555555555555555" } },
-        { "weaponId": "a4-vanguard", "action": "sprint", "clockTick": 5, "artifact": { "path": "artifacts/viewmodel/sprint.png", "sha256": "6666666666666666666666666666666666666666666666666666666666666666" } },
-        { "weaponId": "a4-vanguard", "action": "ads-in", "clockTick": 6, "artifact": { "path": "artifacts/viewmodel/ads-in.png", "sha256": "7777777777777777777777777777777777777777777777777777777777777777" } },
-        { "weaponId": "a4-vanguard", "action": "ads-out", "clockTick": 7, "artifact": { "path": "artifacts/viewmodel/ads-out.png", "sha256": "8888888888888888888888888888888888888888888888888888888888888888" } },
-        { "weaponId": "a4-vanguard", "action": "fire", "clockTick": 8, "artifact": { "path": "artifacts/viewmodel/fire.png", "sha256": "9999999999999999999999999999999999999999999999999999999999999999" } },
-        { "weaponId": "a4-vanguard", "action": "dry-fire", "clockTick": 9, "artifact": { "path": "artifacts/viewmodel/dry-fire.png", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
-        { "weaponId": "a4-vanguard", "action": "reload", "clockTick": 10, "artifact": { "path": "artifacts/viewmodel/reload.png", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
-        { "weaponId": "a4-vanguard", "action": "empty-reload", "clockTick": 11, "artifact": { "path": "artifacts/viewmodel/empty-reload.png", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } },
-        { "weaponId": "a4-vanguard", "action": "melee", "clockTick": 12, "artifact": { "path": "artifacts/viewmodel/melee.png", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" } },
-        { "weaponId": "a4-vanguard", "action": "inspect", "clockTick": 13, "artifact": { "path": "artifacts/viewmodel/inspect.png", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" } }
+        {
+          "weaponId": "a4-vanguard",
+          "action": "equip",
+          "clockTick": 0,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/equip.svg",
+            "sha256": "a6e1d0d40d31cb43bfa4abebab81e4ab239a963786b56d5044f284fdc03ff825"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "unequip",
+          "clockTick": 1,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/unequip.svg",
+            "sha256": "16b8307532f505db7f1c16fec32da2d3baf506f62360bb09b1d902b6a26b04a9"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "idle",
+          "clockTick": 2,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/idle.svg",
+            "sha256": "f6e2caf26691b45c720498044fb77416a80d78565970d1782489cc10b5db27f2"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "idle-variant",
+          "clockTick": 3,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/idle-variant.svg",
+            "sha256": "ca0fcbd95b9967bfc44bd8d14d194fb1519ba5916d748caccf400107ec9bac50"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "walk",
+          "clockTick": 4,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/walk.svg",
+            "sha256": "ea3a6e7908104b85d9b9f264a250fff227305518a00d288bcb30ce92d79bfe3c"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "sprint",
+          "clockTick": 5,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/sprint.svg",
+            "sha256": "693ebd87468025d7bd19f3932252f679f897f6d95355789c5c0f6445ba015f04"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "ads-in",
+          "clockTick": 6,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/ads-in.svg",
+            "sha256": "6fc6f095e33b5b6d1fedcd08ea7275ffa3217fcdaa01cf00502a7334a6ab7ddc"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "ads-out",
+          "clockTick": 7,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/ads-out.svg",
+            "sha256": "b0f16164d64947e69ea98123371b44b6bb7c2d1d08680fb22759cf56ea123e7a"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "fire",
+          "clockTick": 8,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/fire.svg",
+            "sha256": "7886281e864b5ce5f1a04fd9dd06f4da772b818dcd9296aa9623e7ec0ac78334"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "dry-fire",
+          "clockTick": 9,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/dry-fire.svg",
+            "sha256": "ed890a408c34e881e9b9d5b3e521eb5d68e21b8cbd15e217ff146e197fadd4fc"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "reload",
+          "clockTick": 10,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/reload.svg",
+            "sha256": "75d062fae7cb93b3d5856d2db25ff36106c6271f5d81e229b8e0c3059eb62f9d"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "empty-reload",
+          "clockTick": 11,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/empty-reload.svg",
+            "sha256": "06a3461f8dafbe69030e0e77ddadf75396372fc87cc92aec01dea8d68d530e82"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "melee",
+          "clockTick": 12,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/melee.svg",
+            "sha256": "e2c1b4ac6c4cda06170930cba4fe24438fe9ad28d2958b4fcc24c4156556406e"
+          }
+        },
+        {
+          "weaponId": "a4-vanguard",
+          "action": "inspect",
+          "clockTick": 13,
+          "artifact": {
+            "path": "fixture-payloads/viewmodel/captures/inspect.svg",
+            "sha256": "99aa867083536fadb74228437ef20db35911695d7e5c71e59b18489a8a693e62"
+          }
+        }
       ],
       "budgets": {
         "lod0Triangles": 100000,
