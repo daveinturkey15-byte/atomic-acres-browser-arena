@@ -30,3 +30,5 @@ export function classifyPreviewDelta(
   paths: readonly string[],
   manifestPath: string,
 ): Readonly<{ ok: boolean; paths: string[]; reason: string }>;
+
+export function evaluateAcceptance(values: Readonly<Record<string, string>>): unknown;

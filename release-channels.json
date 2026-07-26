@@ -2,14 +2,14 @@
   "schemaVersion": 4,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "EXPERIMENTAL NEW NETCODE",
-    "description": "The live Pass 64 WebGPU, HUD, arena-quality, and multiplayer-correction build."
+    "label": "THE BIG ONE",
+    "description": "The Pass 65 local HITL candidate. It is not approved or published yet."
   },
   "experimental": {
-    "label": "EXPERIMENTAL NEW NETCODE",
-    "description": "Pass 64 live while preserving the byte-exact Pass 63 release as the stable rollback.",
-    "pass": "PASS 64",
-    "path": "channels/experimental-netcode-pass"
+    "label": "THE BIG ONE",
+    "description": "Pass 65 candidate staged for exact-SHA HITL while byte-exact Pass 63 remains the stable rollback.",
+    "pass": "PASS 65",
+    "path": "channels/the-big-one"
   },
   "stable": {
     "label": "NEW NETCODE",

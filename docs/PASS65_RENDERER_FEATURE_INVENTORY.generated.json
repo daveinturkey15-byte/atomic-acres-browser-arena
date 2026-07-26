@@ -1,0 +1,842 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 65",
+  "candidateName": "THE BIG ONE",
+  "scope": "active WebGPU presentation features plus explicitly requested but unavailable renderer controls",
+  "generatedBy": "npx tsx scripts/qa/generate-pass65-renderer-feature-inventory.ts",
+  "settings": [
+    {
+      "key": "graphics.preset",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false
+    },
+    {
+      "key": "graphics.renderScale",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false
+    },
+    {
+      "key": "graphics.adaptiveResolution",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false
+    },
+    {
+      "key": "graphics.targetFps",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false
+    },
+    {
+      "key": "graphics.shadows",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.reducedMotion",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.reducedDamageFlash",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.reducedSensoryEffects",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.damageFlashScale",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.weaponMotionScale",
+      "applyMode": "live",
+      "authorityAffecting": false
+    }
+  ],
+  "profiles": {
+    "performance": {
+      "requested": {
+        "schemaVersion": 1,
+        "preset": "performance",
+        "renderScale": 0.75,
+        "adaptiveResolution": true,
+        "targetFps": 60,
+        "shadows": "off"
+      },
+      "effective": {
+        "requestedPreset": "performance",
+        "effectivePreset": "performance",
+        "renderProfile": "performance",
+        "renderScale": 0.75,
+        "adaptive": true,
+        "targetFps": 60,
+        "shadows": false,
+        "reason": null
+      },
+      "profile": {
+        "profile": "performance",
+        "representation": "responsive",
+        "reducedRepresentation": true,
+        "reducedWorldDetail": true,
+        "reducedPresentationDetail": true,
+        "staticMaterialMode": "vertex-lit",
+        "antialias": false,
+        "shadows": false,
+        "shadowMode": "off",
+        "pixelRatioCap": 0.75,
+        "shadowMapSize": 0
+      },
+      "effects": {
+        "tier": "balanced",
+        "environmentIntensity": 0.5,
+        "contactShadowStrength": 0,
+        "bloomStrength": 0.055,
+        "bloomResolutionScale": 0.25,
+        "depthFogStrength": 0.035,
+        "particleDensityScale": 0.72,
+        "decalLifetimeScale": 0.72
+      }
+    },
+    "high": {
+      "requested": {
+        "schemaVersion": 1,
+        "preset": "high",
+        "renderScale": 1,
+        "adaptiveResolution": true,
+        "targetFps": 60,
+        "shadows": "high"
+      },
+      "effective": {
+        "requestedPreset": "high",
+        "effectivePreset": "high",
+        "renderProfile": "blender",
+        "renderScale": 1,
+        "adaptive": true,
+        "targetFps": 60,
+        "shadows": true,
+        "reason": null
+      },
+      "profile": {
+        "profile": "blender",
+        "representation": "blender",
+        "reducedRepresentation": false,
+        "reducedWorldDetail": false,
+        "reducedPresentationDetail": false,
+        "staticMaterialMode": "preserve",
+        "antialias": true,
+        "shadows": true,
+        "shadowMode": "static",
+        "pixelRatioCap": 1,
+        "shadowMapSize": 2048
+      },
+      "effects": {
+        "tier": "full",
+        "environmentIntensity": 1,
+        "contactShadowStrength": 0.16,
+        "bloomStrength": 0.16,
+        "bloomResolutionScale": 0.5,
+        "depthFogStrength": 0.085,
+        "particleDensityScale": 1,
+        "decalLifetimeScale": 1
+      }
+    },
+    "max": {
+      "requested": {
+        "schemaVersion": 1,
+        "preset": "max",
+        "renderScale": 1,
+        "adaptiveResolution": false,
+        "targetFps": 60,
+        "shadows": "high"
+      },
+      "effective": {
+        "requestedPreset": "max",
+        "effectivePreset": "max",
+        "renderProfile": "blender",
+        "renderScale": 1,
+        "adaptive": false,
+        "targetFps": 60,
+        "shadows": true,
+        "reason": null
+      },
+      "profile": {
+        "profile": "blender",
+        "representation": "blender",
+        "reducedRepresentation": false,
+        "reducedWorldDetail": false,
+        "reducedPresentationDetail": false,
+        "staticMaterialMode": "preserve",
+        "antialias": true,
+        "shadows": true,
+        "shadowMode": "static",
+        "pixelRatioCap": 1,
+        "shadowMapSize": 2048
+      },
+      "effects": {
+        "tier": "full",
+        "environmentIntensity": 1,
+        "contactShadowStrength": 0.16,
+        "bloomStrength": 0.16,
+        "bloomResolutionScale": 0.5,
+        "depthFogStrength": 0.085,
+        "particleDensityScale": 1,
+        "decalLifetimeScale": 1
+      }
+    }
+  },
+  "tslPipelines": [
+    {
+      "id": "pass64.sky-atmosphere.tsl.v1",
+      "owner": "src/legacy-main.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.hdr-grade-grain.tsl.v1",
+      "owner": "src/atomic-signal.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.atmosphere-mist.tsl.v1",
+      "owner": "src/atmosphere-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.atmosphere-smoke.tsl.v1",
+      "owner": "src/atmosphere-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.atmosphere-dust.tsl.v1",
+      "owner": "src/atmosphere-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.grass.tsl.v1",
+      "owner": "src/grass-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.water.tsl.v1",
+      "owner": "src/water-system.ts",
+      "status": "verified"
+    }
+  ],
+  "features": [
+    {
+      "id": "required-webgpu-backend",
+      "title": "Required WebGPU backend",
+      "availability": "active",
+      "owner": "src/rendering/render-runtime.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/render-runtime.ts",
+          "symbol": "class WebGpuRenderRuntime"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "WebGPU required; WebGL2 is an explicit compatibility route",
+        "rationale": "Backend choice is a release route, not an in-match graphics option. The candidate fails closed instead of silently falling back."
+      },
+      "budget": "Zero device loss, uncaptured GPU errors, completion failures, or presentation stalls.",
+      "verifier": "scripts/qa/verify-pass65-webgpu-endurance.mjs",
+      "authorityAffecting": false
+    },
+    {
+      "id": "render-resolution",
+      "title": "Render scale and adaptive resolution",
+      "availability": "active",
+      "owner": "src/pass65-settings.ts + src/adaptive-quality.ts",
+      "sourceProbes": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "resolveGraphicsRuntime"
+        },
+        {
+          "path": "src/adaptive-quality.ts",
+          "symbol": "class AdaptiveQualityController"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.renderScale",
+          "graphics.adaptiveResolution",
+          "graphics.targetFps"
+        ],
+        "effectiveValue": "50-100% effective WebGPU scale; target FPS drives adaptive-budget selection",
+        "rationale": "Requested scale up to 200% is retained in storage but the current renderer generation truthfully reports a 100% safety cap. Target FPS is not a frame limiter."
+      },
+      "budget": "Profile-specific bounded DPR tiers with sustained-p95 downshift and cooldown-controlled recovery.",
+      "verifier": "src/pass65-settings.test.ts + src/adaptive-quality.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "presentation-profile",
+      "title": "Performance, High, Max and Custom presentation profiles",
+      "availability": "active",
+      "owner": "src/pass65-settings.ts + src/render-profile.ts",
+      "sourceProbes": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom'"
+        },
+        {
+          "path": "src/render-profile.ts",
+          "symbol": "renderProfileConfig"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "preset",
+        "settingKeys": [
+          "graphics.preset"
+        ],
+        "effectiveValue": "Performance uses reduced presentation; High and Max use authored Blender presentation; Max disables adaptive resolution",
+        "rationale": "Profiles change presentation budgets only. They never change movement, collision, ballistics, visibility authority, or major debris physics."
+      },
+      "budget": "Performance pixel ratio cap 0.75; High/Max cap 1.0; compatibility cap 0.2.",
+      "verifier": "src/pass65-settings.test.ts + src/render-profile.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "arena-lighting-and-shadows",
+      "title": "Arena-authored lighting and shadows",
+      "availability": "active",
+      "owner": "src/rendering/arena-visual-definition.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/arena-visual-definition.ts",
+          "symbol": "type ArenaVisualDefinition"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "adaptiveShadowsEnabled"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.shadows",
+          "graphics.preset",
+          "graphics.adaptiveResolution"
+        ],
+        "effectiveValue": "Off or authored High shadows; adaptive resolution may disable shadows below the 0.65 DPR floor",
+        "rationale": "Shadow distance, map size, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work."
+      },
+      "budget": "Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.",
+      "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "principal-hdr-msaa",
+      "title": "Principal HDR render target and MSAA",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const scenePass = pass(scene, camera, { samples: 4 })"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Linear-sRGB HDR scene target with four samples; bloom chain has zero MSAA samples",
+        "rationale": "The current WebGPU graph is compiled around a verified four-sample principal target. A user MSAA selector is not implemented and must not be implied by the menu."
+      },
+      "budget": "Four principal HDR samples and zero bloom-target samples, asserted in runtime telemetry.",
+      "verifier": "tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "aces-grade-exposure",
+      "title": "ACES output, deterministic grade and arena exposure",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts + ArenaVisualDefinition",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const contrasted = saturated.sub(0.5).mul(contrast).add(0.5)"
+        },
+        {
+          "path": "src/rendering/arena-visual-definition.ts",
+          "symbol": "toneMap: 'aces-filmic'"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Arena-authored exposure and colour pipeline",
+        "rationale": "Exposure is fixed per arena and deterministic review camera. A player exposure control is not implemented because it would invalidate the current calibrated visibility and review baselines."
+      },
+      "budget": "One controlled HDR owner and one ACES-to-sRGB output transform.",
+      "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/pass64-tsl-scene.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "depth-aware-bloom",
+      "title": "Depth-aware full-scene bloom",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "bloom(sceneColor, 0.14, 0.32, 0.92)"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Authored strength 0.14 with scene-depth occlusion",
+        "rationale": "Bloom is active but has no user slider in this candidate. The fixed value is bounded and depth-tested so foreground geometry cannot be smeared through."
+      },
+      "budget": "Arena maximum post-texture samples and transient-byte limits.",
+      "verifier": "tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tsl-atmosphere",
+      "title": "TSL sky, mist, smoke and dust atmosphere",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeSky"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeMist"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeSmoke"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeDust"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.sky-atmosphere.tsl.v1",
+        "pass64.atmosphere-mist.tsl.v1",
+        "pass64.atmosphere-smoke.tsl.v1",
+        "pass64.atmosphere-dust.tsl.v1"
+      ],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "ArenaVisualDefinition-authored density, placement, cloud state and deterministic time",
+        "rationale": "The candidate does not expose an atmosphere selector. Debug URL toggles and review hooks are QA surfaces, not supported player settings."
+      },
+      "budget": "Fixed maximum mist layers, fixed-seed dust counts, bounded opacity, and no depth writes.",
+      "verifier": "src/rendering/pass64-tsl-scene.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tsl-grass-and-water",
+      "title": "TSL grass and perimeter water",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeGrass"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeWater"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.grass.tsl.v1",
+        "pass64.water.tsl.v1"
+      ],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Grass is arena-owned for Nuke Town; perimeter water is arena-owned for RustRig",
+        "rationale": "Player toggles are not exposed because these are curated arena identity features. They remain presentation-only and may not enter authority collections."
+      },
+      "budget": "Fixed-seed grass instance count; one non-reflective perimeter-water plane with three bounded wave bands.",
+      "verifier": "src/rendering/pass64-tsl-scene.test.ts + src/rendering/arena-visual-definition.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "material-texture-quality",
+      "title": "Material, texture and anisotropy quality",
+      "availability": "active",
+      "owner": "src/render-profile.ts + src/graphics-refinement.ts",
+      "sourceProbes": [
+        {
+          "path": "src/render-profile.ts",
+          "symbol": "staticMaterialMode"
+        },
+        {
+          "path": "src/graphics-refinement.ts",
+          "symbol": "this.profile === 'blender' ? 8 : 4"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "preset",
+        "settingKeys": [
+          "graphics.preset"
+        ],
+        "effectiveValue": "Performance uses reduced vertex-lit presentation and up to 4x anisotropy; High/Max preserve authored materials and use up to 8x",
+        "rationale": "Independent texture-quality and anisotropy controls are not implemented. The preset mapping is the only truthful player control in this candidate."
+      },
+      "budget": "Arena texture-byte and triangle budgets plus renderer maximum-anisotropy clamp.",
+      "verifier": "src/render-profile.test.ts + tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "impact-particles-and-decals",
+      "title": "Material impacts, particles and persistent decals",
+      "availability": "active",
+      "owner": "src/impact-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/impact-presentation.ts",
+          "symbol": "MAX_PARTICLES = 72"
+        },
+        {
+          "path": "src/impact-presentation.ts",
+          "symbol": "MAX_IMPACT_MARKS = 48"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "preset",
+        "settingKeys": [
+          "graphics.preset",
+          "graphics.adaptiveResolution"
+        ],
+        "effectiveValue": "Particle density and decal lifetime scale with the effective effects budget",
+        "rationale": "Separate particle and decal sliders are not implemented. The current bounded preset/adaptive mapping is reported instead of inventing controls."
+      },
+      "budget": "At most 72 pooled particles and 48 pooled marks before effective-budget scaling.",
+      "verifier": "src/impact-presentation.test.ts + src/graphics-refinement.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tracer-pool",
+      "title": "Weapon tracers",
+      "availability": "active",
+      "owner": "src/tracer-pool.ts",
+      "sourceProbes": [
+        {
+          "path": "src/tracer-pool.ts",
+          "symbol": "MAX_TRACERS = 32"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Bounded presentation for admitted shots",
+        "rationale": "Tracer visibility is part of combat readability and is capped rather than exposed as an authority-adjacent player toggle."
+      },
+      "budget": "Exactly 32 reusable tracer slots.",
+      "verifier": "src/tracer-pool.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "pooled-explosions",
+      "title": "Grenade and support explosion presentation",
+      "availability": "active",
+      "owner": "src/grenade-explosion-presentation.ts + src/support-explosion-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/grenade-explosion-presentation.ts",
+          "symbol": "GRENADE_EXPLOSION_POOL_CAPACITY = 4"
+        },
+        {
+          "path": "src/support-explosion-presentation.ts",
+          "symbol": "SUPPORT_EXPLOSION_POOL_CAPACITY = 12"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Pooled authored presentation with fixed lifetimes",
+        "rationale": "Explosion presentation follows host-authored effects and remains capped. No player density control is currently implemented."
+      },
+      "budget": "Four grenade and twelve support presentation slots; 280 ms and 460 ms authored lifetimes.",
+      "verifier": "src/grenade-explosion-presentation.test.ts + src/support-explosion-presentation.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "semantic-smoke-presentation",
+      "title": "Semantic smoke volume presentation",
+      "availability": "active",
+      "owner": "src/smoke-volume-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/smoke-volume-presentation.ts",
+          "symbol": "SMOKE_PRESENTATION_CARD_COUNT = 3"
+        },
+        {
+          "path": "src/smoke-volume-presentation.ts",
+          "symbol": "SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY = 12"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Three cards per authoritative smoke volume with a twelve-volume pool",
+        "rationale": "Smoke cannot be disabled or thinned independently because its visible presentation must remain coherent with shared visibility authority."
+      },
+      "budget": "Twelve pooled volumes, three cards each, 12 second presentation lifetime.",
+      "verifier": "src/smoke-volume-presentation.test.ts + src/ordnance.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "damage-and-low-health-feedback",
+      "title": "Directional damage and low-health feedback",
+      "availability": "active",
+      "owner": "src/sensory-feedback.ts + DOM presentation",
+      "sourceProbes": [
+        {
+          "path": "src/sensory-feedback.ts",
+          "symbol": "directionalDamagePresentation"
+        },
+        {
+          "path": "src/sensory-feedback.ts",
+          "symbol": "sampleLowHealthFeedback"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "accessibility.reducedDamageFlash",
+          "accessibility.reducedSensoryEffects",
+          "accessibility.damageFlashScale"
+        ],
+        "effectiveValue": "Most-restrictive accessibility composition scales flash/vignette presentation without changing damage",
+        "rationale": "These controls are live presentation settings and never alter combat authority."
+      },
+      "budget": "Four concurrent directional sources and bounded low-health pulse/opacity envelopes.",
+      "verifier": "src/sensory-feedback.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "weapon-motion",
+      "title": "First-person weapon motion",
+      "availability": "active",
+      "owner": "src/weapon-presentation.ts + src/legacy-main.ts",
+      "sourceProbes": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "accessibilityRuntime.weaponMotionScale"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "accessibility.weaponMotionScale",
+          "accessibility.reducedSensoryEffects"
+        ],
+        "effectiveValue": "0-100% requested motion; reduced sensory caps effective motion at 35%",
+        "rationale": "Motion scaling changes viewmodel presentation only and never the authoritative camera ray."
+      },
+      "budget": "One viewmodel root with bounded additive idle/inertia offsets.",
+      "verifier": "src/weapon-presentation.test.ts + src/pass65-settings.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "menu-preview-motion",
+      "title": "Helicopter and cat menu-preview choreography",
+      "availability": "active",
+      "owner": "src/ui/menu-preview-camera.ts",
+      "sourceProbes": [
+        {
+          "path": "src/ui/menu-preview-camera.ts",
+          "symbol": "menuPreviewPose"
+        },
+        {
+          "path": "src/ui/menu-preview-camera.ts",
+          "symbol": "MENU_PREVIEW_VISIT_SEED_SLOTS = 64"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "accessibility.reducedMotion",
+          "accessibility.reducedSensoryEffects"
+        ],
+        "effectiveValue": "Seeded bounded motion or deterministic static reduced-motion pose",
+        "rationale": "The same arena renderer is reused; preview cameras are presentation-only and cannot mutate gameplay authority."
+      },
+      "budget": "One active preview camera path, 64 visit-seed slots, and a bounded 256-track cache.",
+      "verifier": "src/ui/menu-preview-camera.test.ts + tests/e2e/pass64-hud-menu.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "destructible-shed-presentation",
+      "title": "Destructible shed holes, dents, doors and debris",
+      "availability": "active",
+      "owner": "src/destructible-shed-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/destructible-shed-presentation.ts",
+          "symbol": "class DestructibleShedPresentation"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Presentation reconstructs bounded host-authored shed state in every profile",
+        "rationale": "Major debris, apertures, and doors cannot be hidden or simplified independently because visible geometry must agree with movement, ballistics, LOS, and physics authority."
+      },
+      "budget": "Definition-capped apertures, dents, detached panels, debris bodies, geometry retirement, and per-arena placement counts.",
+      "verifier": "src/destructible-shed-presentation.test.ts + src/interactive-world-runtime.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "thermal-optics",
+      "title": "Railgun and DMR thermal presentation",
+      "availability": "active",
+      "owner": "src/railgun-presentation.ts + src/dmr-thermal-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/railgun-presentation.ts",
+          "symbol": "class RailgunPresentation"
+        },
+        {
+          "path": "src/dmr-thermal-presentation.ts",
+          "symbol": "class DmrThermalPresentation"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Weapon-capability gated; DMR bypasses smoke but never solid-wall occlusion",
+        "rationale": "This is a weapon capability, not a general graphics option. Disabling it would change intended information semantics."
+      },
+      "budget": "One bounded overlay/contact set per equipped optic; solid geometry remains the occlusion oracle.",
+      "verifier": "src/dmr-thermal-presentation.test.ts + tests/e2e/pass64-railgun.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "support-entity-presentation",
+      "title": "Aircraft, chopper and drone presentation",
+      "availability": "active",
+      "owner": "src/killstreak-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/killstreak-presentation.ts",
+          "symbol": "class KillstreakPresentation"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Host-seeded, host-owned support state with bounded presentation lifetimes",
+        "rationale": "Support entities are targetable gameplay actors. Their visibility and identity are fixed instead of exposed as graphics toggles."
+      },
+      "budget": "Catalog/entity caps, pooled explosion roots, hard lifetimes, and generation-aware retirement.",
+      "verifier": "src/killstreak-presentation.test.ts + src/killstreak-runtime.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "ambient-contact-effects",
+      "title": "Ambient/contact shading",
+      "availability": "unsupported",
+      "owner": "src/atomic-signal.ts (WebGL2 compatibility only)",
+      "sourceProbes": [
+        {
+          "path": "src/atomic-signal.ts",
+          "symbol": "contactShadowStrength"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "unsupported",
+        "settingKeys": [],
+        "effectiveValue": "Unavailable on the required WebGPU route",
+        "rationale": "The existing screen-space contact effect belongs to the isolated WebGL2 compatibility post path. It is not exposed until a TSL depth implementation passes parity and performance gates."
+      },
+      "budget": "Zero WebGPU texture samples allocated to this unsupported feature.",
+      "verifier": "src/atomic-signal.test.ts + WebGPU no-legacy-post traversal gate",
+      "authorityAffecting": false
+    },
+    {
+      "id": "frame-cap",
+      "title": "Frame-rate cap",
+      "availability": "unsupported",
+      "owner": "not implemented",
+      "sourceProbes": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "targetFps"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "unsupported",
+        "settingKeys": [],
+        "effectiveValue": "No output frame cap; graphics.targetFps is adaptive-quality target only",
+        "rationale": "The UI must not describe target FPS as a hard cap. A cap requires a dedicated frame scheduler and timing verification."
+      },
+      "budget": "Browser requestAnimationFrame cadence remains authoritative for presentation scheduling.",
+      "verifier": "src/pass65-settings.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "hardware-ray-tracing",
+      "title": "Hardware ray tracing",
+      "availability": "unsupported",
+      "owner": "not available in current Three.js WebGPU route",
+      "sourceProbes": [
+        {
+          "path": "docs/PASS65_BIG_ONE_MASTER_PLAN.md",
+          "symbol": "No claim of RTX ray tracing"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "unsupported",
+        "settingKeys": [],
+        "effectiveValue": "Unavailable",
+        "rationale": "The RTX 5080 is the review GPU, but the current renderer does not implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted."
+      },
+      "budget": "Zero ray-tracing acceleration structures or passes.",
+      "verifier": "Generated inventory unsupported-feature gate.",
+      "authorityAffecting": false
+    }
+  ],
+  "summary": {
+    "total": 23,
+    "active": 20,
+    "unsupported": 3,
+    "adjustable": 8,
+    "fixedWithRationale": 12
+  },
+  "inventorySha256": "3b723c3840bd74c81734dd0859051b65596581ee46d6a3d398203e2e2927ab2b"
+}

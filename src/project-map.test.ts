@@ -24,11 +24,16 @@ describe('project map', () => {
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
     expect(bundle.current.release).toEqual(PROJECT_MAP_CANDIDATE);
-    expect(bundle.current.previousRelease).toBe('PASS 63');
+    expect(bundle.current.previousRelease).toBe('PASS 64');
     expect(bundle.archive).toEqual(CHANGELOG);
-    expect(bundle.changes).toEqual([PROJECT_MAP_CANDIDATE, ...CHANGELOG.filter((entry) => entry.pass !== 'PASS 64')]);
+    expect(bundle.changes).toEqual([PROJECT_MAP_CANDIDATE, ...CHANGELOG]);
     expect(bundle.current.candidateState).toBe('hitl-candidate');
-    expect(bundle.publishedChannels.live.pass).toBe('PASS 64');
+    expect(bundle.publishedChannels.stagedCandidate).toMatchObject({
+      pass: 'PASS 65', label: 'THE BIG ONE', path: 'channels/the-big-one', state: 'unpublished-hitl-candidate',
+    });
+    expect(bundle.publishedChannels.live).toMatchObject({
+      pass: 'PASS 64', role: 'published-failed-regression-evidence',
+    });
     expect(bundle.publishedChannels.stable.pass).toBe('PASS 63');
   });
 
@@ -43,6 +48,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
+    expect(markdown).toContain('Staged HITL candidate: PASS 65 (THE BIG ONE); unpublished');
     expect(markdown).toContain('Published live channel: PASS 64');
   });
 

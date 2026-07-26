@@ -58,7 +58,7 @@ export function projectMapDialogMarkup(bundle: ProjectMapBundle = createProjectM
       <div class="project-map-pages">
         <section id="project-map-page-overview" role="tabpanel" data-project-map-page="overview">
           <div class="project-map-intro"><span><small>LOCAL CANDIDATE</small><strong>${escapeHtml(current.pass)}</strong></span><p>${escapeHtml(current.summary)}</p></div>
-          <div class="project-channel-state"><span><small>PUBLISHED LIVE</small><b>${escapeHtml(bundle.publishedChannels.live.pass)}</b></span><span><small>STABLE FALLBACK</small><b>${escapeHtml(bundle.publishedChannels.stable.pass)}</b></span></div>
+          <div class="project-channel-state"><span><small>PUBLISHED LIVE · REGRESSION ONLY</small><b>${escapeHtml(bundle.publishedChannels.live.pass)}</b></span><span><small>STABLE FALLBACK</small><b>${escapeHtml(bundle.publishedChannels.stable.pass)}</b></span></div>
           <h3>AUTHORITY BOUNDARIES</h3>
           <ul class="project-boundaries">${bundle.operatingBoundaries.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
           <div class="project-downloads">

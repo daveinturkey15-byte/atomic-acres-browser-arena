@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       release_pass:
-        description: Live pass; this topology requires PASS 63
+        description: Exact approved live pass; this topology requires PASS 65
         required: true
         type: string
 
@@ -60,7 +60,7 @@ jobs:
         run: npm run verify:release-tree
       - name: Install topology browser
         run: npx playwright install --with-deps chromium
-      - name: Stage live Pass 64 and byte-exact stable Pass 63
+      - name: Stage live Pass 65 The Big One and byte-exact stable Pass 63
         run: |
           git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           npm run verify:benchmark -- --verify-git

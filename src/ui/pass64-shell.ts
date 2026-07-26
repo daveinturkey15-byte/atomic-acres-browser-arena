@@ -9,6 +9,7 @@ import { DEFAULT_KILLSTREAK_LOADOUT } from '../killstreak-loadout';
 import { killstreakLoadoutPanelMarkup } from './killstreak-loadout-menu';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
+import { PASS65_HITL_IDENTITY } from '../release-identity';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -26,7 +27,7 @@ function escapeAttribute(value: string): string {
 export function createPass64ShellViewModel(playerName: string): Pass64ShellViewModel {
   return Object.freeze({
     playerName: escapeAttribute(playerName),
-    releaseLabel: 'PASS 64 · HITL CANDIDATE',
+    releaseLabel: PASS65_HITL_IDENTITY.runtimeLabel,
   });
 }
 

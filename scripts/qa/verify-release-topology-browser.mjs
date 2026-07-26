@@ -64,7 +64,7 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   if (await buttons.count() !== 2
-    || !labels.some((text) => text.includes('PASS 64') && text.includes('LIVE') && text.includes('EXPERIMENTAL NEW NETCODE'))
+    || !labels.some((text) => text.includes('PASS 65') && text.includes('LIVE') && text.includes('THE BIG ONE'))
     || !labels.some((text) => text.includes('PASS 63') && text.includes('STABLE') && text.includes('NEW NETCODE'))
     || labels.some((text) => text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
@@ -115,7 +115,7 @@ async function verifyLegacyRoute(name, configure) {
     const url = new URL(rootUrl);
     configure(url.searchParams);
     await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-    const eyebrow = await verifyRuntime(page, 'channels/experimental-netcode-pass', 'PASS 64');
+    const eyebrow = await verifyRuntime(page, 'channels/the-big-one', 'PASS 65');
     routes[name] = { url: page.url(), eyebrow };
   } finally {
     await observed.close();
@@ -136,7 +136,7 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/experimental-netcode-pass', 'PASS 64');
+  await verifyChoice('experimental', 'channels/the-big-one', 'PASS 65');
   await verifyChoice('stable', 'channels/recent-stable', 'PASS 63');
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);

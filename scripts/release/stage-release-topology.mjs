@@ -10,6 +10,7 @@ const distRoot = join(repositoryRoot, 'dist');
 const config = JSON.parse(readFileSync(join(repositoryRoot, 'release-channels.json'), 'utf8'));
 const sourceSha = process.env.SOURCE_SHA ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
 const releasePass = process.env.RELEASE_PASS ?? config.experimental.pass;
+const liveChannelId = config.experimental.path.split('/').at(-1);
 
 const safePath = (value, label) => {
   if (typeof value !== 'string' || !value || value.split('/').some((part) => !part || part === '.' || part === '..')) {
@@ -23,6 +24,13 @@ const exactSha = (value, label) => {
 };
 exactSha(sourceSha, 'SOURCE_SHA');
 if (config.schemaVersion !== 4) throw new Error('release-channels.json schemaVersion must be 4');
+if (config.experimental.pass !== 'PASS 65' || config.experimental.label !== 'THE BIG ONE'
+  || config.experimental.path !== 'channels/the-big-one') {
+  throw new Error('Pass 65 production topology must stage THE BIG ONE at channels/the-big-one');
+}
+if (config.stable.pass !== 'PASS 63' || config.stable.label !== 'NEW NETCODE') {
+  throw new Error('Pass 63 must remain the byte-exact stable channel');
+}
 if (releasePass !== config.experimental.pass) throw new Error(`Expected ${config.experimental.pass}, received ${releasePass}`);
 if (!existsSync(join(distRoot, 'index.html')) || !existsSync(join(distRoot, 'assets'))) throw new Error(`${releasePass} candidate dist is incomplete`);
 
@@ -129,7 +137,7 @@ function stagePinned(channelName, channel) {
 const stable = stagePinned('recent-stable', config.stable);
 const experimentalFiles = walkFiles(experimentalRoot);
 const experimental = {
-  schemaVersion: 4, channel: 'experimental-netcode-pass', releasePass,
+  schemaVersion: 4, channel: liveChannelId, releasePass,
   sourceSha, path: config.experimental.path,
   exactRootFileCount: experimentalFiles.length,
   treeSha256: treeDigest(experimentalRoot, experimentalFiles),

@@ -13,6 +13,7 @@ import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/aren
 import { auditLocalLightOcclusion, makeEmissiveOnly } from './rendering/light-occlusion';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
+import { PASS65_HITL_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
@@ -2092,8 +2093,8 @@ const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
 const configuredDiagnosticBuildId = (import.meta.env.VITE_MATCH_BUILD_ID ?? '').trim();
 const PASS64_DIAGNOSTIC_BUILD_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(configuredDiagnosticBuildId)
   ? configuredDiagnosticBuildId
-  : 'pass64-local-candidate';
-const PASS64_DIAGNOSTIC_SOURCE_ID = 'pass64-automatic-post-match';
+  : 'pass65-local-hitl-candidate';
+const PASS65_DIAGNOSTIC_SOURCE_ID = 'pass65-automatic-post-match';
 const localMultiplayerQa = new URLSearchParams(window.location.search).get('multiplayerQa') === '1'
   && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 const localArenaSwitchQaDelayMs = localMultiplayerQa
@@ -2440,7 +2441,7 @@ function beginMatchDiagnostics(mode: 'solo' | 'host' | 'client', startedAt: numb
   matchDiagnosticUploader.beginMatch();
   matchDiagnostics = new MatchDiagnostics({
     buildId: PASS64_DIAGNOSTIC_BUILD_ID,
-    sourceId: PASS64_DIAGNOSTIC_SOURCE_ID,
+    sourceId: PASS65_DIAGNOSTIC_SOURCE_ID,
     sessionId: `${player.id}:${Date.now()}:${crypto.randomUUID()}`,
     role: mode === 'solo' ? 'offline' : mode === 'host' ? 'host' : 'guest',
     arena: selectedArena.id,
@@ -11367,7 +11368,7 @@ function updateMatchState(now: number): void {
     if (matchDiagnostics) {
       const remoteEnvelope = matchDiagnostics.remoteEnvelope({
         completedAtEpochMs: Date.now(),
-        pass: 'PASS 64',
+        pass: PASS65_HITL_IDENTITY.pass,
         backend: renderRuntime.telemetry().actualBackend === 'webgpu' ? 'webgpu' : 'webgl-compatibility',
         durationMs: Math.max(0, performance.now() - matchDiagnosticsStartedAt),
         network: {

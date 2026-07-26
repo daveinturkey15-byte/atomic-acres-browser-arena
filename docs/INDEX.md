@@ -3,6 +3,7 @@
 ## Current development and release
 
 - [Pass 65 P0 release foundation](PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md) - exact Pass 64 publication/regression handoff evidence, byte-exact Pass 63 stable policy, B0/B1 branch discipline, planning-corpus validation, mandatory HITL and separate publish-confirmation stops.
+- [Pass 65 generated renderer feature inventory](PASS65_RENDERER_FEATURE_INVENTORY.generated.md) - truthful active WebGPU feature ownership, effective settings/presets, fixed rationales, budgets, and unsupported controls.
 - [Pass 65 “Big One” master plan](PASS65_BIG_ONE_MASTER_PLAN.md) - complete scope, architecture, phased delivery, authority boundaries, integration strategy, QA, immutable preview, and protected release plan.
 - [Pass 65 requirements and decisions](PASS65_REQUIREMENTS_MATRIX.md) - 99 user-facing/system requirements with active falsifiers and evidence, plus 15 explicit product decisions and freeze deadlines.
 - [Pass 65 decision receipts](PASS65_DECISION_RECEIPTS.json) and [schema](PASS65_DECISION_RECEIPTS.schema.json) - canonical 15-entry receipt registry; P0 created all entries as `OPEN`, and Dave's 2026-07-26 reply freezes all 15 with structured values, resolution metadata and DEC-03 supersession lineage.

@@ -119,12 +119,14 @@ The first successful exact-SHA receipt plus cache-busted live smoke is the termi
 
 ## Player release channels
 
-The canonical root is a chooser, not a gameplay build. Schema 4 presents exactly two explicit choices and can pin a nested historical Pages subtree by exact digest:
+The canonical root is a chooser, not a gameplay build. Pass 65 source stages schema 4 locally with exactly two intended choices, but this source configuration is not evidence that Pass 65 is approved, published, or live:
 
-- **Experimental New Netcode** loads the exact green source SHA being promoted as live Pass 64.
-- **New Netcode** loads the immutable stable channel pinned to the released Pass 63 source `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`, Pages SHA `2201a606a8c9f83d441036eac07dc140bd7e63f5`, exact `channels/experimental-netcode-pass` subtree, 119-file runtime set, and tree digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7`.
+- **The Big One** is the unpublished Pass 65 exact-SHA HITL candidate staged at `channels/the-big-one`. It may become Live only after Dave approves the immutable preview, the approval-only lineage and exact-main checks pass, and Dave separately confirms publication.
+- **New Netcode** remains the immutable Stable channel pinned to the released Pass 63 source `1bd55076c952080d5f7a8a5b0b8869aaa0646a76`, Pages SHA `2201a606a8c9f83d441036eac07dc140bd7e63f5`, exact historical `channels/experimental-netcode-pass` subtree, 119-file runtime set, and tree digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7`.
 
-The stable channel is a Git commit identity, not a moving branch or manually copied folder. During promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 63 only from the source and Pages commits pinned in `release-channels.json`, builds the Pass 64 live candidate from the exact promoted source, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 63 file to its pinned Git blob before deployment. Room invitations and legacy `latest` or `normal` links bypass the chooser into live Pass 64. The separate Pass 62 benchmark record remains immutable historical evidence.
+Pass 64 remains the currently published failed-regression comparator until a later approved promotion; it is never Stable. Its published source `5075a52d80c6db69a97ed53acc2df5368728371a`, Pages SHA `8326c95659a9fb8c5979c13f9b88126c4ffb85f7`, 130-file channel and digest `ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b` stay separately identified in candidate project-map evidence.
+
+The Stable channel is a Git commit identity, not a moving branch or manually copied folder. During an authorized promotion, `scripts/release/stage-release-topology.mjs` reconstructs Pass 63 only from the source and Pages commits pinned in `release-channels.json`, places the exact Pass 65 build under `channels/the-big-one`, replaces the root with the two-choice chooser, and records provenance plus tree digests. `scripts/qa/verify-release-topology.mjs` byte-compares every archived Pass 63 file to its pinned Git blob before deployment. Only after a successful protected promotion do room invitations and legacy `latest` or `normal` links become live Pass 65 routes. The separate Pass 62 benchmark record remains immutable offline/reconstructible historical evidence.
 
 Changing either pinned Pass 63 SHA is a separate reviewed release decision. Verify the candidate was genuinely live, update the config in one PR, and test the root chooser plus both direct channel URLs before promotion. Never infer "stable" from a pass number, branch name, local build, or chat claim.
 

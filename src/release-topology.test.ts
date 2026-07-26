@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { evaluateAcceptance } from '../scripts/release/acceptance-gate.mjs';
+import { PASS65_HITL_IDENTITY } from './release-identity';
 
 const config = JSON.parse(readFileSync('release-channels.json', 'utf8'));
 const pass62Benchmark = JSON.parse(readFileSync('baselines/pass62/best-netcode-benchmark.json', 'utf8'));
@@ -7,7 +9,7 @@ const shell = readFileSync('release-shell/release-shell.js', 'utf8');
 const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 
-describe('Pass 64 two-channel release topology', () => {
+describe('Pass 65 two-channel release topology', () => {
   it('retains the immutable best-ever Pass 62 benchmark record independently', () => {
     expect(pass62Benchmark).toMatchObject({
       designation: 'user-approved-best-ever-netcode',
@@ -37,30 +39,32 @@ describe('Pass 64 two-channel release topology', () => {
     });
   });
 
-  it('keeps Pass 64 live at the experimental netcode path and removes old channels', () => {
+  it('stages Pass 65 The Big One at its own candidate path and removes old live channels', () => {
     expect(config.experimental).toEqual({
-      pass: 'PASS 64',
-      label: 'EXPERIMENTAL NEW NETCODE',
+      pass: PASS65_HITL_IDENTITY.pass,
+      label: PASS65_HITL_IDENTITY.label,
       description: expect.any(String),
-      path: 'channels/experimental-netcode-pass',
+      path: PASS65_HITL_IDENTITY.route,
     });
     expect(config.normal).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain('PASS 59');
+    expect(config.stable.pass).not.toBe('PASS 64');
     expect(JSON.stringify(config)).not.toContain('channels/new-netcode');
   });
 
-  it('renders exactly live Pass 64 and stable Pass 63 choices', () => {
+  it('renders exactly live Pass 65 The Big One and stable Pass 63 choices', () => {
     expect(shell).toContain("['experimental', 'stable']");
     expect(shell).not.toContain("['normal', 'stable', 'experimental']");
     expect(shell).toContain("key === 'stable' ? 'STABLE' : 'LIVE'");
-    expect(shellHtml).toContain('live Pass 64 build');
+    expect(shellHtml).toContain('Pass 65');
+    expect(shellHtml).toContain('The Big One');
     expect(shellHtml).toContain('byte-exact Pass 63 production release');
     expect(shellHtml).toContain('Nuke Town');
     expect(shellHtml).not.toContain('Atomic Acres');
     expect(shellHtml).not.toContain('Pass 59');
   });
 
-  it('routes root rooms and legacy latest or normal aliases to Pass 64', () => {
+  it('routes root rooms and legacy latest or normal aliases to Pass 65', () => {
     expect(shell).toContain("requested === 'latest' || requested === 'normal') return route('experimental')");
     expect(shell).toContain("requested === 'experimental'");
     expect(shell).toContain("requested === 'stable'");
@@ -70,10 +74,17 @@ describe('Pass 64 two-channel release topology', () => {
   it('moves the candidate under experimental and reconstructs only stable Pass 63 from Git blobs', () => {
     expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
     expect(staging).toContain("const stable = stagePinned('recent-stable', config.stable)");
+    expect(staging).toContain("channel: liveChannelId");
     expect(staging).toContain('channel.pagesPath');
     expect(staging).toContain("'pinned-channel-provenance.json'");
     expect(staging).not.toContain("stagePinned('new-netcode'");
     expect(staging).toContain("channels: { experimental, stable }");
     expect(staging).toContain("schemaVersion: 4");
+  });
+
+  it('keeps publication denied until the exact-SHA Pass 65 acceptance descendant exists', () => {
+    expect(existsSync('acceptance/pass-65.json')).toBe(false);
+    expect(() => evaluateAcceptance({ phase: 'release', pass: PASS65_HITL_IDENTITY.pass, head: 'a'.repeat(40) }))
+      .toThrow('acceptance manifest does not exist: acceptance/pass-65.json');
   });
 });

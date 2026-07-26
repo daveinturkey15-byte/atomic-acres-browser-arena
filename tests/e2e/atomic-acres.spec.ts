@@ -475,7 +475,7 @@ test.describe('boot and authored presentation', () => {
     expect(state.arenaStoryReady).toBe(true);
     await expect(page.locator('html')).toHaveAttribute('data-ui-contract', 'pass64-command-v2');
     await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
-    await expect(page.locator('.command-brand span')).toContainText('PASS 64');
+    await expect(page.locator('.command-brand span')).toContainText('PASS 65 · THE BIG ONE');
     expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
     expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
     expect(state.networkSync.hostTime).toMatchObject({

@@ -5,6 +5,7 @@ import {
   type ChangelogEntry,
 } from './changelog';
 import releaseChannelsJson from '../release-channels.json';
+import { PASS64_FAILED_REGRESSION_IDENTITY, PASS65_HITL_IDENTITY } from './release-identity';
 
 export type ProjectMapNode = Readonly<{
   id: string;
@@ -21,15 +22,25 @@ export type ProjectMapBundle = Readonly<{
   current: Readonly<{
     product: 'Nuke Town';
     generatedAt: string;
-    architectureRevision: 'pass64-webgpu-hud-v1';
+    architectureRevision: 'pass65-big-one-v1';
     candidateState: 'hitl-candidate' | 'released';
     release: ChangelogEntry;
     previousRelease: string | null;
   }>;
   publishedChannels: Readonly<{
     schemaVersion: number;
-    live: Readonly<{ pass: string; label: string; path: string }>;
-    stable: Readonly<{ pass: string; label: string; path: string; sourceSha: string; pagesSha: string }>;
+    stagedCandidate: Readonly<{ pass: string; label: string; path: string; state: 'unpublished-hitl-candidate' }>;
+    live: Readonly<{
+      pass: string;
+      label: string;
+      path: string;
+      role: 'published-failed-regression-evidence';
+      sourceSha: string;
+      pagesSha: string;
+      runtimeFileCount: number;
+      runtimeTreeSha256: string;
+    }>;
+    stable: Readonly<{ pass: string; label: string; path: string; sourceSha: string; pagesSha: string; role: 'stable' }>;
   }>;
   operatingBoundaries: readonly string[];
   architecture: readonly ProjectMapNode[];
@@ -43,19 +54,19 @@ export type ProjectMapBundle = Readonly<{
  * unpublished pass from appearing as live release history.
  */
 export const PROJECT_MAP_CANDIDATE: ChangelogEntry = Object.freeze({
-  id: 'pass64-candidate',
-  pass: 'PASS 64',
-  title: 'Playable WebGPU, Command UI & Multiplayer Hardening',
+  id: 'pass65-candidate',
+  pass: PASS65_HITL_IDENTITY.pass,
+  title: 'The Big One',
   releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE),
-  areas: Object.freeze(['WEBGPU', 'TSL', 'HUD', 'MULTIPLAYER', 'MAPS', 'DIAGNOSTICS']),
-  summary: 'HITL candidate for the complete playable WebGPU/TSL route, redesigned command HUD and menus, rematch and health reconciliation repairs, lightweight post-match diagnostics, Railgun, and arena visual-quality gates.',
+  areas: Object.freeze(['WEBGPU', 'COMBAT', 'KILLSTREAKS', 'DESTRUCTION', 'AUDIO', 'MAPS', 'HITL']),
+  summary: 'Unpublished exact-SHA HITL candidate for Pass 65: The Big One. Pass 63 remains the byte-exact stable rollback and Pass 64 remains failed-regression evidence only.',
   highlights: Object.freeze([
     'The normal gameplay route is fail-closed hardware WebGPU with TSL-owned atmosphere and HDR presentation; WebGL2 remains an explicit rollback-compatible route',
     'Nuke Town, Terminal, RustRig and Gun Range each own a streamed ArenaVisualDefinition with deterministic review cameras and budgets',
     'The HUD, lobby, map selection, loadout and match overlays use the new command interface without dropping gameplay controls',
     'Private-match rematches, authoritative health regeneration and duplicate result handling have dedicated regression coverage',
     'The Railgun spawns during Nuke Town matches with finite ammunition, rechamber cadence, wall penetration and hostile thermal identification',
-    'Pass 63 is retained byte-exact as the stable rollback while the immutable Pass 62 benchmark record remains available for regression comparison',
+    'Pass 63 is retained byte-exact as the stable rollback; Pass 64 is never promoted to Stable and remains failed-regression evidence only',
   ]),
 });
 
@@ -233,17 +244,28 @@ export function createProjectMapBundle(
     current: {
       product: 'Nuke Town',
       generatedAt,
-      architectureRevision: 'pass64-webgpu-hud-v1',
+      architectureRevision: 'pass65-big-one-v1',
       candidateState: release.releasedAt === PENDING_PRODUCTION_RELEASE ? 'hitl-candidate' : 'released',
       release,
       previousRelease: entries.find((entry) => entry.pass !== release.pass)?.pass ?? null,
     },
     publishedChannels: {
       schemaVersion: releaseChannelsJson.schemaVersion,
-      live: {
+      stagedCandidate: {
         pass: releaseChannelsJson.experimental.pass,
         label: releaseChannelsJson.experimental.label,
         path: releaseChannelsJson.experimental.path,
+        state: 'unpublished-hitl-candidate',
+      },
+      live: {
+        pass: PASS64_FAILED_REGRESSION_IDENTITY.pass,
+        label: PASS64_FAILED_REGRESSION_IDENTITY.publishedLabel,
+        path: PASS64_FAILED_REGRESSION_IDENTITY.route,
+        role: PASS64_FAILED_REGRESSION_IDENTITY.role,
+        sourceSha: PASS64_FAILED_REGRESSION_IDENTITY.sourceSha,
+        pagesSha: PASS64_FAILED_REGRESSION_IDENTITY.pagesSha,
+        runtimeFileCount: PASS64_FAILED_REGRESSION_IDENTITY.runtimeFileCount,
+        runtimeTreeSha256: PASS64_FAILED_REGRESSION_IDENTITY.runtimeTreeSha256,
       },
       stable: {
         pass: releaseChannelsJson.stable.pass,
@@ -251,6 +273,7 @@ export function createProjectMapBundle(
         path: releaseChannelsJson.stable.path,
         sourceSha: releaseChannelsJson.stable.sourceSha,
         pagesSha: releaseChannelsJson.stable.pagesSha,
+        role: 'stable',
       },
     },
     operatingBoundaries: PROJECT_OPERATING_BOUNDARIES,
@@ -296,7 +319,8 @@ export function projectMapMarkdown(bundle: ProjectMapBundle = createProjectMapBu
     `- Release timestamp: ${current.releasedAt}`,
     `- Areas: ${current.areas.join(', ')}`,
     `- Summary: ${current.summary}`,
-    `- Published live channel: ${bundle.publishedChannels.live.pass} (${bundle.publishedChannels.live.label})`,
+    `- Staged HITL candidate: ${bundle.publishedChannels.stagedCandidate.pass} (${bundle.publishedChannels.stagedCandidate.label}); unpublished`,
+    `- Published live channel: ${bundle.publishedChannels.live.pass} (${bundle.publishedChannels.live.label}); failed-regression evidence only`,
     `- Published stable channel: ${bundle.publishedChannels.stable.pass} (${bundle.publishedChannels.stable.label})`,
     '',
     'Current changes:',

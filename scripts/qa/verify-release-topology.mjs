@@ -15,8 +15,9 @@ const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.inde
 if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(['experimental', 'stable'])) {
   throw new Error(`Root chooser must expose only experimental and stable: ${Object.keys(publicConfig).join(', ')}`);
 }
-if (publicConfig.experimental.pass !== 'PASS 64' || publicConfig.experimental.label !== 'EXPERIMENTAL NEW NETCODE') {
-  throw new Error('Root chooser is missing live Pass 64 experimental netcode');
+if (publicConfig.experimental.pass !== 'PASS 65' || publicConfig.experimental.label !== 'THE BIG ONE'
+  || publicConfig.experimental.path !== 'channels/the-big-one') {
+  throw new Error('Root chooser is missing live Pass 65 THE BIG ONE');
 }
 if (publicConfig.stable.pass !== 'PASS 63' || publicConfig.stable.label !== 'NEW NETCODE') {
   throw new Error('Root chooser is missing stable Pass 63 new netcode');
@@ -25,7 +26,7 @@ const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileT
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(['experimental-netcode-pass', 'recent-stable'])) {
+if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(['recent-stable', 'the-big-one'])) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
 
