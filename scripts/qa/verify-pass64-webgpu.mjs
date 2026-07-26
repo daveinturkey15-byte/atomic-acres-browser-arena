@@ -617,16 +617,34 @@ try {
   // identical in-match pair: menu-only residency excludes players, weapons,
   // bots, and support geometry and is therefore not a valid gameplay baseline.
   const gameplayCycle = ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres'];
-  for (const arenaId of [...gameplayCycle, ...gameplayCycle]) {
+  for (const [visitIndex, arenaId] of [...gameplayCycle, ...gameplayCycle].entries()) {
+    const deploymentStartedAt = Date.now();
+    console.log(`[pass64-webgpu] gameplay-soak visit=${visitIndex + 1}/8 arena=${arenaId}`);
     await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
     await switchPage.evaluate(() => {
       window.__ATOMIC_ACRES_DEBUG__.startSolo();
       window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
     });
-    await switchPage.waitForFunction(() => {
-      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
-      return state?.gameStarted === true && document.querySelector('#menu')?.classList.contains('hidden');
-    }, undefined, { timeout: 15_000 });
+    try {
+      await switchPage.waitForFunction(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return state?.gameStarted === true && document.querySelector('#menu')?.classList.contains('hidden');
+      }, undefined, { timeout: 15_000 });
+    } catch (error) {
+      const stalled = await switchPage.evaluate(() => {
+        const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return {
+          gameStarted: state?.gameStarted ?? null,
+          bootstrap: state?.bootstrap ?? null,
+          arenaSelection: state?.arenaSelection ?? null,
+          menuLifecycle: state?.menuLifecycle ?? null,
+          runtime: state?.render?.runtime ?? null,
+          qualityAssetStreaming: state?.render?.qualityAssetStreaming ?? null,
+          status: document.querySelector('#status')?.textContent ?? null,
+        };
+      }).catch((snapshotError) => ({ snapshotError: String(snapshotError) }));
+      throw new Error(`${arenaId} gameplay-soak deployment ${visitIndex + 1}/8 exceeded 15 seconds after ${Date.now() - deploymentStartedAt}ms: ${JSON.stringify(stalled)}`, { cause: error });
+    }
     await switchPage.waitForTimeout(arenaId === 'rustworks-1v1' ? 2_500 : 1_250);
     const beforePose = await switchPage.evaluate(() => {
       const [x, y, z] = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position;
