@@ -21,7 +21,7 @@ The release integrator fills this before handing over the candidate:
 | Browser/backend | Chrome version, actual WebGPU, adapter/vendor/architecture, no fallback |
 | Settings | High and Max effective-setting hashes |
 | Test machine | RTX 5080, driver, display resolution/refresh |
-| Stable fallback | Frozen Pass 64 subtree/tree digest and route |
+| Stable fallback | Byte-exact Pass 63 subtree/tree digest and route; Pass 64 separately labelled failed-regression evidence |
 | Best-netcode benchmark | Unchanged Pass 62 record/digest |
 
 Fail closed if any identity is missing, abbreviated ambiguously, moving, mutable, or inconsistent; also fail if S0M changes runtime/release-shell bytes or its acceptance output has any error other than missing Dave approval.
@@ -44,16 +44,16 @@ Use diagnostic grants and deterministic setup so this stays practical:
 1. Confirm the full S0 SHA/build ID, real RTX 5080 WebGPU backend and clean browser/GPU logs.
 2. Watch every menu preview: judge the helicopter's smooth varied path and sleek cockpit, then the Gun Range cat's composed joyful POV loop and reduced-motion pose.
 3. Inspect High default and Max; change representative graphics, audio and sensory controls and reload.
-4. Rename/use one custom preset, choose weapon/secondary/grenade, deploy, respawn and rematch.
+4. Rename/use one custom preset, choose weapon/secondary/one grenade family, deploy, spend the grenade, verify a kill does not restore it, then use a corpse ammo pickup to restore exactly one; respawn and rematch.
 5. In Gun Range, sample every new weapon and the reworked knife; focus on feel, identity, hands, clipping, passive motion, fire/reload, sound and effects.
 6. Test damage directions, critical-health visuals/breathing and reduced-sensory behaviour.
 7. Hear local/remote/bot footsteps and two contrasting arena ambience profiles.
 8. Test smoke, flash, DMR smoke/wall rule and the explosive bolt with a second peer.
 9. Test one intact-to-damaged shed sequence: F door, obstruction, visible aperture shoot-through, explosion detach, non-flat nudge and flat/sleeping bullet wake.
-10. Use diagnostic grants for Adrenaline, Care Package, Chopper, Carpet Bomber, Drone Swarm and Piloted Drone; specifically judge whether chopper motion feels subtly alive without twitching or gameplay drift.
+10. Exercise all five killstreak slot families with diagnostic grants, including retained Scout Sweep and Nuke. During Chopper Gunner, press `F` to enter and exit the gun at different times while confirming flight remains AI; judge whether chopper motion feels subtly alive without twitching or gameplay drift.
 11. Visit every map on High and one combined Max stress scene.
 12. Complete one representative two-peer join/play/death/respawn/reconnect/rematch lifecycle.
-13. Review the precomputed evidence summary, known issues, Pass 64 rollback rehearsal, final `The Big One` Live / `WebGPU Migration` Stable labels and release-lineage plan; then approve, reject or defer the full S0 SHA.
+13. Review the precomputed evidence summary, known issues, Pass 63 rollback rehearsal, Pass 64 regression record, staged `The Big One` Live identity and release-lineage plan; then approve, reject or defer the full S0 SHA. This HITL decision does not itself authorize publication; Codex must return with final publish-ready identities and ask separately.
 
 ## 2B. Precomputed evidence review and optional spot checks
 
@@ -92,8 +92,8 @@ Sections 3–12 are owned by the integrator and independent QA lanes. They must 
 - Existing four curated kits remain present and coherent.
 - The second row presents Custom 1/2/3 plus the approved fourth-tile behaviour.
 - Rename accepts useful Unicode, rejects empty/oversized/unsafe input, survives reload and is not exposed to peers.
-- Every custom preset selects one allowed primary, secondary and grenade.
-- Five killstreak slots are selectable and valid under the frozen roster/cost/alternative/duplication rules, persisted and reflected in match.
+- Every custom preset selects one allowed primary, secondary and exactly one grenade family; only one grenade exists on spawn and carry never exceeds one.
+- Five killstreak slots obey the exact frozen families: Scout/Adrenaline/Care; Yardhawk/Piloted Drone; two distinct Tri-Pass/Carpet Bomber/Hunter Swarm/Chopper choices; and mutually exclusive Nuke/Drone Swarm.
 - Corrupt/old saved data recovers without destroying the last known-good selection.
 
 ## 4. Core combat feedback
@@ -163,6 +163,7 @@ Spot-check recoil, falloff, wallbang, reserve/magazine, reload, switch and stanc
 - Reduced-flash mode changes presentation, not the authoritative result.
 - DMR thermal sees a living target through smoke while normal view does not; both views stop at walls.
 - Grenade use, respawn, reconnect, duplicate/reordered messages and rematch do not duplicate effects or inventory.
+- Spend the selected grenade, score a kill and confirm it remains depleted; then walk over a valid corpse ammo pickup and confirm ammo plus exactly one selected grenade replenish atomically. Repeat with duplicate/reordered pickup messages and confirm the cap remains one.
 
 ## 9. Destructible shed vertical slice and map rollout
 
@@ -191,8 +192,8 @@ Reject a visual-only hole, invisible shoot-through, render-only door, client-aut
 - Earn/select/consume every streak through legitimate host-owned score flow.
 - Adrenaline lasts exactly 15 seconds, applies the approved non-stacking damage/move/reload modifiers, expires on schedule and follows the agreed death policy.
 - Care-package aircraft, parachute and crate lifecycle is coherent; F loot is range/LOS/sequence validated and exactly once.
-- Inspect deterministic weighted reward evidence: the unique catalog types every streak `selectable`, `care-only`, or `retired`; its derived pool contains every non-retired streak except care package exactly once, contains no retired/recursive entry, and gives care-only Nuke exactly 1%.
-- Chopper circles for 30 seconds, acquires valid targets, respects cover/LOS and meets the measurable four-to-five-second escape/survival envelope.
+- Inspect deterministic weighted reward evidence: the pool is derived from the unique catalog, contains retained Scout Sweep at the highest base-weight band and every present/future eligible nonretired streak except Care Package exactly once, recomputes under synthetic add/retire/rename/weight mutations, contains no retired/recursive entry, and gives selectable Nuke exactly 1%.
+- Chopper flies under AI for 30 seconds, acquires valid targets, respects cover/LOS and meets the measurable four-to-five-second escape/survival envelope. Its gun defaults to AI; `F` enters/exits owner gun-only control at any active time, AI resumes firing on exit, the operator body stays vulnerable and no gun input changes flight.
 - Carpet Bomber activation supplies only the frozen strip anchor semantics; host-seeded RNG chooses and communicates a random valid ingress, then resolves exactly 20 bounded zigzag impacts along the intended strip.
 - Drone Swarm creates exactly 12 targetable 50-HP drones, seeks eligible opposing living human players and bots indoors/outdoors, rejects allies/dead lives, performs unlimited host-authored 20-round reload loops until its 60-second hard expiry, and meets the frozen approximately-five-second exposure/escape survival-pressure band.
 - Destroy drones within the frozen hitbox/core and per-weapon shot-count bands; no client can forge drone damage/death.
@@ -233,4 +234,4 @@ Choose one outcome and record it against the full candidate SHA:
 
 Approval wording should explicitly name the full candidate SHA. Any later change to runtime, release shell, assets, gameplay data, settings, network schema or public topology invalidates the approval and requires a new immutable preview.
 
-After approval, the integrator must still run the post-approval acceptance commit gates, exact-merge gates, protected production workflow, Pages/receipt reconciliation and public live/stable/alias browser checks. Those public checks must show Pass 65 Live as `The Big One` and Pass 64 Stable as `WebGPU Migration`. Owner approval authorizes promotion of the named S0 source and runtime/release-shell trees; rebuilt production output must record controlled differences unless the exact stored artifact is promoted. Approval is not evidence that production succeeded.
+After approval, the integrator must still run the post-approval acceptance commit gates and exact-merge gates, then stop at the publish-ready exact main SHA. Codex must show Dave the final checks and topology and obtain a separate explicit publish confirmation. Only then may the protected production workflow run. Public checks must show Pass 65 Live as `The Big One`, byte-exact Pass 63 Stable, Pass 64 absent from the Stable role, and the frozen Pass 62 offline/reconstructible policy. Owner HITL approval validates named S0 source and runtime/release-shell trees; it is neither publish authorization nor evidence that production succeeded.

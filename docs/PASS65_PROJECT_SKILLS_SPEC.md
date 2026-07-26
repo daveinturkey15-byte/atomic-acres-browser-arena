@@ -69,6 +69,9 @@ Author, extend, rebalance, or verify Atomic Acres weapons, sidearms, grenades, p
 - Do not use an incomplete/generic release fallback.
 - Do not rebalance existing content accidentally during adapter migration.
 - Do not copy proprietary franchise assets, audio, code, animations, or branded presentation.
+- Per DEC-11, every current/future weapon uses its approved real-world display name while stable machine IDs remain protocol/storage/replay/telemetry authority; a display rename must not fork identity.
+- Per DEC-07, loadouts expose exactly one selected grenade family with spawn/carry cap one; kills never replenish it and the validated corpse-ammo-pickup transaction restores it exactly once.
+- Adding any weapon, grenade or projectile ID must automatically enter every catalog-derived completeness set; validators must mutate the catalog with synthetic future IDs and reject every downstream registry that fails to update.
 
 ### Validator responsibilities
 
@@ -121,7 +124,7 @@ Add, change, select, balance, network, simulate, or verify Atomic Acres killstre
 
 1. Read catalog/schema, protocol, remote-support admission, canonical combat-result path, arena nav metadata, and acceptance rows.
 2. Define cost/tier/selection/activation/entity/authority/presentation policy in the typed catalog.
-3. Freeze five-slot selection at match start and validate unique legal slots.
+3. Freeze exact family-constrained slots at match start: Scout/Adrenaline/Care; Yardhawk/Piloted Drone; two distinct Tri-Pass/Carpet Bomber/Hunter Swarm/Chopper choices; Nuke/Drone Swarm.
 4. Model activation as host-owned stable ID/seed/time/life/revision with exactly-once consume.
 5. For stateful effects, use host fixed-step entities; reliable lifecycle plus bounded lossy pose snapshots.
 6. Derive targeting, navigation, reward, hit, health, ammo, reload, fuel, expiry and damage on the host.
@@ -133,13 +136,15 @@ Add, change, select, balance, network, simulate, or verify Atomic Acres killstre
 
 - Never accept client-authored reward, path, target, ammo, health, hit, damage, or score.
 - Shared RNG uses canonical seed/time, never ambient `Math.random()`.
-- Nuke care-package probability is explicit and exactly 1% if the approved decision retains it.
+- Nuke and Drone Swarm are selectable mutually exclusive slot-5 alternatives; Nuke is also exactly 1% of the derived care pool.
+- The reward pool is a projection of the canonical catalog, never a second authored list. Every present/future eligible nonretired nonrecursive streak appears exactly once; Scout Sweep has a highest-band base weight; every catalog add/rename/retire/cost/weight change recomputes the set and exact safe-integer formula automatically.
+- Chopper flight is always host-AI. The owner may toggle gun-only possession with `F` throughout the 30-second active window; no gun input may enter flight state.
 - Chopper/drone targeting respects hard cover and semantic smoke.
 - Support entities/audio/lights/projectiles are pooled, prewarmed, capped and disposed.
 
 ### Validator responsibilities
 
-`verify-killstreak-catalog.mjs` should check catalog completeness, five-slot legality, exact weights/counts/HP/ammo/durations, authority policy, nav requirements, entity/effect budgets, and required unit/network/visual evidence IDs.
+`verify-killstreak-catalog.mjs` should check catalog completeness, exact slot-family legality, Nuke/Drone exclusion, exact weights/counts/HP/ammo/durations, chopper gun/flight isolation, authority policy, nav requirements, entity/effect budgets, and required unit/network/visual evidence IDs. Its adversarial suite must add at least two synthetic future streaks and mutate rename/retire/cost/base-weight fields, proving automatic care-pool inclusion/recomputation and rejecting stale mirrors.
 
 ## 5. `atomic-acres-destructible-world`
 

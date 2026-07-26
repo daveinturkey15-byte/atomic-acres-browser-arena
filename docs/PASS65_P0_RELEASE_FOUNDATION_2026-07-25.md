@@ -9,7 +9,7 @@ This record turns the Pass 65 planning package into repository-visible contribut
 
 ## 1. Pass 64 handoff evidence
 
-Pass 65 was not allowed to mutate the repository until Pass 64 was independently proven merged, published, and playable. The evidence gate is now satisfied:
+Pass 65 was not allowed to mutate the repository until Pass 64 was independently proven merged, published and capable of entering a shallow browser smoke. That release-evidence gate was satisfied, allowing isolated P0 work. Dave's later 2026-07-26 full local test found Pass 64 freezing and unplayable; that deeper owner observation supersedes the shallow gameplay assumption for every rollback/promotion decision without changing the historical publication identities below.
 
 | Evidence | Exact identity | Result |
 |---|---|---|
@@ -18,11 +18,11 @@ Pass 65 was not allowed to mutate the repository until Pass 64 was independently
 | Protected production | GitHub Actions run `30175191044` | Validation, build, topology, publish, Pages, live smoke, and receipt succeeded. |
 | Pages deployment | Run `30175279180`; `gh-pages` SHA `8326c95659a9fb8c5979c13f9b88126c4ffb85f7` | Succeeded. |
 | Production receipt | Artifact ID `8624038234`; artifact digest `sha256:dde14d5f4bd1555481d3887ea5e4dcb917aa229b3ce052987667871b31d155c8` | Schema v3 source/Pages/acceptance/topology/live-smoke fields agree. |
-| Pass 64 published subtree pointer | Receipt topology channel `channels/experimental-netcode-pass`: `exactRootFileCount=130`, `treeSha256=ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b` | Captured identity pointer. F00 must turn it into schema-v1 `baselines/pass64/pass65-stable-rollback.json` with digest algorithm, path scope, exclusions, complete release identities, verifier, and no-rebuild restore policy before calling the rollback record complete. |
-| Pass 63 stable runtime | 119 files; digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7` | Stable remained byte-identified during the Pass 64 release. |
+| Pass 64 published subtree pointer | Receipt topology channel `channels/experimental-netcode-pass`: `exactRootFileCount=130`, `treeSha256=ffd3e130d005e9321976795fe2d5cadfd9965ebb27dc0bbff0c1609816cff20b` | Captured immutable failed-regression evidence and repair comparator. It must never be designated Stable. |
+| Pass 63 stable runtime | 119 files; digest `61666de694ea6bd62391c1e0661ffcc2864142bb569407c93a2ebdfd28031ce7` | This remains the byte-exact Stable/no-rebuild rollback before, during and after any approved Pass 65 promotion. |
 | Public browser | Chooser rendered Pass 64 Live / Pass 63 Stable; direct live entered bot gameplay; stable, normal, and room routes loaded in fresh isolated tabs with no unexpected logs | Public behavior agrees with release evidence. |
 
-A rapid same-tab sequence through multiple aliases did expose a Three.js disposal-time `isReady` exception. Fresh isolated normal and room loads were clean, so it did not falsify the Pass 64 live claim. Pass 65 must retain it as a bounded navigation/disposal regression challenge rather than erase it from the record.
+A rapid same-tab sequence through multiple aliases exposed a Three.js disposal-time `isReady` exception. Fresh isolated normal and room loads initially looked clean, but Dave's later full play found freezing/unplayability. Pass 65 must retain both observations as regression evidence, repair the failure, and prove Pass 63 stable restoration rather than promote Pass 64 as rollback.
 
 ## 2. Exact P0 boundary
 
@@ -79,7 +79,7 @@ The estimates are planning distributions, not a promise. Current totals are 813 
 
 Observed:
 
-- Pass 64 release evidence and public routes agree on the exact identities in section 1.
+- Pass 64 release evidence and public routes agree on the exact publication identities in section 1; later owner play separately falsifies its suitability as a stable rollback.
 - The P0 worktree started clean at `B0`, contained current `origin/main`, and passed the repository contributor preflight before implementation.
 - The current classifier recognizes every intended P0 path as process-only.
 
@@ -104,4 +104,4 @@ Falsifiers that stop progression include a P0 path classifying as runtime or rel
 
 P0 authorizes architecture and implementation work only. It does not authorize a Pass 65 release.
 
-The final candidate must stop at one immutable preview source SHA after all runtime, release-shell, evidence, multiplayer, renderer, performance, accessibility, asset-provenance, and rollback gates are green. Dave then performs the owner HITL route in `PASS65_OWNER_HITL_CHECKLIST.md`. Only Dave's explicit approval of that exact candidate may unlock an approval-only lineage commit, final exact-main checks, and the protected production workflow. Any later runtime or release-shell change invalidates approval and requires a new immutable preview and HITL.
+The final candidate must stop at one immutable preview source SHA after all runtime, release-shell, evidence, multiplayer, renderer, performance, accessibility, asset-provenance, Pass 63 rollback and Pass 64 regression-repair gates are green. Dave then performs the owner HITL route in `PASS65_OWNER_HITL_CHECKLIST.md`. Approval may unlock only the approval-lineage commit and exact-main checks. Codex must then return with the publish-ready exact SHA/topology and obtain a separate explicit publication confirmation before the protected production workflow. Any later runtime or release-shell change invalidates approval and requires a new immutable preview and HITL.
