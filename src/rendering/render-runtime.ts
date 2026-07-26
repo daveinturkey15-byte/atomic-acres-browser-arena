@@ -331,11 +331,6 @@ export class LegacyWebGlRenderRuntime {
     this.renderer.render(scene, camera);
   }
 
-  compileAndRenderImmediate(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
-    void this.renderer.compileAsync(root, camera, scene);
-    this.renderer.render(scene, camera);
-  }
-
   resetRenderInfo(): void {
     this.renderer.info.reset();
   }
@@ -714,11 +709,6 @@ export class WebGpuRenderRuntime {
     // Chrome/driver shader creation can exceed the live four-second fence,
     // especially when each QA page owns a fresh WebGPU device.
     await this.waitForSubmittedWork(12_000);
-  }
-
-  compileAndRenderImmediate(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): void {
-    void this.renderer.compileAsync(root, camera, scene);
-    this.submitFrame(performance.now(), true);
   }
 
   submitFrame(now = performance.now(), force = false): boolean {
