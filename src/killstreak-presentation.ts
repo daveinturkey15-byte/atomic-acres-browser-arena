@@ -1,15 +1,79 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
 
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
 const MAX_SENSOR_CONTACTS = 16;
+export const HUNTER_DRONE_ASSET = './assets/original/models/support/hunter-drone-lod0.glb';
+const HUNTER_DRONE_TARGET_MAX_DIMENSION = 1.45;
+
+let hunterDroneTemplate: THREE.Group | null = null;
+let hunterDroneAnimations: readonly THREE.AnimationClip[] = [];
+let hunterDroneSourceMaxDimension = 0;
+let hunterDroneLoadState: 'idle' | 'loading' | 'ready' | 'fallback' = 'idle';
+let hunterDroneLoadPromise: Promise<void> | null = null;
+
+function markSharedPresentationAsset(root: THREE.Object3D): void {
+  root.traverse((node) => {
+    node.userData.presentationOnly = true;
+    node.userData.authoredSharedAsset = true;
+    node.raycast = () => undefined;
+    if (node instanceof THREE.Mesh) {
+      node.castShadow = true;
+      node.receiveShadow = true;
+    }
+  });
+}
+
+export function loadHunterDronePresentation(): Promise<void> {
+  if (hunterDroneLoadPromise) return hunterDroneLoadPromise;
+  hunterDroneLoadState = 'loading';
+  hunterDroneLoadPromise = new Promise((resolve) => {
+    new GLTFLoader().load(HUNTER_DRONE_ASSET, (gltf) => {
+      const root = gltf.scene;
+      root.updateMatrixWorld(true);
+      const size = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+      hunterDroneSourceMaxDimension = Math.max(size.x, size.y, size.z);
+      const required = ['drone-body', 'drone-mounted-gun', 'drone-gun-muzzle-socket', 'drone-first-person-camera-socket', 'drone-rotors'];
+      hunterDroneLoadState = hunterDroneSourceMaxDimension > 0 && required.every((name) => root.getObjectByName(name))
+        ? 'ready'
+        : 'fallback';
+      if (hunterDroneLoadState === 'ready') {
+        hunterDroneTemplate = root;
+        hunterDroneAnimations = Object.freeze([...gltf.animations]);
+        markSharedPresentationAsset(root);
+      }
+      resolve();
+    }, undefined, (error) => {
+      hunterDroneLoadState = 'fallback';
+      console.warn('[Arena] Authored Hunter Drone unavailable; retaining bounded fallback.', error);
+      resolve();
+    });
+  });
+  return hunterDroneLoadPromise;
+}
+
+export function hunterDronePresentationTelemetry(): Readonly<{
+  state: typeof hunterDroneLoadState;
+  asset: string;
+  sourceMaxDimension: number;
+  animations: readonly string[];
+}> {
+  return Object.freeze({
+    state: hunterDroneLoadState,
+    asset: HUNTER_DRONE_ASSET,
+    sourceMaxDimension: hunterDroneSourceMaxDimension,
+    animations: Object.freeze(hunterDroneAnimations.map((clip) => clip.name)),
+  });
+}
 
 type PresentedEntity = Readonly<{
   root: THREE.Group;
   rotor: THREE.Object3D | null;
   target: THREE.Vector3;
+  mixer: THREE.AnimationMixer | null;
 }>;
 
 export type KillstreakPresentationRetireRoot = (root: THREE.Object3D) => void;
@@ -91,7 +155,7 @@ function buildChopper(): PresentedEntity {
   root.userData.audioSemanticIds = ['chopper-low-loop', 'chopper-gun-report'];
   root.userData.weaponFeedback = ['gun-recoil', 'muzzle-flash', 'tracer', 'impact'];
   root.scale.setScalar(0.82);
-  return Object.freeze({ root, rotor, target: new THREE.Vector3() });
+  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixer: null });
 }
 
 function buildCareAircraft(): PresentedEntity {
@@ -115,10 +179,26 @@ function buildCareAircraft(): PresentedEntity {
   root.add(fuselage, nose, wing, tailWing, tailFin, cargoLight, forwardSocket);
   root.userData.forwardAxis = [0, 0, -1];
   root.scale.setScalar(0.9);
-  return Object.freeze({ root, rotor: null, target: new THREE.Vector3() });
+  return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixer: null });
 }
 
 function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
+  if (hunterDroneTemplate && hunterDroneLoadState === 'ready') {
+    const root = hunterDroneTemplate.clone(true);
+    root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
+    root.scale.setScalar(HUNTER_DRONE_TARGET_MAX_DIMENSION / Math.max(0.001, hunterDroneSourceMaxDimension));
+    root.userData.pass65KillstreakPresentation = true;
+    root.userData.authoredHunterDrone = true;
+    root.userData.presentationFamilyId = DRONE_PRESENTATION_FAMILY_ID;
+    root.userData.gunProfileId = DRONE_GUN_PROFILE_ID;
+    root.userData.forwardAxis = [0, 0, -1];
+    root.userData.weaponFeedback = ['report', 'muzzle-flash', 'tracer', 'impact', 'owner-hit-confirm', 'owner-damage-number'];
+    markSharedPresentationAsset(root);
+    const mixer = new THREE.AnimationMixer(root);
+    const propellers = hunterDroneAnimations.find((clip) => clip.name === 'Drone_Propellers_Loop');
+    if (propellers) mixer.clipAction(propellers).play();
+    return Object.freeze({ root, rotor: null, target: new THREE.Vector3(), mixer });
+  }
   const root = new THREE.Group();
   root.name = mode === 'piloted' ? 'pass65-piloted-drone' : 'pass65-swarm-drone';
   root.userData.pass65KillstreakPresentation = true;
@@ -155,7 +235,7 @@ function buildDrone(mode: 'piloted' | 'swarm' | null): PresentedEntity {
     rotor.add(arm, disc);
   }
   root.add(body, eye, gun, muzzleSocket, cameraSocket, rotor);
-  return Object.freeze({ root, rotor, target: new THREE.Vector3() });
+  return Object.freeze({ root, rotor, target: new THREE.Vector3(), mixer: null });
 }
 
 function buildCareCrate(): PresentedEntity {
@@ -173,7 +253,7 @@ function buildCareCrate(): PresentedEntity {
   canopy.position.y = 2.4;
   canopy.scale.y = 0.45;
   root.add(crate, straps, canopy);
-  return Object.freeze({ root, rotor: canopy, target: new THREE.Vector3() });
+  return Object.freeze({ root, rotor: canopy, target: new THREE.Vector3(), mixer: null });
 }
 
 function createPresentedEntity(entity: KillstreakEntitySnapshot): PresentedEntity {
@@ -272,6 +352,7 @@ export class KillstreakPresentation {
       presented.target.fromArray(entity.position);
       presented.root.position.lerp(presented.target, 0.38);
       presented.root.rotation.set(entity.attitude[0], entity.attitude[1], entity.attitude[2], 'YXZ');
+      presented.mixer?.setTime(nowMs / 1_000);
       if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
       const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');
       if (tailRotor) tailRotor.rotation.x += 1.35;

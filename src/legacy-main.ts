@@ -65,7 +65,7 @@ import {
   type KillstreakRecipientSnapshot,
   type KillstreakWorld,
 } from './killstreak-runtime';
-import { KillstreakPresentation } from './killstreak-presentation';
+import { KillstreakPresentation, loadHunterDronePresentation } from './killstreak-presentation';
 import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
 import type {
   KillstreakActivateIntentMessage,
@@ -996,7 +996,10 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
-const killstreakPresentation = new KillstreakPresentation(scene, (root) => scheduleDeferredGpuRetirement(root));
+const killstreakPresentation = new KillstreakPresentation(
+  scene,
+  (root) => scheduleDeferredGpuRetirement(root, root.userData.authoredSharedAsset !== true),
+);
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const graphicsRefinement = new GraphicsRefinementSystem(
   legacyRenderer,
@@ -15405,8 +15408,9 @@ async function bootstrap(): Promise<void> {
         return value;
       });
   const grenadePromise = loadGrenadePresentation();
+  const hunterDronePromise = loadHunterDronePresentation();
   const [physics, , art] = await Promise.all([
-    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise,
+    physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise, hunterDronePromise,
   ]);
   characterPhysics = physics;
   syncInteractiveWorldPhysics(true);

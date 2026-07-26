@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { KillstreakPresentation } from './killstreak-presentation';
+import { HUNTER_DRONE_ASSET, KillstreakPresentation, hunterDronePresentationTelemetry } from './killstreak-presentation';
 import type { KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 import { SUPPORT_VEHICLE_PRESENTATION_CONTRACT, missingSupportNodes, supportForwardAlignment } from './support-vehicle-presentation-contract';
@@ -35,6 +35,11 @@ const snapshot = (count: number, sensorContacts: KillstreakRecipientSnapshot['se
 });
 
 describe('killstreak presentation', () => {
+  it('binds the runtime presentation loader to the gated authored Hunter Drone LOD0', () => {
+    expect(HUNTER_DRONE_ASSET).toBe('./assets/original/models/support/hunter-drone-lod0.glb');
+    expect(hunterDronePresentationTelemetry()).toMatchObject({ state: 'idle', asset: HUNTER_DRONE_ASSET });
+  });
+
   it('renders a sleek chopper/care/drone vocabulary and retires stale entities', () => {
     const scene = new THREE.Scene();
     const presentation = new KillstreakPresentation(scene);
