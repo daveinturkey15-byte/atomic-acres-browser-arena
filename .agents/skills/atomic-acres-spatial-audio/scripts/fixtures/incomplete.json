@@ -1,13 +1,13 @@
 {
-  "schemaVersion": 1,
-  "buses": ["master", "sfx"],
-  "settings": {"master": {"gain": 2}, "sfx": {"gain": 1}},
-  "events": [
-    {"id": "rifle-shot", "family": "weapon", "bus": "sfx", "policy": "spatial", "spatialProfileId": "missing", "maxConcurrent": 0, "variants": []}
-  ],
+  "schemaVersion": 2,
+  "runtimeAuthority": {"registryPath": "src/audio.ts", "testPath": "none", "state": "implemented"},
+  "buses": [{"id": "master", "gain": 2, "muted": false, "maxVoices": 1}],
+  "families": [],
+  "events": [],
   "spatialProfiles": [],
-  "footsteps": {"admittedGroundedOnly": false, "airborneEmits": true},
-  "arenas": [],
+  "footsteps": {},
+  "arenas": [{"id": "rustrig"}],
   "budgets": {},
-  "settleChecks": {}
+  "spatialEvidence": [],
+  "lifecycleEvidence": []
 }

@@ -1,14 +1,8 @@
 {
-  "schemaVersion": 1,
-  "identity": {"buildId": "moving-latest", "dirtyWorktree": true, "immutableBuild": false},
-  "acceptance": {"frozen": false},
-  "impairmentManifest": {
-    "version": "draft",
-    "sha256": "bad",
-    "profiles": [
-      {"id": "draft-profile", "delayMs": -1, "jitterMs": -1, "lossPercent": 101, "duplicatePercent": 101, "reorderPercent": 101, "seed": -1, "durationSeconds": 0, "eventCount": 0, "repairDeadlineMs": 0, "expectFinalHashEquality": false}
-    ]
-  },
+  "schemaVersion": 2,
+  "identity": {"sourceSha": "not-a-git-sha", "buildId": "moving-latest", "environmentHash": "bad", "worktreeState": "dirty", "buildState": "moving"},
+  "acceptance": {"state": "draft", "artifact": {"path": "../moving.json", "sha256": "bad"}, "requirementIds": [], "falsifierIds": []},
+  "impairmentManifest": {"version": "draft", "sha256": "bad", "profiles": []},
   "results": [],
-  "hardwareEvidence": {"gpuMetricKind": "queue-proxy"}
+  "hardwareEvidence": []
 }

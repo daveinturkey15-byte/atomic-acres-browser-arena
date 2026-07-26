@@ -9,7 +9,7 @@ Create complete, positional and bounded audio without inventing gameplay authori
 
 ## Workflow
 
-1. Read repo rules, the game-wide event inventory, current audio/footstep code, admitted movement snapshots, arena surface/audio definitions, settings/accessibility schemas, budgets, asset manifest and acceptance rows.
+1. Read repo rules and the F16 runtime authority at `src/sound-event-inventory.ts` plus `src/sound-event-inventory.test.ts`, then inspect current audio/footstep code, admitted movement snapshots, arena surface/audio definitions, settings/accessibility schemas, budgets, asset manifest and acceptance rows.
 2. Route every event through an explicit semantic bus and versioned persisted gain/mute settings.
 3. Use bounded reusable spatial chains for remote/world sources; keep local nearfield handling explicit.
 4. Derive footsteps from admitted grounded travel, velocity, stance and surface. Key state by actor/life/continuity and reset teleports, stale snapshots and reconciliation jumps without emission.
@@ -25,7 +25,7 @@ Create complete, positional and bounded audio without inventing gameplay authori
 - Performance: hard-cap active voices, continuous loops, reusable chains, per-bus voices and occlusion queries/CPU; use deterministic stealing and complete disposal.
 - Privacy: never announce or replicate local custom loadout names or hidden support rewards through audio.
 - Provenance: manifest source, license, derivative notes and digest for every sample, stem and generated sound; never rip franchise audio.
-- Coverage: every registered sound event declares bus, spatial policy, variants, concurrency/cooldown, provenance and evidence.
+- Coverage: every registered sound event declares bus, spatial policy, variants, concurrency/cooldown, provenance and evidence. A staging fixture proves the contract shape, not canonical runtime completeness.
 
 ## Validate
 
@@ -35,6 +35,10 @@ Read [references/audio-budget-contract.md](references/audio-budget-contract.md),
 
 `node scripts/verify-audio-catalog.mjs scripts/fixtures/incomplete.json`
 
-The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
+`node scripts/verify-audio-catalog.mjs --self-test`
+
+The first command must exit zero, the second must exit nonzero, and the self-test must reject every adversarial mutation. For a candidate manifest, run:
 
 `node scripts/verify-audio-catalog.mjs <audio-manifest.json>`
+
+Use `runtimeAuthority.state: "staging-contract"` for isolated contract fixtures. Claim `"canonical-runtime"` only when both F16 authority files exist in the validator's repository root. The validator then enforces the exact bus, family, staging-event, spatial-profile and arena oracles, numeric pan/occlusion and footstep evidence, monotonic rolloff, cap arithmetic and lifecycle settlement.

@@ -11,10 +11,10 @@ Build authored first-person presentation without moving gameplay authority.
 
 1. Read repo rules, the weapon definition, viewmodel/action contracts, asset manifest, source/license record, TSL renderer rules, accessibility settings, budgets, and deterministic capture requirements.
 2. Freeze canonical fire, reload, switch, melee, projectile, and camera-centered ray timings before changing presentation.
-3. Define the skeleton, semantic parts, required sockets, capability-conditioned actions, allowed transitions, materials, LODs, and budgets.
+3. Define the skeleton, semantic parts, required sockets, capability-conditioned actions, allowed transitions, materials, LODs, and budgets from an independent weapon capability oracle rather than from the candidate manifest.
 4. Author bounded passive breathing/inertia/stride/landing layers and final grip IK. Reduce motion in ADS and through the accessibility scale.
 5. Validate color space, normals, roughness/metalness, texel density, LOD transitions, triangles, draws, decoded textures, and WebGPU-compatible TSL materials.
-6. Capture every applicable action at deterministic clock, seed, viewport, backend, profile, and source SHA.
+6. Capture every applicable action under one root source/build/backend/profile/viewport/fixed-clock/seed identity, with a per-action immutable artifact path and SHA-256 digest.
 7. Reject clipping, detached fingers, deformation, missing materials, socket drift, authority-ray movement, generic fallback, and mismatched first/world models.
 
 ## Invariants
@@ -34,8 +34,10 @@ Read [references/asset-animation-contract.md](references/asset-animation-contrac
 
 `node scripts/verify-viewmodel-assets.mjs scripts/fixtures/incomplete.json`
 
-The first command must exit zero and the second must exit nonzero. For a candidate manifest, run:
+`node scripts/verify-viewmodel-assets.mjs --self-test`
+
+The first command must exit zero, the second must exit nonzero, and the self-test must reject every adversarial mutation. For a candidate manifest, run:
 
 `node scripts/verify-viewmodel-assets.mjs <viewmodel-manifest.json>`
 
-A capture index is evidence only when it matches the exact source/build identity.
+A capture index is evidence only when it matches the one exact root capture identity. The staging validator enforces strict nested schemas, exact capability/action/socket/semantic-part and transition oracles for `a4-vanguard`, required action markers, ordered decreasing first/world LODs, explicit approval for any cross-weapon asset sharing, measured budgets and release fallback prohibition.
