@@ -18,23 +18,29 @@ import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOpe
 import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
+  BOT_DEATHS_PER_REINFORCEMENT,
+  BOT_GRENADE_POOL,
   BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
-  assignBotWeapons,
+  BOT_WEAPON_POOL,
   advanceSpawnFlipHysteresis,
   botAimJitter,
   botCanFireWhileProtected,
   botWeaponBurstSize,
+  botWeaponDefinition,
   botWeaponFireInterval,
   chooseBotIntent,
   chooseTacticalWaypoint,
+  createShuffleBag,
   createSpawnFlipHysteresis,
+  grenadeDefinition,
   operatorYawToward,
   respawnBotState,
   shouldBotThrowGrenade,
   shouldFlipSpawnSide,
   type SpawnFlipHysteresis,
 } from './bot-ai';
+import type { ShuffleBag } from './bot-arsenal';
 import { classifyFootstepSurface, classifyImpactSurface, nearMissStrength, type ImpactSurface } from './combat-feedback';
 import { nextShotDeadline } from './combat-timing';
 import { SEMTEX_HITL_CONTRACT, flashbangPresentation, semtexBlastDamage } from './combat/pass65-ordnance-contract';
@@ -272,6 +278,7 @@ import {
   deathDropAmmoAvailable,
   deathDropAvailable,
   deathDropWeaponAvailable,
+  isPrimaryWeaponId,
   nearestDeathDrop,
   nearestScavengeDeathDrop,
   pruneDeathDrops,
@@ -574,7 +581,8 @@ type BotPlayer = {
   deathVisibleUntil: number;
   waypoint: number;
   blockedSince: number;
-  weapon: PrimaryWeaponId;
+  weapon: WeaponId;
+  grenade: GrenadeId;
   nextGrenadeAt: number;
   grenadeActive: boolean;
   positionHistory: CombatantPoseSample[];
@@ -2145,7 +2153,8 @@ let flashExposureUntil = 0;
 let flashExposureStrength = 0;
 let localGrenadeActionSequence = 0;
 const remoteSupportPresentations: RemoteSupportPresentation[] = [];
-let botWeaponAssignments: PrimaryWeaponId[] = [];
+let botWeaponCycle: ShuffleBag<WeaponId> | null = null;
+let botGrenadeCycle: ShuffleBag<GrenadeId> | null = null;
 let botGrenadeThrows = 0;
 let botGrenadeMaxActive = 0;
 let lastBotGrenadeDamage = 0;
@@ -5768,7 +5777,7 @@ function clearDeathDrops(): void {
   element<HTMLElement>('#pickup-prompt').hidden = true;
 }
 
-function deathDropVictim(message: DeathMessage): { weapon: PrimaryWeaponId; position: THREE.Vector3 } | null {
+function deathDropVictim(message: DeathMessage): { weapon: WeaponId; position: THREE.Vector3 } | null {
   if (message.victim === player.id) {
     const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
     return { weapon: player.primaryWeapon, position: new THREE.Vector3(player.position.x, floorY, player.position.z) };
@@ -5923,7 +5932,7 @@ function interactWithDeathDrop(now = performance.now()): boolean {
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id,
     dropId: drop.id,
-    weapon: drop.weapon,
+    weapon: result.inventory.primary,
     mode: 'weapon',
     selectedGrenade: player.selectedGrenade,
     grenadeGranted: 0,
@@ -6044,7 +6053,7 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
     || position.distanceTo(senderPosition) > 2.8
     || !validDropDistance
     || message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)
-    || message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)
+    || message.mode === 'weapon' && (!isPrimaryWeaponId(message.weapon) || !deathDropWeaponAvailable(entity.drop, now))
     || message.selectedGrenade !== remote.snapshot.grenade
     || message.grenadeGranted !== expectedGrenadeGranted) return;
   processedNonces.add(message.nonce);
@@ -6054,6 +6063,7 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
       remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
     }
   } else {
+    if (!isPrimaryWeaponId(message.weapon)) return;
     entity.drop = { ...entity.drop, weaponConsumedAt: now };
     authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
     setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
@@ -7960,11 +7970,43 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
 
 const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
 
-function spawnBot(index: number, hosted = false): void {
+function resetBotArsenalCycles(): void {
+  botWeaponCycle = createShuffleBag(BOT_WEAPON_POOL, gameplayRandom);
+  botGrenadeCycle = createShuffleBag(BOT_GRENADE_POOL, gameplayRandom);
+}
+
+function nextBotWeapon(): WeaponId {
+  if (!botWeaponCycle) resetBotArsenalCycles();
+  return botWeaponCycle!.next();
+}
+
+function nextBotGrenade(): GrenadeId {
+  if (!botGrenadeCycle) resetBotArsenalCycles();
+  return botGrenadeCycle!.next();
+}
+
+function equipNextBotArsenal(bot: BotPlayer): void {
+  const weapon = nextBotWeapon();
+  const grenade = nextBotGrenade();
+  if (bot.weapon !== weapon) {
+    bot.weapon = weapon;
+    setOperatorWeapon(bot.root, weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
+  }
+  bot.grenade = grenade;
+}
+
+function spawnBot(index: number, hosted = false, dormantPresentation = false): void {
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
   const id = hosted ? `host-bot-${index}` : `bot-${index}`;
-  const weapon = botWeaponAssignments[index] ?? assignBotWeapons(1, gameplayRandom)[0];
+  // Dormant operators exist only to prewarm reinforcement presentation. Their
+  // real arsenal draw occurs atomically when they become player-visible.
+  const weapon = dormantPresentation
+    ? BOT_WEAPON_POOL[index % BOT_WEAPON_POOL.length]!
+    : nextBotWeapon();
+  const grenade = dormantPresentation
+    ? BOT_GRENADE_POOL[index % BOT_GRENADE_POOL.length]!
+    : nextBotGrenade();
   const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
@@ -8001,7 +8043,7 @@ function spawnBot(index: number, hosted = false): void {
     kills: 0, deaths: 0, lastShotAt: 0, lastSightAt: 0, hasLineOfSight: false,
     sightStartedAt: 0, burstShots: 0, nextDecisionAt: 0, strafeSign: index % 2 === 0 ? 1 : -1,
     invulnerableUntil: spawnedAt + 1_000, respawnAt: 0, deathVisibleUntil: 0, waypoint: index, blockedSince: 0,
-    weapon, nextGrenadeAt: spawnedAt + 5_000 + gameplayRandom() * 3_000, grenadeActive: false,
+    weapon, grenade, nextGrenadeAt: spawnedAt + 5_000 + gameplayRandom() * 3_000, grenadeActive: false,
     positionHistory: [{
       at: currentHostTimeMs(), x: position.x, y: position.y + 1.7, z: position.z,
       yaw: root.rotation.y, stance: 'stand', continuity: 1,
@@ -8042,6 +8084,7 @@ function activateDormantBot(index: number): boolean {
   dormantBots.delete(id);
   const now = performance.now();
   const spawn = selectSafeBotSpawn(bot.team, bot.id);
+  equipNextBotArsenal(bot);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.root.scale.setScalar(1);
@@ -8066,8 +8109,7 @@ function activateDormantBot(index: number): boolean {
 async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
   const activeCount = hostedCount ?? selectedArena.soloBotCount;
-  const maximumCount = hostedCount === undefined ? selectedArena.maximumSoloBots : activeCount;
-  botWeaponAssignments = assignBotWeapons(maximumCount, gameplayRandom);
+  resetBotArsenalCycles();
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
   lastBotGrenadeDamage = 0;
@@ -8085,7 +8127,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
   for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
-    spawnBot(index);
+    spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
     bots.delete(bot.id);
     bot.alive = false;
@@ -8123,7 +8165,8 @@ function clearBots(): void {
   dormantBotsPrewarmed = false;
   soloBotDeaths = 0;
   lastBotSpawnIndices.clear();
-  botWeaponAssignments = [];
+  botWeaponCycle = null;
+  botGrenadeCycle = null;
 }
 
 function hostedBotSnapshot(bot: BotPlayer, seq: number): HostedBotSnapshot {
@@ -8167,7 +8210,6 @@ function acceptHostedBotState(message: BotStateMessage): void {
     if (!bot) {
       const index = Number(snapshot.id.slice('host-bot-'.length));
       if (!Number.isSafeInteger(index) || index < 0 || index > 3) continue;
-      if (botWeaponAssignments.length <= index) botWeaponAssignments = assignBotWeapons(privateMatchConfig.hostedBotCount, gameplayRandom);
       spawnBot(index, true);
       bot = bots.get(snapshot.id);
     }
@@ -8235,6 +8277,7 @@ function throwBotGrenade(
   fuseMs = 2_300,
   target = player.position,
   targetStance: Stance = player.stance,
+  grenade: GrenadeId = bot.grenade,
 ): boolean {
   if (!bot.alive || bot.grenadeActive || activeBotGrenadeCount() > 0) return false;
   const origin = bot.position.clone().add(new THREE.Vector3(0, 1.2, 0));
@@ -8248,13 +8291,21 @@ function throwBotGrenade(
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
+  const grenadeSpec = grenadeDefinition(grenade);
+  const impactDetonated = grenadeSpec.runtimeKind === 'impact-flash';
+  const sticky = grenadeSpec.runtimeKind === 'sticky-explosive';
+  const maximumLifetimeMs = impactDetonated || sticky
+    ? SEMTEX_HITL_CONTRACT.maximumNoImpactLifetimeMs
+    : Math.max(120, fuseMs);
   grenades.push({
-    grenade: 'frag',
+    grenade,
     mesh,
     velocity,
     angularVelocity: new THREE.Vector3(7.6, 5.8, 9.4),
-    explodeAt: now + Math.max(120, fuseMs),
-    nextFuseBeepAt: now + Math.max(120, fuseMs) - GRENADE_FUSE_BEEP_START_MS,
+    explodeAt: now + maximumLifetimeMs,
+    nextFuseBeepAt: impactDetonated || sticky
+      ? Number.POSITIVE_INFINITY
+      : now + maximumLifetimeMs - GRENADE_FUSE_BEEP_START_MS,
     lastBounceAt: 0,
     actionNonce: randomNonce(),
     ownerKind: 'bot',
@@ -8268,7 +8319,7 @@ function throwBotGrenade(
   bot.nextGrenadeAt = now + BOT_GRENADE_COOLDOWN_MS;
   botGrenadeThrows += 1;
   botGrenadeMaxActive = Math.max(botGrenadeMaxActive, activeBotGrenadeCount());
-  addFeed(`${bot.name} THREW FRAG`, 'coral');
+  addFeed(`${bot.name} THREW ${grenadeSpec.displayName.toUpperCase()}`, 'coral');
   return true;
 }
 
@@ -8371,6 +8422,7 @@ function applyBotDamage(
 function respawnBot(bot: BotPlayer, now: number): void {
   const state = respawnBotState(now);
   const spawn = selectSafeBotSpawn(bot.team, bot.id);
+  equipNextBotArsenal(bot);
   bot.position.set(spawn.x, spawn.y - 1.7, spawn.z);
   bot.root.position.copy(bot.position);
   bot.continuity += 1;
@@ -8728,54 +8780,74 @@ function updateBots(dt: number, now: number): void {
       bot.lastShotAt = now;
       fireOperator(bot.root);
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
-      const direction = targetPosition.clone().sub(origin).normalize();
+      const baseDirection = targetPosition.clone().sub(origin).normalize();
       const jitter = botAimJitter(distance) + bot.burstShots * 0.006;
-      direction.x += (gameplayRandom() - 0.5) * jitter;
-      direction.y += (gameplayRandom() - 0.5) * jitter;
-      direction.z += (gameplayRandom() - 0.5) * jitter;
-      direction.normalize();
       const shotLength = Math.min(distance + 2, 75);
       const targetRadius = combatTarget.stance === 'prone' ? 0.38 : combatTarget.stance === 'crouch' ? 0.48 : 0.55;
       const botWeapon = WEAPONS[bot.weapon];
-      const resolution = resolveBallisticHitscanAgainstTarget(
-        origin,
-        direction,
-        shotLength,
-        targetPosition,
-        targetRadius,
-        botWeapon.penetration,
-        activeBallisticSurfaces(),
-      );
-      applyInteractiveWorldBallisticTrace(resolution.trace, origin, direction, bot.weapon);
-      const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
+      const canonicalDefinition = botWeaponDefinition(bot.weapon);
+      const pelletCount = canonicalDefinition.fireKind === 'pellet' ? canonicalDefinition.pellets : 1;
+      const shotRight = new THREE.Vector3().crossVectors(baseDirection, new THREE.Vector3(0, 1, 0));
+      if (shotRight.lengthSq() < 1e-8) shotRight.set(1, 0, 0);
+      else shotRight.normalize();
+      const shotUp = new THREE.Vector3().crossVectors(shotRight, baseDirection).normalize();
       const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-      spawnTracer(botMuzzle ?? origin, visibleEnd, botWeapon.color);
       let impactAudioPlayed = false;
-      for (const impact of resolution.trace.impacts) {
-        const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
-        const point = origin.clone().addScaledVector(direction, impactDistance);
-        const surface = ballisticImpactSurface(impact.surface.material);
-        spawnImpactFlash(point, surface, new THREE.Vector3(
-          impact.entryNormal.x,
-          impact.entryNormal.y,
-          impact.entryNormal.z,
-        ));
-        if (!impactAudioPlayed) {
-          impactAudioPlayed = true;
-          audio.impact(surface, point.distanceTo(player.position));
+      let hitTarget = false;
+      let damage = 0;
+      let principalDirection = baseDirection;
+      let visibleEnd = origin.clone().addScaledVector(baseDirection, shotLength);
+      let impactCount = 0;
+      for (let pellet = 0; pellet < pelletCount; pellet += 1) {
+        const sample = sampleWeaponPellet(botWeapon, pellet, jitter, gameplayRandom(), gameplayRandom());
+        const direction = baseDirection.clone()
+          .addScaledVector(shotRight, sample.x)
+          .addScaledVector(shotUp, sample.y)
+          .normalize();
+        if (pellet === 0) principalDirection = direction;
+        const resolution = resolveBallisticHitscanAgainstTarget(
+          origin,
+          direction,
+          shotLength,
+          targetPosition,
+          targetRadius,
+          botWeapon.penetration,
+          activeBallisticSurfaces(),
+        );
+        applyInteractiveWorldBallisticTrace(resolution.trace, origin, direction, bot.weapon);
+        const pelletVisibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
+        if (pellet === 0) visibleEnd = pelletVisibleEnd;
+        spawnTracer(botMuzzle ?? origin, pelletVisibleEnd, botWeapon.color);
+        impactCount += resolution.trace.impacts.length;
+        for (const impact of resolution.trace.impacts) {
+          const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
+          const point = origin.clone().addScaledVector(direction, impactDistance);
+          const surface = ballisticImpactSurface(impact.surface.material);
+          spawnImpactFlash(point, surface, new THREE.Vector3(
+            impact.entryNormal.x,
+            impact.entryNormal.y,
+            impact.entryNormal.z,
+          ));
+          if (!impactAudioPlayed) {
+            impactAudioPlayed = true;
+            audio.impact(surface, point.distanceTo(player.position));
+          }
+        }
+        if (resolution.hitTarget) {
+          hitTarget = true;
+          damage += botScaledDamage(applyPenetrationDamage(
+            computeDamage(botWeapon, distance, 'body'),
+            resolution.damageMultiplier,
+          ));
         }
       }
-      if (combatTarget.kind === 'local' && !resolution.hitTarget && resolution.trace.impacts.length === 0) {
+      if (combatTarget.kind === 'local' && !hitTarget && impactCount === 0) {
         audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
       }
       audio.shot(bot.weapon, true);
-      if (resolution.hitTarget) {
-        const damage = botScaledDamage(applyPenetrationDamage(
-          computeDamage(botWeapon, distance, 'body'),
-          resolution.damageMultiplier,
-        ));
+      if (hitTarget) {
         if (combatTarget.kind === 'remote') {
-          applyHostedBotDamageToRemote(bot, combatTarget, damage, origin, direction, now);
+          applyHostedBotDamageToRemote(bot, combatTarget, damage, origin, principalDirection, now);
         } else {
           applyDamage(damage, bot.id, 1, false, { kind: 'gun', weapon: bot.weapon });
           if (!player.alive) {
@@ -13776,7 +13848,7 @@ const debugWindow = window as Window & {
     startSolo: () => void;
     setBotsFrozen: (frozen: boolean) => void;
     stageHostedBotAgainstRemote: () => { botId: string; targetId: string } | null;
-    setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: PrimaryWeaponId) => void;
+    setBotPresentation: (stance: PlayerSnapshot['stance'] | null, speed?: number, weapon?: WeaponId) => void;
     clearBots: () => void;
     placeBotAhead: (distance?: number) => void;
     placeBotRelative: (right: number, forward: number) => void;
@@ -13852,7 +13924,7 @@ const debugWindow = window as Window & {
     damageRemoteAuthoritatively: (amount: number, playerId?: string) => { targetId: string; storedBefore: number; canonicalBefore: number; storedAfter: number } | null;
     earnSupport: (eliminations: number) => void;
     activateKillstreak: (id: Pass65KillstreakId, anchor?: [number, number, number]) => boolean;
-    forceBotGrenade: (fuseMs?: number) => boolean;
+    forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
     stageRailgunSpawn: (siteIndex?: number) => RailgunAuthorityState;
@@ -14104,6 +14176,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       alive: bot.alive,
       kills: bot.kills,
       weapon: bot.weapon,
+      grenade: bot.grenade,
       nextGrenadeInMs: Math.max(0, bot.nextGrenadeAt - performance.now()),
       grenadeActive: bot.grenadeActive,
       position: bot.position.toArray(),
@@ -14144,7 +14217,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       dynamicReinforcementLights: 0,
       maximumBots: selectedArena.maximumSoloBots,
       nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
-        ? (Math.floor(soloBotDeaths / 5) + 1) * 5
+        ? (Math.floor(soloBotDeaths / BOT_DEATHS_PER_REINFORCEMENT) + 1) * BOT_DEATHS_PER_REINFORCEMENT
         : null,
       lastEliminationProfile: { ...lastBotEliminationProfile },
     },
@@ -15323,9 +15396,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     for (let index = 0; index < Math.max(0, Math.min(15, Math.floor(eliminations))); index += 1) awardSupportElimination(false);
   },
   activateKillstreak: (id: Pass65KillstreakId, anchor) => requestKillstreakActivation(id, performance.now(), anchor),
-  forceBotGrenade: (fuseMs = 1_100) => {
+  forceBotGrenade: (fuseMs = 1_100, grenade: GrenadeId = 'frag') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
-    return bot ? throwBotGrenade(bot, performance.now(), fuseMs) : false;
+    return bot ? throwBotGrenade(bot, performance.now(), fuseMs, player.position, player.stance, grenade) : false;
   },
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {

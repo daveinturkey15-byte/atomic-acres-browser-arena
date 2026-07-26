@@ -23,6 +23,7 @@ describe('opening arena selection', () => {
     expect(atomic.matchRules).toEqual({ durationMs: 300_000, scoreLimit: null });
     expect(atomic.soloBotCount).toBe(2);
     expect(atomic.maximumSoloBots).toBe(6);
+    expect(atomic.rulesLabel).toBe('5 MIN · 2 BOTS · +1 / 10 DEFEATS · MAX 6');
   });
 
   it('defines one-bot solo RustRig, gun range and Terminal with private multiplayer hosting', () => {
@@ -51,13 +52,13 @@ describe('opening arena selection', () => {
     });
   });
 
-  it('bounds Atomic fifth-death reinforcements and never reinforces sibling modes', () => {
+  it('bounds Atomic ten-defeat reinforcements and never reinforces sibling modes', () => {
     const atomic = arenaSelection('atomic-acres');
-    expect([0, 4, 5, 10, 15, 20, 25, 100].map((deaths) => activeSoloBotTarget(atomic, deaths)))
-      .toEqual([2, 2, 3, 4, 5, 6, 6, 6]);
+    expect([0, 9, 10, 19, 20, 29, 30, 39, 40, 100].map((deaths) => activeSoloBotTarget(atomic, deaths)))
+      .toEqual([2, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
     expect(activeSoloBotTarget(arenaSelection('rustworks-1v1'), 100)).toBe(1);
     expect(activeSoloBotTarget(arenaSelection('gun-range'), 100)).toBe(0);
-    expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(6);
+    expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(2);
   });
 
   it('decodes current route labels and preserves stable URL/storage/protocol ids', () => {

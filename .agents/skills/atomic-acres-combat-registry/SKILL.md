@@ -44,4 +44,9 @@ The first and third commands must exit zero and the second must exit nonzero. Fo
 
 `node scripts/verify-combat-registry.mjs <combat-manifest.json>`
 
+After changing runtime weapon or grenade eligibility, return to the repository root and run the
+catalog-projection, mutation and deterministic-cycle suite:
+
+`npm exec vitest run src/bot-arsenal.test.ts`
+
 Treat an unknown key, missing mapping, unbounded number, illegal union/cross-field combination, self-declared completeness set, or missing policy/evidence as a hard failure.

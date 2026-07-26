@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { GrenadeId } from '../../src/protocol';
 
 type ArenaId = 'atomic-acres' | 'rustworks-1v1' | 'gun-range';
 type Snapshot = {
@@ -20,8 +21,10 @@ type Snapshot = {
     renderedRows: number;
   };
   player: { hp: number; ammo: number; reserve: number; reloading: boolean; position: [number, number, number] };
-  bots: Array<{ id: string; weapon: 'carbine' | 'smg' | 'scattergun' | 'sniper'; grenadeActive: boolean; presentationWeaponSafe: boolean }>;
+  bots: Array<{ id: string; weapon: string; grenade: GrenadeId; grenadeActive: boolean; presentationWeaponSafe: boolean }>;
   botGrenades: { active: number; maximumActiveObserved: number; throws: number; lastDamage: number; damageMultiplier: number; ownerIds: string[] };
+  dmrThermal: { smokeVolumes: number };
+  grenadeExplosion: { total: number };
   breakableWindows: Array<{ id: string; broken: boolean; visible: boolean }>;
   deathDrops: Array<{ id: string; ammoAvailable: boolean; weaponAvailable: boolean; expiresInMs: number }>;
   deathDropPresentation: { active: number; capacity: number };
@@ -39,7 +42,7 @@ type DebugApi = {
   setBotsFrozen(frozen: boolean): void;
   clearBots(): void;
   placeBotAhead(distance?: number): void;
-  forceBotGrenade(fuseMs?: number): boolean;
+  forceBotGrenade(fuseMs?: number, grenade?: GrenadeId): boolean;
   setAmmo(weapon: 'carbine', ammo: number, reserve: number): void;
   equipWeapon(weapon: 'carbine'): void;
   teleportPlayer(x: number, y: number, z: number, yaw?: number, pitch?: number): void;
@@ -79,7 +82,7 @@ async function deploySolo(page: Page): Promise<void> {
   await expect.poll(async () => (await snapshot(page)).matchPhase, { timeout: 15_000 }).toBe('active');
 }
 
-const light = 'render=performance&signal=off&grass=off&clouds=off&rays=off&multiplayerQa=1';
+const light = 'renderer=webgl2&render=performance&signal=off&grass=off&clouds=off&rays=off&multiplayerQa=1';
 
 test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () => {
   test('deduplicates Dave to one best leaderboard row and rewrites legacy storage', async ({ page }) => {
@@ -209,7 +212,7 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     });
   });
 
-  test('spawns mixed bot weapons and admits only one reduced-damage bot grenade', async ({ page }) => {
+  test('spawns mixed bot arsenals and exercises every canonical grenade with one-bot-ordnance admission', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`/?${light}&mist=off&seed=36036`);
@@ -224,6 +227,7 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     const spawned = await snapshot(page);
     expect(spawned.bots).toHaveLength(2);
     expect(new Set(spawned.bots.map((bot) => bot.weapon)).size).toBe(2);
+    expect(new Set(spawned.bots.map((bot) => bot.grenade)).size).toBe(2);
     expect(spawned.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
     const admissions = await page.evaluate(() => [api().forceBotGrenade(4_000), api().forceBotGrenade(4_000)]);
     expect(admissions).toEqual([true, false]);
@@ -239,6 +243,21 @@ test.describe('Pass 36 range, atmosphere, windows, drops, and leaderboard', () =
     expect(exploded.botGrenades.lastDamage).toBeGreaterThan(0);
     expect(exploded.botGrenades.lastDamage).toBeLessThanOrEqual(57.5);
     expect(exploded.player.hp).toBeCloseTo(100 - exploded.botGrenades.lastDamage, 4);
+
+    const smokeVolumesBefore = exploded.dmrThermal.smokeVolumes;
+    expect(await page.evaluate(() => api().forceBotGrenade(180, 'smoke'))).toBe(true);
+    await expect.poll(async () => (await snapshot(page)).botGrenades.active, { timeout: 8_000 }).toBe(0);
+    expect((await snapshot(page)).dmrThermal.smokeVolumes).toBeGreaterThan(smokeVolumesBefore);
+
+    expect(await page.evaluate(() => api().forceBotGrenade(180, 'flash'))).toBe(true);
+    await expect.poll(async () => page.locator('#ordnance-flash').evaluate((overlay) => !overlay.hidden), { timeout: 8_000 }).toBe(true);
+    await expect.poll(async () => (await snapshot(page)).botGrenades.active, { timeout: 8_000 }).toBe(0);
+
+    const explosionsBeforeSemtex = (await snapshot(page)).grenadeExplosion.total;
+    expect(await page.evaluate(() => api().forceBotGrenade(180, 'semtex'))).toBe(true);
+    await expect.poll(async () => (await snapshot(page)).botGrenades.active, { timeout: 8_000 }).toBe(0);
+    expect((await snapshot(page)).grenadeExplosion.total).toBeGreaterThan(explosionsBeforeSemtex);
+    expect((await snapshot(page)).botGrenades.throws).toBe(4);
     expect(errors).toEqual([]);
   });
 

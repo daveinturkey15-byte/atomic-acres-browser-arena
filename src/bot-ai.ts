@@ -1,4 +1,17 @@
-import type { PrimaryWeaponId } from './protocol';
+export {
+  BOT_GRENADE_POOL,
+  BOT_WEAPON_DEFINITIONS,
+  BOT_WEAPON_POOL,
+  assignBotGrenades,
+  assignBotWeapons,
+  botWeaponBurstSize,
+  botWeaponDefinition,
+  botWeaponFireInterval,
+  createShuffleBag,
+  grenadeDefinition,
+  projectBotGrenadeIds,
+  projectBotWeaponIds,
+} from './bot-arsenal';
 
 export type BotMovement = 'idle' | 'advance' | 'retreat' | 'strafe-left' | 'strafe-right';
 
@@ -25,46 +38,12 @@ export type BotIntent = {
 
 export const SOLO_BOT_COUNT = 2;
 export const MAX_SOLO_BOTS = 6;
-export const BOT_DEATHS_PER_REINFORCEMENT = 5;
+export const BOT_DEATHS_PER_REINFORCEMENT = 10;
 export const BOT_FIRE_RANGE = 22;
 export const BOT_REACTION_DELAY = 650;
 export const BOT_GRENADE_MIN_RANGE = 7;
 export const BOT_GRENADE_MAX_RANGE = 18;
 export const BOT_GRENADE_COOLDOWN_MS = 12_000;
-export const BOT_WEAPON_POOL: readonly PrimaryWeaponId[] = Object.freeze(['carbine', 'smg', 'scattergun', 'sniper']);
-
-export function assignBotWeapons(count: number, random: () => number): PrimaryWeaponId[] {
-  const total = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
-  const assignments: PrimaryWeaponId[] = [];
-  while (assignments.length < total) {
-    const cycle = [...BOT_WEAPON_POOL];
-    for (let index = cycle.length - 1; index > 0; index -= 1) {
-      const sample = random();
-      const bounded = Number.isFinite(sample) ? Math.max(0, Math.min(0.999999999, sample)) : 0;
-      const swap = Math.floor(bounded * (index + 1));
-      [cycle[index], cycle[swap]] = [cycle[swap], cycle[index]];
-    }
-    if (assignments.length > 0 && cycle[0] === assignments[assignments.length - 1]) {
-      const alternate = cycle.findIndex((weapon) => weapon !== assignments[assignments.length - 1]);
-      [cycle[0], cycle[alternate]] = [cycle[alternate], cycle[0]];
-    }
-    assignments.push(...cycle.slice(0, total - assignments.length));
-  }
-  return assignments;
-}
-
-export function botWeaponBurstSize(weapon: PrimaryWeaponId, variation: number): number {
-  if (weapon === 'scattergun' || weapon === 'sniper') return 1;
-  return weapon === 'smg' ? 4 + Math.abs(Math.floor(variation)) % 2 : 3 + Math.abs(Math.floor(variation)) % 2;
-}
-
-export function botWeaponFireInterval(weapon: PrimaryWeaponId, burstActive: boolean): number {
-  if (weapon === 'sniper') return 1_250;
-  if (weapon === 'scattergun') return 920;
-  if (weapon === 'smg') return burstActive ? 92 : 520;
-  return burstActive ? 135 : 620;
-}
-
 export type BotGrenadeSense = Readonly<{
   alive: boolean;
   hasLineOfSight: boolean;
@@ -90,7 +69,7 @@ export function shouldBotThrowGrenade(sense: BotGrenadeSense): boolean {
     && sense.random < 0.32;
 }
 
-/** Fifth-death reinforcements, capped so an uncapped five-minute score race stays performant. */
+/** Ten-defeat Nuke Town reinforcements, capped so an uncapped score race stays performant. */
 export function soloBotTargetForDeaths(botDeaths: number): number {
   const deaths = Number.isFinite(botDeaths) ? Math.max(0, Math.floor(botDeaths)) : 0;
   return Math.min(MAX_SOLO_BOTS, SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));

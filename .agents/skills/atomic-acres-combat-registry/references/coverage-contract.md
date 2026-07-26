@@ -12,7 +12,7 @@ Each pinned weapon must have exactly one definition and one coverage row for gam
 
 ## Bot projection contract
 
-The pinned oracle protects the reviewed baseline, while runtime bot eligibility is still derived from the canonical definitions rather than copied into another list. The exact bot weapon set is every shipped definition with `botPolicy === 'eligible'`; the exact bot grenade set is every shipped grenade definition. A deterministic seeded shuffle bag covers each eligible member before an avoidable repeat. The verifier injects synthetic future weapon and grenade definitions through the canonical loader and requires bot projection/behavior coverage to expand automatically, then mutates rename/retire policy and rejects stale mirrors. Candidate-owned `requiredBotIds` arrays are forbidden.
+The pinned oracle protects the reviewed baseline, while runtime bot eligibility is still derived from the canonical definitions rather than copied into another list. The exact bot weapon set is every shipped definition with `botPolicy === 'eligible'`; the exact bot grenade set is every shipped grenade definition. A deterministic seeded shuffle bag covers each eligible member before an avoidable repeat. The runtime projection suite (`src/bot-arsenal.test.ts`) injects synthetic future weapon and grenade definitions and requires bot projection/behavior coverage to expand automatically, then mutates rename/retire policy and rejects stale mirrors. Candidate-owned `requiredBotIds` arrays are forbidden.
 
 ## F01 typed target
 

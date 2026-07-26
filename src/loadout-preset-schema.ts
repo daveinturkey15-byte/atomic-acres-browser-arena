@@ -1,4 +1,5 @@
 import { parseWeaponDefinitions, type WeaponDefinitionId } from './combat/weapon-schema';
+import { GRENADE_IDS, type GrenadeId as CanonicalGrenadeId } from './combat/grenade-catalog';
 import {
   DEFAULT_FIELD_KIT,
   FIELD_KITS,
@@ -19,11 +20,11 @@ export const LOADOUT_PRESET_IDS = Object.freeze([
   'custom-2',
   'custom-3',
 ] as const);
-export const LOADOUT_GRENADE_IDS = Object.freeze(['frag', 'smoke', 'flash', 'semtex'] as const);
+export const LOADOUT_GRENADE_IDS = GRENADE_IDS;
 export const CURATED_KIT_IDS = Object.freeze(FIELD_KITS.map((kit) => kit.id));
 
 export type LoadoutPresetId = (typeof LOADOUT_PRESET_IDS)[number];
-export type GrenadeId = (typeof LOADOUT_GRENADE_IDS)[number];
+export type GrenadeId = CanonicalGrenadeId;
 
 export const DEFAULT_LOADOUT_PRESET_NAMES: Readonly<Record<LoadoutPresetId, string>> = Object.freeze({
   'custom-1': 'Custom 1',

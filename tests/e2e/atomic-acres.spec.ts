@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { BOT_GRENADE_POOL, BOT_WEAPON_POOL } from '../../src/bot-ai';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 
 type DebugState = {
@@ -41,6 +42,8 @@ type DebugState = {
     hp: number;
     alive: boolean;
     kills: number;
+    weapon: string;
+    grenade: string;
     position: number[];
     waypoint: number;
     blockedSince: number;
@@ -1086,8 +1089,12 @@ test.describe('solo mechanics', () => {
     await page.screenshot({ path: 'test-results/pass59-kill-provenance-support-column.png', animations: 'disabled' });
   });
 
-  test('adds one matching hostile reinforcement on the fifth cumulative bot death', async ({ page }) => {
-    expect((await debug(page)).botEscalation).toMatchObject({
+  test('adds one matching hostile reinforcement on the tenth cumulative bot defeat', async ({ page }) => {
+    const initial = await debug(page);
+    const observedWeapons = new Set(initial.bots.map((bot) => bot.weapon));
+    const observedGrenades = new Set(initial.bots.map((bot) => bot.grenade));
+    expect(initial.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
+    expect(initial.botEscalation).toMatchObject({
       deaths: 0,
       initialBots: 2,
       targetBots: 2,
@@ -1096,18 +1103,24 @@ test.describe('solo mechanics', () => {
       dormantBotsPrewarmed: true,
       dynamicReinforcementLights: 0,
       maximumBots: 6,
-      nextReinforcementAt: 5,
+      nextReinforcementAt: 10,
     });
-    for (let death = 1; death <= 5; death += 1) {
+    for (let death = 1; death <= 10; death += 1) {
       await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
       await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
-      if (death === 2 || death === 4) {
-        await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(2);
+      if (death % 2 === 0) {
+        await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(death === 10 ? 3 : 2);
+        const respawned = await debug(page);
+        expect(respawned.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
+        respawned.bots.forEach((bot) => {
+          observedWeapons.add(bot.weapon);
+          observedGrenades.add(bot.grenade);
+        });
       }
     }
     const escalated = await debug(page);
     expect(escalated.botEscalation).toMatchObject({
-      deaths: 5,
+      deaths: 10,
       initialBots: 2,
       targetBots: 3,
       activeBots: 3,
@@ -1115,10 +1128,16 @@ test.describe('solo mechanics', () => {
       dormantBotsPrewarmed: true,
       dynamicReinforcementLights: 0,
       maximumBots: 6,
-      nextReinforcementAt: 10,
+      nextReinforcementAt: 20,
     });
     expect(escalated.bots).toHaveLength(3);
     expect(escalated.bots[2]).toMatchObject({ alive: true, neonHaze: true, presentationReady: true, presentationWeaponSafe: true });
+    escalated.bots.forEach((bot) => {
+      observedWeapons.add(bot.weapon);
+      observedGrenades.add(bot.grenade);
+    });
+    expect(observedWeapons).toEqual(new Set(BOT_WEAPON_POOL));
+    expect(observedGrenades).toEqual(new Set(BOT_GRENADE_POOL));
     expect(escalated.bots[2].operatorModel).toMatchObject({
       source: 'Quaternius Ultimate Modular Males / Swat.gltf', appearance: 'neon-purple', skinnedMeshes: 5,
     });

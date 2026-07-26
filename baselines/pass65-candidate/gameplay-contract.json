@@ -2586,6 +2586,12 @@
       "botGrenade": {
         "cooldownMs": 12000,
         "damageMultiplier": 0.25,
+        "families": [
+          "frag",
+          "smoke",
+          "flash",
+          "semtex"
+        ],
         "maximumActive": 1,
         "maximumRange": 18,
         "minimumRange": 7
@@ -2593,8 +2599,17 @@
       "botWeapons": [
         "carbine",
         "smg",
+        "lmg",
         "scattergun",
-        "sniper"
+        "sniper",
+        "pistol",
+        "machine-pistol",
+        "mini-uzi",
+        "mp5",
+        "m4a1",
+        "ak-47",
+        "m14-ebr",
+        "slug-shotgun"
       ],
       "grenade": {
         "maximumDamage": 230,
@@ -2607,6 +2622,7 @@
             "id": "atomic-acres",
             "maximumSoloBots": 6,
             "multiplayer": true,
+            "reinforcementEveryDefeats": 10,
             "scoreLimit": null,
             "soloBotCount": 2
           },
@@ -2615,6 +2631,7 @@
             "id": "rustworks-1v1",
             "maximumSoloBots": 1,
             "multiplayer": true,
+            "reinforcementEveryDefeats": null,
             "scoreLimit": null,
             "soloBotCount": 1
           },
@@ -2623,6 +2640,7 @@
             "id": "gun-range",
             "maximumSoloBots": 0,
             "multiplayer": true,
+            "reinforcementEveryDefeats": null,
             "scoreLimit": null,
             "soloBotCount": 0
           },
@@ -2631,6 +2649,7 @@
             "id": "skyline-terminal",
             "maximumSoloBots": 6,
             "multiplayer": true,
+            "reinforcementEveryDefeats": null,
             "scoreLimit": null,
             "soloBotCount": 2
           }
@@ -3977,7 +3996,9 @@
       "pass65-single-selected-grenade-and-corpse-refill",
       "pass65-coherent-pellet-shotgun-rebalance",
       "pass65-hitl-minigun-no-crit-and-25-percent-damage-reduction",
-      "pass65-hitl-crossbow-compact-1.5x-optic"
+      "pass65-hitl-crossbow-compact-1.5x-optic",
+      "pass65-canonical-bot-weapon-and-grenade-cycles",
+      "pass65-atomic-ten-defeat-reinforcements"
     ]
   }
 }

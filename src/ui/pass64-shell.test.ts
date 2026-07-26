@@ -42,7 +42,8 @@ describe('Pass 65 command shell', () => {
     expect(markup).toContain('id="loadout-grenade"');
     expect(markup).toContain('<option value="frag">Frag</option>');
     expect(markup).toContain('<option value="smoke">Smoke</option>');
-    expect(markup).toContain('<option value="flash">Flash</option>');
+    expect(markup).toContain('<option value="flash">Flashbang</option>');
+    expect(markup).toContain('<option value="semtex">Semtex</option>');
   });
 
   it('exposes three simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {

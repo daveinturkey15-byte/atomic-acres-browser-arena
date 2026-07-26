@@ -1,4 +1,5 @@
-import type { PrimaryWeaponId, Team } from './protocol';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
+import type { Team, WeaponId } from './protocol';
 
 export const HOSTED_BOT_COUNTS = [0, 2, 4] as const;
 export type HostedBotCount = typeof HOSTED_BOT_COUNTS[number];
@@ -7,7 +8,7 @@ export type HostedBotSnapshot = Readonly<{
   id: string;
   name: string;
   team: Team;
-  weapon: PrimaryWeaponId;
+  weapon: WeaponId;
   x: number;
   y: number;
   z: number;
@@ -33,8 +34,7 @@ export function isHostedBotSnapshot(value: unknown): value is HostedBotSnapshot 
   return typeof bot.id === 'string' && /^host-bot-[0-3]$/.test(bot.id)
     && typeof bot.name === 'string' && bot.name.length >= 1 && bot.name.length <= 20
     && (bot.team === 0 || bot.team === 1)
-    && (bot.weapon === 'carbine' || bot.weapon === 'smg' || bot.weapon === 'lmg'
-      || bot.weapon === 'scattergun' || bot.weapon === 'sniper')
+    && WEAPON_CATALOG.some((definition) => definition.id === bot.weapon && definition.policies.bot === 'eligible')
     && ['x', 'y', 'z', 'yaw', 'hp'].every((key) => Number.isFinite(bot[key]))
     && Number(bot.hp) >= 0 && Number(bot.hp) <= 100
     && ['kills', 'deaths', 'seq'].every((key) => Number.isSafeInteger(bot[key]) && Number(bot[key]) >= 0)

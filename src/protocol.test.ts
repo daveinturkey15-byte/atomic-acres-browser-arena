@@ -143,6 +143,9 @@ describe('network protocol guards', () => {
     expect(isHostAuthorityMessage(botState)).toBe(true);
     expect(isStateTrafficMessage(botState)).toBe(true);
     expect(isGameMessage(botDamage)).toBe(true);
+    expect(isGameMessage({ ...botState, bots: [{ ...bot, weapon: 'pistol' }] })).toBe(true);
+    expect(isGameMessage({ ...botDamage, weapon: 'pistol' })).toBe(true);
+    expect(isGameMessage({ ...botState, bots: [{ ...bot, weapon: 'minigun' }] })).toBe(false);
     expect(isHostAuthorityMessage(botDamage)).toBe(true);
     expect(isGameMessage({ ...botDamage, healthAfter: 85 })).toBe(false);
     expect(isGameMessage({ ...botState, bots: [bot, bot] })).toBe(false);
@@ -173,6 +176,7 @@ describe('network protocol guards', () => {
     const brokenWindow = { type: 'window-break', by: 'abc', windowId: 'aqua-house:ground-window-glass', origin: [1, 1.7, 2] as [number, number, number], nonce: 78 } as const;
     expect(isGameMessage(pickup)).toBe(true);
     expect(isGameMessage({ ...pickup, mode: 'scavenge' })).toBe(true);
+    expect(isGameMessage({ ...pickup, mode: 'scavenge', weapon: 'pistol' })).toBe(true);
     expect(isGameMessage(brokenWindow)).toBe(true);
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive' })).toBe(false);
     expect(isGameMessage({ ...brokenWindow, kind: 'explosive', actionNonce: 55 })).toBe(true);

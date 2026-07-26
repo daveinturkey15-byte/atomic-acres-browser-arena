@@ -1,6 +1,7 @@
 import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
+import { GRENADE_CATALOG } from '../combat/grenade-catalog';
 import { ARENA_SELECTIONS } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
@@ -72,6 +73,13 @@ function weaponOptionsMarkup(slot: 'primary' | 'secondary'): string {
   return WEAPON_CATALOG
     .filter((weapon) => weapon.slot === slot && weapon.policies.loadout === 'eligible')
     .map((weapon) => `<option value="${weapon.id}">${weapon.displayName}</option>`)
+    .join('');
+}
+
+function grenadeOptionsMarkup(): string {
+  return GRENADE_CATALOG
+    .filter((grenade) => grenade.availability === 'shipped')
+    .map((grenade) => `<option value="${grenade.id}">${grenade.displayName}</option>`)
     .join('');
 }
 
@@ -162,7 +170,7 @@ function fieldKitPanelMarkup(): string {
         <label>NAME<input id="loadout-preset-name" type="text" maxlength="32" autocomplete="off"></label>
         <label>PRIMARY<select id="loadout-primary">${weaponOptionsMarkup('primary')}</select></label>
         <label>SECONDARY<select id="loadout-secondary">${weaponOptionsMarkup('secondary')}</select></label>
-        <label>GRENADE<select id="loadout-grenade"><option value="frag">Frag</option><option value="smoke">Smoke</option><option value="flash">Flash</option><option value="semtex">Semtex</option></select></label>
+        <label>GRENADE<select id="loadout-grenade">${grenadeOptionsMarkup()}</select></label>
         <button id="loadout-save" type="button">SAVE PRESET</button>
       </div>
     </section>
@@ -207,7 +215,7 @@ function optionsPanelMarkup(): string {
         <label>WEAPON MOTION<input id="weapon-motion-scale" type="range" min="0" max="1" step="0.05" value="1"></label>
       </div>
     </section>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> frag · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/frag · <b>1/2</b> primary/sidearm · <b>TAB</b> roster · <b>ENTER</b> chat<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
+    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> selected grenade · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/grenade · <b>1/2</b> primary/sidearm · <b>TAB</b> roster · <b>ENTER</b> chat<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </div>`;
 }

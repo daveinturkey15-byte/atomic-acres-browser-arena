@@ -52,6 +52,8 @@ const contract = {
       'pass65-coherent-pellet-shotgun-rebalance',
       'pass65-hitl-minigun-no-crit-and-25-percent-damage-reduction',
       'pass65-hitl-crossbow-compact-1.5x-optic',
+      'pass65-canonical-bot-weapon-and-grenade-cycles',
+      'pass65-atomic-ten-defeat-reinforcements',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,

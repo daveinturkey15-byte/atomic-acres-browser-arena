@@ -16,6 +16,10 @@ describe('hosted lobby bots', () => {
       yaw: 0.4, hp: 70, kills: 2, deaths: 1, alive: true, seq: 9,
     } as const;
     expect(isHostedBotSnapshot(bot)).toBe(true);
+    expect(isHostedBotSnapshot({ ...bot, weapon: 'mp5' })).toBe(true);
+    expect(isHostedBotSnapshot({ ...bot, weapon: 'pistol' })).toBe(true);
+    expect(isHostedBotSnapshot({ ...bot, weapon: 'minigun' })).toBe(false);
+    expect(isHostedBotSnapshot({ ...bot, weapon: 'explosive-crossbow' })).toBe(false);
     expect(isHostedBotSnapshot({ ...bot, id: 'bot-owned-by-guest' })).toBe(false);
     expect(isHostedBotSnapshot({ ...bot, hp: 0, alive: true })).toBe(false);
   });

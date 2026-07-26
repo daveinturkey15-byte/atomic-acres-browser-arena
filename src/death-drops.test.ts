@@ -46,6 +46,16 @@ describe('death-drop inventory contract', () => {
     expect(deathDropAmmoAvailable(result.drop, 1_101)).toBe(true);
   });
 
+  it('keeps a bot sidearm corpse drop scavengable without treating it as a primary-slot pickup', () => {
+    const drop = createDeathDrop('death-sidearm', 'pistol', { x: 0, y: 0, z: 0 }, 8, 12, 1_000);
+    expect(deathDropAmmoAvailable(drop, 1_100)).toBe(true);
+    expect(deathDropWeaponAvailable(drop, 1_100)).toBe(false);
+    const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 110, grenades: 0 }, 120, 1_100);
+    expect(scavenged.scavenged).toBe(true);
+    expect(scavenged.inventory).toEqual({ weapon: 'carbine', reserve: 120, grenades: 1 });
+    expect(consumeDeathDropWeapon(drop, { primary: 'carbine', ammo: 30, reserve: 110 }, 120, 1_100).consumed).toBe(false);
+  });
+
   it('keeps the dropped weapon independently selectable after walk-over scavenging', () => {
     const drop = createDeathDrop('death-2', 'sniper', { x: 0, y: 0, z: 0 }, 5, 6, 1_000);
     const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 100, grenades: 0 }, 120, 1_100);

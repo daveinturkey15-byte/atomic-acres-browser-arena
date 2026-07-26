@@ -1,6 +1,6 @@
 import { GRENADE_CARRY_CAP } from './combat/ordnance';
 import { WEAPONS } from './gameplay';
-import type { PrimaryWeaponId, WeaponId } from './protocol';
+import { PRIMARY_WEAPON_IDS, type PrimaryWeaponId, type WeaponId } from './protocol';
 
 export const DEATH_DROP_LIFETIME_MS = 30_000;
 export const DEATH_DROP_INTERACTION_RANGE = 2.35;
@@ -13,7 +13,7 @@ export type DropPoint = { x: number; y: number; z: number };
 
 export type DeathDrop = {
   id: string;
-  weapon: PrimaryWeaponId;
+  weapon: WeaponId;
   position: DropPoint;
   ammo: number;
   reserve: number;
@@ -41,7 +41,7 @@ function finiteRound(value: number): number {
 
 export function createDeathDrop(
   id: string,
-  weapon: PrimaryWeaponId,
+  weapon: WeaponId,
   position: DropPoint,
   ammo: number,
   reserve: number,
@@ -70,11 +70,17 @@ export function deathDropAmmoAvailable(drop: DeathDrop, now: number): boolean {
 }
 
 export function deathDropWeaponAvailable(drop: DeathDrop, now: number): boolean {
-  return drop.weaponConsumedAt === null && now < drop.expiresAt;
+  return isPrimaryWeaponId(drop.weapon) && drop.weaponConsumedAt === null && now < drop.expiresAt;
 }
 
 export function deathDropAvailable(drop: DeathDrop, now: number): boolean {
-  return now < drop.expiresAt && (drop.ammoConsumedAt === null || drop.weaponConsumedAt === null);
+  return now < drop.expiresAt && (drop.ammoConsumedAt === null || deathDropWeaponAvailable(drop, now));
+}
+
+const PRIMARY_WEAPON_ID_SET = new Set<WeaponId>(PRIMARY_WEAPON_IDS);
+
+export function isPrimaryWeaponId(weapon: WeaponId): weapon is PrimaryWeaponId {
+  return PRIMARY_WEAPON_ID_SET.has(weapon);
 }
 
 export function nearestDeathDrop(
@@ -166,7 +172,9 @@ export function consumeDeathDropWeapon(
   inventory: DeathDropInventory;
   drop: DeathDrop;
 } {
-  if (!deathDropWeaponAvailable(drop, now)) return { consumed: false, mode: null, inventory, drop };
+  if (!deathDropWeaponAvailable(drop, now) || !isPrimaryWeaponId(drop.weapon)) {
+    return { consumed: false, mode: null, inventory, drop };
+  }
   const spec = WEAPONS[drop.weapon];
   const reserveCap = Math.min(spec.reserve, finiteRound(maximumReserve));
   if (inventory.primary === drop.weapon) {

@@ -14,7 +14,7 @@ import {
   movementProfile,
 } from './gameplay';
 import { createHouseArchitecture } from './house-navigation';
-import { BOT_GRENADE_COOLDOWN_MS, BOT_GRENADE_MAX_RANGE, BOT_GRENADE_MIN_RANGE, BOT_WEAPON_POOL, SOLO_BOT_COUNT } from './bot-ai';
+import { BOT_DEATHS_PER_REINFORCEMENT, BOT_GRENADE_COOLDOWN_MS, BOT_GRENADE_MAX_RANGE, BOT_GRENADE_MIN_RANGE, BOT_GRENADE_POOL, BOT_WEAPON_POOL, SOLO_BOT_COUNT } from './bot-ai';
 import { ARENA_SELECTIONS } from './map-selection';
 import {
   FIELD_SUPPORT,
@@ -81,6 +81,7 @@ export function buildGameplayContract(): Record<string, unknown> {
       soloBotCount: SOLO_BOT_COUNT,
       botWeapons: [...BOT_WEAPON_POOL],
       botGrenade: {
+        families: [...BOT_GRENADE_POOL],
         damageMultiplier: BOT_DAMAGE_MULTIPLIER,
         minimumRange: BOT_GRENADE_MIN_RANGE,
         maximumRange: BOT_GRENADE_MAX_RANGE,
@@ -99,6 +100,7 @@ export function buildGameplayContract(): Record<string, unknown> {
           id: selection.id,
           soloBotCount: selection.soloBotCount,
           maximumSoloBots: selection.maximumSoloBots,
+          reinforcementEveryDefeats: selection.id === 'atomic-acres' ? BOT_DEATHS_PER_REINFORCEMENT : null,
           multiplayer: selection.multiplayer,
           ...selection.matchRules,
         })),

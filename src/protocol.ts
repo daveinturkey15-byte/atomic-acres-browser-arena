@@ -39,6 +39,9 @@ import {
   type InteractiveWorldProtocolMessage,
   type InteractiveWorldSnapshotMessage,
 } from './interactive-world-protocol';
+import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
+
+export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
 export const MULTIPLAYER_PROTOCOL_VERSION = 7;
@@ -49,7 +52,6 @@ export type SidearmWeaponId =
   | 'pistol' | 'machine-pistol' | 'magnum' | 'flashlight-pistol' | 'explosive-crossbow';
 export type SpecialWeaponId = 'railgun';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
-export type GrenadeId = 'frag' | 'smoke' | 'flash' | 'semtex';
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
   'carbine', 'smg', 'lmg', 'scattergun', 'sniper',
@@ -58,7 +60,6 @@ export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
 export const SIDEARM_WEAPON_IDS: readonly SidearmWeaponId[] = Object.freeze([
   'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
 ]);
-export const GRENADE_IDS: readonly GrenadeId[] = Object.freeze(['frag', 'smoke', 'flash', 'semtex']);
 export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([...PRIMARY_WEAPON_IDS, ...SIDEARM_WEAPON_IDS, 'railgun']);
 export const MAX_MATCH_SCORE_ENTRIES = 10;
 
@@ -225,7 +226,7 @@ export type SupportActivateMessage = {
 export type DeathMessage = { type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number };
 export type BotStateMessage = { type: 'bot-state'; by: string; seq: number; bots: HostedBotSnapshot[]; nonce: number };
 export type BotDamageMessage = {
-  type: 'bot-damage'; by: string; botId: string; target: string; weapon: PrimaryWeaponId;
+  type: 'bot-damage'; by: string; botId: string; target: string; weapon: WeaponId;
   origin: [number, number, number]; direction: [number, number, number];
   damageApplied: number; healthBefore: number; healthAfter: number; nonce: number;
 };
@@ -234,7 +235,7 @@ export type PickupMessage = {
   protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string;
   dropId: string;
-  weapon: PrimaryWeaponId;
+  weapon: WeaponId;
   mode: 'scavenge' | 'weapon';
   selectedGrenade: GrenadeId;
   grenadeGranted: 0 | 1;
@@ -540,7 +541,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && typeof msg.botId === 'string' && /^host-bot-[0-3]$/.test(msg.botId)
         && typeof msg.target === 'string' && msg.target.length > 0 && msg.target.length <= 80
-        && primaryWeapons.has(msg.weapon as PrimaryWeaponId)
+        && weapons.has(msg.weapon as WeaponId)
         && Array.isArray(msg.origin) && msg.origin.length === 3 && msg.origin.every(Number.isFinite)
         && Array.isArray(msg.direction) && msg.direction.length === 3 && msg.direction.every(Number.isFinite)
         && Number.isFinite(msg.damageApplied) && Number(msg.damageApplied) > 0 && Number(msg.damageApplied) <= 100
@@ -558,7 +559,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string'
         && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
-        && primaryWeapons.has(msg.weapon as PrimaryWeaponId)
+        && weapons.has(msg.weapon as WeaponId)
         && (msg.mode === 'scavenge' || msg.mode === 'weapon')
         && grenades.has(msg.selectedGrenade as GrenadeId)
         && (msg.grenadeGranted === 0 || msg.grenadeGranted === 1)
