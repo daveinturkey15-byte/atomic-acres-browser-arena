@@ -27,9 +27,9 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('solids: activeWorldColliders()');
   });
 
-  it('routes F to gun-only chopper handoff, drone exit, care capture, or shed interaction before weapon pickup', () => {
+  it('routes F to gun-only chopper handoff, autonomous/manual drone toggle, care capture, or shed interaction before weapon pickup', () => {
     expect(source).toContain("requestKillstreakControl(chopper.id, 'toggle-chopper-gunner'");
-    expect(source).toContain("requestKillstreakControl(actor.possession.entityId, 'exit-piloted-drone'");
+    expect(source).toContain("requestKillstreakControl(actor.possession.entityId, 'toggle-piloted-drone'");
     expect(source).toContain("type: 'killstreak-care-capture-intent'");
     expect(source).toMatch(/!interactWithKillstreakSupport\(\)[\s\S]{0,100}!interactWithShedDoor\(\)\) interactWithWeaponPickup\(\)/);
   });

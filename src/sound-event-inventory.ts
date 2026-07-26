@@ -283,20 +283,23 @@ export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteCon
  * residual risk and must be closed when the audio runtime is integrated.
  */
 export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
+  runtimeCallsite('adrenalineState', 'adrenalineActive', 1, ['support.adrenaline-state']),
   runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
   runtimeCallsite('shedDoorMotion', 'nearest.distance', 1, ['shed.door-motion']),
   runtimeCallsite('coverImpact', 'point.distanceTo(player.position)', 1, ['world.projectile-impact']),
+  runtimeCallsite('coverImpact', 'position.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('crossbowFuseBeep', 'bolt.mesh.position,remainingMs,now', 1, ['ordnance.crossbow-fuse-beep']),
   runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
   runtimeCallsite('empty', '', 2, ['weapon.dry-fire']),
-  runtimeCallsite('explosion', 'afterPresentationDetach', 2, ['ordnance.frag-explosion']),
+  runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
   runtimeCallsite('explosion', 'now', 1, ['support.legacy-explosion']),
   runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
+  runtimeCallsite('flashbang', '', 1, ['ordnance.flash-detonation', 'ordnance.flash-recovery']),
   runtimeCallsite('footstep', 'localSurface,currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeBounce', 'Math.abs(incoming)', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeFuseBeep', 'fuseRemainingMs,now', 1, ['ordnance.frag-fuse-beep']),
-  runtimeCallsite('hit', 'false', 2, ['combat.hit-confirm']),
+  runtimeCallsite('hit', 'false', 3, ['combat.hit-confirm']),
   runtimeCallsite('hit', 'headshot', 2, ['combat.hit-confirm']),
   runtimeCallsite('hit', "hit.zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
@@ -306,6 +309,8 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('impact', 'surface,point.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
+  runtimeCallsite('matchCountdown', "'engage'", 1, ['announcement.match']),
+  runtimeCallsite('matchCountdown', 'Number(headline) as 1 | 2 | 3', 1, ['announcement.match']),
   runtimeCallsite('melee', '', 2, ['weapon.melee-swing', 'weapon.melee-world']),
   runtimeCallsite('minigunDrive', "0,'idle',false", 1, ['weapon.minigun-drive']),
   runtimeCallsite('minigunDrive', "weaponView.minigunSpoolFraction(),weaponView.minigunSpoolPhase(),gameStarted && player.alive && player.weapon === 'minigun'", 1, ['weapon.minigun-drive']),
@@ -327,6 +332,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', "'explosive-crossbow',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
+  runtimeCallsite('supportGun', "drone ? 'drone' : 'chopper'", 1, ['support.chopper-gun', 'support.drone-gun']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
@@ -785,15 +791,17 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: WORLD_LOOP, lifecycleOwner: 'projectile-entity',
     coverageDetail: 'A bounded per-volume loop may follow density but cannot outlive the canonical smoke generation.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'ordnance.flash-detonation', family: 'ordnance', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'explosion-world-v1', variants: ['occluded', 'peripheral', 'direct'],
+    emitterSymbols: ['flashbang'],
     contractRefs: ['R212', 'R215', 'R305', 'R307', 'R308'], concurrency: WORLD_DENSE_TRANSIENT,
     lifecycleOwner: 'projectile-entity', coverageDetail: 'Flash detonation audibility follows admitted LOS/distance while sensory scaling remains presentation-only.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'ordnance.flash-recovery', family: 'ordnance', bus: 'sfx', delivery: 'listener-local',
     variants: ['reduced-sensory', 'standard'], contractRefs: ['R212', 'R215', 'R305', 'R307', 'R308'],
+    emitterSymbols: ['flashbang'],
     concurrency: LOCAL_LOOP, lifecycleOwner: 'player-life',
     coverageDetail: 'Any local recovery/ringing cue must use remaining host duration, respect sensory controls, and never restart after replay.',
   }),
@@ -823,9 +831,10 @@ const events: SoundEventInventoryEntry[] = [
   }),
 
   // Pass 65 support-entity obligations.
-  plannedEvent({
+  existingEvent({
     id: 'support.adrenaline-state', family: 'support', bus: 'ui', delivery: 'listener-local',
     variants: ['activate', 'five-second-warning', 'expire'], contractRefs: ['R500', 'R501', 'R308'],
+    emitterSymbols: ['adrenalineState'],
     concurrency: LOCAL_CRITICAL, lifecycleOwner: 'player-life',
     coverageDetail: 'Adrenaline state cues must track the frozen modifier lifecycle without becoming the only state indication.',
   }),
@@ -853,9 +862,10 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
     coverageDetail: 'Rotor audio follows replicated aircraft pose and the exact chopper entity lifetime.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'support.chopper-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['burst-near', 'burst-far'],
+    emitterSymbols: ['supportGun'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Gun bursts are position-bound, compressor-limited, and capped independently from player reports.',
   }),
@@ -883,9 +893,10 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
     coverageDetail: 'Every active drone owns at most one pooled positional rotor voice and releases it on death/expiry/rematch.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'support.drone-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['single', 'burst', 'dry-fire', 'reload'],
+    emitterSymbols: ['supportGun'],
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Drone-gun audio follows admitted magazine/fire state and shares a hard support-weapon cap.',
   }),
@@ -940,9 +951,10 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: LOCAL_CRITICAL, lifecycleOwner: 'ui-root',
     coverageDetail: 'Loadout, killstreak, graphics, audio, and accessibility surfaces share a manifested UI family without audio-only meaning.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'announcement.match', family: 'announcements', bus: 'announcements', delivery: 'global-nonspatial',
     variants: ['countdown', 'start', 'one-minute', 'end-win', 'end-loss', 'end-draw'], contractRefs: ['R303', 'R308'],
+    emitterSymbols: ['matchCountdown'],
     concurrency: GLOBAL_CUE, lifecycleOwner: 'match-epoch',
     coverageDetail: 'Match announcements are epoch-owned, deduplicated, and never overlap stale rematch state.',
   }),
@@ -988,7 +1000,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '31d63267c63513e7bcc1180275d0d1ec0b8643d0393a6c7de7e5d2462f4674b7';
+export const SOUND_EVENT_INVENTORY_SHA256 = 'a81e1a40bf0edfc0dd767700612062ce683c03b567128d2011ab9f28993b3fb9';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];
