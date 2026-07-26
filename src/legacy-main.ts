@@ -848,6 +848,8 @@ type DeferredGpuRetirement = Readonly<{
 }>;
 
 const deferredGpuRetirements: DeferredGpuRetirement[] = [];
+const scheduledGpuRetirementRoots = new WeakSet<THREE.Object3D>();
+const scheduledGpuRetirementGeometries = new WeakSet<THREE.BufferGeometry>();
 let gpuRetirementTask: Promise<void> | null = null;
 let gpuRetirementFences = 0;
 let gpuRetirementDisposedRoots = 0;
@@ -896,6 +898,8 @@ async function drainDeferredGpuRetirements(): Promise<void> {
 }
 
 function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = true): void {
+  if (scheduledGpuRetirementRoots.has(root)) return;
+  scheduledGpuRetirementRoots.add(root);
   root.removeFromParent();
   root.visible = false;
   deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources }));
@@ -903,6 +907,8 @@ function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = 
 }
 
 function scheduleDeferredGpuGeometryRetirement(geometry: THREE.BufferGeometry): void {
+  if (scheduledGpuRetirementGeometries.has(geometry)) return;
+  scheduledGpuRetirementGeometries.add(geometry);
   deferredGpuRetirements.push(Object.freeze({ kind: 'geometry', geometry }));
   scheduleGpuRetirementDrain();
 }
@@ -2246,6 +2252,7 @@ const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expir
 const verifiedRemoteKills = new Map<string, number>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
+let matchStartPreparing = false;
 let refreshWarningUntil = 0;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let privateMatchMode: MatchMode = 'tdm';
@@ -3554,7 +3561,7 @@ async function beginPrivateMatch(
   const activeAtLocalMonoMs = mode === 'host'
     ? activeAtHostTimeMs
     : hostTimeToGuestMono(hostTimeMapping, activeAtHostTimeMs, observedGuestMonoMs, observedHostTimeMs);
-  startGame(mode, false, activeAtLocalMonoMs);
+  await startGame(mode, false, activeAtLocalMonoMs);
 }
 
 function hostStartPrivateMatch(): void {
@@ -6599,13 +6606,16 @@ function applyLocalClassRedeploy(selection: CombatLoadoutSelection, requestLock:
   setStatus(`Redeployed with ${WEAPONS[selection.primary].name} without a combat death.`, 'ok');
 }
 
-function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtLocalMonoMs?: number): void {
+async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeAtLocalMonoMs?: number): Promise<void> {
+  if (gameStarted || matchStartPreparing) return;
   if (mode !== 'solo' && !selectedArena.multiplayer) {
     setStatus(`${selectedArena.displayName} is solo-only.`, 'warn');
     return;
   }
   const requiredName = requirePlayerName();
   if (!requiredName) return;
+  matchStartPreparing = true;
+  try {
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
   fieldSupport = createFieldSupportState(frozenKillstreakLoadout);
@@ -6637,7 +6647,6 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   killstreakPresentation.clear();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
-  gameStarted = true;
   lastGameplayPresentedFrame = 0;
   lastGameplayBackdropFrame = 0;
   lastGameplayBackdropCapturedAt = Number.NEGATIVE_INFINITY;
@@ -6699,6 +6708,18 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   botsFrozen = false;
   debugBotStanceOverride = null;
   debugBotSpeedOverride = 0;
+  // Hold all simulation in a non-active state while newly staged operators
+  // compile behind the transition surface. Official match clocks begin only
+  // after the first submitted presentation has completed.
+  matchState = {
+    phase: 'warmup',
+    phaseStartedAt: performance.now(),
+    endsAt: Number.POSITIVE_INFINITY,
+    winner: null,
+  };
+  if (mode === 'solo') await spawnBots();
+  else if (mode === 'host') await spawnBots(privateMatchConfig.hostedBotCount);
+  gameStarted = true;
   const matchStartedAt = performance.now();
   beginMatchDiagnostics(mode, matchStartedAt);
   const matchRules = currentMatchRules();
@@ -6748,8 +6769,6 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
   respawn(requestLock, false, undefined, 'match-start');
-  if (mode === 'solo') spawnBots();
-  else if (mode === 'host') spawnBots(privateMatchConfig.hostedBotCount);
   addFeed(`Welcome to ${arena.label}`, 'gold');
   if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
   if (mode !== 'solo') {
@@ -6765,6 +6784,15 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
     if (mode === 'host') broadcastOverdriveState(matchStartedAt);
   }
   renderTextChat();
+  } catch (error) {
+    gameStarted = false;
+    clearBots();
+    killstreakLoadoutController.releaseAfterMatch();
+    killstreakMenuBinding.setMatchActive(false);
+    showFatalError(error);
+  } finally {
+    matchStartPreparing = false;
+  }
 }
 
 function randomNonce(): number {
@@ -7836,23 +7864,28 @@ function spawnBot(index: number, hosted = false): void {
   });
 }
 
-function prewarmDormantBotPresentations(): void {
-  if (dormantBots.size === 0) {
+async function prewarmBotPresentations(): Promise<void> {
+  if (bots.size === 0 && dormantBots.size === 0) {
     dormantBotsPrewarmed = true;
     return;
   }
+  const submissionWasPaused = renderSubmissionPaused;
+  renderSubmissionPaused = true;
   for (const bot of dormantBots.values()) {
     bot.root.visible = true;
     bot.root.scale.setScalar(0.0001);
   }
   try {
-    renderRuntime.compileAndRenderImmediate(scene, camera, scene);
+    // Never let cold operator shaders enter the live frame loop. Completion of
+    // this hidden first submission is the boundary between loading and play.
+    await renderRuntime.compileAndRender(scene, camera, scene);
     dormantBotsPrewarmed = true;
   } finally {
     for (const bot of dormantBots.values()) {
       bot.root.visible = false;
       bot.root.scale.setScalar(1);
     }
+    renderSubmissionPaused = submissionWasPaused;
   }
 }
 
@@ -7884,7 +7917,7 @@ function activateDormantBot(index: number): boolean {
   return true;
 }
 
-function spawnBots(hostedCount?: HostedBotCount): void {
+async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
   const activeCount = hostedCount ?? selectedArena.soloBotCount;
   const maximumCount = hostedCount === undefined ? selectedArena.maximumSoloBots : activeCount;
@@ -7899,6 +7932,9 @@ function spawnBots(hostedCount?: HostedBotCount): void {
     for (const bot of bots.values()) authoritativeScores.set(bot.id, emptyPlayerScore(bot.id));
     if (activeCount > 0) addFeed(String(activeCount) + ' HOST-AUTHORITATIVE BOTS DEPLOYED', 'coral');
     broadcastHostedBotState();
+    // Private-match activation uses an already-announced shared host clock.
+    // Do not move that clock behind a host-only compile boundary.
+    dormantBotsPrewarmed = activeCount === 0;
     return;
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
@@ -7912,7 +7948,7 @@ function spawnBots(hostedCount?: HostedBotCount): void {
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
-  prewarmDormantBotPresentations();
+  await prewarmBotPresentations();
   if (selectedArena.soloBotCount > 0) {
     addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
   }
@@ -11382,7 +11418,7 @@ function updateMatchState(now: number): void {
       else {
         network.close();
         resetForMode();
-        startGame('solo', false);
+        void startGame('solo', false);
       }
     }, { once: true });
     element<HTMLButtonElement>('#match-main-menu').addEventListener('click', returnToMainMenu, { once: true });
@@ -12198,7 +12234,7 @@ function syncArenaSelectionUi(): void {
     const selected = button.dataset.arenaId === selectedArena.id;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
-    button.disabled = !arenaSelectionReady || gameStarted || lobbyArenaLocked;
+    button.disabled = !arenaSelectionReady || gameStarted || matchStartPreparing || lobbyArenaLocked;
   }
   const soloButton = element<HTMLButtonElement>('#solo');
   const hostButton = element<HTMLButtonElement>('#host');
@@ -12429,7 +12465,7 @@ function animateMenuPreview(now: number): void {
 requestAnimationFrame(animateMenuPreview);
 
 async function performArenaSelection(id: ArenaId): Promise<void> {
-  if (gameStarted || !arenaSelectionReady || id === selectedArena.id) return;
+  if (gameStarted || matchStartPreparing || !arenaSelectionReady || id === selectedArena.id) return;
   arenaTransitionGeneration += 1;
   const nextSelection = arenaSelection(id);
   const previousSelection = selectedArena;
@@ -12694,11 +12730,12 @@ bindReleaseHistoryDialog();
 bindProjectMapDialog();
 
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
+  if (matchStartPreparing) return;
   if (!requirePlayerName()) return;
   network.close();
   resetForMode();
   resetPrivateLobbyState();
-  startGame('solo');
+  void startGame('solo');
 });
 element<HTMLButtonElement>('#host').addEventListener('click', () => {
   if (!requirePlayerName()) return;
@@ -14245,7 +14282,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     element<HTMLInputElement>('#player-name').value = 'QA Operator';
     network.close();
     resetForMode();
-    startGame('solo', false);
+    void startGame('solo', false);
   },
   setBotsFrozen: (frozen: boolean) => { botsFrozen = frozen; },
   stageHostedBotAgainstRemote: () => {
@@ -14968,7 +15005,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   rematch: () => {
     network.close();
     resetForMode();
-    startGame('solo', false);
+    void startGame('solo', false);
   },
   returnToMainMenu,
   selectArena: async (id: ArenaId) => activateArenaSelection(id),
