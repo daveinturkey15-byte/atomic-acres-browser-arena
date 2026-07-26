@@ -55,6 +55,10 @@ describe('killstreak presentation', () => {
     expect(supportForwardAlignment(chopper, 'chopper-player-gun', 'chopper-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(drone, 'drone-gun-receiver', 'drone-gun-muzzle-socket')).toBeCloseTo(1, 6);
     expect(supportForwardAlignment(aircraft, 'care-aircraft-fuselage', 'care-aircraft-forward-socket')).toBeCloseTo(1, 6);
+    const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
+    expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
+    expect(carePackage.getObjectByName('care-package-crate')!.userData)
+      .toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
     presentation.sync(snapshot(0), 1_100);
     expect(presentation.telemetry().entities).toBe(0);
     presentation.dispose();

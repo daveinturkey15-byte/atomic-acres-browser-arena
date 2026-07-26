@@ -368,6 +368,26 @@ describe('additional authored maps', () => {
       onlyShippingContainers: true,
     });
     expect(layout.minimumTowerDistance).toBeGreaterThan(15);
+    const practicalAudit = map.root.userData.rustworksContainerPracticalAudit as {
+      ids: string[]; count: number; palette: number[]; occlusionPolicy: string; shadowedDynamicFill: string;
+    };
+    expect(practicalAudit).toMatchObject({
+      count: 8,
+      palette: [0xff4d2e, 0xff9a3d, 0xffd25a],
+      occlusionPolicy: 'emissive-only',
+      shadowedDynamicFill: 'tower-mounted-work-light-pulse',
+    });
+    expect(practicalAudit.ids).toHaveLength(8);
+    for (const id of practicalAudit.ids) {
+      const practical = map.root.getObjectByName(id) as THREE.Mesh;
+      expect(practical).toBeInstanceOf(THREE.Mesh);
+      expect(practical.userData).toMatchObject({
+        occlusionPolicy: 'emissive-only',
+        practicalPolicyId: 'container-interior-warm-practicals',
+        containerInterior: true,
+      });
+      expect((practical.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThanOrEqual(3.2);
+    }
     expect(RUSTWORKS_TOWER.openContainerClearWidth).toBeGreaterThan(0.38 * 2 + 1.4);
     expect(RUSTWORKS_TOWER.openContainerClearHeight).toBeGreaterThan(1.82 + 0.5);
     const openRoutes = map.root.userData.rustworksOpenContainerRoutes as Array<{
@@ -581,17 +601,18 @@ describe('additional authored maps', () => {
     const map = buildGunRange(new THREE.Scene());
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Indoor Gun Range');
-    expect(map.targets).toHaveLength(14);
+    expect(map.targets).toHaveLength(16);
     expect(map.targets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
-    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(4);
+    expect(map.targets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
     expect(map.targets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
     expect(map.targets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
-      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 300, 300, 300, 500,
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
     expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
-    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
-    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    const staticPlates = map.targets.filter((target) => target.kind === 'plate' && !target.id.startsWith('lateral-'));
+    expect(staticPlates.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
+    expect(staticPlates.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
     const cat = map.targets.find((target) => target.id === 'flying-black-cat');
     expect(cat).toMatchObject({ kind: 'flying-cat', maxHealth: 100, health: 100, scoreValue: 500, respawnDelayMs: 30_000, alwaysCritical: true });
     expect(map.root.getObjectByName('gun-range-flying-black-cat')).toBeTruthy();
@@ -615,6 +636,8 @@ describe('additional authored maps', () => {
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-floor-neon-strip')).toHaveLength(2);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-strip')).toHaveLength(2);
     expect(auditLocalLightOcclusion(map.root)).toMatchObject({
       activeLocalLights: 0,
       emissiveOnlySources: 16,
@@ -629,15 +652,17 @@ describe('additional authored maps', () => {
     expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
     const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
     const before = neon.color.getHex();
-    const movingTargetLight = map.root.getObjectByName('gun-range-moving-target-light') as THREE.Mesh;
-    const movingTargetStart = movingTargetLight.position.clone();
+    const lateralTarget = map.root.getObjectByName('gun-range-lateral-illuminated-target') as THREE.Group;
+    const lateralTargetStart = lateralTarget.position.clone();
     const bayMaterial = map.root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial;
     const bayIntensity = bayMaterial.emissiveIntensity;
     updateGunRangePresentation(map.root, 9_000);
     expect(neon.color.getHex()).not.toBe(before);
-    expect(movingTargetLight.position.equals(movingTargetStart)).toBe(false);
-    expect(movingTargetLight.userData.presentationOnly).toBe(true);
-    expect(map.raycastMeshes).not.toContain(movingTargetLight);
+    expect(lateralTarget.position.equals(lateralTargetStart)).toBe(false);
+    expect(lateralTarget.userData.lateralAmplitudeM).toBeGreaterThanOrEqual(3);
+    const lateralPlate = lateralTarget.getObjectByName('gun-range-lateral-target-plate') as THREE.Mesh;
+    expect(lateralPlate).toBeInstanceOf(THREE.Mesh);
+    expect((lateralPlate.material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(2.8);
     expect(bayMaterial.emissiveIntensity).not.toBe(bayIntensity);
     const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
     expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);

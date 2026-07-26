@@ -56,11 +56,11 @@ export const FIELD_SHED_DEFINITION: DestructibleShedDefinition = Object.freeze({
     }),
     Object.freeze({
       id: 'roof-east', role: 'roof' as const, detachableChunkId: 'chunk-roof-east',
-      frame: Object.freeze({ centre: { x: 0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),
+      frame: Object.freeze({ centre: { x: 0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: -ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),
     }),
     Object.freeze({
       id: 'roof-west', role: 'roof' as const, detachableChunkId: 'chunk-roof-west',
-      frame: Object.freeze({ centre: { x: -0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: -ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),
+      frame: Object.freeze({ centre: { x: -0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),
     }),
   ]),
   preauthoredChunkIds: Object.freeze([

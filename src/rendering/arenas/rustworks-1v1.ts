@@ -12,6 +12,7 @@ export const definition = createProceduralArenaVisualDefinition({
     sunColor: 0xe2ebff, sunIntensity: 3.6, ambientColor: 0x718aa5, ambientIntensity: 0.72,
     practicals: [
       { id: 'tower-work-light-lenses', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
+      { id: 'container-interior-warm-practicals', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
       { id: 'tower-mounted-work-light', policy: 'shadowed-local', maximumDistance: 34, castsShadow: true },
       { id: 'tower-mounted-work-light-south', policy: 'shadowed-local', maximumDistance: 34, castsShadow: true },
     ],

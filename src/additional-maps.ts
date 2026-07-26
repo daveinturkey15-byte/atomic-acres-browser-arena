@@ -937,7 +937,20 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     { cluster: 'south-east', side: 'east', slot: 3, axis: 'z', x: 7, z: 19, opening: 'open-one' },
   ] as const;
   const containerPalette = [hazardDark, rustDark, tarp] as const;
+  const containerPracticalPalette = [0xff4d2e, 0xff9a3d, 0xffd25a] as const;
+  const containerPracticalMaterials = containerPracticalPalette.map((color, index) => {
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 3.2 + index * 0.35,
+      roughness: 0.24,
+      metalness: 0.28,
+    });
+    material.name = `RustRig_Container_Practical_${index}`;
+    return material;
+  });
   const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
+  const containerPracticalIds: string[] = [];
   for (const [index, placement] of containerRows.entries()) {
     const alongX = placement.axis === 'x';
     const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
@@ -981,6 +994,21 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         cast: false,
         detail: 'performance',
       });
+      const practicalId = `rustworks-container-practical-${placement.cluster}-${placement.slot}`;
+      const practicalMaterial = containerPracticalMaterials[index % containerPracticalMaterials.length]!;
+      const practical = box(
+        builder,
+        practicalId,
+        [placement.x, 2.36, placement.z],
+        alongX ? [2.1, 0.08, 0.16] : [0.16, 0.08, 2.1],
+        practicalMaterial,
+        { solid: false, shots: false, cast: false, detail: 'performance' },
+      );
+      practical.userData.occlusionPolicy = 'emissive-only';
+      practical.userData.practicalPolicyId = 'container-interior-warm-practicals';
+      practical.userData.containerInterior = true;
+      practical.userData.containerCluster = placement.cluster;
+      containerPracticalIds.push(practicalId);
       if (placement.opening === 'open-one') {
         const endThickness = 0.16;
         const closesPositiveEnd = (placement.side === 'north' || placement.side === 'west');
@@ -1044,6 +1072,13 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     perimeterWall: false,
     minimumTowerDistance: Math.min(...containerRows.map((placement) => Math.hypot(placement.x, placement.z))),
     onlyShippingContainers: true,
+  };
+  root.userData.rustworksContainerPracticalAudit = {
+    ids: containerPracticalIds,
+    count: containerPracticalIds.length,
+    palette: [...containerPracticalPalette],
+    occlusionPolicy: 'emissive-only',
+    shadowedDynamicFill: 'tower-mounted-work-light-pulse',
   };
   root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
   root.userData.rustworksUndercroft = {
@@ -1238,31 +1273,6 @@ export function fitCanvasText(
   return { fontSize, measuredWidth: context.measureText(text).width, availableWidth };
 }
 
-function scoreTexture(value: number): THREE.CanvasTexture | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  const text = `${value} PTS`;
-  context.fillStyle = '#10171b';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.strokeStyle = '#f4c44f';
-  context.lineWidth = 18;
-  context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-  context.fillStyle = '#f8f0d2';
-  const layout = fitCanvasText(context, text, 118, canvas.width - 88, 54);
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2 + 6);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  texture.userData.textLayout = { ...layout, canvasWidth: canvas.width, canvasHeight: canvas.height };
-  return texture;
-}
-
 function rangeSign(text: string, accent: number, name: string, scale: [number, number]): THREE.Mesh | null {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -1331,40 +1341,49 @@ function rangeTarget(
   bullseye.userData.hitZone = 'head';
   bullseye.position.set(0, 1.65, 0.01);
   bullseye.rotation.x = Math.PI / 2;
-  const movingLight = new THREE.Mesh(
-    new THREE.RingGeometry(0.12, 0.17, 18),
-    new THREE.MeshBasicMaterial({
-      color: distanceBand === 'near' ? 0x7afff6 : distanceBand === 'mid' ? 0xffdb67 : 0xff8a78,
-      transparent: true,
-      opacity: 0.82,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  movingLight.name = 'gun-range-moving-target-light';
-  movingLight.position.set(0, 1.65, 0.085);
-  movingLight.userData.presentationOnly = true;
-  movingLight.userData.targetLightPhase = targets.length * 0.83;
-  movingLight.raycast = () => undefined;
-  root.add(stand, plate, bullseye, movingLight);
-  const movingLights = (builder.root.userData.gunRangeMovingTargetLights ??= []) as THREE.Mesh[];
-  movingLights.push(movingLight);
-  const texture = scoreTexture(scoreValue);
-  if (texture) {
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: false, depthTest: true, toneMapped: false }));
-    label.name = `${scoreValue}-point-label`;
-    label.position.set(0, 2.75, 0);
-    label.scale.set(2.4, 1.2, 1);
-    root.add(label);
-  }
+  root.add(stand, plate, bullseye);
   root.traverse((child) => {
     child.userData.targetRoot = root;
     child.userData.impactSurface = 'metal';
   });
   builder.root.add(root);
   targets.push({ id, root, active: true, respawnAt: 0, scoreValue, distanceBand, maxHealth: 500, health: 500, kind: 'plate' });
+}
+
+function lateralRangeTarget(
+  builder: Builder,
+  targets: PracticeTarget[],
+  id: string,
+  originX: number,
+  z: number,
+  phase: number,
+  color: number,
+): void {
+  const root = new THREE.Group();
+  root.name = 'gun-range-lateral-illuminated-target';
+  root.userData.targetId = id;
+  root.userData.scoreValue = 250;
+  root.userData.lateralOriginX = originX;
+  root.userData.lateralAmplitudeM = 3.6;
+  root.userData.lateralFrequencyHz = 0.065;
+  root.userData.lateralPhaseRadians = phase;
+  root.position.set(originX, 0, z);
+  const plate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.92, 1.45, 0.16),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.8, roughness: 0.34, metalness: 0.4 }),
+  );
+  plate.name = 'gun-range-lateral-target-plate';
+  plate.position.y = 1.72;
+  plate.userData.hitZone = 'body';
+  root.add(plate);
+  root.traverse((child) => {
+    child.userData.targetRoot = root;
+    child.userData.impactSurface = 'metal';
+  });
+  builder.root.add(root);
+  const lateralTargets = (builder.root.userData.gunRangeLateralTargets ??= []) as THREE.Group[];
+  lateralTargets.push(root);
+  targets.push({ id, root, active: true, respawnAt: 0, scoreValue: 250, distanceBand: 'mid', maxHealth: 500, health: 500, kind: 'plate' });
 }
 
 function fivePointStarGeometry(outerRadius = 0.16, innerRadius = 0.065): THREE.ShapeGeometry {
@@ -1457,7 +1476,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const builder: Builder = {
     root, colliders: [], physicsColliders: [], raycastMeshes: [], shotSurfaces: [], ballisticSurfaceSequence: 0,
   };
-  const concrete = standard(0x444b4e, 0.98, 0.02);
+  const concrete = standard(0x626a6d, 0.98, 0.02);
   const wall = terminalSurfaceMaterial('panel', 0xb8c1c4, '#69777d', 0.5, 0.38, [7, 4]);
   wall.name = 'GunRange_SilverWall_PanelTexture';
   wall.userData.gunRangeShell = 'white-silver-wall';
@@ -1469,7 +1488,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const timber = standard(0x765136, 0.91, 0.04);
   const safety = new THREE.MeshStandardMaterial({ color: 0xe0aa37, emissive: 0x4b2b00, emissiveIntensity: 0.5, roughness: 0.62, metalness: 0.28 });
   const redSafety = new THREE.MeshStandardMaterial({ color: 0xc74235, emissive: 0x4a0804, emissiveIntensity: 0.72, roughness: 0.54, metalness: 0.2 });
-  const lamp = new THREE.MeshStandardMaterial({ color: 0xd9eff2, emissive: 0x9edfe9, emissiveIntensity: 2.5, roughness: 0.22, metalness: 0.08 });
+  const lamp = new THREE.MeshStandardMaterial({ color: 0xeafafa, emissive: 0xa8f5ff, emissiveIntensity: 3.4, roughness: 0.22, metalness: 0.08 });
   const targets: PracticeTarget[] = [];
   root.userData.gunRangeBayLightMaterial = lamp;
 
@@ -1521,7 +1540,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     makeEmissiveOnly(light);
     root.add(light);
   }
-  const ambient = new THREE.HemisphereLight(0xe8f5f5, 0x253137, 0.68);
+  const ambient = new THREE.HemisphereLight(0xf2ffff, 0x405159, 0.92);
   ambient.name = 'gun-range-moderate-ambient';
   ambient.userData.presentationOnly = true;
   root.add(ambient);
@@ -1548,6 +1567,11 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     makeEmissiveOnly(light);
     neonLights.push(light);
     root.add(light);
+  }
+  const perimeterNeon = neonMaterials[1]!;
+  for (const side of [-1, 1] as const) {
+    box(builder, 'gun-range-floor-neon-strip', [side * 19.78, 0.11, -14], [0.11, 0.12, 60], perimeterNeon, { solid: false, shots: false, cast: false });
+    box(builder, 'gun-range-ceiling-neon-strip', [side * 19.78, 6.68, -14], [0.11, 0.12, 60], perimeterNeon, { solid: false, shots: false, cast: false });
   }
   root.userData.gunRangeNeonMaterials = neonMaterials;
   root.userData.gunRangeNeonLights = neonLights;
@@ -1577,6 +1601,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   ] as const) {
     for (const x of [-7, 0, 7]) rangeTarget(builder, targets, `${band}-${x}`, x, z, score, band);
   }
+  const movingTargetSign = rangeSign('MOVING 250 PTS', 0xf4c44f, 'gun-range-moving-score-sign', [4.2, 0.72]);
+  if (movingTargetSign) {
+    movingTargetSign.position.set(16.2, 2.75, -29);
+    root.add(movingTargetSign);
+  }
+  box(builder, 'gun-range-lateral-target-rail', [0, 3.02, -29], [25, 0.12, 0.16], dark, { solid: false, shots: false, cast: false });
+  lateralRangeTarget(builder, targets, 'lateral-cyan', -6.2, -29, 0, 0x56e7df);
+  lateralRangeTarget(builder, targets, 'lateral-amber', 6.2, -29, Math.PI, 0xffb347);
 
   // Subtle live wall-penetration lab: four isolated lanes use explicit material
   // and thickness contracts, with a scored plate behind every panel.
@@ -1700,12 +1732,12 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
   });
   const bayMaterial = root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial | undefined;
   if (bayMaterial) bayMaterial.emissiveIntensity = 2.25 + (Math.sin(nowMs * 0.00062) * 0.5 + 0.5) * 0.55;
-  const targetLights = root.userData.gunRangeMovingTargetLights as THREE.Mesh[] | undefined;
-  targetLights?.forEach((light, index) => {
-    const phase = nowMs * 0.00135 + Number(light.userData.targetLightPhase ?? index);
-    light.position.x = Math.sin(phase) * 0.28;
-    light.position.y = 1.65 + Math.cos(phase * 0.73) * 0.12;
-    (light.material as THREE.MeshBasicMaterial).opacity = 0.58 + (Math.sin(phase * 1.4) * 0.5 + 0.5) * 0.34;
+  const lateralTargets = root.userData.gunRangeLateralTargets as THREE.Group[] | undefined;
+  lateralTargets?.forEach((target) => {
+    const phase = nowMs / 1_000 * Math.PI * 2 * Number(target.userData.lateralFrequencyHz)
+      + Number(target.userData.lateralPhaseRadians);
+    target.position.x = Number(target.userData.lateralOriginX)
+      + Math.sin(phase) * Number(target.userData.lateralAmplitudeM);
   });
 }
 

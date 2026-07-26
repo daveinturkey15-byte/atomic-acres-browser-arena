@@ -20,7 +20,7 @@ export const definition = createProceduralArenaVisualDefinition({
   assetDependencies: [],
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
-    sunColor: 0xffffff, sunIntensity: 0, ambientColor: 0x8999a4, ambientIntensity: 0.32,
+    sunColor: 0xffffff, sunIntensity: 0, ambientColor: 0xaabcc4, ambientIntensity: 0.48,
     practicals: [
       { id: 'ceiling-panels', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
       { id: 'weapon-stations', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
@@ -34,7 +34,7 @@ export const definition = createProceduralArenaVisualDefinition({
           position: [0, 6.05, 13.4],
           target: [0, 1.7, -17.5],
           color: 0xbdefff,
-          intensity: 18,
+          intensity: 24,
           distance: 38,
           angle: 0.44,
           penumbra: 0.82,

@@ -162,7 +162,11 @@ function buildCareCrate(): PresentedEntity {
   const root = new THREE.Group();
   root.name = 'pass65-care-package';
   root.userData.pass65KillstreakPresentation = true;
+  root.userData.interactable = true;
+  root.userData.interactionPrompt = 'F TO COLLECT KILLSTREAK';
   const crate = mesh(new THREE.BoxGeometry(1.05, 0.75, 1.05), 0x4e604d, 'care-package-crate');
+  crate.userData.interactable = true;
+  crate.userData.interactionPrompt = 'F TO COLLECT KILLSTREAK';
   const straps = mesh(new THREE.BoxGeometry(1.1, 0.79, 0.12), 0xe0b94f, 'care-package-straps');
   const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.45, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), material(0xd7dad0, { transparent: true, opacity: 0.82 }));
   canopy.name = 'care-package-parachute';

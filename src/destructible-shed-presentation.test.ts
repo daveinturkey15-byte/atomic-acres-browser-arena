@@ -46,6 +46,21 @@ describe('Pass 65 destructible shed presentation', () => {
     presentation.dispose();
   });
 
+  it('slopes both roof sheets up to the centre ridge with outward-facing normals', () => {
+    for (const surfaceId of ['roof-east', 'roof-west']) {
+      const surface = FIELD_SHED_DEFINITION.surfaces.find((candidate) => candidate.id === surfaceId)!;
+      const centre = new THREE.Vector3(surface.frame.centre.x, surface.frame.centre.y, surface.frame.centre.z);
+      const u = new THREE.Vector3(surface.frame.uAxis.x, surface.frame.uAxis.y, surface.frame.uAxis.z);
+      const v = new THREE.Vector3(surface.frame.vAxis.x, surface.frame.vAxis.y, surface.frame.vAxis.z);
+      const ridge = centre.clone().addScaledVector(v, surface.frame.halfV);
+      const eave = centre.clone().addScaledVector(v, -surface.frame.halfV);
+      expect(Math.abs(ridge.x), `${surfaceId}:ridge-x`).toBeLessThan(0.01);
+      expect(Math.abs(eave.x), `${surfaceId}:eave-x`).toBeGreaterThan(1.79);
+      expect(ridge.y).toBeGreaterThan(eave.y);
+      expect(new THREE.Vector3().crossVectors(u, v).normalize().y).toBeGreaterThan(0.8);
+    }
+  });
+
   it('cuts real panel geometry and renders the rim from the same admitted aperture', () => {
     const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 2);
     const presentation = createFieldShedPresentation(placement, initial);

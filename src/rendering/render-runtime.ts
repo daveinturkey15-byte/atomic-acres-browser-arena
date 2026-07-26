@@ -64,8 +64,15 @@ export function shouldBackpressureWebGpuSubmissions(
   pendingSince: number | null,
   now: number,
   thresholdMs: number,
+  inFlightSubmissions = 0,
+  maximumInFlightSubmissions = Number.POSITIVE_INFINITY,
 ): boolean {
-  return pendingSince !== null
+  const queueDepthBoundReached = Number.isSafeInteger(inFlightSubmissions)
+    && Number.isSafeInteger(maximumInFlightSubmissions)
+    && inFlightSubmissions >= 0
+    && maximumInFlightSubmissions > 0
+    && inFlightSubmissions >= maximumInFlightSubmissions;
+  return queueDepthBoundReached || pendingSince !== null
     && Number.isFinite(pendingSince)
     && Number.isFinite(now)
     && Number.isFinite(thresholdMs)
@@ -429,6 +436,10 @@ export class WebGpuRenderRuntime {
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
+  // Queue completion resolves in frontiers rather than per-frame. Bound the
+  // unresolved frontier so a cold arena/support shader compile cannot enqueue
+  // dozens of expensive frames before the age-based backpressure engages.
+  private static readonly MAX_IN_FLIGHT_SUBMISSIONS = 4;
   // Cold shader/shadow compilation on the frozen owner hardware can retire in
   // ~2.4 s. Backpressure still stops new work at 250 ms; four seconds matches
   // the explicit queue-fence timeout and distinguishes cold work from a hang.
@@ -561,6 +572,8 @@ export class WebGpuRenderRuntime {
         this.pendingCompletionStartedAt,
         now,
         WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
+        this.submissionSequence - this.completedSequence,
+        WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
       ),
       skippedSubmissions: this.skippedSubmissions,
     };
@@ -718,6 +731,8 @@ export class WebGpuRenderRuntime {
       this.pendingCompletionStartedAt,
       now,
       WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
+      this.submissionSequence - this.completedSequence,
+      WebGpuRenderRuntime.MAX_IN_FLIGHT_SUBMISSIONS,
     )) {
       this.scheduleCompletionProbe(now, true);
       this.skippedSubmissions += 1;

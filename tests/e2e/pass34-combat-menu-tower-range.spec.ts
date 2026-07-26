@@ -220,7 +220,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     expect(state.sniperScope.active).toBe(false);
     expect(state.sniperScope.cameraFov).toBe(state.sniperScope.baseFov);
     expect(state.rangePractice.values.sort((a, b) => a - b)).toEqual([
-      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 300, 300, 300, 500,
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
     ]);
     await expect(page.locator('#timer')).toHaveText(/01:5[5-9]/);
     await expect(page.locator('#aqua-label')).toHaveText('SCORE');
@@ -240,7 +240,7 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     });
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.hits === 1);
     state = await snapshot(page);
-    expect(state.rangePractice).toMatchObject({ score: 0, hits: 1, activeTargets: 14 });
+    expect(state.rangePractice).toMatchObject({ score: 0, hits: 1, activeTargets: 16 });
     const centreTarget = state.rangePractice.targets.find((target) => target.id === 'near-0');
     expect(centreTarget?.maxHealth).toBe(500);
     expect(centreTarget?.health).toBeGreaterThan(0);
@@ -253,11 +253,11 @@ test.describe('Pass 34 combat, navigation, and authored map contracts', () => {
     });
     await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.score === 100);
     state = await snapshot(page);
-    expect(state.rangePractice).toMatchObject({ score: 100, hits: 2, activeTargets: 13 });
+    expect(state.rangePractice).toMatchObject({ score: 100, hits: 2, activeTargets: 15 });
     await expect(page.locator('#objective')).toContainText('SCORE 100 · 2 HITS');
     await expect.poll(() => page.evaluate(() => (
       window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }
-    ).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.activeTargets), { timeout: 4_000 }).toBe(14);
+    ).__ATOMIC_ACRES_DEBUG__.snapshot().rangePractice.activeTargets), { timeout: 4_000 }).toBe(16);
 
     await page.evaluate(() => {
       (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.hitRangeTarget('flying-black-cat', 100, 'body');
