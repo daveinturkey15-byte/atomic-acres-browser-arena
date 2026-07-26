@@ -100,8 +100,7 @@ describe('Pass 65 destructible-world authority', () => {
     expect(validateDestructibleShedDefinition(definition)).toEqual([]);
     expect(definition.caps).toEqual({ apertures: 32, dents: 24, majorChunks: 6, arenaAwakeMajorBodies: 18 });
     expect(definition.consumers).toEqual([
-      'player-movement', 'ballistics', 'grenade-explosion-sweeps', 'ai-line-of-sight',
-      'support-targeting', 'spawn-safety-navigation', 'rendering', 'minimap-diagnostics',
+      'movement', 'ballistics', 'grenades', 'ai-los', 'support-targeting', 'spawn-nav', 'rendering',
     ]);
     expect(validateDestructibleShedDefinition({
       ...definition,

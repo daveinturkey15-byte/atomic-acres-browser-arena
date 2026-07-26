@@ -10,14 +10,13 @@ export const SHED_ANGLE_Q = 10_000;
 export const SHED_PANEL_COORD_Q = 10_000;
 
 export const WORLD_COLLISION_CONSUMERS = Object.freeze([
-  'player-movement',
+  'movement',
   'ballistics',
-  'grenade-explosion-sweeps',
-  'ai-line-of-sight',
+  'grenades',
+  'ai-los',
   'support-targeting',
-  'spawn-safety-navigation',
+  'spawn-nav',
   'rendering',
-  'minimap-diagnostics',
 ] as const);
 
 export type WorldCollisionConsumer = typeof WORLD_COLLISION_CONSUMERS[number];
