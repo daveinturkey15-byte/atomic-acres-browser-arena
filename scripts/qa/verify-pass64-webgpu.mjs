@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
@@ -21,8 +21,12 @@ if (trackedWorktreeDirty) throw new Error('Pass 64 hardware WebGPU QA requires a
 const cases = process.env.PASS64_ARENAS
   ? process.env.PASS64_ARENAS.split(',').map((value) => value.trim()).filter(Boolean)
   : ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'];
-const artifactRoot = 'artifacts/pass64/playable-webgpu';
+const publishedArtifactRoot = 'artifacts/pass64/playable-webgpu';
+const artifactRunId = `${sourceRevision.slice(0, 12)}-${Date.now()}-${process.pid}`;
+const artifactRoot = `artifacts/pass64/.playable-webgpu-run-${artifactRunId}`;
+const artifactBackupRoot = `artifacts/pass64/.playable-webgpu-backup-${artifactRunId}`;
 await mkdir(artifactRoot, { recursive: true });
+let artifactsPromoted = false;
 
 function pngLuminance(png) {
   if (png.toString('ascii', 1, 4) !== 'PNG') throw new Error('ROI capture is not PNG');
@@ -103,6 +107,141 @@ function pngLuminance(png) {
   };
 }
 
+const PRESENTATION_FRESHNESS_TIMEOUT_MS = 15_000;
+
+function concisePresentationState(state) {
+  const presentation = state?.render?.runtime?.presentation;
+  const playableScene = state?.render?.playableScene;
+  return {
+    frameCount: state?.frameCount ?? null,
+    cameraId: playableScene?.deterministicReview?.cameraId ?? null,
+    cameraPosition: playableScene?.cameraComposition?.position ?? null,
+    cameraInsideCollider: playableScene?.cameraComposition?.insideHorizontalCollider ?? null,
+    status: presentation?.status ?? null,
+    submissionSequence: presentation?.submissionSequence ?? null,
+    completedSequence: presentation?.completedSequence ?? null,
+    pendingForMs: presentation?.pendingForMs ?? null,
+    completionFailures: presentation?.completionFailures ?? null,
+    lastFailure: presentation?.lastFailure ?? null,
+    backpressureActive: presentation?.backpressureActive ?? null,
+    skippedSubmissions: presentation?.skippedSubmissions ?? null,
+    deviceLost: state?.render?.runtime?.deviceLost ?? null,
+    uncapturedErrors: state?.render?.runtime?.uncapturedErrors ?? null,
+  };
+}
+
+async function freshPresentationDiagnostics(page) {
+  return page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot() ?? null)
+    .then(concisePresentationState)
+    .catch((error) => ({ snapshotError: error instanceof Error ? error.message : String(error) }));
+}
+
+async function applyAndAwaitFreshPresentation(page, action, label) {
+  const started = await page.evaluate((requestedAction) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot();
+    let applied = true;
+    if (requestedAction.kind === 'review-camera') {
+      applied = api.setArenaReviewCamera(requestedAction.cameraId);
+    } else {
+      api.setCaptureCameraPose(...requestedAction.pose);
+    }
+    const afterMutation = api.snapshot();
+    const summarize = (state) => ({
+      frameCount: state.frameCount,
+      cameraId: state.render.playableScene.deterministicReview.cameraId,
+      cameraPosition: state.render.playableScene.cameraComposition.position,
+      cameraInsideCollider: state.render.playableScene.cameraComposition.insideHorizontalCollider,
+      status: state.render.runtime.presentation.status,
+      submissionSequence: state.render.runtime.presentation.submissionSequence,
+      completedSequence: state.render.runtime.presentation.completedSequence,
+      completionFailures: state.render.runtime.presentation.completionFailures,
+      lastFailure: state.render.runtime.presentation.lastFailure,
+      deviceLost: state.render.runtime.deviceLost,
+      uncapturedErrors: state.render.runtime.uncapturedErrors,
+    });
+    return { applied, before: summarize(before), afterMutation: summarize(afterMutation) };
+  }, action);
+  if (!started.applied) throw new Error(`${label} could not apply presentation action ${JSON.stringify(action)}`);
+
+  const expectedCameraId = action.kind === 'review-camera' ? action.cameraId : null;
+  try {
+    await page.waitForFunction(({ beforeFrame, beforeSubmission, expectedCameraId }) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const presentation = state?.render?.runtime?.presentation;
+      return state?.render?.playableScene?.deterministicReview?.cameraId === expectedCameraId
+        && state?.frameCount > beforeFrame
+        && presentation?.submissionSequence > beforeSubmission;
+    }, {
+      beforeFrame: started.before.frameCount,
+      beforeSubmission: started.before.submissionSequence,
+      expectedCameraId,
+    }, { timeout: PRESENTATION_FRESHNESS_TIMEOUT_MS });
+  } catch (error) {
+    const stalled = await freshPresentationDiagnostics(page);
+    throw new Error(`${label} timed out before a post-mutation WebGPU submission was admitted: ${JSON.stringify({ action, started, stalled })}`, { cause: error });
+  }
+
+  const admitted = concisePresentationState(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot()));
+  try {
+    await page.waitForFunction(({ targetSequence, expectedCameraId }) => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      const presentation = state?.render?.runtime?.presentation;
+      return state?.render?.playableScene?.deterministicReview?.cameraId === expectedCameraId
+        && state?.render?.playableScene?.cameraComposition?.insideHorizontalCollider === false
+        && presentation?.completedSequence >= targetSequence
+        && presentation?.status === 'healthy'
+        && presentation?.completionFailures === 0
+        && state?.render?.runtime?.deviceLost === false
+        && state?.render?.runtime?.uncapturedErrors === 0;
+    }, {
+      targetSequence: admitted.submissionSequence,
+      expectedCameraId,
+    }, { timeout: PRESENTATION_FRESHNESS_TIMEOUT_MS });
+  } catch (error) {
+    const stalled = await freshPresentationDiagnostics(page);
+    throw new Error(`${label} timed out before admitted WebGPU submission ${admitted.submissionSequence} completed cleanly: ${JSON.stringify({ action, started, admitted, stalled })}`, { cause: error });
+  }
+
+  const completed = concisePresentationState(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot()));
+  return {
+    action,
+    before: started.before,
+    afterMutation: started.afterMutation,
+    admitted,
+    completed,
+    admittedSubmissionDelta: admitted.submissionSequence - started.before.submissionSequence,
+    completedSubmissionDelta: completed.completedSequence - started.before.completedSequence,
+  };
+}
+
+async function promoteArtifactDirectory() {
+  let previousCorpusMoved = false;
+  try {
+    if (existsSync(publishedArtifactRoot)) {
+      await rename(publishedArtifactRoot, artifactBackupRoot);
+      previousCorpusMoved = true;
+    }
+    await rename(artifactRoot, publishedArtifactRoot);
+    artifactsPromoted = true;
+  } catch (error) {
+    let rollbackFailure = null;
+    if (previousCorpusMoved && !existsSync(publishedArtifactRoot) && existsSync(artifactBackupRoot)) {
+      try {
+        await rename(artifactBackupRoot, publishedArtifactRoot);
+      } catch (rollbackError) {
+        rollbackFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      }
+    }
+    throw new Error(`WebGPU evidence promotion failed without publishing a mixed corpus: ${JSON.stringify({ artifactRunId, rollbackFailure })}`, { cause: error });
+  }
+  if (previousCorpusMoved) {
+    await rm(artifactBackupRoot, { recursive: true, force: true }).catch((error) => {
+      console.warn(`[Pass 64 WebGPU evidence backup retained at ${artifactBackupRoot}]`, error);
+    });
+  }
+}
+
 const server = await createServer({
   server: { host: '127.0.0.1', port, strictPort: true },
   logLevel: 'error',
@@ -156,14 +295,18 @@ try {
     });
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === true, undefined, { timeout: 30_000 });
     await page.waitForTimeout(500);
-    const overview = await page.evaluate(() => {
+    const overviewCameraId = await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      const cameraId = api.snapshot().render.playableScene.appliedArenaVisualPolicy.reviewCameraIds
-        .find((id) => id.includes('overview'));
-      return { cameraId, selected: typeof cameraId === 'string' && api.setArenaReviewCamera(cameraId) };
+      return api.snapshot().render.playableScene.appliedArenaVisualPolicy.reviewCameraIds
+        .find((id) => id.includes('overview')) ?? null;
     });
-    if (!overview.selected) throw new Error(`${arenaId} deterministic overview camera is missing`);
-    await page.waitForTimeout(350);
+    if (!overviewCameraId) throw new Error(`${arenaId} deterministic overview camera is missing`);
+    const overviewPresentation = await applyAndAwaitFreshPresentation(
+      page,
+      { kind: 'review-camera', cameraId: overviewCameraId },
+      `${arenaId} deterministic overview`,
+    );
+    const overview = { cameraId: overviewCameraId, selected: true, presentation: overviewPresentation };
     let performanceBudget;
     try {
       performanceBudget = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaPerformanceBudget());
@@ -347,15 +490,22 @@ try {
       const cameraIds = arenaId === 'skyline-terminal'
         ? ['terminal-concourse-wall-closed', 'terminal-boarding-open']
         : ['nuke-town-aqua-wall-closed', 'nuke-town-aqua-door-open'];
-      const closedSelected = await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera(id), cameraIds[0]);
-      if (!closedSelected) throw new Error(`${arenaId} solid-wall review camera missing`);
-      await page.waitForTimeout(350);
+      const closedPresentation = await applyAndAwaitFreshPresentation(
+        page,
+        { kind: 'review-camera', cameraId: cameraIds[0] },
+        `${arenaId} solid-wall review`,
+      );
       const closedPng = await page.screenshot({ path: `${artifactRoot}/${arenaId}-solid-wall-roi.png`, clip, animations: 'disabled' });
-      const openSelected = await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.setArenaReviewCamera(id), cameraIds[1]);
-      if (!openSelected) throw new Error(`${arenaId} open-door review camera missing`);
-      await page.waitForTimeout(350);
+      const openPresentation = await applyAndAwaitFreshPresentation(
+        page,
+        { kind: 'review-camera', cameraId: cameraIds[1] },
+        `${arenaId} open-door review`,
+      );
       const openPng = await page.screenshot({ path: `${artifactRoot}/${arenaId}-open-door-roi.png`, clip, animations: 'disabled' });
-      roi = { solidWall: pngLuminance(closedPng), openDoor: pngLuminance(openPng) };
+      roi = {
+        solidWall: { ...pngLuminance(closedPng), presentation: closedPresentation },
+        openDoor: { ...pngLuminance(openPng), presentation: openPresentation },
+      };
     }
     receipts.push({ arenaId, scripts: arenaChunks, errors: uniqueErrors, overview, composition, performanceBudget, ...evidence, roi });
     await page.close();
@@ -478,32 +628,42 @@ try {
       return state?.gameStarted === true && document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 15_000 });
     await switchPage.waitForTimeout(arenaId === 'rustworks-1v1' ? 2_500 : 1_250);
+    const beforePose = await switchPage.evaluate(() => {
+      const [x, y, z] = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position;
+      return [x, y, z, 0, 0];
+    });
+    const beforePresentation = await applyAndAwaitFreshPresentation(
+      switchPage,
+      { kind: 'capture-pose', pose: beforePose },
+      `${arenaId} presentation-soak before pose`,
+    );
     const before = await switchPage.evaluate(async () => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      const state = api.snapshot();
-      const [x, y, z] = state.player.position;
-      api.setCaptureCameraPose(x, y, z, 0, 0);
-      await new Promise((resolve) => setTimeout(resolve, 350));
       return {
         state: api.snapshot(),
         menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
         readback: await api.readbackWebGpuFrame(),
       };
     });
+    const afterPose = await switchPage.evaluate(() => {
+      const [x, y, z] = window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position;
+      return [x, y, z, 1.2, 0];
+    });
+    const afterPresentation = await applyAndAwaitFreshPresentation(
+      switchPage,
+      { kind: 'capture-pose', pose: afterPose },
+      `${arenaId} presentation-soak after pose`,
+    );
     const after = await switchPage.evaluate(async () => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      const [x, y, z] = api.snapshot().player.position;
-      api.setCaptureCameraPose(x, y, z, 1.2, 0);
-      await new Promise((resolve) => setTimeout(resolve, 750));
-      const result = {
+      return {
         state: api.snapshot(),
         menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
         readback: await api.readbackWebGpuFrame(),
         residency: api.sampleRendererResidency(),
       };
-      api.setCaptureCameraPose(null);
-      return result;
     });
+    await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null));
     const residentArenaIds = [...after.state.arenaSelection.streaming.residentArenaIds].sort();
     const residencyPairKey = residentArenaIds.join('+');
     const baselineResidency = gameplayResidencyBaselines.get(residencyPairKey) ?? null;
@@ -565,6 +725,8 @@ try {
         - before.state.render.runtime.presentation.completedSequence,
       beforeHash: before.readback.hash,
       afterHash: after.readback.hash,
+      beforePresentation,
+      afterPresentation,
       presentationStatus: after.state.render.runtime.presentation.status,
       residency: after.residency,
     });
@@ -671,6 +833,11 @@ try {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     source: { revision: sourceRevision, trackedWorktreeDirty },
+    artifactTransaction: {
+      mode: 'run-scoped-directory-atomic-promote',
+      runId: artifactRunId,
+      publishedRoot: publishedArtifactRoot,
+    },
     browserExecutable: executablePath,
     rendererPolicy: 'webgpu-default-fail-closed-webgl-explicit-compatibility',
     arenaRetirementPolicy: 'single-authoritative-gameplay-root',
@@ -685,9 +852,17 @@ try {
     receipts,
   };
   await writeFile(`${artifactRoot}/hardware-webgpu-playable-receipt.json`, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
+  await promoteArtifactDirectory();
   console.log(JSON.stringify(output, null, 2));
 } finally {
-  await browser?.close();
-  peerServer?.kill();
-  await server.close();
+  try {
+    await browser?.close();
+  } finally {
+    peerServer?.kill();
+    try {
+      await server.close();
+    } finally {
+      if (!artifactsPromoted) await rm(artifactRoot, { recursive: true, force: true });
+    }
+  }
 }

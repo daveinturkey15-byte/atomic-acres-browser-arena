@@ -28,7 +28,7 @@ export const definition = createProceduralArenaVisualDefinition({
     // sunlit backfaces, making its HDR result depend on geometry overlap rather
     // than whether light was actually retained through the doorway.
     camera('nuke-town-aqua-wall-closed', [-9, 2.2, -23], [-14, 2.2, -28], 'light-occlusion', 1.08),
-    camera('nuke-town-aqua-door-open', [-9, 2.2, -23], [-9, 2.2, -28], 'portal', 1.08),
+    camera('nuke-town-aqua-door-open', [-9, 2.2, -23], [-7, 2.2, -28], 'portal', 1.08),
   ],
   collisionIdentity: { authoritativeArenaId: 'atomic-acres', evidence: 'ArenaMap atomic-acres collider and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['grass, decals, particles and overhead dressing remain presentation-only'],

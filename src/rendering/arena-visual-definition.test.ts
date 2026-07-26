@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { HOUSE_LAYOUT } from '../arena-layout';
+import { firstSegmentBoxHit, isBlocked, type Point3 } from '../collision';
+import { createHouseArchitecture, solidBounds } from '../house-navigation';
 import type { ArenaId } from '../map-selection';
 import type { ArenaVisualDefinition, LoadedArenaVisual } from './arena-visual-definition';
 import { createIdempotentRootDisposer, validateArenaVisualDefinition } from './arena-visual-definition';
@@ -54,6 +57,48 @@ describe('Pass 64 arena visual definitions', () => {
     expect(solid!.target).not.toEqual(portal!.target);
     expect(solid!.purpose).toBe('light-occlusion');
     expect(portal!.purpose).toBe('portal');
+
+    const [aquaLayout] = HOUSE_LAYOUT;
+    const architecture = createHouseArchitecture(aquaLayout.team, aquaLayout.x, aquaLayout.z, aquaLayout.facing);
+    const movementBlockers = architecture.solids.filter((entry) => entry.collidable);
+    const shotBlockers = architecture.solids.filter(
+      (entry) => entry.collidable || (entry.kind === 'glass' && entry.breakable),
+    );
+    const movementBounds = movementBlockers.map(solidBounds);
+    const shotBounds = shotBlockers.map(solidBounds);
+    const point = ([x, y, z]: readonly [number, number, number]): Point3 => ({ x, y, z });
+
+    expect(isBlocked(point(solid!.position), movementBounds, 0.16)).toBe(false);
+    expect(isBlocked(point(portal!.position), movementBounds, 0.16)).toBe(false);
+
+    const wallHit = firstSegmentBoxHit(point(solid!.position), point(solid!.target), shotBounds, 0);
+    expect(wallHit).not.toBeNull();
+    const wallSolid = shotBlockers[shotBounds.findIndex((bounds) => bounds === wallHit!.box)];
+    expect(wallSolid).toMatchObject({ collidable: true, kind: 'wall', breakable: false });
+    expect(wallSolid.surface).not.toBe('glass');
+
+    const intendedOpening = architecture.openings.find((entry) => entry.id === 'ground-room-opening');
+    expect(intendedOpening).toBeDefined();
+    expect(portal!.target).toEqual([
+      intendedOpening!.centre[0],
+      portal!.position[1],
+      intendedOpening!.centre[2],
+    ]);
+    expect(portal!.target[1]).toBeGreaterThan(intendedOpening!.centre[1] - intendedOpening!.height / 2);
+    expect(portal!.target[1]).toBeLessThan(intendedOpening!.centre[1] + intendedOpening!.height / 2);
+    const portalStart = point(portal!.position);
+    const portalTarget = point(portal!.target);
+    const portalDistance = Math.hypot(
+      portalTarget.x - portalStart.x,
+      portalTarget.y - portalStart.y,
+      portalTarget.z - portalStart.z,
+    );
+    const portalEnd = {
+      x: portalTarget.x + (portalTarget.x - portalStart.x) / portalDistance,
+      y: portalTarget.y + (portalTarget.y - portalStart.y) / portalDistance,
+      z: portalTarget.z + (portalTarget.z - portalStart.z) / portalDistance,
+    };
+    expect(firstSegmentBoxHit(portalStart, portalEnd, shotBounds, 0)).toBeNull();
   });
 
   it('rejects canonical practical motion that escapes its volume or exceeds the slow-motion bound', async () => {
