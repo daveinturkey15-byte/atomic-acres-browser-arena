@@ -34,4 +34,15 @@ describe('FramePacingSampler', () => {
     for (let index = 0; index < 10; index += 1) sampler.record(500);
     expect(sampler.summary()).toMatchObject({ sampleCount: 10, cadenceHz: 2 });
   });
+
+  it('reports tail latency and every fixed long-frame threshold', () => {
+    const sampler = new FramePacingSampler();
+    for (const sample of [8, 12, 20, 20.1, 33, 33.1, 50, 50.1, 100, 100.1]) sampler.record(sample);
+    expect(sampler.summary()).toMatchObject({
+      sampleCount: 10,
+      p99Ms: 100,
+      maxMs: 100.1,
+      longFrames: { over20Ms: 7, over33Ms: 5, over50Ms: 3, over100Ms: 1 },
+    });
+  });
 });
