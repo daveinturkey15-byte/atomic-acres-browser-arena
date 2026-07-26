@@ -352,6 +352,8 @@ try {
     return state?.weaponReady === true && state?.bootstrap?.stage === 'ready';
   }, undefined, { timeout: 60_000 });
   const switchReceipts = [];
+  const maximumResidentTextureBytes = 768 * 1024 * 1024;
+  const maximumResidentGeometryBytes = 256 * 1024 * 1024;
   const switchSequence = ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres'];
   for (const [switchIndex, arenaId] of switchSequence.entries()) {
     await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
@@ -363,6 +365,7 @@ try {
         streaming: state.arenaSelection.streaming,
         playableScene: state.render.playableScene,
         runtime: state.render.runtime,
+        residency: window.__ATOMIC_ACRES_DEBUG__.sampleRendererResidency(),
       };
     });
     if (switchState.arenaId !== arenaId || switchState.playableScene.arena.arenaId !== arenaId
@@ -392,10 +395,14 @@ try {
       || receipt.actualArenaVisualPolicy.atmosphereDefinitionId !== arenaId
       || JSON.stringify(receipt.actualArenaVisualPolicy.atmosphere) !== JSON.stringify(receipt.appliedArenaVisualPolicy.atmosphere)
       || receipt.actualArenaVisualPolicy.practicals.definitionId !== arenaId
+      || switchState.residency.totalTextureBytes > maximumResidentTextureBytes
+      || switchState.residency.totalGeometryBytes > maximumResidentGeometryBytes
+      || switchState.residency.totalTextureBytes !== switchState.residency.activeTextureBytes + switchState.residency.cachedTextureBytes
+      || switchState.residency.totalGeometryBytes !== switchState.residency.activeGeometryBytes + switchState.residency.cachedGeometryBytes
       || !receipt.budgetAudit.pass) {
       throw new Error(`${arenaId} switch violated the bounded-cache, presentation-freshness, definition, or budget gates: ${JSON.stringify(switchState)}`);
     }
-    switchReceipts.push({ ...receipt, streaming: switchState.streaming });
+    switchReceipts.push({ ...receipt, streaming: switchState.streaming, residency: switchState.residency });
   }
   const requestedArenaModules = [...new Set(switchScripts
     .map((url) => /\/arenas\/(atomic-acres|skyline-terminal|rustworks-1v1|gun-range)(?:\.|\?)/.exec(url)?.[1])
@@ -404,6 +411,9 @@ try {
     throw new Error(`Gameplay arena switch did not lazily request all four definition modules: ${JSON.stringify(requestedArenaModules)}`);
   }
   if (switchErrors.length > 0) throw new Error(`Gameplay arena switches emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
+  const fullyWarmedResidency = switchReceipts.at(-1).residency;
+  const textureGrowthAllowance = Math.max(16 * 1024 * 1024, fullyWarmedResidency.totalTextureBytes * 0.05);
+  const geometryGrowthAllowance = Math.max(8 * 1024 * 1024, fullyWarmedResidency.totalGeometryBytes * 0.05);
   const presentationSoak = [];
   for (const arenaId of [
     'rustworks-1v1', 'gun-range',
@@ -441,6 +451,7 @@ try {
         state: api.snapshot(),
         menuHidden: document.querySelector('#menu')?.classList.contains('hidden') === true,
         readback: await api.readbackWebGpuFrame(),
+        residency: api.sampleRendererResidency(),
       };
       api.setCaptureCameraPose(null);
       return result;
@@ -450,6 +461,10 @@ try {
       || after.state.render.runtime.presentation.status !== 'healthy'
       || after.state.render.runtime.presentation.completedSequence <= before.state.render.runtime.presentation.completedSequence
       || after.state.frameCount <= before.state.frameCount
+      || after.residency.totalTextureBytes > maximumResidentTextureBytes
+      || after.residency.totalGeometryBytes > maximumResidentGeometryBytes
+      || after.residency.totalTextureBytes > fullyWarmedResidency.totalTextureBytes + textureGrowthAllowance
+      || after.residency.totalGeometryBytes > fullyWarmedResidency.totalGeometryBytes + geometryGrowthAllowance
       || after.readback.hash === before.readback.hash) {
       throw new Error(`${arenaId} gameplay presentation did not remain fresh: ${JSON.stringify({ before, after })}`);
     }
@@ -461,6 +476,7 @@ try {
       beforeHash: before.readback.hash,
       afterHash: after.readback.hash,
       presentationStatus: after.state.render.runtime.presentation.status,
+      residency: after.residency,
     });
     await switchPage.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
     await switchPage.waitForFunction(() => {

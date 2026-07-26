@@ -5,6 +5,7 @@ import { AdaptiveQualityController, adaptiveShadowsEnabled, classifyDisplayFrame
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
+import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
@@ -10845,10 +10846,16 @@ type ArenaPerformanceBudgetSample = Readonly<{
   frameHitchThresholdMs: number;
   frameHitchCount: number;
   steadyStateFps: number;
+  activeTextureBytesEstimate: number;
+  cachedTextureBytesEstimate: number;
   textureBytesEstimate: number;
+  activeGeometryBytesEstimate: number;
+  cachedGeometryBytesEstimate: number;
+  geometryBytesEstimate: number;
   transientBytesEstimate: number;
   gpuTimingMethod: 'queue-on-submitted-work-done-conservative-proxy';
-  textureEstimateMethod: 'unique-material-textures-rgba8-mip-chain';
+  textureEstimateMethod: 'unique-active-plus-detached-cache-textures-rgba8-mip-chain';
+  geometryEstimateMethod: 'unique-active-plus-detached-cache-buffer-arrays';
   transientEstimateMethod: 'principal-msaa-hdr-depth-post-upper-bound';
 }>;
 let latestArenaPerformanceBudgetSample: ArenaPerformanceBudgetSample | null = null;
@@ -10859,26 +10866,13 @@ function percentile(values: readonly number[], quantile: number): number {
   return sorted[Math.floor((sorted.length - 1) * THREE.MathUtils.clamp(quantile, 0, 1))];
 }
 
-function estimateResidentTextureBytes(): number {
-  const textures = new Set<THREE.Texture>();
-  scene.traverse((node) => {
-    const material = (node as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
-    const materials = Array.isArray(material) ? material : material ? [material] : [];
-    for (const candidate of materials) {
-      const record = candidate as THREE.Material & Record<string, unknown>;
-      for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'lightMap', 'envMap']) {
-        if (record[key] instanceof THREE.Texture) textures.add(record[key] as THREE.Texture);
-      }
-    }
-  });
-  let bytes = 0;
-  for (const texture of textures) {
-    const source = texture.source?.data as { width?: number; height?: number; videoWidth?: number; videoHeight?: number } | undefined;
-    const width = source?.width ?? source?.videoWidth ?? 1;
-    const height = source?.height ?? source?.videoHeight ?? 1;
-    bytes += Math.max(1, width) * Math.max(1, height) * 4 * (texture.generateMipmaps ? 4 / 3 : 1);
-  }
-  return Math.ceil(bytes);
+function estimateRendererResidency() {
+  return estimateResidentObjectMemory(scene, [
+    ...[...arenaCache.values()].map((entry) => entry.root),
+    arenaArtRoot,
+    worldIdentityPresentation?.root,
+    neighbourhoodLifeRoot,
+  ]);
 }
 
 function estimateTransientRenderBytes(): number {
@@ -10933,6 +10927,7 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
   const queueSubmissionP95Ms = percentile(queueMs, 0.95);
   const queueSubmissionP99Ms = percentile(queueMs, 0.99);
   const frameHitchThresholdMs = 50;
+  const residency = estimateRendererResidency();
   latestArenaPerformanceBudgetSample = Object.freeze({
     definitionId: definition.id,
     cpuFrameP50Ms,
@@ -10954,10 +10949,16 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     frameHitchCount: frameMs.filter((durationMs) => durationMs > frameHitchThresholdMs).length,
     steadyStateFps: presentationFrameMs.length * 1_000
       / Math.max(0.001, presentationFrameMs.reduce((sum, durationMs) => sum + durationMs, 0)),
-    textureBytesEstimate: estimateResidentTextureBytes(),
+    activeTextureBytesEstimate: residency.activeTextureBytes,
+    cachedTextureBytesEstimate: residency.cachedTextureBytes,
+    textureBytesEstimate: residency.totalTextureBytes,
+    activeGeometryBytesEstimate: residency.activeGeometryBytes,
+    cachedGeometryBytesEstimate: residency.cachedGeometryBytes,
+    geometryBytesEstimate: residency.totalGeometryBytes,
     transientBytesEstimate: estimateTransientRenderBytes(),
     gpuTimingMethod: 'queue-on-submitted-work-done-conservative-proxy',
-    textureEstimateMethod: 'unique-material-textures-rgba8-mip-chain',
+    textureEstimateMethod: 'unique-active-plus-detached-cache-textures-rgba8-mip-chain',
+    geometryEstimateMethod: 'unique-active-plus-detached-cache-buffer-arrays',
     transientEstimateMethod: 'principal-msaa-hdr-depth-post-upper-bound',
   });
   return latestArenaPerformanceBudgetSample;
@@ -10995,7 +10996,13 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
     shadowMapPixels,
     postTextureSamples: renderRuntime.backend === 'webgpu' ? 18 : 0,
     textureBytes: latestArenaPerformanceBudgetSample?.definitionId === definition.id
+      ? latestArenaPerformanceBudgetSample.activeTextureBytesEstimate
+      : null,
+    residentTextureBytes: latestArenaPerformanceBudgetSample?.definitionId === definition.id
       ? latestArenaPerformanceBudgetSample.textureBytesEstimate
+      : null,
+    residentGeometryBytes: latestArenaPerformanceBudgetSample?.definitionId === definition.id
+      ? latestArenaPerformanceBudgetSample.geometryBytesEstimate
       : null,
     transientBytes: latestArenaPerformanceBudgetSample?.definitionId === definition.id
       ? latestArenaPerformanceBudgetSample.transientBytesEstimate
@@ -11152,6 +11159,7 @@ const debugWindow = window as Window & {
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
     readbackWebGpuFrame: () => Promise<{ bytes: number; hash: string }>;
+    sampleRendererResidency: () => ReturnType<typeof estimateRendererResidency>;
     sampleArenaPerformanceBudget: () => Promise<ArenaPerformanceBudgetSample>;
     setRenderPaused: (paused: boolean) => void;
     openMenu: () => void;
@@ -12446,6 +12454,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }
     return { bytes: bytes.byteLength, hash: (hash >>> 0).toString(16).padStart(8, '0') };
   },
+  sampleRendererResidency: estimateRendererResidency,
   sampleArenaPerformanceBudget,
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
   openMenu: () => openActiveMatchPause('debug-pause'),
