@@ -4,6 +4,7 @@ import {
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
   resolveRenderRuntimeRequest,
+  shouldBackpressureWebGpuSubmissions,
   webGpuRenderInfoSnapshot,
 } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
@@ -84,5 +85,12 @@ describe('Pass 64 render runtime boundary', () => {
     expect([sun, practical].every((light) => !light.shadow.autoUpdate && light.shadow.needsUpdate)).toBe(true);
     expect(configureSceneLightShadowSchedule(scene, false, false)).toBe(2);
     expect([sun, practical].every((light) => !light.shadow.autoUpdate && !light.shadow.needsUpdate)).toBe(true);
+  });
+
+  it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {
+    expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250)).toBe(false);
+    expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
+    expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
+    expect(shouldBackpressureWebGpuSubmissions(800, 2_300, 250)).toBe(true);
   });
 });

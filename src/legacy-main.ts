@@ -664,8 +664,8 @@ const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
     });
 if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
 const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
-function submitWebGpuFrame(now = performance.now()): void {
-  if (renderRuntime.backend === 'webgpu') renderRuntime.submitFrame(now);
+function submitWebGpuFrame(now = performance.now(), force = false): boolean {
+  return renderRuntime.backend === 'webgpu' && renderRuntime.submitFrame(now, force);
 }
 async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
@@ -10090,7 +10090,7 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     setArenaMenuCamera();
     arenaTransitionPhase = 'committing';
     renderRuntime.resetRenderInfo();
-    if (renderRuntime.backend === 'webgpu') submitWebGpuFrame();
+    if (renderRuntime.backend === 'webgpu') submitWebGpuFrame(performance.now(), true);
     else atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
     await flushWebGpuFrames();
     const presentationRoot = selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible
@@ -10594,7 +10594,6 @@ function frame(now: number, scheduleNext = true): void {
     refreshStaticShadowsForDynamicCasters(now);
     if (!debugRenderPaused && !renderSubmissionPaused && !webglContextLost && document.visibilityState === 'visible') {
       if (renderRuntime.backend === 'webgpu') {
-        renderRuntime.resetRenderInfo();
         submitWebGpuFrame(now);
       } else {
         atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
@@ -10741,7 +10740,7 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     for (let index = 0; index < 7; index += 1) {
       const started = performance.now();
       renderRuntime.resetRenderInfo();
-      submitWebGpuFrame();
+      submitWebGpuFrame(performance.now(), true);
       await flushWebGpuFrames();
       queueMs.push(performance.now() - started);
     }
@@ -12239,7 +12238,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       throw new Error('WebGPU HDR readback is unavailable on the explicit WebGL compatibility route');
     }
     await flushWebGpuFrames();
-    submitWebGpuFrame();
+    submitWebGpuFrame(performance.now(), true);
     await flushWebGpuFrames();
     const target = pass64TslSystems.principalHdrTarget;
     const width = Math.max(1, Math.min(target.width, 64));

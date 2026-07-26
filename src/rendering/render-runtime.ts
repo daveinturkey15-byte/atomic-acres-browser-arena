@@ -39,6 +39,8 @@ export type PresentationFreshnessTelemetry = Readonly<{
   lastCompletionLatencyMs: number | null;
   completionFailures: number;
   lastFailure: string | null;
+  backpressureActive: boolean;
+  skippedSubmissions: number;
 }>;
 
 export function classifyPresentationFreshness(input: Readonly<{
@@ -54,6 +56,19 @@ export function classifyPresentationFreshness(input: Readonly<{
   if (input.submissionSequence === 0 || input.completedSequence === 0) return 'warming';
   if (input.pendingForMs > input.stallThresholdMs) return 'stalled';
   return 'healthy';
+}
+
+export function shouldBackpressureWebGpuSubmissions(
+  pendingSince: number | null,
+  now: number,
+  thresholdMs: number,
+): boolean {
+  return pendingSince !== null
+    && Number.isFinite(pendingSince)
+    && Number.isFinite(now)
+    && Number.isFinite(thresholdMs)
+    && thresholdMs >= 0
+    && now - pendingSince >= thresholdMs;
 }
 
 export type RenderInfoSnapshot = Readonly<{
@@ -170,6 +185,8 @@ export class LegacyWebGlRenderRuntime {
       lastCompletionLatencyMs: null,
       completionFailures: 0,
       lastFailure: lost ? 'WebGL context lost' : null,
+      backpressureActive: false,
+      skippedSubmissions: 0,
     };
   }
 
@@ -333,8 +350,10 @@ export class WebGpuRenderRuntime {
   private lastCompletionLatencyMs: number | null = null;
   private completionFailures = 0;
   private lastFailure: string | null = null;
+  private skippedSubmissions = 0;
   private nextCompletionProbeAt = 0;
   private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
+  private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
   private static readonly PRESENTATION_STALL_MS = 1_500;
 
   private constructor(
@@ -457,6 +476,12 @@ export class WebGpuRenderRuntime {
       lastCompletionLatencyMs: this.lastCompletionLatencyMs,
       completionFailures: this.completionFailures,
       lastFailure: this.lastFailure,
+      backpressureActive: shouldBackpressureWebGpuSubmissions(
+        this.pendingCompletionStartedAt,
+        now,
+        WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
+      ),
+      skippedSubmissions: this.skippedSubmissions,
     };
   }
 
@@ -587,12 +612,22 @@ export class WebGpuRenderRuntime {
     this.renderPipeline.render();
   }
 
-  submitFrame(now = performance.now()): void {
+  submitFrame(now = performance.now(), force = false): boolean {
+    if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
+    if (!force && shouldBackpressureWebGpuSubmissions(
+      this.pendingCompletionStartedAt,
+      now,
+      WebGpuRenderRuntime.SUBMISSION_BACKPRESSURE_MS,
+    )) {
+      this.skippedSubmissions += 1;
+      return false;
+    }
     this.renderer.info.reset();
     this.renderPipeline.render();
     this.submissionSequence += 1;
     this.lastSubmittedAt = now;
     this.scheduleCompletionProbe(now);
+    return true;
   }
 
   resetRenderInfo(): void {
