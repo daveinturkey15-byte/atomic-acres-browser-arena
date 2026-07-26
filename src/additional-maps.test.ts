@@ -638,6 +638,15 @@ describe('additional authored maps', () => {
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
     expect(map.root.children.filter((child) => child.name === 'gun-range-floor-neon-strip')).toHaveLength(2);
     expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-strip')).toHaveLength(2);
+    const presentationBatches = map.root.userData.gunRangePresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(presentationBatches.sourceMeshes).toBeGreaterThanOrEqual(30);
+    expect(presentationBatches.batches).toBeGreaterThan(0);
+    expect(presentationBatches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+    expect(map.root.children.some((node) => node.name.startsWith('gun-range-presentation-batch-') && node.visible)).toBe(true);
     expect(auditLocalLightOcclusion(map.root)).toMatchObject({
       activeLocalLights: 0,
       emissiveOnlySources: 16,

@@ -209,7 +209,8 @@ function skylineOpeningParityAudit(
   builder.root.updateMatrixWorld(true);
   const sourceMeshes: THREE.Mesh[] = [];
   builder.root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh) || node.name.startsWith('rustworks-presentation-batch-')) return;
+    if (!(node instanceof THREE.Mesh)
+      || (node.userData.staticBatchRendered === true && typeof node.userData.sourceMeshes === 'number')) return;
     sourceMeshes.push(node);
   });
 
@@ -270,7 +271,7 @@ function skylineOpeningParityAudit(
  * are deliberately excluded: only non-solid, non-raycast presentation detail
  * enters these static batches.
  */
-function batchPresentationOnlyBoxes(root: THREE.Group): PresentationBatchTelemetry {
+function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentation'): PresentationBatchTelemetry {
   const groups = new Map<string, {
     material: THREE.Material;
     castShadow: boolean;
@@ -315,7 +316,7 @@ function batchPresentationOnlyBoxes(root: THREE.Group): PresentationBatchTelemet
     transformed.forEach((entry) => entry.dispose());
     if (!geometry) continue;
     const batch = new THREE.Mesh(geometry, group.material);
-    batch.name = `rustworks-presentation-batch-${batches}`;
+    batch.name = `${batchPrefix}-presentation-batch-${batches}`;
     batch.castShadow = group.castShadow;
     batch.receiveShadow = group.receiveShadow;
     batch.userData.presentationOnly = true;
@@ -1100,7 +1101,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   root.add(welshFlag);
   root.userData.rustworksFlagAudit = welshFlag.userData.rustworksFlagAudit;
 
-  root.userData.rustworksPresentationBatches = batchPresentationOnlyBoxes(root);
+  root.userData.rustworksPresentationBatches = batchPresentationOnlyBoxes(root, 'rustworks');
   // Default to full presentation for tests/tools; runtime re-applies the active render profile.
   applyRustworksPresentationProfile(root, 'blender');
 
@@ -1694,6 +1695,8 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     liveFireSign.position.set(0, 4.45, 1.13);
     root.add(liveFireSign);
   }
+
+  root.userData.gunRangePresentationBatches = batchPresentationOnlyBoxes(root, 'gun-range');
 
   return {
     id: 'gun-range',
@@ -2849,7 +2852,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     { id: 'wood-pallet-stack-east', bounds: { minX: 22.7, maxX: 25.3, minZ: 19.4, maxZ: 24.6 }, blocksMovement: true, blocksShots: true },
   ];
 
-  root.userData.skylinePresentationBatches = batchPresentationOnlyBoxes(root);
+  root.userData.skylinePresentationBatches = batchPresentationOnlyBoxes(root, 'skyline');
   root.userData.skylineOpeningAudit = skylineOpeningParityAudit(builder, [
     {
       id: 'terminal-gate',
