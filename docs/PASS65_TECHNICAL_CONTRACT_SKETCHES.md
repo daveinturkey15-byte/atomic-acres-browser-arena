@@ -252,7 +252,7 @@ Authority boundary:
 
 ```ts
 type GrenadeId = 'frag' | 'smoke' | 'flash';
-type LoadoutPresetId = 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
+type LoadoutPresetId = 'custom-1' | 'custom-2' | 'custom-3';
 type CuratedKitId = string; // strict allowlisted registry ID
 
 type LoadoutSchemaDefinitionV2 = Readonly<{
@@ -292,7 +292,7 @@ Migration transaction:
 6. Retain v1 until at least one successful v2 load; never delete on parse failure.
 7. Fault-inject before/after the atomic commit and prove the last known-good curated/custom selection survives.
 
-The enabled preset list and Manage/Rename surface are not inferred from the four-value type. They must exactly match the validated `FROZEN` DEC-01 receipt, contain three or four unique ordered IDs, and reject selection of a disabled ID.
+The enabled preset list and Manage/Rename surface are fixed by the validated `FROZEN` DEC-01 receipt. They must contain exactly the three unique ordered IDs `custom-1`, `custom-2`, and `custom-3`, expose `Manage/Rename` as a non-loadout tile, and reject every other preset ID.
 
 ## 5. Host combat inventory
 
