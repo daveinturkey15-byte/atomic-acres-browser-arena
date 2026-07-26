@@ -56,7 +56,12 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <aside id="menu-showcase" aria-hidden="true">
         <img class="preview-poster" src="./assets/original/menu/atomic-acres-menu-squad-joke.jpg?v=20260722-mapshot-operators" alt="" decoding="async">
         <div id="menu-preview-frame" data-frame="helicopter" data-arena="atomic-acres" data-motion="orbit">
-          <div class="preview-helicopter"><i></i><i></i><i></i><b>ALT 018 // SPD 064</b></div>
+          <div class="preview-helicopter" data-cockpit-asset="pass65-sleek-cockpit-v1" data-asset-owner="atomic-acres-original">
+            <i class="cockpit-spine"></i><i class="cockpit-strut cockpit-strut-left"></i><i class="cockpit-strut cockpit-strut-right"></i>
+            <span class="cockpit-canopy-glass"></span>
+            <span class="cockpit-glareshield"><em></em><em></em><em></em><strong>AA // NAV</strong></span>
+            <b id="menu-preview-flight-data">ALT 018 // SPD 064</b>
+          </div>
           <div class="preview-cat"><i></i><i></i><b></b><b></b><span>CAT-CAM</span></div>
           <div class="preview-reticle"><i></i><b></b></div>
         </div>

@@ -40,7 +40,13 @@ import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
-import { menuPreviewDefinition, menuPreviewPose } from './ui/menu-preview-camera';
+import {
+  MENU_PREVIEW_VISIT_SEED_SLOTS,
+  menuPreviewDefinition,
+  menuPreviewPose,
+  menuPreviewVisitSeed,
+} from './ui/menu-preview-camera';
+import { flyingCatPose } from './gun-range-cat-choreography';
 import { copyTextWithFallback } from './clipboard';
 import { FIELD_KIT_STORAGE_KEY, deployedWeapons, fieldKitById, parseFieldKitSelection, serializeFieldKitSelection, type FieldKitId } from './loadout';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
@@ -382,7 +388,8 @@ import {
   WindowBreakMessage,
 } from './protocol';
 
-configureRuntimeRandom(runtimeSeed(window.location.search));
+const configuredRuntimeSeed = runtimeSeed(window.location.search);
+configureRuntimeRandom(configuredRuntimeSeed);
 
 function clientSessionStorage(): Storage | undefined {
   try { return window.sessionStorage; } catch { return undefined; }
@@ -590,12 +597,15 @@ const menuShowcase = element<HTMLElement>('#menu-showcase');
 const menuPreviewFrame = element<HTMLElement>('#menu-preview-frame');
 const menuPreviewLabel = element<HTMLElement>('#menu-preview-label');
 const menuPreviewMotion = element<HTMLElement>('#menu-preview-motion');
+const menuPreviewFlightData = element<HTMLElement>('#menu-preview-flight-data');
 const canvasHomeAnchor = document.createComment('game-canvas-home');
 canvas.after(canvasHomeAnchor);
 const fixedMenuPreviewTimeRaw = new URLSearchParams(window.location.search).get('previewTime');
 const fixedMenuPreviewTimeMs = fixedMenuPreviewTimeRaw === null ? null : Number(fixedMenuPreviewTimeRaw);
 const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 let menuPreviewStartedAt = performance.now();
+let menuPreviewVisitSerial = 0;
+let menuPreviewSeed = menuPreviewVisitSeed(configuredRuntimeSeed, menuPreviewVisitSerial);
 let menuPreviewActive = false;
 const hudRoot = element<HTMLElement>('#hud');
 const fpsCounter = element<HTMLElement>('#fps-counter');
@@ -7410,18 +7420,15 @@ function updateTargets(now: number): void {
     }
     target.root.visible = target.active;
     if (target.active && target.kind === 'flying-cat') {
-      const phase = now * 0.00055;
-      const x = Math.cos(phase) * 10.5;
-      const z = -22 + Math.sin(phase * 1.35) * 12;
-      const y = 3.65 + Math.sin(phase * 2.4) * 0.72;
-      const nextX = Math.cos(phase + 0.01) * 10.5;
-      const nextZ = -22 + Math.sin((phase + 0.01) * 1.35) * 12;
-      target.root.position.set(x, y, z);
-      target.root.rotation.y = Math.atan2(nextX - x, nextZ - z);
+      const pose = flyingCatPose(now);
+      target.root.position.set(...pose.position);
+      target.root.rotation.set(pose.pitchRadians, pose.yawRadians, pose.rollRadians);
+      const tail = target.root.getObjectByName('flying-black-cat-tail');
+      if (tail) tail.rotation.z = 0.3 + Math.sin(pose.tailPhase) * 0.18;
       const trail = target.root.userData.starTrail as THREE.Mesh[] | undefined;
       trail?.forEach((star, index) => {
-        star.rotation.z = now * (0.0018 + index * 0.00008) + index;
-        const pulse = 0.72 + Math.sin(now * 0.006 - index * 0.9) * 0.18;
+        star.rotation.z = pose.trailPhase * (0.72 + index * 0.035) + index;
+        const pulse = 0.72 + Math.sin(pose.trailPhase - index * 0.9) * 0.18;
         star.scale.setScalar(Math.max(0.2, pulse * (1 - index * 0.075)));
       });
     }
@@ -9942,10 +9949,11 @@ function applyMenuPreviewCamera(now: number): boolean {
   const elapsedMs = Number.isFinite(fixedMenuPreviewTimeMs)
     ? Math.max(0, fixedMenuPreviewTimeMs ?? 0)
     : Math.max(0, now - menuPreviewStartedAt);
-  const pose = menuPreviewPose(selectedArena.id, elapsedMs, reducedMotion);
+  const pose = menuPreviewPose(selectedArena.id, elapsedMs, reducedMotion, menuPreviewSeed);
   const definition = menuPreviewDefinition(selectedArena.id);
   camera.position.set(...pose.position);
   camera.lookAt(...pose.target);
+  camera.rotateZ(pose.bankRadians);
   camera.fov = pose.fov;
   const bounds = menuShowcase.getBoundingClientRect();
   if (bounds.width > 0 && bounds.height > 0) camera.aspect = bounds.width / bounds.height;
@@ -9955,14 +9963,28 @@ function applyMenuPreviewCamera(now: number): boolean {
   menuPreviewFrame.dataset.arena = selectedArena.id;
   menuPreviewFrame.dataset.motion = reducedMotion || Number.isFinite(fixedMenuPreviewTimeMs) ? 'static' : 'orbit';
   menuPreviewFrame.dataset.phase = pose.phase.toFixed(6);
+  menuPreviewFrame.dataset.pathProgress = pose.pathProgress.toFixed(6);
+  menuPreviewFrame.dataset.presentation = pose.presentationId;
+  menuPreviewFrame.dataset.moment = pose.momentLabel;
+  menuPreviewFrame.dataset.pitch = pose.variance.pitchDegrees.toFixed(3);
+  menuPreviewFrame.dataset.yaw = pose.variance.yawDegrees.toFixed(3);
+  menuPreviewFrame.dataset.bank = pose.variance.bankDegrees.toFixed(3);
+  menuPreviewFrame.dataset.altitudeOffset = pose.variance.altitudeM.toFixed(3);
+  menuPreviewFrame.dataset.speedScale = pose.variance.speedScale.toFixed(4);
+  menuPreviewFrame.dataset.visit = String(menuPreviewVisitSerial);
   menuPreviewLabel.textContent = definition.label;
   menuPreviewMotion.textContent = definition.frame === 'cat'
-    ? reducedMotion ? 'FIRST-PERSON HOLD' : 'FIRST-PERSON PROWL'
-    : reducedMotion ? 'STABILIZED HOLD' : 'LIVE ORBIT';
+    ? reducedMotion ? 'FIRST-PERSON HOLD' : `FIRST-PERSON PROWL // ${pose.momentLabel}`
+    : reducedMotion ? 'STABILIZED HOLD' : 'SEEDED PILOTED ORBIT';
+  menuPreviewFlightData.textContent = definition.frame === 'cat'
+    ? 'CAT POV // SOFT STEP'
+    : `ALT ${Math.round(pose.position[1]).toString().padStart(3, '0')} // SPD ${Math.round(64 * pose.variance.speedScale).toString().padStart(3, '0')}`;
   return true;
 }
 
 function setArenaMenuCamera(): void {
+  menuPreviewVisitSerial = (menuPreviewVisitSerial + 1) % MENU_PREVIEW_VISIT_SEED_SLOTS;
+  menuPreviewSeed = menuPreviewVisitSeed(configuredRuntimeSeed, menuPreviewVisitSerial);
   menuPreviewStartedAt = performance.now();
   syncMenuPreviewCanvasPlacement();
   if (applyMenuPreviewCamera(menuPreviewStartedAt)) return;
