@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "decisionReceipt": {"status": "OPEN", "outdoorMaps": ["nuke-town"]},
+  "consumers": ["rendering"],
+  "objects": [
+    {
+      "id": "field-shed",
+      "kind": "destructible-shed",
+      "authority": "guest",
+      "revisioned": false,
+      "verticalSlicePassed": false,
+      "placements": [{"arenaId": "nuke-town", "count": 1}],
+      "door": {"durationMs": 850, "commandSequenced": false, "canonicalTicks": false},
+      "apertures": {"canonicalSharedRepresentation": false, "maxPerObject": 0},
+      "surfaces": ["wall"],
+      "debris": {"maxMajorChunks": 100, "hostSimulated": false},
+      "persistence": {"lateJoin": false, "resetOnRematch": false},
+      "budgets": {},
+      "provenance": {},
+      "evidenceIds": []
+    }
+  ]
+}

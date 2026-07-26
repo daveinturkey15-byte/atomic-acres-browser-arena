@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "buildId": "pass65-candidate-001",
+    "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "acceptanceDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "dirtyWorktree": false,
+    "immutableBuild": true
+  },
+  "acceptance": {
+    "frozen": true,
+    "requirementIds": ["host-authority", "exactly-once", "repair-deadline"],
+    "falsifierIds": ["forged-command", "duplicate-event", "hash-divergence"]
+  },
+  "impairmentManifest": {
+    "version": "pass65-chaos-v1",
+    "profiles": [
+      {"id": "moderate-chaos", "delayMs": 80, "jitterMs": 30, "lossPercent": 3, "duplicatePercent": 2, "reorderPercent": 2, "seed": 65001, "durationSeconds": 120, "eventCount": 5000, "repairDeadlineMs": 3000, "expectFinalHashEquality": true}
+    ]
+  },
+  "results": [
+    {"profileId": "moderate-chaos", "scenarioId": "solo-host-bots", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["forged-command"], "commandOrFixture": "fixtures/solo-host-bots.json", "expected": "host owns admitted combat", "observed": "host owned admitted combat", "artifactSha256": "1111111111111111111111111111111111111111111111111111111111111111", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "two-peer-private", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["forged-command"], "commandOrFixture": "fixtures/two-peer-private.json", "expected": "guest requests only", "observed": "guest requests only", "artifactSha256": "2222222222222222222222222222222222222222222222222222222222222222", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "host-guest-bot", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["forged-command"], "commandOrFixture": "fixtures/host-guest-bot.json", "expected": "one authoritative timeline", "observed": "one authoritative timeline", "artifactSha256": "3333333333333333333333333333333333333333333333333333333333333333", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "life-action-revision-races", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["repair-deadline"], "falsifierIds": ["duplicate-event"], "commandOrFixture": "fixtures/life-action-races.json", "expected": "stale epochs rejected", "observed": "stale epochs rejected", "artifactSha256": "4444444444444444444444444444444444444444444444444444444444444444", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "weapon-command-forgery", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["forged-command"], "commandOrFixture": "fixtures/weapon-forgery.json", "expected": "forgeries rejected", "observed": "forgeries rejected", "artifactSha256": "5555555555555555555555555555555555555555555555555555555555555555", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "ordnance-duplicate-stale", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["exactly-once"], "falsifierIds": ["duplicate-event"], "commandOrFixture": "fixtures/ordnance-duplicate.json", "expected": "effects apply once", "observed": "effects applied once", "artifactSha256": "6666666666666666666666666666666666666666666666666666666666666666", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "support-reward-forgery", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["forged-command"], "commandOrFixture": "fixtures/support-forgery.json", "expected": "private support state protected", "observed": "private support state protected", "artifactSha256": "7777777777777777777777777777777777777777777777777777777777777777", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "shed-revision-forgery", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["forged-command"], "commandOrFixture": "fixtures/shed-forgery.json", "expected": "invalid revisions rejected", "observed": "invalid revisions rejected", "artifactSha256": "8888888888888888888888888888888888888888888888888888888888888888", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "reconnect-rematch-repair", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["repair-deadline"], "falsifierIds": ["hash-divergence"], "commandOrFixture": "fixtures/reconnect-rematch.json", "expected": "state repairs before deadline", "observed": "state repaired before deadline", "artifactSha256": "9999999999999999999999999999999999999999999999999999999999999999", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "pose-history-dynamic-geometry", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["host-authority"], "falsifierIds": ["hash-divergence"], "commandOrFixture": "fixtures/pose-history.json", "expected": "target-time geometry used", "observed": "target-time geometry used", "artifactSha256": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"profileId": "moderate-chaos", "scenarioId": "exactly-once-outcomes", "status": "passed", "cleanupPassed": true, "finalHashEqual": true, "withinRepairDeadline": true, "requirementIds": ["exactly-once"], "falsifierIds": ["duplicate-event"], "commandOrFixture": "fixtures/exactly-once.json", "expected": "outcomes apply once", "observed": "outcomes applied once", "artifactSha256": "fedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedc", "sourceSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "buildId": "pass65-candidate-001", "environmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+  ],
+  "hardwareEvidence": {
+    "os": "Windows 11",
+    "browser": "Chrome stable",
+    "adapter": "RTX-class adapter",
+    "backend": "WebGPU",
+    "settingsHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "resolution": "1920x1080",
+    "warmupSamples": 120,
+    "measuredSamples": 1000,
+    "cpuP95Ms": 5.2,
+    "gpuOrProxyP95Ms": 7.8,
+    "gpuMetricKind": "gpu-time"
+  }
+}

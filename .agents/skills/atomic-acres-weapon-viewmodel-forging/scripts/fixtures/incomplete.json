@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "presentations": [
+    {
+      "id": "broken-view",
+      "skeletonId": "",
+      "materialPath": "shader-material",
+      "cameraRaySource": "animated-muzzle",
+      "animationMarkersAuthority": true,
+      "accessibility": { "weaponMotionScale": false },
+      "firstPersonLods": [{ "url": "generic.glb", "sha256": "bad", "source": "", "license": "" }],
+      "worldLods": [],
+      "semanticParts": ["weapon"],
+      "requiredSockets": ["rightGrip", "muzzle"],
+      "sockets": { "rightGrip": true },
+      "requiredActions": ["idle", "fire"],
+      "allowedTransitions": [{ "from": "sprint", "to": "ads-in" }],
+      "clips": [{ "action": "idle" }],
+      "captures": [],
+      "budgets": { "lod0Triangles": 999999, "draws": 0, "decodedTextureBytes": -1 },
+      "genericFallbackAllowed": true
+    }
+  ]
+}

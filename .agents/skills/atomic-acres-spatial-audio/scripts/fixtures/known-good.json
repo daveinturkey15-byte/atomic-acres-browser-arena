@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "buses": ["master", "sfx", "movement", "ui", "announcements", "ambience", "menu-music", "game-music"],
+  "settings": {
+    "master": {"gain": 1, "muted": false},
+    "sfx": {"gain": 0.9, "muted": false},
+    "movement": {"gain": 0.85, "muted": false},
+    "ui": {"gain": 0.8, "muted": false},
+    "announcements": {"gain": 0.9, "muted": false},
+    "ambience": {"gain": 0.65, "muted": false},
+    "menu-music": {"gain": 0.55, "muted": false},
+    "game-music": {"gain": 0.5, "muted": false}
+  },
+  "events": [
+    {"id": "rifle-shot", "family": "weapon", "bus": "sfx", "policy": "spatial", "spatialProfileId": "combat-near", "maxConcurrent": 12, "priority": 220, "cooldownMs": 0, "owner": "weapon-runtime", "evidenceId": "audio-weapon", "variants": [{"id": "rifle-shot-a", "source": "audio/rifle-shot-a.wav", "license": "project-owned", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]},
+    {"id": "frag-blast", "family": "ordnance", "bus": "sfx", "policy": "spatial", "spatialProfileId": "combat-far", "maxConcurrent": 8, "priority": 240, "cooldownMs": 20, "owner": "ordnance-runtime", "evidenceId": "audio-ordnance", "variants": [{"id": "frag-blast-a", "source": "audio/frag-blast-a.wav", "license": "project-owned", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]},
+    {"id": "metal-impact", "family": "impact", "bus": "sfx", "policy": "spatial", "spatialProfileId": "combat-near", "maxConcurrent": 16, "priority": 140, "cooldownMs": 15, "owner": "impact-pool", "evidenceId": "audio-impact", "variants": [{"id": "metal-impact-a", "source": "audio/metal-impact-a.wav", "license": "cc0", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}]},
+    {"id": "shed-door", "family": "door", "bus": "sfx", "policy": "spatial", "spatialProfileId": "world-object", "maxConcurrent": 8, "priority": 120, "cooldownMs": 50, "owner": "shed-runtime", "evidenceId": "audio-door", "variants": [{"id": "shed-door-a", "source": "audio/shed-door-a.wav", "license": "project-owned", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}]},
+    {"id": "shed-break", "family": "shed-debris", "bus": "sfx", "policy": "spatial", "spatialProfileId": "combat-far", "maxConcurrent": 6, "priority": 180, "cooldownMs": 30, "owner": "debris-pool", "evidenceId": "audio-shed", "variants": [{"id": "shed-break-a", "source": "audio/shed-break-a.wav", "license": "project-owned", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}]},
+    {"id": "drone-loop", "family": "support", "bus": "sfx", "policy": "spatial", "spatialProfileId": "support-air", "maxConcurrent": 12, "priority": 190, "cooldownMs": 0, "owner": "support-runtime", "evidenceId": "audio-support", "variants": [{"id": "drone-loop-a", "source": "audio/drone-loop-a.wav", "license": "project-owned", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}]},
+    {"id": "boot-dirt", "family": "footstep", "bus": "movement", "policy": "spatial", "spatialProfileId": "movement-near", "maxConcurrent": 16, "priority": 110, "cooldownMs": 80, "owner": "movement-runtime", "evidenceId": "audio-footstep", "variants": [{"id": "boot-dirt-a", "source": "audio/boot-dirt-a.wav", "license": "cc0", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"}]},
+    {"id": "hurt-breath", "family": "health", "bus": "movement", "policy": "local", "spatialProfileId": null, "maxConcurrent": 1, "priority": 210, "cooldownMs": 500, "owner": "local-health", "evidenceId": "audio-health", "variants": [{"id": "hurt-breath-a", "source": "audio/hurt-breath-a.wav", "license": "project-owned", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"}]},
+    {"id": "menu-confirm", "family": "ui", "bus": "ui", "policy": "local", "spatialProfileId": null, "maxConcurrent": 2, "priority": 160, "cooldownMs": 30, "owner": "ui-runtime", "evidenceId": "audio-ui", "variants": [{"id": "menu-confirm-a", "source": "audio/menu-confirm-a.wav", "license": "project-owned", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"}]},
+    {"id": "match-start", "family": "announcement", "bus": "announcements", "policy": "local", "spatialProfileId": null, "maxConcurrent": 1, "priority": 250, "cooldownMs": 1000, "owner": "match-runtime", "evidenceId": "audio-announcement", "variants": [{"id": "match-start-a", "source": "audio/match-start-a.wav", "license": "project-owned", "sha256": "4444444444444444444444444444444444444444444444444444444444444444"}]},
+    {"id": "nuke-town-wind", "family": "ambience", "bus": "ambience", "policy": "spatial", "spatialProfileId": "ambience-wide", "maxConcurrent": 4, "priority": 40, "cooldownMs": 0, "owner": "arena-audio", "evidenceId": "audio-ambience", "variants": [{"id": "nuke-town-wind-a", "source": "audio/nuke-town-wind-a.wav", "license": "cc0", "sha256": "5555555555555555555555555555555555555555555555555555555555555555"}]},
+    {"id": "rustrig-machinery", "family": "ambience", "bus": "ambience", "policy": "spatial", "spatialProfileId": "ambience-wide", "maxConcurrent": 4, "priority": 40, "cooldownMs": 0, "owner": "arena-audio", "evidenceId": "audio-rustrig-ambience", "variants": [{"id": "rustrig-machinery-a", "source": "audio/rustrig-machinery-a.wav", "license": "project-owned", "sha256": "7777777777777777777777777777777777777777777777777777777777777777"}]},
+    {"id": "combat-score", "family": "music", "bus": "game-music", "policy": "local", "spatialProfileId": null, "maxConcurrent": 1, "priority": 60, "cooldownMs": 0, "owner": "music-director", "evidenceId": "audio-music", "variants": [{"id": "combat-score-a", "source": "audio/combat-score-a.ogg", "license": "project-owned", "sha256": "6666666666666666666666666666666666666666666666666666666666666666"}]}
+  ],
+  "spatialProfiles": [
+    {"id": "combat-near", "referenceDistanceM": 1, "maxDistanceM": 100, "rolloff": 1, "coneInnerDeg": 180, "coneOuterDeg": 270, "voiceCap": 32, "stealPolicy": "lowest-priority"},
+    {"id": "combat-far", "referenceDistanceM": 2, "maxDistanceM": 300, "rolloff": 0.8, "coneInnerDeg": 180, "coneOuterDeg": 300, "voiceCap": 16, "stealPolicy": "oldest"},
+    {"id": "world-object", "referenceDistanceM": 1, "maxDistanceM": 60, "rolloff": 1.2, "coneInnerDeg": 120, "coneOuterDeg": 240, "voiceCap": 16, "stealPolicy": "quietest"},
+    {"id": "support-air", "referenceDistanceM": 4, "maxDistanceM": 400, "rolloff": 0.7, "coneInnerDeg": 180, "coneOuterDeg": 300, "voiceCap": 16, "stealPolicy": "lowest-priority"},
+    {"id": "movement-near", "referenceDistanceM": 1, "maxDistanceM": 40, "rolloff": 1.4, "coneInnerDeg": 180, "coneOuterDeg": 270, "voiceCap": 24, "stealPolicy": "oldest"},
+    {"id": "ambience-wide", "referenceDistanceM": 10, "maxDistanceM": 500, "rolloff": 0.4, "coneInnerDeg": 180, "coneOuterDeg": 360, "voiceCap": 8, "stealPolicy": "quietest"}
+  ],
+  "footsteps": {
+    "admittedGroundedOnly": true,
+    "airborneEmits": false,
+    "keyedBy": ["actor", "life", "continuity"],
+    "resetOnDiscontinuity": true,
+    "surfacePolicies": ["dirt", "metal", "wood", "concrete"]
+  },
+  "arenas": [
+    {"id": "nuke-town", "beds": ["nuke-town-wind"], "sourceBudget": 4, "disposesOnLeave": true},
+    {"id": "rustrig", "beds": ["rustrig-machinery"], "sourceBudget": 4, "disposesOnLeave": true}
+  ],
+  "budgets": {
+    "maxActiveVoices": 96,
+    "maxLoops": 24,
+    "maxReusableChains": 32,
+    "maxOcclusionQueriesPerSecond": 240,
+    "occlusionCpuP95Ms": 1.5,
+    "perBusVoices": {"sfx": 48, "movement": 20, "ui": 8, "announcements": 2, "ambience": 8, "menu-music": 1, "game-music": 1}
+  },
+  "settleChecks": {"arenaSwitch": true, "rematch": true, "suspendResume": true}
+}

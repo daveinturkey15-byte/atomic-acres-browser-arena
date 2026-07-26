@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "decisionReceipt": {
+    "status": "FROZEN",
+    "outdoorMaps": ["nuke-town", "rustrig"]
+  },
+  "consumers": ["movement", "ballistics", "grenades", "ai-los", "support-targeting", "spawn-nav", "rendering"],
+  "objects": [
+    {
+      "id": "field-shed",
+      "kind": "destructible-shed",
+      "authority": "host",
+      "revisioned": true,
+      "verticalSlicePassed": true,
+      "placements": [
+        {"arenaId": "nuke-town", "count": 2},
+        {"arenaId": "rustrig", "count": 2}
+      ],
+      "door": {
+        "durationMs": 1000,
+        "commandSequenced": true,
+        "canonicalTicks": true,
+        "obstructionKinds": ["player", "major-debris", "bullet"],
+        "obstructionPolicy": "reverse-resume"
+      },
+      "apertures": {
+        "canonicalSharedRepresentation": true,
+        "maxPerObject": 32,
+        "saturation": "merge"
+      },
+      "surfaces": ["wall", "roof", "door", "detached-chunk"],
+      "debris": {
+        "maxMajorChunks": 6,
+        "hostSimulated": true,
+        "shotWakeFlat": true,
+        "contactNudgeNonFlat": true
+      },
+      "persistence": {
+        "lateJoin": true,
+        "resetOnRematch": true,
+        "resetOnArenaChange": true
+      },
+      "budgets": {
+        "maxStateBytes": 16384,
+        "maxCollisionQueriesPerTick": 128,
+        "maxMajorBodiesPerMatch": 48
+      },
+      "provenance": {
+        "source": "authored/field-shed-v1.blend",
+        "license": "project-owned",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "evidenceIds": ["shed-parity", "shed-late-join", "shed-budget"]
+    }
+  ]
+}

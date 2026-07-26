@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "decisionReceipt": { "id": "DEC-13", "status": "OPEN", "duplicatesAllowed": false, "catalogIds": ["care-package", "nuke", "missing-streak"] },
+  "catalog": [
+    { "id": "care-package", "cost": 5, "tier": "mid", "availability": "selectable", "carePackageWeightUnits": 50, "selectable": true, "careEligible": true, "supportDefinitionId": "missing", "authorityPolicy": "client", "presentationId": "", "evidenceIds": [] },
+    { "id": "nuke", "cost": 20, "tier": "top", "availability": "selectable", "carePackageWeightUnits": 50, "supportDefinitionId": null, "authorityPolicy": "client", "presentationId": "nuke-view", "evidenceIds": [] }
+  ],
+  "loadout": ["care-package", "care-package", "nuke"],
+  "gunProfiles": [{ "id": "drone-gun-a", "damage": -1, "rpm": 0, "falloffEndM": -2, "penetration": -1 }],
+  "supportDefinitions": [
+    { "id": "drone-swarm-entity", "kind": "drone", "authority": "client", "count": 11, "health": 40, "magazine": 30, "reserveClips": 2, "durationMs": 90000, "gunProfileId": "drone-gun-a", "navRequired": false, "targeting": "client", "maximumEntities": 100, "maximumActiveVoices": 999, "maximumProjectiles": 999, "pooled": false, "provenanceId": "" },
+    { "id": "piloted-drone-entity", "kind": "drone", "authority": "client", "count": 2, "health": 100, "magazine": 99, "reserveClips": 9, "fuelMs": 99999, "gunProfileId": "other-gun", "sensor": { "presentationOnly": false, "revealPolicy": "all" }, "maximumEntities": 0, "maximumActiveVoices": -1, "maximumProjectiles": 999, "pooled": false, "prewarmed": false, "provenanceId": "" }
+  ],
+  "carePool": { "entries": [{ "id": "nuke", "weight": 50 }] }
+}

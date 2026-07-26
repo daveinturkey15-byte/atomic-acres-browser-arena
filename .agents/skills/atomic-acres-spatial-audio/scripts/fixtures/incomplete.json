@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "buses": ["master", "sfx"],
+  "settings": {"master": {"gain": 2}, "sfx": {"gain": 1}},
+  "events": [
+    {"id": "rifle-shot", "family": "weapon", "bus": "sfx", "policy": "spatial", "spatialProfileId": "missing", "maxConcurrent": 0, "variants": []}
+  ],
+  "spatialProfiles": [],
+  "footsteps": {"admittedGroundedOnly": false, "airborneEmits": true},
+  "arenas": [],
+  "budgets": {},
+  "settleChecks": {}
+}

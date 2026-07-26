@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "presentations": [
+    {
+      "id": "a4-vanguard-view",
+      "skeletonId": "aa-first-person-v1",
+      "materialPath": "tsl",
+      "cameraRaySource": "camera-center",
+      "animationMarkersAuthority": false,
+      "accessibility": { "weaponMotionScale": true },
+      "firstPersonLods": [
+        { "url": "assets/a4-fp.glb", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "source": "original Blender", "license": "project-owned" }
+      ],
+      "worldLods": [
+        { "url": "assets/a4-world.glb", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "source": "original Blender", "license": "project-owned" }
+      ],
+      "semanticParts": ["arms", "hands", "weapon", "magazine"],
+      "requiredSockets": ["rightGrip", "leftGrip", "magazine", "muzzle", "eject"],
+      "sockets": { "rightGrip": true, "leftGrip": true, "magazine": true, "muzzle": true, "eject": true },
+      "requiredActions": ["equip", "idle", "fire", "reload", "empty-reload", "melee"],
+      "allowedTransitions": [
+        { "from": "idle", "to": "fire" }, { "from": "fire", "to": "idle" }, { "from": "idle", "to": "reload" }
+      ],
+      "clips": [
+        { "action": "equip" }, { "action": "idle" }, { "action": "fire" },
+        { "action": "reload" }, { "action": "empty-reload" }, { "action": "melee" }
+      ],
+      "captures": [
+        { "action": "equip", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
+        { "action": "idle", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
+        { "action": "fire", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
+        { "action": "reload", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
+        { "action": "empty-reload", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 },
+        { "action": "melee", "sourceSha": "1111111111111111111111111111111111111111", "buildId": "preview-1", "backend": "webgpu", "seed": 1 }
+      ],
+      "budgets": { "lod0Triangles": 90000, "draws": 12, "decodedTextureBytes": 67108864 },
+      "genericFallbackAllowed": false
+    }
+  ]
+}

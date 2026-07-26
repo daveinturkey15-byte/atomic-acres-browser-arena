@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "weapons": [
+    {
+      "id": "a4-vanguard",
+      "slot": "primary",
+      "family": "assault-rifle",
+      "fireKind": "hitscan",
+      "fireMode": "automatic",
+      "rpm": 700,
+      "pellets": 1,
+      "spinUpMs": 0,
+      "movementMultiplier": 1,
+      "damage": { "base": 30, "minimum": 20, "falloffStartM": 18, "falloffEndM": 55, "headMultiplier": 1.5, "limbMultiplier": 0.8 },
+      "ammo": { "magazine": 30, "reserve": 120, "reloadSeconds": 2.2, "switchSeconds": 0.45 },
+      "penetration": { "power": 55, "maximumSurfaces": 3 },
+      "projectileId": null,
+      "policies": { "loadout": "eligible", "bot": "eligible", "drop": "droppable", "replay": "serialized", "telemetry": "bounded" },
+      "presentationId": "a4-vanguard-view",
+      "audioId": "a4-vanguard-audio",
+      "provenanceId": "a4-vanguard-source",
+      "testId": "a4-vanguard-tests"
+    }
+  ],
+  "mappings": {
+    "gameplay": ["a4-vanguard"], "protocol": ["a4-vanguard"], "loadout": ["a4-vanguard"],
+    "bots": ["a4-vanguard"], "drops": ["a4-vanguard"], "replay": ["a4-vanguard"],
+    "presentation": ["a4-vanguard"], "audio": ["a4-vanguard"], "penetration": ["a4-vanguard"],
+    "telemetry": ["a4-vanguard"], "tests": ["a4-vanguard"], "provenance": ["a4-vanguard"]
+  },
+  "provenance": [
+    { "id": "a4-vanguard-source", "source": "original Blender source", "license": "project-owned", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  ]
+}

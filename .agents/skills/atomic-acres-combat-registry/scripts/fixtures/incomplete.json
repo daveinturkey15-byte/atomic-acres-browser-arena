@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "weapons": [
+    {
+      "id": "broken-gun",
+      "slot": "primary",
+      "family": "assault-rifle",
+      "fireKind": "projectile",
+      "fireMode": "automatic",
+      "rpm": 0,
+      "pellets": 4,
+      "spinUpMs": -1,
+      "movementMultiplier": 3,
+      "damage": { "base": 20, "minimum": 40, "falloffStartM": 50, "falloffEndM": 10, "headMultiplier": 1, "limbMultiplier": 1 },
+      "ammo": { "magazine": 0, "reserve": -1, "reloadSeconds": 0, "switchSeconds": 0 },
+      "penetration": { "power": -1, "maximumSurfaces": 99 },
+      "projectileId": null,
+      "policies": {},
+      "presentationId": "",
+      "audioId": "",
+      "provenanceId": "missing",
+      "testId": ""
+    }
+  ],
+  "mappings": { "gameplay": ["broken-gun"], "protocol": ["unknown-gun"] },
+  "provenance": []
+}
