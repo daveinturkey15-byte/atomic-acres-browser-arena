@@ -415,18 +415,19 @@ try {
     throw new Error(`Gameplay arena switch did not lazily request all four definition modules: ${JSON.stringify(requestedArenaModules)}`);
   }
   if (switchErrors.length > 0) throw new Error(`Gameplay arena switches emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
-  const warmedResidencyEnvelope = {
+  const menuResidencyEnvelope = {
     totalTextureBytes: Math.max(...switchReceipts.map((receipt) => receipt.residency.totalTextureBytes)),
     totalGeometryBytes: Math.max(...switchReceipts.map((receipt) => receipt.residency.totalGeometryBytes)),
   };
-  const textureGrowthAllowance = Math.max(16 * 1024 * 1024, warmedResidencyEnvelope.totalTextureBytes * 0.05);
-  const geometryGrowthAllowance = Math.max(8 * 1024 * 1024, warmedResidencyEnvelope.totalGeometryBytes * 0.05);
+  const gameplayResidencyBaselines = new Map();
+  const gameplayResidencyVisits = new Map();
   const presentationSoak = [];
-  for (const arenaId of [
-    'rustworks-1v1', 'gun-range',
-    'rustworks-1v1', 'gun-range',
-    'skyline-terminal', 'atomic-acres', 'rustworks-1v1',
-  ]) {
+  // Start from the warmed gun-range/atomic-acres pair above, then traverse the
+  // same four two-arena LRU pairs twice. Residency must be compared against an
+  // identical in-match pair: menu-only residency excludes players, weapons,
+  // bots, and support geometry and is therefore not a valid gameplay baseline.
+  const gameplayCycle = ['skyline-terminal', 'rustworks-1v1', 'gun-range', 'atomic-acres'];
+  for (const arenaId of [...gameplayCycle, ...gameplayCycle]) {
     await switchPage.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
     await switchPage.evaluate(() => {
       window.__ATOMIC_ACRES_DEBUG__.startSolo();
@@ -463,6 +464,15 @@ try {
       api.setCaptureCameraPose(null);
       return result;
     });
+    const residentArenaIds = [...after.state.arenaSelection.streaming.residentArenaIds].sort();
+    const residencyPairKey = residentArenaIds.join('+');
+    const baselineResidency = gameplayResidencyBaselines.get(residencyPairKey) ?? null;
+    const textureGrowthAllowance = baselineResidency
+      ? Math.max(8 * 1024 * 1024, baselineResidency.totalTextureBytes * 0.04)
+      : null;
+    const geometryGrowthAllowance = baselineResidency
+      ? Math.max(4 * 1024 * 1024, baselineResidency.totalGeometryBytes * 0.04)
+      : null;
     const freshnessFailures = [
       ['game-started', after.state.gameStarted === true],
       ['menu-hidden', after.menuHidden === true],
@@ -470,10 +480,13 @@ try {
       ['after-presentation-healthy', after.state.render.runtime.presentation.status === 'healthy'],
       ['completion-advanced', after.state.render.runtime.presentation.completedSequence > before.state.render.runtime.presentation.completedSequence],
       ['frame-advanced', after.state.frameCount > before.state.frameCount],
+      ['two-resident-arena-roots', residentArenaIds.length === 2],
       ['texture-hard-bound', after.residency.totalTextureBytes <= maximumResidentTextureBytes],
       ['geometry-hard-bound', after.residency.totalGeometryBytes <= maximumResidentGeometryBytes],
-      ['texture-warmed-envelope', after.residency.totalTextureBytes <= warmedResidencyEnvelope.totalTextureBytes + textureGrowthAllowance],
-      ['geometry-warmed-envelope', after.residency.totalGeometryBytes <= warmedResidencyEnvelope.totalGeometryBytes + geometryGrowthAllowance],
+      ['texture-repeated-pair-envelope', !baselineResidency
+        || after.residency.totalTextureBytes <= baselineResidency.totalTextureBytes + textureGrowthAllowance],
+      ['geometry-repeated-pair-envelope', !baselineResidency
+        || after.residency.totalGeometryBytes <= baselineResidency.totalGeometryBytes + geometryGrowthAllowance],
       ['readback-changed', after.readback.hash !== before.readback.hash],
     ].filter(([, passed]) => !passed).map(([name]) => name);
     if (freshnessFailures.length > 0) {
@@ -492,13 +505,21 @@ try {
           readback: after.readback,
           residency: after.residency,
         },
-        warmedResidencyEnvelope,
+        menuResidencyEnvelope,
+        residentArenaIds,
+        residencyPairKey,
+        baselineResidency,
         textureGrowthAllowance,
         geometryGrowthAllowance,
       })}`);
     }
+    if (!baselineResidency) gameplayResidencyBaselines.set(residencyPairKey, after.residency);
+    gameplayResidencyVisits.set(residencyPairKey, (gameplayResidencyVisits.get(residencyPairKey) ?? 0) + 1);
     presentationSoak.push({
       arenaId,
+      residentArenaIds,
+      residencyPairKey,
+      residencyVisit: gameplayResidencyVisits.get(residencyPairKey),
       frameDelta: after.state.frameCount - before.state.frameCount,
       completionDelta: after.state.render.runtime.presentation.completedSequence
         - before.state.render.runtime.presentation.completedSequence,
@@ -512,6 +533,14 @@ try {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
       return state?.gameStarted === false && !document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 15_000 });
+  }
+  if (gameplayResidencyBaselines.size !== gameplayCycle.length
+    || [...gameplayResidencyVisits.values()].some((visits) => visits !== 2)) {
+    throw new Error(`Gameplay residency pair coverage was incomplete: ${JSON.stringify({
+      expectedPairs: gameplayCycle.length,
+      baselines: Object.fromEntries(gameplayResidencyBaselines),
+      visits: Object.fromEntries(gameplayResidencyVisits),
+    })}`);
   }
   if (switchErrors.length > 0) {
     throw new Error(`Repeated gameplay presentation soak emitted browser/GPU errors: ${[...new Set(switchErrors)][0]}`);
@@ -605,6 +634,9 @@ try {
     browserExecutable: executablePath,
     rendererPolicy: 'webgpu-default-fail-closed-webgl-explicit-compatibility',
     arenaRetirementPolicy: 'single-authoritative-gameplay-root',
+    menuResidencyEnvelope,
+    gameplayResidencyBaselines: Object.fromEntries(gameplayResidencyBaselines),
+    gameplayResidencyVisits: Object.fromEntries(gameplayResidencyVisits),
     switchReceipts,
     presentationSoak,
     requestedArenaModules,
