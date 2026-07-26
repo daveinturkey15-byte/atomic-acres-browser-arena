@@ -1,11 +1,12 @@
-import type { ExplosiveSource, HitMessage, WeaponId } from './protocol';
+import type { HitMessage, WeaponId } from './protocol';
+import type { Pass65KillstreakId } from './killstreak-catalog';
 
 export type KillCause =
   | Readonly<{ kind: 'gun'; weapon: WeaponId }>
   | Readonly<{ kind: 'grenade' }>
   | Readonly<{ kind: 'melee' }>
   | Readonly<{ kind: 'environment' }>
-  | Readonly<{ kind: 'killstreak'; effect: Exclude<ExplosiveSource, 'grenade' | 'explosive-crossbow'> }>;
+  | Readonly<{ kind: 'killstreak'; effect: Pass65KillstreakId }>;
 
 export function killCauseFromHit(message: Pick<HitMessage, 'kind' | 'explosiveSource'>, weapon: WeaponId): KillCause {
   if (message.kind === 'shot') return { kind: 'gun', weapon };

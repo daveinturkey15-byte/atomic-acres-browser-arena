@@ -39,6 +39,7 @@ import { nextShotDeadline } from './combat-timing';
 import { latestChangelogEntry } from './changelog';
 import { bindReleaseHistoryDialog } from './ui/release-history-dialog';
 import { bindProjectMapDialog } from './ui/project-map-dialog';
+import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/killstreak-loadout-menu';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
 import {
@@ -54,6 +55,22 @@ import {
   menuPreviewVisitSeed,
 } from './ui/menu-preview-camera';
 import { flyingCatPose } from './gun-range-cat-choreography';
+import { KillstreakLoadoutController } from './killstreak-loadout';
+import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
+import {
+  HostKillstreakRuntime,
+  type KillstreakDamageEvent,
+  type KillstreakRecipientSnapshot,
+  type KillstreakWorld,
+} from './killstreak-runtime';
+import { KillstreakPresentation } from './killstreak-presentation';
+import type {
+  KillstreakActivateIntentMessage,
+  KillstreakControlIntentMessage,
+  KillstreakDamageResultMessage,
+  KillstreakLoadoutIntentMessage,
+  KillstreakStateMessage,
+} from './killstreak-protocol';
 import { copyTextWithFallback } from './clipboard';
 import { fieldKitById, type FieldKitId } from './loadout';
 import { WEAPON_CATALOG } from './combat/weapon-catalog';
@@ -204,6 +221,7 @@ import {
 import {
   HUNTER_SWARM_BLAST_RADIUS,
   HUNTER_SWARM_COUNT,
+  FIELD_SUPPORT,
   NUKE_WARNING_MS,
   SCOUT_SWEEP_DURATION_MS,
   TRI_PASS_BLAST_RADIUS,
@@ -655,6 +673,8 @@ const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
 let storedPlayerName = '';
 try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
 app.innerHTML = renderPass64Shell(createPass64ShellViewModel(storedPlayerName));
+const killstreakLoadoutController = new KillstreakLoadoutController(localStorage);
+let killstreakMenuBinding: KillstreakMenuBinding;
 
 assertUiSurfaceInventory(document);
 document.documentElement.dataset.uiContract = 'pass64-command-v2';
@@ -853,6 +873,7 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
+const killstreakPresentation = new KillstreakPresentation(scene);
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const graphicsRefinement = new GraphicsRefinementSystem(
   legacyRenderer,
@@ -1719,6 +1740,16 @@ let lastBotEliminationProfile = {
   totalSyncMs: 0,
 };
 let fieldSupport = createFieldSupportState();
+let killstreakMatchEpoch = 0;
+let killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
+let killstreakActivationSequence = 0;
+let killstreakControlSequence = 0;
+let localCareCaptureCrateId: string | null = null;
+let killstreakSnapshot: KillstreakRecipientSnapshot = killstreakRuntime.snapshotFor(null, 0);
+let lastKillstreakStateBroadcastAt = Number.NEGATIVE_INFINITY;
+const appliedKillstreakDamageResults = new Set<string>();
+const killstreakRegisteredActors = new Set<string>();
+let displayedCareReward: Pass65KillstreakId | null = null;
 let overdriveState: OverdriveState = createOverdriveState(0);
 let overdriveClaimGeneration = -1;
 let overdriveClaimLastSentAt = Number.NEGATIVE_INFINITY;
@@ -2246,12 +2277,24 @@ let characterPhysics: CharacterPhysics | null = null;
 let arenaSelectionReady = false;
 let arenaSelectionTask: Promise<void> = Promise.resolve();
 
+killstreakMenuBinding = bindKillstreakLoadoutMenu(document, killstreakLoadoutController, () => {
+  const selected = killstreakLoadoutController.selected;
+  fieldSupport = createFieldSupportState(selected);
+  gamepadSupportSelection = selected.slots[0];
+  syncFieldSupportRows(selected);
+  updateFieldSupportHud();
+});
+fieldSupport = createFieldSupportState(killstreakLoadoutController.selected);
+gamepadSupportSelection = fieldSupport.loadout.slots[0];
+syncFieldSupportRows(fieldSupport.loadout);
+
 function gameplayInputEnabled(): boolean {
   return gameStarted && player.alive && matchState.phase === 'active' && menu.classList.contains('hidden') && !isTextChatTyping();
 }
 
 function playerSimulationEnabled(): boolean {
-  return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden');
+  return gameStarted && player.alive && matchState.phase !== 'ended' && menu.classList.contains('hidden')
+    && !localKillstreakActorSnapshot()?.possession;
 }
 
 function interruptReload(force = false, now = performance.now()): void {
@@ -3583,7 +3626,7 @@ function applyMenuLoadoutImmediately(): void {
   weaponView.setWeapon(player.weapon, true);
 }
 
-function setMenuTab(tab: 'deploy' | 'kit' | 'options'): void {
+function setMenuTab(tab: 'deploy' | 'kit' | 'streaks' | 'options'): void {
   if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
   document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
     const active = button.dataset.menuTab === tab;
@@ -3706,7 +3749,7 @@ function saveManagedPreset(): void {
 }
 
 document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button) => {
-  button.addEventListener('click', () => setMenuTab(button.dataset.menuTab as 'deploy' | 'kit' | 'options'));
+  button.addEventListener('click', () => setMenuTab(button.dataset.menuTab as 'deploy' | 'kit' | 'streaks' | 'options'));
   button.addEventListener('keydown', (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]:not([hidden]):not(:disabled)')];
@@ -3719,7 +3762,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-menu-tab]').forEach((button)
         ? tabs.length - 1
         : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
     const next = tabs[nextIndex]!;
-    setMenuTab(next.dataset.menuTab as 'deploy' | 'kit' | 'options');
+    setMenuTab(next.dataset.menuTab as 'deploy' | 'kit' | 'streaks' | 'options');
     next.focus();
   });
 });
@@ -3916,8 +3959,12 @@ function nextCombatTiming(): CombatTiming {
   return timing;
 }
 
-function isTimedCombatMessage(message: GameMessage): message is ShotMessage | MeleeMessage | Extract<GameMessage, { type: 'grenade-throw' | 'hit' | 'support-activate' }> {
-  return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit' || message.type === 'support-activate';
+function isTimedCombatMessage(message: GameMessage): message is ShotMessage | MeleeMessage | Extract<GameMessage, {
+  type: 'grenade-throw' | 'hit' | 'support-activate' | 'killstreak-activate-intent' | 'killstreak-control-intent' | 'killstreak-care-capture-intent';
+}> {
+  return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit'
+    || message.type === 'support-activate' || message.type === 'killstreak-activate-intent'
+    || message.type === 'killstreak-control-intent' || message.type === 'killstreak-care-capture-intent';
 }
 
 function admitIncomingCombatTiming(message: GameMessage): boolean {
@@ -3949,6 +3996,56 @@ function admitIncomingCombatTiming(message: GameMessage): boolean {
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
+  if (message.type === 'killstreak-loadout-intent') {
+    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
+    const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
+    const remote = remotes.get(message.by);
+    if (!member || !remote || message.lifeId !== remote.continuity) return;
+    killstreakRuntime.registerActor(message.by, member.team, message.lifeId, message.loadout);
+    killstreakRegisteredActors.add(message.by);
+    broadcastKillstreakState();
+    return;
+  }
+  if (message.type === 'killstreak-activate-intent') {
+    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || !admitIncomingCombatTiming(message)) return;
+    const admission = killstreakRuntime.activate(message, performance.now(), killstreakWorldState());
+    if (admission.accepted) {
+      addFeed(`${combatantLabel(message.by).name} CALLED ${GAMEPAD_SUPPORT_LABELS[admission.activatedId!]}`, 'gold');
+      broadcastKillstreakState();
+    }
+    return;
+  }
+  if (message.type === 'killstreak-control-intent') {
+    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || !admitIncomingCombatTiming(message)) return;
+    if (killstreakRuntime.control(message, performance.now()).accepted) broadcastKillstreakState();
+    return;
+  }
+  if (message.type === 'killstreak-care-capture-intent') {
+    if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || !admitIncomingCombatTiming(message)) return;
+    if (message.holding) killstreakRuntime.beginCareCapture(message.by, message.lifeId, message.crateId, performance.now(), killstreakWorldState());
+    else killstreakRuntime.interruptCareCapture(message.by, message.lifeId);
+    broadcastKillstreakState();
+    return;
+  }
+  if (message.type === 'killstreak-state') {
+    if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id
+      || message.snapshot.matchEpoch !== killstreakMatchEpoch || message.snapshot.revision < killstreakSnapshot.revision) return;
+    killstreakSnapshot = message.snapshot;
+    const actor = localKillstreakActorSnapshot();
+    if (actor) {
+      const available = Object.fromEntries(FIELD_SUPPORT.map((definition) => [definition.id, actor.available.includes(definition.id)])) as typeof fieldSupport.available;
+      for (const reward of actor.revealedCareRewards) available[reward] = true;
+      fieldSupport = { ...fieldSupport, streak: actor.streak, available };
+      refreshLocalKillstreakSnapshot();
+      updateFieldSupportHud();
+    }
+    return;
+  }
+  if (message.type === 'killstreak-damage-result') {
+    if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
+    for (const event of message.events) if (event.targetId === player.id) applyKillstreakDamageEvent(event);
+    return;
+  }
   if (message.type === 'railgun-state') {
     if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) applyRailgunState(message.state);
     return;
@@ -4730,7 +4827,8 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
   );
   const outcomes: ShotResultMessage['outcomes'] = [];
   for (const [targetId, hit] of derived) {
-    const powerMultiplier = overdriveDamageMultiplier(overdriveState, request.by, receivedAt);
+    const powerMultiplier = overdriveDamageMultiplier(overdriveState, request.by, receivedAt)
+      * killstreakActorModifiers(request.by, receivedAt).damage;
     const powered = resolveRemotePoweredDamage(hit.damage, powerMultiplier);
     const outgoing = handicapOutgoingDamage(request.by, powered, request.weapon);
     const rawOutgoing = handicapOutgoingDamage(request.by, hit.rawDamage * powerMultiplier, request.weapon);
@@ -5005,6 +5103,11 @@ function applyDamage(
     player.alive = false;
     player.deaths += 1;
     fieldSupport = recordSupportDeath(fieldSupport);
+    if (network.role !== 'client') {
+      killstreakRuntime.recordActorDeath(player.id, localContinuity + 1);
+      refreshLocalKillstreakSnapshot(now);
+      broadcastKillstreakState(now);
+    }
     updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, cause, nonce: randomNonce() };
     if (network.role !== 'client') {
@@ -5505,9 +5608,14 @@ function processDeath(message: DeathMessage): void {
   if (message.killer !== message.victim && isKillstreakEligible(message.cause)) {
     const killerAuthority = remoteSupportAuthorities.get(message.killer);
     if (killerAuthority) remoteSupportAuthorities.set(message.killer, recordRemoteSupportElimination(killerAuthority));
+    if (network.role === 'host' && message.killer !== player.id) killstreakRuntime.recordEligibleElimination(message.killer, 'weapon');
   }
   const victimAuthority = remoteSupportAuthorities.get(message.victim);
   if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
+  if (network.role === 'host' && message.victim !== player.id) {
+    killstreakRuntime.recordActorDeath(message.victim, (remotes.get(message.victim)?.continuity ?? 0) + 1);
+    broadcastKillstreakState();
+  }
   if (remoteGrenadeAuthorities.has(message.victim)) remoteGrenadeAuthorities.set(message.victim, resetRemoteGrenadeAuthorityState());
   if (network.role === 'host' && message.killer !== message.victim) {
     const killerMember = hostLobbyMembers.get(message.killer) ?? bots.get(message.killer);
@@ -5966,6 +6074,23 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   }
   const requiredName = requirePlayerName();
   if (!requiredName) return;
+  killstreakLoadoutController.releaseAfterMatch();
+  const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
+  fieldSupport = createFieldSupportState(frozenKillstreakLoadout);
+  gamepadSupportSelection = frozenKillstreakLoadout.slots[0];
+  syncFieldSupportRows(frozenKillstreakLoadout);
+  killstreakMenuBinding.setMatchActive(true);
+  killstreakMatchEpoch = mode === 'solo'
+    ? killstreakMatchEpoch + 1
+    : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000);
+  killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
+  killstreakActivationSequence = 0;
+  killstreakControlSequence = 0;
+  localCareCaptureCrateId = null;
+  displayedCareReward = null;
+  appliedKillstreakDamageResults.clear();
+  killstreakRegisteredActors.clear();
+  killstreakPresentation.clear();
   player.name = requiredName;
   player.team = Number(element<HTMLSelectElement>('#team').value) === 1 ? 1 : 0;
   gameStarted = true;
@@ -5988,6 +6113,11 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   roundDamageDealt = 0;
   roundDamageTaken = 0;
   localContinuity += 1;
+  if (mode !== 'client') {
+    killstreakRuntime.registerActor(player.id, player.team, localContinuity, frozenKillstreakLoadout);
+    killstreakRegisteredActors.add(player.id);
+  }
+  killstreakSnapshot = killstreakRuntime.snapshotFor(mode === 'client' ? null : player.id, performance.now());
   localPositionHistory.length = 0;
   localShotSeq = 0;
   localWeaponSequences.clear();
@@ -6076,6 +6206,13 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   if (selectedArena.id === 'gun-range') addFeed('100 / 200 / 300 POINT TARGETS · SCORE ATTACK', 'gold');
   if (mode !== 'solo') {
     network.send({ type: 'join', player: snapshot() });
+    if (mode === 'client') {
+      const loadoutMessage: KillstreakLoadoutIntentMessage = {
+        type: 'killstreak-loadout-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
+        lifeId: localContinuity, sequence: 0, loadout: frozenKillstreakLoadout, nonce: randomNonce(),
+      };
+      network.send(loadoutMessage);
+    }
     sendLeaderboardSync();
     if (mode === 'host') broadcastOverdriveState(matchStartedAt);
   }
@@ -6491,7 +6628,14 @@ function reload(): void {
   const ammo = player.ammo[player.weapon];
   const availableReserve = reloadSupply(selectedArena.id, player.reserve[player.weapon], spec.mag);
   if (player.reloadState || ammo >= spec.mag || availableReserve <= 0) return;
-  player.reloadState = beginReload(spec, ammo, availableReserve, performance.now());
+  const reloadStartedAt = performance.now();
+  const reloadState = beginReload(spec, ammo, availableReserve, reloadStartedAt);
+  const reloadDuration = killstreakActorModifiers(player.id, reloadStartedAt).reloadDuration;
+  player.reloadState = reloadState ? {
+    ...reloadState,
+    seatAt: reloadStartedAt + (reloadState.seatAt - reloadStartedAt) * reloadDuration,
+    endsAt: reloadStartedAt + (reloadState.endsAt - reloadStartedAt) * reloadDuration,
+  } : null;
   weaponActionHistory.length = 0;
   audio.reload();
   weaponView.reload();
@@ -8535,6 +8679,22 @@ function addFeed(
   setTimeout(() => row.classList.add('fade'), visibleMs - 800);
   setTimeout(() => row.remove(), visibleMs);
 }
+
+function syncFieldSupportRows(loadout: KillstreakLoadoutV1): void {
+  loadout.slots.forEach((id, index) => {
+    const row = document.querySelector<HTMLElement>(`[data-support-slot="${index + 1}"]`);
+    const definition = FIELD_SUPPORT.find((entry) => entry.id === id);
+    if (!row || !definition) return;
+    row.dataset.support = id;
+    const key = row.querySelector<HTMLElement>('kbd');
+    const threshold = row.querySelector<HTMLElement>('.support-meta small');
+    const name = row.querySelector<HTMLElement>('.support-name');
+    if (key) key.textContent = String(index + 3);
+    if (threshold) threshold.textContent = `${definition.eliminations} KILLS`;
+    if (name) name.textContent = definition.name.toUpperCase();
+  });
+}
+
 function updateFieldSupportHud(): void {
   element<HTMLElement>('#support-streak').textContent = `STREAK ${fieldSupport.streak}`;
   document.querySelectorAll<HTMLElement>('[data-support]').forEach((item) => {
@@ -8545,6 +8705,323 @@ function updateFieldSupportHud(): void {
     const state = item.querySelector<HTMLElement>('.support-state');
     if (state) state.textContent = ready ? 'READY' : 'LOCKED';
   });
+}
+
+function localKillstreakActorSnapshot(): KillstreakRecipientSnapshot['actors'][number] | null {
+  return killstreakSnapshot.actors.find((actor) => actor.actorId === player.id) ?? null;
+}
+
+function killstreakActorModifiers(actorId: string, now: number): Readonly<{ damage: number; movement: number; reloadDuration: number }> {
+  if (network.role !== 'client') return killstreakRuntime.modifiersForActor(actorId, now);
+  const actor = killstreakSnapshot.actors.find((entry) => entry.actorId === actorId);
+  const active = (actor?.adrenalineRemainingMs ?? 0) > 0;
+  return { damage: active ? 1.1 : 1, movement: active ? 1.1 : 1, reloadDuration: active ? 0.9 : 1 };
+}
+
+function killstreakWorldState(): KillstreakWorld {
+  const targets: KillstreakWorld['targets'][number][] = [];
+  targets.push({
+    id: player.id,
+    kind: 'player',
+    team: player.team,
+    lifeId: localContinuity,
+    alive: player.alive,
+    position: [player.position.x, player.position.y, player.position.z],
+  });
+  for (const bot of bots.values()) targets.push({
+    id: bot.id,
+    kind: 'bot',
+    team: bot.team,
+    lifeId: bot.continuity,
+    alive: bot.alive,
+    position: [bot.position.x, bot.position.y + 1.15, bot.position.z],
+  });
+  for (const remote of remotes.values()) targets.push({
+    id: remote.snapshot.id,
+    kind: 'player',
+    team: remote.snapshot.team,
+    lifeId: remote.continuity,
+    alive: remote.snapshot.hp > 0,
+    position: [remote.target.x, remote.target.y + 1.15, remote.target.z],
+  });
+  return {
+    bounds: {
+      minX: arena.bounds.minX,
+      maxX: arena.bounds.maxX,
+      minZ: arena.bounds.minZ,
+      maxZ: arena.bounds.maxZ,
+      floorY: 0,
+      ceilingY: 42,
+    },
+    targets,
+    areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
+    hasLineOfSight: (from, to) => !arena.colliders.some((box) => segmentIntersectsBox(
+      { x: from[0], y: from[1], z: from[2] },
+      { x: to[0], y: to[1], z: to[2] },
+      box,
+    )),
+    isFlightPositionValid: (position) => pointInsideBounds({ x: position[0], y: position[1], z: position[2] }, arena.bounds, 0.35),
+  };
+}
+
+function refreshLocalKillstreakSnapshot(now = performance.now()): void {
+  if (network.role !== 'client') killstreakSnapshot = killstreakRuntime.snapshotFor(player.id, now);
+  const actor = localKillstreakActorSnapshot();
+  const reward = actor?.revealedCareRewards[0] ?? null;
+  let hudChanged = false;
+  if (actor) {
+    const restored = actor.available.filter((id) => fieldSupport.loadout.slots.includes(id) && !fieldSupport.available[id]);
+    if (restored.length > 0) {
+      const available = { ...fieldSupport.available };
+      for (const id of restored) available[id] = true;
+      fieldSupport = { ...fieldSupport, available };
+      hudChanged = true;
+    }
+  }
+  if (reward && fieldSupport.available[reward] !== true) {
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, [reward]: true } };
+    addFeed(`CARE PACKAGE SECURED · ${GAMEPAD_SUPPORT_LABELS[reward]} READY`, 'gold');
+    hudChanged = true;
+  }
+  if (displayedCareReward !== reward) {
+    displayedCareReward = reward;
+    const slotOne = document.querySelector<HTMLElement>('[data-support-slot="1"] .support-name');
+    if (slotOne) slotOne.textContent = reward
+      ? `CARE DROP: ${GAMEPAD_SUPPORT_LABELS[reward]}`
+      : GAMEPAD_SUPPORT_LABELS[fieldSupport.loadout.slots[0]];
+    hudChanged = true;
+  }
+  if (hudChanged) updateFieldSupportHud();
+}
+
+function broadcastKillstreakState(now = performance.now()): void {
+  if (network.role !== 'host') return;
+  for (const remote of remotes.values()) {
+    const message: KillstreakStateMessage = {
+      type: 'killstreak-state',
+      by: player.id,
+      forPlayerId: remote.snapshot.id,
+      snapshot: killstreakRuntime.snapshotFor(remote.snapshot.id, now),
+      nonce: randomNonce(),
+    };
+    network.sendToPlayer(remote.snapshot.id, message);
+  }
+  lastKillstreakStateBroadcastAt = now;
+}
+
+function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
+  const careReward = localKillstreakActorSnapshot()?.revealedCareRewards[0];
+  if (careReward === id) return 1;
+  const index = fieldSupport.loadout.slots.indexOf(id);
+  return index < 0 ? null : (index + 1) as 1 | 2 | 3 | 4 | 5;
+}
+
+function requestKillstreakActivation(id: Pass65KillstreakId, now: number, anchor?: [number, number, number]): boolean {
+  const slot = killstreakSlotFor(id);
+  if (!slot) return false;
+  killstreakActivationSequence += 1;
+  const message: KillstreakActivateIntentMessage = {
+    type: 'killstreak-activate-intent',
+    by: player.id,
+    matchEpoch: killstreakMatchEpoch,
+    lifeId: localContinuity,
+    sequence: killstreakActivationSequence,
+    slot,
+    activationId: `activation-${killstreakMatchEpoch}-${killstreakActivationSequence}`,
+    expectedId: id,
+    ...(anchor ? { anchor } : {}),
+    timing: nextCombatTiming(),
+    nonce: randomNonce(),
+  };
+  if (network.role === 'client') {
+    network.send(message);
+    return true;
+  }
+  const admission = killstreakRuntime.activate(message, now, killstreakWorldState());
+  if (!admission.accepted) {
+    addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} REJECTED · ${admission.reason.toUpperCase()}`, 'coral');
+    return false;
+  }
+  refreshLocalKillstreakSnapshot(now);
+  broadcastKillstreakState(now);
+  return true;
+}
+
+function requestKillstreakControl(
+  entityId: string,
+  action: KillstreakControlIntentMessage['action'],
+  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'verticalQ' | 'fire'> = {},
+  now = performance.now(),
+): boolean {
+  killstreakControlSequence += 1;
+  const message: KillstreakControlIntentMessage = {
+    type: 'killstreak-control-intent',
+    by: player.id,
+    matchEpoch: killstreakMatchEpoch,
+    lifeId: localContinuity,
+    sequence: killstreakControlSequence,
+    entityId,
+    action,
+    ...control,
+    timing: nextCombatTiming(),
+    nonce: randomNonce(),
+  };
+  if (network.role === 'client') {
+    network.send(message);
+    return true;
+  }
+  const result = killstreakRuntime.control(message, now);
+  if (!result.accepted) return false;
+  refreshLocalKillstreakSnapshot(now);
+  broadcastKillstreakState(now);
+  return true;
+}
+
+function interactWithKillstreakSupport(now = performance.now()): boolean {
+  const actor = localKillstreakActorSnapshot();
+  if (actor?.possession?.kind === 'piloted-drone') {
+    requestKillstreakControl(actor.possession.entityId, 'exit-piloted-drone', {}, now);
+    addFeed('PILOTED DRONE · PLAYER CONTROL RELEASED', 'gold');
+    return true;
+  }
+  const chopper = killstreakSnapshot.entities.find((entity) => entity.kind === 'chopper' && entity.ownerId === player.id);
+  if (chopper) {
+    requestKillstreakControl(chopper.id, 'toggle-chopper-gunner', {}, now);
+    addFeed(chopper.gunController === 'ai' ? 'CHOPPER GUNNER · PLAYER CONTROL' : 'CHOPPER GUNNER · AI CONTROL', 'gold');
+    return true;
+  }
+  const crate = killstreakSnapshot.entities
+    .filter((entity) => entity.kind === 'care-crate' && (entity.phase === 'landed' || entity.phase === 'capturing'))
+    .sort((left, right) => Math.hypot(left.position[0] - player.position.x, left.position[2] - player.position.z)
+      - Math.hypot(right.position[0] - player.position.x, right.position[2] - player.position.z))[0];
+  if (!crate || Math.hypot(crate.position[0] - player.position.x, crate.position[2] - player.position.z) > 2.75) return false;
+  if (network.role === 'client') {
+    network.send({
+      type: 'killstreak-care-capture-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
+      lifeId: localContinuity, sequence: ++killstreakControlSequence, crateId: crate.id,
+      holding: true, timing: nextCombatTiming(), nonce: randomNonce(),
+    });
+  } else killstreakRuntime.beginCareCapture(player.id, localContinuity, crate.id, now, killstreakWorldState());
+  localCareCaptureCrateId = crate.id;
+  addFeed('CARE PACKAGE · SECURING', 'gold');
+  return true;
+}
+
+function releaseCareCapture(now = performance.now()): void {
+  const crateId = localCareCaptureCrateId;
+  if (!crateId) return;
+  localCareCaptureCrateId = null;
+  if (network.role === 'client') {
+    network.send({
+      type: 'killstreak-care-capture-intent', by: player.id, matchEpoch: killstreakMatchEpoch,
+      lifeId: localContinuity, sequence: ++killstreakControlSequence, crateId,
+      holding: false, timing: nextCombatTiming(), nonce: randomNonce(),
+    });
+  } else {
+    killstreakRuntime.interruptCareCapture(player.id, localContinuity);
+    refreshLocalKillstreakSnapshot(now);
+    broadcastKillstreakState(now);
+  }
+}
+
+function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDamageEvent | null {
+  if (appliedKillstreakDamageResults.has(event.resultId)) return null;
+  appliedKillstreakDamageResults.add(event.resultId);
+  if (appliedKillstreakDamageResults.size > 512) {
+    const oldest = appliedKillstreakDamageResults.values().next().value;
+    if (oldest) appliedKillstreakDamageResults.delete(oldest);
+  }
+  const cause: KillCause = { kind: 'killstreak', effect: event.source };
+  if (event.targetId === player.id) {
+    if (event.targetLifeId !== localContinuity) return null;
+    const before = player.hp;
+    applyDamage(event.damage, event.ownerId, 1, true, cause);
+    return { ...event, damage: Math.max(0, before - player.hp) };
+  }
+  const bot = bots.get(event.targetId);
+  if (bot && network.role !== 'client') {
+    if (event.targetLifeId !== bot.continuity) return null;
+    const damage = applyBotDamage(bot, event.damage, 'body', cause, event.ownerId);
+    return { ...event, damage };
+  }
+  if (network.role !== 'host') return event;
+  const remote = remotes.get(event.targetId);
+  const health = remoteHealthAuthorities.get(event.targetId);
+  if (!remote || !health || event.targetLifeId !== remote.continuity) return null;
+  const result = applyAuthoritativeRemoteDamage(
+    health,
+    event.damage,
+    event.atMs,
+    (damage, canonicalHealth) => applyDhvIncomingDamage(damage, canonicalHealth, memberDhv(event.targetId)),
+  );
+  if (!result.applied) return null;
+  remoteHealthAuthorities.set(event.targetId, result.state);
+  remote.snapshot = { ...remote.snapshot, hp: result.state.hp };
+  remote.root.visible = result.state.alive;
+  recordAuthoritativeDamage(event.ownerId, event.targetId, result.damageApplied);
+  if (result.died) {
+    const death: DeathMessage = { type: 'death', killer: event.ownerId, victim: event.targetId, cause, nonce: randomNonce() };
+    processedNonces.add(death.nonce);
+    network.send(death);
+    processDeath(death);
+  }
+  return { ...event, damage: result.damageApplied };
+}
+
+let lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+function updateKillstreakPossession(now: number): void {
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (!possession) return;
+  const entity = killstreakSnapshot.entities.find((entry) => entry.id === possession.entityId);
+  if (!entity) return;
+  const root = killstreakPresentation.entityRoot(entity.id);
+  const position = root?.position ?? new THREE.Vector3(...entity.position);
+  camera.position.lerp(position.clone().add(new THREE.Vector3(0, possession.kind === 'chopper-gunner' ? -0.35 : 0.12, 0)), 0.5);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = player.yaw;
+  camera.rotation.x = player.pitch;
+  weaponView.root.visible = false;
+  if (now - lastKillstreakControlSentAt < 50) return;
+  const forwardInput = THREE.MathUtils.clamp(Number(keys.has('KeyW')) - Number(keys.has('KeyS')) - gamepadMove.y, -1, 1);
+  const vertical = THREE.MathUtils.clamp(Number(keys.has('Space')) - Number(keys.has('ControlLeft') || keys.has('KeyC')), -1, 1);
+  requestKillstreakControl(entity.id, 'pilot-control', {
+    yawQ: player.yaw,
+    pitchQ: player.pitch,
+    thrustQ: possession.kind === 'piloted-drone' ? forwardInput : 0,
+    verticalQ: possession.kind === 'piloted-drone' ? vertical : 0,
+    fire: triggerHeld,
+  }, now);
+  lastKillstreakControlSentAt = now;
+}
+
+function updatePass65KillstreakRuntime(now: number): void {
+  if (!gameStarted) {
+    killstreakPresentation.clear();
+    return;
+  }
+  if (matchState.phase === 'ended') {
+    killstreakPresentation.clear();
+    return;
+  }
+  if (network.role !== 'client' && matchState.phase === 'active') {
+    const result = killstreakRuntime.advance(now, killstreakWorldState());
+    const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
+    killstreakPresentation.presentImpacts(result.impactEvents, now);
+    refreshLocalKillstreakSnapshot(now);
+    if (network.role === 'host' && applied.length > 0) {
+      const message: KillstreakDamageResultMessage = {
+        type: 'killstreak-damage-result', by: player.id, matchEpoch: killstreakMatchEpoch,
+        revision: killstreakSnapshot.revision, events: applied, nonce: randomNonce(),
+      };
+      network.send(message);
+    }
+    if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
+  }
+  killstreakPresentation.sync(killstreakSnapshot, now);
+  const possession = localKillstreakActorSnapshot()?.possession;
+  document.documentElement.dataset.killstreakPossession = possession?.kind ?? 'none';
+  weaponView.root.visible = !possession && player.alive;
+  updateKillstreakPossession(now);
 }
 
 function overdriveStateMessage(now: number): OverdriveStateMessage {
@@ -8635,7 +9112,8 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
 }
 
 function outgoingDamage(value: number, now = performance.now()): number {
-  const powered = value * overdriveDamageMultiplier(overdriveState, player.id, now);
+  const powered = value * overdriveDamageMultiplier(overdriveState, player.id, now)
+    * killstreakActorModifiers(player.id, now).damage;
   return handicapOutgoingDamage(player.id, powered, player.weapon);
 }
 
@@ -8719,15 +9197,14 @@ function updateOverdrive(now: number): void {
 function awardSupportElimination(syncGlobalLeaderboard = true): void {
   const before = fieldSupport.available;
   fieldSupport = recordSupportElimination(fieldSupport);
+  if (network.role !== 'client') {
+    killstreakRuntime.recordEligibleElimination(player.id, 'weapon');
+    refreshLocalKillstreakSnapshot();
+    broadcastKillstreakState();
+  }
   bestStreakThisMatch = Math.max(bestStreakThisMatch, fieldSupport.streak);
-  for (const [id, label] of [
-    ['scout-sweep', 'SCOUT SWEEP'],
-    ['yardhawk', 'YARDHAWK'],
-    ['tri-pass', 'TRI-PASS STRIKE'],
-    ['hunter-swarm', 'HUNTER SWARM'],
-    ['nuke', 'NUKE'],
-  ] as const) {
-    if (!before[id] && fieldSupport.available[id]) addFeed(`${label} READY`, 'gold');
+  for (const id of fieldSupport.loadout.slots) {
+    if (!before[id] && fieldSupport.available[id]) addFeed(`${GAMEPAD_SUPPORT_LABELS[id]} READY`, 'gold');
   }
   recordImmediateStreak(syncGlobalLeaderboard);
   updateFieldSupportHud();
@@ -9304,6 +9781,13 @@ function registerTriPassClick(clientX: number, clientY: number, confirmedAt = pe
   triPassTargeting = next;
   drawStrikeMap();
   if (next.complete) {
+    const anchor = next.points[1] ?? next.points[0];
+    if (!anchor || !requestKillstreakActivation('tri-pass', confirmedAt, [anchor.x, 0.2, anchor.z])) {
+      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'tri-pass': true } };
+      addFeed('TRI-PASS AUTHORITY REJECTED · REFUNDED', 'coral');
+      cancelTriPassTargeting(false);
+      return true;
+    }
     authorizeLocalOffensiveSupport('tri-pass', next.points.map((point) => [point.x, 0.2, point.z]));
     scheduleTriPassMissiles(next.points, confirmedAt);
     cancelTriPassTargeting(false);
@@ -9330,22 +9814,29 @@ function authorizeLocalOffensiveSupport(
 
 function activateFieldSupport(id: FieldSupportId): void {
   if (!selectedArena.fieldSupport || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
-  const consumed = consumeFieldSupport(fieldSupport, id);
+  const revealedCareReward = id === 'care-package' ? localKillstreakActorSnapshot()?.revealedCareRewards[0] : undefined;
+  const activatedId = revealedCareReward ?? id;
+  const consumed = consumeFieldSupport(fieldSupport, activatedId);
   if (!consumed.activated) return;
   const now = performance.now();
   endSpawnProtectionOnOffense(now);
   fieldSupport = consumed.state;
-  if (id === 'scout-sweep') {
+  const refund = (): void => {
+    fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, [activatedId]: true } };
+    updateFieldSupportHud();
+  };
+  if (activatedId === 'scout-sweep') {
+    if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
     scoutSweepUntil = now + SCOUT_SWEEP_DURATION_MS;
     audio.scoutSweep();
     addFeed('SCOUT SWEEP · PULSE 1.5 SEC / 3 SEC · 12 SEC', 'gold');
-  } else if (id === 'yardhawk') {
+  } else if (activatedId === 'yardhawk') {
     const target = nearestSupportTarget();
     if (!target) {
-      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, yardhawk: true } };
-      updateFieldSupportHud();
+      refund();
       return;
     }
+    if (!requestKillstreakActivation(activatedId, now, [target.point.x, target.point.y, target.point.z])) { refund(); return; }
     if (yardhawk) disposeSupportRoot(yardhawk.root);
     const root = new THREE.Group(); root.name = 'yardhawk-hunter-killer';
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, 0.9), new THREE.MeshBasicMaterial({ color: 0x29393d }));
@@ -9367,17 +9858,45 @@ function activateFieldSupport(id: FieldSupportId): void {
     audio.supportInbound('yardhawk');
     authorizeLocalOffensiveSupport('yardhawk', [], [target.id]);
     addFeed('YARDHAWK THROWN · HOMING SYSTEM ARMING', 'gold');
-  } else if (id === 'tri-pass') {
+  } else if (activatedId === 'tri-pass') {
     beginTriPassTargeting();
-  } else if (id === 'hunter-swarm') {
+  } else if (activatedId === 'hunter-swarm') {
+    const firstSpawnedDrone = hunterDrones.length;
     const assignments = spawnHunterSwarm(now);
     if (!assignments) {
-      fieldSupport = { ...fieldSupport, available: { ...fieldSupport.available, 'hunter-swarm': true } };
+      refund();
       addFeed('HUNTER SWARM · NO HOSTILE TARGETS · REFUNDED', 'gold');
-    } else authorizeLocalOffensiveSupport('hunter-swarm', [], assignments);
-  } else {
+    } else {
+      if (!requestKillstreakActivation(activatedId, now)) {
+        for (const drone of hunterDrones.splice(firstSpawnedDrone)) disposeSupportRoot(drone.root);
+        refund();
+        return;
+      }
+      authorizeLocalOffensiveSupport('hunter-swarm', [], assignments);
+    }
+  } else if (activatedId === 'nuke') {
+    if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
     authorizeLocalOffensiveSupport('nuke');
     beginNuke(now);
+  } else if (activatedId === 'adrenaline') {
+    if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
+    addFeed('ADRENALINE BOOST · +10% DAMAGE / MOVE · -10% RELOAD · 15 SEC', 'gold');
+  } else if (activatedId === 'care-package') {
+    if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) { refund(); return; }
+    addFeed('CARE PACKAGE · INBOUND · PRESS F TO SECURE', 'gold');
+  } else if (activatedId === 'carpet-bomber') {
+    const target = nearestSupportTarget()?.point ?? player.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 18);
+    if (!requestKillstreakActivation(activatedId, now, [target.x, target.y, target.z])) { refund(); return; }
+    addFeed('CARPET BOMBER · 20-IMPACT ZIGZAG RUN INBOUND', 'gold');
+  } else if (activatedId === 'piloted-drone') {
+    if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) { refund(); return; }
+    addFeed('PILOTED DRONE · 20 ROUNDS + ONE SPARE CLIP · F EXITS', 'gold');
+  } else if (activatedId === 'chopper') {
+    if (!requestKillstreakActivation(activatedId, now)) { refund(); return; }
+    addFeed('CHOPPER GUNNER · AI ONLINE · F TO TAKE / RELEASE GUN · 30 SEC', 'gold');
+  } else if (activatedId === 'drone-swarm') {
+    if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) { refund(); return; }
+    addFeed('DRONE SWARM · 12 DRONES · 60 SEC', 'gold');
   }
   updateFieldSupportHud();
 }
@@ -9598,6 +10117,7 @@ function clearGrenades(): void {
 }
 
 function clearFieldSupport(): void {
+  killstreakPresentation.clear();
   if (yardhawk) disposeSupportRoot(yardhawk.root);
   yardhawk = null;
   for (const strike of strikeMissiles) {
@@ -9632,7 +10152,7 @@ function clearFieldSupport(): void {
   hunterSwarmImpacts = 0;
   nukeLaunches = 0;
   nukeDetonations = 0;
-  fieldSupport = createFieldSupportState();
+  fieldSupport = createFieldSupportState(killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected);
   localSupportNonces.clear();
   admittedRemoteShots.clear();
   admittedRemoteMelees.clear();
@@ -9660,7 +10180,7 @@ function updatePhysics(dt: number): void {
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
-  const profile = movementProfile({
+  const baseProfile = movementProfile({
     crouched,
     prone,
     ads: adsHeld,
@@ -9668,6 +10188,12 @@ function updatePhysics(dt: number): void {
     grounded: playerGrounded,
     equippedMovementMultiplier: WEAPONS[player.weapon].movementMultiplier,
   });
+  const movementBoost = killstreakActorModifiers(player.id, now).movement;
+  const profile = {
+    ...baseProfile,
+    maxSpeed: baseProfile.maxSpeed * movementBoost,
+    acceleration: baseProfile.acceleration * movementBoost,
+  };
   const integrated = integrateHorizontalVelocity(
     { x: player.velocity.x, z: player.velocity.z },
     { x: input.x, z: input.z },
@@ -10014,6 +10540,8 @@ function updateMatchState(now: number): void {
   }
   if (matchState.phase === 'ended') {
     matchFinished = true;
+    killstreakLoadoutController.releaseAfterMatch();
+    killstreakMenuBinding.setMatchActive(false);
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'ended') broadcastHostLobby('ended');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' };
     recordCompletedMatch();
@@ -10767,14 +11295,20 @@ window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
 const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
   'scout-sweep': 'SCOUT SWEEP',
+  adrenaline: 'ADRENALINE BOOST',
+  'care-package': 'CARE PACKAGE',
   yardhawk: 'YARDHAWK',
+  'piloted-drone': 'PILOTED DRONE',
   'tri-pass': 'TRI-PASS',
+  'carpet-bomber': 'CARPET BOMBER',
   'hunter-swarm': 'HUNTER SWARM',
+  chopper: 'CHOPPER GUNNER',
+  'drone-swarm': 'DRONE SWARM',
   nuke: 'NUKE',
 };
 
 function selectGamepadSupport(direction: -1 | 1): void {
-  gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction);
+  gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction, fieldSupport.loadout);
   addFeed(`PAD SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
   updateFieldSupportHud();
 }
@@ -10900,15 +11434,12 @@ window.addEventListener('keydown', (event) => {
   if ((event.code === 'KeyZ' || event.code === 'ControlLeft') && !event.repeat) requestStance('toggle-prone');
   if (event.code === 'Digit1') switchWeapon(0);
   if (event.code === 'Digit2') switchWeapon(1);
-  if (event.code === 'Digit3' && !event.repeat) activateFieldSupport('scout-sweep');
-  if (event.code === 'Digit4' && !event.repeat) activateFieldSupport('yardhawk');
-  if (event.code === 'Digit5' && !event.repeat) activateFieldSupport('tri-pass');
-  if (event.code === 'Digit6' && !event.repeat) activateFieldSupport('hunter-swarm');
-  if (event.code === 'Digit7' && !event.repeat) activateFieldSupport('nuke');
+  const supportSlot = ['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code);
+  if (supportSlot >= 0 && !event.repeat) activateFieldSupport(fieldSupport.loadout.slots[supportSlot]);
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
-  if (event.code === 'KeyF' && !event.repeat) interactWithWeaponPickup();
+  if (event.code === 'KeyF' && !event.repeat && !interactWithKillstreakSupport()) interactWithWeaponPickup();
   if (event.code === 'Tab') {
     event.preventDefault();
     updateRoster();
@@ -10917,10 +11448,12 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => {
   keys.delete(event.code);
+  if (event.code === 'KeyF') releaseCareCapture();
   if (event.code === 'Tab') element<HTMLElement>('#roster').hidden = true;
 });
 window.addEventListener('blur', () => {
   lastWindowBlurAt = performance.now();
+  releaseCareCapture();
   clearGameplayInput();
   applyMenuLifecycle({ type: 'focus-lost' });
 });
@@ -11433,6 +11966,8 @@ function returnToMainMenu(): void {
   resetPrivateLobbyState();
   gameStarted = false;
   matchFinished = false;
+  killstreakLoadoutController.releaseAfterMatch();
+  killstreakMenuBinding.setMatchActive(false);
   weaponView.root.visible = false;
   hudRoot.hidden = true;
   roomCard.hidden = true;
@@ -11754,7 +12289,7 @@ function frame(now: number, scheduleNext = true): void {
       accumulator -= step;
       iterations += 1;
     }
-    if (triggerHeld && WEAPONS[player.weapon].automatic) tryFire(now);
+    if (triggerHeld && WEAPONS[player.weapon].automatic && !localKillstreakActorSnapshot()?.possession) tryFire(now);
     finishReload(now);
     updateTargets(now);
     updateBots(frameDt, now);
@@ -11762,6 +12297,7 @@ function frame(now: number, scheduleNext = true): void {
     updateExplosiveBolts(frameDt, now);
     updateGrenadeExplosionVisuals(now);
     updateFieldSupport(frameDt, now);
+    updatePass65KillstreakRuntime(now);
     updateOverdrive(now);
     updateRailgun(now);
     updateDeathDrops(now);

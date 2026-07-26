@@ -272,3 +272,17 @@ html[data-reduced-motion=true] *,html[data-reduced-motion=true] *::before,html[d
   #support-block{transform:none}
 }
 }
+
+/* Pass 65: catalog-driven five-slot killstreak selection. */
+.menu-tabs{grid-template-columns:1fr 1fr 1fr 1fr}
+.panel:has([data-menu-panel=streaks].active){width:min(1020px,calc(100vw - 36px))}
+.killstreak-slot-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:8px}
+.killstreak-slot-card{display:grid;align-content:start;gap:8px;min-height:178px;padding:14px;border:1px solid rgba(255,255,255,.13);background:linear-gradient(150deg,rgba(88,227,220,.07),rgba(0,0,0,.23));color:#dfe9df}
+.killstreak-slot-card>span{font:800 8px/1 Inter,sans-serif;letter-spacing:.13em;color:var(--aqua)}
+.killstreak-slot-card>strong{min-height:32px;font:900 17px/1 'Barlow Condensed',sans-serif;letter-spacing:.055em;color:#fff}
+.killstreak-slot-card select{width:100%;min-width:0;padding:10px 8px;border:1px solid rgba(244,196,79,.38);background:#0d1719;color:#fff;font:800 11px/1 'Barlow Condensed',sans-serif;letter-spacing:.04em}
+.killstreak-slot-card select:disabled{opacity:.62}
+.killstreak-slot-card small{font:600 9px/1.35 Inter,sans-serif;color:#8fa7a4}
+.killstreak-loadout-status{margin:12px 0 0;padding:9px 11px;border-left:3px solid var(--gold);background:rgba(244,196,79,.07);font:800 9px/1 Inter,sans-serif;letter-spacing:.1em;color:var(--gold)}
+@media(max-width:900px){.killstreak-slot-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.killstreak-slot-card{min-height:140px}}
+@media(max-width:700px){.menu-tabs{grid-template-columns:1fr 1fr}.killstreak-slot-grid{grid-template-columns:1fr}.killstreak-slot-card{min-height:0}}

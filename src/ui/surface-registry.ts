@@ -10,6 +10,7 @@ export type UiSurfaceDefinition = Readonly<{
 export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freeze([
   { id: 'deployment-shell', rootElementId: 'menu', renderer: 'main-shell', critical: true },
   { id: 'field-kit-panel', rootElementId: 'menu-panel-kit', renderer: 'main-shell', critical: true },
+  { id: 'killstreak-loadout-panel', rootElementId: 'menu-panel-streaks', renderer: 'main-shell', critical: true },
   { id: 'options-panel', rootElementId: 'menu-panel-options', renderer: 'main-shell', critical: true },
   { id: 'graphics-settings', rootElementId: 'graphics-settings', renderer: 'main-shell', critical: true },
   { id: 'audio-settings', rootElementId: 'audio-settings', renderer: 'main-shell', critical: true },
@@ -63,7 +64,7 @@ export const UI_STATE_INVENTORY = Object.freeze([
   'countdown', 'live', 'dead', 'respawning', 'match-ended', 'returned-lobby',
   'modal-open', 'chat-typing', 'loading', 'error', 'reduced-motion', 'reduced-sensory',
   'pointer-lock-requesting', 'pointer-lock-denied', 'focus-suspended', 'paused-match',
-  'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
+  'killstreak-possession', 'narrow-height', 'narrow-width', 'ultrawide', 'high-dpi',
 ] as const);
 
 export const UI_REVIEW_VIEWPORTS = Object.freeze([

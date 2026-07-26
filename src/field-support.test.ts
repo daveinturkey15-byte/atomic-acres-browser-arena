@@ -36,55 +36,57 @@ describe('field support rewards', () => {
     expect(scoutSweepPulseVisible(4_500, until)).toBe(false);
     expect(scoutSweepPulseVisible(until, until)).toBe(false);
   });
-  it('unlocks the three original rewards at bounded elimination thresholds', () => {
+  it('unlocks only the five frozen match selections at their exact thresholds', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
     expect(state.streak).toBe(7);
     expect(state.rewardCycle).toBe(0);
-    expect(state.available).toEqual({
+    expect(state.available).toMatchObject({
       'scout-sweep': true,
       yardhawk: true,
       'tri-pass': true,
+      adrenaline: false,
+      'care-package': false,
+      'piloted-drone': false,
+      'carpet-bomber': false,
       'hunter-swarm': false,
+      chopper: false,
+      'drone-swarm': false,
       nuke: false,
     });
   });
 
-  it('starts a fresh reward cycle immediately after the final streak without requiring death', () => {
+  it('does not repeat a consumed reward during the same life', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
     state = consumeFieldSupport(state, 'scout-sweep').state;
-    for (let index = 0; index < 4; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(7);
-    expect(state.rewardCycle).toBe(0);
-    expect(state.available['tri-pass']).toBe(true);
-    for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(10);
-    expect(state.rewardCycle).toBe(3);
-    expect(state.available['scout-sweep']).toBe(true);
+    for (let index = 0; index < 12; index += 1) state = recordSupportElimination(state);
+    expect(state.streak).toBe(15);
+    expect(state.available['scout-sweep']).toBe(false);
+    expect(state.available.nuke).toBe(true);
   });
 
-  it('resets the live streak on death without deleting already earned support', () => {
+  it('resets the live streak and every unconsumed reward on death', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 5; index += 1) state = recordSupportElimination(state);
     state = recordSupportDeath(state);
     expect(state.streak).toBe(0);
     expect(state.rewardCycle).toBe(0);
-    expect(state.available['scout-sweep']).toBe(true);
-    expect(state.available.yardhawk).toBe(true);
+    expect(state.available['scout-sweep']).toBe(false);
+    expect(state.available.yardhawk).toBe(false);
   });
 
-  it('drops unused high-tier rewards on death rather than carrying them into the next life', () => {
+  it('drops unused selected high-tier rewards on death and earns them afresh next life', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
-    expect(state.available['hunter-swarm']).toBe(true);
+    expect(state.available.chopper).toBe(true);
     expect(state.available.nuke).toBe(true);
     state = recordSupportDeath(state);
-    expect(state.available['hunter-swarm']).toBe(false);
+    expect(state.available.chopper).toBe(false);
     expect(state.available.nuke).toBe(false);
-    expect(consumeFieldSupport(state, 'hunter-swarm').activated).toBe(false);
+    expect(consumeFieldSupport(state, 'chopper').activated).toBe(false);
     for (let index = 0; index < 8; index += 1) state = recordSupportElimination(state);
-    expect(consumeFieldSupport(state, 'hunter-swarm').activated).toBe(true);
+    expect(consumeFieldSupport(state, 'chopper').activated).toBe(true);
   });
 
   it('consumes each reward at most once until it is earned again', () => {
@@ -107,26 +109,21 @@ describe('field support rewards', () => {
 
   it('cycles every support for standard-gamepad selection', () => {
     expect(cycleFieldSupportSelection('scout-sweep', -1)).toBe('nuke');
-    expect(cycleFieldSupportSelection('tri-pass', 1)).toBe('hunter-swarm');
-    expect(cycleFieldSupportSelection('hunter-swarm', 1)).toBe('nuke');
+    expect(cycleFieldSupportSelection('tri-pass', 1)).toBe('chopper');
+    expect(cycleFieldSupportSelection('chopper', 1)).toBe('nuke');
   });
 
-  it('re-earns Hunter Swarm and Nuke at independent streak multiples without requiring death', () => {
+  it('never re-earns consumed high-tier rewards without a death reset', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
     expect(state.streak).toBe(15);
-    expect(state.available['hunter-swarm']).toBe(true);
+    expect(state.available.chopper).toBe(true);
     expect(state.available.nuke).toBe(true);
-    state = consumeFieldSupport(consumeFieldSupport(state, 'hunter-swarm').state, 'nuke').state;
-    state = recordSupportElimination(state);
-    expect(state.streak).toBe(16);
-    expect(state.available['hunter-swarm']).toBe(true);
-    expect(state.available.nuke).toBe(false);
-    state = consumeFieldSupport(state, 'hunter-swarm').state;
-    for (let index = 0; index < 14; index += 1) state = recordSupportElimination(state);
+    state = consumeFieldSupport(consumeFieldSupport(state, 'chopper').state, 'nuke').state;
+    for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
     expect(state.streak).toBe(30);
-    expect(state.available.nuke).toBe(true);
-    expect(state.available['tri-pass']).toBe(true);
+    expect(state.available.chopper).toBe(false);
+    expect(state.available.nuke).toBe(false);
   });
 
   it('assigns exactly five deterministic hostile Hunter Swarm targets and excludes friendlies/dead targets', () => {

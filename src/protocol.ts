@@ -26,6 +26,14 @@ import {
   type RailgunShotResultMessage,
   type RailgunStateMessage,
 } from './railgun-authority';
+import {
+  isKillstreakHostAuthorityMessage,
+  isPass65KillstreakId,
+  isKillstreakProtocolMessage,
+  killstreakMessageBelongsToPlayer,
+  type KillstreakProtocolMessage,
+  type KillstreakStateMessage,
+} from './killstreak-protocol';
 
 export type Team = 0 | 1;
 export const MULTIPLAYER_PROTOCOL_VERSION = 7;
@@ -313,7 +321,8 @@ export type ChatHistoryMessage = {
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
-  | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage;
+  | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
+  | KillstreakProtocolMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -361,6 +370,7 @@ const shotRejectReasons = new Set<ShotRejectReason>([
 ]);
 
 export function isGameMessage(value: unknown): value is GameMessage {
+  if (isKillstreakProtocolMessage(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
@@ -497,7 +507,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
           || (msg.cause as { kind?: unknown }).kind === 'melee'
           || (msg.cause as { kind?: unknown }).kind === 'environment'
           || (msg.cause as { kind?: unknown; effect?: unknown }).kind === 'killstreak'
-            && offensiveSupportSources.has((msg.cause as { effect?: OffensiveSupportSource }).effect as OffensiveSupportSource))
+            && isPass65KillstreakId((msg.cause as { effect?: unknown }).effect))
         && Number.isFinite(msg.nonce);
     case 'bot-damage':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -677,6 +687,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
 
 export function messageBelongsToPlayer(message: GameMessage, playerId: string): boolean {
   if (!playerId) return false;
+  if (isKillstreakProtocolMessage(message)) return killstreakMessageBelongsToPlayer(message, playerId);
   switch (message.type) {
     case 'join':
     case 'state':
@@ -732,7 +743,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
 }
 
 export function isHostAuthorityMessage(message: GameMessage): boolean {
-  return message.type === 'lobby-config'
+  return isKillstreakProtocolMessage(message) && isKillstreakHostAuthorityMessage(message)
+    || message.type === 'lobby-config'
     || message.type === 'lobby-state'
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
@@ -748,8 +760,8 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'bot-damage';
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage {
-  return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state';
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage {
+  return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state' || message.type === 'killstreak-state';
 }
 
 export function sanitizeName(value: string): string {

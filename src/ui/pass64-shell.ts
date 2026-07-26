@@ -4,6 +4,9 @@ import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { ARENA_SELECTIONS } from '../map-selection';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
+import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
+import { DEFAULT_KILLSTREAK_LOADOUT } from '../killstreak-loadout';
+import { killstreakLoadoutPanelMarkup } from './killstreak-loadout-menu';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
 
@@ -205,6 +208,13 @@ function optionsPanelMarkup(): string {
   </div>`;
 }
 
+function fieldSupportRowsMarkup(): string {
+  return DEFAULT_KILLSTREAK_LOADOUT.slots.map((id, index) => {
+    const definition = PASS65_KILLSTREAK_CATALOG.definitions.find((entry) => entry.id === id)!;
+    return `<b data-support="${id}" data-support-slot="${index + 1}"><span class="support-meta"><kbd>${index + 3}</kbd><small>${definition.cost} KILLS</small></span><span class="support-name">${definition.displayName.toUpperCase()}</span><em class="support-state">LOCKED</em></b>`;
+  }).join('');
+}
+
 function menuMarkup(model: Pass64ShellViewModel): string {
   return `<section id="menu" class="panel pass64-command-deck">
     <header class="command-header">
@@ -217,13 +227,15 @@ function menuMarkup(model: Pass64ShellViewModel): string {
         <nav class="menu-tabs" role="tablist" aria-label="Deployment menu">
           <button id="menu-tab-deploy" type="button" role="tab" data-menu-tab="deploy" class="active" aria-controls="menu-panel-deploy" aria-selected="true" tabindex="0"><i>01</i><span>DEPLOY</span><small>ARENA + LOBBY</small></button>
           <button id="menu-tab-kit" type="button" role="tab" data-menu-tab="kit" aria-controls="menu-panel-kit" aria-selected="false" tabindex="-1"><i>02</i><span>FIELD KIT</span><small>LOADOUT</small></button>
-          <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1"><i>03</i><span>OPTIONS</span><small>INPUT + VIDEO</small></button>
+          <button id="menu-tab-streaks" type="button" role="tab" data-menu-tab="streaks" aria-controls="menu-panel-streaks" aria-selected="false" tabindex="-1"><i>03</i><span>STREAKS</span><small>FIVE SLOTS</small></button>
+          <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1"><i>04</i><span>OPTIONS</span><small>INPUT + VIDEO</small></button>
         </nav>
         <footer><span>SESSION</span><strong>SECURE / LOCAL</strong><small>HITL REVIEW DECK</small></footer>
       </aside>
       <main class="command-workspace">
         ${deploymentPanelMarkup(model)}
         ${fieldKitPanelMarkup()}
+        ${killstreakLoadoutPanelMarkup()}
         ${optionsPanelMarkup()}
       </main>
     </div>
@@ -271,13 +283,7 @@ function hudMarkup(): string {
     </section>
     <aside id="support-block" aria-label="Field support">
       <div class="support-heading"><span>FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
-      <div class="support-list">
-        <b data-support="scout-sweep"><span class="support-meta"><kbd>3</kbd><small>3 KILLS</small></span><span class="support-name">SCOUT SWEEP</span><em class="support-state">LOCKED</em></b>
-        <b data-support="yardhawk"><span class="support-meta"><kbd>4</kbd><small>5 KILLS</small></span><span class="support-name">YARDHAWK</span><em class="support-state">LOCKED</em></b>
-        <b data-support="tri-pass"><span class="support-meta"><kbd>5</kbd><small>7 KILLS</small></span><span class="support-name">TRI-PASS</span><em class="support-state">LOCKED</em></b>
-        <b data-support="hunter-swarm"><span class="support-meta"><kbd>6</kbd><small>8 KILLS</small></span><span class="support-name">HUNTER SWARM</span><em class="support-state">LOCKED</em></b>
-        <b data-support="nuke"><span class="support-meta"><kbd>7</kbd><small>15 KILLS</small></span><span class="support-name">NUKE</span><em class="support-state">LOCKED</em></b>
-      </div>
+      <div class="support-list">${fieldSupportRowsMarkup()}</div>
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </aside>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div><div id="hitmarker">×</div>
