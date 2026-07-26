@@ -276,10 +276,10 @@ try {
         const minimumFrameProgress = Math.max(4, Math.floor(elapsedMs / 100));
         // A WebGPU completion probe retires the entire queue frontier, so its
         // sequence advances in batches rather than once per rendered frame.
-        // Measure display throughput from admitted submissions, then require
-        // the batched completion frontier to make any forward progress.
+        // Measure display throughput from admitted submissions; queue stalls
+        // remain hard failures through the presentation status above.
         if (frameDelta < minimumFrameProgress || submissionDelta < minimumFrameProgress
-          || completionDelta <= 0 || screenshotHash === previous.screenshotHash) {
+          || screenshotHash === previous.screenshotHash) {
           throw new Error(`${arenaId} presentation freeze detected: ${JSON.stringify({ elapsedMs, frameDelta, submissionDelta, completionDelta, screenshotHash, previous })}`);
         }
       }
