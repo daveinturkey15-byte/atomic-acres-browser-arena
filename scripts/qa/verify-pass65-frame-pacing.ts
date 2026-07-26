@@ -45,6 +45,8 @@ if (!gtaoValues.has(requestedGtao as GtaoQuality)) {
 }
 const gtaoQuality = requestedGtao as GtaoQuality;
 const requestedGraphicsPreset = gtaoQuality === 'off' ? 'high' : 'custom';
+// The explicit render=blender review override is intentionally surfaced as High while preserving Custom internals.
+const expectedDisplayedGraphicsPreset = 'high';
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
   process.env.PASS64_CHROME_PATH,
@@ -396,7 +398,7 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
       || before.graphicsPreset?.requestedPreset !== requestedGraphicsPreset
       || before.graphicsPreset?.effectivePreset !== requestedGraphicsPreset
       || before.graphicsPreset?.ambientOcclusion?.quality !== gtaoQuality
-      || before.displayedGraphicsPreset !== requestedGraphicsPreset) {
+      || before.displayedGraphicsPreset !== expectedDisplayedGraphicsPreset) {
       issues.push(`quality-profile-not-active:${JSON.stringify({ renderProfile: before.renderProfile, graphics: before.graphicsPreset, displayed: before.displayedGraphicsPreset })}`);
     }
     const deploymentStartedAt = await page.evaluate(() => {
