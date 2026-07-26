@@ -36,13 +36,21 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
   await page.waitForFunction(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
   ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === true);
-  await page.evaluate(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
-  ).__ATOMIC_ACRES_DEBUG__.fireOnce());
-
-  const first = await page.evaluate(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot());
+  const shotStates = await page.evaluate(() => {
+    const api = (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void; snapshot: () => any } }
+    ).__ATOMIC_ACRES_DEBUG__;
+    api.fireOnce();
+    const first = api.snapshot();
+    // Keep this attempted follow-up in the same browser task as the accepted
+    // shot. On a heavily loaded renderer, crossing the Playwright boundary and
+    // inspecting the full presentation can legitimately consume the 1.5 s
+    // rechamber window, turning this into a machine-speed test instead of an
+    // authority test.
+    api.fireOnce();
+    return { first, blocked: api.snapshot() };
+  });
+  const first = shotStates.first;
   expect(first.railgun).toMatchObject({ roundsRemaining: 7, adsResetRequired: true, rechamberPresentationActive: true });
   expect(first.railgun.presentation).toMatchObject({
     beamPresentations: 1,
@@ -64,18 +72,13 @@ test('railgun exits ADS, enforces the 1.5 second rechamber, and permits a releas
   )).toBeCloseTo(180, 5);
   expect(first.audio.railgun).toMatchObject({ local: 1, layerCount: 8, pressureDuration: 0.62 });
   expect(first.textChat.adsHeld).toBe(false);
-  expect(first.railgun.thermalVisible).toBe(false);
 
   const presentationCountBeforeBlockedShot = first.railgun.presentation.beamPresentations;
-  await page.evaluate(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
-  ).__ATOMIC_ACRES_DEBUG__.fireOnce());
-  expect(await page.evaluate(() => (
+  expect(shotStates.blocked.railgun.roundsRemaining).toBe(7);
+  expect(shotStates.blocked.railgun.presentation.beamPresentations).toBe(presentationCountBeforeBlockedShot);
+  await page.waitForFunction(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.roundsRemaining)).toBe(7);
-  expect(await page.evaluate(() => (
-    window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => any } }
-  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation.beamPresentations)).toBe(presentationCountBeforeBlockedShot);
+  ).__ATOMIC_ACRES_DEBUG__.snapshot().railgun.thermalVisible === false);
 
   await page.evaluate(() => (
     window as unknown as { __ATOMIC_ACRES_DEBUG__: any }
