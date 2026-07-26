@@ -539,6 +539,8 @@ export function applyShedExplosion(
   }
   if (state.detachedChunkIds.length >= definition.caps.majorChunks) return { accepted: false, reason: 'chunk-cap', state };
   const chunkId = surface.attachedChunkId;
+  const surfaceDefinition = definition.surfaces.find((candidate) => candidate.id === surface.surfaceId);
+  if (!surfaceDefinition) return { accepted: false, reason: 'unknown-surface', state };
   const detachedChunkIds = Object.freeze([...state.detachedChunkIds, chunkId]);
   const surfaces = replaceSurface(state, surface.surfaceId, (candidate) => Object.freeze({
     ...candidate,
@@ -548,7 +550,14 @@ export function applyShedExplosion(
   }));
   const majorDebris = Object.freeze([...state.majorDebris, Object.freeze({
     chunkId,
-    poseQ: IDENTITY_POSE,
+    poseQ: Object.freeze({
+      ...IDENTITY_POSE,
+      position: Object.freeze({
+        xQ: Math.round(surfaceDefinition.frame.centre.x * 1_000),
+        yQ: Math.round(surfaceDefinition.frame.centre.y * 1_000),
+        zQ: Math.round(surfaceDefinition.frame.centre.z * 1_000),
+      }),
+    }),
     velocityQ: ZERO_VECTOR,
     angularVelocityQ: ZERO_VECTOR,
     sleeping: false,
