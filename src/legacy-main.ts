@@ -44,6 +44,8 @@ import { bindProjectMapDialog } from './ui/project-map-dialog';
 import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/killstreak-loadout-menu';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
+import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES } from './graphics-settings-registry';
 import {
   INITIAL_MENU_LIFECYCLE_STATE,
   reduceMenuLifecycle,
@@ -167,9 +169,11 @@ import { ImpactPresentation } from './impact-presentation';
 import {
   PASS65_SETTINGS_STORAGE_KEY,
   AUDIO_BUS_IDS,
+  advancePresentationFrameAnchor,
   createDefaultPass65Settings,
   normalizePass65Settings,
   parsePass65Settings,
+  presentationFrameDue,
   resolveAccessibilityRuntime,
   resolveGraphicsRuntime,
   writePass65Settings,
@@ -802,7 +806,10 @@ const activeRenderConfig = Object.freeze({
   pixelRatioCap: renderProfile === 'compat' ? 0.2
     : renderProfile === 'performance' ? Math.min(0.75, graphicsRuntime.renderScale)
       : queryRenderProfile === 'blender' ? 1 : graphicsRuntime.renderScale,
+  antialias: renderProfile !== 'compat' && graphicsRuntime.antialiasSamples > 0,
   shadows: renderProfile === 'blender' && (queryRenderProfile === 'blender' || graphicsRuntime.shadows),
+  shadowMapSize: renderProfile === 'compat' ? 0 : graphicsRuntime.shadowMapSize,
+  shadowMode: renderProfile === 'compat' || !graphicsRuntime.shadows ? 'off' : graphicsRuntime.shadowUpdateMode,
 });
 const displayedGraphicsPreset: GraphicsPreset = renderProfile === 'performance' || renderProfile === 'compat'
   ? 'performance'
@@ -821,6 +828,11 @@ document.documentElement.classList.toggle('performance-render', renderProfile ==
 document.documentElement.classList.toggle('blender-render', renderProfile === 'blender');
 document.documentElement.dataset.renderProfile = renderProfile;
 document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
+document.documentElement.dataset.graphicsFrameRateLimit = graphicsRuntime.frameRateLimit === 0
+  ? 'uncapped'
+  : String(graphicsRuntime.frameRateLimit);
+document.documentElement.dataset.graphicsAntialiasSamples = String(graphicsRuntime.antialiasSamples);
+document.documentElement.dataset.graphicsToneMapping = graphicsRuntime.post.toneMapping;
 document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
 document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
 document.documentElement.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
@@ -828,8 +840,8 @@ const runtimeRequest = resolveRenderRuntimeRequest(window.location.search);
 const renderRuntime = runtimeRequest.requestedBackend === 'webgpu'
   ? await WebGpuRenderRuntime.create({
       canvas,
-      antialias: true,
-      samples: 4,
+      antialias: graphicsRuntime.antialiasSamples > 0,
+      samples: Math.max(1, graphicsRuntime.antialiasSamples),
       requireWebGPU: true,
     })
   : await LegacyWebGlRenderRuntime.create({
@@ -942,7 +954,8 @@ function scheduleGpuRetirementDrain(): void {
   });
 }
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
-renderRuntime.configureOutput(activeLighting.exposure);
+const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
+renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), graphicsRuntime.post.toneMapping);
 renderRuntime.configureShadows({
   enabled: activeRenderConfig.shadows,
   type: THREE.PCFShadowMap,
@@ -1005,6 +1018,8 @@ const graphicsRefinement = new GraphicsRefinementSystem(
   renderProfile,
   softwareRenderer || renderRuntime.backend === 'webgpu',
   activeRenderConfig.pixelRatioCap,
+  graphicsRuntime.maximumAnisotropy,
+  graphicsRuntime.reflectionScale,
 );
 const maximumAnisotropy = renderRuntime.maximumAnisotropy();
 
@@ -1023,12 +1038,22 @@ function requestStaticShadowRefresh(value = true): void {
   }
 }
 let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
+function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsEffectsBudget {
+  return Object.freeze({
+    ...budget,
+    bloomStrength: Math.min(budget.bloomStrength, graphicsRuntime.post.bloomStrength),
+    depthFogStrength: budget.depthFogStrength * graphicsRuntime.volumetricScale,
+    particleDensityScale: budget.particleDensityScale * graphicsRuntime.particleScale,
+    decalLifetimeScale: budget.decalLifetimeScale * graphicsRuntime.decalScale,
+  });
+}
 const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
 const dmrThermalPresentation = new DmrThermalPresentation(scene, element<HTMLElement>('#dmr-thermal'));
 const smokeVolumePresentationPool = new SmokeVolumePresentationPool(scene);
+smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale);
 const VIEWMODEL_RENDER_LAYER = 2;
 camera.layers.enable(VIEWMODEL_RENDER_LAYER);
 let skyMaterial: THREE.ShaderMaterial | null = null;
@@ -1099,7 +1124,7 @@ let activeArenaVisualDefinition: ArenaVisualDefinition | null = null;
 
 function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
-  const effectsBudget = graphicsEffectsBudget(renderProfile, pixelRatioCap);
+  const effectsBudget = applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, pixelRatioCap));
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
   applyPresentationEffectsBudget?.(effectsBudget);
@@ -1218,8 +1243,12 @@ function buildSky(): void {
     skyMaterial = material;
     scene.add(sky);
   }
-  hemisphereLight = new THREE.HemisphereLight(activeLighting.hemisphereSky, activeLighting.hemisphereGround, activeLighting.hemisphereIntensity);
-  ambientLight = new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity);
+  hemisphereLight = new THREE.HemisphereLight(
+    activeLighting.hemisphereSky,
+    activeLighting.hemisphereGround,
+    activeLighting.hemisphereIntensity * graphicsRuntime.indirectLightScale,
+  );
+  ambientLight = new THREE.AmbientLight(activeLighting.ambientColor, activeLighting.ambientIntensity * graphicsRuntime.indirectLightScale);
   scene.add(hemisphereLight);
   scene.add(ambientLight);
   sunLight = new THREE.DirectionalLight(activeLighting.sunColor, activeLighting.sunIntensity);
@@ -1236,7 +1265,7 @@ function buildSky(): void {
   sunLight.shadow.normalBias = activeLighting.shadowNormalBias;
   sunLight.shadow.radius = activeLighting.softShadows ? 2.2 : 1;
   scene.add(sunLight);
-  fillLight = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity);
+  fillLight = new THREE.DirectionalLight(activeLighting.fillColor, activeLighting.fillIntensity * graphicsRuntime.indirectLightScale);
   fillLight.name = 'shadow-side-arena-fill';
   fillLight.position.set(...activeLighting.fillPosition);
   fillLight.castShadow = false;
@@ -1540,14 +1569,14 @@ let appliedArenaVisualPolicy: Readonly<{
 
 function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): void {
   activeLighting = rustworksLightingTint(arenaLightingProfile(renderProfile, definition.id), renderProfile, definition.id);
-  renderRuntime.setExposure(definition.colorPipeline.exposure);
+  renderRuntime.setExposure(effectiveGraphicsExposure(definition.colorPipeline.exposure));
   if (scene.fog instanceof THREE.Fog) {
     scene.fog.color.setHex(definition.fog.color);
     scene.fog.near = definition.fog.near;
     scene.fog.far = definition.fog.far;
   }
   ambientLight.color.setHex(definition.lighting.ambientColor);
-  ambientLight.intensity = definition.lighting.ambientIntensity;
+  ambientLight.intensity = definition.lighting.ambientIntensity * graphicsRuntime.indirectLightScale;
   sunLight.color.setHex(definition.lighting.sunColor);
   sunLight.intensity = definition.lighting.sunIntensity;
   const definitionShadowsEnabled = adaptiveShadowsEnabled(
@@ -1557,14 +1586,15 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
   );
   renderRuntime.setShadowsEnabled(definitionShadowsEnabled);
   sunLight.castShadow = definitionShadowsEnabled && definition.lighting.sunIntensity > 0;
-  sunLight.shadow.mapSize.set(definition.shadows.mapSize, definition.shadows.mapSize);
+  const shadowMapSize = Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize);
+  sunLight.shadow.mapSize.set(shadowMapSize, shadowMapSize);
   sunLight.shadow.normalBias = definition.shadows.normalBias;
   graphicsRefinement.applyArena(
     definition.id,
     arena.bounds,
     sunLight,
     activeLighting.sunPosition,
-    sunLight.castShadow ? definition.shadows.mapSize : 0,
+    sunLight.castShadow ? shadowMapSize : 0,
   );
   sunLight.shadow.camera.far = Math.min(sunLight.shadow.camera.far, definition.shadows.maximumDistance);
   sunLight.shadow.camera.updateProjectionMatrix();
@@ -1594,7 +1624,11 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   applySelectedArenaVisualDefinition(module.definition);
   if (renderRuntime.backend === 'webgpu') {
     if (pass64TslSystems) pass64TslSystems.applyDefinition(module.definition);
-    else pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition);
+    else pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
+      principalSamples: graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1,
+      volumetricScale: graphicsRuntime.volumetricScale,
+      post: graphicsRuntime.post,
+    });
     appliedTslArenaDefinitions += 1;
     renderRuntime.setRenderTargetTelemetry(pass64TslSystems.principalHdrTarget.samples, pass64TslSystems.bloomSamples);
     const traversal = auditRuntimeTslTraversal(scene, pass64TslSystems.compiledPipelineIds);
@@ -1839,7 +1873,7 @@ applyPresentationEffectsBudget = (budget) => {
   atmosphereSystem?.setDensityScale(budget.particleDensityScale);
   impactPresentation.setBudget(budget.particleDensityScale, budget.decalLifetimeScale);
 };
-applyPresentationEffectsBudget(graphicsEffectsBudget(renderProfile, adaptiveQuality.telemetry().pixelRatioCap));
+applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, adaptiveQuality.telemetry().pixelRatioCap)));
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
@@ -2399,6 +2433,7 @@ function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }
   return activeWorldColliders().some((box) => segmentIntersectsBox(origin, target, box));
 }
 let lastFrame = performance.now();
+let lastPresentedFrameAt = lastFrame;
 let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
 let lastHudAt = 0;
@@ -12171,11 +12206,6 @@ const sensitivityInput = element<HTMLInputElement>('#sensitivity');
 const controllerSensitivityInput = element<HTMLInputElement>('#controller-sensitivity');
 const fovInput = element<HTMLInputElement>('#field-of-view');
 const graphicsProfileInput = element<HTMLSelectElement>('#graphics-profile');
-const graphicsRenderScaleInput = element<HTMLInputElement>('#graphics-render-scale');
-const graphicsRenderScaleValue = element<HTMLElement>('#graphics-render-scale-value');
-const graphicsAdaptiveInput = element<HTMLInputElement>('#graphics-adaptive');
-const graphicsTargetFpsInput = element<HTMLSelectElement>('#graphics-target-fps');
-const graphicsShadowsInput = element<HTMLSelectElement>('#graphics-shadows');
 const reducedMotionInput = element<HTMLInputElement>('#reduced-motion');
 const reducedDamageFlashInput = element<HTMLInputElement>('#reduced-damage-flash');
 const reducedSensoryEffectsInput = element<HTMLInputElement>('#reduced-sensory-effects');
@@ -12192,11 +12222,6 @@ sensitivityInput.value = String(sensitivity);
 controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
 graphicsProfileInput.value = displayedGraphicsPreset;
-graphicsRenderScaleInput.value = String(pass65Settings.graphics.renderScale);
-graphicsRenderScaleValue.textContent = `${Math.round(pass65Settings.graphics.renderScale * 100)}%`;
-graphicsAdaptiveInput.checked = pass65Settings.graphics.adaptiveResolution;
-graphicsTargetFpsInput.value = String(pass65Settings.graphics.targetFps);
-graphicsShadowsInput.value = pass65Settings.graphics.shadows;
 reducedMotionInput.checked = pass65Settings.accessibility.reducedMotion;
 reducedDamageFlashInput.checked = pass65Settings.accessibility.reducedDamageFlash;
 reducedSensoryEffectsInput.checked = pass65Settings.accessibility.reducedSensoryEffects;
@@ -12235,6 +12260,9 @@ function persistGraphicsAndReload(graphics: Partial<Pass65Settings['graphics']>)
   window.location.assign(url);
 }
 
+const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, persistGraphicsAndReload);
+document.documentElement.dataset.graphicsRegistryCount = String(advancedGraphicsBinding.registeredKeys.length);
+
 applyAccessibilitySettings();
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
@@ -12251,19 +12279,6 @@ fovInput.addEventListener('input', () => {
 graphicsProfileInput.addEventListener('change', () => {
   persistGraphicsAndReload({ preset: graphicsProfileInput.value as GraphicsPreset });
 });
-graphicsRenderScaleInput.addEventListener('input', () => {
-  graphicsRenderScaleValue.textContent = `${Math.round(Number(graphicsRenderScaleInput.value) * 100)}%`;
-});
-graphicsRenderScaleInput.addEventListener('change', () => persistGraphicsAndReload({
-  preset: 'custom', renderScale: Number(graphicsRenderScaleInput.value),
-}));
-graphicsAdaptiveInput.addEventListener('change', () => persistGraphicsAndReload({ preset: 'custom', adaptiveResolution: graphicsAdaptiveInput.checked }));
-graphicsTargetFpsInput.addEventListener('change', () => persistGraphicsAndReload({
-  preset: 'custom', targetFps: Number(graphicsTargetFpsInput.value) as Pass65Settings['graphics']['targetFps'],
-}));
-graphicsShadowsInput.addEventListener('change', () => persistGraphicsAndReload({
-  preset: 'custom', shadows: graphicsShadowsInput.value as Pass65Settings['graphics']['shadows'],
-}));
 
 for (const id of AUDIO_BUS_IDS) {
   const gain = element<HTMLInputElement>(`#audio-${id}-gain`);
@@ -12605,7 +12620,7 @@ function applyArenaLightingForSelection(): void {
   );
   const lighting = activeLighting;
   const definition = activeArenaVisualDefinition?.id === selectedArena.id ? activeArenaVisualDefinition : null;
-  renderRuntime.setExposure(definition?.colorPipeline.exposure ?? lighting.exposure);
+  renderRuntime.setExposure(effectiveGraphicsExposure(definition?.colorPipeline.exposure ?? lighting.exposure));
   renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: THREE.PCFShadowMap });
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(definition?.fog.color ?? lighting.fogColor);
   if (skyMaterial) {
@@ -12625,11 +12640,11 @@ function applyArenaLightingForSelection(): void {
   if (hemisphereLight) {
     hemisphereLight.color.setHex(lighting.hemisphereSky);
     hemisphereLight.groundColor.setHex(lighting.hemisphereGround);
-    hemisphereLight.intensity = lighting.hemisphereIntensity;
+    hemisphereLight.intensity = lighting.hemisphereIntensity * graphicsRuntime.indirectLightScale;
   }
   if (ambientLight) {
     ambientLight.color.setHex(definition?.lighting.ambientColor ?? lighting.ambientColor);
-    ambientLight.intensity = definition?.lighting.ambientIntensity ?? lighting.ambientIntensity;
+    ambientLight.intensity = (definition?.lighting.ambientIntensity ?? lighting.ambientIntensity) * graphicsRuntime.indirectLightScale;
   }
   if (sunLight) {
     sunLight.color.setHex(definition?.lighting.sunColor ?? lighting.sunColor);
@@ -12644,7 +12659,8 @@ function applyArenaLightingForSelection(): void {
     renderRuntime.setShadowsEnabled(shadowsEnabled);
     sunLight.castShadow = shadowsEnabled && (definition?.lighting.sunIntensity ?? lighting.sunIntensity) > 0;
     if (definition) {
-      sunLight.shadow.mapSize.set(definition.shadows.mapSize, definition.shadows.mapSize);
+      const shadowMapSize = Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize);
+      sunLight.shadow.mapSize.set(shadowMapSize, shadowMapSize);
       sunLight.shadow.normalBias = definition.shadows.normalBias;
     }
     graphicsRefinement.applyArena(
@@ -12652,7 +12668,9 @@ function applyArenaLightingForSelection(): void {
       arena.bounds,
       sunLight,
       lighting.sunPosition,
-      renderRuntime.shadowsEnabled() ? (definition?.shadows.mapSize ?? activeRenderConfig.shadowMapSize) : 0,
+      renderRuntime.shadowsEnabled()
+        ? Math.min(definition?.shadows.mapSize ?? activeRenderConfig.shadowMapSize, activeRenderConfig.shadowMapSize)
+        : 0,
     );
     if (definition) {
       sunLight.shadow.camera.far = Math.min(sunLight.shadow.camera.far, definition.shadows.maximumDistance);
@@ -12661,7 +12679,7 @@ function applyArenaLightingForSelection(): void {
   }
   if (fillLight) {
     fillLight.color.setHex(lighting.fillColor);
-    fillLight.intensity = lighting.fillIntensity;
+    fillLight.intensity = lighting.fillIntensity * graphicsRuntime.indirectLightScale;
     fillLight.position.set(...lighting.fillPosition);
   }
   if (definition) arenaContrastLighting.applyDefinition(definition);
@@ -13264,6 +13282,13 @@ function monitorSelectedArenaRender(now: number): void {
 }
 
 function frame(now: number, scheduleNext = true): void {
+  if (scheduleNext && !presentationFrameDue(now, lastPresentedFrameAt, graphicsRuntime.frameRateLimit)) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  if (scheduleNext) {
+    lastPresentedFrameAt = advancePresentationFrameAnchor(now, lastPresentedFrameAt, graphicsRuntime.frameRateLimit);
+  }
   const frameWorkStartedAt = performance.now();
   frameCount += 1;
   try {
@@ -13389,15 +13414,16 @@ function activePostTelemetry(): Record<string, unknown> {
     fallbackReason: null,
     bypassReason: null,
     samples: frameCount,
-    canvasAntialias: true,
-    canvasSamples: 4,
+    canvasAntialias: graphicsRuntime.antialiasSamples > 0,
+    canvasSamples: Math.max(1, graphicsRuntime.antialiasSamples),
     principalHdrSamples: target?.samples ?? 0,
     bloomSamples: pass64TslSystems?.bloomSamples ?? 0,
-    targetValidated: target?.samples === 4,
+    targetValidated: target?.samples === Math.max(1, graphicsRuntime.antialiasSamples),
     outputValidated: pass64TslSystems?.depthAwareBloom === true,
     depthAwareBloom: pass64TslSystems?.depthAwareBloom === true,
     bloomGraphId: pass64TslSystems?.bloomGraphId ?? null,
     bloomOcclusionSource: pass64TslSystems?.bloomOcclusionSource ?? null,
+    advancedGraphics: pass64TslSystems?.root.userData.pass65AdvancedGraphics ?? null,
   };
 }
 
@@ -14179,6 +14205,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       graphics: graphicsRuntime,
       displayedGraphicsPreset,
       accessibility: accessibilityRuntime,
+      advancedGraphicsRegistry: {
+        registeredKeys: advancedGraphicsBinding.registeredKeys,
+        controls: ADVANCED_GRAPHICS_CONTROLS.map(({ key, runtimeConsumer, applyMode }) => ({ key, runtimeConsumer, applyMode })),
+        unavailableCapabilities: GRAPHICS_CAPABILITY_NOTICES.map(({ id, reason, evidence }) => ({ id, reason, evidence })),
+      },
     },
     sensory: {
       directions: directionalDamagePresentation(directionalDamageState, performance.now(), player.yaw),
@@ -14927,7 +14958,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     activeArenaReviewSeed = null;
     activeArenaReviewExposure = null;
     activeArenaReviewHud = null;
-    if (activeArenaVisualDefinition) renderRuntime.setExposure(activeArenaVisualDefinition.colorPipeline.exposure);
+    if (activeArenaVisualDefinition) renderRuntime.setExposure(effectiveGraphicsExposure(activeArenaVisualDefinition.colorPipeline.exposure));
     debugCaptureCameraPosition.set(x!, y, z);
     debugCaptureCameraYaw = yaw;
     debugCaptureCameraPitch = THREE.MathUtils.clamp(pitch, -1.5, 1.5);
@@ -14942,7 +14973,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.far = reviewCamera.far;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
-    renderRuntime.setExposure(reviewCamera.exposure);
+    renderRuntime.setExposure(effectiveGraphicsExposure(reviewCamera.exposure));
     pass64TslSystems?.setReviewCamera(reviewCamera);
     activeArenaReviewCameraId = reviewCamera.id;
     activeArenaReviewFixedTimeMs = reviewCamera.fixedTimeMs;

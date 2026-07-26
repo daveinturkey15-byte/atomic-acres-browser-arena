@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
+import type { ToneMappingMode } from '../graphics-settings-registry';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
@@ -163,6 +164,12 @@ export function formatWebGpuUncapturedError(event: unknown): string {
   return `${name}: ${message}`;
 }
 
+export function toneMappingForMode(mode: ToneMappingMode): THREE.ToneMapping {
+  if (mode === 'agx') return THREE.AgXToneMapping;
+  if (mode === 'neutral') return THREE.NeutralToneMapping;
+  return THREE.ACESFilmicToneMapping;
+}
+
 export type ShadowRuntimeState = Readonly<{
   enabled: boolean;
   autoUpdate: boolean;
@@ -263,9 +270,9 @@ export class LegacyWebGlRenderRuntime {
     };
   }
 
-  configureOutput(exposure: number): void {
+  configureOutput(exposure: number, toneMapping: ToneMappingMode = 'aces'): void {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMapping = toneMappingForMode(toneMapping);
     this.renderer.toneMappingExposure = exposure;
   }
 
@@ -645,9 +652,9 @@ export class WebGpuRenderRuntime {
     this.bloomSamples = bloomSamples;
   }
 
-  configureOutput(exposure: number): void {
+  configureOutput(exposure: number, toneMapping: ToneMappingMode = 'aces'): void {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMapping = toneMappingForMode(toneMapping);
     this.renderer.toneMappingExposure = exposure;
   }
 

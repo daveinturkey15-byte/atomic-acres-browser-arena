@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   arenaEnvironmentScale,
   arenaShadowVolume,
+  GraphicsRefinementSystem,
   graphicsEffectsBudget,
   SELECTIVE_BLOOM_LAYER,
 } from './graphics-refinement';
@@ -45,5 +46,19 @@ describe('Pass 62 graphics refinement budgets', () => {
     }
     expect(arenaEnvironmentScale('rustworks-1v1')).toBeLessThan(arenaEnvironmentScale('atomic-acres'));
     expect(arenaEnvironmentScale('gun-range')).toBeLessThan(arenaEnvironmentScale('rustworks-1v1'));
+  });
+
+  it('applies requested anisotropy and reflection scaling to real material properties', () => {
+    const scene = new THREE.Scene();
+    const texture = new THREE.Texture();
+    const material = new THREE.MeshStandardMaterial({ map: texture, metalness: 0.8, envMapIntensity: 1 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+    scene.add(mesh);
+    const refinement = new GraphicsRefinementSystem(null, scene, 'blender', false, 1, 16, 0.62);
+    refinement.refine(scene, 8);
+    expect(texture.anisotropy).toBe(8);
+    expect(material.envMapIntensity).toBeCloseTo(0.62);
+    expect(refinement.telemetry()).toMatchObject({ requestedAnisotropy: 16, reflectionScale: 0.62 });
+    refinement.dispose();
   });
 });

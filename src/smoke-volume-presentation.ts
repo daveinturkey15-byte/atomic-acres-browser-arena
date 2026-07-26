@@ -105,6 +105,7 @@ export class SmokeVolumePresentation {
   private radiusM = 0;
   private disturbedAtMs = Number.NEGATIVE_INFINITY;
   private disturbance = 0;
+  private qualityScale = 1;
   private readonly disturbanceDirection = new THREE.Vector3();
   private readonly envelope: MutableSmokePresentationEnvelope = {
     active: false, growth: 0, coreOpacity: 0, edgeOpacity: 0, lifetimeProgress: 0,
@@ -178,9 +179,15 @@ export class SmokeVolumePresentation {
     this.core.position.copy(this.disturbanceDirection).multiplyScalar(disturbancePulse * 0.28);
     this.cards.position.copy(this.disturbanceDirection).multiplyScalar(-disturbancePulse * 0.18);
     this.cards.rotation.z = disturbancePulse * 0.14;
-    this.coreMaterial.opacity = envelope.coreOpacity * (1 - disturbancePulse * 0.34);
-    this.edgeMaterial.opacity = envelope.edgeOpacity * (1 - disturbancePulse * 0.16);
+    const densityScale = 0.72 + this.qualityScale * 0.28;
+    this.coreMaterial.opacity = envelope.coreOpacity * densityScale * (1 - disturbancePulse * 0.34);
+    this.edgeMaterial.opacity = envelope.edgeOpacity * densityScale * (1 - disturbancePulse * 0.16);
     return true;
+  }
+
+  setQualityScale(scale: number): void {
+    this.qualityScale = THREE.MathUtils.clamp(Number.isFinite(scale) ? scale : 1, 0.35, 1);
+    this.cards.count = this.qualityScale >= 0.95 ? 3 : this.qualityScale >= 0.7 ? 2 : 1;
   }
 
   disturb(direction: Readonly<{ x: number; y: number; z: number }>, strength: number, nowMs: number): void {
@@ -205,11 +212,12 @@ export class SmokeVolumePresentation {
     return this.active && this.root.visible && !this.disposed;
   }
 
-  telemetry(): Readonly<{ active: boolean; drawCalls: 2; cards: number; coreOpacity: number; edgeOpacity: number; triangles: number }> {
+  telemetry(): Readonly<{ active: boolean; drawCalls: 2; cards: number; qualityScale: number; coreOpacity: number; edgeOpacity: number; triangles: number }> {
     return Object.freeze({
       active: this.isActive(),
       drawCalls: 2,
       cards: this.cards.count,
+      qualityScale: this.qualityScale,
       coreOpacity: this.coreMaterial.opacity,
       edgeOpacity: this.edgeMaterial.opacity,
       triangles: (this.coreGeometry.index ? this.coreGeometry.index.count / 3 : this.coreGeometry.getAttribute('position').count / 3)
@@ -295,13 +303,20 @@ export class SmokeVolumePresentationPool {
     for (const slot of this.slots) slot.presentation.deactivate();
   }
 
-  telemetry(): Readonly<{ capacity: number; active: number; emissions: number; recycled: number; liveDisposals: 0 }> {
+  setQualityScale(scale: number): void {
+    for (const slot of this.slots) slot.presentation.setQualityScale(scale);
+  }
+
+  telemetry(): Readonly<{ capacity: number; active: number; emissions: number; recycled: number; liveDisposals: 0; cardsPerVolume: number; qualityScale: number }> {
+    const sample = this.slots[0]?.presentation.telemetry();
     return Object.freeze({
       capacity: this.slots.length,
       active: this.slots.reduce((count, { presentation }) => count + Number(presentation.isActive()), 0),
       emissions: this.emissions,
       recycled: this.recycled,
       liveDisposals: 0,
+      cardsPerVolume: sample?.cards ?? 0,
+      qualityScale: sample?.qualityScale ?? 0,
     });
   }
 

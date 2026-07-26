@@ -9,6 +9,7 @@ import {
   pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
   shouldBackpressureWebGpuSubmissions,
+  toneMappingForMode,
   webGpuRenderInfoSnapshot,
 } from './render-runtime';
 import { assertTslCutoverReady, assertTslReviewAuthored, pendingTslMigrationIds, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
@@ -19,6 +20,12 @@ describe('Pass 64 render runtime boundary', () => {
     expect(resolveRenderRuntimeRequest('?renderer=webgpu')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
     expect(resolveRenderRuntimeRequest('?renderer=webgpu&requireWebGPU=1')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
     expect(resolveRenderRuntimeRequest('?renderer=webgl2')).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
+  });
+
+  it('maps every exposed tone-mapping label to a real Three renderer mode', () => {
+    expect(toneMappingForMode('aces')).toBe(THREE.ACESFilmicToneMapping);
+    expect(toneMappingForMode('agx')).toBe(THREE.AgXToneMapping);
+    expect(toneMappingForMode('neutral')).toBe(THREE.NeutralToneMapping);
   });
 
   it('admits the cutover only after every custom GLSL owner has a verified TSL graph', () => {
@@ -97,6 +104,8 @@ describe('Pass 64 render runtime boundary', () => {
     expect([sun, practical].every((light) => !light.shadow.autoUpdate && light.shadow.needsUpdate)).toBe(true);
     expect(configureSceneLightShadowSchedule(scene, false, false)).toBe(2);
     expect([sun, practical].every((light) => !light.shadow.autoUpdate && !light.shadow.needsUpdate)).toBe(true);
+    expect(configureSceneLightShadowSchedule(scene, true, false)).toBe(2);
+    expect([sun, practical].every((light) => light.shadow.autoUpdate && !light.shadow.needsUpdate)).toBe(true);
   });
 
   it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {

@@ -56,7 +56,9 @@ describe('Pass 65 command shell', () => {
     ]);
     expect(markup).toContain('id="advanced-graphics"');
     expect(markup).toContain('ADVANCED GRAPHICS');
-    expect(markup).toContain('id="graphics-target-fps" type="range" min="30" max="360"');
+    expect(markup).toMatch(/id="graphics-target-fps"[^>]+type="range"[^>]+min="30" max="360"/);
+    expect(markup).toMatch(/id="graphics-frame-rate-limit"[^>]+max="361"/);
+    expect(markup).toContain('AI upscaling / frame generation');
     expect(markup.indexOf('id="advanced-graphics"')).toBeLessThan(markup.indexOf('id="graphics-render-scale"'));
   });
 

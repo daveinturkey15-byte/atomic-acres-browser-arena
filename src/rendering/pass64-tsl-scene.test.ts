@@ -83,4 +83,35 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(audit.legacyShaderMaterials).toHaveLength(1);
     expect(() => assertRuntimeTslTraversal(audit)).toThrow(/legacy shader materials remain/);
   });
+
+  it('allocates the selected HDR samples and applies bounded volumetric/post settings', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
+      principalSamples: 2,
+      volumetricScale: 0.5,
+      post: {
+        bloomStrength: 0,
+        exposureScale: 0.9,
+        toneMapping: 'agx',
+        filmGrainScale: 0,
+        vignetteStrength: 0.35,
+      },
+    });
+    expect(systems.principalHdrTarget.samples).toBe(2);
+    expect(systems.root.userData.pass65AdvancedGraphics).toEqual({
+      principalSamples: 2,
+      volumetricScale: 0.5,
+      bloomStrength: 0,
+      filmGrainScale: 0,
+      vignetteStrength: 0.35,
+    });
+    const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
+    expect(dust.geometry.drawRange.count).toBe(48);
+    expect(systems.root.getObjectByName('Pass 64 TSL smoke')?.children.filter(({ visible }) => visible)).toHaveLength(2);
+    expect(renderPipeline.outputNode).not.toBeNull();
+    systems.dispose();
+  });
 });

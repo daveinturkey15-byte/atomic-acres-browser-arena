@@ -31,6 +31,25 @@ import {
 import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-definition';
 import { createGrassPlacements } from '../grass-placement';
 import { TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import type { GraphicsRuntime } from '../pass65-settings';
+
+export type Pass65TslGraphicsOptions = Readonly<{
+  principalSamples: 1 | 2 | 4;
+  volumetricScale: number;
+  post: GraphicsRuntime['post'];
+}>;
+
+const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
+  principalSamples: 4,
+  volumetricScale: 1,
+  post: Object.freeze({
+    bloomStrength: 0.14,
+    exposureScale: 1,
+    toneMapping: 'aces',
+    filmGrainScale: 1,
+    vignetteStrength: 0,
+  }),
+});
 
 export type RuntimeTslTraversal = Readonly<{
   legacyShaderMaterials: readonly string[];
@@ -213,14 +232,21 @@ function makeDust(definition: ArenaVisualDefinition): THREE.Points {
   return dust;
 }
 
-function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefinition, seed = definition.reviewCameras[0]?.seed ?? 6401): void {
+function applyArenaSystemLayout(
+  root: THREE.Group,
+  definition: ArenaVisualDefinition,
+  seed = definition.reviewCameras[0]?.seed ?? 6401,
+  graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
+): void {
   const layout = ATMOSPHERE_LAYOUTS[definition.id];
+  const volumetricScale = THREE.MathUtils.clamp(graphics.volumetricScale, 0.35, 1);
   const mist = root.getObjectByName('Pass 64 TSL mist');
   const mistUniform = mist?.userData.opacityUniform as { value: number } | undefined;
-  if (mistUniform) mistUniform.value = Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09);
+  if (mistUniform) mistUniform.value = Math.min(0.12, 0.035 + definition.atmosphere.mist * 0.09) * volumetricScale;
+  const visibleMistLayers = Math.max(1, Math.ceil(layout.mist.length * volumetricScale));
   mist?.children.forEach((node, index) => {
     const placement = layout.mist[index];
-    node.visible = placement !== undefined;
+    node.visible = placement !== undefined && index < visibleMistLayers;
     if (placement) {
       const [x, z, width, depth] = placement;
       node.position.set(x, 0.08, z);
@@ -229,10 +255,11 @@ function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefini
   });
   const smoke = root.getObjectByName('Pass 64 TSL smoke');
   const smokeUniform = smoke?.userData.opacityUniform as { value: number } | undefined;
-  if (smokeUniform) smokeUniform.value = 0.035 + definition.atmosphere.mist * 0.12;
+  if (smokeUniform) smokeUniform.value = (0.035 + definition.atmosphere.mist * 0.12) * volumetricScale;
+  const visibleSmokeLayers = Math.max(1, Math.ceil(layout.smoke.length * volumetricScale));
   smoke?.children.forEach((node, index) => {
     const placement = layout.smoke[index];
-    node.visible = placement !== undefined;
+    node.visible = placement !== undefined && index < visibleSmokeLayers;
     if (placement) {
       const [x, z, width, height] = placement;
       node.position.set(x, height * 0.5 + 0.15, z);
@@ -241,7 +268,7 @@ function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefini
   });
   const dust = root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points | undefined;
   const dustUniform = dust?.userData.opacityUniform as { value: number } | undefined;
-  if (dustUniform) dustUniform.value = Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72);
+  if (dustUniform) dustUniform.value = Math.min(0.32, 0.08 + definition.atmosphere.dust * 0.72) * volumetricScale;
   const positions = dust?.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
   if (dust && positions) {
     for (let index = 0; index < positions.count; index += 1) {
@@ -253,7 +280,7 @@ function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefini
       );
     }
     positions.needsUpdate = true;
-    dust.geometry.setDrawRange(0, layout.dust.count);
+    dust.geometry.setDrawRange(0, Math.max(1, Math.round(layout.dust.count * volumetricScale)));
   }
   const grass = root.getObjectByName('Pass 64 TSL grass');
   if (grass) grass.visible = definition.id === 'atomic-acres';
@@ -266,6 +293,7 @@ function applyArenaSystemLayout(root: THREE.Group, definition: ArenaVisualDefini
   }
   root.userData.tslArenaVisualDefinitionId = definition.id;
   root.userData.tslAtmosphere = { ...definition.atmosphere };
+  root.userData.tslVolumetricScale = volumetricScale;
   root.userData.tslReviewSeed = seed;
 }
 
@@ -346,15 +374,17 @@ function configureHdrPipeline(
   scene: THREE.Scene,
   camera: THREE.Camera,
   definition: ArenaVisualDefinition,
+  graphics: Pass65TslGraphicsOptions,
 ): Readonly<{ scenePass: ReturnType<typeof pass>; applyDefinition(next: ArenaVisualDefinition): void }> {
-  const scenePass = pass(scene, camera, { samples: 4 });
+  const scenePass = pass(scene, camera, { samples: graphics.principalSamples });
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const saturation = uniform(definition.colorPipeline.grade.saturation);
   const contrast = uniform(definition.colorPipeline.grade.contrast);
   // Definition strength is authored in 8-bit output steps. Convert it before
   // adding the dither in linear HDR; using it as a 0-1 scalar creates noise.
-  const grain = uniform(definition.colorPipeline.grain.strength / 255);
+  const grain = uniform(definition.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale);
+  const vignette = uniform(graphics.post.vignetteStrength);
   const luma = dot(sceneColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   const saturated = mix(vec3(luma), sceneColor.rgb, saturation);
   const contrasted = saturated.sub(0.5).mul(contrast).add(0.5);
@@ -369,16 +399,19 @@ function configureHdrPipeline(
   // energy on the visible side of roofs, walls and portal frames rather than
   // allowing the low-resolution bloom chain to smear across their silhouettes.
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
-  const emissiveBloom = bloom(sceneColor, 0.14, 0.32, 0.92);
+  const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
   const hdrWithBloom = contrasted.add(emissiveBloom.rgb.mul(depthEdgeGuard));
-  renderPipeline.outputNode = vec4(hdrWithBloom.add(orderedDither), sceneColor.a);
+  const vignetteDistance = dot(screenUV.sub(0.5), screenUV.sub(0.5));
+  const vignetteFalloff = smoothstep(0.12, 0.5, vignetteDistance).mul(vignette).mul(0.42);
+  const postColor = hdrWithBloom.add(orderedDither).mul(float(1).sub(vignetteFalloff));
+  renderPipeline.outputNode = vec4(postColor, sceneColor.a);
   renderPipeline.needsUpdate = true;
   return {
     scenePass,
     applyDefinition(next) {
       saturation.value = next.colorPipeline.grade.saturation;
       contrast.value = next.colorPipeline.grade.contrast;
-      grain.value = next.colorPipeline.grain.strength / 255;
+      grain.value = next.colorPipeline.grain.strength / 255 * graphics.post.filmGrainScale;
     },
   };
 }
@@ -403,6 +436,7 @@ export function createPass64TslSceneSystems(
   camera: THREE.Camera,
   renderPipeline: RenderPipeline,
   definition: ArenaVisualDefinition,
+  graphics: Pass65TslGraphicsOptions = DEFAULT_TSL_GRAPHICS_OPTIONS,
 ): Pass64TslSceneSystems {
   let activeDefinition = definition;
   let activeReviewCamera: ArenaReviewCamera | null = null;
@@ -418,9 +452,16 @@ export function createPass64TslSceneSystems(
     makeWater(definition.id),
   );
   scene.add(root);
-  const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition);
+  const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition, graphics);
   const scenePass = hdr.scenePass;
-  applyArenaSystemLayout(root, definition);
+  applyArenaSystemLayout(root, definition, definition.reviewCameras[0]?.seed ?? 6401, graphics);
+  root.userData.pass65AdvancedGraphics = {
+    principalSamples: graphics.principalSamples,
+    volumetricScale: graphics.volumetricScale,
+    bloomStrength: graphics.post.bloomStrength,
+    filmGrainScale: graphics.post.filmGrainScale,
+    vignetteStrength: graphics.post.vignetteStrength,
+  };
   setAnimationTime(root, 0);
   const compiledPipelineIds = Object.freeze(TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId));
   return Object.freeze({
@@ -435,12 +476,12 @@ export function createPass64TslSceneSystems(
       activeDefinition = nextDefinition;
       activeReviewCamera = null;
       delete root.userData.tslReviewCameraId;
-      applyArenaSystemLayout(root, nextDefinition);
+      applyArenaSystemLayout(root, nextDefinition, nextDefinition.reviewCameras[0]?.seed ?? 6401, graphics);
       hdr.applyDefinition(nextDefinition);
     },
     setReviewCamera: (reviewCamera) => {
       activeReviewCamera = reviewCamera;
-      applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed);
+      applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed, graphics);
       setAnimationTime(root, reviewCamera.fixedTimeMs);
       root.userData.tslReviewCameraId = reviewCamera.id;
     },

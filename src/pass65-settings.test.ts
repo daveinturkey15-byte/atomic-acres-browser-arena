@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUDIO_BUS_IDS,
+  advancePresentationFrameAnchor,
   createDefaultPass65Settings,
   normalizePass65Settings,
   parsePass65Settings,
+  presentationFrameDue,
   resolveAccessibilityRuntime,
   resolveGraphicsRuntime,
   writePass65Settings,
@@ -12,8 +14,16 @@ import {
 describe('Pass 65 settings contract', () => {
   it('defaults capable machines to a real High configuration', () => {
     const settings = createDefaultPass65Settings({ hardwareConcurrency: 16, deviceMemoryGb: 16 });
-    expect(settings.graphics).toEqual({ schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 60, shadows: 'high' });
-    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ renderProfile: 'blender', adaptive: true, shadows: true });
+    expect(settings.graphics).toMatchObject({
+      schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 60,
+      frameRateLimit: 0, antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high',
+      shadowResolution: 'high', indirectLighting: 'high', volumetricQuality: 'high',
+      anisotropy: 8, bloomQuality: 'cinematic', toneMapping: 'aces',
+    });
+    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({
+      renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 4,
+      shadowMapSize: 2048, maximumAnisotropy: 8,
+    });
     expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
     expect(Object.keys(settings.audio.mutes).sort()).toEqual([...AUDIO_BUS_IDS].sort());
   });
@@ -21,7 +31,10 @@ describe('Pass 65 settings contract', () => {
   it('uses Performance on constrained machines and keeps Max available to internal benchmarks', () => {
     expect(createDefaultPass65Settings({ hardwareConcurrency: 4, deviceMemoryGb: 4 }).graphics.preset).toBe('performance');
     const max = normalizePass65Settings({ graphics: { preset: 'max' } });
-    expect(resolveGraphicsRuntime(max.graphics)).toMatchObject({ renderProfile: 'blender', renderScale: 1, adaptive: false, shadows: true });
+    expect(resolveGraphicsRuntime(max.graphics)).toMatchObject({
+      renderProfile: 'blender', renderScale: 1.25, adaptive: false, shadows: true,
+      shadowUpdateMode: 'dynamic', maximumAnisotropy: 16,
+    });
   });
 
   it('migrates legacy persisted High and Max presets into the simplified public Quality choice', () => {
@@ -89,11 +102,23 @@ describe('Pass 65 settings contract', () => {
     });
   });
 
-  it('preserves a requested 200% custom scale but resolves it to the renderer safety cap', () => {
+  it('canonicalizes custom supersampling to the renderer-supported 125% ceiling', () => {
     const settings = normalizePass65Settings({ graphics: { preset: 'custom', renderScale: 2 } });
-    expect(settings.graphics.renderScale).toBe(2);
-    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ renderScale: 1 });
-    expect(resolveGraphicsRuntime(settings.graphics).reason).toContain('safety-capped');
+    expect(settings.graphics.renderScale).toBe(1.25);
+    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ renderScale: 1.25, reason: null });
+  });
+
+  it('keeps adaptive target and output frame limiter separate beyond 144 FPS', () => {
+    const settings = normalizePass65Settings({
+      graphics: { preset: 'custom', targetFps: 240, frameRateLimit: 360 },
+    });
+    expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({ targetFps: 240, frameRateLimit: 360 });
+    expect(presentationFrameDue(102, 100, 360)).toBe(false);
+    expect(presentationFrameDue(103, 100, 360)).toBe(true);
+    expect(presentationFrameDue(100.01, 100, 0)).toBe(true);
+    const first = advancePresentationFrameAnchor(120.8, 100, 60);
+    expect(first).toBeCloseTo(116.667, 2);
+    expect(presentationFrameDue(134.7, first, 60)).toBe(true);
   });
 
   it('persists only a canonical read-back and rolls back a mismatched store', () => {

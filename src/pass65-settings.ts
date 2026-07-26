@@ -1,5 +1,11 @@
 import type { RenderProfile } from './render-profile';
 import { AUDIO_BUS_IDS, type AudioBusId } from './audio-buses';
+import {
+  GRAPHICS_PRESET_VALUES,
+  normalizeAdvancedGraphicsValues,
+  type AdvancedGraphicsValues,
+  type ToneMappingMode,
+} from './graphics-settings-registry';
 
 export { AUDIO_BUS_IDS };
 export type { AudioBusId };
@@ -8,14 +14,9 @@ export const PASS65_SETTINGS_STORAGE_KEY = 'atomic-acres-pass65-settings-v1';
 export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom';
 export type ShadowQuality = 'off' | 'high';
 
-export type GraphicsSettings = Readonly<{
+export type GraphicsSettings = Readonly<AdvancedGraphicsValues & {
   schemaVersion: 1;
   preset: GraphicsPreset;
-  renderScale: number;
-  adaptiveResolution: boolean;
-  /** Adaptive-quality target, not an output frame limiter. */
-  targetFps: number;
-  shadows: ShadowQuality;
 }>;
 
 export type AudioSettings = Readonly<{
@@ -47,7 +48,25 @@ export type GraphicsRuntime = Readonly<{
   renderScale: number;
   adaptive: boolean;
   targetFps: GraphicsSettings['targetFps'];
+  frameRateLimit: number;
+  antialiasSamples: 0 | 2 | 4;
   shadows: boolean;
+  shadowMapSize: 1024 | 2048;
+  shadowUpdateMode: GraphicsSettings['shadowUpdateMode'];
+  indirectLightScale: number;
+  reflectionScale: number;
+  volumetricScale: number;
+  maximumAnisotropy: GraphicsSettings['anisotropy'];
+  particleScale: number;
+  decalScale: number;
+  smokeScale: number;
+  post: Readonly<{
+    bloomStrength: number;
+    exposureScale: number;
+    toneMapping: ToneMappingMode;
+    filmGrainScale: number;
+    vignetteStrength: number;
+  }>;
   reason: string | null;
 }>;
 
@@ -79,13 +98,7 @@ function bool(value: unknown, fallback: boolean): boolean {
 }
 
 function presetGraphics(preset: Exclude<GraphicsPreset, 'custom'>): GraphicsSettings {
-  if (preset === 'performance') {
-    return Object.freeze({ schemaVersion: 1, preset, renderScale: 0.75, adaptiveResolution: true, targetFps: 60, shadows: 'off' });
-  }
-  if (preset === 'max') {
-    return Object.freeze({ schemaVersion: 1, preset, renderScale: 1, adaptiveResolution: false, targetFps: 60, shadows: 'high' });
-  }
-  return Object.freeze({ schemaVersion: 1, preset, renderScale: 1, adaptiveResolution: true, targetFps: 60, shadows: 'high' });
+  return Object.freeze({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset] });
 }
 
 export function defaultGraphicsPreset(capabilities: CapabilityHints = {}): Exclude<GraphicsPreset, 'custom'> {
@@ -124,15 +137,11 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   const rawGraphics = raw.graphics && typeof raw.graphics === 'object' ? raw.graphics as Partial<GraphicsSettings> : {};
   const preset = PRESETS.has(rawGraphics.preset as GraphicsPreset) ? rawGraphics.preset as GraphicsPreset : defaults.graphics.preset;
   const base = preset === 'custom' ? defaults.graphics : presetGraphics(preset);
-  const targetCandidate = finiteNumber(rawGraphics.targetFps, base.targetFps);
-  const targetFps = Math.round(clamp(targetCandidate, MIN_GRAPHICS_TARGET_FPS, MAX_GRAPHICS_TARGET_FPS));
+  const advanced = normalizeAdvancedGraphicsValues(rawGraphics, base);
   const graphics: GraphicsSettings = Object.freeze({
     schemaVersion: 1,
     preset,
-    renderScale: Number(clamp(finiteNumber(rawGraphics.renderScale, base.renderScale), 0.5, 2).toFixed(2)),
-    adaptiveResolution: bool(rawGraphics.adaptiveResolution, base.adaptiveResolution),
-    targetFps,
-    shadows: rawGraphics.shadows === 'off' || rawGraphics.shadows === 'high' ? rawGraphics.shadows : base.shadows,
+    ...advanced,
   });
   const rawAudio = raw.audio && typeof raw.audio === 'object' ? raw.audio as Partial<AudioSettings> : {};
   const rawGains = rawAudio.gains && typeof rawAudio.gains === 'object' ? rawAudio.gains as Partial<Record<AudioBusId, number>> : {};
@@ -210,6 +219,10 @@ export function writePass65Settings(
 }
 
 export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatibility = false): GraphicsRuntime {
+  const qualityScale = (tier: GraphicsSettings['particleQuality']): number => tier === 'low' ? 0.5 : tier === 'high' ? 0.8 : 1;
+  const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
+  const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
+  const antialiasSamples = settings.antiAliasing === 'msaa-4x' ? 4 : settings.antiAliasing === 'msaa-2x' ? 2 : 0;
   if (forceCompatibility) {
     return Object.freeze({
       requestedPreset: settings.preset,
@@ -218,20 +231,69 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       renderScale: 0.2,
       adaptive: false,
       targetFps: settings.targetFps,
+      frameRateLimit: settings.frameRateLimit,
+      antialiasSamples: 0,
       shadows: false,
+      shadowMapSize: 1024,
+      shadowUpdateMode: 'static',
+      indirectLightScale: 0.45,
+      reflectionScale: 0,
+      volumetricScale: 0.4,
+      maximumAnisotropy: 1,
+      particleScale: 0.4,
+      decalScale: 0.4,
+      smokeScale: 0.55,
+      post: Object.freeze({ bloomStrength: 0, exposureScale: settings.exposure, toneMapping: settings.toneMapping, filmGrainScale: 0, vignetteStrength: 0 }),
       reason: 'Compatibility renderer is active.',
     });
   }
   return Object.freeze({
     requestedPreset: settings.preset,
     effectivePreset: settings.preset,
-    renderProfile: settings.preset === 'performance' ? 'performance' : 'blender',
-    renderScale: Math.min(1, settings.renderScale),
+    renderProfile: settings.geometryDetail === 'reduced' ? 'performance' : 'blender',
+    renderScale: Math.min(1.25, settings.renderScale),
     adaptive: settings.adaptiveResolution,
     targetFps: settings.targetFps,
-    shadows: settings.shadows === 'high' && settings.preset !== 'performance',
-    reason: settings.renderScale > 1 ? 'Render scale is safety-capped at 100% for this renderer generation.' : null,
+    frameRateLimit: settings.frameRateLimit,
+    antialiasSamples,
+    shadows: settings.shadows === 'high' && settings.geometryDetail !== 'reduced',
+    shadowMapSize: settings.shadowResolution === 'high' ? 2048 : 1024,
+    shadowUpdateMode: settings.shadowUpdateMode,
+    indirectLightScale: lightingScale(settings.indirectLighting),
+    reflectionScale: lightingScale(settings.reflectionQuality),
+    volumetricScale: qualityScale(settings.volumetricQuality),
+    maximumAnisotropy: settings.anisotropy,
+    particleScale: qualityScale(settings.particleQuality),
+    decalScale: qualityScale(settings.decalQuality),
+    smokeScale: qualityScale(settings.smokeQuality),
+    post: Object.freeze({
+      bloomStrength,
+      exposureScale: settings.exposure,
+      toneMapping: settings.toneMapping,
+      filmGrainScale: settings.filmGrain,
+      vignetteStrength: settings.vignette,
+    }),
+    reason: null,
   });
+}
+
+/**
+ * Pure presentation scheduler gate. Simulation remains fixed-step; callers use
+ * this only to decide whether the next requestAnimationFrame should do work.
+ */
+export function presentationFrameDue(now: number, lastPresentedAt: number, frameRateLimit: number): boolean {
+  if (!Number.isFinite(now) || !Number.isFinite(lastPresentedAt)) return true;
+  if (!Number.isFinite(frameRateLimit) || frameRateLimit <= 0) return true;
+  const intervalMs = 1_000 / Math.min(MAX_GRAPHICS_TARGET_FPS, Math.max(MIN_GRAPHICS_TARGET_FPS, frameRateLimit));
+  return now - lastPresentedAt >= intervalMs - 0.25;
+}
+
+export function advancePresentationFrameAnchor(now: number, lastPresentedAt: number, frameRateLimit: number): number {
+  if (!Number.isFinite(frameRateLimit) || frameRateLimit <= 0) return now;
+  const boundedLimit = Math.min(MAX_GRAPHICS_TARGET_FPS, Math.max(MIN_GRAPHICS_TARGET_FPS, frameRateLimit));
+  const intervalMs = 1_000 / boundedLimit;
+  const elapsedMs = Math.max(intervalMs, now - lastPresentedAt);
+  return lastPresentedAt + Math.max(1, Math.floor((elapsedMs + 0.25) / intervalMs)) * intervalMs;
 }
 
 export function resolveAccessibilityRuntime(

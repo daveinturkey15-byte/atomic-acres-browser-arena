@@ -131,6 +131,17 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#graphics-target-fps')).toBeVisible();
     await expect(page.locator('#graphics-target-fps')).toHaveAttribute('max', '360');
     await expect(page.locator('#graphics-target-fps-marks option[value="240"]')).toHaveCount(1);
+    await expect(page.locator('[data-graphics-setting]')).toHaveCount(21);
+    await expect(page.locator('[data-graphics-capability][aria-disabled="true"]')).toHaveCount(6);
+    await expect(page.locator('#graphics-frame-rate-limit')).toHaveAttribute('max', '361');
+    await expect(page.locator('#graphics-frame-rate-limit-value')).toHaveText('UNCAPPED');
+    const registry = await page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().settings as {
+        advancedGraphicsRegistry: { registeredKeys: string[]; controls: Array<{ runtimeConsumer: string }> };
+      }
+    ).advancedGraphicsRegistry);
+    expect(registry.registeredKeys).toHaveLength(21);
+    expect(registry.controls.every(({ runtimeConsumer }) => runtimeConsumer.length > 0)).toBe(true);
     const layout = await page.evaluate(() => ({
       pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       panelOverflowX: document.querySelector<HTMLElement>('#menu-panel-options')!.scrollWidth
@@ -138,6 +149,26 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
     }));
     expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 11 });
+  });
+
+  test('persists an Advanced Graphics edit as Custom across the renderer rebuild', async ({ page }) => {
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await page.locator('#advanced-graphics summary').click();
+    await page.locator('#graphics-frame-rate-limit').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '240';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForURL((url) => !url.searchParams.has('render'), { timeout: 30_000 });
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await page.locator('#advanced-graphics summary').click();
+    await expect(page.locator('#graphics-profile')).toHaveValue('custom');
+    await expect(page.locator('#graphics-frame-rate-limit')).toHaveValue('240');
+    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres-pass65-settings-v1') ?? 'null'));
+    expect(persisted.graphics).toMatchObject({ preset: 'custom', frameRateLimit: 240 });
+    await expect(page.locator('html')).toHaveAttribute('data-graphics-frame-rate-limit', '240');
   });
 
   test('animates the live arena preview when motion is allowed', async ({ page }) => {

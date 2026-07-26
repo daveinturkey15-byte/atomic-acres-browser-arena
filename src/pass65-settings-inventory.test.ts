@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AUDIO_BUS_IDS } from './pass65-settings';
+import { ADVANCED_GRAPHICS_CONTROLS } from './graphics-settings-registry';
 import { PASS65_SETTING_DEFINITIONS, validatePass65SettingDefinitions } from './pass65-settings-inventory';
 import { AUDIO_BUS_IDS as SOUND_EVENT_AUDIO_BUS_IDS } from './sound-event-inventory';
 
@@ -16,9 +17,10 @@ describe('Pass 65 setting inventory', () => {
     const graphics = PASS65_SETTING_DEFINITIONS.filter((definition) => definition.key.startsWith('graphics.'));
     const accessibility = PASS65_SETTING_DEFINITIONS.filter((definition) => definition.key.startsWith('accessibility.'));
     expect(graphics.map(({ key }) => key)).toEqual([
-      'graphics.preset', 'graphics.renderScale', 'graphics.adaptiveResolution', 'graphics.targetFps', 'graphics.shadows',
+      'graphics.preset', ...ADVANCED_GRAPHICS_CONTROLS.map(({ key }) => `graphics.${key}`),
     ]);
     expect(graphics.every(({ applyMode }) => applyMode === 'arena-reload')).toBe(true);
+    expect(graphics.slice(1).every(({ runtimeConsumer }) => typeof runtimeConsumer === 'string' && runtimeConsumer.length > 0)).toBe(true);
     expect(accessibility).toHaveLength(5);
     expect(accessibility.every(({ applyMode }) => applyMode === 'live')).toBe(true);
   });

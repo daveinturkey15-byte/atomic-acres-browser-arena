@@ -50,4 +50,16 @@ describe('smoke grenade volume presentation', () => {
     expect(SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY).toBe(12);
     vi.restoreAllMocks();
   });
+
+  it('changes card detail without removing the authoritative smoke presentation', () => {
+    const scene = new THREE.Scene();
+    const pool = new SmokeVolumePresentationPool(scene, 1);
+    pool.setQualityScale(0.5);
+    const lease = pool.emit({ x: 0, y: 1, z: 0 }, 1_000, 13_000, 4.2);
+    pool.update(lease, 2_000);
+    expect(pool.telemetry()).toMatchObject({ active: 1, cardsPerVolume: 1, qualityScale: 0.5 });
+    expect(scene.getObjectByName('smoke-grenade-dense-core')?.visible).not.toBe(false);
+    pool.setQualityScale(0.8);
+    expect(pool.telemetry().cardsPerVolume).toBe(2);
+  });
 });

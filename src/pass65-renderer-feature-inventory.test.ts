@@ -22,7 +22,13 @@ describe('Pass 65 renderer feature inventory', () => {
   it('reports unavailable features instead of implying unsupported controls work', () => {
     const unsupported = PASS65_RENDERER_FEATURES.filter(({ availability }) => availability === 'unsupported');
     expect(unsupported.map(({ id }) => id).sort()).toEqual([
-      'ambient-contact-effects', 'frame-cap', 'hardware-ray-tracing',
+      'ai-upscaling-frame-generation',
+      'ambient-contact-effects',
+      'depth-of-field',
+      'hardware-ray-tracing',
+      'motion-blur',
+      'screen-space-gi',
+      'screen-space-reflections',
     ]);
     expect(unsupported.every(({ control }) => control.kind === 'unsupported' && control.settingKeys.length === 0)).toBe(true);
   });

@@ -10,6 +10,8 @@ import { killstreakLoadoutPanelMarkup } from './killstreak-loadout-menu';
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
 import { PASS65_HITL_IDENTITY } from '../release-identity';
+import { advancedGraphicsMarkup } from './advanced-graphics-controls';
+import './advanced-graphics.css';
 
 export type Pass64ShellViewModel = Readonly<{
   playerName: string;
@@ -187,14 +189,8 @@ function optionsPanelMarkup(): string {
         <p>Quality is the balanced default. Performance reduces presentation cost. Editing any advanced control saves the mode as Custom.</p>
       </div>
       <details id="advanced-graphics" class="advanced-settings">
-        <summary><span>ADVANCED GRAPHICS</span><small>WEBGPU PRESENTATION CONTROLS</small></summary>
-        <div class="settings-grid advanced-graphics-grid">
-          <label>RENDER SCALE<input id="graphics-render-scale" type="range" min="0.5" max="2" step="0.05" value="1"><small id="graphics-render-scale-value">100%</small></label>
-          <label>ADAPTIVE TARGET <small>30-360 FPS</small><input id="graphics-target-fps" type="range" min="30" max="360" step="1" value="144" list="graphics-target-fps-marks" aria-describedby="graphics-target-fps-help"><small id="graphics-target-fps-help">Adaptive-quality target; browser/display cadence remains authoritative.</small></label>
-          <datalist id="graphics-target-fps-marks"><option value="60"></option><option value="120"></option><option value="144"></option><option value="240"></option><option value="360"></option></datalist>
-          <label>SHADOWS<select id="graphics-shadows"><option value="off">OFF</option><option value="high">HIGH</option></select></label>
-          <label class="setting-check"><input id="graphics-adaptive" type="checkbox" checked> ADAPTIVE QUALITY</label>
-        </div>
+        <summary><span>ADVANCED GRAPHICS</span><small>REAL WEBGPU / PRESENTATION CONTROLS + CAPABILITY LIMITS</small></summary>
+        ${advancedGraphicsMarkup()}
       </details>
     </section>
     <section id="audio-settings" class="settings-section" aria-labelledby="audio-settings-title">
