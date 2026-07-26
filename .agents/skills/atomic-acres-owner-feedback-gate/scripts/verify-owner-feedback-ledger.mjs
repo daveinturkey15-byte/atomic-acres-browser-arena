@@ -23,7 +23,8 @@ function expandFeedbackRange(value) {
   return Array.from({ length: end - start + 1 }, (_, offset) => `HF-${String(start + offset).padStart(3, '0')}`);
 }
 
-function validate(ledger, matrix, agents) {
+function validate(ledger, matrix, agents, options = {}) {
+  const candidateMode = options.candidateMode === true;
   const errors = [];
   const feedbackRows = [];
   const mappingRows = [];
@@ -50,6 +51,9 @@ function validate(ledger, matrix, agents) {
     if (falsifier.length < 20) errors.push(`${id} has no mechanical falsifier/evidence recipe.`);
     if (scope.length < 2) errors.push(`${id} has no affected maps/modes scope.`);
     if (!allowedState.has(state)) errors.push(`${id} has invalid lifecycle state ${state || '<empty>'}.`);
+    if (candidateMode && (priority === 'P0' || priority === 'P1') && state !== 'VERIFIED' && state !== 'HITL') {
+      errors.push(`${id} is ${state}; an immutable candidate requires VERIFIED or HITL for ${priority}.`);
+    }
   }
 
   const orderedIds = [...byId.keys()].sort();
@@ -133,18 +137,37 @@ function runSelfTest(ledger, matrix, agents) {
       failures.push(`Verifier accepted invalid fixture: ${name}.`);
     }
   }
+  const candidateReadyLedger = ledger.split(/\r?\n/).map((line) => {
+    const row = cells(line);
+    if (!row || !/^HF-\d{3}$/.test(row[0]) || row.length !== 7 || (row[1] !== 'P0' && row[1] !== 'P1')) return line;
+    row[6] = 'VERIFIED';
+    return `| ${row.join(' | ')} |`;
+  }).join('\n');
+  if (validate(candidateReadyLedger, matrix, agents, { candidateMode: true }).errors.length > 0) {
+    failures.push('Candidate verifier rejected a mechanically ready lifecycle fixture.');
+  }
+  const downgradedCandidate = candidateReadyLedger.replace(
+    /^(\| HF-001 \| P0 \|[^\n]*\| )(?:VERIFIED|HITL)( \|)$/m,
+    '$1OPEN$2',
+  );
+  if (downgradedCandidate === candidateReadyLedger) {
+    failures.push('Candidate lifecycle mutation did not alter input.');
+  } else if (validate(downgradedCandidate, matrix, agents, { candidateMode: true }).errors.length === 0) {
+    failures.push('Candidate verifier accepted an OPEN P0 row.');
+  }
   return failures;
 }
 
 const ledger = fs.readFileSync(LEDGER_PATH, 'utf8');
 const matrix = fs.readFileSync(MATRIX_PATH, 'utf8');
 const agents = fs.readFileSync(AGENTS_PATH, 'utf8');
-const result = validate(ledger, matrix, agents);
+const candidateMode = process.argv.includes('--candidate');
+const result = validate(ledger, matrix, agents, { candidateMode });
 if (process.argv.includes('--self-test')) result.errors.push(...runSelfTest(ledger, matrix, agents));
 
 if (result.errors.length > 0) {
   console.error(JSON.stringify({ ok: false, ...result }, null, 2));
   process.exitCode = 1;
 } else {
-  console.log(JSON.stringify({ ok: true, ...result.summary, selfTest: process.argv.includes('--self-test') }, null, 2));
+  console.log(JSON.stringify({ ok: true, ...result.summary, selfTest: process.argv.includes('--self-test'), candidateMode }, null, 2));
 }

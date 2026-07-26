@@ -47,9 +47,10 @@ Run:
 ```powershell
 npm run qa:pass65:owner-feedback
 node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test
+npm run qa:pass65:owner-feedback:candidate
 ```
 
-The verifier must fail duplicate, skipped, malformed, unowned, unscoped or unmapped feedback rows and unknown planning requirement references. Its negative self-test is part of the skill contract.
+The structural verifier must fail duplicate, skipped, malformed, unowned, unscoped or unmapped feedback rows and unknown planning requirement references. The candidate verifier additionally rejects every `OPEN` or merely `IMPLEMENTED` P0/P1 row; only `VERIFIED` or `HITL` may enter an immutable candidate. Its negative self-test is part of the skill contract.
 
 ## Handoff
 

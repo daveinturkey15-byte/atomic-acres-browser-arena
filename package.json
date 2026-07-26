@@ -52,6 +52,7 @@
     "qa:pass65:frame-pacing": "npm run qa:pass65:frame-pacing-policy && npm run build && node scripts/qa/verify-pass65-frame-pacing.ts",
     "qa:pass65:menu-lifecycle": "playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass65:owner-feedback": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test",
+    "qa:pass65:owner-feedback:candidate": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test --candidate",
     "qa:pass65:drone-asset": "node scripts/qa/verify-pass65-drone-production.mjs",
     "qa:pass65:support-vehicles": "node scripts/qa/verify-pass65-support-vehicle-production.mjs",
     "qa:pass65:menu-previews": "node scripts/qa/verify-pass65-menu-preview-production.mjs",
