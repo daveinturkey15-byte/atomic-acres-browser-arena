@@ -5,7 +5,7 @@
   "decisionBinding": {
     "id": "DEC-13",
     "scope": "synthetic-fixture-only",
-    "receiptSha256": "8caa20d3bafefd77f191fb2724d89d43fea125d537daa8fb757ec7c2ee26c665"
+    "receiptSha256": "411142eed54c79addbeadf0eb2b324e8ac355d03d8e935162626a495d8a82451"
   },
   "catalog": [
     {"id": "scout-sweep", "displayName": "Scout Sweep", "cost": 3, "tier": "low", "availability": "selectable", "carePackageBaseWeightUnits": 24, "carePackageWeightUnits": 2376, "relationship": "retained-slot-1", "activation": "instant", "supportDefinitionIds": [], "durationMs": 12000, "repeatable": false, "authorityPolicy": "host", "presentationId": "scout-sweep-view", "audioProfileId": "scout-sweep-audio", "evidenceIds": ["killstreak-catalog-exactness", "care-pool-completeness"]},
@@ -22,7 +22,7 @@
   ],
   "loadout": ["scout-sweep", "yardhawk", "tri-pass", "chopper", "nuke"],
   "selectionPolicy": {"slotCount": 5, "duplicatesAllowed": false, "freezeAt": "match-start", "keyBindings": [3, 4, 5, 6, 7], "slots": [{"slot": 1, "allowedIds": ["scout-sweep", "adrenaline", "care-package"]}, {"slot": 2, "allowedIds": ["yardhawk", "piloted-drone"]}, {"slot": 3, "allowedIds": ["tri-pass", "carpet-bomber", "hunter-swarm", "chopper"]}, {"slot": 4, "allowedIds": ["tri-pass", "carpet-bomber", "hunter-swarm", "chopper"]}, {"slot": 5, "allowedIds": ["nuke", "drone-swarm"]}], "mutuallyExclusiveGroups": [["nuke", "drone-swarm"]]},
-  "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerLife": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": true, "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
+  "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerLife": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": false, "unconsumedRewardLifetime": "until-consumed-or-match-epoch-ends", "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
   "activationPolicy": {"hostOwnsActivation": true, "consumesExactlyOnce": true, "duplicateOwnerTypePolicy": "forbid-unless-definition-allows"},
   "privacyPolicy": {"rewardSeedRollHostOnly": true, "acquisitionStateHostOnly": true, "rewardRevealPolicy": "claimant-after-exclusive-claim", "recipientSnapshotOmitsSeedAndRoll": true},
   "gunProfiles": [

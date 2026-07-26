@@ -164,7 +164,7 @@ if (receipt) {
   check(digest(receipt) === binding.receiptSha256, 'DEC-13 receipt digest mismatch');
   exactKeys(receipt.value, [
     'catalog', 'selectionPolicy', 'carePackagePolicy', 'earningPolicy', 'activationPolicy', 'privacyPolicy',
-    'chopperCalibration', 'droneSwarmCalibration', 'pilotedDroneSensor', 'carpetBomber',
+    'chopperCalibration', 'droneSwarmCalibration', 'pilotedDroneSensor', 'pilotedDroneDeployment', 'carpetBomber',
   ], 'DEC-13 value');
   decision = receipt.value ?? {};
 }
@@ -199,7 +199,7 @@ for (const item of decisionCatalog) {
 
 exactKeys(decision.selectionPolicy, ['slotCount', 'duplicatesAllowed', 'freezeAt', 'keyBindings', 'slots', 'mutuallyExclusiveGroups'], 'DEC-13 selectionPolicy');
 exactKeys(decision.carePackagePolicy, ['eligibilityPredicate', 'inclusionCardinality', 'futureCatalogEntries', 'recomputeTrigger', 'normalization', 'fixedProbability', 'algorithm', 'currentNonNukeBaseWeightTotal', 'currentDerivedWeightTotal', 'scoutSweepWeightClass', 'recursiveIdsExcluded', 'retiredEntriesExcluded', 'validatorPolicy'], 'DEC-13 carePackagePolicy');
-exactKeys(decision.earningPolicy, ['progressScope', 'advancingKillSources', 'excludedKillSources', 'eachRewardEarnsOncePerLife', 'deathClearsProgress', 'deathClearsUnconsumedRewards', 'respawnStartsFreshLife', 'rematchStartsFreshEpoch'], 'DEC-13 earningPolicy');
+exactKeys(decision.earningPolicy, ['progressScope', 'advancingKillSources', 'excludedKillSources', 'eachRewardEarnsOncePerLife', 'deathClearsProgress', 'deathClearsUnconsumedRewards', 'unconsumedRewardLifetime', 'respawnStartsFreshLife', 'rematchStartsFreshEpoch'], 'DEC-13 earningPolicy');
 exactKeys(decision.activationPolicy, ['hostOwnsActivation', 'consumesExactlyOnce', 'duplicateOwnerTypePolicy'], 'DEC-13 activationPolicy');
 exactKeys(decision.privacyPolicy, ['rewardSeedRollHostOnly', 'acquisitionStateHostOnly', 'rewardRevealPolicy', 'recipientSnapshotOmitsSeedAndRoll'], 'DEC-13 privacyPolicy');
 check(decision.selectionPolicy?.slotCount === 5 && decision.selectionPolicy?.duplicatesAllowed === false, 'DEC-13 must explicitly require five distinct slots');
@@ -224,6 +224,16 @@ check(decision.carePackagePolicy?.scoutSweepWeightClass === 'highest', 'DEC-13 S
 check(canonical(decision.carePackagePolicy?.recursiveIdsExcluded) === canonical([CARE_PACKAGE_ID]), 'DEC-13 recursive exclusion invalid');
 check(decision.carePackagePolicy?.retiredEntriesExcluded === true, 'DEC-13 retired-entry exclusion invalid');
 check(decision.carePackagePolicy?.validatorPolicy === 'catalog-set-equality-plus-forced-every-reward-plus-formula-recomputation', 'DEC-13 care validator policy invalid');
+check(decision.earningPolicy?.progressScope === 'per-life' && decision.earningPolicy?.deathClearsProgress === true, 'per-life progress must reset on death');
+check(decision.earningPolicy?.deathClearsUnconsumedRewards === false, 'death must retain unconsumed rewards');
+check(decision.earningPolicy?.unconsumedRewardLifetime === 'until-consumed-or-match-epoch-ends', 'unconsumed reward lifetime invalid');
+check(canonical(decision.pilotedDroneDeployment) === canonical({
+  modeChoiceRequired: true,
+  allowedModes: ['autonomous', 'first-person-owner-control'],
+  sharedAssetFamilyWithDroneSwarm: true,
+  sharedGunProfileId: 'drone-gun-standard-v1',
+  variantDifferencesLimitedTo: ['control-mode', 'reserve', 'lifetime', 'sensor-policy'],
+}), 'piloted-drone deployment/shared-identity policy invalid');
 check(decision.activationPolicy?.hostOwnsActivation === true && decision.activationPolicy?.consumesExactlyOnce === true && decision.activationPolicy?.duplicateOwnerTypePolicy === 'forbid-unless-definition-allows', 'activation authority/exactly-once policy invalid');
 check(decision.privacyPolicy?.rewardSeedRollHostOnly === true && decision.privacyPolicy?.acquisitionStateHostOnly === true && decision.privacyPolicy?.recipientSnapshotOmitsSeedAndRoll === true, 'host-private support state policy invalid');
 check(decision.privacyPolicy?.rewardRevealPolicy === 'claimant-after-exclusive-claim', 'reward reveal policy invalid');

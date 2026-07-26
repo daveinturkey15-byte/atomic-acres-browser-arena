@@ -114,7 +114,11 @@ export function recordSupportDeath(state: FieldSupportState): FieldSupportState 
     ...state,
     streak: 0,
     rewardCycle: 0,
-    available: supportFlags(),
+    // Earned rewards belong to the match, not the life that unlocked them.
+    // Death resets only progress so an unconsumed reward remains usable after
+    // any number of respawns. The per-life earned flags reset so a consumed
+    // reward can be earned again during a later life.
+    available: { ...state.available },
     earnedThisStreak: supportFlags(),
   };
 }

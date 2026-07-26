@@ -19,7 +19,7 @@ The release integrator fills this before handing over the candidate:
 | Asset manifest | Digest plus licence/provenance report |
 | Required CI | Exact run ID and five required-job results |
 | Browser/backend | Chrome version, actual WebGPU, adapter/vendor/architecture, no fallback |
-| Settings | High and Max effective-setting hashes |
+| Settings | Quality, Performance and representative Custom effective-setting hashes |
 | Test machine | RTX 5080, driver, display resolution/refresh |
 | Stable fallback | Byte-exact Pass 63 subtree/tree digest and route; Pass 64 separately labelled failed-regression evidence |
 | Best-netcode benchmark | Unchanged Pass 62 record/digest |
@@ -32,7 +32,7 @@ Fail closed if any identity is missing, abbreviated ambiguously, moving, mutable
 - Confirm the on-screen build/pass identity matches the evidence header.
 - Confirm native Chrome reports actual WebGPU on the NVIDIA hardware adapter with no software fallback.
 - Use the primary 2560×1440 display for the owner pass; retain the deterministic 1600×900 evidence corpus for comparison.
-- Start on High, then repeat stress-sensitive scenes on Max.
+- Start on Quality, then repeat authority-parity scenes on Performance and stress-sensitive scenes on a recorded high-end Custom profile.
 - Keep browser console/GPU error capture active.
 - Use a fresh private match for lifecycle checks and a second peer for authority checks.
 - Stop immediately on a device loss, wrong build, wrong backend, corrupted settings migration, cross-profile gameplay drift, or unexpected publication action.
@@ -43,15 +43,15 @@ Use diagnostic grants and deterministic setup so this stays practical:
 
 1. Confirm the full S0 SHA/build ID, real RTX 5080 WebGPU backend and clean browser/GPU logs.
 2. Watch every menu preview: judge the helicopter's smooth varied path and sleek cockpit, then the Gun Range cat's composed joyful POV loop and reduced-motion pose.
-3. Inspect High default and Max; change representative graphics, audio and sensory controls and reload.
+3. Inspect Quality default, Performance and Custom; expand Advanced Graphics, set target FPS above 144, change representative graphics/audio/sensory controls and reload.
 4. Rename/use one custom preset, choose weapon/secondary/one grenade family, deploy, spend the grenade, verify a kill does not restore it, then use a corpse ammo pickup to restore exactly one; respawn and rematch.
 5. In Gun Range, sample every new weapon and the reworked knife; focus on feel, identity, hands, clipping, passive motion, fire/reload, sound and effects.
 6. Test damage directions, critical-health visuals/breathing and reduced-sensory behaviour.
 7. Hear local/remote/bot footsteps and two contrasting arena ambience profiles.
 8. Test smoke, flash, DMR smoke/wall rule and the explosive bolt with a second peer.
 9. Test one intact-to-damaged shed sequence: F door, obstruction, visible aperture shoot-through, explosion detach, non-flat nudge and flat/sleeping bullet wake.
-10. Exercise all five killstreak slot families with diagnostic grants, including retained Scout Sweep and Nuke. During Chopper Gunner, press `F` to enter and exit the gun at different times while confirming flight remains AI; judge whether chopper motion feels subtly alive without twitching or gameplay drift.
-11. Visit every map on High and one combined Max stress scene.
+10. Exercise all five killstreak slot families with diagnostic grants, including retained Scout Sweep and Nuke. Earn a reward, die twice and consume it. Verify the Care aircraft faces forward, its crate descends under a visible parachute and `F to collect killstreak` works. For the standalone drone, choose both autonomous and first-person modes. During Chopper Gunner, press `F` to enter and exit the gun at different times while confirming flight remains AI; judge motion, rotors, gun feedback and damage HUD.
+11. Visit every map on Quality and Performance, checking identical semantic cover/collision, then run one combined high-end Custom stress scene.
 12. Complete one representative two-peer join/play/death/respawn/reconnect/rematch lifecycle.
 13. Review the precomputed evidence summary, known issues, Pass 63 rollback rehearsal, Pass 64 regression record, staged `The Big One` Live identity and release-lineage plan; then approve, reject or defer the full S0 SHA. This HITL decision does not itself authorize publication; Codex must return with final publish-ready identities and ask separately.
 
@@ -71,13 +71,13 @@ Sections 3–12 are owned by the integrator and independent QA lanes. They must 
 
 ### Graphics
 
-- High is the effective default on the capable target machine.
-- Max is explicit and visibly changes only intended presentation budgets.
-- Performance/High/Max/Custom labels and effective values are understandable.
+- Quality is the effective default on the capable target machine.
+- Only Quality, Performance and Custom appear at the top level; Advanced Graphics starts collapsed and an advanced edit selects Custom.
+- Target FPS accepts values above 144 and clearly distinguishes adaptive target from an optional hard/uncapped scheduler.
 - Unsupported settings are clamped with a reason; they do not silently fail.
 - Live-change and arena-reload settings behave as labelled.
 - Render scale, shadows, filtering, atmosphere, particles, decals, bloom/exposure, material quality, dynamic-debris quality, motion and damage-flash controls persist correctly.
-- Performance and Max do not change collision, recoil, damage, projectile, visibility, spawn, or movement authority.
+- Performance and Custom do not change semantic geometry, collision, recoil, damage, projectile, visibility, spawn, navigation or movement authority. In particular, Atomic's kitchen/sofa presentation must match the collider set in every profile.
 - WebGL compatibility remains an explicit compatibility route rather than a silent WebGPU fallback.
 
 ### Audio and accessibility
@@ -92,7 +92,7 @@ Sections 3–12 are owned by the integrator and independent QA lanes. They must 
 - Existing four curated kits remain present and coherent.
 - The second row presents Custom 1/2/3 plus the approved fourth-tile behaviour.
 - Rename accepts useful Unicode, rejects empty/oversized/unsafe input, survives reload and is not exposed to peers.
-- Every custom preset selects one allowed primary, secondary and exactly one grenade family; only one grenade exists on spawn and carry never exceeds one.
+- Every custom preset selects one allowed primary, secondary and exactly one grenade family from Frag/Smoke/Flash/Semtex; only one grenade exists on spawn and carry never exceeds one.
 - Five killstreak slots obey the exact frozen families: Scout/Adrenaline/Care; Yardhawk/Piloted Drone; two distinct Tri-Pass/Carpet Bomber/Hunter Swarm/Chopper choices; and mutually exclusive Nuke/Drone Swarm.
 - Corrupt/old saved data recovers without destroying the last known-good selection.
 
@@ -159,7 +159,7 @@ Spot-check recoil, falloff, wallbang, reserve/magazine, reload, switch and stanc
 - Frag behaviour still matches its frozen comparator.
 - Smoke deploys from a typed inventory slot, has a coherent lifetime, blocks normal visual/AI acquisition and does not block bullets.
 - A late-joining peer reconstructs active smoke consistently.
-- Flash strength follows distance, facing and line of sight; a closed solid wall blocks it.
+- Flash detonates on first valid impact without countdown beeps; strength follows distance, facing and line of sight; a closed solid wall blocks it. The one strong whiteout excludes the HUD and recovers monotonically within DEC-14.
 - Reduced-flash mode changes presentation, not the authoritative result.
 - DMR thermal sees a living target through smoke while normal view does not; both views stop at walls.
 - Grenade use, respawn, reconnect, duplicate/reordered messages and rematch do not duplicate effects or inventory.
@@ -189,7 +189,7 @@ Reject a visual-only hole, invisible shoot-through, render-only door, client-aut
 
 ## 10. Killstreaks
 
-- Earn/select/consume every streak through legitimate host-owned score flow.
+- Earn/select/consume every streak through legitimate host-owned score flow. Unconsumed rewards survive repeated deaths; progress still resets per life and rematch clears the epoch.
 - Adrenaline lasts exactly 15 seconds, applies the approved non-stacking damage/move/reload modifiers, expires on schedule and follows the agreed death policy.
 - Care-package aircraft, parachute and crate lifecycle is coherent; F loot is range/LOS/sequence validated and exactly once.
 - Inspect deterministic weighted reward evidence: the pool is derived from the unique catalog, contains retained Scout Sweep at the highest base-weight band and every present/future eligible nonretired streak except Care Package exactly once, recomputes under synthetic add/retire/rename/weight mutations, contains no retired/recursive entry, and gives selectable Nuke exactly 1%.
@@ -197,7 +197,7 @@ Reject a visual-only hole, invisible shoot-through, render-only door, client-aut
 - Carpet Bomber activation supplies only the frozen strip anchor semantics; host-seeded RNG chooses and communicates a random valid ingress, then resolves exactly 20 bounded zigzag impacts along the intended strip.
 - Drone Swarm creates exactly 12 targetable 50-HP drones, seeks eligible opposing living human players and bots indoors/outdoors, rejects allies/dead lives, performs unlimited host-authored 20-round reload loops until its 60-second hard expiry, and meets the frozen approximately-five-second exposure/escape survival-pressure band.
 - Destroy drones within the frozen hitbox/core and per-weapon shot-count bands; no client can forge drone damage/death.
-- Piloted Drone restores player control on exit, destruction, death, disconnect and 30-second fuel expiry.
+- Standalone Drone explicitly offers autonomous-AI or first-person owner-control deployment, reuses the Swarm drone asset/gun family, and restores player control on exit, destruction, death, disconnect and 30-second fuel expiry.
 - Piloted Drone altitude controls use Space/Crouch, wall vision matches the approved railgun-like rule, HP is 50 and ammunition is exactly two 20-round magazines.
 - Swarm and piloted variants use the identical immutable DroneGunProfileId; only reserve, lifetime and control mode differ.
 - Across several seeded activations, chopper pitch/yaw/bank/direction/height variance is subtle and smooth; peers see the same path and targeting, LOS, cover, collision and 30-second lifetime remain unchanged.

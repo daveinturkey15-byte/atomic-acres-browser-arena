@@ -47,7 +47,7 @@ function intent(
 }
 
 describe('host killstreak runtime', () => {
-  it('earns only the frozen five-slot selection, once per life, from weapon or ordnance kills', () => {
+  it('earns only the frozen five-slot selection and retains unconsumed rewards across lives', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm']));
     expect(runtime.recordEligibleElimination('owner', 'killstreak')).toEqual([]);
@@ -62,7 +62,17 @@ describe('host killstreak runtime', () => {
     ]);
     expect(runtime.recordEligibleElimination('owner', 'weapon')).toEqual([]);
     runtime.recordActorDeath('owner', 2);
-    expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({ lifeId: 2, streak: 0, available: [] });
+    expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({
+      lifeId: 2,
+      streak: 0,
+      available: ['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm'],
+    });
+    runtime.recordActorDeath('owner', 3);
+    expect(runtime.snapshotFor('owner', 0).actors[0]).toMatchObject({
+      lifeId: 3,
+      streak: 0,
+      available: ['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'drone-swarm'],
+    });
   });
 
   it('applies the exact non-stacking Adrenaline stage for exactly 15 seconds', () => {

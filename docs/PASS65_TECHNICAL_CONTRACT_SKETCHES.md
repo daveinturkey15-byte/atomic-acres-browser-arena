@@ -226,6 +226,7 @@ type ActionClipContract = Readonly<{
 
 type WeaponPresentationDefinition = Readonly<{
   id: WeaponPresentationId;
+  sourceWorkingFile: AssetRef; // project-owned .blend or licence-vetted editable source package
   firstPersonLods: readonly AssetRef[];
   worldLods: readonly AssetRef[];
   skeletonId: string;
@@ -235,6 +236,13 @@ type WeaponPresentationDefinition = Readonly<{
   allowedTransitions: readonly Readonly<{ from: ViewmodelAction; to: ViewmodelAction }>[];
   clips: readonly ActionClipContract[];
   materialFamilyId: string;
+  pbrTextureSet: Readonly<{
+    albedo: AssetRef;
+    normal: AssetRef;
+    orm: AssetRef;
+    emissive: AssetRef | null;
+  }>;
+  uvAndTangentValidationId: string;
   triangleBudget: readonly [number, number, number];
   decodedTextureBudgetBytes: number;
   drawBudget: number;
@@ -252,7 +260,7 @@ Authority boundary:
 ## 4. Loadout v2
 
 ```ts
-type GrenadeId = 'frag' | 'smoke' | 'flash';
+type GrenadeId = 'frag' | 'smoke' | 'flash' | 'semtex';
 type LoadoutPresetId = 'custom-1' | 'custom-2' | 'custom-3';
 type CuratedKitId = string; // strict allowlisted registry ID
 
@@ -334,6 +342,8 @@ type GrenadeDefinition = Readonly<{
   spawnCount: 1;
   maximumCarry: 1;
   fuseMs: number;
+  collisionPolicy: 'bounce' | 'detonate-on-first-valid-impact' | 'stick-world-and-current-actor-life';
+  proneDamageMultiplier: number;
   throwSpeed: number;
   effect: GrenadeEffectKind;
   effectDefinitionId: string;
@@ -460,6 +470,9 @@ type SupportDefinitionBase = Readonly<{
   lifetimeMs: number;
   presentationId: CatalogId;
   audioProfileId: CatalogId;
+  assetFamilyId: CatalogId;
+  modelForwardAxis: '+x' | '-x' | '+z' | '-z';
+  modelUpAxis: '+y';
 }>;
 
 type SupportEntityDefinition =
@@ -473,7 +486,7 @@ type SupportEntityDefinition =
       kind: 'chopper'; targetable: boolean; healthQ: number; hitboxProfileId: CatalogId; gunProfileId: CatalogId; navigationPolicyId: CatalogId; targetingPolicyId: CatalogId; flightAuthority: 'host-ai'; gunControlPolicyId: CatalogId;
     }>)
   | (SupportDefinitionBase & Readonly<{
-      kind: 'drone'; targetable: true; healthQ: number; hitboxProfileId: CatalogId; gunProfileId: DroneGunProfileId; magazineSize: 20; reservePolicy: 'two-magazines-total' | 'unlimited-reloads-until-expiry'; reloadMs: number; fuelMs: number | null; navigationPolicyId: CatalogId; targetingPolicyId: CatalogId | null; sensorCapabilityId: CatalogId | null;
+      kind: 'drone'; targetable: true; healthQ: number; hitboxProfileId: CatalogId; gunProfileId: DroneGunProfileId; magazineSize: 20; reservePolicy: 'two-magazines-total' | 'unlimited-reloads-until-expiry'; reloadMs: number; fuelMs: number | null; navigationPolicyId: CatalogId; targetingPolicyId: CatalogId | null; sensorCapabilityId: CatalogId | null; allowedControlModes: readonly ('host-ai' | 'first-person-owner-control')[];
     }>)
   | (SupportDefinitionBase & Readonly<{
       kind: 'bomb'; targetable: boolean; healthQ: number | null; hitboxProfileId: CatalogId | null; impactProfileId: CatalogId;
@@ -581,6 +594,7 @@ type DroneState = SupportEntityBase & Readonly<{
   reloadCompletesAtMs: number | null;
   fuelEndsAtMs: number | null;
   navigationStateId: string;
+  controlMode: 'host-ai' | 'first-person-owner-control';
 }>;
 
 type BombState = SupportEntityBase & Readonly<{
@@ -613,6 +627,12 @@ No reliable per-frame pose stream.
 The Drone Swarm targeting policy admits only opposing living `player` and `bot` actors under current match/life/team identity; allies, dead/stale lives, support entities and scenery are ineligible. Its fixed-start/cover-route/armour-health/seed/sample profile freezes an approximately-five-second exposure/escape survival percentile, so target selection and damage pressure cannot drift behind a generic targeting-policy ID.
 
 Chopper navigation, route pose, no-fly recovery and motion variance remain host-AI under every gun mode. The gun defaults to AI. During the 30-second active phase, an admitted owner `F` intent may switch only `gunController`; a second `F`, body death, chopper death, expiry, disconnect, round end or invalid life restores ordinary player control exactly once, and AI resumes the gun when the chopper remains active. The operator body remains in-world, immobile and vulnerable while gunning. No client yaw/pitch/fire input can affect flight pose or navigation.
+
+Unconsumed earned rewards belong to the match epoch, not the life that crossed the cost threshold. Death clears per-life progress and earned-this-life markers but retains every available reward and claimed care reward through any number of respawns until exactly-once consumption or epoch reset.
+
+Every support vehicle uses one asset-authored axis conversion. At each moving route sample its canonical forward vector must face admitted velocity within the frozen angular tolerance; individual abilities cannot add ad-hoc sign flips. Care Package presentation includes a visible aircraft, visible descent parachute and range/LOS-derived `F to collect killstreak` prompt bound to the same host capture state.
+
+Swarm and standalone drone definitions reference the same `assetFamilyId` and immutable `DroneGunProfileId`. Standalone deployment admits an explicit `host-ai | first-person-owner-control` choice. Only control mode, reserve, lifetime and sensor policy may differ; muzzle socket, weapon action, report, tracer, impact and owner hit/damage feedback remain one shared presentation contract.
 
 ## 10. Care package
 
@@ -771,7 +791,7 @@ Hard caps are part of the parser and definition, not presentation advice: global
 ## 14. Settings contracts
 
 ```ts
-type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom';
+type GraphicsPreset = 'performance' | 'quality' | 'custom';
 type Percent0To100 = number; // parser requires finite integer 0..100
 type UnitScale0To1 = number; // parser requires finite 0..1
 type SettingApplyMode = 'live' | 'pipeline-rebuild' | 'arena-reload';
@@ -781,7 +801,7 @@ type GraphicsSettingsV1 = Readonly<{
   preset: GraphicsPreset;
   renderScale: number; // finite 0.50..2.00
   adaptiveResolution: boolean;
-  targetFps: 60 | 90 | 120 | 144;
+  targetFps: number; // finite integer 30..360; adaptive-quality target, not a hard frame cap
   msaaSamples: 0 | 2 | 4;
   shadows: 'off' | 'medium' | 'high' | 'max';
   shadowDistance: 'low' | 'medium' | 'high' | 'max';
@@ -795,7 +815,7 @@ type GraphicsSettingsV1 = Readonly<{
   ambientContactEffects: 'off' | 'low' | 'high' | 'max';
   materialQuality: 'medium' | 'high' | 'max';
   minorDebrisPresentationQuality: 'low' | 'high' | 'max';
-  frameCap: 0 | 60 | 90 | 120 | 144;
+  frameCap: number; // 0 means uncapped; otherwise finite integer 30..360
 }>;
 
 type AudioSettingsV1 = Readonly<{
@@ -820,7 +840,7 @@ type SettingDefinition = Readonly<{
 }>;
 ```
 
-Normalization rejects NaN/infinity/out-of-range values, returns requested/effective values plus downgrade/apply-mode reasons, and enforces effective adaptive target ≤ nonzero frame cap. Save only after successful application and read-back. MSAA is a pipeline rebuild. Sensory controls live only in accessibility settings. Minor-debris quality never changes authoritative major bodies, colliders or replication.
+Normalization rejects NaN/infinity/out-of-range values, returns requested/effective values plus downgrade/apply-mode reasons, and enforces effective adaptive target ≤ nonzero frame cap. The top-level UI exposes only Quality (default), Performance and Custom; Advanced Graphics is collapsed initially and any admitted advanced edit selects Custom. Legacy `high`/`max` values migrate transactionally into Quality or an equivalent Custom snapshot. Save only after successful application and read-back. MSAA is a pipeline rebuild. Sensory controls live only in accessibility settings. Minor-debris quality never changes authoritative major bodies, colliders or replication.
 
 ## 15. Spatial audio definitions
 

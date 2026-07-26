@@ -2,7 +2,7 @@
   "$schema": "PASS65_DECISION_RECEIPTS.schema.json",
   "schemaVersion": 1,
   "releasePass": "PASS 65",
-  "updatedAt": "2026-07-26T06:33:46.635Z",
+  "updatedAt": "2026-07-26T14:18:00.000Z",
   "receipts": [
     {
       "receiptVersion": 1,
@@ -138,10 +138,16 @@
       "proposedDefault": "Select exactly one grenade family; spawn and carry at most one; corpse ammo pickup replenishes it while kills do not",
       "value": {
         "selectedFamiliesPerLoadout": 1,
-        "availableFamilies": ["frag", "smoke", "flash"],
+        "availableFamilies": ["frag", "smoke", "flash", "semtex"],
         "spawnCount": 1,
         "maximumCarry": 1,
-        "countsByFamily": { "frag": 1, "smoke": 1, "flash": 1 },
+        "countsByFamily": { "frag": 1, "smoke": 1, "flash": 1, "semtex": 1 },
+        "semtexPolicy": {
+          "collisionPolicy": "stick-world-and-current-actor-life",
+          "damageRole": "high-localized-blast",
+          "proneMitigationRequired": true,
+          "authority": "host-exactly-once"
+        },
         "killReplenishesGrenade": false,
         "corpseAmmoPickupReplenishesGrenade": true,
         "corpsePickupResult": "set-selected-grenade-count-to-one-without-exceeding-cap",
@@ -150,12 +156,12 @@
         "selfFlashPolicy": "full-host-angle-distance-line-of-sight-calculation",
         "authority": "host"
       },
-      "rationale": "Dave replaced the provisional per-family counts with one selected grenade, one on spawn and an absolute carry cap of one. Grenades replenish only through the same valid corpse ammo pickup that replenishes ammunition, never from a kill event. The accepted friendly-effect defaults remain smoke for everyone and half-strength friendly flash.",
-      "owner": "Dave — 2026-07-26 decision correction",
+      "rationale": "Dave replaced the provisional per-family counts with one selected grenade, one on spawn and an absolute carry cap of one. Grenades replenish only through the same valid corpse ammo pickup that replenishes ammunition, never from a kill event. The accepted friendly-effect defaults remain smoke for everyone and half-strength friendly flash. The first HITL correction adds Semtex as a selectable sticky high-damage family with prone mitigation, without changing the one-count lifecycle.",
+      "owner": "Dave — 2026-07-26 HITL correction",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-26T06:33:46.635Z",
+      "resolvedAt": "2026-07-26T14:08:29.561Z",
       "freezeNoLaterThan": "Ordnance-schema wave",
-      "supersedesReceiptSha256": null
+      "supersedesReceiptSha256": "4e226659d248974bf563fd4db834da4bd3b50bc5777f719f8a1dcd2a0fdd4c7a"
     },
     {
       "receiptVersion": 1,
@@ -308,20 +314,21 @@
           "retiredEntriesExcluded": true,
           "validatorPolicy": "catalog-set-equality-plus-forced-every-reward-plus-formula-recomputation"
         },
-        "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerLife": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": true, "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
+        "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerLife": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": false, "unconsumedRewardLifetime": "until-consumed-or-match-epoch-ends", "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
         "activationPolicy": {"hostOwnsActivation": true, "consumesExactlyOnce": true, "duplicateOwnerTypePolicy": "forbid-unless-definition-allows"},
         "privacyPolicy": {"rewardSeedRollHostOnly": true, "acquisitionStateHostOnly": true, "rewardRevealPolicy": "claimant-after-exclusive-claim", "recipientSnapshotOmitsSeedAndRoll": true},
         "chopperCalibration": {"targetable": true, "health": 800, "durationMs": 30000, "severePressureByMs": 4000, "survivalIntent": "breaking-line-of-sight-within-four-to-five-seconds-normally-survives", "flightAuthority": "host-ai"},
         "droneSwarmCalibration": {"count": 12, "healthEach": 50, "magazineSize": 20, "reservePolicy": "unlimited-reloads-until-expiry", "maximumLifetimeMs": 60000, "targets": ["opposing-living-human-player", "opposing-living-bot"], "rejects": ["ally", "dead-life", "stale-life"], "survivalIntent": "breaking-exposure-after-approximately-five-seconds-usually-permits-survival"},
         "pilotedDroneSensor": {"targets": "opposing-living-hostiles-only", "maximumRangeM": 50, "forwardConeDegrees": 90, "refreshMs": 250, "revealsThroughWalls": true, "changesBallisticAuthority": false},
+        "pilotedDroneDeployment": {"modeChoiceRequired": true, "allowedModes": ["autonomous", "first-person-owner-control"], "sharedAssetFamilyWithDroneSwarm": true, "sharedGunProfileId": "drone-gun-standard-v1", "variantDifferencesLimitedTo": ["control-mode", "reserve", "lifetime", "sensor-policy"]},
         "carpetBomber": {"playerInput": "strip-midpoint-only", "ingressAndOrientation": "host-seeded-valid-random", "impactCount": 20, "pattern": "bounded-zigzag"}
       },
-      "rationale": "Dave replaced free pick-any-five with five exact slot families, retained both Scout Sweep and Nuke, and made Nuke and Drone Swarm mutually exclusive slot-5 alternatives. Repository evidence confirms Yardhawk is the existing canonical ID. The request's 'carpet bomb' and 'carpet bomber' wording maps to the one planned canonical Carpet Bomber ID because no second distinct catalog ID exists. Recommended costs, lifecycle, privacy and support calibration remain approved. Care rewards are derived from the catalog itself: Scout Sweep shares the highest base weight, every present or future eligible nonrecursive nonretired streak appears exactly once, weights recompute on every catalog change, and Nuke remains exactly one percent.",
-      "owner": "Dave — 2026-07-26 decision correction; canonical-ID observations verified in repository",
+      "rationale": "Dave replaced free pick-any-five with five exact slot families, retained both Scout Sweep and Nuke, and made Nuke and Drone Swarm mutually exclusive slot-5 alternatives. Repository evidence confirms Yardhawk is the existing canonical ID. The request's 'carpet bomb' and 'carpet bomber' wording maps to the one planned canonical Carpet Bomber ID because no second distinct catalog ID exists. Recommended costs, lifecycle, privacy and support calibration remain approved. Care rewards are derived from the catalog itself: Scout Sweep shares the highest base weight, every present or future eligible nonrecursive nonretired streak appears exactly once, weights recompute on every catalog change, and Nuke remains exactly one percent. The first HITL correction makes earned unconsumed rewards survive deaths while per-life progress resets. The second correction requires the standalone drone to reuse the Swarm asset/gun family and offer an explicit autonomous or first-person owner-control deployment choice, with only the frozen variant specifications differing.",
+      "owner": "Dave — 2026-07-26 HITL correction; canonical-ID observations verified in repository",
       "recordedAt": "2026-07-25T22:30:00Z",
-      "resolvedAt": "2026-07-26T06:33:46.635Z",
+      "resolvedAt": "2026-07-26T14:18:00.000Z",
       "freezeNoLaterThan": "Before support schema",
-      "supersedesReceiptSha256": null
+      "supersedesReceiptSha256": "8ab6ebaf21a6b0e58561f67362396f52ff32ca21ff1943bda82653a8d2cde848"
     },
     {
       "receiptVersion": 1,

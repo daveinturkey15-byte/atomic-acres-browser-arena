@@ -507,8 +507,6 @@ export class HostKillstreakRuntime {
     actor.lifeId = nextLifeId;
     actor.streak = 0;
     actor.earned.clear();
-    actor.available.clear();
-    actor.careRewards.length = 0;
     actor.adrenalineUntilMs = 0;
     actor.lastActivationSequence = -1;
     actor.lastControlSequence = -1;

@@ -5,6 +5,8 @@ Plan owner: Codex release integrator
 Target project: `daveinturkey15-byte/atomic-acres-browser-arena`
 Publication rule: **Pass 65 must stop at an immutable preview for Dave’s explicit HITL approval. It must not publish before that approval.**
 
+Correction authority: Dave's 2026-07-26 local review rejected failed-HITL baseline `ec8a55fa83f194f34abe6708cab727e45057285e`. The complete correction scope, owners, falsifiers and execution waves are frozen in [`PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`](PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md). Where this original plan still mentions High/Max top-level presets, rewards clearing on death, three grenade families, possession-only standalone drone behavior, or visual-only support placeholders, the correction ledger and superseded decision receipts govern.
+
 ## 0. Executive decision
 
 Pass 65 will be treated as one numbered product release assembled through staged, reviewable integration waves. It will not be treated as one giant commit, a cosmetic reskin, or a set of unrelated experiments.

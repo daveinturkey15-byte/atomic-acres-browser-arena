@@ -66,27 +66,28 @@ describe('field support rewards', () => {
     expect(state.available.nuke).toBe(true);
   });
 
-  it('resets the live streak and every unconsumed reward on death', () => {
+  it('resets per-life progress but retains every unconsumed reward through death', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 5; index += 1) state = recordSupportElimination(state);
     state = recordSupportDeath(state);
     expect(state.streak).toBe(0);
     expect(state.rewardCycle).toBe(0);
-    expect(state.available['scout-sweep']).toBe(false);
-    expect(state.available.yardhawk).toBe(false);
+    expect(state.available['scout-sweep']).toBe(true);
+    expect(state.available.yardhawk).toBe(true);
   });
 
-  it('drops unused selected high-tier rewards on death and earns them afresh next life', () => {
+  it('retains unused high-tier rewards through repeated deaths until consumed', () => {
     let state = createFieldSupportState();
     for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
     expect(state.available.chopper).toBe(true);
     expect(state.available.nuke).toBe(true);
     state = recordSupportDeath(state);
-    expect(state.available.chopper).toBe(false);
-    expect(state.available.nuke).toBe(false);
-    expect(consumeFieldSupport(state, 'chopper').activated).toBe(false);
-    for (let index = 0; index < 8; index += 1) state = recordSupportElimination(state);
-    expect(consumeFieldSupport(state, 'chopper').activated).toBe(true);
+    state = recordSupportDeath(state);
+    expect(state.available.chopper).toBe(true);
+    expect(state.available.nuke).toBe(true);
+    const consumed = consumeFieldSupport(state, 'chopper');
+    expect(consumed.activated).toBe(true);
+    expect(consumed.state.available.chopper).toBe(false);
   });
 
   it('consumes each reward at most once until it is earned again', () => {
