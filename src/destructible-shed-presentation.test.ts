@@ -33,7 +33,14 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(presentation.root.getObjectByName('field-shed-damageable-shell')).toBeInstanceOf(THREE.Mesh);
     expect(presentation.root.getObjectByName('field-shed-door-leaf')).toBeInstanceOf(THREE.Mesh);
     expect(presentation.root.getObjectByName('field-shed-structural-frame')).toBeInstanceOf(THREE.InstancedMesh);
-    expect(presentation.telemetry(state)).toEqual({ revision: 0, activeDraws: 4, apertures: 0, dents: 0, detachedChunks: 0 });
+    expect(presentation.telemetry(state)).toEqual({
+      revision: 0,
+      activeDraws: 4,
+      apertures: 0,
+      dents: 0,
+      detachedChunks: 0,
+      retiredGeometries: 0,
+    });
     presentation.dispose();
   });
 

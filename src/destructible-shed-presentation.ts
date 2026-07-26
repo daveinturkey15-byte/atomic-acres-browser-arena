@@ -226,7 +226,14 @@ export type ShedPresentationTelemetry = Readonly<{
   apertures: number;
   dents: number;
   detachedChunks: number;
+  retiredGeometries: number;
 }>;
+
+function presentationTopologySignature(state: ShedState): string {
+  return state.surfaces.map((surface) => `${surface.surfaceId}:${surface.stage}:${surface.apertures
+    .map((aperture) => `${aperture.uQ},${aperture.vQ},${aperture.radiusUQ},${aperture.radiusVQ}`)
+    .join(';')}`).join('|');
+}
 
 export class DestructibleShedPresentation {
   readonly root = new THREE.Group();
@@ -242,6 +249,8 @@ export class DestructibleShedPresentation {
   private readonly apertureRims: THREE.InstancedMesh;
   private readonly dents: THREE.InstancedMesh;
   private readonly debris: THREE.InstancedMesh;
+  private readonly retiredGeometries = new Set<THREE.BufferGeometry>();
+  private topologySignature = '';
   private revision = -1;
   private disposed = false;
 
@@ -316,24 +325,30 @@ export class DestructibleShedPresentation {
     const doorState = state.surfaces.find((surface) => surface.surfaceId === this.definition.doorSurfaceId);
     if (!doorDefinition || !doorState) throw new TypeError('Shed door definition missing');
 
-    const staticGeometries: THREE.BufferGeometry[] = [];
-    for (const surfaceDefinition of this.definition.surfaces) {
-      if (surfaceDefinition.role === 'door') continue;
-      const surfaceState = state.surfaces.find((surface) => surface.surfaceId === surfaceDefinition.id);
-      if (!surfaceState || surfaceState.stage === 'detached') continue;
-      staticGeometries.push(transformedPanelGeometry(surfaceDefinition, surfaceState));
-    }
-    const shellGeometry = mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry();
-    staticGeometries.forEach((geometry) => geometry.dispose());
-    const oldShellGeometry = this.shell.geometry;
-    this.shell.geometry = shellGeometry;
-    oldShellGeometry.dispose();
+    const topologySignature = presentationTopologySignature(state);
+    if (topologySignature !== this.topologySignature) {
+      const staticGeometries: THREE.BufferGeometry[] = [];
+      for (const surfaceDefinition of this.definition.surfaces) {
+        if (surfaceDefinition.role === 'door') continue;
+        const surfaceState = state.surfaces.find((surface) => surface.surfaceId === surfaceDefinition.id);
+        if (!surfaceState || surfaceState.stage === 'detached') continue;
+        staticGeometries.push(transformedPanelGeometry(surfaceDefinition, surfaceState));
+      }
+      const shellGeometry = mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry();
+      staticGeometries.forEach((geometry) => geometry.dispose());
+      const oldShellGeometry = this.shell.geometry;
+      this.shell.geometry = shellGeometry;
+      if (oldShellGeometry.getAttribute('position')) this.retiredGeometries.add(oldShellGeometry);
+      else oldShellGeometry.dispose();
 
-    const oldDoorGeometry = this.door.geometry;
-    this.door.geometry = doorState.stage === 'detached'
-      ? new THREE.BufferGeometry()
-      : localPanelGeometry(doorDefinition, doorState);
-    oldDoorGeometry.dispose();
+      const oldDoorGeometry = this.door.geometry;
+      this.door.geometry = doorState.stage === 'detached'
+        ? new THREE.BufferGeometry()
+        : localPanelGeometry(doorDefinition, doorState);
+      if (oldDoorGeometry.getAttribute('position')) this.retiredGeometries.add(oldDoorGeometry);
+      else oldDoorGeometry.dispose();
+      this.topologySignature = topologySignature;
+    }
     this.doorHinge.position.set(-doorDefinition.frame.halfU, doorDefinition.frame.centre.y, doorDefinition.frame.centre.z);
     this.door.position.set(doorDefinition.frame.halfU, 0, 0);
     this.doorHinge.rotation.y = -state.door.angleQ / SHED_ANGLE_Q * Math.PI / 2;
@@ -399,6 +414,7 @@ export class DestructibleShedPresentation {
       apertures: state.surfaces.reduce((sum, surface) => sum + surface.apertures.length, 0),
       dents: state.surfaces.reduce((sum, surface) => sum + surface.dents.length, 0),
       detachedChunks: state.detachedChunkIds.length,
+      retiredGeometries: this.retiredGeometries.size,
     });
   }
 
@@ -414,6 +430,8 @@ export class DestructibleShedPresentation {
       entries.forEach((material) => materials.add(material));
     });
     geometries.forEach((geometry) => geometry.dispose());
+    this.retiredGeometries.forEach((geometry) => geometry.dispose());
+    this.retiredGeometries.clear();
     materials.forEach((material) => material.dispose());
     this.bumpTexture.dispose();
     this.root.removeFromParent();

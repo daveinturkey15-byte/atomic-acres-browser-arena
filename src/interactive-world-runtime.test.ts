@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { traceBallisticPath, type WeaponPenetrationProfile } from './ballistics';
 import type { ShedPlacement } from './destructible-world';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-presentation';
@@ -45,6 +46,7 @@ describe('shared interactive-world runtime adapter', () => {
   it('updates the rotating door collider and presentation from the same canonical angle', () => {
     const runtime = new InteractiveWorldRuntime('atomic-acres', 8, [placement], true);
     const closedDoor = runtime.collisions().ballisticSurfaces.find((surface) => surface.destructibleSurface?.surfaceId === 'door-south')!;
+    const doorGeometry = (runtime.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh).geometry;
     const interaction = runtime.interactNearestDoor({
       actorId: 'player-a',
       actorAlive: true,
@@ -59,6 +61,8 @@ describe('shared interactive-world runtime adapter', () => {
     expect(movingDoor.bounds.rotation).not.toEqual(closedDoor.bounds.rotation);
     expect(runtime.collisions().revision).toBeGreaterThan(1);
     expect(runtime.root.getObjectByName('field-shed-door-hinge')!.rotation.y).toBeCloseTo(-Math.PI / 4);
+    expect((runtime.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh).geometry).toBe(doorGeometry);
+    expect(runtime.telemetry()).toMatchObject({ presentationRetiredGeometries: 0 });
     runtime.dispose();
   });
 
@@ -70,6 +74,8 @@ describe('shared interactive-world runtime adapter', () => {
     });
     const runtime = new InteractiveWorldRuntime('atomic-acres', 8, [placement, eastPlacement], true);
     expect(runtime.nearestDoor({ x: 0, y: 1.1, z: 3 })?.placementId).toBe(placement.id);
+    expect(runtime.nextInteractionSequence(placement.id, 'player-a')).toBe(1);
+    expect(runtime.nextInteractionSequence(eastPlacement.id, 'player-a')).toBe(1);
     const spoofed = runtime.interactDoor({
       placementId: eastPlacement.id,
       actorId: 'player-a',
@@ -80,6 +86,7 @@ describe('shared interactive-world runtime adapter', () => {
       hasLineOfSight: () => true,
     });
     expect(spoofed).toMatchObject({ accepted: false, reason: 'out-of-range' });
+    expect(runtime.nextInteractionSequence(eastPlacement.id, 'player-a')).toBe(1);
     expect(runtime.stateEnvelope().sheds.every((shed) => shed.door.phase === 'closed')).toBe(true);
     runtime.dispose();
   });
@@ -146,6 +153,17 @@ describe('shared interactive-world runtime adapter', () => {
     runtime.dispose();
   });
 
+  it('applies bounded radial explosion damage only under host authority', () => {
+    const host = new InteractiveWorldRuntime('atomic-acres', 10, [placement], true);
+    const guest = new InteractiveWorldRuntime('atomic-acres', 10, [placement], false);
+    const origin = { x: placement.position.x, y: placement.position.y + 1.2, z: placement.position.z + 2.1 };
+    expect(guest.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 300 })).toBe(0);
+    expect(host.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 300 })).toBeGreaterThan(0);
+    expect(host.telemetry().revision).toBeGreaterThan(0);
+    guest.dispose();
+    host.dispose();
+  });
+
   it('strictly reconstructs a late join and resets every shed on a newer epoch', () => {
     const host = new InteractiveWorldRuntime('atomic-acres', 11, [placement], true);
     const guest = new InteractiveWorldRuntime('atomic-acres', 11, [placement], false);
@@ -164,6 +182,9 @@ describe('shared interactive-world runtime adapter', () => {
       actorId: 'player-b', actorAlive: true, actorPosition: { x: 0, y: 1.1, z: 3 }, sequence: 1, tick: 30,
       hasLineOfSight: () => true,
     })?.reason).toBe('not-host');
+    expect(guest.hasHostAuthority()).toBe(false);
+    guest.setHostAuthority(true);
+    expect(guest.hasHostAuthority()).toBe(true);
     host.reset(12);
     expect(host.telemetry()).toMatchObject({ matchEpoch: 12, revision: 0, apertures: 0, dents: 0, detachedChunks: 0 });
     host.dispose();

@@ -243,7 +243,7 @@ import {
   type FieldSupportId,
   type TriPassTargeting,
 } from './field-support';
-import { createGrenadePresentation, disposeGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
+import { createGrenadePresentation, grenadePresentationTelemetry, loadGrenadePresentation } from './grenade-presentation';
 import {
   EXPLOSIVE_BOLT_BLAST_RADIUS_M,
   EXPLOSIVE_BOLT_ARM_DELAY_MS,
@@ -390,6 +390,13 @@ import {
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import { CharacterPhysics, worldBoundaryColliders } from './physics';
+import { InteractiveWorldRuntime } from './interactive-world-runtime';
+import { shedPlacementsForArena } from './destructible-shed-registry';
+import {
+  INTERACTIVE_WORLD_SCHEMA_VERSION,
+  type InteractiveWorldSnapshotMessage,
+  type ShedInteractionIntentMessage,
+} from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { loadRiggedOperatorAsset, riggedOperatorAssetReady, riggedOperatorTelemetry } from './operator-model';
 import { loadImportedWeaponAssets } from './weapon-model';
@@ -819,6 +826,72 @@ function submitWebGpuFrame(now = performance.now(), force = false): boolean {
 async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
 }
+
+type DeferredGpuRetirement = Readonly<{
+  root: THREE.Object3D;
+  disposeResources: boolean;
+}>;
+
+const deferredGpuRetirements: DeferredGpuRetirement[] = [];
+let gpuRetirementTask: Promise<void> | null = null;
+let gpuRetirementFences = 0;
+let gpuRetirementDisposedRoots = 0;
+let gpuRetirementFailures = 0;
+
+function disposeDetachedRootResources(root: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    geometries.add(node.geometry);
+    const entries = Array.isArray(node.material) ? node.material : [node.material];
+    entries.forEach((material) => materials.add(material));
+  });
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
+  root.clear();
+}
+
+async function drainDeferredGpuRetirements(): Promise<void> {
+  while (deferredGpuRetirements.length > 0) {
+    // Snapshot before fencing. Roots detached after this target was captured
+    // may have appeared in a newer submission and must wait for the next
+    // fence, never piggyback on this one.
+    const batch = deferredGpuRetirements.splice(0, deferredGpuRetirements.length);
+    try {
+      await flushWebGpuFrames();
+      if (renderRuntime.backend === 'webgpu') gpuRetirementFences += 1;
+    } catch (error) {
+      gpuRetirementFailures += 1;
+      deferredGpuRetirements.unshift(...batch);
+      console.warn('[Pass 65 GPU retirement fence failed; resources retained]', error);
+      return;
+    }
+    for (const retirement of batch) {
+      if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
+      gpuRetirementDisposedRoots += 1;
+    }
+  }
+}
+
+function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = true): void {
+  root.removeFromParent();
+  root.visible = false;
+  deferredGpuRetirements.push(Object.freeze({ root, disposeResources }));
+  if (gpuRetirementTask) return;
+  gpuRetirementTask = drainDeferredGpuRetirements().finally(() => {
+    gpuRetirementTask = null;
+    if (deferredGpuRetirements.length > 0) {
+      // A failed fence retains resources safely. A later admitted frame or map
+      // transition will give the queue another completion target.
+      window.setTimeout(() => {
+        if (!gpuRetirementTask) {
+          gpuRetirementTask = drainDeferredGpuRetirements().finally(() => { gpuRetirementTask = null; });
+        }
+      }, 250);
+    }
+  });
+}
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
 renderRuntime.configureOutput(activeLighting.exposure);
 renderRuntime.configureShadows({
@@ -873,7 +946,7 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
-const killstreakPresentation = new KillstreakPresentation(scene);
+const killstreakPresentation = new KillstreakPresentation(scene, (root) => scheduleDeferredGpuRetirement(root));
 scene.fog = new THREE.Fog(activeLighting.fogColor, activeLighting.fogNear, activeLighting.fogFar);
 const graphicsRefinement = new GraphicsRefinementSystem(
   legacyRenderer,
@@ -1235,6 +1308,127 @@ async function retireAllArenasExcept(arenaId: ArenaId): Promise<void> {
 }
 
 let arena: ArenaMap = ensureArenaConstructed(selectedArena.id);
+let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
+let interactiveWorldMatchEpoch = 1;
+let interactiveWorldTick = 0;
+let lastInteractiveWorldBroadcastRevision = -1;
+let activeWorldColliderCacheArena: ArenaMap | null = null;
+let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
+let activeWorldColliderCacheRevision = -1;
+let activeWorldColliderCache: ArenaMap['colliders'] = [];
+
+function createInteractiveWorldRuntime(
+  arenaId: ArenaId,
+  matchEpoch: number,
+  hostAuthority: boolean,
+): InteractiveWorldRuntime {
+  const runtime = new InteractiveWorldRuntime(
+    arenaId,
+    matchEpoch,
+    shedPlacementsForArena(arenaId),
+    hostAuthority,
+  );
+  // Quality/Blender arena presentation may intentionally hide the procedural
+  // arena root while retaining its collision authority. Interactive gameplay
+  // must remain visible in either presentation mode, so it owns a scene-level
+  // dynamic root rather than inheriting that procedural visibility toggle.
+  scene.add(runtime.root);
+  return runtime;
+}
+
+function invalidateActiveWorldCollisionCache(): void {
+  activeWorldColliderCacheArena = null;
+  activeWorldColliderCacheRuntime = null;
+  activeWorldColliderCacheRevision = -1;
+  activeWorldColliderCache = [];
+}
+
+function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['colliders'] {
+  if (activeArena !== arena || !interactiveWorldRuntime) return activeArena.colliders;
+  const collision = interactiveWorldRuntime.collisions();
+  if (activeWorldColliderCacheArena !== activeArena
+    || activeWorldColliderCacheRuntime !== interactiveWorldRuntime
+    || activeWorldColliderCacheRevision !== collision.revision) {
+    activeWorldColliderCacheArena = activeArena;
+    activeWorldColliderCacheRuntime = interactiveWorldRuntime;
+    activeWorldColliderCacheRevision = collision.revision;
+    activeWorldColliderCache = [...activeArena.colliders, ...collision.movementColliders];
+  }
+  return activeWorldColliderCache;
+}
+
+function syncInteractiveWorldPhysics(authoritativeResync = false): void {
+  invalidateActiveWorldCollisionCache();
+  if (!characterPhysics || !interactiveWorldRuntime) return;
+  const collision = interactiveWorldRuntime.collisions();
+  // Major debris has real Rapier rigid bodies. Do not duplicate it as a
+  // second static collider while retaining it in the shared collision view
+  // used by ballistics, LOS, support and diagnostics.
+  characterPhysics.syncDynamicColliders(
+    collision.dynamicColliders.filter((entry) => !entry.id.includes(':debris:')),
+  );
+  characterPhysics.syncMajorDebrisBodies(interactiveWorldRuntime.majorDebrisPhysicsBodies(), authoritativeResync);
+  botNavigationColliders = navigationCollidersFor(arena);
+}
+
+function reconcileInteractiveWorldDoorObstructions(): boolean {
+  if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
+  const blockers: Array<Readonly<{
+    kind: 'player' | 'major-debris';
+    id: string;
+    position: THREE.Vector3;
+    radius: number;
+  }>> = [];
+  if (player.alive) blockers.push({ kind: 'player', id: player.id, position: player.position.clone(), radius: 0.42 });
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    blockers.push({
+      kind: 'player', id: remote.snapshot.id,
+      position: new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z), radius: 0.42,
+    });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    blockers.push({ kind: 'player', id: bot.id, position: bot.position.clone().add(new THREE.Vector3(0, 1.55, 0)), radius: 0.42 });
+  }
+  for (const body of interactiveWorldRuntime.majorDebrisPhysicsBodies()) {
+    blockers.push({
+      kind: 'major-debris', id: body.id.split(':').at(-1) ?? 'shed-debris',
+      position: new THREE.Vector3(body.position.x, body.position.y, body.position.z), radius: 0.72,
+    });
+  }
+  let changed = false;
+  for (const door of interactiveWorldRuntime.doorCollisionStates()) {
+    if (!['opening', 'closing', 'blocked'].includes(door.phase)) continue;
+    const blocker = blockers.find((candidate) => isBlocked(candidate.position, [door.bounds], candidate.radius));
+    if (door.phase === 'blocked') {
+      if (!blocker && interactiveWorldRuntime.resumeDoor(door.placementId, interactiveWorldTick)?.accepted) changed = true;
+      continue;
+    }
+    if (blocker && interactiveWorldRuntime.blockDoor({
+      placementId: door.placementId,
+      tick: interactiveWorldTick,
+      kind: blocker.kind,
+      entityId: blocker.id,
+    })?.accepted) changed = true;
+  }
+  return changed;
+}
+
+function stepInteractiveWorldAuthority(): void {
+  if (!interactiveWorldRuntime || !gameStarted || matchState.phase !== 'active') return;
+  interactiveWorldTick += 1;
+  if (!interactiveWorldRuntime.hasHostAuthority()) return;
+  let changed = reconcileInteractiveWorldDoorObstructions();
+  changed = interactiveWorldRuntime.step(interactiveWorldTick) || changed;
+  if (characterPhysics && interactiveWorldTick % 6 === 0 && characterPhysics.majorDebrisBodyCount() > 0) {
+    changed = interactiveWorldRuntime.adoptMajorDebrisPhysics(characterPhysics.majorDebrisSnapshots()) || changed;
+  }
+  if (changed) syncInteractiveWorldPhysics();
+  broadcastInteractiveWorldState();
+}
+
+interactiveWorldRuntime = createInteractiveWorldRuntime(selectedArena.id, interactiveWorldMatchEpoch, true);
 let worldIdentityPresentation: WorldIdentityPresentation | null = null;
 let neighbourhoodLifeRoot: THREE.Group | null = null;
 
@@ -1341,7 +1535,12 @@ await configurePlayableArenaVisuals(selectedArena.id, arena.root);
 
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
-  return activeArena.shotSurfaces.filter((surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId));
+  const staticSurfaces = activeArena.shotSurfaces.filter(
+    (surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId),
+  );
+  return activeArena === arena && interactiveWorldRuntime
+    ? [...staticSurfaces, ...interactiveWorldRuntime.collisions().ballisticSurfaces]
+    : staticSurfaces;
 }
 
 function traceWeaponPath(
@@ -1350,7 +1549,91 @@ function traceWeaponPath(
   distance: number,
   weapon: WeaponId,
 ): BallisticTrace {
-  return traceBallisticPath(origin, direction, distance, WEAPONS[weapon].penetration, activeBallisticSurfaces());
+  return traceBallisticPath(
+    origin,
+    direction,
+    distance,
+    WEAPONS[weapon].penetration,
+    activeBallisticSurfaces(),
+    interactiveWorldRuntime?.apertureQuery,
+  );
+}
+
+function applyInteractiveWorldBallisticTrace(
+  trace: BallisticTrace,
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  weapon: WeaponId,
+): boolean {
+  if (!interactiveWorldRuntime?.hasHostAuthority() || trace.impacts.length === 0) return false;
+  const spec = WEAPONS[weapon];
+  const unitDirection = direction.clone().normalize();
+  const penetrationEnergyQ = Math.max(0, Math.round(
+    spec.penetration.penetrationPower * spec.penetration.fmjMultiplier * 10,
+  ));
+  const damageQ = Math.max(1, Math.round(spec.damage));
+  const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
+  let changed = false;
+  for (const impact of trace.impacts) {
+    if (!impact.surface.destructibleSurface && !impact.surface.majorDebris) continue;
+    const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
+    const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
+    const impulseQ = Object.freeze({
+      xQ: Math.round(unitDirection.x * impulseMagnitudeQ),
+      yQ: Math.round(unitDirection.y * impulseMagnitudeQ),
+      zQ: Math.round(unitDirection.z * impulseMagnitudeQ),
+    });
+    const result = interactiveWorldRuntime.applyBulletImpact({
+      surface: impact.surface,
+      point,
+      damageQ,
+      penetrationEnergyQ,
+      radiusUQ: apertureRadiusQ,
+      radiusVQ: apertureRadiusQ,
+      impulseQ,
+    });
+    if (!result?.accepted) continue;
+    changed = true;
+    if (impact.surface.majorDebris && characterPhysics) {
+      characterPhysics.applyMajorDebrisImpulse(
+        `${impact.surface.majorDebris.placementId}:debris:${impact.surface.majorDebris.chunkId}`,
+        unitDirection.clone().multiplyScalar(Math.min(12, Math.max(0.5, damageQ * 0.055))),
+        point,
+      );
+    }
+  }
+  if (changed) {
+    syncInteractiveWorldPhysics();
+    broadcastInteractiveWorldState();
+  }
+  return changed;
+}
+
+function applyInteractiveWorldExplosion(point: THREE.Vector3, radius: number, maximumDamage: number): boolean {
+  if (!interactiveWorldRuntime?.hasHostAuthority() || radius <= 0 || maximumDamage <= 0) return false;
+  const mutations = interactiveWorldRuntime.applyExplosionAt({
+    origin: point,
+    radius,
+    maximumDamageQ: Math.max(1, Math.round(maximumDamage * 3)),
+  });
+  if (mutations <= 0) return false;
+  syncInteractiveWorldPhysics();
+  if (characterPhysics) {
+    for (const body of interactiveWorldRuntime.majorDebrisPhysicsBodies()) {
+      const bodyPosition = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
+      const distance = bodyPosition.distanceTo(point);
+      if (distance > radius) continue;
+      const direction = bodyPosition.sub(point);
+      if (direction.lengthSq() < 1e-6) direction.set(0, 1, 0);
+      else direction.normalize().addScaledVector(new THREE.Vector3(0, 1, 0), 0.24).normalize();
+      characterPhysics.applyMajorDebrisImpulse(
+        body.id,
+        direction.multiplyScalar(Math.min(38, Math.max(2, maximumDamage * 0.075 * (1 - distance / radius)))),
+      );
+    }
+  }
+  broadcastInteractiveWorldState(true);
+  return true;
 }
 document.documentElement.dataset.arenaId = selectedArena.id;
 function applyArenaFogProfile(): void {
@@ -1458,7 +1741,7 @@ const grassSystem = renderRuntime.backend === 'webgl2'
       grassQuery,
       // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
       // must never seed its permanent placements from their collision geometry.
-      selectedArena.id === 'atomic-acres' ? arena.colliders : [],
+      selectedArena.id === 'atomic-acres' ? activeWorldColliders() : [],
       atomicLighting,
     )
   : null;
@@ -2028,7 +2311,7 @@ function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }
   if (!audioOcclusionBudget.admit(frameCount)) return false;
   const origin = { x: player.position.x, y: player.position.y, z: player.position.z };
   const target = { x: source.x, y: source.y + 1.1, z: source.z };
-  return arena.colliders.some((box) => segmentIntersectsBox(origin, target, box));
+  return activeWorldColliders().some((box) => segmentIntersectsBox(origin, target, box));
 }
 let lastFrame = performance.now();
 let lastWindowBlurAt = -Infinity;
@@ -3837,7 +4120,7 @@ function currentViewmodelSurfaceRetreat(): number {
   let nearest: number | null = null;
   for (let distance = 0.2; distance <= 1.2; distance += 0.1) {
     const sample = player.position.clone().addScaledVector(direction, distance);
-    if (!isBlocked(sample, arena.colliders, 0.09)) continue;
+    if (!isBlocked(sample, activeWorldColliders(), 0.09)) continue;
     nearest = distance;
     break;
   }
@@ -3993,9 +4276,86 @@ function admitIncomingCombatTiming(message: GameMessage): boolean {
   }
   return admission.accepted;
 }
+
+function interactiveWorldLineOfSight(
+  placementId: string,
+  from: Readonly<{ x: number; y: number; z: number }>,
+  to: Readonly<{ x: number; y: number; z: number }>,
+  collision = interactiveWorldRuntime?.collisions(),
+): boolean {
+  if (!collision) return false;
+  const origin = new THREE.Vector3(from.x, from.y, from.z);
+  const target = new THREE.Vector3(to.x, to.y, to.z);
+  if (arena.colliders.some((box) => segmentIntersectsBox(origin, target, box))) return false;
+  return !collision.dynamicColliders.some((entry) => {
+    // The segment terminates at the requested door centre; that exact door is
+    // the interaction target, not an occluder. Every other live shed panel and
+    // debris body remains authoritative cover.
+    if (entry.id === `${placementId}:door-south`) return false;
+    return segmentIntersectsBox(origin, target, entry.bounds);
+  });
+}
+
+function broadcastInteractiveWorldState(forceReliable = false): void {
+  if (network.role !== 'host' || !interactiveWorldRuntime || !gameStarted) return;
+  const revision = interactiveWorldRuntime.collisions().revision;
+  if (!forceReliable && (interactiveWorldTick % 6 !== 0 || revision === lastInteractiveWorldBroadcastRevision)) return;
+  const envelope = interactiveWorldRuntime.stateEnvelope();
+  const message: InteractiveWorldSnapshotMessage = {
+    type: 'interactive-world-snapshot',
+    schemaVersion: INTERACTIVE_WORLD_SCHEMA_VERSION,
+    by: player.id,
+    envelope,
+    nonce: randomNonce(),
+  };
+  network.send(message);
+  if (forceReliable || interactiveWorldTick % 30 === 0) network.sendStateCommitReliably(message);
+  lastInteractiveWorldBroadcastRevision = envelope.revision;
+}
+
+function handleInteractiveWorldMessage(message: GameMessage): boolean {
+  if (message.type === 'interactive-world-snapshot') {
+    if (network.role !== 'client'
+      || message.by !== privateLobbySnapshot?.hostId
+      || !interactiveWorldRuntime
+      || message.envelope.arenaId !== selectedArena.id
+      || message.envelope.matchEpoch !== interactiveWorldMatchEpoch) return true;
+    if (interactiveWorldRuntime.applyAuthoritativeEnvelope(message.envelope)) syncInteractiveWorldPhysics(true);
+    return true;
+  }
+  if (message.type !== 'shed-interact-request') return false;
+  if (network.role !== 'host'
+    || !interactiveWorldRuntime
+    || message.arenaId !== selectedArena.id
+    || message.matchEpoch !== interactiveWorldMatchEpoch) return true;
+  const remote = remotes.get(message.by);
+  const health = remoteHealthAuthorities.get(message.by);
+  if (!remote || !health?.alive || message.lifeId !== remote.continuity) return true;
+  const actorPosition = Object.freeze({
+    x: remote.snapshot.x,
+    y: remote.snapshot.y,
+    z: remote.snapshot.z,
+  });
+  const result = interactiveWorldRuntime.interactDoor({
+    placementId: message.placementId,
+    actorId: message.by,
+    actorAlive: health.alive,
+    actorPosition,
+    sequence: message.actionSequence,
+    tick: interactiveWorldTick,
+    hasLineOfSight: (from, to, collision) => interactiveWorldLineOfSight(message.placementId, from, to, collision),
+  });
+  if (result?.accepted) {
+    syncInteractiveWorldPhysics();
+    broadcastInteractiveWorldState(true);
+  }
+  return true;
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
+  if (handleInteractiveWorldMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
@@ -4193,6 +4553,7 @@ function onNetworkMessage(message: GameMessage): void {
         network.send(createStateMessage());
         broadcastOverdriveState(performance.now());
         broadcastRailgunState();
+        broadcastInteractiveWorldState(true);
       }
     }
     if (incoming.seq > remote.snapshot.seq) {
@@ -4388,7 +4749,17 @@ function onNetworkMessage(message: GameMessage): void {
     }
     actions.set(message.nonce, { message, receivedAt: now, targets: new Set() });
     admittedRemoteShots.set(message.by, actions);
-    if (network.role === 'host') network.send(message);
+    if (network.role === 'host') {
+      network.send(message);
+      applyKillstreakEntityShot(
+        message.by,
+        sender!.snapshot.team,
+        new THREE.Vector3(...message.origin),
+        message.pelletDirections.map((entry) => new THREE.Vector3(...entry)),
+        message.weapon,
+        now,
+      );
+    }
     renderRemoteShot(message);
     return;
   }
@@ -4411,7 +4782,7 @@ function onNetworkMessage(message: GameMessage): void {
     const origin = new THREE.Vector3(...message.origin);
     if (network.role !== 'client' && player.alive && areCombatantsHostile(message.by, sender.snapshot.team, player.id, player.team)
       && meleeActionHitsPoint(message, player.position)
-      && !arena.colliders.some((box) => segmentIntersectsBox(origin, player.position, box))) {
+      && !activeWorldColliders().some((box) => segmentIntersectsBox(origin, player.position, box))) {
       applyDamage(100 * overdriveDamageMultiplier(overdriveState, message.by, now), message.by, 1, false, { kind: 'melee' });
     }
     return;
@@ -4510,7 +4881,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (!action || now - action.receivedAt > 1_000 || action.targets.has(message.target)) return;
       if (Math.abs(message.damage - 100) > 1e-6
         || !meleeActionHitsPoint(action.message, blastTargetPosition)
-        || arena.colliders.some((box) => segmentIntersectsBox(new THREE.Vector3(...action.message.origin), blastTargetPosition, box))) return;
+        || activeWorldColliders().some((box) => segmentIntersectsBox(new THREE.Vector3(...action.message.origin), blastTargetPosition, box))) return;
       action.targets.add(message.target);
       admittedDamage = handicapOutgoingDamage(message.by, resolveRemotePoweredDamage(100, overdriveDamageMultiplier(overdriveState, message.by, now)));
     } else {
@@ -4521,7 +4892,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (!pointInsideBounds(validationOrigin, arena.bounds, 0)) return;
       const distance = validationOrigin.distanceTo(blastTargetPosition);
       if (distance > remoteExplosiveHitMaximumDistance(source)) return;
-      if (source !== 'nuke' && arena.colliders.some((box) => segmentIntersectsBox(validationOrigin, blastTargetPosition, box))) return;
+      if (source !== 'nuke' && activeWorldColliders().some((box) => segmentIntersectsBox(validationOrigin, blastTargetPosition, box))) return;
       const maximumBaseDamage = maximumRemoteExplosiveBaseDamage(source, distance, targetStance);
       if (!admitRemoteBaseDamage(message.damage, maximumBaseDamage)
         || Math.abs(message.damage - maximumBaseDamage) > 1e-6) return;
@@ -4787,6 +5158,14 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     return;
   }
   renderRemoteShot(visualShot);
+  applyKillstreakEntityShot(
+    request.by,
+    sender.snapshot.team,
+    new THREE.Vector3(...request.origin),
+    request.pelletDirections.map((entry) => new THREE.Vector3(...entry)),
+    request.weapon,
+    receivedAt,
+  );
 
   const targetPoses: Array<{ id: string; x: number; y: number; z: number; yaw: number; stance: Stance }> = [];
   if (player.alive && areCombatantsHostile(request.by, sender.snapshot.team, player.id, player.team)) {
@@ -4988,6 +5367,7 @@ function renderRemoteShot(message: ShotMessage): void {
     return;
   }
   const trace = traceWeaponPath(origin, direction, message.weapon === 'railgun' ? 220 : 50, message.weapon);
+  applyInteractiveWorldBallisticTrace(trace, origin, direction, message.weapon);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
@@ -5215,6 +5595,44 @@ function interactWithGunRangeArmory(now = performance.now()): boolean {
 
 function interactWithWeaponPickup(now = performance.now()): boolean {
   return interactWithRailgunPickup(now) || interactWithGunRangeArmory(now) || interactWithDeathDrop(now);
+}
+
+function interactWithShedDoor(): boolean {
+  if (!interactiveWorldRuntime || !player.alive || matchState.phase !== 'active') return false;
+  const nearest = interactiveWorldRuntime.nearestDoor(player.position);
+  if (!nearest || nearest.distance > 2.35) return false;
+  const actionSequence = interactiveWorldRuntime.nextInteractionSequence(nearest.placementId, player.id);
+  if (actionSequence === null) return false;
+  if (network.role === 'client') {
+    const request: ShedInteractionIntentMessage = {
+      type: 'shed-interact-request',
+      schemaVersion: INTERACTIVE_WORLD_SCHEMA_VERSION,
+      by: player.id,
+      arenaId: selectedArena.id,
+      placementId: nearest.placementId,
+      matchEpoch: interactiveWorldMatchEpoch,
+      lifeId: localContinuity,
+      actionSequence,
+      nonce: randomNonce(),
+    };
+    network.send(request);
+    return true;
+  }
+  const result = interactiveWorldRuntime.interactDoor({
+    placementId: nearest.placementId,
+    actorId: player.id,
+    actorAlive: player.alive,
+    actorPosition: player.position,
+    sequence: actionSequence,
+    tick: interactiveWorldTick,
+    hasLineOfSight: (from, to, collision) => interactiveWorldLineOfSight(nearest.placementId, from, to, collision),
+  });
+  if (result?.accepted) {
+    syncInteractiveWorldPhysics();
+    broadcastInteractiveWorldState(true);
+    audio.coverImpact(nearest.distance);
+  }
+  return true;
 }
 
 function interactWithDeathDrop(now = performance.now()): boolean {
@@ -5472,7 +5890,7 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
     || origin.distanceTo(sender) > senderOriginLimit
     || explosive && origin.distanceTo(centre) > GRENADE_RADIUS + 0.5
     || !explosive && origin.distanceTo(centre) > 110
-    || explosive && windowBreakPathBlocked(origin, centre, arena.colliders)
+    || explosive && windowBreakPathBlocked(origin, centre, activeWorldColliders())
     || !explosive && !shotTrace?.reachedDistance) return;
   if (explosive && !localMultiplayerQa) {
     const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
@@ -5503,13 +5921,7 @@ const MAX_CORPSE_PRESENTATIONS = 12;
 const corpsePresentations: Array<{ root: THREE.Group; expiresAt: number }> = [];
 
 function disposeCorpsePresentation(root: THREE.Group): void {
-  scene.remove(root);
-  root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh)) return;
-    node.geometry.dispose();
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    materials.forEach((material) => material.dispose());
-  });
+  scheduleDeferredGpuRetirement(root);
 }
 
 function clearCorpsePresentations(): void {
@@ -5727,7 +6139,7 @@ function spawnPoint(): THREE.Vector3 {
       const bodyPoint = { x: point.x, y: 0, z: point.z };
       return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
         && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-        && !isBlocked(bodyPoint, arena.colliders, 0.44);
+        && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
     });
   const home = validForSide(player.team);
   const oppositeTeam: Team = player.team === 0 ? 1 : 0;
@@ -5735,7 +6147,7 @@ function spawnPoint(): THREE.Vector3 {
   if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored player spawn for team ${player.team}`);
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scored = options.map(({ point }) => ({
-      visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
+      visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(threat, point, box))).length,
       nearestThreatDistanceSq: threats.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...threats.map((threat) => threat.distanceToSquared(point))),
     }));
     const minimumVisibleThreats = Math.min(...scored.map((entry) => entry.visibleThreats));
@@ -5771,7 +6183,7 @@ function spawnPoint(): THREE.Vector3 {
     nearestPlayerDistanceSq: otherPlayers.length === 0
       ? Number.POSITIVE_INFINITY
       : Math.min(...otherPlayers.map((other) => other.distanceToSquared(point))),
-    visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(threat, point, box))).length,
+    visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(threat, point, box))).length,
   }));
   const previousIndex = lastPlayerSpawnIndex;
   const population = otherPlayers.length + 1;
@@ -5783,7 +6195,7 @@ function spawnPoint(): THREE.Vector3 {
     threats,
     occupants: otherPlayers,
     recentDeaths: recentSpawnDeathPoints(),
-    colliders: arena.colliders,
+    colliders: activeWorldColliders(),
     previousIndex,
     tieBreakSeed: stableSpawnTieBreakSeed(player.id),
   });
@@ -6083,6 +6495,18 @@ function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, activeA
   killstreakMatchEpoch = mode === 'solo'
     ? killstreakMatchEpoch + 1
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000);
+  interactiveWorldMatchEpoch = killstreakMatchEpoch;
+  interactiveWorldTick = 0;
+  lastInteractiveWorldBroadcastRevision = -1;
+  if (interactiveWorldRuntime) {
+    const priorEpoch = interactiveWorldRuntime.telemetry().matchEpoch;
+    if (interactiveWorldMatchEpoch > priorEpoch) interactiveWorldRuntime.reset(interactiveWorldMatchEpoch);
+    else if (interactiveWorldMatchEpoch < priorEpoch) {
+      throw new Error(`Interactive-world match epoch regressed (${interactiveWorldMatchEpoch} < ${priorEpoch})`);
+    }
+    interactiveWorldRuntime.setHostAuthority(mode !== 'client');
+    syncInteractiveWorldPhysics(true);
+  }
   killstreakRuntime = new HostKillstreakRuntime(killstreakMatchEpoch);
   killstreakActivationSequence = 0;
   killstreakControlSequence = 0;
@@ -6478,6 +6902,7 @@ function resolveRailgunShot(request: RailgunShotRequestMessage): RailgunShotResu
     type: 'shot', by: request.by, weapon: 'railgun', origin: request.origin as [number, number, number],
     direction: request.direction as [number, number, number], pelletDirections: [request.direction as [number, number, number]], nonce: request.nonce,
   };
+  applyKillstreakEntityShot(request.by, remote.snapshot.team, origin, [normalized], 'railgun');
   renderRemoteShot(visual);
   network.send(visual, request.by);
   network.send(result);
@@ -6532,6 +6957,8 @@ function tryFireRailgun(now: number): void {
   if (!fired.accepted) return;
   applyRailgunState(fired.state);
   broadcastRailgunState();
+  applyInteractiveWorldBallisticTrace(traceWeaponPath(origin, direction, 180, 'railgun'), origin, direction, 'railgun');
+  applyKillstreakEntityShot(player.id, player.team, origin, [direction], 'railgun', now);
   const target = selectRailgunTarget(player.id, player.team, origin, direction);
   const outcome = target ? applyAuthoritativeRailgunDamage(player.id, target.target, target.distance) : null;
   if (outcome) {
@@ -6791,6 +7218,7 @@ function tryFire(now: number): void {
     }
     if (projectileShot) continue;
     const result = castShot(origin, direction, player.weapon, true);
+    if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
     const authoritativeEnd = origin.clone().addScaledVector(direction, result.distance);
     const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
     spawnTracer(visualStart, authoritativeEnd, spec.color);
@@ -6856,6 +7284,16 @@ function tryFire(now: number): void {
           },
         );
     }
+  }
+  if (!projectileShot) {
+    applyKillstreakEntityShot(
+      player.id,
+      player.team,
+      origin,
+      pelletDirections.map((entry) => new THREE.Vector3(...entry)),
+      player.weapon,
+      now,
+    );
   }
   const shot: ShotMessage = {
     type: 'shot',
@@ -7064,14 +7502,14 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
       return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
         && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-        && !isBlocked(bodyPoint, arena.colliders, 0.44);
+        && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
     });
   const home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
   if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored spawn for team ${team}`);
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scores = options.map(({ candidate }) => ({
-      visibleThreats: threats.filter((threat) => !arena.colliders.some((box) => segmentIntersectsBox(candidate, threat, box))).length,
+      visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(candidate, threat, box))).length,
       distance: threats.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...threats.map((threat) => threat.distanceToSquared(candidate))),
     }));
     const minimumVisibleThreats = Math.min(...scores.map((score) => score.visibleThreats));
@@ -7097,7 +7535,7 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
     threats,
     occupants: otherPlayers,
     recentDeaths: recentSpawnDeathPoints(),
-    colliders: arena.colliders,
+    colliders: activeWorldColliders(),
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
     tieBreakSeed: stableSpawnTieBreakSeed(actorId),
   });
@@ -7400,7 +7838,7 @@ function botHasLineOfSight(bot: BotPlayer, targetPosition = player.position): bo
   const origin = { x: bot.position.x, y: bot.position.y + 1.42, z: bot.position.z };
   const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
   if (performance.now() < Number(bot.root.userData.flashBlindedUntil ?? 0)) return false;
-  return !arena.colliders.some((box) => segmentIntersectsBox(origin, target, box))
+  return !activeWorldColliders().some((box) => segmentIntersectsBox(origin, target, box))
     && !smokeBlocksTargetAcquisition(origin, target, smokeVolumes, performance.now());
 }
 
@@ -7465,7 +7903,7 @@ function selectBotTacticalWaypoint(
       index,
       distanceFromBot: point.distanceTo(bot.position),
       distanceFromPlayer: point.distanceTo(targetPosition),
-      seesPlayer: targetAlive && !arena.colliders.some((box) => segmentIntersectsBox(eye, target, box)),
+      seesPlayer: targetAlive && !activeWorldColliders().some((box) => segmentIntersectsBox(eye, target, box)),
     };
   }), bot.waypoint, bot.deaths + bot.kills);
 }
@@ -7626,7 +8064,7 @@ function botElevationAt(position: THREE.Vector3, previousY: number): number {
 }
 
 function navigationCollidersFor(activeArena: ArenaMap): ArenaMap['colliders'] {
-  return activeArena.colliders.filter((box) => {
+  return activeWorldColliders(activeArena).filter((box) => {
     const minY = box.minY ?? 0;
     const maxY = box.maxY ?? 8;
     const thinSurface = maxY - minY <= 0.5;
@@ -7927,6 +8365,7 @@ function updateBots(dt: number, now: number): void {
         botWeapon.penetration,
         activeBallisticSurfaces(),
       );
+      applyInteractiveWorldBallisticTrace(resolution.trace, origin, direction, bot.weapon);
       const visibleEnd = origin.clone().addScaledVector(direction, resolution.tracerDistance);
       const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
       spawnTracer(botMuzzle ?? origin, visibleEnd, botWeapon.color);
@@ -8100,13 +8539,7 @@ function spawnExplosiveBolt(
 }
 
 function disposeExplosiveBolt(entity: ExplosiveBoltEntity): void {
-  scene.remove(entity.mesh);
-  entity.mesh.traverse((node) => {
-    if (!(node instanceof THREE.Mesh)) return;
-    node.geometry.dispose();
-    if (Array.isArray(node.material)) node.material.forEach((material) => material.dispose());
-    else node.material.dispose();
-  });
+  scheduleDeferredGpuRetirement(entity.mesh);
 }
 
 function applyExplosiveBoltTargetDamage(
@@ -8155,13 +8588,14 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   spawnGrenadeExplosionVisual(point, now);
   audio.explosion(now);
   if (!bolt.authority) return;
+  applyInteractiveWorldExplosion(point, EXPLOSIVE_BOLT_BLAST_RADIUS_M, EXPLOSIVE_BOLT_DIRECT_DAMAGE);
   for (const target of explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)) {
     if (target.id === bolt.targetId && target.lifeId !== bolt.targetLifeId) continue;
     const direct = target.id === bolt.targetId && target.lifeId === bolt.targetLifeId;
     if (direct) applyExplosiveBoltTargetDamage(bolt, target, EXPLOSIVE_BOLT_DIRECT_DAMAGE, 'direct', point);
     const distance = target.position.distanceTo(point);
     if (distance > EXPLOSIVE_BOLT_BLAST_RADIUS_M) continue;
-    const blocked = !direct && arena.colliders.some((box) => segmentIntersectsBox(point, target.position, box));
+    const blocked = !direct && activeWorldColliders().some((box) => segmentIntersectsBox(point, target.position, box));
     if (blocked) continue;
     applyExplosiveBoltTargetDamage(bolt, target, explosiveBoltBlastDamage(distance), 'blast', point);
   }
@@ -8173,7 +8607,7 @@ function updateExplosiveBolts(dt: number, now: number): void {
     if (bolt.impactedAt === null) {
       const start = bolt.mesh.position.clone();
       const delta = bolt.velocity.clone().multiplyScalar(dt);
-      const worldCollision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
+      const worldCollision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders());
       let targetHit: ExplosiveBoltTarget | null = null;
       let targetFraction = 2;
       for (const target of explosiveBoltTargets(bolt.ownerId, bolt.ownerTeam)) {
@@ -8295,7 +8729,7 @@ function breakWindowsInGrenadeBlast(point: THREE.Vector3, actionNonce: number, r
     if (pane.broken) continue;
     const centre = pane.mesh.getWorldPosition(new THREE.Vector3());
     if (centre.distanceTo(point) > GRENADE_RADIUS) continue;
-    if (windowBreakPathBlocked(point, centre, arena.colliders)) continue;
+    if (windowBreakPathBlocked(point, centre, activeWorldColliders())) continue;
     const normal = centre.clone().sub(point);
     if (normal.lengthSq() < 1e-8) normal.set(0, 0, 1);
     else normal.normalize().multiplyScalar(-1);
@@ -8336,7 +8770,7 @@ function grenadeOwnerTeam(entity: GrenadeEntity): Team | null {
 
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: number): void {
   const eyes = player.position;
-  const solidOccluded = arena.colliders.some((box) => segmentIntersectsBox(point, eyes, box));
+  const solidOccluded = activeWorldColliders().some((box) => segmentIntersectsBox(point, eyes, box));
   const lookDirection = camera.getWorldDirection(new THREE.Vector3());
   const ownerTeam = grenadeOwnerTeam(entity);
   const exposure = calculateFlashExposure({
@@ -8355,7 +8789,7 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     const botEyes = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
-    const botOccluded = arena.colliders.some((box) => segmentIntersectsBox(point, botEyes, box));
+    const botOccluded = activeWorldColliders().some((box) => segmentIntersectsBox(point, botEyes, box));
     const botLook = new THREE.Vector3(Math.sin(bot.root.rotation.y), 0, -Math.cos(bot.root.rotation.y));
     const botExposure = calculateFlashExposure({
       origin: point,
@@ -8375,9 +8809,7 @@ function updateOrdnanceVolumes(now: number): void {
     const age = now - smoke.startsAtMs;
     const remaining = smoke.expiresAtMs - now;
     if (remaining <= 0) {
-      scene.remove(smoke.mesh);
-      smoke.mesh.geometry.dispose();
-      (smoke.mesh.material as THREE.Material).dispose();
+      scheduleDeferredGpuRetirement(smoke.mesh);
       smokeVolumes.splice(index, 1);
       continue;
     }
@@ -8402,8 +8834,7 @@ function updateOrdnanceVolumes(now: number): void {
 function explodeGrenade(entity: GrenadeEntity): void {
   const started = performance.now();
   const point = entity.mesh.position.clone();
-  if (entity.mesh.userData.fallback === true) retireSupportRoot(entity.mesh);
-  else scene.remove(entity.mesh);
+  scheduleDeferredGpuRetirement(entity.mesh, entity.mesh.userData.authoredGrenade !== true);
   releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
   if (entity.grenade === 'smoke') {
@@ -8424,8 +8855,9 @@ function explodeGrenade(entity: GrenadeEntity): void {
   const afterVisual = performance.now();
   // Remote grenades are presentation-only. Authoritative hit/window events are the sole mutation path.
   if (entity.ownerKind === 'remote') return;
+  applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100);
   if (entity.ownerKind === 'bot') {
-    const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
+    const blocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, player.position, box));
     const damage = blocked ? 0 : botScaledDamage(grenadeDamage(player.position.distanceTo(point)));
     lastBotGrenadeDamage = damage;
     if (damage > 0 && player.alive) {
@@ -8449,14 +8881,14 @@ function explodeGrenade(entity: GrenadeEntity): void {
   }
   for (const bot of bots.values()) {
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
-    const blocked = arena.colliders.some((box) => segmentIntersectsBox(point, target, box));
+    const blocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box));
     const damage = blocked ? 0 : outgoingDamage(grenadeDamage(bot.position.distanceTo(point)), afterAudio);
     if (damage > 0) applyBotDamage(bot, damage, 'body', { kind: 'grenade' });
   }
   const blastNonce = entity.actionNonce;
   for (const remote of remotes.values()) {
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
-    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
     const baseDamage = grenadeDamage(target.distanceTo(point));
     if (baseDamage > 0) sendAuthoritativeHit({
       type: 'hit', by: player.id, target: remote.snapshot.id, damage: Math.min(100, baseDamage), kind: 'explosive',
@@ -8464,7 +8896,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
     });
   }
   const afterTargets = performance.now();
-  const selfBlocked = arena.colliders.some((box) => segmentIntersectsBox(point, player.position, box));
+  const selfBlocked = activeWorldColliders().some((box) => segmentIntersectsBox(point, player.position, box));
   const selfDamage = selfBlocked ? 0 : grenadeDamage(player.position.distanceTo(point)) * 0.35;
   if (selfDamage > 0) applyDamage(selfDamage, player.id, 1, false, { kind: 'grenade' });
   const finished = performance.now();
@@ -8493,7 +8925,7 @@ function updateGrenades(dt: number, now: number): void {
     grenade.mesh.rotation.z += grenade.angularVelocity.z * dt;
     const start = grenade.mesh.position.clone();
     const delta = grenade.velocity.clone().multiplyScalar(dt);
-    const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders);
+    const collision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders());
     if (collision) {
       const collisionNormal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
       grenade.mesh.position.copy(start).addScaledVector(delta, collision.time).addScaledVector(collisionNormal, 0.025);
@@ -8512,7 +8944,7 @@ function updateGrenades(dt: number, now: number): void {
       grenade.mesh.position.set(impact.x, impact.y, impact.z);
       spawnImpactFlash(grenade.mesh.position.clone());
       audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
-      disposeGrenadePresentation(grenade.mesh);
+      scheduleDeferredGpuRetirement(grenade.mesh, grenade.mesh.userData.authoredGrenade !== true);
       releaseBotGrenadeOwner(grenade);
       grenades.splice(index, 1);
       continue;
@@ -8755,7 +9187,7 @@ function killstreakWorldState(): KillstreakWorld {
     },
     targets,
     areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
-    hasLineOfSight: (from, to) => !arena.colliders.some((box) => segmentIntersectsBox(
+    hasLineOfSight: (from, to) => !activeWorldColliders().some((box) => segmentIntersectsBox(
       { x: from[0], y: from[1], z: from[2] },
       { x: to[0], y: to[1], z: to[2] },
       box,
@@ -8807,6 +9239,53 @@ function broadcastKillstreakState(now = performance.now()): void {
     network.sendToPlayer(remote.snapshot.id, message);
   }
   lastKillstreakStateBroadcastAt = now;
+}
+
+function applyKillstreakEntityShot(
+  shooterId: string,
+  shooterTeam: Team,
+  origin: THREE.Vector3,
+  directions: readonly THREE.Vector3[],
+  weapon: WeaponId,
+  now = performance.now(),
+): boolean {
+  if (network.role === 'client' || directions.length === 0) return false;
+  const spec = WEAPONS[weapon];
+  let applied = false;
+  const destroyed = new Set<string>();
+  for (const authoredDirection of directions) {
+    const direction = authoredDirection.clone().normalize();
+    const ray = new THREE.Ray(origin, direction);
+    let nearest: { id: string; distance: number } | null = null;
+    const entities = killstreakRuntime.snapshotFor(null, now).entities;
+    for (const entity of entities) {
+      if (entity.kind === 'care-crate'
+        || !areCombatantsHostile(shooterId, shooterTeam, entity.ownerId, entity.team)
+        || destroyed.has(entity.id)) continue;
+      const centre = new THREE.Vector3(...entity.position);
+      const along = centre.clone().sub(origin).dot(direction);
+      if (along <= 0.1 || along > 220) continue;
+      const radius = entity.kind === 'chopper' ? 1.25 : 0.58;
+      if (ray.at(along, new THREE.Vector3()).distanceToSquared(centre) > radius * radius) continue;
+      const trace = traceWeaponPath(origin, direction, along, weapon);
+      if (!trace.reachedDistance) continue;
+      if (!nearest || along < nearest.distance) nearest = { id: entity.id, distance: along };
+    }
+    if (!nearest) continue;
+    const damage = Math.max(1, computeDamage(spec, nearest.distance, 'body'));
+    const result = killstreakRuntime.damageEntity(nearest.id, damage);
+    if (!result.applied) continue;
+    applied = true;
+    if (result.destroyed) {
+      destroyed.add(nearest.id);
+      addFeed(`${weapon === 'railgun' ? 'RAILGUN' : spec.name.toUpperCase()} DESTROYED HOSTILE AIR SUPPORT`, 'gold');
+    }
+  }
+  if (applied) {
+    refreshLocalKillstreakSnapshot(now);
+    broadcastKillstreakState(now);
+  }
+  return applied;
 }
 
 function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
@@ -9006,6 +9485,9 @@ function updatePass65KillstreakRuntime(now: number): void {
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
+    for (const impact of result.impactEvents) {
+      applyInteractiveWorldExplosion(new THREE.Vector3(...impact.position), 4.5, 80);
+    }
     killstreakPresentation.presentImpacts(result.impactEvents, now);
     refreshLocalKillstreakSnapshot(now);
     if (network.role === 'host' && applied.length > 0) {
@@ -9319,6 +9801,7 @@ function spawnHunterSwarm(now: number): string[] | null {
 function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): void {
   const started = performance.now();
   const presentationProfile = supportBlast(point, HUNTER_SWARM_BLAST_RADIUS, 0, 'hunter-swarm', false);
+  applyInteractiveWorldExplosion(point, HUNTER_SWARM_BLAST_RADIUS, 100);
   const afterPresentation = performance.now();
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get('hunter-swarm');
@@ -9326,7 +9809,7 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
     if (!bot.alive || bot.team === player.team) continue;
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
-    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
     const damage = outgoingDamage(hunterSwarmDamage(distance, 'stand'));
     if (damage > 0) applyBotDamage(bot, damage, 'body', { kind: 'killstreak', effect: 'hunter-swarm' });
   }
@@ -9334,7 +9817,7 @@ function detonateHunterDrone(drone: HunterDroneEntity, point: THREE.Vector3): vo
     if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) || remote.snapshot.hp <= 0) continue;
     const target = remote.target.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
-    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
     const baseDamage = hunterSwarmDamage(distance, remote.snapshot.stance ?? 'stand');
     if (baseDamage > 0 && supportNonce !== undefined) {
       sendAuthoritativeHit({
@@ -9401,6 +9884,7 @@ function detonateNuke(sequence: NukeSequence): void {
   const blastNonce = randomNonce();
   const supportNonce = localSupportNonces.get('nuke');
   if (sequence.authoritativeDamage) {
+    applyInteractiveWorldExplosion(new THREE.Vector3(0, 1.5, 0), 220, 400);
     for (const remote of remotes.values()) {
       const damage = nukeDamageForTarget(player.team, remote.snapshot.team, remote.snapshot.hp > 0);
       if (damage <= 0 || supportNonce === undefined) continue;
@@ -9497,18 +9981,13 @@ function makeSkyMissile(): THREE.Group {
 }
 
 function disposeSupportRoot(root: THREE.Object3D): void {
-  scene.remove(root);
   // Shared Tri-Pass missile/marker GPU resources must not be disposed per impact.
   if (root.userData.pooledSupportPresentation === true) {
+    root.removeFromParent();
     root.visible = false;
     return;
   }
-  root.traverse((node) => {
-    if (!(node instanceof THREE.Mesh)) return;
-    node.geometry.dispose();
-    const materials = Array.isArray(node.material) ? node.material : [node.material];
-    materials.forEach((material) => material.dispose());
-  });
+  scheduleDeferredGpuRetirement(root);
 }
 
 function retireSupportRoot(root: THREE.Object3D): void {
@@ -9529,6 +10008,7 @@ function supportBlast(
   const afterAudio = performance.now();
   supportExplosionPresentation.emit(point, radius, started);
   const afterVisual = performance.now();
+  if (maximumDamage > 0) applyInteractiveWorldExplosion(point, radius, maximumDamage);
   if (maximumDamage <= 0) {
     const profile: ExplosionSyncProfile = {
       source: explosiveSource,
@@ -9544,7 +10024,7 @@ function supportBlast(
     if (!bot.alive) continue;
     const target = bot.position.clone().add(new THREE.Vector3(0, 1.1, 0));
     const distance = target.distanceTo(point);
-    if (distance > radius || arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) continue;
+    if (distance > radius || activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) continue;
     const damage = Math.min(400, outgoingDamage(Math.max(1, Math.round(maximumDamage * (1 - distance / radius)))));
     applyBotDamage(bot, damage, 'body', { kind: 'killstreak', effect: explosiveSource });
   }
@@ -9562,7 +10042,7 @@ function supportBlast(
       supportNetworkHitTelemetry[explosiveSource].outOfRange += 1;
       continue;
     }
-    if (arena.colliders.some((box) => segmentIntersectsBox(point, target, box))) {
+    if (activeWorldColliders().some((box) => segmentIntersectsBox(point, target, box))) {
       supportNetworkHitTelemetry[explosiveSource].blocked += 1;
       continue;
     }
@@ -9654,7 +10134,7 @@ function drawStrikeMap(now = performance.now()): void {
     context.strokeStyle = 'rgba(210, 190, 150, 0.35)';
     context.lineWidth = 1;
     let drawn = 0;
-    for (const box of arena.colliders) {
+    for (const box of activeWorldColliders()) {
       const sizeX = box.maxX - box.minX;
       const sizeZ = box.maxZ - box.minZ;
       if (sizeX < 1.2 || sizeZ < 1.2 || sizeX > 30 || sizeZ > 30) continue;
@@ -9938,7 +10418,7 @@ function updateHunterDrones(dt: number, now: number): void {
       continue;
     }
     const step = direction.normalize().multiplyScalar(Math.min(distance, dt * (20 + drone.index * 0.85)));
-    const collision = sweepSphereAgainstBoxes(drone.root.position, step, arena.colliders, 0.24);
+    const collision = sweepSphereAgainstBoxes(drone.root.position, step, activeWorldColliders(), 0.24);
     if (collision) {
       const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
       const impact = drone.root.position.clone().addScaledVector(step, collision.time).addScaledVector(normal, 0.26);
@@ -10023,7 +10503,7 @@ function updateFieldSupport(dt: number, now: number): void {
       yardhawk.velocity.y -= 9.5 * dt;
       const start = yardhawk.root.position.clone();
       const delta = yardhawk.velocity.clone().multiplyScalar(dt);
-      const collision = sweepSphereAgainstBoxes(start, delta, arena.colliders, 0.24);
+      const collision = sweepSphereAgainstBoxes(start, delta, activeWorldColliders(), 0.24);
       if (collision) {
         const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
         const impact = start.clone().addScaledVector(delta, collision.time).addScaledVector(normal, 0.26);
@@ -10057,7 +10537,7 @@ function updateFieldSupport(dt: number, now: number): void {
         } else {
           const step = direction.normalize().multiplyScalar(Math.min(distance, dt * 16));
           const start = yardhawk.root.position.clone();
-          const collision = sweepSphereAgainstBoxes(start, step, arena.colliders, 0.24);
+          const collision = sweepSphereAgainstBoxes(start, step, activeWorldColliders(), 0.24);
           if (collision) {
             const normal = new THREE.Vector3(collision.normal.x, collision.normal.y, collision.normal.z);
             const impact = start.clone().addScaledVector(step, collision.time).addScaledVector(normal, 0.26);
@@ -10098,15 +10578,13 @@ function updateFieldSupport(dt: number, now: number): void {
 function clearGrenades(): void {
   for (const grenade of grenades) {
     releaseBotGrenadeOwner(grenade);
-    disposeGrenadePresentation(grenade.mesh);
+    scheduleDeferredGpuRetirement(grenade.mesh, grenade.mesh.userData.authoredGrenade !== true);
   }
   grenades.length = 0;
   for (const bolt of explosiveBolts) disposeExplosiveBolt(bolt);
   explosiveBolts.length = 0;
   for (const smoke of smokeVolumes) {
-    scene.remove(smoke.mesh);
-    smoke.mesh.geometry.dispose();
-    (smoke.mesh.material as THREE.Material).dispose();
+    scheduleDeferredGpuRetirement(smoke.mesh);
   }
   smokeVolumes.length = 0;
   flashExposureUntil = 0;
@@ -10874,7 +11352,7 @@ function updateMinimap(now: number): void {
     context.lineWidth = 1.5;
     context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
     context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
-    for (const collider of arena.colliders) {
+    for (const collider of activeWorldColliders()) {
       const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
       context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
       context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
@@ -11439,7 +11917,9 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR') reload();
   if (event.code === 'KeyV' && !event.repeat) melee();
   if (event.code === 'KeyG' && !event.repeat) throwGrenade();
-  if (event.code === 'KeyF' && !event.repeat && !interactWithKillstreakSupport()) interactWithWeaponPickup();
+  if (event.code === 'KeyF' && !event.repeat
+    && !interactWithKillstreakSupport()
+    && !interactWithShedDoor()) interactWithWeaponPickup();
   if (event.code === 'Tab') {
     event.preventDefault();
     updateRoster();
@@ -11770,7 +12250,9 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
   const previousSelection = selectedArena;
   const previousArena = arena;
   const previousPhysics = characterPhysics;
+  const previousInteractiveWorldRuntime = interactiveWorldRuntime;
   let nextPhysics: CharacterPhysics | null = null;
+  let nextInteractiveWorldRuntime: InteractiveWorldRuntime | null = null;
   let committed = false;
   arenaSelectionReady = false;
   renderSubmissionPaused = true;
@@ -11787,6 +12269,12 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     await flushWebGpuFrames();
     arenaTransitionPhase = 'preparing';
     const nextArena = ensureArenaConstructed(nextSelection.id);
+    nextInteractiveWorldRuntime = createInteractiveWorldRuntime(
+      nextSelection.id,
+      interactiveWorldMatchEpoch,
+      true,
+    );
+    nextInteractiveWorldRuntime.root.visible = false;
     latestArenaPerformanceBudgetSample = null;
     if (localArenaSwitchQaDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
@@ -11795,9 +12283,12 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     characterPhysics = nextPhysics;
     selectedArena = nextSelection;
     arena = nextArena;
+    interactiveWorldRuntime = nextInteractiveWorldRuntime;
+    previousInteractiveWorldRuntime?.root.removeFromParent();
+    interactiveWorldRuntime.root.visible = true;
+    syncInteractiveWorldPhysics(true);
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
-    botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
     await ensureSelectedQualityPresentation(selectedArena.id);
@@ -11832,6 +12323,7 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     await retireAllArenasExcept(selectedArena.id);
     renderHighScores();
     committed = true;
+    previousInteractiveWorldRuntime?.dispose();
     try {
       previousPhysics?.dispose();
     } catch (disposeError) {
@@ -11845,9 +12337,14 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     characterPhysics = previousPhysics;
     selectedArena = previousSelection;
     arena = previousArena;
+    interactiveWorldRuntime = previousInteractiveWorldRuntime;
+    if (interactiveWorldRuntime) {
+      scene.add(interactiveWorldRuntime.root);
+      interactiveWorldRuntime.root.visible = true;
+    }
+    syncInteractiveWorldPhysics(true);
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
-    botNavigationColliders = navigationCollidersFor(arena);
     document.documentElement.dataset.arenaId = selectedArena.id;
     try {
       await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
@@ -11869,6 +12366,16 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     }
   } finally {
     if (!committed && nextPhysics && nextPhysics !== characterPhysics) nextPhysics.dispose();
+    if (!committed && nextInteractiveWorldRuntime && nextInteractiveWorldRuntime !== interactiveWorldRuntime) {
+      try {
+        await flushWebGpuFrames();
+        nextInteractiveWorldRuntime.dispose();
+      } catch (retirementError) {
+        nextInteractiveWorldRuntime.root.removeFromParent();
+        nextInteractiveWorldRuntime.root.visible = false;
+        console.warn('[Pass 65 failed arena interactive world retained after fence failure]', retirementError);
+      }
+    }
     renderSubmissionPaused = false;
     if (arenaTransitionPhase !== 'failed') arenaTransitionPhase = 'idle';
     arenaTransitionCompletedAt = performance.now();
@@ -12286,6 +12793,7 @@ function frame(now: number, scheduleNext = true): void {
     let iterations = 0;
     while (accumulator >= step && iterations < 6) {
       updatePhysics(step);
+      stepInteractiveWorldAuthority();
       accumulator -= step;
       iterations += 1;
     }
@@ -12628,7 +13136,7 @@ function playableSceneProof(): Record<string, unknown> {
     playerCamera: camera.parent === scene,
     cameraComposition: {
       position: camera.position.toArray(),
-      insideHorizontalCollider: isBlocked(camera.position, arena.colliders, 0.16),
+      insideHorizontalCollider: isBlocked(camera.position, activeWorldColliders(), 0.16),
       aboveArenaFloor: camera.position.y > -1,
     },
     botObjects: bots.size + dormantBots.size,
@@ -12772,6 +13280,8 @@ const debugWindow = window as Window & {
     hitRangeTarget: (id: string, damage?: number, zone?: HitZone) => void;
     spawnDeathDrop: (ageMs?: number) => string | null;
     setKills: (kills: number) => void;
+    interactShed: () => boolean;
+    damageShed: (placementId?: string, surfaceId?: string, damageQ?: number) => boolean;
 
   };
 };
@@ -12855,11 +13365,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       },
       bounds: { ...arena.bounds },
       spawnCounts: [arena.spawns[0].length, arena.spawns[1].length],
-      colliders: arena.colliders.length,
+      colliders: activeWorldColliders().length,
       physicsColliders: arena.physicsColliders.length,
       physicsBoundaryWalls: worldBoundaryColliders(arena.bounds).length,
       navigationColliders: botNavigationColliders.length,
-      navigationCollidersMatchArena: botNavigationColliders.every((box) => arena.colliders.includes(box)),
+      navigationCollidersMatchArena: botNavigationColliders.every((box) => activeWorldColliders().includes(box)),
       raycastMeshes: arena.raycastMeshes.length,
       targets: arena.targets.length,
       skylineAssetAudit: selectedArena.id === 'skyline-terminal' ? arena.root.userData.skylineAssetAudit : null,
@@ -12872,6 +13382,21 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           : selectedArena.id === 'skyline-terminal'
             ? arena.root.userData.skylineDoorAudit
             : null,
+    },
+    interactiveWorld: {
+      telemetry: interactiveWorldRuntime?.telemetry() ?? null,
+      envelope: interactiveWorldRuntime?.stateEnvelope() ?? null,
+      presentationRootInScene: interactiveWorldRuntime?.root.parent === scene,
+      presentationRootVisible: interactiveWorldRuntime?.root.visible ?? false,
+      collisionCacheRevision: activeWorldColliderCacheRevision,
+      rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
+      gpuRetirement: {
+        queuedRoots: deferredGpuRetirements.length,
+        draining: gpuRetirementTask !== null,
+        fences: gpuRetirementFences,
+        disposedRoots: gpuRetirementDisposedRoots,
+        failures: gpuRetirementFailures,
+      },
     },
     ballistics: {
       activeSurfaces: activeBallisticSurfaces().length,
@@ -13256,7 +13781,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       authored: arena.spawns[team].length,
       valid: arena.spawns[team].filter((point) => {
         const bodyPoint = { x: point.x, y: 0, z: point.z };
-        return pointInsideBounds(bodyPoint, arena.bounds, 0.44) && !isBlocked(bodyPoint, arena.colliders, 0.44);
+        return pointInsideBounds(bodyPoint, arena.bounds, 0.44) && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
       }).length,
     })),
     houseNavigation: arena.houses.map((house) => ({
@@ -13541,7 +14066,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
           target.z + Math.sin(angle) * radius,
         );
         const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
-        if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
+        if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, activeWorldColliders(), 0.45)) continue;
         bot.position.copy(candidate);
         if (botHasLineOfSight(bot, target)) {
           staged = candidate;
@@ -13597,7 +14122,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const candidate = new THREE.Vector3(player.position.x, 0, player.position.z)
         .addScaledVector(forward, stagedDistance);
       const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
-      if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, arena.colliders, 0.45)) continue;
+      if (!pointInsideBounds(bodyPoint, arena.bounds, 0.55) || isBlocked(bodyPoint, activeWorldColliders(), 0.45)) continue;
       const clearAtHeight = (height: number) => {
         const target = candidate.clone().add(new THREE.Vector3(0, height, 0));
         const ray = target.clone().sub(origin);
@@ -13678,7 +14203,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const nearestDistance = Math.hypot(target.x - nearest.origin.x, target.z - nearest.origin.z);
       return currentDistance < nearestDistance ? candidate : nearest;
     }, arena.houses[0]);
-    const staged = selectPlayableWindowApproach(target, house.origin, arena.bounds, arena.colliders, distance);
+    const staged = selectPlayableWindowApproach(target, house.origin, arena.bounds, activeWorldColliders(), distance);
     if (!staged) return;
     const eye = new THREE.Vector3(staged.x, staged.y, staged.z);
     player.position.copy(eye);
@@ -13961,12 +14486,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     };
   },
   collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
-    ? isBlocked({ x, y: 0, z }, arena.colliders, 0.44)
+    ? isBlocked({ x, y: 0, z }, activeWorldColliders(), 0.44)
     : true,
   collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
-    ? isBlocked({ x, y, z }, arena.colliders, 0.36)
+    ? isBlocked({ x, y, z }, activeWorldColliders(), 0.36)
     : true,
-  segmentBlocked: (x1, z1, x2, z2) => arena.colliders.some((box) => segmentIntersectsBox(
+  segmentBlocked: (x1, z1, x2, z2) => activeWorldColliders().some((box) => segmentIntersectsBox(
     new THREE.Vector3(x1, 0.2, z1),
     new THREE.Vector3(x2, 1.1, z2),
     box,
@@ -14236,6 +14761,21 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setKills: (kills: number) => {
     if (Number.isFinite(kills)) player.kills = Math.max(0, Math.floor(kills));
   },
+  interactShed: () => interactWithShedDoor(),
+  damageShed: (placementId, surfaceId = 'wall-west', damageQ = 220) => {
+    if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
+    const targetPlacementId = placementId ?? interactiveWorldRuntime.nearestDoor(player.position)?.placementId;
+    if (!targetPlacementId || !Number.isFinite(damageQ)) return false;
+    const result = interactiveWorldRuntime.applyExplosion({
+      placementId: targetPlacementId,
+      surfaceId,
+      damageQ: Math.max(1, Math.floor(damageQ)),
+    });
+    if (!result?.accepted) return false;
+    syncInteractiveWorldPhysics();
+    broadcastInteractiveWorldState(true);
+    return true;
+  },
 
 };
 
@@ -14308,6 +14848,7 @@ async function bootstrap(): Promise<void> {
     physicsPromise, weaponPromise, artPromise, rustworksArtPromise, grenadePromise,
   ]);
   characterPhysics = physics;
+  syncInteractiveWorldPhysics(true);
   arenaArtRoot = art?.root ?? null;
   // First-person geometry is composited after world depth is cleared. Contact
   // retreat still keeps it visually tucked near walls, while floor/wall depth

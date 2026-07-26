@@ -10,6 +10,8 @@ type PresentedEntity = Readonly<{
   target: THREE.Vector3;
 }>;
 
+export type KillstreakPresentationRetireRoot = (root: THREE.Object3D) => void;
+
 function material(color: number, options: { emissive?: number; transparent?: boolean; opacity?: number } = {}): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color,
@@ -129,7 +131,10 @@ export class KillstreakPresentation {
   private readonly impactFlashes: Array<{ root: THREE.Mesh; expiresAt: number }> = [];
   private readonly prewarmed: PresentedEntity[];
 
-  constructor(scene: THREE.Scene) {
+  constructor(
+    scene: THREE.Scene,
+    private readonly retireRoot: KillstreakPresentationRetireRoot = disposeRoot,
+  ) {
     this.root.name = 'pass65-killstreak-presentations';
     this.root.userData.presentationOnly = true;
     scene.add(this.root);
@@ -149,7 +154,7 @@ export class KillstreakPresentation {
     const liveIds = new Set(admitted.map((entity) => entity.id));
     for (const [id, presented] of this.entities) {
       if (liveIds.has(id)) continue;
-      disposeRoot(presented.root);
+      this.retireRoot(presented.root);
       this.entities.delete(id);
     }
     for (const entity of admitted) {
@@ -179,7 +184,7 @@ export class KillstreakPresentation {
       flash.root.scale.setScalar(1 + (1 - remaining) * 2.8);
       (flash.root.material as THREE.MeshBasicMaterial).opacity = remaining * 0.8;
       if (remaining > 0) continue;
-      disposeRoot(flash.root);
+      this.retireRoot(flash.root);
       this.impactFlashes.splice(index, 1);
     }
   }
@@ -211,15 +216,15 @@ export class KillstreakPresentation {
   }
 
   clear(): void {
-    for (const presented of this.entities.values()) disposeRoot(presented.root);
+    for (const presented of this.entities.values()) this.retireRoot(presented.root);
     this.entities.clear();
-    for (const flash of this.impactFlashes) disposeRoot(flash.root);
+    for (const flash of this.impactFlashes) this.retireRoot(flash.root);
     this.impactFlashes.length = 0;
   }
 
   dispose(): void {
     this.clear();
-    for (const entry of this.prewarmed) disposeRoot(entry.root);
+    for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.root.removeFromParent();
   }
 }

@@ -40,7 +40,7 @@ export type InteractiveWorldCollisionView = Readonly<{
 }>;
 
 export type InteractiveWorldRuntimeTelemetry = Readonly<{
-  arenaId: ShedPlacement['arenaId'];
+  arenaId: ShedArenaId;
   matchEpoch: number;
   revision: number;
   sheds: number;
@@ -51,6 +51,7 @@ export type InteractiveWorldRuntimeTelemetry = Readonly<{
   movementColliders: number;
   ballisticSurfaces: number;
   presentationDraws: number;
+  presentationRetiredGeometries: number;
 }>;
 
 export type InteractiveWorldDoorCandidate = Readonly<{
@@ -59,9 +60,16 @@ export type InteractiveWorldDoorCandidate = Readonly<{
   distance: number;
 }>;
 
+export type InteractiveWorldDoorCollisionState = Readonly<{
+  placementId: string;
+  bounds: Box2;
+  phase: ShedState['door']['phase'];
+  blockedBy: ShedState['door']['blockedBy'];
+}>;
+
 export type InteractiveWorldStateEnvelope = Readonly<{
   schemaVersion: 1;
-  arenaId: ShedPlacement['arenaId'];
+  arenaId: ShedArenaId;
   matchEpoch: number;
   revision: number;
   sheds: readonly ShedState[];
@@ -242,10 +250,10 @@ export class InteractiveWorldRuntime {
   private disposed = false;
 
   constructor(
-    readonly arenaId: ShedPlacement['arenaId'],
+    readonly arenaId: ShedArenaId,
     private matchEpoch: number,
     placements: readonly ShedPlacement[],
-    readonly hostAuthority: boolean,
+    private hostAuthority: boolean,
     definition: DestructibleShedDefinition = FIELD_SHED_DEFINITION,
   ) {
     if (placements.some((placement) => placement.arenaId !== arenaId || placement.definitionId !== definition.id)) {
@@ -255,6 +263,7 @@ export class InteractiveWorldRuntime {
       throw new TypeError('Duplicate interactive-world placement id');
     }
     this.root.name = `interactive-world:${arenaId}`;
+    this.root.userData.dynamic = true;
     this.sheds = placements.map((placement) => {
       const state = createInitialShedState(definition, placement, matchEpoch);
       const presentation = new DestructibleShedPresentation(definition, placement, state);
@@ -262,6 +271,14 @@ export class InteractiveWorldRuntime {
       return { placement, definition, state, presentation };
     });
     this.collisionView = this.rebuildCollisionView();
+  }
+
+  setHostAuthority(hostAuthority: boolean): void {
+    this.hostAuthority = hostAuthority;
+  }
+
+  hasHostAuthority(): boolean {
+    return this.hostAuthority;
   }
 
   private rebuildCollisionView(): InteractiveWorldCollisionView {
@@ -399,6 +416,25 @@ export class InteractiveWorldRuntime {
     return nearest;
   }
 
+  doorCollisionStates(): readonly InteractiveWorldDoorCollisionState[] {
+    return Object.freeze(this.sheds.map((shed) => {
+      const door = shed.definition.surfaces.find((surface) => surface.id === shed.definition.doorSurfaceId)!;
+      return Object.freeze({
+        placementId: shed.placement.id,
+        bounds: surfaceBounds(surfaceFrame(door, shed.placement, shed.state)),
+        phase: shed.state.door.phase,
+        blockedBy: shed.state.door.blockedBy,
+      });
+    }));
+  }
+
+  nextInteractionSequence(placementId: string, actorId: string): number | null {
+    const shed = this.sheds.find((candidate) => candidate.placement.id === placementId);
+    if (!shed) return null;
+    const prior = shed.state.interactionSequences.find((entry) => entry.actorId === actorId)?.sequence ?? 0;
+    return prior + 1;
+  }
+
   interactDoor(request: Readonly<{
     placementId: string;
     actorId: string;
@@ -527,6 +563,39 @@ export class InteractiveWorldRuntime {
       surfaceId: request.surfaceId,
       damageQ: request.damageQ,
     }));
+  }
+
+  applyExplosionAt(request: Readonly<{
+    origin: Point3;
+    radius: number;
+    maximumDamageQ: number;
+  }>): number {
+    if (!this.hostAuthority
+      || ![request.origin.x, request.origin.y, request.origin.z, request.radius, request.maximumDamageQ].every(Number.isFinite)
+      || request.radius <= 0
+      || request.maximumDamageQ < 1) return 0;
+    let mutations = 0;
+    for (const shed of this.sheds) {
+      for (const surface of shed.definition.surfaces) {
+        const state = shed.state.surfaces.find((candidate) => candidate.surfaceId === surface.id);
+        if (!state || state.stage === 'detached') continue;
+        const centre = surfaceFrame(surface, shed.placement, shed.state).centre;
+        const distance = Math.hypot(
+          centre.x - request.origin.x,
+          centre.y - request.origin.y,
+          centre.z - request.origin.z,
+        );
+        if (distance > request.radius) continue;
+        const damageQ = Math.max(1, Math.round(request.maximumDamageQ * (1 - distance / request.radius)));
+        const result = this.applyExplosion({
+          placementId: shed.placement.id,
+          surfaceId: surface.id,
+          damageQ,
+        });
+        if (result?.accepted) mutations += 1;
+      }
+    }
+    return mutations;
   }
 
   majorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] {
@@ -667,6 +736,10 @@ export class InteractiveWorldRuntime {
       movementColliders: this.collisionView.movementColliders.length,
       ballisticSurfaces: this.collisionView.ballisticSurfaces.length,
       presentationDraws: this.sheds.reduce((sum, shed) => sum + shed.presentation.telemetry(shed.state).activeDraws, 0),
+      presentationRetiredGeometries: this.sheds.reduce(
+        (sum, shed) => sum + shed.presentation.telemetry(shed.state).retiredGeometries,
+        0,
+      ),
     });
   }
 

@@ -3,6 +3,8 @@ import { configureRuntimeRandom } from './runtime-random';
 import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, isHostAuthorityMessage, isPlayerSnapshot, isStateTrafficMessage, messageBelongsToPlayer, sanitizeName, type ChatHistoryMessage, type ChatMessage, type ChatSubmitMessage, type GrenadeThrowMessage, type LeaderboardSyncMessage, type RedeployCommitMessage, type RedeployRequestMessage, type SupportActivateMessage } from './protocol';
 import { advanceRailgunAuthority, createRailgunAuthorityState, RAILGUN_SPAWN_DELAY_MS } from './railgun-authority';
+import { shedPlacementsForArena } from './destructible-shed-registry';
+import { InteractiveWorldRuntime } from './interactive-world-runtime';
 
 const player = {
   id: 'abc', name: 'Tester', team: 0 as const,
@@ -326,6 +328,32 @@ describe('network protocol guards', () => {
     })).toBe(true);
     expect(isStateTrafficMessage(lobbyState)).toBe(false);
     expect(isGameMessage({ ...lobbyState, snapshot: { ...lobbyState.snapshot, config: { ...lobbyState.snapshot.config, capacity: 5 } } })).toBe(false);
+  });
+
+  it('routes strict interactive-world intents and snapshots through protocol v7', () => {
+    const runtime = new InteractiveWorldRuntime(
+      'atomic-acres',
+      9,
+      [shedPlacementsForArena('atomic-acres')[0]!],
+      true,
+    );
+    const intent = {
+      type: 'shed-interact-request', schemaVersion: 1, by: 'guest-a', arenaId: 'atomic-acres',
+      placementId: 'atomic-shed-west', matchEpoch: 9, lifeId: 2, actionSequence: 1, nonce: 22,
+    } as const;
+    const snapshot = {
+      type: 'interactive-world-snapshot', schemaVersion: 1, by: 'host-a',
+      envelope: runtime.stateEnvelope(), nonce: 23,
+    } as const;
+    expect(isGameMessage(intent)).toBe(true);
+    expect(messageBelongsToPlayer(intent, 'guest-a')).toBe(true);
+    expect(isHostAuthorityMessage(intent)).toBe(false);
+    expect(isGameMessage(snapshot)).toBe(true);
+    expect(isHostAuthorityMessage(snapshot)).toBe(true);
+    expect(isStateTrafficMessage(snapshot)).toBe(true);
+    expect(isGameMessage({ ...intent, clientAngleQ: 4_000 })).toBe(false);
+    expect(isGameMessage({ ...snapshot, envelope: { ...snapshot.envelope, hash: '0'.repeat(64) } })).toBe(false);
+    runtime.dispose();
   });
 });
 
