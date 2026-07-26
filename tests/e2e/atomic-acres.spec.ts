@@ -156,7 +156,12 @@ type DebugState = {
     minimapSymbol: string;
   };
   deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
-  breakableWindows: Array<{ id: string; broken: boolean; visible: boolean; position: number[] }>;
+  breakableWindows: Array<{
+    id: string; broken: boolean; visible: boolean; position: number[]; persistentDebrisId: string | null;
+  }>;
+  persistentWindowDebris: Array<{
+    id: string; windowId: string; position: number[]; visible: boolean; physical: boolean;
+  }>;
   physicalCover: Array<{
     id: string;
     bounds: { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
@@ -994,6 +999,28 @@ test.describe('solo mechanics', () => {
       api.respawn();
       if (pauseRenderer) api.setRenderPaused(true);
     }, simulationOnly);
+  });
+
+  test('keeps a broken house pane as persistent physical major debris', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        stageWindow: (index: number, distance: number) => void;
+        equipWeapon: (weapon: string) => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.stageWindow(0, 4);
+      api.equipWeapon('carbine');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[0]?.broken).toBe(true);
+    await expect.poll(async () => (await debug(page)).persistentWindowDebris.length).toBe(1);
+    await expect.poll(async () => (await debug(page)).persistentWindowDebris[0]?.physical).toBe(true);
+    const initial = (await debug(page)).persistentWindowDebris[0];
+    await page.waitForTimeout(1_250);
+    const settled = await debug(page);
+    expect(settled.breakableWindows[0].persistentDebrisId).toBe(initial.id);
+    expect(settled.persistentWindowDebris[0]).toMatchObject({ id: initial.id, visible: true, physical: true });
+    expect(settled.persistentWindowDebris[0].position.every(Number.isFinite)).toBe(true);
   });
 
   test('sprints smoothly from the foot to the landing of both house ramps', async ({ page }) => {

@@ -415,7 +415,13 @@ import {
 } from './match-report';
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
-import { CharacterPhysics, worldBoundaryColliders } from './physics';
+import {
+  CharacterPhysics,
+  MAX_MAJOR_DEBRIS_BODIES,
+  worldBoundaryColliders,
+  type MajorDebrisBodyDefinition,
+  type MajorDebrisBodySnapshot,
+} from './physics';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import {
@@ -1521,6 +1527,13 @@ let activeWorldColliderCacheArena: ArenaMap | null = null;
 let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
 let activeWorldColliderCacheRevision = -1;
 let activeWorldColliderCache: ArenaMap['colliders'] = [];
+type PersistentWindowDebris = {
+  id: string;
+  windowId: string;
+  root: THREE.Group;
+  definition: MajorDebrisBodyDefinition;
+};
+const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
 
 function createInteractiveWorldRuntime(
   arenaId: ArenaId,
@@ -1574,8 +1587,44 @@ function syncInteractiveWorldPhysics(authoritativeResync = false): void {
   characterPhysics.syncDynamicColliders(
     collision.dynamicColliders.filter((entry) => !entry.id.includes(':debris:')),
   );
-  characterPhysics.syncMajorDebrisBodies(interactiveWorldRuntime.majorDebrisPhysicsBodies(), authoritativeResync);
+  characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync);
   botNavigationColliders = navigationCollidersFor(arena);
+}
+
+function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] {
+  const shedBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies() ?? [];
+  const capacity = Math.max(0, MAX_MAJOR_DEBRIS_BODIES - shedBodies.length);
+  const windowBodies = [...persistentWindowDebris.values()]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .slice(0, capacity)
+    .map((entry) => entry.definition);
+  return Object.freeze([...shedBodies, ...windowBodies]);
+}
+
+function updatePersistentWindowDebrisPhysics(): void {
+  if (!characterPhysics || persistentWindowDebris.size === 0) return;
+  const snapshots = new Map(characterPhysics.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]));
+  for (const entry of persistentWindowDebris.values()) {
+    const snapshot = snapshots.get(entry.id);
+    if (!snapshot) continue;
+    entry.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+    entry.root.quaternion.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z, snapshot.rotation.w);
+    entry.definition = majorDebrisDefinitionFromSnapshot(entry.definition, snapshot);
+  }
+}
+
+function majorDebrisDefinitionFromSnapshot(
+  definition: MajorDebrisBodyDefinition,
+  snapshot: MajorDebrisBodySnapshot,
+): MajorDebrisBodyDefinition {
+  return Object.freeze({
+    ...definition,
+    position: snapshot.position,
+    rotation: snapshot.rotation,
+    linearVelocity: snapshot.linearVelocity,
+    angularVelocity: snapshot.angularVelocity,
+    sleeping: snapshot.sleeping,
+  });
 }
 
 function reconcileInteractiveWorldDoorObstructions(): boolean {
@@ -1827,22 +1876,23 @@ function applyInteractiveWorldExplosion(point: THREE.Vector3, radius: number, ma
     radius,
     maximumDamageQ: Math.max(1, Math.round(maximumDamage * 3)),
   });
-  if (mutations <= 0) return false;
-  syncInteractiveWorldPhysics();
+  let debrisImpulses = 0;
+  if (mutations > 0) syncInteractiveWorldPhysics();
   if (characterPhysics) {
-    for (const body of interactiveWorldRuntime.majorDebrisPhysicsBodies()) {
+    for (const body of activeMajorDebrisPhysicsBodies()) {
       const bodyPosition = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
       const distance = bodyPosition.distanceTo(point);
       if (distance > radius) continue;
       const direction = bodyPosition.sub(point);
       if (direction.lengthSq() < 1e-6) direction.set(0, 1, 0);
       else direction.normalize().addScaledVector(new THREE.Vector3(0, 1, 0), 0.24).normalize();
-      characterPhysics.applyMajorDebrisImpulse(
+      if (characterPhysics.applyMajorDebrisImpulse(
         body.id,
         direction.multiplyScalar(Math.min(38, Math.max(2, maximumDamage * 0.075 * (1 - distance / radius)))),
-      );
+      )) debrisImpulses += 1;
     }
   }
+  if (mutations <= 0 && debrisImpulses <= 0) return false;
   broadcastInteractiveWorldState(true);
   return true;
 }
@@ -6180,6 +6230,114 @@ function spawnGlassShards(point: THREE.Vector3, normal: THREE.Vector3): void {
   requestAnimationFrame(animate);
 }
 
+function deterministicWindowUnit(windowId: string, salt: number): number {
+  let hash = 0x811c9dc5 ^ salt;
+  for (let index = 0; index < windowId.length; index += 1) {
+    hash ^= windowId.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash ^= hash >>> 16;
+  return (hash >>> 0) / 0x1_0000_0000;
+}
+
+function persistentWindowDebrisId(windowId: string): string {
+  const canonical = windowId.toLowerCase().replace(/[^a-z0-9:-]/g, '-').slice(0, 104);
+  return `window-debris:${canonical}`;
+}
+
+function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
+  const id = persistentWindowDebrisId(window.id);
+  if (persistentWindowDebris.has(id)) return;
+  const shedBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies().length ?? 0;
+  if (shedBodies + persistentWindowDebris.size >= MAX_MAJOR_DEBRIS_BODIES) return;
+
+  window.mesh.updateWorldMatrix(true, false);
+  window.mesh.geometry.computeBoundingBox();
+  const localSize = window.mesh.geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1.4, 1.2, 0.04);
+  const worldScale = window.mesh.getWorldScale(new THREE.Vector3());
+  const halfExtents = Object.freeze({
+    x: Math.max(0.12, localSize.x * Math.abs(worldScale.x) * 0.34),
+    y: Math.max(0.12, localSize.y * Math.abs(worldScale.y) * 0.32),
+    z: Math.max(0.025, localSize.z * Math.abs(worldScale.z) * 0.55),
+  });
+  const centre = window.mesh.getWorldPosition(new THREE.Vector3());
+  const paneRotation = window.mesh.getWorldQuaternion(new THREE.Quaternion());
+  const direction = normal.lengthSq() > 1e-6 ? normal.clone().normalize() : new THREE.Vector3(0, 0.15, 1).normalize();
+  centre.addScaledVector(direction, Math.max(0.06, halfExtents.z * 1.4));
+
+  const root = new THREE.Group();
+  root.name = id;
+  root.position.copy(centre);
+  root.quaternion.copy(paneRotation);
+  root.userData.persistentMajorDebris = true;
+  root.userData.windowId = window.id;
+  const pane = new THREE.Mesh(
+    new THREE.BoxGeometry(halfExtents.x * 2, halfExtents.y * 2, halfExtents.z * 2),
+    new THREE.MeshPhysicalMaterial({
+      color: 0x8ad9e8,
+      emissive: 0x0b3241,
+      emissiveIntensity: 0.22,
+      roughness: 0.16,
+      metalness: 0.04,
+      transparent: true,
+      opacity: 0.52,
+      transmission: reducedRenderMode ? 0 : 0.18,
+      thickness: halfExtents.z * 2,
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.2,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+    }),
+  );
+  pane.name = `${id}:pane`;
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(pane.geometry),
+    new THREE.LineBasicMaterial({ color: 0xbaf5ff, transparent: true, opacity: 0.72, toneMapped: false }),
+  );
+  edges.name = `${id}:edges`;
+  const frontZ = halfExtents.z + 0.004;
+  const crackGeometry = new THREE.BufferGeometry();
+  crackGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0, frontZ, halfExtents.x * 0.72, halfExtents.y * 0.52, frontZ,
+    0, 0, frontZ, -halfExtents.x * 0.64, halfExtents.y * 0.62, frontZ,
+    0, 0, frontZ, halfExtents.x * 0.28, -halfExtents.y * 0.78, frontZ,
+    -halfExtents.x * 0.2, halfExtents.y * 0.18, frontZ, -halfExtents.x * 0.78, -halfExtents.y * 0.26, frontZ,
+  ], 3));
+  const cracks = new THREE.LineSegments(
+    crackGeometry,
+    new THREE.LineBasicMaterial({ color: 0xe1fbff, transparent: true, opacity: 0.62, toneMapped: false }),
+  );
+  cracks.name = `${id}:cracks`;
+  root.add(pane, edges, cracks);
+  scene.add(root);
+
+  const definition: MajorDebrisBodyDefinition = Object.freeze({
+    id,
+    position: Object.freeze({ x: centre.x, y: centre.y, z: centre.z }),
+    rotation: Object.freeze({ x: paneRotation.x, y: paneRotation.y, z: paneRotation.z, w: paneRotation.w }),
+    halfExtents,
+    linearVelocity: Object.freeze({
+      x: direction.x * (1.8 + deterministicWindowUnit(window.id, 1) * 1.2),
+      y: 1.1 + deterministicWindowUnit(window.id, 2) * 1.4,
+      z: direction.z * (1.8 + deterministicWindowUnit(window.id, 3) * 1.2),
+    }),
+    angularVelocity: Object.freeze({
+      x: (deterministicWindowUnit(window.id, 4) - 0.5) * 5,
+      y: (deterministicWindowUnit(window.id, 5) - 0.5) * 4,
+      z: (deterministicWindowUnit(window.id, 6) - 0.5) * 6,
+    }),
+    sleeping: false,
+  });
+  persistentWindowDebris.set(id, { id, windowId: window.id, root, definition });
+  syncInteractiveWorldPhysics();
+}
+
+function clearPersistentWindowDebris(): void {
+  for (const entry of persistentWindowDebris.values()) scheduleDeferredGpuRetirement(entry.root);
+  persistentWindowDebris.clear();
+  syncInteractiveWorldPhysics();
+}
+
 function breakHouseWindow(
   windowId: string,
   point: THREE.Vector3,
@@ -6191,6 +6349,7 @@ function breakHouseWindow(
 ): boolean {
   const window = arena.breakableWindows.find((candidate) => candidate.id === windowId);
   if (!window || window.broken) return false;
+  spawnPersistentWindowDebris(window, normal);
   window.broken = true;
   window.mesh.visible = false;
   spawnImpactFlash(point, 'glass', normal);
@@ -6251,6 +6410,7 @@ function acceptRemoteWindowBreak(message: WindowBreakMessage): void {
 }
 
 function resetBreakableWindows(): void {
+  clearPersistentWindowDebris();
   for (const window of arena.breakableWindows) {
     window.broken = false;
     window.mesh.visible = true;
@@ -13850,6 +14010,7 @@ function frame(now: number, scheduleNext = true): void {
       accumulator -= step;
       iterations += 1;
     }
+    updatePersistentWindowDebrisPhysics();
     if (triggerHeld && WEAPONS[player.weapon].automatic && !localKillstreakActorSnapshot()?.possession) tryFire(now);
     finishReload(now);
     updateTargets(now);
@@ -14847,6 +15008,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       broken: window.broken,
       visible: window.mesh.visible,
       position: window.mesh.getWorldPosition(new THREE.Vector3()).toArray(),
+      persistentDebrisId: [...persistentWindowDebris.values()].find((entry) => entry.windowId === window.id)?.id ?? null,
+    })),
+    persistentWindowDebris: [...persistentWindowDebris.values()].map((entry) => ({
+      id: entry.id,
+      windowId: entry.windowId,
+      position: entry.root.position.toArray(),
+      visible: entry.root.visible,
+      physical: characterPhysics?.majorDebrisSnapshots().some((snapshot) => snapshot.id === entry.id) ?? false,
     })),
     physicalCover: arena.physicalCover.map((cover) => ({
       id: cover.id,
