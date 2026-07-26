@@ -12468,10 +12468,17 @@ async function performArenaSelection(id: ArenaId): Promise<void> {
     respawn(false);
     setArenaMenuCamera();
     arenaTransitionPhase = 'committing';
+    // Lazy arena roots and their selected TSL definition must be compiled while
+    // submissions remain paused. Terminal and Gun Range do not have a separate
+    // quality-asset loader, so without this boundary their first live frame can
+    // spend several seconds compiling and trip the presentation watchdog.
+    await renderRuntime.compile(scene, camera);
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') submitWebGpuFrame(performance.now(), true);
     else atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
-    await flushWebGpuFrames();
+    // This is an admitted cold-generation fence, not the live-frame stall
+    // budget. Keep the longer allowance behind the menu/loading surface.
+    await flushWebGpuFrames(12_000);
     const presentationRoot = selectedArena.id === 'atomic-acres' && arenaArtRoot?.visible
       ? arenaArtRoot
       : arena.root;

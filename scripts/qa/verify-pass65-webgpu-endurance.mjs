@@ -20,7 +20,7 @@ const executablePath = chromeCandidates.find((candidate) => existsSync(candidate
 if (!executablePath) throw new Error('Pass 65 endurance requires PASS65_CHROME_PATH or installed Google Chrome');
 
 const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-const trackedWorktreeDirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim().length > 0;
+const trackedWorktreeDirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
 if (trackedWorktreeDirty) throw new Error('Pass 65 endurance requires a clean tracked worktree so the receipt identifies an exact source SHA');
 
 const arenaSequence = [
@@ -42,6 +42,15 @@ function fatalBrowserErrors(errors) {
   ));
 }
 
+async function captureCanvasOnly(page, clip) {
+  await page.evaluate(() => { document.documentElement.dataset.pass65CanvasOnly = 'true'; });
+  try {
+    return await page.screenshot({ clip });
+  } finally {
+    await page.evaluate(() => { delete document.documentElement.dataset.pass65CanvasOnly; });
+  }
+}
+
 await mkdir(artifactRoot, { recursive: true });
 const server = await createServer({
   server: { host: '127.0.0.1', port, strictPort: true },
@@ -49,6 +58,9 @@ const server = await createServer({
 });
 
 let browser;
+let page;
+let activeContext = null;
+const errors = [];
 try {
   await server.listen();
   browser = await chromium.launch({
@@ -61,13 +73,15 @@ try {
       '--disable-backgrounding-occluded-windows',
     ],
   });
-  const page = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
-  const errors = [];
+  page = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&map=rustworks-1v1&render=blender&grass=on&mist=on&seed=6501`);
+  await page.addStyleTag({
+    content: 'html[data-pass65-canvas-only="true"] body > :not(#app), html[data-pass65-canvas-only="true"] #app > :not(#game) { visibility: hidden !important; }',
+  });
   await page.waitForFunction(() => {
     const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return state?.weaponReady === true
@@ -77,6 +91,8 @@ try {
 
   const arenaReceipts = [];
   for (const [visit, arenaId] of arenaSequence.entries()) {
+    activeContext = { visit, arenaId, phase: 'select-arena', sampleIndex: null };
+    console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} phase=select`);
     await page.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.selectArena(id), arenaId);
     await page.waitForFunction((id) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -97,6 +113,10 @@ try {
         && state?.render?.runtime?.presentation?.status === 'healthy'
         && document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 30_000 });
+    const canvasClip = await page.locator('#game').boundingBox();
+    if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
+      throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
+    }
 
     const durationMs = arenaId === 'rustworks-1v1' ? rustworksDurationMs : otherArenaDurationMs;
     const startedAt = Date.now();
@@ -106,6 +126,7 @@ try {
     let sampleIndex = 0;
     let lastScreenshot = null;
     while (Date.now() - startedAt < durationMs) {
+      activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
       await page.evaluate((index) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
         const state = api.snapshot();
@@ -143,7 +164,7 @@ try {
           residency: api.sampleRendererResidency(),
         };
       });
-      lastScreenshot = await page.locator('#game').screenshot();
+      lastScreenshot = await captureCanvasOnly(page, canvasClip);
       const screenshotHash = digest(lastScreenshot);
       screenshotHashes.add(screenshotHash);
 
@@ -212,6 +233,7 @@ try {
       last: beforeReturn,
       afterReturn,
     });
+    console.log(`[pass65-endurance] visit=${visit} arena=${arenaId} samples=${samples.length} result=pass`);
   }
 
   const uniqueErrors = fatalBrowserErrors(errors);
@@ -221,6 +243,13 @@ try {
     verdict: 'pass',
     sourceRevision,
     browserExecutable: executablePath,
+    browserVersion: browser.version(),
+    adapter: arenaReceipts[0]?.first?.runtime ? {
+      label: arenaReceipts[0].first.runtime.adapterLabel,
+      adapterClass: arenaReceipts[0].first.runtime.adapterClass,
+      deviceClass: arenaReceipts[0].first.runtime.deviceClass,
+      softwareAdapter: arenaReceipts[0].first.runtime.softwareAdapter,
+    } : null,
     viewport: [2560, 1440],
     sampleIntervalMs,
     rustworksDurationMs,
@@ -229,8 +258,36 @@ try {
     browserErrors: [...new Set(errors)],
     arenaReceipts,
   };
+  const endingRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const endingStatus = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim();
+  if (endingRevision !== sourceRevision || endingStatus.length > 0) {
+    throw new Error(`Pass 65 endurance source changed during the run: ${JSON.stringify({ sourceRevision, endingRevision, endingStatus })}`);
+  }
   await writeFile(`${artifactRoot}/exact-sha-receipt.json`, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(output, null, 2));
+} catch (error) {
+  let state = null;
+  try {
+    state = await page?.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot() ?? null);
+  } catch {
+    // The renderer may have already failed closed; the browser errors remain evidence.
+  }
+  const failure = {
+    gate: 'pass65-webgpu-presentation-endurance',
+    verdict: 'fail',
+    sourceRevision,
+    activeContext,
+    error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+    browserErrors: [...new Set(errors)],
+    state,
+  };
+  await writeFile(`${artifactRoot}/failure-receipt.json`, `${JSON.stringify(failure, null, 2)}\n`, 'utf8');
+  try {
+    await page?.screenshot({ path: `${artifactRoot}/failure.png` });
+  } catch {
+    // The JSON receipt remains authoritative if the page itself is unavailable.
+  }
+  throw error;
 } finally {
   await browser?.close();
   await server.close();
