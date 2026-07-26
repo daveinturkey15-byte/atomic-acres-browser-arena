@@ -427,6 +427,12 @@ export class ArenaAudio {
     this.impact('concrete', distance);
   }
 
+  shedDoorMotion(distance = 0): void {
+    const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
+    this.impact('metal', distance);
+    this.sweep(118, 72, 0.13, 0.032 * attenuation, 'triangle', this.feedback, 0.012);
+  }
+
   nearMiss(strength: number): void {
     const now = performance.now();
     if (strength <= 0 || now - this.lastNearMissAt < 85) return;

@@ -284,6 +284,7 @@ export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteCon
  */
 export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
   runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
+  runtimeCallsite('shedDoorMotion', 'nearest.distance', 1, ['shed.door-motion']),
   runtimeCallsite('coverImpact', 'point.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('crossbowFuseBeep', 'bolt.mesh.position,remainingMs,now', 1, ['ordnance.crossbow-fuse-beep']),
   runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
@@ -914,11 +915,12 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: LOCAL_CRITICAL, lifecycleOwner: 'player-life',
     coverageDetail: 'Pickup success/failure needs bounded local feedback and a non-audio state indication.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'shed.door-motion', family: 'interactive-world', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'shed-mechanism-world-v1', variants: ['open-start', 'open-loop', 'close-start', 'close-loop', 'latched', 'interrupted'],
-    contractRefs: ['R403', 'R405', 'R411', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'shed-entity',
-    coverageDetail: 'Door audio follows the host-authoritative reversible phase and stops on collision, bullet interruption, detach, or disposal.',
+    emitterSymbols: ['shedDoorMotion'], contractRefs: ['R403', 'R405', 'R411', 'R308'],
+    concurrency: WORLD_LOOP, lifecycleOwner: 'shed-entity', coverageStatus: 'partial',
+    coverageDetail: 'Accepted host-authoritative door motion emits a bounded metal mechanism start cue; phase-loop, latch, and interruption variants remain planned.',
   }),
   plannedEvent({
     id: 'shed.damage', family: 'interactive-world', bus: 'sfx', delivery: 'world-spatial',
@@ -986,7 +988,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '669896023d6de872d8a96e964fb4b2c6a7089b941fac2fa73b3b20aeab910901';
+export const SOUND_EVENT_INVENTORY_SHA256 = '31d63267c63513e7bcc1180275d0d1ec0b8643d0393a6c7de7e5d2462f4674b7';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

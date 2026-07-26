@@ -5728,7 +5728,7 @@ function interactWithShedDoor(): boolean {
   if (result?.accepted) {
     syncInteractiveWorldPhysics();
     broadcastInteractiveWorldState(true);
-    audio.coverImpact(nearest.distance);
+    audio.shedDoorMotion(nearest.distance);
   }
   return true;
 }
