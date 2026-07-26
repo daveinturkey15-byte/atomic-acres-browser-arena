@@ -99,6 +99,17 @@ function issueAt(value: unknown, path: string, code?: WeaponSchemaIssueCode): vo
   ]));
 }
 
+function expectSchemaFailure(run: () => unknown): WeaponSchemaValidationError {
+  let captured: unknown;
+  try {
+    run();
+  } catch (error) {
+    captured = error;
+  }
+  expect(captured).toBeInstanceOf(WeaponSchemaValidationError);
+  return captured as WeaponSchemaValidationError;
+}
+
 function secondWeapon(): any {
   const weapon = validWeapon();
   weapon.id = 'test-rifle-two';
@@ -150,6 +161,7 @@ describe('weapon schema valid definitions', () => {
     expect(Object.isFrozen(parsed.damage)).toBe(true);
     expect(Object.isFrozen(parsed.policies.range)).toBe(true);
     expect(Object.isFrozen(parsed.evidenceIds)).toBe(true);
+    expect(validateWeaponDefinition(parsed)).toEqual([]);
   });
 
   it.each(WEAPON_FAMILIES)('accepts the %s family', (family) => {
@@ -314,6 +326,84 @@ describe('weapon schema strict object parsing', () => {
       expect(Object.isFrozen((error as WeaponSchemaValidationError).issues)).toBe(true);
     }
   });
+
+  it('rejects a changing evidence index accessor without reading it', () => {
+    const weapon = validWeapon();
+    const evidenceIds: string[] = [];
+    let reads = 0;
+    Object.defineProperty(evidenceIds, '0', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads === 1 ? 'r232-first' : 'r232-changed';
+      },
+    });
+    weapon.evidenceIds = evidenceIds;
+
+    const error = expectSchemaFailure(() => parseWeaponDefinition(weapon));
+    expect(reads).toBe(0);
+    expect(error.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: '$.evidenceIds[0]', code: 'type' }),
+    ]));
+  });
+
+  it('rejects a changing scalar accessor without validating and cloning different values', () => {
+    const weapon = validWeapon();
+    let reads = 0;
+    Object.defineProperty(weapon, 'rpm', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return reads === 1 ? 650 : 0;
+      },
+    });
+
+    const error = expectSchemaFailure(() => parseWeaponDefinition(weapon));
+    expect(reads).toBe(0);
+    expect(error.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: '$.rpm', code: 'type' }),
+    ]));
+  });
+
+  it('normalizes a throwing array index getter into WeaponSchemaValidationError', () => {
+    const weapon = validWeapon();
+    const evidenceIds: string[] = [];
+    Object.defineProperty(evidenceIds, '0', {
+      configurable: true,
+      enumerable: true,
+      get: () => { throw new Error('must not escape'); },
+    });
+    weapon.evidenceIds = evidenceIds;
+
+    expectSchemaFailure(() => parseWeaponDefinition(weapon));
+  });
+
+  it.each([
+    ['ownKeys', (target: any) => new Proxy(target, { ownKeys: () => { throw new Error('ownKeys'); } })],
+    ['getOwnPropertyDescriptor', (target: any) => new Proxy(target, {
+      getOwnPropertyDescriptor: () => { throw new Error('descriptor'); },
+    })],
+    ['get', (target: any) => new Proxy(target, { get: () => { throw new Error('get'); } })],
+  ])('normalizes a throwing Proxy %s trap into WeaponSchemaValidationError', (_name, proxied) => {
+    const input = proxied(validWeapon());
+    expect(() => validateWeaponDefinition(input)).not.toThrow();
+    expect(validateWeaponDefinition(input).length).toBeGreaterThan(0);
+    expectSchemaFailure(() => parseWeaponDefinition(input));
+  });
+
+  it('caps validation work and issue sorting for a non-index array-property flood', () => {
+    const weapon = validWeapon();
+    for (let index = 0; index < 10_000; index += 1) weapon.evidenceIds[`candidate${index}`] = index;
+
+    const issues = validateWeaponDefinition(weapon);
+    expect(issues.length).toBeLessThanOrEqual(128);
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: '$', code: 'issue-limit' }),
+    ]));
+    expectSchemaFailure(() => parseWeaponDefinition(weapon));
+  });
 });
 
 describe('weapon schema bounds and cross-field rules', () => {
@@ -402,6 +492,7 @@ describe('weapon definition collection parsing', () => {
     expect(parsed).toHaveLength(2);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(Object.isFrozen(parsed[1].recoil)).toBe(true);
+    expect(validateWeaponDefinitions(parsed)).toEqual([]);
   });
 
   it.each([

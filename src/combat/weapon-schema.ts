@@ -166,6 +166,7 @@ export type WeaponSchemaIssueCode =
   | 'cross-field'
   | 'duplicate'
   | 'format'
+  | 'issue-limit'
   | 'missing-key'
   | 'type'
   | 'unknown-key'
@@ -194,6 +195,10 @@ const FORBIDDEN_DISPLAY_NAME_PATTERN = /[\u0000-\u001f\u007f]/;
 const MAX_DEFINITION_COUNT = 128;
 const MAX_EVIDENCE_ID_COUNT = 64;
 const MAX_COMPANION_PRIMARY_COUNT = 64;
+const MAX_SCHEMA_ISSUES = 128;
+const MAX_SNAPSHOT_KEYS = 256;
+const MAX_SNAPSHOT_DEPTH = 12;
+const MAX_SNAPSHOT_ARRAY_LENGTH = MAX_DEFINITION_COUNT;
 
 const WEAPON_KEYS = Object.freeze([
   'id',
@@ -228,11 +233,205 @@ function issue(
   code: WeaponSchemaIssueCode,
   message: string,
 ): void {
+  if (issues.length >= MAX_SCHEMA_ISSUES) {
+    if (issues[MAX_SCHEMA_ISSUES - 1]?.code !== 'issue-limit') {
+      issues[MAX_SCHEMA_ISSUES - 1] = Object.freeze({
+        path: '$',
+        code: 'issue-limit',
+        message: `validation stopped after ${MAX_SCHEMA_ISSUES - 1} detailed issues`,
+      });
+    }
+    return;
+  }
   issues.push(Object.freeze({ path, code, message }));
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function snapshotFailure(issues: WeaponSchemaIssue[], path: string, operation: string): void {
+  issue(issues, path, 'type', `${operation} could not be read safely`);
+}
+
+function snapshotOwnKeys(
+  value: object,
+  path: string,
+  issues: WeaponSchemaIssue[],
+): readonly PropertyKey[] | null {
+  try {
+    const keys = Reflect.ownKeys(value);
+    if (keys.length > MAX_SNAPSHOT_KEYS) {
+      issue(issues, path, 'bounds', `must not expose more than ${MAX_SNAPSHOT_KEYS} own properties`);
+    }
+    return keys.slice(0, MAX_SNAPSHOT_KEYS);
+  } catch {
+    snapshotFailure(issues, path, 'own property keys');
+    return null;
+  }
+}
+
+function snapshotDescriptor(
+  value: object,
+  key: PropertyKey,
+  path: string,
+  issues: WeaponSchemaIssue[],
+): PropertyDescriptor | null {
+  try {
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+    if (!descriptor) {
+      snapshotFailure(issues, path, 'own property descriptor');
+      return null;
+    }
+    return descriptor;
+  } catch {
+    snapshotFailure(issues, path, 'own property descriptor');
+    return null;
+  }
+}
+
+function snapshotPropertyValue(
+  value: object,
+  key: PropertyKey,
+  path: string,
+  issues: WeaponSchemaIssue[],
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+  try {
+    return Object.freeze({ ok: true, value: Reflect.get(value, key, value) });
+  } catch {
+    snapshotFailure(issues, path, 'property value');
+    return Object.freeze({ ok: false });
+  }
+}
+
+function snapshotArray(
+  value: object,
+  path: string,
+  issues: WeaponSchemaIssue[],
+  active: WeakSet<object>,
+  depth: number,
+): unknown[] {
+  const lengthResult = snapshotPropertyValue(value, 'length', `${path}.length`, issues);
+  if (!lengthResult.ok) return [];
+  const length = lengthResult.value;
+  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > MAX_SNAPSHOT_ARRAY_LENGTH) {
+    issue(
+      issues,
+      `${path}.length`,
+      'bounds',
+      `must be a safe integer from 0 through ${MAX_SNAPSHOT_ARRAY_LENGTH}`,
+    );
+    return [];
+  }
+  const snapshot = new Array<unknown>(length);
+  const keys = snapshotOwnKeys(value, path, issues);
+  if (!keys) return snapshot;
+  for (const key of keys) {
+    if (key === 'length') continue;
+    if (typeof key === 'symbol') {
+      issue(issues, `${path}[${String(key)}]`, 'unknown-key', 'symbol array properties are forbidden');
+      continue;
+    }
+    const index = Number(key);
+    const isIndex = Number.isSafeInteger(index) && index >= 0 && index < length && String(index) === key;
+    if (!isIndex) {
+      issue(issues, `${path}.${key}`, 'unknown-key', 'non-index array properties are forbidden');
+      continue;
+    }
+    const propertyPath = `${path}[${index}]`;
+    const descriptor = snapshotDescriptor(value, key, propertyPath, issues);
+    if (!descriptor) continue;
+    if (!descriptor.enumerable) {
+      issue(issues, propertyPath, 'unknown-key', 'non-enumerable array entries are forbidden');
+      continue;
+    }
+    if (!Object.hasOwn(descriptor, 'value')) {
+      issue(issues, propertyPath, 'type', 'accessor properties are forbidden');
+      continue;
+    }
+    const property = snapshotPropertyValue(value, key, propertyPath, issues);
+    if (!property.ok) continue;
+    snapshot[index] = snapshotValue(property.value, propertyPath, issues, active, depth + 1);
+  }
+  return snapshot;
+}
+
+function snapshotRecord(
+  value: object,
+  path: string,
+  issues: WeaponSchemaIssue[],
+  active: WeakSet<object>,
+  depth: number,
+): UnknownRecord {
+  const snapshot: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  const keys = snapshotOwnKeys(value, path, issues);
+  if (!keys) return snapshot;
+  for (const key of keys) {
+    if (typeof key === 'symbol') {
+      issue(issues, `${path}[${String(key)}]`, 'unknown-key', 'symbol object properties are forbidden');
+      continue;
+    }
+    const propertyPath = `${path}.${key}`;
+    const descriptor = snapshotDescriptor(value, key, propertyPath, issues);
+    if (!descriptor) continue;
+    if (!descriptor.enumerable) {
+      issue(issues, propertyPath, 'unknown-key', 'non-enumerable object properties are forbidden');
+      continue;
+    }
+    if (!Object.hasOwn(descriptor, 'value')) {
+      issue(issues, propertyPath, 'type', 'accessor properties are forbidden');
+      continue;
+    }
+    const property = snapshotPropertyValue(value, key, propertyPath, issues);
+    if (!property.ok) continue;
+    snapshot[key] = snapshotValue(property.value, propertyPath, issues, active, depth + 1);
+  }
+  return snapshot;
+}
+
+function snapshotValue(
+  value: unknown,
+  path: string,
+  issues: WeaponSchemaIssue[],
+  active: WeakSet<object>,
+  depth: number,
+): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (depth > MAX_SNAPSHOT_DEPTH) {
+    issue(issues, path, 'bounds', `must not exceed snapshot depth ${MAX_SNAPSHOT_DEPTH}`);
+    return null;
+  }
+  if (active.has(value)) {
+    issue(issues, path, 'cross-field', 'cyclic values are forbidden');
+    return null;
+  }
+  let array: boolean;
+  try {
+    array = Array.isArray(value);
+  } catch {
+    snapshotFailure(issues, path, 'value kind');
+    return null;
+  }
+  active.add(value);
+  try {
+    return array
+      ? snapshotArray(value, path, issues, active, depth)
+      : snapshotRecord(value, path, issues, active, depth);
+  } catch {
+    snapshotFailure(issues, path, 'value snapshot');
+    return null;
+  } finally {
+    active.delete(value);
+  }
+}
+
+function snapshotInput(value: unknown, issues: WeaponSchemaIssue[]): unknown {
+  try {
+    return snapshotValue(value, '$', issues, new WeakSet<object>(), 0);
+  } catch {
+    snapshotFailure(issues, '$', 'input snapshot');
+    return null;
+  }
 }
 
 function exactRecord(
@@ -794,26 +993,33 @@ function sortedIssues(issues: readonly WeaponSchemaIssue[]): readonly WeaponSche
 
 export function validateWeaponDefinition(value: unknown): readonly WeaponSchemaIssue[] {
   const issues: WeaponSchemaIssue[] = [];
-  collectWeaponDefinitionIssues(value, '$', issues);
+  const snapshot = snapshotInput(value, issues);
+  collectWeaponDefinitionIssues(snapshot, '$', issues);
   return sortedIssues(issues);
 }
 
 export function parseWeaponDefinition(value: unknown): WeaponDefinition {
-  const issues = validateWeaponDefinition(value);
-  if (issues.length > 0) throw new WeaponSchemaValidationError(issues);
-  return cloneAndFreeze(value) as WeaponDefinition;
+  const issues: WeaponSchemaIssue[] = [];
+  const snapshot = snapshotInput(value, issues);
+  collectWeaponDefinitionIssues(snapshot, '$', issues);
+  const orderedIssues = sortedIssues(issues);
+  if (orderedIssues.length > 0) throw new WeaponSchemaValidationError(orderedIssues);
+  const parsed = cloneAndFreeze(snapshot) as WeaponDefinition;
+  const invariantIssues: WeaponSchemaIssue[] = [];
+  collectWeaponDefinitionIssues(parsed, '$', invariantIssues);
+  if (invariantIssues.length > 0) throw new WeaponSchemaValidationError(sortedIssues(invariantIssues));
+  return parsed;
 }
 
-export function validateWeaponDefinitions(value: unknown): readonly WeaponSchemaIssue[] {
-  const issues: WeaponSchemaIssue[] = [];
+function collectWeaponDefinitionsIssues(value: unknown, issues: WeaponSchemaIssue[]): void {
   if (!Array.isArray(value)) {
     issue(issues, '$', 'type', 'must be an array of weapon definitions');
-    return sortedIssues(issues);
+    return;
   }
   if (value.length < 1 || value.length > MAX_DEFINITION_COUNT) {
     issue(issues, '$', 'bounds', `must contain between 1 and ${MAX_DEFINITION_COUNT} definitions`);
   }
-  if (value.length > MAX_DEFINITION_COUNT) return sortedIssues(issues);
+  if (value.length > MAX_DEFINITION_COUNT) return;
   validateDenseArray(value, '$', issues);
   for (let index = 0; index < value.length; index += 1) {
     if (!Object.hasOwn(value, index)) continue;
@@ -864,11 +1070,24 @@ export function validateWeaponDefinitions(value: unknown): readonly WeaponSchema
       firstPatternIndex.set(pattern, index);
     }
   }
+}
+
+export function validateWeaponDefinitions(value: unknown): readonly WeaponSchemaIssue[] {
+  const issues: WeaponSchemaIssue[] = [];
+  const snapshot = snapshotInput(value, issues);
+  collectWeaponDefinitionsIssues(snapshot, issues);
   return sortedIssues(issues);
 }
 
 export function parseWeaponDefinitions(value: unknown): readonly WeaponDefinition[] {
-  const issues = validateWeaponDefinitions(value);
-  if (issues.length > 0) throw new WeaponSchemaValidationError(issues);
-  return cloneAndFreeze(value) as readonly WeaponDefinition[];
+  const issues: WeaponSchemaIssue[] = [];
+  const snapshot = snapshotInput(value, issues);
+  collectWeaponDefinitionsIssues(snapshot, issues);
+  const orderedIssues = sortedIssues(issues);
+  if (orderedIssues.length > 0) throw new WeaponSchemaValidationError(orderedIssues);
+  const parsed = cloneAndFreeze(snapshot) as readonly WeaponDefinition[];
+  const invariantIssues: WeaponSchemaIssue[] = [];
+  collectWeaponDefinitionsIssues(parsed, invariantIssues);
+  if (invariantIssues.length > 0) throw new WeaponSchemaValidationError(sortedIssues(invariantIssues));
+  return parsed;
 }
