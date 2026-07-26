@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CARE_PACKAGE_ID, NUKE_ID, deriveCarePackagePool } from './care-package-weights.mjs';
 
 const argv = process.argv.slice(2);
 const syntheticFixture = argv[0] === '--synthetic-fixture';
@@ -17,9 +18,6 @@ const FIXTURE_DIR = path.join(SCRIPT_DIR, 'fixtures');
 const SKILL_DIR = path.resolve(SCRIPT_DIR, '..');
 const REPO_ROOT = path.resolve(SKILL_DIR, '..', '..', '..');
 const CANONICAL_DECISIONS = path.join(REPO_ROOT, 'docs', 'PASS65_DECISION_RECEIPTS.json');
-const SYNTHETIC_RECEIPT = path.join(FIXTURE_DIR, 'synthetic-dec-13-receipt.json');
-const CARE_PACKAGE_ID = 'care-package';
-const NUKE_ID = 'nuke';
 const DRONE_GUN_ID = 'drone-gun-standard-v1';
 const AVAILABILITY = Object.freeze(['selectable', 'care-only', 'retired']);
 const TIERS = Object.freeze(['low', 'mid', 'high', 'top']);
@@ -54,59 +52,11 @@ const EXPECTED_SUPPORT_BINDINGS = Object.freeze({
   nuke: Object.freeze([]),
   'scout-sweep': Object.freeze([]),
 });
-const SYNTHETIC_CATALOG = Object.freeze([
-  Object.freeze({ id: 'adrenaline', displayName: 'Adrenaline Boost', cost: 3, tier: 'low', availability: 'selectable', carePackageWeightUnits: 24, relationship: 'replaces-scout-sweep', activation: 'instant', durationMs: 15000, repeatable: false }),
-  Object.freeze({ id: 'care-package', displayName: 'Care Package', cost: 4, tier: 'low', availability: 'selectable', carePackageWeightUnits: 0, relationship: 'new', activation: 'instant', durationMs: 60000, repeatable: false }),
-  Object.freeze({ id: 'yardhawk', displayName: 'Yardhawk', cost: 5, tier: 'mid', availability: 'selectable', carePackageWeightUnits: 16, relationship: 'yardhawk-retained', activation: 'instant', durationMs: 15000, repeatable: false }),
-  Object.freeze({ id: 'piloted-drone', displayName: 'Piloted Drone', cost: 5, tier: 'mid', availability: 'selectable', carePackageWeightUnits: 16, relationship: 'yardhawk-cost-alternative', activation: 'possession', durationMs: 30000, repeatable: false }),
-  Object.freeze({ id: 'tri-pass', displayName: 'Tri-Pass Strike', cost: 7, tier: 'high', availability: 'selectable', carePackageWeightUnits: 12, relationship: 'tri-pass-retained', activation: 'target-line', durationMs: 12000, repeatable: false }),
-  Object.freeze({ id: 'carpet-bomber', displayName: 'Carpet Bomber', cost: 7, tier: 'high', availability: 'selectable', carePackageWeightUnits: 12, relationship: 'tri-pass-cost-alternative', activation: 'target-point', durationMs: 12000, repeatable: false }),
-  Object.freeze({ id: 'hunter-swarm', displayName: 'Hunter Swarm', cost: 8, tier: 'high', availability: 'selectable', carePackageWeightUnits: 9, relationship: 'hunter-swarm-retained', activation: 'instant', durationMs: 20000, repeatable: false }),
-  Object.freeze({ id: 'chopper', displayName: 'Chopper Gunner', cost: 8, tier: 'high', availability: 'selectable', carePackageWeightUnits: 9, relationship: 'hunter-swarm-cost-alternative', activation: 'instant', durationMs: 30000, repeatable: false }),
-  Object.freeze({ id: 'drone-swarm', displayName: 'Drone Swarm', cost: 15, tier: 'top', availability: 'selectable', carePackageWeightUnits: 1, relationship: 'selectable-nuke-replacement', activation: 'instant', durationMs: 60000, repeatable: false }),
-  Object.freeze({ id: 'nuke', displayName: 'Nuke', cost: null, tier: 'top', availability: 'care-only', carePackageWeightUnits: 1, relationship: 'care-only-preserved', activation: 'instant', durationMs: 0, repeatable: false }),
-  Object.freeze({ id: 'scout-sweep', displayName: 'Scout Sweep', cost: 3, tier: 'low', availability: 'retired', carePackageWeightUnits: 0, relationship: 'decode-only-compatibility', activation: 'instant', durationMs: 0, repeatable: false }),
-]);
-const SYNTHETIC_SELECTION = Object.freeze({
-  slotCount: 5,
-  duplicatesAllowed: false,
-  selectableAvailability: 'selectable',
-  freezeAt: 'match-start',
-  keyBindings: Object.freeze([3, 4, 5, 6, 7]),
-});
-const SYNTHETIC_EARNING = Object.freeze({
-  progressScope: 'per-life',
-  advancingKillSources: Object.freeze(['weapon', 'ordnance']),
-  excludedKillSources: Object.freeze(['killstreak']),
-  eachRewardEarnsOncePerLife: true,
-  deathClearsProgress: true,
-  deathClearsUnconsumedRewards: true,
-  respawnStartsFreshLife: true,
-  rematchStartsFreshEpoch: true,
-});
-const SYNTHETIC_ACTIVATION = Object.freeze({
-  hostOwnsActivation: true,
-  consumesExactlyOnce: true,
-  duplicateOwnerTypePolicy: 'forbid-unless-definition-allows',
-});
-const SYNTHETIC_PRIVACY = Object.freeze({
-  rewardSeedRollHostOnly: true,
-  acquisitionStateHostOnly: true,
-  rewardRevealPolicy: 'claimant-after-exclusive-claim',
-  recipientSnapshotOmitsSeedAndRoll: true,
-});
-const SYNTHETIC_DECISION_VALUE = Object.freeze({
-  catalog: SYNTHETIC_CATALOG,
-  selectionPolicy: SYNTHETIC_SELECTION,
-  earningPolicy: SYNTHETIC_EARNING,
-  activationPolicy: SYNTHETIC_ACTIVATION,
-  privacyPolicy: SYNTHETIC_PRIVACY,
-});
-
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); };
 const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
 const idOk = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
+const relationshipOk = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{0,95}$/.test(value);
 const gitOidOk = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const shaOk = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const isoOk = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -156,14 +106,14 @@ function repoFile(relativePath, label) {
   return resolved;
 }
 
-function decisionProjection(item) {
+function authoredDecisionProjection(item) {
   return {
     id: item?.id,
     displayName: item?.displayName,
     cost: item?.cost,
     tier: item?.tier,
     availability: item?.availability,
-    carePackageWeightUnits: item?.carePackageWeightUnits,
+    carePackageBaseWeightUnits: item?.carePackageBaseWeightUnits,
     relationship: item?.relationship,
     activation: item?.activation,
     durationMs: item?.durationMs,
@@ -198,24 +148,12 @@ check(binding.id === 'DEC-13', 'decisionBinding must target DEC-13');
 check(binding.scope === (syntheticFixture ? 'synthetic-fixture-only' : 'canonical-decision-registry'), 'decision binding scope does not match validation mode');
 check(shaOk(binding.receiptSha256), 'decision receipt digest invalid');
 
-let receipt = null;
-if (syntheticFixture) {
-  receipt = readJson(SYNTHETIC_RECEIPT, 'synthetic DEC-13 receipt');
-  if (receipt) {
-    exactKeys(receipt, ['receiptVersion', 'id', 'status', 'syntheticFixtureOnly', 'sourceDecisionStatus', 'value', 'rationale', 'owner', 'recordedAt', 'resolvedAt'], 'synthetic DEC-13 receipt');
-    check(receipt.syntheticFixtureOnly === true, 'synthetic receipt must be fixture-only');
-    check(receipt.sourceDecisionStatus === 'OPEN', 'synthetic receipt must record live DEC-13 as OPEN');
-    check(receipt.owner === 'synthetic-fixture-not-owner-approval', 'synthetic receipt cannot impersonate owner approval');
-    check(canonical(receipt.value) === canonical(SYNTHETIC_DECISION_VALUE), 'synthetic DEC-13 value drifted from the Pass 65 decision packet recommendation');
-  }
-} else {
-  const registry = readJson(CANONICAL_DECISIONS, 'canonical decision registry');
-  exactKeys(registry, ['$schema', 'schemaVersion', 'releasePass', 'updatedAt', 'receipts'], 'canonical decision registry');
-  check(registry?.schemaVersion === 1 && registry?.releasePass === 'PASS 65' && isoOk(registry?.updatedAt), 'canonical decision registry identity invalid');
-  receipt = Array.isArray(registry?.receipts) ? registry.receipts.find(item => item?.id === 'DEC-13') : null;
-  check(Boolean(receipt), 'canonical DEC-13 receipt missing');
-  if (receipt) exactKeys(receipt, ['receiptVersion', 'id', 'status', 'proposedDefault', 'value', 'rationale', 'owner', 'recordedAt', 'resolvedAt', 'freezeNoLaterThan', 'supersedesReceiptSha256'], 'canonical DEC-13 receipt');
-}
+const registry = readJson(CANONICAL_DECISIONS, 'canonical decision registry');
+exactKeys(registry, ['$schema', 'schemaVersion', 'releasePass', 'updatedAt', 'receipts'], 'canonical decision registry');
+check(registry?.schemaVersion === 1 && registry?.releasePass === 'PASS 65' && isoOk(registry?.updatedAt), 'canonical decision registry identity invalid');
+const receipt = Array.isArray(registry?.receipts) ? registry.receipts.find(item => item?.id === 'DEC-13') : null;
+check(Boolean(receipt), 'canonical DEC-13 receipt missing');
+if (receipt) exactKeys(receipt, ['receiptVersion', 'id', 'status', 'proposedDefault', 'value', 'rationale', 'owner', 'recordedAt', 'resolvedAt', 'freezeNoLaterThan', 'supersedesReceiptSha256'], 'canonical DEC-13 receipt');
 
 let decision = {};
 if (receipt) {
@@ -224,7 +162,10 @@ if (receipt) {
   check(isoOk(receipt.recordedAt) && isoOk(receipt.resolvedAt), 'DEC-13 receipt timestamps invalid');
   check(typeof receipt.rationale === 'string' && receipt.rationale.length > 0, 'DEC-13 rationale missing');
   check(digest(receipt) === binding.receiptSha256, 'DEC-13 receipt digest mismatch');
-  exactKeys(receipt.value, ['catalog', 'selectionPolicy', 'earningPolicy', 'activationPolicy', 'privacyPolicy'], 'DEC-13 value');
+  exactKeys(receipt.value, [
+    'catalog', 'selectionPolicy', 'carePackagePolicy', 'earningPolicy', 'activationPolicy', 'privacyPolicy',
+    'chopperCalibration', 'droneSwarmCalibration', 'pilotedDroneSensor', 'carpetBomber',
+  ], 'DEC-13 value');
   decision = receipt.value ?? {};
 }
 
@@ -233,27 +174,56 @@ check(decisionCatalog.length === 11 && unique(decisionCatalog.map(item => item?.
 for (const itemValue of decisionCatalog) {
   const item = plainObject(itemValue) ? itemValue : {};
   check(plainObject(itemValue), 'DEC-13 catalog entry must be an object');
-  exactKeys(item, ['id', 'displayName', 'cost', 'tier', 'availability', 'carePackageWeightUnits', 'relationship', 'activation', 'durationMs', 'repeatable'], `DEC-13 catalog ${item?.id ?? '<invalid>'}`);
+  exactKeys(item, ['id', 'displayName', 'cost', 'tier', 'availability', 'carePackageBaseWeightUnits', 'carePackageWeightUnits', 'relationship', 'activation', 'durationMs', 'repeatable'], `DEC-13 catalog ${item?.id ?? '<invalid>'}`);
   check(idOk(item?.id), 'DEC-13 catalog ID invalid');
-  check(typeof item?.displayName === 'string' && item.displayName.length > 0, `${item?.id}: DEC-13 display name missing`);
-  check(item?.cost === null || (Number.isInteger(item.cost) && item.cost >= 1 && item.cost <= 100), `${item?.id}: DEC-13 cost invalid`);
+  check(typeof item?.displayName === 'string' && item.displayName.trim().length > 0 && item.displayName.length <= 80, `${item?.id}: DEC-13 display name invalid`);
+  check(Number.isSafeInteger(item?.cost) && item.cost >= 1 && item.cost <= 100, `${item?.id}: DEC-13 cost invalid`);
   check(TIERS.includes(item?.tier), `${item?.id}: DEC-13 tier invalid`);
   check(AVAILABILITY.includes(item?.availability), `${item?.id}: DEC-13 availability invalid`);
+  check(Number.isSafeInteger(item?.carePackageBaseWeightUnits) && item.carePackageBaseWeightUnits >= 0, `${item?.id}: DEC-13 care base weight invalid`);
   check(Number.isSafeInteger(item?.carePackageWeightUnits) && item.carePackageWeightUnits >= 0, `${item?.id}: DEC-13 care weight invalid`);
-  check(idOk(item?.relationship), `${item?.id}: DEC-13 relationship invalid`);
+  check(relationshipOk(item?.relationship), `${item?.id}: DEC-13 relationship invalid`);
   check(ACTIVATIONS.includes(item?.activation), `${item?.id}: DEC-13 activation invalid`);
   check(Number.isInteger(item?.durationMs) && item.durationMs >= 0 && item.durationMs <= 600000, `${item?.id}: DEC-13 duration invalid`);
   check(typeof item?.repeatable === 'boolean', `${item?.id}: DEC-13 repeatability invalid`);
 }
+let decisionDerivedPool = null;
+try {
+  decisionDerivedPool = deriveCarePackagePool(decisionCatalog);
+} catch (error) {
+  check(false, `DEC-13 care-package formula invalid: ${error.message}`);
+}
+for (const item of decisionCatalog) {
+  check(item?.carePackageWeightUnits === (decisionDerivedPool?.derivedWeights.get(item?.id) ?? -1), `${item?.id}: DEC-13 derived care weight is stale`);
+}
 
-exactKeys(decision.selectionPolicy, ['slotCount', 'duplicatesAllowed', 'selectableAvailability', 'freezeAt', 'keyBindings'], 'DEC-13 selectionPolicy');
+exactKeys(decision.selectionPolicy, ['slotCount', 'duplicatesAllowed', 'freezeAt', 'keyBindings', 'slots', 'mutuallyExclusiveGroups'], 'DEC-13 selectionPolicy');
+exactKeys(decision.carePackagePolicy, ['eligibilityPredicate', 'inclusionCardinality', 'futureCatalogEntries', 'recomputeTrigger', 'normalization', 'fixedProbability', 'algorithm', 'currentNonNukeBaseWeightTotal', 'currentDerivedWeightTotal', 'scoutSweepWeightClass', 'recursiveIdsExcluded', 'retiredEntriesExcluded', 'validatorPolicy'], 'DEC-13 carePackagePolicy');
 exactKeys(decision.earningPolicy, ['progressScope', 'advancingKillSources', 'excludedKillSources', 'eachRewardEarnsOncePerLife', 'deathClearsProgress', 'deathClearsUnconsumedRewards', 'respawnStartsFreshLife', 'rematchStartsFreshEpoch'], 'DEC-13 earningPolicy');
 exactKeys(decision.activationPolicy, ['hostOwnsActivation', 'consumesExactlyOnce', 'duplicateOwnerTypePolicy'], 'DEC-13 activationPolicy');
 exactKeys(decision.privacyPolicy, ['rewardSeedRollHostOnly', 'acquisitionStateHostOnly', 'rewardRevealPolicy', 'recipientSnapshotOmitsSeedAndRoll'], 'DEC-13 privacyPolicy');
 check(decision.selectionPolicy?.slotCount === 5 && decision.selectionPolicy?.duplicatesAllowed === false, 'DEC-13 must explicitly require five distinct slots');
-check(decision.selectionPolicy?.selectableAvailability === 'selectable' && decision.selectionPolicy?.freezeAt === 'match-start', 'DEC-13 selection availability/freeze policy invalid');
+check(decision.selectionPolicy?.freezeAt === 'match-start', 'DEC-13 selection freeze policy invalid');
 check(canonical(decision.selectionPolicy?.keyBindings) === canonical([3, 4, 5, 6, 7]), 'DEC-13 slot keys must equal 3-7');
-check(canonical(decision.earningPolicy) === canonical(SYNTHETIC_EARNING) || !syntheticFixture, 'synthetic earning semantics drifted');
+const expectedSlots = [
+  { slot: 1, allowedIds: ['scout-sweep', 'adrenaline', 'care-package'] },
+  { slot: 2, allowedIds: ['yardhawk', 'piloted-drone'] },
+  { slot: 3, allowedIds: ['tri-pass', 'carpet-bomber', 'hunter-swarm', 'chopper'] },
+  { slot: 4, allowedIds: ['tri-pass', 'carpet-bomber', 'hunter-swarm', 'chopper'] },
+  { slot: 5, allowedIds: ['nuke', 'drone-swarm'] },
+];
+check(canonical(decision.selectionPolicy?.slots) === canonical(expectedSlots), 'DEC-13 slot families drifted');
+check(canonical(decision.selectionPolicy?.mutuallyExclusiveGroups) === canonical([['nuke', 'drone-swarm']]), 'DEC-13 Nuke/Drone exclusion missing');
+check(decision.carePackagePolicy?.eligibilityPredicate === 'availability-is-not-retired-and-id-is-not-care-package', 'DEC-13 care eligibility predicate invalid');
+check(decision.carePackagePolicy?.inclusionCardinality === 'exactly-once' && decision.carePackagePolicy?.normalization === 'exact-safe-integer-units', 'DEC-13 care inclusion/normalization invalid');
+check(decision.carePackagePolicy?.futureCatalogEntries === 'automatically-eligible-when-nonretired-nonrecursive-and-positive-base-weight', 'DEC-13 future catalog enrollment invalid');
+check(decision.carePackagePolicy?.recomputeTrigger === 'every-catalog-change-including-add-rename-retire-cost-or-weight', 'DEC-13 recompute trigger invalid');
+check(canonical(decision.carePackagePolicy?.fixedProbability) === canonical({ id: 'nuke', numerator: 1, denominator: 100 }), 'DEC-13 fixed Nuke probability invalid');
+check(decision.carePackagePolicy?.algorithm === 'Let S be the sum of non-Nuke eligible base weights; each non-Nuke derived weight is baseWeight*99, Nuke derived weight is S, and total derived weight is 100*S', 'DEC-13 care formula text drifted');
+check(decision.carePackagePolicy?.scoutSweepWeightClass === 'highest', 'DEC-13 Scout Sweep weight class invalid');
+check(canonical(decision.carePackagePolicy?.recursiveIdsExcluded) === canonical([CARE_PACKAGE_ID]), 'DEC-13 recursive exclusion invalid');
+check(decision.carePackagePolicy?.retiredEntriesExcluded === true, 'DEC-13 retired-entry exclusion invalid');
+check(decision.carePackagePolicy?.validatorPolicy === 'catalog-set-equality-plus-forced-every-reward-plus-formula-recomputation', 'DEC-13 care validator policy invalid');
 check(decision.activationPolicy?.hostOwnsActivation === true && decision.activationPolicy?.consumesExactlyOnce === true && decision.activationPolicy?.duplicateOwnerTypePolicy === 'forbid-unless-definition-allows', 'activation authority/exactly-once policy invalid');
 check(decision.privacyPolicy?.rewardSeedRollHostOnly === true && decision.privacyPolicy?.acquisitionStateHostOnly === true && decision.privacyPolicy?.recipientSnapshotOmitsSeedAndRoll === true, 'host-private support state policy invalid');
 check(decision.privacyPolicy?.rewardRevealPolicy === 'claimant-after-exclusive-claim', 'reward reveal policy invalid');
@@ -267,8 +237,15 @@ const catalog = (Array.isArray(manifest.catalog) ? manifest.catalog : []).map((i
   check(plainObject(item), 'catalog entry must be an object');
   return plainObject(item) ? item : {};
 });
-check(catalog.length === decisionCatalog.length && unique(catalog.map(item => item?.id)), 'manifest catalog must exactly cover unique DEC-13 IDs');
-check(canonical(catalog.map(decisionProjection)) === canonical(decisionCatalog), 'manifest catalog decision-owned values differ from DEC-13');
+check(catalog.length >= decisionCatalog.length && unique(catalog.map(item => item?.id)), 'manifest catalog must contain every frozen DEC-13 row and unique extension IDs');
+const frozenIds = new Set(decisionCatalog.map(item => item?.id));
+const frozenCatalogRows = catalog.filter(item => frozenIds.has(item?.id));
+const extensionCatalog = catalog.filter(item => !frozenIds.has(item?.id));
+check(
+  canonical(frozenCatalogRows.map(authoredDecisionProjection)) === canonical(decisionCatalog.map(authoredDecisionProjection)),
+  'manifest frozen catalog rows differ from DEC-13 authored values or relative order',
+);
+check(extensionCatalog.every(item => !decisionCatalog.some(frozen => frozen?.id === item?.id)), 'extension catalog IDs must not shadow frozen DEC-13 IDs');
 const definitions = (Array.isArray(manifest.supportDefinitions) ? manifest.supportDefinitions : []).map((item) => {
   check(plainObject(item), 'support definition entry must be an object');
   return plainObject(item) ? item : {};
@@ -288,19 +265,22 @@ check(unique(provenance.map(item => item?.id)), 'provenance IDs must be unique')
 
 for (const item of catalog) {
   const label = item?.id ?? '<invalid>';
-  exactKeys(item, ['id', 'displayName', 'cost', 'tier', 'availability', 'carePackageWeightUnits', 'relationship', 'activation', 'supportDefinitionIds', 'durationMs', 'repeatable', 'authorityPolicy', 'presentationId', 'audioProfileId', 'evidenceIds'], `catalog ${label}`);
+  exactKeys(item, ['id', 'displayName', 'cost', 'tier', 'availability', 'carePackageBaseWeightUnits', 'carePackageWeightUnits', 'relationship', 'activation', 'supportDefinitionIds', 'durationMs', 'repeatable', 'authorityPolicy', 'presentationId', 'audioProfileId', 'evidenceIds'], `catalog ${label}`);
   check(idOk(item?.id), `${label}: invalid catalog ID`);
-  check(typeof item?.displayName === 'string' && item.displayName.length > 0, `${label}: display name missing`);
-  check(item?.cost === null || (Number.isInteger(item.cost) && item.cost >= 1 && item.cost <= 100), `${label}: cost invalid`);
+  check(typeof item?.displayName === 'string' && item.displayName.trim().length > 0 && item.displayName.length <= 80, `${label}: display name invalid`);
+  check(Number.isSafeInteger(item?.cost) && item.cost >= 1 && item.cost <= 100, `${label}: cost invalid`);
   check(TIERS.includes(item?.tier), `${label}: tier invalid`);
   check(AVAILABILITY.includes(item?.availability), `${label}: availability invalid`);
+  check(Number.isSafeInteger(item?.carePackageBaseWeightUnits) && item.carePackageBaseWeightUnits >= 0, `${label}: care base weight invalid`);
   check(Number.isSafeInteger(item?.carePackageWeightUnits) && item.carePackageWeightUnits >= 0, `${label}: care weight invalid`);
-  check(idOk(item?.relationship), `${label}: relationship invalid`);
+  check(relationshipOk(item?.relationship), `${label}: relationship invalid`);
   check(ACTIVATIONS.includes(item?.activation), `${label}: activation invalid`);
   const supportIds = Array.isArray(item?.supportDefinitionIds) ? item.supportDefinitionIds : [];
   check(supportIds.every(idOk) && unique(supportIds), `${label}: support definition references invalid or duplicated`);
   for (const id of supportIds) check(definitions.some(def => def?.id === id), `${label}: missing support definition ${id}`);
-  check(canonical(supportIds) === canonical(EXPECTED_SUPPORT_BINDINGS[item.id] ?? []), `${label}: strict support-definition binding invalid`);
+  if (Object.hasOwn(EXPECTED_SUPPORT_BINDINGS, item.id)) {
+    check(canonical(supportIds) === canonical(EXPECTED_SUPPORT_BINDINGS[item.id]), `${label}: frozen support-definition binding invalid`);
+  }
   check(Number.isInteger(item?.durationMs) && item.durationMs >= 0 && item.durationMs <= 600000, `${label}: duration invalid`);
   check(typeof item?.repeatable === 'boolean', `${label}: repeatable policy missing`);
   check(item?.authorityPolicy === 'host', `${label}: authority policy must be host`);
@@ -309,34 +289,53 @@ for (const item of catalog) {
   check(evidenceIds.length > 0 && evidenceIds.every(idOk) && unique(evidenceIds), `${label}: evidence IDs invalid or duplicated`);
   check(evidenceIds.every(id => REQUIRED_EVIDENCE_IDS.includes(id)), `${label}: unknown evidence ID`);
 }
+const slotEligibleIds = new Set((decision.selectionPolicy?.slots ?? []).flatMap(slot => slot?.allowedIds ?? []));
+for (const item of catalog) {
+  check(item.availability !== 'selectable' || slotEligibleIds.has(item.id), `${item.id}: selectable catalog row is absent from every frozen slot family`);
+  check(item.availability === 'selectable' || !slotEligibleIds.has(item.id), `${item.id}: non-selectable catalog row appears in a frozen slot family`);
+}
 
 const flattenedBindings = catalog.flatMap(item => item?.supportDefinitionIds ?? []);
 check(sameSet(flattenedBindings, definitions.map(item => item?.id)), 'support definitions must be referenced exactly once by the catalog');
 check(catalog.find(item => item.id === 'adrenaline')?.durationMs === 15000, 'Adrenaline duration must equal 15000ms');
 const nuke = catalog.find(item => item.id === NUKE_ID);
-check(Boolean(nuke) && nuke.cost === null && nuke.availability === 'care-only', 'Nuke must be nullable-cost and care-only');
-check(catalog.find(item => item.id === 'scout-sweep')?.availability === 'retired', 'Scout Sweep must be retired compatibility-only');
+check(Boolean(nuke) && nuke.cost === 15 && nuke.availability === 'selectable', 'Nuke must be selectable at cost 15');
+const scout = catalog.find(item => item.id === 'scout-sweep');
+check(Boolean(scout) && scout.cost === 3 && scout.availability === 'selectable' && scout.durationMs === 12000, 'Scout Sweep must remain the selectable slot-1 support');
 
 const loadout = Array.isArray(manifest.loadout) ? manifest.loadout : [];
 check(loadout.length === 5 && unique(loadout), 'loadout must contain exactly five distinct IDs');
 for (const id of loadout) check(catalog.some(item => item.id === id && item.availability === 'selectable'), `loadout contains non-selectable or unknown ${id}`);
 check(manifest.selectionPolicy?.duplicatesAllowed === false, 'duplicatesAllowed must explicitly equal false');
+for (const [index, id] of loadout.entries()) {
+  const slot = decision.selectionPolicy?.slots?.[index];
+  check(slot?.slot === index + 1 && Array.isArray(slot.allowedIds) && slot.allowedIds.includes(id), `loadout slot ${index + 1} violates its frozen family`);
+}
+check(loadout[2] !== loadout[3], 'loadout slots 3 and 4 must be distinct');
+check(!(loadout.includes('nuke') && loadout.includes('drone-swarm')), 'Nuke and Drone Swarm must be mutually exclusive');
 
 check(!Object.hasOwn(manifest, 'carePool') && !Object.hasOwn(manifest, 'rewardPool'), 'secondary reward-pool sources are forbidden');
+let derivedPool = null;
+try {
+  derivedPool = deriveCarePackagePool(catalog);
+} catch (error) {
+  check(false, `care-package formula invalid: ${error.message}`);
+}
 const rewardEligible = catalog.filter(item => item.availability !== 'retired' && item.id !== CARE_PACKAGE_ID);
 for (const item of catalog) {
-  const eligible = item.availability !== 'retired' && item.id !== CARE_PACKAGE_ID;
-  if (eligible) check(item.carePackageWeightUnits > 0, `${item.id}: reward-eligible item must have positive weight`);
-  else check(item.carePackageWeightUnits === 0, `${item.id}: reward-ineligible item must have zero weight`);
+  check(item.carePackageWeightUnits === (derivedPool?.derivedWeights.get(item.id) ?? -1), `${item.id}: derived care weight is stale or independently authored`);
 }
-const totalWeight = rewardEligible.reduce((sum, item) => sum + item.carePackageWeightUnits, 0);
-check(Number.isSafeInteger(totalWeight) && totalWeight === 100, 'derived reward pool must total exactly 100 integer units');
-check(nuke?.carePackageWeightUnits === 1, 'Nuke must have exactly one of 100 reward units');
-for (const lower of rewardEligible.filter(item => Number.isInteger(item.cost))) {
-  for (const higher of rewardEligible.filter(item => Number.isInteger(item.cost))) {
-    if (higher.cost > lower.cost) check(higher.carePackageWeightUnits <= lower.carePackageWeightUnits, `care weight increases with cost at ${higher.id}`);
-  }
+const totalWeight = derivedPool?.totalWeightUnits ?? 0;
+check(decisionDerivedPool?.totalWeightUnits === decision.carePackagePolicy?.currentDerivedWeightTotal, 'DEC-13 current derived reward total is stale');
+check(decisionDerivedPool?.nonNukeBaseWeightTotal === decision.carePackagePolicy?.currentNonNukeBaseWeightTotal, 'DEC-13 current non-Nuke base total is stale');
+check((derivedPool?.nonNukeBaseWeightTotal ?? 0) >= (decisionDerivedPool?.nonNukeBaseWeightTotal ?? Number.MAX_SAFE_INTEGER), 'catalog extensions cannot reduce frozen baseline probability mass');
+if (extensionCatalog.length === 0) {
+  check(totalWeight === decision.carePackagePolicy?.currentDerivedWeightTotal, 'baseline derived reward total differs from DEC-13');
+  check(derivedPool?.nonNukeBaseWeightTotal === decision.carePackagePolicy?.currentNonNukeBaseWeightTotal, 'baseline non-Nuke base total differs from DEC-13');
 }
+check((derivedPool?.derivedWeights.get(NUKE_ID) ?? 0) * 100 === totalWeight, 'Nuke must have exactly one percent of derived reward units');
+const highestBaseWeight = Math.max(...rewardEligible.filter(item => item.id !== NUKE_ID).map(item => item.carePackageBaseWeightUnits));
+check(scout?.carePackageBaseWeightUnits === highestBaseWeight, 'Scout Sweep must remain in the highest care-weight band');
 
 for (const profile of gunProfiles) {
   const label = profile?.id ?? '<invalid-profile>';

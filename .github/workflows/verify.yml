@@ -55,6 +55,7 @@ jobs:
       - run: npm run lint
       - run: npm run verify:gameplay-contract
       - run: npm run verify:provenance
+      - run: npm run verify:killstreak-catalog
       - run: npm test
       - run: npm run leaderboard:check
       - run: npm run build

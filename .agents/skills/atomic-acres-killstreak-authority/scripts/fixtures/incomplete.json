@@ -3,7 +3,7 @@
   "sourceSha": "moving-latest",
   "buildId": "bad fixture",
   "decisionBinding": {"id": "DEC-13", "scope": "synthetic-fixture-only", "receiptSha256": "bad"},
-  "catalog": [{"id": "nuke", "availability": "selectable", "cost": 20, "carePackageWeightUnits": 50, "clientOwnsReward": true}],
+  "catalog": [{"id": "nuke", "availability": "care-only", "cost": null, "carePackageBaseWeightUnits": 1, "carePackageWeightUnits": 50, "clientOwnsReward": true}],
   "loadout": ["nuke", "nuke"],
   "selectionPolicy": {"duplicatesAllowed": true},
   "earningPolicy": {},
