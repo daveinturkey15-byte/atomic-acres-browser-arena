@@ -43,6 +43,19 @@ describe('Pass 64 arena visual definitions', () => {
     expect(overview!.target[2]).toBeLessThan(-9);
   });
 
+  it('compares the Atomic solid wall and open portal from one legal room position', async () => {
+    const { definition } = await ARENA_VISUAL_REGISTRY['atomic-acres']();
+    const solid = definition.reviewCameras.find((entry) => entry.id === 'nuke-town-aqua-wall-closed');
+    const portal = definition.reviewCameras.find((entry) => entry.id === 'nuke-town-aqua-door-open');
+    expect(solid).toBeDefined();
+    expect(portal).toBeDefined();
+    expect(solid!.position).toEqual(portal!.position);
+    expect(solid!.position).toEqual([-9, 2.2, -23]);
+    expect(solid!.target).not.toEqual(portal!.target);
+    expect(solid!.purpose).toBe('light-occlusion');
+    expect(portal!.purpose).toBe('portal');
+  });
+
   it('rejects canonical practical motion that escapes its volume or exceeds the slow-motion bound', async () => {
     const { definition } = await ARENA_VISUAL_REGISTRY['gun-range']();
     const replaceLight = (replacement: Record<string, unknown>): ArenaVisualDefinition => ({
