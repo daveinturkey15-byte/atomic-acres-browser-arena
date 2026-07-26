@@ -6,6 +6,7 @@ import {
   applyShedExplosion,
   applyShedSheetImpact,
   createInitialShedState,
+  resetShedState,
   validateDestructibleShedDefinition,
   type ShedPlacement,
 } from './destructible-world';
@@ -63,8 +64,10 @@ describe('Pass 65 destructible shed presentation', () => {
       penetrationEnergyQ: 70,
     });
     presentation.sync(impact.state);
-    const cutVertexCount = shell.geometry.getAttribute('position').count;
+    const cutShell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
+    const cutVertexCount = cutShell.geometry.getAttribute('position').count;
     const rims = presentation.root.getObjectByName('field-shed-aperture-rims') as THREE.InstancedMesh;
+    expect(cutShell).not.toBe(shell);
     expect(cutVertexCount).toBeGreaterThan(intactVertexCount);
     expect(rims.count).toBe(1);
     expect(presentation.telemetry(impact.state)).toMatchObject({ activeDraws: 5, apertures: 1 });
@@ -95,6 +98,69 @@ describe('Pass 65 destructible shed presentation', () => {
     presentation.sync(impact.state);
     expect(retired).toHaveLength(2);
     expect(presentation.telemetry(impact.state).retiredGeometries).toBe(0);
+    presentation.dispose();
+    retired.forEach((geometry) => geometry.dispose());
+  });
+
+  it('replaces WebGPU mesh identities and keeps a detached door hidden with complete buffers through reset', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 13);
+    const retired: THREE.BufferGeometry[] = [];
+    const presentation = new DestructibleShedPresentation(
+      FIELD_SHED_DEFINITION,
+      placement,
+      initial,
+      (geometry) => retired.push(geometry),
+    );
+    const initialShell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
+    const initialDoor = presentation.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh;
+    const perforated = applyShedSheetImpact(FIELD_SHED_DEFINITION, initial, {
+      isHost: true,
+      matchEpoch: 13,
+      expectedRevision: initial.revision,
+      surfaceId: 'wall-north',
+      uQ: 0,
+      vQ: 0,
+      radiusUQ: 700,
+      radiusVQ: 700,
+      damageQ: 60,
+      penetrationEnergyQ: 70,
+    });
+    presentation.sync(perforated.state);
+    const perforatedShell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
+    const perforatedDoor = presentation.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh;
+    expect(perforatedShell).not.toBe(initialShell);
+    expect(perforatedDoor).not.toBe(initialDoor);
+    expect(retired).toEqual(expect.arrayContaining([initialShell.geometry, initialDoor.geometry]));
+
+    const detached = applyShedExplosion(FIELD_SHED_DEFINITION, perforated.state, {
+      isHost: true,
+      matchEpoch: 13,
+      expectedRevision: perforated.state.revision,
+      surfaceId: 'door-south',
+      damageQ: FIELD_SHED_DEFINITION.thresholds.detachDamageQ,
+    });
+    presentation.sync(detached.state);
+    const detachedDoor = presentation.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh;
+    expect(detachedDoor).not.toBe(perforatedDoor);
+    expect(detachedDoor.visible).toBe(false);
+    expect(detachedDoor.geometry.index?.count).toBeGreaterThan(0);
+    expect(detachedDoor.geometry.getAttribute('position').count).toBeGreaterThan(0);
+    expect(detachedDoor.geometry.getAttribute('normal').count).toBeGreaterThan(0);
+    expect(detachedDoor.geometry.getAttribute('uv').count).toBeGreaterThan(0);
+    expect(retired).toContain(perforatedDoor.geometry);
+
+    const reset = resetShedState(detached.state, 14, FIELD_SHED_DEFINITION, placement);
+    presentation.sync(reset);
+    const resetShell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
+    const resetDoor = presentation.root.getObjectByName('field-shed-door-leaf') as THREE.Mesh;
+    expect(resetShell).not.toBe(perforatedShell);
+    expect(resetDoor).not.toBe(detachedDoor);
+    expect(resetDoor.visible).toBe(true);
+    expect(resetDoor.geometry.index?.count).toBeGreaterThan(0);
+    expect(resetDoor.geometry.getAttribute('position').count).toBeGreaterThan(0);
+    expect(resetDoor.geometry.getAttribute('normal').count).toBeGreaterThan(0);
+    expect(resetDoor.geometry.getAttribute('uv').count).toBeGreaterThan(0);
+    expect(retired).toEqual(expect.arrayContaining([detachedDoor.geometry, perforatedShell.geometry]));
     presentation.dispose();
     retired.forEach((geometry) => geometry.dispose());
   });
@@ -144,6 +210,71 @@ describe('Pass 65 destructible shed presentation', () => {
     presentation.dispose();
   });
 
+  it('renders bounded pressed-metal geometry and keeps the dent attached after sheet detachment', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 6);
+    const presentation = createFieldShedPresentation(placement, initial);
+    const dented = applyShedSheetImpact(FIELD_SHED_DEFINITION, initial, {
+      isHost: true,
+      matchEpoch: 6,
+      expectedRevision: initial.revision,
+      surfaceId: 'wall-west',
+      uQ: 1_700,
+      vQ: -800,
+      radiusUQ: 900,
+      radiusVQ: 900,
+      damageQ: 30,
+      penetrationEnergyQ: 20,
+    });
+    presentation.sync(dented.state);
+    const dents = presentation.root.getObjectByName('field-shed-dents') as THREE.InstancedMesh;
+    expect(dents.count).toBe(1);
+    expect(dents.userData.deformationModel).toBe('pressed-metal-geometry-v1');
+    expect(dents.castShadow).toBe(true);
+    expect(dents.receiveShadow).toBe(true);
+    const positions = dents.geometry.getAttribute('position');
+    const normals = dents.geometry.getAttribute('normal');
+    expect(positions.count).toBeGreaterThan(40);
+    expect(Math.max(...Array.from({ length: positions.count }, (_, index) => positions.getZ(index)))
+      - Math.min(...Array.from({ length: positions.count }, (_, index) => positions.getZ(index)))).toBeGreaterThan(0.5);
+    expect(Array.from({ length: normals.count }, (_, index) => Math.hypot(normals.getX(index), normals.getY(index)))
+      .some((slope) => slope > 0.1)).toBe(true);
+    const attachedMatrix = new THREE.Matrix4();
+    dents.getMatrixAt(0, attachedMatrix);
+    const attachedScale = new THREE.Vector3();
+    attachedMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), attachedScale);
+    expect(attachedScale.z).toBeGreaterThan(0.018);
+    expect(attachedScale.z).toBeLessThanOrEqual(0.1);
+
+    const detached = applyShedExplosion(FIELD_SHED_DEFINITION, dented.state, {
+      isHost: true,
+      matchEpoch: 6,
+      expectedRevision: dented.state.revision,
+      surfaceId: 'wall-west',
+      damageQ: FIELD_SHED_DEFINITION.thresholds.detachDamageQ - 30,
+    });
+    presentation.sync(detached.state);
+    const debris = presentation.root.getObjectByName('field-shed-major-debris') as THREE.InstancedMesh;
+    expect(dents.count).toBe(1);
+    expect(debris.count).toBe(1);
+    expect(debris.castShadow).toBe(true);
+    expect(debris.receiveShadow).toBe(true);
+    expect(debris.userData.geometryKind).toBe('definition-scaled-corrugated-sheet-v1');
+    expect(debris.geometry.name).toBe('field-shed-corrugated-sheet-debris-geometry');
+    const debrisMatrix = new THREE.Matrix4();
+    const debrisScale = new THREE.Vector3();
+    debris.getMatrixAt(0, debrisMatrix);
+    debrisMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), debrisScale);
+    expect(debrisScale.x).toBeCloseTo(2.1);
+    expect(debrisScale.y).toBeCloseTo(1.2);
+    expect(debrisScale.z).toBeCloseTo(1);
+    expect(presentation.telemetry(detached.state)).toMatchObject({
+      dents: 1,
+      detachedChunks: 1,
+      activeDraws: 6,
+    });
+    presentation.dispose();
+  });
+
   it('swaps an authored detached panel for one bounded major-debris instance', () => {
     const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 4);
     const presentation = createFieldShedPresentation(placement, initial);
@@ -157,8 +288,10 @@ describe('Pass 65 destructible shed presentation', () => {
       damageQ: FIELD_SHED_DEFINITION.thresholds.detachDamageQ,
     });
     presentation.sync(fractured.state);
+    const fracturedShell = presentation.root.getObjectByName('field-shed-damageable-shell') as THREE.Mesh;
     const debris = presentation.root.getObjectByName('field-shed-major-debris') as THREE.InstancedMesh;
-    expect(shell.geometry.getAttribute('position').count).toBeLessThan(intactVertexCount);
+    expect(fracturedShell).not.toBe(shell);
+    expect(fracturedShell.geometry.getAttribute('position').count).toBeLessThan(intactVertexCount);
     expect(debris.count).toBe(1);
     expect(presentation.telemetry(fractured.state)).toMatchObject({ activeDraws: 5, detachedChunks: 1 });
     presentation.dispose();

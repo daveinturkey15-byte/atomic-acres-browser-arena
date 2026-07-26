@@ -16,6 +16,7 @@ import {
   resetShedState,
   resumeShedDoorWhenClear,
   shedApertureContainsWorldPoint,
+  shedMajorChunkExtents,
   synchronizeMajorShedDebris,
   type DestructibleShedDefinition,
   type SheetSurfaceDefinition,
@@ -65,6 +66,7 @@ export type InteractiveWorldDoorCollisionState = Readonly<{
   bounds: Box2;
   phase: ShedState['door']['phase'];
   blockedBy: ShedState['door']['blockedBy'];
+  resumePolicy: ShedState['door']['resumePolicy'];
 }>;
 
 export type InteractiveWorldStateEnvelope = Readonly<{
@@ -228,13 +230,14 @@ function majorDebrisBounds(shed: RuntimeShed, body: ShedState['majorDebris'][num
   ).normalize();
   const worldRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), shed.placement.yaw).multiply(localRotation);
   const euler = new THREE.Euler().setFromQuaternion(worldRotation, 'XYZ');
+  const extents = shedMajorChunkExtents(shed.definition, body.chunkId);
   return Object.freeze({
-    minX: centre.x - 0.625,
-    maxX: centre.x + 0.625,
-    minY: centre.y - 0.06,
-    maxY: centre.y + 0.06,
-    minZ: centre.z - 0.875,
-    maxZ: centre.z + 0.875,
+    minX: centre.x - extents.halfU,
+    maxX: centre.x + extents.halfU,
+    minY: centre.y - extents.halfV,
+    maxY: centre.y + extents.halfV,
+    minZ: centre.z - extents.halfThickness,
+    maxZ: centre.z + extents.halfThickness,
     rotation: [euler.x, euler.y, euler.z] as [number, number, number],
   });
 }
@@ -430,6 +433,7 @@ export class InteractiveWorldRuntime {
         bounds: surfaceBounds(surfaceFrame(door, shed.placement, shed.state)),
         phase: shed.state.door.phase,
         blockedBy: shed.state.door.blockedBy,
+        resumePolicy: shed.state.door.resumePolicy,
       });
     }));
   }
@@ -518,6 +522,7 @@ export class InteractiveWorldRuntime {
   applyBulletImpact(request: Readonly<{
     surface: BallisticSurface;
     point: Point3;
+    tick: number;
     damageQ: number;
     penetrationEnergyQ: number;
     radiusUQ: number;
@@ -541,7 +546,7 @@ export class InteractiveWorldRuntime {
     const surface = shed?.definition.surfaces.find((candidate) => candidate.id === identity.surfaceId);
     if (!shed || !surface || identity.definitionId !== shed.definition.id) return null;
     const coordinates = panelCoordinates(surfaceFrame(surface, shed.placement, shed.state), request.point);
-    return this.commit(shed, applyShedSheetImpact(shed.definition, shed.state, {
+    const impact = applyShedSheetImpact(shed.definition, shed.state, {
       isHost: this.hostAuthority,
       matchEpoch: this.matchEpoch,
       expectedRevision: shed.state.revision,
@@ -552,7 +557,23 @@ export class InteractiveWorldRuntime {
       radiusVQ: request.radiusVQ,
       damageQ: request.damageQ,
       penetrationEnergyQ: request.penetrationEnergyQ,
-    }));
+    });
+    const impactedState = impact.accepted ? impact.state : shed.state;
+    if (surface.role === 'door'
+      && impactedState.door.phase !== 'blocked'
+      && impactedState.door.direction !== 'stationary') {
+      const blocked = blockShedDoor(impactedState, {
+        isHost: this.hostAuthority,
+        expectedRevision: impactedState.revision,
+        tick: request.tick,
+        blocker: {
+          kind: 'bullet',
+          entityId: `bullet-${this.matchEpoch}-${impactedState.revision + 1}`,
+        },
+      });
+      if (blocked.accepted) return this.commit(shed, blocked);
+    }
+    return this.commit(shed, impact);
   }
 
   applyExplosion(request: Readonly<{
@@ -629,11 +650,12 @@ export class InteractiveWorldRuntime {
         y: body.angularVelocityQ.yQ / 1_000,
         z: body.angularVelocityQ.zQ / 1_000,
       }, shed.placement.yaw);
+      const extents = shedMajorChunkExtents(shed.definition, body.chunkId);
       return Object.freeze({
         id: `${shed.placement.id}:debris:${body.chunkId}`,
         position: Object.freeze(transformPoint(localPosition, shed.placement)),
         rotation: Object.freeze({ x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }),
-        halfExtents: Object.freeze({ x: 0.625, y: 0.06, z: 0.875 }),
+        halfExtents: Object.freeze({ x: extents.halfU, y: extents.halfV, z: extents.halfThickness }),
         linearVelocity: Object.freeze(linearVelocity),
         angularVelocity: Object.freeze(angularVelocity),
         sleeping: body.sleeping,

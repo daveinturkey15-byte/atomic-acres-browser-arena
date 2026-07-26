@@ -1441,7 +1441,9 @@ function reconcileInteractiveWorldDoorObstructions(): boolean {
     if (!['opening', 'closing', 'blocked'].includes(door.phase)) continue;
     const blocker = blockers.find((candidate) => isBlocked(candidate.position, [door.bounds], candidate.radius));
     if (door.phase === 'blocked') {
-      if (!blocker && interactiveWorldRuntime.resumeDoor(door.placementId, interactiveWorldTick)?.accepted) changed = true;
+      if (!blocker
+        && door.resumePolicy === 'resume-when-clear'
+        && interactiveWorldRuntime.resumeDoor(door.placementId, interactiveWorldTick)?.accepted) changed = true;
       continue;
     }
     if (blocker && interactiveWorldRuntime.blockDoor({
@@ -1625,6 +1627,7 @@ function applyInteractiveWorldBallisticTrace(
     const result = interactiveWorldRuntime.applyBulletImpact({
       surface: impact.surface,
       point,
+      tick: interactiveWorldTick,
       damageQ,
       penetrationEnergyQ,
       radiusUQ: apertureRadiusQ,
@@ -13532,6 +13535,7 @@ const debugWindow = window as Window & {
     setKills: (kills: number) => void;
     interactShed: () => boolean;
     damageShed: (placementId?: string, surfaceId?: string, damageQ?: number) => boolean;
+    bulletHitShed: (placementId?: string, surfaceId?: string, damageQ?: number, penetrationEnergyQ?: number) => boolean;
 
   };
 };
@@ -15045,6 +15049,33 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (Number.isFinite(kills)) player.kills = Math.max(0, Math.floor(kills));
   },
   interactShed: () => interactWithShedDoor(),
+  bulletHitShed: (placementId, surfaceId = 'door-south', damageQ = 30, penetrationEnergyQ = 20) => {
+    if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
+    const targetPlacementId = placementId ?? interactiveWorldRuntime.nearestDoor(player.position)?.placementId;
+    if (!targetPlacementId || ![damageQ, penetrationEnergyQ].every(Number.isFinite)) return false;
+    const surface = interactiveWorldRuntime.collisions().ballisticSurfaces.find((candidate) => (
+      candidate.destructibleSurface?.placementId === targetPlacementId
+      && candidate.destructibleSurface.surfaceId === surfaceId
+    ));
+    if (!surface) return false;
+    const result = interactiveWorldRuntime.applyBulletImpact({
+      surface,
+      point: {
+        x: (surface.bounds.minX + surface.bounds.maxX) / 2,
+        y: ((surface.bounds.minY ?? 0) + (surface.bounds.maxY ?? 0)) / 2,
+        z: (surface.bounds.minZ + surface.bounds.maxZ) / 2,
+      },
+      tick: interactiveWorldTick,
+      damageQ: Math.max(1, Math.floor(damageQ)),
+      penetrationEnergyQ: Math.max(0, Math.floor(penetrationEnergyQ)),
+      radiusUQ: 700,
+      radiusVQ: 700,
+    });
+    if (!result?.accepted) return false;
+    syncInteractiveWorldPhysics();
+    broadcastInteractiveWorldState(true);
+    return true;
+  },
   damageShed: (placementId, surfaceId = 'wall-west', damageQ = 220) => {
     if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
     const targetPlacementId = placementId ?? interactiveWorldRuntime.nearestDoor(player.position)?.placementId;

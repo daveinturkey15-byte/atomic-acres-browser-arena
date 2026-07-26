@@ -9,6 +9,7 @@ export const SHED_DOOR_TRAVEL_TICKS = 60;
 export const SHED_ANGLE_Q = 10_000;
 export const SHED_PANEL_COORD_Q = 10_000;
 export const SHED_MAX_INTERACTION_ACTORS = 12;
+export const SHED_MAJOR_DEBRIS_HALF_THICKNESS = 0.06;
 
 export const WORLD_COLLISION_CONSUMERS = Object.freeze([
   'movement',
@@ -141,6 +142,12 @@ export type ShedPlacement = Readonly<{
   zone: 'whole-arena' | 'terminal-apron';
   position: Point3;
   yaw: number;
+}>;
+
+export type ShedMajorChunkExtents = Readonly<{
+  halfU: number;
+  halfV: number;
+  halfThickness: typeof SHED_MAJOR_DEBRIS_HALF_THICKNESS;
 }>;
 
 export type WorldCollisionSnapshot = Readonly<{
@@ -287,6 +294,14 @@ export function validateDestructibleShedDefinition(definition: DestructibleShedD
       errors.push(`${surface.id}: unknown detachable chunk`);
     }
   }
+  const usedChunkIds = definition.surfaces
+    .map((surface) => surface.detachableChunkId)
+    .filter((chunkId): chunkId is string => chunkId !== null);
+  if (!unique(usedChunkIds)
+    || usedChunkIds.length !== definition.preauthoredChunkIds.length
+    || !definition.preauthoredChunkIds.every((chunkId) => usedChunkIds.includes(chunkId))) {
+    errors.push('pre-authored chunks must map one-to-one to detachable sheet surfaces');
+  }
   const { dentDamageQ, perforateEnergyQ, detachDamageQ } = definition.thresholds;
   if (![dentDamageQ, perforateEnergyQ, detachDamageQ].every((value) => finiteInteger(value, 1, 1_000_000))) {
     errors.push('damage thresholds must be bounded integers');
@@ -298,6 +313,24 @@ export function validateDestructibleShedDefinition(definition: DestructibleShedD
     errors.push('world collision consumer parity incomplete');
   }
   return Object.freeze(errors);
+}
+
+/**
+ * Canonical sheet dimensions shared by presentation, movement, ballistics and
+ * Rapier. Keeping these dimensions definition-derived prevents a detached roof
+ * or wall from becoming the old one-size-fits-all box in another consumer.
+ */
+export function shedMajorChunkExtents(
+  definition: DestructibleShedDefinition,
+  chunkId: string,
+): ShedMajorChunkExtents {
+  const surface = definition.surfaces.find((candidate) => candidate.detachableChunkId === chunkId);
+  if (!surface) throw new TypeError(`Unknown shed chunk: ${chunkId}`);
+  return Object.freeze({
+    halfU: surface.frame.halfU,
+    halfV: surface.frame.halfV,
+    halfThickness: SHED_MAJOR_DEBRIS_HALF_THICKNESS,
+  });
 }
 
 export function createInitialShedState(
@@ -453,6 +486,9 @@ export function blockShedDoor(
     phase: 'blocked' as const,
     blockedAtTick: request.tick,
     blockedBy: Object.freeze({ ...request.blocker }),
+    resumePolicy: request.blocker.kind === 'bullet'
+      ? 'remain-blocked-until-new-command' as const
+      : 'resume-when-clear' as const,
   });
   return { accepted: true, reason: 'accepted', state: withRevision(state, { door }) };
 }
@@ -463,7 +499,9 @@ export function resumeShedDoorWhenClear(
 ): ShedMutationResult {
   if (!request.isHost) return { accepted: false, reason: 'not-host', state };
   if (request.expectedRevision !== state.revision) return { accepted: false, reason: 'stale-revision', state };
-  if (state.door.phase !== 'blocked' || !finiteInteger(request.tick)) return { accepted: false, reason: 'invalid-blocker', state };
+  if (state.door.phase !== 'blocked'
+    || state.door.resumePolicy !== 'resume-when-clear'
+    || !finiteInteger(request.tick)) return { accepted: false, reason: 'invalid-blocker', state };
   const distanceQ = Math.abs(state.door.desiredAngleQ - state.door.angleQ);
   const duration = Math.max(1, Math.round(SHED_DOOR_TRAVEL_TICKS * distanceQ / SHED_ANGLE_Q));
   const opening = state.door.desiredAngleQ === SHED_ANGLE_Q;

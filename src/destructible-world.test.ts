@@ -148,7 +148,12 @@ describe('Pass 65 destructible-world authority', () => {
       tick: 35,
       blocker: { kind: 'player', entityId: 'player-b' },
     });
-    expect(blocked.state.door).toMatchObject({ phase: 'blocked', angleQ: 4167, desiredAngleQ: SHED_ANGLE_Q });
+    expect(blocked.state.door).toMatchObject({
+      phase: 'blocked',
+      angleQ: 4167,
+      desiredAngleQ: SHED_ANGLE_Q,
+      resumePolicy: 'resume-when-clear',
+    });
     expect(advanceShedDoor(blocked.state, 200)).toBe(blocked.state);
 
     const resumed = resumeShedDoorWhenClear(blocked.state, {
@@ -161,6 +166,47 @@ describe('Pass 65 destructible-world authority', () => {
     expect(reversed.state.door).toMatchObject({ desiredAngleQ: 0, direction: 'closing' });
     expect(reversed.state.door.completesAtTick - 36).toBe(26);
     expect(advanceShedDoor(reversed.state, 62).door.phase).toBe('closed');
+  });
+
+  it('keeps a host-resolved bullet interruption stopped until a new F command reverses it', () => {
+    const moving = advanceShedDoor(interact(initial(), 10, 1).state, 35);
+    const blocked = blockShedDoor(moving, {
+      isHost: true,
+      expectedRevision: moving.revision,
+      tick: 35,
+      blocker: { kind: 'bullet', entityId: 'bullet-11-2' },
+    });
+    expect(blocked).toMatchObject({ accepted: true, reason: 'accepted' });
+    expect(blocked.state.door).toMatchObject({
+      phase: 'blocked',
+      blockedBy: { kind: 'bullet', entityId: 'bullet-11-2' },
+      resumePolicy: 'remain-blocked-until-new-command',
+      angleQ: 4167,
+    });
+    expect(resumeShedDoorWhenClear(blocked.state, {
+      isHost: true,
+      expectedRevision: blocked.state.revision,
+      tick: 55,
+    })).toMatchObject({ accepted: false, reason: 'invalid-blocker', state: blocked.state });
+    expect(advanceShedDoor(blocked.state, 200)).toBe(blocked.state);
+
+    const reversed = admitShedDoorInteraction(blocked.state, {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: blocked.state.revision,
+      actorId: 'player-a',
+      actorAlive: true,
+      sequence: 2,
+      distance: 1,
+      hasLineOfSight: true,
+      tick: 56,
+    });
+    expect(reversed.state.door).toMatchObject({
+      phase: 'closing',
+      direction: 'closing',
+      desiredAngleQ: 0,
+      blockedBy: null,
+    });
   });
 
   it('uses the identical quantized ellipse for visible masking and shoot-through', () => {

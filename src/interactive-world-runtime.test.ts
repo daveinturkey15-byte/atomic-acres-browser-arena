@@ -84,6 +84,65 @@ describe('shared interactive-world runtime adapter', () => {
     runtime.dispose();
   });
 
+  it('atomically persists door damage and a canonical bullet interruption for late join', () => {
+    const host = new InteractiveWorldRuntime('atomic-acres', 8, [placement], true);
+    const guest = new InteractiveWorldRuntime('atomic-acres', 8, [placement], false);
+    expect(host.interactDoor({
+      placementId: placement.id,
+      actorId: 'player-a',
+      actorAlive: true,
+      actorPosition: { x: 0, y: 1.1, z: 3 },
+      sequence: 1,
+      tick: 100,
+      hasLineOfSight: () => true,
+    })?.accepted).toBe(true);
+    expect(host.step(130)).toBe(true);
+    const movingDoor = host.collisions().ballisticSurfaces.find(
+      (surface) => surface.destructibleSurface?.surfaceId === 'door-south',
+    )!;
+    const point = {
+      x: (movingDoor.bounds.minX + movingDoor.bounds.maxX) / 2,
+      y: ((movingDoor.bounds.minY ?? 0) + (movingDoor.bounds.maxY ?? 0)) / 2,
+      z: (movingDoor.bounds.minZ + movingDoor.bounds.maxZ) / 2,
+    };
+    const interrupted = host.applyBulletImpact({
+      surface: movingDoor,
+      point,
+      tick: 130,
+      damageQ: 30,
+      penetrationEnergyQ: 20,
+      radiusUQ: 700,
+      radiusVQ: 700,
+    });
+    expect(interrupted).toMatchObject({ accepted: true, reason: 'accepted' });
+    expect(interrupted!.state.door).toMatchObject({
+      phase: 'blocked',
+      angleQ: 5_000,
+      blockedBy: { kind: 'bullet' },
+      resumePolicy: 'remain-blocked-until-new-command',
+    });
+    expect(interrupted!.state.surfaces.find((surface) => surface.surfaceId === 'door-south')?.dents).toHaveLength(1);
+    expect(host.step(200)).toBe(false);
+    expect(host.resumeDoor(placement.id, 201)).toMatchObject({ accepted: false, reason: 'invalid-blocker' });
+    expect(guest.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(host.stateEnvelope())))).toBe(true);
+    expect(guest.stateEnvelope()).toEqual(host.stateEnvelope());
+
+    const guestDoor = guest.collisions().ballisticSurfaces.find(
+      (surface) => surface.destructibleSurface?.surfaceId === 'door-south',
+    )!;
+    expect(guest.applyBulletImpact({
+      surface: guestDoor,
+      point,
+      tick: 131,
+      damageQ: 30,
+      penetrationEnergyQ: 20,
+      radiusUQ: 700,
+      radiusVQ: 700,
+    })).toMatchObject({ accepted: false, reason: 'not-host' });
+    host.dispose();
+    guest.dispose();
+  });
+
   it('binds a remote interaction to the requested shed instead of retargeting it', () => {
     const eastPlacement: ShedPlacement = Object.freeze({
       ...placement,
@@ -119,6 +178,7 @@ describe('shared interactive-world runtime adapter', () => {
     const impact = runtime.applyBulletImpact({
       surface: north,
       point: { x: 0, y: 1.2, z: -2.1 },
+      tick: 0,
       damageQ: 60,
       penetrationEnergyQ: 70,
       radiusUQ: 900,
@@ -155,6 +215,7 @@ describe('shared interactive-world runtime adapter', () => {
     expect(runtime.telemetry()).toMatchObject({ detachedChunks: 1, awakeMajorBodies: 1, presentationDraws: 5 });
     const physicsBody = runtime.majorDebrisPhysicsBodies()[0]!;
     expect(physicsBody.id).toBe('atomic-shed-vertical-slice:debris:chunk-west');
+    expect(physicsBody.halfExtents).toEqual({ x: 2.1, y: 1.2, z: 0.06 });
     const priorDebris = after.ballisticSurfaces.find((surface) => surface.majorDebris?.chunkId === 'chunk-west')!;
     expect(runtime.adoptMajorDebrisPhysics([{
       id: physicsBody.id,

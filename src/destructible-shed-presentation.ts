@@ -6,6 +6,7 @@ import {
   SHED_MAX_APERTURES,
   SHED_MAX_DENTS,
   SHED_MAX_MAJOR_CHUNKS,
+  SHED_MAJOR_DEBRIS_HALF_THICKNESS,
   SHED_PANEL_COORD_Q,
   WORLD_COLLISION_CONSUMERS,
   type BallisticAperture,
@@ -14,6 +15,7 @@ import {
   type SheetSurfaceDefinition,
   type ShedPlacement,
   type ShedState,
+  shedMajorChunkExtents,
 } from './destructible-world';
 
 const ROOF_COS = Math.sqrt(3) / 2;
@@ -144,6 +146,80 @@ function localPanelGeometry(surface: SheetSurfaceDefinition, state: DamageableSh
   return geometry;
 }
 
+/**
+ * A bounded pressed-metal dimple. Unlike the retired flat circle decal, this
+ * mesh has a depressed centre, a raised crease ring and real normals/depth, so
+ * it participates in the colour, depth and shadow passes on WebGPU/WebGL.
+ */
+function pressedMetalDentGeometry(radialSegments = 20): THREE.BufferGeometry {
+  const rings = Object.freeze([
+    Object.freeze({ radius: 0.32, height: 0.2 }),
+    Object.freeze({ radius: 0.7, height: 0.78 }),
+    Object.freeze({ radius: 1, height: 0.04 }),
+  ]);
+  const positions: number[] = [0, 0, 0.1];
+  const uvs: number[] = [0.5, 0.5];
+  for (const ring of rings) {
+    for (let segment = 0; segment < radialSegments; segment += 1) {
+      const angle = segment / radialSegments * Math.PI * 2;
+      const x = Math.cos(angle) * ring.radius;
+      const y = Math.sin(angle) * ring.radius;
+      positions.push(x, y, ring.height);
+      uvs.push(x * 0.5 + 0.5, y * 0.5 + 0.5);
+    }
+  }
+  const indices: number[] = [];
+  for (let segment = 0; segment < radialSegments; segment += 1) {
+    const next = (segment + 1) % radialSegments;
+    indices.push(0, 1 + segment, 1 + next);
+  }
+  for (let ring = 0; ring < rings.length - 1; ring += 1) {
+    const innerStart = 1 + ring * radialSegments;
+    const outerStart = innerStart + radialSegments;
+    for (let segment = 0; segment < radialSegments; segment += 1) {
+      const next = (segment + 1) % radialSegments;
+      const inner = innerStart + segment;
+      const innerNext = innerStart + next;
+      const outer = outerStart + segment;
+      const outerNext = outerStart + next;
+      indices.push(inner, outer, outerNext, inner, outerNext, innerNext);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.name = 'field-shed-pressed-metal-dent-geometry';
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/**
+ * One normalized, closed corrugated sheet geometry. Per-chunk canonical
+ * half-extents provide the distinct door/wall/roof silhouettes without adding
+ * draw calls or inventing presentation-only collision dimensions.
+ */
+function corrugatedSheetDebrisGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BoxGeometry(2, 2, 0.12, 10, 10, 1);
+  geometry.name = 'field-shed-corrugated-sheet-debris-geometry';
+  const positions = geometry.getAttribute('position') as THREE.BufferAttribute;
+  for (let index = 0; index < positions.count; index += 1) {
+    const z = positions.getZ(index);
+    if (Math.abs(z) < 0.055) continue;
+    const x = positions.getX(index);
+    const y = positions.getY(index);
+    const corrugation = 0.012 * (0.5 + 0.5 * Math.sin((x + 1) * Math.PI * 7 + y * 0.7));
+    const crease = 0.007 * Math.exp(-Math.pow(x - y * 0.22, 2) / 0.045);
+    positions.setZ(index, Math.sign(z) * (0.06 - corrugation - crease));
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function placeBoxInstance(
   mesh: THREE.InstancedMesh,
   index: number,
@@ -172,6 +248,19 @@ function createFrame(material: THREE.Material): THREE.InstancedMesh {
   frame.castShadow = true;
   frame.receiveShadow = true;
   return frame;
+}
+
+function damageableSheetMesh(
+  name: 'field-shed-damageable-shell' | 'field-shed-door-leaf',
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.topologyOwnedMesh = true;
+  return mesh;
 }
 
 function apertureLocalPosition(surface: SheetSurfaceDefinition, aperture: BallisticAperture): THREE.Vector3 {
@@ -218,6 +307,49 @@ function presentationSurfaceDefinition(
       vAxis: Object.freeze({ x: rotatedV.x, y: rotatedV.y, z: rotatedV.z }),
     }),
   });
+}
+
+function detachedPresentationSurfaceDefinition(
+  surface: SheetSurfaceDefinition,
+  state: ShedState,
+): SheetSurfaceDefinition | null {
+  if (!surface.detachableChunkId) return null;
+  const body = state.majorDebris.find((candidate) => candidate.chunkId === surface.detachableChunkId);
+  if (!body) return null;
+  const rotation = new THREE.Quaternion(
+    body.poseQ.rotation.xQ / SHED_PANEL_COORD_Q,
+    body.poseQ.rotation.yQ / SHED_PANEL_COORD_Q,
+    body.poseQ.rotation.zQ / SHED_PANEL_COORD_Q,
+    body.poseQ.rotation.wQ / SHED_PANEL_COORD_Q,
+  ).normalize();
+  const uAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation);
+  const vAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+  const normal = new THREE.Vector3().crossVectors(uAxis, vAxis).normalize();
+  const centre = new THREE.Vector3(
+    body.poseQ.position.xQ / 1_000,
+    body.poseQ.position.yQ / 1_000,
+    body.poseQ.position.zQ / 1_000,
+  ).addScaledVector(normal, SHED_MAJOR_DEBRIS_HALF_THICKNESS);
+  return Object.freeze({
+    ...surface,
+    frame: Object.freeze({
+      ...surface.frame,
+      centre: Object.freeze({
+        x: centre.x,
+        y: centre.y,
+        z: centre.z,
+      }),
+      uAxis: Object.freeze({ x: uAxis.x, y: uAxis.y, z: uAxis.z }),
+      vAxis: Object.freeze({ x: vAxis.x, y: vAxis.y, z: vAxis.z }),
+    }),
+  });
+}
+
+function debrisTint(chunkId: string): THREE.Color {
+  const palette = [0x294a37, 0x315640, 0x254333, 0x395c45, 0x2c4f3a, 0x22402f];
+  let hash = 0;
+  for (let index = 0; index < chunkId.length; index += 1) hash = (hash * 31 + chunkId.charCodeAt(index)) >>> 0;
+  return new THREE.Color(palette[hash % palette.length]!);
 }
 
 export type ShedPresentationTelemetry = Readonly<{
@@ -277,17 +409,11 @@ export class DestructibleShedPresentation {
       bumpMap: this.bumpTexture,
       bumpScale: 0.055,
     });
-    this.shell = new THREE.Mesh(new THREE.BufferGeometry(), this.sheetMaterial);
-    this.shell.name = 'field-shed-damageable-shell';
-    this.shell.castShadow = true;
-    this.shell.receiveShadow = true;
+    this.shell = damageableSheetMesh('field-shed-damageable-shell', new THREE.BufferGeometry(), this.sheetMaterial);
     this.root.add(this.shell);
 
     this.doorHinge.name = 'field-shed-door-hinge';
-    this.door = new THREE.Mesh(new THREE.BufferGeometry(), this.sheetMaterial);
-    this.door.name = 'field-shed-door-leaf';
-    this.door.castShadow = true;
-    this.door.receiveShadow = true;
+    this.door = damageableSheetMesh('field-shed-door-leaf', new THREE.BufferGeometry(), this.sheetMaterial);
     this.doorHinge.add(this.door);
     this.root.add(this.doorHinge);
 
@@ -306,12 +432,16 @@ export class DestructibleShedPresentation {
     this.apertureRims.name = 'field-shed-aperture-rims';
     this.apertureRims.count = 0;
     this.root.add(this.apertureRims);
-    this.dents = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 12), this.dentMaterial, SHED_MAX_DENTS);
+    this.dents = new THREE.InstancedMesh(pressedMetalDentGeometry(), this.dentMaterial, SHED_MAX_DENTS);
     this.dents.name = 'field-shed-dents';
+    this.dents.userData.deformationModel = 'pressed-metal-geometry-v1';
     this.dents.count = 0;
+    this.dents.castShadow = true;
+    this.dents.receiveShadow = true;
     this.root.add(this.dents);
-    this.debris = new THREE.InstancedMesh(new THREE.BoxGeometry(1.25, 0.12, 1.75), this.debrisMaterial, SHED_MAX_MAJOR_CHUNKS);
+    this.debris = new THREE.InstancedMesh(corrugatedSheetDebrisGeometry(), this.debrisMaterial, SHED_MAX_MAJOR_CHUNKS);
     this.debris.name = 'field-shed-major-debris';
+    this.debris.userData.geometryKind = 'definition-scaled-corrugated-sheet-v1';
     this.debris.count = 0;
     this.debris.castShadow = true;
     this.debris.receiveShadow = true;
@@ -337,17 +467,32 @@ export class DestructibleShedPresentation {
       }
       const shellGeometry = mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry();
       staticGeometries.forEach((geometry) => geometry.dispose());
-      const oldShellGeometry = this.shell.geometry;
-      this.shell.geometry = shellGeometry;
+      const oldShell = this.shell;
+      const oldShellGeometry = oldShell.geometry;
+      const nextShell = damageableSheetMesh('field-shed-damageable-shell', shellGeometry, this.sheetMaterial);
+
+      const oldDoor = this.door;
       if (oldShellGeometry.getAttribute('position')) this.retireGeometry(oldShellGeometry);
       else oldShellGeometry.dispose();
-
-      const oldDoorGeometry = this.door.geometry;
-      this.door.geometry = doorState.stage === 'detached'
-        ? new THREE.BufferGeometry()
-        : localPanelGeometry(doorDefinition, doorState);
+      const oldDoorGeometry = oldDoor.geometry;
+      const nextDoor = damageableSheetMesh(
+        'field-shed-door-leaf',
+        localPanelGeometry(doorDefinition, doorState),
+        this.sheetMaterial,
+      );
+      nextDoor.visible = doorState.stage !== 'detached';
       if (oldDoorGeometry.getAttribute('position')) this.retireGeometry(oldDoorGeometry);
       else oldDoorGeometry.dispose();
+
+      // Three r185 WebGPU caches vertex buffers on RenderObject identity. Swap
+      // the complete Mesh objects synchronously so no stale/empty attribute set
+      // can survive a perforate, detach or rematch topology transition.
+      this.root.add(nextShell);
+      this.doorHinge.add(nextDoor);
+      oldShell.removeFromParent();
+      oldDoor.removeFromParent();
+      this.shell = nextShell;
+      this.door = nextDoor;
       this.topologySignature = topologySignature;
     }
     this.doorHinge.position.set(-doorDefinition.frame.halfU, doorDefinition.frame.centre.y, doorDefinition.frame.centre.z);
@@ -358,18 +503,23 @@ export class DestructibleShedPresentation {
     let dentIndex = 0;
     for (const surfaceState of state.surfaces) {
       const canonicalSurface = this.definition.surfaces.find((surface) => surface.id === surfaceState.surfaceId);
-      if (!canonicalSurface || surfaceState.stage === 'detached') continue;
-      const surfaceDefinition = presentationSurfaceDefinition(canonicalSurface, state.door.angleQ);
+      if (!canonicalSurface) continue;
+      const surfaceDefinition = surfaceState.stage === 'detached'
+        ? detachedPresentationSurfaceDefinition(canonicalSurface, state)
+        : presentationSurfaceDefinition(canonicalSurface, state.door.angleQ);
+      if (!surfaceDefinition) continue;
       const rotation = panelQuaternion(surfaceDefinition);
-      for (const aperture of surfaceState.apertures) {
-        if (apertureIndex >= SHED_MAX_APERTURES) break;
-        const scale = new THREE.Vector3(
-          aperture.radiusUQ / SHED_PANEL_COORD_Q * surfaceDefinition.frame.halfU,
-          aperture.radiusVQ / SHED_PANEL_COORD_Q * surfaceDefinition.frame.halfV,
-          Math.min(surfaceDefinition.frame.halfU, surfaceDefinition.frame.halfV) * 0.035,
-        );
-        placeBoxInstance(this.apertureRims, apertureIndex, apertureLocalPosition(surfaceDefinition, aperture), scale, rotation);
-        apertureIndex += 1;
+      if (surfaceState.stage !== 'detached') {
+        for (const aperture of surfaceState.apertures) {
+          if (apertureIndex >= SHED_MAX_APERTURES) break;
+          const scale = new THREE.Vector3(
+            aperture.radiusUQ / SHED_PANEL_COORD_Q * surfaceDefinition.frame.halfU,
+            aperture.radiusVQ / SHED_PANEL_COORD_Q * surfaceDefinition.frame.halfV,
+            Math.min(surfaceDefinition.frame.halfU, surfaceDefinition.frame.halfV) * 0.035,
+          );
+          placeBoxInstance(this.apertureRims, apertureIndex, apertureLocalPosition(surfaceDefinition, aperture), scale, rotation);
+          apertureIndex += 1;
+        }
       }
       for (const dent of surfaceState.dents) {
         if (dentIndex >= SHED_MAX_DENTS) break;
@@ -382,7 +532,14 @@ export class DestructibleShedPresentation {
           radiusVQ: dent.radiusQ,
         };
         const radius = dent.radiusQ / SHED_PANEL_COORD_Q * Math.min(surfaceDefinition.frame.halfU, surfaceDefinition.frame.halfV);
-        placeBoxInstance(this.dents, dentIndex, apertureLocalPosition(surfaceDefinition, apertureLike), new THREE.Vector3(radius, radius, 1), rotation);
+        const depth = 0.018 + dent.depthQ / 2_500 * 0.082;
+        placeBoxInstance(
+          this.dents,
+          dentIndex,
+          apertureLocalPosition(surfaceDefinition, apertureLike),
+          new THREE.Vector3(radius, radius, depth),
+          rotation,
+        );
         dentIndex += 1;
       }
     }
@@ -400,9 +557,12 @@ export class DestructibleShedPresentation {
         chunk.poseQ.rotation.zQ / SHED_PANEL_COORD_Q,
         chunk.poseQ.rotation.wQ / SHED_PANEL_COORD_Q,
       ).normalize();
-      placeBoxInstance(this.debris, index, position, new THREE.Vector3(1, 1, 1), rotation);
+      const extents = shedMajorChunkExtents(this.definition, chunk.chunkId);
+      placeBoxInstance(this.debris, index, position, new THREE.Vector3(extents.halfU, extents.halfV, 1), rotation);
+      this.debris.setColorAt(index, debrisTint(chunk.chunkId));
     });
     this.debris.instanceMatrix.needsUpdate = true;
+    if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
     this.revision = state.revision;
     this.root.userData.worldRevision = state.revision;
   }
