@@ -1,3 +1,4 @@
+import { GRENADE_CARRY_CAP } from './combat/ordnance';
 import { WEAPONS } from './gameplay';
 import type { PrimaryWeaponId, WeaponId } from './protocol';
 
@@ -125,7 +126,6 @@ export function scavengeDeathDrop(
   drop: DeathDrop,
   inventory: ScavengeInventory,
   maximumReserve: number,
-  grenadeCap: number,
   now: number,
 ): {
   scavenged: boolean;
@@ -140,7 +140,7 @@ export function scavengeDeathDrop(
   const reserveCap = Math.min(WEAPONS[inventory.weapon].reserve, finiteRound(maximumReserve));
   const ammunitionAvailable = finiteRound(drop.ammo) + finiteRound(drop.reserve);
   const reserve = Math.min(reserveCap, finiteRound(inventory.reserve) + ammunitionAvailable);
-  const grenades = Math.min(finiteRound(grenadeCap), finiteRound(inventory.grenades) + 1);
+  const grenades = Math.min(GRENADE_CARRY_CAP, finiteRound(inventory.grenades) + 1);
   const ammoGranted = Math.max(0, reserve - finiteRound(inventory.reserve));
   const grenadeGranted = Math.max(0, grenades - finiteRound(inventory.grenades));
   if (ammoGranted === 0 && grenadeGranted === 0) {

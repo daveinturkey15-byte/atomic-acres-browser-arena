@@ -5795,7 +5795,6 @@ function autoScavengeDeathDrop(now: number): boolean {
     drop,
     { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
     WEAPONS[activeWeapon].reserve,
-    1,
     now,
   );
   if (!result.scavenged) return false;

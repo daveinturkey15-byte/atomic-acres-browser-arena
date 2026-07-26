@@ -1778,7 +1778,7 @@ test.describe('solo mechanics', () => {
         teleportPlayer: (x: number, y: number, z: number) => void;
       } }).__ATOMIC_ACRES_DEBUG__;
       api.setAmmo('machine-pistol', 3, 0);
-      api.setGrenades(1);
+      api.setGrenades(0);
       api.teleportPlayer(dropX, dropY + 1.5, dropZ);
     }, [x, y, z]);
     await expect.poll(async () => (await debug(page)).player.reserve).toBeGreaterThan(0);
@@ -1786,7 +1786,7 @@ test.describe('solo mechanics', () => {
     expect(state.player.primaryWeapon).toBe('sniper');
     expect(state.player.weapon).toBe('machine-pistol');
     expect(state.player.ammo).toBe(3);
-    expect(state.player.grenades).toBe(2);
+    expect(state.player.grenades).toBe(1);
     const scavenged = state.deathDrops.find((drop) => drop.id === targetDrop.id);
     expect(scavenged).toMatchObject({ ammoAvailable: false, weaponAvailable: true });
 
@@ -2357,7 +2357,7 @@ test.describe('solo mechanics', () => {
       };
     });
 
-    expect(result.before.player.grenades).toBe(2);
+    expect(result.before.player.grenades).toBe(1);
     expect(result.before.grenadeVisual.status).toBe('ready');
     expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/frag-grenade.glb');
     expect(result.before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
@@ -2367,7 +2367,7 @@ test.describe('solo mechanics', () => {
       grenadeFuse: { beeps: 0, startMs: 1_450 },
     });
     expect(result.before.audio.ambience.busGain).toBeCloseTo(0.12, 5);
-    expect(result.thrown.player.grenades).toBe(1);
+    expect(result.thrown.player.grenades).toBe(0);
     expect(result.thrown.grenades).toBe(1);
     expect(result.thrown.grenadeVisual.active).toHaveLength(1);
     expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'frag-grenade-authored-glb', authored: true });
@@ -2392,7 +2392,7 @@ test.describe('solo mechanics', () => {
   test('HUD reports match, stance, equipment and bots in roster', async ({ page }) => {
     await expect(page.locator('#connection-pill')).toHaveText('BOT SKIRMISH');
     await expect(page.locator('#objective')).toContainText('FIVE MINUTES · MOST KILLS WINS');
-    await expect(page.locator('#grenades')).toHaveText('FRAG ×2');
+    await expect(page.locator('#grenades')).toHaveText('FRAG ×1');
     await expect(page.locator('#minimap')).toBeVisible();
     await expect(page.locator('#location-label')).toHaveText(/AQUA HABITAT|CORAL HABITAT|VERDANT ARRAY|CIVIC TRANSIT|HELIO SERVICE/);
     await page.keyboard.down('Tab');

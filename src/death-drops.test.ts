@@ -28,9 +28,9 @@ describe('death-drop inventory contract', () => {
 
   it('scavenges carried-weapon ammo and one grenade without selecting the dropped gun', () => {
     const drop = createDeathDrop('death-1', 'sniper', { x: 1, y: 0, z: 1 }, 5, 4, 1_000);
-    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 116, grenades: 1 }, 120, 2, 1_100);
+    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 116, grenades: 0 }, 120, 1_100);
     expect(result.scavenged).toBe(true);
-    expect(result.inventory).toEqual({ weapon: 'carbine', reserve: 120, grenades: 2 });
+    expect(result.inventory).toEqual({ weapon: 'carbine', reserve: 120, grenades: 1 });
     expect(result.ammoGranted).toBe(4);
     expect(result.grenadeGranted).toBe(1);
     expect(deathDropAmmoAvailable(result.drop, 1_101)).toBe(false);
@@ -40,7 +40,7 @@ describe('death-drop inventory contract', () => {
 
   it('does not consume the ammo payload when carried ammo and grenades are already full', () => {
     const drop = createDeathDrop('death-full', 'smg', { x: 0, y: 0, z: 0 }, 16, 32, 1_000);
-    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 120, grenades: 2 }, 120, 2, 1_100);
+    const result = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 120, grenades: 1 }, 120, 1_100);
     expect(result.scavenged).toBe(false);
     expect(result.drop).toEqual(drop);
     expect(deathDropAmmoAvailable(result.drop, 1_101)).toBe(true);
@@ -48,7 +48,7 @@ describe('death-drop inventory contract', () => {
 
   it('keeps the dropped weapon independently selectable after walk-over scavenging', () => {
     const drop = createDeathDrop('death-2', 'sniper', { x: 0, y: 0, z: 0 }, 5, 6, 1_000);
-    const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 100, grenades: 1 }, 120, 2, 1_100);
+    const scavenged = scavengeDeathDrop(drop, { weapon: 'carbine', reserve: 100, grenades: 0 }, 120, 1_100);
     const picked = consumeDeathDropWeapon(scavenged.drop, { primary: 'carbine', ammo: 30, reserve: 120 }, 25, 1_200);
     expect(picked.consumed).toBe(true);
     expect(picked.mode).toBe('pickup');
