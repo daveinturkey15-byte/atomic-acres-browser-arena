@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { cloneMeshGeometriesForOwner } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
@@ -34,12 +33,17 @@ export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
   return adjusted;
 }
 
-const OPERATOR_URL = './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf';
+const OPERATOR_QUALITY_URL = './assets/original/models/operators/pass65-third-person-operator-lod0.glb';
+const OPERATOR_PERFORMANCE_URL = './assets/original/models/operators/pass65-third-person-operator-lod1.glb';
 const FIRST_PERSON_ARMS_URL = './assets/original/models/operators/pass65-first-person-arms-lod0.glb';
 
 type RiggedOperatorAsset = {
   scene: THREE.Group;
   clips: THREE.AnimationClip[];
+  lod: 0 | 1;
+  source: string;
+  skinnedMeshes: number;
+  pbrMaterials: number;
 };
 
 type RiggedOperatorRuntime = {
@@ -81,7 +85,7 @@ export type RiggedOperatorInstance = {
 
 export type OperatorAppearance = 'team' | 'neon-purple';
 
-let operatorAsset: RiggedOperatorAsset | null = null;
+const operatorAssets: Partial<Record<'quality' | 'performance', RiggedOperatorAsset>> = {};
 let firstPersonArmsAsset: THREE.Group | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
 let firstPersonArmsAssetPromise: Promise<void> | null = null;
@@ -278,74 +282,6 @@ function materialForTeam(
   return result;
 }
 
-function flattenOperatorMaterialGroups(
-  mesh: THREE.Mesh,
-  materials: THREE.Material[],
-  appearance: OperatorAppearance,
-): void {
-  const cloned = mesh.geometry.clone();
-  const geometry = cloned.index ? cloned.toNonIndexed() : cloned;
-  if (geometry !== cloned) cloned.dispose();
-  const vertexCount = geometry.getAttribute('position')?.count ?? 0;
-  const colors = new Float32Array(vertexCount * 3);
-  const groups = geometry.groups.length > 0
-    ? [...geometry.groups]
-    : [{ start: 0, count: vertexCount, materialIndex: 0 }];
-  for (const group of groups) {
-    const source = materials[group.materialIndex ?? 0] ?? materials[0];
-    const candidate = source as THREE.MeshStandardMaterial;
-    const color = candidate.color?.clone() ?? new THREE.Color(0xffffff);
-    if (candidate.emissive && candidate.emissiveIntensity > 0) {
-      color.lerp(candidate.emissive, Math.min(0.34, candidate.emissiveIntensity * 0.3));
-    }
-    const end = Math.min(vertexCount, group.start + group.count);
-    for (let vertex = group.start; vertex < end; vertex += 1) color.toArray(colors, vertex * 3);
-  }
-  geometry.clearGroups();
-  if (vertexCount > 0) geometry.addGroup(0, vertexCount, 0);
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  mesh.geometry = geometry;
-  mesh.material = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    roughness: appearance === 'neon-purple' ? 0.46 : 1,
-    metalness: appearance === 'neon-purple' ? 0.06 : 0,
-    emissive: appearance === 'neon-purple' ? 0x4f078d : 0x000000,
-    emissiveIntensity: appearance === 'neon-purple' ? 0.92 : 0,
-  });
-}
-
-function mergeFlattenedOperatorMeshes(visual: THREE.Group): void {
-  const meshes: THREE.SkinnedMesh[] = [];
-  visual.traverse((node) => {
-    if (node instanceof THREE.SkinnedMesh && node.visible) meshes.push(node);
-  });
-  if (meshes.length < 2) return;
-  const first = meshes[0];
-  if (!meshes.every((mesh) => mesh.skeleton.bones.length === first.skeleton.bones.length)) return;
-  const allowedAttributes = new Set(['position', 'normal', 'color', 'skinIndex', 'skinWeight']);
-  const geometries = meshes.map((mesh) => {
-    const geometry = mesh.geometry.clone();
-    for (const attribute of Object.keys(geometry.attributes)) {
-      if (!allowedAttributes.has(attribute)) geometry.deleteAttribute(attribute);
-    }
-    return geometry;
-  });
-  const geometry = mergeGeometries(geometries, false);
-  geometries.forEach((candidate) => candidate.dispose());
-  if (!geometry) return;
-  const merged = new THREE.SkinnedMesh(geometry, first.material);
-  merged.name = 'Swat_Merged_Vertex_LOD';
-  merged.castShadow = false;
-  merged.receiveShadow = false;
-  merged.userData.presentationOnly = true;
-  merged.raycast = () => undefined;
-  merged.bindMode = first.bindMode;
-  merged.bind(first.skeleton, first.bindMatrix);
-  meshes.forEach((mesh) => { mesh.visible = false; });
-  visual.add(merged);
-}
-
 function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
   if (result instanceof THREE.MeshStandardMaterial && material.name.toLowerCase() === 'skin') {
@@ -362,6 +298,34 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
 
 const loadRiggedGltf = (url: string) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
 
+function describeOperatorAsset(
+  operator: Awaited<ReturnType<typeof loadRiggedGltf>>,
+  lod: 0 | 1,
+  source: string,
+): RiggedOperatorAsset {
+  let skinnedMeshes = 0;
+  const pbrMaterials = new Set<THREE.MeshStandardMaterial>();
+  operator.scene.traverse((node) => {
+    if (node instanceof THREE.SkinnedMesh) skinnedMeshes += 1;
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (material instanceof THREE.MeshStandardMaterial
+        && material.map && material.normalMap && material.roughnessMap && material.metalnessMap) {
+        pbrMaterials.add(material);
+      }
+    }
+  });
+  return {
+    scene: operator.scene,
+    clips: operator.animations,
+    lod,
+    source,
+    skinnedMeshes,
+    pbrMaterials: pbrMaterials.size,
+  };
+}
+
 export function loadFirstPersonArmsAsset(): Promise<void> {
   if (firstPersonArmsAsset) return Promise.resolve();
   firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).then((arms) => {
@@ -371,11 +335,14 @@ export function loadFirstPersonArmsAsset(): Promise<void> {
 }
 
 export function loadRiggedOperatorAsset(): Promise<void> {
-  if (operatorAsset && firstPersonArmsAsset) return Promise.resolve();
+  if (operatorAssets.quality && operatorAssets.performance && firstPersonArmsAsset) return Promise.resolve();
   if (operatorAssetPromise) return operatorAssetPromise;
   operatorAssetPromise = Promise.all([
-    operatorAsset ? Promise.resolve() : loadRiggedGltf(OPERATOR_URL).then((operator) => {
-      operatorAsset = { scene: operator.scene, clips: operator.animations };
+    operatorAssets.quality ? Promise.resolve() : loadRiggedGltf(OPERATOR_QUALITY_URL).then((operator) => {
+      operatorAssets.quality = describeOperatorAsset(operator, 0, OPERATOR_QUALITY_URL);
+    }),
+    operatorAssets.performance ? Promise.resolve() : loadRiggedGltf(OPERATOR_PERFORMANCE_URL).then((operator) => {
+      operatorAssets.performance = describeOperatorAsset(operator, 1, OPERATOR_PERFORMANCE_URL);
     }),
     loadFirstPersonArmsAsset(),
   ]).then(() => undefined);
@@ -383,7 +350,9 @@ export function loadRiggedOperatorAsset(): Promise<void> {
 }
 
 export function riggedOperatorAssetReady(): boolean {
-  return operatorAsset !== null && firstPersonArmsAsset !== null;
+  return operatorAssets.quality !== undefined
+    && operatorAssets.performance !== undefined
+    && firstPersonArmsAsset !== null;
 }
 
 export type FirstPersonArmChain = {
@@ -487,6 +456,7 @@ export function createRiggedOperator(
   flattenMaterials: boolean,
   appearance: OperatorAppearance = 'team',
 ): RiggedOperatorInstance | null {
+  const operatorAsset = flattenMaterials ? operatorAssets.performance : operatorAssets.quality;
   if (!operatorAsset) return null;
   const root = new THREE.Group();
   root.name = name;
@@ -505,17 +475,19 @@ export function createRiggedOperator(
     node.receiveShadow = !flattenMaterials;
     node.userData.presentationOnly = true;
     node.raycast = () => undefined;
-    if (Array.isArray(node.material)) {
-      const materials = node.material.map((material) => materialForTeam(material, team, flattenMaterials, appearance));
-      if (flattenMaterials) {
-        flattenOperatorMaterialGroups(node, materials, appearance);
-      } else {
-        node.material = materials;
-      }
-    } else node.material = materialForTeam(node.material, team, flattenMaterials, appearance);
+    const prepare = (material: THREE.Material) => {
+      const result = materialForTeam(material, team, flattenMaterials, appearance);
+      result.transparent = false;
+      result.opacity = 1;
+      result.depthWrite = true;
+      result.depthTest = true;
+      result.alphaTest = 0;
+      return result;
+    };
+    if (Array.isArray(node.material)) node.material = node.material.map(prepare);
+    else node.material = prepare(node.material);
   });
   cloneMeshGeometriesForOwner(visual, 'operator-instance');
-  if (flattenMaterials) mergeFlattenedOperatorMeshes(visual);
   const stancePivot = new THREE.Group();
   stancePivot.name = 'operator-stance-pivot';
   stancePivot.position.y = STANCE_PIVOT_HEIGHT;
@@ -567,9 +539,13 @@ export function createRiggedOperator(
     },
   } satisfies RiggedOperatorRuntime;
   root.userData.operatorAsset = {
-    source: 'Quaternius Ultimate Modular Males / Swat.gltf',
+    source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
+    assetUrl: operatorAsset.source,
     license: 'CC0-1.0',
-    skinnedMeshes: 5,
+    lod: operatorAsset.lod,
+    skinnedMeshes: operatorAsset.skinnedMeshes,
+    pbrMaterials: operatorAsset.pbrMaterials,
+    materialContract: 'opaque-embedded-pbr-depth-writing',
     clips: operatorAsset.clips.length,
     embeddedWeaponsSuppressed,
   };
@@ -709,9 +685,13 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
   const hitProxyHeadWorld = headProxy?.getWorldPosition(new THREE.Vector3()) ?? null;
   return {
     source: root.userData.operatorAsset?.source,
+    assetUrl: root.userData.operatorAsset?.assetUrl,
     appearance: root.userData.operatorAppearance,
     license: root.userData.operatorAsset?.license,
+    lod: root.userData.operatorAsset?.lod,
     skinnedMeshes: root.userData.operatorAsset?.skinnedMeshes,
+    pbrMaterials: root.userData.operatorAsset?.pbrMaterials,
+    materialContract: root.userData.operatorAsset?.materialContract,
     clips: root.userData.operatorAsset?.clips,
     embeddedWeaponsSuppressed: root.userData.operatorAsset?.embeddedWeaponsSuppressed,
     visibleEmbeddedWeapons,

@@ -89,6 +89,16 @@ function authorSupportVehicles() {
   }
 }
 
+function authorThirdPersonOperator() {
+  mkdirSync('public/assets/original/models/operators', { recursive: true });
+  run(blenderCommand, ['--background', '--factory-startup', '--python', 'scripts/blender/create-pass65-third-person-operator.py']);
+  for (const lod of [0, 1, 2]) optimizeGlb(
+    `artifacts/blender-third-person-operator/raw/pass65-third-person-operator-lod${lod}.glb`,
+    `public/assets/original/models/operators/pass65-third-person-operator-lod${lod}.glb`,
+  );
+  run(process.execPath, ['scripts/blender/finalize-pass65-third-person-operator.mjs']);
+}
+
 if (target === 'arena') {
   run(npxCommand, [
     'vite-node',
@@ -168,6 +178,8 @@ if (target === 'arena') {
 } else if (target === 'operator-arms') {
   authorOperatorArms();
   run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
+} else if (target === 'operator-body') {
+  authorThirdPersonOperator();
 } else if (target === 'pass65-weapon-tranche') {
   authorCrossbow();
   authorOperatorArms();

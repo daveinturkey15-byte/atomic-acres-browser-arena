@@ -1,7 +1,8 @@
 import type { ArenaVisualBudgets, ArenaReviewCamera, ArenaColorPipelineDefinition } from '../arena-visual-definition';
 
 export const SHARED_GAMEPLAY_ASSETS = Object.freeze([
-  './assets/third-party/quaternius/ultimate-modular-males/Swat.gltf',
+  './assets/original/models/operators/pass65-third-person-operator-lod0.glb',
+  './assets/original/models/operators/pass65-third-person-operator-lod1.glb',
   './assets/third-party/quaternius/animated-guns/',
 ]);
 

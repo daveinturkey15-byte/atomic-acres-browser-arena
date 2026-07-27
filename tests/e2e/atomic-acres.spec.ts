@@ -55,8 +55,12 @@ type DebugState = {
     presentationWeaponSafe: boolean;
     operatorModel: {
       source: string;
+      assetUrl: string;
       appearance: string;
+      lod: 0 | 1;
       skinnedMeshes: number;
+      pbrMaterials: number;
+      materialContract: string;
       visibleSkinnedMeshes: number;
       mergedVertexLod: boolean;
       clips: number;
@@ -1071,10 +1075,13 @@ test.describe('solo mechanics', () => {
     expect(before.bots).toHaveLength(2);
     expect(before.bots.every((bot) => bot.alive)).toBe(true);
     expect(before.bots.every((bot) => bot.operatorModel !== null
-      && bot.operatorModel.source === 'Quaternius Ultimate Modular Males / Swat.gltf'
+      && bot.operatorModel.source === 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative'
+      && /pass65-third-person-operator-lod[01]\.glb$/u.test(bot.operatorModel.assetUrl)
       && bot.operatorModel.appearance === 'neon-purple'
-      && bot.operatorModel.skinnedMeshes > 0
-      && bot.operatorModel.visibleSkinnedMeshes > 0
+      && bot.operatorModel.skinnedMeshes === 9
+      && bot.operatorModel.visibleSkinnedMeshes === 9
+      && bot.operatorModel.pbrMaterials === 4
+      && bot.operatorModel.materialContract === 'opaque-embedded-pbr-depth-writing'
       && bot.neonHaze)).toBe(true);
     expect(new Set(before.bots.map((bot) => JSON.stringify({
       source: bot.operatorModel?.source,
@@ -1166,7 +1173,8 @@ test.describe('solo mechanics', () => {
     expect(observedWeapons).toEqual(new Set(BOT_WEAPON_POOL));
     expect(observedGrenades).toEqual(new Set(BOT_GRENADE_POOL));
     expect(escalated.bots[2].operatorModel).toMatchObject({
-      source: 'Quaternius Ultimate Modular Males / Swat.gltf', appearance: 'neon-purple', skinnedMeshes: 5,
+      source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
+      appearance: 'neon-purple', skinnedMeshes: 9, pbrMaterials: 4,
     });
   });
 
@@ -1222,7 +1230,8 @@ test.describe('solo mechanics', () => {
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(9);
     expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
     expect(state.bots[0].operatorModel).toMatchObject({
-      skinnedMeshes: 5, visibleSkinnedMeshes: 1, mergedVertexLod: true, clips: 24, weaponChildren: 1,
+      skinnedMeshes: 9, visibleSkinnedMeshes: 9, mergedVertexLod: false,
+      pbrMaterials: 4, materialContract: 'opaque-embedded-pbr-depth-writing', clips: 24, weaponChildren: 1,
     });
     expect(Math.abs(state.bots[0].screenPosition[0])).toBeLessThan(0.5);
     expect(Math.abs(state.bots[0].screenPosition[1])).toBeLessThan(0.8);
@@ -1271,7 +1280,7 @@ test.describe('solo mechanics', () => {
       }, weapon);
       await page.waitForTimeout(180);
       const operator = (await debug(page)).bots[0].operatorModel!;
-      expect.soft(operator.embeddedWeaponsSuppressed, `${weapon}:suppressed`).toBeGreaterThanOrEqual(1);
+      expect.soft(operator.embeddedWeaponsSuppressed, `${weapon}:source weapon removed before export`).toBe(0);
       expect.soft(operator.visibleEmbeddedWeapons, `${weapon}:spareWeapon`).toBe(0);
       expect.soft(operator.weaponChildren, `${weapon}:socketChildren`).toBe(1);
       expect.soft(operator.weaponMount, `${weapon}:mount`).toMatchObject({
@@ -1363,9 +1372,9 @@ test.describe('solo mechanics', () => {
     expect(dying.operatorModel?.activeClip).toBe('Death');
     expect((await debug(page)).corpses).toMatchObject({ active: 1, lifetimeMs: 7_500 });
     expect((await debug(page)).corpses.models[0]).toMatchObject({
-      source: 'Quaternius Ultimate Modular Males / Swat.gltf',
+      source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
       appearance: 'team',
-      skinnedMeshes: 5,
+      skinnedMeshes: 9,
       weaponChildren: 1,
       activeClip: 'Death',
     });

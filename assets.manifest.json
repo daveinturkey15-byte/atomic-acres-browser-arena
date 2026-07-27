@@ -271,6 +271,27 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-pass65-third-person-operator-family-2026-07-27",
+      "kind": "cc0-source-project-blender-pbr-skinned-operator-derivative",
+      "creator": "Quaternius source; Atomic Acres controlled Blender derivative",
+      "source": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "generatedAsOf": "2026-07-27",
+      "license": "CC0 1.0 Universal / Public Domain Dedication",
+      "files": "public/assets/original/**/pass65-third-person-operator-*",
+      "sourceBlend": "source-assets/blender/pass65-third-person-operator.blend",
+      "sourceBlendSha256": "50e0799d91ab36e01f2d928aa37b2f49dd05bf510817b50718bc94035ea61bba",
+      "sourceScript": "scripts/blender/create-pass65-third-person-operator.py",
+      "sourceScriptSha256": "6b4541d523ba998aaabd2ccea9005d52f77d3f3799892868ca0fc6431c87a818",
+      "sourceProvenance": "source-assets/blender/pass65-third-person-operator.provenance.json",
+      "sourceProvenanceSha256": "c31b656b69fbc094bc5d2e9ba6081b1f95565f35d8def35a211ae8a396906e9b",
+      "productionManifest": "source-assets/blender/pass65-third-person-operator.manifest.json",
+      "productionManifestSha256": "d4f9be917e5dc9a3b4ccde2ebbc1dca7599c788dd3e706aeea3292ab4d791f0b",
+      "preview": "docs/assets/pass65-operators/third-person/pass65-third-person-operator-contact-sheet.png",
+      "format": "Three distinct optimized self-contained glTF 2.0 skinned LODs with 62-joint rig, 24 clips, embedded material-specific WebP PBR textures and opaque materials",
+      "modifications": "Removed the embedded source pistol; retained lawful topology, full-body skin weights and complete action corpus; authored material-specific base-color, normal, roughness and metallic maps; added strict LOD/provenance/review contracts. Runtime Quality selects LOD0 and Performance selects LOD1 without replacing anatomy or collision authority.",
+      "attributionRequired": false
+    },
+    {
       "id": "atomic-acres-rustworks-central-tower-2026-07-20",
       "kind": "original-project-3d-model",
       "creator": "Atomic Acres project / Jigglyclaw",
