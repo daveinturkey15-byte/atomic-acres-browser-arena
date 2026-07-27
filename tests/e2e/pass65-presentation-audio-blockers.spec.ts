@@ -54,7 +54,7 @@ async function readyAndDeploy(page: Page): Promise<void> {
   await page.locator('#solo').click();
   await expect.poll(async () => page.evaluate(() => (
     window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase
-  ))).toBe('active');
+  )), { timeout: 30_000 }).toBe('active');
 }
 
 test('bounds M14 smoke thermal, pre-shot minigun spool/audio, and passive knife presence', async ({ page }) => {

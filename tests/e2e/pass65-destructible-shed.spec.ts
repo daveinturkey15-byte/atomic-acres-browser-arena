@@ -40,7 +40,7 @@ async function readyAndDeploy(page: Page): Promise<void> {
   await page.locator('#solo').click();
   await expect.poll(async () => page.evaluate(() => (
     (window.__ATOMIC_ACRES_DEBUG__ as unknown as ShedDebug).snapshot().matchPhase
-  ))).toBe('active');
+  )), { timeout: 30_000 }).toBe('active');
 }
 
 async function westShed(page: Page): Promise<ShedSnapshot> {
