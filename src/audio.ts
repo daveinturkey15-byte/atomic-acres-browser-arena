@@ -10,6 +10,7 @@ import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-set
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
 import type { MinigunSpoolPhase } from './minigun-spool';
+import { WEAPON_REPORT_PROFILES } from './weapon-audio-profiles';
 
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
@@ -56,14 +57,7 @@ export function flashbangAudioEnvelope(requestedAudioGain: number): FlashbangAud
 }
 
 export const RAILGUN_REPORT_PROFILE = Object.freeze({
-  body: 42,
-  bodyEnd: 13,
-  duration: 0.46,
-  crack: 5_200,
-  noise: 0.5,
-  lowpass: 3_200,
-  tail: 180,
-  tailDuration: 0.9,
+  ...WEAPON_REPORT_PROFILES.railgun,
   pressureDuration: 0.62,
   layerCount: 8,
 });
@@ -358,28 +352,10 @@ export class ArenaAudio {
       ? railgunReportAttenuation(remote, distance)
       : remote ? Math.max(0.08, 0.55 * (1 - Math.min(1, distance / 80))) : 1;
     const attenuation = spatialAttenuation * WEAPON_REPORT_GAIN[weapon];
-    const profile = weapon === 'railgun'
-      ? RAILGUN_REPORT_PROFILE
-      : weapon === 'explosive-crossbow'
-      ? { body: 116, bodyEnd: 54, duration: 0.11, crack: 840, noise: 0.045, lowpass: 1600, tail: 290, tailDuration: 0.14 }
-      : weapon === 'scattergun' || weapon === 'slug-shotgun'
-      ? { body: 78, bodyEnd: 34, duration: 0.22, crack: 1120, noise: 0.34, lowpass: 1900, tail: 410, tailDuration: 0.3 }
-      : weapon === 'sniper' || weapon === 'm14-ebr'
-        ? { body: 62, bodyEnd: 24, duration: 0.26, crack: 2920, noise: 0.3, lowpass: 2400, tail: 330, tailDuration: 0.42 }
-      : weapon === 'lmg' || weapon === 'minigun'
-        ? { body: 88, bodyEnd: 34, duration: 0.17, crack: 1540, noise: 0.29, lowpass: 2500, tail: 440, tailDuration: 0.26 }
-      : weapon === 'smg' || weapon === 'mini-uzi' || weapon === 'mp5'
-        ? { body: 156, bodyEnd: 68, duration: 0.085, crack: 2100, noise: 0.16, lowpass: 3600, tail: 760, tailDuration: 0.12 }
-        : weapon === 'machine-pistol'
-          ? { body: 168, bodyEnd: 72, duration: 0.078, crack: 2280, noise: 0.14, lowpass: 3900, tail: 720, tailDuration: 0.1 }
-          : weapon === 'magnum' || weapon === 'flashlight-pistol'
-            ? { body: 64, bodyEnd: 22, duration: 0.24, crack: 2840, noise: 0.32, lowpass: 2500, tail: 340, tailDuration: 0.38 }
-          : weapon === 'pistol'
-            ? { body: 182, bodyEnd: 76, duration: 0.105, crack: 2380, noise: 0.18, lowpass: 4100, tail: 690, tailDuration: 0.14 }
-            : { body: 116, bodyEnd: 46, duration: 0.13, crack: 1750, noise: 0.23, lowpass: 2900, tail: 560, tailDuration: 0.19 };
+    const profile = WEAPON_REPORT_PROFILES[weapon];
 
     this.sweep(profile.body, profile.bodyEnd, profile.duration, 0.22 * attenuation, 'sawtooth', this.weapons);
-    this.sweep(profile.crack, profile.crack * 0.38, 0.035, 0.075 * attenuation, 'square', this.weapons);
+    this.sweep(profile.crack, profile.crack * profile.crackEndRatio, profile.crackDuration, 0.075 * attenuation, 'square', this.weapons);
     this.noise({
       duration: profile.duration,
       volume: profile.noise * attenuation,
@@ -388,10 +364,10 @@ export class ArenaAudio {
       q: 0.7,
     }, this.weapons);
     this.noise({
-      duration: 0.028,
+      duration: profile.transientDuration,
       volume: 0.17 * attenuation,
       filter: 'highpass',
-      frequency: weapon === 'scattergun' || weapon === 'slug-shotgun' ? 1400 : weapon === 'sniper' || weapon === 'm14-ebr' ? 1250 : 2400,
+      frequency: profile.transientHighpass,
       q: 0.4,
     }, this.weapons);
     this.noise({
@@ -421,9 +397,8 @@ export class ArenaAudio {
     }
 
     if (!remote) {
-      const mechanismDelay = weapon === 'scattergun' ? 0.21 : weapon === 'sniper' ? 0.62 : 0.055;
-      this.tone(weapon === 'scattergun' ? 340 : weapon === 'sniper' ? 290 : 520, 0.028, 0.038, 'square', this.feedback, mechanismDelay);
-      this.tone(weapon === 'smg' ? 680 : 430, 0.018, 0.022, 'triangle', this.feedback, mechanismDelay + 0.025);
+      this.tone(profile.mechanismPrimaryHz, 0.028, 0.038, 'square', this.feedback, profile.mechanismDelay);
+      this.tone(profile.mechanismSecondaryHz, 0.018, 0.022, 'triangle', this.feedback, profile.mechanismDelay + 0.025);
     }
   }
 
