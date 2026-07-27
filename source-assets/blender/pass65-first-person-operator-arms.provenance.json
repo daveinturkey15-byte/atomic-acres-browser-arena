@@ -10,19 +10,19 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-first-person-arms.py",
-    "sha256": "4e19edd3881cc195cf71662fedde636363a3db13ea2a874ba721cfe12157d4b4"
+    "sha256": "8e4b1b3ec431900ba1dd142ee209f4aa39e74b7f76fdd5f337bd2a3beb91cbb0"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-first-person-operator-arms.blend",
-    "sha256": "463af87c51744b8971e13cab08900667bbf6cef198b19e97c45e7d3d83db6b0f"
+    "sha256": "5bd58ef28e556c89aa63a649c8df02a794fc6271a014fafc4f0c1ba107cd1b08"
   },
   "firstPersonGlbs": [
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-      "sha256": "9e3f0f3fcb4112b6192e08bef0ca7724371e31ca40e7bba004b5bfbfaba52b81",
+      "sha256": "dd79624ebfb0868970d841491e58033174cba8e5b7e29f76d0b18fbcbcc4c45a",
       "lod": 0,
-      "triangles": 10116,
-      "bytes": 374452,
+      "triangles": 5268,
+      "bytes": 309200,
       "skinnedMeshNodes": 4,
       "renderPrimitives": 4,
       "skins": 4,
@@ -31,10 +31,10 @@
     },
     {
       "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-      "sha256": "31030d919b6225c515c23f401360e6d05c2aab71b604d1e25312174272870437",
+      "sha256": "d089a68d51fdb44fe17a1f214745973320d59675e28b7e62818c07f16124d964",
       "lod": 1,
-      "triangles": 9212,
-      "bytes": 362544,
+      "triangles": 4132,
+      "bytes": 298248,
       "skinnedMeshNodes": 4,
       "renderPrimitives": 4,
       "skins": 4,
@@ -45,25 +45,25 @@
   "pbrMaps": {
     "baseColor": {
       "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-baseColor.png",
-      "sha256": "a7f587087ebe617a107c3fd11320e6d39dd6e9a26b96c213b87b8a93af920477",
+      "sha256": "588681190d16af6253a28be4498c3e1e788e9997cd6ae73a1134e2033373ccc0",
       "width": 512,
       "height": 512
     },
     "normal": {
       "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-normal.png",
-      "sha256": "0fe9d922d2383356342291c8508108150a63d3c0562c0ca39595002a044bec3f",
+      "sha256": "e7f2071073fab2d95ca66ff1fdfa0eea73094ea5855bd82e2fabaa44ea8ccfde",
       "width": 512,
       "height": 512
     },
     "roughness": {
       "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-roughness.png",
-      "sha256": "15c7063f741ab76762c8b5dfc87b2582234f279031d7cc7cc053799ee2f0225f",
+      "sha256": "e4e6f51425cecaa5a841de5debaf74c87a909508922c092f0ba12e3e9811d8b1",
       "width": 512,
       "height": 512
     },
     "metallic": {
       "path": "public/assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-metallic.png",
-      "sha256": "dc1c7e4818d39a4007581234bdda21ec0ccb9fca660d97326eaa88fa41a07d14",
+      "sha256": "a92653d0ff3499d538ff310bc32d121a99981a238e563cf977d8115a89954803",
       "width": 512,
       "height": 512
     }
@@ -129,6 +129,14 @@
     "inspect"
   ],
   "materialContract": "All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.",
+  "visualRevision": "human-anatomy-m4-contact-v4",
+  "limbProfileContract": "human-deltoid-brachioradialis-ulna-wrist-taper-v4",
+  "handPoseContract": "separate-palm-thumb-index-resting-digit-grip-v4",
+  "shoulderEntryContract": "tapered-offscreen-sleeve",
+  "gloveConstructionContract": "opaque-articulated-knuckle-pads-seams-cloth-v4",
+  "weaponGripReviewContract": "m4a1-neutral-ads-reload-contact-v4",
+  "fingerSegmentCount": 30,
+  "weaponGripReviewFrames": 3,
   "performanceContract": {
     "maxSkinnedRenderableMeshesPerLod": 6,
     "maxSkinnedPrimitivesPerLod": 6,
@@ -143,46 +151,60 @@
     "renders": [
       {
         "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-neutral-front.png",
-        "sha256": "4968428d25322ede54913ee6b9a9d7c457aa7da5a404286ef1cb01c8e8814e87",
-        "width": 512,
-        "height": 512,
+        "sha256": "a57e351365e54c10922c786332b6ffccc237b6269ad827f0262f22fe4e7357f9",
+        "width": 640,
+        "height": 640,
         "cameraId": "neutral-front"
       },
       {
-        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-neutral-quarter.png",
-        "sha256": "0d2057d1c0fb727e99c7ca89639224e3b3e23476846a4612e4a1fbce20f6b24d",
-        "width": 512,
-        "height": 512,
-        "cameraId": "neutral-quarter"
+        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-forearm-wrist-quarter.png",
+        "sha256": "dde7d2365ec535043ae133e1bcd2756e5dac6530b8e8dec64679ff5ca23070ea",
+        "width": 640,
+        "height": 640,
+        "cameraId": "forearm-wrist-quarter"
       },
       {
-        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-glove-closeup.png",
-        "sha256": "cacab7a55105ecfdac30817f42732b2fc1167be8919c8aa2fabba5aca60a689d",
-        "width": 512,
-        "height": 512,
-        "cameraId": "glove-closeup"
+        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-hand-anatomy-closeup.png",
+        "sha256": "3fc6f2d2149ccd8cdf4f9269e2562dd72c42cb3e415f1b17ecee70bdcff5e6b6",
+        "width": 640,
+        "height": 640,
+        "cameraId": "hand-anatomy-closeup"
       },
       {
-        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-reload-action.png",
-        "sha256": "f5a43ee535b81eeb6c7325c04f1684b818bdf80e2a39748e576b625f55b7f258",
-        "width": 512,
-        "height": 512,
-        "cameraId": "reload-action"
+        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-neutral-contact.png",
+        "sha256": "fe5eda8d5ca7b4750e42b4dbea899832e50ca533639ac1dc5424a9b81a2fe924",
+        "width": 640,
+        "height": 640,
+        "cameraId": "m4a1-neutral-contact"
+      },
+      {
+        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-ads-contact.png",
+        "sha256": "96194e222882af529fb0a54b982de1e05a2d2599902adea190d645cce3f58034",
+        "width": 640,
+        "height": 640,
+        "cameraId": "m4a1-ads-contact"
+      },
+      {
+        "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-m4a1-reload-contact.png",
+        "sha256": "d97ad4d9155c50abf99abcef21c2c2dac9b913c7e4bbaf2b70349309cddbefb1",
+        "width": 640,
+        "height": 640,
+        "cameraId": "m4a1-reload-contact"
       }
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-contact-sheet.png",
-      "sha256": "0dcdfd947c51324aa3be9d0a202f5df6825a31618473afc12e62beb248f10ba5",
-      "width": 1024,
-      "height": 1024
+      "sha256": "068b9a6955599786b68ac990fbf69b5de63f9f57d14eaaa7d0682c5ab79eaade",
+      "width": 1920,
+      "height": 1280
     }
   },
   "runtimeAudit": {
     "lods": [
       {
         "lod": 0,
-        "triangles": 10116,
-        "bytes": 374452,
+        "triangles": 5268,
+        "bytes": 309200,
         "meshNodes": 4,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
@@ -206,12 +228,21 @@
           "melee",
           "inspect"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "gripContactReceipts": {
+          "m4a1": {
+            "rightError": 1e-7,
+            "leftError": 0,
+            "scale": 0.520386,
+            "rightContacts": 3,
+            "leftContacts": 5
+          }
+        }
       },
       {
         "lod": 1,
-        "triangles": 9212,
-        "bytes": 362544,
+        "triangles": 4132,
+        "bytes": 298248,
         "meshNodes": 4,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
@@ -235,7 +266,16 @@
           "melee",
           "inspect"
         ],
-        "externalUris": 0
+        "externalUris": 0,
+        "gripContactReceipts": {
+          "m4a1": {
+            "rightError": 1e-7,
+            "leftError": 0,
+            "scale": 0.520386,
+            "rightContacts": 3,
+            "leftContacts": 5
+          }
+        }
       }
     ],
     "externalUris": 0

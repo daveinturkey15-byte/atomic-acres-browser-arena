@@ -263,7 +263,7 @@ type DebugState = {
     activeCasings: number;
     activeSmoke: number;
     detailsReady: boolean;
-    modelKind: 'licensed-imported' | 'original-authored';
+    modelKind: 'licensed-imported' | 'original-authored' | 'project-original-blender';
     firstPersonSource: string;
     weaponModelId: string;
     weaponFinishId: string;
@@ -276,7 +276,7 @@ type DebugState = {
     attachedWeaponBatchStats: { sourceMeshes: number; batches: number };
     knifeVisible: boolean;
     riggedArms: Array<{ finite: boolean; bindOffsetsPreserved: boolean; contactError: number }>;
-    importedModel: { source: string; weapon: string; clips: number; meshes: number; detailMeshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
+    importedModel: { source: string; weapon: string; clips: number; meshes: number; renderPrimitives: number; triangles: number; detailMeshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
   };
   sniperScope: { active: boolean; magnification: number; baseFov: number; cameraFov: number; viewmodelVisible: boolean };
   weaponActionHistory: string[];
@@ -1063,6 +1063,72 @@ test.describe('solo mechanics', () => {
     expect(settled.persistentWindowDebris[0].position.every(Number.isFinite)).toBe(true);
   });
 
+  test('loads the consolidated M4A1 anchor inside its runtime primitive budget', async ({ page }) => {
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } })
+        .__ATOMIC_ACRES_DEBUG__.equipWeapon('m4a1');
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('m4a1');
+    const presentation = (await debug(page)).weaponPresentation;
+    expect(presentation).toMatchObject({
+      weapon: 'm4a1',
+      detailsReady: true,
+      modelKind: 'project-original-blender',
+      firstPersonSource: 'project-original-blender-pass65-firearm',
+      modelVisibleMeshCount: 8,
+    });
+    expect(presentation.importedModel).toMatchObject({
+      weapon: 'm4a1',
+      clips: 13,
+      meshes: 8,
+      renderPrimitives: 8,
+      triangles: 32112,
+      socketContractReady: true,
+    });
+    expect(presentation.importedModel?.muzzleForwardDot ?? -1).toBeGreaterThan(0.85);
+    expect(presentation.importedModel?.sightForwardDot ?? -1).toBeGreaterThan(0.995);
+  });
+
+  test('captures accepted arms v4 on the integrated M4 neutral, ADS and reload paths', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        equipWeapon: (weapon: 'm4a1') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon('m4a1');
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('m4a1');
+    await page.screenshot({ path: 'test-results/pass65-arms-v4-m4-neutral.png', animations: 'disabled' });
+
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } })
+        .__ATOMIC_ACRES_DEBUG__.setAds(true);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+    await page.screenshot({ path: 'test-results/pass65-arms-v4-m4-ads.png', animations: 'disabled' });
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setAds: (held: boolean) => void;
+        setAmmo: (weapon: 'm4a1', ammo: number, reserve: number) => void;
+        reload: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setAmmo('m4a1', 10, 60);
+      api.reload();
+    });
+    await expect.poll(async () => (await debug(page)).player.reloading).toBe(true);
+    await page.waitForTimeout(380);
+    const reloadState = await debug(page);
+    expect(reloadState.weaponPresentation.armsVisible).toBe(true);
+    expect(reloadState.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(4);
+    expect(reloadState.weaponPresentation.armMeshCount).toBeLessThanOrEqual(6);
+    expect(reloadState.weaponPresentation.importedModel).toMatchObject({
+      weapon: 'm4a1', clips: 13, socketContractReady: true,
+    });
+    await page.screenshot({ path: 'test-results/pass65-arms-v4-m4-reload.png', animations: 'disabled' });
+  });
+
   test('sprints smoothly from the foot to the landing of both house ramps', async ({ page }) => {
     type RampStage = { kind: 'interior' | 'exterior'; start: number[]; top: number[]; uphill: number[]; run: number };
     for (const kind of ['interior', 'exterior'] as const) {
@@ -1214,53 +1280,95 @@ test.describe('solo mechanics', () => {
     });
   });
 
-  test('renders seven distinct authored first-person weapons with connected two-hand grips and a readable hostile operator', async ({ page }) => {
-    test.setTimeout(180_000);
+  test('renders every distinct project-original Blender firearm through neutral, ADS and reload evidence', async ({ page }) => {
+    test.setTimeout(300_000);
     await page.evaluate(() => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotAhead: (distance: number) => void } }).__ATOMIC_ACRES_DEBUG__;
       api.placeBotAhead(5);
     });
     await page.waitForTimeout(150);
-    const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
-    const sourceMeshCounts = new Map<string, number>();
+    const designs = {
+      carbine: 'hk416-short-stroke-rail-v1', smg: 'p90-bullpup-top-feed-v1', lmg: 'm249-belt-fed-support-v1',
+      scattergun: 'remington870-pump-v1', sniper: 'm40a5-bolt-action-v1', railgun: 'emrg-twin-coil-capacitor-v1',
+      pistol: 'glock17-service-v1', magnum: 'desert-eagle-heavy-gas-v1', 'machine-pistol': 'glock18-ported-auto-v1',
+      'mini-uzi': 'mini-uzi-stamped-telescoping-v1', mp5: 'mp5-roller-delayed-v1', m4a1: 'm4a1-direct-impingement-v1',
+      'ak-47': 'ak47-long-stroke-laminate-v1', minigun: 'm134-six-barrel-rotary-v1', 'm14-ebr': 'm14ebr-sage-chassis-v1',
+      'slug-shotgun': 'benelli-m4-gas-slug-v1', 'flashlight-pistol': 'usp45-tactical-light-v1',
+    } as const;
+    const weapons = Object.keys(designs) as Array<keyof typeof designs>;
+    const captureViewmodel = async (path: string) => {
+      await page.evaluate(() => (
+        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
+      ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+      try {
+        await page.screenshot({ path, animations: 'disabled', timeout: 60_000 });
+      } finally {
+        await page.evaluate(() => (
+          window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
+        ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+      }
+    };
     const finishIds = new Set<string>();
     for (const weapon of weapons) {
       await page.evaluate((selected) => {
         (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } }).__ATOMIC_ACRES_DEBUG__.equipWeapon(selected);
       }, weapon);
       await expect.poll(async () => (await debug(page)).weaponPresentation.weapon).toBe(weapon);
+      await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe(weapon);
       const weaponState = (await debug(page)).weaponPresentation;
       expect(weaponState.armsVisible, `${weapon}:armsVisible`).toBe(true);
-      expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(6);
-      expect(weaponState.modelKind, `${weapon}:modelKind`).toBe('original-authored');
-      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('authored-pbr-v6-seven-unique-finishes');
-      expect(weaponState.weaponModelId, `${weapon}:modelId`).toBe(`${weapon}-authored-v6`);
-      expect(typeof weaponState.weaponFinishId, `${weapon}:finishId`).toBe('string');
-      expect(weaponState.importedModel, `${weapon}:importedModel`).toBeNull();
+      expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeLessThanOrEqual(6);
+      expect(weaponState.modelKind, `${weapon}:modelKind`).toBe('project-original-blender');
+      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('project-original-blender-pass65-firearm');
+      expect(weaponState.weaponModelId, `${weapon}:modelId`).toBe(designs[weapon]);
+      expect(weaponState.weaponFinishId, `${weapon}:finishId`).toBe(`${weapon}-project-original-pbr-v1`);
+      expect(weaponState.importedModel, `${weapon}:importedModel`).toMatchObject({
+        weapon, clips: 13, socketContractReady: true,
+      });
+      expect(weaponState.importedModel?.source, `${weapon}:source`).toBe(
+        `./assets/original/models/weapons/pass65-firearms/${weapon}/${weapon}-fp-lod0.glb`,
+      );
+      expect(weaponState.importedModel?.meshes, `${weapon}:runtimeMeshes`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.importedModel?.meshes, `${weapon}:runtimeMeshes`).toBeLessThanOrEqual(16);
+      expect(weaponState.importedModel?.renderPrimitives, `${weapon}:runtimeRenderPrimitives`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.importedModel?.renderPrimitives, `${weapon}:runtimeRenderPrimitives`).toBeLessThanOrEqual(16);
+      expect(weaponState.importedModel?.triangles, `${weapon}:runtimeTriangles`).toBeGreaterThanOrEqual(1_200);
+      expect(weaponState.importedModel?.triangles, `${weapon}:runtimeTriangles`).toBeLessThanOrEqual(35_000);
+      if (weapon === 'm4a1') {
+        expect(weaponState.importedModel?.triangles, 'm4a1:runtimeTriangles').toBe(32112);
+      }
       expect(weaponState.detailsReady, `${weapon}:detailsReady`).toBe(true);
-      expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeGreaterThanOrEqual(8);
-      expect(weaponState.attachedWeaponBatchStats, `${weapon}:batchStats`).not.toBeNull();
-      expect(weaponState.attachedWeaponBatchStats.sourceMeshes, `${weapon}:sourceMeshes`).toBeGreaterThanOrEqual(11);
+      expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeLessThanOrEqual(16);
+      expect(weaponState.attachedWeaponBatchStats, `${weapon}:qualityPathPreservesPbrParts`).toBeNull();
       expect(weaponState.riggedArms, `${weapon}:riggedArms`).toHaveLength(2);
       expect(weaponState.riggedArms.every((arm: { finite: boolean; bindOffsetsPreserved: boolean; contactError: number }) => arm.finite && arm.bindOffsetsPreserved && arm.contactError <= 0.02), `${weapon}:handContact`).toBe(true);
       expect(weaponState.sightOffset?.every(Number.isFinite), `${weapon}:sightOffset`).toBe(true);
-      sourceMeshCounts.set(weapon, weaponState.attachedWeaponBatchStats.sourceMeshes);
       finishIds.add(weaponState.weaponFinishId);
+      await captureViewmodel(`test-results/pass65-${weapon}-first-person-neutral.png`);
+
       await page.evaluate(() => (
-        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
-      ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
-      try {
-        await page.screenshot({ path: `test-results/pass32-${weapon}-viewmodel.png`, animations: 'disabled', timeout: 60_000 });
-      } finally {
-        await page.evaluate(() => (
-          window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
-        ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
-      }
+        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }
+      ).__ATOMIC_ACRES_DEBUG__.setAds(true));
+      await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+      await captureViewmodel(`test-results/pass65-${weapon}-first-person-ads.png`);
+
+      await page.evaluate(() => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          setAds: (held: boolean) => void;
+          setReloadCaptureProgress: (progress: number | null) => void;
+        } }).__ATOMIC_ACRES_DEBUG__;
+        api.setAds(false);
+        api.setReloadCaptureProgress(0.46);
+      });
+      await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeLessThan(0.02);
+      await captureViewmodel(`test-results/pass65-${weapon}-first-person-reload.png`);
+      await page.evaluate(() => (
+        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setReloadCaptureProgress: (progress: number | null) => void } }
+      ).__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
     }
-    // Performance batching should preserve the machine pistol's extra authored
-    // compensator/control geometry without rewarding it for extra draw calls.
-    expect(sourceMeshCounts.get('machine-pistol')).toBeGreaterThan(sourceMeshCounts.get('pistol') ?? 0);
-    expect(finishIds.size).toBe(7);
+    expect(finishIds.size).toBe(weapons.length);
     const state = await debug(page);
     expect(state.bots[0].rootVisible).toBe(true);
     expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(9);
@@ -1305,7 +1413,16 @@ test.describe('solo mechanics', () => {
       } }).__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(x, 0.9, z, yaw, 0);
     }, { x: cameraX, z: cameraZ, yaw: cameraYaw });
 
-    const weapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
+    const designs = {
+      carbine: 'hk416-short-stroke-rail-v1', smg: 'p90-bullpup-top-feed-v1', lmg: 'm249-belt-fed-support-v1',
+      scattergun: 'remington870-pump-v1', sniper: 'm40a5-bolt-action-v1', railgun: 'emrg-twin-coil-capacitor-v1',
+      pistol: 'glock17-service-v1', magnum: 'desert-eagle-heavy-gas-v1', 'machine-pistol': 'glock18-ported-auto-v1',
+      'mini-uzi': 'mini-uzi-stamped-telescoping-v1', mp5: 'mp5-roller-delayed-v1', m4a1: 'm4a1-direct-impingement-v1',
+      'ak-47': 'ak47-long-stroke-laminate-v1', minigun: 'm134-six-barrel-rotary-v1', 'm14-ebr': 'm14ebr-sage-chassis-v1',
+      'slug-shotgun': 'benelli-m4-gas-slug-v1', 'flashlight-pistol': 'usp45-tactical-light-v1',
+    } as const;
+    const weapons = Object.keys(designs) as Array<keyof typeof designs>;
+    const poseWeapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
     const modelIds = new Set<string>();
     const finishIds = new Set<string>();
     for (const weapon of weapons) {
@@ -1314,13 +1431,14 @@ test.describe('solo mechanics', () => {
           setBotPresentation: (stance: 'stand', speed: number, weapon: typeof selected) => void;
         } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation('stand', 0, selected);
       }, weapon);
-      await page.waitForTimeout(180);
+      await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.weaponMount?.modelId ?? null).toBe(designs[weapon]);
       const operator = (await debug(page)).bots[0].operatorModel!;
       expect.soft(operator.embeddedWeaponsSuppressed, `${weapon}:source weapon removed before export`).toBe(0);
       expect.soft(operator.visibleEmbeddedWeapons, `${weapon}:spareWeapon`).toBe(0);
       expect.soft(operator.weaponChildren, `${weapon}:socketChildren`).toBe(1);
       expect.soft(operator.weaponMount, `${weapon}:mount`).toMatchObject({
         directChild: true, finite: true, forwardCorrection: 'stable-body-mount-minus-z',
+        modelId: designs[weapon], finishId: `${weapon}-project-original-pbr-v1`,
       });
       expect.soft(Math.max(...operator.weaponMount.localScale), `${weapon}:third-person scale`).toBeLessThanOrEqual(0.54);
       expect.soft(operator.armBonesPresent, `${weapon}:complete arm chains`).toBe(6);
@@ -1332,10 +1450,10 @@ test.describe('solo mechanics', () => {
       });
       modelIds.add(operator.weaponMount.modelId);
       finishIds.add(operator.weaponMount.finishId);
-      await page.screenshot({ path: `test-results/refined-operator-${weapon}.png`, animations: 'disabled' });
+      await page.screenshot({ path: `test-results/pass65-operator-${weapon}.png`, animations: 'disabled' });
     }
-    expect(modelIds.size).toBe(7);
-    expect(finishIds.size).toBe(7);
+    expect(modelIds.size).toBe(weapons.length);
+    expect(finishIds.size).toBe(weapons.length);
 
     const poses = [
       { name: 'idle', stance: 'stand' as const, speed: 0 },
@@ -1369,7 +1487,7 @@ test.describe('solo mechanics', () => {
         expect.soft(operator.animationContract.pivotHeight, pose.name).toBeLessThan(0.55);
       }
       await page.screenshot({ path: `test-results/refined-operator-pose-${pose.name}.png`, animations: 'disabled' });
-      for (const poseWeapon of weapons) {
+      for (const poseWeapon of poseWeapons) {
         if (poseWeapon === 'carbine') continue;
         await page.evaluate(({ stance, speed, weapon }) => {
           (window as unknown as { __ATOMIC_ACRES_DEBUG__: {

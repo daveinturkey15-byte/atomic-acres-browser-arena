@@ -10,6 +10,9 @@ const AUTHORING_TARGETS = Object.freeze([
   'crossbow',
   'operator-arms',
   'operator-body',
+  'weapon-families',
+  'weapon-preview-reconcile',
+  'field-knife',
   'pass65-weapon-tranche',
   'support-vehicles',
 ]);

@@ -26,6 +26,7 @@ export async function readGlb(file) {
   if (bytes.readUInt32LE(8) !== bytes.length) throw new Error(`${file}: GLB byte length header mismatch`);
   let offset = 12;
   let json = null;
+  let binary = null;
   while (offset + 8 <= bytes.length) {
     const length = bytes.readUInt32LE(offset);
     const type = bytes.readUInt32LE(offset + 4);
@@ -33,10 +34,11 @@ export async function readGlb(file) {
     const end = start + length;
     if (end > bytes.length) throw new Error(`${file}: GLB chunk exceeds file length`);
     if (type === 0x4e4f534a) json = JSON.parse(bytes.toString('utf8', start, end).replace(/[\0 ]+$/u, ''));
+    if (type === 0x004e4942) binary = bytes.subarray(start, end);
     offset = end;
   }
   if (!json) throw new Error(`${file}: GLB JSON chunk missing`);
-  return { bytes, json };
+  return { bytes, json, binary };
 }
 
 function descendantMeshCount(json, rootIndex) {

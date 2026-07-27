@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "assetFamilyId": "pass65-project-original-firearm-corpus-v1",
+  "id": "minigun",
+  "displayName": "M134 Minigun",
+  "designId": "m134-six-barrel-rotary-v1",
+  "silhouetteFamily": "lmg",
+  "title": "Pass 65 project-original M134 Minigun presentation family",
+  "creator": "Atomic Acres project",
+  "owner": "Atomic Acres project",
+  "created": "2026-07-26",
+  "license": "Project-original; no third-party meshes or textures",
+  "inspirationBoundary": "Project-original Blender geometry and procedural PBR textures; real platform names are catalog labels only; no copied commercial-game geometry, textures, logos, or extracted assets.",
+  "blenderVersion": "5.1.2",
+  "generator": {
+    "path": "scripts/blender/create-pass65-weapon-families.py",
+    "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+  },
+  "geometryModule": {
+    "path": "scripts/blender/pass65_weapon_production_geometry.py",
+    "sha256": "70a191c14928ec95d9aefdc41a10cd94662bd44f684fb21f3149d88a813c38b8"
+  },
+  "sourceBlend": {
+    "path": "source-assets/blender/pass65-weapon-families.blend",
+    "sha256": "6a8c458807efedaaca6234ae33d91a204dcacf96cefb7cb201585f90807e8754"
+  },
+  "sourceSpec": {
+    "path": "source-assets/blender/pass65-weapon-family-specs.json",
+    "sha256": "3e8cff133381c65a514a2a5f97a348a4229208dc014de0bf9bad53432255cebf"
+  },
+  "runtimeForwardAxis": "-Z",
+  "visualRevision": "platform-production-hero-v4",
+  "materialLanguage": "platform-authentic-metal-polymer-pbr-v4",
+  "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+  "deliveries": {
+    "firstPersonGlbs": [
+      {
+        "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod0.glb",
+        "sha256": "bc7c965c3931ca2cce575a98552532b46fae11f41e313d3b03940cf726583a3b",
+        "variant": "first-person-lod0",
+        "lod": 0,
+        "triangles": 10840,
+        "bytes": 213428,
+        "meshNodes": 8,
+        "renderPrimitives": 8
+      },
+      {
+        "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod1.glb",
+        "sha256": "ee938f709c39d0ccf4a6594786d2f8bd23534659a829d515e69b7589d9be8e5a",
+        "variant": "first-person-lod1",
+        "lod": 1,
+        "triangles": 6994,
+        "bytes": 181848,
+        "meshNodes": 8,
+        "renderPrimitives": 8
+      }
+    ],
+    "worldGlbs": [
+      {
+        "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod0.glb",
+        "sha256": "0302f01ddae85ad5aace8b356068e3fba4c1d255b0b5504c31f726d129e0eacd",
+        "variant": "world-lod0",
+        "lod": 0,
+        "triangles": 8536,
+        "bytes": 196240,
+        "meshNodes": 8,
+        "renderPrimitives": 8
+      },
+      {
+        "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod1.glb",
+        "sha256": "5b844bb66d5bcbdaab4f1aed21070b481a61d76f0415196e153b1fcb36ddb70c",
+        "variant": "world-lod1",
+        "lod": 1,
+        "triangles": 7128,
+        "bytes": 182556,
+        "meshNodes": 8,
+        "renderPrimitives": 8
+      },
+      {
+        "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod2.glb",
+        "sha256": "cc0a9f99a0c0cd0fd8c2b566f6cd65a456bb6253c6cd60cecdaf1aace9b6fdb5",
+        "variant": "world-lod2",
+        "lod": 2,
+        "triangles": 3136,
+        "bytes": 147684,
+        "meshNodes": 8,
+        "renderPrimitives": 8
+      }
+    ],
+    "dropGlbs": [
+      {
+        "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-drop-lod0.glb",
+        "sha256": "db4c0b9b844772b660bec18cc1d5ab684155e8cd9ae59e74b6a81d49ac5e70c9",
+        "variant": "drop-lod0",
+        "lod": 0,
+        "triangles": 7128,
+        "bytes": 182552,
+        "meshNodes": 8,
+        "renderPrimitives": 8
+      }
+    ]
+  },
+  "pbrMaps": {
+    "baseColor": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-baseColor.png",
+      "sha256": "e5ed3c08fb6bde235b9f8182428468102545aa5789b52af839452d9ac292eced",
+      "width": 512,
+      "height": 512
+    },
+    "normal": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-normal.png",
+      "sha256": "15143134dc1db7f189d9a0993b87d6ac14242b91423f5943c55a2cfa55cc6e52",
+      "width": 512,
+      "height": 512
+    },
+    "roughness": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-roughness.png",
+      "sha256": "fa4f3d9b7411864605b3dc23a20d86142a324d51679c2df8c5c1aae9a7e07ef5",
+      "width": 512,
+      "height": 512
+    },
+    "metallic": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-metallic.png",
+      "sha256": "7cc0bb5aee3de627a884526683f40991477885671e290e61ff2551b9821c78bd",
+      "width": 512,
+      "height": 512
+    },
+    "polymerBaseColor": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-polymerBaseColor.png",
+      "sha256": "f3fe3cec5b723f70077fb6ca369ab36a9dd0dae98b804ac84168d91653c272fa",
+      "width": 512,
+      "height": 512
+    },
+    "polymerRoughness": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-polymerRoughness.png",
+      "sha256": "9e8f8ffee4eaa7bbb4b9c15c57ba9aec7d3873683203af15d55020136330a022",
+      "width": 512,
+      "height": 512
+    },
+    "polymerMetallic": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/minigun/minigun-polymerMetallic.png",
+      "sha256": "cc8a44c8ae4e72b5f7fd7fc7dbaab7baaa754271960ec37f6f8a3ddc8679469e",
+      "width": 512,
+      "height": 512
+    }
+  },
+  "requiredSignatureNodes": [
+    "m134-barrel-cluster",
+    "m134-ammo-drum",
+    "m134-carry-frame",
+    "m134-drive-motor"
+  ],
+  "requiredSockets": [
+    "grip-socket-r",
+    "support-socket-l",
+    "reload-socket-l",
+    "magazine-socket",
+    "muzzle-socket",
+    "eject-socket",
+    "optic-socket",
+    "rear-sight-socket",
+    "front-sight-socket"
+  ],
+  "animationClips": [
+    "equip",
+    "unequip",
+    "idle",
+    "walk",
+    "sprint",
+    "ads-in",
+    "ads-out",
+    "fire",
+    "dry-fire",
+    "reload",
+    "empty-reload",
+    "melee",
+    "inspect"
+  ],
+  "review": {
+    "authoringSeed": 0,
+    "frame": 1,
+    "renderEngine": "BLENDER_EEVEE",
+    "renders": [
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-hero-quarter.png",
+        "sha256": "059c789ff011b82ba1f99a52a599ee4cc4c382f7c9bdd7e5e87fe3a4e32cdec8",
+        "width": 480,
+        "height": 360,
+        "cameraId": "hero-quarter",
+        "evidenceRole": "first-person-neutral"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-side-silhouette.png",
+        "sha256": "1b3e617a50e757ac41edca520747c0ee3ea4b4e82baa813cbfef394509632ffc",
+        "width": 480,
+        "height": 360,
+        "cameraId": "side-silhouette",
+        "evidenceRole": "first-person-side-silhouette"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-sight-line.png",
+        "sha256": "dc72be745fdc0cae7abc426ea8e56e75378d7048cfec397bcbcc9ccd18971734",
+        "width": 480,
+        "height": 360,
+        "cameraId": "sight-line",
+        "evidenceRole": "first-person-ads"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-reload-action.png",
+        "sha256": "edab946371ce4840cbfb349ec7cfcc4eb7cdfac53833852c98bbbfc460e8d61f",
+        "width": 480,
+        "height": 360,
+        "cameraId": "reload-action",
+        "evidenceRole": "first-person-reload"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-world-lod0-silhouette.png",
+        "sha256": "d58b4574594072e7aead577bb6bd896a7ac4cff61dae2c3cb038a6d5f0d1ebaf",
+        "width": 480,
+        "height": 360,
+        "cameraId": "world-lod0-silhouette",
+        "evidenceRole": "world-near-silhouette"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-world-lod2-silhouette.png",
+        "sha256": "e1b585941b4a42659e898ff156d0bdea5a903ead4fa99b1dba79971e35ff26ca",
+        "width": 480,
+        "height": 360,
+        "cameraId": "world-lod2-silhouette",
+        "evidenceRole": "world-far-lod-silhouette"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-drop-lod0-silhouette.png",
+        "sha256": "388be921991e2e570ade6d62227b9bcd395fc62287d2d229b0816d203dd84647",
+        "width": 480,
+        "height": 360,
+        "cameraId": "drop-lod0-silhouette",
+        "evidenceRole": "drop-silhouette"
+      }
+    ],
+    "contactSheet": {
+      "path": "docs/assets/pass65-weapons/firearms/minigun/minigun-contact-sheet.png",
+      "sha256": "83f0b4d1b49494e3e0d121b4d613215a0338a1bbc2358e807a1d227a4b28cbe8",
+      "width": 1920,
+      "height": 720
+    }
+  },
+  "runtimeAudit": {
+    "deliveries": [
+      {
+        "variant": "first-person-lod0",
+        "triangles": 10840,
+        "bytes": 213428,
+        "meshNodes": 8,
+        "renderPrimitives": 8,
+        "materials": 4,
+        "images": 5,
+        "animations": [
+          "equip",
+          "unequip",
+          "idle",
+          "walk",
+          "sprint",
+          "ads-in",
+          "ads-out",
+          "fire",
+          "dry-fire",
+          "reload",
+          "empty-reload",
+          "melee",
+          "inspect"
+        ],
+        "animationSignature": "[{\"name\":\"equip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":9,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"b1deca576b661d38d29b82572ef719759ef82500b523b8c3e3f76c0be73d564a\"}]},{\"name\":\"unequip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"2d5e635f20af5397b371c658a48c48459b76856d63cd2e21e1e8e56c986cf947\"}]},{\"name\":\"idle\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"c29f60677f2f32269c41bffdfdf8de78cc328b7bed4f15584c77ab0feac4a24a\"}]},{\"name\":\"walk\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"0335f4fcc8624a84f9c57d67eb5153243c7427dc64d546d61115722fb984e9a3\"}]},{\"name\":\"sprint\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"98e2ef533b7d82faffaa15e33923e8f79c7e43f692948c45b096a489d5a5369c\"},{\"count\":22,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"5c051db2cf3d701f4f8d9754b7643ab1a403b5f5eb64e2d705fd6c353b9ebdc2\"}]},{\"name\":\"ads-in\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"36b1584aa7873ae49aab4db4596dd58461834717832896671ee6efacc3b8a26a\"}]},{\"name\":\"ads-out\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"cd6dd29ef44f9751d7181c44e6aea7be28add79a55da6b0147642e9af9f7e2ad\"}]},{\"name\":\"fire\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":19,\"path\":\"rotation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"ea332de95534afb1b8dff2ce949dcfa04d9a726c7f56d246a393252b37072569\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"a55f984d2f0a2e418a972f245b85eb47d8fd0d6aa51e10264d1b0bd98b61edc2\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"ab0a1d238cab30cc9000d99fe10933f1c5cb3491c2d0f1f0753f79162f0e973a\"}]},{\"name\":\"dry-fire\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":5,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4164444be9466f30eeb322dd02d17fa59657a71e8bf707b4f29df5a483afe2f3\"}]},{\"name\":\"reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":27,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"df49019c7b1d5f50b4ddc69db37bf59ccf6701bcdb054c1a45c81b7d1fec449c\"},{\"count\":30,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"eb89334846123adf12145b00df91ceb34674c4f6cd5c090089ce4b6bfa3ed74a\"},{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4e637b30849ce14383a430c0ff9fce8352f958d6cc2bf1fd13ee6155a9b5b9d0\"}]},{\"name\":\"empty-reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":35,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d29750aef8fcdba86b3c22dbc24f1fa2e3b68cbb1ebcca62ab46a2a8a494205d\"},{\"count\":38,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"db712f371177ef7206d43aefb926fa8cb4909db3e57bdc0e3b4f8c821d733987\"},{\"count\":28,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"6b5e9ce95188aca4a1e8db48f590637494650e75c9f100d79cc6d28296544fa8\"}]},{\"name\":\"melee\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d31168eef7665e04b6a4e367929c6352bdd86b214c1c1106938dbd401ba9b62c\"},{\"count\":16,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"7ab2a7ebf450473396dd0b6122c508f7ab37dced7189d393db920eef28bc9a99\"}]},{\"name\":\"inspect\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":43,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"176f464432990ebb0f795f8c4589e1d3a03b88493ca0040b3f61c8d7ff0f4c9f\"},{\"count\":48,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"3aaacd1d83cf53ba4caeb66cc33e847985ec44dcb5b7b11c8ddfaf9eb20a82a7\"}]}]",
+        "externalUris": 0,
+        "muzzleForwardDot": 0.95294634515367,
+        "sightForwardDot": 0.9999999999999962,
+        "declaredLength": 1.94,
+        "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+        "silhouetteSignature": "{\"designId\":\"m134-six-barrel-rotary-v1\",\"family\":\"lmg\",\"triangles\":10840,\"meshNodes\":8,\"declaredLength\":1.94,\"platformAnatomy\":\"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum\",\"signatures\":[16,20,9,10]}"
+      },
+      {
+        "variant": "first-person-lod1",
+        "triangles": 6994,
+        "bytes": 181848,
+        "meshNodes": 8,
+        "renderPrimitives": 8,
+        "materials": 4,
+        "images": 5,
+        "animations": [
+          "equip",
+          "unequip",
+          "idle",
+          "walk",
+          "sprint",
+          "ads-in",
+          "ads-out",
+          "fire",
+          "dry-fire",
+          "reload",
+          "empty-reload",
+          "melee",
+          "inspect"
+        ],
+        "animationSignature": "[{\"name\":\"equip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":9,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"b1deca576b661d38d29b82572ef719759ef82500b523b8c3e3f76c0be73d564a\"}]},{\"name\":\"unequip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"2d5e635f20af5397b371c658a48c48459b76856d63cd2e21e1e8e56c986cf947\"}]},{\"name\":\"idle\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"c29f60677f2f32269c41bffdfdf8de78cc328b7bed4f15584c77ab0feac4a24a\"}]},{\"name\":\"walk\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"0335f4fcc8624a84f9c57d67eb5153243c7427dc64d546d61115722fb984e9a3\"}]},{\"name\":\"sprint\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"98e2ef533b7d82faffaa15e33923e8f79c7e43f692948c45b096a489d5a5369c\"},{\"count\":22,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"5c051db2cf3d701f4f8d9754b7643ab1a403b5f5eb64e2d705fd6c353b9ebdc2\"}]},{\"name\":\"ads-in\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"36b1584aa7873ae49aab4db4596dd58461834717832896671ee6efacc3b8a26a\"}]},{\"name\":\"ads-out\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"cd6dd29ef44f9751d7181c44e6aea7be28add79a55da6b0147642e9af9f7e2ad\"}]},{\"name\":\"fire\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":19,\"path\":\"rotation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"ea332de95534afb1b8dff2ce949dcfa04d9a726c7f56d246a393252b37072569\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"a55f984d2f0a2e418a972f245b85eb47d8fd0d6aa51e10264d1b0bd98b61edc2\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"ab0a1d238cab30cc9000d99fe10933f1c5cb3491c2d0f1f0753f79162f0e973a\"}]},{\"name\":\"dry-fire\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":5,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4164444be9466f30eeb322dd02d17fa59657a71e8bf707b4f29df5a483afe2f3\"}]},{\"name\":\"reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":27,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"df49019c7b1d5f50b4ddc69db37bf59ccf6701bcdb054c1a45c81b7d1fec449c\"},{\"count\":30,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"eb89334846123adf12145b00df91ceb34674c4f6cd5c090089ce4b6bfa3ed74a\"},{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4e637b30849ce14383a430c0ff9fce8352f958d6cc2bf1fd13ee6155a9b5b9d0\"}]},{\"name\":\"empty-reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":35,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d29750aef8fcdba86b3c22dbc24f1fa2e3b68cbb1ebcca62ab46a2a8a494205d\"},{\"count\":38,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"db712f371177ef7206d43aefb926fa8cb4909db3e57bdc0e3b4f8c821d733987\"},{\"count\":28,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"6b5e9ce95188aca4a1e8db48f590637494650e75c9f100d79cc6d28296544fa8\"}]},{\"name\":\"melee\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d31168eef7665e04b6a4e367929c6352bdd86b214c1c1106938dbd401ba9b62c\"},{\"count\":16,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"7ab2a7ebf450473396dd0b6122c508f7ab37dced7189d393db920eef28bc9a99\"}]},{\"name\":\"inspect\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":43,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"176f464432990ebb0f795f8c4589e1d3a03b88493ca0040b3f61c8d7ff0f4c9f\"},{\"count\":48,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"3aaacd1d83cf53ba4caeb66cc33e847985ec44dcb5b7b11c8ddfaf9eb20a82a7\"}]}]",
+        "externalUris": 0,
+        "muzzleForwardDot": 0.95294634515367,
+        "sightForwardDot": 0.9999999999999962,
+        "declaredLength": 1.94,
+        "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+        "silhouetteSignature": "{\"designId\":\"m134-six-barrel-rotary-v1\",\"family\":\"lmg\",\"triangles\":6994,\"meshNodes\":8,\"declaredLength\":1.94,\"platformAnatomy\":\"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum\",\"signatures\":[16,20,9,10]}"
+      },
+      {
+        "variant": "world-lod0",
+        "triangles": 8536,
+        "bytes": 196240,
+        "meshNodes": 8,
+        "renderPrimitives": 8,
+        "materials": 4,
+        "images": 5,
+        "animations": [
+          "equip",
+          "unequip",
+          "idle",
+          "walk",
+          "sprint",
+          "ads-in",
+          "ads-out",
+          "fire",
+          "dry-fire",
+          "reload",
+          "empty-reload",
+          "melee",
+          "inspect"
+        ],
+        "animationSignature": "[{\"name\":\"equip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":9,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"b1deca576b661d38d29b82572ef719759ef82500b523b8c3e3f76c0be73d564a\"}]},{\"name\":\"unequip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"2d5e635f20af5397b371c658a48c48459b76856d63cd2e21e1e8e56c986cf947\"}]},{\"name\":\"idle\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"c29f60677f2f32269c41bffdfdf8de78cc328b7bed4f15584c77ab0feac4a24a\"}]},{\"name\":\"walk\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"0335f4fcc8624a84f9c57d67eb5153243c7427dc64d546d61115722fb984e9a3\"}]},{\"name\":\"sprint\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"98e2ef533b7d82faffaa15e33923e8f79c7e43f692948c45b096a489d5a5369c\"},{\"count\":22,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"5c051db2cf3d701f4f8d9754b7643ab1a403b5f5eb64e2d705fd6c353b9ebdc2\"}]},{\"name\":\"ads-in\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"36b1584aa7873ae49aab4db4596dd58461834717832896671ee6efacc3b8a26a\"}]},{\"name\":\"ads-out\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"cd6dd29ef44f9751d7181c44e6aea7be28add79a55da6b0147642e9af9f7e2ad\"}]},{\"name\":\"fire\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":19,\"path\":\"rotation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"ea332de95534afb1b8dff2ce949dcfa04d9a726c7f56d246a393252b37072569\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"a55f984d2f0a2e418a972f245b85eb47d8fd0d6aa51e10264d1b0bd98b61edc2\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"ab0a1d238cab30cc9000d99fe10933f1c5cb3491c2d0f1f0753f79162f0e973a\"}]},{\"name\":\"dry-fire\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":5,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4164444be9466f30eeb322dd02d17fa59657a71e8bf707b4f29df5a483afe2f3\"}]},{\"name\":\"reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":27,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"df49019c7b1d5f50b4ddc69db37bf59ccf6701bcdb054c1a45c81b7d1fec449c\"},{\"count\":30,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"eb89334846123adf12145b00df91ceb34674c4f6cd5c090089ce4b6bfa3ed74a\"},{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4e637b30849ce14383a430c0ff9fce8352f958d6cc2bf1fd13ee6155a9b5b9d0\"}]},{\"name\":\"empty-reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":35,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d29750aef8fcdba86b3c22dbc24f1fa2e3b68cbb1ebcca62ab46a2a8a494205d\"},{\"count\":38,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"db712f371177ef7206d43aefb926fa8cb4909db3e57bdc0e3b4f8c821d733987\"},{\"count\":28,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"6b5e9ce95188aca4a1e8db48f590637494650e75c9f100d79cc6d28296544fa8\"}]},{\"name\":\"melee\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d31168eef7665e04b6a4e367929c6352bdd86b214c1c1106938dbd401ba9b62c\"},{\"count\":16,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"7ab2a7ebf450473396dd0b6122c508f7ab37dced7189d393db920eef28bc9a99\"}]},{\"name\":\"inspect\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":43,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"176f464432990ebb0f795f8c4589e1d3a03b88493ca0040b3f61c8d7ff0f4c9f\"},{\"count\":48,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"3aaacd1d83cf53ba4caeb66cc33e847985ec44dcb5b7b11c8ddfaf9eb20a82a7\"}]}]",
+        "externalUris": 0,
+        "muzzleForwardDot": 0.95294634515367,
+        "sightForwardDot": 0.9999999999999962,
+        "declaredLength": 1.94,
+        "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+        "silhouetteSignature": "{\"designId\":\"m134-six-barrel-rotary-v1\",\"family\":\"lmg\",\"triangles\":8536,\"meshNodes\":8,\"declaredLength\":1.94,\"platformAnatomy\":\"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum\",\"signatures\":[16,20,9,10]}"
+      },
+      {
+        "variant": "world-lod1",
+        "triangles": 7128,
+        "bytes": 182556,
+        "meshNodes": 8,
+        "renderPrimitives": 8,
+        "materials": 4,
+        "images": 5,
+        "animations": [
+          "equip",
+          "unequip",
+          "idle",
+          "walk",
+          "sprint",
+          "ads-in",
+          "ads-out",
+          "fire",
+          "dry-fire",
+          "reload",
+          "empty-reload",
+          "melee",
+          "inspect"
+        ],
+        "animationSignature": "[{\"name\":\"equip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":9,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"b1deca576b661d38d29b82572ef719759ef82500b523b8c3e3f76c0be73d564a\"}]},{\"name\":\"unequip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"2d5e635f20af5397b371c658a48c48459b76856d63cd2e21e1e8e56c986cf947\"}]},{\"name\":\"idle\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"c29f60677f2f32269c41bffdfdf8de78cc328b7bed4f15584c77ab0feac4a24a\"}]},{\"name\":\"walk\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"0335f4fcc8624a84f9c57d67eb5153243c7427dc64d546d61115722fb984e9a3\"}]},{\"name\":\"sprint\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"98e2ef533b7d82faffaa15e33923e8f79c7e43f692948c45b096a489d5a5369c\"},{\"count\":22,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"5c051db2cf3d701f4f8d9754b7643ab1a403b5f5eb64e2d705fd6c353b9ebdc2\"}]},{\"name\":\"ads-in\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"36b1584aa7873ae49aab4db4596dd58461834717832896671ee6efacc3b8a26a\"}]},{\"name\":\"ads-out\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"cd6dd29ef44f9751d7181c44e6aea7be28add79a55da6b0147642e9af9f7e2ad\"}]},{\"name\":\"fire\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":19,\"path\":\"rotation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"ea332de95534afb1b8dff2ce949dcfa04d9a726c7f56d246a393252b37072569\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"a55f984d2f0a2e418a972f245b85eb47d8fd0d6aa51e10264d1b0bd98b61edc2\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"ab0a1d238cab30cc9000d99fe10933f1c5cb3491c2d0f1f0753f79162f0e973a\"}]},{\"name\":\"dry-fire\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":5,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4164444be9466f30eeb322dd02d17fa59657a71e8bf707b4f29df5a483afe2f3\"}]},{\"name\":\"reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":27,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"df49019c7b1d5f50b4ddc69db37bf59ccf6701bcdb054c1a45c81b7d1fec449c\"},{\"count\":30,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"eb89334846123adf12145b00df91ceb34674c4f6cd5c090089ce4b6bfa3ed74a\"},{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4e637b30849ce14383a430c0ff9fce8352f958d6cc2bf1fd13ee6155a9b5b9d0\"}]},{\"name\":\"empty-reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":35,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d29750aef8fcdba86b3c22dbc24f1fa2e3b68cbb1ebcca62ab46a2a8a494205d\"},{\"count\":38,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"db712f371177ef7206d43aefb926fa8cb4909db3e57bdc0e3b4f8c821d733987\"},{\"count\":28,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"6b5e9ce95188aca4a1e8db48f590637494650e75c9f100d79cc6d28296544fa8\"}]},{\"name\":\"melee\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d31168eef7665e04b6a4e367929c6352bdd86b214c1c1106938dbd401ba9b62c\"},{\"count\":16,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"7ab2a7ebf450473396dd0b6122c508f7ab37dced7189d393db920eef28bc9a99\"}]},{\"name\":\"inspect\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":43,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"176f464432990ebb0f795f8c4589e1d3a03b88493ca0040b3f61c8d7ff0f4c9f\"},{\"count\":48,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"3aaacd1d83cf53ba4caeb66cc33e847985ec44dcb5b7b11c8ddfaf9eb20a82a7\"}]}]",
+        "externalUris": 0,
+        "muzzleForwardDot": 0.95294634515367,
+        "sightForwardDot": 0.9999999999999962,
+        "declaredLength": 1.94,
+        "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+        "silhouetteSignature": "{\"designId\":\"m134-six-barrel-rotary-v1\",\"family\":\"lmg\",\"triangles\":7128,\"meshNodes\":8,\"declaredLength\":1.94,\"platformAnatomy\":\"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum\",\"signatures\":[16,20,9,10]}"
+      },
+      {
+        "variant": "world-lod2",
+        "triangles": 3136,
+        "bytes": 147684,
+        "meshNodes": 8,
+        "renderPrimitives": 8,
+        "materials": 4,
+        "images": 5,
+        "animations": [
+          "equip",
+          "unequip",
+          "idle",
+          "walk",
+          "sprint",
+          "ads-in",
+          "ads-out",
+          "fire",
+          "dry-fire",
+          "reload",
+          "empty-reload",
+          "melee",
+          "inspect"
+        ],
+        "animationSignature": "[{\"name\":\"equip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":9,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"b1deca576b661d38d29b82572ef719759ef82500b523b8c3e3f76c0be73d564a\"}]},{\"name\":\"unequip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"2d5e635f20af5397b371c658a48c48459b76856d63cd2e21e1e8e56c986cf947\"}]},{\"name\":\"idle\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"c29f60677f2f32269c41bffdfdf8de78cc328b7bed4f15584c77ab0feac4a24a\"}]},{\"name\":\"walk\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"0335f4fcc8624a84f9c57d67eb5153243c7427dc64d546d61115722fb984e9a3\"}]},{\"name\":\"sprint\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"98e2ef533b7d82faffaa15e33923e8f79c7e43f692948c45b096a489d5a5369c\"},{\"count\":22,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"5c051db2cf3d701f4f8d9754b7643ab1a403b5f5eb64e2d705fd6c353b9ebdc2\"}]},{\"name\":\"ads-in\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"36b1584aa7873ae49aab4db4596dd58461834717832896671ee6efacc3b8a26a\"}]},{\"name\":\"ads-out\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"cd6dd29ef44f9751d7181c44e6aea7be28add79a55da6b0147642e9af9f7e2ad\"}]},{\"name\":\"fire\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":19,\"path\":\"rotation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"ea332de95534afb1b8dff2ce949dcfa04d9a726c7f56d246a393252b37072569\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"a55f984d2f0a2e418a972f245b85eb47d8fd0d6aa51e10264d1b0bd98b61edc2\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"ab0a1d238cab30cc9000d99fe10933f1c5cb3491c2d0f1f0753f79162f0e973a\"}]},{\"name\":\"dry-fire\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":5,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4164444be9466f30eeb322dd02d17fa59657a71e8bf707b4f29df5a483afe2f3\"}]},{\"name\":\"reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":27,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"df49019c7b1d5f50b4ddc69db37bf59ccf6701bcdb054c1a45c81b7d1fec449c\"},{\"count\":30,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"eb89334846123adf12145b00df91ceb34674c4f6cd5c090089ce4b6bfa3ed74a\"},{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4e637b30849ce14383a430c0ff9fce8352f958d6cc2bf1fd13ee6155a9b5b9d0\"}]},{\"name\":\"empty-reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":35,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d29750aef8fcdba86b3c22dbc24f1fa2e3b68cbb1ebcca62ab46a2a8a494205d\"},{\"count\":38,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"db712f371177ef7206d43aefb926fa8cb4909db3e57bdc0e3b4f8c821d733987\"},{\"count\":28,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"6b5e9ce95188aca4a1e8db48f590637494650e75c9f100d79cc6d28296544fa8\"}]},{\"name\":\"melee\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d31168eef7665e04b6a4e367929c6352bdd86b214c1c1106938dbd401ba9b62c\"},{\"count\":16,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"7ab2a7ebf450473396dd0b6122c508f7ab37dced7189d393db920eef28bc9a99\"}]},{\"name\":\"inspect\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":43,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"176f464432990ebb0f795f8c4589e1d3a03b88493ca0040b3f61c8d7ff0f4c9f\"},{\"count\":48,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"3aaacd1d83cf53ba4caeb66cc33e847985ec44dcb5b7b11c8ddfaf9eb20a82a7\"}]}]",
+        "externalUris": 0,
+        "muzzleForwardDot": 0.95294634515367,
+        "sightForwardDot": 0.9999999999999962,
+        "declaredLength": 1.94,
+        "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+        "silhouetteSignature": "{\"designId\":\"m134-six-barrel-rotary-v1\",\"family\":\"lmg\",\"triangles\":3136,\"meshNodes\":8,\"declaredLength\":1.94,\"platformAnatomy\":\"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum\",\"signatures\":[16,20,9,10]}"
+      },
+      {
+        "variant": "drop-lod0",
+        "triangles": 7128,
+        "bytes": 182552,
+        "meshNodes": 8,
+        "renderPrimitives": 8,
+        "materials": 4,
+        "images": 5,
+        "animations": [
+          "equip",
+          "unequip",
+          "idle",
+          "walk",
+          "sprint",
+          "ads-in",
+          "ads-out",
+          "fire",
+          "dry-fire",
+          "reload",
+          "empty-reload",
+          "melee",
+          "inspect"
+        ],
+        "animationSignature": "[{\"name\":\"equip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":9,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"b1deca576b661d38d29b82572ef719759ef82500b523b8c3e3f76c0be73d564a\"}]},{\"name\":\"unequip\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"2d5e635f20af5397b371c658a48c48459b76856d63cd2e21e1e8e56c986cf947\"}]},{\"name\":\"idle\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"c29f60677f2f32269c41bffdfdf8de78cc328b7bed4f15584c77ab0feac4a24a\"}]},{\"name\":\"walk\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"0335f4fcc8624a84f9c57d67eb5153243c7427dc64d546d61115722fb984e9a3\"}]},{\"name\":\"sprint\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"98e2ef533b7d82faffaa15e33923e8f79c7e43f692948c45b096a489d5a5369c\"},{\"count\":22,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"5c051db2cf3d701f4f8d9754b7643ab1a403b5f5eb64e2d705fd6c353b9ebdc2\"}]},{\"name\":\"ads-in\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"36b1584aa7873ae49aab4db4596dd58461834717832896671ee6efacc3b8a26a\"}]},{\"name\":\"ads-out\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":10,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"cd6dd29ef44f9751d7181c44e6aea7be28add79a55da6b0147642e9af9f7e2ad\"}]},{\"name\":\"fire\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":19,\"path\":\"rotation\"}],\"outputs\":[{\"count\":7,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"ea332de95534afb1b8dff2ce949dcfa04d9a726c7f56d246a393252b37072569\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"a55f984d2f0a2e418a972f245b85eb47d8fd0d6aa51e10264d1b0bd98b61edc2\"},{\"count\":7,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"ab0a1d238cab30cc9000d99fe10933f1c5cb3491c2d0f1f0753f79162f0e973a\"}]},{\"name\":\"dry-fire\",\"channels\":1,\"targets\":[{\"node\":28,\"path\":\"translation\"}],\"outputs\":[{\"count\":5,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4164444be9466f30eeb322dd02d17fa59657a71e8bf707b4f29df5a483afe2f3\"}]},{\"name\":\"reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":27,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"df49019c7b1d5f50b4ddc69db37bf59ccf6701bcdb054c1a45c81b7d1fec449c\"},{\"count\":30,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"eb89334846123adf12145b00df91ceb34674c4f6cd5c090089ce4b6bfa3ed74a\"},{\"count\":22,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"4e637b30849ce14383a430c0ff9fce8352f958d6cc2bf1fd13ee6155a9b5b9d0\"}]},{\"name\":\"empty-reload\",\"channels\":3,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"},{\"node\":23,\"path\":\"translation\"}],\"outputs\":[{\"count\":35,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d29750aef8fcdba86b3c22dbc24f1fa2e3b68cbb1ebcca62ab46a2a8a494205d\"},{\"count\":38,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"db712f371177ef7206d43aefb926fa8cb4909db3e57bdc0e3b4f8c821d733987\"},{\"count\":28,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"6b5e9ce95188aca4a1e8db48f590637494650e75c9f100d79cc6d28296544fa8\"}]},{\"name\":\"melee\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":15,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"d31168eef7665e04b6a4e367929c6352bdd86b214c1c1106938dbd401ba9b62c\"},{\"count\":16,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"7ab2a7ebf450473396dd0b6122c508f7ab37dced7189d393db920eef28bc9a99\"}]},{\"name\":\"inspect\",\"channels\":2,\"targets\":[{\"node\":28,\"path\":\"translation\"},{\"node\":28,\"path\":\"rotation\"}],\"outputs\":[{\"count\":43,\"type\":\"VEC3\",\"componentType\":5126,\"payloadSha256\":\"176f464432990ebb0f795f8c4589e1d3a03b88493ca0040b3f61c8d7ff0f4c9f\"},{\"count\":48,\"type\":\"VEC4\",\"componentType\":5122,\"payloadSha256\":\"3aaacd1d83cf53ba4caeb66cc33e847985ec44dcb5b7b11c8ddfaf9eb20a82a7\"}]}]",
+        "externalUris": 0,
+        "muzzleForwardDot": 0.95294634515367,
+        "sightForwardDot": 0.9999999999999962,
+        "declaredLength": 1.94,
+        "platformAnatomy": "six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum",
+        "silhouetteSignature": "{\"designId\":\"m134-six-barrel-rotary-v1\",\"family\":\"lmg\",\"triangles\":7128,\"meshNodes\":8,\"declaredLength\":1.94,\"platformAnatomy\":\"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum\",\"signatures\":[16,20,9,10]}"
+      }
+    ],
+    "externalUris": 0
+  },
+  "gameplayBoundary": "Presentation assets only. TypeScript owns damage, spread, recoil authority, hit registration, projectiles, collision and networking."
+}

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const target = process.argv[2];
@@ -46,9 +46,17 @@ function optimizeGlb(input, output) {
   ]);
 }
 
+function runBlenderPython(script) {
+  // Blender otherwise reports status 0 after an unhandled --python exception,
+  // which can let stale raw files proceed into optimization and provenance.
+  run(blenderCommand, [
+    '--background', '--factory-startup', '--python-exit-code', '1', '--python', script,
+  ]);
+}
+
 function authorCrossbow() {
   mkdirSync('public/assets/original/models/weapons/pass65-crossbow', { recursive: true });
-  run(blenderCommand, ['--background', '--factory-startup', '--python', 'scripts/blender/create-pass65-explosive-crossbow.py']);
+  runBlenderPython('scripts/blender/create-pass65-explosive-crossbow.py');
   for (const name of [
     'pass65-crossbow-fp-lod0', 'pass65-crossbow-fp-lod1',
     'pass65-crossbow-world-lod0', 'pass65-crossbow-world-lod1', 'pass65-crossbow-world-lod2',
@@ -58,7 +66,7 @@ function authorCrossbow() {
 
 function authorOperatorArms() {
   mkdirSync('public/assets/original/models/operators', { recursive: true });
-  run(blenderCommand, ['--background', '--factory-startup', '--python', 'scripts/blender/create-pass65-first-person-arms.py']);
+  runBlenderPython('scripts/blender/create-pass65-first-person-arms.py');
   for (const lod of [0, 1]) optimizeGlb(
     `artifacts/blender-operator-arms/raw/pass65-first-person-arms-lod${lod}.glb`,
     `public/assets/original/models/operators/pass65-first-person-arms-lod${lod}.glb`,
@@ -67,12 +75,7 @@ function authorOperatorArms() {
 
 function authorSupportVehicles() {
   mkdirSync('public/assets/original/models/support', { recursive: true });
-  run(blenderCommand, [
-    '--background',
-    '--factory-startup',
-    '--python',
-    'scripts/blender/create-pass65-support-vehicles.py',
-  ]);
+  runBlenderPython('scripts/blender/create-pass65-support-vehicles.py');
   for (const lod of [0, 1, 2]) {
     optimizeGlb(
       `artifacts/blender-support-vehicles/raw/chopper/pass65-chopper-gunner-lod${lod}.glb`,
@@ -95,9 +98,52 @@ function authorSupportVehicles() {
   }
 }
 
+function authorWeaponFamilies() {
+  const spec = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-family-specs.json', 'utf8'));
+  const previewIds = new Set((process.env.PASS65_WEAPON_PREVIEW_IDS ?? '')
+    .split(',').map((value) => value.trim()).filter(Boolean));
+  const previewDeliverySuffixes = new Set((process.env.PASS65_WEAPON_PREVIEW_DELIVERY_SUFFIXES ?? '')
+    .split(',').map((value) => value.trim()).filter(Boolean));
+  const weapons = previewIds.size > 0
+    ? spec.weapons.filter((weapon) => previewIds.has(weapon.id))
+    : spec.weapons;
+  const deliveries = previewDeliverySuffixes.size > 0
+    ? spec.deliveries.filter((delivery) => previewDeliverySuffixes.has(delivery.suffix))
+    : spec.deliveries;
+  if (weapons.length !== (previewIds.size || spec.weapons.length)) {
+    throw new Error('PASS65_WEAPON_PREVIEW_IDS contains an unknown weapon ID');
+  }
+  if (deliveries.length !== (previewDeliverySuffixes.size || spec.deliveries.length)) {
+    throw new Error('PASS65_WEAPON_PREVIEW_DELIVERY_SUFFIXES contains an unknown delivery suffix');
+  }
+  runBlenderPython('scripts/blender/create-pass65-weapon-families.py');
+  for (const weapon of weapons) {
+    const directory = `public/assets/original/models/weapons/pass65-firearms/${weapon.id}`;
+    mkdirSync(directory, { recursive: true });
+    for (const delivery of deliveries) {
+      const name = `${weapon.id}-${delivery.suffix}`;
+      optimizeGlb(
+        `artifacts/blender-weapon-families/raw/${name}.glb`,
+        `${directory}/${name}.glb`,
+      );
+    }
+  }
+}
+
+function authorFieldKnife() {
+  mkdirSync('public/assets/original/models/weapons/pass65-field-knife', { recursive: true });
+  runBlenderPython('scripts/blender/create-pass65-field-knife.py');
+  for (const suffix of ['fp-lod0', 'fp-lod1', 'world-lod0', 'world-lod1', 'drop-lod0']) {
+    optimizeGlb(
+      `artifacts/blender-field-knife/raw/pass65-field-knife-${suffix}.glb`,
+      `public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-${suffix}.glb`,
+    );
+  }
+}
+
 function authorThirdPersonOperator() {
   mkdirSync('public/assets/original/models/operators', { recursive: true });
-  run(blenderCommand, ['--background', '--factory-startup', '--python', 'scripts/blender/create-pass65-third-person-operator.py']);
+  runBlenderPython('scripts/blender/create-pass65-third-person-operator.py');
   for (const lod of [0, 1, 2]) optimizeGlb(
     `artifacts/blender-third-person-operator/raw/pass65-third-person-operator-lod${lod}.glb`,
     `public/assets/original/models/operators/pass65-third-person-operator-lod${lod}.glb`,
@@ -111,27 +157,12 @@ if (target === 'arena') {
     'scripts/blender/export-atomic-acres-arena-spec.ts',
     'source-assets/blender/atomic-acres-arena-spec.json',
   ]);
-  run(blenderCommand, [
-    '--background',
-    '--factory-startup',
-    '--python',
-    'scripts/blender/create-atomic-acres-blender-arena.py',
-  ]);
+  runBlenderPython('scripts/blender/create-atomic-acres-blender-arena.py');
 } else if (target === 'tower') {
-  run(blenderCommand, [
-    '--background',
-    '--factory-startup',
-    '--python',
-    'scripts/blender/create-rustworks-central-tower.py',
-  ]);
+  runBlenderPython('scripts/blender/create-rustworks-central-tower.py');
 } else if (target === 'drone') {
   mkdirSync('public/assets/original/models/support', { recursive: true });
-  run(blenderCommand, [
-    '--background',
-    '--factory-startup',
-    '--python',
-    'scripts/blender/create-hunter-drone-family.py',
-  ]);
+  runBlenderPython('scripts/blender/create-hunter-drone-family.py');
   for (const lod of [0, 1, 2]) {
     run(process.execPath, [
       gltfTransformCli,
@@ -154,12 +185,7 @@ if (target === 'arena') {
 } else if (target === 'semtex') {
   mkdirSync('public/assets/original/models/ordnance', { recursive: true });
   mkdirSync('artifacts/blender-semtex/optimized', { recursive: true });
-  run(blenderCommand, [
-    '--background',
-    '--factory-startup',
-    '--python',
-    'scripts/blender/create-semtex-bundle.py',
-  ]);
+  runBlenderPython('scripts/blender/create-semtex-bundle.py');
   for (const lod of [0, 1, 2]) {
     run(process.execPath, [
       gltfTransformCli,
@@ -186,10 +212,28 @@ if (target === 'arena') {
   run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
 } else if (target === 'operator-body') {
   authorThirdPersonOperator();
+} else if (target === 'weapon-families') {
+  authorWeaponFamilies();
+  if (process.env.PASS65_WEAPON_PREVIEW_IDS) {
+    console.log('PASS65_WEAPON_PREVIEW_COMPLETE: production provenance/finalizer intentionally skipped');
+  } else {
+    run(process.execPath, ['scripts/blender/finalize-pass65-weapon-family-assets.mjs']);
+  }
+} else if (target === 'weapon-preview-reconcile') {
+  runBlenderPython('scripts/blender/reconcile-pass65-weapon-preview.py');
+} else if (target === 'field-knife') {
+  authorFieldKnife();
+  run(process.execPath, ['scripts/blender/finalize-pass65-field-knife-assets.mjs']);
 } else if (target === 'pass65-weapon-tranche') {
   authorCrossbow();
+  // Arms v4 imports the actual consolidated M4A1 delivery for strict neutral,
+  // ADS and reload socket/digit contact review, so firearm sources must exist first.
+  authorWeaponFamilies();
   authorOperatorArms();
+  authorFieldKnife();
   run(process.execPath, ['scripts/blender/finalize-pass65-crossbow-arms-assets.mjs']);
+  run(process.execPath, ['scripts/blender/finalize-pass65-weapon-family-assets.mjs']);
+  run(process.execPath, ['scripts/blender/finalize-pass65-field-knife-assets.mjs']);
 } else if (target === 'support-vehicles') {
   authorSupportVehicles();
   run(process.execPath, ['scripts/blender/finalize-pass65-support-vehicle-assets.mjs']);

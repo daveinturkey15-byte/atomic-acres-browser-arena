@@ -75,7 +75,9 @@ describe('Pass 65 authored firearm runtime selection', () => {
     expect(artKitSource).toContain("'weapon-action', 'weapon-magazine', 'm134-barrel-cluster'");
     expect(artKitSource).toContain('fireImportedWeapon(rig.weapon)');
     expect(artKitSource).toContain('if (rig.weapon) updateImportedWeapon(rig.weapon, animationDeltaSeconds)');
-    expect(artKitSource).toContain('root.userData.pass65PresentationRetired === true');
+    expect(artKitSource).toContain('capturePass65PresentationGeneration(root)');
+    expect(artKitSource).toContain('isPass65PresentationGenerationCurrent(root, presentationGeneration)');
+    expect(modelSource).toContain('node.userData.pass65PresentationRetired = true');
     expect(modelSource).toContain('export function invalidatePass65PresentationTree');
     expect(modelSource).toContain('export function releasePass65WeaponModelsIn');
     expect(railgunSource).toContain("loadPass65WeaponAsset('railgun', 'world')");

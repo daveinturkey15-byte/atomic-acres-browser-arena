@@ -11,7 +11,7 @@ import math
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,8 +19,9 @@ SOURCE_BLEND = ROOT / "source-assets/blender/pass65-first-person-operator-arms.b
 RAW_DIR = ROOT / "artifacts/blender-operator-arms/raw"
 TEXTURE_DIR = ROOT / "public/assets/original/textures/operators/pass65-first-person-arms"
 REVIEW_DIR = ROOT / "docs/assets/pass65-operators/first-person-arms"
+FIREARM_RAW_DIR = ROOT / "artifacts/blender-weapon-families/raw"
 TEXTURE_SIZE = 512
-REVIEW_SIZE = 512
+REVIEW_SIZE = 640
 ASSET_ID = "pass65-first-person-operator-arms"
 CORE_ACTIONS = (
     "equip", "unequip", "idle", "walk", "sprint", "ads-in", "ads-out",
@@ -69,29 +70,30 @@ def make_texture(name: str, kind: str) -> bpy.types.Image:
             u = x / (TEXTURE_SIZE - 1)
             v = y / (TEXTURE_SIZE - 1)
             weave = ((x * 31 + y * 47 + (x ^ y) * 5) % 127) / 126.0
-            seam = min(x % 128, y % 128, 127 - (x % 128), 127 - (y % 128)) < 3
+            twill = (math.sin((x + y) * 0.39) + math.sin((x - y) * 0.27)) * 0.5
+            seam = min(x % 192, y % 192, 191 - (x % 192), 191 - (y % 192)) < 2
+            stitch = ((x + y * 3) % 211) < 3
             glove_zone = u > 0.5
-            cuff_stripe = glove_zone and ((y // 18) % 7 == 0)
             if kind == "baseColor":
                 if glove_zone:
-                    base = 0.115 + weave * 0.055
-                    value = [base * 0.75, base * 0.84, base * 0.82]
+                    base = 0.045 + weave * 0.032 + max(0.0, twill) * 0.008
+                    value = [base * 0.72, base * 0.86, base * 0.92]
                 else:
-                    base = 0.24 + weave * 0.075
-                    value = [base * 0.64, base * 0.83, base * 0.87]
+                    base = 0.09 + weave * 0.045 + twill * 0.009
+                    value = [base * 0.48, base * 0.72, base * 0.78]
                 if seam:
-                    value = [component * 0.42 for component in value]
-                if cuff_stripe:
-                    value = [0.44, 0.36, 0.18]
+                    value = [component * 0.52 for component in value]
+                elif stitch:
+                    value = [min(1.0, component + 0.018) for component in value]
             elif kind == "normal":
-                nx = 0.5 + (weave - 0.5) * 0.035
-                ny = 0.5 + (0.08 if seam else (weave - 0.5) * 0.02)
-                value = [nx, ny, 0.996]
+                nx = 0.5 + (weave - 0.5) * 0.065 + twill * 0.018
+                ny = 0.5 + (0.085 if seam else (weave - 0.5) * 0.05 - twill * 0.012)
+                value = [nx, ny, 0.992]
             elif kind == "roughness":
-                rough = (0.77 if glove_zone else 0.87) + weave * 0.09
+                rough = (0.79 if glove_zone else 0.9) + weave * 0.07
                 value = [rough, rough, rough]
             elif kind == "metallic":
-                metal = 0.02 if not cuff_stripe else 0.18
+                metal = 0.015
                 value = [metal, metal, metal]
             else:
                 raise RuntimeError(kind)
@@ -131,7 +133,7 @@ def textured_material(name: str, images, tint, uv_offset_x: float):
     normal_tex.image = images["normal"]
     links.new(mapping.outputs["Vector"], normal_tex.inputs["Vector"])
     normal_map = nodes.new("ShaderNodeNormalMap")
-    normal_map.inputs["Strength"].default_value = 0.46
+    normal_map.inputs["Strength"].default_value = 0.78
     links.new(normal_tex.outputs["Color"], normal_map.inputs["Color"])
     links.new(normal_map.outputs["Normal"], input_socket(bsdf, "Normal"))
     return material
@@ -177,6 +179,25 @@ def rounded_cube(name, location, dimensions, material, bevel, rotation=(0, 0, 0)
     return finish_mesh(obj, material, bevel=bevel)
 
 
+def join_meshes(name, objects):
+    source_materials = {material for obj in objects for material in obj.data.materials if material is not None}
+    if len(source_materials) != 1:
+        raise RuntimeError(f"{name}: reviewable joined construction requires one shared material")
+    material = next(iter(source_materials))
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
+    if len(objects) > 1:
+        bpy.ops.object.join()
+    objects[0].name = name
+    objects[0].data.materials.clear()
+    objects[0].data.materials.append(material)
+    for polygon in objects[0].data.polygons:
+        polygon.material_index = 0
+    return objects[0]
+
+
 def tapered_segment(name, start, end, radius_start, radius_end, material, vertices):
     start_v = Vector(start)
     end_v = Vector(end)
@@ -193,6 +214,58 @@ def tapered_segment(name, start, end, radius_start, radius_end, material, vertic
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     obj.rotation_mode = "XYZ"
     return finish_mesh(obj, material, bevel=0.006, smooth=True)
+
+
+def profiled_segment(name, start, end, rings, material, vertices):
+    """Create an asymmetric elliptical limb/hand rather than a cone-like tube."""
+    start_v = Vector(start)
+    end_v = Vector(end)
+    axis = (end_v - start_v).normalized()
+    side = axis.cross(Vector((0, 0, 1)))
+    if side.length < 0.001:
+        side = axis.cross(Vector((1, 0, 0)))
+    side.normalize()
+    up = side.cross(axis).normalized()
+    points = []
+    for t, radius_side, radius_up, side_offset, up_offset in rings:
+        center = start_v.lerp(end_v, t) + side * side_offset + up * up_offset
+        for index in range(vertices):
+            angle = math.tau * index / vertices
+            points.append(center + side * (math.cos(angle) * radius_side) + up * (math.sin(angle) * radius_up))
+    faces = []
+    ring_count = len(rings)
+    for ring in range(ring_count - 1):
+        for index in range(vertices):
+            next_index = (index + 1) % vertices
+            a = ring * vertices + index
+            b = ring * vertices + next_index
+            c = (ring + 1) * vertices + next_index
+            d = (ring + 1) * vertices + index
+            faces.append((a, b, c, d))
+    start_center = len(points)
+    end_center = start_center + 1
+    points.extend([start_v, end_v])
+    for index in range(vertices):
+        next_index = (index + 1) % vertices
+        faces.append((start_center, next_index, index))
+        final_ring = (ring_count - 1) * vertices
+        faces.append((end_center, final_ring + index, final_ring + next_index))
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(points, [], faces)
+    mesh.update()
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    for polygon in mesh.polygons:
+        for loop_index in polygon.loop_indices:
+            vertex_index = mesh.loops[loop_index].vertex_index
+            if vertex_index < ring_count * vertices:
+                ring = vertex_index // vertices
+                around = vertex_index % vertices
+                uv_layer.data[loop_index].uv = (around / vertices, ring / max(1, ring_count - 1))
+            else:
+                uv_layer.data[loop_index].uv = (0.5, 0.5)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    return finish_mesh(obj, material, smooth=True)
 
 
 def sphere(name, location, radius, material, segments, rings):
@@ -397,6 +470,14 @@ def build_armature(label: str, detail: float):
     root["blender_authoring_forward_axis"] = "+Y"
     root["opaque_material_contract"] = True
     root["presentation_only"] = True
+    root["visual_revision"] = "human-anatomy-m4-contact-v4"
+    root["limb_profile_contract"] = "human-deltoid-brachioradialis-ulna-wrist-taper-v4"
+    root["hand_pose_contract"] = "separate-palm-thumb-index-resting-digit-grip-v4"
+    root["shoulder_entry_contract"] = "tapered-offscreen-sleeve"
+    root["glove_construction_contract"] = "opaque-articulated-knuckle-pads-seams-cloth-v4"
+    root["weapon_grip_review_contract"] = "m4a1-neutral-ads-reload-contact-v4"
+    root["finger_segment_count"] = 30
+    root["weapon_grip_review_frames"] = 3
 
     armature_data = bpy.data.armatures.new(f"Pass65_FirstPersonArms_Skeleton_{label}")
     armature = bpy.data.objects.new(f"pass65-first-person-arms-skeleton-{label}", armature_data)
@@ -412,32 +493,46 @@ def build_armature(label: str, detail: float):
 
     chains = {}
     for side, sign in (("R", 1), ("L", -1)):
-        shoulder_x = 0.4 * sign
-        elbow_x = 0.33 * sign
-        wrist_x = 0.205 * sign
+        shoulder_x = 0.355 * sign
         # Blender +Y exports to glTF -Z, the same forward axis used by the
         # camera-space weapon/socket contract.
-        upper_head = (shoulder_x, -0.42, 0.045)
-        upper_tail = (elbow_x, 0.12, 0.0)
-        lower_tail = (wrist_x, 0.66, -0.035)
-        wrist_tail = (0.155 * sign, 0.81, -0.045)
+        upper_head = (shoulder_x, -0.42, 0.035)
+        if side == "R":
+            # The firing hand sits closer to the camera and lower on the A2
+            # pistol grip. Its palm and curled trigger/resting fingers meet the
+            # authored right-grip socket without forcing a mirrored mannequin
+            # pose on the support arm.
+            upper_tail = (0.27, 0.08, -0.005)
+            lower_tail = (0.18, 0.62, -0.04)
+            wrist_tail = (0.10, 0.78, -0.055)
+        else:
+            # The support arm reaches farther and slightly higher around the
+            # RAS handguard. This asymmetric first-person stance is the actual
+            # M4 contact silhouette, not a cosmetic camera offset.
+            upper_tail = (-0.27, 0.10, 0.0)
+            lower_tail = (-0.17, 0.75, 0.01)
+            wrist_tail = (-0.08, 1.05, 0.005)
         add_edit_bone(armature, f"UpperArm{side}", upper_head, upper_tail, "Root")
         add_edit_bone(armature, f"LowerArm{side}", upper_tail, lower_tail, f"UpperArm{side}")
         add_edit_bone(armature, f"Wrist{side}", lower_tail, wrist_tail, f"LowerArm{side}")
         chains[side] = (upper_head, upper_tail, lower_tail, wrist_tail)
-        finger_x_offsets = (0.056, 0.018, -0.02, -0.056)
-        for finger_name, offset in zip(FINGER_NAMES, finger_x_offsets):
-            start = (wrist_tail[0] + offset * sign, wrist_tail[1] + 0.018, wrist_tail[2] + 0.012)
-            one = (start[0], start[1] + 0.085, start[2] - 0.006)
-            two = (start[0], one[1] + 0.067, one[2] - 0.012)
-            three = (start[0], two[1] + 0.048, two[2] - 0.014)
+        finger_x_offsets = (-0.055, -0.018, 0.02, 0.054)
+        finger_lengths = ((0.084, 0.061, 0.044), (0.091, 0.066, 0.047), (0.087, 0.062, 0.044), (0.073, 0.052, 0.038))
+        palm_end_y = wrist_tail[1] + 0.19
+        for finger_index, (finger_name, offset) in enumerate(zip(FINGER_NAMES, finger_x_offsets)):
+            proximal, middle, distal = finger_lengths[finger_index]
+            length_bias = (1.5 - finger_index) * 0.003
+            start = (wrist_tail[0] + offset * sign, palm_end_y - 0.025 + length_bias, wrist_tail[2] + 0.002)
+            one = (start[0] + 0.004 * sign, start[1] + proximal * 0.88, start[2] - proximal * 0.22)
+            two = (one[0] - 0.002 * sign, one[1] + middle * 0.56, one[2] - middle * 0.83)
+            three = (two[0] - 0.004 * sign, two[1] - distal * 0.24, two[2] - distal * 0.97)
             add_edit_bone(armature, f"{finger_name}1{side}", start, one, f"Wrist{side}")
             add_edit_bone(armature, f"{finger_name}2{side}", one, two, f"{finger_name}1{side}")
             add_edit_bone(armature, f"{finger_name}3{side}", two, three, f"{finger_name}2{side}")
-        thumb_start = (wrist_tail[0] + 0.086 * sign, wrist_tail[1] + 0.002, wrist_tail[2] - 0.008)
-        thumb_one = (thumb_start[0] + 0.064 * sign, thumb_start[1] + 0.052, thumb_start[2] - 0.012)
-        thumb_two = (thumb_one[0] + 0.045 * sign, thumb_one[1] + 0.048, thumb_one[2] - 0.018)
-        thumb_three = (thumb_two[0] + 0.026 * sign, thumb_two[1] + 0.035, thumb_two[2] - 0.012)
+        thumb_start = (wrist_tail[0] - 0.066 * sign, wrist_tail[1] + 0.055, wrist_tail[2] + 0.008)
+        thumb_one = (thumb_start[0] - 0.052 * sign, wrist_tail[1] + 0.105, wrist_tail[2] - 0.008)
+        thumb_two = (thumb_one[0] - 0.028 * sign, wrist_tail[1] + 0.168, wrist_tail[2] - 0.043)
+        thumb_three = (thumb_two[0] + 0.018 * sign, wrist_tail[1] + 0.195, wrist_tail[2] - 0.084)
         add_edit_bone(armature, f"Thumb1{side}", thumb_start, thumb_one, f"Wrist{side}")
         add_edit_bone(armature, f"Thumb2{side}", thumb_one, thumb_two, f"Thumb1{side}")
         add_edit_bone(armature, f"Thumb3{side}", thumb_two, thumb_three, f"Thumb2{side}")
@@ -448,50 +543,112 @@ def build_armature(label: str, detail: float):
         )
 
     segments = 18 if detail > 0.8 else 10
-    rings = 10 if detail > 0.8 else 6
     for side, sign in (("R", 1), ("L", -1)):
         upper_head, upper_tail, lower_tail, wrist_tail = chains[side]
-        upper = tapered_segment(f"{side}-authored-upper-sleeve-{label}", upper_head, upper_tail, 0.135, 0.09, materials["sleeve"], segments)
-        lower = tapered_segment(f"{side}-authored-forearm-sleeve-{label}", upper_tail, lower_tail, 0.094, 0.067, materials["sleeve"], segments)
-        elbow = sphere(f"{side}-authored-elbow-{label}", upper_tail, 0.092, materials["sleeve"], segments, rings)
+        upper_axis = (Vector(upper_tail) - Vector(upper_head)).normalized()
+        lower_axis = (Vector(lower_tail) - Vector(upper_tail)).normalized()
+        upper_start = Vector(upper_head) - upper_axis * 0.13
+        upper = profiled_segment(
+            f"{side}-authored-upper-sleeve-{label}", upper_start, upper_tail,
+            ((0.0, 0.064, 0.052, 0.0, 0.0), (0.1, 0.083, 0.065, 0.0, 0.0),
+             (0.28, 0.094, 0.071, 0.002 * sign, 0.003), (0.5, 0.088, 0.069, 0.004 * sign, 0.006),
+             (0.7, 0.078, 0.063, 0.002 * sign, 0.004), (0.86, 0.066, 0.056, 0.0, 0.002),
+             (1.0, 0.057, 0.049, 0.0, 0.0)),
+            materials["sleeve"], segments,
+        )
+        lower = profiled_segment(
+            f"{side}-authored-forearm-sleeve-{label}", upper_tail, lower_tail,
+            ((0.0, 0.061, 0.052, 0.0, 0.0), (0.1, 0.071, 0.055, 0.0, 0.003),
+             (0.3, 0.082, 0.061, -0.004 * sign, 0.006), (0.49, 0.078, 0.058, -0.006 * sign, 0.007),
+             (0.68, 0.068, 0.052, -0.003 * sign, 0.003), (0.84, 0.057, 0.045, 0.0, 0.001),
+             (1.0, 0.047, 0.038, 0.0, 0.0)),
+            materials["sleeve"], segments,
+        )
+        elbow_start = Vector(upper_tail) - upper_axis * 0.036
+        elbow_end = Vector(upper_tail) + lower_axis * 0.074
+        elbow = profiled_segment(
+            f"{side}-authored-elbow-ulna-transition-{label}", elbow_start, elbow_end,
+            ((0.0, 0.055, 0.047, 0.0, 0.0), (0.3, 0.064, 0.052, 0.0, 0.005),
+             (0.68, 0.061, 0.048, -0.003 * sign, -0.004), (1.0, 0.057, 0.045, 0.0, 0.0)),
+            materials["sleeve"], segments,
+        )
         cuff_mid = Vector(lower_tail).lerp(Vector(wrist_tail), 0.35)
-        cuff = tapered_segment(f"{side}-authored-glove-cuff-{label}", lower_tail, wrist_tail, 0.078, 0.083, materials["glove"], segments)
-        palm_center = Vector(wrist_tail) + Vector((0, 0.065, 0.0))
-        palm = rounded_cube(f"{side}-authored-palm-{label}", palm_center, (0.17, 0.22, 0.085), materials["glove"], 0.035)
-        knuckle = rounded_cube(f"{side}-authored-knuckle-guard-{label}", palm_center + Vector((0, -0.035, 0.052)), (0.15, 0.105, 0.035), materials["pad"], 0.014)
-        wrist_guard = rounded_cube(f"{side}-authored-wrist-guard-{label}", cuff_mid + Vector((0, 0, 0.055)), (0.145, 0.09, 0.04), materials["pad"], 0.012)
+        cuff = profiled_segment(
+            f"{side}-authored-glove-cuff-{label}", lower_tail, wrist_tail,
+            ((0.0, 0.052, 0.042, 0.0, 0.0), (0.18, 0.057, 0.046, 0.0, 0.0),
+             (0.68, 0.054, 0.043, 0.0, 0.0), (1.0, 0.049, 0.038, 0.0, 0.0)),
+            materials["glove"], segments,
+        )
+        palm_end = Vector(wrist_tail) + Vector((0, 0.19, -0.002))
+        palm = profiled_segment(
+            f"{side}-authored-palm-{label}", wrist_tail, palm_end,
+            ((0.0, 0.047, 0.033, 0.0, 0.0), (0.18, 0.061, 0.036, 0.0, 0.001),
+             (0.48, 0.079, 0.041, 0.002 * sign, 0.003), (0.76, 0.093, 0.043, 0.003 * sign, 0.004),
+             (0.92, 0.098, 0.04, 0.002 * sign, 0.002), (1.0, 0.088, 0.035, 0.0, 0.0)),
+            materials["glove"], segments,
+        )
+        knuckle_pads = [
+            rounded_cube(
+                f"{side}-authored-knuckle-pad-{index + 1}-{label}",
+                palm_end + Vector((offset * sign, -0.044 + abs(offset) * 0.08, 0.043)),
+                (0.024 if index in {0, 3} else 0.029, 0.041, 0.01), materials["pad"], 0.004,
+            )
+            for index, offset in enumerate((-0.054, -0.018, 0.018, 0.054))
+        ]
+        knuckle = join_meshes(
+            f"{side}-authored-articulated-knuckle-pads-{label}", knuckle_pads,
+        )
+        guard_start = Vector(lower_tail).lerp(Vector(wrist_tail), 0.2)
+        guard_end = Vector(lower_tail).lerp(Vector(wrist_tail), 0.55)
+        wrist_guard = profiled_segment(
+            f"{side}-authored-low-profile-cuff-strap-{label}", guard_start, guard_end,
+            ((0.0, 0.058, 0.048, 0.0, 0.0), (0.5, 0.061, 0.05, 0.0, 0.0),
+             (1.0, 0.058, 0.047, 0.0, 0.0)), materials["pad"], max(10, segments // 2),
+        )
         for obj, bone_name in ((upper, f"UpperArm{side}"), (lower, f"LowerArm{side}"), (elbow, f"LowerArm{side}"),
                                (cuff, f"Wrist{side}"), (palm, f"Wrist{side}"), (knuckle, f"Wrist{side}"), (wrist_guard, f"Wrist{side}")):
             skin_to_bone(obj, armature, bone_name)
         if side == "L":
-            display = rounded_cube("left-wrist-authored-display", cuff_mid + Vector((0, -0.015, 0.078)), (0.105, 0.078, 0.018), materials["display"], 0.007)
+            display = rounded_cube(
+                "left-wrist-authored-display", cuff_mid + Vector((0, -0.004, 0.056)),
+                (0.064, 0.052, 0.009), materials["display"], 0.004, rotation=(math.radians(-4), 0, 0),
+            )
             skin_to_bone(display, armature, "WristL")
 
+        finger_base_radii = {"Index": 0.02, "Middle": 0.021, "Ring": 0.0195, "Pinky": 0.0175}
         for finger_name in FINGER_NAMES:
             for joint in (1, 2, 3):
                 bone = armature.data.bones[f"{finger_name}{joint}{side}"]
-                radius = 0.022 if joint == 1 else 0.019 if joint == 2 else 0.016
-                mesh = tapered_segment(
+                radius = finger_base_radii[finger_name] * (1.0 if joint == 1 else 0.86 if joint == 2 else 0.7)
+                mesh = profiled_segment(
                     f"{side}-{finger_name.lower()}-{joint}-{label}", bone.head_local, bone.tail_local,
-                    radius, radius * 0.88, materials["glove"], max(8, segments // 2),
+                    ((0.0, radius * 0.8, radius * 0.68, 0.0, 0.0),
+                     (0.18, radius, radius * 0.82, 0.0, 0.0),
+                     (0.7, radius * 0.91, radius * 0.76, 0.0, 0.0),
+                     (1.0, radius * 0.66, radius * 0.58, 0.0, 0.0)),
+                    materials["glove"], max(8, segments // 2),
                 )
                 skin_to_bone(mesh, armature, bone.name)
         for joint in (1, 2, 3):
             bone = armature.data.bones[f"Thumb{joint}{side}"]
-            radius = 0.025 if joint == 1 else 0.021 if joint == 2 else 0.017
-            mesh = tapered_segment(
+            radius = 0.023 if joint == 1 else 0.02 if joint == 2 else 0.0165
+            mesh = profiled_segment(
                 f"{side}-thumb-{joint}-{label}", bone.head_local, bone.tail_local,
-                radius, radius * 0.86, materials["glove"], max(8, segments // 2),
+                ((0.0, radius * 0.82, radius * 0.7, 0.0, 0.0),
+                 (0.2, radius, radius * 0.84, 0.0, 0.0),
+                 (0.72, radius * 0.9, radius * 0.76, 0.0, 0.0),
+                 (1.0, radius * 0.64, radius * 0.56, 0.0, 0.0)),
+                materials["glove"], max(8, segments // 2),
             )
             skin_to_bone(mesh, armature, bone.name)
 
     batch_skinned_renderables(root, armature)
 
     for name, location, semantic in (
-        ("right-hand-grip-socket", (0.155, 0.86, -0.045), "rightGrip"),
-        ("left-hand-grip-socket", (-0.155, 0.86, -0.045), "leftGrip"),
-        ("right-wrist-knife-socket", (0.19, 0.76, -0.06), "knife"),
-        ("left-hand-grenade-socket", (-0.15, 0.87, -0.045), "grenade"),
+        ("right-hand-grip-socket", (0.06, 1.04, -0.13), "rightGrip"),
+        ("left-hand-grip-socket", (-0.08, 1.31, -0.055), "leftGrip"),
+        ("right-wrist-knife-socket", (0.13, 0.735, -0.07), "knife"),
+        ("left-hand-grenade-socket", (-0.08, 1.28, -0.055), "grenade"),
     ):
         empty(name, location, armature, semantic)
     action_corpus(armature)
@@ -539,8 +696,150 @@ def look_at(obj, target):
     obj.rotation_euler = (Vector(target) - obj.location).to_track_quat("-Z", "Y").to_euler()
 
 
-def render_reviews(hero_root, armature):
-    for root, _candidate_armature in arm_roots:
+def point_to_mesh_bounds_distance(point, mesh):
+    local = mesh.matrix_world.inverted() @ point
+    success, closest, _normal, _face = mesh.closest_point_on_mesh(local)
+    if not success:
+        return math.inf
+    return (mesh.matrix_world @ closest - point).length
+
+
+def prepare_review_weapon(weapon_id, hero_root, armature):
+    path = FIREARM_RAW_DIR / f"{weapon_id}-fp-lod0.glb"
+    if not path.exists():
+        raise RuntimeError(
+            f"{path} is required for the true weapon-contact review; author weapon families before operator arms"
+        )
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    imported = [obj for obj in bpy.data.objects if obj not in before]
+    # The source GLB carries the full runtime action corpus. Review frames own
+    # their deterministic action staging explicitly; mute imported NLA so an
+    # evaluation update cannot snap the detached reload magazine back into the
+    # magwell between contact placement and render.
+    for obj in imported:
+        if obj.animation_data is None:
+            continue
+        obj.animation_data.action = None
+        for track in obj.animation_data.nla_tracks:
+            track.mute = True
+    group = bpy.data.objects.new(f"Pass65_{weapon_id}_ActualGripReview", None)
+    bpy.context.collection.objects.link(group)
+    imported_set = set(imported)
+    for obj in imported:
+        if obj.parent not in imported_set:
+            world = obj.matrix_world.copy()
+            obj.parent = group
+            obj.matrix_world = world
+
+    def imported_node(name):
+        return next(
+            (obj for obj in imported if obj.get("canonical_node_name") == name or obj.name == name or obj.name.startswith(f"{name}.")),
+            None,
+        )
+
+    source_right = imported_node("grip-socket-r")
+    source_left = imported_node("support-socket-l")
+    target_right = next(obj for obj in armature.children if obj.name.startswith("right-hand-grip-socket"))
+    target_left = next(obj for obj in armature.children if obj.name.startswith("left-hand-grip-socket"))
+    if not source_right or not source_left:
+        raise RuntimeError(f"{weapon_id}: actual review weapon lacks authored grip sockets")
+    bpy.context.view_layer.update()
+    source_right_position = source_right.matrix_world.translation.copy()
+    source_left_position = source_left.matrix_world.translation.copy()
+    target_right_position = target_right.matrix_world.translation.copy()
+    target_left_position = target_left.matrix_world.translation.copy()
+    source_vector = source_left_position - source_right_position
+    target_vector = target_left_position - target_right_position
+    if source_vector.length < 0.001 or target_vector.length < 0.001:
+        raise RuntimeError(f"{weapon_id}: degenerate grip-review socket span")
+    scale = target_vector.length / source_vector.length
+    rotation = source_vector.normalized().rotation_difference(target_vector.normalized())
+    transform = (
+        Matrix.Translation(target_right_position)
+        @ rotation.to_matrix().to_4x4()
+        @ Matrix.Scale(scale, 4)
+        @ Matrix.Translation(-source_right_position)
+    )
+    group.matrix_world = transform
+    bpy.context.view_layer.update()
+    right_error = (source_right.matrix_world.translation - target_right_position).length
+    left_error = (source_left.matrix_world.translation - target_left_position).length
+    if right_error > 0.0005 or left_error > 0.0005:
+        raise RuntimeError(f"{weapon_id}: socket contact fit failed right={right_error:.6f} left={left_error:.6f}")
+
+    # Runtime M4 detail is correctly consolidated by material. Contact audits
+    # therefore query exact mesh surfaces, not fragile pre-batch part names or
+    # broad bounding boxes (which would report false contact through empty air).
+    right_grip_meshes = [
+        obj for obj in imported if obj.type == "MESH"
+        and any("Polymer" in material.name for material in obj.data.materials if material)
+    ]
+    left_grip_meshes = [obj for obj in imported if obj.type == "MESH"]
+    if not right_grip_meshes or not left_grip_meshes:
+        raise RuntimeError(f"{weapon_id}: review contact meshes unavailable")
+
+    def contact_distances(side, meshes):
+        names = [f"{finger}2{side}" for finger in FINGER_NAMES] + [f"Thumb2{side}"]
+        points = [armature.matrix_world @ armature.pose.bones[name].tail for name in names]
+        return [min(point_to_mesh_bounds_distance(point, mesh) for mesh in meshes) for point in points]
+
+    right_distances = contact_distances("R", right_grip_meshes)
+    left_distances = contact_distances("L", left_grip_meshes)
+    # The actual project weapon is socket-fitted and must penetrate the curled
+    # digit envelope closely enough to read as a held object, not a nearby prop.
+    right_contacts = sum(distance <= 0.065 for distance in right_distances)
+    left_contacts = sum(distance <= 0.075 for distance in left_distances)
+    if right_contacts < 3 or left_contacts < 3:
+        raise RuntimeError(
+            f"{weapon_id}: actual grip contact insufficient "
+            f"right={right_contacts}/5 {right_distances} left={left_contacts}/5 {left_distances}"
+        )
+    hero_root[f"{weapon_id}_review_right_socket_error_m"] = round(right_error, 7)
+    hero_root[f"{weapon_id}_review_left_socket_error_m"] = round(left_error, 7)
+    hero_root[f"{weapon_id}_review_scale"] = round(scale, 6)
+    hero_root[f"{weapon_id}_review_right_digit_contacts"] = right_contacts
+    hero_root[f"{weapon_id}_review_left_digit_contacts"] = left_contacts
+    group["actual_project_weapon_review"] = True
+    group["socket_contact_verified"] = True
+    group["right_socket_error_m"] = right_error
+    group["left_socket_error_m"] = left_error
+    group.hide_render = True
+    group.hide_viewport = True
+    for obj in imported:
+        obj.hide_render = True
+        obj.hide_viewport = True
+    magazine = imported_node("weapon-magazine")
+    magazine_meshes = [
+        obj for obj in imported if obj.type == "MESH"
+        and obj.get("runtime_transform_owner") == "magazine"
+    ]
+    if not magazine or not magazine_meshes:
+        raise RuntimeError(f"{weapon_id}: reload review requires the authored magazine transform group")
+    reload_magazine_meshes = []
+    for mesh in magazine_meshes:
+        duplicate = mesh.copy()
+        duplicate.data = mesh.data.copy()
+        duplicate.name = f"{mesh.name}_ReloadContactReview"
+        duplicate.parent = None
+        duplicate.matrix_world = mesh.matrix_world.copy()
+        duplicate.hide_render = True
+        duplicate.hide_viewport = True
+        bpy.context.collection.objects.link(duplicate)
+        reload_magazine_meshes.append(duplicate)
+    return {
+        "group": group,
+        "imported": imported,
+        "magazine": magazine,
+        "magazine_meshes": magazine_meshes,
+        "magazine_matrix_basis": magazine.matrix_basis.copy(),
+        "magazine_mesh_matrices": [mesh.matrix_world.copy() for mesh in magazine_meshes],
+        "reload_magazine_meshes": reload_magazine_meshes,
+    }
+
+
+def render_reviews(hero_root, armature, review_weapons):
+    for root, _candidate_armature, _output_name in arm_roots:
         visible = root == hero_root
         for obj in hierarchy(root):
             obj.hide_render = not visible
@@ -551,8 +850,8 @@ def render_reviews(hero_root, armature):
     stage.data.materials.append(materials["stage"])
     for name, location, energy, color, size in (
         ("Arms_Key", (-2.8, -2.3, 3.4), 1120, (0.55, 0.78, 1.0), 2.0),
-        ("Arms_Rim", (2.7, 0.2, 2.6), 980, (1.0, 0.28, 0.06), 1.6),
-        ("Arms_Fill", (0.0, 3.2, 1.2), 620, (0.25, 0.5, 0.72), 2.2),
+        ("Arms_Rim", (2.7, 0.2, 2.6), 780, (0.16, 0.72, 0.92), 1.6),
+        ("Arms_Fill", (0.0, 3.2, 1.2), 680, (0.38, 0.58, 0.72), 2.2),
     ):
         bpy.ops.object.light_add(type="AREA", location=location)
         light = bpy.context.object
@@ -577,23 +876,83 @@ def render_reviews(hero_root, armature):
     scene.view_settings.look = "AgX - Medium High Contrast"
     scene.frame_set(1)
     views = (
-        ("neutral-front", (0, -2.65, 0.8), (0, 0.26, -0.02), 58, None),
-        ("neutral-quarter", (2.25, -1.75, 1.2), (0, 0.3, -0.02), 62, None),
-        ("glove-closeup", (0.82, 0.04, 0.28), (0.2, 0.79, -0.045), 72, None),
-        ("reload-action", (-1.9, -1.55, 0.95), (0, 0.32, -0.02), 62, "reload"),
+        ("neutral-front", (0, -1.82, 0.62), (0, 0.5, -0.025), 68, None, 1, None),
+        ("forearm-wrist-quarter", (1.52, -0.48, 0.7), (0.08, 0.63, -0.025), 72, None, 1, None),
+        ("hand-anatomy-closeup", (0.72, 0.48, 0.28), (0.0, 1.08, -0.075), 76, None, 1, None),
+        ("m4a1-neutral-contact", (1.36, 0.58, 0.38), (0.0, 1.11, -0.09), 68, None, 1, "m4a1"),
+        ("m4a1-ads-contact", (0.78, 0.74, 0.43), (0.0, 1.18, -0.055), 76, None, 1, "m4a1"),
+        ("m4a1-reload-contact", (-1.38, 0.62, 0.38), (-0.36, 1.12, -0.2), 58, "reload", 15, "m4a1"),
     )
     rendered = []
-    for label, location, target, lens, action_name in views:
+    for label, location, target, lens, action_name, action_frame, weapon_id in views:
+        for candidate_id, review in review_weapons.items():
+            weapon_group = review["group"]
+            imported = review["imported"]
+            visible = candidate_id == weapon_id
+            weapon_group.hide_render = not visible
+            weapon_group.hide_viewport = not visible
+            review["magazine"].matrix_basis = review["magazine_matrix_basis"].copy()
+            for mesh, matrix in zip(review["magazine_meshes"], review["magazine_mesh_matrices"]):
+                mesh.matrix_world = matrix.copy()
+            for mesh, matrix in zip(review["reload_magazine_meshes"], review["magazine_mesh_matrices"]):
+                mesh.matrix_world = matrix.copy()
+                mesh.hide_render = True
+                mesh.hide_viewport = True
+            for obj in imported:
+                obj.hide_render = not visible
+                obj.hide_viewport = not visible
         if action_name:
             track = next(track for track in armature.animation_data.nla_tracks if track.name == action_name)
             for candidate in armature.animation_data.nla_tracks:
                 candidate.mute = candidate != track
-            scene.frame_set(15)
+            scene.frame_set(action_frame)
         else:
             for candidate in armature.animation_data.nla_tracks:
                 candidate.mute = True
             reset_pose(armature)
             scene.frame_set(1)
+        if label == "m4a1-reload-contact":
+            review = review_weapons["m4a1"]
+            bpy.context.view_layer.update()
+            digit_points = [
+                armature.matrix_world @ armature.pose.bones[f"{finger}2L"].tail
+                for finger in FINGER_NAMES
+            ]
+            hand_target = sum(digit_points, Vector()) / len(digit_points)
+            # Keep the cassette nested in the curled digit envelope while
+            # biasing it a few centimetres toward the review camera so its
+            # authored metal silhouette remains visibly readable rather than
+            # being fully occluded by the opaque palm.
+            visible_hand_target = hand_target + Vector((0.04, 0, -0.12))
+            magazine_points = [
+                mesh.matrix_world @ Vector(corner)
+                for mesh in review["magazine_meshes"]
+                for corner in mesh.bound_box
+            ]
+            magazine_center = sum(magazine_points, Vector()) / len(magazine_points)
+            magazine_delta = visible_hand_target - magazine_center
+            for mesh in review["magazine_meshes"]:
+                mesh.hide_render = True
+                mesh.hide_viewport = True
+            for mesh in review["reload_magazine_meshes"]:
+                magazine_matrix = mesh.matrix_world.copy()
+                magazine_matrix.translation += magazine_delta
+                mesh.matrix_world = magazine_matrix
+                mesh.hide_render = False
+                mesh.hide_viewport = False
+            bpy.context.view_layer.update()
+            moved_points = [
+                mesh.matrix_world @ Vector(corner)
+                for mesh in review["reload_magazine_meshes"]
+                for corner in mesh.bound_box
+            ]
+            moved_center = sum(moved_points, Vector()) / len(moved_points)
+            print(
+                "PASS65_ARMS_RELOAD_CONTACT "
+                f"hand={tuple(round(value, 4) for value in visible_hand_target)} "
+                f"before={tuple(round(value, 4) for value in magazine_center)} "
+                f"after={tuple(round(value, 4) for value in moved_center)}"
+            )
         camera.location = location
         camera.data.lens = lens
         look_at(camera, target)
@@ -606,15 +965,19 @@ def render_reviews(hero_root, armature):
     reset_pose(armature)
     scene.frame_set(1)
     images = [bpy.data.images.load(str(path), check_existing=False) for path in rendered]
-    sheet = bpy.data.images.new("Pass65_FirstPersonArms_ContactSheet", REVIEW_SIZE * 2, REVIEW_SIZE * 2, alpha=True)
-    pixels = [0.0] * (REVIEW_SIZE * 2 * REVIEW_SIZE * 2 * 4)
+    sheet_columns = 3
+    sheet_rows = 2
+    sheet = bpy.data.images.new(
+        "Pass65_FirstPersonArms_ContactSheet", REVIEW_SIZE * sheet_columns, REVIEW_SIZE * sheet_rows, alpha=True,
+    )
+    pixels = [0.0] * (REVIEW_SIZE * sheet_columns * REVIEW_SIZE * sheet_rows * 4)
     for index, image in enumerate(images):
         source = list(image.pixels[:])
-        tile_x = (index % 2) * REVIEW_SIZE
-        tile_y = (1 - index // 2) * REVIEW_SIZE
+        tile_x = (index % sheet_columns) * REVIEW_SIZE
+        tile_y = (sheet_rows - 1 - index // sheet_columns) * REVIEW_SIZE
         for row in range(REVIEW_SIZE):
             source_start = row * REVIEW_SIZE * 4
-            target_start = ((tile_y + row) * REVIEW_SIZE * 2 + tile_x) * 4
+            target_start = ((tile_y + row) * REVIEW_SIZE * sheet_columns + tile_x) * 4
             pixels[target_start:target_start + REVIEW_SIZE * 4] = source[source_start:source_start + REVIEW_SIZE * 4]
     sheet.pixels = pixels
     sheet.file_format = "PNG"
@@ -628,17 +991,31 @@ materials = {
     "sleeve": textured_material("MAT_Pass65_Arms_Sleeve_PBR", images, (0.42, 0.62, 0.66, 1), 0.0),
     "glove": textured_material("MAT_Pass65_Arms_Glove_PBR", images, (0.16, 0.19, 0.18, 1), 0.5),
     "pad": simple_material("MAT_Pass65_Arms_ArmorPad", (0.055, 0.067, 0.066, 1), 0.12, 0.72),
-    "display": simple_material("MAT_Pass65_Arms_WristDisplay", (0.01, 0.18, 0.19, 1), 0.22, 0.18, (0.0, 0.86, 0.78, 1), 4.2),
+    "display": simple_material("MAT_Pass65_Arms_WristDisplay", (0.008, 0.12, 0.13, 1), 0.22, 0.24, (0.0, 0.68, 0.62, 1), 1.8),
     "stage": simple_material("MAT_Pass65_Arms_ReviewStage", (0.012, 0.017, 0.023, 1), 0.1, 0.6),
 }
 arm_roots = []
 for label, detail, output_name in (("LOD0", 1.0, "pass65-first-person-arms-lod0"), ("LOD1", 0.55, "pass65-first-person-arms-lod1")):
     root, armature = build_armature(label, detail)
-    arm_roots.append((root, armature))
+    arm_roots.append((root, armature, output_name))
+hero_root, hero_armature, _hero_output = arm_roots[0]
+review_weapons = {
+    weapon_id: prepare_review_weapon(weapon_id, hero_root, hero_armature)
+    for weapon_id in ("m4a1",)
+}
+for root, _armature, _output_name in arm_roots[1:]:
+    for weapon_id in review_weapons:
+        for receipt in (
+            "right_socket_error_m", "left_socket_error_m", "scale",
+            "right_digit_contacts", "left_digit_contacts",
+        ):
+            key = f"{weapon_id}_review_{receipt}"
+            root[key] = hero_root[key]
+for root, armature, output_name in arm_roots:
     export_root(root, output_name)
-render_reviews(arm_roots[0][0], arm_roots[0][1])
+render_reviews(hero_root, hero_armature, review_weapons)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
-for root, armature in arm_roots:
+for root, armature, _output_name in arm_roots:
     meshes = [obj for obj in hierarchy(root) if obj.type == "MESH"]
     triangles = sum(len(poly.vertices) - 2 for obj in meshes for poly in obj.data.polygons)
     print(f"PASS65_OPERATOR_ARMS_{root.get('quality_tier')}_READY meshes={len(meshes)} bones={len(armature.data.bones)} triangles={triangles}")

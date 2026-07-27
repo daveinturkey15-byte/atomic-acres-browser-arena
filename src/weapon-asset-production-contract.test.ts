@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { WEAPON_IDS } from './protocol';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
 
 type ProductionEntry = Readonly<{
   id: string;
+  displayName?: string;
+  designId?: string;
+  silhouetteFamily?: string;
+  platformAnatomy?: string;
   releaseState: 'blocked' | 'release-ready';
   currentRuntimeSource?: string;
   blockers?: readonly string[];
@@ -16,12 +21,17 @@ type ProductionEntry = Readonly<{
     sourceWeightedParts?: number;
     bones?: number;
   }[];
-  worldGlbs?: readonly { path: string; sha256: string; triangles: number }[];
-  dropGlbs?: readonly { path: string; sha256: string; triangles: number }[];
+  worldGlbs?: readonly { path: string; sha256: string; triangles: number; renderPrimitives?: number }[];
+  dropGlbs?: readonly { path: string; sha256: string; triangles: number; renderPrimitives?: number }[];
   actions?: readonly string[];
   pbrMaps?: Readonly<Record<string, { path: string; sha256: string }>>;
   opticMagnification?: number;
   materialContract?: string;
+  visualRevision?: string;
+  materialLanguage?: string;
+  review?: Readonly<{
+    renders?: readonly { cameraId: string; path: string; sha256: string }[];
+  }>;
   renderBudget?: Readonly<{
     maxSkinnedRenderableMeshesPerLod: number;
     maxSkinnedPrimitivesPerLod: number;
@@ -38,6 +48,7 @@ const manifest = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-pr
   requiredSockets: readonly string[];
   requiredCoreActions: readonly string[];
   operatorArms: ProductionEntry;
+  meleeWeapons: readonly ProductionEntry[];
   supportVehicles: readonly ProductionEntry[];
   weapons: readonly ProductionEntry[];
 };
@@ -60,7 +71,7 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
     ]));
   });
 
-  it('releases only the structurally audited Blender crossbow and opaque rigged arms tranche', () => {
+  it('releases the structurally audited unique Blender firearm corpus, crossbow and opaque rigged arms', () => {
     const crossbow = manifest.weapons.find((entry) => entry.id === 'explosive-crossbow');
     expect(crossbow).toMatchObject({
       releaseState: 'release-ready',
@@ -79,7 +90,19 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
       releaseState: 'release-ready',
       materialContract: 'opaque-depth-writing',
       currentRuntimeSource: 'public/assets/original/models/operators/pass65-first-person-arms-lod0.glb',
+      visualRevision: 'human-anatomy-m4-contact-v4',
+      limbProfileContract: 'human-deltoid-brachioradialis-ulna-wrist-taper-v4',
+      handPoseContract: 'separate-palm-thumb-index-resting-digit-grip-v4',
+      shoulderEntryContract: 'tapered-offscreen-sleeve',
+      gloveConstructionContract: 'opaque-articulated-knuckle-pads-seams-cloth-v4',
+      weaponGripReviewContract: 'm4a1-neutral-ads-reload-contact-v4',
+      fingerSegmentCount: 30,
+      weaponGripReviewFrames: 3,
     });
+    expect(manifest.operatorArms.review?.renders?.map((render) => render.cameraId)).toEqual(expect.arrayContaining([
+      'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
+      'm4a1-neutral-contact', 'm4a1-ads-contact', 'm4a1-reload-contact',
+    ]));
     expect(manifest.operatorArms.firstPersonGlbs).toHaveLength(2);
     expect(manifest.operatorArms.renderBudget).toEqual({
       maxSkinnedRenderableMeshesPerLod: 6,
@@ -99,8 +122,64 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
       expect(lod.bones).toBe(37);
     }
     expect(manifest.operatorArms.actions).toEqual(expect.arrayContaining([...manifest.requiredCoreActions]));
-    expect(manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')
-      .every((entry) => entry.releaseState === 'blocked')).toBe(true);
+    expect(manifest.meleeWeapons).toHaveLength(1);
+    expect(manifest.meleeWeapons[0]).toMatchObject({
+      id: 'field-knife',
+      releaseState: 'release-ready',
+      currentRuntimeSource: 'public/assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod0.glb',
+    });
+    expect(manifest.meleeWeapons[0].firstPersonGlbs).toHaveLength(2);
+    expect(manifest.meleeWeapons[0].worldGlbs).toHaveLength(2);
+    expect(manifest.meleeWeapons[0].dropGlbs).toHaveLength(1);
+    expect(manifest.weapons.every((entry) => entry.releaseState === 'release-ready')).toBe(true);
+    const catalogNames = new Map(WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.displayName]));
+    for (const weapon of manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')) {
+      expect(weapon.displayName).toBe(catalogNames.get(weapon.id as (typeof WEAPON_IDS)[number]));
+      expect(weapon.currentRuntimeSource).toBe(
+        `public/assets/original/models/weapons/pass65-firearms/${weapon.id}/${weapon.id}-fp-lod0.glb`,
+      );
+      expect(weapon.designId).toBeTruthy();
+      expect(weapon.silhouetteFamily).toBeTruthy();
+      expect(weapon.visualRevision).toBe(
+        weapon.id === 'm4a1' ? 'm4a1-production-hero-v3' : 'platform-production-hero-v4',
+      );
+      expect(weapon.materialLanguage).toBe(
+        weapon.id === 'm4a1' ? 'm4a1-anodized-metal-polymer-pbr-v3' : 'platform-authentic-metal-polymer-pbr-v4',
+      );
+      expect(weapon.review?.renders?.map((render) => render.cameraId)).toEqual(expect.arrayContaining([
+        'hero-quarter', 'side-silhouette', 'sight-line', 'reload-action',
+        'world-lod0-silhouette', 'world-lod2-silhouette', 'drop-lod0-silhouette',
+      ]));
+      expect(weapon.review?.renders?.map((render) => (
+        'evidenceRole' in render ? render.evidenceRole : undefined
+      ))).toEqual(expect.arrayContaining([
+        'first-person-neutral', 'first-person-side-silhouette', 'first-person-ads',
+        'first-person-reload', 'world-near-silhouette', 'world-far-lod-silhouette',
+        'drop-silhouette',
+      ]));
+      expect(weapon.firstPersonGlbs).toHaveLength(2);
+      expect(weapon.worldGlbs).toHaveLength(3);
+      expect(weapon.dropGlbs).toHaveLength(1);
+      expect(weapon.firstPersonGlbs?.[0].triangles).toBeGreaterThan(weapon.firstPersonGlbs?.[1].triangles ?? Infinity);
+      expect(weapon.worldGlbs?.[0].triangles).toBeGreaterThan(weapon.worldGlbs?.[1].triangles ?? Infinity);
+      expect(weapon.worldGlbs?.[1].triangles).toBeGreaterThan(weapon.worldGlbs?.[2].triangles ?? Infinity);
+      for (const delivery of [...(weapon.firstPersonGlbs ?? []), ...(weapon.worldGlbs ?? [])]) {
+        expect(delivery.renderPrimitives).toBeGreaterThanOrEqual(4);
+        expect(delivery.renderPrimitives).toBeLessThanOrEqual(16);
+      }
+      for (const delivery of weapon.dropGlbs ?? []) {
+        expect(delivery.renderPrimitives).toBeGreaterThanOrEqual(4);
+        expect(delivery.renderPrimitives).toBeLessThanOrEqual(12);
+      }
+      expect(weapon.actions).toEqual(expect.arrayContaining([...manifest.requiredCoreActions]));
+      expect(Object.keys(weapon.pbrMaps ?? {})).toEqual(expect.arrayContaining([
+        ...manifest.requiredPbrMaps, 'polymerBaseColor', 'polymerRoughness', 'polymerMetallic',
+      ]));
+    }
+    expect(new Set(manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')
+      .map((entry) => entry.designId)).size).toBe(WEAPON_IDS.length - 1);
+    expect(new Set(manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')
+      .map((entry) => entry.platformAnatomy)).size).toBe(WEAPON_IDS.length - 1);
     expect(manifest.supportVehicles.map((entry) => entry.id)).toEqual([
       'hunter-drone-visual-family-v1', 'chopper-gunner-vehicle-v1', 'support-aircraft-family-v1',
     ]);

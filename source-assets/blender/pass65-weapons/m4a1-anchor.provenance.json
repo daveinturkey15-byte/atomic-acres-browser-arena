@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "gate": "pass65-m4a1-production-anchor",
+  "status": "passed",
+  "id": "m4a1",
+  "displayName": "M4A1",
+  "designId": "m4a1-direct-impingement-v1",
+  "title": "Pass 65 project-original M4A1 stylized production anchor",
+  "creator": "Atomic Acres project",
+  "owner": "Atomic Acres project",
+  "created": "2026-07-27",
+  "license": "Project-original; no third-party meshes or textures",
+  "inspirationBoundary": "Project-original Blender geometry and procedural PBR textures; real platform names are catalog labels only; no copied commercial-game geometry, textures, logos, or extracted assets.",
+  "visualRevision": "m4a1-production-hero-v3",
+  "materialLanguage": "m4a1-anodized-metal-polymer-pbr-v3",
+  "blenderVersion": "5.1.2",
+  "generator": {
+    "path": "scripts/blender/create-pass65-weapon-families.py",
+    "sha256": "31925a8242b2865b295e76a7e9034771429549e628741fce9f80f5a0df30502f",
+    "bytes": 91569
+  },
+  "sourceBlend": {
+    "path": "artifacts/blender-weapon-families/pass65-weapon-families-preview.blend",
+    "sha256": "5c78072d56a40412eb0d1fab830a03b5b772852baad3edec14e30924da22b2d7",
+    "bytes": 4048532
+  },
+  "sourceSpec": {
+    "path": "source-assets/blender/pass65-weapon-family-specs.json",
+    "sha256": "3e8cff133381c65a514a2a5f97a348a4229208dc014de0bf9bad53432255cebf",
+    "bytes": 9749
+  },
+  "runtimeForwardAxis": "-Z",
+  "runtimePolicy": {
+    "batching": "static-action-magazine-by-material-v1",
+    "firstPersonAndWorldRenderPrimitiveCap": 16,
+    "dropRenderPrimitiveCap": 12,
+    "lazySelection": true
+  },
+  "deliveries": [
+    {
+      "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+      "sha256": "181fb7e27d4403113fc8439727825c890aca1d829696f38b78ca48de9189a5ca",
+      "bytes": 533380,
+      "variant": "first-person-lod0",
+      "lod": 0,
+      "triangles": 32112,
+      "meshNodes": 8,
+      "renderPrimitives": 8,
+      "clips": 13,
+      "gltfValidation": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9
+      },
+      "muzzleForwardDot": 0.9245012660487684,
+      "sightForwardDot": 0.9994291737710199
+    },
+    {
+      "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod1.glb",
+      "sha256": "52c01381ed1ae68d8c4b2a02482ab14d67f65753e51cda28e148240fba4a2cde",
+      "bytes": 517700,
+      "variant": "first-person-lod1",
+      "lod": 1,
+      "triangles": 30324,
+      "meshNodes": 8,
+      "renderPrimitives": 8,
+      "clips": 13,
+      "gltfValidation": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9
+      },
+      "muzzleForwardDot": 0.9245012660487684,
+      "sightForwardDot": 0.9994291737710199
+    },
+    {
+      "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod0.glb",
+      "sha256": "339c2a6f1ef40325d8609eb1cd6fda97a0e1e551a183df0b0b0c65fb27c45ac2",
+      "bytes": 517716,
+      "variant": "world-lod0",
+      "lod": 0,
+      "triangles": 30324,
+      "meshNodes": 8,
+      "renderPrimitives": 8,
+      "clips": 13,
+      "gltfValidation": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9
+      },
+      "muzzleForwardDot": 0.9245012660487684,
+      "sightForwardDot": 0.9994291737710199
+    },
+    {
+      "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod1.glb",
+      "sha256": "e5b0b06afe7d11207c8d477ad8c50403f23ba09082aec405187048e104004601",
+      "bytes": 444252,
+      "variant": "world-lod1",
+      "lod": 1,
+      "triangles": 22940,
+      "meshNodes": 8,
+      "renderPrimitives": 8,
+      "clips": 13,
+      "gltfValidation": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9
+      },
+      "muzzleForwardDot": 0.9245012660487684,
+      "sightForwardDot": 0.9994291737710199
+    },
+    {
+      "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod2.glb",
+      "sha256": "9e703d308d3183843bc5e4dcc01d08255c9b08d02e06de9712bd7dc4005628ad",
+      "bytes": 382532,
+      "variant": "world-lod2",
+      "lod": 2,
+      "triangles": 17016,
+      "meshNodes": 7,
+      "renderPrimitives": 7,
+      "clips": 13,
+      "gltfValidation": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9
+      },
+      "muzzleForwardDot": 0.9245012660487684,
+      "sightForwardDot": 0.9994291737710199
+    },
+    {
+      "path": "public/assets/original/models/weapons/pass65-firearms/m4a1/m4a1-drop-lod0.glb",
+      "sha256": "e04797a288daadbc893f33cc34509ff31923907e42cedfec29fda0bd0c4767ec",
+      "bytes": 444236,
+      "variant": "drop-lod0",
+      "lod": 0,
+      "triangles": 22940,
+      "meshNodes": 8,
+      "renderPrimitives": 8,
+      "clips": 13,
+      "gltfValidation": {
+        "errors": 0,
+        "warnings": 0,
+        "infos": 9
+      },
+      "muzzleForwardDot": 0.9245012660487684,
+      "sightForwardDot": 0.9994291737710199
+    }
+  ],
+  "pbrMaps": {
+    "baseColor": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-baseColor.png",
+      "sha256": "0dc516877498814bc66be945daf3128e6910305e3beb62ea04eb00c506b97035",
+      "bytes": 210239,
+      "width": 512,
+      "height": 512
+    },
+    "normal": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-normal.png",
+      "sha256": "181f8a43eb6e0bdba9e169eea23eb918a0791d76f770e56ced074b5b5867ea9f",
+      "bytes": 179431,
+      "width": 512,
+      "height": 512
+    },
+    "roughness": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-roughness.png",
+      "sha256": "da0ee9332fc5cf6628a3826be94e23bce590c4a06403d52e306f60f45cb1f72c",
+      "bytes": 171336,
+      "width": 512,
+      "height": 512
+    },
+    "metallic": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-metallic.png",
+      "sha256": "51ed77a4e90d7ecde1c2eee474be7f223eacec200142f4ae7ce4192b1d4b1e15",
+      "bytes": 141354,
+      "width": 512,
+      "height": 512
+    },
+    "polymerBaseColor": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-polymerBaseColor.png",
+      "sha256": "fdde0f5c1a20737f8ac0ed005ec1c95d64df7f251445a955483049baf323039b",
+      "bytes": 140726,
+      "width": 512,
+      "height": 512
+    },
+    "polymerRoughness": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-polymerRoughness.png",
+      "sha256": "221b813b518d39c5aa314f98cd1eb1b5a278e96b6bbbfbbed229b0865ff94646",
+      "bytes": 165470,
+      "width": 512,
+      "height": 512
+    },
+    "polymerMetallic": {
+      "path": "public/assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-polymerMetallic.png",
+      "sha256": "f5796692204c5c136fe903a3fafff3e29e01b52188578ccf6c6ae776e582561b",
+      "bytes": 124784,
+      "width": 512,
+      "height": 512
+    }
+  },
+  "requiredSignatureNodes": [
+    "m4a1-delta-sight",
+    "m4a1-stanag-magazine",
+    "m4a1-buffer-stock"
+  ],
+  "requiredSockets": [
+    "grip-socket-r",
+    "support-socket-l",
+    "reload-socket-l",
+    "magazine-socket",
+    "muzzle-socket",
+    "eject-socket",
+    "optic-socket",
+    "rear-sight-socket",
+    "front-sight-socket"
+  ],
+  "animationClips": [
+    "equip",
+    "unequip",
+    "idle",
+    "walk",
+    "sprint",
+    "ads-in",
+    "ads-out",
+    "fire",
+    "dry-fire",
+    "reload",
+    "empty-reload",
+    "melee",
+    "inspect"
+  ],
+  "review": {
+    "renders": [
+      {
+        "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-hero-quarter.png",
+        "sha256": "f2cf6939369313002a213c8a2977833a2bd658c213e9b48efdc16b5c1926bc89",
+        "bytes": 359056,
+        "width": 720,
+        "height": 480,
+        "cameraId": "hero-quarter"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-side-silhouette.png",
+        "sha256": "7439addde4e460a41800a879f299d7910570bd58a775194bf7d990524da298a8",
+        "bytes": 329195,
+        "width": 720,
+        "height": 480,
+        "cameraId": "side-silhouette"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-sight-line.png",
+        "sha256": "e922b8cbc0fa10ba3c9a1ec9b88269bd770af160dc999a9417e14191cda11c98",
+        "bytes": 450356,
+        "width": 720,
+        "height": 480,
+        "cameraId": "sight-line"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-reload-action.png",
+        "sha256": "721f4801913fa82b132db9a163560556a029696c9a250958c7259c745acb37c0",
+        "bytes": 393294,
+        "width": 720,
+        "height": 480,
+        "cameraId": "reload-action"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-world-lod0-silhouette.png",
+        "sha256": "5deb010781b57a67c1441bd1f4c110ef748dbb834de0626dec90b946c1f23504",
+        "bytes": 327880,
+        "width": 720,
+        "height": 480,
+        "cameraId": "world-lod0-silhouette"
+      },
+      {
+        "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-drop-lod0-silhouette.png",
+        "sha256": "4e1d29beeaf9bc4d9ef19f4f4b337979c85101ee83393a29f632a68e4272d5de",
+        "bytes": 325122,
+        "width": 720,
+        "height": 480,
+        "cameraId": "drop-lod0-silhouette"
+      }
+    ],
+    "contactSheet": {
+      "path": "docs/assets/pass65-weapons/firearms/m4a1/m4a1-contact-sheet.png",
+      "sha256": "a9170cc48a2b3a251e4b788d574bc627748c4bfc919d1e028b1b4321b003208c",
+      "bytes": 2080148,
+      "width": 2160,
+      "height": 960
+    }
+  },
+  "gameplayBoundary": "Presentation only. TypeScript owns damage, spread, recoil authority, collision, hit registration and networking."
+}

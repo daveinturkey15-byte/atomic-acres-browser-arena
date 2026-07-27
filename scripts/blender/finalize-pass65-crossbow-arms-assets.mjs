@@ -93,7 +93,10 @@ const crossbowRenders = await Promise.all(crossbowRenderLabels.map((label) => pn
   `docs/assets/pass65-weapons/crossbow/pass65-crossbow-${label}.png`, { cameraId: label },
 )));
 const crossbowContactSheet = await pngRecord('docs/assets/pass65-weapons/crossbow/pass65-crossbow-contact-sheet.png');
-const armsRenderLabels = ['neutral-front', 'neutral-quarter', 'glove-closeup', 'reload-action'];
+const armsRenderLabels = [
+  'neutral-front', 'forearm-wrist-quarter', 'hand-anatomy-closeup',
+  'm4a1-neutral-contact', 'm4a1-ads-contact', 'm4a1-reload-contact',
+];
 const armsRenders = await Promise.all(armsRenderLabels.map((label) => pngRecord(
   `docs/assets/pass65-operators/first-person-arms/pass65-first-person-arms-${label}.png`, { cameraId: label },
 )));
@@ -130,6 +133,14 @@ const armsProvenance = {
   firstPersonGlbs: armsGlbs, pbrMaps: armsPbrMaps,
   requiredBones: REQUIRED_ARM_BONES, requiredSockets: REQUIRED_ARM_SOCKETS, animationClips: REQUIRED_CORE_ACTIONS,
   materialContract: 'All visible materials OPAQUE with depth writes; no alpha fading or see-through anatomy.',
+  visualRevision: 'human-anatomy-m4-contact-v4',
+  limbProfileContract: 'human-deltoid-brachioradialis-ulna-wrist-taper-v4',
+  handPoseContract: 'separate-palm-thumb-index-resting-digit-grip-v4',
+  shoulderEntryContract: 'tapered-offscreen-sleeve',
+  gloveConstructionContract: 'opaque-articulated-knuckle-pads-seams-cloth-v4',
+  weaponGripReviewContract: 'm4a1-neutral-ads-reload-contact-v4',
+  fingerSegmentCount: 30,
+  weaponGripReviewFrames: 3,
   performanceContract: OPERATOR_ARMS_RENDER_BUDGET,
   review: { authoringSeed: 0, frame: 1, renderEngine: 'BLENDER_EEVEE', renders: armsRenders, contactSheet: armsContactSheet },
   runtimeAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit), externalUris: 0 },
@@ -140,6 +151,7 @@ const armsProvenanceRecord = await fileRecord(armsProvenancePath);
 
 const productionManifestPath = absolute('source-assets/blender/pass65-weapon-production.manifest.json');
 const productionManifest = JSON.parse(await readFile(productionManifestPath, 'utf8'));
+const supportVehicleSnapshot = JSON.stringify(productionManifest.supportVehicles ?? []);
 const crossbowIndex = productionManifest.weapons.findIndex((entry) => entry.id === 'explosive-crossbow');
 if (crossbowIndex < 0) throw new Error('Pass65 production manifest has no explosive-crossbow entry');
 productionManifest.weapons[crossbowIndex] = {
@@ -162,10 +174,21 @@ productionManifest.operatorArms = {
   pbrMaps: armsPbrMaps, provenance: armsProvenanceRecord,
   bones: REQUIRED_ARM_BONES, sockets: REQUIRED_ARM_SOCKETS, actions: REQUIRED_CORE_ACTIONS,
   materialContract: 'opaque-depth-writing',
+  visualRevision: 'human-anatomy-m4-contact-v4',
+  limbProfileContract: 'human-deltoid-brachioradialis-ulna-wrist-taper-v4',
+  handPoseContract: 'separate-palm-thumb-index-resting-digit-grip-v4',
+  shoulderEntryContract: 'tapered-offscreen-sleeve',
+  gloveConstructionContract: 'opaque-articulated-knuckle-pads-seams-cloth-v4',
+  weaponGripReviewContract: 'm4a1-neutral-ads-reload-contact-v4',
+  fingerSegmentCount: 30,
+  weaponGripReviewFrames: 3,
   renderBudget: OPERATOR_ARMS_RENDER_BUDGET,
   review: { renders: armsRenders, contactSheet: armsContactSheet },
   technicalAudit: { lods: armsAudits.map(({ failures: _failures, ...audit }) => audit) },
 };
+if (JSON.stringify(productionManifest.supportVehicles ?? []) !== supportVehicleSnapshot) {
+  throw new Error('Crossbow/arms finalization must preserve every existing support-vehicle production record byte-for-byte');
+}
 await writeFile(productionManifestPath, `${JSON.stringify(productionManifest, null, 2)}\n`, 'utf8');
 
 const assetManifestPath = absolute('assets.manifest.json');
@@ -190,7 +213,7 @@ const assetRecords = [
     sourceProvenance: armsProvenanceRecord.path, sourceProvenanceSha256: armsProvenanceRecord.sha256,
     preview: armsContactSheet.path,
     format: 'Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips',
-    modifications: 'Project-original first-person operator arms authored in Blender from 45 weighted sleeve, glove, guard, full-finger/thumb and wrist-display parts, then batched one-per-material under a six-renderable/six-primitive budget. Grip/knife/grenade sockets and the equip-to-inspect action corpus remain intact; runtime camera-space IK remains TypeScript-owned.',
+    modifications: 'Project-original first-person operator arms authored in Blender from 45 weighted sleeve, glove, guard, full-finger/thumb and wrist-display parts. The v4 silhouette uses human deltoid, brachioradialis, ulna and articulated-wrist taper; separate wedge palms, opposed thumbs, trigger indexes and resting digit groups; opaque articulated knuckle pads, low-profile cuff straps, cloth normal detail and an intentional wrist device. Neutral, ADS and reload frames socket-fit the consolidated authored M4A1 and require exact digit-to-mesh contact receipts. Four material batches remain under the six-renderable/six-primitive budget. Runtime camera-space IK remains TypeScript-owned.',
     attributionRequired: false,
   },
 ];

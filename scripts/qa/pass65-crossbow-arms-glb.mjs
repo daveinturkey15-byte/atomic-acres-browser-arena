@@ -204,6 +204,29 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
   if (!skeleton) failures.push(`${label}: dedicated first-person skeleton metadata missing`);
   const deliveryRoot = nodes.find((node) => node.extras?.runtime_forward_axis === '-Z');
   if (!deliveryRoot || deliveryRoot.extras?.blender_authoring_forward_axis !== '+Y') failures.push(`${label}: physical runtime -Z delivery-axis contract missing`);
+  if (deliveryRoot?.extras?.visual_revision !== 'human-anatomy-m4-contact-v4'
+    || deliveryRoot?.extras?.limb_profile_contract !== 'human-deltoid-brachioradialis-ulna-wrist-taper-v4'
+    || deliveryRoot?.extras?.hand_pose_contract !== 'separate-palm-thumb-index-resting-digit-grip-v4'
+    || deliveryRoot?.extras?.shoulder_entry_contract !== 'tapered-offscreen-sleeve'
+    || deliveryRoot?.extras?.glove_construction_contract !== 'opaque-articulated-knuckle-pads-seams-cloth-v4'
+    || deliveryRoot?.extras?.weapon_grip_review_contract !== 'm4a1-neutral-ads-reload-contact-v4'
+    || deliveryRoot?.extras?.finger_segment_count !== 30
+    || deliveryRoot?.extras?.weapon_grip_review_frames !== 3) {
+    failures.push(`${label}: human-anatomy M4 contact v4 silhouette, hand, glove and grip-review contract missing`);
+  }
+  const gripContactReceipts = {};
+  for (const weapon of ['m4a1']) {
+    const rightError = Number(deliveryRoot?.extras?.[`${weapon}_review_right_socket_error_m`]);
+    const leftError = Number(deliveryRoot?.extras?.[`${weapon}_review_left_socket_error_m`]);
+    const scale = Number(deliveryRoot?.extras?.[`${weapon}_review_scale`]);
+    const rightContacts = Number(deliveryRoot?.extras?.[`${weapon}_review_right_digit_contacts`]);
+    const leftContacts = Number(deliveryRoot?.extras?.[`${weapon}_review_left_digit_contacts`]);
+    gripContactReceipts[weapon] = { rightError, leftError, scale, rightContacts, leftContacts };
+    if (!Number.isFinite(rightError) || !Number.isFinite(leftError) || rightError > 0.0005 || leftError > 0.0005
+      || !Number.isFinite(scale) || scale < 0.2 || scale > 1.2 || rightContacts < 3 || leftContacts < 3) {
+      failures.push(`${label}: ${weapon} actual weapon-contact receipt is invalid`);
+    }
+  }
   for (const socketName of ['right-hand-grip-socket', 'left-hand-grip-socket']) {
     const index = nodes.findIndex((node) => node.name === socketName);
     const position = index < 0 ? null : nodeWorldTranslation(json, index);
@@ -292,5 +315,6 @@ export function auditOperatorArmsGlb(json, lod, bytes) {
     bones: REQUIRED_ARM_BONES.filter((bone) => names.includes(bone)).length,
     materials: (json.materials ?? []).length, images: (json.images ?? []).length,
     animations: Object.freeze(animationNames), externalUris: common.externalUris,
+    gripContactReceipts: Object.freeze(gripContactReceipts),
   });
 }
