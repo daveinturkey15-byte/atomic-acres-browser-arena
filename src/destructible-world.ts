@@ -10,6 +10,8 @@ export const SHED_ANGLE_Q = 10_000;
 export const SHED_PANEL_COORD_Q = 10_000;
 export const SHED_MAX_INTERACTION_ACTORS = 12;
 export const SHED_MAJOR_DEBRIS_HALF_THICKNESS = 0.06;
+export const SHED_CORNER_ZONE_Q = 6_500;
+export const SHED_CORNER_COLLAPSE_MARKS = 3;
 
 export const WORLD_COLLISION_CONSUMERS = Object.freeze([
   'movement',
@@ -465,6 +467,53 @@ export function admitShedDoorInteraction(state: ShedState, request: DoorInteract
   return { accepted: true, reason: 'accepted', state: withRevision(state, { door, interactionSequences }) };
 }
 
+/**
+ * Host-owned contact response for an intact door. Walking into a closed or
+ * closing leaf pushes it towards open without forging an F-interaction
+ * sequence. Repeated overlap while it is already opening is a no-op, which
+ * keeps one physical contact from manufacturing revisions every simulation
+ * tick.
+ */
+export function pushShedDoorFromPlayerContact(
+  state: ShedState,
+  request: Readonly<{
+    isHost: boolean;
+    expectedRevision: number;
+    actorId: string;
+    tick: number;
+  }>,
+): ShedMutationResult {
+  if (!request.isHost) return { accepted: false, reason: 'not-host', state };
+  if (request.expectedRevision !== state.revision) return { accepted: false, reason: 'stale-revision', state };
+  if (!validId(request.actorId) || !finiteInteger(request.tick)) return { accepted: false, reason: 'invalid-blocker', state };
+  const doorSurface = state.surfaces.find((surface) => surface.surfaceId === state.door.surfaceId);
+  if (!doorSurface || doorSurface.stage === 'detached') return { accepted: false, reason: 'already-detached', state };
+  if (state.door.phase === 'open' || state.door.phase === 'opening') {
+    return { accepted: false, reason: 'invalid-blocker', state };
+  }
+  const currentAngleQ = doorAngleAt(state.door, request.tick);
+  const distanceQ = SHED_ANGLE_Q - currentAngleQ;
+  if (distanceQ <= 0) return { accepted: false, reason: 'invalid-blocker', state };
+  const duration = Math.max(1, Math.round(SHED_DOOR_TRAVEL_TICKS * distanceQ / SHED_ANGLE_Q));
+  const commandSequence = state.door.commandSequence + 1;
+  const door: ShedDoorState = Object.freeze({
+    ...state.door,
+    commandId: `${state.placementId}-door-contact-${commandSequence}`,
+    commandSequence,
+    angleQ: currentAngleQ,
+    motionOriginAngleQ: currentAngleQ,
+    desiredAngleQ: SHED_ANGLE_Q,
+    direction: 'opening',
+    phase: 'opening',
+    startedAtTick: request.tick,
+    completesAtTick: request.tick + duration,
+    blockedAtTick: null,
+    blockedBy: null,
+    resumePolicy: 'resume-when-clear',
+  });
+  return { accepted: true, reason: 'accepted', state: withRevision(state, { door }) };
+}
+
 export function blockShedDoor(
   state: ShedState,
   request: Readonly<{
@@ -543,6 +592,74 @@ function replaceSurface(
   return Object.freeze(state.surfaces.map((surface) => surface.surfaceId === surfaceId ? update(surface) : surface));
 }
 
+function cornerSign(value: number): -1 | 1 {
+  return value < 0 ? -1 : 1;
+}
+
+function markOccupiesCorner(
+  mark: Readonly<{ uQ: number; vQ: number }>,
+  uSign: -1 | 1,
+  vSign: -1 | 1,
+): boolean {
+  return Math.abs(mark.uQ) >= SHED_CORNER_ZONE_Q
+    && Math.abs(mark.vQ) >= SHED_CORNER_ZONE_Q
+    && cornerSign(mark.uQ) === uSign
+    && cornerSign(mark.vQ) === vSign;
+}
+
+function cornerWeakeningTriggersCollapse(
+  definition: DestructibleShedDefinition,
+  surface: DamageableSheetSurfaceState,
+  impact: Pick<SheetImpactRequest, 'uQ' | 'vQ'>,
+): boolean {
+  if (surface.attachedChunkId === null
+    || Math.abs(impact.uQ) < SHED_CORNER_ZONE_Q
+    || Math.abs(impact.vQ) < SHED_CORNER_ZONE_Q
+    || surface.healthQ < definition.thresholds.detachDamageQ) return false;
+  const uSign = cornerSign(impact.uQ);
+  const vSign = cornerSign(impact.vQ);
+  const localMarks = surface.apertures.filter((mark) => markOccupiesCorner(mark, uSign, vSign)).length
+    + surface.dents.filter((mark) => markOccupiesCorner(mark, uSign, vSign)).length;
+  return localMarks >= SHED_CORNER_COLLAPSE_MARKS;
+}
+
+function detachSurfaceUpdate(
+  definition: DestructibleShedDefinition,
+  state: ShedState,
+  surfaces: readonly DamageableSheetSurfaceState[],
+  surfaceId: string,
+  healthQ: number,
+): Readonly<Pick<ShedState, 'surfaces' | 'detachedChunkIds' | 'majorDebris'>> | null {
+  const surface = surfaces.find((candidate) => candidate.surfaceId === surfaceId);
+  if (!surface || surface.stage === 'detached' || surface.attachedChunkId === null
+    || state.detachedChunkIds.length >= definition.caps.majorChunks) return null;
+  const surfaceDefinition = definition.surfaces.find((candidate) => candidate.id === surfaceId);
+  if (!surfaceDefinition) return null;
+  const chunkId = surface.attachedChunkId;
+  return Object.freeze({
+    surfaces: Object.freeze(surfaces.map((candidate) => candidate.surfaceId === surfaceId
+      ? Object.freeze({ ...candidate, healthQ, stage: 'detached' as const, attachedChunkId: null })
+      : candidate)),
+    detachedChunkIds: Object.freeze([...state.detachedChunkIds, chunkId]),
+    majorDebris: Object.freeze([...state.majorDebris, Object.freeze({
+      chunkId,
+      poseQ: Object.freeze({
+        ...IDENTITY_POSE,
+        position: Object.freeze({
+          xQ: Math.round(surfaceDefinition.frame.centre.x * 1_000),
+          yQ: Math.round(surfaceDefinition.frame.centre.y * 1_000),
+          zQ: Math.round(surfaceDefinition.frame.centre.z * 1_000),
+        }),
+        rotation: frameRotationQ(surfaceDefinition.frame),
+      }),
+      velocityQ: ZERO_VECTOR,
+      angularVelocityQ: ZERO_VECTOR,
+      sleeping: false,
+      flat: false,
+    })]),
+  });
+}
+
 export function applyShedSheetImpact(
   definition: DestructibleShedDefinition,
   state: ShedState,
@@ -598,10 +715,22 @@ export function applyShedSheetImpact(
     apertures,
     dents: dentList,
   }));
+  const weakenedSurface = surfaces.find((candidate) => candidate.surfaceId === surface.surfaceId)!;
+  const collapse = cornerWeakeningTriggersCollapse(definition, weakenedSurface, request)
+    ? detachSurfaceUpdate(definition, state, surfaces, surface.surfaceId, healthQ)
+    : null;
   return {
     accepted: true,
     reason: 'accepted',
-    state: withRevision(state, { surfaces, nextApertureId, nextDentId }),
+    state: withRevision(state, {
+      surfaces: collapse?.surfaces ?? surfaces,
+      nextApertureId,
+      nextDentId,
+      ...(collapse ? {
+        detachedChunkIds: collapse.detachedChunkIds,
+        majorDebris: collapse.majorDebris,
+      } : {}),
+    }),
   };
 }
 
@@ -629,36 +758,12 @@ export function applyShedExplosion(
     return { accepted: true, reason: 'accepted', state: withRevision(state, { surfaces }) };
   }
   if (state.detachedChunkIds.length >= definition.caps.majorChunks) return { accepted: false, reason: 'chunk-cap', state };
-  const chunkId = surface.attachedChunkId;
-  const surfaceDefinition = definition.surfaces.find((candidate) => candidate.id === surface.surfaceId);
-  if (!surfaceDefinition) return { accepted: false, reason: 'unknown-surface', state };
-  const detachedChunkIds = Object.freeze([...state.detachedChunkIds, chunkId]);
-  const surfaces = replaceSurface(state, surface.surfaceId, (candidate) => Object.freeze({
-    ...candidate,
-    healthQ,
-    stage: 'detached',
-    attachedChunkId: null,
-  }));
-  const majorDebris = Object.freeze([...state.majorDebris, Object.freeze({
-    chunkId,
-    poseQ: Object.freeze({
-      ...IDENTITY_POSE,
-      position: Object.freeze({
-        xQ: Math.round(surfaceDefinition.frame.centre.x * 1_000),
-        yQ: Math.round(surfaceDefinition.frame.centre.y * 1_000),
-        zQ: Math.round(surfaceDefinition.frame.centre.z * 1_000),
-      }),
-      rotation: frameRotationQ(surfaceDefinition.frame),
-    }),
-    velocityQ: ZERO_VECTOR,
-    angularVelocityQ: ZERO_VECTOR,
-    sleeping: false,
-    flat: false,
-  })]);
+  const collapse = detachSurfaceUpdate(definition, state, state.surfaces, surface.surfaceId, healthQ);
+  if (!collapse) return { accepted: false, reason: 'unknown-surface', state };
   return {
     accepted: true,
     reason: 'accepted',
-    state: withRevision(state, { surfaces, detachedChunkIds, majorDebris }),
+    state: withRevision(state, collapse),
   };
 }
 

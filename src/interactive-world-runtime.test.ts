@@ -84,6 +84,31 @@ describe('shared interactive-world runtime adapter', () => {
     runtime.dispose();
   });
 
+  it('routes player contact through host authority and the same door collider/presentation state', () => {
+    const host = new InteractiveWorldRuntime('atomic-acres', 8, [placement], true);
+    const guest = new InteractiveWorldRuntime('atomic-acres', 8, [placement], false);
+    const closedBounds = host.doorCollisionStates()[0]!.bounds;
+    expect(guest.pushDoorFromPlayerContact({
+      placementId: placement.id,
+      actorId: 'player-a',
+      tick: 10,
+    })).toMatchObject({ accepted: false, reason: 'not-host' });
+    expect(host.pushDoorFromPlayerContact({
+      placementId: placement.id,
+      actorId: 'player-a',
+      tick: 10,
+    })).toMatchObject({ accepted: true, reason: 'accepted' });
+    expect(host.step(40)).toBe(true);
+    const moving = host.doorCollisionStates()[0]!;
+    expect(moving.phase).toBe('opening');
+    expect(moving.bounds.rotation).not.toEqual(closedBounds.rotation);
+    expect(host.stateEnvelope().sheds[0]!.interactionSequences).toEqual([]);
+    expect(guest.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(host.stateEnvelope())))).toBe(true);
+    expect(guest.doorCollisionStates()[0]!.bounds).toEqual(moving.bounds);
+    host.dispose();
+    guest.dispose();
+  });
+
   it('atomically persists door damage and a canonical bullet interruption for late join', () => {
     const host = new InteractiveWorldRuntime('atomic-acres', 8, [placement], true);
     const guest = new InteractiveWorldRuntime('atomic-acres', 8, [placement], false);

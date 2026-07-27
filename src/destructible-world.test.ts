@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ARENA_MAX_AWAKE_SHED_BODIES,
   SHED_ANGLE_Q,
+  SHED_CORNER_COLLAPSE_MARKS,
+  SHED_CORNER_ZONE_Q,
   SHED_DOOR_TRAVEL_TICKS,
   SHED_MAX_APERTURES,
   SHED_MAX_DENTS,
@@ -17,6 +19,7 @@ import {
   createWorldCollisionSnapshot,
   impulseMajorShedDebris,
   isShedState,
+  pushShedDoorFromPlayerContact,
   resetShedState,
   resumeShedDoorWhenClear,
   shedApertureContainsWorldPoint,
@@ -209,6 +212,29 @@ describe('Pass 65 destructible-world authority', () => {
     });
   });
 
+  it('opens from host-owned player contact without consuming or forging an F interaction sequence', () => {
+    expect(pushShedDoorFromPlayerContact(initial(), {
+      isHost: false, expectedRevision: 0, actorId: 'player-a', tick: 10,
+    })).toMatchObject({ accepted: false, reason: 'not-host' });
+    const pushed = pushShedDoorFromPlayerContact(initial(), {
+      isHost: true, expectedRevision: 0, actorId: 'player-a', tick: 10,
+    });
+    expect(pushed).toMatchObject({ accepted: true, reason: 'accepted' });
+    expect(pushed.state.interactionSequences).toEqual([]);
+    expect(pushed.state.door).toMatchObject({
+      commandId: 'atomic-shed-a-door-contact-1',
+      desiredAngleQ: SHED_ANGLE_Q,
+      direction: 'opening',
+      phase: 'opening',
+      resumePolicy: 'resume-when-clear',
+    });
+    expect(pushed.state.door.completesAtTick - pushed.state.door.startedAtTick).toBe(SHED_DOOR_TRAVEL_TICKS);
+    expect(pushShedDoorFromPlayerContact(pushed.state, {
+      isHost: true, expectedRevision: pushed.state.revision, actorId: 'player-a', tick: 11,
+    })).toMatchObject({ accepted: false, reason: 'invalid-blocker', state: pushed.state });
+    expect(advanceShedDoor(pushed.state, 70).door).toMatchObject({ phase: 'open', angleQ: SHED_ANGLE_Q });
+  });
+
   it('uses the identical quantized ellipse for visible masking and shoot-through', () => {
     const impact = applyShedSheetImpact(definition, initial(), {
       isHost: true,
@@ -264,6 +290,53 @@ describe('Pass 65 destructible-world authority', () => {
       isHost: true, matchEpoch: 11, expectedRevision: dentState.revision, surfaceId: 'wall-east',
       uQ: 9_000, vQ: 0, radiusUQ: 100, radiusVQ: 100, damageQ: 20, penetrationEnergyQ: 0,
     }).reason).toBe('dent-cap');
+  });
+
+  it('detaches one bounded authored panel only after repeated weakening in the same corner', () => {
+    expect(SHED_CORNER_COLLAPSE_MARKS).toBe(3);
+    expect(SHED_CORNER_ZONE_Q).toBe(6_500);
+    let state = initial();
+    for (let index = 0; index < SHED_CORNER_COLLAPSE_MARKS; index += 1) {
+      const impact = applyShedSheetImpact(definition, state, {
+        isHost: true,
+        matchEpoch: 11,
+        expectedRevision: state.revision,
+        surfaceId: 'wall-north',
+        uQ: 8_600 + index * 100,
+        vQ: 8_400 + index * 100,
+        radiusUQ: 420,
+        radiusVQ: 460,
+        damageQ: 80,
+        penetrationEnergyQ: 70,
+      });
+      expect(impact.accepted).toBe(true);
+      state = impact.state;
+      if (index < SHED_CORNER_COLLAPSE_MARKS - 1) expect(state.detachedChunkIds).toEqual([]);
+    }
+    expect(state.detachedChunkIds).toEqual(['chunk-north']);
+    expect(state.majorDebris).toHaveLength(1);
+    expect(state.surfaces.find((surface) => surface.surfaceId === 'wall-north')).toMatchObject({
+      stage: 'detached',
+      attachedChunkId: null,
+      healthQ: 240,
+    });
+
+    let centreDamage = initial();
+    for (let index = 0; index < SHED_CORNER_COLLAPSE_MARKS; index += 1) {
+      centreDamage = applyShedSheetImpact(definition, centreDamage, {
+        isHost: true,
+        matchEpoch: 11,
+        expectedRevision: centreDamage.revision,
+        surfaceId: 'wall-north',
+        uQ: 8_600,
+        vQ: 0,
+        radiusUQ: 420,
+        radiusVQ: 460,
+        damageQ: 80,
+        penetrationEnergyQ: 70,
+      }).state;
+    }
+    expect(centreDamage.detachedChunkIds).toEqual([]);
   });
 
   it('detaches only pre-authored chunks and preserves flat-shot wake semantics', () => {

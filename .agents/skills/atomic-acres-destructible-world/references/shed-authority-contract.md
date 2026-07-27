@@ -21,9 +21,10 @@ All consume one explicit world revision. Never mutate unrelated static arrays ar
 ## Pass 65 shed rules
 
 - Unobstructed closed-to-open/open-to-closed door motion is nominally one second.
-- Player, major debris and admitted bullets use explicit bounded interruption/reversal/resume semantics.
+- A host-observed player contact with an intact closed/closing door pushes it towards open without forging or consuming an `F` interaction sequence. Repeated overlap while already opening is revision-free; major debris and admitted bullets retain explicit bounded interruption/reversal/resume semantics.
 - Rendering and ballistics consume the exact same aperture region, including cap/merge behavior.
 - Valid contact nudges non-flat major debris; admitted shots/explosions can wake flat or sleeping major debris.
+- Three or more marks inside the same quantized panel-corner zone can detach exactly one pre-authored major panel only after that surface also reaches its damage threshold. Equally damaged centre-line hits do not collapse a corner; the event is host-owned, bounded and late-join reconstructible.
 - Holes/dents/detachment persist for the round, reconstruct late join and reset on rematch/arena change.
 - The canonical Pass 65 shed definition uses exact ceilings of 32 apertures, 24 dents and six major chunks per shed, plus 18 simultaneously awake major shed bodies arena-wide; runtime occupancy may remain lower. The contract fixture exercises those ceilings.
 - At least two sheds appear in every eligible arena zone in frozen `DEC-09` only after the vertical slice passes. Placement rows are unique by canonical arena/zone.

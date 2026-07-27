@@ -13,6 +13,7 @@ import {
   createWorldCollisionSnapshot,
   isShedState,
   impulseMajorShedDebris,
+  pushShedDoorFromPlayerContact,
   resetShedState,
   resumeShedDoorWhenClear,
   shedApertureContainsWorldPoint,
@@ -491,6 +492,21 @@ export class InteractiveWorldRuntime {
       ...request,
       placementId: nearest.placementId,
     });
+  }
+
+  pushDoorFromPlayerContact(request: Readonly<{
+    placementId: string;
+    actorId: string;
+    tick: number;
+  }>): ShedMutationResult | null {
+    const shed = this.sheds.find((candidate) => candidate.placement.id === request.placementId);
+    if (!shed) return null;
+    return this.commit(shed, pushShedDoorFromPlayerContact(shed.state, {
+      isHost: this.hostAuthority,
+      expectedRevision: shed.state.revision,
+      actorId: request.actorId,
+      tick: request.tick,
+    }));
   }
 
   blockDoor(request: Readonly<{

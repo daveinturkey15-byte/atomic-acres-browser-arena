@@ -13,7 +13,7 @@ Build bounded dynamic objects whose rendering, movement, ballistics, LOS, naviga
 2. Load `DEC-09` from the canonical decision registry. Stop while it is `OPEN`; never treat the bundled synthetic fixture receipt as owner approval.
 3. Define stable object, placement, surface, door, chunk, collider and aperture IDs plus strict bounded definitions and state. Use canonical machine arena IDs; display labels are presentation only.
 4. Route movement, ballistics, grenades, AI LOS, support targeting, spawn and navigation through one revisioned world-collision snapshot.
-5. Build one greybox vertical slice first: one-second door, one damageable sheet, one canonical aperture and one detachable major chunk.
+5. Build one greybox vertical slice first: one-second `F` door, host-owned player-contact push, one damageable sheet, one canonical aperture, spatial corner weakening and one detachable major chunk.
 6. Let the host admit interaction, obstruction, perforation, explosion damage/fracture, debris activation and impulse. Reject stale/replayed/impossible revisions.
 7. Drive visual holes and ballistic pass-through from the identical canonical aperture region; keep player collision solid until authored detachment.
 8. Use pre-authored chunks and bounded dents/deformation. Do not use arbitrary runtime CSG, soft bodies or client debris authority.

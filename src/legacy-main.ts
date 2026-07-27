@@ -1663,14 +1663,26 @@ function reconcileInteractiveWorldDoorObstructions(): boolean {
   }
   let changed = false;
   for (const door of interactiveWorldRuntime.doorCollisionStates()) {
-    if (!['opening', 'closing', 'blocked'].includes(door.phase)) continue;
     const blocker = blockers.find((candidate) => isBlocked(candidate.position, [door.bounds], candidate.radius));
+    if (door.phase === 'closed' && blocker?.kind === 'player') {
+      if (interactiveWorldRuntime.pushDoorFromPlayerContact({
+        placementId: door.placementId,
+        actorId: blocker.id,
+        tick: interactiveWorldTick,
+      })?.accepted) {
+        changed = true;
+        audio.shedDoorMotion(blocker.position.distanceTo(camera.position));
+      }
+      continue;
+    }
     if (door.phase === 'blocked') {
       if (!blocker
         && door.resumePolicy === 'resume-when-clear'
         && interactiveWorldRuntime.resumeDoor(door.placementId, interactiveWorldTick)?.accepted) changed = true;
       continue;
     }
+    if (door.phase === 'opening' && blocker?.kind === 'player') continue;
+    if (door.phase !== 'opening' && door.phase !== 'closing') continue;
     if (blocker && interactiveWorldRuntime.blockDoor({
       placementId: door.placementId,
       tick: interactiveWorldTick,
