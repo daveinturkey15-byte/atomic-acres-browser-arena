@@ -6624,12 +6624,43 @@ function resetBreakableWindows(): void {
 const CORPSE_LIFETIME_MS = 7_500;
 const MAX_CORPSE_PRESENTATIONS = 12;
 const corpsePresentations: Array<{ root: THREE.Group; expiresAt: number }> = [];
+const deferredDeathPresentations: Array<{
+  victimId: string;
+  source: CorpseSource | null;
+  death: DeathMessage;
+  now: number;
+  matchEpoch: number;
+}> = [];
+let deferredDeathPresentationTimer: ReturnType<typeof setTimeout> | null = null;
+
+function drainDeferredDeathPresentation(): void {
+  deferredDeathPresentationTimer = null;
+  const pending = deferredDeathPresentations.shift();
+  if (!pending) return;
+  if (pending.matchEpoch === interactiveWorldMatchEpoch && gameStarted) {
+    spawnCorpsePresentation(pending.victimId, pending.source, performance.now());
+    spawnDeathDrop(pending.death, pending.now);
+  }
+  if (deferredDeathPresentations.length > 0) {
+    deferredDeathPresentationTimer = globalThis.setTimeout(drainDeferredDeathPresentation, 48);
+  }
+}
+
+function deferDeathPresentation(victimId: string, source: CorpseSource | null, death: DeathMessage, now: number): void {
+  deferredDeathPresentations.push({ victimId, source, death, now, matchEpoch: interactiveWorldMatchEpoch });
+  if (deferredDeathPresentationTimer === null) {
+    deferredDeathPresentationTimer = globalThis.setTimeout(drainDeferredDeathPresentation, 24);
+  }
+}
 
 function disposeCorpsePresentation(root: THREE.Group): void {
   scheduleDeferredGpuRetirement(root);
 }
 
 function clearCorpsePresentations(): void {
+  deferredDeathPresentations.length = 0;
+  if (deferredDeathPresentationTimer !== null) globalThis.clearTimeout(deferredDeathPresentationTimer);
+  deferredDeathPresentationTimer = null;
   while (corpsePresentations.length > 0) disposeCorpsePresentation(corpsePresentations.pop()!.root);
 }
 
@@ -8943,6 +8974,7 @@ function applyBotDamage(
   cause: KillCause = { kind: 'gun', weapon: player.weapon },
   attackerId = player.id,
   evidence?: Readonly<{ wallbang?: boolean; penetrationMultiplier?: number; distanceMeters?: number }>,
+  deferPresentation = false,
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
@@ -8987,8 +9019,12 @@ function applyBotDamage(
     processDeath(death);
     broadcastHostedBotState();
   } else {
-    spawnCorpsePresentation(bot.id, corpseSource(bot.id), now);
-    spawnDeathDrop(death, now);
+    const source = corpseSource(bot.id);
+    if (deferPresentation) deferDeathPresentation(bot.id, source, death, now);
+    else {
+      spawnCorpsePresentation(bot.id, source, now);
+      spawnDeathDrop(death, now);
+    }
   }
   const afterDeathDrop = performance.now();
   bot.respawnAt = now + 2_200;
@@ -11524,7 +11560,15 @@ function detonateNuke(sequence: NukeSequence): void {
     }
     for (const bot of [...bots.values()]) {
       const damage = nukeDamageForTarget(player.team, bot.team, bot.alive);
-      if (damage > 0) applyBotDamage(bot, outgoingDamage(damage), 'body', { kind: 'killstreak', effect: 'nuke' });
+      if (damage > 0) applyBotDamage(
+        bot,
+        outgoingDamage(damage),
+        'body',
+        { kind: 'killstreak', effect: 'nuke' },
+        player.id,
+        undefined,
+        true,
+      );
     }
   }
   const finished = performance.now();

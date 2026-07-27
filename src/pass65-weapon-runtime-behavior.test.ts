@@ -146,6 +146,34 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     expect(pass65WeaponCacheTelemetry().entries.find((entry) => entry.key === 'world:ak-47')?.refs).toBe(0);
   });
 
+  it('keeps the mounted operator weapon until a delayed replacement can commit atomically', async () => {
+    vi.stubGlobal('document', {});
+    const gate = deferred<FakeGltf>();
+    vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation((() => gate.promise) as unknown as GLTFLoader['loadAsync']);
+    const root = new THREE.Group();
+    const weaponSocket = new THREE.Group();
+    const hitProxyRoot = new THREE.Group();
+    const previous = new THREE.Group(); previous.name = 'operator-carbine';
+    weaponSocket.add(previous);
+    root.add(weaponSocket, hitProxyRoot);
+    root.userData.operatorRig = {
+      rigged: true, weaponSocket, hitProxyRoot, weapon: previous, weaponId: 'carbine', armPoseBeforeIk: [],
+    };
+
+    setOperatorWeapon(root, 'mini-uzi');
+    expect(root.userData.pass65PendingWorldWeapon).toBe('mini-uzi');
+    expect(root.userData.operatorRig.weaponId).toBe('carbine');
+    expect(root.userData.operatorRig.weapon).toBe(previous);
+    expect(weaponSocket.children).toEqual([previous]);
+
+    gate.resolve(fakeWeaponGltf('mini-uzi'));
+    await flushPromises();
+    expect(root.userData.operatorRig.weaponId).toBe('mini-uzi');
+    expect(root.userData.operatorRig.weapon).not.toBe(previous);
+    expect(weaponSocket.children).toHaveLength(1);
+    expect(releasePass65WeaponModelsIn(root)).toBe(1);
+  });
+
   it('returns managed refs to zero and enforces the world cache budget across churn', async () => {
     vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(((url: string) => (
       Promise.resolve(fakeWeaponGltf(weaponIdFromUrl(String(url))))

@@ -1285,31 +1285,25 @@ export function setOperatorWeapon(
   if (!rig || rig.weaponId === weaponId && rig.weapon) return;
   const browserRuntime = typeof document !== 'undefined';
   const presentationGeneration = capturePass65PresentationGeneration(root);
-  if (browserRuntime && !rig.weapon && root.userData.pass65PendingWorldWeapon === weaponId) return;
-  if (rig.weapon) {
-    const previous = rig.weapon;
-    rig.weaponSocket.remove(previous);
-    if (retirePrevious) retirePrevious(previous, () => releasePass65WeaponModel(previous));
-    else disposePass65WeaponModel(previous);
-    rig.weapon = undefined;
-  }
+  if (browserRuntime && root.userData.pass65PendingWorldWeapon === weaponId) return;
   // Third-person mounting must use the socket-native authored model. Pass 16's
   // imported scene could place visible bounds metres away from WristR even
   // while the root socket itself was correct.
   const authoredWorldWeapon = browserRuntime ? createImportedWeaponModel(weaponId, flattenMaterials) : null;
   if (browserRuntime && !authoredWorldWeapon) {
-    rig.weaponId = weaponId;
     root.userData.pass65PendingWorldWeapon = weaponId;
     const request = Number(root.userData.pass65WorldWeaponRequest ?? 0) + 1;
     root.userData.pass65WorldWeaponRequest = request;
     void loadPass65WeaponPresentation(weaponId, 'world').then(() => {
       const currentRig = operatorRig(root);
       if (!currentRig || !isPass65PresentationGenerationCurrent(root, presentationGeneration)
-        || currentRig.weaponId !== weaponId
+        || root.userData.pass65PendingWorldWeapon !== weaponId
         || root.userData.pass65WorldWeaponRequest !== request) return;
       delete root.userData.pass65PendingWorldWeapon;
       setOperatorWeapon(root, weaponId, flattenMaterials, retirePrevious);
     }).catch((error: unknown) => {
+      if (root.userData.pass65PendingWorldWeapon !== weaponId
+        || root.userData.pass65WorldWeaponRequest !== request) return;
       delete root.userData.pass65PendingWorldWeapon;
       root.userData.pass65WorldWeaponLoadError = error instanceof Error ? error.message : String(error);
       console.error(`Pass 65 authored world weapon load failed for ${weaponId}`, error);
@@ -1339,6 +1333,12 @@ export function setOperatorWeapon(
       node.raycast = () => undefined;
     }
   });
+  if (rig.weapon) {
+    const previous = rig.weapon;
+    rig.weaponSocket.remove(previous);
+    if (retirePrevious) retirePrevious(previous, () => releasePass65WeaponModel(previous));
+    else disposePass65WeaponModel(previous);
+  }
   rig.weaponSocket.add(weapon);
   rig.weapon = weapon;
   rig.weaponId = weaponId;

@@ -718,7 +718,7 @@ export class WeaponPresentation {
   private trimBrowserWeaponModels(): void {
     while (this.models.size > 2) {
       const victim = [...this.models.keys()]
-        .filter((id) => id !== this.active)
+        .filter((id) => id !== this.active && this.models.get(id)?.visible !== true)
         .sort((a, b) => (this.modelLastUsed.get(a) ?? 0) - (this.modelLastUsed.get(b) ?? 0))[0];
       if (!victim) return;
       const model = this.models.get(victim);
@@ -739,6 +739,10 @@ export class WeaponPresentation {
       this.muzzleLight.position.copy(muzzlePosition);
       this.muzzleFlash.position.copy(muzzlePosition);
     }
+  }
+
+  private mountedModel(): THREE.Object3D | undefined {
+    return this.models.get(this.active) ?? [...this.models.values()].find((model) => model.visible);
   }
 
   private ensureBrowserWeapon(id: WeaponId): void {
@@ -777,12 +781,17 @@ export class WeaponPresentation {
     this.switchBlend = immediate ? 1 : 0;
     this.reloadLastProgress = 0;
     this.pendingScattergunShell = false;
-    for (const [weaponId, model] of this.models) model.visible = weaponId === id;
     const activeModel = this.models.get(id);
     if (activeModel) {
+      for (const [weaponId, model] of this.models) model.visible = weaponId === id;
       this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.updateActiveSockets(id);
-    } else if (typeof document !== 'undefined') this.ensureBrowserWeapon(id);
+    } else if (typeof document !== 'undefined') {
+      // Keep the last complete viewmodel mounted while the requested authored
+      // model is loading. The completion callback performs the visibility swap
+      // atomically and is generation guarded by browserWeaponRequest.
+      this.ensureBrowserWeapon(id);
+    }
     const flashlight = WEAPONS[id].flashlight;
     this.weaponFlashlight.visible = flashlight !== null && !this.flattenMaterials;
     this.weaponFlashlight.intensity = flashlight?.intensity ?? 0;
@@ -795,7 +804,7 @@ export class WeaponPresentation {
     const casing = this.casings[this.casingCursor++ % this.casings.length];
     casing.mesh.geometry = shell ? this.shellGeometry : this.brassGeometry;
     casing.mesh.material = shell ? this.shellMaterial : this.brassMaterial;
-    const activeModel = this.models.get(this.active);
+    const activeModel = this.mountedModel();
     const ejectPosition = activeModel ? this.socketLocalPosition(activeModel, 'eject-socket') : null;
     casing.mesh.position.copy(ejectPosition ?? new THREE.Vector3(0.12, 0.04, -0.48));
     casing.mesh.rotation.set(presentationRandom() * 0.4, 0, Math.PI / 2);
@@ -820,10 +829,10 @@ export class WeaponPresentation {
       this.meleeRig.visible = false;
       const arms = this.root.getObjectByName('first-person-arms');
       if (arms) arms.visible = true;
-      const model = this.models.get(this.active);
+      const model = this.mountedModel();
       if (model) model.visible = true;
     }
-    const activeModel = this.models.get(this.active);
+    const activeModel = this.mountedModel();
     if (activeModel) fireImportedWeapon(activeModel);
     const profile = weaponFamilyPresentation(this.active);
     this.weaponHeat = advanceWeaponHeat(this.weaponHeat, true, 0, this.active);
@@ -835,7 +844,7 @@ export class WeaponPresentation {
     this.muzzleFlash.scale.setScalar(profile.flashScale);
     this.muzzleFlash.rotation.z = (this.shotsPresented * 2.399963229728653) % Math.PI;
 
-    const activeModelForSmoke = this.models.get(this.active);
+    const activeModelForSmoke = this.mountedModel();
     const muzzlePosition = activeModelForSmoke ? this.socketLocalPosition(activeModelForSmoke, 'muzzle-socket') : null;
     const smokeCount = Math.min(this.smokes.length, profile.smokeBase + (this.weaponHeat > 0.56 ? 1 : 0));
     const cycle = fireCycleAt(this.active, 0, this.weaponHeat);
@@ -870,7 +879,7 @@ export class WeaponPresentation {
   }
 
   reload(): void {
-    const activeModel = this.models.get(this.active);
+    const activeModel = this.mountedModel();
     if (activeModel) reloadImportedWeapon(activeModel);
     this.reloadLastProgress = 0;
   }
@@ -886,7 +895,7 @@ export class WeaponPresentation {
     meleeImportedWeapon(this.meleeKnife);
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) arms.visible = false;
-    const activeModel = this.models.get(this.active);
+    const activeModel = this.mountedModel();
     if (activeModel) activeModel.visible = false;
     this.actionContract = characterActionContract({
       weapon: this.active,
@@ -915,7 +924,7 @@ export class WeaponPresentation {
   }
 
   muzzleWorldPosition(target = new THREE.Vector3()): THREE.Vector3 | null {
-    const socket = this.models.get(this.active)?.getObjectByName('muzzle-socket');
+    const socket = this.mountedModel()?.getObjectByName('muzzle-socket');
     return socket ? socket.getWorldPosition(target) : null;
   }
 
@@ -945,7 +954,9 @@ export class WeaponPresentation {
         : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
           ? 'pistol-rear-sight'
           : 'ghost-ring';
-    return model?.getObjectByName(sightName);
+    // Pass 65 authored GLBs expose a canonical socket contract. Cosmetic mesh
+    // names are retained only as a fallback for the procedural/headless models.
+    return model?.getObjectByName('rear-sight-socket') ?? model?.getObjectByName(sightName);
   }
 
   private centerSightReference(model: THREE.Object3D | undefined): void {
@@ -962,7 +973,7 @@ export class WeaponPresentation {
   }
 
   presentationState() {
-    const model = this.models.get(this.active);
+    const model = this.mountedModel();
     const requiredDetails = weaponFamilyPresentation(this.active).requiredDetails;
     const sight = this.sightReference(model);
     this.camera.updateMatrixWorld(true);
@@ -1224,7 +1235,7 @@ export class WeaponPresentation {
       (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
     }
 
-    const activeModel = this.models.get(this.active);
+    const activeModel = this.mountedModel();
     if (activeModel) updateImportedWeapon(activeModel, pose.dt);
     updateImportedWeapon(this.meleeKnife, pose.dt);
     const minigunBarrels = this.models.get('minigun')?.getObjectByName('minigun-barrel-cluster');
