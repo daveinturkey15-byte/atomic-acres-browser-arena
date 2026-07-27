@@ -13,9 +13,15 @@ import { advanceAdsBlend, advanceWeaponHeat, fireCycleAt } from './weapon-presen
 import { weaponFamilyPresentation } from './weapon-family-presentation';
 import {
   createPass65CrossbowModel,
+  createPass65FieldKnifeModel,
+  createPass65WeaponModel,
+  disposePass65WeaponModel,
   fireImportedWeapon,
   importedWeaponTelemetry,
-  loadPass65CrossbowAssets,
+  loadPass65FieldKnifeAsset,
+  loadPass65WeaponPresentation,
+  meleeImportedWeapon,
+  releasePass65WeaponModel,
   reloadImportedWeapon,
   updateImportedWeapon,
 } from './weapon-model';
@@ -139,6 +145,9 @@ const ADS_VIEWMODEL_SCALE = 0.64;
 export class WeaponPresentation {
   readonly root = new THREE.Group();
   private readonly models = new Map<WeaponId, THREE.Object3D>();
+  private readonly modelLastUsed = new Map<WeaponId, number>();
+  private modelUseCounter = 0;
+  private browserWeaponRequest = 0;
   private active: WeaponId = 'carbine';
   private recoil = 0;
   private reloadLastProgress = 0;
@@ -184,7 +193,11 @@ export class WeaponPresentation {
     weapon: 'carbine', aimBlend: 0, sprintBlend: 0, reloadProgress: null, meleeProgress: null,
   });
 
-  constructor(private readonly camera: THREE.Camera, private readonly flattenMaterials = false) {
+  constructor(
+    private readonly camera: THREE.Camera,
+    private readonly flattenMaterials = false,
+    private readonly retireModel?: (root: THREE.Object3D, afterFence?: () => void) => void,
+  ) {
     this.root.name = 'original-weapon-view';
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
@@ -217,11 +230,9 @@ export class WeaponPresentation {
     const glovePalm: THREE.Material = flattenMaterials
       ? new THREE.MeshBasicMaterial({ color: 0x766d5c })
       : fabricMaterial(0x8a806c, 0.91, 8, 5, 0.3);
-    // The licensed full-body derivative remains available for future authored
-    // grip poses, but its current bind/IK calibration fails the viewmodel
-    // acceptance gate (detached hands and sleeves outside the viewport). Keep
-    // the readable original two-bone arms as the public presentation rather
-    // than shipping a technically rigged but visibly broken pose.
+    // This bounded procedural rig is a construction-time and headless-test
+    // scaffold only. Browser load() replaces it atomically with the dedicated
+    // project-original Blender arms before the presentation becomes ready.
     const arms = new THREE.Group(); arms.name = 'first-person-arms';
     const anatomicalLimb = (
       name: string,
@@ -418,41 +429,44 @@ export class WeaponPresentation {
     arms.visible = true;
     this.root.add(arms);
 
-    // Original compact field knife. It is a camera-space presentation prop;
-    // authoritative melee range and occlusion remain in gameplay/main.
+    // Headless tests retain a deterministic construction-only fallback. Browser
+    // release runtime leaves this container empty until the authored GLB is
+    // available, so a procedural knife can never flash on screen during load.
     this.meleeKnife.name = 'field-knife-presentation';
-    const knifeHandle = roundedBox('field-knife-handle', [0.15, 0.42, 0.14], glove, 0.035, 2);
-    knifeHandle.position.set(0, -0.24, 0);
-    const knifeGuard = roundedBox('field-knife-guard', [0.36, 0.075, 0.11], sleeveTrim, 0.018, 2);
-    knifeGuard.position.set(0, 0, 0);
-    const bladeShape = new THREE.Shape();
-    bladeShape.moveTo(-0.095, 0);
-    bladeShape.lineTo(0.095, 0);
-    bladeShape.lineTo(0.072, 0.82);
-    bladeShape.lineTo(0, 1.04);
-    bladeShape.lineTo(-0.072, 0.82);
-    bladeShape.closePath();
-    const blade = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(bladeShape, { depth: 0.045, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 1 }),
-      flattenMaterials
-        ? new THREE.MeshBasicMaterial({ color: 0xe4eeee })
-        : new THREE.MeshStandardMaterial({ color: 0xd5e0e0, roughness: 0.24, metalness: 0.8 }),
-    );
-    blade.name = 'field-knife-blade';
-    blade.position.set(0, 0.02, -0.03);
-    const bladeDetailMaterial = flattenMaterials
-      ? new THREE.MeshBasicMaterial({ color: 0x59696d })
-      : new THREE.MeshStandardMaterial({ color: 0x56666a, roughness: 0.34, metalness: 0.74 });
-    const bladeFuller = roundedBox('field-knife-fuller', [0.035, 0.64, 0.018], bladeDetailMaterial, 0.008, 2);
-    bladeFuller.position.set(0, 0.43, 0.022);
-    const pommel = roundedBox('field-knife-pommel', [0.18, 0.1, 0.16], sleeveTrim, 0.028, 3);
-    pommel.position.set(0, -0.49, 0);
-    this.meleeKnife.add(knifeHandle, knifeGuard, blade, bladeFuller, pommel);
-    for (let ridge = 0; ridge < 6; ridge += 1) {
-      const wrap = roundedBox(`field-knife-grip-ridge-${ridge}`, [0.164, 0.026, 0.152], sleeveTrim, 0.01, 2);
-      wrap.position.set(0, -0.075 - ridge * 0.062, 0);
-      wrap.rotation.z = ridge % 2 === 0 ? 0.08 : -0.08;
-      this.meleeKnife.add(wrap);
+    if (typeof document === 'undefined') {
+      const knifeHandle = roundedBox('field-knife-handle', [0.15, 0.42, 0.14], glove, 0.035, 2);
+      knifeHandle.position.set(0, -0.24, 0);
+      const knifeGuard = roundedBox('field-knife-guard', [0.36, 0.075, 0.11], sleeveTrim, 0.018, 2);
+      knifeGuard.position.set(0, 0, 0);
+      const bladeShape = new THREE.Shape();
+      bladeShape.moveTo(-0.095, 0);
+      bladeShape.lineTo(0.095, 0);
+      bladeShape.lineTo(0.072, 0.82);
+      bladeShape.lineTo(0, 1.04);
+      bladeShape.lineTo(-0.072, 0.82);
+      bladeShape.closePath();
+      const blade = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(bladeShape, { depth: 0.045, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 1 }),
+        flattenMaterials
+          ? new THREE.MeshBasicMaterial({ color: 0xe4eeee })
+          : new THREE.MeshStandardMaterial({ color: 0xd5e0e0, roughness: 0.24, metalness: 0.8 }),
+      );
+      blade.name = 'field-knife-blade';
+      blade.position.set(0, 0.02, -0.03);
+      const bladeDetailMaterial = flattenMaterials
+        ? new THREE.MeshBasicMaterial({ color: 0x59696d })
+        : new THREE.MeshStandardMaterial({ color: 0x56666a, roughness: 0.34, metalness: 0.74 });
+      const bladeFuller = roundedBox('field-knife-fuller', [0.035, 0.64, 0.018], bladeDetailMaterial, 0.008, 2);
+      bladeFuller.position.set(0, 0.43, 0.022);
+      const pommel = roundedBox('field-knife-pommel', [0.18, 0.1, 0.16], sleeveTrim, 0.028, 3);
+      pommel.position.set(0, -0.49, 0);
+      this.meleeKnife.add(knifeHandle, knifeGuard, blade, bladeFuller, pommel);
+      for (let ridge = 0; ridge < 6; ridge += 1) {
+        const wrap = roundedBox(`field-knife-grip-ridge-${ridge}`, [0.164, 0.026, 0.152], sleeveTrim, 0.01, 2);
+        wrap.position.set(0, -0.075 - ridge * 0.062, 0);
+        wrap.rotation.z = ridge % 2 === 0 ? 0.08 : -0.08;
+        this.meleeKnife.add(wrap);
+      }
     }
     this.meleeRig.name = 'field-knife-arm-rig';
     const meleeForearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.82, 8, 16), sleeve);
@@ -579,8 +593,13 @@ export class WeaponPresentation {
 
   async load(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     const browserRuntime = typeof document !== 'undefined';
+    const initialWeapon = this.active;
     if (browserRuntime) {
-      await Promise.all([loadPass65CrossbowAssets(), loadFirstPersonArmsAsset()]);
+      await Promise.all([
+        loadPass65WeaponPresentation(initialWeapon, 'first-person'),
+        loadPass65FieldKnifeAsset('first-person'),
+        loadFirstPersonArmsAsset(),
+      ]);
       const authoredArms = createFirstPersonRiggedArms(this.flattenMaterials);
       if (!authoredArms || authoredArms.chains.length !== 2) {
         throw new Error('Pass 65 authored first-person arms failed the two-chain release contract');
@@ -598,20 +617,48 @@ export class WeaponPresentation {
         });
       }
       this.root.add(authoredArms.root);
+      const authoredKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'first-person');
+      if (!authoredKnife) throw new Error('Pass 65 authored first-person field knife failed the release contract');
+      this.meleeKnife.clear();
+      this.meleeKnife.add(authoredKnife);
+      this.meleeKnife.userData.projectOriginalMeleeWeapon = true;
+      this.passiveKnife.clear();
+      const prewarmDropKnife = () => {
+        void loadPass65FieldKnifeAsset('drop').then(() => {
+          const dropKnife = createPass65FieldKnifeModel(this.flattenMaterials, 'drop');
+          if (!dropKnife) throw new Error('Pass 65 authored field-knife drop delivery unavailable after prewarm');
+          dropKnife.name = 'passive-field-knife-model';
+          this.passiveKnife.add(dropKnife);
+          this.passiveKnife.visible = false;
+        }).catch((error: unknown) => {
+          this.root.userData.pass65FieldKnifeDropLoadError = error instanceof Error ? error.message : String(error);
+        });
+      };
+      const idleCallback = (window as Window & {
+        requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      }).requestIdleCallback;
+      if (typeof idleCallback === 'function') idleCallback.call(window, prewarmDropKnife, { timeout: 2_000 });
+      else globalThis.setTimeout(prewarmDropKnife, 0);
     }
 
-    const ids = Object.keys(WEAPONS) as WeaponId[];
+    const ids = browserRuntime ? [initialWeapon] : Object.keys(WEAPONS) as WeaponId[];
     ids.forEach((id, index) => {
       // Camera-space weapons use the project-authored high-detail model. The
       // imported low-poly assets remain suitable for distant world operators.
       // The low-poly imported pickups remain valid world assets, but first
       // person needs the authored PBR receiver, functional action parts and
       // calibrated sockets rather than a camera-close pickup mesh.
-      const model = id === 'explosive-crossbow' && browserRuntime
-        ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
+      if (browserRuntime && this.models.has(id)) {
+        onProgress?.(index + 1, ids.length);
+        return;
+      }
+      const model = browserRuntime
+        ? id === 'explosive-crossbow'
+          ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
+          : createPass65WeaponModel(id, this.flattenMaterials, 'first-person')
         : buildWeaponModel(id, this.flattenMaterials, false);
       if (!model) throw new Error(`Pass 65 first-person asset unavailable: ${id}`);
-      if (id !== 'explosive-crossbow') model.userData.firstPersonSource = 'authored-pbr-v6-seven-unique-finishes';
+      if (!browserRuntime && id !== 'explosive-crossbow') model.userData.firstPersonSource = 'test-only-procedural-fallback';
       const firstPersonHidden: Record<WeaponId, Set<string>> = {
         carbine: new Set(['stock-shoulder-pad', 'stock-cheek-rest', 'stock-support-rod']),
         smg: new Set(['smg-stock-rod', 'wire-stock-pad']),
@@ -650,14 +697,71 @@ export class WeaponPresentation {
       if (this.flattenMaterials && id !== 'explosive-crossbow') optimizeAttachedWeapon(model, 'palette-basic');
       model.visible = false;
       this.models.set(id, model);
+      this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.root.add(model);
       onProgress?.(index + 1, ids.length);
     });
     this.setWeapon(this.active, true);
+    if (browserRuntime) this.trimBrowserWeaponModels();
   }
 
   isReady(): boolean {
-    return this.models.size === Object.keys(WEAPONS).length;
+    return typeof document !== 'undefined' ? this.models.has(this.active) : this.models.size === Object.keys(WEAPONS).length;
+  }
+
+  private createLoadedBrowserWeapon(id: WeaponId): THREE.Group | null {
+    return id === 'explosive-crossbow'
+      ? createPass65CrossbowModel(this.flattenMaterials, 'first-person')
+      : createPass65WeaponModel(id, this.flattenMaterials, 'first-person');
+  }
+
+  private trimBrowserWeaponModels(): void {
+    while (this.models.size > 2) {
+      const victim = [...this.models.keys()]
+        .filter((id) => id !== this.active)
+        .sort((a, b) => (this.modelLastUsed.get(a) ?? 0) - (this.modelLastUsed.get(b) ?? 0))[0];
+      if (!victim) return;
+      const model = this.models.get(victim);
+      if (model) {
+        this.root.remove(model);
+        if (this.retireModel) this.retireModel(model, () => releasePass65WeaponModel(model));
+        else disposePass65WeaponModel(model);
+      }
+      this.models.delete(victim);
+      this.modelLastUsed.delete(victim);
+    }
+  }
+
+  private updateActiveSockets(id: WeaponId): void {
+    const activeModel = this.models.get(id);
+    const muzzlePosition = activeModel ? this.socketLocalPosition(activeModel, 'muzzle-socket') : null;
+    if (muzzlePosition) {
+      this.muzzleLight.position.copy(muzzlePosition);
+      this.muzzleFlash.position.copy(muzzlePosition);
+    }
+  }
+
+  private ensureBrowserWeapon(id: WeaponId): void {
+    const request = ++this.browserWeaponRequest;
+    void loadPass65WeaponPresentation(id, 'first-person').then(() => {
+      if (!this.models.has(id)) {
+        const model = this.createLoadedBrowserWeapon(id);
+        if (!model) throw new Error(`Pass 65 first-person asset unavailable after load: ${id}`);
+        model.visible = false;
+        this.models.set(id, model);
+        this.modelLastUsed.set(id, ++this.modelUseCounter);
+        this.root.add(model);
+      }
+      if (request === this.browserWeaponRequest && this.active === id) {
+        for (const [weaponId, model] of this.models) model.visible = weaponId === id;
+        this.modelLastUsed.set(id, ++this.modelUseCounter);
+        this.updateActiveSockets(id);
+      }
+      this.trimBrowserWeaponModels();
+    }).catch((error: unknown) => {
+      this.root.userData.pass65WeaponLoadError = error instanceof Error ? error.message : String(error);
+      console.error(`Pass 65 authored weapon load failed for ${id}`, error);
+    });
   }
 
   private socketLocalPosition(model: THREE.Object3D, name: string): THREE.Vector3 | null {
@@ -675,11 +779,10 @@ export class WeaponPresentation {
     this.pendingScattergunShell = false;
     for (const [weaponId, model] of this.models) model.visible = weaponId === id;
     const activeModel = this.models.get(id);
-    const muzzlePosition = activeModel ? this.socketLocalPosition(activeModel, 'muzzle-socket') : null;
-    if (muzzlePosition) {
-      this.muzzleLight.position.copy(muzzlePosition);
-      this.muzzleFlash.position.copy(muzzlePosition);
-    }
+    if (activeModel) {
+      this.modelLastUsed.set(id, ++this.modelUseCounter);
+      this.updateActiveSockets(id);
+    } else if (typeof document !== 'undefined') this.ensureBrowserWeapon(id);
     const flashlight = WEAPONS[id].flashlight;
     this.weaponFlashlight.visible = flashlight !== null && !this.flattenMaterials;
     this.weaponFlashlight.intensity = flashlight?.intensity ?? 0;
@@ -780,6 +883,7 @@ export class WeaponPresentation {
     this.meleeStart = performance.now();
     this.meleePresentationFrames = 0;
     this.meleeRig.visible = true;
+    meleeImportedWeapon(this.meleeKnife);
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) arms.visible = false;
     const activeModel = this.models.get(this.active);
@@ -895,7 +999,9 @@ export class WeaponPresentation {
       activeCasings: this.casings.filter((casing) => casing.active).length,
       activeSmoke: this.smokes.reduce((count, smoke) => count + Number(smoke.active), 0),
       detailsReady,
-      modelKind: importedModel ? 'licensed-imported' : 'original-authored',
+      modelKind: model?.userData.projectOriginalWeapon === true
+        ? 'project-original-blender'
+        : importedModel ? 'licensed-imported' : 'original-authored',
       firstPersonSource: model?.userData.firstPersonSource ?? 'unknown',
       weaponModelId: model?.userData.weaponModelId ?? null,
       weaponFinishId: model?.userData.weaponFinishId ?? null,
@@ -1120,6 +1226,7 @@ export class WeaponPresentation {
 
     const activeModel = this.models.get(this.active);
     if (activeModel) updateImportedWeapon(activeModel, pose.dt);
+    updateImportedWeapon(this.meleeKnife, pose.dt);
     const minigunBarrels = this.models.get('minigun')?.getObjectByName('minigun-barrel-cluster');
     if (minigunBarrels) minigunBarrels.rotation.z = this.minigunSpool.angleRadians;
     const profile = weaponFamilyPresentation(this.active);

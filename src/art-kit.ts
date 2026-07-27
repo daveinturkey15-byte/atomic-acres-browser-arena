@@ -3,7 +3,20 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createRiggedOperator, deathRiggedOperator, fireRiggedOperator, meleeRiggedOperator, reactRiggedOperator, resetRiggedOperator, updateRiggedOperator, type OperatorAppearance } from './operator-model';
 import { advanceMinigunSpool, createMinigunSpoolState, type MinigunSpoolState } from './minigun-spool';
-import { createImportedWeaponModel, createPass65CrossbowModel } from './weapon-model';
+import {
+  capturePass65PresentationGeneration,
+  createImportedWeaponModel,
+  createPass65FieldKnifeModel,
+  createPass65CrossbowModel,
+  disposePass65WeaponModel,
+  fireImportedWeapon,
+  isPass65PresentationGenerationCurrent,
+  loadPass65FieldKnifeAsset,
+  loadPass65WeaponPresentation,
+  meleeImportedWeapon,
+  releasePass65WeaponModel,
+  updateImportedWeapon,
+} from './weapon-model';
 import { weaponFinishProfile } from './weapon-finish';
 import { solveTwoBoneElbow } from './ik';
 import { objectLocalGeometryBounds, resolveSocketWorld } from './character-presentation-contract';
@@ -216,7 +229,10 @@ export function optimizeAttachedWeapon(
   materialMode: StaticBatchMaterialMode,
 ): StaticBatchStats {
   if (weapon.userData.attachedWeaponBatchStats) return weapon.userData.attachedWeaponBatchStats as StaticBatchStats;
-  const articulatedNames = new Set(['bolt-or-slide', 'pump', 'curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle']);
+  const articulatedNames = new Set([
+    'bolt-or-slide', 'pump', 'curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine', 'optic-reticle',
+    'weapon-action', 'weapon-magazine', 'm134-barrel-cluster',
+  ]);
   const compoundArticulatedNames = ['curved-magazine', 'lmg-box-magazine', 'straight-magazine', 'pistol-magazine'];
   for (const name of compoundArticulatedNames) {
     const articulated = weapon.getObjectByName(name);
@@ -1263,20 +1279,48 @@ export function setOperatorWeapon(
   root: THREE.Group,
   weaponId: WeaponId,
   flattenMaterials = false,
-  retirePrevious?: (root: THREE.Object3D) => void,
+  retirePrevious?: (root: THREE.Object3D, afterFence?: () => void) => void,
 ): void {
   const rig = operatorRig(root);
   if (!rig || rig.weaponId === weaponId && rig.weapon) return;
+  const browserRuntime = typeof document !== 'undefined';
+  const presentationGeneration = capturePass65PresentationGeneration(root);
+  if (browserRuntime && !rig.weapon && root.userData.pass65PendingWorldWeapon === weaponId) return;
   if (rig.weapon) {
     const previous = rig.weapon;
     rig.weaponSocket.remove(previous);
-    retirePrevious?.(previous);
+    if (retirePrevious) retirePrevious(previous, () => releasePass65WeaponModel(previous));
+    else disposePass65WeaponModel(previous);
+    rig.weapon = undefined;
   }
   // Third-person mounting must use the socket-native authored model. Pass 16's
   // imported scene could place visible bounds metres away from WristR even
   // while the root socket itself was correct.
-  const weapon = buildWeaponModel(weaponId, flattenMaterials, false);
-  optimizeAttachedWeapon(weapon, flattenMaterials ? 'palette-basic' : 'vertex-lit');
+  const authoredWorldWeapon = browserRuntime ? createImportedWeaponModel(weaponId, flattenMaterials) : null;
+  if (browserRuntime && !authoredWorldWeapon) {
+    rig.weaponId = weaponId;
+    root.userData.pass65PendingWorldWeapon = weaponId;
+    const request = Number(root.userData.pass65WorldWeaponRequest ?? 0) + 1;
+    root.userData.pass65WorldWeaponRequest = request;
+    void loadPass65WeaponPresentation(weaponId, 'world').then(() => {
+      const currentRig = operatorRig(root);
+      if (!currentRig || !isPass65PresentationGenerationCurrent(root, presentationGeneration)
+        || currentRig.weaponId !== weaponId
+        || root.userData.pass65WorldWeaponRequest !== request) return;
+      delete root.userData.pass65PendingWorldWeapon;
+      setOperatorWeapon(root, weaponId, flattenMaterials, retirePrevious);
+    }).catch((error: unknown) => {
+      delete root.userData.pass65PendingWorldWeapon;
+      root.userData.pass65WorldWeaponLoadError = error instanceof Error ? error.message : String(error);
+      console.error(`Pass 65 authored world weapon load failed for ${weaponId}`, error);
+    });
+    return;
+  }
+  const weapon = authoredWorldWeapon ?? buildWeaponModel(weaponId, flattenMaterials, false);
+  optimizeAttachedWeapon(
+    weapon,
+    flattenMaterials ? 'palette-basic' : weapon.userData.projectOriginalWeapon === true ? 'texture-lit' : 'vertex-lit',
+  );
   weapon.name = `operator-${weaponId}`;
   weapon.userData.weaponId = weaponId;
   weapon.scale.setScalar(THIRD_PERSON_WEAPON_SCALE[weaponId]);
@@ -1298,6 +1342,7 @@ export function setOperatorWeapon(
   rig.weaponSocket.add(weapon);
   rig.weapon = weapon;
   rig.weaponId = weaponId;
+  delete root.userData.pass65PendingWorldWeapon;
   if (weaponId === 'minigun') {
     root.userData.operatorMinigunSpool = createMinigunSpoolState();
     root.userData.operatorMinigunSpoolUpdatedAt = performance.now();
@@ -1327,6 +1372,7 @@ export function fireOperator(root: THREE.Group): void {
   fireRiggedOperator(root);
   const rig = operatorRig(root);
   if (rig?.weapon) {
+    fireImportedWeapon(rig.weapon);
     const flash = rig.weapon.getObjectByName('world-muzzle-flash');
     if (flash) flash.visible = true;
     if (rig.weaponId === 'minigun') root.userData.operatorMinigunDriveUntil = now + 140;
@@ -1354,7 +1400,10 @@ export function meleeOperator(root: THREE.Group): void {
   root.userData.operatorMeleeAt = performance.now();
   meleeRiggedOperator(root);
   const rig = operatorRig(root);
-  if (rig?.meleeKnife) rig.meleeKnife.visible = true;
+  if (rig?.meleeKnife) {
+    rig.meleeKnife.visible = true;
+    meleeImportedWeapon(rig.meleeKnife);
+  }
 }
 
 export function poseOperator(
@@ -1364,9 +1413,20 @@ export function poseOperator(
   _phase: number,
   _blend = 1,
   _aimPitch = 0,
+  explicitDeltaSeconds?: number,
 ): void {
   const rig = operatorRig(root);
   if (!rig) return;
+  const now = performance.now();
+  const previousAnimationAt = Number(root.userData.pass65WeaponAnimationUpdatedAt ?? now);
+  const measuredDeltaSeconds = Math.max(0, (now - previousAnimationAt) / 1_000);
+  const animationDeltaSeconds = THREE.MathUtils.clamp(
+    Number.isFinite(explicitDeltaSeconds) ? Number(explicitDeltaSeconds) : measuredDeltaSeconds,
+    0,
+    0.05,
+  );
+  root.userData.pass65WeaponAnimationUpdatedAt = now;
+  if (rig.meleeKnife) updateImportedWeapon(rig.meleeKnife, animationDeltaSeconds);
   root.userData.operatorStance = stance;
   const proxyTransform = hitProxyRootTransform(stance);
   rig.hitProxyRoot.position.set(...proxyTransform.position);
@@ -1381,6 +1441,7 @@ export function poseOperator(
     entry.bone.quaternion.copy(entry.quaternion);
   }
   updateRiggedOperator(root, speed, stance);
+  if (rig.weapon) updateImportedWeapon(rig.weapon, animationDeltaSeconds);
   if (rig.weaponId === 'minigun' && rig.weapon) {
     const now = performance.now();
     const state = (root.userData.operatorMinigunSpool as MinigunSpoolState | undefined)
@@ -1393,7 +1454,8 @@ export function poseOperator(
     });
     root.userData.operatorMinigunSpool = state;
     root.userData.operatorMinigunSpoolUpdatedAt = now;
-    const barrels = rig.weapon.getObjectByName('minigun-barrel-cluster');
+    const barrels = rig.weapon.getObjectByName('m134-barrel-cluster')
+      ?? rig.weapon.getObjectByName('minigun-barrel-cluster');
     if (barrels) barrels.rotation.z = state.angleRadians;
     const telemetry = (root.userData.operatorMinigunSpoolTelemetry ?? {
       fraction: 0,
@@ -1476,16 +1538,30 @@ export function buildOperator(
       const knife = new THREE.Group();
       knife.name = 'operator-melee-knife';
       knife.visible = false;
-      const handle = roundedBox('operator-knife-handle', [0.09, 0.25, 0.09], MAT.rubber(), 0.025, 2);
-      handle.position.y = -0.1;
-      const blade = new THREE.Mesh(
-        new THREE.ConeGeometry(0.085, 0.48, 4),
-        new THREE.MeshStandardMaterial({ color: 0xc6d0d2, roughness: 0.22, metalness: 0.82 }),
-      );
-      blade.name = 'operator-knife-blade';
-      blade.position.y = -0.46;
-      blade.rotation.y = Math.PI / 4;
-      knife.add(handle, blade);
+      if (typeof document === 'undefined') {
+        const handle = roundedBox('operator-knife-handle', [0.09, 0.25, 0.09], MAT.rubber(), 0.025, 2);
+        handle.position.y = -0.1;
+        const blade = new THREE.Mesh(
+          new THREE.ConeGeometry(0.085, 0.48, 4),
+          new THREE.MeshStandardMaterial({ color: 0xc6d0d2, roughness: 0.22, metalness: 0.82 }),
+        );
+        blade.name = 'operator-knife-blade';
+        blade.position.y = -0.46;
+        blade.rotation.y = Math.PI / 4;
+        knife.add(handle, blade);
+      } else {
+        const presentationGeneration = capturePass65PresentationGeneration(root);
+        void loadPass65FieldKnifeAsset('world').then(() => {
+          if (!isPass65PresentationGenerationCurrent(root, presentationGeneration)) return;
+          const authoredKnife = createPass65FieldKnifeModel(flattenMaterials, 'world');
+          if (!authoredKnife) throw new Error('Pass 65 authored operator field knife unavailable after load');
+          knife.add(authoredKnife);
+          knife.userData.projectOriginalMeleeWeapon = true;
+        }).catch((error: unknown) => {
+          root.userData.pass65FieldKnifeWorldLoadError = error instanceof Error ? error.message : String(error);
+          console.error('Pass 65 authored operator field knife load failed', error);
+        });
+      }
       knife.position.set(0.04, -0.08, -0.02);
       knife.rotation.set(0.14, 0, -0.16);
       wristR.add(knife);

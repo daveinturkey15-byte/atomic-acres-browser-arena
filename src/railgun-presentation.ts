@@ -7,6 +7,7 @@ import {
   type RailgunBeamAuthority,
   type RailgunShotResultMessage,
 } from './railgun-authority';
+import { createPass65WeaponModel, loadPass65WeaponAsset } from './weapon-model';
 
 export type RailgunThermalContact = Readonly<{
   id: string;
@@ -51,9 +52,14 @@ export class RailgunPresentation {
   private lastPresentationStartOffsetM = 0;
   private lastViewer: RailgunBeamViewer = 'peer';
   private visibleThermalContacts = 0;
+  private weaponLoad: Promise<void> | null = null;
+  private weaponLoadAttempts = 0;
+  private weaponLoadRetryAt = 0;
+  private readonly flattenMaterials: boolean;
 
   constructor(scene: THREE.Scene, thermalRoot: HTMLElement, flattenMaterials: boolean) {
     this.thermalRoot = thermalRoot;
+    this.flattenMaterials = flattenMaterials;
     this.root.name = 'railgun-world-pickup';
     this.root.userData.presentationOnly = true;
     this.root.userData.weapon = 'railgun';
@@ -77,10 +83,15 @@ export class RailgunPresentation {
     halo.position.y = -0.3;
     this.root.add(halo);
 
-    this.weapon = buildWeaponModel('railgun', flattenMaterials, false);
+    this.weapon = new THREE.Group();
     this.weapon.name = 'railgun-world-weapon';
     this.weapon.scale.setScalar(0.58);
     this.weapon.rotation.set(0.08, Math.PI / 2, -0.08);
+    if (typeof window === 'undefined') {
+      const fallback = buildWeaponModel('railgun', flattenMaterials, false);
+      this.weapon.userData.weaponModelId = fallback.userData.weaponModelId;
+      this.weapon.add(fallback);
+    }
     this.root.add(this.weapon);
     this.root.visible = false;
     this.thermalWorldRoot.name = 'railgun-through-wall-silhouettes';
@@ -129,9 +140,30 @@ export class RailgunPresentation {
     this.updateBeams(now);
     this.root.visible = state.status === 'available' && state.pickupPosition !== null;
     if (!this.root.visible || !state.pickupPosition) return;
+    this.ensureAuthoredWeapon(now);
     this.root.position.set(...state.pickupPosition);
     this.root.position.y += 0.28 + Math.sin(now * 0.0032) * 0.07;
     this.root.rotation.y = now * 0.00055;
+  }
+
+  private ensureAuthoredWeapon(now: number): void {
+    if (this.weapon.children.length > 0 || this.weaponLoad
+      || this.weaponLoadAttempts >= 3 || now < this.weaponLoadRetryAt) return;
+    this.weaponLoadAttempts += 1;
+    this.weaponLoad = loadPass65WeaponAsset('railgun', 'world').then(() => {
+      const authored = createPass65WeaponModel('railgun', this.flattenMaterials, 'world');
+      if (!authored) throw new Error('Pass 65 authored railgun pickup model unavailable after load');
+      authored.name = 'railgun-world-authored-visual';
+      this.weapon.add(authored);
+      this.weapon.userData.weaponModelId = authored.userData.weaponModelId;
+      this.weapon.userData.projectOriginalWeapon = true;
+    }).catch((error: unknown) => {
+      this.weaponLoadRetryAt = now + 5_000 * this.weaponLoadAttempts;
+      this.root.userData.pass65RailgunWorldLoadError = error instanceof Error ? error.message : String(error);
+      console.error('Pass 65 authored railgun pickup load failed', error);
+    }).finally(() => {
+      this.weaponLoad = null;
+    });
   }
 
   /** The only beam admission hook: a host-accepted result with canonical endpoints. */
@@ -308,6 +340,7 @@ export class RailgunPresentation {
       lengthM: number;
     }> | null;
     modelId: string;
+    authoredWorldModel: boolean;
   }> {
     const throughGeometry = this.beams.every(({ core, bloom }) => {
       const coreMaterial = core.material as THREE.MeshBasicMaterial;
@@ -345,6 +378,7 @@ export class RailgunPresentation {
         lengthM: this.lastBeamLengthM,
       }) : null,
       modelId: String(this.weapon.userData.weaponModelId ?? 'railgun-authored-v1'),
+      authoredWorldModel: this.weapon.userData.projectOriginalWeapon === true,
     };
   }
 

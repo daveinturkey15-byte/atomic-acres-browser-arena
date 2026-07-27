@@ -15,6 +15,7 @@ import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { WaterSystem } from './water-system';
 import { PASS65_HITL_IDENTITY } from './release-identity';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
+import { invalidatePass65PresentationTree, releasePass65WeaponModelsIn } from './weapon-model';
 import { applyBotEmissiveBrightness } from './operator-model';
 import { GUN_RANGE_FIRING_LINE_Z, applyAdditionalMapPresentationProfile, applyRustworksPresentationProfile, buildGunRange, buildRustworks1v1, buildSkylineTerminal, updateGunRangePresentation } from './additional-maps';
 import {
@@ -935,6 +936,7 @@ type DeferredGpuRetirement = Readonly<{
   kind: 'root';
   root: THREE.Object3D;
   disposeResources: boolean;
+  afterFence?: () => void;
 }> | Readonly<{
   kind: 'geometry';
   geometry: THREE.BufferGeometry;
@@ -989,20 +991,31 @@ async function drainDeferredGpuRetirements(): Promise<void> {
         retirement.geometry.dispose();
         gpuRetirementDisposedGeometries += 1;
       } else {
+        // Cache ownership outlives one clone. Release refs only after the GPU
+        // fence and before generic teardown clears the nested weapon roots.
+        releasePass65WeaponModelsIn(retirement.root);
         if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
+        retirement.afterFence?.();
         gpuRetirementDisposedRoots += 1;
       }
     }
   }
 }
 
-function scheduleDeferredGpuRetirement(root: THREE.Object3D, disposeResources = true): void {
+function scheduleDeferredGpuRetirement(
+  root: THREE.Object3D,
+  disposeResourcesOrAfterFence: boolean | (() => void) = true,
+  explicitAfterFence?: () => void,
+): void {
   if (scheduledGpuRetirementRoots.has(root)) return;
+  const disposeResources = typeof disposeResourcesOrAfterFence === 'boolean' ? disposeResourcesOrAfterFence : true;
+  const afterFence = typeof disposeResourcesOrAfterFence === 'function' ? disposeResourcesOrAfterFence : explicitAfterFence;
   scheduledGpuRetirementRoots.add(root);
   gpuRetirementScheduledRoots += 1;
+  invalidatePass65PresentationTree(root);
   root.removeFromParent();
   root.visible = false;
-  deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources }));
+  deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources, afterFence }));
   scheduleGpuRetirementDrain();
 }
 
@@ -2120,7 +2133,11 @@ applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(graphicsEffectsBudg
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
-const deathDropPresentationPool = new DeathDropPresentationPool(scene, MAX_DEATH_DROPS);
+const deathDropPresentationPool = new DeathDropPresentationPool(
+  scene,
+  MAX_DEATH_DROPS,
+  (root, afterFence) => scheduleDeferredGpuRetirement(root, true, afterFence),
+);
 const nukeShockwave = new THREE.Mesh(
   new THREE.SphereGeometry(1, reducedRenderMode ? 12 : 28, reducedRenderMode ? 8 : 18),
   new THREE.MeshBasicMaterial({ color: 0xffb15c, transparent: true, opacity: 0, depthWrite: false, side: THREE.BackSide, toneMapped: false }),
@@ -4303,7 +4320,9 @@ element<HTMLInputElement>('#player-name').addEventListener('input', () => {
   renderHighScores();
 });
 
-const weaponView = new WeaponPresentation(camera, reducedRenderMode);
+const weaponView = new WeaponPresentation(camera, reducedRenderMode, (root, afterFence) => (
+  scheduleDeferredGpuRetirement(root, true, afterFence)
+));
 let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
   ? loadoutState.selected.presetId
@@ -6111,7 +6130,7 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
     now,
   );
   if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
-  const root = deathDropPresentationPool.acquire(id, spec.color, victim.position);
+  const root = deathDropPresentationPool.acquire(id, spec.color, victim.position, victim.weapon);
   const entity = { drop, root };
   deathDrops.unshift(entity);
   return entity;
@@ -9209,7 +9228,7 @@ function updateBots(dt: number, now: number): void {
     }
     if (!bot.alive) {
       bot.root.visible = now < bot.deathVisibleUntil;
-      if (bot.root.visible) poseOperator(bot.root, 'stand', 0, now * 0.001);
+      if (bot.root.visible) poseOperator(bot.root, 'stand', 0, now * 0.001, 1, 0, dt);
       if (now >= bot.respawnAt && !matchFinished) respawnBot(bot, now);
       continue;
     }
@@ -9220,7 +9239,7 @@ function updateBots(dt: number, now: number): void {
       });
     }
     if (botsFrozen) {
-      poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001);
+      poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
       continue;
     }
     // A corrupted position can never become an out-of-arena damage source.
@@ -9324,7 +9343,7 @@ function updateBots(dt: number, now: number): void {
     bot.root.position.copy(bot.position);
     const lookTarget = lineOfSight ? targetPosition : verticalRouteTarget ?? patrolTarget;
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
-    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12));
+    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), 0, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -12521,7 +12540,7 @@ function updateRemotes(dt: number, now: number): void {
     const stance = renderedSnapshot.stance ?? 'stand';
     const operator = remote.root.userData.operator as THREE.Group;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
-    poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch);
+    poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch, dt);
     const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));
     const expectedGround = botElevationAt(renderedTarget, previousFootY);
     const remoteMovement: FootstepMovement = stance === 'prone' ? 'prone' : stance === 'crouch'
@@ -16751,7 +16770,7 @@ async function prepareSharedGameplayAssets(): Promise<void> {
     bootstrapStage = 'prewarming-support-explosion';
     await supportExplosionPresentation.prewarm(renderRuntime, camera);
     bootstrapStage = 'prewarming-death-drops';
-    await deathDropPresentationPool.prewarm(renderRuntime, camera);
+    await deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon);
     bootstrapStage = 'prewarming-nuke';
     await prewarmNukePresentation();
     bootstrapStage = 'prewarming-overdrive';
