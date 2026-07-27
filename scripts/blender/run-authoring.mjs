@@ -15,11 +15,17 @@ const blenderCommand = blenderCandidates.find((candidate) => existsSync(candidat
 const gltfTransformCli = path.join(process.cwd(), 'node_modules/@gltf-transform/cli/bin/cli.js');
 
 function run(command, args) {
+  const pythonFlagIndex = command === blenderCommand
+    ? args.findIndex((argument) => argument === '--python' || argument === '--python-expr')
+    : -1;
+  const runArgs = pythonFlagIndex >= 0 && !args.includes('--python-exit-code')
+    ? [...args.slice(0, pythonFlagIndex), '--python-exit-code', '1', ...args.slice(pythonFlagIndex)]
+    : args;
   if (process.env.AUTHORING_DRY_RUN === '1') {
-    console.log(JSON.stringify({ command, args, pythonHashSeed: env.PYTHONHASHSEED }));
+    console.log(JSON.stringify({ command, args: runArgs, pythonHashSeed: env.PYTHONHASHSEED }));
     return;
   }
-  const result = spawnSync(command, args, {
+  const result = spawnSync(command, runArgs, {
     cwd: process.cwd(),
     env,
     stdio: 'inherit',
