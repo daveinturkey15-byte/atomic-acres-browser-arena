@@ -41,10 +41,22 @@ describe('Pass 64 arena visual definitions', () => {
   it('keeps the Gun Range overview inside its shell with a target-rich sightline', async () => {
     const { definition } = await ARENA_VISUAL_REGISTRY['gun-range']();
     const overview = definition.reviewCameras.find((entry) => entry.id === 'gun-range-overview');
+    const neonLanes = definition.reviewCameras.find((entry) => entry.id === 'gun-range-neon-lanes');
+    const lateralTargets = definition.reviewCameras.find((entry) => entry.id === 'gun-range-lateral-targets');
     expect(overview).toBeDefined();
     expect(overview!.position[1]).toBeLessThan(7.1);
     expect(overview!.position[2]).toBeGreaterThan(11);
     expect(overview!.target[2]).toBeLessThan(-9);
+    expect(neonLanes).toMatchObject({
+      position: [0, 2.55, -1],
+      target: [0, 1.7, -36],
+      purpose: 'light-occlusion',
+    });
+    expect(lateralTargets).toMatchObject({
+      position: [0, 2.45, -18.5],
+      target: [0, 1.72, -29],
+      purpose: 'geometry',
+    });
   });
 
   it('keeps the Terminal open-boarding review camera above its walkable floor authority', async () => {

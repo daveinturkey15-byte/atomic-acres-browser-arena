@@ -55,11 +55,13 @@ export const definition = createProceduralArenaVisualDefinition({
   colorPipeline: colorPipeline('pass64.gun-range.hdr.v1', 1),
   budgets: budgets({ maximumDrawCalls: 320, maximumTriangles: 700_000, maximumTextureBytes: 224 * 1024 * 1024, maximumShadowLights: 1 }),
   reviewCameras: [
-    // Stay below the 7.1 m ceiling and behind the armory so the overview
-    // actually frames firing booths, target lanes and the backstop.
-    camera('gun-range-overview', [0, 6.2, 18], [0, 1.5, -28], 'overview', 1.04),
+    // Stay below the 7.1 m ceiling and offset from the armory header so the
+    // overview frames the booths, target lanes and backstop instead of ceiling.
+    camera('gun-range-overview', [10, 3.2, 15.5], [0, 1.7, -28], 'overview', 1.12),
     camera('gun-range-armory-support', [10, 2.2, 12], [0, 2, 10], 'geometry', 1),
     camera('gun-range-lane-wall', [6, 2, -4], [0, 2, -4], 'light-occlusion', 1),
+    camera('gun-range-neon-lanes', [0, 2.55, -1], [0, 1.7, -36], 'light-occlusion', 1.16),
+    camera('gun-range-lateral-targets', [0, 2.45, -18.5], [0, 1.72, -29], 'geometry', 1.18),
   ],
   collisionIdentity: { authoritativeArenaId: 'gun-range', evidence: 'ArenaMap gun-range collider and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['target plate animation is gameplay presentation attached to authoritative targets'],
