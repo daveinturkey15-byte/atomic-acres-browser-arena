@@ -177,6 +177,11 @@ if (chopperProvenanceBytes) {
   if (JSON.stringify(provenance.worldGlbs) !== JSON.stringify(chopperEntry.worldGlbs)) failures.push('chopper provenance GLBs drift from production manifest');
   if (JSON.stringify(provenance.pbrMaps) !== JSON.stringify(chopperEntry.pbrMaps)) failures.push('chopper provenance PBR records drift');
   if (provenance.review?.acceptedFirstPersonFrame?.sha256 !== chopperEntry.review?.acceptedFirstPersonFrame?.sha256) failures.push('accepted cockpit provenance drift');
+  if (provenance.reproducibility?.contract !== 'semantic-and-decoded-visual'
+    || provenance.reproducibility?.exactCandidateHashesPinned !== true
+    || provenance.reproducibility?.byteIdentityAcrossBlenderExports !== false) {
+    failures.push('chopper reproducibility boundary is missing or overclaims Blender byte identity');
+  }
 }
 if (aircraftProvenanceBytes) {
   const provenance = JSON.parse(aircraftProvenanceBytes.toString('utf8'));
@@ -184,6 +189,11 @@ if (aircraftProvenanceBytes) {
   if (provenance.license !== 'Project-original; no third-party meshes or textures') failures.push('aircraft provenance license boundary missing');
   if (JSON.stringify(provenance.variants) !== JSON.stringify(aircraftEntry.variants)) failures.push('aircraft provenance variants drift from production manifest');
   if (JSON.stringify(provenance.pbrMaps) !== JSON.stringify(aircraftEntry.pbrMaps)) failures.push('aircraft provenance PBR records drift');
+  if (provenance.reproducibility?.contract !== 'semantic-and-decoded-visual'
+    || provenance.reproducibility?.exactCandidateHashesPinned !== true
+    || provenance.reproducibility?.byteIdentityAcrossBlenderExports !== false) {
+    failures.push('aircraft reproducibility boundary is missing or overclaims Blender byte identity');
+  }
 }
 
 const assetManifest = JSON.parse(await readFile(resolveRepoPath('assets.manifest.json'), 'utf8'));

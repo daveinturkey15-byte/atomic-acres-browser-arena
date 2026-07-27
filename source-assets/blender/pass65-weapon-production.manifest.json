@@ -537,7 +537,7 @@
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b"
+        "sha256": "033b1324530c0ce3dddc408839cd7ceddcaea406fb84d816f8c9e450171b963f"
       },
       "worldGlbs": [
         {
@@ -597,7 +597,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-chopper-gunner.provenance.json",
-        "sha256": "7eac4c15f0e1bc3988ad79d05bdf7a3ac71246f6484c5961eb1796b52e57a068"
+        "sha256": "8982d2caf9cb3a36d1677804d7b2632439918c479cfe89b7d6bf5810c1c284c9"
       },
       "sockets": [
         "chopper-first-person-camera-socket",
@@ -758,11 +758,11 @@
       "runtimeForwardAxis": "-Z",
       "sourceBlend": {
         "path": "source-assets/blender/pass65-support-aircraft-family.blend",
-        "sha256": "7b2339e31bf4380ab09018c627ee6d26deb81e7f2148f68dae97694b74adf261"
+        "sha256": "1902a7a38c0a466855939f194873e1be6a8f0c0444074f34138e617963091ffd"
       },
       "sourceScript": {
         "path": "scripts/blender/create-pass65-support-vehicles.py",
-        "sha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b"
+        "sha256": "033b1324530c0ce3dddc408839cd7ceddcaea406fb84d816f8c9e450171b963f"
       },
       "pbrMaps": {
         "baseColor": {
@@ -792,7 +792,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-support-aircraft-family.provenance.json",
-        "sha256": "f2993dd6ad68d462c51e936324b68b01de6b7c3c509d9a11fea880b415ddf61b"
+        "sha256": "31f3869bd7ac5ab0417f76c9f23ea2a6b3872d36b6ba6354a60de6a07f8ac776"
       },
       "variants": {
         "care": {
@@ -931,28 +931,28 @@
         "renders": [
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-front-quarter.png",
-            "sha256": "31bf2964de4057a6c09300666283e142ce0ad1332881b734f7c94f7e72d3ff2c",
+            "sha256": "91850dbe69c11ff95355a52f287cfbb78b9962807e2c7a0dc7d0a9fe6b5bb02a",
             "cameraId": "care-front-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-care-cargo-parachute.png",
-            "sha256": "80e802405608322cd2a101d700881717bb503ace00ca2850a4d1bce169deb158",
+            "sha256": "c20223f4413d83e383313d80056d023e06a97dd9ed7af6bf016fa179158a06bf",
             "cameraId": "care-cargo-parachute",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-front-quarter.png",
-            "sha256": "8fb9ab54df9ee5e0711afa702cf9ca79aa41d22dd6df65e6e73b8fd8a6c162a3",
+            "sha256": "acc7be0ed92af353fb0f0981aca3c496ce833f20e642d45fe90786b8da537f95",
             "cameraId": "carpet-front-quarter",
             "width": 512,
             "height": 512
           },
           {
             "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-carpet-bomb-bay.png",
-            "sha256": "68dab4cc96677818e2f47d8e23f8ce7b3d4c70f30cfe1729c4da971415ba4fd8",
+            "sha256": "1c52c9cc17db4df4b50750938b5a6e2b0eaeada7e1867e6c333382c000a04c55",
             "cameraId": "carpet-bomb-bay",
             "width": 512,
             "height": 512
@@ -960,7 +960,7 @@
         ],
         "contactSheet": {
           "path": "docs/assets/pass65-vehicles/aircraft/pass65-aircraft-contact-sheet.png",
-          "sha256": "d002204c74ca9572a422a03fca589ed7bc62c4f27715a712654b5676e1dc8e54",
+          "sha256": "7ab0f045f1a75caefb5515999d90698684b48be3f032accf2276c7b4a6fe8e8d",
           "cameraId": "aircraft-contact-sheet",
           "width": 1024,
           "height": 1024

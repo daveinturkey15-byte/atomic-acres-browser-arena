@@ -94,6 +94,12 @@ const sharedBoundary = {
   blenderAuthoringForwardAxis: '-Y converted to glTF -Z by Y-up export',
   presentationOnly: true,
 };
+const reproducibilityBoundary = {
+  contract: 'semantic-and-decoded-visual',
+  exactCandidateHashesPinned: true,
+  byteIdentityAcrossBlenderExports: false,
+  reason: 'Blender container, generated UV/index ordering and PNG encoding bytes can vary while audited scene semantics and decoded review pixels remain equivalent.',
+};
 
 const chopperProvenancePath = 'source-assets/blender/pass65-chopper-gunner.provenance.json';
 const chopperProvenance = {
@@ -124,6 +130,7 @@ const chopperProvenance = {
   },
   authorityBoundary: 'Presentation only. Flight, targeting, damage, collision, duration, ownership and replication remain TypeScript authoritative.',
   determinism: { command: 'npm run author:blender-support-vehicles', cleanFactoryStartup: true, pythonHashSeed: 0 },
+  reproducibility: reproducibilityBoundary,
 };
 await writeFile(absolute(chopperProvenancePath), `${JSON.stringify(chopperProvenance, null, 2)}\n`, 'utf8');
 const chopperProvenanceRecord = await fileRecord(chopperProvenancePath);
@@ -153,6 +160,7 @@ const aircraftProvenance = {
   },
   authorityBoundary: 'Presentation only. Target markers, corridor ownership, flight, drops, impacts, damage, collision, interaction and replication remain TypeScript authoritative.',
   determinism: { command: 'npm run author:blender-support-vehicles', cleanFactoryStartup: true, pythonHashSeed: 0 },
+  reproducibility: reproducibilityBoundary,
 };
 await writeFile(absolute(aircraftProvenancePath), `${JSON.stringify(aircraftProvenance, null, 2)}\n`, 'utf8');
 const aircraftProvenanceRecord = await fileRecord(aircraftProvenancePath);

@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 import bpy
+from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
 
@@ -847,6 +848,38 @@ def look_at(obj: bpy.types.Object, target) -> None:
     obj.rotation_euler = (Vector(target) - obj.location).to_track_quat("-Z", "Y").to_euler()
 
 
+def assert_roots_inside_review_camera(scene, camera, roots, label: str, margin: float = 0.015) -> None:
+    """Fail before rendering if a required asset is behind or cropped by the review camera."""
+    bpy.context.view_layer.update()
+    violations = []
+    for root in roots:
+        for obj in hierarchy(root):
+            if obj.type != "MESH" or obj.hide_render:
+                continue
+            for corner in obj.bound_box:
+                projected = world_to_camera_view(scene, camera, obj.matrix_world @ Vector(corner))
+                if projected.z <= 0 or projected.x < margin or projected.x > 1 - margin or projected.y < margin or projected.y > 1 - margin:
+                    violations.append((obj.name, round(projected.x, 4), round(projected.y, 4), round(projected.z, 4)))
+                    break
+    if violations:
+        raise RuntimeError(f"{label} review camera crops required geometry: {violations[:12]}")
+
+
+def assert_roots_above_review_stage(roots, stage_z: float, label: str, clearance: float = 0.05) -> None:
+    """Fail if the opaque review floor can hide any required asset geometry."""
+    bpy.context.view_layer.update()
+    violations = []
+    for root in roots:
+        for obj in hierarchy(root):
+            if obj.type != "MESH" or obj.hide_render:
+                continue
+            minimum_z = min((obj.matrix_world @ Vector(corner)).z for corner in obj.bound_box)
+            if minimum_z <= stage_z + clearance:
+                violations.append((obj.name, round(minimum_z, 4), round(stage_z, 4)))
+    if violations:
+        raise RuntimeError(f"{label} review stage occludes required geometry: {violations[:12]}")
+
+
 def review_scene(stage_z: float, scenic=False):
     bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, stage_z))
     stage = bpy.context.object
@@ -1007,7 +1040,7 @@ def render_chopper_reviews(roots) -> None:
             target.hide_viewport = hide_viewport
         print(f"CHOPPER_FP_DIAGNOSTIC={diagnostic}")
         return
-    if FOCUSED_FP_REVIEW:
+    def render_accepted_first_person() -> Path:
         cockpit = next((
             obj for obj in hierarchy(lod0)
             if obj.name == "chopper-first-person-cockpit"
@@ -1039,6 +1072,10 @@ def render_chopper_reviews(roots) -> None:
         focused_path = CHOPPER_REVIEW / "pass65-chopper-first-person-instruments-16x9.png"
         scene.render.filepath = str(focused_path)
         bpy.ops.render.render(write_still=True)
+        return focused_path
+
+    if FOCUSED_FP_REVIEW:
+        focused_path = render_accepted_first_person()
         contact_sheet([
             CHOPPER_REVIEW / "pass65-chopper-exterior-front-quarter.png",
             CHOPPER_REVIEW / "pass65-chopper-rotor-gun-profile.png",
@@ -1051,32 +1088,30 @@ def render_chopper_reviews(roots) -> None:
         ("exterior-front-quarter", (-8.2, 9.6, 4.7), (0, -0.25, 0.22)),
         ("rotor-gun-profile", (11.0, -0.2, 3.1), (0, -0.70, 0.18)),
         ("cockpit-glass-closeup", (-3.3, 6.4, 2.35), (0, 1.34, 0.36)),
-        ("first-person-instruments", (0, 0.38, 0.62), (0, 7.0, 0.40)),
     )
     paths = []
     for label, location, target in views:
         path = CHOPPER_REVIEW / f"pass65-chopper-{label}.png"
         paths.append(path)
-        if FOCUSED_FP_REVIEW and label != "first-person-instruments":
-            continue
-        fp_visible = label == "first-person-instruments"
         for obj in hierarchy(fp_world):
-            obj.hide_render = not fp_visible
-            obj.hide_viewport = not fp_visible
+            obj.hide_render = True
+            obj.hide_viewport = True
         camera.location = location
-        camera.data.lens = 42 if label == "first-person-instruments" else 58
+        camera.data.lens = 58
         look_at(camera, target)
         scene.render.filepath = str(path)
         bpy.ops.render.render(write_still=True)
+    paths.append(render_accepted_first_person())
     contact_sheet(paths, CHOPPER_REVIEW / "pass65-chopper-contact-sheet.png")
 
 
 def render_aircraft_reviews(care_roots, carpet_roots, crate_roots) -> None:
     all_roots = [*care_roots, *carpet_roots, *crate_roots]
-    camera, scene = review_scene(-1.15)
+    stage_z = -2.65
+    camera, scene = review_scene(stage_z)
     views = (
         ("care-front-quarter", (-13.8, 16.4, 8.1), (0, -0.3, 0.2), [care_roots[0]]),
-        ("care-cargo-parachute", (-12.0, 8.0, 6.3), (0, -1.1, -0.1), [care_roots[0], crate_roots[0]]),
+        ("care-cargo-parachute", (-14.0, 14.0, 8.6), (-2.4, -0.9, -0.3), [care_roots[0], crate_roots[0]]),
         ("carpet-front-quarter", (14.8, 15.2, 7.5), (0, -0.3, 0.05), [carpet_roots[0]]),
         ("carpet-bomb-bay", (-10.8, 1.8, -0.20), (0, -0.75, -0.42), [carpet_roots[0]]),
     )
@@ -1085,8 +1120,11 @@ def render_aircraft_reviews(care_roots, carpet_roots, crate_roots) -> None:
         set_roots_visible(all_roots, visible)
         crate_roots[0].location = (-5.0, -2.0, -1.85) if label == "care-cargo-parachute" else (0, 0, 0)
         camera.location = location
-        camera.data.lens = 56
+        camera.data.lens = 45 if label == "care-cargo-parachute" else 56
         look_at(camera, target)
+        assert_roots_above_review_stage(visible, stage_z, label)
+        if label == "care-cargo-parachute":
+            assert_roots_inside_review_camera(scene, camera, visible, label)
         path = AIRCRAFT_REVIEW / f"pass65-aircraft-{label}.png"
         scene.render.filepath = str(path)
         bpy.ops.render.render(write_still=True)

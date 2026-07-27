@@ -9,7 +9,7 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-support-vehicles.py",
-    "sha256": "4e127a2c3a25ce0abbfa3a468dc9e1760a42048085b97ce60f79dd393556aa0b"
+    "sha256": "033b1324530c0ce3dddc408839cd7ceddcaea406fb84d816f8c9e450171b963f"
   },
   "runtimeForwardAxis": "-Z",
   "blenderAuthoringForwardAxis": "-Y converted to glTF -Z by Y-up export",
@@ -235,5 +235,11 @@
     "command": "npm run author:blender-support-vehicles",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0
+  },
+  "reproducibility": {
+    "contract": "semantic-and-decoded-visual",
+    "exactCandidateHashesPinned": true,
+    "byteIdentityAcrossBlenderExports": false,
+    "reason": "Blender container, generated UV/index ordering and PNG encoding bytes can vary while audited scene semantics and decoded review pixels remain equivalent."
   }
 }
