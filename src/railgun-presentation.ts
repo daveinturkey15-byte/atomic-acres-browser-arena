@@ -17,8 +17,10 @@ export type RailgunThermalContact = Readonly<{
 export const RAILGUN_BOLT_PRESENTATION = Object.freeze({
   minimumLengthM: RAILGUN_BEAM_LENGTH_M,
   visibleDurationMs: 900,
-  coreRadiusM: 0.14,
-  haloRadiusM: 0.62,
+  coreRadiusM: 0.32,
+  haloRadiusM: 1,
+  shooterCoreRadiusM: 0.045,
+  shooterHaloRadiusM: 0.15,
   shooterStartOffsetM: 2.4,
   poolCapacity: 6,
 });
@@ -154,10 +156,18 @@ export class RailgunPresentation {
     const presentationLength = presentationDelta.length();
     beam.root.position.copy(presentationStart).addScaledVector(presentationDelta, 0.5);
     beam.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-    beam.core.scale.set(RAILGUN_BOLT_PRESENTATION.coreRadiusM, presentationLength, RAILGUN_BOLT_PRESENTATION.coreRadiusM);
-    beam.bloom.scale.set(RAILGUN_BOLT_PRESENTATION.haloRadiusM, presentationLength, RAILGUN_BOLT_PRESENTATION.haloRadiusM);
-    (beam.core.material as THREE.MeshBasicMaterial).side = viewer === 'shooter' ? THREE.BackSide : THREE.FrontSide;
-    (beam.bloom.material as THREE.MeshBasicMaterial).side = viewer === 'shooter' ? THREE.BackSide : THREE.FrontSide;
+    const coreRadius = viewer === 'shooter'
+      ? RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM
+      : RAILGUN_BOLT_PRESENTATION.coreRadiusM;
+    const haloRadius = viewer === 'shooter'
+      ? RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM
+      : RAILGUN_BOLT_PRESENTATION.haloRadiusM;
+    beam.core.scale.set(coreRadius, presentationLength, coreRadius);
+    beam.bloom.scale.set(haloRadius, presentationLength, haloRadius);
+    // The camera starts outside the open tube. Rendering its back faces turns
+    // the near circular wall into a cyan tunnel that fills the shooter view.
+    (beam.core.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
+    (beam.bloom.material as THREE.MeshBasicMaterial).side = THREE.FrontSide;
     beam.root.visible = true;
     beam.expiresAt = now + RAILGUN_BOLT_PRESENTATION.visibleDurationMs;
     beam.authorityKey = authorityKey;
@@ -166,6 +176,8 @@ export class RailgunPresentation {
     beam.root.userData.authoritativeStart = [...authority.start];
     beam.root.userData.authoritativeEnd = [...authority.end];
     beam.root.userData.presentationStartOffsetM = startOffsetM;
+    beam.root.userData.presentationCoreRadiusM = coreRadius;
+    beam.root.userData.presentationHaloRadiusM = haloRadius;
     beam.root.userData.viewer = viewer;
     this.beamPresentations += 1;
     this.lastBeamLengthM = length;
@@ -281,8 +293,11 @@ export class RailgunPresentation {
     visibleDurationMs: number;
     coreRadiusM: number;
     haloRadiusM: number;
+    shooterCoreRadiusM: number;
+    shooterHaloRadiusM: number;
     poolCapacity: number;
     throughGeometry: boolean;
+    openEnded: boolean;
     lastPresentationStartOffsetM: number;
     lastViewer: RailgunBeamViewer;
     lastAcceptedBeam: Readonly<{
@@ -300,6 +315,10 @@ export class RailgunPresentation {
       return coreMaterial.depthTest === false && coreMaterial.depthWrite === false
         && bloomMaterial.depthTest === false && bloomMaterial.depthWrite === false;
     });
+    const openEnded = this.beams.every(({ core, bloom }) => (
+      (core.geometry as THREE.CylinderGeometry).parameters.openEnded === true
+      && (bloom.geometry as THREE.CylinderGeometry).parameters.openEnded === true
+    ));
     return {
       worldVisible: this.root.visible,
       thermalActive: !this.thermalRoot.hidden,
@@ -311,8 +330,11 @@ export class RailgunPresentation {
       visibleDurationMs: RAILGUN_BOLT_PRESENTATION.visibleDurationMs,
       coreRadiusM: RAILGUN_BOLT_PRESENTATION.coreRadiusM,
       haloRadiusM: RAILGUN_BOLT_PRESENTATION.haloRadiusM,
+      shooterCoreRadiusM: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
+      shooterHaloRadiusM: RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM,
       poolCapacity: this.beams.length,
       throughGeometry,
+      openEnded,
       lastPresentationStartOffsetM: this.lastPresentationStartOffsetM,
       lastViewer: this.lastViewer,
       lastAcceptedBeam: this.lastAcceptedBeam ? Object.freeze({

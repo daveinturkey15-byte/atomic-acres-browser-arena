@@ -60,6 +60,7 @@ describe('railgun presentation', () => {
       visibleDurationMs: 900,
       poolCapacity: 6,
       throughGeometry: true,
+      openEnded: true,
       lastPresentationStartOffsetM: 0,
       lastViewer: 'peer',
       lastAcceptedBeam: {
@@ -95,14 +96,24 @@ describe('railgun presentation', () => {
     const beam = scene.getObjectByName('railgun-massive-beam-1') as THREE.Group;
     const core = beam.getObjectByName('railgun-beam-core') as THREE.Mesh;
     const bloom = beam.getObjectByName('railgun-beam-bloom') as THREE.Mesh;
-    expect(core.scale.y).toBeCloseTo(180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM, 6);
-    expect(bloom.scale.y).toBeCloseTo(180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM, 6);
-    expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.BackSide);
-    expect((bloom.material as THREE.MeshBasicMaterial).side).toBe(THREE.BackSide);
+    expect(core.scale).toMatchObject({
+      x: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
+      y: 180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
+      z: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
+    });
+    expect(bloom.scale).toMatchObject({
+      x: RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM,
+      y: 180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
+      z: RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM,
+    });
+    expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
+    expect((bloom.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
     expect(beam.userData).toMatchObject({
       authoritativeStart: authority.start,
       authoritativeEnd: authority.end,
       presentationStartOffsetM: RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
+      presentationCoreRadiusM: RAILGUN_BOLT_PRESENTATION.shooterCoreRadiusM,
+      presentationHaloRadiusM: RAILGUN_BOLT_PRESENTATION.shooterHaloRadiusM,
       viewer: 'shooter',
     });
     expect(presentation.telemetry()).toMatchObject({
@@ -111,6 +122,7 @@ describe('railgun presentation', () => {
       lastViewer: 'shooter',
       lastAcceptedBeam: { start: authority.start, end: authority.end, lengthM: 180 },
       throughGeometry: true,
+      openEnded: true,
     });
   });
 
