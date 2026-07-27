@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ImpactPresentation, MAX_IMPACT_MARKS } from './impact-presentation';
 
 describe('pooled impact presentation', () => {
-  it('bounds debris and marks and expires both pools', () => {
+  it('bounds debris, retains marks for the round, and resets them explicitly', () => {
     const scene = new THREE.Scene();
     const presentation = new ImpactPresentation(scene);
     for (let index = 0; index < MAX_IMPACT_MARKS + 8; index += 1) {
@@ -16,7 +16,10 @@ describe('pooled impact presentation', () => {
     expect((presentation.marks.material as THREE.MeshBasicMaterial).map?.name).toBe('pass62-procedural-impact-mark');
     presentation.update(15);
     expect(presentation.activeParticles()).toBe(0);
+    expect(presentation.activeMarks()).toBe(MAX_IMPACT_MARKS);
+    presentation.resetForRound();
     expect(presentation.activeMarks()).toBe(0);
+    expect(presentation.marks.visible).toBe(false);
   });
 
   it('reduces particle density and decal capacity as a separate adaptive effect', () => {

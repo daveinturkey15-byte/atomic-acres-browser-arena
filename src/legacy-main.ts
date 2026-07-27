@@ -99,6 +99,7 @@ import {
   ballisticImpactSurface,
   resolveBallisticHitscanAgainstTarget,
   traceBallisticPath,
+  type BallisticMaterialId,
   type BallisticSurface,
   type BallisticTrace,
 } from './ballistics';
@@ -172,7 +173,7 @@ import {
   setRustworksQualityPresentationActive,
 } from './rustworks-quality';
 import { arenaLightingProfile } from './blender-lighting';
-import { ImpactPresentation } from './impact-presentation';
+import { ImpactPresentation, type ImpactPresentationSurface } from './impact-presentation';
 import {
   AUDIO_BUS_IDS,
   advancePresentationFrameAnchor,
@@ -5825,7 +5826,7 @@ function renderRemoteShot(message: ShotMessage): void {
     const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
     const point = origin.clone().addScaledVector(direction, impactDistance);
     const surface = ballisticImpactSurface(impact.surface.material);
-    spawnImpactFlash(point, surface, new THREE.Vector3(
+    spawnImpactFlash(point, impact.surface.material, new THREE.Vector3(
       impact.entryNormal.x,
       impact.entryNormal.y,
       impact.entryNormal.z,
@@ -7152,6 +7153,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     ? killstreakMatchEpoch + 1
     : Math.max(1, Math.floor(privateMatchActiveAtEpochMs ?? Date.now()) % 1_000_000_000);
   interactiveWorldMatchEpoch = killstreakMatchEpoch;
+  impactPresentation.resetForRound();
   smokeVolumePresentationPool.clear();
   smokeVolumes.length = 0;
   smokeAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
@@ -8026,7 +8028,7 @@ function tryFire(now: number): void {
         continue;
       }
       const surface = ballisticImpactSurface(impact.surface.material);
-      spawnImpactFlash(point, surface, normal);
+      spawnImpactFlash(point, impact.surface.material, normal);
       if (!impactAudioPlayed) {
         impactAudioPlayed = true;
         audio.impact(surface, point.distanceTo(camera.position));
@@ -8042,7 +8044,7 @@ function tryFire(now: number): void {
       const point = result.impactPoint ?? origin.clone().addScaledVector(direction, result.distance);
       const normal = result.impactNormal ?? direction.clone().multiplyScalar(-1);
       const surface = result.impactSurface ?? 'concrete';
-      spawnImpactFlash(point, surface, normal);
+      spawnImpactFlash(point, result.impactMaterial ?? surface, normal);
       if (!impactAudioPlayed) {
         impactAudioPlayed = true;
         audio.impact(surface, point.distanceTo(camera.position));
@@ -8205,6 +8207,7 @@ type ShotCastResult = {
   impactPoint?: THREE.Vector3;
   impactNormal?: THREE.Vector3;
   impactSurface?: ImpactSurface;
+  impactMaterial?: BallisticMaterialId;
   ballisticTrace?: BallisticTrace;
 };
 
@@ -8236,6 +8239,7 @@ function castShot(
           ? new THREE.Vector3(stoppedImpact.entryNormal.x, stoppedImpact.entryNormal.y, stoppedImpact.entryNormal.z)
           : direction.clone().multiplyScalar(-1),
         impactSurface: ballisticTrace.stoppedBy ? ballisticImpactSurface(ballisticTrace.stoppedBy.material) : 'concrete',
+        impactMaterial: ballisticTrace.stoppedBy?.material,
         ballisticTrace,
       };
     }
@@ -8255,6 +8259,7 @@ function castShot(
   let windowId: string | undefined;
   let hitZone: HitZone | undefined;
   let surfaceHint: unknown;
+  let materialHint: BallisticMaterialId | undefined;
   const names: string[] = [];
   while (node) {
     playerId ??= node.userData.playerId as string | undefined;
@@ -8262,6 +8267,7 @@ function castShot(
     windowId ??= node.userData.breakableWindowId as string | undefined;
     hitZone ??= node.userData.hitZone as HitZone | undefined;
     surfaceHint ??= node.userData.impactSurface;
+    materialHint ??= node.userData.ballisticMaterial as BallisticMaterialId | undefined;
     if (node.name) names.push(node.name);
     node = node.parent;
   }
@@ -8283,6 +8289,7 @@ function castShot(
     impactPoint: first.point.clone(),
     impactNormal,
     impactSurface: classifyImpactSurface({ hint: surfaceHint, name: names.join(' '), metalness }),
+    impactMaterial: materialHint,
     ballisticTrace,
   };
 }
@@ -9248,7 +9255,7 @@ function updateBots(dt: number, now: number): void {
           const impactDistance = impact.penetrated ? impact.entryDistance : impact.exitDistance;
           const point = origin.clone().addScaledVector(direction, impactDistance);
           const surface = ballisticImpactSurface(impact.surface.material);
-          spawnImpactFlash(point, surface, new THREE.Vector3(
+          spawnImpactFlash(point, impact.surface.material, new THREE.Vector3(
             impact.entryNormal.x,
             impact.entryNormal.y,
             impact.entryNormal.z,
@@ -10121,7 +10128,7 @@ function updateTargets(now: number): void {
 
 function spawnImpactFlash(
   point: THREE.Vector3,
-  surface: ImpactSurface = 'concrete',
+  surface: ImpactPresentationSurface = 'concrete',
   normal = new THREE.Vector3(0, 1, 0),
 ): void {
   impactPresentation.impact(point, normal.normalize(), surface);

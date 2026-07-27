@@ -129,6 +129,7 @@ function box(
     builder.ballisticSurfaceSequence += 1;
     builder.shotSurfaces.push(surface);
     mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
   }
   if (solid) {
     builder.colliders.push(bounds);
@@ -521,6 +522,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   builder.ballisticSurfaceSequence += 1;
   builder.shotSurfaces.push(groundSurface);
   ground.userData.ballisticSurfaceId = groundSurface.id;
+  ground.userData.ballisticMaterial = groundSurface.material;
   // Thick deck plate + edge lip so the drop to water reads when looking over.
   box(builder, 'rustworks-rig-deck-slab', [0, -0.85, 0], [54.5, 1.6, 58.5], rustDark, { solid: false, cast: true, shots: false });
   const deckEdgeSpecs = [
@@ -1582,6 +1584,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   builder.ballisticSurfaceSequence += 1;
   builder.shotSurfaces.push(floorSurface);
   floor.userData.ballisticSurfaceId = floorSurface.id;
+  floor.userData.ballisticMaterial = floorSurface.material;
 
   // A pale textured shell keeps player and target silhouettes readable. Dark
   // acoustic/ballistic inserts preserve contrast without turning the room black.
@@ -2221,6 +2224,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   builder.ballisticSurfaceSequence += 1;
   builder.shotSurfaces.push(tarmacSurface);
   tarmac.userData.ballisticSurfaceId = tarmacSurface.id;
+  tarmac.userData.ballisticMaterial = tarmacSurface.material;
 
   const addPalletStack = (id: string, x: number, z: number, alongX: boolean): void => {
     for (let level = 0; level < 4; level += 1) {

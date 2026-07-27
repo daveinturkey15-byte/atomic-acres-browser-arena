@@ -165,6 +165,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       ballisticSurfaceSequence += 1;
       shotSurfaces.push(surface);
       mesh.userData.ballisticSurfaceId = surface.id;
+      mesh.userData.ballisticMaterial = surface.material;
     }
     if (solid) {
       colliders.push(bounds);
@@ -314,6 +315,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   ballisticSurfaceSequence += 1;
   shotSurfaces.push(groundSurface);
   ground.userData.ballisticSurfaceId = groundSurface.id;
+  ground.userData.ballisticMaterial = groundSurface.material;
 
   const road = new THREE.Mesh(new THREE.PlaneGeometry(19, 88), palette.road);
   road.name = 'aged asphalt road';
@@ -332,6 +334,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   ballisticSurfaceSequence += 1;
   shotSurfaces.push(roadSurface);
   road.userData.ballisticSurfaceId = roadSurface.id;
+  road.userData.ballisticMaterial = roadSurface.material;
   for (const x of [-10.25, 10.25]) box('curb', [x, 0.12, 0], [1.4, 0.24, 88], palette.concrete, false, false);
   for (const x of [-12.6, 12.6]) box('sidewalk', [x, 0.07, 0], [3.2, 0.14, 88], palette.concrete, false, false);
   for (let z = -38; z <= 38; z += 8) box('lane marker', [0, 0.055, z], [0.18, 0.03, 3.6], palette.mustard, false, false);

@@ -161,9 +161,9 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
       { path: 'src/impact-presentation.ts', symbol: 'MAX_PARTICLES = 72' },
       { path: 'src/impact-presentation.ts', symbol: 'MAX_IMPACT_MARKS = 48' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.particleQuality', 'graphics.decalQuality', 'graphics.preset', 'graphics.adaptiveResolution'], 'Independent Low/High/Ultra particle-density and decal-lifetime scaling composes with the adaptive effects budget', 'The canonical controls modify the bounded presentation budget without changing admitted impacts, hit outcomes, collision, or authoritative destruction.'),
+    control: control('setting', ['graphics.particleQuality', 'graphics.decalQuality', 'graphics.preset', 'graphics.adaptiveResolution'], 'Independent Low/High/Ultra particle-density and round-persistent decal-capacity scaling composes with the adaptive effects budget', 'The canonical controls modify the bounded presentation budget without changing admitted impacts, hit outcomes, collision, or authoritative destruction.'),
     budget: 'At most 72 pooled particles and 48 pooled marks before effective-budget scaling.',
-    verifier: 'src/impact-presentation.test.ts + src/graphics-refinement.test.ts',
+    verifier: 'src/impact-presentation.test.ts + src/surface-impact-registry.test.ts + src/graphics-refinement.test.ts',
   }),
   feature({
     id: 'tracer-pool', title: 'Weapon tracers', availability: 'active', owner: 'src/tracer-pool.ts',

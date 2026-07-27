@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { presentationRandom } from './runtime-random';
 import type { ImpactSurface } from './combat-feedback';
+import type { BallisticMaterialId } from './ballistics';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import { SURFACE_IMPACT_PROFILES, surfaceImpactProfile, type SurfaceImpactProfile } from './surface-impact-registry';
 
 type Particle = {
   velocity: THREE.Vector3;
@@ -14,13 +16,14 @@ const MAX_PARTICLES = 72;
 export const MAX_IMPACT_MARKS = 48;
 const HIDDEN_Y = -10_000;
 
-const SURFACE_COLORS: Record<ImpactSurface, [number, number]> = {
-  metal: [0xffd06a, 0xff7b3a],
-  concrete: [0xd8d0bc, 0x8c918d],
-  wood: [0xd3a167, 0x6d4a32],
-  glass: [0xbbeeff, 0x5ca8c4],
-  soil: [0x8ca56e, 0x5c4731],
-};
+export type ImpactPresentationSurface = ImpactSurface | BallisticMaterialId;
+
+function resolveImpactProfile(surface: ImpactPresentationSurface): SurfaceImpactProfile {
+  if (surface in SURFACE_IMPACT_PROFILES) return surfaceImpactProfile(surface as BallisticMaterialId);
+  if (surface === 'metal') return surfaceImpactProfile('structural-metal');
+  if (surface === 'soil') return surfaceImpactProfile('earth');
+  return surfaceImpactProfile('concrete');
+}
 
 function proceduralImpactTexture(size: number, kind: 'particle' | 'mark'): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
@@ -62,7 +65,7 @@ export class ImpactPresentation {
   private cursor = 0;
   private markCursor = 0;
   private particleDensityScale = 1;
-  private decalLifetimeScale = 1;
+  private decalCapacityScale = 1;
   private wasPrewarmed = false;
 
   constructor(scene: THREE.Scene, reducedDetail = false) {
@@ -130,9 +133,10 @@ export class ImpactPresentation {
     }
   }
 
-  impact(point: THREE.Vector3, normal: THREE.Vector3, surface: ImpactSurface): void {
-    const [primary, secondary] = SURFACE_COLORS[surface];
-    const authoredCount = surface === 'glass' ? 10 : surface === 'metal' ? 8 : surface === 'concrete' ? 6 : 5;
+  impact(point: THREE.Vector3, normal: THREE.Vector3, surface: ImpactPresentationSurface): void {
+    const profile = resolveImpactProfile(surface);
+    const [primary, secondary] = profile.particleColors;
+    const authoredCount = profile.particleCount;
     const count = Math.max(2, Math.round(authoredCount * this.particleDensityScale));
     const tangent = new THREE.Vector3(normal.z, 0.35, -normal.x).normalize();
     const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
@@ -140,14 +144,14 @@ export class ImpactPresentation {
       const slot = this.cursor++ % MAX_PARTICLES;
       const particle = this.particles[slot];
       const positionIndex = slot * 3;
-      const spreadA = (presentationRandom() - 0.5) * (surface === 'metal' ? 4.2 : 2.6);
+      const spreadA = (presentationRandom() - 0.5) * (profile.impactSurface === 'metal' ? 4.2 : 2.6);
       const spreadB = (presentationRandom() - 0.5) * 2.2;
-      const speed = surface === 'metal' ? 2.4 + presentationRandom() * 2.8 : 0.8 + presentationRandom() * 1.9;
+      const speed = profile.impactSurface === 'metal' ? 2.4 + presentationRandom() * 2.8 : 0.8 + presentationRandom() * 1.9;
       particle.velocity.copy(normal).multiplyScalar(speed)
         .addScaledVector(tangent, spreadA)
         .addScaledVector(bitangent, spreadB)
-        .add(new THREE.Vector3(0, surface === 'soil' ? 1.2 : 0.55, 0));
-      particle.maxLife = surface === 'metal' ? 0.24 : 0.38;
+        .add(new THREE.Vector3(0, profile.impactSurface === 'soil' ? 1.2 : 0.55, 0));
+      particle.maxLife = profile.impactSurface === 'metal' ? 0.24 : 0.38;
       particle.life = particle.maxLife * (0.72 + presentationRandom() * 0.28);
       particle.color.set(index % 2 === 0 ? primary : secondary);
       this.positions[positionIndex] = point.x + normal.x * 0.035;
@@ -157,22 +161,19 @@ export class ImpactPresentation {
       this.colors[positionIndex + 1] = particle.color.g;
       this.colors[positionIndex + 2] = particle.color.b;
     }
-    const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalLifetimeScale));
+    const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalCapacityScale));
     const markSlot = this.markCursor++ % markCapacity;
     const markNormal = normal.clone().normalize();
     const markPosition = point.clone().addScaledVector(markNormal, 0.018);
     const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
     markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, presentationRandom() * Math.PI));
-    const markScale = surface === 'metal' ? 0.085 : surface === 'soil' ? 0.15 : 0.12;
     this.marks.setMatrixAt(markSlot, new THREE.Matrix4().compose(
       markPosition,
       markRotation,
-      new THREE.Vector3(markScale, markScale, 1),
+      new THREE.Vector3(profile.markScale, profile.markScale, 1),
     ));
-    this.marks.setColorAt(markSlot, new THREE.Color(
-      surface === 'metal' ? 0x5c482f : surface === 'wood' ? 0x4d3322 : surface === 'soil' ? 0x4a452f : 0x4a4b49,
-    ));
-    this.markLife[markSlot] = (surface === 'metal' ? 9 : 14) * this.decalLifetimeScale;
+    this.marks.setColorAt(markSlot, new THREE.Color(profile.markColor));
+    this.markLife[markSlot] = Number.POSITIVE_INFINITY;
     this.marks.visible = true;
     this.marks.instanceMatrix.needsUpdate = true;
     if (this.marks.instanceColor) this.marks.instanceColor.needsUpdate = true;
@@ -180,10 +181,10 @@ export class ImpactPresentation {
     this.markDirty();
   }
 
-  setBudget(particleDensityScale: number, decalLifetimeScale: number): void {
+  setBudget(particleDensityScale: number, decalCapacityScale: number): void {
     this.particleDensityScale = THREE.MathUtils.clamp(particleDensityScale, 0.35, 1);
-    this.decalLifetimeScale = THREE.MathUtils.clamp(decalLifetimeScale, 0.35, 1);
-    const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalLifetimeScale));
+    this.decalCapacityScale = THREE.MathUtils.clamp(decalCapacityScale, 0.35, 1);
+    const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalCapacityScale));
     let changed = false;
     for (let slot = markCapacity; slot < MAX_IMPACT_MARKS; slot += 1) {
       if (this.markLife[slot] <= 0) continue;
@@ -192,6 +193,27 @@ export class ImpactPresentation {
       changed = true;
     }
     if (changed) this.marks.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Round boundary for marks that otherwise persist until bounded eviction. */
+  resetForRound(): void {
+    this.cursor = 0;
+    this.markCursor = 0;
+    this.markLife.fill(0);
+    const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let slot = 0; slot < MAX_IMPACT_MARKS; slot += 1) this.marks.setMatrixAt(slot, hiddenMatrix);
+    for (let slot = 0; slot < this.particles.length; slot += 1) {
+      this.particles[slot].life = 0;
+      const index = slot * 3;
+      this.positions[index] = 0;
+      this.positions[index + 1] = HIDDEN_Y;
+      this.positions[index + 2] = 0;
+      this.colors[index] = this.colors[index + 1] = this.colors[index + 2] = 0;
+    }
+    this.points.visible = false;
+    this.marks.visible = false;
+    this.marks.instanceMatrix.needsUpdate = true;
+    this.markDirty();
   }
 
   update(dt: number): void {
@@ -222,6 +244,7 @@ export class ImpactPresentation {
     let marksChanged = false;
     for (let slot = 0; slot < MAX_IMPACT_MARKS; slot += 1) {
       if (this.markLife[slot] <= 0) continue;
+      if (!Number.isFinite(this.markLife[slot])) continue;
       this.markLife[slot] -= dt;
       if (this.markLife[slot] <= 0) {
         this.marks.setMatrixAt(slot, new THREE.Matrix4().makeScale(0, 0, 0));
