@@ -2362,7 +2362,7 @@ test.describe('solo mechanics', () => {
     expect(after.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
   });
 
-  test('starts with two normal frags, accelerates the fuse beep, and resolves the prewarmed explosion without a hitch', async ({ page }) => {
+  test('starts with one selected frag, accelerates the fuse beep, and resolves the prewarmed explosion without a hitch', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState; throwGrenade: () => void; teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
       const before = api.snapshot();
