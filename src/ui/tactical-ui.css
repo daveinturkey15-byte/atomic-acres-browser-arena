@@ -1,4 +1,4 @@
-@layer legacy, pass64.tokens, pass64.shell, pass64.components, pass64.states, pass64.bright, pass65.hitl, pass64.accessibility;
+@layer legacy, pass64.tokens, pass64.shell, pass64.components, pass64.states, pass64.bright, pass65.hitl, pass65.hud, pass64.accessibility;
 
 @layer pass64.tokens {
   :root {

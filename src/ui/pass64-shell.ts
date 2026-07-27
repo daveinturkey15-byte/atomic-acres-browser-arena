@@ -222,7 +222,7 @@ function optionsPanelMarkup(): string {
 function fieldSupportRowsMarkup(): string {
   return DEFAULT_KILLSTREAK_LOADOUT.slots.map((id, index) => {
     const definition = PASS65_KILLSTREAK_CATALOG.definitions.find((entry) => entry.id === id)!;
-    return `<b data-support="${id}" data-support-slot="${index + 1}"><span class="support-meta"><kbd>${index + 3}</kbd><small>${definition.cost} KILLS</small></span><span class="support-name">${definition.displayName.toUpperCase()}</span><em class="support-state">LOCKED</em></b>`;
+    return `<b role="listitem" data-support="${id}" data-support-slot="${index + 1}"><span class="support-meta"><kbd>${index + 3}</kbd><small>${definition.cost} KILLS</small></span><span class="support-name">${definition.displayName.toUpperCase()}</span><em class="support-state">LOCKED</em></b>`;
   }).join('');
 }
 
@@ -281,7 +281,7 @@ function chatMarkup(): string {
 }
 
 function hudMarkup(): string {
-  return `<div id="hud" hidden>
+  return `<div id="hud" hidden data-hud-contract="pass65-responsive-v1">
     <div id="pause-hint">ESC · MENU</div>
     <section class="hud-mission-console" aria-label="Match status">
       <header id="matchbar"><div><span class="tiny" id="match-mode-label">TEAM DEATHMATCH</span><strong id="timer">05:00</strong></div><div id="scoreline"><span class="aqua"><em id="aqua-label">AQUA</em> <b id="aqua-score">0</b></span><i id="score-limit">—</i><span class="coral"><b id="coral-score">0</b> <em id="coral-label">CORAL</em></span></div><div id="connection-pill">SOLO</div></header>
@@ -307,9 +307,9 @@ function hudMarkup(): string {
         <small id="railgun-status" hidden></small>
       </div>
     </section>
-    <aside id="support-block" aria-label="Field support">
-      <div class="support-heading"><span>FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
-      <div class="support-list">${fieldSupportRowsMarkup()}</div>
+    <aside id="support-block" aria-labelledby="support-title" aria-live="polite">
+      <div class="support-heading"><span id="support-title">FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
+      <div class="support-list" role="list">${fieldSupportRowsMarkup()}</div>
       <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
     </aside>
     <section id="support-combat-feedback" hidden aria-live="polite" data-support-kind="none" data-possessed="false">

@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { UI_REVIEW_VIEWPORTS, UI_STATE_INVENTORY, UI_SURFACE_INVENTORY } from './surface-registry';
+import {
+  UI_HIGH_DPI_REVIEW_VIEWPORT,
+  UI_REVIEW_VIEWPORTS,
+  UI_STATE_INVENTORY,
+  UI_SURFACE_INVENTORY,
+} from './surface-registry';
 
 const mainSource = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
 const generatedDialogSources = [
@@ -51,7 +56,15 @@ describe('Pass 64 typed UI surface contract', () => {
       'error', 'reduced-motion', 'pointer-lock-requesting', 'pointer-lock-denied',
       'focus-suspended', 'paused-match', 'high-dpi',
     ]));
-    expect(UI_REVIEW_VIEWPORTS.map(({ id }) => id)).toEqual(['laptop', 'desktop', 'ultrawide', 'narrow']);
+    expect(UI_REVIEW_VIEWPORTS.map(({ id }) => id)).toEqual([
+      'laptop', 'review', 'desktop', 'owner', 'ultrawide', 'narrow',
+    ]);
+    expect(UI_REVIEW_VIEWPORTS.map(({ width, height }) => `${width}x${height}`)).toEqual([
+      '1280x720', '1600x900', '1920x1080', '2560x1440', '3440x1440', '390x844',
+    ]);
+    expect(UI_HIGH_DPI_REVIEW_VIEWPORT).toEqual({
+      id: 'high-dpi', width: 1280, height: 720, deviceScaleFactor: 2,
+    });
   });
 
   it('registers the railgun thermal scope as a critical rendered and styled HUD surface', () => {

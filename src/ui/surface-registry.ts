@@ -75,10 +75,19 @@ export const UI_STATE_INVENTORY = Object.freeze([
 
 export const UI_REVIEW_VIEWPORTS = Object.freeze([
   { id: 'laptop', width: 1280, height: 720, deviceScaleFactor: 1 },
+  { id: 'review', width: 1600, height: 900, deviceScaleFactor: 1 },
   { id: 'desktop', width: 1920, height: 1080, deviceScaleFactor: 1 },
-  { id: 'ultrawide', width: 2560, height: 1080, deviceScaleFactor: 1 },
+  { id: 'owner', width: 2560, height: 1440, deviceScaleFactor: 1 },
+  { id: 'ultrawide', width: 3440, height: 1440, deviceScaleFactor: 1 },
   { id: 'narrow', width: 390, height: 844, deviceScaleFactor: 2 },
 ] as const);
+
+export const UI_HIGH_DPI_REVIEW_VIEWPORT = Object.freeze({
+  id: 'high-dpi',
+  width: 1280,
+  height: 720,
+  deviceScaleFactor: 2,
+} as const);
 
 export function assertUiSurfaceInventory(root: ParentNode): void {
   for (const surface of UI_SURFACE_INVENTORY) {

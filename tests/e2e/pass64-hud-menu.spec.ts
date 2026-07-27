@@ -2,16 +2,12 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
+import { UI_HIGH_DPI_REVIEW_VIEWPORT, UI_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
 
 type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 
-const reviewViewports = [
-  { id: 'laptop', width: 1280, height: 720 },
-  { id: 'desktop', width: 1920, height: 1080 },
-  { id: 'ultrawide', width: 2560, height: 1080 },
-  { id: 'narrow', width: 390, height: 844 },
-] as const satisfies readonly ReviewViewport[];
-const highDpiViewport = { id: 'high-dpi', width: 390, height: 844 } as const satisfies ReviewViewport;
+const reviewViewports: readonly ReviewViewport[] = UI_REVIEW_VIEWPORTS;
+const highDpiViewport = UI_HIGH_DPI_REVIEW_VIEWPORT;
 
 async function ready(page: Page): Promise<void> {
   await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud&previewTime=0');
@@ -314,7 +310,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(layout.previewFrameVisible).toBe(true);
       expect(layout.mapDetailFontPx).toBeGreaterThanOrEqual(9);
       expect(layout.mapHeadingFontPx).toBeGreaterThanOrEqual(15);
-      expect(layout.shellWidthRatio).toBeGreaterThan(viewport.id === 'ultrawide' ? 0.8 : viewport.id === 'narrow' ? 0.99 : 0.95);
+      expect(layout.shellWidthRatio).toBeGreaterThan(viewport.id === 'ultrawide' ? 0.6 : viewport.id === 'narrow' ? 0.99 : viewport.id === 'owner' ? 0.8 : 0.95);
 
       await captureReview(page, testInfo, 'setup', viewport);
     });
@@ -397,32 +393,72 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       const mapGeometry = await page.evaluate(() => {
         const minimap = document.querySelector('#minimap')!.getBoundingClientRect();
         const heading = document.querySelector('#map-heading')!.getBoundingClientRect();
-        const panels = ['#matchbar', '#objective', '#fps-counter', '#network-strip', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console', '#support-block']
+        const operator = document.querySelector('.hud-operator-console')!.getBoundingClientRect();
+        const support = document.querySelector('#support-block')!.getBoundingClientRect();
+        const panels = ['#matchbar', '#objective', '#fps-counter', '#network-strip', '.hud-map-console', '.hud-operator-console', '.hud-weapon-console', '#support-block', '#pause-hint', '#killfeed', '#damage-feeds']
           .map((selector) => ({ selector, rect: document.querySelector(selector)!.getBoundingClientRect().toJSON() }));
         const overlapPairs: string[] = [];
         for (let left = 0; left < panels.length; left += 1) {
           for (let right = left + 1; right < panels.length; right += 1) {
             const a = panels[left]!;
             const b = panels[right]!;
-            const overlaps = a.rect.left < b.rect.right - 1
+            const overlaps = a.rect.width > 1 && a.rect.height > 1 && b.rect.width > 1 && b.rect.height > 1
+              && a.rect.left < b.rect.right - 1
               && a.rect.right > b.rect.left + 1
               && a.rect.top < b.rect.bottom - 1
               && a.rect.bottom > b.rect.top + 1;
             if (overlaps) overlapPairs.push(`${a.selector}:${b.selector}`);
           }
         }
+        const supportCards = [...document.querySelectorAll<HTMLElement>('#support-block [data-support]')];
+        const supportColumns = new Set(supportCards.map((card) => Math.round(card.getBoundingClientRect().left))).size;
+        const clippedSupportCards = supportCards.filter((card) => card.scrollWidth > card.clientWidth + 1 || card.scrollHeight > card.clientHeight + 1)
+          .map((card) => card.dataset.support);
+        const outOfBounds = panels.filter(({ rect }) => rect.width > 1 && rect.height > 1 && (
+          rect.left < -1 || rect.top < -1 || rect.right > innerWidth + 1 || rect.bottom > innerHeight + 1
+        )).map(({ selector }) => selector);
+        const fontSize = (selector: string) => Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>(selector)!).fontSize);
         return {
           minimapBottom: minimap.bottom,
           headingTop: heading.top,
           overlapPairs,
-          objectiveFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('#objective')!).fontSize),
-          supportStateFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.support-state')!).fontSize),
+          outOfBounds,
+          clippedSupportCards,
+          supportColumns,
+          supportToOperatorGap: operator.top - support.bottom,
+          objectiveFontPx: fontSize('#objective'),
+          supportNameFontPx: fontSize('.support-name'),
+          supportStateFontPx: fontSize('.support-state'),
+          timerFontPx: fontSize('#timer'),
+          healthFontPx: fontSize('#health'),
+          ammoFontPx: fontSize('#ammo'),
+          criticalLabelFloorPx: Math.min(
+            fontSize('.tiny'),
+            fontSize('#objective'),
+            fontSize('#fps-counter span'),
+            fontSize('#map-heading'),
+            fontSize('#health-block span'),
+            fontSize('#weapon-name'),
+            fontSize('.support-name'),
+            fontSize('.support-state'),
+          ),
+          hudContract: document.querySelector<HTMLElement>('#hud')!.dataset.hudContract,
         };
       });
       expect(mapGeometry.headingTop).toBeGreaterThanOrEqual(mapGeometry.minimapBottom);
       expect(mapGeometry.overlapPairs).toEqual([]);
+      expect(mapGeometry.outOfBounds).toEqual([]);
+      expect(mapGeometry.clippedSupportCards).toEqual([]);
+      expect(mapGeometry.supportColumns).toBe(viewport.id === 'narrow' ? 2 : 1);
+      if (viewport.id === 'narrow') expect(mapGeometry.supportToOperatorGap).toBeGreaterThanOrEqual(6);
+      if (viewport.id === 'owner') expect(mapGeometry.criticalLabelFloorPx).toBeGreaterThanOrEqual(10);
+      expect(mapGeometry.hudContract).toBe('pass65-responsive-v1');
       expect(mapGeometry.objectiveFontPx).toBeGreaterThanOrEqual(9);
-      expect(mapGeometry.supportStateFontPx).toBeGreaterThanOrEqual(viewport.id === 'narrow' ? 8 : 9);
+      expect(mapGeometry.supportNameFontPx).toBeGreaterThanOrEqual(9);
+      expect(mapGeometry.supportStateFontPx).toBeGreaterThanOrEqual(9);
+      expect(mapGeometry.timerFontPx).toBeGreaterThanOrEqual(12);
+      expect(mapGeometry.healthFontPx).toBeGreaterThanOrEqual(12);
+      expect(mapGeometry.ammoFontPx).toBeGreaterThanOrEqual(12);
       await captureReview(page, testInfo, 'live-hud', viewport);
     }
   });
