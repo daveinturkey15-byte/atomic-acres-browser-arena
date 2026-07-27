@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
 
 type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 
@@ -172,19 +173,19 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await page.locator('#advanced-graphics summary').click();
     await expect(page.locator('#graphics-profile')).toHaveValue('custom');
     await expect(page.locator('#graphics-frame-rate-limit')).toHaveValue('240');
-    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres-pass65-settings-v1') ?? 'null'));
-    expect(persisted.graphics).toMatchObject({ preset: 'custom', frameRateLimit: 240 });
+    const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null'), PLAYER_PROFILE_STORAGE_KEY);
+    expect(persisted.settings.graphics).toMatchObject({ preset: 'custom', frameRateLimit: 240 });
     await expect(page.locator('html')).toHaveAttribute('data-graphics-frame-rate-limit', '240');
   });
 
   test('keeps leaderboard sharing default-off, disclosed, persistent, and revocable', async ({ page }) => {
-    await page.addInitScript(() => {
+    await page.addInitScript((profileKey) => {
       if (sessionStorage.getItem('pass65-privacy-test-initialized') !== '1') {
-        localStorage.removeItem('atomic-acres-pass65-settings-v1');
+        localStorage.removeItem(profileKey);
         localStorage.setItem('atomic-acres:leaderboard-install:v2', 'legacy_install_123');
         sessionStorage.setItem('pass65-privacy-test-initialized', '1');
       }
-    });
+    }, PLAYER_PROFILE_STORAGE_KEY);
     await ready(page);
     expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
     await page.locator('#menu-tab-options').click();
@@ -195,7 +196,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
 
     await sharing.check();
     await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING ENABLED');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres-pass65-settings-v1') ?? 'null')?.privacy))
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.settings?.privacy, PLAYER_PROFILE_STORAGE_KEY))
       .toEqual({ schemaVersion: 1, shareGlobalLeaderboard: true });
     expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
 
@@ -203,13 +204,45 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await sharing.uncheck();
     await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING OFF');
     expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres-pass65-settings-v1') ?? 'null')?.privacy))
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.settings?.privacy, PLAYER_PROFILE_STORAGE_KEY))
       .toEqual({ schemaVersion: 1, shareGlobalLeaderboard: false });
 
     await page.reload();
     await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
     await page.locator('#menu-tab-options').click();
     await expect(page.locator('#share-global-leaderboard')).not.toBeChecked();
+  });
+
+  test('shares one player profile across same-origin Live and Stable query routes', async ({ page }) => {
+    await ready(page);
+    await page.locator('#menu-tab-options').click();
+    await page.locator('#sensitivity').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '1.45';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#field-of-view').evaluate((node) => {
+      const input = node as HTMLInputElement;
+      input.value = '97';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const latestProfile = await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY);
+    expect(latestProfile).not.toBeNull();
+
+    await page.goto('/?release=stable&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass65-profile-stable&previewTime=0');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#sensitivity')).toHaveValue('1.45');
+    await expect(page.locator('#field-of-view')).toHaveValue('97');
+    expect(await page.evaluate((key) => localStorage.getItem(key), PLAYER_PROFILE_STORAGE_KEY)).toBe(latestProfile);
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => [
+      'atomic-acres-pass65-settings-v1',
+      'atomic-acres.loadout.v2',
+      'atomic-acres:killstreak-loadout:v1',
+      'atomic-acres-sensitivity',
+      'atomic-acres-controller-sensitivity',
+      'atomic-acres-fov',
+    ].includes(key)))).toEqual([]);
   });
 
   test('plays prerecorded media without moving or submitting the gameplay renderer', async ({ page }) => {

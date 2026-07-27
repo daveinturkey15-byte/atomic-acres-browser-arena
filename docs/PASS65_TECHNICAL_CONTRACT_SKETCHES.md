@@ -961,6 +961,26 @@ type SettingDefinition = Readonly<{
 
 Normalization rejects NaN/infinity/out-of-range values, returns requested/effective values plus downgrade/apply-mode reasons, and enforces effective adaptive target ≤ nonzero frame cap. The top-level UI exposes only Quality (default), Performance and Custom; Advanced Graphics is collapsed initially and any admitted advanced edit selects Custom. Legacy `high`/`max` values migrate transactionally into Quality or an equivalent Custom snapshot. Save only after successful application and read-back. MSAA is a pipeline rebuild. Sensory controls live only in accessibility settings. Minor-debris quality never changes authoritative major bodies, colliders or replication.
 
+### 14.1 Route-neutral local player profile
+
+```ts
+type PlayerProfileV1 = Readonly<{
+  schemaVersion: 1;
+  revision: number;
+  settings: Pass65Settings; // graphics including target FPS, audio, accessibility and privacy consent
+  controls: Readonly<{
+    schemaVersion: 1;
+    mouseSensitivity: number;
+    controllerSensitivity: number;
+    fieldOfView: number;
+  }>;
+  loadout: LoadoutStorageV2; // selected kit plus Custom 1/2/3 names, weapons and grenade
+  killstreakLoadout: KillstreakLoadoutV1;
+}>;
+```
+
+The only current preference record is the route-neutral same-origin key `atomic-acres.player-profile.v1`; `release=latest` and `release=stable` queries therefore read the same profile. One validated canonical JSON value is committed with the browser's single-key atomic replacement, decoded from read-back, and restored to the prior value on any verification/checkpoint failure. Legacy settings, render-profile, control, class-loadout and killstreak keys are read only when no valid current profile exists, then removed only after the canonical read-back succeeds. A valid current profile always wins without rereading legacy values, making migration exactly once even if legacy cleanup was temporarily blocked. Unknown future profile versions are preserved byte-for-byte and make persistence read-only for that session; malformed or unavailable storage falls back to bounded defaults with leaderboard sharing off. Player callsigns, scores, diagnostic queues, room-rejoin leases and pseudonymous leaderboard installation IDs remain separate because they are identity/history/operational records rather than preferences; no login, cloud identity or PII is introduced.
+
 ## 15. Spatial audio definitions
 
 ```ts

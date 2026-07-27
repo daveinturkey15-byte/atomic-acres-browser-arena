@@ -89,7 +89,7 @@ export type AccessibilityRuntime = Readonly<AccessibilitySettings & {
   reasons: readonly string[];
 }>;
 
-type CapabilityHints = Readonly<{
+export type CapabilityHints = Readonly<{
   hardwareConcurrency?: number;
   deviceMemoryGb?: number;
   forceCompatibility?: boolean;

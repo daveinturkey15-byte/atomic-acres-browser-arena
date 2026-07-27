@@ -84,10 +84,7 @@ import {
   LOADOUT_STORAGE_SCHEMA_VERSION,
   createDefaultCustomPresets,
   createLoadoutItemEligibility,
-  loadLoadoutStorageV2,
-  migrateLegacyFieldKitStorageV1,
   sanitizeLoadoutPresetName,
-  writeLoadoutStorageV2Transaction,
   type GrenadeId as LoadoutGrenadeId,
   type LoadoutPresetId,
   type LoadoutStorageV2,
@@ -177,21 +174,18 @@ import {
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation } from './impact-presentation';
 import {
-  PASS65_SETTINGS_STORAGE_KEY,
   AUDIO_BUS_IDS,
   advancePresentationFrameAnchor,
-  createDefaultPass65Settings,
   normalizePass65Settings,
-  parsePass65Settings,
   presentationFrameDue,
   resolveActiveGraphicsConfig,
   resolveAccessibilityRuntime,
   resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
-  writePass65Settings,
   type GraphicsPreset,
   type Pass65Settings,
 } from './pass65-settings';
+import { PlayerProfileStore, type PlayerControlPreferencesV1 } from './player-profile';
 import { arenaFootstepSurface, AudioOcclusionBudget, FootstepEmitterRegistry, type FootstepMovement } from './spatial-audio';
 import {
   createDirectionalDamageState,
@@ -478,7 +472,7 @@ import {
   type RailgunStateMessage,
 } from './railgun-authority';
 import { selectPlayableWindowApproach, windowBreakPathBlocked } from './window-breaks';
-import { RENDER_PROFILE_STORAGE_KEY, resolveRenderProfile, type RenderProfile } from './render-profile';
+import { resolveRenderProfile, type RenderProfile } from './render-profile';
 import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRandom, runtimeRandomTelemetry, runtimeSeed } from './runtime-random';
 import {
   BotDamageMessage,
@@ -743,7 +737,6 @@ const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
 let storedPlayerName = '';
 try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
 app.innerHTML = renderPass64Shell(createPass64ShellViewModel(storedPlayerName));
-const killstreakLoadoutController = new KillstreakLoadoutController(localStorage);
 let killstreakMenuBinding: KillstreakMenuBinding;
 
 assertUiSurfaceInventory(document);
@@ -822,19 +815,34 @@ const capabilityHints = {
   hardwareConcurrency: navigator.hardwareConcurrency,
   deviceMemoryGb: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
 };
-let serializedPass65Settings: string | null = null;
-try { serializedPass65Settings = localStorage.getItem(PASS65_SETTINGS_STORAGE_KEY); } catch { /* Hardened storage falls back safely. */ }
-let pass65Settings: Pass65Settings = parsePass65Settings(serializedPass65Settings, capabilityHints);
-if (!serializedPass65Settings) {
-  let legacyProfile: string | null = null;
-  try { legacyProfile = localStorage.getItem(RENDER_PROFILE_STORAGE_KEY); } catch { /* Optional migration only. */ }
-  if (legacyProfile === 'performance' || legacyProfile === 'blender') {
-    pass65Settings = normalizePass65Settings({
-      ...createDefaultPass65Settings(capabilityHints),
-      graphics: { preset: legacyProfile === 'performance' ? 'performance' : 'high' },
-    }, capabilityHints);
-  }
-}
+const loadoutEligibility = createLoadoutItemEligibility(WEAPON_CATALOG);
+const baseCustomPresets = createDefaultCustomPresets(
+  { primary: 'm4a1', secondary: 'pistol', grenade: 'frag' },
+  loadoutEligibility,
+);
+const defaultCustomPresets = Object.freeze(baseCustomPresets.map((preset) => Object.freeze({
+  ...preset,
+  ...(preset.id === 'custom-2'
+    ? { primary: 'mp5', secondary: 'machine-pistol', grenade: 'smoke' }
+    : preset.id === 'custom-3'
+      ? { primary: 'm14-ebr', secondary: 'flashlight-pistol', grenade: 'flash' }
+      : {}),
+})));
+const fallbackLoadoutState: LoadoutStorageV2 = Object.freeze({
+  schemaVersion: LOADOUT_STORAGE_SCHEMA_VERSION,
+  selected: Object.freeze({ kind: 'curated', kitId: 'balanced' }),
+  customPresets: defaultCustomPresets,
+});
+const playerProfileStore = new PlayerProfileStore(clientPersistentStorage() ?? null, {
+  capabilityHints,
+  loadoutEligibility,
+  defaultLoadout: fallbackLoadoutState,
+});
+let pass65Settings: Pass65Settings = playerProfileStore.current.settings;
+const killstreakLoadoutController = new KillstreakLoadoutController(null, {
+  initialLoadout: playerProfileStore.current.killstreakLoadout,
+  persist: (loadout) => playerProfileStore.update({ killstreakLoadout: loadout }).ok,
+});
 if (!pass65Settings.privacy.shareGlobalLeaderboard) forgetLeaderboardInstallId(localStorage);
 const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
 const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
@@ -4214,31 +4222,7 @@ element<HTMLInputElement>('#player-name').addEventListener('input', () => {
 });
 
 const weaponView = new WeaponPresentation(camera, reducedRenderMode);
-const loadoutEligibility = createLoadoutItemEligibility(WEAPON_CATALOG);
-const baseCustomPresets = createDefaultCustomPresets(
-  { primary: 'm4a1', secondary: 'pistol', grenade: 'frag' },
-  loadoutEligibility,
-);
-const defaultCustomPresets = Object.freeze(baseCustomPresets.map((preset) => Object.freeze({
-  ...preset,
-  ...(preset.id === 'custom-2'
-    ? { primary: 'mp5', secondary: 'machine-pistol', grenade: 'smoke' }
-    : preset.id === 'custom-3'
-      ? { primary: 'm14-ebr', secondary: 'flashlight-pistol', grenade: 'flash' }
-      : {}),
-})));
-const fallbackLoadoutState: LoadoutStorageV2 = Object.freeze({
-  schemaVersion: LOADOUT_STORAGE_SCHEMA_VERSION,
-  selected: Object.freeze({ kind: 'curated', kitId: 'balanced' }),
-  customPresets: defaultCustomPresets,
-});
-const loadoutMigration = migrateLegacyFieldKitStorageV1(localStorage, defaultCustomPresets, loadoutEligibility);
-const loadedLoadoutState = loadLoadoutStorageV2(localStorage, loadoutEligibility);
-let loadoutState: LoadoutStorageV2 = loadedLoadoutState.ok
-  ? loadedLoadoutState.value
-  : loadoutMigration.ok
-    ? loadoutMigration.value
-    : fallbackLoadoutState;
+let loadoutState: LoadoutStorageV2 = playerProfileStore.current.loadout;
 let managedPresetId: LoadoutPresetId = loadoutState.selected.kind === 'custom'
   ? loadoutState.selected.presetId
   : 'custom-1';
@@ -4277,12 +4261,12 @@ function loadoutMatchesPlayer(selection: CombatLoadoutSelection): boolean {
 }
 
 function persistLoadoutState(candidate: LoadoutStorageV2): boolean {
-  const result = writeLoadoutStorageV2Transaction(localStorage, candidate, loadoutEligibility);
+  const result = playerProfileStore.update({ loadout: candidate });
   if (!result.ok) {
-    setStatus(`Loadout could not be saved (${result.phase}).`, 'warn');
+    setStatus(`Loadout could not be saved (${result.reason}).`, 'warn');
     return false;
   }
-  loadoutState = result.value;
+  loadoutState = result.value.loadout;
   return true;
 }
 
@@ -13089,13 +13073,9 @@ const reducedSensoryEffectsInput = element<HTMLInputElement>('#reduced-sensory-e
 const damageFlashScaleInput = element<HTMLInputElement>('#damage-flash-scale');
 const weaponMotionScaleInput = element<HTMLInputElement>('#weapon-motion-scale');
 const shareGlobalLeaderboardInput = element<HTMLInputElement>('#share-global-leaderboard');
-const storedRange = (key: string, fallback: number, minimum: number, maximum: number): number => {
-  const parsed = Number(localStorage.getItem(key));
-  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
-};
-sensitivity = storedRange('atomic-acres-sensitivity', Number(sensitivityInput.value), 0.6, 2);
-controllerSensitivity = storedRange('atomic-acres-controller-sensitivity', Number(controllerSensitivityInput.value), 0.5, 1.8);
-preferredFov = storedRange('atomic-acres-fov', Number(fovInput.value), 70, 100);
+sensitivity = playerProfileStore.current.controls.mouseSensitivity;
+controllerSensitivity = playerProfileStore.current.controls.controllerSensitivity;
+preferredFov = playerProfileStore.current.controls.fieldOfView;
 sensitivityInput.value = String(sensitivity);
 controllerSensitivityInput.value = String(controllerSensitivity);
 fovInput.value = String(preferredFov);
@@ -13108,9 +13088,19 @@ weaponMotionScaleInput.value = String(pass65Settings.accessibility.weaponMotionS
 shareGlobalLeaderboardInput.checked = pass65Settings.privacy.shareGlobalLeaderboard;
 element<HTMLElement>('#graphics-effective').textContent = `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
 
-function persistPass65Settings(next: Pass65Settings): void {
-  pass65Settings = next;
-  try { writePass65Settings(localStorage, next, capabilityHints); } catch { /* Runtime settings still apply without storage. */ }
+function persistPass65Settings(next: Pass65Settings): boolean {
+  const result = playerProfileStore.update({ settings: next }, { sessionOnFailure: true });
+  pass65Settings = result.value.settings;
+  return result.ok;
+}
+
+function persistControlPreferences(patch: Partial<PlayerControlPreferencesV1>): void {
+  const controls: PlayerControlPreferencesV1 = Object.freeze({
+    ...playerProfileStore.current.controls,
+    ...patch,
+    schemaVersion: 1,
+  });
+  playerProfileStore.update({ controls }, { sessionOnFailure: true });
 }
 
 function applyAccessibilitySettings(): void {
@@ -13139,8 +13129,10 @@ function persistGraphicsAndReload(graphics: Partial<Pass65Settings['graphics']>)
     ? { ...pass65Settings.graphics, ...graphics, preset }
     : { preset };
   const next = normalizePass65Settings({ ...pass65Settings, graphics: merged }, capabilityHints);
-  persistPass65Settings(next);
-  try { localStorage.setItem(RENDER_PROFILE_STORAGE_KEY, next.graphics.preset === 'performance' ? 'performance' : 'blender'); } catch { /* Migration mirror only. */ }
+  if (!persistPass65Settings(next)) {
+    setStatus('Graphics could not be saved; renderer reload was cancelled.', 'warn');
+    return;
+  }
   const url = new URL(window.location.href);
   url.searchParams.delete('render');
   window.location.assign(url);
@@ -13153,15 +13145,15 @@ applyAccessibilitySettings();
 applyPrivacySettings();
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
-  localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
+  persistControlPreferences({ mouseSensitivity: sensitivity });
 });
 controllerSensitivityInput.addEventListener('input', () => {
   controllerSensitivity = Number(controllerSensitivityInput.value);
-  localStorage.setItem('atomic-acres-controller-sensitivity', String(controllerSensitivity));
+  persistControlPreferences({ controllerSensitivity });
 });
 fovInput.addEventListener('input', () => {
   preferredFov = Number(fovInput.value);
-  localStorage.setItem('atomic-acres-fov', String(preferredFov));
+  persistControlPreferences({ fieldOfView: preferredFov });
 });
 graphicsProfileInput.addEventListener('change', () => {
   persistGraphicsAndReload({ preset: graphicsProfileInput.value as GraphicsPreset });
@@ -15089,6 +15081,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       graphics: graphicsRuntime,
       displayedGraphicsPreset,
       accessibility: accessibilityRuntime,
+      playerProfile: {
+        schemaVersion: playerProfileStore.current.schemaVersion,
+        revision: playerProfileStore.current.revision,
+        source: playerProfileStore.loadResult.source,
+        writeProtected: playerProfileStore.loadResult.writeProtected,
+        legacyCleanupFailures: [...playerProfileStore.loadResult.legacyCleanup.failed],
+      },
       advancedGraphicsRegistry: {
         registeredKeys: advancedGraphicsBinding.registeredKeys,
         controls: ADVANCED_GRAPHICS_CONTROLS.map(({ key, runtimeConsumer, applyMode }) => ({ key, runtimeConsumer, applyMode })),

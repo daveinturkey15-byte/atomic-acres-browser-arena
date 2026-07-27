@@ -21,6 +21,11 @@ export type KillstreakLoadoutReadResult = Readonly<{
   repaired: boolean;
 }>;
 
+export type KillstreakLoadoutControllerOptions = Readonly<{
+  initialLoadout?: KillstreakLoadoutV1;
+  persist?: (loadout: KillstreakLoadoutV1) => boolean;
+}>;
+
 function cloneLoadout(loadout: KillstreakLoadoutV1): KillstreakLoadoutV1 {
   return parseKillstreakLoadout({ schemaVersion: 1, slots: [...loadout.slots] });
 }
@@ -78,9 +83,16 @@ export function replaceKillstreakSlot(
 export class KillstreakLoadoutController {
   private editable: KillstreakLoadoutV1;
   private frozenMatch: KillstreakLoadoutV1 | null = null;
+  private readonly persistSelection: ((loadout: KillstreakLoadoutV1) => boolean) | null;
 
-  constructor(private readonly storage: KillstreakLoadoutStorage | null) {
-    this.editable = readKillstreakLoadout(storage).loadout;
+  constructor(
+    private readonly storage: KillstreakLoadoutStorage | null,
+    options: KillstreakLoadoutControllerOptions = {},
+  ) {
+    this.editable = options.initialLoadout
+      ? cloneLoadout(options.initialLoadout)
+      : readKillstreakLoadout(storage).loadout;
+    this.persistSelection = options.persist ?? null;
   }
 
   get selected(): KillstreakLoadoutV1 {
@@ -94,7 +106,10 @@ export class KillstreakLoadoutController {
   select(slot: 1 | 2 | 3 | 4 | 5, id: Pass65KillstreakId): KillstreakLoadoutV1 {
     if (this.frozenMatch) throw new Error('killstreak loadout is frozen for the active match');
     const next = replaceKillstreakSlot(this.editable, slot, id);
-    if (!persistKillstreakLoadout(this.storage, next) && this.storage) {
+    const persisted = this.persistSelection
+      ? this.persistSelection(next)
+      : persistKillstreakLoadout(this.storage, next);
+    if (!persisted && (this.persistSelection || this.storage)) {
       throw new Error('killstreak loadout persistence verification failed');
     }
     this.editable = next;
@@ -110,4 +125,3 @@ export class KillstreakLoadoutController {
     this.frozenMatch = null;
   }
 }
-

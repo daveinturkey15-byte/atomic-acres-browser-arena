@@ -59,5 +59,17 @@ describe('Pass 65 killstreak loadout persistence', () => {
     controller.select(5, 'nuke');
     expect(controller.freezeAtMatchStart().slots[4]).toBe('nuke');
   });
-});
 
+  it('supports a canonical profile-backed repository without touching the legacy key', () => {
+    const storage = new MemoryStorage();
+    const persisted: unknown[] = [];
+    const controller = new KillstreakLoadoutController(null, {
+      initialLoadout: DEFAULT_KILLSTREAK_LOADOUT,
+      persist: (loadout) => { persisted.push(loadout); return true; },
+    });
+    controller.select(1, 'care-package');
+    expect(controller.selected.slots[0]).toBe('care-package');
+    expect(persisted).toHaveLength(1);
+    expect(storage.values.has(KILLSTREAK_LOADOUT_STORAGE_KEY)).toBe(false);
+  });
+});

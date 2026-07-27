@@ -35,7 +35,7 @@ export const PASS65_ADVANCED_GRAPHICS_TRACE = Object.freeze({
   registry: Object.freeze({ path: 'src/graphics-settings-registry.ts', symbol: 'ADVANCED_GRAPHICS_CONTROLS' }),
   ui: Object.freeze({ path: 'src/ui/advanced-graphics-controls.ts', symbol: 'bindAdvancedGraphicsControls' }),
   normalization: Object.freeze({ path: 'src/graphics-settings-registry.ts', symbol: 'normalizeAdvancedGraphicsValues' }),
-  persistence: Object.freeze({ path: 'src/pass65-settings.ts', symbol: 'writePass65Settings' }),
+  persistence: Object.freeze({ path: 'src/player-profile.ts', symbol: 'class PlayerProfileStore' }),
   runtime: Object.freeze({ path: 'src/pass65-settings-inventory.ts', symbol: 'runtimeEvidence' }),
   telemetry: Object.freeze({ path: 'src/legacy-main.ts', symbol: 'advancedGraphicsRegistry' }),
 });

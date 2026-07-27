@@ -344,8 +344,8 @@
       "symbol": "normalizeAdvancedGraphicsValues"
     },
     "persistence": {
-      "path": "src/pass65-settings.ts",
-      "symbol": "writePass65Settings"
+      "path": "src/player-profile.ts",
+      "symbol": "class PlayerProfileStore"
     },
     "runtime": {
       "path": "src/pass65-settings-inventory.ts",
