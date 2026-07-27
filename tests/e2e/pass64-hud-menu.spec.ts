@@ -9,7 +9,7 @@ type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 const reviewViewports: readonly ReviewViewport[] = UI_REVIEW_VIEWPORTS;
 const highDpiViewport = UI_HIGH_DPI_REVIEW_VIEWPORT;
 
-async function ready(page: Page): Promise<void> {
+async function ready(page: Page, options: Readonly<{ freezeCssMotion?: boolean }> = {}): Promise<void> {
   await page.goto('/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=pass64-hud&previewTime=0');
   await page.waitForFunction(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
@@ -17,7 +17,9 @@ async function ready(page: Page): Promise<void> {
     return debug?.snapshot().weaponReady === true && solo?.disabled === false;
   }, undefined, { timeout: 30_000 });
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
-  await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+  if (options.freezeCssMotion !== false) {
+    await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+  }
 }
 
 async function captureReview(page: Page, testInfo: TestInfo, state: string, viewport: ReviewViewport): Promise<void> {
@@ -461,6 +463,70 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(mapGeometry.ammoFontPx).toBeGreaterThanOrEqual(12);
       await captureReview(page, testInfo, 'live-hud', viewport);
     }
+  });
+
+  test('presents an accessible animated 3-2-1 with bounded mixer telemetry and cleanup', async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await ready(page, { freezeCssMotion: false });
+    await page.evaluate(() => {
+      window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
+      window.__ATOMIC_ACRES_DEBUG__.startSolo();
+    });
+    await page.waitForFunction(() => {
+      const countdown = document.querySelector<HTMLElement>('#countdown');
+      const cue = countdown?.dataset.cue;
+      return countdown?.hidden === false && (cue === '3' || cue === '2' || cue === '1');
+    });
+    const cue = await page.evaluate(() => {
+      const countdown = document.querySelector<HTMLElement>('#countdown')!;
+      const computed = getComputedStyle(countdown);
+      const audio = window.__ATOMIC_ACRES_DEBUG__.snapshot().audio as {
+        countdown: { cues: number; lastCue: string | number; maximumVoicesPerCue: number; maximumCueWindowSeconds: number; buses: string[] };
+        runtime: { voices: number; globalCap: number };
+      };
+      return {
+        role: countdown.getAttribute('role'),
+        ariaLive: countdown.getAttribute('aria-live'),
+        ariaLabel: countdown.getAttribute('aria-label'),
+        className: countdown.className,
+        cueKey: countdown.dataset.cueKey,
+        reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        animationName: computed.animationName,
+        fontPx: Number.parseFloat(computed.fontSize),
+        cue: countdown.dataset.cue,
+        audio,
+      };
+    });
+    expect(cue).toMatchObject({
+      role: 'status',
+      ariaLive: 'assertive',
+      className: 'countdown-cue-active',
+      cueKey: expect.stringMatching(/^(odd|even)$/),
+      reducedMotion: false,
+    });
+    expect(cue.ariaLabel).toMatch(/^Deployment countdown [123]$/);
+    expect(cue.animationName).toMatch(/^pass65CountdownBeat(?:Odd|Even)$/);
+    expect(cue.fontPx).toBeGreaterThanOrEqual(100);
+    expect(cue.audio.countdown).toMatchObject({ maximumVoicesPerCue: 2, maximumCueWindowSeconds: 0.36, buses: ['announcements', 'ui'] });
+    expect(cue.audio.countdown.cues).toBeGreaterThanOrEqual(1);
+    expect(cue.audio.runtime.voices).toBeLessThanOrEqual(cue.audio.runtime.globalCap);
+
+    const directory = resolve(process.cwd(), 'artifacts/pass65/hud-review');
+    mkdirSync(directory, { recursive: true });
+    const screenshot = resolve(directory, 'countdown-1280x720.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled' });
+    await testInfo.attach('countdown-1280x720', { path: screenshot, contentType: 'image/png' });
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect.poll(async () => page.locator('#countdown').evaluate((element) => getComputedStyle(element).animationName)).toBe('none');
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 15_000 });
+    await expect.poll(async () => page.evaluate(() => (
+      window.__ATOMIC_ACRES_DEBUG__.snapshot().audio as { countdown: { cues: number; lastCue: string } }
+    ).countdown)).toMatchObject({ cues: 4, lastCue: 'engage' });
+    await expect(page.locator('#countdown')).toBeHidden({ timeout: 2_000 });
+    await expect(page.locator('#countdown')).not.toHaveAttribute('data-cue', /.+/);
+    await expect(page.locator('#countdown')).not.toHaveAttribute('aria-label', /.+/);
   });
 
   test('renders real dead and respawning HUD states', async ({ page }) => {

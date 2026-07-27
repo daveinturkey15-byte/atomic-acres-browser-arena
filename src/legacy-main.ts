@@ -12555,6 +12555,7 @@ function presentMatchCountdownCue(cue: MatchCountdownCue): number {
   const sequence = ++matchCountdownCueSequence;
   countdown.classList.remove('countdown-cue-active');
   countdown.textContent = cue === 'engage' ? 'ENGAGE' : cue;
+  countdown.setAttribute('aria-label', cue === 'engage' ? 'Match active. Engage.' : `Deployment countdown ${cue}`);
   countdown.dataset.cue = cue;
   countdown.dataset.cueSequence = String(sequence);
   countdown.dataset.cueKey = sequence % 2 === 0 ? 'even' : 'odd';
@@ -12570,6 +12571,11 @@ function hideMatchCountdownCue(): void {
   const countdown = element<HTMLElement>('#countdown');
   countdown.hidden = true;
   countdown.classList.remove('countdown-cue-active');
+  countdown.textContent = '';
+  countdown.removeAttribute('aria-label');
+  delete countdown.dataset.cue;
+  delete countdown.dataset.cueKey;
+  delete countdown.dataset.cueSequence;
 }
 
 function updateMatchState(now: number): void {

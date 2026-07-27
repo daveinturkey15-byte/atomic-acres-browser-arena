@@ -29,4 +29,12 @@ describe('Pass 65 modern tactical HUD layout contract', () => {
     expect(shell).toContain('class="support-list" role="list"');
     expect(shell).toContain('role="listitem" data-support=');
   });
+
+  it('preserves an assertive accessible countdown with a motion-free alternative', () => {
+    expect(shell).toContain('id="countdown" role="status" aria-live="assertive" aria-atomic="true"');
+    expect(tacticalCss).toContain('@keyframes pass65CountdownBeatOdd');
+    expect(tacticalCss).toContain('@keyframes pass65CountdownBeatEven');
+    expect(hudCss).toContain('@keyframes pass65HudCountdownRing');
+    expect(hudCss).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*?#countdown\.countdown-cue-active[\s\S]*?animation:\s*none/);
+  });
 });

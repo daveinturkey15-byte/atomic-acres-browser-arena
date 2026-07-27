@@ -10,6 +10,11 @@ import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-set
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 import { EXPLOSIVE_BOLT_ARM_DELAY_MS } from './combat/ordnance';
 import type { MinigunSpoolPhase } from './minigun-spool';
+import {
+  MATCH_COUNTDOWN_AUDIO_LIMITS,
+  matchCountdownAudioCue,
+  type MatchCountdownAudioCueId,
+} from './match-countdown-audio';
 import { WEAPON_REPORT_PROFILES } from './weapon-audio-profiles';
 
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
@@ -157,6 +162,8 @@ export class ArenaAudio {
   private chopperRotorStarts = 0;
   private chopperRotorStops = 0;
   private supportCuePlays = 0;
+  private matchCountdownCuePlays = 0;
+  private lastMatchCountdownCue: MatchCountdownAudioCueId | null = null;
   private explosionAudioGate = createExplosionAudioGate();
   private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
   private flashbangs = { plays: 0, lastAudioGain: 0, immediateOnsets: 0, scheduledBeeps: 0 };
@@ -791,14 +798,20 @@ export class ArenaAudio {
   }
 
   matchCountdown(step: 1 | 2 | 3 | 'engage'): void {
-    if (step === 'engage') {
-      this.sweep(360, 1_120, 0.24, 0.065, 'sawtooth', this.announcements);
-      this.tone(1_320, 0.18, 0.045, 'square', this.ui, 0.08);
-      return;
+    this.matchCountdownCuePlays += 1;
+    this.lastMatchCountdownCue = step;
+    for (const voice of matchCountdownAudioCue(step)) {
+      const destination = voice.bus === 'announcements' ? this.announcements : this.ui;
+      this.sweep(
+        voice.startFrequencyHz,
+        voice.endFrequencyHz,
+        voice.durationSeconds,
+        voice.gain,
+        voice.waveform,
+        destination,
+        voice.delaySeconds,
+      );
     }
-    const frequency = 430 + (3 - step) * 85;
-    this.tone(frequency, 0.11, 0.045, 'triangle', this.announcements);
-    this.tone(frequency * 2, 0.07, 0.024, 'sine', this.ui, 0.025);
   }
 
   adrenalineState(active: boolean): void {
@@ -884,6 +897,7 @@ export class ArenaAudio {
     crossbowFuse: { beeps: number; lastRemainingMs: number; lastDistanceM: number; startMs: number };
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
     support: { cues: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
+    countdown: { cues: number; lastCue: MatchCountdownAudioCueId | null; maximumVoicesPerCue: number; maximumCueWindowSeconds: number; buses: readonly ['announcements', 'ui'] };
     railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
     flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
@@ -917,6 +931,13 @@ export class ArenaAudio {
         chopperRotorActive: this.chopperRotorLoops.size > 0,
         chopperRotorStarts: this.chopperRotorStarts,
         chopperRotorStops: this.chopperRotorStops,
+      },
+      countdown: {
+        cues: this.matchCountdownCuePlays,
+        lastCue: this.lastMatchCountdownCue,
+        maximumVoicesPerCue: MATCH_COUNTDOWN_AUDIO_LIMITS.maximumVoicesPerCue,
+        maximumCueWindowSeconds: MATCH_COUNTDOWN_AUDIO_LIMITS.maximumCueWindowSeconds,
+        buses: ['announcements', 'ui'] as const,
       },
       railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
       flashbang: { ...this.flashbangs, maximumTailMs: FLASHBANG_AUDIO_PROFILE.maximumTailMs },

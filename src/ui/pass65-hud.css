@@ -441,6 +441,61 @@
     font-size: 9px;
   }
 
+  #countdown {
+    top: 37%;
+    min-width: min(580px, calc(100vw - 32px));
+    padding: 16px 30px 25px;
+    color: #fff3c8;
+    font: 900 clamp(112px, 13vw, 190px)/0.72 var(--ui-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.035em;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(242, 183, 79, 0.72), 0 9px 30px rgba(0, 0, 0, 0.86);
+  }
+
+  #countdown[data-cue='engage'] {
+    font-size: clamp(68px, 8vw, 112px);
+    letter-spacing: 0.1em;
+  }
+
+  #countdown::before {
+    inset: 50% auto auto 50%;
+    width: 1.22em;
+    border: 2px solid rgba(102, 235, 225, 0.72);
+    background:
+      linear-gradient(45deg, transparent 49%, rgba(102, 235, 225, 0.17) 50%, transparent 51%),
+      radial-gradient(circle, rgba(242, 183, 79, 0.1), transparent 64%);
+    box-shadow: 0 0 0 8px rgba(102, 235, 225, 0.055), 0 0 34px rgba(102, 235, 225, 0.16);
+  }
+
+  #countdown::after {
+    content: 'DEPLOYMENT SYNC';
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+    color: var(--hud-cyan);
+    font: 900 11px/1 var(--ui-copy);
+    letter-spacing: 0.28em;
+    text-shadow: 0 2px 7px #000;
+    white-space: nowrap;
+  }
+
+  #countdown[data-cue='engage']::after {
+    content: 'OBJECTIVE LIVE';
+    color: var(--hud-amber);
+  }
+
+  #countdown.countdown-cue-active::before {
+    animation: pass65HudCountdownRing 680ms ease-out;
+  }
+
+  @keyframes pass65HudCountdownRing {
+    0% { opacity: 0; transform: translate(-50%, -50%) rotate(33deg) scale(0.72); }
+    40% { opacity: 1; }
+    100% { opacity: 0.72; transform: translate(-50%, -50%) rotate(45deg) scale(1); }
+  }
+
   @media (max-width: 700px) {
     #hud {
       --hud-edge: 8px;
@@ -566,6 +621,23 @@
       bottom: 112px;
     }
 
+    #countdown {
+      top: 41%;
+      min-width: calc(100vw - 20px);
+      padding-inline: 10px;
+      font-size: clamp(94px, 30vw, 132px);
+    }
+
+    #countdown[data-cue='engage'] {
+      font-size: clamp(52px, 16vw, 76px);
+      letter-spacing: 0.06em;
+    }
+
+    #countdown::after {
+      font-size: 9px;
+      letter-spacing: 0.19em;
+    }
+
   }
 
   @media (max-width: 430px) {
@@ -622,5 +694,17 @@
 
     .support-name { font-size: 14px; }
     #pause-hint { bottom: calc(var(--hud-edge) + 154px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #countdown.countdown-cue-active,
+    #countdown.countdown-cue-active::before {
+      animation: none;
+      filter: none;
+    }
+
+    #countdown::before {
+      opacity: 0.72;
+    }
   }
 }

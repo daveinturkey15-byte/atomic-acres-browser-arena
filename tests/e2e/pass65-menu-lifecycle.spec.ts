@@ -466,7 +466,8 @@ test.describe('Pass 65 active-match menu lifecycle', () => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return snapshot.gameStarted === true && snapshot.matchPhase === 'active';
     }, undefined, { timeout: 30_000 });
-    await expect.poll(async () => (await countdownAnimations(page)).length).toBe(4);
+    await expect.poll(async () => (await countdownAnimations(page)).map(({ cue }) => cue))
+      .toEqual(['3', '2', '1', 'engage']);
     const animations = await countdownAnimations(page);
     expect(animations.map((event) => event.cue)).toEqual(['3', '2', '1', 'engage']);
     expect(animations.map((event) => event.sequence)).toEqual([1, 2, 3, 4]);

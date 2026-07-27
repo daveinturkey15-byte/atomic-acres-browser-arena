@@ -337,7 +337,7 @@ function hudMarkup(): string {
     <div id="power-announcement" hidden aria-live="assertive"><small>MID-MAP POWER WEAPON</small><strong>2× DAMAGE</strong><span>30 SECONDS</span></div>
     <div id="pickup-prompt" hidden><kbd>F</kbd><span>PICK UP</span><strong></strong></div>
     <div id="respawn" hidden><strong>ELIMINATED</strong><span id="respawn-countdown">REDEPLOYING</span></div>
-    <div id="countdown" hidden></div>
+    <div id="countdown" role="status" aria-live="assertive" aria-atomic="true" hidden></div>
     <div id="banner" hidden></div>
     <div id="roster" hidden><h2>FIELD ROSTER</h2><div id="roster-list"></div></div>
   </div>`;
