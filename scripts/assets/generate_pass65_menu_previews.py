@@ -7,7 +7,7 @@ The script does not import any external image, model, map, or franchise asset.
 
 Run from the repository root with Blender 5.1 or newer:
 
-  blender.exe --background --python scripts/assets/generate_pass65_menu_previews.py
+  blender.exe --background --python-exit-code 1 --python scripts/assets/generate_pass65_menu_previews.py
 """
 
 from __future__ import annotations

@@ -260,9 +260,9 @@ const provenance = {
   releaseState: 'HITL candidate only',
   choreography: await fileRecord(choreographyPath, { recipeId: choreography.recipeId }),
   documentation: await fileRecord(documentationPath),
-  generator: await fileRecord(generatorPath, { blender: '5.1.2' }),
+  generator: await fileRecord(generatorPath, { blender: '5.1.2', pythonExitCode: 1 }),
   finalizer: await fileRecord(finalizerPath, { ffmpeg: 'required' }),
-  blendAudit: await fileRecord(auditScriptPath, { failClosed: true }),
+  blendAudit: await fileRecord(auditScriptPath, { failClosed: true, pythonExitCode: 1 }),
   verification: await fileRecord(verifierPath, { failClosed: true }),
   authoredCockpit: {
     assetId: 'chopper-gunner-vehicle-v1',

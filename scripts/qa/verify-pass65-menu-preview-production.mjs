@@ -200,7 +200,7 @@ function validateImage(file, width, height, maximumBytes, codec = 'webp') {
 function auditBlend(blender, arena) {
   const blendPath = path.join(sourceRoot, `${arena}.blend`);
   const result = spawnSync(blender, [
-    '--background', '--factory-startup', '--python', auditScriptPath, '--',
+    '--background', '--factory-startup', '--python-exit-code', '1', '--python', auditScriptPath, '--',
     '--blend', blendPath, '--arena', arena, '--recipe', choreographyPath,
   ], {
     cwd: root,
@@ -208,6 +208,11 @@ function auditBlend(blender, arena) {
     windowsHide: true,
     maxBuffer: 64 * 1024 * 1024,
   });
+  const blenderOutput = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  if (/Traceback \(most recent call last\):|Python: Exception:/i.test(blenderOutput)) {
+    failures.push(`Blender audit emitted a Python exception for ${arena}`);
+    return;
+  }
   const marker = result.stdout?.split(/\r?\n/).find((line) => line.startsWith('AA_PREVIEW_BLEND_AUDIT='));
   if (!marker) {
     failures.push(`Blender audit emitted no structured result for ${arena}: ${(result.stderr || result.stdout || '').trim()}`);
@@ -245,6 +250,9 @@ if (!manifestRecord) failures.push(`assets.manifest.json is missing ${provenance
 if (provenance.authoredCockpit?.assetId !== 'chopper-gunner-vehicle-v1'
   || provenance.authoredCockpit?.qualityTier !== 'LOD0') {
   failures.push('provenance must pin the authored chopper-gunner LOD0 cockpit');
+}
+if (provenance.generator?.pythonExitCode !== 1 || provenance.blendAudit?.pythonExitCode !== 1) {
+  failures.push('provenance must fail-close Blender Python authoring and audit with exit code 1');
 }
 
 await checkHash(path.join(root, acceptedCockpitEvidence), acceptedCockpitDigest, 'accepted cockpit evidence');
@@ -306,12 +314,18 @@ for (const arena of arenas) {
 }
 
 const generatorSource = await readFile(generatorPath, 'utf8');
+const documentationSource = await readFile(documentationPath, 'utf8');
 if (!generatorSource.includes('add_authored_helicopter_cockpit(rig)')
   || !generatorSource.includes('XorShift32')
   || !generatorSource.includes('sample_hold_track')
+  || !generatorSource.includes('--python-exit-code 1')
   || !generatorSource.includes('"atomic-acres,skyline-terminal,rustworks-1v1,gun-range"')
   || generatorSource.includes('uv_sphere("authored-cat')) {
   failures.push('offline generator lacks canonical authored cockpit/cat/seeded-hold contracts');
+}
+if (!documentationSource.includes('--python-exit-code 1')
+  || !documentationSource.includes('exact `frame-0001.png` through `frame-0192.png` roster')) {
+  failures.push('authoring documentation does not fail-close Blender Python or exact frame-roster proof');
 }
 
 const runtimeSource = await readFile(runtimeSourcePath, 'utf8');

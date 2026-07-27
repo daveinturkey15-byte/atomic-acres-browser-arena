@@ -335,9 +335,9 @@
       "license": "Original project work",
       "files": "public/assets/original/menu-previews/*",
       "sourceScript": "scripts/assets/generate_pass65_menu_previews.py",
-      "sourceScriptSha256": "292927a39b09ed19765a798d430030865787bbfa934f94f23b33667374c3d69e",
+      "sourceScriptSha256": "37c5eff0aa84b47bb9fc3d5af395cf58c842dad3d1536052e4fa133d9904a616",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
-      "sourceProvenanceSha256": "6d1fbfe40824397d4a62eedf751339f4bb6dd86da200f9162793d58096ed68af",
+      "sourceProvenanceSha256": "e89e820396a5d9c9ca4f3e5e8d1203db96899aa89df6d3ea025c5a3c7a060bd9",
       "format": "Four distinct 960x540 eight-second 24 FPS loops, each shipped as VP9/Opus WebM, H.264/AAC MP4 and a static WebP poster, plus deterministic five-frame review evidence",
       "modifications": "Four project-original prerecorded Blender previews: three deterministic cockpit flyovers using the authored chopper-gunner LOD0 with bounded hold/blend corrections, visible first-person rotor, cyan/green emissive instruments, modeled canopy glass and quiet synthetic rotor audio; plus a regenerated Gun Range cat POV with authored non-primitive ears, paws, toes and pads, a compact loop-safe path, moving illuminated targets and quiet synthetic room tone. The former byte-identical Gun Range gate is explicitly superseded. No downloaded or sampled assets are used.",
       "attributionRequired": false

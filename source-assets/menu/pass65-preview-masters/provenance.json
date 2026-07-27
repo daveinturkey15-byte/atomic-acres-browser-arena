@@ -12,26 +12,28 @@
   },
   "documentation": {
     "path": "source-assets/menu/pass65-preview-masters/README.md",
-    "sha256": "b502ba3d3b7dae3e3ef5d5aa4ab23e1171928f44567db6f31643b85a1c8dc658"
+    "sha256": "87f18b0912c041b7cd9f3ab7bfa21ad724c4322deef40158f71ac36005f4cd43"
   },
   "generator": {
     "path": "scripts/assets/generate_pass65_menu_previews.py",
-    "sha256": "292927a39b09ed19765a798d430030865787bbfa934f94f23b33667374c3d69e",
-    "blender": "5.1.2"
+    "sha256": "37c5eff0aa84b47bb9fc3d5af395cf58c842dad3d1536052e4fa133d9904a616",
+    "blender": "5.1.2",
+    "pythonExitCode": 1
   },
   "finalizer": {
     "path": "scripts/assets/finalize_pass65_menu_previews.mjs",
-    "sha256": "3122673ba915038a9aea14ccc7d7eb638b9eeda354d7207bc08937a97f585cd3",
+    "sha256": "dfa7b0c651acf8b3cb333424f0a8a9bd4e039d78f9ef6bdf653426f2c5dc41ba",
     "ffmpeg": "required"
   },
   "blendAudit": {
     "path": "scripts/qa/audit_pass65_menu_preview_blend.py",
     "sha256": "7dbb441441d8917b0750f6c05486f6eae7df6699789793c4583f543bc342850e",
-    "failClosed": true
+    "failClosed": true,
+    "pythonExitCode": 1
   },
   "verification": {
     "path": "scripts/qa/verify-pass65-menu-preview-production.mjs",
-    "sha256": "4e428f3b19dea6827b6005abcddf4777f4492b2bdcde6cb5da64b856b6a0f07a",
+    "sha256": "990a9e5acbbc5dafff320f4d310b57148a8f2615f0d7b9a2a1835301275ea93b",
     "failClosed": true
   },
   "authoredCockpit": {

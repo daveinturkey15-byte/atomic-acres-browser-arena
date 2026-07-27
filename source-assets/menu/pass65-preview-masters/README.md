@@ -22,10 +22,10 @@ npm run finalize:pass65:menu-previews
 Remove-Item Env:AA_PREVIEW_VALIDATE_ONLY -ErrorAction SilentlyContinue
 
 $env:AA_PREVIEW_SAVE_ONLY='1'
-& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup --python scripts/assets/generate_pass65_menu_previews.py
+& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup --python-exit-code 1 --python scripts/assets/generate_pass65_menu_previews.py
 
 Remove-Item Env:AA_PREVIEW_SAVE_ONLY -ErrorAction SilentlyContinue
-& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup --python scripts/assets/generate_pass65_menu_previews.py
+& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup --python-exit-code 1 --python scripts/assets/generate_pass65_menu_previews.py
 
 npm run finalize:pass65:menu-previews
 npm run qa:pass65:menu-previews
@@ -44,5 +44,7 @@ The production gate fails closed on:
 - missing cat anatomy/material/fur signals, primitive-sphere stand-ins, or unsafe review-frustum composition;
 - any browser import of the offline camera evaluator, live preview canvas, arena construction, or gameplay renderer submission;
 - missing reduced-motion poster-only behavior or rapid-switch generation ownership.
+
+Every Blender Python invocation must include `--python-exit-code 1`. Blender 5.1 can otherwise report process status 0 after an unhandled Python exception. Process status is still not accepted as render proof: the finalizer requires the exact `frame-0001.png` through `frame-0192.png` roster for every arena, and the production gate independently opens and audits each saved master.
 
 Passing automation creates only a HITL candidate. Owner visual approval of the immutable candidate remains mandatory before publication.
