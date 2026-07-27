@@ -207,11 +207,12 @@ export function calculateFlashExposure(input: Readonly<{
   const facing = lookLength > 1e-6 ? Math.max(0, dot(direction, input.lookDirection) / lookLength) : 0;
   const distanceFactor = 1 - Math.min(1, distance / input.maximumRadiusM);
   const teamFactor = input.friendly ? 0.5 : 1;
-  const intensity = Math.max(0, Math.min(1, distanceFactor * distanceFactor * (0.2 + facing * 0.8) * teamFactor));
+  const hostileIntensity = Math.max(0, Math.min(1, distanceFactor * distanceFactor * (0.2 + facing * 0.8)));
+  const intensity = hostileIntensity * teamFactor;
   return Object.freeze({
     accepted: intensity > 0.01,
     intensity,
-    durationMs: Math.round(220 + intensity * 2_580),
+    durationMs: Math.round((220 + hostileIntensity * 2_580) * teamFactor),
   });
 }
 

@@ -44,6 +44,10 @@ import {
   type SmokeProtocolMessage,
   type SmokeStateMessage,
 } from './smoke-protocol';
+import {
+  isFlashProtocolMessage,
+  type FlashProtocolMessage,
+} from './flash-protocol';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
@@ -346,7 +350,7 @@ export type ChatHistoryMessage = {
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | RedeployRequestMessage | RedeployCommitMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
-  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage;
+  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -397,6 +401,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isKillstreakProtocolMessage(value)) return true;
   if (isInteractiveWorldProtocolMessage(value)) return true;
   if (isSmokeProtocolMessage(value)) return true;
+  if (isFlashProtocolMessage(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
@@ -728,6 +733,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (isKillstreakProtocolMessage(message)) return killstreakMessageBelongsToPlayer(message, playerId);
   if (isInteractiveWorldProtocolMessage(message)) return message.by === playerId;
   if (isSmokeProtocolMessage(message)) return message.by === playerId;
+  if (isFlashProtocolMessage(message)) return message.by === playerId;
   switch (message.type) {
     case 'join':
     case 'state':
@@ -785,6 +791,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
 
 export function isHostAuthorityMessage(message: GameMessage): boolean {
   return isKillstreakProtocolMessage(message) && isKillstreakHostAuthorityMessage(message)
+    || isFlashProtocolMessage(message)
     || message.type === 'interactive-world-snapshot'
     || message.type === 'smoke-state'
     || message.type === 'lobby-config'

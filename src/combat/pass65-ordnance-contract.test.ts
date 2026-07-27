@@ -36,6 +36,12 @@ describe('Pass 65 HITL ordnance corrections', () => {
     expect(reduced.hudOpacity).toBe(1);
   });
 
+  it('routes the admitted reduced-sensory audio gain into the runtime flashbang emitter', () => {
+    const runtime = readFileSync(new URL('../legacy-main.ts', import.meta.url), 'utf8');
+    expect(runtime).toContain('audio.flashbang(presentation.audioGain);');
+    expect(runtime).not.toMatch(/audio\.flashbang\(\s*\)/);
+  });
+
   it('composites the flash whiteout over the world while preserving the combat HUD', () => {
     const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
     const layerFor = (selector: string): number => {

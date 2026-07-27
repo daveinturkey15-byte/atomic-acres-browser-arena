@@ -447,6 +447,15 @@ import {
 } from './smoke-authority';
 import type { SmokeStateMessage } from './smoke-protocol';
 import {
+  FLASH_AUTHORITY_SCHEMA_VERSION,
+  FlashHostAuthority,
+  FlashVictimResultConsumer,
+  flashActivationId,
+  type FlashResult,
+  type FlashVictimAdmission,
+} from './flash-authority';
+import { isFlashResultMessage, type FlashResultMessage } from './flash-protocol';
+import {
   RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
   RAILGUN_RECHAMBER_MS,
@@ -2291,9 +2300,26 @@ const smokeVolumes: RuntimeSmokeVolume[] = [];
 let smokeAuthority = new SmokeAuthority(interactiveWorldMatchEpoch, 'host');
 let lastSmokeStateBroadcastRevision = -1;
 let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
+let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
+let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
 const explosiveBolts: ExplosiveBoltEntity[] = [];
-let flashExposureUntil = 0;
+let flashExposureUntilHostTimeMs = 0;
 let flashExposureStrength = 0;
+let lastFlashResultAdmission: Readonly<{
+  resultId: string;
+  intensity: number;
+  remainingDurationMs: number;
+  reducedSensory: boolean;
+  audioGain: number;
+}> | null = null;
+const lastAuthoredFlashResults = new Map<string, FlashResult>();
+const remoteFlashVictimLifeIds = new Map<string, number>();
+let lastFlashDispatch: Readonly<{
+  targetId: string;
+  resultId: string;
+  messageValid: boolean;
+  delivery: 'local' | 'sent' | 'failed';
+}> | null = null;
 let localGrenadeActionSequence = 0;
 const remoteSupportPresentations: RemoteSupportPresentation[] = [];
 let botWeaponCycle: ShuffleBag<WeaponId> | null = null;
@@ -3704,6 +3730,8 @@ function markLobbyDisconnected(playerId: string): void {
     remoteSupportAuthorities.delete(playerId);
     remoteGrenadeAuthorities.delete(playerId);
     remoteHealthAuthorities.delete(playerId);
+    remoteFlashVictimLifeIds.delete(playerId);
+    lastAuthoredFlashResults.delete(playerId);
     broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   }, REJOIN_GRACE_MS + 50);
 }
@@ -4732,11 +4760,28 @@ function handleSmokeAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+function handleFlashAuthorityMessage(message: GameMessage): boolean {
+  if (message.type !== 'flash-result') return false;
+  // The host transport rejects host-authority message kinds from guests before
+  // this handler. Keep a second fail-closed role/identity/recipient fence here
+  // so a direct or future transport integration cannot turn a guest result into
+  // local presentation authority.
+  if (network.role !== 'client'
+    || message.by !== privateLobbySnapshot?.hostId
+    || message.forPlayerId !== player.id
+    || message.result.targetId !== player.id
+    || matchState.phase !== 'active'
+    || !player.alive) return true;
+  applyAuthoritativeFlashResult(message.result);
+  return true;
+}
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   if (!gameStarted) return;
   if (handleInteractiveWorldMessage(message)) return;
   if (handleSmokeAuthorityMessage(message)) return;
+  if (handleFlashAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch || killstreakRegisteredActors.has(message.by)) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
@@ -4980,6 +5025,17 @@ function onNetworkMessage(message: GameMessage): void {
         broadcastRailgunState();
         broadcastInteractiveWorldState(true);
         broadcastSmokeState(true);
+      }
+    }
+    if (network.role === 'host' && message.type === 'state') {
+      // The remote continuity reducer is intentionally stricter than movement
+      // presentation and can lag the authenticated sender's match-start token
+      // by one. Bind flash presentation to that bounded sender-life token even
+      // when a movement sample is independently rejected; it grants no health,
+      // movement, damage, or detonation authority.
+      const claimedLifeId = message.continuity;
+      if (claimedLifeId === remote.continuity || claimedLifeId === remote.continuity + 1) {
+        remoteFlashVictimLifeIds.set(incoming.id, Math.max(remoteFlashVictimLifeIds.get(incoming.id) ?? 0, claimedLifeId));
       }
     }
     if (incoming.seq > remote.snapshot.seq) {
@@ -6577,6 +6633,7 @@ function processDeath(message: DeathMessage): void {
   if (message.victim === player.id && player.alive) {
     const now = performance.now();
     interruptReload(true, now);
+    clearLocalFlashPresentation();
     player.hp = 0;
     player.alive = false;
     if (gameMode === 'solo') player.deaths += 1;
@@ -6664,6 +6721,8 @@ function removeRemote(id: string, reason: string): void {
     remoteSupportAuthorities.delete(id);
     remoteGrenadeAuthorities.delete(id);
     remoteHealthAuthorities.delete(id);
+    remoteFlashVictimLifeIds.delete(id);
+    lastAuthoredFlashResults.delete(id);
   }
   peerTimingStates.delete(id);
   remoteMeleeAdmissions.delete(id);
@@ -7049,9 +7108,11 @@ function respawn(
   deploymentOverride?: CombatLoadoutSelection,
   pointerLockSource: PointerLockRequestSource = 'respawn',
 ): void {
-  if (!player.alive || forceNewLife) {
+  const startsNewLife = !player.alive || forceNewLife;
+  if (startsNewLife) {
     localContinuity += 1;
     localPositionHistory.length = 0;
+    resetFlashVictimLife();
   }
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
@@ -7166,6 +7227,10 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   smokeAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
   lastSmokeStateBroadcastRevision = -1;
   lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
+  flashHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  lastAuthoredFlashResults.clear();
+  remoteFlashVictimLifeIds.clear();
+  lastFlashDispatch = null;
   interactiveWorldTick = 0;
   lastInteractiveWorldBroadcastRevision = -1;
   if (interactiveWorldRuntime) {
@@ -7203,6 +7268,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   roundDamageDealt = 0;
   roundDamageTaken = 0;
   localContinuity += 1;
+  resetFlashVictimLife();
   if (mode !== 'client') {
     killstreakRuntime.registerActor(player.id, player.team, localContinuity, frozenKillstreakLoadout);
     killstreakRegisteredActors.add(player.id);
@@ -9782,23 +9848,143 @@ function admitAuthoritativeSmokeShot(
   );
 }
 
-function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: number): void {
-  const eyes = player.position;
+function flashLookDirection(yaw: number, pitch: number): THREE.Vector3 {
+  return new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ')).normalize();
+}
+
+function flashVictimAdmission(
+  point: THREE.Vector3,
+  entity: GrenadeEntity,
+  targetId: string,
+  targetLifeId: number,
+  targetTeam: Team,
+  eyes: THREE.Vector3,
+  lookDirection: THREE.Vector3,
+): FlashVictimAdmission | null {
   const solidOccluded = activeWorldColliders().some((box) => segmentIntersectsBox(point, eyes, box));
-  const lookDirection = camera.getWorldDirection(new THREE.Vector3());
   const exposure = calculateFlashExposure({
     origin: point,
     eyes,
     lookDirection,
     maximumRadiusM: 14,
     solidOccluded,
-    friendly: entity.ownerTeam === player.team,
+    // Self-flash uses the full host calculation; only a distinct friendly
+    // combatant receives the frozen exact 0.5 duration/intensity multiplier.
+    friendly: entity.ownerId !== targetId && entity.ownerTeam === targetTeam,
   });
-  if (exposure.accepted) {
-    const presentation = flashbangPresentation(exposure.intensity, accessibilityRuntime.reducedSensory);
-    flashExposureStrength = Math.max(flashExposureStrength, presentation.whiteoutOpacity);
-    flashExposureUntil = Math.max(flashExposureUntil, now + presentation.recoveryMs);
+  return exposure.accepted ? Object.freeze({
+    targetId,
+    targetLifeId,
+    intensity: exposure.intensity,
+    durationMs: exposure.durationMs,
+  }) : null;
+}
+
+function clearLocalFlashPresentation(): void {
+  flashExposureUntilHostTimeMs = 0;
+  flashExposureStrength = 0;
+  lastFlashResultAdmission = null;
+  const overlay = element<HTMLElement>('#ordnance-flash');
+  overlay.hidden = true;
+  overlay.style.opacity = '0';
+}
+
+function resetFlashVictimLife(): void {
+  flashVictimConsumer.reset(interactiveWorldMatchEpoch, player.id, localContinuity);
+  clearLocalFlashPresentation();
+}
+
+function applyAuthoritativeFlashResult(result: FlashResult): boolean {
+  const estimatedHostNowMs = currentHostTimeMs();
+  const admission = flashVictimConsumer.admit(result, estimatedHostNowMs);
+  if (!admission.accepted) return false;
+  const presentation = flashbangPresentation(admission.intensity, accessibilityRuntime.reducedSensory);
+  const effectiveRemainingMs = Math.min(admission.remainingDurationMs, presentation.recoveryMs);
+  flashExposureStrength = Math.max(flashExposureStrength, presentation.whiteoutOpacity);
+  flashExposureUntilHostTimeMs = Math.max(flashExposureUntilHostTimeMs, estimatedHostNowMs + effectiveRemainingMs);
+  audio.flashbang(presentation.audioGain);
+  lastFlashResultAdmission = Object.freeze({
+    resultId: result.resultId,
+    intensity: admission.intensity,
+    remainingDurationMs: effectiveRemainingMs,
+    reducedSensory: accessibilityRuntime.reducedSensory,
+    audioGain: presentation.audioGain,
+  });
+  return true;
+}
+
+function dispatchAuthoritativeFlashResult(result: FlashResult): void {
+  lastAuthoredFlashResults.set(result.targetId, result);
+  if (result.targetId === player.id) {
+    lastFlashDispatch = Object.freeze({
+      targetId: result.targetId,
+      resultId: result.resultId,
+      messageValid: true,
+      delivery: applyAuthoritativeFlashResult(result) ? 'local' : 'failed',
+    });
+    return;
   }
+  if (network.role !== 'host') return;
+  const message: FlashResultMessage = {
+    type: 'flash-result',
+    schemaVersion: FLASH_AUTHORITY_SCHEMA_VERSION,
+    by: player.id,
+    forPlayerId: result.targetId,
+    result,
+    nonce: randomNonce(),
+  };
+  const messageValid = isFlashResultMessage(message);
+  const sent = messageValid && network.sendToPlayer(result.targetId, message);
+  lastFlashDispatch = Object.freeze({
+    targetId: result.targetId,
+    resultId: result.resultId,
+    messageValid,
+    delivery: sent ? 'sent' : 'failed',
+  });
+}
+
+function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, nowHostTimeMs: number): void {
+  // Clients may predict only projectile/world presentation. Human and AI flash
+  // authority is resolved once by the host (or by the offline host runtime).
+  if (network.role === 'client') return;
+  const humanVictims: FlashVictimAdmission[] = [];
+  if (player.alive) {
+    const local = flashVictimAdmission(
+      point,
+      entity,
+      player.id,
+      localContinuity,
+      player.team,
+      player.position,
+      flashLookDirection(player.yaw, player.pitch),
+    );
+    if (local) humanVictims.push(local);
+  }
+  if (network.role === 'host') {
+    for (const remote of remotes.values()) {
+      const health = remoteHealthAuthorities.get(remote.snapshot.id);
+      if (!health?.alive || remote.snapshot.hp <= 0) continue;
+      const admitted = flashVictimAdmission(
+        point,
+        entity,
+        remote.snapshot.id,
+        remoteFlashVictimLifeIds.get(remote.snapshot.id) ?? remote.continuity,
+        remote.snapshot.team,
+        new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z),
+        flashLookDirection(remote.snapshot.yaw, remote.snapshot.pitch),
+      );
+      if (admitted) humanVictims.push(admitted);
+    }
+  }
+  const activationId = flashActivationId(interactiveWorldMatchEpoch, entity.ownerId, entity.actionNonce);
+  const resolution = flashHostAuthority.resolveDetonation({
+    matchEpoch: interactiveWorldMatchEpoch,
+    activationId,
+    startsAtHostTimeMs: nowHostTimeMs,
+    victims: humanVictims,
+  });
+  if (resolution.accepted) for (const result of resolution.results) dispatchAuthoritativeFlashResult(result);
+
   if (!shouldResolveFlashAgainstBots(network.role, entity.ownerKind)) return;
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
@@ -9811,19 +9997,19 @@ function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, now: num
       lookDirection: botLook,
       maximumRadiusM: 14,
       solidOccluded: botOccluded,
-      friendly: bot.team === entity.ownerTeam,
+      friendly: entity.ownerId !== bot.id && bot.team === entity.ownerTeam,
     });
-    if (botExposure.accepted) bot.root.userData.flashBlindedUntil = now + botExposure.durationMs;
+    if (botExposure.accepted) bot.root.userData.flashBlindedUntil = nowHostTimeMs + botExposure.durationMs;
   }
 }
 
-function updateOrdnanceVolumes(now: number): void {
+function updateOrdnanceVolumes(_now: number): void {
   const nowHostTimeMs = currentHostTimeMs();
   const authorityChanged = smokeAuthority.advance(nowHostTimeMs);
   synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
   broadcastSmokeState(authorityChanged, nowHostTimeMs);
   const overlay = element<HTMLElement>('#ordnance-flash');
-  const remainingFlash = flashExposureUntil - now;
+  const remainingFlash = flashExposureUntilHostTimeMs - nowHostTimeMs;
   if (remainingFlash <= 0) {
     flashExposureStrength = 0;
     overlay.hidden = true;
@@ -9846,7 +10032,6 @@ function explodeGrenade(entity: GrenadeEntity): void {
     return;
   }
   if (entity.grenade === 'flash') {
-    audio.flashbang();
     spawnImpactFlash(point, 'metal');
     applyFlashGrenade(point, entity, afterPresentationDetach);
     return;
@@ -11972,11 +12157,7 @@ function clearGrenades(): void {
   smokeAuthority.reset(interactiveWorldMatchEpoch, network.role === 'client' ? 'replica' : 'host');
   lastSmokeStateBroadcastRevision = -1;
   lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
-  flashExposureUntil = 0;
-  flashExposureStrength = 0;
-  const flash = element<HTMLElement>('#ordnance-flash');
-  flash.hidden = true;
-  flash.style.opacity = '0';
+  clearLocalFlashPresentation();
 }
 
 function clearFieldSupport(): void {
@@ -14652,6 +14833,9 @@ const debugWindow = window as Window & {
     fireOnce: () => void;
     setTriggerHeld: (held: boolean) => void;
     stageSmokeVolume: (distance?: number) => string;
+    authorFlashResult: (targetId: string, intensity?: number, durationMs?: number) => boolean;
+    replayLastFlashResult: (targetId: string) => boolean;
+    sendForgedFlashResult: () => boolean;
     throwGrenade: () => void;
     switchWeapon: (index: number) => void;
     equipKit: (id: FieldKitId) => void;
@@ -14748,6 +14932,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       smokeVolumes: smokeVolumes.length,
       smokeAuthority: smokeAuthority.telemetry(currentHostTimeMs()),
       smokePresentation: smokeVolumePresentationPool.telemetry(),
+    },
+    flashAuthority: {
+      host: flashHostAuthority.telemetry(),
+      victim: flashVictimConsumer.telemetry(),
+      remainingDurationMs: Math.max(0, flashExposureUntilHostTimeMs - currentHostTimeMs()),
+      whiteoutStrength: flashExposureStrength,
+      overlayVisible: !element<HTMLElement>('#ordnance-flash').hidden,
+      lastAdmission: lastFlashResultAdmission ? { ...lastFlashResultAdmission } : null,
+      lastDispatch: lastFlashDispatch ? { ...lastFlashDispatch } : null,
+      remoteVictimLifeIds: Object.fromEntries(remoteFlashVictimLifeIds),
     },
     lastCompletedMultiplayerDiagnostic: loadLastMultiplayerDiagnostic(clientPersistentStorage()),
     matchDiagnosticsUpload: matchDiagnosticUploader.telemetry(),
@@ -15874,6 +16068,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
     localContinuity += 1;
     localPositionHistory.length = 0;
+    resetFlashVictimLife();
     player.position.set(x, y, z);
     characterPhysics?.teleportEye(player.position);
     player.velocity.set(0, 0, 0);
@@ -16089,6 +16284,62 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const point = camera.position.clone().addScaledVector(direction, THREE.MathUtils.clamp(distance, 1.5, 8));
     const actionNonce = randomNonce();
     return spawnSmokeVolume(point, currentHostTimeMs(), actionNonce, player.id) ?? '';
+  },
+  authorFlashResult: (targetId, intensity = 0.8, durationMs = 2_000) => {
+    if (!localMultiplayerQa || network.role !== 'host' || matchState.phase !== 'active') return false;
+    const targetLifeId = targetId === player.id
+      ? localContinuity
+      : remoteFlashVictimLifeIds.get(targetId) ?? remotes.get(targetId)?.continuity;
+    if (targetLifeId === undefined || !Number.isFinite(intensity) || !Number.isFinite(durationMs)) return false;
+    const nowHostTimeMs = currentHostTimeMs();
+    const resolution = flashHostAuthority.resolveDetonation({
+      matchEpoch: interactiveWorldMatchEpoch,
+      activationId: flashActivationId(interactiveWorldMatchEpoch, player.id, randomNonce()),
+      startsAtHostTimeMs: nowHostTimeMs,
+      victims: [{
+        targetId,
+        targetLifeId,
+        intensity: THREE.MathUtils.clamp(intensity, 0.01, 1),
+        durationMs: THREE.MathUtils.clamp(durationMs, 1, 2_800),
+      }],
+    });
+    if (!resolution.accepted || resolution.results.length !== 1) return false;
+    dispatchAuthoritativeFlashResult(resolution.results[0]!);
+    return true;
+  },
+  replayLastFlashResult: (targetId) => {
+    if (!localMultiplayerQa || network.role !== 'host') return false;
+    const result = lastAuthoredFlashResults.get(targetId);
+    if (!result) return false;
+    dispatchAuthoritativeFlashResult(result);
+    return true;
+  },
+  sendForgedFlashResult: () => {
+    if (!localMultiplayerQa || network.role !== 'client' || matchState.phase !== 'active') return false;
+    const nowHostTimeMs = currentHostTimeMs();
+    const nextSequence = flashVictimConsumer.telemetry().lastSequence + 1;
+    const activationId = `flash:${interactiveWorldMatchEpoch}:forged-${player.id}:${randomNonce()}`;
+    const forged: FlashResult = Object.freeze({
+      schemaVersion: FLASH_AUTHORITY_SCHEMA_VERSION,
+      matchEpoch: interactiveWorldMatchEpoch,
+      resultId: `${activationId}:target:${player.id}:${localContinuity}`,
+      activationId,
+      targetId: player.id,
+      targetLifeId: localContinuity,
+      sequence: nextSequence,
+      intensityQ: 1_000,
+      startsAtHostTimeMs: nowHostTimeMs,
+      endsAtHostTimeMs: nowHostTimeMs + 2_000,
+    });
+    network.send({
+      type: 'flash-result',
+      schemaVersion: FLASH_AUTHORITY_SCHEMA_VERSION,
+      by: player.id,
+      forPlayerId: player.id,
+      result: forged,
+      nonce: randomNonce(),
+    });
+    return true;
   },
   throwGrenade: () => throwGrenade(),
   switchWeapon: (index: number) => switchWeapon(index),

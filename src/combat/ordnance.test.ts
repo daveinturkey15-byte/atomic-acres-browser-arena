@@ -70,6 +70,7 @@ describe('Pass 65 ordnance rules', () => {
     const friendly = calculateFlashExposure({ ...base, friendly: true });
     expect(hostile.accepted).toBe(true);
     expect(friendly.intensity).toBeCloseTo(hostile.intensity * 0.5);
+    expect(friendly.durationMs).toBe(Math.round(hostile.durationMs * 0.5));
     expect(calculateFlashExposure({ ...base, friendly: false, solidOccluded: true }).intensity).toBe(0);
   });
 

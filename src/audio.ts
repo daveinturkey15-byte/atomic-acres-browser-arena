@@ -18,6 +18,43 @@ const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 export const GRENADE_FUSE_BEEP_START_MS = 1_450;
 
+export const FLASHBANG_AUDIO_PROFILE = Object.freeze({
+  impactDurationSeconds: 0.085,
+  impactVolume: 0.48,
+  firstRecoveryDelaySeconds: 0.025,
+  firstRecoveryDurationSeconds: 0.72,
+  firstRecoveryVolume: 0.12,
+  secondRecoveryDelaySeconds: 0.09,
+  secondRecoveryDurationSeconds: 0.48,
+  secondRecoveryVolume: 0.065,
+  maximumTailMs: 745,
+  scheduledBeeps: 0,
+  onsetDelayMs: 0,
+} as const);
+
+export type FlashbangAudioEnvelope = Readonly<{
+  audioGain: number;
+  impactVolume: number;
+  firstRecoveryVolume: number;
+  secondRecoveryVolume: number;
+  maximumTailMs: number;
+  scheduledBeeps: 0;
+  onsetDelayMs: 0;
+}>;
+
+export function flashbangAudioEnvelope(requestedAudioGain: number): FlashbangAudioEnvelope {
+  const audioGain = Math.max(0, Math.min(1, Number.isFinite(requestedAudioGain) ? requestedAudioGain : 0));
+  return Object.freeze({
+    audioGain,
+    impactVolume: FLASHBANG_AUDIO_PROFILE.impactVolume * audioGain,
+    firstRecoveryVolume: FLASHBANG_AUDIO_PROFILE.firstRecoveryVolume * audioGain,
+    secondRecoveryVolume: FLASHBANG_AUDIO_PROFILE.secondRecoveryVolume * audioGain,
+    maximumTailMs: FLASHBANG_AUDIO_PROFILE.maximumTailMs,
+    scheduledBeeps: 0,
+    onsetDelayMs: 0,
+  });
+}
+
 export const RAILGUN_REPORT_PROFILE = Object.freeze({
   body: 42,
   bodyEnd: 13,
@@ -128,6 +165,7 @@ export class ArenaAudio {
   private supportCuePlays = 0;
   private explosionAudioGate = createExplosionAudioGate();
   private railgunReports = { local: 0, replicated: 0, lastAttenuation: 0 };
+  private flashbangs = { plays: 0, lastAudioGain: 0, immediateOnsets: 0, scheduledBeeps: 0 };
   private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number }>();
   private nextVoiceId = 1;
   private voicesDropped = 0;
@@ -651,12 +689,40 @@ export class ArenaAudio {
     return true;
   }
 
-  flashbang(): void {
+  flashbang(audioGain = 1): void {
     // One sharp, limiter-bounded onset plus a short tinnitus tail. The visual
     // recovery is continuous, so this cue never introduces a repeated strobe.
-    this.noise({ duration: 0.085, volume: 0.48, filter: 'highpass', frequency: 2_900, q: 0.55 }, this.weapons);
-    this.sweep(5_600, 2_100, 0.72, 0.12, 'sine', this.feedback, 0.025);
-    this.sweep(7_200, 3_100, 0.48, 0.065, 'sine', this.feedback, 0.09);
+    const envelope = flashbangAudioEnvelope(audioGain);
+    this.flashbangs.lastAudioGain = envelope.audioGain;
+    if (envelope.audioGain <= 0) return;
+    this.flashbangs.plays += 1;
+    this.flashbangs.immediateOnsets += envelope.onsetDelayMs === 0 ? 1 : 0;
+    this.flashbangs.scheduledBeeps += envelope.scheduledBeeps;
+    this.noise({
+      duration: FLASHBANG_AUDIO_PROFILE.impactDurationSeconds,
+      volume: envelope.impactVolume,
+      filter: 'highpass',
+      frequency: 2_900,
+      q: 0.55,
+    }, this.weapons);
+    this.sweep(
+      5_600,
+      2_100,
+      FLASHBANG_AUDIO_PROFILE.firstRecoveryDurationSeconds,
+      envelope.firstRecoveryVolume,
+      'sine',
+      this.feedback,
+      FLASHBANG_AUDIO_PROFILE.firstRecoveryDelaySeconds,
+    );
+    this.sweep(
+      7_200,
+      3_100,
+      FLASHBANG_AUDIO_PROFILE.secondRecoveryDurationSeconds,
+      envelope.secondRecoveryVolume,
+      'sine',
+      this.feedback,
+      FLASHBANG_AUDIO_PROFILE.secondRecoveryDelaySeconds,
+    );
   }
 
   supportGun(kind: 'chopper' | 'drone'): void {
@@ -844,6 +910,7 @@ export class ArenaAudio {
     minigunDrive: { active: boolean; starts: number; stops: number; fraction: number; phase: MinigunSpoolPhase };
     support: { cues: number; chopperRotorActive: boolean; chopperRotorStarts: number; chopperRotorStops: number };
     railgun: { local: number; replicated: number; lastAttenuation: number; layerCount: number; pressureDuration: number };
+    flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
   } {
@@ -877,6 +944,7 @@ export class ArenaAudio {
         chopperRotorStops: this.chopperRotorStops,
       },
       railgun: { ...this.railgunReports, layerCount: RAILGUN_REPORT_PROFILE.layerCount, pressureDuration: RAILGUN_REPORT_PROFILE.pressureDuration },
+      flashbang: { ...this.flashbangs, maximumTailMs: FLASHBANG_AUDIO_PROFILE.maximumTailMs },
       runtime: {
         voices: this.activeVoices.size,
         spatialChains: this.spatialChains + this.arenaSources.length,

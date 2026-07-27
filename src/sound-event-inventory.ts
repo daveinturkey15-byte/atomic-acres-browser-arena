@@ -295,7 +295,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
   runtimeCallsite('explosion', 'now', 1, ['support.legacy-explosion']),
   runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
-  runtimeCallsite('flashbang', '', 1, ['ordnance.flash-detonation', 'ordnance.flash-recovery']),
+  runtimeCallsite('flashbang', 'presentation.audioGain', 1, ['ordnance.flash-detonation', 'ordnance.flash-recovery']),
   runtimeCallsite('footstep', 'localSurface,currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
   runtimeCallsite('grenadeBounce', 'Math.abs(incoming)', 1, ['ordnance.grenade-bounce']),
