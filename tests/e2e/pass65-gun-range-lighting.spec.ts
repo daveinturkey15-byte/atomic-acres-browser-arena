@@ -31,15 +31,23 @@ test('ships the bounded, shadowed, slow-moving Gun Range contrast-light contract
   expect(evidence).toMatchObject({
     arenaId: 'gun-range',
     definitionId: 'gun-range',
-    maximumShadowLights: 1,
-    authoredLights: [{
+    maximumShadowLights: 3,
+    authoredLights: expect.arrayContaining([expect.objectContaining({
       practicalId: 'range-inspection-key',
       shadowMapSize: 512,
-      intendedVolume: { id: 'gun-range-authored-shell-interior' },
-    }],
+      intendedVolume: expect.objectContaining({ id: 'gun-range-authored-shell-interior' }),
+    }), expect.objectContaining({
+      practicalId: 'range-cyan-lane-key',
+      color: 0x53e9e1,
+      shadowMapSize: 256,
+    }), expect.objectContaining({
+      practicalId: 'range-amber-lane-key',
+      color: 0xffb84f,
+      shadowMapSize: 256,
+    })]),
     occlusion: { violations: [] },
   });
-  expect([0, 1]).toContain(evidence.activeLights);
+  expect([0, 3]).toContain(evidence.activeLights);
   expect(evidence.shadowCastingLights).toBe(evidence.activeLights);
   expect(evidence.occlusion.activeLocalLights).toBe(evidence.activeLights);
   expect(evidence.occlusion.shadowedLocalLights).toBe(evidence.activeLights);

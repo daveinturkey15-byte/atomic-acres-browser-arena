@@ -667,6 +667,7 @@ describe('additional authored maps', () => {
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
     expect(map.root.children.filter((child) => child.name === 'gun-range-floor-neon-strip')).toHaveLength(2);
     expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-strip')).toHaveLength(2);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-rib')).toHaveLength(4);
     const presentationBatches = map.root.userData.gunRangePresentationBatches as {
       sourceMeshes: number;
       batches: number;

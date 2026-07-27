@@ -76,7 +76,7 @@ describe('Pass 62 arena contrast lighting', () => {
       'rustrig-container-dynamic-southeast',
     ]));
     rig.applyDefinition(gunRangeDefinition);
-    expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 1, shadowCastingLights: 1 });
+    expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 3, shadowCastingLights: 3 });
     const rangeLight = scene.getObjectByName('gun-range-range-inspection-key-1') as THREE.SpotLight;
     const targetX = rangeLight.target.position.x;
     rig.update(3_000);
@@ -104,8 +104,12 @@ describe('Pass 65 Gun Range authored contrast light', () => {
     const practical = gunRangeDefinition.lighting.practicals.find((entry) => entry.id === 'range-inspection-key');
     const light = practical?.light;
     expect(light).toBeDefined();
-    expect(gunRangeDefinition.budgets.maximumShadowLights).toBe(1);
-    expect(gunRangeDefinition.lighting.practicals.filter((entry) => entry.castsShadow)).toHaveLength(1);
+    expect(gunRangeDefinition.budgets.maximumShadowLights).toBe(3);
+    expect(gunRangeDefinition.lighting.practicals.filter((entry) => entry.castsShadow)).toHaveLength(3);
+    for (const authored of gunRangeDefinition.lighting.practicals.flatMap((entry) => entry.light ? [entry.light] : [])) {
+      expect(arenaVolumeContainsPoint(authored.intendedVolume, authored.position), `${authored.position}`).toBe(true);
+      expect(arenaVolumeContainsPoint(authored.intendedVolume, authored.target), `${authored.target}`).toBe(true);
+    }
     expect(arenaVolumeContainsPoint(light!.intendedVolume, light!.position)).toBe(true);
     expect(arenaVolumeContainsPoint(light!.intendedVolume, light!.target)).toBe(true);
     const targetAmplitude = light!.motion?.target?.amplitude ?? [0, 0, 0];
@@ -166,11 +170,18 @@ describe('Pass 65 Gun Range authored contrast light', () => {
     expect(rangeLight.shadow.mapSize.toArray()).toEqual([512, 512]);
     expect(rangeLight.userData).toMatchObject({ presentationOnly: true, blocksShots: false, practicalPolicyId: practical.id });
     expect(rig.telemetry()).toMatchObject({
-      activeLights: 1,
-      shadowCastingLights: 1,
-      maximumShadowLights: 1,
-      authoredLights: [{ practicalId: practical.id, intendedVolume: { id: lightDefinition.intendedVolume.id } }],
-      occlusion: { activeLocalLights: 1, shadowedLocalLights: 1, violations: [] },
+      activeLights: 3,
+      shadowCastingLights: 3,
+      maximumShadowLights: 3,
+      authoredLights: expect.arrayContaining([
+        expect.objectContaining({
+          practicalId: practical.id,
+          intendedVolume: expect.objectContaining({ id: lightDefinition.intendedVolume.id }),
+        }),
+        expect.objectContaining({ practicalId: 'range-cyan-lane-key', color: 0x53e9e1, shadowMapSize: 256 }),
+        expect.objectContaining({ practicalId: 'range-amber-lane-key', color: 0xffb84f, shadowMapSize: 256 }),
+      ]),
+      occlusion: { activeLocalLights: 3, shadowedLocalLights: 3, violations: [] },
     });
 
     const stepMs = 100;

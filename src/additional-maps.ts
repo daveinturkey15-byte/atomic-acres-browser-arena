@@ -1563,7 +1563,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   const timber = standard(0x765136, 0.91, 0.04);
   const safety = new THREE.MeshStandardMaterial({ color: 0xe0aa37, emissive: 0x4b2b00, emissiveIntensity: 0.5, roughness: 0.62, metalness: 0.28 });
   const redSafety = new THREE.MeshStandardMaterial({ color: 0xc74235, emissive: 0x4a0804, emissiveIntensity: 0.72, roughness: 0.54, metalness: 0.2 });
-  const lamp = new THREE.MeshStandardMaterial({ color: 0xeafafa, emissive: 0xa8f5ff, emissiveIntensity: 3.4, roughness: 0.22, metalness: 0.08 });
+  const lamp = new THREE.MeshStandardMaterial({ color: 0xf1ffff, emissive: 0xa8f5ff, emissiveIntensity: 4.2, roughness: 0.18, metalness: 0.08 });
   const targets: PracticeTarget[] = [];
   root.userData.gunRangeBayLightMaterial = lamp;
 
@@ -1616,7 +1616,7 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     makeEmissiveOnly(light);
     root.add(light);
   }
-  const ambient = new THREE.HemisphereLight(0xf2ffff, 0x405159, 0.92);
+  const ambient = new THREE.HemisphereLight(0xf2ffff, 0x4f626a, 1.24);
   ambient.name = 'gun-range-moderate-ambient';
   ambient.userData.presentationOnly = true;
   root.add(ambient);
@@ -1646,8 +1646,11 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   }
   const perimeterNeon = neonMaterials[1]!;
   for (const side of [-1, 1] as const) {
-    box(builder, 'gun-range-floor-neon-strip', [side * 19.78, 0.11, -14], [0.11, 0.12, 60], perimeterNeon, { solid: false, shots: false, cast: false });
-    box(builder, 'gun-range-ceiling-neon-strip', [side * 19.78, 6.68, -14], [0.11, 0.12, 60], perimeterNeon, { solid: false, shots: false, cast: false });
+    box(builder, 'gun-range-floor-neon-strip', [side * 19.55, 0.12, -14], [0.34, 0.14, 60], perimeterNeon, { solid: false, shots: false, cast: false });
+    box(builder, 'gun-range-ceiling-neon-strip', [side * 19.55, 6.68, -14], [0.34, 0.14, 60], perimeterNeon, { solid: false, shots: false, cast: false });
+  }
+  for (const [index, z] of [-37, -21, -5, 11].entries()) {
+    box(builder, 'gun-range-ceiling-neon-rib', [0, 6.69, z], [29, 0.1, 0.22], neonMaterials[index]!, { solid: false, shots: false, cast: false });
   }
   root.userData.gunRangeNeonMaterials = neonMaterials;
   root.userData.gunRangeNeonLights = neonLights;
@@ -1809,7 +1812,7 @@ export function updateGunRangePresentation(root: THREE.Object3D, nowMs: number):
     light.color.copy(materials[index % materials.length].color);
   });
   const bayMaterial = root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial | undefined;
-  if (bayMaterial) bayMaterial.emissiveIntensity = 2.25 + (Math.sin(nowMs * 0.00062) * 0.5 + 0.5) * 0.55;
+  if (bayMaterial) bayMaterial.emissiveIntensity = 3.7 + (Math.sin(nowMs * 0.00062) * 0.5 + 0.5) * 0.9;
   const lateralTargets = root.userData.gunRangeLateralTargets as THREE.Group[] | undefined;
   lateralTargets?.forEach((target) => {
     const phase = nowMs / 1_000 * Math.PI * 2 * Number(target.userData.lateralFrequencyHz)
