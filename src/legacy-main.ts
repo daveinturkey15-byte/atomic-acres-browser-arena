@@ -305,6 +305,7 @@ import {
 import {
   GLOBAL_LEADERBOARD_ENDPOINT,
   fetchGlobalLeaderboard,
+  forgetLeaderboardInstallId,
   leaderboardInstallId,
   submitGlobalStreak,
 } from './global-leaderboard';
@@ -829,6 +830,7 @@ if (!serializedPass65Settings) {
     }, capabilityHints);
   }
 }
+if (!pass65Settings.privacy.shareGlobalLeaderboard) forgetLeaderboardInstallId(localStorage);
 const explicitRenderQuery = new URLSearchParams(window.location.search).get('render');
 const queryRenderProfile = explicitRenderQuery ? resolveRenderProfile(window.location.search, null) : null;
 const graphicsRuntime = resolveGraphicsRuntime(pass65Settings.graphics, queryRenderProfile === 'compat');
@@ -2332,7 +2334,6 @@ let highScores: HighScoreEntry[] = [];
 try { highScores = loadHighScores(localStorage); } catch { /* Gameplay remains available when persistent storage is blocked. */ }
 let gunRangeScores: GunRangeScoreEntry[] = [];
 try { gunRangeScores = loadGunRangeScores(localStorage); } catch { /* Range board is optional when storage is blocked. */ }
-const leaderboardInstallation = leaderboardInstallId(localStorage);
 const LEADERBOARD_BUILD_ID = 'neighbourhood-overdrive-pass31';
 const configuredDiagnosticBuildId = (import.meta.env.VITE_MATCH_BUILD_ID ?? '').trim();
 const PASS64_DIAGNOSTIC_BUILD_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(configuredDiagnosticBuildId)
@@ -3013,7 +3014,9 @@ function renderHighScores(): void {
   }
   card.dataset.board = 'streak';
   element<HTMLElement>('#high-score-title').textContent = 'NUKE TOWN LEADERBOARD';
-  element<HTMLElement>('#high-score-footnote').textContent = 'Global streak records sync across builds and devices · local cache remains available offline.';
+  element<HTMLElement>('#high-score-footnote').textContent = pass65Settings.privacy.shareGlobalLeaderboard
+    ? 'Global result sharing is enabled · local cache remains available offline.'
+    : 'Public records are readable · sharing your results is off by default in Options.';
   if (highScores.length === 0) {
     list.innerHTML = '<li class="empty">Set the first named streak record.</li>';
   } else {
@@ -3090,7 +3093,6 @@ function recordImmediateStreak(syncGlobal = true): void {
   const existing = personalBest(highScores, player.name);
   if (existing && existing.bestStreak >= fieldSupport.streak) return;
   const entry = immediateStreakEntry(
-    leaderboardInstallation,
     player.name,
     fieldSupport.streak,
     player.kills,
@@ -3099,7 +3101,9 @@ function recordImmediateStreak(syncGlobal = true): void {
   if (!entry) return;
   persistMergedHighScores([entry]);
   if (network.role !== 'offline') network.send({ type: 'high-score', by: player.id, season: LEADERBOARD_SEASON, entry });
-  if (!syncGlobal || localMultiplayerQa) return;
+  if (!syncGlobal || localMultiplayerQa || !pass65Settings.privacy.shareGlobalLeaderboard) return;
+  const leaderboardInstallation = leaderboardInstallId(localStorage, true);
+  if (!leaderboardInstallation) return;
   const nameKey = entry.id.replace(/^global:/, '');
   void submitGlobalStreak({
     name: entry.name,
@@ -3110,7 +3114,7 @@ function recordImmediateStreak(syncGlobal = true): void {
     buildId: LEADERBOARD_BUILD_ID,
     idempotencyKey: `${leaderboardInstallation}:${nameKey}:${entry.bestStreak}`.slice(0, 120),
     season: LEADERBOARD_SEASON,
-  }).then((accepted) => {
+  }, pass65Settings.privacy.shareGlobalLeaderboard).then((accepted) => {
     globalLeaderboardState = accepted ? 'saved' : 'cached';
     renderHighScores();
   }).catch(() => {
@@ -13068,6 +13072,7 @@ const reducedDamageFlashInput = element<HTMLInputElement>('#reduced-damage-flash
 const reducedSensoryEffectsInput = element<HTMLInputElement>('#reduced-sensory-effects');
 const damageFlashScaleInput = element<HTMLInputElement>('#damage-flash-scale');
 const weaponMotionScaleInput = element<HTMLInputElement>('#weapon-motion-scale');
+const shareGlobalLeaderboardInput = element<HTMLInputElement>('#share-global-leaderboard');
 const storedRange = (key: string, fallback: number, minimum: number, maximum: number): number => {
   const parsed = Number(localStorage.getItem(key));
   return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
@@ -13084,6 +13089,7 @@ reducedDamageFlashInput.checked = pass65Settings.accessibility.reducedDamageFlas
 reducedSensoryEffectsInput.checked = pass65Settings.accessibility.reducedSensoryEffects;
 damageFlashScaleInput.value = String(pass65Settings.accessibility.damageFlashScale);
 weaponMotionScaleInput.value = String(pass65Settings.accessibility.weaponMotionScale);
+shareGlobalLeaderboardInput.checked = pass65Settings.privacy.shareGlobalLeaderboard;
 element<HTMLElement>('#graphics-effective').textContent = `EFFECTIVE: ${displayedGraphicsPreset.toUpperCase()}${graphicsRuntime.reason ? ` · ${graphicsRuntime.reason.toUpperCase()}` : ''}`;
 
 function persistPass65Settings(next: Pass65Settings): void {
@@ -13105,6 +13111,12 @@ function applyAccessibilitySettings(): void {
     : 'STANDARD SENSORY';
 }
 
+function applyPrivacySettings(): void {
+  const enabled = pass65Settings.privacy.shareGlobalLeaderboard;
+  element<HTMLElement>('#global-leaderboard-sharing-state').textContent = enabled ? 'SHARING ENABLED' : 'SHARING OFF';
+  renderHighScores();
+}
+
 function persistGraphicsAndReload(graphics: Partial<Pass65Settings['graphics']>): void {
   const preset = (graphics.preset ?? 'custom') as GraphicsPreset;
   const merged = preset === 'custom'
@@ -13122,6 +13134,7 @@ const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Set
 document.documentElement.dataset.graphicsRegistryCount = String(advancedGraphicsBinding.registeredKeys.length);
 
 applyAccessibilitySettings();
+applyPrivacySettings();
 sensitivityInput.addEventListener('input', () => {
   sensitivity = Number(sensitivityInput.value);
   localStorage.setItem('atomic-acres-sensitivity', String(sensitivity));
@@ -13178,6 +13191,16 @@ function updateAccessibilityFromInputs(): void {
 for (const input of [reducedMotionInput, reducedDamageFlashInput, reducedSensoryEffectsInput, damageFlashScaleInput, weaponMotionScaleInput]) {
   input.addEventListener(input.type === 'range' ? 'input' : 'change', updateAccessibilityFromInputs);
 }
+shareGlobalLeaderboardInput.addEventListener('change', () => {
+  const enabled = shareGlobalLeaderboardInput.checked;
+  const next = normalizePass65Settings({
+    ...pass65Settings,
+    privacy: { schemaVersion: 1, shareGlobalLeaderboard: enabled },
+  }, capabilityHints);
+  if (!enabled) forgetLeaderboardInstallId(localStorage);
+  persistPass65Settings(next);
+  applyPrivacySettings();
+});
 reducedMotionMedia.addEventListener('change', applyAccessibilitySettings);
 reducedTransparencyMedia.addEventListener('change', applyAccessibilitySettings);
 document.addEventListener('visibilitychange', () => { if (document.hidden) audio.suspend(); });

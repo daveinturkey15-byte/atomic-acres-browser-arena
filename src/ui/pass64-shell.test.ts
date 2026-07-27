@@ -78,6 +78,15 @@ describe('Pass 65 command shell', () => {
     expect(markup).toContain('<kbd>F</kbd><span>COLLECT KILLSTREAK</span>');
   });
 
+  it('makes public leaderboard result sharing an explicit default-off choice with disclosure', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(markup).toContain('id="privacy-settings"');
+    expect(markup).toContain('id="share-global-leaderboard" type="checkbox"');
+    expect(markup).not.toContain('id="share-global-leaderboard" type="checkbox" checked');
+    expect(markup).toContain('chosen callsign, streak, kills, deaths, build/season and a pseudonymous browser ID');
+    expect(markup).toContain('Turning this off stops future submissions and forgets this browser ID');
+  });
+
   it('ships a prerecorded menu preview surface instead of renderer-owned showcase geometry', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect(markup).toContain('id="menu-preview-video"');

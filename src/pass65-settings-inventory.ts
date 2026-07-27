@@ -46,10 +46,20 @@ const accessibilitySettings = [
   authorityAffecting: false,
 }));
 
+const privacySettings: readonly SettingDefinition[] = Object.freeze([
+  Object.freeze({
+    key: 'privacy.shareGlobalLeaderboard',
+    applyMode: 'live',
+    authorityAffecting: false,
+    runtimeConsumer: 'consented-global-leaderboard-submission',
+  }),
+]);
+
 export const PASS65_SETTING_DEFINITIONS: readonly SettingDefinition[] = Object.freeze([
   ...graphicsSettings,
   ...audioSettings,
   ...accessibilitySettings,
+  ...privacySettings,
 ]);
 
 export function validatePass65SettingDefinitions(): readonly string[] {

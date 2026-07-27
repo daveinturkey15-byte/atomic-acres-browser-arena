@@ -2712,6 +2712,23 @@
     font: 650 11px/1.5 var(--ui-copy);
   }
 
+  .privacy-setting-row {
+    display: grid;
+    grid-template-columns: minmax(250px, 0.55fr) minmax(320px, 1fr);
+    gap: 18px;
+    align-items: center;
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid var(--ui-line);
+    background: var(--ui-deep);
+  }
+
+  .privacy-setting-row p {
+    margin: 0;
+    color: var(--ui-muted);
+    font: 650 10px/1.55 var(--ui-copy);
+  }
+
   .advanced-settings {
     margin-top: 14px;
     border: 1px solid var(--ui-line);
@@ -2954,6 +2971,7 @@
   @media (max-width: 900px) {
     .command-body { grid-template-columns: 1fr; }
     .graphics-preset-row { grid-template-columns: 1fr; }
+    .privacy-setting-row { grid-template-columns: 1fr; }
     .advanced-settings summary { align-items: flex-start; flex-direction: column; }
   }
 }

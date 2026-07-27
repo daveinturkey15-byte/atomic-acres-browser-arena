@@ -15,6 +15,7 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'graphics-settings', rootElementId: 'graphics-settings', renderer: 'main-shell', critical: true },
   { id: 'audio-settings', rootElementId: 'audio-settings', renderer: 'main-shell', critical: true },
   { id: 'accessibility-settings', rootElementId: 'accessibility-settings', renderer: 'main-shell', critical: true },
+  { id: 'privacy-settings', rootElementId: 'privacy-settings', renderer: 'main-shell', critical: true },
   { id: 'menu-showcase', rootElementId: 'menu-showcase', renderer: 'main-shell', critical: false },
   { id: 'match-pause-backdrop', rootElementId: 'match-pause-backdrop', renderer: 'main-shell', critical: true },
   { id: 'menu-meta-actions', rootElementId: 'menu-meta-actions', renderer: 'main-shell', critical: false },

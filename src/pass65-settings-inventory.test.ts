@@ -24,5 +24,11 @@ describe('Pass 65 setting inventory', () => {
     expect(graphics.every(({ runtimeEvidence }) => (runtimeEvidence?.length ?? 0) > 0)).toBe(true);
     expect(accessibility).toHaveLength(5);
     expect(accessibility.every(({ applyMode }) => applyMode === 'live')).toBe(true);
+    expect(PASS65_SETTING_DEFINITIONS.filter((definition) => definition.key.startsWith('privacy.'))).toEqual([
+      expect.objectContaining({
+        key: 'privacy.shareGlobalLeaderboard', applyMode: 'live', authorityAffecting: false,
+        runtimeConsumer: 'consented-global-leaderboard-submission',
+      }),
+    ]);
   });
 });

@@ -172,6 +172,41 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('html')).toHaveAttribute('data-graphics-frame-rate-limit', '240');
   });
 
+  test('keeps leaderboard sharing default-off, disclosed, persistent, and revocable', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('pass65-privacy-test-initialized') !== '1') {
+        localStorage.removeItem('atomic-acres-pass65-settings-v1');
+        localStorage.setItem('atomic-acres:leaderboard-install:v2', 'legacy_install_123');
+        sessionStorage.setItem('pass65-privacy-test-initialized', '1');
+      }
+    });
+    await ready(page);
+    expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
+    await page.locator('#menu-tab-options').click();
+    const sharing = page.locator('#share-global-leaderboard');
+    await expect(sharing).not.toBeChecked();
+    await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING OFF');
+    await expect(page.locator('#privacy-settings')).toContainText('chosen callsign, streak, kills, deaths, build/season and a pseudonymous browser ID');
+
+    await sharing.check();
+    await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING ENABLED');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres-pass65-settings-v1') ?? 'null')?.privacy))
+      .toEqual({ schemaVersion: 1, shareGlobalLeaderboard: true });
+    expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
+
+    await page.evaluate(() => localStorage.setItem('atomic-acres:leaderboard-install:v2', 'consented_install_123'));
+    await sharing.uncheck();
+    await expect(page.locator('#global-leaderboard-sharing-state')).toHaveText('SHARING OFF');
+    expect(await page.evaluate(() => localStorage.getItem('atomic-acres:leaderboard-install:v2'))).toBeNull();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('atomic-acres-pass65-settings-v1') ?? 'null')?.privacy))
+      .toEqual({ schemaVersion: 1, shareGlobalLeaderboard: false });
+
+    await page.reload();
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 30_000 });
+    await page.locator('#menu-tab-options').click();
+    await expect(page.locator('#share-global-leaderboard')).not.toBeChecked();
+  });
+
   test('plays prerecorded media without moving or submitting the gameplay renderer', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));

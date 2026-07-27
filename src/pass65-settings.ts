@@ -34,11 +34,17 @@ export type AccessibilitySettings = Readonly<{
   weaponMotionScale: number;
 }>;
 
+export type PrivacySettings = Readonly<{
+  schemaVersion: 1;
+  shareGlobalLeaderboard: boolean;
+}>;
+
 export type Pass65Settings = Readonly<{
   version: 1;
   graphics: GraphicsSettings;
   audio: AudioSettings;
   accessibility: AccessibilitySettings;
+  privacy: PrivacySettings;
 }>;
 
 export type GraphicsRuntime = Readonly<{
@@ -135,6 +141,10 @@ export function createDefaultPass65Settings(capabilities: CapabilityHints = {}):
       damageFlashScale: 1,
       weaponMotionScale: 1,
     }),
+    privacy: Object.freeze({
+      schemaVersion: 1,
+      shareGlobalLeaderboard: false,
+    }),
   });
 }
 
@@ -172,7 +182,14 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
     damageFlashScale: Number(clamp(finiteNumber(rawAccessibility.damageFlashScale, 1), 0, 1).toFixed(2)),
     weaponMotionScale: Number(clamp(finiteNumber(rawAccessibility.weaponMotionScale, 1), 0, 1).toFixed(2)),
   });
-  return Object.freeze({ version: 1, graphics, audio, accessibility });
+  const rawPrivacy = raw.privacy && typeof raw.privacy === 'object'
+    ? raw.privacy as Partial<PrivacySettings>
+    : {};
+  const privacy: PrivacySettings = Object.freeze({
+    schemaVersion: 1,
+    shareGlobalLeaderboard: bool(rawPrivacy.shareGlobalLeaderboard, defaults.privacy.shareGlobalLeaderboard),
+  });
+  return Object.freeze({ version: 1, graphics, audio, accessibility, privacy });
 }
 
 export function parsePass65Settings(serialized: string | null, capabilities: CapabilityHints = {}): Pass65Settings {

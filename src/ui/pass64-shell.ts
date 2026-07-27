@@ -207,6 +207,13 @@ function optionsPanelMarkup(): string {
         <label>WEAPON MOTION<input id="weapon-motion-scale" type="range" min="0" max="1" step="0.05" value="1"></label>
       </div>
     </section>
+    <section id="privacy-settings" class="settings-section" aria-labelledby="privacy-settings-title">
+      <header><b id="privacy-settings-title">PRIVACY + ONLINE SHARING</b><span id="global-leaderboard-sharing-state">SHARING OFF</span></header>
+      <div class="privacy-setting-row">
+        <label class="setting-check"><input id="share-global-leaderboard" type="checkbox"> SHARE MY GLOBAL LEADERBOARD RESULTS</label>
+        <p>Off by default. If enabled, completed streaks send your chosen callsign, streak, kills, deaths, build/season and a pseudonymous browser ID to the public leaderboard service. No account credentials are sent. Turning this off stops future submissions and forgets this browser ID; rows already published may remain public.</p>
+      </div>
+    </section>
     <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> selected grenade · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/grenade · <b>1/2</b> primary/sidearm · <b>TAB</b> roster · <b>ENTER</b> chat<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </div>`;

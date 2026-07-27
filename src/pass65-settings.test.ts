@@ -31,6 +31,7 @@ describe('Pass 65 settings contract', () => {
     });
     expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
     expect(Object.keys(settings.audio.mutes).sort()).toEqual([...AUDIO_BUS_IDS].sort());
+    expect(settings.privacy).toEqual({ schemaVersion: 1, shareGlobalLeaderboard: false });
   });
 
   it('uses Performance on constrained machines and keeps Max available to internal benchmarks', () => {
@@ -73,6 +74,20 @@ describe('Pass 65 settings contract', () => {
     const settings = normalizePass65Settings({ graphics: { preset: 'custom', targetFps: 240 } });
     expect(writePass65Settings(storage, settings)).toBe(true);
     expect(parsePass65Settings([...values.values()][0] ?? null).graphics).toMatchObject({ preset: 'custom', targetFps: 240 });
+  });
+
+  it('keeps global leaderboard sharing default-off and persists explicit consent', () => {
+    const defaults = createDefaultPass65Settings();
+    expect(defaults.privacy.shareGlobalLeaderboard).toBe(false);
+    const optedIn = normalizePass65Settings({
+      ...defaults,
+      privacy: { schemaVersion: 1, shareGlobalLeaderboard: true },
+    });
+    expect(parsePass65Settings(JSON.stringify(optedIn)).privacy.shareGlobalLeaderboard).toBe(true);
+    expect(normalizePass65Settings({
+      ...optedIn,
+      privacy: { schemaVersion: 1, shareGlobalLeaderboard: 'yes' as unknown as boolean },
+    }).privacy.shareGlobalLeaderboard).toBe(false);
   });
 
   it('recovers corrupt storage and clamps every numeric boundary', () => {

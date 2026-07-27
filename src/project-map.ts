@@ -153,18 +153,20 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
   Object.freeze({
     id: 'services',
     title: 'Optional services',
-    summary: 'The season-aware global leaderboard Worker and browser-local fallback policy.',
-    authority: 'Leaderboard availability never blocks local play or private matches.',
+    summary: 'The season-aware public leaderboard, browser-local fallback and explicit result-sharing consent policy.',
+    authority: 'Public records are readable without creating an identifier. Result submission is default-off, disclosed, revocable and never blocks play.',
     status: 'active',
     children: Object.freeze([
       Object.freeze({
         id: 'leaderboard-service',
         title: 'Leaderboard Worker',
-        summary: 'Cloudflare Worker/D1 submission and retrieval with shared validation policy.',
-        authority: 'Authoritative only for the optional global board; local cache remains a fallback.',
+        summary: 'Cloudflare Worker/D1 retrieval plus explicitly consented submission with shared validation policy.',
+        authority: 'Authoritative only for the optional global board; local cache remains a fallback and no browser ID is created or retained while sharing is off.',
         status: 'active',
         paths: Object.freeze([
           'src/global-leaderboard.ts',
+          'src/pass65-settings.ts',
+          'src/ui/pass64-shell.ts',
           'shared/leaderboard-policy.ts',
           'shared/leaderboard-season.ts',
           'worker/src/index.ts',
