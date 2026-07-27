@@ -768,7 +768,7 @@
         "rationale": "Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work."
       },
       "budget": "Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.",
-      "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts",
+      "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts + src/arena-contrast-lighting.test.ts + tests/e2e/pass65-rustrig-container-lighting.spec.ts",
       "authorityAffecting": false
     },
     {
@@ -1406,5 +1406,5 @@
     "adjustable": 15,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "ba15ec1365d8c869e6fd0b6bf4b8850de5cdc6f0f57b4a59ad9eb78be5d0a6c0"
+  "inventorySha256": "f2fdf0c4f93a3629ae2c49c4577f380e868ff23f8ea39cf6999a0cc7bbb8c2d9"
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildGunRange, RUSTWORKS_WORK_LIGHTS } from './additional-maps';
+import { buildGunRange, RUSTWORKS_CONTAINER_LIGHTS, RUSTWORKS_WORK_LIGHTS } from './additional-maps';
 import { ArenaContrastLighting, sampleArenaPracticalLight } from './arena-contrast-lighting';
 import { arenaVolumeContainsPoint, MAX_PRACTICAL_MOTION_FREQUENCY_HZ } from './rendering/arena-visual-definition';
 import { definition as atomicDefinition } from './rendering/arenas/atomic-acres';
@@ -27,9 +27,10 @@ describe('Pass 62 arena contrast lighting', () => {
     rig.applyDefinition(rustworksDefinition);
     expect(rig.telemetry()).toMatchObject({
       arenaId: 'rustworks-1v1',
-      activeLights: 2,
-      shadowCastingLights: 2,
-      occlusion: { activeLocalLights: 2, shadowedLocalLights: 2, violations: [] },
+      maximumShadowLights: 7,
+      activeLights: 6,
+      shadowCastingLights: 6,
+      occlusion: { activeLocalLights: 6, shadowedLocalLights: 6, violations: [] },
     });
     const fixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.id === 'north');
     const southFixture = RUSTWORKS_WORK_LIGHTS.find((entry) => entry.id === 'south');
@@ -47,10 +48,32 @@ describe('Pass 62 arena contrast lighting', () => {
     const northIntensity = mountedLight.intensity;
     rig.update(2_400);
     expect(mountedLight.intensity).not.toBe(northIntensity);
-    expect(mountedLight.intensity).toBeLessThanOrEqual(fixture!.intensity);
+    expect(mountedLight.intensity).toBeGreaterThanOrEqual(fixture!.intensity * 0.925);
+    expect(mountedLight.intensity).toBeLessThanOrEqual(fixture!.intensity * 1.075);
+    const authoredContainerLights = rig.telemetry().authoredLights.filter(({ practicalId }) => practicalId.startsWith('container-dynamic-'));
+    expect(authoredContainerLights).toHaveLength(4);
+    expect(authoredContainerLights.map(({ practicalId }) => practicalId)).toEqual(
+      RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => `container-dynamic-${id}`),
+    );
+    for (const [index, containerFixture] of RUSTWORKS_CONTAINER_LIGHTS.entries()) {
+      const light = scene.getObjectByName(`rustworks-1v1-container-dynamic-${containerFixture.id}-${index + 3}`) as THREE.SpotLight;
+      expect(light, containerFixture.id).toBeInstanceOf(THREE.SpotLight);
+      expect(light.position.toArray()).toEqual([...containerFixture.position]);
+      expect(light.target.position.toArray()).toEqual([...containerFixture.target]);
+      expect(light.color.getHex()).toBe(containerFixture.color);
+      expect(light.shadow.mapSize.toArray()).toEqual([256, 256]);
+      expect(light.userData).toMatchObject({
+        presentationOnly: true,
+        blocksShots: false,
+        practicalPolicyId: `container-dynamic-${containerFixture.id}`,
+      });
+      expect(light.intensity).not.toBe(containerFixture.intensity);
+    }
     expect(rustworksDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
       'rustrig-mounted-work-lights',
       'rustrig-deck-surface',
+      'rustrig-container-dynamic-northwest',
+      'rustrig-container-dynamic-southeast',
     ]));
     rig.applyDefinition(gunRangeDefinition);
     expect(rig.telemetry()).toMatchObject({ arenaId: 'gun-range', activeLights: 1, shadowCastingLights: 1 });

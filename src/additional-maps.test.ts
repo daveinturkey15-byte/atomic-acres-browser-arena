@@ -7,6 +7,7 @@ import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
   RUSTWORKS_TOWER,
+  RUSTWORKS_CONTAINER_LIGHTS,
   RUSTWORKS_WORK_LIGHTS,
   applyAdditionalMapPresentationProfile,
   applyRustworksPresentationProfile,
@@ -190,14 +191,18 @@ describe('additional authored maps', () => {
     const map = buildRustworks1v1(new THREE.Scene());
     const lightAudit = map.root.userData.rustworksWorkLightAudit as {
       fixtures: Array<{ id: string; position: number[]; target: number[]; emissiveOnlyLens: boolean; shadowedLocalVolume: boolean }>;
+      containerFixtures: Array<{ id: string; position: number[]; target: number[]; color: number; shadowedLocalVolume: boolean }>;
       shadowedLocalVolumes: number;
       maximumShadowCastersIncludingMoon: number;
     };
     expect(lightAudit).toMatchObject({
-      shadowedLocalVolumes: 2,
-      maximumShadowCastersIncludingMoon: 3,
+      shadowedLocalVolumes: 6,
+      maximumShadowCastersIncludingMoon: 7,
     });
     expect(lightAudit.fixtures).toHaveLength(2);
+    expect(lightAudit.containerFixtures).toHaveLength(4);
+    expect(lightAudit.containerFixtures.map(({ id }) => id)).toEqual(RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => id));
+    expect(lightAudit.containerFixtures.map(({ color }) => color)).toEqual(RUSTWORKS_CONTAINER_LIGHTS.map(({ color }) => color));
     expect(lightAudit.fixtures.map((fixture) => fixture.id)).toEqual(RUSTWORKS_WORK_LIGHTS.map((fixture) => fixture.id));
     for (const fixture of RUSTWORKS_WORK_LIGHTS) {
       const lens = map.root.getObjectByName(`rustworks-work-light-lens-${fixture.id}`) as THREE.Mesh;
@@ -369,15 +374,27 @@ describe('additional authored maps', () => {
     });
     expect(layout.minimumTowerDistance).toBeGreaterThan(15);
     const practicalAudit = map.root.userData.rustworksContainerPracticalAudit as {
-      ids: string[]; count: number; palette: number[]; occlusionPolicy: string; shadowedDynamicFill: string;
+      ids: string[];
+      count: number;
+      palette: number[];
+      fixtureOcclusionPolicy: string;
+      dynamicOcclusionPolicy: string;
+      shadowedDynamicFill: string;
+      dynamicPracticalIds: string[];
     };
     expect(practicalAudit).toMatchObject({
       count: 8,
       palette: [0xff4d2e, 0xff9a3d, 0xffd25a],
-      occlusionPolicy: 'emissive-only',
-      shadowedDynamicFill: 'tower-mounted-work-light-pulse',
+      fixtureOcclusionPolicy: 'emissive-only',
+      dynamicOcclusionPolicy: 'shadowed-local',
+      shadowedDynamicFill: 'four-cluster-container-practical-pulse',
     });
+    expect(practicalAudit.dynamicPracticalIds).toEqual(
+      RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => `container-dynamic-${id}`),
+    );
     expect(practicalAudit.ids).toHaveLength(8);
+    const practicalColours = new Set<number>();
+    const practicalPaletteIndexes = new Set<number>();
     for (const id of practicalAudit.ids) {
       const practical = map.root.getObjectByName(id) as THREE.Mesh;
       expect(practical).toBeInstanceOf(THREE.Mesh);
@@ -386,7 +403,19 @@ describe('additional authored maps', () => {
         practicalPolicyId: 'container-interior-warm-practicals',
         containerInterior: true,
       });
-      expect((practical.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThanOrEqual(3.2);
+      const material = practical.material as THREE.MeshStandardMaterial;
+      expect(material.emissiveIntensity).toBeGreaterThanOrEqual(1.55);
+      practicalColours.add(material.emissive.getHex());
+      practicalPaletteIndexes.add(Number(practical.userData.paletteIndex));
+    }
+    expect([...practicalColours].sort((a, b) => a - b)).toEqual([0xff4d2e, 0xff9a3d, 0xffd25a].sort((a, b) => a - b));
+    expect([...practicalPaletteIndexes].sort()).toEqual([0, 1, 2]);
+    for (const fixture of RUSTWORKS_CONTAINER_LIGHTS) {
+      const visibleFixture = practicalAudit.ids
+        .map((id) => map.root.getObjectByName(id) as THREE.Mesh)
+        .find((mesh) => mesh.position.distanceTo(new THREE.Vector3(...fixture.position)) < 0.1);
+      expect(visibleFixture, `${fixture.id}:visible-fixture`).toBeInstanceOf(THREE.Mesh);
+      expect((visibleFixture!.material as THREE.MeshStandardMaterial).emissive.getHex()).toBe(fixture.color);
     }
     expect(RUSTWORKS_TOWER.openContainerClearWidth).toBeGreaterThan(0.38 * 2 + 1.4);
     expect(RUSTWORKS_TOWER.openContainerClearHeight).toBeGreaterThan(1.82 + 0.5);

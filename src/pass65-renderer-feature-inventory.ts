@@ -94,7 +94,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     ], pipelineIds: [],
     control: control('setting', ['graphics.shadows', 'graphics.shadowResolution', 'graphics.shadowUpdateMode', 'graphics.indirectLighting', 'graphics.preset', 'graphics.adaptiveResolution'], 'Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, and bounded indirect-light scaling', 'Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work.'),
     budget: 'Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.',
-    verifier: 'src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts',
+    verifier: 'src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts + src/arena-contrast-lighting.test.ts + tests/e2e/pass65-rustrig-container-lighting.spec.ts',
   }),
   feature({
     id: 'principal-hdr-msaa', title: 'Principal HDR render target and MSAA', availability: 'active', owner: 'src/rendering/pass64-tsl-scene.ts',

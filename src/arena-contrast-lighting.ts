@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { RUSTWORKS_WORK_LIGHTS } from './additional-maps';
 import type { ArenaId } from './map-selection';
 import type { RenderProfile } from './render-profile';
 import type {
@@ -32,20 +31,6 @@ const LEGACY_KEY_LIGHTS: Readonly<Partial<Record<ArenaId, readonly ArenaKeyLight
     { position: [-26, 11, 12], target: [-18, 1.8, 2], color: 0xffc981, intensity: 13, distance: 32, angle: 0.62 },
     { position: [26, 10, -12], target: [18, 1.8, -2], color: 0xa9d8ff, intensity: 11, distance: 31, angle: 0.6 },
   ],
-  // The visual fixture and shadowed volume share authored coordinates. The
-  // opposite head remains emissive-only so the moon + practical stay within
-  // RustRig's two-shadow-light budget.
-  'rustworks-1v1': RUSTWORKS_WORK_LIGHTS
-    .filter((fixture) => fixture.shadowed)
-    .map((fixture) => ({
-      position: fixture.position,
-      target: fixture.target,
-      color: fixture.color,
-      intensity: fixture.intensity,
-      distance: fixture.distance,
-      angle: fixture.angle,
-      shadowMapSize: 512,
-    })),
   'skyline-terminal': [
     { position: [-20, 6.7, -30], target: [-8, 0.8, -19], color: 0xbcecff, intensity: 20, distance: 34, angle: 0.62 },
     { position: [20, 6.7, -24], target: [8, 0.8, -17], color: 0xffc68a, intensity: 17, distance: 34, angle: 0.62 },
@@ -88,6 +73,7 @@ export type ArenaAuthoredLightTelemetry = Readonly<{
   practicalId: string;
   position: ArenaVector3;
   target: ArenaVector3;
+  color: number;
   intensity: number;
   distance: number;
   angle: number;
@@ -138,6 +124,7 @@ export class ArenaContrastLighting {
       practicalId: practical.id,
       position: [...practical.light.position] as ArenaVector3,
       target: [...practical.light.target] as ArenaVector3,
+      color: practical.light.color,
       intensity: practical.light.intensity,
       distance: practical.light.distance,
       angle: practical.light.angle,
@@ -212,8 +199,6 @@ export class ArenaContrastLighting {
   /** Slow deterministic practical-light motion; presentation only, no allocations. */
   update(nowMs: number): void {
     if (!this.activeRoot) return;
-    const seconds = nowMs / 1_000;
-    let index = 0;
     for (const node of this.activeRoot.children) {
       if (!(node instanceof THREE.SpotLight)) continue;
       const base = Number(node.userData.authoredIntensity ?? node.intensity);
@@ -234,14 +219,7 @@ export class ArenaContrastLighting {
           authoredTarget[1] + (targetMotion?.amplitude[1] ?? 0) * targetOffset,
           authoredTarget[2] + (targetMotion?.amplitude[2] ?? 0) * targetOffset,
         );
-      } else if (this.arenaId === 'rustworks-1v1') {
-        // Preserve the accepted Pass 64 RustRig pulse until that arena's
-        // legacy fixture adapter is migrated into canonical definition data.
-        const phase = index * 1.73;
-        const amplitude = 0.075;
-        node.intensity = base * (1 - amplitude + amplitude * (Math.sin(seconds * 0.72 + phase) * 0.5 + 0.5));
       }
-      index += 1;
     }
   }
 

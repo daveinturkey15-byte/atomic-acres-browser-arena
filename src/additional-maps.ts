@@ -379,7 +379,7 @@ export const RUSTWORKS_TOWER = Object.freeze({
 });
 
 /**
- * Authored fixture locations shared by the RustRig presentation and its one
+ * Authored fixture locations shared by the RustRig presentation and its
  * budgeted shadowed-local work lights. Both heads remain visible/emissive and
  * own bounded, opposed shadowed volumes so the playable deck is readable from
  * both ends without reintroducing unoccluded point-light leakage.
@@ -406,6 +406,63 @@ export const RUSTWORKS_WORK_LIGHTS = Object.freeze([
     distance: 34,
     angle: 0.82,
     shadowed: true,
+  }),
+]);
+
+/**
+ * One bounded shadowed practical per freight cluster. The eight visible
+ * red/orange/yellow strips remain cheap emissive navigation cues; these four
+ * ceiling-mounted volumes add real occluded colour and slow deterministic
+ * intensity motion in Quality/Custom without changing container collision.
+ */
+export const RUSTWORKS_CONTAINER_LIGHTS = Object.freeze([
+  Object.freeze({
+    id: 'north-west',
+    position: [-8, 2.32, -13] as const,
+    target: [-8, 0.28, -13] as const,
+    volume: { minimum: [-10.76, 0.04, -14.18] as const, maximum: [-5.24, 2.48, -11.82] as const },
+    color: 0xff4d2e,
+    intensity: 18,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.18,
+    phaseRadians: 0.35,
+  }),
+  Object.freeze({
+    id: 'north-east',
+    position: [8, 2.32, -13] as const,
+    target: [8, 0.28, -13] as const,
+    volume: { minimum: [5.24, 0.04, -14.18] as const, maximum: [10.76, 2.48, -11.82] as const },
+    color: 0xffd25a,
+    intensity: 17,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.23,
+    phaseRadians: 1.7,
+  }),
+  Object.freeze({
+    id: 'south-west',
+    position: [-18, 2.32, 8] as const,
+    target: [-18, 0.28, 8] as const,
+    volume: { minimum: [-19.18, 0.04, 5.24] as const, maximum: [-16.82, 2.48, 10.76] as const },
+    color: 0xff9a3d,
+    intensity: 16,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.29,
+    phaseRadians: 3.05,
+  }),
+  Object.freeze({
+    id: 'south-east',
+    position: [18, 2.32, 8] as const,
+    target: [18, 0.28, 8] as const,
+    volume: { minimum: [16.82, 0.04, 5.24] as const, maximum: [19.18, 2.48, 10.76] as const },
+    color: 0xff4d2e,
+    intensity: 17,
+    distance: 4.2,
+    angle: 0.86,
+    frequencyHz: 0.31,
+    phaseRadians: 4.4,
   }),
 ]);
 
@@ -709,8 +766,15 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       emissiveOnlyLens: true,
       shadowedLocalVolume: fixture.shadowed,
     })),
-    shadowedLocalVolumes: RUSTWORKS_WORK_LIGHTS.filter((fixture) => fixture.shadowed).length,
-    maximumShadowCastersIncludingMoon: 3,
+    containerFixtures: RUSTWORKS_CONTAINER_LIGHTS.map((fixture) => ({
+      id: fixture.id,
+      position: [...fixture.position],
+      target: [...fixture.target],
+      color: fixture.color,
+      shadowedLocalVolume: true,
+    })),
+    shadowedLocalVolumes: RUSTWORKS_WORK_LIGHTS.filter((fixture) => fixture.shadowed).length + RUSTWORKS_CONTAINER_LIGHTS.length,
+    maximumShadowCastersIncludingMoon: 7,
   };
 
   // Ground → lower deck ramp on -Z with explicit foot/top landings (≤50°).
@@ -943,7 +1007,9 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     const material = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
-      emissiveIntensity: 3.2 + index * 0.35,
+      // Keep the hue saturated through the HDR/ACES path; the former 3.2+
+      // values clipped all three cues toward white at RustRig exposure.
+      emissiveIntensity: 1.55 + index * 0.1,
       roughness: 0.24,
       metalness: 0.28,
     });
@@ -952,6 +1018,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   });
   const openContainerRoutes: Array<{ id: string; side: string; axis: 'x' | 'z'; anchors: [number, number, number][] }> = [];
   const containerPracticalIds: string[] = [];
+  let openPracticalSequence = 0;
   for (const [index, placement] of containerRows.entries()) {
     const alongX = placement.axis === 'x';
     const containerSize: [number, number, number] = alongX ? [5.8, 2.6, 2.5] : [2.5, 2.6, 5.8];
@@ -996,7 +1063,9 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         detail: 'performance',
       });
       const practicalId = `rustworks-container-practical-${placement.cluster}-${placement.slot}`;
-      const practicalMaterial = containerPracticalMaterials[index % containerPracticalMaterials.length]!;
+      const practicalPaletteIndex = openPracticalSequence % containerPracticalMaterials.length;
+      const practicalMaterial = containerPracticalMaterials[practicalPaletteIndex]!;
+      openPracticalSequence += 1;
       const practical = box(
         builder,
         practicalId,
@@ -1009,6 +1078,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
       practical.userData.practicalPolicyId = 'container-interior-warm-practicals';
       practical.userData.containerInterior = true;
       practical.userData.containerCluster = placement.cluster;
+      practical.userData.paletteIndex = practicalPaletteIndex;
       containerPracticalIds.push(practicalId);
       if (placement.opening === 'open-one') {
         const endThickness = 0.16;
@@ -1078,8 +1148,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     ids: containerPracticalIds,
     count: containerPracticalIds.length,
     palette: [...containerPracticalPalette],
-    occlusionPolicy: 'emissive-only',
-    shadowedDynamicFill: 'tower-mounted-work-light-pulse',
+    fixtureOcclusionPolicy: 'emissive-only',
+    dynamicOcclusionPolicy: 'shadowed-local',
+    shadowedDynamicFill: 'four-cluster-container-practical-pulse',
+    dynamicPracticalIds: RUSTWORKS_CONTAINER_LIGHTS.map((fixture) => `container-dynamic-${fixture.id}`),
   };
   root.userData.rustworksOpenContainerRoutes = openContainerRoutes;
   root.userData.rustworksUndercroft = {
