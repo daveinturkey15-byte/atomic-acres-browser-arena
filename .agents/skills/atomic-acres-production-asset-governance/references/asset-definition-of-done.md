@@ -24,7 +24,7 @@ Every player-visible production family must provide:
 | Third-person operator | Skeleton and skin coverage; opaque complete body; locomotion, aim, fire, reload, grenade, hit and death clips; weapon-hand contact; team/material variants; near/mid/far LOD review. |
 | Aircraft or helicopter | Canonical forward/up axis; body, cockpit/glass, rotor/propeller and weapon/cargo sockets; exterior/cockpit LODs; rotor, gun, cargo/bomb and ingress/egress actions; pose-dot-velocity proof. |
 | Drone | Shared family projection for autonomous/manual variants; articulated propulsion; visible mounted gun and camera socket; propeller, recoil and fire actions; unobstructed first-person camera sweep. |
-| Ordnance prop | Distinct held, thrown, flight, stuck and world silhouettes; fuse/impact action; attachment origin; readable LODs without substituting authority geometry. |
+| Ordnance prop | Distinct held, thrown, flight, stuck and world silhouettes; fuse/impact action; attachment origin; readable LODs without substituting authority geometry; enrolment in `qa:pass65:ordnance-assets` and the aggregate production gate. |
 | Hero world asset | Correct normals/winding; material/decal coverage; visible geometry/collider parity across profiles; damage/destruction states; major debris persistence and contact evidence. |
 
 ## Automatic rejection

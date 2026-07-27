@@ -54,6 +54,7 @@
     "qa:pass65:owner-feedback": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test",
     "qa:pass65:owner-feedback:candidate": "node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test --candidate",
     "qa:pass65:drone-asset": "node scripts/qa/verify-pass65-drone-production.mjs",
+    "qa:pass65:ordnance-assets": "node scripts/qa/verify-pass65-semtex-production.mjs",
     "qa:pass65:support-vehicles": "node scripts/qa/verify-pass65-support-vehicle-production.mjs",
     "qa:pass65:menu-previews": "node scripts/qa/verify-pass65-menu-preview-production.mjs",
     "qa:pass65:weapon-assets": "node scripts/qa/verify-pass65-weapon-production.mjs",

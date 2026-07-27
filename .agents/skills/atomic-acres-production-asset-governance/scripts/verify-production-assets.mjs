@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 
 const REQUIRED_GATES = Object.freeze([
   'qa:pass65:weapon-assets',
+  'qa:pass65:ordnance-assets',
   'qa:pass65:drone-asset',
   'qa:pass65:support-vehicles',
   'qa:pass65:operator-assets',
