@@ -40,6 +40,8 @@ export const SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M = 200;
 export const SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M = 12;
 export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
 export const MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP = 64;
+/** Matches the strict recipient snapshot bound; a full queue leaves the crate claimable. */
+export const MAX_RETAINED_CARE_REWARDS = 8;
 
 export type SupportVec3 = readonly [number, number, number];
 
@@ -579,6 +581,65 @@ export class HostKillstreakRuntime {
     this.revision += 1;
   }
 
+  /**
+   * A transport disconnect ends possession immediately without deleting earned
+   * rewards or per-match progress. Sequence domains restart on the replacement
+   * transport, while activation request IDs remain globally replay-protected.
+   */
+  recordActorDisconnect(actorId: string): void {
+    const actor = this.actors.get(actorId);
+    if (!actor) return;
+    actor.lastActivationSequence = -1;
+    actor.lastControlSequence = -1;
+    this.restoreActorControl(actor, true);
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'chopper' && entity.ownerId === actorId && entity.gunController !== 'ai') {
+        entity.gunController = 'ai';
+        entity.pendingPlayerFire = false;
+        entity.revision += 1;
+      } else if (entity.kind === 'care-crate' && entity.captureActorId === actorId) {
+        entity.phase = 'landed';
+        entity.captureActorId = null;
+        entity.captureStartedAtMs = null;
+        entity.revision += 1;
+      }
+    }
+    this.revision += 1;
+  }
+
+  /** Permanently removes an actor and every support resource it owns. */
+  unregisterActor(actorId: string): void {
+    const actor = this.actors.get(actorId);
+    if (!actor) return;
+    this.recordActorDisconnect(actorId);
+    for (const entity of [...this.entities.values()]) {
+      if (entity.ownerId === actorId) this.expireEntity(entity.id);
+    }
+    for (const [activationId, activation] of this.carpetBombers) {
+      if (activation.ownerId === actorId) this.carpetBombers.delete(activationId);
+    }
+    for (const [activationId, activation] of this.timedActivations) {
+      if (activation.ownerId === actorId) this.timedActivations.delete(activationId);
+    }
+    this.actors.delete(actorId);
+    this.revision += 1;
+  }
+
+  /** Ends the epoch's active support while retaining a final, non-possessed projection. */
+  endMatch(): readonly string[] {
+    for (const actor of this.actors.values()) {
+      actor.adrenalineUntilMs = 0;
+      this.restoreActorControl(actor, true);
+    }
+    const expired = [...this.entities.keys()];
+    for (const entityId of expired) this.expireEntity(entityId);
+    this.carpetBombers.clear();
+    this.timedActivations.clear();
+    this.swarmFireLanes.clear();
+    this.revision += 1;
+    return Object.freeze(expired);
+  }
+
   private nextEntityId(kind: string): string {
     this.entityCounter += 1;
     return `ks-${this.matchEpoch}-${kind}-${this.entityCounter}`;
@@ -943,7 +1004,15 @@ export class HostKillstreakRuntime {
     const actor = this.actors.get(actorId);
     const entity = this.entities.get(crateId);
     if (!actor || actor.lifeId !== lifeId) return Object.freeze({ accepted: false, reason: 'identity-mismatch' });
+    if (!Number.isFinite(nowMs)) return Object.freeze({ accepted: false, reason: 'invalid-time' });
+    if (actor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
+      return Object.freeze({ accepted: false, reason: 'reward-capacity' });
+    }
     if (!entity || entity.kind !== 'care-crate' || entity.phase !== 'landed') return Object.freeze({ accepted: false, reason: 'crate-unavailable' });
+    if ([...this.entities.values()].some((candidate) => candidate.kind === 'care-crate'
+      && candidate.id !== entity.id && candidate.captureActorId === actorId)) {
+      return Object.freeze({ accepted: false, reason: 'actor-already-capturing' });
+    }
     const position = actorPosition(world, actorId);
     if (!position || distance(position, entity.position) > 2.75 || !lineOfSight(world, position, entity.position)) {
       return Object.freeze({ accepted: false, reason: 'capture-admission-failed' });
@@ -990,41 +1059,53 @@ export class HostKillstreakRuntime {
   }
 
   advance(nowMs: number, world: KillstreakWorld): KillstreakAdvanceResult {
-    const previousAt = this.lastAdvancedAtMs === 0 ? nowMs : this.lastAdvancedAtMs;
-    const dt = clamp((nowMs - previousAt) / 1_000, 0, 0.1);
-    this.lastAdvancedAtMs = Math.max(previousAt, nowMs);
+    if (!Number.isFinite(nowMs)) return Object.freeze({
+      damageEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+    });
+    if (this.lastAdvancedAtMs !== 0 && nowMs < this.lastAdvancedAtMs) return Object.freeze({
+      damageEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+    });
+    const canonicalNowMs = Math.max(this.lastAdvancedAtMs, nowMs);
+    const previousAt = this.lastAdvancedAtMs === 0 ? canonicalNowMs : this.lastAdvancedAtMs;
+    const dt = clamp((canonicalNowMs - previousAt) / 1_000, 0, 0.1);
+    this.lastAdvancedAtMs = canonicalNowMs;
+    const hadRuntimeState = this.entities.size > 0 || this.carpetBombers.size > 0 || this.timedActivations.size > 0;
     const damageEvents: KillstreakDamageEvent[] = [];
     const impactEvents: KillstreakImpactEvent[] = [];
     const expiredEntityIds: string[] = [];
 
     for (const [activationId, activation] of this.timedActivations) {
-      if (nowMs >= activation.expiresAtMs) this.timedActivations.delete(activationId);
+      if (canonicalNowMs >= activation.expiresAtMs) this.timedActivations.delete(activationId);
     }
     for (const [activationId, bomber] of this.carpetBombers) {
       while (bomber.nextImpactOrdinal < bomber.impacts.length
-        && nowMs >= bomber.createdAtMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + bomber.nextImpactOrdinal * 180
+        && canonicalNowMs >= bomber.createdAtMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + bomber.nextImpactOrdinal * 180
         && impactEvents.length < CARPET_BOMBER_IMPACT_COUNT) {
         const ordinal = bomber.nextImpactOrdinal;
         const position = bomber.impacts[ordinal];
         bomber.nextImpactOrdinal += 1;
-        impactEvents.push(Object.freeze({ activationId, source: 'carpet-bomber', ordinal, position, atMs: nowMs }));
+        impactEvents.push(Object.freeze({ activationId, source: 'carpet-bomber', ordinal, position, atMs: canonicalNowMs }));
         const owner = this.actors.get(bomber.ownerId);
-        if (owner) this.damageAround(owner, activationId, 'carpet-bomber', position, 4.5, 80, nowMs, world, damageEvents);
+        if (owner) this.damageAround(owner, activationId, 'carpet-bomber', position, 4.5, 80, canonicalNowMs, world, damageEvents);
       }
-      if (nowMs >= bomber.expiresAtMs || bomber.nextImpactOrdinal >= bomber.impacts.length) this.carpetBombers.delete(activationId);
+      if (canonicalNowMs >= bomber.expiresAtMs || bomber.nextImpactOrdinal >= bomber.impacts.length) this.carpetBombers.delete(activationId);
     }
 
     for (const entity of [...this.entities.values()]) {
-      if (nowMs >= entity.expiresAtMs || entity.health <= 0) {
+      if (canonicalNowMs >= entity.expiresAtMs || entity.health <= 0) {
         expiredEntityIds.push(entity.id);
         this.expireEntity(entity.id);
         continue;
       }
-      if (entity.kind === 'aircraft') this.advanceAircraft(entity, nowMs, dt, world);
-      else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, nowMs, dt, world);
-      else if (entity.kind === 'chopper') this.advanceChopper(entity, nowMs, dt, world, damageEvents);
-      else this.advanceDrone(entity, nowMs, dt, world, damageEvents);
+      if (entity.kind === 'aircraft') this.advanceAircraft(entity, canonicalNowMs, dt, world);
+      else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
+      else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents);
+      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents);
     }
+    // Recipient admission is keyed by this aggregate revision. Every mutable
+    // host step advances it so reordered snapshots cannot roll pose/ammo/fuel
+    // backwards while carrying an equal top-level revision.
+    if (hadRuntimeState) this.revision += 1;
     return Object.freeze({
       damageEvents: Object.freeze(damageEvents.slice(0, MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP)),
       impactEvents: Object.freeze(impactEvents),
@@ -1096,6 +1177,14 @@ export class HostKillstreakRuntime {
     }
     const requiredMs = captureActor.team === entity.team ? 1_250 : 2_500;
     if (nowMs - entity.captureStartedAtMs < requiredMs) return;
+    if (captureActor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
+      entity.phase = 'landed';
+      entity.captureActorId = null;
+      entity.captureStartedAtMs = null;
+      entity.revision += 1;
+      this.revision += 1;
+      return;
+    }
     captureActor.careRewards.push(entity.reward);
     this.entities.delete(entity.id);
     this.revision += 1;

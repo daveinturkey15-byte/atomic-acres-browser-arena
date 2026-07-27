@@ -3759,8 +3759,10 @@ function applyHostLobbyConfig(config: PrivateMatchConfig): void {
 function markLobbyDisconnected(playerId: string): void {
   const member = hostLobbyMembers.get(playerId);
   if (!member || playerId === player.id) return;
+  if (!member.connected && hostDisconnectedAt.has(playerId)) return;
   hostLobbyMembers.set(playerId, { ...member, connected: false, ready: false, pingMs: null });
   hostDisconnectedAt.set(playerId, performance.now());
+  const reservationMatchEpoch = killstreakMatchEpoch;
   broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   window.setTimeout(() => {
     const disconnectedAt = hostDisconnectedAt.get(playerId);
@@ -3780,6 +3782,13 @@ function markLobbyDisconnected(playerId: string): void {
     remoteHealthAuthorities.delete(playerId);
     remoteFlashVictimLifeIds.delete(playerId);
     lastAuthoredFlashResults.delete(playerId);
+    if (network.role === 'host' && killstreakMatchEpoch === reservationMatchEpoch
+      && killstreakRegisteredActors.has(playerId)) {
+      killstreakRuntime.unregisterActor(playerId);
+      killstreakRegisteredActors.delete(playerId);
+      refreshLocalKillstreakSnapshot();
+      broadcastKillstreakState();
+    }
     broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   }, REJOIN_GRACE_MS + 50);
 }
@@ -4176,7 +4185,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
   if (message.type === 'leave' && privateLobbySnapshot) {
-    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected');
+    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected', !message.voluntary);
     if (network.role === 'host') {
       if (message.voluntary) {
         hostLobbyMembers.delete(message.playerId);
@@ -5509,7 +5518,7 @@ function onNetworkMessage(message: GameMessage): void {
     trimNonceSet();
     return;
   }
-  if (message.type === 'leave') removeRemote(message.playerId, 'left the block');
+  if (message.type === 'leave') removeRemote(message.playerId, 'left the block', !message.voluntary);
 }
 
 function trimNonceSet(): void {
@@ -6752,7 +6761,7 @@ function processDeath(message: DeathMessage): void {
   checkMatchEnd();
 }
 
-function removeRemote(id: string, reason: string): void {
+function removeRemote(id: string, reason: string, allowRejoinReservation = true): void {
   const remote = remotes.get(id);
   if (!remote) return;
   if (network.role === 'host') dropHeldRailgun(id, remote.target.clone().add(new THREE.Vector3(0, 0.3, 0)));
@@ -6765,11 +6774,21 @@ function removeRemote(id: string, reason: string): void {
   admittedRemoteShots.delete(id);
   admittedRemoteMelees.delete(id);
   admittedRemoteExplosions.delete(id);
-  const retainCombatAuthority = shouldRetainRemoteCombatAuthority(
+  const retainCombatAuthority = allowRejoinReservation && shouldRetainRemoteCombatAuthority(
     network.role,
     privateLobbySnapshot?.phase ?? null,
     hostLobbyMembers.has(id),
   );
+  if (network.role === 'host' && killstreakRegisteredActors.has(id)) {
+    if (retainCombatAuthority) killstreakRuntime.recordActorDisconnect(id);
+    else {
+      killstreakRuntime.unregisterActor(id);
+      killstreakRegisteredActors.delete(id);
+    }
+    refreshLocalKillstreakSnapshot();
+    broadcastKillstreakState();
+  }
+  if (network.role === 'host' && retainCombatAuthority) markLobbyDisconnected(id);
   if (!retainCombatAuthority) {
     remoteSupportAuthorities.delete(id);
     remoteGrenadeAuthorities.delete(id);
@@ -12215,7 +12234,15 @@ function clearGrenades(): void {
 
 function clearFieldSupport(): void {
   localCareCaptureCrateId = null;
+  lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+  killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
+  document.documentElement.dataset.killstreakPossession = 'none';
+  if (camera.near !== 0.08) {
+    camera.near = 0.08;
+    camera.updateProjectionMatrix();
+  }
+  weaponView.root.visible = player.alive;
   if (yardhawk) disposeSupportRoot(yardhawk.root);
   yardhawk = null;
   for (const strike of strikeMissiles) {
@@ -12693,6 +12720,11 @@ function updateMatchState(now: number): void {
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'ended') broadcastHostLobby('ended');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' };
     recordCompletedMatch();
+    if (network.role !== 'client') {
+      killstreakRuntime.endMatch();
+      refreshLocalKillstreakSnapshot(now);
+      if (network.role === 'host') broadcastKillstreakState(now);
+    }
     clearGrenades();
     clearFieldSupport();
     const privateMatch = gameMode !== 'solo';
@@ -14123,7 +14155,7 @@ function resetForMode(): void {
   railgunPresentation.updateThermal(camera, [], false);
   authorizedRemoteRedeploys.clear();
   resetBreakableWindows();
-  for (const id of remotes.keys()) removeRemote(id, 'cleared');
+  for (const id of remotes.keys()) removeRemote(id, 'cleared', false);
   verifiedRemoteKills.clear();
   element<HTMLElement>('#banner').hidden = true;
   element<HTMLElement>('#countdown').hidden = true;

@@ -12,6 +12,7 @@ import {
   DRONE_SWARM_COUNT,
   DRONE_SWARM_DURATION_MS,
   HostKillstreakRuntime,
+  MAX_RETAINED_CARE_REWARDS,
   adrenalineModifiers,
   type KillstreakActivationIntent,
   type KillstreakWorld,
@@ -175,6 +176,82 @@ describe('host killstreak runtime', () => {
     expect(snapshot.actors[0].possession).toBeNull();
     expect(snapshot.entities[0].gunController).toBe('ai');
     expect(runtime.control({ by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId, action: 'toggle-chopper-gunner' }, 3)).toMatchObject({ accepted: false, reason: 'identity-mismatch' });
+  });
+
+  it('ends chopper possession on disconnect, resumes AI, and preserves rewards for a replacement transport', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']));
+    earn(runtime, 15);
+    const entityId = runtime.activate(intent('chopper', 3), 1_000, DEFAULT_WORLD).entityIds[0];
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-chopper-gunner',
+    }, 1_001).accepted).toBe(true);
+
+    runtime.recordActorDisconnect('owner');
+    const disconnected = runtime.snapshotFor('owner', 1_002);
+    expect(disconnected.actors[0]).toMatchObject({
+      lifeId: 1,
+      streak: 15,
+      possession: null,
+      available: ['scout-sweep', 'yardhawk', 'tri-pass', 'nuke'],
+    });
+    expect(disconnected.entities[0]).toMatchObject({ id: entityId, gunController: 'ai' });
+
+    // A replacement transport starts a fresh control-sequence domain without
+    // minting rewards or replacing the canonical actor.
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-chopper-gunner',
+    }, 1_003).accepted).toBe(true);
+    expect(runtime.snapshotFor('owner', 1_003).actors[0].possession).toEqual({ kind: 'chopper-gunner', entityId });
+    expect(runtime.activate(intent('nuke', 5, 1, 'activation-rejoined-nuke'), 1_004, DEFAULT_WORLD).accepted).toBe(true);
+  });
+
+  it('returns a disconnected piloted drone to autonomous fire and unregisters only after reservation expiry', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'piloted-drone', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 5);
+    const entityId = runtime.activate(intent('piloted-drone', 2), 1_000, DEFAULT_WORLD).entityIds[0];
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-piloted-drone',
+    }, 1_001).accepted).toBe(true);
+
+    runtime.recordActorDisconnect('owner');
+    expect(runtime.snapshotFor('owner', 1_002).actors[0].possession).toBeNull();
+    expect(runtime.advance(1_600, DEFAULT_WORLD).damageEvents).toEqual([
+      expect.objectContaining({ source: 'piloted-drone', ownerId: 'owner', damage: expect.any(Number) }),
+    ]);
+    runtime.unregisterActor('owner');
+    const expired = runtime.snapshotFor('owner', 1_601);
+    expect(expired.actors).toEqual([]);
+    expect(expired.entities).toEqual([]);
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-piloted-drone',
+    }, 1_602)).toMatchObject({ accepted: false, reason: 'unknown-actor' });
+  });
+
+  it('atomically ends support, possession, timed modifiers, and deferred impacts on every match terminal path', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['adrenaline', 'yardhawk', 'carpet-bomber', 'chopper', 'nuke']));
+    earn(runtime, 15);
+    expect(runtime.activate(intent('adrenaline', 1, 1, 'activation-end-adrenaline'), 1_000, DEFAULT_WORLD).accepted).toBe(true);
+    expect(runtime.activate(intent('carpet-bomber', 3, 2, 'activation-end-carpet'), 1_001, DEFAULT_WORLD).accepted).toBe(true);
+    const chopperId = runtime.activate(intent('chopper', 4, 3, 'activation-end-chopper'), 1_002, DEFAULT_WORLD).entityIds[0];
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId: chopperId, action: 'toggle-chopper-gunner',
+    }, 1_003).accepted).toBe(true);
+
+    expect(runtime.modifiersForActor('owner', 1_004).active).toBe(true);
+    const activeEntityIds = runtime.snapshotFor('owner', 1_004).entities.map((entity) => entity.id);
+    expect(new Set(runtime.endMatch())).toEqual(new Set(activeEntityIds));
+    const ended = runtime.snapshotFor('owner', 1_005);
+    expect(ended.entities).toEqual([]);
+    expect(ended.placementMarkers).toEqual([]);
+    expect(ended.actors[0].possession).toBeNull();
+    expect(runtime.modifiersForActor('owner', 1_005).active).toBe(false);
+    expect(runtime.advance(20_000, DEFAULT_WORLD)).toEqual({
+      damageEvents: [], impactEvents: [], expiredEntityIds: [],
+    });
+    expect(runtime.endMatch()).toEqual([]);
   });
 
   it('derives exactly 20 deterministic in-bounds Carpet Bomber impacts from host seed only', () => {
@@ -433,6 +510,122 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('owner', 10_850).actors[0].revealedCareRewards).toHaveLength(1);
     runtime.advance(20_000, DEFAULT_WORLD);
     expect(runtime.snapshotFor('owner', 20_000).actors[0].revealedCareRewards).toHaveLength(1);
+  });
+
+  it('bounds the private care queue to the recipient protocol and leaves overflow crates claimable', () => {
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [
+        ...DEFAULT_WORLD.targets,
+        { id: 'collector', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+      ],
+    };
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    runtime.registerActor('collector', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    let lifeId = 1;
+    let now = 1_000;
+    for (let index = 0; index < MAX_RETAINED_CARE_REWARDS; index += 1) {
+      earn(runtime, 4);
+      const crateId = runtime.activate({
+        ...intent('care-package', 1, 1, `activation-care-cap-${index}`), lifeId,
+      }, now, world).entityIds[0];
+      runtime.advance(now + 6_000, world);
+      expect(runtime.beginCareCapture('collector', 1, crateId, now + 6_000, world).accepted).toBe(true);
+      runtime.advance(now + 7_250, world);
+      expect(runtime.snapshotFor('collector', now + 7_250).actors.find((actor) => actor.actorId === 'collector')?.revealedCareRewards)
+        .toHaveLength(index + 1);
+      lifeId += 1;
+      runtime.recordActorDeath('owner', lifeId);
+      now += 8_000;
+    }
+
+    earn(runtime, 4);
+    const overflowCrateId = runtime.activate({
+      ...intent('care-package', 1, 1, 'activation-care-cap-overflow'), lifeId,
+    }, now, world).entityIds[0];
+    runtime.advance(now + 6_000, world);
+    expect(runtime.beginCareCapture('collector', 1, overflowCrateId, now + 6_000, world))
+      .toEqual({ accepted: false, reason: 'reward-capacity' });
+    expect(runtime.snapshotFor('collector', now + 6_000)).toMatchObject({
+      entities: expect.arrayContaining([expect.objectContaining({ id: overflowCrateId, phase: 'landed' })]),
+      actors: expect.arrayContaining([expect.objectContaining({
+        actorId: 'collector', revealedCareRewards: expect.any(Array),
+      })]),
+    });
+    const collector = runtime.snapshotFor('collector', now + 6_000).actors.find((actor) => actor.actorId === 'collector');
+    expect(collector?.revealedCareRewards).toHaveLength(MAX_RETAINED_CARE_REWARDS);
+  });
+
+  it('admits at most one simultaneous care capture per actor', () => {
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [
+        ...DEFAULT_WORLD.targets,
+        { id: 'second-owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+        { id: 'collector', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] },
+      ],
+    };
+    const runtime = new HostKillstreakRuntime(7);
+    const careLoadout = loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']);
+    runtime.registerActor('owner', 0, 1, careLoadout);
+    runtime.registerActor('second-owner', 0, 1, careLoadout);
+    runtime.registerActor('collector', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    earn(runtime, 4, 'second-owner');
+    const firstCrateId = runtime.activate(intent('care-package', 1, 1, 'activation-care-first'), 1_000, world).entityIds[0];
+    const secondCrateId = runtime.activate({
+      ...intent('care-package', 1, 1, 'activation-care-second'), by: 'second-owner',
+    }, 1_000, world).entityIds[0];
+    runtime.advance(7_000, world);
+
+    expect(runtime.beginCareCapture('collector', 1, firstCrateId, 7_000, world).accepted).toBe(true);
+    expect(runtime.beginCareCapture('collector', 1, secondCrateId, 7_000, world))
+      .toEqual({ accepted: false, reason: 'actor-already-capturing' });
+  });
+
+  it('interrupts care capture on disconnect without revealing or consuming its reward', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 4);
+    const crateId = runtime.activate(intent('care-package', 1), 1_000, DEFAULT_WORLD).entityIds[0];
+    runtime.advance(7_000, DEFAULT_WORLD);
+    expect(runtime.beginCareCapture('owner', 1, crateId, 7_000, DEFAULT_WORLD).accepted).toBe(true);
+
+    runtime.recordActorDisconnect('owner');
+    expect(runtime.snapshotFor('owner', 7_500)).toMatchObject({
+      entities: expect.arrayContaining([expect.objectContaining({ id: crateId, phase: 'landed', captureProgress: null })]),
+      actors: [expect.objectContaining({ actorId: 'owner', revealedCareRewards: [] })],
+    });
+    runtime.advance(9_000, DEFAULT_WORLD);
+    expect(runtime.snapshotFor('owner', 9_000).actors[0].revealedCareRewards).toEqual([]);
+    expect(runtime.beginCareCapture('owner', 1, crateId, 9_000, DEFAULT_WORLD).accepted).toBe(true);
+    runtime.advance(10_250, DEFAULT_WORLD);
+    expect(runtime.snapshotFor('owner', 10_250).actors[0].revealedCareRewards).toHaveLength(1);
+  });
+
+  it('advances aggregate revisions with moving support and never rewinds on a regressed host clock', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']));
+    earn(runtime, 8);
+    runtime.activate(intent('chopper', 3), 1_000, DEFAULT_WORLD);
+    const activated = runtime.snapshotFor('owner', 1_000);
+    runtime.advance(2_000, DEFAULT_WORLD);
+    const advanced = runtime.snapshotFor('owner', 2_000);
+    expect(advanced.revision).toBeGreaterThan(activated.revision);
+    expect(advanced.entities[0].revision).toBeGreaterThan(activated.entities[0].revision);
+
+    runtime.advance(1_500, DEFAULT_WORLD);
+    const regressedClock = runtime.snapshotFor('owner', 2_000);
+    expect(regressedClock.revision).toBe(advanced.revision);
+    expect(regressedClock.entities[0].position).toEqual(advanced.entities[0].position);
+    expect(regressedClock.entities[0].attitude).toEqual(advanced.entities[0].attitude);
+
+    const beforeInvalid = regressedClock.revision;
+    expect(runtime.advance(Number.NaN, DEFAULT_WORLD)).toEqual({
+      damageEvents: [], impactEvents: [], expiredEntityIds: [],
+    });
+    expect(runtime.snapshotFor('owner', 2_000).revision).toBe(beforeInvalid);
   });
 
   it('produces identical host snapshots and exactly-once damage IDs for identical seed/time', () => {

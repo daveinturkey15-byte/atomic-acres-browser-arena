@@ -26,11 +26,30 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('event.targetLifeId !== localContinuity');
   });
 
-  it('keeps the registered host actor through the bounded disconnect/rejoin reservation', () => {
+  it('restores support possession immediately, then retains or removes the actor with the bounded rejoin reservation', () => {
     expect(source).toContain('killstreakRegisteredActors.has(message.by)');
     expect(source).toContain('shouldRetainRemoteCombatAuthority(');
     expect(source).toContain("privateLobbySnapshot?.phase ?? null");
-    expect(source).not.toMatch(/function removeRemote[\s\S]*?killstreakRegisteredActors\.delete/);
+    const removeStart = source.indexOf('function removeRemote(');
+    const removeEnd = source.indexOf('\nfunction activeSpawnMode(', removeStart);
+    const removeBlock = source.slice(removeStart, removeEnd);
+    expect(removeBlock).toContain('if (retainCombatAuthority) killstreakRuntime.recordActorDisconnect(id);');
+    expect(removeBlock).toContain('killstreakRuntime.unregisterActor(id);');
+    expect(removeBlock).toContain('killstreakRegisteredActors.delete(id);');
+    expect(removeBlock).toContain('markLobbyDisconnected(id);');
+    expect(source).toContain('killstreakRuntime.unregisterActor(playerId);');
+    expect(source).toContain('killstreakMatchEpoch === reservationMatchEpoch');
+  });
+
+  it('restores ordinary camera and weapon presentation on match termination', () => {
+    expect(source).toContain('killstreakRuntime.endMatch();');
+    const clearStart = source.indexOf('function clearFieldSupport()');
+    const clearEnd = source.indexOf('\nfunction updatePhysics(', clearStart);
+    const clearBlock = source.slice(clearStart, clearEnd);
+    expect(clearBlock).toContain('killstreakPresentation.setFirstPersonEntity(null);');
+    expect(clearBlock).toContain("document.documentElement.dataset.killstreakPossession = 'none';");
+    expect(clearBlock).toContain('camera.near = 0.08;');
+    expect(clearBlock).toContain('weaponView.root.visible = player.alive;');
   });
 
   it('keeps legacy offensive effects as admitted presentation adapters, never a second reward queue', () => {

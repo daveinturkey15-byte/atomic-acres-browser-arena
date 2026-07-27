@@ -11,6 +11,7 @@ import type {
 import {
   CARE_TARGET_MARKER_MAX_LIFETIME_MS,
   CARPET_TARGET_MARKER_MAX_LIFETIME_MS,
+  MAX_RETAINED_CARE_REWARDS,
   SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M,
   SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
 } from './killstreak-runtime';
@@ -176,7 +177,7 @@ function isActorSnapshot(value: unknown): boolean {
     || !validateKillstreakLoadout(value.loadout).valid
     || !Array.isArray(value.available) || value.available.length > 5 || !value.available.every((id) => ids.has(String(id)))
     || !finite(value.adrenalineRemainingMs, 0, 15_000)
-    || !Array.isArray(value.revealedCareRewards) || value.revealedCareRewards.length > 8
+    || !Array.isArray(value.revealedCareRewards) || value.revealedCareRewards.length > MAX_RETAINED_CARE_REWARDS
     || !value.revealedCareRewards.every((id) => ids.has(String(id)))) return false;
   if (value.possession === null) return true;
   return object(value.possession)
