@@ -121,7 +121,7 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(opener).toBeFocused();
   });
 
-  test('keeps the simple graphics choice separate from collapsed advanced WebGPU controls', async ({ page }) => {
+  test('keeps the simple graphics choice separate from collapsed advanced WebGPU controls', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await ready(page);
     await page.locator('#menu-tab-options').click();
@@ -150,6 +150,11 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
     }));
     expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 11 });
+    const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
+    mkdirSync(directory, { recursive: true });
+    const screenshot = resolve(directory, 'advanced-webgpu-controls-1280x720.png');
+    await page.screenshot({ path: screenshot, animations: 'disabled', fullPage: true });
+    await testInfo.attach('advanced-webgpu-controls-1280x720', { path: screenshot, contentType: 'image/png' });
   });
 
   test('persists an Advanced Graphics edit as Custom across the renderer rebuild', async ({ page }) => {

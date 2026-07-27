@@ -77,7 +77,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/pass65-settings.test.ts + src/adaptive-quality.test.ts',
   }),
   feature({
-    id: 'presentation-profile', title: 'Performance, High, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
+    id: 'presentation-profile', title: 'Quality, Performance and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
     sourceProbes: [
       { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom'" },
       { path: 'src/render-profile.ts', symbol: 'renderProfileConfig' },

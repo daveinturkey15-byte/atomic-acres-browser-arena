@@ -711,7 +711,7 @@
     },
     {
       "id": "presentation-profile",
-      "title": "Performance, High, Max and Custom presentation profiles",
+      "title": "Quality, Performance and Custom presentation profiles",
       "availability": "active",
       "owner": "src/pass65-settings.ts + src/render-profile.ts",
       "sourceProbes": [
@@ -1406,5 +1406,5 @@
     "adjustable": 15,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "f2fdf0c4f93a3629ae2c49c4577f380e868ff23f8ea39cf6999a0cc7bbb8c2d9"
+  "inventorySha256": "8a40650da878be5f2a29d5fc4b9bdd3ae13ecbec238af2fd381ed4c115bb1180"
 }
