@@ -7,6 +7,7 @@ const REQUIRED_GATES = Object.freeze([
   'qa:pass65:drone-asset',
   'qa:pass65:support-vehicles',
   'qa:pass65:operator-assets',
+  'qa:pass65:menu-previews',
 ]);
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));

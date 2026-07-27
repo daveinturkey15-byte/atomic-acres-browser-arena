@@ -6,6 +6,7 @@ import {
   menuPreviewVideoDefinition,
   menuPreviewVideoMarkup,
 } from './menu-preview-video';
+import { menuPreviewDefinition } from './menu-preview-camera';
 
 describe('prerecorded map-selection previews', () => {
   it('defines one distinct WebM, MP4, and poster for every selectable arena', () => {
@@ -16,9 +17,9 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.arenaId).toBe(id);
       expect(definition.durationSeconds).toBe(8);
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
-      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm$`));
-      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4$`));
-      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp$`));
+      expect(definition.webm).toMatch(new RegExp(`${id}\\.webm\\?v=pass65-preview-v2$`));
+      expect(definition.mp4).toMatch(new RegExp(`${id}\\.mp4\\?v=pass65-preview-v2$`));
+      expect(definition.poster).toMatch(new RegExp(`${id}\\.webp\\?v=pass65-preview-v2$`));
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
@@ -30,6 +31,13 @@ describe('prerecorded map-selection previews', () => {
     expect(menuPreviewVideoDefinition('rustworks-1v1').frame).toBe('helicopter');
     expect(menuPreviewVideoDefinition('gun-range').frame).toBe('cat');
     expect(menuPreviewVideoDefinition('gun-range').motionLabel).toContain('FIRST-PERSON');
+  });
+
+  it('keeps runtime presentation identities aligned with the offline choreography recipe', () => {
+    for (const arena of ARENA_SELECTIONS) {
+      expect(menuPreviewVideoDefinition(arena.id).presentationId)
+        .toBe(menuPreviewDefinition(arena.id).presentationId);
+    }
   });
 
   it('renders browser-safe autoplay markup with a poster fallback and no renderer ownership', () => {

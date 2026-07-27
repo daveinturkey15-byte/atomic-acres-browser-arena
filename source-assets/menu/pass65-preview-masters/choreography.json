@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 2,
+  "recipeId": "pass65-menu-preview-choreography-v2",
+  "coordinateSystem": "Blender Z-up metres; camera looks along local -Z",
+  "fps": 24,
+  "durationSeconds": 8,
+  "frameCount": 192,
+  "reviewFrames": [1, 48, 96, 144, 192],
+  "runtimeContract": "prerecorded compressed media only; static poster for reduced motion; zero arena construction or gameplay renderer submissions",
+  "media": {
+    "cacheKey": "pass65-preview-v2",
+    "containers": ["webm", "mp4"],
+    "poster": "webp",
+    "encodingBudget": {
+      "minimumAverageBitrateKbps": 300,
+      "maximumAverageBitrateKbps": 1100,
+      "maximumBytesPerVideo": 1100000,
+      "maximumPosterBytes": 80000,
+      "maximumReviewSheetBytes": 120000
+    },
+    "audioProfiles": {
+      "helicopter": { "id": "quiet-rotor-bed-v1", "minimumPeakDb": -48, "maximumPeakDb": -24 },
+      "cat": { "id": "quiet-range-roomtone-v1", "minimumPeakDb": -52, "maximumPeakDb": -27 }
+    }
+  },
+  "helicopter": {
+    "varianceAlgorithm": "xorshift32-cyclic-quintic-hold-v1",
+    "segmentCount": 8,
+    "holdFraction": 0.56,
+    "rotorTurnsPerLoop": 39,
+    "maximumPitchDegrees": 0.8,
+    "maximumYawDegrees": 1.2,
+    "maximumBankDegrees": 2.2,
+    "maximumAltitudeOffsetM": 0.75,
+    "maximumDirectionBiasDegrees": 0.6,
+    "maximumRadiusScaleDelta": 0.018,
+    "maximumLinearSpeedMps": 35,
+    "maximumLinearAccelerationMps2": 36,
+    "maximumAngularVelocityRadPerSecond": 1.2,
+    "maximumAngularAccelerationRadPerSecond2": 3
+  },
+  "arenas": {
+    "atomic-acres": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // NUKE TOWN",
+      "presentationId": "menu-video-helo-nuke-town-v2",
+      "cockpitAssetId": "pass65-sleek-cockpit-v1",
+      "seed": 65011201,
+      "fovDegrees": 68,
+      "posterFrame": 48,
+      "centre": [0, 0, 2],
+      "radius": [34, 25],
+      "altitudeM": 15.2,
+      "lookAt": [0, 0, 2],
+      "phaseRadians": 0.17,
+      "safeVolume": { "x": [-35.5, 35.5], "y": [-26.5, 26.5], "z": [14.2, 16.2] },
+      "reviewLabel": "Nuke Town cockpit flyover"
+    },
+    "skyline-terminal": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // TERMINAL",
+      "presentationId": "menu-video-helo-terminal-v2",
+      "cockpitAssetId": "pass65-sleek-cockpit-v1",
+      "seed": 65011202,
+      "fovDegrees": 68,
+      "posterFrame": 48,
+      "centre": [0, 0, 2.9],
+      "radius": [39, 28],
+      "altitudeM": 16.8,
+      "lookAt": [0, 1, 2.9],
+      "phaseRadians": -0.34,
+      "safeVolume": { "x": [-41, 41], "y": [-30, 30], "z": [15.8, 17.8] },
+      "reviewLabel": "Terminal cockpit flyover"
+    },
+    "rustworks-1v1": {
+      "kind": "helicopter",
+      "label": "HELO ORBIT // RUSTRIG",
+      "presentationId": "menu-video-helo-rustrig-v2",
+      "cockpitAssetId": "pass65-sleek-cockpit-v1",
+      "seed": 65011203,
+      "fovDegrees": 68,
+      "posterFrame": 48,
+      "centre": [0, 0, 7],
+      "radius": [36, 30],
+      "altitudeM": 22,
+      "lookAt": [0, 0, 7],
+      "phaseRadians": 0.48,
+      "safeVolume": { "x": [-38, 38], "y": [-32, 32], "z": [21, 23] },
+      "reviewLabel": "RustRig cockpit flyover"
+    },
+    "gun-range": {
+      "kind": "cat",
+      "label": "CAT-CAM // GUN RANGE",
+      "presentationId": "menu-video-cat-gun-range-v2",
+      "seed": 65011401,
+      "fovDegrees": 62,
+      "posterFrame": 96,
+      "safeVolume": { "x": [-2.1, 2.1], "y": [6.1, 14.2], "z": [0.96, 1.22] },
+      "path": [
+        [0, 13.8, 1.08],
+        [1.35, 12.3, 1.12],
+        [1.65, 9.7, 1.05],
+        [0.8, 7.35, 1.16],
+        [0, 6.55, 1.08],
+        [-0.9, 7.7, 1.12],
+        [-1.65, 10.1, 1.04],
+        [-1.25, 12.45, 1.13]
+      ],
+      "lookAtPath": [
+        [0, -6, 2.4],
+        [7.5, -10, 2.35],
+        [7.5, -21, 3.1],
+        [2.5, -33, 2.3],
+        [0, -36, 2.55],
+        [-2.5, -22, 3.05],
+        [-7.5, -10, 2.35],
+        [0, -6, 3.15]
+      ],
+      "momentLabels": [
+        "CURIOUS ENTRY",
+        "RIGHT TARGET TRACK",
+        "NEON CEILING GLANCE",
+        "PAW-UP DOWNRANGE BEAT",
+        "FAR TARGET HERO MOMENT",
+        "LEFT TARGET TRACK",
+        "EAR-TWITCH RETURN",
+        "COMFORTABLE LOOP HOME"
+      ],
+      "motionBounds": {
+        "maximumLinearSpeedMps": 4.2,
+        "maximumLinearAccelerationMps2": 8,
+        "maximumAngularVelocityRadPerSecond": 1.8,
+        "maximumAngularAccelerationRadPerSecond2": 6
+      },
+      "anatomyContract": {
+        "earCount": 2,
+        "pawCount": 2,
+        "toeCountPerPaw": 4,
+        "primitiveSphereCount": 0,
+        "materials": ["cat-fur-charcoal", "cat-fur-silver", "cat-pads-soft-coral", "cat-inner-ear"]
+      },
+      "reviewLabel": "Gun Range joyful feline first-person prowl"
+    }
+  }
+}

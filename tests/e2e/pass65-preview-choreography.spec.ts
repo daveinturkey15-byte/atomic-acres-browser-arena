@@ -9,6 +9,9 @@ type PreviewEvidence = {
   mediaState: string;
   videoCurrentSrc: string;
   videoPaused: boolean;
+  audioUnlocked: boolean;
+  videoMuted: boolean;
+  videoVolume: number;
   rendererEvidence: {
     renderCalls: number;
     presentation: { submissionSequence: number };
@@ -59,12 +62,16 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     await page.goto(`/${BASE_QUERY}`);
     await waitForPreview(page);
     const before = await previewEvidence(page);
+    expect(before.audioUnlocked).toBe(false);
+    expect(before.videoMuted).toBe(true);
+    expect(before.videoVolume).toBeGreaterThanOrEqual(0);
+    expect(before.videoVolume).toBeLessThanOrEqual(0.22);
 
     for (const [arenaId, frame, presentation] of [
-      ['skyline-terminal', 'helicopter', 'menu-video-helo-terminal-v1'],
-      ['rustworks-1v1', 'helicopter', 'menu-video-helo-rustrig-v1'],
-      ['gun-range', 'cat', 'menu-video-cat-gun-range-v1'],
-      ['atomic-acres', 'helicopter', 'menu-video-helo-nuke-town-v1'],
+      ['skyline-terminal', 'helicopter', 'menu-video-helo-terminal-v2'],
+      ['rustworks-1v1', 'helicopter', 'menu-video-helo-rustrig-v2'],
+      ['gun-range', 'cat', 'menu-video-cat-gun-range-v2'],
+      ['atomic-acres', 'helicopter', 'menu-video-helo-nuke-town-v2'],
     ] as const) {
       await page.locator(`.map-card[data-arena-id="${arenaId}"]`).click();
       const frameLocator = page.locator('#menu-preview-frame');
@@ -74,6 +81,8 @@ test.describe('Pass 65 prerecorded menu previews', () => {
       await expect(page.locator('#menu-preview-video source')).toHaveCount(2);
       const current = await previewEvidence(page);
       expect(current.arenaId).toBe(arenaId);
+      expect(current.audioUnlocked).toBe(true);
+      expect(current.videoMuted).toBe(current.videoVolume <= 0);
       expect(current.rendererEvidence.gameplayArenaPrepared).toBe(false);
       expect(current.rendererEvidence.arenaConstructionCount).toBe(0);
     }
@@ -94,12 +103,12 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     }
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-arena', 'gun-range');
     await expect.poll(async () => (await previewEvidence(page)).videoCurrentSrc, { timeout: 15_000 })
-      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)$/);
+      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-preview-v2$/);
     await page.waitForTimeout(400);
     const final = await previewEvidence(page);
     expect(final.arenaId).toBe('gun-range');
     expect(final.sourceCount).toBe(2);
-    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)$/);
+    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-preview-v2$/);
     expect(final.rendererEvidence.arenaConstructionCount).toBe(0);
   });
 

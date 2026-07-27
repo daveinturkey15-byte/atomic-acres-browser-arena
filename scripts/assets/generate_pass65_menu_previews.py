@@ -13,27 +13,50 @@ Run from the repository root with Blender 5.1 or newer:
 from __future__ import annotations
 
 import math
+import json
 import os
 from pathlib import Path
 from typing import Iterable
 
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Vector
 
 
 ROOT = Path(__file__).resolve().parents[2]
 MASTER_DIR = ROOT / "source-assets" / "menu" / "pass65-preview-masters"
 MASTER_DIR.mkdir(parents=True, exist_ok=True)
 CHOPPER_SOURCE = ROOT / "source-assets" / "blender" / "pass65-chopper-gunner.blend"
+CHOREOGRAPHY_PATH = MASTER_DIR / "choreography.json"
 FRAME_ROOT = ROOT / "artifacts" / "pass65" / "menu-preview-master-frames"
 FRAME_ROOT.mkdir(parents=True, exist_ok=True)
 
-FPS = 24
-SECONDS = 8
-FINAL_FRAME = FPS * SECONDS
+
+def load_choreography() -> dict[str, object]:
+    if not CHOREOGRAPHY_PATH.is_file():
+        raise RuntimeError(f"canonical preview choreography missing: {CHOREOGRAPHY_PATH}")
+    recipe = json.loads(CHOREOGRAPHY_PATH.read_text(encoding="utf-8"))
+    if recipe.get("schemaVersion") != 2:
+        raise RuntimeError("preview choreography must use schemaVersion 2")
+    if set(recipe.get("arenas", {})) != {"atomic-acres", "skyline-terminal", "rustworks-1v1", "gun-range"}:
+        raise RuntimeError("preview choreography arena set is incomplete")
+    return recipe
+
+
+CHOREOGRAPHY = load_choreography()
+FPS = int(CHOREOGRAPHY["fps"])
+SECONDS = int(CHOREOGRAPHY["durationSeconds"])
+FINAL_FRAME = int(CHOREOGRAPHY["frameCount"])
+if FINAL_FRAME != FPS * SECONDS:
+    raise RuntimeError("preview choreography frameCount must equal fps * durationSeconds")
 RESOLUTION_X = int(os.environ.get("AA_PREVIEW_WIDTH", "960"))
 RESOLUTION_Y = int(os.environ.get("AA_PREVIEW_HEIGHT", "540"))
 STILL_FRAME = int(os.environ.get("AA_PREVIEW_STILL_FRAME", "0"))
+STILL_FRAMES = tuple(
+    int(value)
+    for value in os.environ.get("AA_PREVIEW_STILL_FRAMES", "").split(",")
+    if value.strip()
+)
+SAVE_ONLY = os.environ.get("AA_PREVIEW_SAVE_ONLY", "0") == "1"
 
 
 def material(
@@ -62,6 +85,37 @@ def material(
         if strength_input is not None:
             strength_input.default_value = emission_strength
     return value
+
+
+def add_fur_microtexture(value, dark: tuple[float, float, float, float], light: tuple[float, float, float, float]) -> None:
+    """Give authored cat silhouettes a subtle spatial fur grain instead of flat plastic color."""
+    nodes = value.node_tree.nodes
+    links = value.node_tree.links
+    bsdf = nodes.get("Principled BSDF")
+    if bsdf is None:
+        raise RuntimeError(f"fur material {value.name} has no Principled BSDF")
+    coordinates = nodes.new("ShaderNodeTexCoord")
+    coordinates.name = f"{value.name}-generated-coordinates"
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.name = f"{value.name}-micro-fur-noise"
+    noise.inputs["Scale"].default_value = 54.0
+    noise.inputs["Detail"].default_value = 4.2
+    noise.inputs["Roughness"].default_value = 0.72
+    ramp = nodes.new("ShaderNodeValToRGB")
+    ramp.name = f"{value.name}-fur-colour-ramp"
+    ramp.color_ramp.elements[0].position = 0.25
+    ramp.color_ramp.elements[0].color = dark
+    ramp.color_ramp.elements[1].position = 0.78
+    ramp.color_ramp.elements[1].color = light
+    bump = nodes.new("ShaderNodeBump")
+    bump.name = f"{value.name}-micro-fur-bump"
+    bump.inputs["Strength"].default_value = 0.18
+    bump.inputs["Distance"].default_value = 0.018
+    links.new(coordinates.outputs["Generated"], noise.inputs["Vector"])
+    links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+    links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 
 
 def assign(obj, mat) -> None:
@@ -157,6 +211,116 @@ def polygon_plate(
     return obj
 
 
+def ellipse_plate(
+    name: str,
+    center: tuple[float, float],
+    radii: tuple[float, float],
+    z: float,
+    mat,
+    *,
+    vertices: int = 20,
+    thickness: float = 0.04,
+    bevel: float = 0.018,
+):
+    """Create an authored rounded silhouette without primitive-sphere anatomy."""
+    points = [
+        (
+            center[0] + math.cos(index / vertices * math.tau) * radii[0],
+            center[1] + math.sin(index / vertices * math.tau) * radii[1],
+        )
+        for index in range(vertices)
+    ]
+    return polygon_plate(name, points, z, mat, thickness=thickness, bevel=bevel)
+
+
+class XorShift32:
+    """Small cross-language PRNG used only to author deterministic preview tracks."""
+
+    def __init__(self, seed: int):
+        self.state = int(seed) & 0xFFFFFFFF or 0x9E3779B9
+
+    def next(self) -> float:
+        value = self.state
+        value ^= (value << 13) & 0xFFFFFFFF
+        value ^= value >> 17
+        value ^= (value << 5) & 0xFFFFFFFF
+        self.state = value & 0xFFFFFFFF
+        return self.state / 0x100000000
+
+    def signed(self) -> float:
+        return self.next() * 2.0 - 1.0
+
+
+def quintic(value: float) -> float:
+    return value * value * value * (value * (value * 6.0 - 15.0) + 10.0)
+
+
+def lerp(start: float, end: float, blend: float) -> float:
+    return start + (end - start) * blend
+
+
+def closed_catmull_rom(path: list[list[float]], progress: float) -> Vector:
+    if progress >= 1.0:
+        progress = 0.0
+    scaled = (progress % 1.0) * len(path)
+    index = int(math.floor(scaled)) % len(path)
+    local = scaled - math.floor(scaled)
+    points = [Vector(path[(index + offset) % len(path)]) for offset in (-1, 0, 1, 2)]
+    p0, p1, p2, p3 = points
+    return 0.5 * (
+        2.0 * p1
+        + (-p0 + p2) * local
+        + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * local * local
+        + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * local * local * local
+    )
+
+
+def build_helicopter_variance_track(seed: int) -> list[dict[str, float]]:
+    contract = CHOREOGRAPHY["helicopter"]
+    random = XorShift32(seed)
+    maxima = {
+        "pitch": float(contract["maximumPitchDegrees"]),
+        "yaw": float(contract["maximumYawDegrees"]),
+        "bank": float(contract["maximumBankDegrees"]),
+        "altitude": float(contract["maximumAltitudeOffsetM"]),
+        "direction": math.radians(float(contract["maximumDirectionBiasDegrees"])),
+        "radius": float(contract["maximumRadiusScaleDelta"]),
+    }
+    track: list[dict[str, float]] = []
+    for _ in range(int(contract["segmentCount"])):
+        # Most segments remain close to trim. A few make a restrained, coupled
+        # correction, with the hold/blend envelope applied by the sampler.
+        amount = (0.46 + random.next() * 0.54) if random.next() < 0.42 else (0.04 + random.next() * 0.14)
+        turn = random.signed() * amount
+        vertical = random.signed() * amount
+        direction = random.signed() * amount
+        track.append({
+            "pitch": (vertical * 0.92 - abs(turn) * 0.08) * maxima["pitch"],
+            "yaw": turn * maxima["yaw"],
+            "bank": (-turn * 0.88 + random.signed() * 0.12 * amount) * maxima["bank"],
+            "altitude": vertical * maxima["altitude"],
+            "direction": direction * maxima["direction"],
+            "radius": random.signed() * amount * maxima["radius"],
+        })
+    return track
+
+
+def sample_hold_track(track: list[dict[str, float]], progress: float) -> dict[str, float]:
+    if progress >= 1.0:
+        progress = 0.0
+    scaled = (progress % 1.0) * len(track)
+    index = int(math.floor(scaled)) % len(track)
+    local = scaled - math.floor(scaled)
+    hold_fraction = float(CHOREOGRAPHY["helicopter"]["holdFraction"])
+    if local <= hold_fraction:
+        blend = 0.0
+    else:
+        blend = quintic((local - hold_fraction) / (1.0 - hold_fraction))
+    start = track[index]
+    end = track[(index + 1) % len(track)]
+    return {key: lerp(start[key], end[key], blend) for key in start}
+
+
 def parent(child, owner) -> None:
     child.parent = owner
 
@@ -184,7 +348,17 @@ def reset_scene() -> dict[str, object]:
     scene.render.fps = FPS
     scene.render.fps_base = 1.0
     scene.render.use_file_extension = True
+    if hasattr(scene.render, "use_motion_blur"):
+        scene.render.use_motion_blur = True
+    if hasattr(scene.render, "motion_blur_shutter"):
+        scene.render.motion_blur_shutter = 0.32
+    if hasattr(scene.render, "motion_blur_position"):
+        scene.render.motion_blur_position = "CENTER"
     scene.view_settings.look = "AgX - Medium High Contrast"
+    scene["preview_recipe_id"] = CHOREOGRAPHY["recipeId"]
+    scene["preview_variance_algorithm"] = CHOREOGRAPHY["helicopter"]["varianceAlgorithm"]
+    scene["preview_review_frames"] = ",".join(str(frame) for frame in CHOREOGRAPHY["reviewFrames"])
+    scene["runtime_contract"] = "prerecorded-media-only-zero-gameplay-render-submissions"
 
     world = bpy.data.worlds.new("pass65-preview-world") if bpy.data.worlds.get("pass65-preview-world") is None else bpy.data.worlds["pass65-preview-world"]
     scene.world = world
@@ -209,7 +383,7 @@ def reset_scene() -> dict[str, object]:
     fill.location = (0, -8, 26)
     fill.rotation_euler = (0, 0, 0)
 
-    return {
+    materials = {
         "asphalt": material("asphalt", (0.035, 0.055, 0.07, 1), roughness=0.86),
         "concrete": material("concrete", (0.22, 0.25, 0.27, 1), roughness=0.78),
         "steel": material("gunmetal", (0.035, 0.08, 0.12, 1), metallic=0.82, roughness=0.24),
@@ -228,6 +402,9 @@ def reset_scene() -> dict[str, object]:
         "pink": material("cat-pads-soft-coral", (0.58, 0.16, 0.23, 1), emission=(0.22, 0.025, 0.045, 1), emission_strength=0.32, roughness=0.68),
         "pink_inner": material("cat-inner-ear", (0.48, 0.12, 0.18, 1), emission=(0.16, 0.018, 0.03, 1), emission_strength=0.24, roughness=0.76),
     }
+    add_fur_microtexture(materials["fur"], (0.012, 0.01, 0.016, 1), (0.075, 0.068, 0.082, 1))
+    add_fur_microtexture(materials["fur_highlight"], (0.13, 0.12, 0.14, 1), (0.48, 0.45, 0.43, 1))
+    return materials
 
 
 def add_point_light(name: str, location: tuple[float, float, float], color: tuple[float, float, float], energy: float, radius: float):
@@ -324,9 +501,9 @@ def build_gun_range(mats) -> None:
                 item.location.x = origin_x - travel
                 item.keyframe_insert(data_path="location", frame=1)
                 item.location.x = origin_x + travel
-                item.keyframe_insert(data_path="location", frame=FINAL_FRAME // 2 + 1)
+                item.keyframe_insert(data_path="location", frame=(FINAL_FRAME + 1) // 2)
                 item.location.x = origin_x - travel
-                item.keyframe_insert(data_path="location", frame=FINAL_FRAME + 1)
+                item.keyframe_insert(data_path="location", frame=FINAL_FRAME)
     for y in range(-33, 17, 7):
         cube("neon-ceiling-strip", (0, y, 7.08), (9.4, 0.11, 0.12), mats["cyan"] if y % 2 else mats["amber"], bevel=0.03)
     for x in (-11.4, 11.4):
@@ -340,7 +517,63 @@ def animate_rotor(rotor, final_frame: int, axis: int = 1) -> None:
     rotor.rotation_mode = "XYZ"
     rotor.rotation_euler[axis] = 0
     driver = rotor.driver_add("rotation_euler", axis).driver
-    driver.expression = f"frame * {math.tau * 38 / max(1, final_frame):.12f}"
+    turns = int(CHOREOGRAPHY["helicopter"]["rotorTurnsPerLoop"])
+    driver.expression = f"(frame - 1) * {math.tau * turns / max(1, final_frame - 1):.12f}"
+    rotor["preview_rotor_visible_first_person"] = True
+    rotor["preview_rotor_turns_per_loop"] = turns
+    rotor["preview_rotor_loop_frames"] = final_frame
+
+
+def strengthen_first_person_rotor_cue(rotor) -> None:
+    """Keep the authored rotor readable as a restrained, physical top-frame cue."""
+    for item in object_tree(rotor):
+        if item.type != "MESH":
+            continue
+        if "RotorBlade" in item.name:
+            # The accepted vehicle uses physically narrow blades. At 960x540
+            # they collapse below a pixel when viewed edge-on from the pilot
+            # socket, so widen only this offline presentation copy.
+            item.scale.x *= 3.2
+            cue = "authored-blade-motion-cue"
+            alpha = 0.20
+            emission_strength = 0.42
+        elif "RotorArc" in item.name:
+            cue = "authored-disc-motion-cue"
+            alpha = 0.115
+            emission_strength = 0.28
+        elif "RotorTip" in item.name:
+            cue = "authored-tip-motion-cue"
+            alpha = 0.42
+            emission_strength = 1.25
+        else:
+            continue
+        if not item.data.materials:
+            raise RuntimeError(f"first-person rotor cue has no authored material: {item.name}")
+        source = item.data.materials[0]
+        value = source.copy()
+        value.name = f"{source.name}-{cue}"
+        value.diffuse_color[3] = alpha
+        value.surface_render_method = "DITHERED"
+        if value.node_tree is None:
+            raise RuntimeError(f"first-person rotor cue material has no nodes: {value.name}")
+        bsdf = value.node_tree.nodes.get("Principled BSDF")
+        if bsdf is None:
+            raise RuntimeError(f"first-person rotor cue material has no Principled BSDF: {value.name}")
+        base = bsdf.inputs.get("Base Color")
+        material_alpha = bsdf.inputs.get("Alpha")
+        emission = bsdf.inputs.get("Emission Color") or bsdf.inputs.get("Emission")
+        emission_amount = bsdf.inputs.get("Emission Strength")
+        if base is not None:
+            base.default_value[3] = alpha
+        if material_alpha is not None:
+            material_alpha.default_value = alpha
+        if emission is not None and "RotorTip" not in item.name:
+            emission.default_value = (0.035, 0.26, 0.31, 1.0)
+        if emission_amount is not None:
+            emission_amount.default_value = emission_strength
+        item.data.materials[0] = value
+        item["preview_rotor_visual_cue"] = cue
+        item["preview_rotor_visual_alpha"] = alpha
 
 
 def object_tree(root) -> list[bpy.types.Object]:
@@ -351,6 +584,54 @@ def object_tree(root) -> list[bpy.types.Object]:
         result.append(item)
         stack.extend(item.children)
     return result
+
+
+def animate_cockpit_instruments(cockpit_tree: set[bpy.types.Object]) -> None:
+    radar_sweep = next((item for item in cockpit_tree if item.name.startswith("Chopper_RadarSweep_LOD0")), None)
+    target_ring = next((item for item in cockpit_tree if item.name.startswith("chopper-cockpit-hud-target-ring")), None)
+    if radar_sweep is None or target_ring is None:
+        raise RuntimeError("authored cockpit is missing radar sweep or HUD target-ring geometry")
+    radar_sweep.rotation_mode = "XYZ"
+    radar_driver = radar_sweep.driver_add("rotation_euler", 1).driver
+    radar_driver.expression = f"(frame - 1) * {math.tau * 2 / max(1, FINAL_FRAME - 1):.12f}"
+    radar_sweep["preview_instrument_animation"] = "two-exact-loop-radar-turns"
+    base_scale = target_ring.scale.copy()
+    for frame in range(1, FINAL_FRAME + 1):
+        progress = (frame - 1) / max(1, FINAL_FRAME - 1)
+        pulse = 1.0 + math.sin(progress * math.tau * 2.0) * 0.045
+        target_ring.scale = base_scale * pulse
+        target_ring.keyframe_insert(data_path="scale", frame=frame)
+    target_ring["preview_instrument_animation"] = "bounded-two-pulse-exact-loop"
+    set_linear_interpolation(target_ring)
+
+    for material_name, minimum, maximum in (
+        ("MAT_Pass65Chopper_HUDGreen", 2.8, 3.25),
+        ("MAT_Pass65Chopper_HUDCyan", 2.65, 3.05),
+    ):
+        used_materials = {
+            value
+            for item in cockpit_tree
+            if item.type == "MESH"
+            for value in item.data.materials
+            if value is not None
+        }
+        value = next((
+            candidate for candidate in used_materials
+            if candidate.name == material_name or candidate.name.startswith(f"{material_name}.")
+        ), None)
+        if value is None or value.node_tree is None:
+            raise RuntimeError(f"authored cockpit material missing: {material_name}")
+        bsdf = value.node_tree.nodes.get("Principled BSDF")
+        strength = None if bsdf is None else bsdf.inputs.get("Emission Strength")
+        if strength is None:
+            raise RuntimeError(f"authored cockpit material has no emission strength: {material_name}")
+        for frame in range(1, FINAL_FRAME + 1):
+            progress = (frame - 1) / max(1, FINAL_FRAME - 1)
+            blend = (math.sin(progress * math.tau * 2.0 - math.pi / 2.0) + 1.0) / 2.0
+            strength.default_value = lerp(minimum, maximum, blend)
+            strength.keyframe_insert(data_path="default_value", frame=frame)
+        value["preview_instrument_animation"] = "bounded-emission-breathe-exact-loop"
+        set_linear_interpolation(value.node_tree)
 
 
 def add_authored_helicopter_cockpit(rig) -> None:
@@ -405,134 +686,246 @@ def add_authored_helicopter_cockpit(rig) -> None:
     lod0.location.y += 0.055
     lod0["offline_preview_source"] = "source-assets/blender/pass65-chopper-gunner.blend"
     lod0["offline_preview_visibility"] = "first-person-cockpit-only"
+    lod0["preview_cockpit_contract"] = "authored-lod0-3d-cyan-green-glass"
+    lod0["preview_recipe_id"] = CHOREOGRAPHY["recipeId"]
+    animate_cockpit_instruments(cockpit_tree)
+    for name, location, color in (
+        ("cockpit-cyan-instrument-bounce", (-0.38, -0.20, -0.58), (0.03, 0.52, 1.0)),
+        ("cockpit-green-instrument-bounce", (0.34, -0.16, -0.62), (0.04, 1.0, 0.32)),
+    ):
+        light = add_point_light(name, location, color, 11, 0.26)
+        light["preview_cockpit_depth_light"] = True
+        parent(light, rig)
+    strengthen_first_person_rotor_cue(first_person_rotor)
     animate_rotor(first_person_rotor, FINAL_FRAME, axis=2)
 
 
-def camera_keyframe(rig, frame: int, position: Vector, look_at: Vector, bank: float) -> None:
+def camera_keyframe(
+    rig,
+    frame: int,
+    position: Vector,
+    look_at: Vector,
+    bank: float,
+    pitch: float = 0.0,
+    yaw: float = 0.0,
+    previous_rotation: Euler | None = None,
+) -> Euler:
     rig.location = position
     direction = look_at - position
-    rig.rotation_mode = "QUATERNION"
-    rig.rotation_quaternion = direction.to_track_quat("-Z", "Y")
+    correction = Euler((pitch, yaw, bank), "XYZ").to_quaternion()
+    orientation = direction.to_track_quat("-Z", "Y") @ correction
+    rotation = orientation.to_euler("XYZ", previous_rotation)
     rig.rotation_mode = "XYZ"
-    rig.rotation_euler.rotate_axis("Z", bank)
+    rig.rotation_euler = rotation
     rig.keyframe_insert(data_path="location", frame=frame)
     rig.keyframe_insert(data_path="rotation_euler", frame=frame)
+    return rotation.copy()
+
+
+def set_linear_interpolation(obj) -> None:
+    if obj.animation_data is None or obj.animation_data.action is None:
+        return
+    action = obj.animation_data.action
+    curves = list(getattr(action, "fcurves", ()))
+    for layer in getattr(action, "layers", ()):
+        for strip in layer.strips:
+            for channelbag in strip.channelbags:
+                curves.extend(channelbag.fcurves)
+    for curve in curves:
+        for point in curve.keyframe_points:
+            point.interpolation = "LINEAR"
 
 
 def animate_helicopter_camera(rig, map_name: str) -> None:
-    parameters = {
-        "atomic-acres": (34.0, 25.0, 15.2, Vector((0, 0, 2.0)), 0.17),
-        "skyline-terminal": (39.0, 28.0, 16.8, Vector((0, 1, 2.9)), -0.34),
-        "rustworks-1v1": (36.0, 30.0, 22.0, Vector((0, 0, 7.0)), 0.48),
-    }
-    radius_x, radius_y, altitude, look_at, phase = parameters[map_name]
-    keys = 16
-    for key in range(keys + 1):
-        progress = key / keys
-        theta = phase + progress * math.tau
-        # Smooth, coupled, deterministic corrections: no per-frame noise.
-        correction = math.sin(theta * 3.0 + 0.4) * 0.65 + math.sin(theta * 5.0 - 0.2) * 0.22
-        radius_scale = 1.0 + math.sin(theta * 2.0 + 0.7) * 0.018
+    recipe = CHOREOGRAPHY["arenas"][map_name]
+    radius_x, radius_y = (float(value) for value in recipe["radius"])
+    centre = Vector(recipe["centre"])
+    altitude = float(recipe["altitudeM"])
+    look_at = Vector(recipe["lookAt"])
+    phase = float(recipe["phaseRadians"])
+    track = build_helicopter_variance_track(int(recipe["seed"]))
+    rig["preview_recipe_id"] = CHOREOGRAPHY["recipeId"]
+    rig["preview_arena_id"] = map_name
+    rig["preview_seed"] = int(recipe["seed"])
+    rig["preview_variance_algorithm"] = CHOREOGRAPHY["helicopter"]["varianceAlgorithm"]
+    rig["preview_hold_fraction"] = float(CHOREOGRAPHY["helicopter"]["holdFraction"])
+    first_pose: tuple[Vector, Vector, float, float, float] | None = None
+    previous_rotation: Euler | None = None
+    for frame in range(1, FINAL_FRAME + 1):
+        progress = (frame - 1) / max(1, FINAL_FRAME - 1)
+        variance = sample_hold_track(track, progress)
+        theta = phase + progress * math.tau + variance["direction"]
+        radius_scale = 1.0 + variance["radius"]
         position = Vector((
-            math.cos(theta) * radius_x * radius_scale,
-            math.sin(theta) * radius_y * radius_scale,
-            altitude + correction,
+            centre.x + math.cos(theta) * radius_x * radius_scale,
+            centre.y + math.sin(theta) * radius_y * radius_scale,
+            altitude + variance["altitude"],
         ))
-        gaze = look_at + Vector((
-            math.sin(theta * 2.0) * 0.65,
-            math.cos(theta * 3.0) * 0.45,
-            math.sin(theta * 4.0) * 0.22,
-        ))
-        bank = math.radians(-math.sin(theta + 0.2) * 2.2 - math.sin(theta * 3.0) * 0.45)
-        frame = 1 + round(progress * FINAL_FRAME)
-        camera_keyframe(rig, frame, position, gaze, bank)
+        pose = (
+            position,
+            look_at,
+            math.radians(variance["bank"]),
+            math.radians(variance["pitch"]),
+            math.radians(variance["yaw"]),
+        )
+        if first_pose is None:
+            first_pose = pose
+        elif frame == FINAL_FRAME:
+            pose = first_pose
+        previous_rotation = camera_keyframe(rig, frame, *pose, previous_rotation=previous_rotation)
+    set_linear_interpolation(rig)
 
 
 def add_cat_pov(rig, mats) -> None:
     for side in (-1, 1):
-        ear_root = bpy.data.objects.new(f"authored-cat-ear-root-{'left' if side < 0 else 'right'}", None)
+        side_name = "left" if side < 0 else "right"
+        ear_root = bpy.data.objects.new(f"authored-cat-ear-root-{side_name}", None)
         bpy.context.collection.objects.link(ear_root)
-        ear_root.location = (side * 0.50, 0.06, -1.18)
-        ear_root.scale = (0.65, 0.65, 0.65)
+        ear_root.location = (side * 0.44, -0.015, -1.16)
+        ear_root.scale = (0.68, 0.68, 0.68)
+        ear_root["preview_anatomy"] = "ear"
+        ear_root["preview_side"] = side_name
         parent(ear_root, rig)
         outer = polygon_plate(
-            "authored-feline-ear-silhouette",
-            [(-0.23, 0.0), (-0.21, 0.12), (-0.11, 0.29), (side * 0.08, 0.43), (0.13, 0.28), (0.22, 0.11), (0.23, 0.0)],
+            f"authored-feline-ear-silhouette-{side_name}",
+            [(-0.28, -0.02), (-0.25, 0.14), (-0.14, 0.35), (0.0, 0.56), (0.14, 0.35), (0.25, 0.14), (0.28, -0.02)],
             0,
             mats["fur_highlight"],
-            thickness=0.065,
-            bevel=0.028,
+            thickness=0.078,
+            bevel=0.032,
         )
+        outer["preview_anatomy"] = "ear-shell"
         parent(outer, ear_root)
         inner = polygon_plate(
-            "authored-feline-ear-inner",
-            [(-0.13, 0.05), (-0.10, 0.15), (side * 0.055, 0.33), (0.08, 0.17), (0.13, 0.05)],
-            0.043,
+            f"authored-feline-ear-inner-{side_name}",
+            [(-0.16, 0.07), (-0.11, 0.21), (0.0, 0.43), (0.11, 0.21), (0.16, 0.07)],
+            0.052,
             mats["pink_inner"],
             thickness=0.018,
-            bevel=0.016,
+            bevel=0.019,
         )
+        inner["preview_anatomy"] = "ear-pinna"
         parent(inner, ear_root)
+        tuft = polygon_plate(
+            f"authored-feline-ear-tuft-{side_name}",
+            [(-0.09, 0.38), (-0.04, 0.58), (0.0, 0.43), (0.04, 0.60), (0.09, 0.38)],
+            0.061,
+            mats["fur"],
+            thickness=0.014,
+            bevel=0.01,
+        )
+        tuft["preview_anatomy"] = "ear-tuft"
+        parent(tuft, ear_root)
         ear_root.rotation_mode = "XYZ"
-        for frame, twitch in [(1, 0), (61, 0), (70, side * 4.5), (79, -side * 1.5), (88, 0), (FINAL_FRAME + 1, 0)]:
-            ear_root.rotation_euler[2] = math.radians(twitch)
+        for frame in range(1, FINAL_FRAME + 1):
+            progress = (frame - 1) / max(1, FINAL_FRAME - 1)
+            centre = 0.35 if side < 0 else 0.71
+            distance = abs(((progress - centre + 0.5) % 1.0) - 0.5)
+            twitch = 0.0 if distance >= 0.075 else math.cos(distance / 0.075 * math.pi / 2.0) ** 2
+            ear_root.rotation_euler = (math.radians(-1.5), 0, math.radians(side * (7.0 + twitch * 5.5)))
             ear_root.keyframe_insert(data_path="rotation_euler", frame=frame)
+        set_linear_interpolation(ear_root)
 
     for side in (-1, 1):
-        paw_root = bpy.data.objects.new(f"authored-cat-forepaw-root-{'left' if side < 0 else 'right'}", None)
+        side_name = "left" if side < 0 else "right"
+        paw_root = bpy.data.objects.new(f"authored-cat-forepaw-root-{side_name}", None)
         bpy.context.collection.objects.link(paw_root)
-        paw_root.location = (side * 0.35, -0.26, -1.04)
-        paw_root.scale = (0.72, 0.72, 0.72)
+        base_location = Vector((side * 0.34, -0.30, -1.05))
+        paw_root.location = base_location
+        paw_root.scale = (0.76, 0.76, 0.76)
+        paw_root["preview_anatomy"] = "paw"
+        paw_root["preview_side"] = side_name
         parent(paw_root, rig)
-        foreleg = uv_sphere("authored-cat-foreleg", (0, -0.13, -0.25), (0.19, 0.13, 0.31), mats["fur"])
-        palm = uv_sphere("authored-cat-paw-palm", (0, 0, 0), (0.25, 0.12, 0.23), mats["fur"])
+        foreleg = ellipse_plate(
+            f"authored-cat-foreleg-{side_name}", (0, -0.19), (0.18, 0.34), 0,
+            mats["fur"], thickness=0.09, bevel=0.028,
+        )
+        palm = ellipse_plate(
+            f"authored-cat-paw-palm-{side_name}", (0, 0.09), (0.28, 0.24), 0.012,
+            mats["fur"], thickness=0.11, bevel=0.032,
+        )
+        foreleg["preview_anatomy"] = "foreleg"
+        palm["preview_anatomy"] = "palm"
         parent(foreleg, paw_root)
         parent(palm, paw_root)
-        for toe_x in (-0.15, -0.05, 0.05, 0.15):
-            toe = uv_sphere("authored-cat-paw-toe", (toe_x, 0.045, 0.19), (0.082, 0.065, 0.105), mats["fur_highlight"])
-            pad = uv_sphere("authored-cat-digital-pad", (toe_x, 0.052, 0.295), (0.032, 0.018, 0.037), mats["pink"])
+        for toe_index, toe_x in enumerate((-0.18, -0.06, 0.06, 0.18), start=1):
+            toe = ellipse_plate(
+                f"authored-cat-paw-toe-{side_name}-{toe_index}", (toe_x, 0.30), (0.075, 0.115), 0.025,
+                mats["fur_highlight"], vertices=16, thickness=0.075, bevel=0.025,
+            )
+            pad = ellipse_plate(
+                f"authored-cat-digital-pad-{side_name}-{toe_index}", (toe_x, 0.32), (0.034, 0.047), 0.071,
+                mats["pink"], vertices=14, thickness=0.018, bevel=0.01,
+            )
+            toe["preview_anatomy"] = "toe"
+            toe["preview_side"] = side_name
+            toe["preview_toe_index"] = toe_index
+            pad["preview_anatomy"] = "digital-pad"
             parent(toe, paw_root)
             parent(pad, paw_root)
-        central_pad = uv_sphere("authored-cat-central-pad", (0, -0.015, 0.285), (0.08, 0.022, 0.055), mats["pink"])
+        central_pad = ellipse_plate(
+            f"authored-cat-central-pad-{side_name}", (0, 0.13), (0.09, 0.07), 0.072,
+            mats["pink"], vertices=18, thickness=0.018, bevel=0.012,
+        )
+        central_pad["preview_anatomy"] = "central-pad"
         parent(central_pad, paw_root)
         paw_root.rotation_mode = "XYZ"
-        for frame, lift, splay in [
-            (1, 0, 0),
-            (FINAL_FRAME // 4 + 1, side * 3.5, -side * 2.0),
-            (FINAL_FRAME // 2 + 1, 0, 0),
-            (FINAL_FRAME * 3 // 4 + 1, -side * 2.5, side * 1.5),
-            (FINAL_FRAME + 1, 0, 0),
-        ]:
-            paw_root.rotation_euler = (math.radians(lift), math.radians(splay), math.radians(side * lift * 0.35))
+        for frame in range(1, FINAL_FRAME + 1):
+            progress = (frame - 1) / max(1, FINAL_FRAME - 1)
+            centre = 0.43 if side < 0 else 0.79
+            distance = abs(((progress - centre + 0.5) % 1.0) - 0.5)
+            lift = 0.0 if distance >= 0.10 else math.cos(distance / 0.10 * math.pi / 2.0) ** 2
+            paw_root.location = base_location + Vector((0, lift * 0.075, lift * 0.035))
+            paw_root.rotation_euler = (
+                math.radians(-lift * 8.0),
+                math.radians(-side * lift * 2.5),
+                math.radians(side * (2.0 + lift * 3.0)),
+            )
+            paw_root.keyframe_insert(data_path="location", frame=frame)
             paw_root.keyframe_insert(data_path="rotation_euler", frame=frame)
+        set_linear_interpolation(paw_root)
     add_point_light("cat-pov-cyan-rim", (0, -0.08, -0.68), (0.08, 0.55, 1.0), 9, 0.28).parent = rig
 
 
 def animate_cat_camera(rig) -> None:
-    positions = [
-        Vector((0.0, 15.0, 1.05)), Vector((4.8, 10.0, 1.10)), Vector((7.0, 1.0, 1.00)),
-        Vector((4.2, -8.0, 1.12)), Vector((0.0, -18.0, 1.02)), Vector((-4.8, -8.0, 1.08)),
-        Vector((-7.0, 2.0, 1.00)), Vector((-4.0, 11.0, 1.13)), Vector((0.0, 15.0, 1.05)),
-    ]
-    looks = [
-        Vector((0, -8, 2.3)), Vector((7.5, -10, 2.2)), Vector((2.5, -21, 2.8)),
-        Vector((0, -31, 2.4)), Vector((0, -36, 2.0)), Vector((-4.0, -22, 3.1)),
-        Vector((-7.5, -7, 2.0)), Vector((0, -5, 3.2)), Vector((0, -8, 2.3)),
-    ]
-    for index, (position, look) in enumerate(zip(positions, looks)):
-        frame = 1 + round(index / (len(positions) - 1) * FINAL_FRAME)
-        bob = math.sin(index * math.pi * 0.75) * 0.03
-        camera_keyframe(rig, frame, position + Vector((0, 0, bob)), look, math.radians(math.sin(index * 1.7) * 1.0))
+    recipe = CHOREOGRAPHY["arenas"]["gun-range"]
+    rig["preview_recipe_id"] = CHOREOGRAPHY["recipeId"]
+    rig["preview_arena_id"] = "gun-range"
+    rig["preview_seed"] = int(recipe["seed"])
+    rig["preview_motion_bounds"] = json.dumps(recipe["motionBounds"], sort_keys=True)
+    first_pose: tuple[Vector, Vector, float] | None = None
+    previous_rotation: Euler | None = None
+    for frame in range(1, FINAL_FRAME + 1):
+        progress = (frame - 1) / max(1, FINAL_FRAME - 1)
+        position = closed_catmull_rom(recipe["path"], progress)
+        look = closed_catmull_rom(recipe["lookAtPath"], progress)
+        # Four light footsteps and a curious head cant; both return exactly to
+        # the first frame so the prerecorded loop has no camera snap.
+        bob = math.sin(progress * math.tau * 4.0) * 0.018
+        bank = math.radians(math.sin(progress * math.tau * 2.0) * 0.75)
+        pose = (position + Vector((0, 0, bob)), look, bank)
+        if first_pose is None:
+            first_pose = pose
+        elif frame == FINAL_FRAME:
+            pose = first_pose
+        previous_rotation = camera_keyframe(rig, frame, *pose, previous_rotation=previous_rotation)
+    set_linear_interpolation(rig)
 
 
-def add_camera_rig(kind: str, mats):
+def add_camera_rig(kind: str, arena_id: str, mats):
     rig = bpy.data.objects.new(f"{kind}-preview-camera-rig", None)
     bpy.context.collection.objects.link(rig)
+    recipe = CHOREOGRAPHY["arenas"][arena_id]
+    rig["preview_kind"] = kind
+    rig["preview_arena_id"] = arena_id
+    rig["preview_recipe_id"] = CHOREOGRAPHY["recipeId"]
     camera_data = bpy.data.cameras.new(f"{kind}-preview-camera")
-    camera_data.lens = 28 if kind == "cat" else 32
     camera_data.sensor_width = 36
+    camera_data.angle = math.radians(float(recipe["fovDegrees"]))
     camera = bpy.data.objects.new(f"{kind}-preview-camera", camera_data)
     bpy.context.collection.objects.link(camera)
+    camera["preview_fov_degrees"] = float(recipe["fovDegrees"])
+    camera["preview_static_poster_frame"] = int(recipe["posterFrame"])
     camera.parent = rig
     camera.location = (0, 0, 0)
     camera.rotation_euler = (0, 0, 0)
@@ -558,31 +951,43 @@ def render(map_name: str) -> None:
         raise ValueError(map_name)
 
     is_cat = map_name == "gun-range"
-    rig = add_camera_rig("cat" if is_cat else "helicopter", mats)
+    rig = add_camera_rig("cat" if is_cat else "helicopter", map_name, mats)
     if is_cat:
         animate_cat_camera(rig)
     else:
         animate_helicopter_camera(rig, map_name)
 
     scene = bpy.context.scene
+    scene["preview_arena_id"] = map_name
+    scene["preview_seed"] = int(CHOREOGRAPHY["arenas"][map_name]["seed"])
+    scene["preview_kind"] = CHOREOGRAPHY["arenas"][map_name]["kind"]
+    scene["preview_fov_degrees"] = float(CHOREOGRAPHY["arenas"][map_name]["fovDegrees"])
+    scene["preview_poster_frame"] = int(CHOREOGRAPHY["arenas"][map_name]["posterFrame"])
     frame_directory = FRAME_ROOT / map_name
     frame_directory.mkdir(parents=True, exist_ok=True)
     scene.render.filepath = str(frame_directory / "frame-")
     scene.frame_set(1)
     bpy.ops.wm.save_as_mainfile(filepath=str(MASTER_DIR / f"{map_name}.blend"))
-    if STILL_FRAME > 0:
-        scene.frame_set(min(FINAL_FRAME, STILL_FRAME))
-        scene.render.filepath = str(frame_directory / f"frame-{scene.frame_current:04d}.png")
-        bpy.ops.render.render(write_still=True)
+    if SAVE_ONLY:
+        return
+    requested_stills = STILL_FRAMES or ((STILL_FRAME,) if STILL_FRAME > 0 else ())
+    if requested_stills:
+        for still_frame in requested_stills:
+            if still_frame < 1 or still_frame > FINAL_FRAME:
+                raise RuntimeError(f"preview still frame outside 1..{FINAL_FRAME}: {still_frame}")
+            scene.frame_set(still_frame)
+            scene.render.filepath = str(frame_directory / f"frame-{scene.frame_current:04d}.png")
+            bpy.ops.render.render(write_still=True)
     else:
         bpy.ops.render.render(animation=True)
 
 
-# Pass 65 vehicle refreshes intentionally leave the accepted Gun Range cat
-# master untouched. Regenerating it remains an explicit, opt-in authoring act.
 requested_arenas = tuple(filter(None, os.environ.get(
     "AA_PREVIEW_ARENAS",
-    "atomic-acres,skyline-terminal,rustworks-1v1",
+    "atomic-acres,skyline-terminal,rustworks-1v1,gun-range",
 ).split(",")))
+unknown_arenas = set(requested_arenas) - set(CHOREOGRAPHY["arenas"])
+if unknown_arenas:
+    raise RuntimeError(f"unknown preview arenas requested: {sorted(unknown_arenas)}")
 for arena in requested_arenas:
     render(arena)

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_SELECTIONS } from '../map-selection';
-import {
-  MENU_PREVIEW_VISIT_SEED_SLOTS,
-  menuPreviewDefinition,
-  menuPreviewPose,
-  menuPreviewVisitSeed,
-} from './menu-preview-camera';
+import { ARENA_SELECTIONS, type ArenaId } from '../map-selection';
+import { menuPreviewDefinition, menuPreviewPose } from './menu-preview-camera';
 
 function distance(left: readonly number[], right: readonly number[]): number {
   return Math.hypot(...left.map((value, index) => value - (right[index] ?? 0)));
@@ -22,97 +17,101 @@ function angleBetween(left: readonly number[], right: readonly number[]): number
   return Math.acos(Math.max(-1, Math.min(1, dot)));
 }
 
-describe('menu map preview camera', () => {
-  it('defines a bounded presentation pose for every selectable arena', () => {
+function expectInsideSafeVolume(arenaId: ArenaId, position: readonly number[]): void {
+  const bounds = menuPreviewDefinition(arenaId).safeVolume;
+  expect(position[0]).toBeGreaterThanOrEqual(bounds.x[0]);
+  expect(position[0]).toBeLessThanOrEqual(bounds.x[1]);
+  expect(position[1]).toBeGreaterThanOrEqual(bounds.y[0]);
+  expect(position[1]).toBeLessThanOrEqual(bounds.y[1]);
+  expect(position[2]).toBeGreaterThanOrEqual(bounds.z[0]);
+  expect(position[2]).toBeLessThanOrEqual(bounds.z[1]);
+}
+
+describe('canonical prerecorded menu preview choreography', () => {
+  it('defines the same eight-second authored recipe for every selectable arena', () => {
     for (const arena of ARENA_SELECTIONS) {
-      const pose = menuPreviewPose(arena.id, 1_234);
-      expect([...pose.position, ...pose.target, pose.fov, pose.phase].every(Number.isFinite)).toBe(true);
-      expect(pose.fov).toBeGreaterThanOrEqual(50);
-      expect(pose.fov).toBeLessThanOrEqual(75);
-      expect(pose.label).toContain(arena.selectorLabel);
+      const definition = menuPreviewDefinition(arena.id);
+      expect(definition.recipeId).toBe('pass65-menu-preview-choreography-v2');
+      expect(definition.durationMs).toBe(8_000);
+      expect(definition.reviewFrames).toEqual([1, 48, 96, 144, 192]);
+      expect(definition.label).toContain(arena.selectorLabel);
+      expect(definition.fovDegrees).toBeGreaterThanOrEqual(60);
+      expect(definition.fovDegrees).toBeLessThanOrEqual(70);
     }
   });
 
-  it('uses helicopter framing for arenas and first-person cat framing for the range', () => {
-    expect(menuPreviewDefinition('atomic-acres').frame).toBe('helicopter');
-    expect(menuPreviewDefinition('skyline-terminal').frame).toBe('helicopter');
-    expect(menuPreviewDefinition('rustworks-1v1').frame).toBe('helicopter');
-    expect(menuPreviewDefinition('gun-range').frame).toBe('cat');
-  });
-
-  it('animates normal previews while reduced motion stays deterministic', () => {
-    expect(menuPreviewPose('atomic-acres', 0).position).not.toEqual(menuPreviewPose('atomic-acres', 2_000).position);
-    expect(menuPreviewPose('gun-range', 0).position).not.toEqual(menuPreviewPose('gun-range', 900).position);
-    expect(menuPreviewPose('atomic-acres', 0, true)).toEqual(menuPreviewPose('atomic-acres', 8_000, true));
-    expect(menuPreviewPose('gun-range', 0, true)).toEqual(menuPreviewPose('gun-range', 8_000, true));
-  });
-
-  it('keeps helicopter corrections subtle, smooth, seeded, and exactly reviewable', () => {
+  it('uses authored LOD0 helicopter framing and a dedicated cat POV for the range', () => {
     for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1'] as const) {
       const definition = menuPreviewDefinition(arenaId);
-      expect(definition.frame).toBe('helicopter');
-      if (definition.frame !== 'helicopter') throw new Error('unreachable definition');
+      expect(definition.kind).toBe('helicopter');
+      if (definition.kind !== 'helicopter') throw new Error('unreachable definition');
       expect(definition.cockpitAssetId).toBe('pass65-sleek-cockpit-v1');
-      const seed = `review-${arenaId}`;
-      let previous = menuPreviewPose(arenaId, 0, false, seed);
-      for (let timeMs = 16; timeMs <= definition.durationMs * 4; timeMs += 16) {
-        const pose = menuPreviewPose(arenaId, timeMs, false, seed);
-        expect(Math.abs(pose.variance.pitchDegrees)).toBeLessThanOrEqual(0.9);
-        expect(Math.abs(pose.variance.yawDegrees)).toBeLessThanOrEqual(1.4);
-        expect(Math.abs(pose.variance.bankDegrees)).toBeLessThanOrEqual(2.3);
-        expect(Math.abs(pose.variance.altitudeM)).toBeLessThanOrEqual(0.85);
-        expect(Math.abs(pose.variance.directionBiasDegrees)).toBeLessThanOrEqual(0.81);
+    }
+    expect(menuPreviewDefinition('gun-range').kind).toBe('cat');
+  });
+
+  it('holds occasional helicopter trim values and blends bounded seeded corrections', () => {
+    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1'] as const) {
+      const definition = menuPreviewDefinition(arenaId);
+      const unique = new Set<string>();
+      let heldFramePairs = 0;
+      let previous = menuPreviewPose(arenaId, 0);
+      for (let frame = 1; frame <= 192; frame += 1) {
+        const timeMs = (frame - 1) / 191 * definition.durationMs;
+        const pose = menuPreviewPose(arenaId, timeMs);
+        expectInsideSafeVolume(arenaId, pose.position);
+        expect(Math.abs(pose.variance.pitchDegrees)).toBeLessThanOrEqual(0.8);
+        expect(Math.abs(pose.variance.yawDegrees)).toBeLessThanOrEqual(1.2);
+        expect(Math.abs(pose.variance.bankDegrees)).toBeLessThanOrEqual(2.2);
+        expect(Math.abs(pose.variance.altitudeM)).toBeLessThanOrEqual(0.75);
+        expect(Math.abs(pose.variance.directionBiasDegrees)).toBeLessThanOrEqual(0.6);
+        expect(Math.abs(pose.variance.radiusScaleDelta)).toBeLessThanOrEqual(0.018);
         expect(pose.variance.speedScale).toBeGreaterThanOrEqual(0.92);
         expect(pose.variance.speedScale).toBeLessThanOrEqual(1.08);
-        expect(distance(previous.position, pose.position)).toBeLessThan(0.42);
-        expect(angleBetween(
-          viewDirection(previous.position, previous.target),
-          viewDirection(pose.position, pose.target),
-        )).toBeLessThan(0.035);
+        const signature = JSON.stringify(pose.variance);
+        unique.add(signature);
+        if (frame > 1 && signature === JSON.stringify(previous.variance)) heldFramePairs += 1;
+        expect(distance(previous.position, pose.position)).toBeLessThan(1.8);
         previous = pose;
       }
-      const start = menuPreviewPose(arenaId, 0, false, seed);
-      const seam = menuPreviewPose(arenaId, definition.durationMs * 4, false, seed);
+      expect(unique.size).toBeGreaterThan(20);
+      expect(heldFramePairs).toBeGreaterThan(40);
+      const start = menuPreviewPose(arenaId, 0);
+      const seam = menuPreviewPose(arenaId, definition.durationMs);
       expect(distance(start.position, seam.position)).toBeLessThan(0.000_001);
       expect(distance(start.target, seam.target)).toBeLessThan(0.000_001);
-      expect(seam.variance.pitchDegrees).toBeCloseTo(start.variance.pitchDegrees, 10);
-      expect(seam.variance.yawDegrees).toBeCloseTo(start.variance.yawDegrees, 10);
-      expect(seam.variance.bankDegrees).toBeCloseTo(start.variance.bankDegrees, 10);
-      expect(seam.variance.altitudeM).toBeCloseTo(start.variance.altitudeM, 10);
-      expect(seam.variance.directionBiasDegrees).toBeCloseTo(start.variance.directionBiasDegrees, 10);
-      expect(seam.variance.speedScale).toBeCloseTo(start.variance.speedScale, 6);
-      expect(menuPreviewPose(arenaId, 7_500, false, 'seed-a').variance)
-        .not.toEqual(menuPreviewPose(arenaId, 7_500, false, 'seed-b').variance);
-      expect(menuPreviewPose(arenaId, 7_500, false, seed)).toEqual(menuPreviewPose(arenaId, 7_500, false, seed));
+      expect(seam.variance).toEqual(start.variance);
     }
   });
 
-  it('gives cat-cam a bounded authored moment path with a clean comfortable loop', () => {
+  it('keeps the cat path compact, smooth, varied, and exactly looped', () => {
     const definition = menuPreviewDefinition('gun-range');
-    expect(definition.frame).toBe('cat');
-    if (definition.frame !== 'cat') throw new Error('unreachable definition');
-    expect(definition.durationMs).toBe(24_000);
-    expect(new Set(definition.momentLabels).size).toBe(definition.momentLabels.length);
+    expect(definition.kind).toBe('cat');
+    if (definition.kind !== 'cat') throw new Error('unreachable definition');
+    expect(new Set(definition.momentLabels).size).toBe(8);
+    const deltaSeconds = definition.durationMs / 1_000 / 191;
     const seenMoments = new Set<string>();
     let previous = menuPreviewPose('gun-range', 0);
+    let previousVelocity = 0;
     let previousAngularVelocity = 0;
-    for (let timeMs = 16; timeMs <= definition.durationMs; timeMs += 16) {
+    for (let frame = 2; frame <= 191; frame += 1) {
+      const timeMs = (frame - 1) / 191 * definition.durationMs;
       const pose = menuPreviewPose('gun-range', timeMs);
-      expect(pose.position[0]).toBeGreaterThanOrEqual(-8.5);
-      expect(pose.position[0]).toBeLessThanOrEqual(8.8);
-      expect(pose.position[1]).toBeGreaterThanOrEqual(1.05);
-      expect(pose.position[1]).toBeLessThanOrEqual(1.35);
-      expect(pose.position[2]).toBeGreaterThanOrEqual(13.4);
-      expect(pose.position[2]).toBeLessThanOrEqual(17.3);
-      expect(distance(previous.position, pose.position)).toBeLessThan(0.09);
+      expectInsideSafeVolume('gun-range', pose.position);
+      const velocity = distance(previous.position, pose.position) / deltaSeconds;
       const angularVelocity = angleBetween(
         viewDirection(previous.position, previous.target),
         viewDirection(pose.position, pose.target),
-      ) / 0.016;
-      expect(angularVelocity).toBeLessThanOrEqual(1.75);
-      if (timeMs > 16) {
-        expect(Math.abs(angularVelocity - previousAngularVelocity) / 0.016).toBeLessThanOrEqual(3);
+      ) / deltaSeconds;
+      expect(velocity).toBeLessThanOrEqual(definition.motionBounds.maximumLinearSpeedMps);
+      expect(angularVelocity).toBeLessThanOrEqual(definition.motionBounds.maximumAngularVelocityRadPerSecond);
+      if (frame > 2) {
+        expect(Math.abs(velocity - previousVelocity) / deltaSeconds)
+          .toBeLessThanOrEqual(definition.motionBounds.maximumLinearAccelerationMps2);
+        expect(Math.abs(angularVelocity - previousAngularVelocity) / deltaSeconds)
+          .toBeLessThanOrEqual(definition.motionBounds.maximumAngularAccelerationRadPerSecond2);
       }
+      previousVelocity = velocity;
       previousAngularVelocity = angularVelocity;
       seenMoments.add(pose.momentLabel);
       previous = pose;
@@ -122,18 +121,15 @@ describe('menu map preview camera', () => {
     const seam = menuPreviewPose('gun-range', definition.durationMs);
     expect(distance(start.position, seam.position)).toBeLessThan(0.000_001);
     expect(distance(start.target, seam.target)).toBeLessThan(0.000_001);
-    expect(seam.bankRadians).toBeCloseTo(start.bankRadians, 10);
+    expect(seam.bankRadians).toBeCloseTo(start.bankRadians, 12);
   });
 
-  it('derives deterministic but distinct correction tracks for each menu visit', () => {
-    const first = menuPreviewVisitSeed('capture-seed', 1);
-    const revisit = menuPreviewVisitSeed('capture-seed', 2);
-    expect(first).toBe(menuPreviewVisitSeed('capture-seed', 1));
-    expect(revisit).not.toBe(first);
-    expect(menuPreviewPose('atomic-acres', 2_500, false, revisit).variance)
-      .not.toEqual(menuPreviewPose('atomic-acres', 2_500, false, first).variance);
-    expect(menuPreviewVisitSeed('capture-seed', Number.NaN)).toBe(menuPreviewVisitSeed('capture-seed', 0));
-    expect(menuPreviewVisitSeed('capture-seed', MENU_PREVIEW_VISIT_SEED_SLOTS))
-      .toBe(menuPreviewVisitSeed('capture-seed', 0));
+  it('uses the authored poster pose as the deterministic reduced-motion fallback', () => {
+    for (const arena of ARENA_SELECTIONS) {
+      const first = menuPreviewPose(arena.id, 0, true);
+      expect(menuPreviewPose(arena.id, 7_999, true)).toEqual(first);
+      expect(first.momentLabel).toBe('STATIC POSTER');
+      expect(first.variance.speedScale).toBe(1);
+    }
   });
 });

@@ -3,6 +3,7 @@ dist/
 .vite/
 .swarm/
 __pycache__/
+*.blend1
 qwen_swarm.py
 *.log
 .DS_Store
