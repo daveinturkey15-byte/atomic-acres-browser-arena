@@ -285,6 +285,7 @@ export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteCon
 export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
   runtimeCallsite('adrenalineState', 'adrenalineActive', 1, ['support.adrenaline-state']),
   runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
+  runtimeCallsite('shedDoorMotion', 'blocker.position.distanceTo(camera.position)', 1, ['shed.door-motion']),
   runtimeCallsite('shedDoorMotion', 'nearest.distance', 1, ['shed.door-motion']),
   runtimeCallsite('coverImpact', 'point.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('coverImpact', 'position.distanceTo(player.position)', 1, ['world.projectile-impact']),
