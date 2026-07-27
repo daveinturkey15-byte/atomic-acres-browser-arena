@@ -8728,7 +8728,7 @@ function throwBotGrenade(
   const flightTime = THREE.MathUtils.clamp(horizontalDistance / 12, 0.72, 1.35);
   const velocity = targetGround.clone().sub(origin).divideScalar(flightTime);
   velocity.y += 9 * flightTime;
-  const mesh = createGrenadePresentation('frag');
+  const mesh = createGrenadePresentation(grenade);
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
@@ -9572,7 +9572,7 @@ function throwGrenade(): void {
     nonce: randomNonce(),
   });
   localGrenadeActionSequence += 1;
-  const mesh = createGrenadePresentation(player.selectedGrenade === 'semtex' ? 'semtex' : 'frag');
+  const mesh = createGrenadePresentation(player.selectedGrenade);
   mesh.position.copy(origin);
   mesh.castShadow = true;
   scene.add(mesh);
@@ -9598,7 +9598,7 @@ function throwGrenade(): void {
 }
 
 function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-throw' }>, ownerTeam: Team): void {
-  const mesh = createGrenadePresentation(message.grenade === 'semtex' ? 'semtex' : 'frag');
+  const mesh = createGrenadePresentation(message.grenade);
   mesh.position.fromArray(message.origin);
   mesh.castShadow = true;
   scene.add(mesh);

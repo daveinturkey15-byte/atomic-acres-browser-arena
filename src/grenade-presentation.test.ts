@@ -7,6 +7,7 @@ import {
   SEMTEX_BUNDLE_MAX_DIMENSION,
   createGrenadePresentation,
   disposeGrenadePresentation,
+  grenadePresentationFamily,
   grenadePresentationTelemetry,
 } from './grenade-presentation';
 
@@ -50,6 +51,13 @@ describe('conventional fragmentation grenade presentation', () => {
 });
 
 describe('Semtex bundle presentation', () => {
+  it('uses one exhaustive presentation mapping for player, remote and bot grenade paths', () => {
+    expect(grenadePresentationFamily('frag')).toBe('frag');
+    expect(grenadePresentationFamily('smoke')).toBe('frag');
+    expect(grenadePresentationFamily('flash')).toBe('frag');
+    expect(grenadePresentationFamily('semtex')).toBe('semtex');
+  });
+
   it('ships three decreasing authored Blender LODs with bundle semantics and PBR materials', () => {
     expect(SEMTEX_BUNDLE_ASSET).toBe('./assets/original/models/ordnance/semtex-bundle-lod0.glb');
     const lods = [0, 1, 2].map((lod) => glbJson(`public/assets/original/models/ordnance/semtex-bundle-lod${lod}.glb`));
@@ -71,5 +79,17 @@ describe('Semtex bundle presentation', () => {
     expect(root.getObjectByName('fallback-semtex-block-4')).toBeTruthy();
     expect(root.getObjectByName('fallback-semtex-detonator')).toBeTruthy();
     disposeGrenadePresentation(root);
+  });
+
+  it('applies the canonical mapping inside the presentation factory', () => {
+    const smoke = createGrenadePresentation('smoke');
+    const flash = createGrenadePresentation('flash');
+    const semtex = createGrenadePresentation('semtex');
+    expect(smoke.userData.grenadeKind).toBe('frag');
+    expect(flash.userData.grenadeKind).toBe('frag');
+    expect(semtex.userData.grenadeKind).toBe('semtex');
+    disposeGrenadePresentation(smoke);
+    disposeGrenadePresentation(flash);
+    disposeGrenadePresentation(semtex);
   });
 });

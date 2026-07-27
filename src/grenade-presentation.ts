@@ -1,11 +1,34 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import type { GrenadeId } from './combat/grenade-catalog';
 
 export const FRAG_GRENADE_ASSET = './assets/original/models/frag-grenade.glb';
 export const FRAG_GRENADE_MAX_DIMENSION = 0.46;
 export const SEMTEX_BUNDLE_ASSET = './assets/original/models/ordnance/semtex-bundle-lod0.glb';
 export const SEMTEX_BUNDLE_MAX_DIMENSION = 0.58;
+
+export type GrenadePresentationFamily = 'frag' | 'semtex';
+
+/**
+ * Maps every canonical grenade family to its current world-model family.
+ * Keeping this exhaustive prevents player, remote and bot throw paths from
+ * silently choosing different silhouettes when the grenade catalog changes.
+ */
+export function grenadePresentationFamily(grenade: GrenadeId): GrenadePresentationFamily {
+  switch (grenade) {
+    case 'frag':
+    case 'smoke':
+    case 'flash':
+      return 'frag';
+    case 'semtex':
+      return 'semtex';
+    default: {
+      const unhandled: never = grenade;
+      return unhandled;
+    }
+  }
+}
 
 let template: THREE.Group | null = null;
 let state: 'idle' | 'loading' | 'ready' | 'fallback' = 'idle';
@@ -77,6 +100,7 @@ function fallbackGrenade(): THREE.Group {
   const root = new THREE.Group();
   root.name = 'frag-grenade-fallback';
   root.userData.authoredGrenade = false;
+  root.userData.grenadeKind = 'frag';
   const olive = new THREE.MeshStandardMaterial({ color: 0x4d5525, roughness: 0.72, metalness: 0.2 });
   const steel = new THREE.MeshStandardMaterial({ color: 0x555b56, roughness: 0.36, metalness: 0.82 });
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 20, 14), olive);
@@ -123,8 +147,8 @@ function fallbackSemtex(): THREE.Group {
   return root;
 }
 
-export function createGrenadePresentation(grenade: 'frag' | 'semtex' = 'frag'): THREE.Object3D {
-  if (grenade === 'semtex') {
+export function createGrenadePresentation(grenade: GrenadeId = 'frag'): THREE.Object3D {
+  if (grenadePresentationFamily(grenade) === 'semtex') {
     if (!semtexTemplate || semtexState !== 'ready') return fallbackSemtex();
     const root = semtexTemplate.clone(true);
     root.name = 'semtex-bundle-authored-glb';
