@@ -125,7 +125,7 @@
     {"id":"T-KILLSTREAK-CATALOG","command":"npm run verify:killstreak-catalog","paths":["src/killstreak-support-catalog.test.ts"]},
     {"id":"T-NETWORK","command":"npm run qa:network-chaos","paths":["scripts/qa/run-network-chaos-matrix.ts"]},
     {"id":"T-ADDITIONAL-MAPS","command":"npx vitest run src/additional-maps.test.ts","paths":["src/additional-maps.test.ts"]},
-    {"id":"T-SUPPORT-RUNTIME","command":"npx vitest run src/field-support.test.ts src/killstreak-runtime.test.ts","paths":["src/field-support.test.ts","src/killstreak-runtime.test.ts"]},
+    {"id":"T-SUPPORT-RUNTIME","command":"npx vitest run src/field-support.test.ts src/killstreak-runtime.test.ts src/killstreak-protocol.test.ts src/killstreak-main-integration.test.ts","paths":["src/field-support.test.ts","src/killstreak-runtime.test.ts","src/killstreak-protocol.test.ts","src/killstreak-main-integration.test.ts"]},
     {"id":"T-ORDNANCE","command":"npx vitest run src/combat/pass65-ordnance-contract.test.ts","paths":["src/combat/pass65-ordnance-contract.test.ts"]},
     {"id":"T-WEAPON-CATALOG","command":"npx vitest run src/combat/weapon-catalog.test.ts","paths":["src/combat/weapon-catalog.test.ts"]},
     {"id":"T-WEAPON-PRESENTATION","command":"npx vitest run src/weapon-presentation-state.test.ts src/pass65-crossbow-arms-runtime-contract.test.ts","paths":["src/weapon-presentation-state.test.ts","src/pass65-crossbow-arms-runtime-contract.test.ts"]},

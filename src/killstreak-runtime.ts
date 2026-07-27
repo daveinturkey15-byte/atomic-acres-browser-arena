@@ -547,7 +547,10 @@ export class HostKillstreakRuntime {
       actor.available.add(id);
       newlyEarned.push(id);
     }
-    if (newlyEarned.length > 0) this.revision += 1;
+    // Streak is replicated authority too. Advancing the revision on every
+    // eligible elimination lets recipients reject an older reward projection
+    // even when neither snapshot crossed an unlock threshold.
+    this.revision += 1;
     return Object.freeze(newlyEarned);
   }
 

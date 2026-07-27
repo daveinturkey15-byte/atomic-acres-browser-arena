@@ -75,6 +75,48 @@ describe('host killstreak runtime', () => {
     });
   });
 
+  it('preserves earned rewards across repeated deaths and a transport rejoin while rejecting stale, duplicate, and forged activation claims', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    const registeredRevision = runtime.snapshotFor('owner', 0).revision;
+    earn(runtime, 15);
+    expect(runtime.snapshotFor('owner', 0).revision).toBe(registeredRevision + 15);
+    runtime.recordActorDeath('owner', 2);
+    runtime.recordActorDeath('owner', 3);
+
+    // A network disconnect does not unregister the host actor. A reconnecting
+    // recipient receives a fresh projection of the same canonical queue.
+    const rejoined = runtime.snapshotFor('owner', 5_000).actors[0];
+    expect(rejoined).toMatchObject({ lifeId: 3, streak: 0 });
+    expect(rejoined.available).toEqual(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']);
+
+    expect(runtime.activate({
+      ...intent('nuke', 5), lifeId: 2, activationId: 'activation-stale-life',
+    }, 5_001, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'life-mismatch' });
+    expect(runtime.activate({
+      ...intent('nuke', 4), lifeId: 3, activationId: 'activation-forged-slot',
+    }, 5_002, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'selection-mismatch' });
+
+    const accepted = runtime.activate({
+      ...intent('nuke', 5), lifeId: 3, activationId: 'activation-authority-nuke',
+    }, 5_003, DEFAULT_WORLD);
+    expect(accepted.accepted).toBe(true);
+    expect(runtime.snapshotFor('owner', 5_003).actors[0].available).not.toContain('nuke');
+    expect(runtime.activate({
+      ...intent('nuke', 5), lifeId: 3, activationId: 'activation-authority-nuke',
+    }, 5_004, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'replayed-sequence' });
+
+    runtime.recordActorDeath('owner', 4);
+    earn(runtime, 15);
+    expect(runtime.activate({
+      ...intent('nuke', 5, 1, 'activation-authority-nuke'), lifeId: 4,
+    }, 6_000, DEFAULT_WORLD)).toMatchObject({ accepted: false, reason: 'duplicate-activation-id' });
+    expect(runtime.snapshotFor('owner', 6_000).actors[0].available).toContain('nuke');
+    expect(runtime.activate({
+      ...intent('nuke', 5, 2, 'activation-authority-nuke-2'), lifeId: 4,
+    }, 6_001, DEFAULT_WORLD).accepted).toBe(true);
+  });
+
   it('applies the exact non-stacking Adrenaline stage for exactly 15 seconds', () => {
     expect(adrenalineModifiers(ADRENALINE_DURATION_MS, ADRENALINE_DURATION_MS - 1)).toEqual({
       active: true,

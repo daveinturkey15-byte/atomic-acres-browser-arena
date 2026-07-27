@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import { HostKillstreakRuntime } from './killstreak-runtime';
-import { isKillstreakHostAuthorityMessage, isKillstreakProtocolMessage, killstreakMessageBelongsToPlayer } from './killstreak-protocol';
+import {
+  admitKillstreakStateMessage,
+  isKillstreakHostAuthorityMessage,
+  isKillstreakProtocolMessage,
+  killstreakMessageBelongsToPlayer,
+} from './killstreak-protocol';
 
 const loadout = parseKillstreakLoadout({ schemaVersion: 1, slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'] });
 
@@ -116,6 +121,38 @@ describe('killstreak protocol', () => {
         }],
       },
     })).toBe(false);
+  });
+
+  it('rejects stale, duplicate, and forged host reward projections before they replace local state', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout);
+    for (let index = 0; index < 15; index += 1) runtime.recordEligibleElimination('owner', 'weapon');
+    const message = {
+      type: 'killstreak-state' as const,
+      by: 'host',
+      forPlayerId: 'owner',
+      snapshot: runtime.snapshotFor('owner', 1_000),
+      nonce: 71,
+    };
+    const context = {
+      expectedHostId: 'host',
+      expectedRecipientId: 'owner',
+      expectedMatchEpoch: 7,
+      currentRevision: message.snapshot.revision,
+      seenNonces: new Set<number>(),
+    };
+    expect(admitKillstreakStateMessage(message, context)).toEqual({ accepted: true, reason: 'accepted' });
+    expect(admitKillstreakStateMessage({ ...message, by: 'peer' }, context)).toEqual({ accepted: false, reason: 'forged-host' });
+    expect(admitKillstreakStateMessage({ ...message, forPlayerId: 'observer' }, context)).toEqual({ accepted: false, reason: 'forged-recipient' });
+    expect(admitKillstreakStateMessage({
+      ...message, snapshot: { ...message.snapshot, matchEpoch: 6 },
+    }, context)).toEqual({ accepted: false, reason: 'match-epoch-mismatch' });
+    expect(admitKillstreakStateMessage({
+      ...message, snapshot: { ...message.snapshot, revision: message.snapshot.revision - 1 },
+    }, context)).toEqual({ accepted: false, reason: 'stale-revision' });
+    expect(admitKillstreakStateMessage(message, {
+      ...context, seenNonces: new Set([message.nonce]),
+    })).toEqual({ accepted: false, reason: 'duplicate-nonce' });
   });
 
   it('admits host-filtered piloted sensor contacts only for the possessing recipient', () => {

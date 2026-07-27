@@ -74,6 +74,44 @@ export type KillstreakProtocolMessage = KillstreakLoadoutIntentMessage
   | KillstreakStateMessage
   | KillstreakDamageResultMessage;
 
+export type KillstreakStateAdmission = Readonly<{
+  accepted: boolean;
+  reason: 'accepted' | 'forged-host' | 'forged-recipient' | 'match-epoch-mismatch' | 'stale-revision' | 'duplicate-nonce';
+}>;
+
+/**
+ * Transport admission for the recipient-specific authority snapshot. The
+ * runtime validates all reward mutations; this guard prevents a peer, replay,
+ * or older host snapshot from replacing that canonical projection locally.
+ */
+export function admitKillstreakStateMessage(
+  message: KillstreakStateMessage,
+  context: Readonly<{
+    expectedHostId: string | null;
+    expectedRecipientId: string;
+    expectedMatchEpoch: number;
+    currentRevision: number;
+    seenNonces: ReadonlySet<number>;
+  }>,
+): KillstreakStateAdmission {
+  if (!context.expectedHostId || message.by !== context.expectedHostId) {
+    return Object.freeze({ accepted: false, reason: 'forged-host' });
+  }
+  if (message.forPlayerId !== context.expectedRecipientId) {
+    return Object.freeze({ accepted: false, reason: 'forged-recipient' });
+  }
+  if (message.snapshot.matchEpoch !== context.expectedMatchEpoch) {
+    return Object.freeze({ accepted: false, reason: 'match-epoch-mismatch' });
+  }
+  if (context.seenNonces.has(message.nonce)) {
+    return Object.freeze({ accepted: false, reason: 'duplicate-nonce' });
+  }
+  if (message.snapshot.revision < context.currentRevision) {
+    return Object.freeze({ accepted: false, reason: 'stale-revision' });
+  }
+  return Object.freeze({ accepted: true, reason: 'accepted' });
+}
+
 const ids = new Set<string>(PASS65_KILLSTREAK_CATALOG.definitions.map((definition) => definition.id));
 
 function object(value: unknown): value is Record<string, unknown> {

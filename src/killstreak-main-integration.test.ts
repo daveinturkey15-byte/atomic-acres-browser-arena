@@ -6,9 +6,14 @@ const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8'
 describe('Pass 65 playable killstreak integration', () => {
   it('freezes the persisted five-slot selection at match start and maps keys 3-7 by slot order', () => {
     expect(source).toContain('killstreakLoadoutController.freezeAtMatchStart()');
-    expect(source).toContain('createFieldSupportState(frozenKillstreakLoadout)');
+    expect(source).toContain('projectFieldSupportActor(');
+    expect(source).not.toContain('let fieldSupport =');
+    expect(source).not.toContain('createFieldSupportState(');
+    expect(source).not.toContain('recordSupportElimination(');
+    expect(source).not.toContain('recordSupportDeath(');
+    expect(source).not.toContain('consumeFieldSupport(');
     expect(source).toContain("['Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(event.code)");
-    expect(source).toContain('activateFieldSupport(fieldSupport.loadout.slots[supportSlot])');
+    expect(source).toContain('activateFieldSupport(localFieldSupportProjection().loadout.slots[supportSlot])');
     expect(source).not.toContain("activateFieldSupport('hunter-swarm');");
   });
 
@@ -16,8 +21,30 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain('killstreakRuntime.advance(now, killstreakWorldState())');
     expect(source).toContain("message.type === 'killstreak-activate-intent'");
     expect(source).toContain("message.type === 'killstreak-damage-result'");
-    expect(source).toContain("message.by !== privateLobbySnapshot?.hostId");
+    expect(source).toContain('admitKillstreakStateMessage(message, {');
+    expect(source).toContain('seenNonces: processedNonces');
     expect(source).toContain('event.targetLifeId !== localContinuity');
+  });
+
+  it('keeps the registered host actor through the bounded disconnect/rejoin reservation', () => {
+    expect(source).toContain('killstreakRegisteredActors.has(message.by)');
+    expect(source).toContain('shouldRetainRemoteCombatAuthority(');
+    expect(source).toContain("privateLobbySnapshot?.phase ?? null");
+    expect(source).not.toMatch(/function removeRemote[\s\S]*?killstreakRegisteredActors\.delete/);
+  });
+
+  it('keeps legacy offensive effects as admitted presentation adapters, never a second reward queue', () => {
+    const activationStart = source.indexOf('function activateFieldSupport(');
+    const activationEnd = source.indexOf('\nfunction detonateYardhawk(', activationStart);
+    const block = source.slice(activationStart, activationEnd);
+    expect(block).toContain('beginTriPassTargeting()');
+    expect(source).toContain("requestKillstreakActivation('tri-pass'");
+    expect(block).toContain("authorizeLocalOffensiveSupport('yardhawk'");
+    expect(block).toContain("authorizeLocalOffensiveSupport('hunter-swarm'");
+    expect(block).toContain("authorizeLocalOffensiveSupport('nuke'");
+    expect(block).not.toContain('available:');
+    expect(block).not.toContain('consumeFieldSupport');
+    expect(block).not.toContain('recordSupport');
   });
 
   it('binds legacy offensive effects to the exact host-admitted activation request', () => {

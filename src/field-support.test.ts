@@ -7,15 +7,12 @@ import {
   TRI_PASS_BLAST_RADIUS,
   TRI_PASS_MAX_DAMAGE,
   assignHunterSwarmTargets,
-  consumeFieldSupport,
-  createFieldSupportState,
   createTriPassTargeting,
   cycleFieldSupportSelection,
   hunterSwarmDamage,
   nukeDamageForTarget,
+  projectFieldSupportActor,
   registerTriPassTarget,
-  recordSupportDeath,
-  recordSupportElimination,
   remoteExplosiveHitMaximumDistance,
   scoutSweepPulseVisible,
   selectTriPassHostiles,
@@ -36,69 +33,35 @@ describe('field support rewards', () => {
     expect(scoutSweepPulseVisible(4_500, until)).toBe(false);
     expect(scoutSweepPulseVisible(until, until)).toBe(false);
   });
-  it('unlocks only the five frozen match selections at their exact thresholds', () => {
-    let state = createFieldSupportState();
-    for (let index = 0; index < 7; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(7);
-    expect(state.rewardCycle).toBe(0);
-    expect(state.available).toMatchObject({
-      'scout-sweep': true,
+  it('projects canonical actor rewards for legacy HUD/input without owning mutable reward state', () => {
+    const loadout = {
+      schemaVersion: 1 as const,
+      slots: ['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke'] as const,
+    };
+    const projection = projectFieldSupportActor({
+      streak: 17,
+      loadout,
+      available: ['yardhawk', 'tri-pass'],
+      revealedCareRewards: ['nuke'],
+    });
+    expect(projection.streak).toBe(17);
+    expect(projection.rewardCycle).toBe(3);
+    expect(projection.available).toMatchObject({
+      'care-package': true,
+      'scout-sweep': false,
       yardhawk: true,
       'tri-pass': true,
       adrenaline: false,
-      'care-package': false,
       'piloted-drone': false,
       'carpet-bomber': false,
       'hunter-swarm': false,
       chopper: false,
       'drone-swarm': false,
-      nuke: false,
+      nuke: true,
     });
-  });
-
-  it('does not repeat a consumed reward during the same life', () => {
-    let state = createFieldSupportState();
-    for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
-    state = consumeFieldSupport(state, 'scout-sweep').state;
-    for (let index = 0; index < 12; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(15);
-    expect(state.available['scout-sweep']).toBe(false);
-    expect(state.available.nuke).toBe(true);
-  });
-
-  it('resets per-life progress but retains every unconsumed reward through death', () => {
-    let state = createFieldSupportState();
-    for (let index = 0; index < 5; index += 1) state = recordSupportElimination(state);
-    state = recordSupportDeath(state);
-    expect(state.streak).toBe(0);
-    expect(state.rewardCycle).toBe(0);
-    expect(state.available['scout-sweep']).toBe(true);
-    expect(state.available.yardhawk).toBe(true);
-  });
-
-  it('retains unused high-tier rewards through repeated deaths until consumed', () => {
-    let state = createFieldSupportState();
-    for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
-    expect(state.available.chopper).toBe(true);
-    expect(state.available.nuke).toBe(true);
-    state = recordSupportDeath(state);
-    state = recordSupportDeath(state);
-    expect(state.available.chopper).toBe(true);
-    expect(state.available.nuke).toBe(true);
-    const consumed = consumeFieldSupport(state, 'chopper');
-    expect(consumed.activated).toBe(true);
-    expect(consumed.state.available.chopper).toBe(false);
-  });
-
-  it('consumes each reward at most once until it is earned again', () => {
-    let state = createFieldSupportState();
-    for (let index = 0; index < 3; index += 1) state = recordSupportElimination(state);
-    const first = consumeFieldSupport(state, 'scout-sweep');
-    expect(first.activated).toBe(true);
-    const fourthElimination = recordSupportElimination(first.state);
-    expect(fourthElimination.available['scout-sweep']).toBe(false);
-    const second = consumeFieldSupport(fourthElimination, 'scout-sweep');
-    expect(second.activated).toBe(false);
+    expect(projection.revealedCareReward).toBe('nuke');
+    expect(Object.isFrozen(projection)).toBe(true);
+    expect(Object.isFrozen(projection.available)).toBe(true);
   });
 
   it('gives the owner-approved Tri-Pass a decisive blast contract', () => {
@@ -112,19 +75,6 @@ describe('field support rewards', () => {
     expect(cycleFieldSupportSelection('scout-sweep', -1)).toBe('nuke');
     expect(cycleFieldSupportSelection('tri-pass', 1)).toBe('chopper');
     expect(cycleFieldSupportSelection('chopper', 1)).toBe('nuke');
-  });
-
-  it('never re-earns consumed high-tier rewards without a death reset', () => {
-    let state = createFieldSupportState();
-    for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(15);
-    expect(state.available.chopper).toBe(true);
-    expect(state.available.nuke).toBe(true);
-    state = consumeFieldSupport(consumeFieldSupport(state, 'chopper').state, 'nuke').state;
-    for (let index = 0; index < 15; index += 1) state = recordSupportElimination(state);
-    expect(state.streak).toBe(30);
-    expect(state.available.chopper).toBe(false);
-    expect(state.available.nuke).toBe(false);
   });
 
   it('assigns exactly five deterministic hostile Hunter Swarm targets and excludes friendlies/dead targets', () => {

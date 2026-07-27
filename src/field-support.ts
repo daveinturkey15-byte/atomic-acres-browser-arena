@@ -73,62 +73,48 @@ function supportFlags(value = false): Record<FieldSupportId, boolean> {
   return Object.fromEntries(FIELD_SUPPORT_IDS.map((id) => [id, value])) as Record<FieldSupportId, boolean>;
 }
 
-export type FieldSupportState = {
-  /** Continuous combat streak. Resets only on death or a new match. */
+/**
+ * Read-only compatibility projection for the legacy HUD and input adapters.
+ * Reward authority lives exclusively in HostKillstreakRuntime; this shape must
+ * never be stored and mutated as gameplay state.
+ */
+export type FieldSupportProjection = Readonly<{
   streak: number;
-  /** Compatibility telemetry only; eligibility derives from streak + frozen loadout. */
   rewardCycle: number;
-  /** Frozen at match start. Menu edits affect the next match only. */
   loadout: KillstreakLoadoutV1;
-  available: Record<FieldSupportId, boolean>;
-  earnedThisStreak: Record<FieldSupportId, boolean>;
-};
+  available: Readonly<Record<FieldSupportId, boolean>>;
+  revealedCareReward: FieldSupportId | null;
+}>;
 
-export function createFieldSupportState(loadout: KillstreakLoadoutV1 = DEFAULT_KILLSTREAK_LOADOUT): FieldSupportState {
-  return {
-    streak: 0,
-    rewardCycle: 0,
-    loadout,
-    available: supportFlags(),
-    earnedThisStreak: supportFlags(),
-  };
-}
+export type FieldSupportActorProjectionSource = Readonly<{
+  streak: number;
+  loadout: KillstreakLoadoutV1;
+  available: readonly FieldSupportId[];
+  revealedCareRewards: readonly FieldSupportId[];
+}>;
 
-export function recordSupportElimination(state: FieldSupportState): FieldSupportState {
-  const nextStreak = Math.max(0, Math.floor(state.streak)) + 1;
-  const available = { ...state.available };
-  const earnedThisStreak = { ...state.earnedThisStreak };
-  for (const id of state.loadout.slots) {
-    const reward = FIELD_SUPPORT.find((definition) => definition.id === id);
-    // Every selected reward is earned once at its exact threshold during this life.
-    if (reward && nextStreak === reward.eliminations && !earnedThisStreak[id]) {
-      available[reward.id] = true;
-      earnedThisStreak[reward.id] = true;
-    }
+export function projectFieldSupportActor(
+  actor: FieldSupportActorProjectionSource | null,
+  fallbackLoadout: KillstreakLoadoutV1 = DEFAULT_KILLSTREAK_LOADOUT,
+): FieldSupportProjection {
+  const loadout = actor?.loadout ?? fallbackLoadout;
+  const available = supportFlags();
+  for (const id of actor?.available ?? []) available[id] = true;
+  const revealedCareReward = actor?.revealedCareRewards[0] ?? null;
+  if (revealedCareReward) {
+    available[revealedCareReward] = true;
+    // A captured Care Package is still selected through slot one. Project its
+    // readiness onto that slot without manufacturing a second reward queue.
+    available[loadout.slots[0]] = true;
   }
-  return { ...state, streak: nextStreak, rewardCycle: nextStreak % 7, available, earnedThisStreak };
-}
-
-export function recordSupportDeath(state: FieldSupportState): FieldSupportState {
-  return {
-    ...state,
-    streak: 0,
-    rewardCycle: 0,
-    // Earned rewards belong to the match, not the life that unlocked them.
-    // Death resets only progress so an unconsumed reward remains usable after
-    // any number of respawns. The per-life earned flags reset so a consumed
-    // reward can be earned again during a later life.
-    available: { ...state.available },
-    earnedThisStreak: supportFlags(),
-  };
-}
-
-export function consumeFieldSupport(state: FieldSupportState, id: FieldSupportId): { state: FieldSupportState; activated: boolean } {
-  if (!state.available[id]) return { state, activated: false };
-  return {
-    state: { ...state, available: { ...state.available, [id]: false } },
-    activated: true,
-  };
+  const streak = Math.max(0, Math.floor(actor?.streak ?? 0));
+  return Object.freeze({
+    streak,
+    rewardCycle: streak % 7,
+    loadout,
+    available: Object.freeze(available),
+    revealedCareReward,
+  });
 }
 
 export type TriPassPoint = { x: number; z: number };
