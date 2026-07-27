@@ -12,6 +12,9 @@ export const SHED_MAX_INTERACTION_ACTORS = 12;
 export const SHED_MAJOR_DEBRIS_HALF_THICKNESS = 0.06;
 export const SHED_CORNER_ZONE_Q = 6_500;
 export const SHED_CORNER_COLLAPSE_MARKS = 3;
+export const SHED_DAMAGE_REGION_RADIUS_Q = 1_800;
+export const SHED_EXPLOSION_DENT_MIN_RADIUS_Q = 900;
+export const SHED_EXPLOSION_DENT_MAX_RADIUS_Q = 3_200;
 
 export const WORLD_COLLISION_CONSUMERS = Object.freeze([
   'movement',
@@ -60,6 +63,13 @@ export type DamageableSheetSurfaceState = Readonly<{
   stage: 'intact' | 'dented' | 'perforated' | 'detached';
   apertures: readonly BallisticAperture[];
   dents: readonly SheetDent[];
+}>;
+
+export type ShedRegionalDamage = Readonly<{
+  apertureCount: number;
+  dentCount: number;
+  markCount: number;
+  maximumDentDepthQ: number;
 }>;
 
 export type ShedDoorState = Readonly<{
@@ -262,6 +272,14 @@ function magnitude(vector: Point3): number {
   return Math.hypot(vector.x, vector.y, vector.z);
 }
 
+export function shedSurfaceNormal(frame: SheetSurfaceDefinition['frame']): Point3 {
+  return Object.freeze({
+    x: frame.uAxis.y * frame.vAxis.z - frame.uAxis.z * frame.vAxis.y,
+    y: frame.uAxis.z * frame.vAxis.x - frame.uAxis.x * frame.vAxis.z,
+    z: frame.uAxis.x * frame.vAxis.y - frame.uAxis.y * frame.vAxis.x,
+  });
+}
+
 function validFrame(frame: SheetSurfaceDefinition['frame']): boolean {
   const uLength = magnitude(frame.uAxis);
   const vLength = magnitude(frame.vAxis);
@@ -292,6 +310,13 @@ export function validateDestructibleShedDefinition(definition: DestructibleShedD
   if (definition.surfaces.filter((surface) => surface.role === 'door').length !== 1) errors.push('exactly one door surface required');
   for (const surface of definition.surfaces) {
     if (!validFrame(surface.frame)) errors.push(`${surface.id}: invalid frame`);
+    const normal = shedSurfaceNormal(surface.frame);
+    const horizontalOutward = normal.x * surface.frame.centre.x + normal.z * surface.frame.centre.z;
+    if (surface.role === 'roof') {
+      if (normal.y < 0.5 || horizontalOutward <= 0.05) errors.push(`${surface.id}: roof normal must face up and outward`);
+    } else if (horizontalOutward <= 0.05) {
+      errors.push(`${surface.id}: wall/door normal must face outward`);
+    }
     if (surface.detachableChunkId !== null && !definition.preauthoredChunkIds.includes(surface.detachableChunkId)) {
       errors.push(`${surface.id}: unknown detachable chunk`);
     }
@@ -607,6 +632,42 @@ function markOccupiesCorner(
     && cornerSign(mark.vQ) === vSign;
 }
 
+function markInsideDamageRegion(
+  mark: Readonly<{ uQ: number; vQ: number }>,
+  centre: Readonly<{ uQ: number; vQ: number }>,
+  radiusQ = SHED_DAMAGE_REGION_RADIUS_Q,
+): boolean {
+  const du = mark.uQ - centre.uQ;
+  const dv = mark.vQ - centre.vQ;
+  return du * du + dv * dv <= radiusQ * radiusQ;
+}
+
+/**
+ * Canonical bounded regional damage query. It derives exclusively from the
+ * persistent aperture/dent state, so clients cannot invent a separate visual
+ * degradation field and late join reconstructs the same result.
+ */
+export function shedRegionalDamageAt(
+  surface: DamageableSheetSurfaceState,
+  uQ: number,
+  vQ: number,
+  radiusQ = SHED_DAMAGE_REGION_RADIUS_Q,
+): ShedRegionalDamage {
+  if (!validPanelCoordinate(uQ) || !validPanelCoordinate(vQ)
+    || !finiteInteger(radiusQ, 1, SHED_PANEL_COORD_Q)) {
+    throw new TypeError('Invalid shed regional-damage query');
+  }
+  const centre = { uQ, vQ };
+  const apertures = surface.apertures.filter((mark) => markInsideDamageRegion(mark, centre, radiusQ));
+  const dents = surface.dents.filter((mark) => markInsideDamageRegion(mark, centre, radiusQ));
+  return Object.freeze({
+    apertureCount: apertures.length,
+    dentCount: dents.length,
+    markCount: apertures.length + dents.length,
+    maximumDentDepthQ: Math.max(0, ...dents.map((dent) => dent.depthQ)),
+  });
+}
+
 function cornerWeakeningTriggersCollapse(
   definition: DestructibleShedDefinition,
   surface: DamageableSheetSurfaceState,
@@ -618,8 +679,11 @@ function cornerWeakeningTriggersCollapse(
     || surface.healthQ < definition.thresholds.detachDamageQ) return false;
   const uSign = cornerSign(impact.uQ);
   const vSign = cornerSign(impact.vQ);
-  const localMarks = surface.apertures.filter((mark) => markOccupiesCorner(mark, uSign, vSign)).length
-    + surface.dents.filter((mark) => markOccupiesCorner(mark, uSign, vSign)).length;
+  const localMarks = surface.apertures.filter((mark) => (
+    markOccupiesCorner(mark, uSign, vSign) && markInsideDamageRegion(mark, impact)
+  )).length + surface.dents.filter((mark) => (
+    markOccupiesCorner(mark, uSign, vSign) && markInsideDamageRegion(mark, impact)
+  )).length;
   return localMarks >= SHED_CORNER_COLLAPSE_MARKS;
 }
 
@@ -743,6 +807,9 @@ export function applyShedExplosion(
     expectedRevision: number;
     surfaceId: string;
     damageQ: number;
+    uQ?: number;
+    vQ?: number;
+    radiusQ?: number;
   }>,
 ): ShedMutationResult {
   if (!request.isHost) return { accepted: false, reason: 'not-host', state };
@@ -750,20 +817,53 @@ export function applyShedExplosion(
   if (request.expectedRevision !== state.revision) return { accepted: false, reason: 'stale-revision', state };
   const surface = state.surfaces.find((candidate) => candidate.surfaceId === request.surfaceId);
   if (!surface) return { accepted: false, reason: 'unknown-surface', state };
-  if (!finiteInteger(request.damageQ, 1, 1_000_000)) return { accepted: false, reason: 'invalid-impact', state };
   if (surface.stage === 'detached') return { accepted: false, reason: 'already-detached', state };
+  const uQ = request.uQ ?? 0;
+  const vQ = request.vQ ?? 0;
+  const radiusQ = request.radiusQ ?? Math.min(
+    SHED_EXPLOSION_DENT_MAX_RADIUS_Q,
+    SHED_EXPLOSION_DENT_MIN_RADIUS_Q + Math.round(request.damageQ * 8),
+  );
+  if (!finiteInteger(request.damageQ, 1, 1_000_000)
+    || !validPanelCoordinate(uQ)
+    || !validPanelCoordinate(vQ)
+    || !finiteInteger(radiusQ, 1, SHED_PANEL_COORD_Q / 2)) {
+    return { accepted: false, reason: 'invalid-impact', state };
+  }
   const healthQ = Math.min(1_000_000, surface.healthQ + request.damageQ);
+  const globalDentCount = state.surfaces.reduce((sum, candidate) => sum + candidate.dents.length, 0);
+  const createsDent = request.damageQ >= definition.thresholds.dentDamageQ
+    && globalDentCount < definition.caps.dents;
+  let nextDentId = state.nextDentId;
+  const dents = createsDent
+    ? Object.freeze([...surface.dents, Object.freeze({
+      id: nextDentId++,
+      surfaceId: surface.surfaceId,
+      uQ,
+      vQ,
+      radiusQ,
+      depthQ: Math.min(2_500, Math.max(1, Math.round(request.damageQ * 5))),
+    })])
+    : surface.dents;
+  const stage = surface.stage === 'perforated'
+    ? 'perforated' as const
+    : dents.length > 0 ? 'dented' as const : surface.stage;
+  const surfaces = replaceSurface(state, surface.surfaceId, (candidate) => Object.freeze({
+    ...candidate,
+    healthQ,
+    stage,
+    dents,
+  }));
   if (healthQ < definition.thresholds.detachDamageQ || surface.attachedChunkId === null) {
-    const surfaces = replaceSurface(state, surface.surfaceId, (candidate) => Object.freeze({ ...candidate, healthQ }));
-    return { accepted: true, reason: 'accepted', state: withRevision(state, { surfaces }) };
+    return { accepted: true, reason: 'accepted', state: withRevision(state, { surfaces, nextDentId }) };
   }
   if (state.detachedChunkIds.length >= definition.caps.majorChunks) return { accepted: false, reason: 'chunk-cap', state };
-  const collapse = detachSurfaceUpdate(definition, state, state.surfaces, surface.surfaceId, healthQ);
+  const collapse = detachSurfaceUpdate(definition, state, surfaces, surface.surfaceId, healthQ);
   if (!collapse) return { accepted: false, reason: 'unknown-surface', state };
   return {
     accepted: true,
     reason: 'accepted',
-    state: withRevision(state, collapse),
+    state: withRevision(state, { ...collapse, nextDentId }),
   };
 }
 

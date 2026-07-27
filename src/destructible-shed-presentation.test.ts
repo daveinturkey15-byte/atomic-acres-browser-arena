@@ -35,6 +35,12 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(presentation.root.getObjectByName('field-shed-damageable-shell')).toBeInstanceOf(THREE.Mesh);
     expect(presentation.root.getObjectByName('field-shed-door-leaf')).toBeInstanceOf(THREE.Mesh);
     expect(presentation.root.getObjectByName('field-shed-structural-frame')).toBeInstanceOf(THREE.InstancedMesh);
+    for (const name of ['field-shed-dents', 'field-shed-major-debris']) {
+      const mesh = presentation.root.getObjectByName(name) as THREE.InstancedMesh;
+      expect(mesh.instanceColor, `${name}:prewarmed-color-buffer`).not.toBeNull();
+      expect(mesh.instanceColor?.usage, `${name}:dynamic-color-buffer`).toBe(THREE.DynamicDrawUsage);
+      expect(mesh.userData.instanceColorPrewarmed).toBe(true);
+    }
     expect(presentation.telemetry(state)).toEqual({
       revision: 0,
       activeDraws: 4,
@@ -225,6 +231,49 @@ describe('Pass 65 destructible shed presentation', () => {
     presentation.dispose();
   });
 
+  it('deepens, spreads and recolors repeated damage in one persistent local region', () => {
+    const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 16);
+    const presentation = createFieldShedPresentation(placement, initial);
+    const first = applyShedSheetImpact(FIELD_SHED_DEFINITION, initial, {
+      isHost: true, matchEpoch: 16, expectedRevision: 0, surfaceId: 'wall-east',
+      uQ: 1_000, vQ: 1_000, radiusUQ: 850, radiusVQ: 850, damageQ: 32, penetrationEnergyQ: 10,
+    });
+    presentation.sync(first.state);
+    const dents = presentation.root.getObjectByName('field-shed-dents') as THREE.InstancedMesh;
+    expect(dents.userData).toMatchObject({
+      regionalDamageModel: 'persistent-neighbour-density-v1',
+      regionalRadiusQ: 1_800,
+    });
+    const firstMatrix = new THREE.Matrix4();
+    dents.getMatrixAt(0, firstMatrix);
+    const firstScale = new THREE.Vector3();
+    firstMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), firstScale);
+    const firstColor = new THREE.Color();
+    dents.getColorAt(0, firstColor);
+
+    const second = applyShedSheetImpact(FIELD_SHED_DEFINITION, first.state, {
+      isHost: true, matchEpoch: 16, expectedRevision: first.state.revision, surfaceId: 'wall-east',
+      uQ: 1_120, vQ: 940, radiusUQ: 850, radiusVQ: 850, damageQ: 32, penetrationEnergyQ: 10,
+    });
+    presentation.sync(second.state);
+    expect(dents.count).toBe(2);
+    const strengthenedMatrix = new THREE.Matrix4();
+    dents.getMatrixAt(0, strengthenedMatrix);
+    const strengthenedScale = new THREE.Vector3();
+    strengthenedMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), strengthenedScale);
+    const strengthenedColor = new THREE.Color();
+    dents.getColorAt(0, strengthenedColor);
+    const secondMatrix = new THREE.Matrix4();
+    dents.getMatrixAt(1, secondMatrix);
+    expect(strengthenedScale.x).toBeGreaterThan(firstScale.x);
+    expect(strengthenedScale.z).toBeGreaterThan(firstScale.z);
+    expect(strengthenedColor.getHex()).not.toBe(firstColor.getHex());
+    expect(new THREE.Vector3().setFromMatrixPosition(strengthenedMatrix).distanceTo(
+      new THREE.Vector3().setFromMatrixPosition(secondMatrix),
+    )).toBeGreaterThan(0.001);
+    presentation.dispose();
+  });
+
   it('renders bounded pressed-metal geometry and keeps the dent attached after sheet detachment', () => {
     const initial = createInitialShedState(FIELD_SHED_DEFINITION, placement, 6);
     const presentation = createFieldShedPresentation(placement, initial);
@@ -269,7 +318,7 @@ describe('Pass 65 destructible shed presentation', () => {
     });
     presentation.sync(detached.state);
     const debris = presentation.root.getObjectByName('field-shed-major-debris') as THREE.InstancedMesh;
-    expect(dents.count).toBe(1);
+    expect(dents.count).toBe(2);
     expect(debris.count).toBe(1);
     expect(debris.castShadow).toBe(true);
     expect(debris.receiveShadow).toBe(true);
@@ -283,7 +332,7 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(debrisScale.y).toBeCloseTo(1.2);
     expect(debrisScale.z).toBeCloseTo(1);
     expect(presentation.telemetry(detached.state)).toMatchObject({
-      dents: 1,
+      dents: 2,
       detachedChunks: 1,
       activeDraws: 6,
     });
@@ -308,7 +357,7 @@ describe('Pass 65 destructible shed presentation', () => {
     expect(fracturedShell).not.toBe(shell);
     expect(fracturedShell.geometry.getAttribute('position').count).toBeLessThan(intactVertexCount);
     expect(debris.count).toBe(1);
-    expect(presentation.telemetry(fractured.state)).toMatchObject({ activeDraws: 5, detachedChunks: 1 });
+    expect(presentation.telemetry(fractured.state)).toMatchObject({ activeDraws: 6, detachedChunks: 1, dents: 1 });
     presentation.dispose();
   });
 });

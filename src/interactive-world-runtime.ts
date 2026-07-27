@@ -29,10 +29,11 @@ import {
   type QuantizedVector,
 } from './destructible-world';
 import type { MajorDebrisBodyDefinition, MajorDebrisBodySnapshot } from './physics';
+import { DestructibleShedPresentation } from './destructible-shed-presentation';
 import {
-  DestructibleShedPresentation,
+  FIELD_SHED_BALLISTIC_MATERIAL_ID,
   FIELD_SHED_DEFINITION,
-} from './destructible-shed-presentation';
+} from './destructible-shed-definition';
 
 export type InteractiveWorldCollisionView = Readonly<{
   revision: number;
@@ -306,7 +307,7 @@ export class InteractiveWorldRuntime {
           id: `${shed.placement.id}:${surface.id}`,
           name: `destructible shed ${surface.id}`,
           bounds,
-          material: 'thin-metal' as const,
+          material: FIELD_SHED_BALLISTIC_MATERIAL_ID,
           classification: 'explicit' as const,
           destructibleSurface: Object.freeze({
             definitionId: shed.definition.id,
@@ -323,7 +324,7 @@ export class InteractiveWorldRuntime {
           id: `${shed.placement.id}:debris:${body.chunkId}`,
           name: `destructible shed debris ${body.chunkId}`,
           bounds,
-          material: 'thin-metal' as const,
+          material: FIELD_SHED_BALLISTIC_MATERIAL_ID,
           classification: 'explicit' as const,
           majorDebris: Object.freeze({ placementId: shed.placement.id, chunkId: body.chunkId }),
         }));
@@ -596,6 +597,9 @@ export class InteractiveWorldRuntime {
     placementId: string;
     surfaceId: string;
     damageQ: number;
+    uQ?: number;
+    vQ?: number;
+    radiusQ?: number;
   }>): ShedMutationResult | null {
     const shed = this.sheds.find((candidate) => candidate.placement.id === request.placementId);
     if (!shed) return null;
@@ -605,6 +609,9 @@ export class InteractiveWorldRuntime {
       expectedRevision: shed.state.revision,
       surfaceId: request.surfaceId,
       damageQ: request.damageQ,
+      uQ: request.uQ,
+      vQ: request.vQ,
+      radiusQ: request.radiusQ,
     }));
   }
 
@@ -630,10 +637,13 @@ export class InteractiveWorldRuntime {
         );
         if (distance > request.radius) continue;
         const damageQ = Math.max(1, Math.round(request.maximumDamageQ * (1 - distance / request.radius)));
+        const impactCoordinates = panelCoordinates(surfaceFrame(surface, shed.placement, shed.state), request.origin);
         const result = this.applyExplosion({
           placementId: shed.placement.id,
           surfaceId: surface.id,
           damageQ,
+          uQ: Math.max(-SHED_PANEL_COORD_Q, Math.min(SHED_PANEL_COORD_Q, impactCoordinates.uQ)),
+          vQ: Math.max(-SHED_PANEL_COORD_Q, Math.min(SHED_PANEL_COORD_Q, impactCoordinates.vQ)),
         });
         if (result?.accepted) mutations += 1;
       }

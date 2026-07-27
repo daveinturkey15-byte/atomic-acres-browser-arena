@@ -175,4 +175,41 @@ describe('CharacterPhysics', () => {
     }));
     expect(() => active!.syncMajorDebrisBodies(entries)).toThrow(/exceed cap/);
   });
+
+  it('keeps multiple major fragments physical so they collide with each other and the world floor', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    active.teleportEye({ x: -7, y: 1.7, z: -7 });
+    const fragments = [{
+      id: 'shed-a:debris:chunk-east',
+      position: { x: -1.1, y: 0.42, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      halfExtents: { x: 0.32, y: 0.3, z: 0.42 },
+      linearVelocity: { x: 5.5, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0.4, z: 0 },
+      sleeping: false,
+    }, {
+      id: 'window-debris:atomic-blue-window-a',
+      position: { x: 0, y: 0.42, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      halfExtents: { x: 0.32, y: 0.3, z: 0.42 },
+      linearVelocity: { x: 0, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0, z: 0 },
+      sleeping: false,
+    }] as const;
+    active.syncMajorDebrisBodies(fragments);
+    for (let frame = 0; frame < 180; frame += 1) active.move({ x: 0, y: -0.01, z: 0 }, 1 / 120);
+    const snapshots = new Map(active.majorDebrisSnapshots().map((snapshot) => [snapshot.id, snapshot]));
+    const shed = snapshots.get('shed-a:debris:chunk-east')!;
+    const window = snapshots.get('window-debris:atomic-blue-window-a')!;
+    expect(window.position.x).toBeGreaterThan(0.05);
+    expect(shed.position.x).toBeLessThan(window.position.x);
+    expect(shed.position.y).toBeGreaterThan(0.2);
+    expect(window.position.y).toBeGreaterThan(0.2);
+
+    const priorWindowX = window.position.x;
+    active.syncMajorDebrisBodies(fragments);
+    expect(active.majorDebrisBodyCount()).toBe(2);
+    expect(active.majorDebrisSnapshots().find((snapshot) => snapshot.id === window.id)?.position.x)
+      .toBeCloseTo(priorWindowX, 4);
+  });
 });

@@ -1,14 +1,13 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  ARENA_MAX_AWAKE_SHED_BODIES,
   SHED_ANGLE_Q,
+  SHED_DAMAGE_REGION_RADIUS_Q,
   SHED_MAX_APERTURES,
   SHED_MAX_DENTS,
   SHED_MAX_MAJOR_CHUNKS,
   SHED_MAJOR_DEBRIS_HALF_THICKNESS,
   SHED_PANEL_COORD_Q,
-  WORLD_COLLISION_CONSUMERS,
   type BallisticAperture,
   type DamageableSheetSurfaceState,
   type DestructibleShedDefinition,
@@ -16,65 +15,15 @@ import {
   type ShedPlacement,
   type ShedState,
   shedMajorChunkExtents,
+  shedRegionalDamageAt,
 } from './destructible-world';
+import {
+  FIELD_SHED_DEFINITION,
+  FIELD_SHED_MATERIAL_IDS,
+  FIELD_SHED_MATERIAL_POLICY_ID,
+} from './destructible-shed-definition';
 
-const ROOF_COS = Math.sqrt(3) / 2;
-const ROOF_SIN = 0.5;
-
-export const FIELD_SHED_DEFINITION: DestructibleShedDefinition = Object.freeze({
-  schemaVersion: 1,
-  id: 'field-shed-v1',
-  doorSurfaceId: 'door-south',
-  surfaces: Object.freeze([
-    Object.freeze({
-      id: 'door-south', role: 'door' as const, detachableChunkId: 'chunk-door',
-      frame: Object.freeze({ centre: { x: 0, y: 1.1, z: 2.1 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 0.72, halfV: 1.1 }),
-    }),
-    Object.freeze({
-      id: 'wall-north', role: 'wall' as const, detachableChunkId: 'chunk-north',
-      frame: Object.freeze({ centre: { x: 0, y: 1.2, z: -2.1 }, uAxis: { x: -1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.8, halfV: 1.2 }),
-    }),
-    Object.freeze({
-      id: 'wall-east', role: 'wall' as const, detachableChunkId: 'chunk-east',
-      frame: Object.freeze({ centre: { x: 1.8, y: 1.2, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 2.1, halfV: 1.2 }),
-    }),
-    Object.freeze({
-      id: 'wall-west', role: 'wall' as const, detachableChunkId: 'chunk-west',
-      frame: Object.freeze({ centre: { x: -1.8, y: 1.2, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 2.1, halfV: 1.2 }),
-    }),
-    Object.freeze({
-      id: 'wall-south-left', role: 'wall' as const, detachableChunkId: null,
-      frame: Object.freeze({ centre: { x: -1.26, y: 1.2, z: 2.1 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 0.54, halfV: 1.2 }),
-    }),
-    Object.freeze({
-      id: 'wall-south-right', role: 'wall' as const, detachableChunkId: null,
-      frame: Object.freeze({ centre: { x: 1.26, y: 1.2, z: 2.1 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 0.54, halfV: 1.2 }),
-    }),
-    Object.freeze({
-      id: 'wall-south-header', role: 'wall' as const, detachableChunkId: null,
-      frame: Object.freeze({ centre: { x: 0, y: 2.3, z: 2.1 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 0.72, halfV: 0.1 }),
-    }),
-    Object.freeze({
-      id: 'roof-east', role: 'roof' as const, detachableChunkId: 'chunk-roof-east',
-      frame: Object.freeze({ centre: { x: 0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: -ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),
-    }),
-    Object.freeze({
-      id: 'roof-west', role: 'roof' as const, detachableChunkId: 'chunk-roof-west',
-      frame: Object.freeze({ centre: { x: -0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),
-    }),
-  ]),
-  preauthoredChunkIds: Object.freeze([
-    'chunk-door', 'chunk-north', 'chunk-east', 'chunk-west', 'chunk-roof-east', 'chunk-roof-west',
-  ]),
-  thresholds: Object.freeze({ dentDamageQ: 20, perforateEnergyQ: 45, detachDamageQ: 220 }),
-  caps: Object.freeze({
-    apertures: SHED_MAX_APERTURES,
-    dents: SHED_MAX_DENTS,
-    majorChunks: SHED_MAX_MAJOR_CHUNKS,
-    arenaAwakeMajorBodies: ARENA_MAX_AWAKE_SHED_BODIES,
-  }),
-  consumers: WORLD_COLLISION_CONSUMERS,
-});
+export { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 
 function ridgedMetalBumpTexture(): THREE.DataTexture {
   const width = 64;
@@ -352,6 +301,11 @@ function debrisTint(chunkId: string): THREE.Color {
   return new THREE.Color(palette[hash % palette.length]!);
 }
 
+function regionalDamageTint(markCount: number): THREE.Color {
+  const palette = [0x26392f, 0x46503a, 0x755d43, 0xb19a78];
+  return new THREE.Color(palette[Math.max(0, Math.min(palette.length - 1, markCount - 1))]!);
+}
+
 export type ShedPresentationTelemetry = Readonly<{
   revision: number;
   activeDraws: number;
@@ -372,7 +326,7 @@ export class DestructibleShedPresentation {
   private readonly sheetMaterial: THREE.MeshStandardMaterial;
   private readonly frameMaterial = new THREE.MeshStandardMaterial({ color: 0x17251e, metalness: 0.82, roughness: 0.3 });
   private readonly rimMaterial = new THREE.MeshStandardMaterial({ color: 0xc2b69e, metalness: 0.92, roughness: 0.22 });
-  private readonly dentMaterial = new THREE.MeshStandardMaterial({ color: 0x26392f, metalness: 0.72, roughness: 0.46, side: THREE.DoubleSide });
+  private readonly dentMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.72, roughness: 0.46, side: THREE.DoubleSide });
   private readonly debrisMaterial = new THREE.MeshStandardMaterial({ color: 0x304d3b, metalness: 0.74, roughness: 0.42 });
   private readonly bumpTexture = ridgedMetalBumpTexture();
   private shell: THREE.Mesh;
@@ -400,6 +354,9 @@ export class DestructibleShedPresentation {
     this.root.rotation.y = placement.yaw;
     this.root.userData.interactiveWorldKind = 'destructible-shed';
     this.root.userData.placementId = placement.id;
+    this.root.userData.definitionId = definition.id;
+    this.root.userData.materialPolicyId = FIELD_SHED_MATERIAL_POLICY_ID;
+    this.root.userData.qualityInvariantMajorFragments = true;
 
     this.sheetMaterial = new THREE.MeshStandardMaterial({
       color: 0x294a37,
@@ -409,6 +366,11 @@ export class DestructibleShedPresentation {
       bumpMap: this.bumpTexture,
       bumpScale: 0.055,
     });
+    this.sheetMaterial.name = FIELD_SHED_MATERIAL_IDS.sheet;
+    this.frameMaterial.name = FIELD_SHED_MATERIAL_IDS.frame;
+    this.rimMaterial.name = FIELD_SHED_MATERIAL_IDS.apertureRim;
+    this.dentMaterial.name = FIELD_SHED_MATERIAL_IDS.dent;
+    this.debrisMaterial.name = FIELD_SHED_MATERIAL_IDS.debris;
     this.shell = damageableSheetMesh('field-shed-damageable-shell', new THREE.BufferGeometry(), this.sheetMaterial);
     this.root.add(this.shell);
 
@@ -419,10 +381,9 @@ export class DestructibleShedPresentation {
 
     const frame = createFrame(this.frameMaterial);
     this.root.add(frame);
-    const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(3.5, 0.1, 4.1),
-      new THREE.MeshStandardMaterial({ color: 0x3f4741, metalness: 0.22, roughness: 0.82 }),
-    );
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x3f4741, metalness: 0.22, roughness: 0.82 });
+    floorMaterial.name = FIELD_SHED_MATERIAL_IDS.floor;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 4.1), floorMaterial);
     floor.name = 'field-shed-floor';
     floor.position.y = 0.05;
     floor.receiveShadow = true;
@@ -435,6 +396,12 @@ export class DestructibleShedPresentation {
     this.dents = new THREE.InstancedMesh(pressedMetalDentGeometry(), this.dentMaterial, SHED_MAX_DENTS);
     this.dents.name = 'field-shed-dents';
     this.dents.userData.deformationModel = 'pressed-metal-geometry-v1';
+    this.dents.userData.regionalDamageModel = 'persistent-neighbour-density-v1';
+    this.dents.userData.regionalRadiusQ = SHED_DAMAGE_REGION_RADIUS_Q;
+    this.dents.setColorAt(0, regionalDamageTint(1));
+    this.dents.instanceColor!.setUsage(THREE.DynamicDrawUsage);
+    this.dents.instanceColor!.needsUpdate = true;
+    this.dents.userData.instanceColorPrewarmed = true;
     this.dents.count = 0;
     this.dents.castShadow = true;
     this.dents.receiveShadow = true;
@@ -442,6 +409,12 @@ export class DestructibleShedPresentation {
     this.debris = new THREE.InstancedMesh(corrugatedSheetDebrisGeometry(), this.debrisMaterial, SHED_MAX_MAJOR_CHUNKS);
     this.debris.name = 'field-shed-major-debris';
     this.debris.userData.geometryKind = 'definition-scaled-corrugated-sheet-v1';
+    this.debris.userData.authorityClass = 'round-persistent-major-fragment';
+    this.debris.userData.qualityInvariant = true;
+    this.debris.setColorAt(0, debrisTint(definition.preauthoredChunkIds[0]!));
+    this.debris.instanceColor!.setUsage(THREE.DynamicDrawUsage);
+    this.debris.instanceColor!.needsUpdate = true;
+    this.debris.userData.instanceColorPrewarmed = true;
     this.debris.count = 0;
     this.debris.castShadow = true;
     this.debris.receiveShadow = true;
@@ -532,14 +505,38 @@ export class DestructibleShedPresentation {
           radiusVQ: dent.radiusQ,
         };
         const radius = dent.radiusQ / SHED_PANEL_COORD_Q * Math.min(surfaceDefinition.frame.halfU, surfaceDefinition.frame.halfV);
-        const depth = 0.018 + dent.depthQ / 2_500 * 0.082;
+        const regionalDamage = shedRegionalDamageAt(surfaceState, dent.uQ, dent.vQ);
+        const severity = Math.max(1, Math.min(4, regionalDamage.markCount));
+        const position = apertureLocalPosition(surfaceDefinition, apertureLike);
+        if (severity > 1) {
+          const spread = radius * Math.min(0.24, (severity - 1) * 0.07);
+          const angle = dent.id * Math.PI * (3 - Math.sqrt(5));
+          position.addScaledVector(
+            new THREE.Vector3(
+              surfaceDefinition.frame.uAxis.x,
+              surfaceDefinition.frame.uAxis.y,
+              surfaceDefinition.frame.uAxis.z,
+            ),
+            Math.cos(angle) * spread,
+          ).addScaledVector(
+            new THREE.Vector3(
+              surfaceDefinition.frame.vAxis.x,
+              surfaceDefinition.frame.vAxis.y,
+              surfaceDefinition.frame.vAxis.z,
+            ),
+            Math.sin(angle) * spread,
+          );
+        }
+        const warpedRadius = radius * (1 + (severity - 1) * 0.09);
+        const depth = (0.018 + dent.depthQ / 2_500 * 0.082) * (1 + (severity - 1) * 0.14);
         placeBoxInstance(
           this.dents,
           dentIndex,
-          apertureLocalPosition(surfaceDefinition, apertureLike),
-          new THREE.Vector3(radius, radius, depth),
+          position,
+          new THREE.Vector3(warpedRadius, warpedRadius, depth),
           rotation,
         );
+        this.dents.setColorAt(dentIndex, regionalDamageTint(severity));
         dentIndex += 1;
       }
     }
@@ -547,7 +544,9 @@ export class DestructibleShedPresentation {
     this.apertureRims.instanceMatrix.needsUpdate = true;
     this.dents.count = dentIndex;
     this.dents.instanceMatrix.needsUpdate = true;
+    if (this.dents.instanceColor) this.dents.instanceColor.needsUpdate = true;
 
+    this.debris.visible = true;
     this.debris.count = Math.min(state.majorDebris.length, SHED_MAX_MAJOR_CHUNKS);
     state.majorDebris.slice(0, SHED_MAX_MAJOR_CHUNKS).forEach((chunk, index) => {
       const position = new THREE.Vector3(chunk.poseQ.position.xQ / 1_000, chunk.poseQ.position.yQ / 1_000, chunk.poseQ.position.zQ / 1_000);

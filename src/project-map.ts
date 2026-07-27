@@ -99,6 +99,10 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
           'src/ballistics.ts',
           'src/hit-proxies.ts',
           'src/map.ts',
+          'src/destructible-world.ts',
+          'src/destructible-shed-definition.ts',
+          'src/destructible-shed-registry.ts',
+          'src/interactive-world-runtime.ts',
         ]),
       }),
       Object.freeze({
@@ -130,6 +134,7 @@ export const PROJECT_MAP_TREE: readonly ProjectMapNode[] = Object.freeze([
           'src/atomic-signal.ts',
           'src/weapon-presentation.ts',
           'src/render-profile.ts',
+          'src/destructible-shed-presentation.ts',
         ]),
       }),
       Object.freeze({

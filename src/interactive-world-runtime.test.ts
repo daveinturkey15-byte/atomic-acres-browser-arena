@@ -237,7 +237,7 @@ describe('shared interactive-world runtime adapter', () => {
     expect(after.ballisticSurfaces).toHaveLength(before.ballisticSurfaces.length);
     expect(after.ballisticSurfaces.some((surface) => surface.destructibleSurface?.surfaceId === 'wall-west')).toBe(false);
     expect(after.ballisticSurfaces.some((surface) => surface.majorDebris?.chunkId === 'chunk-west')).toBe(true);
-    expect(runtime.telemetry()).toMatchObject({ detachedChunks: 1, awakeMajorBodies: 1, presentationDraws: 5 });
+    expect(runtime.telemetry()).toMatchObject({ detachedChunks: 1, awakeMajorBodies: 1, presentationDraws: 6, dents: 1 });
     const physicsBody = runtime.majorDebrisPhysicsBodies()[0]!;
     expect(physicsBody.id).toBe('atomic-shed-vertical-slice:debris:chunk-west');
     expect(physicsBody.halfExtents).toEqual({ x: 2.1, y: 1.2, z: 0.06 });
@@ -254,6 +254,12 @@ describe('shared interactive-world runtime adapter', () => {
     const movedDebris = runtime.collisions().ballisticSurfaces.find((surface) => surface.majorDebris?.chunkId === 'chunk-west')!;
     expect((movedDebris.bounds.minX + movedDebris.bounds.maxX) / 2)
       .toBeCloseTo((priorDebris.bounds.minX + priorDebris.bounds.maxX) / 2 + 1);
+    const lateJoin = new InteractiveWorldRuntime('atomic-acres', 10, [placement], false);
+    expect(lateJoin.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(runtime.stateEnvelope())))).toBe(true);
+    expect(lateJoin.telemetry()).toMatchObject({ detachedChunks: 1, awakeMajorBodies: 1, dents: 1 });
+    expect(lateJoin.collisions().ballisticSurfaces.some((surface) => surface.majorDebris?.chunkId === 'chunk-west')).toBe(true);
+    expect(lateJoin.majorDebrisPhysicsBodies()).toHaveLength(1);
+    lateJoin.dispose();
     runtime.dispose();
   });
 
@@ -264,6 +270,9 @@ describe('shared interactive-world runtime adapter', () => {
     expect(guest.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 300 })).toBe(0);
     expect(host.applyExplosionAt({ origin, radius: 4, maximumDamageQ: 300 })).toBeGreaterThan(0);
     expect(host.telemetry().revision).toBeGreaterThan(0);
+    expect(host.telemetry().dents).toBeGreaterThan(0);
+    expect(guest.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(host.stateEnvelope())))).toBe(true);
+    expect(guest.telemetry()).toMatchObject({ dents: host.telemetry().dents, detachedChunks: host.telemetry().detachedChunks });
     guest.dispose();
     host.dispose();
   });

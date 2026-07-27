@@ -4,6 +4,7 @@ import {
   SHED_ANGLE_Q,
   SHED_CORNER_COLLAPSE_MARKS,
   SHED_CORNER_ZONE_Q,
+  SHED_DAMAGE_REGION_RADIUS_Q,
   SHED_DOOR_TRAVEL_TICKS,
   SHED_MAX_APERTURES,
   SHED_MAX_DENTS,
@@ -23,6 +24,8 @@ import {
   resetShedState,
   resumeShedDoorWhenClear,
   shedApertureContainsWorldPoint,
+  shedRegionalDamageAt,
+  shedSurfaceNormal,
   validateDestructibleShedDefinition,
   worldPointToPanelCoordinates,
   type DestructibleShedDefinition,
@@ -41,11 +44,11 @@ const definition: DestructibleShedDefinition = Object.freeze({
     },
     {
       id: 'wall-north', role: 'wall' as const, detachableChunkId: 'chunk-north',
-      frame: { centre: { x: 0, y: 1.25, z: -1.5 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.5, halfV: 1.25 },
+      frame: { centre: { x: 0, y: 1.25, z: -1.5 }, uAxis: { x: -1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.5, halfV: 1.25 },
     },
     {
       id: 'wall-east', role: 'wall' as const, detachableChunkId: 'chunk-east',
-      frame: { centre: { x: 1.5, y: 1.25, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.5, halfV: 1.25 },
+      frame: { centre: { x: 1.5, y: 1.25, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.5, halfV: 1.25 },
     },
     {
       id: 'wall-west', role: 'wall' as const, detachableChunkId: 'chunk-west',
@@ -53,11 +56,11 @@ const definition: DestructibleShedDefinition = Object.freeze({
     },
     {
       id: 'roof-east', role: 'roof' as const, detachableChunkId: 'chunk-roof-east',
-      frame: { centre: { x: 0.75, y: 2.85, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: 0.9, y: 0.43589, z: 0 }, halfU: 1.6, halfV: 0.85 },
+      frame: { centre: { x: 0.75, y: 2.85, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: -0.9, y: 0.43589, z: 0 }, halfU: 1.6, halfV: 0.85 },
     },
     {
       id: 'roof-west', role: 'roof' as const, detachableChunkId: 'chunk-roof-west',
-      frame: { centre: { x: -0.75, y: 2.85, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: -0.9, y: 0.43589, z: 0 }, halfU: 1.6, halfV: 0.85 },
+      frame: { centre: { x: -0.75, y: 2.85, z: 0 }, uAxis: { x: 0, y: 0, z: 1 }, vAxis: { x: 0.9, y: 0.43589, z: 0 }, halfU: 1.6, halfV: 0.85 },
     },
   ]),
   preauthoredChunkIds: Object.freeze(['chunk-door', 'chunk-north', 'chunk-east', 'chunk-west', 'chunk-roof-east', 'chunk-roof-west']),
@@ -109,6 +112,14 @@ describe('Pass 65 destructible-world authority', () => {
       ...definition,
       consumers: definition.consumers.slice(1),
     })).toContain('world collision consumer parity incomplete');
+    const roof = definition.surfaces.find((surface) => surface.id === 'roof-east')!;
+    expect(shedSurfaceNormal(roof.frame).y).toBeCloseTo(0.9, 4);
+    expect(validateDestructibleShedDefinition({
+      ...definition,
+      surfaces: definition.surfaces.map((surface) => surface.id === roof.id
+        ? { ...surface, frame: { ...surface.frame, uAxis: { x: 0, y: 0, z: 1 } } }
+        : surface),
+    })).toContain('roof-east: roof normal must face up and outward');
   });
 
   it('moves an unobstructed door exactly one second and rejects guest/stale/replayed intent', () => {
@@ -252,10 +263,10 @@ describe('Pass 65 destructible-world authority', () => {
     const aperture = impact.state.surfaces.find((surface) => surface.surfaceId === 'wall-north')!.apertures[0]!;
     expect(apertureContainsPanelPoint(aperture, 2_000, -1_000)).toBe(true);
     expect(apertureContainsPanelPoint(aperture, 2_801, -1_000)).toBe(false);
-    const worldPoint = { x: 0.3, y: 1.125, z: -1.5 };
+    const worldPoint = { x: -0.3, y: 1.125, z: -1.5 };
     expect(worldPointToPanelCoordinates(definition, placement, 'wall-north', worldPoint)).toEqual({ uQ: 2_000, vQ: -1_000 });
     expect(shedApertureContainsWorldPoint(definition, placement, impact.state, 'wall-north', worldPoint)).toBe(true);
-    expect(shedApertureContainsWorldPoint(definition, placement, impact.state, 'wall-north', { ...worldPoint, x: 0.6 })).toBe(false);
+    expect(shedApertureContainsWorldPoint(definition, placement, impact.state, 'wall-north', { ...worldPoint, x: -0.6 })).toBe(false);
   });
 
   it('fails aperture and dent saturation closed without enlarging authority', () => {
@@ -337,6 +348,103 @@ describe('Pass 65 destructible-world authority', () => {
       }).state;
     }
     expect(centreDamage.detachedChunkIds).toEqual([]);
+
+    let scatteredCornerDamage = initial();
+    for (const [uQ, vQ] of [[6_600, 6_600], [6_600, 9_900], [9_900, 6_600]] as const) {
+      scatteredCornerDamage = applyShedSheetImpact(definition, scatteredCornerDamage, {
+        isHost: true,
+        matchEpoch: 11,
+        expectedRevision: scatteredCornerDamage.revision,
+        surfaceId: 'wall-north',
+        uQ,
+        vQ,
+        radiusUQ: 420,
+        radiusVQ: 460,
+        damageQ: 80,
+        penetrationEnergyQ: 70,
+      }).state;
+    }
+    expect(scatteredCornerDamage.surfaces.find((surface) => surface.surfaceId === 'wall-north')?.healthQ).toBe(240);
+    expect(scatteredCornerDamage.detachedChunkIds).toEqual([]);
+  });
+
+  it('derives bounded local degradation from persistent marks and makes explosion damage visible before detachment', () => {
+    expect(SHED_DAMAGE_REGION_RADIUS_Q).toBe(1_800);
+    let state = initial();
+    for (const [uQ, vQ] of [[1_000, 1_000], [1_200, 900], [900, 1_150]] as const) {
+      const result = applyShedSheetImpact(definition, state, {
+        isHost: true,
+        matchEpoch: 11,
+        expectedRevision: state.revision,
+        surfaceId: 'wall-east',
+        uQ,
+        vQ,
+        radiusUQ: 500,
+        radiusVQ: 500,
+        damageQ: 30,
+        penetrationEnergyQ: 10,
+      });
+      expect(result.accepted).toBe(true);
+      state = result.state;
+    }
+    const locallyDamaged = state.surfaces.find((surface) => surface.surfaceId === 'wall-east')!;
+    expect(shedRegionalDamageAt(locallyDamaged, 1_050, 1_000)).toEqual({
+      apertureCount: 0,
+      dentCount: 3,
+      markCount: 3,
+      maximumDentDepthQ: 8,
+    });
+    expect(shedRegionalDamageAt(locallyDamaged, -8_000, -8_000).markCount).toBe(0);
+    expect(() => shedRegionalDamageAt(locallyDamaged, 20_000, 0)).toThrow(/regional-damage/);
+
+    const firstBlast = applyShedExplosion(definition, initial(), {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: 0,
+      surfaceId: 'wall-west',
+      damageQ: 100,
+      uQ: -2_000,
+      vQ: 1_500,
+      radiusQ: 1_600,
+    });
+    expect(firstBlast.state.surfaces.find((surface) => surface.surfaceId === 'wall-west')).toMatchObject({
+      stage: 'dented',
+      healthQ: 100,
+      dents: [expect.objectContaining({ uQ: -2_000, vQ: 1_500, radiusQ: 1_600, depthQ: 500 })],
+    });
+    const belowThreshold = applyShedExplosion(definition, firstBlast.state, {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: firstBlast.state.revision,
+      surfaceId: 'wall-west',
+      damageQ: definition.thresholds.detachDamageQ - 101,
+      uQ: -1_900,
+      vQ: 1_400,
+    });
+    expect(belowThreshold.state.surfaces.find((surface) => surface.surfaceId === 'wall-west')?.healthQ)
+      .toBe(definition.thresholds.detachDamageQ - 1);
+    expect(belowThreshold.state.detachedChunkIds).toEqual([]);
+    const atThreshold = applyShedExplosion(definition, belowThreshold.state, {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: belowThreshold.state.revision,
+      surfaceId: 'wall-west',
+      damageQ: 1,
+      uQ: -1_900,
+      vQ: 1_400,
+    });
+    expect(atThreshold.state.detachedChunkIds).toEqual(['chunk-west']);
+    expect(atThreshold.state.surfaces.find((surface) => surface.surfaceId === 'wall-west')).toMatchObject({
+      stage: 'detached',
+      healthQ: definition.thresholds.detachDamageQ,
+    });
+    expect(applyShedExplosion(definition, atThreshold.state, {
+      isHost: true,
+      matchEpoch: 11,
+      expectedRevision: atThreshold.state.revision,
+      surfaceId: 'wall-west',
+      damageQ: 1,
+    }).reason).toBe('already-detached');
   });
 
   it('detaches only pre-authored chunks and preserves flat-shot wake semantics', () => {

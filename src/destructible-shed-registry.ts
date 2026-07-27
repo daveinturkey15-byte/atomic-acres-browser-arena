@@ -1,6 +1,6 @@
 import type { Box2 } from './collision';
 import type { ShedArenaId, ShedPlacement } from './destructible-world';
-import { FIELD_SHED_DEFINITION } from './destructible-shed-presentation';
+import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 
 export const PASS65_SHED_ELIGIBILITY = Object.freeze([
   Object.freeze({ arenaId: 'atomic-acres' as const, zone: 'whole-arena' as const, minimumSheds: 2 }),
