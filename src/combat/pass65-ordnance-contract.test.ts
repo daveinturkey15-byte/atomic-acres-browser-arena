@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   FLASHBANG_HITL_CONTRACT,
@@ -33,6 +34,21 @@ describe('Pass 65 HITL ordnance corrections', () => {
     expect(reduced.audioGain).toBeLessThan(full.audioGain);
     expect(reduced.recoveryMs).toBeLessThan(full.recoveryMs);
     expect(reduced.hudOpacity).toBe(1);
+  });
+
+  it('composites the flash whiteout over the world while preserving the combat HUD', () => {
+    const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+    const layerFor = (selector: string): number => {
+      const rule = css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\{[^}]*z-index:(\\d+)`));
+      if (!rule?.[1]) throw new Error(`Missing z-index contract for ${selector}`);
+      return Number(rule[1]);
+    };
+
+    const worldVignetteLayer = layerFor('#vignette');
+    const flashLayer = layerFor('#ordnance-flash');
+    const hudLayer = layerFor('#hud');
+    expect(flashLayer).toBeGreaterThan(worldVignetteLayer);
+    expect(flashLayer).toBeLessThan(hudLayer);
   });
 
   it('defines sticky Semtex with high standing damage and strong prone mitigation', () => {
