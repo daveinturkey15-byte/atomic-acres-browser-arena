@@ -49,6 +49,8 @@ describe('railgun presentation', () => {
     expect(bloom.scale).toMatchObject({ x: RAILGUN_BOLT_PRESENTATION.haloRadiusM, y: 180 });
     expect((core.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
     expect((bloom.material as THREE.MeshBasicMaterial).depthTest).toBe(false);
+    expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
+    expect((bloom.material as THREE.MeshBasicMaterial).side).toBe(THREE.FrontSide);
     const expectedDirection = new THREE.Vector3(...authority.end).sub(new THREE.Vector3(...authority.start)).normalize();
     const renderedDirection = new THREE.Vector3(0, 1, 0).applyQuaternion(beam.quaternion).normalize();
     expect(renderedDirection.distanceTo(expectedDirection)).toBeLessThan(1e-6);
@@ -58,6 +60,8 @@ describe('railgun presentation', () => {
       visibleDurationMs: 900,
       poolCapacity: 6,
       throughGeometry: true,
+      lastPresentationStartOffsetM: 0,
+      lastViewer: 'peer',
       lastAcceptedBeam: {
         generation: 3,
         shotId: 'shot-authority-0001',
@@ -77,6 +81,37 @@ describe('railgun presentation', () => {
     expect(presentation.telemetry().activeBeams).toBe(0);
     presentation.resetBeams();
     expect(presentation.telemetry()).toMatchObject({ activeBeams: 0, beamPresentations: 0, lastAcceptedBeam: null });
+  });
+
+  it('starts the shooter view beyond the near plane while preserving the full authoritative path', () => {
+    const scene = new THREE.Scene();
+    const presentation = new RailgunPresentation(scene, new FakeElement() as unknown as HTMLElement, true);
+    const authority = createRailgunBeamAuthority(4, 'shot-shooter-view-0001', [-17, 1.7, -17], [0, 0, -1]);
+    const accepted: RailgunShotResultMessage = {
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'shooter', generation: 4,
+      shotId: authority.shotId, status: 'accepted-miss', reason: 'accepted', outcomes: [], beam: authority, nonce: 2,
+    };
+    expect(presentation.presentAcceptedResult(accepted, 2_000, 'shooter')).toBe(true);
+    const beam = scene.getObjectByName('railgun-massive-beam-1') as THREE.Group;
+    const core = beam.getObjectByName('railgun-beam-core') as THREE.Mesh;
+    const bloom = beam.getObjectByName('railgun-beam-bloom') as THREE.Mesh;
+    expect(core.scale.y).toBeCloseTo(180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM, 6);
+    expect(bloom.scale.y).toBeCloseTo(180 - RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM, 6);
+    expect((core.material as THREE.MeshBasicMaterial).side).toBe(THREE.BackSide);
+    expect((bloom.material as THREE.MeshBasicMaterial).side).toBe(THREE.BackSide);
+    expect(beam.userData).toMatchObject({
+      authoritativeStart: authority.start,
+      authoritativeEnd: authority.end,
+      presentationStartOffsetM: RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
+      viewer: 'shooter',
+    });
+    expect(presentation.telemetry()).toMatchObject({
+      lastBeamLengthM: 180,
+      lastPresentationStartOffsetM: RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM,
+      lastViewer: 'shooter',
+      lastAcceptedBeam: { start: authority.start, end: authority.end, lengthM: 180 },
+      throughGeometry: true,
+    });
   });
 
   it('never presents a rejected or identity-mismatched result', () => {

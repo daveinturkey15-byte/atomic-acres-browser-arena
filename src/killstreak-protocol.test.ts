@@ -49,7 +49,7 @@ describe('killstreak protocol', () => {
       id: 'ks-activation-7-1:carpet-corridor', activationId: 'ks-activation-7-1', source: 'carpet-bomber', shape: 'corridor',
       ownerId: 'owner', team: 0, audience: 'owner-only', anchor: [0, 0, 0], pathStart: [-10, 0, 0], pathEnd: [10, 0, 0], halfWidthM: 6, expiresInMs: 900,
     } as const;
-    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers: [privateCorridor] } })).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers: [privateCorridor] } })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...message, forPlayerId: 'observer', snapshot: { ...message.snapshot, placementMarkers: [privateCorridor] } })).toBe(false);
     const publicTarget = {
       ...privateCorridor,
@@ -60,7 +60,13 @@ describe('killstreak protocol', () => {
       pathEnd: null,
       halfWidthM: null,
     };
-    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers: [publicTarget] } })).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers: [publicTarget, privateCorridor] } })).toBe(true);
+    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers: [publicTarget] } })).toBe(false);
+    expect(isKillstreakProtocolMessage({
+      ...message,
+      forPlayerId: 'observer',
+      snapshot: { ...message.snapshot, placementMarkers: [publicTarget] },
+    })).toBe(true);
     expect(isKillstreakProtocolMessage({
       ...message,
       snapshot: { ...message.snapshot, placementMarkers: [{ ...publicTarget, audience: 'owner-only' }] },
@@ -68,6 +74,29 @@ describe('killstreak protocol', () => {
     expect(isKillstreakProtocolMessage({
       ...message,
       snapshot: { ...message.snapshot, placementMarkers: [{ ...privateCorridor, halfWidthM: null }] },
+    })).toBe(false);
+    for (const placementMarkers of [
+      [publicTarget, { ...privateCorridor, anchor: [1, 0, 0] }],
+      [publicTarget, { ...privateCorridor, team: 1 }],
+      [publicTarget, { ...privateCorridor, expiresInMs: 901 }],
+      [publicTarget, { ...privateCorridor, halfWidthM: 13 }],
+      [publicTarget, { ...privateCorridor, pathEnd: [250, 0, 0] }],
+      [publicTarget, privateCorridor, privateCorridor],
+      [{ ...publicTarget, id: 'unbound-target-id' }, privateCorridor],
+    ]) {
+      expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers } })).toBe(false);
+    }
+    const careTarget = {
+      ...publicTarget,
+      id: 'ks-activation-7-2:care-target',
+      activationId: 'ks-activation-7-2',
+      source: 'care-package' as const,
+      expiresInMs: 6_000,
+    };
+    expect(isKillstreakProtocolMessage({ ...message, snapshot: { ...message.snapshot, placementMarkers: [careTarget] } })).toBe(true);
+    expect(isKillstreakProtocolMessage({
+      ...message,
+      snapshot: { ...message.snapshot, placementMarkers: [{ ...careTarget, expiresInMs: 6_001 }] },
     })).toBe(false);
     expect(isKillstreakProtocolMessage({
       ...message,

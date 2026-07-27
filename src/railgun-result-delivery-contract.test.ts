@@ -19,6 +19,8 @@ describe('railgun result delivery contract', () => {
   });
 
   it('never creates a speculative client beam and routes every accepted host path through the result hook', () => {
+    const presentationHook = main.slice(main.indexOf('function presentAuthoritativeRailgunResult('), main.indexOf('function railgunResult('));
+    expect(presentationHook).toContain("local ? 'shooter' : 'peer'");
     const firing = main.slice(main.indexOf('function tryFireRailgun('), main.indexOf('function railgunThermalContacts('));
     const clientPath = firing.slice(0, firing.indexOf('const fired = fireRailgun('));
     expect(clientPath).toContain('presentLocalRailgunTrigger()');

@@ -7559,7 +7559,7 @@ function presentLocalRailgunTrigger(): void {
 }
 
 function presentAuthoritativeRailgunResult(message: RailgunShotResultMessage, local: boolean): boolean {
-  const presented = railgunPresentation.presentAcceptedResult(message, performance.now());
+  const presented = railgunPresentation.presentAcceptedResult(message, performance.now(), local ? 'shooter' : 'peer');
   if (!presented || !message.beam) return false;
   audio.railgunReport(!local, new THREE.Vector3(...message.beam.start).distanceTo(camera.position));
   return true;

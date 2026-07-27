@@ -8,6 +8,12 @@ import type {
   KillstreakPlacementMarkerSnapshot,
   KillstreakRecipientSnapshot,
 } from './killstreak-runtime';
+import {
+  CARE_TARGET_MARKER_MAX_LIFETIME_MS,
+  CARPET_TARGET_MARKER_MAX_LIFETIME_MS,
+  SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M,
+  SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M,
+} from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
 
 export type KillstreakLoadoutIntentMessage = Readonly<{
@@ -192,11 +198,25 @@ function isPlacementMarker(value: unknown): value is KillstreakPlacementMarkerSn
     || (value.shape !== 'ground-x' && value.shape !== 'corridor')
     || !actorId(value.ownerId) || (value.team !== 0 && value.team !== 1)
     || (value.audience !== 'all-combatants' && value.audience !== 'owner-only')
-    || !vec3(value.anchor) || !finite(value.expiresInMs, 0, 60_000)) return false;
-  if (value.shape === 'ground-x') return value.audience === 'all-combatants'
-    && value.pathStart === null && value.pathEnd === null && value.halfWidthM === null;
-  return value.source === 'carpet-bomber' && value.audience === 'owner-only'
-    && vec3(value.pathStart) && vec3(value.pathEnd) && finite(value.halfWidthM, 0.1, 100);
+    || !vec3(value.anchor)) return false;
+  const maximumLifetime = value.source === 'care-package'
+    ? CARE_TARGET_MARKER_MAX_LIFETIME_MS
+    : CARPET_TARGET_MARKER_MAX_LIFETIME_MS;
+  if (!finite(value.expiresInMs, 0, maximumLifetime)) return false;
+  if (value.shape === 'ground-x') {
+    const expectedId = `${value.activationId}:${value.source === 'care-package' ? 'care-target' : 'carpet-target'}`;
+    return value.id === expectedId && value.audience === 'all-combatants'
+      && value.pathStart === null && value.pathEnd === null && value.halfWidthM === null;
+  }
+  if (value.id !== `${value.activationId}:carpet-corridor`
+    || value.source !== 'carpet-bomber' || value.audience !== 'owner-only'
+    || !vec3(value.pathStart) || !vec3(value.pathEnd)
+    || !finite(value.halfWidthM, 0.1, SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M)) return false;
+  const horizontalLength = Math.hypot(
+    value.pathEnd[0] - value.pathStart[0],
+    value.pathEnd[2] - value.pathStart[2],
+  );
+  return horizontalLength >= 1 && horizontalLength <= SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M;
 }
 
 function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapshot {
@@ -212,8 +232,23 @@ function isRecipientSnapshot(value: unknown): value is KillstreakRecipientSnapsh
 }
 
 function placementMarkersMatchRecipient(snapshot: KillstreakRecipientSnapshot, recipientId: string | null): boolean {
-  return snapshot.placementMarkers.every((marker) => marker.audience === 'all-combatants'
-    || marker.audience === 'owner-only' && recipientId === marker.ownerId);
+  if (new Set(snapshot.placementMarkers.map((marker) => marker.id)).size !== snapshot.placementMarkers.length) return false;
+  const sameVector = (left: readonly number[], right: readonly number[]) => left.every((entry, axis) => entry === right[axis]);
+  for (const marker of snapshot.placementMarkers) {
+    if (marker.audience === 'owner-only' && recipientId !== marker.ownerId) return false;
+    const owner = snapshot.actors.find((actor) => actor.actorId === marker.ownerId);
+    if (!owner || owner.team !== marker.team) return false;
+    if (marker.shape !== 'corridor') continue;
+    const target = snapshot.placementMarkers.find((candidate) => candidate.activationId === marker.activationId
+      && candidate.source === 'carpet-bomber' && candidate.shape === 'ground-x');
+    if (!target || target.ownerId !== marker.ownerId || target.team !== marker.team
+      || target.expiresInMs !== marker.expiresInMs || !sameVector(target.anchor, marker.anchor)) return false;
+  }
+  for (const target of snapshot.placementMarkers.filter((marker) => marker.source === 'carpet-bomber' && marker.shape === 'ground-x')) {
+    const corridors = snapshot.placementMarkers.filter((marker) => marker.activationId === target.activationId && marker.shape === 'corridor');
+    if (recipientId === target.ownerId ? corridors.length !== 1 : corridors.length !== 0) return false;
+  }
+  return true;
 }
 
 function sensorCapabilityMatchesRecipient(snapshot: KillstreakRecipientSnapshot, recipientId: string | null): boolean {

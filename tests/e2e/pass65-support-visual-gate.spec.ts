@@ -117,7 +117,7 @@ type Pair = Readonly<{
   errors: string[];
 }>;
 
-async function startPair(browser: Browser, label: string): Promise<Pair> {
+async function startPair(browser: Browser, label: string, arenaId = 'rustworks-1v1'): Promise<Pair> {
   const context = await browser.newContext({ viewport: { width: 1_280, height: 720 }, deviceScaleFactor: 1 });
   await context.addInitScript((loadout) => {
     try { localStorage.setItem('atomic-acres:killstreak-loadout:v1', JSON.stringify(loadout)); } catch { /* about:blank */ }
@@ -129,9 +129,9 @@ async function startPair(browser: Browser, label: string): Promise<Pair> {
   const errors: string[] = [];
   collectPageErrors(host, 'host', errors);
   collectPageErrors(guest, 'guest', errors);
-  await Promise.all([host, guest].map((page) => page.evaluate(async () => {
-    await window.__ATOMIC_ACRES_DEBUG__.selectArena('rustworks-1v1');
-  })));
+  await Promise.all([host, guest].map((page) => page.evaluate(async (selectedArenaId) => {
+    await window.__ATOMIC_ACRES_DEBUG__.selectArena(selectedArenaId as any);
+  }, arenaId)));
   for (const page of [host, guest]) {
     await page.locator('[data-menu-tab="streaks"]').click();
     for (const [slot, id] of pass65Loadout.slots.entries()) {
@@ -167,6 +167,9 @@ async function startPair(browser: Browser, label: string): Promise<Pair> {
     return state.remotePlayers.length === 1;
   }, undefined, { timeout: 20_000 })));
   await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().killstreak.actors.length >= 1);
+  await Promise.all([host, guest].map((page) => page.waitForFunction((expectedArenaId) => (
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.id === expectedArenaId
+  ), arenaId)));
   return { context, host, guest, errors };
 }
 
@@ -178,6 +181,23 @@ async function clickStrikeMap(page: Page, xRatio: number, yRatio: number): Promi
   const box = await page.locator('#strike-map').boundingBox();
   if (!box) throw new Error('Targeting map has no bounds');
   await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
+}
+
+async function freezeTopDownMarkerFrame(pages: readonly Page[], anchor: number[]): Promise<void> {
+  await Promise.all(pages.map((page) => page.evaluate(async (worldAnchor) => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setCaptureCameraPose(worldAnchor[0], worldAnchor[1] + 18, worldAnchor[2], 0, -1.42);
+    await new Promise<void>((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())));
+    api.setRenderPaused(true);
+  }, anchor)));
+}
+
+async function releaseMarkerFrame(pages: readonly Page[]): Promise<void> {
+  await Promise.all(pages.map((page) => page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    api.setRenderPaused(false);
+    api.setCaptureCameraPose(null);
+  })));
 }
 
 function writeReceipt(name: string, payload: Record<string, unknown>): void {
@@ -229,20 +249,20 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
         .filter((marker: any) => marker.source === 'care-package').length).toBe(1);
       const hostCare = (await state(host)).killstreakPresentation.markerDetails.find((marker: any) => marker.source === 'care-package');
       const guestCare = (await state(guest)).killstreakPresentation.markerDetails.find((marker: any) => marker.source === 'care-package');
-      expect(hostCare).toMatchObject({ shape: 'ground-x', audience: 'all-combatants', halfWidthM: null, depthTest: true, visible: true });
+      expect(hostCare).toMatchObject({
+        shape: 'ground-x', audience: 'all-combatants', halfWidthM: null,
+        depthTest: true, writesDepth: false, raycastDisabled: true, visible: true,
+      });
+      expect(hostCare.maximumOpacity).toBeLessThanOrEqual(0.88);
       expect(guestCare).toMatchObject({ id: hostCare.id, anchor: hostCare.anchor, worldPosition: hostCare.worldPosition });
       expect(hostCare.colourHexes).toContain('#ff253f');
       expect(hostCare.worldPosition[1] - hostCare.anchor[1]).toBeGreaterThanOrEqual(0.04);
       expect(hostCare.worldPosition[1] - hostCare.anchor[1]).toBeLessThanOrEqual(0.08);
       expect((await state(guest)).killstreak.placementMarkers.some((marker: any) => marker.shape === 'corridor')).toBe(false);
-      await Promise.all([host, guest].map((page) => page.evaluate((anchor: number[]) => {
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(anchor[0], anchor[1] + 18, anchor[2], 0, -1.42);
-      }, hostCare.anchor)));
+      await freezeTopDownMarkerFrame([host, guest], hostCare.anchor);
       await host.screenshot({ path: resolve(artifactRoot, 'care-ground-x-host.png') });
       await guest.screenshot({ path: resolve(artifactRoot, 'care-ground-x-guest.png') });
-      await Promise.all([host, guest].map((page) => page.evaluate(() => {
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null);
-      })));
+      await releaseMarkerFrame([host, guest]);
 
       await expect.poll(async () => (await state(host)).killstreakPresentation.markerDetails
         .some((marker: any) => marker.id === hostCare.id), { timeout: 9_000 }).toBe(false);
@@ -261,20 +281,20 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       const corridor = hostCarpetMarkers.find((marker: any) => marker.shape === 'corridor');
       expect(hostTarget).toMatchObject({ source: 'carpet-bomber', audience: 'all-combatants', halfWidthM: null });
       expect(guestCarpetMarkers[0]).toMatchObject({ id: hostTarget.id, anchor: hostTarget.anchor, worldPosition: hostTarget.worldPosition });
-      expect(corridor).toMatchObject({ source: 'carpet-bomber', audience: 'owner-only', depthTest: true, visible: true });
+      expect(corridor).toMatchObject({
+        source: 'carpet-bomber', audience: 'owner-only',
+        depthTest: true, writesDepth: false, raycastDisabled: true, visible: true,
+      });
+      expect(corridor.maximumOpacity).toBeLessThanOrEqual(0.84);
       expect(corridor.halfWidthM).toBeGreaterThan(3.5);
       expect(corridor.halfWidthM).toBeLessThan(7.5);
       expect(corridor.pathStart).not.toBeNull();
       expect(corridor.pathEnd).not.toBeNull();
       expect(guestCarpetMarkers.some((marker: any) => marker.shape === 'corridor')).toBe(false);
-      await Promise.all([host, guest].map((page) => page.evaluate((anchor: number[]) => {
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(anchor[0], anchor[1] + 18, anchor[2], 0, -1.42);
-      }, hostTarget.anchor)));
+      await freezeTopDownMarkerFrame([host, guest], hostTarget.anchor);
       await host.screenshot({ path: resolve(artifactRoot, 'carpet-target-and-caller-corridor.png') });
       await guest.screenshot({ path: resolve(artifactRoot, 'carpet-shared-target-guest.png') });
-      await Promise.all([host, guest].map((page) => page.evaluate(() => {
-        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(null);
-      })));
+      await releaseMarkerFrame([host, guest]);
 
       await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
       await expect(host.locator('#menu')).toBeVisible();
@@ -284,6 +304,97 @@ test.describe('Pass 65 support visual fail-closed gate', () => {
       writeReceipt('replicated-placement-markers', {
         care: { host: hostCare, guest: guestCare },
         carpet: { host: hostCarpetMarkers, guest: guestCarpetMarkers },
+        browserErrors: errors,
+      });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('replicates the authoritative map-spanning Railgun bolt through its admitted building path', async ({ browser }) => {
+    test.setTimeout(150_000);
+    const pair = await startPair(browser, 'RAILGUN BOLT', 'atomic-acres');
+    const { context, host, guest, errors } = pair;
+    try {
+      await host.bringToFront();
+      await host.locator('#game').click({ position: { x: 100, y: 100 }, force: true });
+      const acquired = await host.evaluate(() => {
+        const api = window.__ATOMIC_ACRES_DEBUG__ as any;
+        const staged = api.stageRailgunSpawn(0);
+        if (!staged.pickupPosition) throw new Error('Railgun did not stage a pickup');
+        api.teleportPlayer(...staged.pickupPosition);
+        const interacted = api.interactRailgun();
+        api.teleportPlayer(-17, 1.7, -17, 0, 0);
+        api.setAds(true);
+        return { interacted, state: api.snapshot() };
+      });
+      expect(acquired.interacted).toBe(true);
+      expect(acquired.state.railgun).toMatchObject({ status: 'held', roundsRemaining: 8, localHolder: true });
+      await expect.poll(async () => (await state(guest)).railgun.status).toBe('held');
+      await guest.evaluate(() => {
+        window.__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(5, 9, -40, 0.83, -0.22);
+      });
+
+      await host.evaluate(() => (window.__ATOMIC_ACRES_DEBUG__ as any).fireOnce());
+      await guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().railgun.presentation.activeBeams === 1, undefined, {
+        timeout: 3_000,
+      });
+      await Promise.all([host, guest].map((page) => page.evaluate(() => {
+        window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true);
+      })));
+      const [hostShot, guestShot] = await Promise.all([state(host), state(guest)]);
+      for (const shot of [hostShot, guestShot]) {
+        expect(shot.railgun.presentation).toMatchObject({
+          activeBeams: 1,
+          beamPresentations: 1,
+          lastBeamLengthM: 180,
+          visibleDurationMs: 900,
+          coreRadiusM: 0.14,
+          haloRadiusM: 0.62,
+          poolCapacity: 6,
+          throughGeometry: true,
+        });
+      }
+      expect(guestShot.railgun.presentation.lastAcceptedBeam).toEqual(hostShot.railgun.presentation.lastAcceptedBeam);
+      expect(hostShot.railgun.presentation).toMatchObject({ lastPresentationStartOffsetM: 2.4, lastViewer: 'shooter' });
+      expect(guestShot.railgun.presentation).toMatchObject({ lastPresentationStartOffsetM: 0, lastViewer: 'peer' });
+      expect(hostShot.railgun.presentation.lastAcceptedBeam.shotId).toMatch(/:rail:\d+$/);
+      expect(hostShot.audio.railgun).toMatchObject({ local: 1, replicated: 0, layerCount: 8, pressureDuration: 0.62 });
+      expect(guestShot.audio.railgun).toMatchObject({ local: 0, replicated: 1, layerCount: 8, pressureDuration: 0.62 });
+
+      const penetrationTrace = await host.evaluate((beam: { start: number[]; end: number[] }) => {
+        const direction = beam.end.map((entry, axis) => (entry - beam.start[axis]) / 180) as [number, number, number];
+        return (window.__ATOMIC_ACRES_DEBUG__ as any).traceBallistics(
+          'railgun',
+          beam.start as [number, number, number],
+          direction,
+          180,
+          'atomic-acres',
+        );
+      }, hostShot.railgun.presentation.lastAcceptedBeam);
+      expect(penetrationTrace.reachedDistance).toBe(true);
+      expect(penetrationTrace.impacts.some((impact: any) => impact.penetrated && (
+        impact.surface.material === 'interior-wall' || impact.surface.material === 'exterior-wall'
+      ))).toBe(true);
+      expect(penetrationTrace.damageMultiplier).toBe(1);
+
+      await Promise.all([
+        host.screenshot({ path: resolve(artifactRoot, 'railgun-map-bolt-shooter.png') }),
+        guest.screenshot({ path: resolve(artifactRoot, 'railgun-map-bolt-peer-through-building.png') }),
+      ]);
+      await Promise.all([host, guest].map((page) => page.evaluate(() => {
+        window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
+      })));
+      await expect.poll(async () => (await state(host)).railgun.presentation.activeBeams, { timeout: 3_000 }).toBe(0);
+      await expect.poll(async () => (await state(guest)).railgun.presentation.activeBeams, { timeout: 3_000 }).toBe(0);
+      expect((await state(host)).railgun.presentation.beamPresentations).toBe(1);
+      expect((await state(guest)).railgun.presentation.beamPresentations).toBe(1);
+      expect(errors).toEqual([]);
+      writeReceipt('replicated-railgun-map-bolt', {
+        host: hostShot.railgun.presentation,
+        guest: guestShot.railgun.presentation,
+        penetrationTrace,
+        audio: { host: hostShot.audio.railgun, guest: guestShot.audio.railgun },
         browserErrors: errors,
       });
     } finally {

@@ -235,6 +235,19 @@ describe('host killstreak runtime', () => {
     expect(runtime.snapshotFor('observer', 2_001).placementMarkers).toEqual([]);
   });
 
+  it('never creates or consumes a target marker for rejected placement requests', () => {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['care-package', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    expect(runtime.activate({ ...intent('care-package', 1), anchor: [4, 0, -2] }, 1_000, DEFAULT_WORLD))
+      .toMatchObject({ accepted: false, reason: 'reward-not-earned' });
+    expect(runtime.snapshotFor('owner', 1_000).placementMarkers).toEqual([]);
+    earn(runtime, 4);
+    expect(runtime.activate({ ...intent('care-package', 1), expectedId: 'carpet-bomber', anchor: [4, 0, -2] }, 1_001, DEFAULT_WORLD))
+      .toMatchObject({ accepted: false, reason: 'selection-mismatch' });
+    expect(runtime.snapshotFor('owner', 1_001).placementMarkers).toEqual([]);
+    expect(runtime.snapshotFor('owner', 1_001).actors[0].available).toContain('care-package');
+  });
+
   it('creates exactly 12 targetable 50-HP swarm drones with bounded host damage and 60-second expiry', () => {
     const runtime = new HostKillstreakRuntime(7);
     runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'drone-swarm']));

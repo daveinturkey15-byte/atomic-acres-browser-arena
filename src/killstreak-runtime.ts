@@ -33,6 +33,11 @@ export const CARE_AIRCRAFT_DURATION_MS = 7_000;
 export const CARE_AIRCRAFT_DROP_DELAY_MS = 800;
 export const CARE_CRATE_DESCENT_MS = 5_200;
 export const CARPET_BOMBER_IMPACT_COUNT = 20;
+/** Recipient-snapshot presentation bounds; these are not gameplay ranges. */
+export const CARE_TARGET_MARKER_MAX_LIFETIME_MS = CARE_AIRCRAFT_DROP_DELAY_MS + CARE_CRATE_DESCENT_MS;
+export const CARPET_TARGET_MARKER_MAX_LIFETIME_MS = 1_000;
+export const SUPPORT_TARGET_CORRIDOR_MAX_LENGTH_M = 200;
+export const SUPPORT_TARGET_CORRIDOR_MAX_HALF_WIDTH_M = 12;
 export const MAX_ACTIVE_SUPPORT_ENTITIES = 32;
 export const MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP = 64;
 
@@ -994,7 +999,7 @@ export class HostKillstreakRuntime {
     }
     for (const [activationId, bomber] of this.carpetBombers) {
       while (bomber.nextImpactOrdinal < bomber.impacts.length
-        && nowMs >= bomber.createdAtMs + 1_000 + bomber.nextImpactOrdinal * 180
+        && nowMs >= bomber.createdAtMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS + bomber.nextImpactOrdinal * 180
         && impactEvents.length < CARPET_BOMBER_IMPACT_COUNT) {
         const ordinal = bomber.nextImpactOrdinal;
         const position = bomber.impacts[ordinal];
@@ -1462,11 +1467,11 @@ export class HostKillstreakRuntime {
         anchor: Object.freeze([entity.dropPosition[0], entity.dropPosition[1] - 0.45, entity.dropPosition[2]]) as unknown as SupportVec3,
         pathStart: null, pathEnd: null,
         halfWidthM: null,
-        expiresInMs: Math.max(0, entity.descentStartsAtMs + CARE_CRATE_DESCENT_MS - nowMs),
+        expiresInMs: Math.max(0, entity.createdAtMs + CARE_TARGET_MARKER_MAX_LIFETIME_MS - nowMs),
       }));
     }
     for (const activation of this.carpetBombers.values()) {
-      const prestrikeRemainingMs = Math.max(0, activation.createdAtMs + 1_000 - nowMs);
+      const prestrikeRemainingMs = Math.max(0, activation.createdAtMs + CARPET_TARGET_MARKER_MAX_LIFETIME_MS - nowMs);
       if (prestrikeRemainingMs <= 0) continue;
       placementMarkers.push(Object.freeze({
         id: `${activation.activationId}:carpet-target`, activationId: activation.activationId, source: 'carpet-bomber', shape: 'ground-x',

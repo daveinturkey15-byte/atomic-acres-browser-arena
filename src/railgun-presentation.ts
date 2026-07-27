@@ -19,8 +19,11 @@ export const RAILGUN_BOLT_PRESENTATION = Object.freeze({
   visibleDurationMs: 900,
   coreRadiusM: 0.14,
   haloRadiusM: 0.62,
+  shooterStartOffsetM: 2.4,
   poolCapacity: 6,
 });
+
+type RailgunBeamViewer = 'shooter' | 'peer';
 
 export class RailgunPresentation {
   readonly root = new THREE.Group();
@@ -30,12 +33,21 @@ export class RailgunPresentation {
   private readonly thermalWorldContacts: THREE.Group[] = [];
   private readonly thermalDomContacts: HTMLElement[] = [];
   private readonly beamRoot = new THREE.Group();
-  private readonly beams: Array<{ root: THREE.Group; core: THREE.Mesh; bloom: THREE.Mesh; expiresAt: number; authorityKey: string | null }> = [];
+  private readonly beams: Array<{
+    root: THREE.Group;
+    core: THREE.Mesh;
+    bloom: THREE.Mesh;
+    expiresAt: number;
+    authorityKey: string | null;
+    viewer: RailgunBeamViewer;
+  }> = [];
   private readonly acceptedBeamKeys = new Set<string>();
   private beamCursor = 0;
   private beamPresentations = 0;
   private lastBeamLengthM = 0;
   private lastAcceptedBeam: RailgunBeamAuthority | null = null;
+  private lastPresentationStartOffsetM = 0;
+  private lastViewer: RailgunBeamViewer = 'peer';
   private visibleThermalContacts = 0;
 
   constructor(scene: THREE.Scene, thermalRoot: HTMLElement, flattenMaterials: boolean) {
@@ -106,7 +118,7 @@ export class RailgunPresentation {
       bloom.frustumCulled = false;
       beam.add(core, bloom);
       this.beamRoot.add(beam);
-      this.beams.push({ root: beam, core, bloom, expiresAt: 0, authorityKey: null });
+      this.beams.push({ root: beam, core, bloom, expiresAt: 0, authorityKey: null, viewer: 'peer' });
     }
     scene.add(this.root, this.thermalWorldRoot, this.beamRoot);
   }
@@ -121,7 +133,7 @@ export class RailgunPresentation {
   }
 
   /** The only beam admission hook: a host-accepted result with canonical endpoints. */
-  presentAcceptedResult(result: RailgunShotResultMessage, now: number): boolean {
+  presentAcceptedResult(result: RailgunShotResultMessage, now: number, viewer: RailgunBeamViewer = 'peer'): boolean {
     const authority = result.beam;
     if (result.status === 'rejected' || result.reason !== 'accepted' || !isRailgunBeamAuthority(authority)
       || authority.generation !== result.generation || authority.shotId !== result.shotId) return false;
@@ -129,24 +141,36 @@ export class RailgunPresentation {
     if (this.acceptedBeamKeys.has(authorityKey)) return false;
     const start = new THREE.Vector3(...authority.start);
     const end = new THREE.Vector3(...authority.end);
-    const delta = end.clone().sub(start);
-    const length = delta.length();
+    const authoritativeDelta = end.clone().sub(start);
+    const length = authoritativeDelta.length();
     if (!Number.isFinite(length) || Math.abs(length - RAILGUN_BEAM_LENGTH_M) > 1e-4) return false;
     this.acceptedBeamKeys.add(authorityKey);
     while (this.acceptedBeamKeys.size > 128) this.acceptedBeamKeys.delete(this.acceptedBeamKeys.values().next().value!);
     const beam = this.beams[this.beamCursor++ % this.beams.length];
-    beam.root.position.copy(start).addScaledVector(delta, 0.5);
-    beam.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
-    beam.core.scale.set(RAILGUN_BOLT_PRESENTATION.coreRadiusM, length, RAILGUN_BOLT_PRESENTATION.coreRadiusM);
-    beam.bloom.scale.set(RAILGUN_BOLT_PRESENTATION.haloRadiusM, length, RAILGUN_BOLT_PRESENTATION.haloRadiusM);
+    const direction = authoritativeDelta.clone().normalize();
+    const startOffsetM = viewer === 'shooter' ? RAILGUN_BOLT_PRESENTATION.shooterStartOffsetM : 0;
+    const presentationStart = start.clone().addScaledVector(direction, startOffsetM);
+    const presentationDelta = end.clone().sub(presentationStart);
+    const presentationLength = presentationDelta.length();
+    beam.root.position.copy(presentationStart).addScaledVector(presentationDelta, 0.5);
+    beam.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    beam.core.scale.set(RAILGUN_BOLT_PRESENTATION.coreRadiusM, presentationLength, RAILGUN_BOLT_PRESENTATION.coreRadiusM);
+    beam.bloom.scale.set(RAILGUN_BOLT_PRESENTATION.haloRadiusM, presentationLength, RAILGUN_BOLT_PRESENTATION.haloRadiusM);
+    (beam.core.material as THREE.MeshBasicMaterial).side = viewer === 'shooter' ? THREE.BackSide : THREE.FrontSide;
+    (beam.bloom.material as THREE.MeshBasicMaterial).side = viewer === 'shooter' ? THREE.BackSide : THREE.FrontSide;
     beam.root.visible = true;
     beam.expiresAt = now + RAILGUN_BOLT_PRESENTATION.visibleDurationMs;
     beam.authorityKey = authorityKey;
+    beam.viewer = viewer;
     beam.root.userData.authorityKey = authorityKey;
     beam.root.userData.authoritativeStart = [...authority.start];
     beam.root.userData.authoritativeEnd = [...authority.end];
+    beam.root.userData.presentationStartOffsetM = startOffsetM;
+    beam.root.userData.viewer = viewer;
     this.beamPresentations += 1;
     this.lastBeamLengthM = length;
+    this.lastPresentationStartOffsetM = startOffsetM;
+    this.lastViewer = viewer;
     this.lastAcceptedBeam = Object.freeze({
       generation: authority.generation,
       shotId: authority.shotId,
@@ -259,6 +283,8 @@ export class RailgunPresentation {
     haloRadiusM: number;
     poolCapacity: number;
     throughGeometry: boolean;
+    lastPresentationStartOffsetM: number;
+    lastViewer: RailgunBeamViewer;
     lastAcceptedBeam: Readonly<{
       generation: number;
       shotId: string;
@@ -287,6 +313,8 @@ export class RailgunPresentation {
       haloRadiusM: RAILGUN_BOLT_PRESENTATION.haloRadiusM,
       poolCapacity: this.beams.length,
       throughGeometry,
+      lastPresentationStartOffsetM: this.lastPresentationStartOffsetM,
+      lastViewer: this.lastViewer,
       lastAcceptedBeam: this.lastAcceptedBeam ? Object.freeze({
         generation: this.lastAcceptedBeam.generation,
         shotId: this.lastAcceptedBeam.shotId,
@@ -309,5 +337,7 @@ export class RailgunPresentation {
     this.beamPresentations = 0;
     this.lastBeamLengthM = 0;
     this.lastAcceptedBeam = null;
+    this.lastPresentationStartOffsetM = 0;
+    this.lastViewer = 'peer';
   }
 }

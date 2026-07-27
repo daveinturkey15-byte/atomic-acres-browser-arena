@@ -275,6 +275,9 @@ export type KillstreakPlacementMarkerTelemetry = Readonly<{
   meshNames: readonly string[];
   colourHexes: readonly string[];
   depthTest: boolean;
+  writesDepth: boolean;
+  maximumOpacity: number;
+  raycastDisabled: boolean;
   visible: boolean;
 }>;
 
@@ -657,6 +660,8 @@ function buildDroneSensorSilhouette(index: number): THREE.Group {
   return root;
 }
 
+const disabledPlacementMarkerRaycast: THREE.Object3D['raycast'] = () => undefined;
+
 function placementMarkerMaterial(opacity: number): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({
     color: 0xff253f,
@@ -679,7 +684,8 @@ function buildPlacementMarker(marker: KillstreakPlacementMarkerSnapshot): THREE.
   root.userData.activationId = marker.activationId;
   root.userData.source = marker.source;
   root.userData.audience = marker.audience;
-  root.raycast = () => undefined;
+  root.userData.presentationPolicy = 'depth-tested-nonblocking-world-telegraph';
+  root.raycast = disabledPlacementMarkerRaycast;
   if (marker.shape === 'ground-x') {
     root.position.fromArray(marker.anchor);
     root.position.y += 0.055;
@@ -688,14 +694,14 @@ function buildPlacementMarker(marker: KillstreakPlacementMarkerSnapshot): THREE.
       bar.name = 'support-target-x-bar';
       bar.rotation.y = angle;
       bar.renderOrder = 18;
-      bar.raycast = () => undefined;
+      bar.raycast = disabledPlacementMarkerRaycast;
       root.add(bar);
     }
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.5, 2.68, 48), placementMarkerMaterial(0.58));
     ring.name = 'support-target-x-ring';
     ring.rotation.x = -Math.PI / 2;
     ring.renderOrder = 18;
-    ring.raycast = () => undefined;
+    ring.raycast = disabledPlacementMarkerRaycast;
     root.add(ring);
   } else if (marker.pathStart && marker.pathEnd) {
     const start = new THREE.Vector3(...marker.pathStart);
@@ -707,15 +713,26 @@ function buildPlacementMarker(marker: KillstreakPlacementMarkerSnapshot): THREE.
     root.rotation.y = -Math.atan2(delta.z, delta.x);
     const corridorWidthM = Math.max(0.2, (marker.halfWidthM ?? 0.1) * 2);
     root.userData.halfWidthM = marker.halfWidthM;
-    const corridor = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, corridorWidthM), placementMarkerMaterial(0.32));
+    const corridor = new THREE.Mesh(new THREE.BoxGeometry(length, 0.025, corridorWidthM), placementMarkerMaterial(0.1));
     corridor.name = 'carpet-bomber-flight-corridor';
     corridor.renderOrder = 17;
-    corridor.raycast = () => undefined;
-    const centre = new THREE.Mesh(new THREE.BoxGeometry(length, 0.045, 0.18), placementMarkerMaterial(0.92));
+    corridor.raycast = disabledPlacementMarkerRaycast;
+    const centre = new THREE.Mesh(new THREE.BoxGeometry(length, 0.045, 0.18), placementMarkerMaterial(0.84));
     centre.name = 'carpet-bomber-flight-centreline';
     centre.renderOrder = 18;
-    centre.raycast = () => undefined;
-    root.add(corridor, centre);
+    centre.raycast = disabledPlacementMarkerRaycast;
+    const railWidth = Math.min(0.2, corridorWidthM * 0.08);
+    const leftRail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.04, railWidth), placementMarkerMaterial(0.66));
+    leftRail.name = 'carpet-bomber-flight-corridor-left-edge';
+    leftRail.position.z = -(corridorWidthM - railWidth) * 0.5;
+    leftRail.renderOrder = 18;
+    leftRail.raycast = disabledPlacementMarkerRaycast;
+    const rightRail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.04, railWidth), placementMarkerMaterial(0.66));
+    rightRail.name = 'carpet-bomber-flight-corridor-right-edge';
+    rightRail.position.z = (corridorWidthM - railWidth) * 0.5;
+    rightRail.renderOrder = 18;
+    rightRail.raycast = disabledPlacementMarkerRaycast;
+    root.add(corridor, centre, leftRail, rightRail);
   }
   return root;
 }
@@ -948,13 +965,19 @@ export class KillstreakPresentation {
         const meshNames: string[] = [];
         const colourHexes = new Set<string>();
         let depthTest = true;
+        let writesDepth = false;
+        let maximumOpacity = 0;
+        let raycastDisabled = true;
         root.traverse((node) => {
           if (!(node instanceof THREE.Mesh)) return;
           meshNames.push(node.name);
+          raycastDisabled &&= node.raycast === disabledPlacementMarkerRaycast;
           const materials = Array.isArray(node.material) ? node.material : [node.material];
           for (const entry of materials) {
             if ('color' in entry && entry.color instanceof THREE.Color) colourHexes.add(`#${entry.color.getHexString()}`);
             depthTest &&= entry.depthTest;
+            writesDepth ||= entry.depthWrite;
+            maximumOpacity = Math.max(maximumOpacity, entry.opacity);
           }
         });
         const corridorLengthM = snapshot.pathStart && snapshot.pathEnd
@@ -980,6 +1003,9 @@ export class KillstreakPresentation {
           meshNames: Object.freeze(meshNames.sort()),
           colourHexes: Object.freeze([...colourHexes].sort()),
           depthTest,
+          writesDepth,
+          maximumOpacity,
+          raycastDisabled,
           visible: root.visible && root.parent !== null,
         });
       });

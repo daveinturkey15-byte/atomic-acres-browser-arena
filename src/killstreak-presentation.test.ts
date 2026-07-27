@@ -205,6 +205,9 @@ describe('killstreak presentation', () => {
         halfWidthM: 6.25,
         colourHexes: ['#ff253f'],
         depthTest: true,
+        writesDepth: false,
+        maximumOpacity: 0.84,
+        raycastDisabled: true,
         visible: true,
       }),
       expect.objectContaining({
@@ -218,6 +221,9 @@ describe('killstreak presentation', () => {
         worldPosition: [2, 0.055, 3],
         colourHexes: ['#ff253f'],
         depthTest: true,
+        writesDepth: false,
+        maximumOpacity: 0.88,
+        raycastDisabled: true,
         visible: true,
       }),
     ]);
@@ -226,7 +232,12 @@ describe('killstreak presentation', () => {
     expect(targetBounds.max[0]! - targetBounds.min[0]!).toBeGreaterThan(5);
     expect(targetBounds.max[2]! - targetBounds.min[2]!).toBeGreaterThan(5);
     expect(presentation.root.getObjectByName('support-placement-ground-x')?.userData.audience).toBe('all-combatants');
-    expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor')).toBeDefined();
+    const corridorFill = presentation.root.getObjectByName('carpet-bomber-flight-corridor') as THREE.Mesh;
+    expect((corridorFill.material as THREE.MeshBasicMaterial).opacity).toBe(0.1);
+    expect((corridorFill.material as THREE.MeshBasicMaterial).depthTest).toBe(true);
+    expect((corridorFill.material as THREE.MeshBasicMaterial).depthWrite).toBe(false);
+    expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor-left-edge')).toBeDefined();
+    expect(presentation.root.getObjectByName('carpet-bomber-flight-corridor-right-edge')).toBeDefined();
     // A stale network snapshot cannot keep a marker alive after its local
     // deadline; no later host snapshot is required for teardown.
     presentation.sync(snapshot(0, [], [{
