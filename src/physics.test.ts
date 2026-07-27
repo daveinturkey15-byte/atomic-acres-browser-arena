@@ -176,6 +176,26 @@ describe('CharacterPhysics', () => {
     expect(() => active!.syncMajorDebrisBodies(entries)).toThrow(/exceed cap/);
   });
 
+  it('admits the exact shared 12 shed + 4 house + 2 window physical-body partition', async () => {
+    active = await CharacterPhysics.create([], bounds);
+    const ids = [
+      ...Array.from({ length: 12 }, (_, index) => `shed-${Math.floor(index / 6)}:debris:chunk-${index}`),
+      ...Array.from({ length: 4 }, (_, index) => `house-debris:atomic-house:fragment-${index}`),
+      ...Array.from({ length: 2 }, (_, index) => `window-debris:atomic-window-${index}`),
+    ];
+    active.syncMajorDebrisBodies(ids.map((id, index) => ({
+      id,
+      position: { x: -4 + index % 9, y: 0.25 + Math.floor(index / 9) * 0.6, z: index < 9 ? -2 : 2 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      halfExtents: { x: 0.16, y: 0.16, z: 0.16 },
+      linearVelocity: { x: 0, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0, z: 0 },
+      sleeping: true,
+    })));
+    expect(active.majorDebrisBodyCount()).toBe(18);
+    expect(active.majorDebrisSnapshots().map((snapshot) => snapshot.id)).toEqual([...ids].sort());
+  });
+
   it('keeps multiple major fragments physical so they collide with each other and the world floor', async () => {
     active = await CharacterPhysics.create([], bounds);
     active.teleportEye({ x: -7, y: 1.7, z: -7 });

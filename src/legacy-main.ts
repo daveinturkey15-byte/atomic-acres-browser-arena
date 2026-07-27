@@ -158,7 +158,7 @@ import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
-import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
+import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import {
   assertAtomicHouseAuthorityParity,
   auditAtomicHouseAuthorityParity,
@@ -423,6 +423,7 @@ import {
 } from './physics';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { shedPlacementsForArena } from './destructible-shed-registry';
+import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
 import {
   INTERACTIVE_WORLD_SCHEMA_VERSION,
   type InteractiveWorldSnapshotMessage,
@@ -1567,17 +1568,18 @@ type PersistentWindowDebris = {
 const persistentWindowDebris = new Map<string, PersistentWindowDebris>();
 
 function createInteractiveWorldRuntime(
-  arenaId: ArenaId,
+  activeArena: ArenaMap,
   matchEpoch: number,
   hostAuthority: boolean,
 ): InteractiveWorldRuntime {
   const runtime = new InteractiveWorldRuntime(
-    arenaId,
+    activeArena.id,
     matchEpoch,
-    shedPlacementsForArena(arenaId),
+    shedPlacementsForArena(activeArena.id),
     hostAuthority,
     undefined,
     scheduleDeferredGpuGeometryRetirement,
+    activeArena.houseDestruction?.definitions ?? [],
   );
   // Quality/Blender arena presentation may intentionally hide the procedural
   // arena root while retaining its collision authority. Interactive gameplay
@@ -1603,7 +1605,11 @@ function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['collider
     activeWorldColliderCacheArena = activeArena;
     activeWorldColliderCacheRuntime = interactiveWorldRuntime;
     activeWorldColliderCacheRevision = collision.revision;
-    activeWorldColliderCache = [...activeArena.colliders, ...collision.movementColliders];
+    const replacedStatic = new Set(activeArena.houseDestruction?.staticColliders ?? []);
+    activeWorldColliderCache = [
+      ...activeArena.colliders.filter((collider) => !replacedStatic.has(collider)),
+      ...collision.movementColliders,
+    ];
   }
   return activeWorldColliderCache;
 }
@@ -1616,20 +1622,26 @@ function syncInteractiveWorldPhysics(authoritativeResync = false): void {
   // second static collider while retaining it in the shared collision view
   // used by ballistics, LOS, support and diagnostics.
   characterPhysics.syncDynamicColliders(
-    collision.dynamicColliders.filter((entry) => !entry.id.includes(':debris:')),
+    collision.dynamicColliders.filter((entry) => !entry.id.includes('debris:')),
   );
   characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync);
+  for (const mesh of interactiveWorldRuntime.housePresentationRaycastMeshes()) {
+    if (!arena.raycastMeshes.includes(mesh)) arena.raycastMeshes.push(mesh);
+  }
   botNavigationColliders = navigationCollidersFor(arena);
+  syncAtomicHouseStructuralPresentation();
 }
 
 function activeMajorDebrisPhysicsBodies(): readonly MajorDebrisBodyDefinition[] {
-  const shedBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies() ?? [];
-  const capacity = Math.max(0, MAX_MAJOR_DEBRIS_BODIES - shedBodies.length);
+  const runtimeBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies() ?? [];
+  const capacity = Math.max(0, MAX_MAJOR_DEBRIS_BODIES - runtimeBodies.length);
   const windowBodies = [...persistentWindowDebris.values()]
     .sort((left, right) => left.id.localeCompare(right.id))
-    .slice(0, capacity)
+    .slice(0, Math.min(capacity, SHARED_MAJOR_DEBRIS_BUDGET.window))
     .map((entry) => entry.definition);
-  return Object.freeze([...shedBodies, ...windowBodies]);
+  const bodies = [...runtimeBodies, ...windowBodies];
+  if (bodies.length > MAX_MAJOR_DEBRIS_BODIES) throw new TypeError('Shared major debris budget exceeded');
+  return Object.freeze(bodies);
 }
 
 function updatePersistentWindowDebrisPhysics(): void {
@@ -1838,12 +1850,31 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
 }
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
+  const runtimeOwnsHouseSurfaces = activeArena === arena && interactiveWorldRuntime !== null;
+  const replacedHouseSurfaces = new Set(
+    runtimeOwnsHouseSurfaces ? activeArena.houseDestruction?.staticBallisticSurfaceIds ?? [] : [],
+  );
   const staticSurfaces = activeArena.shotSurfaces.filter(
-    (surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId),
+    (surface) => (!surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId))
+      && !replacedHouseSurfaces.has(surface.id),
   );
   return activeArena === arena && interactiveWorldRuntime
     ? [...staticSurfaces, ...interactiveWorldRuntime.collisions().ballisticSurfaces]
     : staticSurfaces;
+}
+
+function activeRaycastMeshes(activeArena: ArenaMap = arena): THREE.Object3D[] {
+  const runtimeOwnsHouseMeshes = activeArena === arena && interactiveWorldRuntime !== null;
+  return activeArena.raycastMeshes.filter((object) => {
+    if (runtimeOwnsHouseMeshes && object.userData.dynamicAuthorityReplacement === true) return false;
+    if (activeArena !== arena) return true;
+    let ancestor = object.parent;
+    while (ancestor) {
+      if (!ancestor.visible) return false;
+      ancestor = ancestor.parent;
+    }
+    return object.visible || object.userData.collisionProxy === true;
+  });
 }
 
 function traceWeaponPath(
@@ -1878,7 +1909,10 @@ function applyInteractiveWorldBallisticTrace(
   const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
   let changed = false;
   for (const impact of trace.impacts) {
-    if (!impact.surface.destructibleSurface && !impact.surface.majorDebris) continue;
+    if (!impact.surface.destructibleSurface
+      && !impact.surface.majorDebris
+      && !impact.surface.houseFragment
+      && !impact.surface.houseMajorDebris) continue;
     const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
     const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
     const impulseQ = Object.freeze({
@@ -1886,21 +1920,35 @@ function applyInteractiveWorldBallisticTrace(
       yQ: Math.round(unitDirection.y * impulseMagnitudeQ),
       zQ: Math.round(unitDirection.z * impulseMagnitudeQ),
     });
-    const result = interactiveWorldRuntime.applyBulletImpact({
-      surface: impact.surface,
-      point,
-      tick: interactiveWorldTick,
-      damageQ,
-      penetrationEnergyQ,
-      radiusUQ: apertureRadiusQ,
-      radiusVQ: apertureRadiusQ,
-      impulseQ,
-    });
+    const result = impact.surface.houseFragment || impact.surface.houseMajorDebris
+      ? interactiveWorldRuntime.applyHouseBulletImpact({
+        surface: impact.surface,
+        damageQ,
+        penetrationEnergyQ,
+        impulseQ,
+      })
+      : interactiveWorldRuntime.applyBulletImpact({
+        surface: impact.surface,
+        point,
+        tick: interactiveWorldTick,
+        damageQ,
+        penetrationEnergyQ,
+        radiusUQ: apertureRadiusQ,
+        radiusVQ: apertureRadiusQ,
+        impulseQ,
+      });
     if (!result?.accepted) continue;
     changed = true;
     if (impact.surface.majorDebris && characterPhysics) {
       characterPhysics.applyMajorDebrisImpulse(
         `${impact.surface.majorDebris.placementId}:debris:${impact.surface.majorDebris.chunkId}`,
+        unitDirection.clone().multiplyScalar(Math.min(12, Math.max(0.5, damageQ * 0.055))),
+        point,
+      );
+    }
+    if (impact.surface.houseMajorDebris && characterPhysics) {
+      characterPhysics.applyMajorDebrisImpulse(
+        `house-debris:${impact.surface.houseMajorDebris.fragmentId}`,
         unitDirection.clone().multiplyScalar(Math.min(12, Math.max(0.5, damageQ * 0.055))),
         point,
       );
@@ -4683,7 +4731,8 @@ function interactiveWorldLineOfSight(
   if (!collision) return false;
   const origin = new THREE.Vector3(from.x, from.y, from.z);
   const target = new THREE.Vector3(to.x, to.y, to.z);
-  if (arena.colliders.some((box) => segmentIntersectsBox(origin, target, box))) return false;
+  const replacedHouseColliders = new Set(arena.houseDestruction?.staticColliders ?? []);
+  if (arena.colliders.some((box) => !replacedHouseColliders.has(box) && segmentIntersectsBox(origin, target, box))) return false;
   return !collision.dynamicColliders.some((entry) => {
     // The segment terminates at the requested door centre; that exact door is
     // the interaction target, not an occluder. Every other live shed panel and
@@ -6371,8 +6420,12 @@ function persistentWindowDebrisId(windowId: string): string {
 function spawnPersistentWindowDebris(window: ArenaMap['breakableWindows'][number], normal: THREE.Vector3): void {
   const id = persistentWindowDebrisId(window.id);
   if (persistentWindowDebris.has(id)) return;
-  const shedBodies = interactiveWorldRuntime?.majorDebrisPhysicsBodies().length ?? 0;
-  if (shedBodies + persistentWindowDebris.size >= MAX_MAJOR_DEBRIS_BODIES) return;
+  const counts = Object.freeze({
+    shed: interactiveWorldRuntime?.shedMajorBodyCount() ?? 0,
+    house: interactiveWorldRuntime?.houseMajorBodyCount() ?? 0,
+    window: persistentWindowDebris.size,
+  });
+  if (!canAdmitMajorDebris(counts, 'window')) return;
 
   window.mesh.updateWorldMatrix(true, false);
   window.mesh.geometry.computeBoundingBox();
@@ -8319,7 +8372,7 @@ function castShot(
     if (!first) return { distance: 90, damageMultiplier: 1, ballisticTrace };
   } else {
     const brokenWindowIds = new Set(arena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
-    const activeWorldMeshes = arena.raycastMeshes.filter((object) => {
+    const activeWorldMeshes = activeRaycastMeshes().filter((object) => {
       const windowId = object.userData.breakableWindowId;
       return typeof windowId !== 'string' || !brokenWindowIds.has(windowId);
     });
@@ -10622,7 +10675,7 @@ function supportPlacementGroundHeightAt(x: number, z: number): number {
   supportPlacementRaycaster.near = 0;
   supportPlacementRaycaster.far = originY - floorY + 2;
   arena.root.updateWorldMatrix(true, true);
-  const hit = supportPlacementRaycaster.intersectObjects(arena.raycastMeshes, true)
+  const hit = supportPlacementRaycaster.intersectObjects(activeRaycastMeshes(), true)
     .find((candidate) => candidate.point.y >= floorY - 0.05 && candidate.point.y <= ceilingY);
   if (hit) admittedHeight = Math.max(admittedHeight, hit.point.y);
   return THREE.MathUtils.clamp(admittedHeight, floorY, ceilingY - 0.5);
@@ -13652,12 +13705,27 @@ function syncArenaSelectionUi(): void {
   renderFieldKitSelection();
 }
 
+function atomicQualityHousePresentationActive(): boolean {
+  return blenderArenaActive
+    && !(interactiveWorldRuntime?.hasDetachedProfileOwnedHouseFragment() ?? false);
+}
+
+function syncAtomicHouseStructuralPresentation(): void {
+  if (selectedArena.id !== 'atomic-acres' || arena.id !== 'atomic-acres') return;
+  const qualityOwnsStaticFragments = atomicQualityHousePresentationActive();
+  interactiveWorldRuntime?.setExternalHouseProfilePresentationActive(qualityOwnsStaticFragments);
+  arena.root.visible = !qualityOwnsStaticFragments;
+  if (arenaArtRoot) arenaArtRoot.visible = blenderArenaActive ? qualityOwnsStaticFragments : true;
+}
+
 function setArenaPresentationVisibility(): void {
   const atomicVisible = selectedArena.id === 'atomic-acres';
   const rustworksVisible = selectedArena.id === 'rustworks-1v1';
+  const atomicQualityPrimary = atomicVisible && atomicQualityHousePresentationActive();
   arena.root.visible = arena.id === 'atomic-acres'
-    ? proceduralArenaRootVisible(selectedArena.id, blenderArenaActive)
+    ? !atomicQualityPrimary
     : true;
+  interactiveWorldRuntime?.setExternalHouseProfilePresentationActive(atomicQualityPrimary);
   if (worldIdentityPresentation) {
     worldIdentityPresentation.root.visible = atomicVisible;
     setWorldIdentityHouseShellPresentation(worldIdentityPresentation.root, atomicVisible && !blenderArenaActive);
@@ -13685,7 +13753,7 @@ function setArenaPresentationVisibility(): void {
     setRustworksProceduralPresentationVisible(arena.root, true);
   }
   if (grassSystem) grassSystem.root.visible = atomicVisible;
-  if (arenaArtRoot) arenaArtRoot.visible = atomicVisible;
+  if (arenaArtRoot) arenaArtRoot.visible = atomicVisible && (!blenderArenaActive || atomicQualityPrimary);
   overdriveRoot.visible = false;
   if (activeRenderConfig.shadowMode === 'static') requestStaticShadowRefresh();
   atomicSignal?.invalidateValidation();
@@ -13831,7 +13899,7 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     arenaTransitionPhase = 'preparing';
     nextArena = ensureArenaConstructed(nextSelection.id);
     nextInteractiveWorldRuntime = createInteractiveWorldRuntime(
-      nextSelection.id,
+      nextArena,
       interactiveWorldMatchEpoch,
       true,
     );
@@ -15691,10 +15759,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const temporaryAuthority = arenaId === selectedArena.id ? null : constructArena(arenaId, false);
     const traceArena = temporaryAuthority ?? arena;
     try {
-      const brokenWindowIds = new Set(traceArena.breakableWindows.filter((pane) => pane.broken).map((pane) => pane.id));
-      const surfaces = traceArena.shotSurfaces.filter(
-        (surface) => !surface.breakableWindowId || !brokenWindowIds.has(surface.breakableWindowId),
-      );
+      const surfaces = activeBallisticSurfaces(traceArena);
       return traceBallisticPath(
         new THREE.Vector3(...origin),
         new THREE.Vector3(...direction),
@@ -15799,7 +15864,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         const ray = target.clone().sub(origin);
         const targetDistance = ray.length();
         return !new THREE.Raycaster(origin, ray.normalize(), 0, targetDistance)
-          .intersectObjects(arena.raycastMeshes, false)
+          .intersectObjects(activeRaycastMeshes(), false)
           .some((hit) => hit.distance < targetDistance - 0.2);
       };
       // The old probe only cleared a torso ray, so a tree/awning could still

@@ -6,7 +6,9 @@ const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8'
 describe('persistent physical house-window debris integration', () => {
   it('keeps one bounded major pane per broken window in the shared Rapier budget', () => {
     expect(source).toContain('const persistentWindowDebris = new Map<string, PersistentWindowDebris>()');
-    expect(source).toContain('MAX_MAJOR_DEBRIS_BODIES - shedBodies.length');
+    expect(source).toContain('MAX_MAJOR_DEBRIS_BODIES - runtimeBodies.length');
+    expect(source).toContain('Math.min(capacity, SHARED_MAJOR_DEBRIS_BUDGET.window)');
+    expect(source).toContain("canAdmitMajorDebris(counts, 'window')");
     expect(source).toContain('characterPhysics.syncMajorDebrisBodies(activeMajorDebrisPhysicsBodies(), authoritativeResync)');
     expect(source).toContain('spawnPersistentWindowDebris(window, normal)');
   });

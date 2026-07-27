@@ -2,6 +2,9 @@ import type * as RapierTypes from '@dimforge/rapier3d-compat';
 import type { Box2, Point3 } from './collision';
 import type { Stance } from './gameplay';
 import { SIMULATION_HZ } from './gameplay';
+import { MAX_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
+
+export { MAX_MAJOR_DEBRIS_BODIES } from './major-debris-budget';
 
 export const CHARACTER_PHYSICS_CONFIG = Object.freeze({
   controllerOffset: 0.025,
@@ -48,8 +51,6 @@ export type DynamicWorldCollider = Readonly<{
   id: string;
   bounds: Box2;
 }>;
-
-export const MAX_MAJOR_DEBRIS_BODIES = 18;
 
 export type MajorDebrisBodyDefinition = Readonly<{
   id: string;

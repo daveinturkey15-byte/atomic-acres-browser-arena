@@ -45,6 +45,14 @@ export type BallisticSurface = Readonly<{
     placementId: string;
     chunkId: string;
   }>;
+  houseFragment?: Readonly<{
+    definitionSetId: string;
+    fragmentId: string;
+  }>;
+  houseMajorDebris?: Readonly<{
+    definitionSetId: string;
+    fragmentId: string;
+  }>;
 }>;
 
 type MaterialResistance = Readonly<{

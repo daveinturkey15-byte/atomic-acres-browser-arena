@@ -192,6 +192,7 @@ export type ShedMutationResult = Readonly<{
     | 'already-detached'
     | 'invalid-blocker'
     | 'chunk-cap'
+    | 'shared-major-body-cap'
     | 'flat-contact-rejected';
   state: ShedState;
 }>;
