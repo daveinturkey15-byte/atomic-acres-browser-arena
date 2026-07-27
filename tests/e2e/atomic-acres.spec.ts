@@ -236,6 +236,24 @@ type DebugState = {
     furnishingBatches: number;
     furnishingMaterialFamilies: string[];
     texturedFurnishingMaterialFamilies: string[];
+    profileAuthorityParity: {
+      schema: 'atomic-acres/house-profile-authority-parity@1';
+      profile: 'performance' | 'quality' | 'quality-fallback';
+      expectedBindings: number;
+      passedBindings: number;
+      pass: boolean;
+      issues: string[];
+      entries: Array<{
+        colliderId: string;
+        semantic: string;
+        authorityPresent: boolean;
+        presentationPresent: boolean;
+        presentationBoundToAuthority: boolean;
+        qualityAssetSetPresent: boolean | null;
+        matchingQualityVertices: number;
+        issues: string[];
+      }>;
+    } | null;
   };
   weaponReady: boolean;
   weaponPresentation: {
@@ -829,27 +847,45 @@ test.describe('boot and authored presentation', () => {
   test('keeps substantial Atomic Acres collision identical in Performance and Quality', async ({ page }) => {
     test.setTimeout(180_000);
     const probes = [
-      [-27, 0.7, -34], // north-west earth bank inner tier
-      [30, 0.7, -26], // north-east earth bank inner tier
-      [-31, 2, -30], // authored tree trunk
-      [-18, 0.85, 10], // authored terminal
-      [-31, 3.05, 4], // reclamation tank
-      [-12, 0.62, -30.7], // Aqua dining table
-      [12.7, 0.85, 25.3], // Coral sofa
+      { id: 'north-west-earth-bank', point: [-27, 0.7, -34] },
+      { id: 'north-east-earth-bank', point: [30, 0.7, -26] },
+      { id: 'authored-tree-trunk', point: [-31, 2, -30] },
+      { id: 'authored-terminal', point: [-18, 0.85, 10] },
+      { id: 'reclamation-tank', point: [-31, 3.05, 4] },
+      { id: 'aqua-dining-table', point: [-12, 0.62, -30.7] },
+      { id: 'aqua-kitchen', point: [-12.75, 1.15, -33.25] },
+      { id: 'coral-sofa', point: [12.7, 0.85, 25.3] },
+      { id: 'coral-kitchen', point: [5.25, 1.15, 33.25] },
     ] as const;
     const profiles: Array<'performance' | 'blender'> = ['performance', 'blender'];
-    const results: boolean[][] = [];
+    const results: Array<{ collisions: boolean[]; parity: NonNullable<DebugState['interiorTelemetry']['profileAuthorityParity']> }> = [];
     for (const profile of profiles) {
       await pageReadyAt(page, `/?render=${profile}&signal=off`, 90_000);
+      await startSolo(page);
       const state = await debug(page);
       expect(state.render.profile).toBe(profile);
-      results.push(await page.evaluate((points) => {
+      const collisions = await page.evaluate((namedProbes) => {
         const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { collisionProbeAt: (x: number, y: number, z: number) => boolean } }).__ATOMIC_ACRES_DEBUG__;
-        return points.map(([x, y, z]) => api.collisionProbeAt(x, y, z));
-      }, probes));
+        return namedProbes.map(({ point: [x, y, z] }) => api.collisionProbeAt(x, y, z));
+      }, probes);
+      const parity = state.interiorTelemetry.profileAuthorityParity;
+      expect(parity, `${profile}: missing semantic profile-authority receipt`).not.toBeNull();
+      expect(parity).toMatchObject({ pass: true, expectedBindings: 22, passedBindings: 22, issues: [] });
+      expect(parity!.entries.filter(({ semantic }) => semantic === 'kitchen')).toHaveLength(2);
+      expect(parity!.entries.filter(({ semantic }) => semantic === 'sofa')).toHaveLength(2);
+      expect(parity!.entries.every((entry) => entry.authorityPresent
+        && entry.presentationPresent
+        && entry.presentationBoundToAuthority)).toBe(true);
+      if (profile === 'blender') {
+        expect(parity!.profile).toBe('quality');
+        expect(parity!.entries.every((entry) => entry.qualityAssetSetPresent === true
+          && entry.matchingQualityVertices >= 8)).toBe(true);
+      } else expect(parity!.profile).toBe('performance');
+      results.push({ collisions, parity: parity! });
     }
-    expect(results[0]).toEqual(results[1]);
-    expect(results[0].every(Boolean)).toBe(true);
+    expect(results[0].collisions).toEqual(results[1].collisions);
+    expect(results[0].collisions.map((blocked, index) => ({ id: probes[index].id, blocked })))
+      .toEqual(probes.map(({ id }) => ({ id, blocked: true })));
   });
 
   test('keeps all three Pass 27 route identities legible from representative approaches', async ({ page }) => {
@@ -2622,6 +2658,14 @@ test.describe('performance and stability', () => {
       furnishingBatches: 4,
       furnishingMaterialFamilies: ['dark-equipment', 'fabric', 'metal', 'timber'],
       texturedFurnishingMaterialFamilies: ['dark-equipment', 'fabric', 'metal', 'timber'],
+      profileAuthorityParity: expect.objectContaining({
+        schema: 'atomic-acres/house-profile-authority-parity@1',
+        profile: 'performance',
+        expectedBindings: 22,
+        passedBindings: 22,
+        pass: true,
+        issues: [],
+      }),
     });
     expect(state.neighbourhoodLife).toEqual({
       loaded: true,

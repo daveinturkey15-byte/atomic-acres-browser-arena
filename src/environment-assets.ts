@@ -614,7 +614,7 @@ export function addSemanticHouseInteriors(root: THREE.Group): void {
     }
     for (const [chairIndex, [x, z]] of [
       [diningX - 1.72, diningZ], [diningX + 1.72, diningZ],
-      [diningX, diningZ - 1.05], [diningX, diningZ + 1.05],
+      [diningX, diningZ - house.facing * 1.05], [diningX, diningZ + house.facing * 1.05],
     ].entries()) {
       const chair = addPiece(houseIndex, house, `dining-chair-${chairIndex}`, [x, 0.6, z], [0.72, 1.2, 0.72], timber, 'timber');
       chair.userData.authoritativeCollider = `authored-house-${houseIndex}-chair-collider-${chairIndex}`;

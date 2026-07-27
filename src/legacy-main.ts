@@ -160,6 +160,11 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback, proceduralArenaRootVisible } from './blender-environment';
+import {
+  assertAtomicHouseAuthorityParity,
+  auditAtomicHouseAuthorityParity,
+  type AtomicHouseAuthorityParityReport,
+} from './atomic-profile-authority-parity';
 import { RUSTWORKS_BLENDER_ASSET, loadRustworksBlenderTower, markRustworksBlenderFallback, rustworksBlenderTelemetry, setRustworksProceduralPresentationVisible } from './rustworks-blender';
 import {
   createRustworksQualityLights,
@@ -2078,6 +2083,7 @@ nukeShockwave.raycast = () => undefined;
 scene.add(nukeShockwave);
 let arenaArtRoot: THREE.Group | null = null;
 let blenderArenaActive = false;
+let atomicHouseAuthorityParity: AtomicHouseAuthorityParityReport | null = null;
 let atomicAuthoredLoadPromise: Promise<THREE.Group | null> | null = null;
 let atomicQualityLoadPromise: Promise<THREE.Group | null> | null = null;
 let rustworksQualityLoadPromise: Promise<THREE.Group | null> | null = null;
@@ -2129,6 +2135,9 @@ async function ensureAtomicAuthoredPresentation(): Promise<THREE.Group | null> {
     }
     arenaArtRoot = art.root;
     blenderArenaActive = false;
+    atomicHouseAuthorityParity = auditAtomicHouseAuthorityParity(authority.root, art.root, 'performance');
+    assertAtomicHouseAuthorityParity(atomicHouseAuthorityParity);
+    art.root.userData.atomicHouseAuthorityParity = atomicHouseAuthorityParity;
     qualityAssetStreaming.atomicAcres = 'ready';
     bindAtomicPresentationRaycasts(art.root, authority);
     graphicsRefinement.refine(art.root, maximumAnisotropy);
@@ -2153,6 +2162,9 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       });
       blenderArenaActive = true;
       arenaArtRoot = art.root;
+      atomicHouseAuthorityParity = auditAtomicHouseAuthorityParity(authority.root, art.root, 'quality');
+      assertAtomicHouseAuthorityParity(atomicHouseAuthorityParity);
+      art.root.userData.atomicHouseAuthorityParity = atomicHouseAuthorityParity;
       qualityAssetStreaming.atomicAcres = 'ready';
       bindAtomicPresentationRaycasts(art.root, authority);
       graphicsRefinement.refine(art.root, maximumAnisotropy);
@@ -2165,6 +2177,9 @@ async function ensureAtomicQualityPresentation(): Promise<THREE.Group | null> {
       }, false);
       blenderArenaActive = false;
       arenaArtRoot = fallback.root;
+      atomicHouseAuthorityParity = auditAtomicHouseAuthorityParity(authority.root, fallback.root, 'quality-fallback');
+      assertAtomicHouseAuthorityParity(atomicHouseAuthorityParity);
+      fallback.root.userData.atomicHouseAuthorityParity = atomicHouseAuthorityParity;
       qualityAssetStreaming.atomicAcres = 'fallback';
       bindAtomicPresentationRaycasts(fallback.root, authority);
       graphicsRefinement.refine(fallback.root, maximumAnisotropy);
@@ -2215,6 +2230,7 @@ function retireAtomicPresentation(): void {
   worldIdentityPresentation = null;
   neighbourhoodLifeRoot = null;
   blenderArenaActive = false;
+  atomicHouseAuthorityParity = null;
   atomicAuthoredLoadPromise = null;
   atomicQualityLoadPromise = null;
   qualityAssetStreaming.atomicAcres = 'idle';
@@ -15328,6 +15344,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         furnishingBatches: semantic?.batches ?? 0,
         furnishingMaterialFamilies: [...materialFamilies].sort(),
         texturedFurnishingMaterialFamilies: [...texturedMaterialFamilies].sort(),
+        profileAuthorityParity: selectedArena.id === 'atomic-acres' ? atomicHouseAuthorityParity : null,
       };
     })(),
     weaponReady: weaponView.isReady(),
