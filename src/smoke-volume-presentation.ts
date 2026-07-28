@@ -313,7 +313,9 @@ export class SmokeVolumePresentationPool {
         node.visible = true;
         node.frustumCulled = false;
       });
-      presentation.root.scale.setScalar(0.0001);
+      // Keep the exact inactive-slot scale for the fenced upload frame. Tiny
+      // smoke cards can leave their first fragment/texture workload deferred
+      // until combat even though compileAsync has completed.
     }
     try {
       await runtime.compileAndRender(this.root, camera, parentScene);

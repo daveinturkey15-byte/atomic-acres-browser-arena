@@ -10128,7 +10128,8 @@ async function prewarmExplosiveBoltPresentation(): Promise<void> {
       node.visible = true;
       node.frustumCulled = false;
     });
-    root.scale.setScalar(0.0001);
+    // Preserve exact projectile scale so the loading-boundary fence covers
+    // the same presentation submitted by the first live crossbow bolt.
   }
   try {
     await renderRuntime.compileAndRender(explosiveBoltPresentationRoot, camera, scene);

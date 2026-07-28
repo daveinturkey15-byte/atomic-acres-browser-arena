@@ -41,7 +41,9 @@ describe('smoke grenade volume presentation', () => {
       const alphaTextures = new Set<THREE.Texture>();
       for (const presentationRoot of pool.root.children) {
         expect(presentationRoot.visible).toBe(true);
-        expect(presentationRoot.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+        expect(presentationRoot.scale.toArray()).toEqual(
+          presentationRoot === firstRoot ? [2, 3, 4] : [1, 1, 1],
+        );
         presentationRoot.traverse((node) => {
           expect(node.visible).toBe(true);
           expect(node.frustumCulled).toBe(false);
@@ -98,7 +100,7 @@ describe('smoke grenade volume presentation', () => {
       compileAndRender: vi.fn(() => new Promise<void>((resolve) => { releasePrewarm = resolve; })),
     };
     const inFlight = pool.prewarm(runtime, camera);
-    expect(presentationRoot.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    expect(presentationRoot.scale.toArray()).toEqual([1, 1, 1]);
     pool.terminalDispose();
     expect(pool.root.parent).toBe(scene);
     releasePrewarm();
@@ -106,7 +108,7 @@ describe('smoke grenade volume presentation', () => {
     await Promise.resolve();
     expect(pool.root.parent).toBeNull();
     expect(presentationRoot.parent).toBeNull();
-    expect(presentationRoot.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    expect(presentationRoot.scale.toArray()).toEqual([1, 1, 1]);
     expect(pool.telemetry().capacity).toBe(0);
     await expect(pool.prewarm(runtime, camera)).rejects.toThrow('disposed');
   });

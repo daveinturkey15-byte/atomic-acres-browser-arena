@@ -1105,7 +1105,12 @@ export class KillstreakPresentation {
         node.visible = true;
         node.frustumCulled = false;
       });
-      stagedRoot.scale.setScalar(0.0001);
+      // Preserve the pool entry's exact authored/gameplay scale. A near-zero
+      // transform compiles the shader graph, but it does not exercise the
+      // first real support frame's raster, texture and shadow workload on
+      // WebGPU. The deployment surface is still opaque while this fenced
+      // submission runs, so an exact-scale draw is both invisible to the
+      // player and representative of live activation.
     }
 
     try {

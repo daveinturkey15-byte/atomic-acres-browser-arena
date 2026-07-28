@@ -130,7 +130,7 @@ describe('killstreak presentation', () => {
       expect(stagedCamera).toBe(camera);
       expect(parentScene).toBe(scene);
       expect(chopper.visible).toBe(true);
-      expect(chopper.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+      expect(chopper.scale.toArray()).toEqual([2, 3, 4]);
       expect(chopper.frustumCulled).toBe(false);
       expect(chopperChild.visible).toBe(true);
       expect(chopperChild.frustumCulled).toBe(false);
@@ -214,6 +214,7 @@ describe('killstreak presentation', () => {
     const presentation = new KillstreakPresentation(scene);
     const camera = new THREE.PerspectiveCamera();
     const chopper = presentation.root.getObjectByName('prewarmed-chopper-1')!;
+    const originalScale = chopper.scale.toArray();
     let releasePrewarm!: () => void;
     let compilePass = 0;
     const runtime = {
@@ -224,7 +225,7 @@ describe('killstreak presentation', () => {
       }),
     };
     const inFlight = presentation.prewarm(runtime, camera);
-    expect(chopper.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    expect(chopper.scale.toArray()).toEqual(originalScale);
     presentation.dispose();
     expect(presentation.root.parent).toBe(scene);
     releasePrewarm();
@@ -232,7 +233,7 @@ describe('killstreak presentation', () => {
     await Promise.resolve();
     expect(presentation.root.parent).toBeNull();
     expect(chopper.parent).toBeNull();
-    expect(chopper.scale.toArray()).toEqual([0.0001, 0.0001, 0.0001]);
+    expect(chopper.scale.toArray()).toEqual(originalScale);
     await expect(presentation.prewarm(runtime, camera)).rejects.toThrow('disposed');
   });
 
