@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
@@ -79,6 +79,212 @@ let supportVehicleLoadState: 'idle' | 'loading' | 'ready' | 'fallback' = 'idle';
 let supportVehicleLoadPromise: Promise<void> | null = null;
 const supportVehicleLoadFailures = new Map<SupportVehicleAssetFamily, string>();
 
+export const SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION = Object.freeze({
+  authoredTextureCount: 44,
+  expectedCanonicalTextureCount: 5,
+  decodedBytesPerTexture: 1_398_100,
+  expectedActiveTextureBytes: 6_990_500,
+  expectedAvoidedTextureBytes: 54_525_900,
+});
+
+export type SupportVehicleTextureDedupTelemetry = Readonly<{
+  canonicalTextureCount: number;
+  reusedTextureCount: number;
+  disposedDuplicateTextureCount: number;
+  closedDuplicateImageCount: number;
+  ineligibleTextureCount: number;
+  estimatedActiveTextureBytes: number;
+  estimatedAvoidedTextureBytes: number;
+}>;
+
+type SupportTextureUse = Readonly<{
+  material: THREE.Material;
+  property: string;
+  texture: THREE.Texture;
+}>;
+
+function supportTextureUses(root: THREE.Object3D): readonly SupportTextureUse[] {
+  const uses: SupportTextureUse[] = [];
+  const visitedMaterials = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.material) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const entry of materials) {
+      if (visitedMaterials.has(entry)) continue;
+      visitedMaterials.add(entry);
+      const record = entry as unknown as Record<string, unknown>;
+      for (const property of Object.keys(record)) {
+        const value = record[property];
+        if (value instanceof THREE.Texture) uses.push({ material: entry, property, texture: value });
+      }
+    }
+  });
+  return uses;
+}
+
+function safeTextureMetadataSignature(texture: THREE.Texture): string | null {
+  const entries: [string, string | number | boolean | null][] = [];
+  for (const [key, value] of Object.entries(texture.userData).sort(([left], [right]) => left.localeCompare(right))) {
+    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      entries.push([key, value]);
+      continue;
+    }
+    return null;
+  }
+  return JSON.stringify(entries);
+}
+
+function supportTextureSafetyKey(texture: THREE.Texture, semantic: string, contentDigest: string): string | null {
+  if (texture.mipmaps.length > 0 || texture.onUpdate !== null) return null;
+  const sourceData = texture.source.data as unknown;
+  if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) return null;
+  const sourceRecord = sourceData as Record<string, unknown>;
+  const width = sourceRecord.width;
+  const height = sourceRecord.height;
+  if (typeof width !== 'number' || typeof height !== 'number' || width <= 0 || height <= 0) return null;
+  const metadata = safeTextureMetadataSignature(texture);
+  if (metadata === null) return null;
+  const textureRecord = texture as unknown as Record<string, unknown>;
+  return JSON.stringify({
+    contentDigest,
+    semantic,
+    textureClass: texture.constructor.name,
+    colorSpace: texture.colorSpace,
+    mapping: texture.mapping,
+    channel: texture.channel,
+    wrapS: texture.wrapS,
+    wrapT: texture.wrapT,
+    magFilter: texture.magFilter,
+    minFilter: texture.minFilter,
+    anisotropy: texture.anisotropy,
+    format: texture.format,
+    internalFormat: texture.internalFormat,
+    type: texture.type,
+    generateMipmaps: texture.generateMipmaps,
+    premultiplyAlpha: texture.premultiplyAlpha,
+    flipY: texture.flipY,
+    unpackAlignment: texture.unpackAlignment,
+    compareFunction: textureRecord.compareFunction ?? null,
+    offset: texture.offset.toArray(),
+    repeat: texture.repeat.toArray(),
+    center: texture.center.toArray(),
+    rotation: texture.rotation,
+    matrixAutoUpdate: texture.matrixAutoUpdate,
+    matrix: texture.matrix.elements,
+    width,
+    height,
+    depth: typeof sourceRecord.depth === 'number' ? sourceRecord.depth : 1,
+    metadata,
+  });
+}
+
+function estimatedDecodedTextureBytes(texture: THREE.Texture): number {
+  const sourceData = texture.source.data as unknown;
+  if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) return 0;
+  const sourceRecord = sourceData as Record<string, unknown>;
+  if (typeof sourceRecord.width !== 'number' || typeof sourceRecord.height !== 'number') return 0;
+  let width = Math.max(1, Math.floor(sourceRecord.width));
+  let height = Math.max(1, Math.floor(sourceRecord.height));
+  let bytes = width * height * 4;
+  if (!texture.generateMipmaps) return bytes;
+  while (width > 1 || height > 1) {
+    width = Math.max(1, Math.floor(width / 2));
+    height = Math.max(1, Math.floor(height / 2));
+    bytes += width * height * 4;
+  }
+  return bytes;
+}
+
+export class SupportVehicleTextureCanonicalizer {
+  private readonly canonicalBySafetyKey = new Map<string, THREE.Texture>();
+  private readonly canonicalTextures = new Set<THREE.Texture>();
+  private readonly reusedTextures = new WeakSet<THREE.Texture>();
+  private readonly ineligibleTextures = new WeakSet<THREE.Texture>();
+  private readonly closedSources = new WeakSet<object>();
+  private readonly retainedSources = new WeakSet<object>();
+  private reusedTextureCount = 0;
+  private disposedDuplicateTextureCount = 0;
+  private closedDuplicateImageCount = 0;
+  private ineligibleTextureCount = 0;
+  private estimatedAvoidedTextureBytes = 0;
+
+  canonicalize(root: THREE.Object3D, contentDigests: ReadonlyMap<THREE.Texture, string>): void {
+    const uses = supportTextureUses(root);
+    const detachedCandidates = new Set<THREE.Texture>();
+    for (const use of uses) {
+      const materialRecord = use.material as unknown as Record<string, unknown>;
+      if (materialRecord[use.property] !== use.texture) continue;
+      const digest = contentDigests.get(use.texture);
+      const safetyKey = digest ? supportTextureSafetyKey(use.texture, use.property, digest) : null;
+      if (safetyKey === null) {
+        if (!this.ineligibleTextures.has(use.texture)) {
+          this.ineligibleTextures.add(use.texture);
+          this.ineligibleTextureCount += 1;
+        }
+        const sourceData = use.texture.source.data as unknown;
+        if (sourceData && typeof sourceData === 'object') this.retainedSources.add(sourceData);
+        continue;
+      }
+      const canonical = this.canonicalBySafetyKey.get(safetyKey);
+      if (!canonical) {
+        this.canonicalBySafetyKey.set(safetyKey, use.texture);
+        this.canonicalTextures.add(use.texture);
+        const sourceData = use.texture.source.data as unknown;
+        if (sourceData && typeof sourceData === 'object') this.retainedSources.add(sourceData);
+        continue;
+      }
+      if (canonical === use.texture) continue;
+      materialRecord[use.property] = canonical;
+      detachedCandidates.add(use.texture);
+    }
+
+    for (const use of supportTextureUses(root)) {
+      const sourceData = use.texture.source.data as unknown;
+      if (sourceData && typeof sourceData === 'object') this.retainedSources.add(sourceData);
+    }
+
+    for (const duplicate of detachedCandidates) {
+      const stillReferenced = uses.some((use) => (
+        (use.material as unknown as Record<string, unknown>)[use.property] === duplicate
+      ));
+      if (stillReferenced || this.canonicalTextures.has(duplicate) || this.reusedTextures.has(duplicate)) continue;
+      this.reusedTextures.add(duplicate);
+      this.reusedTextureCount += 1;
+      this.estimatedAvoidedTextureBytes += estimatedDecodedTextureBytes(duplicate);
+      duplicate.dispose();
+      this.disposedDuplicateTextureCount += 1;
+
+      const sourceData = duplicate.source.data as unknown;
+      if (!sourceData || typeof sourceData !== 'object' || this.closedSources.has(sourceData)) continue;
+      const close = (sourceData as Record<string, unknown>).close;
+      if (this.retainedSources.has(sourceData) || typeof close !== 'function') continue;
+      try {
+        close.call(sourceData);
+        this.closedSources.add(sourceData);
+        duplicate.source.data = null;
+        this.closedDuplicateImageCount += 1;
+      } catch {
+        // A failed ImageBitmap.close() must not turn an otherwise safe load into a fallback.
+      }
+    }
+  }
+
+  telemetry(): SupportVehicleTextureDedupTelemetry {
+    return Object.freeze({
+      canonicalTextureCount: this.canonicalTextures.size,
+      reusedTextureCount: this.reusedTextureCount,
+      disposedDuplicateTextureCount: this.disposedDuplicateTextureCount,
+      closedDuplicateImageCount: this.closedDuplicateImageCount,
+      ineligibleTextureCount: this.ineligibleTextureCount,
+      estimatedActiveTextureBytes: [...this.canonicalTextures]
+        .reduce((total, texture) => total + estimatedDecodedTextureBytes(texture), 0),
+      estimatedAvoidedTextureBytes: this.estimatedAvoidedTextureBytes,
+    });
+  }
+}
+
+const supportVehicleTextureCanonicalizer = new SupportVehicleTextureCanonicalizer();
+
 let hunterDroneTemplate: THREE.Group | null = null;
 let hunterDroneAnimations: readonly THREE.AnimationClip[] = [];
 let hunterDroneSourceMaxDimension = 0;
@@ -139,6 +345,66 @@ export function hunterDronePresentationTelemetry(): Readonly<{
   });
 }
 
+type EmbeddedImageDefinition = Readonly<{ name?: string; mimeType?: string; bufferView?: number }>;
+type EmbeddedTextureDefinition = Readonly<{
+  source?: number;
+  extensions?: Readonly<Record<string, Readonly<{ source?: number }>>>;
+}>;
+
+function loadedEmbeddedImageIndex(gltf: GLTF, texture: THREE.Texture, textureIndex: number): number | null {
+  const textureDef = gltf.parser.json.textures?.[textureIndex] as EmbeddedTextureDefinition | undefined;
+  const images = gltf.parser.json.images as readonly EmbeddedImageDefinition[] | undefined;
+  if (!textureDef || !images) return null;
+  const candidates = [
+    textureDef.source,
+    textureDef.extensions?.KHR_texture_basisu?.source,
+    textureDef.extensions?.EXT_texture_webp?.source,
+    textureDef.extensions?.EXT_texture_avif?.source,
+  ].filter((value): value is number => typeof value === 'number');
+  const uniqueCandidates = [...new Set(candidates)];
+  if (uniqueCandidates.length === 1) return uniqueCandidates[0]!;
+  const textureMimeType = typeof texture.userData.mimeType === 'string' ? texture.userData.mimeType : null;
+  const exactMatches = uniqueCandidates.filter((index) => {
+    const image = images[index];
+    if (!image) return false;
+    const nameMatches = texture.name.length === 0 || image.name === texture.name;
+    const mimeMatches = textureMimeType === null || image.mimeType === textureMimeType;
+    return nameMatches && mimeMatches;
+  });
+  return exactMatches.length === 1 ? exactMatches[0]! : null;
+}
+
+async function sha256Digest(buffer: ArrayBuffer): Promise<string | null> {
+  if (!globalThis.crypto?.subtle) return null;
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(buffer).slice());
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function supportTextureContentDigests(gltf: GLTF): Promise<ReadonlyMap<THREE.Texture, string>> {
+  const digests = new Map<THREE.Texture, string>();
+  const byBufferView = new Map<number, Promise<string | null>>();
+  const textures = new Set(supportTextureUses(gltf.scene).map((use) => use.texture));
+  await Promise.all([...textures].map(async (texture) => {
+    const textureIndex = gltf.parser.associations.get(texture)?.textures;
+    if (textureIndex === undefined) return;
+    const imageIndex = loadedEmbeddedImageIndex(gltf, texture, textureIndex);
+    const image = imageIndex === null
+      ? undefined
+      : (gltf.parser.json.images?.[imageIndex] as EmbeddedImageDefinition | undefined);
+    if (image?.bufferView === undefined) return;
+    let pendingDigest = byBufferView.get(image.bufferView);
+    if (!pendingDigest) {
+      pendingDigest = gltf.parser.getDependency('bufferView', image.bufferView)
+        .then((value: unknown) => value instanceof ArrayBuffer ? sha256Digest(value) : null)
+        .catch(() => null);
+      byBufferView.set(image.bufferView, pendingDigest);
+    }
+    const digest = await pendingDigest;
+    if (digest) digests.set(texture, digest);
+  }));
+  return digests;
+}
+
 function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -151,16 +417,17 @@ function loadSupportVehicleLod(asset: string): Promise<LoadedSupportVehicleLod> 
       if (settled) return;
       settled = true;
       globalThis.clearTimeout(timer);
-      const scene = gltf.scene;
-      scene.updateMatrixWorld(true);
-      const size = new THREE.Box3().setFromObject(scene).getSize(new THREE.Vector3());
-      const sourceMaxDimension = Math.max(size.x, size.y, size.z);
-      if (!(sourceMaxDimension > 0)) {
-        reject(new Error(`${asset}: authored scene has no measurable geometry`));
-        return;
-      }
-      markSharedPresentationAsset(scene);
-      resolve(Object.freeze({ scene, animations: Object.freeze([...gltf.animations]), sourceMaxDimension, asset }));
+      void (async () => {
+        const scene = gltf.scene;
+        scene.updateMatrixWorld(true);
+        const size = new THREE.Box3().setFromObject(scene).getSize(new THREE.Vector3());
+        const sourceMaxDimension = Math.max(size.x, size.y, size.z);
+        if (!(sourceMaxDimension > 0)) throw new Error(`${asset}: authored scene has no measurable geometry`);
+        const contentDigests = await supportTextureContentDigests(gltf);
+        supportVehicleTextureCanonicalizer.canonicalize(scene, contentDigests);
+        markSharedPresentationAsset(scene);
+        resolve(Object.freeze({ scene, animations: Object.freeze([...gltf.animations]), sourceMaxDimension, asset }));
+      })().catch((error: unknown) => reject(error instanceof Error ? error : new Error(String(error))));
     }, undefined, (error) => {
       if (settled) return;
       settled = true;
@@ -233,6 +500,7 @@ export function supportVehiclePresentationTelemetry(): Readonly<{
   readyFamilies: readonly string[];
   maxConcurrentDecodes: number;
   failures: Readonly<Record<string, string>>;
+  textureDedup: SupportVehicleTextureDedupTelemetry;
 }> {
   return Object.freeze({
     state: supportVehicleLoadState,
@@ -241,6 +509,7 @@ export function supportVehiclePresentationTelemetry(): Readonly<{
     readyFamilies: Object.freeze([...supportVehicleTemplates.keys()].sort()),
     maxConcurrentDecodes: SUPPORT_VEHICLE_MAX_CONCURRENT_DECODES,
     failures: Object.freeze(Object.fromEntries(supportVehicleLoadFailures)),
+    textureDedup: supportVehicleTextureCanonicalizer.telemetry(),
   });
 }
 

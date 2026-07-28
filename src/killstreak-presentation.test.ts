@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   HUNTER_DRONE_ASSET,
   SUPPORT_VEHICLE_ASSETS,
+  SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION,
   KillstreakPresentation,
+  SupportVehicleTextureCanonicalizer,
   hunterDronePresentationTelemetry,
   supportAircraftPresentationVariant,
   supportVehiclePresentationTelemetry,
@@ -93,10 +95,120 @@ describe('killstreak presentation', () => {
     });
     expect(supportVehiclePresentationTelemetry()).toMatchObject({
       state: 'idle', loadedAssets: [], readyFamilies: [], maxConcurrentDecodes: 2,
+      textureDedup: {
+        canonicalTextureCount: 0,
+        reusedTextureCount: 0,
+        estimatedActiveTextureBytes: 0,
+        estimatedAvoidedTextureBytes: 0,
+      },
     });
     expect(supportAircraftPresentationVariant('ks-9-care-aircraft-12')).toBe('care');
     expect(supportAircraftPresentationVariant('ks-9-carpet-aircraft-13')).toBe('carpet');
     expect(supportAircraftPresentationVariant('malformed-aircraft')).toBeNull();
+  });
+
+  it('canonicalizes byte-identical safe textures and releases only detached duplicate image sources', () => {
+    expect(SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION).toEqual({
+      authoredTextureCount: 44,
+      expectedCanonicalTextureCount: 5,
+      decodedBytesPerTexture: 1_398_100,
+      expectedActiveTextureBytes: 6_990_500,
+      expectedAvoidedTextureBytes: 54_525_900,
+    });
+    const canonicalizer = new SupportVehicleTextureCanonicalizer();
+    const canonicalClose = vi.fn();
+    const duplicateClose = vi.fn();
+    const canonicalImage = { width: 512, height: 512, close: canonicalClose };
+    const canonicalTexture = new THREE.Texture(canonicalImage);
+    canonicalTexture.name = 'pass65-support-aircraft-albedo';
+    canonicalTexture.colorSpace = THREE.SRGBColorSpace;
+    canonicalTexture.userData.mimeType = 'image/webp';
+    const canonicalMaterial = new THREE.MeshStandardMaterial({ map: canonicalTexture });
+    const canonicalRoot = new THREE.Group();
+    canonicalRoot.add(new THREE.Mesh(new THREE.BoxGeometry(), canonicalMaterial));
+    canonicalizer.canonicalize(canonicalRoot, new Map([[canonicalTexture, 'sha256:identical']]));
+
+    const duplicateTexture = new THREE.Texture({ width: 512, height: 512, close: duplicateClose });
+    duplicateTexture.name = 'pass65-chopper-albedo-name-does-not-affect-safety';
+    duplicateTexture.colorSpace = THREE.SRGBColorSpace;
+    duplicateTexture.userData.mimeType = 'image/webp';
+    const duplicateDispose = vi.spyOn(duplicateTexture, 'dispose');
+    const duplicateMaterial = new THREE.MeshStandardMaterial({ map: duplicateTexture });
+    const duplicateRoot = new THREE.Group();
+    duplicateRoot.add(new THREE.Mesh(new THREE.BoxGeometry(), duplicateMaterial));
+    canonicalizer.canonicalize(duplicateRoot, new Map([[duplicateTexture, 'sha256:identical']]));
+
+    const sharedSourceTexture = new THREE.Texture(canonicalImage);
+    sharedSourceTexture.colorSpace = THREE.SRGBColorSpace;
+    sharedSourceTexture.userData.mimeType = 'image/webp';
+    const sharedSourceDispose = vi.spyOn(sharedSourceTexture, 'dispose');
+    const sharedSourceMaterial = new THREE.MeshStandardMaterial({ map: sharedSourceTexture });
+    const sharedSourceRoot = new THREE.Group();
+    sharedSourceRoot.add(new THREE.Mesh(new THREE.BoxGeometry(), sharedSourceMaterial));
+    canonicalizer.canonicalize(sharedSourceRoot, new Map([[sharedSourceTexture, 'sha256:identical']]));
+
+    expect(duplicateMaterial.map).toBe(canonicalTexture);
+    expect(sharedSourceMaterial.map).toBe(canonicalTexture);
+    expect(duplicateDispose).toHaveBeenCalledOnce();
+    expect(sharedSourceDispose).toHaveBeenCalledOnce();
+    expect(duplicateClose).toHaveBeenCalledOnce();
+    expect(canonicalClose).not.toHaveBeenCalled();
+    expect(canonicalizer.telemetry()).toEqual({
+      canonicalTextureCount: 1,
+      reusedTextureCount: 2,
+      disposedDuplicateTextureCount: 2,
+      closedDuplicateImageCount: 1,
+      ineligibleTextureCount: 0,
+      estimatedActiveTextureBytes: 1_398_100,
+      estimatedAvoidedTextureBytes: 2_796_200,
+    });
+  });
+
+  it('never merges a content match across semantic, colour-space, sampler, or albedo-digest boundaries', () => {
+    const canonicalizer = new SupportVehicleTextureCanonicalizer();
+    const makeTexture = (colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace): THREE.Texture => {
+      const texture = new THREE.Texture({ width: 512, height: 512 });
+      texture.colorSpace = colorSpace;
+      texture.userData.mimeType = 'image/webp';
+      return texture;
+    };
+    const add = (
+      texture: THREE.Texture,
+      property: 'map' | 'normalMap',
+      digest: string,
+    ): THREE.MeshStandardMaterial => {
+      const material = new THREE.MeshStandardMaterial();
+      material[property] = texture;
+      const root = new THREE.Group();
+      root.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+      canonicalizer.canonicalize(root, new Map([[texture, digest]]));
+      return material;
+    };
+
+    const baseline = makeTexture();
+    const semanticMismatch = makeTexture();
+    const colorSpaceMismatch = makeTexture(THREE.NoColorSpace);
+    const samplerMismatch = makeTexture();
+    samplerMismatch.minFilter = THREE.LinearFilter;
+    const distinctAlbedo = makeTexture();
+    const baselineMaterial = add(baseline, 'map', 'sha256:same-bytes');
+    const semanticMaterial = add(semanticMismatch, 'normalMap', 'sha256:same-bytes');
+    const colorSpaceMaterial = add(colorSpaceMismatch, 'map', 'sha256:same-bytes');
+    const samplerMaterial = add(samplerMismatch, 'map', 'sha256:same-bytes');
+    const distinctAlbedoMaterial = add(distinctAlbedo, 'map', 'sha256:different-albedo');
+
+    expect(baselineMaterial.map).toBe(baseline);
+    expect(semanticMaterial.normalMap).toBe(semanticMismatch);
+    expect(colorSpaceMaterial.map).toBe(colorSpaceMismatch);
+    expect(samplerMaterial.map).toBe(samplerMismatch);
+    expect(distinctAlbedoMaterial.map).toBe(distinctAlbedo);
+    expect(canonicalizer.telemetry()).toMatchObject({
+      canonicalTextureCount: 5,
+      reusedTextureCount: 0,
+      disposedDuplicateTextureCount: 0,
+      estimatedActiveTextureBytes: 6_990_500,
+      estimatedAvoidedTextureBytes: 0,
+    });
   });
 
   it('GPU-prewarms every bounded resource family once and restores exact pooled state', async () => {
