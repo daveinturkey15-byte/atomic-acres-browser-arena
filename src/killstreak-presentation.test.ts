@@ -277,11 +277,6 @@ describe('killstreak presentation', () => {
       node instanceof THREE.InstancedMesh && node.userData.swarmInstancedPresentation === true
     ));
     expect(swarmBatches).not.toHaveLength(0);
-    expect(swarmBatches.every((batch) => (
-      batch.castShadow === false
-      && batch.receiveShadow === false
-      && batch.userData.airborneShadowPolicy === 'unshadowed-small-support-lod'
-    ))).toBe(true);
     const telemetryBefore = presentation.telemetry();
     let compilePass = 0;
     const compileAndRender = vi.fn(async (root: THREE.Object3D, stagedCamera: THREE.Camera, parentScene: THREE.Scene) => {

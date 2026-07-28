@@ -1507,13 +1507,8 @@ export class KillstreakPresentation {
       instanced.name = `pass65-swarm-instanced-batch-${this.swarmInstanceBatches.length + 1}`;
       instanced.userData.presentationOnly = true;
       instanced.userData.swarmInstancedPresentation = true;
-      // These small airborne drones never touch a readable receiver shadow and
-      // should not sample the arena's seven-light shadow rig 24 times per batch.
-      // Keeping their authored PBR material while removing irrelevant shadow
-      // work preserves silhouette/lighting and stabilizes legal support overlap.
-      instanced.castShadow = false;
-      instanced.receiveShadow = false;
-      instanced.userData.airborneShadowPolicy = 'unshadowed-small-support-lod';
+      instanced.castShadow = representative.castShadow;
+      instanced.receiveShadow = representative.receiveShadow;
       instanced.renderOrder = representative.renderOrder;
       instanced.frustumCulled = false;
       instanced.raycast = () => undefined;
