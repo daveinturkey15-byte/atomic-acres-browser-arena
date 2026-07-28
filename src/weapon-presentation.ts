@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIEWMODEL_SHADOW_BUDGET_SCOPE } from './rendering/runtime-shadow-budget';
 import { presentationRandom } from './runtime-random';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial } from './art-kit';
@@ -621,6 +622,7 @@ export class WeaponPresentation {
 
     this.weaponFlashlight = new THREE.SpotLight(0xeaffff, 0, 18, 0.42, 0.34, 1.5);
     this.weaponFlashlight.name = 'always-on-solid-occluded-weapon-flashlight';
+    this.weaponFlashlight.userData.shadowBudgetScope = VIEWMODEL_SHADOW_BUDGET_SCOPE;
     this.weaponFlashlight.position.set(0.05, -0.08, -0.3);
     this.weaponFlashlight.castShadow = !flattenMaterials;
     this.weaponFlashlight.shadow.mapSize.set(512, 512);
@@ -1130,6 +1132,7 @@ export class WeaponPresentation {
 
   private configureWeaponFlashlight(id: WeaponId): void {
     const flashlight = WEAPONS[id].flashlight;
+    const flashlightActive = flashlight !== null && !this.flattenMaterials;
     // Keep one quality spotlight in the renderer topology from bootstrap onward.
     // Toggling the light's visibility when the flashlight pistol was equipped
     // forced a new WebGPU lighting/shadow pipeline during live play and could
@@ -1140,6 +1143,11 @@ export class WeaponPresentation {
     this.weaponFlashlight.distance = flashlight?.rangeM ?? 0;
     this.weaponFlashlight.angle = flashlight?.coneAngleRadians ?? 0.42;
     if (flashlight) this.weaponFlashlight.color.setHex(flashlight.colorHex);
+    // Keep the compiled light/shadow topology resident, but do not redraw a
+    // zero-intensity 512px shadow map for every non-flashlight weapon.
+    this.weaponFlashlight.shadow.autoUpdate = flashlightActive;
+    this.weaponFlashlight.shadow.needsUpdate = flashlightActive;
+    this.weaponFlashlight.userData.shadowBudgetActive = flashlightActive;
   }
 
   private ejectCasing(shell: boolean): void {
@@ -1441,6 +1449,15 @@ export class WeaponPresentation {
       knifeVisible: this.meleePresentationActive && this.meleeKnife.visible,
       passiveKnifeVisible: this.passiveKnife.visible,
       passiveKnifeModel: this.passiveKnife.getObjectByName('passive-field-knife-model') !== undefined,
+      flashlight: {
+        resident: this.weaponFlashlight.visible && this.weaponFlashlight.castShadow,
+        active: this.weaponFlashlight.userData.shadowBudgetActive === true,
+        intensity: this.weaponFlashlight.intensity,
+        shadowAutoUpdate: this.weaponFlashlight.shadow.autoUpdate,
+        shadowNeedsUpdate: this.weaponFlashlight.shadow.needsUpdate,
+        shadowMapPixels: this.weaponFlashlight.shadow.mapSize.x * this.weaponFlashlight.shadow.mapSize.y,
+        budgetScope: this.weaponFlashlight.userData.shadowBudgetScope ?? null,
+      },
       minigunSpool: { ...this.minigunSpool },
       browserWeaponCatalog: {
         retained: [...this.browserResidentWeaponIds],

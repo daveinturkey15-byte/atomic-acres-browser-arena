@@ -9,6 +9,7 @@ import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
 import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
@@ -16152,6 +16153,11 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
   if (!definition) return { definitionId: null, pass: false, violations: ['no active ArenaVisualDefinition'] };
   let shadowLights = 0;
   let shadowMapPixels = 0;
+  let viewmodelShadowLights = 0;
+  let viewmodelShadowMapPixels = 0;
+  let residentViewmodelShadowLights = 0;
+  let residentViewmodelShadowMapPixels = 0;
+  const shadowLightInventory: Array<Record<string, unknown>> = [];
   let drawCalls = 0;
   let triangles = 0;
   const renderableBreakdown = new Map<string, { drawCalls: number; triangles: number }>();
@@ -16178,8 +16184,26 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
     }
     if (!(node instanceof THREE.PointLight || node instanceof THREE.SpotLight || node instanceof THREE.DirectionalLight)) return;
     if (!node.castShadow) return;
+    const mapPixels = node.shadow.mapSize.x * node.shadow.mapSize.y;
+    const viewmodel = isViewmodelShadowLight(node);
+    const active = !viewmodel || node.userData.shadowBudgetActive === true;
+    shadowLightInventory.push({
+      name: node.name || node.type,
+      scope: viewmodel ? 'viewmodel' : 'arena',
+      active,
+      intensity: node.intensity,
+      mapPixels,
+    });
+    if (viewmodel) {
+      residentViewmodelShadowLights += 1;
+      residentViewmodelShadowMapPixels += mapPixels;
+      if (!active) return;
+      viewmodelShadowLights += 1;
+      viewmodelShadowMapPixels += mapPixels;
+      return;
+    }
     shadowLights += 1;
-    shadowMapPixels += node.shadow.mapSize.x * node.shadow.mapSize.y;
+    shadowMapPixels += mapPixels;
   });
   const measured = {
     drawCalls,
@@ -16191,6 +16215,13 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
       .sort((left, right) => right.drawCalls - left.drawCalls || left.root.localeCompare(right.root)),
     shadowLights,
     shadowMapPixels,
+    viewmodelShadowLights,
+    viewmodelShadowMapPixels,
+    residentViewmodelShadowLights,
+    residentViewmodelShadowMapPixels,
+    totalActiveShadowLights: shadowLights + viewmodelShadowLights,
+    totalActiveShadowMapPixels: shadowMapPixels + viewmodelShadowMapPixels,
+    shadowLightInventory,
     postTextureSamples: renderRuntime.backend === 'webgpu' ? 18 : 0,
     textureBytes: latestArenaPerformanceBudgetSample?.definitionId === definition.id
       ? latestArenaPerformanceBudgetSample.activeTextureBytesEstimate
@@ -16223,6 +16254,18 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
   if (measured.triangles > limits.maximumTriangles) violations.push(`triangles ${measured.triangles}/${limits.maximumTriangles}`);
   if (measured.shadowLights > limits.maximumShadowLights) violations.push(`shadowLights ${measured.shadowLights}/${limits.maximumShadowLights}`);
   if (measured.shadowMapPixels > limits.maximumShadowMapPixels) violations.push(`shadowMapPixels ${measured.shadowMapPixels}/${limits.maximumShadowMapPixels}`);
+  if (measured.viewmodelShadowLights > VIEWMODEL_SHADOW_BUDGET.maximumLights) {
+    violations.push(`viewmodelShadowLights ${measured.viewmodelShadowLights}/${VIEWMODEL_SHADOW_BUDGET.maximumLights}`);
+  }
+  if (measured.viewmodelShadowMapPixels > VIEWMODEL_SHADOW_BUDGET.maximumMapPixels) {
+    violations.push(`viewmodelShadowMapPixels ${measured.viewmodelShadowMapPixels}/${VIEWMODEL_SHADOW_BUDGET.maximumMapPixels}`);
+  }
+  if (measured.residentViewmodelShadowLights > VIEWMODEL_SHADOW_BUDGET.maximumLights) {
+    violations.push(`residentViewmodelShadowLights ${measured.residentViewmodelShadowLights}/${VIEWMODEL_SHADOW_BUDGET.maximumLights}`);
+  }
+  if (measured.residentViewmodelShadowMapPixels > VIEWMODEL_SHADOW_BUDGET.maximumMapPixels) {
+    violations.push(`residentViewmodelShadowMapPixels ${measured.residentViewmodelShadowMapPixels}/${VIEWMODEL_SHADOW_BUDGET.maximumMapPixels}`);
+  }
   if (measured.postTextureSamples > limits.maximumPostTextureSamples) violations.push(`postTextureSamples ${measured.postTextureSamples}/${limits.maximumPostTextureSamples}`);
   if (measured.textureBytes === null) violations.push('textureBytes budget has not been sampled');
   else if (measured.textureBytes > limits.maximumTextureBytes) violations.push(`textureBytes ${measured.textureBytes}/${limits.maximumTextureBytes}`);
@@ -16234,7 +16277,7 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
   else if (measured.gpuFrameP95Ms > limits.gpuFrameP95Ms) violations.push(`gpuFrameP95Ms ${measured.gpuFrameP95Ms}/${limits.gpuFrameP95Ms}`);
   return {
     definitionId: definition.id,
-    limits: { ...limits },
+    limits: { ...limits, viewmodelShadows: VIEWMODEL_SHADOW_BUDGET },
     measured,
     performanceSample: latestArenaPerformanceBudgetSample?.definitionId === definition.id ? latestArenaPerformanceBudgetSample : null,
     pass: violations.length === 0,

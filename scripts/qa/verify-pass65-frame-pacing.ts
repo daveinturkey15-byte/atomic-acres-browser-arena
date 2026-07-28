@@ -329,6 +329,7 @@ async function collectFrameWindow(page: Page, durationMs: number, deploymentStar
 
 async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Promise<TrialReceipt> {
   const trialId = `${arenaId}-r${repeat + 1}`;
+  const sampledWeapon = repeat === 0 ? 'carbine' : 'flashlight-pistol';
   const issues: string[] = [];
   const browserErrors: BrowserError[] = [];
   const browserWarnings: string[] = [];
@@ -423,6 +424,18 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
         && document.documentElement.dataset.gameplayArena === expectedArena
         && document.querySelector('#menu')?.classList.contains('hidden');
     }, arenaId, { timeout: 60_000 });
+    await page.evaluate((weapon) => {
+      const api = (globalThis as typeof globalThis & { __ATOMIC_ACRES_DEBUG__: {
+        equipWeapon: (weaponId: string) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon(weapon);
+    }, sampledWeapon);
+    await page.waitForFunction((weapon) => {
+      const state = (globalThis as typeof globalThis & { __ATOMIC_ACRES_DEBUG__: { snapshot: () => Record<string, any> } })
+        .__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.player.weapon === weapon
+        && state.weaponPresentation.flashlight.active === (weapon === 'flashlight-pistol');
+    }, sampledWeapon, { timeout: 10_000 });
     const activeDeployment = await page.evaluate(() => {
       const api = (globalThis as typeof globalThis & { __ATOMIC_ACRES_DEBUG__: {
         snapshot: () => Record<string, any>;
@@ -437,6 +450,8 @@ async function runTrial(browser: Browser, repeat: number, arenaId: ArenaId): Pro
         arenaId: state.arenaSelection.id,
         gameStarted: state.gameStarted,
         botsFrozen: true,
+        weapon: state.player.weapon,
+        flashlight: state.weaponPresentation.flashlight,
         playerPosition: state.player.position,
         drawingBuffer: state.render.drawingBuffer,
         renderer: state.render.runtime,

@@ -91,15 +91,21 @@ describe('first-person anatomical presentation', () => {
     presentation.setWeapon('carbine', true);
     expect(flashlight.visible).toBe(true);
     expect(flashlight.intensity).toBe(0);
+    expect(flashlight.shadow.autoUpdate).toBe(false);
+    expect(flashlight.userData.shadowBudgetActive).toBe(false);
 
     presentation.setWeapon('flashlight-pistol', true);
     expect(flashlight.visible).toBe(true);
     expect(flashlight.intensity).toBeGreaterThan(0);
     expect(flashlight.castShadow).toBe(true);
+    expect(flashlight.shadow.autoUpdate).toBe(true);
+    expect(flashlight.userData.shadowBudgetActive).toBe(true);
 
     presentation.setWeapon('pistol', true);
     expect(flashlight.visible).toBe(true);
     expect(flashlight.intensity).toBe(0);
+    expect(flashlight.shadow.autoUpdate).toBe(false);
+    expect(flashlight.userData.shadowBudgetActive).toBe(false);
   });
 
   it('makes a non-scattergun casing visible at the accepted shot boundary', () => {
