@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { buildWeaponModel } from './art-kit';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import type { Box2 } from './collision';
@@ -1738,15 +1737,9 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     stationRoot.userData.stationId = station.id;
     stationRoot.userData.weapon = station.weapon;
     stationRoot.userData.label = `${station.label} / ${WEAPONS[station.weapon].name}`;
-    const weapon = buildWeaponModel(station.weapon, true, false);
-    weapon.name = `gun-range-rack-weapon-${station.weapon}`;
-    weapon.rotation.set(0.08, Math.PI / 2, -0.08);
-    weapon.scale.setScalar(station.weapon === 'lmg' ? 0.52 : 0.58);
-    weapon.traverse((node) => {
-      node.userData.presentationOnly = true;
-      if (node instanceof THREE.Mesh) node.raycast = () => undefined;
-    });
-    stationRoot.add(weapon);
+    // Rack presentation fails closed until the selected-arena deployment gate
+    // atomically attaches the already-authored world-LOD firearm family.
+    stationRoot.userData.rackPresentationSource = 'fail-closed-unloaded';
     const label = rangeSign(`${station.label} · ${WEAPONS[station.weapon].name.toUpperCase()}`, WEAPONS[station.weapon].color, `gun-range-station-label-${station.weapon}`, [4.15, 0.62]);
     if (label) {
       label.position.set(0, 0.78, 0.65);
@@ -1760,6 +1753,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     stationRoot.add(stationLight);
     root.add(stationRoot);
   }
+
+  root.userData.gunRangeRackPresentation = Object.freeze({
+    status: 'unloaded',
+    required: GUN_RANGE_WEAPON_STATIONS.length,
+    ready: 0,
+    source: 'fail-closed',
+    error: null,
+  });
 
   box(builder, 'gun-range-armory-header', [0, 3.8, 9.45], [32, 1.15, 0.25], dark, { solid: false, shots: false });
   box(builder, 'gun-range-live-fire-sign', [0, 4.45, 1.0], [12, 0.75, 0.22], redSafety, { solid: false, shots: false });

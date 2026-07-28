@@ -1,4 +1,5 @@
 import { buildGunRange } from '../../additional-maps';
+import { GUN_RANGE_RACK_ASSETS } from '../../gun-range-rack-presentation';
 import type { ArenaInteriorVolumeDefinition } from '../arena-visual-definition';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
@@ -17,7 +18,7 @@ export const definition = createProceduralArenaVisualDefinition({
   id: 'gun-range',
   displayLabel: 'Gun Range',
   moduleId: 'arena.visual.gun-range.v1',
-  assetDependencies: [],
+  assetDependencies: GUN_RANGE_RACK_ASSETS.map((asset) => asset.url),
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xffffff, sunIntensity: 0, ambientColor: 0xc8e2e6, ambientIntensity: 0.64,

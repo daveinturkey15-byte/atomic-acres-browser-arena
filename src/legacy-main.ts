@@ -104,6 +104,7 @@ import {
 } from './loadout-preset-schema';
 import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
+import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sweepSphereAgainstBoxes } from './collision';
 import {
@@ -2431,6 +2432,11 @@ async function ensureRustworksQualityPresentation(): Promise<THREE.Group | null>
 async function ensureSelectedQualityPresentation(id: ArenaId): Promise<void> {
   if (id === 'atomic-acres') await ensureAtomicQualityPresentation();
   else if (id === 'rustworks-1v1' && renderProfile === 'blender') await ensureRustworksQualityPresentation();
+  else if (id === 'gun-range') {
+    await loadGunRangeRackPresentation(selectedArenaAuthority('gun-range').root, {
+      recordRequest: (url) => arenaVisualStream.recordSelectedAssetRequest('gun-range', url),
+    });
+  }
   graphicsRefinement.refreshSelectiveBloom(scene);
 }
 
@@ -15257,9 +15263,8 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);
     arenaTransitionPhase = 'committing';
     // Lazy arena roots and their selected TSL definition must be compiled while
-    // submissions remain paused. Terminal and Gun Range do not have a separate
-    // quality-asset loader, so without this boundary their first live frame can
-    // spend several seconds compiling and trip the presentation watchdog.
+    // submissions remain paused. This also compiles the awaited Gun Range rack
+    // assets before their first live frame can trip the presentation watchdog.
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') submitWebGpuFrame(performance.now(), true);
     else atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);
@@ -16556,13 +16561,23 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hits: targetHits,
       armoryOnly: selectedArena.id === 'gun-range',
       primaryUnlocked: rangePrimaryUnlocked,
-      stations: GUN_RANGE_WEAPON_STATIONS.map((station) => ({
-        id: station.id,
-        weapon: station.weapon,
-        label: station.label,
-        position: [station.position.x, station.position.y, station.position.z],
-        visible: arena.root.getObjectByName(`gun-range-weapon-station-${station.weapon}`)?.visible ?? false,
-      })),
+      rackPresentation: arena.root.userData.gunRangeRackPresentation ?? null,
+      stations: GUN_RANGE_WEAPON_STATIONS.map((station) => {
+        const stationRoot = arena.root.getObjectByName(`gun-range-weapon-station-${station.weapon}`);
+        const rackModel = stationRoot?.getObjectByName(`gun-range-rack-weapon-${station.weapon}`);
+        return {
+          id: station.id,
+          weapon: station.weapon,
+          label: station.label,
+          position: [station.position.x, station.position.y, station.position.z],
+          visible: stationRoot?.visible ?? false,
+          presentationSource: stationRoot?.userData.rackPresentationSource ?? null,
+          modelId: rackModel?.userData.weaponModelId ?? null,
+          importedWeaponSource: rackModel?.userData.importedWeaponSource ?? null,
+          authored: rackModel?.userData.projectOriginalWeapon === true,
+          deliveryVariant: rackModel?.userData.deliveryVariant ?? null,
+        };
+      }),
       unlimitedAmmo: hasUnlimitedRangeAmmo(selectedArena.id),
       reserveHud: reserveHudValue(selectedArena.id, player.reserve[player.weapon]),
       firingLineZ: GUN_RANGE_FIRING_LINE_Z,
