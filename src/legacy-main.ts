@@ -1281,7 +1281,8 @@ async function settleWebGpuPresentation(label: string, maximumLatencyMs = 500): 
     if (nextPixelRatio === null) return;
     applyAdaptiveRenderBudget(nextPixelRatio);
     resize();
-    await renderRuntime.compile(scene, camera);
+    // The next forced RenderPipeline submission compiles the resized TSL/HDR
+    // context directly; a default-context compile would only duplicate it.
   }
 }
 
@@ -4465,14 +4466,12 @@ const runStreamedWeaponGpuPrewarm: WeaponViewmodelGpuPrewarmer = async (model, {
         }
       };
 
-      // Compile the detached candidate while the last complete viewmodel keeps
-      // presenting. Preserve its exact gameplay scale for the fenced upload
-      // frame: sub-pixel staging can compile the pipeline without exercising
-      // texture sampling and leaves first full-size draw work in combat.
+      // Detach the candidate while the last complete viewmodel keeps
+      // presenting, then stage its exact gameplay scale in the fenced TSL/HDR
+      // submission below. A default-context compile does not warm that path.
       model.removeFromParent();
       model.visible = true;
       try {
-        await renderRuntime.compile(model, camera, scene);
         const submissionWasPaused = renderSubmissionPaused;
         renderSubmissionPaused = true;
         try {
@@ -8128,7 +8127,6 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     if (renderRuntime.backend === 'webgpu') {
-      await renderRuntime.compile(scene, camera);
       await settleWebGpuPresentation('Initial match');
       // Initial-match admission may lower the internal render scale and resize
       // Three's HDR context. Any support pipeline compiled before that final
@@ -15202,7 +15200,6 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     // submissions remain paused. Terminal and Gun Range do not have a separate
     // quality-asset loader, so without this boundary their first live frame can
     // spend several seconds compiling and trip the presentation watchdog.
-    await renderRuntime.compile(scene, camera);
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') submitWebGpuFrame(performance.now(), true);
     else atomicSignal?.render(scene, camera, VIEWMODEL_RENDER_LAYER);

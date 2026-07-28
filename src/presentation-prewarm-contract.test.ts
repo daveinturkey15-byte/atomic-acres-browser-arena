@@ -43,8 +43,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('renderRuntime.compileAndRender(overdriveRoot, camera, scene)');
     expect(sharedAssets).not.toContain('renderRuntime.compile(scene, camera)');
     expect(menuBootstrap).not.toContain('renderRuntime.compile(scene, camera)');
-    expect(arenaDeployment.match(/renderRuntime\.compile\(scene, camera\)/g)).toHaveLength(1);
-    expect(matchDeployment.match(/renderRuntime\.compile\(scene, camera\)/g)).toHaveLength(1);
+    expect(arenaDeployment).not.toContain('renderRuntime.compile(scene, camera)');
+    expect(matchDeployment).not.toContain('renderRuntime.compile(scene, camera)');
     expect(matchDeployment).toContain('const matchActiveOverdrivePrewarm = selectedArena.overdrive;');
     expect(matchDeployment).toContain('overdriveRoot.visible = true;');
     expect(matchDeployment).toContain('overdriveRoot.visible = selectedArena.overdrive;');
@@ -120,6 +120,7 @@ describe('presentation prewarm startup contract', () => {
       source.indexOf('const runStreamedWeaponGpuPrewarm:'),
       source.indexOf('const streamedWeaponGpuPrewarmer:'),
     );
+    expect(weaponPrewarm).not.toContain('renderRuntime.compile(');
     expect(weaponPrewarm).not.toContain('multiplyScalar(0.0001)');
     expect(source).toContain('await renderRuntime.compileAndRender(model, camera, scene);');
     expect(source).toContain('streamedWeaponGpuPrewarmer,');

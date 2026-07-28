@@ -811,8 +811,17 @@ export class WebGpuRenderRuntime {
     await this.renderer.compileAsync(root, camera, scene);
   }
 
-  async compileAndRender(root: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
-    await this.compile(root, camera, scene);
+  async compileAndRender(root: THREE.Object3D, _camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
+    let attachmentRoot = root;
+    while (attachmentRoot.parent) attachmentRoot = attachmentRoot.parent;
+    if (attachmentRoot !== scene) {
+      throw new Error('WebGPU presentation prewarm root must be attached to the submitted scene');
+    }
+    // compileAsync() uses Three's default renderer context, while gameplay is
+    // submitted through the TSL/HDR RenderPipeline. Building both contexts
+    // doubles cold node/pipeline residency without warming the live path. One
+    // forced pipeline submission compiles the exact context and the queue fence
+    // below makes that work an admission boundary rather than a gameplay hitch.
     this.submitFrame(performance.now(), true);
     // Presentation-only effects prewarm behind the loading surface. Cold
     // Chrome/driver shader creation can exceed the live four-second fence,

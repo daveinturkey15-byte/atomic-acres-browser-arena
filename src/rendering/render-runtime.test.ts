@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   awaitSubmissionCompletionTarget,
@@ -162,6 +162,42 @@ describe('Pass 64 render runtime boundary', () => {
     await settleProbe();
     expect(runtime.submitFrame(120)).toBe(true);
     expect(pending).toHaveLength(1);
+  });
+
+  it('prewarms only the submitted TSL render-pipeline context', async () => {
+    const compileAsync = vi.fn(async () => undefined);
+    const render = vi.fn();
+    const renderer = {
+      compileAsync,
+      info: { reset: () => undefined, render: { calls: 1, triangles: 2, points: 0, lines: 0 } },
+    };
+    const device = {
+      queue: { onSubmittedWorkDone: async () => undefined },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const staged = new THREE.Group();
+    scene.add(camera, staged);
+
+    await runtime.compileAndRender(staged, camera, scene);
+
+    expect(compileAsync).not.toHaveBeenCalled();
+    expect(render).toHaveBeenCalledTimes(1);
   });
 
   it('restarts pending age when the completion frontier advances and clears it when caught up', () => {
