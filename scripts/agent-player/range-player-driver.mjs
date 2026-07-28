@@ -41,6 +41,18 @@ export async function runRange(args) {
     await page.waitForFunction(() => document.querySelector('#match-mode-label')?.textContent?.includes('TARGET DRILL'), null, { timeout: 30_000 });
     await sleep(3500); await page.screenshot({ path: resolve(output, 'range-spawn.png') });
     let current = await hud(page);
+    if (!current.pointer && await page.locator('#menu').isVisible().catch(() => false)) {
+      await clickVisibleExact(page, 'DEPLOY');
+      const resumeNodes = page.getByText('RETURN TO MATCH', { exact: true });
+      let resumed = false;
+      for (let i = 0; i < await resumeNodes.count(); i += 1) {
+        const node = resumeNodes.nth(i);
+        if (await node.isVisible()) { await trustedLocatorClick(page, node); resumed = true; break; }
+      }
+      if (!resumed) throw new Error('Visible RETURN TO MATCH control missing before bench movement');
+      await sleep(220);
+      current = await hud(page);
+    }
     if (!current.pointer || !current.focused) throw new Error('Visible live-range pointer/focus receipt missing before bench movement');
     await page.keyboard.down('KeyA'); await sleep(1000); await page.keyboard.up('KeyA');
     await page.keyboard.down('KeyW'); await sleep(700); await page.keyboard.up('KeyW');
