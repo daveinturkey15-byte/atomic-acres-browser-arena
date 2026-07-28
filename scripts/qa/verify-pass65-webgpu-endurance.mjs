@@ -204,6 +204,16 @@ try {
         && state?.render?.runtime?.presentation?.status === 'healthy'
         && document.querySelector('#menu')?.classList.contains('hidden');
     }, undefined, { timeout: 30_000 });
+    // The former probe started as soon as the menu closed, during the three-
+    // second countdown. Killstreak authority may accept an activation then, but
+    // the local presentation snapshot is not advanced until active play, so the
+    // measured rAF window contained no support vehicle at all. Enter the exact
+    // gameplay phase whose first-live submission this gate is meant to measure.
+    await page.waitForFunction(() => {
+      const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return state?.matchPhase === 'active'
+        && state?.render?.runtime?.presentation?.status === 'healthy';
+    }, undefined, { timeout: 15_000 });
     let doorResetProbe = null;
     if (visit === doorResetProbeDetachVisit) {
       doorResetProbe = await page.evaluate(() => {
@@ -293,6 +303,8 @@ try {
             skipped: false,
             finishReason,
             activations,
+            matchPhaseBefore: before.matchPhase,
+            matchPhaseAfter: after.matchPhase,
             activationCallMs,
             elapsedMs,
             sampledFrames: frameGapsMs.length,
@@ -367,6 +379,8 @@ try {
     if (enabledStress.has('killstreak')) {
       const minimumActivationProgress = Math.max(4, Math.floor(killstreakActivationProbe.elapsedMs / 100));
       if (killstreakActivationProbe.finishReason !== 'raf-window'
+        || killstreakActivationProbe.matchPhaseBefore !== 'active'
+        || killstreakActivationProbe.matchPhaseAfter !== 'active'
         || killstreakActivationProbe.sampledFrames < minimumActivationProgress
         || killstreakActivationProbe.frameDelta < minimumActivationProgress
         || killstreakActivationProbe.submissionDelta < minimumActivationProgress
