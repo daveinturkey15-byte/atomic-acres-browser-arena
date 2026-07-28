@@ -23,7 +23,7 @@ const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'u
 const trackedWorktreeDirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0;
 if (trackedWorktreeDirty) throw new Error('Pass 65 endurance requires a clean tracked worktree so the receipt identifies an exact source SHA');
 
-const arenaSequence = [
+const canonicalArenaSequence = [
   'rustworks-1v1',
   'gun-range',
   'skyline-terminal',
@@ -35,6 +35,13 @@ const arenaSequence = [
   'rustworks-1v1',
   'rustworks-1v1',
 ];
+const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
+const diagnosticArena = process.env.PASS65_DIAGNOSTIC_ARENA?.trim() ?? '';
+const diagnosticMode = diagnosticStress.length > 0 || diagnosticArena.length > 0;
+const enabledStress = new Set(diagnosticStress && diagnosticStress !== 'all'
+  ? diagnosticStress.split(',').map((entry) => entry.trim()).filter(Boolean)
+  : ['killstreak', 'grenade', 'smoke', 'weapons']);
+const arenaSequence = diagnosticArena ? [diagnosticArena] : canonicalArenaSequence;
 const doorResetProbeDetachVisit = arenaSequence.length - 2;
 const doorResetProbeRestoreVisit = arenaSequence.length - 1;
 
@@ -195,18 +202,19 @@ try {
         throw new Error(`RustRig detached-door reset did not render safely: ${JSON.stringify(doorResetProbe)}`);
       }
     }
-    const killstreakStress = await page.evaluate(() => {
+    const killstreakStress = await page.evaluate((enabled) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
+      if (!enabled) return { chopper: null, droneSwarm: null };
       api.earnSupport(15);
       return {
         chopper: api.activateKillstreak('chopper'),
         droneSwarm: api.activateKillstreak('drone-swarm'),
       };
-    });
-    if (!killstreakStress.chopper || !killstreakStress.droneSwarm) {
+    }, enabledStress.has('killstreak'));
+    if (enabledStress.has('killstreak') && (!killstreakStress.chopper || !killstreakStress.droneSwarm)) {
       throw new Error(`${arenaId} could not stage the chopper plus drone-swarm stress overlap: ${JSON.stringify(killstreakStress)}`);
     }
-    await page.waitForFunction(() => {
+    if (enabledStress.has('killstreak')) await page.waitForFunction(() => {
       const entities = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.killstreak?.entities ?? [];
       return entities.some((entity) => entity.kind === 'chopper')
         && entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length >= 5;
@@ -226,22 +234,26 @@ try {
     let lastScreenshot = null;
     while (Date.now() - startedAt < durationMs) {
       activeContext = { visit, arenaId, phase: 'sample', sampleIndex };
-      await page.evaluate((index) => {
+      await page.evaluate(({ index, stress }) => {
         const api = window.__ATOMIC_ACRES_DEBUG__;
         const state = api.snapshot();
         const [x, y, z] = state.player.position;
         api.setCaptureCameraPose(x, y, z, (index * 0.31) % (Math.PI * 2), Math.sin(index * 0.37) * 0.08);
         if (index % 4 === 0) {
-          api.setGrenades(1);
-          api.throwGrenade();
-          api.stageSmokeVolume(2.5);
-          api.stageSmokeVolume(3.5);
-          api.stageSmokeVolume(4.5);
+          if (stress.grenade) {
+            api.setGrenades(1);
+            api.throwGrenade();
+          }
+          if (stress.smoke) {
+            api.stageSmokeVolume(2.5);
+            api.stageSmokeVolume(3.5);
+            api.stageSmokeVolume(4.5);
+          }
         }
-        if (index % 5 === 1) {
+        if (stress.weapons && index % 5 === 1) {
           api.equipWeapon('explosive-crossbow');
           api.fireOnce();
-        } else if (index % 5 === 3) {
+        } else if (stress.weapons && index % 5 === 3) {
           api.equipWeapon('m14-ebr');
           api.setAds(true);
           api.fireOnce();
@@ -251,7 +263,14 @@ try {
             api.damageShed(shed.placementId, shedIndex === 0 ? 'wall-west' : 'wall-east', 220);
           }
         }
-      }, sampleIndex);
+      }, {
+        index: sampleIndex,
+        stress: {
+          grenade: enabledStress.has('grenade'),
+          smoke: enabledStress.has('smoke'),
+          weapons: enabledStress.has('weapons'),
+        },
+      });
       await page.waitForTimeout(sampleIntervalMs);
 
       const sample = await page.evaluate(() => {
@@ -405,7 +424,7 @@ try {
   const uniqueErrors = fatalBrowserErrors(errors);
   if (uniqueErrors.length > 0) throw new Error(`Pass 65 endurance emitted browser/GPU errors: ${uniqueErrors[0]}`);
   const output = {
-    gate: 'pass65-webgpu-presentation-endurance',
+    gate: diagnosticMode ? 'pass65-webgpu-presentation-endurance-diagnostic' : 'pass65-webgpu-presentation-endurance',
     verdict: 'pass',
     sourceRevision,
     browserExecutable: executablePath,
@@ -421,6 +440,7 @@ try {
     rustworksDurationMs,
     otherArenaDurationMs,
     arenaSequence,
+    enabledStress: [...enabledStress],
     browserErrors: [...new Set(errors)],
     arenaReceipts,
   };
@@ -429,7 +449,10 @@ try {
   if (endingRevision !== sourceRevision || endingStatus.length > 0) {
     throw new Error(`Pass 65 endurance source changed during the run: ${JSON.stringify({ sourceRevision, endingRevision, endingStatus })}`);
   }
-  await writeFile(`${artifactRoot}/exact-sha-receipt.json`, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
+  const receiptName = diagnosticMode
+    ? `diagnostic-${[diagnosticArena || 'canonical', ...enabledStress].join('-')}.json`
+    : 'exact-sha-receipt.json';
+  await writeFile(`${artifactRoot}/${receiptName}`, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(output, null, 2));
 } catch (error) {
   let state = null;
