@@ -12128,7 +12128,6 @@ function updatePass65KillstreakRuntime(now: number): void {
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
-  updateFullSupportOverlapAdaptiveBudget();
   audio.syncChopperRotors(killstreakSnapshot.entities
     .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0)
     .map((entity) => ({
