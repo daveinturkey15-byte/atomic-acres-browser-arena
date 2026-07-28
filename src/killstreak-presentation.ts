@@ -1400,6 +1400,7 @@ export class KillstreakPresentation {
   private gpuPrewarmActive = false;
   private swarmOverlapAdmission: {
     key: string;
+    chopperAdmitted: boolean;
     admittedInstances: number;
     admittedBatches: number;
     requiredCompletionSequence: number;
@@ -2006,23 +2007,29 @@ export class KillstreakPresentation {
         // visible well before its 500ms fire gate.
         this.swarmOverlapAdmission = {
           key,
+          chopperAdmitted: false,
           admittedInstances: 0,
           admittedBatches: 0,
           requiredCompletionSequence: presentationProgress.submissionSequence + 1,
         };
       } else if (
-        (this.swarmOverlapAdmission.admittedInstances < liveSwarm.length
+        (!this.swarmOverlapAdmission.chopperAdmitted
+          || this.swarmOverlapAdmission.admittedInstances < liveSwarm.length
           || this.swarmOverlapAdmission.admittedBatches < this.swarmInstanceBatches.length)
         && presentationProgress.completedSequence >= this.swarmOverlapAdmission.requiredCompletionSequence
       ) {
-        this.swarmOverlapAdmission.admittedInstances = Math.min(
-          liveSwarm.length,
-          this.swarmOverlapAdmission.admittedInstances + 4,
-        );
-        this.swarmOverlapAdmission.admittedBatches = Math.min(
-          this.swarmInstanceBatches.length,
-          this.swarmOverlapAdmission.admittedBatches + 2,
-        );
+        if (!this.swarmOverlapAdmission.chopperAdmitted) {
+          this.swarmOverlapAdmission.chopperAdmitted = true;
+        } else {
+          this.swarmOverlapAdmission.admittedInstances = Math.min(
+            liveSwarm.length,
+            this.swarmOverlapAdmission.admittedInstances + 4,
+          );
+          this.swarmOverlapAdmission.admittedBatches = Math.min(
+            this.swarmInstanceBatches.length,
+            this.swarmOverlapAdmission.admittedBatches + 2,
+          );
+        }
         this.swarmOverlapAdmission.requiredCompletionSequence = presentationProgress.submissionSequence + 1;
       }
       maximumVisibleSwarm = Math.min(liveSwarm.length, this.swarmOverlapAdmission.admittedInstances);
@@ -2032,7 +2039,8 @@ export class KillstreakPresentation {
     }
     const admittedSwarmIds = new Set(liveSwarm.slice(0, maximumVisibleSwarm).map((entity) => entity.id));
     const admitted = bounded.filter((entity) => (
-      entity.kind !== 'drone' || entity.mode !== 'swarm' || admittedSwarmIds.has(entity.id)
+      (entity.kind !== 'chopper' || this.swarmOverlapAdmission?.chopperAdmitted !== false)
+      && (entity.kind !== 'drone' || entity.mode !== 'swarm' || admittedSwarmIds.has(entity.id))
     ));
     const liveIds = new Set(admitted.map((entity) => entity.id));
     for (const [id, presented] of this.entities) {
