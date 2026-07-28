@@ -135,6 +135,29 @@ test('placeholder experiment-policy values are rejected before a counted game ca
   }), /non-placeholder/);
 });
 
+test('comparison baseline IDs and groups are validated independently of the global archive baseline', () => {
+  const policy = {
+    schemaVersion: 1,
+    policyId: 'atomic-player-smg-candidate',
+    hypothesis: 'A bounded SMG pulse will improve concentrated damage while retaining safety gates.',
+    expectedMetricMovements: ['combat.damageDealt increases'],
+    unchangedControls: ['Visible-state firing authority remains mandatory'],
+    rollbackCondition: 'Any hard-gate failure or repeated combat regression.',
+    comparisonBaselineGameId: 'G0059',
+    comparisonGroup: 'weapon:VECTORLINE SMG',
+    configuration: {
+      playerHarnessCommit: 'abc1234',
+      profile: 'atomicplayer',
+      provider: 'openai-codex',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'low',
+      serviceTier: 'normal',
+    },
+  };
+  assert.equal(validateExperimentPolicy(policy).comparisonBaselineGameId, 'G0059');
+  assert.throws(() => validateExperimentPolicy({ ...policy, comparisonBaselineGameId: 'latest-smg' }), /G####/);
+});
+
 test('G0003 and later counted benchmarks require a validated frozen player-policy hypothesis', async () => {
   const root = await mkdtemp(join(tmpdir(), 'atomic-policy-test-'));
   const archiveRoot = join(root, 'archive');

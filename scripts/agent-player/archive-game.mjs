@@ -261,6 +261,12 @@ export function validateExperimentPolicy(policy, { report = null, modelPolicy = 
       throw new Error(`experiment-policy.json requires a non-placeholder string array ${key}`);
     }
   }
+  if (policy.comparisonBaselineGameId !== undefined && !/^G\d{4}$/.test(String(policy.comparisonBaselineGameId))) {
+    throw new Error('experiment-policy.json comparisonBaselineGameId must be a monotonic G#### archive ID');
+  }
+  if (policy.comparisonGroup !== undefined && (typeof policy.comparisonGroup !== 'string' || policy.comparisonGroup.trim().length < 4)) {
+    throw new Error('experiment-policy.json comparisonGroup must be a substantive string');
+  }
   if (!policy.configuration || typeof policy.configuration !== 'object' || Array.isArray(policy.configuration)) {
     throw new Error('experiment-policy.json requires a configuration object');
   }
@@ -375,7 +381,7 @@ export async function archiveGame({
   archiveRoot = resolve(archiveRoot);
   await mkdir(join(archiveRoot, 'games'), { recursive: true });
   const indexPath = join(archiveRoot, 'index.json');
-  const index = await readJson(indexPath, { schemaVersion: 1, kind: 'atomic-player-game-index', baselineGameId: null, games: [] });
+  const index = await readJson(indexPath, { schemaVersion: 1, kind: 'atomic-player-game-index', baselineGameId: null, comparisonBaselines: {}, games: [] });
   const reportPath = join(sourceDirectory, 'report.json');
   if (!await exists(reportPath)) throw new Error(`Source game has no report.json: ${sourceDirectory}`);
   const sourceReport = await readJson(reportPath, {});
@@ -427,9 +433,29 @@ export async function archiveGame({
   const completed = Boolean(summary && report?.outcome?.matchEndedObserved);
   const absoluteHardFailures = hardGateFailures(benchmark);
   const counted = runType === 'benchmark' && completed && absoluteHardFailures.length === 0;
-  const comparableGames = index.games.filter((game) => game.benchmarkFile && (game.counted ?? game.completed));
+  const observedWeaponName = String(
+    experimentPolicy?.configuration?.expectedWeaponName
+      ?? report?.session?.observedWeaponName
+      ?? report?.input?.observedWeaponName
+      ?? '',
+  ).trim().toUpperCase();
+  const comparisonGroup = experimentPolicy?.comparisonGroup
+    ?? (observedWeaponName ? `weapon:${observedWeaponName}` : null);
+  const requestedBaselineId = experimentPolicy?.comparisonBaselineGameId
+    ?? (comparisonGroup ? index.comparisonBaselines?.[comparisonGroup] : null)
+    ?? null;
+  const requestedBaselineGame = requestedBaselineId
+    ? index.games.find((game) => game.id === requestedBaselineId && game.benchmarkFile && (game.counted ?? game.completed))
+    : null;
+  if (requestedBaselineId && !requestedBaselineGame) {
+    throw new Error(`Requested comparison baseline is not a completed comparable archive game: ${requestedBaselineId}`);
+  }
+  const comparableGames = index.games.filter((game) => game.benchmarkFile
+    && (game.counted ?? game.completed)
+    && (!comparisonGroup || game.comparisonGroup === comparisonGroup || game.id === requestedBaselineId));
   const previousGame = comparableGames.at(-1) ?? null;
-  const baselineId = index.baselineGameId ?? (setBaseline || counted ? gameId : null);
+  const globalBaselineId = index.baselineGameId ?? (setBaseline || counted ? gameId : null);
+  const baselineId = requestedBaselineId ?? globalBaselineId;
   const baselineGame = baselineId === gameId ? null : index.games.find((game) => game.id === baselineId) ?? null;
   const previousBenchmark = previousGame ? await readJson(join(archiveRoot, previousGame.benchmarkFile)) : null;
   const baselineBenchmark = baselineGame ? await readJson(join(archiveRoot, baselineGame.benchmarkFile)) : benchmark;
@@ -518,6 +544,8 @@ export async function archiveGame({
     summaryFile: `${gameRelativeDirectory}/summary.md`,
     manifestFile: `${gameRelativeDirectory}/manifest.json`,
     previousComparableGameId: previousGame?.id ?? null,
+    comparisonGroup,
+    comparisonBaselineGameId: baselineId,
     policyId: experimentPolicy?.policyId ?? null,
     hypothesis: experimentPolicy?.hypothesis ?? null,
     policyConfigurationFingerprint: policyFingerprint,
@@ -526,7 +554,8 @@ export async function archiveGame({
     comparisonVsPrevious: previousComparison?.counts ?? null,
     hardRegression: absoluteHardFailures.length > 0,
   };
-  index.baselineGameId = baselineId;
+  index.baselineGameId = globalBaselineId;
+  index.comparisonBaselines ??= {};
   index.games.push(game);
   await atomicWriteJson(indexPath, index);
   return { duplicate: false, game, directory: gameDirectory, manifest, baselineComparison, previousComparison };
