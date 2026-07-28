@@ -11937,6 +11937,27 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
 }
 
 let lastKillstreakControlSentAt = Number.NEGATIVE_INFINITY;
+let fullSupportOverlapAdaptiveActive = false;
+
+function updateFullSupportOverlapAdaptiveBudget(): void {
+  const hasChopper = killstreakSnapshot.entities.some((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0);
+  const swarmDrones = killstreakSnapshot.entities.filter((entity) => (
+    entity.kind === 'drone' && entity.mode === 'swarm' && entity.expiresInMs > 0
+  )).length;
+  const overlapActive = hasChopper && swarmDrones >= 24;
+  if (!overlapActive) {
+    fullSupportOverlapAdaptiveActive = false;
+    return;
+  }
+  if (fullSupportOverlapAdaptiveActive) return;
+  fullSupportOverlapAdaptiveActive = true;
+  const nextPixelRatio = adaptiveQuality.forceDownshift('full chopper plus 24-drone support overlap');
+  if (nextPixelRatio === null) return;
+  applyAdaptiveRenderBudget(nextPixelRatio);
+  grassSystem?.setAdaptivePixelRatio(nextPixelRatio);
+  resize();
+}
+
 function updateKillstreakPossession(now: number): void {
   const possession = localKillstreakActorSnapshot()?.possession;
   if (!possession) {
@@ -11981,11 +12002,13 @@ function updateKillstreakPossession(now: number): void {
 
 function updatePass65KillstreakRuntime(now: number): void {
   if (!gameStarted) {
+    fullSupportOverlapAdaptiveActive = false;
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
     return;
   }
   if (matchState.phase === 'ended') {
+    fullSupportOverlapAdaptiveActive = false;
     audio.syncChopperRotors([]);
     killstreakPresentation.clear();
     return;
@@ -12015,6 +12038,7 @@ function updatePass65KillstreakRuntime(now: number): void {
     if (network.role === 'host' && now - lastKillstreakStateBroadcastAt >= 100) broadcastKillstreakState(now);
   }
   killstreakPresentation.sync(killstreakSnapshot, now);
+  updateFullSupportOverlapAdaptiveBudget();
   audio.syncChopperRotors(killstreakSnapshot.entities
     .filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0)
     .map((entity) => ({
