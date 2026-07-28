@@ -319,15 +319,18 @@ export function createTemporalTargetTracker(options = {}) {
 export function createOperatorTargetTracker(options = {}) {
   const confirmationFrames = Math.max(3, Math.floor(options.confirmationFrames ?? 3));
   const minimumStableFrames = Math.max(2, Math.floor(options.minimumStableFrames ?? 2));
-  const maximumObservationFrames = Math.max(minimumStableFrames + 1, Math.floor(options.maximumObservationFrames ?? 7));
+  const settlingFrames = Math.max(2, Math.floor(options.settlingFrames ?? 4));
+  const requiredEvidenceFrames = Math.max(1, Math.floor(options.requiredEvidenceFrames ?? 2));
+  const maximumObservationFrames = Math.max(settlingFrames + requiredEvidenceFrames + 1, Math.floor(options.maximumObservationFrames ?? 10));
   const maximumTrackDistanceRatio = Number(options.maximumTrackDistanceRatio ?? 0.08);
-  const minimumMotionRatio = Number(options.minimumMotionRatio ?? 0.002);
-  const minimumShapeChange = Number(options.minimumShapeChange ?? 0.08);
+  const minimumMotionRatio = Number(options.minimumMotionRatio ?? 0.003);
+  const minimumShapeChange = Number(options.minimumShapeChange ?? 0.14);
   let previous = null;
   let age = 0;
   let stableFrames = 0;
   let evidenceFrames = 0;
   let confirmed = false;
+  let observationAnchor = null;
 
   const reset = () => {
     previous = null;
@@ -335,6 +338,7 @@ export function createOperatorTargetTracker(options = {}) {
     stableFrames = 0;
     evidenceFrames = 0;
     confirmed = false;
+    observationAnchor = null;
   };
 
   return {
@@ -377,17 +381,21 @@ export function createOperatorTargetTracker(options = {}) {
         age += 1;
         if (!cameraMoved && !movementMoved) {
           stableFrames += 1;
-          if ((distanceRatio ?? 0) >= minimumMotionRatio || (shapeChange ?? 0) >= minimumShapeChange) {
-            evidenceFrames += 1;
+          if (stableFrames === settlingFrames) observationAnchor = { ...candidate };
+          if (stableFrames > settlingFrames && observationAnchor) {
+            const anchorDistance = Math.hypot(candidate.x - observationAnchor.x, candidate.y - observationAnchor.y) / frameDiagonal;
+            const anchorShapeChange = Math.abs(Math.log(candidate.pixels / Math.max(1, observationAnchor.pixels)));
+            if (anchorDistance >= minimumMotionRatio || anchorShapeChange >= minimumShapeChange) evidenceFrames += 1;
           }
         }
       }
       previous = candidate;
 
-      if (!confirmed && age >= confirmationFrames && stableFrames >= minimumStableFrames && evidenceFrames >= 1) {
+      if (!confirmed && age >= confirmationFrames && stableFrames >= Math.max(minimumStableFrames, settlingFrames + requiredEvidenceFrames)
+        && evidenceFrames >= requiredEvidenceFrames) {
         confirmed = true;
       }
-      if (!confirmed && stableFrames >= maximumObservationFrames && evidenceFrames === 0) {
+      if (!confirmed && stableFrames >= maximumObservationFrames) {
         const rejected = candidate;
         const rejectedAge = age;
         reset();
@@ -414,7 +422,7 @@ export function createOperatorTargetTracker(options = {}) {
         fireAuthorized: confirmed,
       };
     },
-    snapshot: () => ({ previous, age, stableFrames, evidenceFrames, confirmed }),
+    snapshot: () => ({ previous, age, stableFrames, evidenceFrames, confirmed, observationAnchor }),
   };
 }
 

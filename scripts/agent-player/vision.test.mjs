@@ -130,7 +130,7 @@ test('temporal confirmation accepts a plausible world track after camera motion'
 });
 
 test('operator tracker rejects static geometry after a scan-stop observation', () => {
-  const tracker = createOperatorTargetTracker({ maximumObservationFrames: 4 });
+  const tracker = createOperatorTargetTracker({ settlingFrames: 2, requiredEvidenceFrames: 1, maximumObservationFrames: 4 });
   const target = [{ x: 50, y: 40, pixels: 18, score: 0, bounds: { width: 3, height: 7 } }];
   tracker.update(target, { width: 100, height: 60, active: true, cameraMoved: true, movementMoved: true });
   let result;
@@ -141,12 +141,17 @@ test('operator tracker rejects static geometry after a scan-stop observation', (
   assert.equal(result.fireAuthorized, false);
 });
 
-test('operator tracker authorises a changing candidate only after stable observation', () => {
+test('operator tracker authorises a changing candidate only after settling and repeated evidence', () => {
   const tracker = createOperatorTargetTracker();
   const target = (x, pixels) => [{ x, y: 40, pixels, score: 0, bounds: { width: 3, height: 7 } }];
   tracker.update(target(50, 18), { width: 100, height: 60, active: true, cameraMoved: true, movementMoved: true });
-  tracker.update(target(51, 19), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
-  const result = tracker.update(target(52, 20), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
+  for (let index = 0; index < 4; index += 1) {
+    const warming = tracker.update(target(50, 18), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
+    assert.equal(warming.fireAuthorized, false);
+  }
+  const firstEvidence = tracker.update(target(51, 20), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
+  assert.equal(firstEvidence.fireAuthorized, false);
+  const result = tracker.update(target(52, 22), { width: 100, height: 60, active: true, cameraMoved: false, movementMoved: false });
   assert.equal(result.reason, 'operator-motion-confirmed');
   assert.equal(result.fireAuthorized, true);
   assert.equal(result.confirmedTarget.x, 52);
