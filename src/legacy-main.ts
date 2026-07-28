@@ -8008,7 +8008,8 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     setStatus(`Streaming ${selectedArena.displayName} gameplay for deployment…`);
     await activateArenaSelection(requestedArenaId, true);
     if (!gameplayArenaPrepared || arena.id !== requestedArenaId) {
-      throw new Error(`Selected arena ${requestedArenaId} did not commit before match start`);
+      const arenaTransitionDetail = arenaTransitionFailure ? `: ${arenaTransitionFailure}` : '';
+      throw new Error(`Selected arena ${requestedArenaId} did not commit before match start${arenaTransitionDetail}`);
     }
   }
   bootstrapStage = 'prewarming-weapon-catalog';

@@ -115,6 +115,9 @@ try {
           bootstrap: state.bootstrap,
           runtime: state.render.runtime,
           localLightOcclusion: state.render.worldLocalLightOcclusion,
+          renderProfile: state.render.profile,
+          atomicQualityStreaming: state.render.qualityAssetStreaming.atomicAcres,
+          blenderEnvironment: state.render.blenderEnvironment,
           originalArtLoaded: state.originalArtLoaded,
           arenaId: state.arenaSelection.id,
           streaming: state.arenaSelection.streaming,
@@ -127,6 +130,17 @@ try {
       if (before.runtime.actualBackend !== 'webgpu' || before.runtime.softwareAdapter) failures.push('hardware WebGPU was not active');
       if (before.localLightOcclusion.violations.length > 0) failures.push(`pre-start local-light violations: ${before.localLightOcclusion.violations.join(', ')}`);
       if (!after.gameStarted || after.arenaId !== 'atomic-acres' || !after.originalArtLoaded) failures.push('Atomic Acres did not become the playable arena');
+      if (after.renderProfile !== 'blender'
+        || after.atomicQualityStreaming !== 'ready'
+        || !after.blenderEnvironment.qualityArtRootVisible
+        || after.blenderEnvironment.proceduralRootActuallyVisible
+        || after.blenderEnvironment.overlappingPrimaryArenaRoots) {
+        failures.push(`Atomic Acres did not retain its intended Quality presentation: ${JSON.stringify({
+          renderProfile: after.renderProfile,
+          atomicQualityStreaming: after.atomicQualityStreaming,
+          blenderEnvironment: after.blenderEnvironment,
+        })}`);
+      }
       if (after.streaming.constructionCount !== 1 || after.streaming.constructionHistory[0] !== 'atomic-acres') failures.push('cold deployment did not construct exactly one Atomic arena');
       if (transition.phase !== 'idle' || transition.failure !== null || transition.renderSubmissionPaused) failures.push(`arena transition did not commit cleanly: ${JSON.stringify(transition)}`);
       if (after.runtime.actualBackend !== 'webgpu' || after.runtime.softwareAdapter || after.runtime.deviceLost) failures.push('hardware WebGPU did not remain healthy');

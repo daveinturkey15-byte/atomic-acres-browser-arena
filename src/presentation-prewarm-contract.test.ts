@@ -77,6 +77,9 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('disposeGrenadePresentation(');
     expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
     expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));');
+    expect(matchDeployment).toContain("const arenaTransitionDetail = arenaTransitionFailure ? `: ${arenaTransitionFailure}` : '';");
+    expect(matchDeployment).toContain('did not commit before match start${arenaTransitionDetail}');
+    expect(matchDeployment).not.toContain('throw new Error(`Selected arena ${requestedArenaId} did not commit before match start`);');
     expect(source).toContain("const rangeSidearm: WeaponId = localDhv === 'X' ? 'magnum' : 'pistol';");
     expect(matchDeployment.indexOf('prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id))'))
       .toBeLessThan(matchDeployment.indexOf('weaponView.setWeapon(player.weapon, true);'));
