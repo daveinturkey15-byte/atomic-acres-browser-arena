@@ -24,12 +24,15 @@ export async function runRange(args) {
   const output = resolve(String(args.output ?? 'artifacts/agent-player/range-run'));
   const pulseMs = clamp(Number(args['pulse-ms'] ?? 72), 20, 250);
   const cadenceMs = clamp(Number(args['cadence-ms'] ?? 300), pulseMs + 30, 1200);
+  const targetResetMs = clamp(Number(args['target-reset-ms'] ?? 0), 0, 3000);
+  const missRecoveryThreshold = clamp(Number(args['miss-recovery-threshold'] ?? 0), 0, 20);
+  const missRecoveryMs = clamp(Number(args['miss-recovery-ms'] ?? 0), 0, 3000);
   const url = String(args.url);
   await mkdir(output, { recursive: true });
   const browser = await chromium.connectOverCDP(String(args.cdp ?? 'http://127.0.0.1:9333'));
   const context = browser.contexts()[0]; const page = context.pages()[0]; const errors = []; const actions = []; let releasedAtEnd = false;
   page.on('pageerror', (error) => errors.push(String(error)));
-  const startedAt = new Date(); let startedFireAt = null; let pulseCount = 0; let reloadCount = 0; let firstEvidence = true; let invalidReason = null; let finalHud = null;
+  const startedAt = new Date(); let startedFireAt = null; let pulseCount = 0; let reloadCount = 0; let firstEvidence = true; let invalidReason = null; let finalHud = null; let lastScore = 0; let lastHits = 0; let scoreChangeCount = 0; let missStreak = 0; let recoveryCount = 0;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.locator('#menu').waitFor({ state: 'visible', timeout: 120_000 });
@@ -96,6 +99,25 @@ export async function runRange(args) {
       if (current.summary) break;
       if (current.mode !== 'TARGET DRILL' || current.weapon !== 'VECTORLINE SMG') { invalidReason = `visible-state-mismatch:${current.mode}:${current.weapon}`; break; }
       if (!current.focused || !current.pointer) { invalidReason = 'focus-or-pointer-loss'; break; }
+      const observedRange = parseRangeHud(current.objective);
+      if (observedRange && observedRange.score > lastScore) {
+        scoreChangeCount += 1;
+        actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'score-change', from: lastScore, to: observedRange.score, hits: observedRange.hits });
+        lastScore = observedRange.score;
+        lastHits = observedRange.hits;
+        missStreak = 0;
+        await page.screenshot({ path: resolve(output, `score-change-${String(scoreChangeCount).padStart(2, '0')}.png`) });
+        if (targetResetMs > 0) { await sleep(targetResetMs); continue; }
+      }
+      if (observedRange && observedRange.hits > lastHits) { lastHits = observedRange.hits; missStreak = 0; }
+      if (missRecoveryThreshold > 0 && missStreak >= missRecoveryThreshold) {
+        recoveryCount += 1;
+        actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'miss-recovery', missStreak, recoveryCount });
+        await moveAim(page, recoveryCount % 2 ? 42 : -42, 0);
+        missStreak = 0;
+        if (missRecoveryMs > 0) await sleep(missRecoveryMs);
+        continue;
+      }
       if (Number.isFinite(current.ammo) && current.ammo <= 4) { await page.keyboard.press('KeyR'); reloadCount += 1; actions.push({ atMs: Date.now() - startedAt.getTime(), kind: 'reload', ammo: current.ammo }); await sleep(1450); continue; }
       const elapsedSincePulse = Date.now() - previousPulseAt;
       if (elapsedSincePulse < cadenceMs) { await sleep(Math.min(40, cadenceMs - elapsedSincePulse)); continue; }
@@ -109,6 +131,12 @@ export async function runRange(args) {
       const beforeHud = parseRangeHud(current.objective);
       previousPulseAt = Date.now(); await firePulse(page, pulseMs); pulseCount += 1;
       actions.push({ atMs: previousPulseAt - startedAt.getTime(), kind: 'smg-pulse', pulseMs, centreError, scoreBefore: beforeHud?.score ?? null, hitsBefore: beforeHud?.hits ?? null });
+      if (missRecoveryThreshold > 0) {
+        await sleep(90);
+        const postPulse = parseRangeHud((await hud(page)).objective);
+        if (postPulse && beforeHud && postPulse.hits <= beforeHud.hits) missStreak += 1;
+        else if (postPulse) { lastHits = Math.max(lastHits, postPulse.hits); missStreak = 0; }
+      }
     }
     await page.evaluate(() => { const c = document.querySelector('#game'); for (const button of [0, 2]) { window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); } });
     await page.locator('#download-match-summary').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
@@ -119,7 +147,7 @@ export async function runRange(args) {
     const summary = summaryVisible ? await download(page, '#download-match-summary', resolve(output, 'match-summary.json')) : null;
     const technical = technicalVisible ? await download(page, '#download-match-technical', resolve(output, 'match-technical.json')) : null;
     await writeFile(resolve(output, 'actions.json'), `${JSON.stringify(actions, null, 2)}\n`);
-    const report = { schemaVersion: 1, kind: 'atomic-player-range-run', startedAt: startedAt.toISOString(), endedAt: new Date().toISOString(), source: { url, pass: 'PASS 63' }, protocol: { activity: 'gun-range', durationSeconds: 120, targetValue: 100, weapon: 'VECTORLINE SMG', pulseMs, cadenceMs }, receipts: { selectedGunRange: true, selectedText, observedWeapon: 'VECTORLINE SMG', mode: 'TARGET DRILL' }, input: { pulseCount, reloadCount, releasedAtEnd: true }, outcome: { invalidReason, finalHud: parseRangeHud(finalHud?.objective), summaryDownloaded: Boolean(summary), technicalDownloaded: Boolean(technical), officialSummary: summary }, browser: { pageErrors: errors } };
+    const report = { schemaVersion: 1, kind: 'atomic-player-range-run', startedAt: startedAt.toISOString(), endedAt: new Date().toISOString(), source: { url, pass: 'PASS 63' }, protocol: { activity: 'gun-range', durationSeconds: 120, targetValue: 100, weapon: 'VECTORLINE SMG', pulseMs, cadenceMs, targetResetMs, missRecoveryThreshold, missRecoveryMs }, receipts: { selectedGunRange: true, selectedText, observedWeapon: 'VECTORLINE SMG', mode: 'TARGET DRILL' }, input: { pulseCount, reloadCount, scoreChangeCount, recoveryCount, releasedAtEnd: true }, outcome: { invalidReason, finalHud: parseRangeHud(finalHud?.objective), summaryDownloaded: Boolean(summary), technicalDownloaded: Boolean(technical), officialSummary: summary }, browser: { pageErrors: errors } };
     await writeFile(resolve(output, 'report.json'), `${JSON.stringify(report, null, 2)}\n`); releasedAtEnd = true; return report;
   } finally {
     try { await page.keyboard.up('KeyA'); await page.keyboard.up('KeyW'); await page.keyboard.up('KeyR'); await page.evaluate(() => { const c = document.querySelector('#game'); for (const button of [0, 2]) { window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); c?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button, buttons: 0 })); } }); releasedAtEnd = true; } catch {}
