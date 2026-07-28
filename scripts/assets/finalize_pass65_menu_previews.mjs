@@ -73,7 +73,7 @@ function validateRecipe() {
     || choreography.reviewFrames.at(-1) !== choreography.frameCount) {
     throw new Error('reviewFrames must be unique and include the exact loop endpoints');
   }
-  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v3') throw new Error('runtime preview cache key is stale');
+  if (choreography.media.cacheKey !== 'pass65-runtime-preview-v4') throw new Error('runtime preview cache key is stale');
   for (const arena of arenas) {
     const recipe = choreography.arenas[arena];
     if (!['helicopter', 'cat'].includes(recipe.kind)) throw new Error(`${arena} has an invalid preview kind`);

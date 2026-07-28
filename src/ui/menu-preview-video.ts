@@ -18,7 +18,7 @@ export type MenuPreviewVideoDefinition = Readonly<{
 }>;
 
 const ROOT = './assets/original/menu-previews';
-const CACHE_KEY = 'pass65-runtime-preview-v3';
+const CACHE_KEY = 'pass65-runtime-preview-v4';
 
 export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   'atomic-acres': Object.freeze({

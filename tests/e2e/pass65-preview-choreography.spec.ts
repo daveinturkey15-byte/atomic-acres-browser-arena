@@ -103,12 +103,12 @@ test.describe('Pass 65 prerecorded menu previews', () => {
     }
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-arena', 'gun-range');
     await expect.poll(async () => (await previewEvidence(page)).videoCurrentSrc, { timeout: 15_000 })
-      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v3$/);
+      .toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v4$/);
     await page.waitForTimeout(400);
     const final = await previewEvidence(page);
     expect(final.arenaId).toBe('gun-range');
     expect(final.sourceCount).toBe(2);
-    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v3$/);
+    expect(final.videoCurrentSrc).toMatch(/\/menu-previews\/gun-range\.(webm|mp4)\?v=pass65-runtime-preview-v4$/);
     expect(final.rendererEvidence.arenaConstructionCount).toBe(0);
   });
 
