@@ -118,7 +118,7 @@
       "ledgerVersion": 1,
       "latestFeedbackId": "HF-127",
       "outcomeCount": 127,
-      "stateIndependentOutcomeSha256": "615a5e6ce0c63ecb1dc3767538f1427e6037bef46cc0eeeab40b16ab4c1b5042"
+      "stateIndependentOutcomeSha256": "2067af464db6eed71e3decb0c759b6f31931f9b1bfe89a68e6cd9e68ac43fb81"
     },
     {
       "id": "SRC-PLANNING-MATRIX-001",
@@ -1125,6 +1125,13 @@
       ]
     },
     {
+      "id": "T-CARE-LATCH-E2E",
+      "command": "npx playwright test tests/e2e/pass65-menu-lifecycle.spec.ts --project=chromium --workers=1 --retries=0 --grep \"latches one F press\"",
+      "paths": [
+        "tests/e2e/pass65-menu-lifecycle.spec.ts"
+      ]
+    },
+    {
       "id": "T-HUD-E2E",
       "command": "npx playwright test tests/e2e/pass64-hud-menu.spec.ts --project=chromium --workers=1 --retries=0",
       "paths": [
@@ -1208,6 +1215,13 @@
       "command": "npm run qa:pass65:frame-pacing-policy",
       "paths": [
         ".agents/skills/atomic-acres-webgpu-frame-pacing/scripts/verify-webgpu-frame-pacing-policy.mjs"
+      ]
+    },
+    {
+      "id": "T-FOCUS-RECOVERY-E2E",
+      "command": "npx playwright test tests/e2e/pass65-frame-pacing-focus.spec.ts --project=chromium --workers=1 --retries=0",
+      "paths": [
+        "tests/e2e/pass65-frame-pacing-focus.spec.ts"
       ]
     },
     {
@@ -1303,6 +1317,25 @@
       "command": "npx vitest run src/combat/pass65-ordnance-contract.test.ts",
       "paths": [
         "src/combat/pass65-ordnance-contract.test.ts"
+      ]
+    },
+    {
+      "id": "T-REMOTE-STICKY-AUTHORITY",
+      "command": "npx vitest run src/remote-sticky-attachment-authority.test.ts src/remote-grenade-admission.test.ts src/protocol.test.ts src/semtex-main-integration.test.ts src/crossbolt-main-integration.test.ts src/remote-sticky-main-integration.test.ts",
+      "paths": [
+        "src/remote-sticky-attachment-authority.test.ts",
+        "src/remote-grenade-admission.test.ts",
+        "src/protocol.test.ts",
+        "src/semtex-main-integration.test.ts",
+        "src/crossbolt-main-integration.test.ts",
+        "src/remote-sticky-main-integration.test.ts"
+      ]
+    },
+    {
+      "id": "T-HOST-CANONICAL-HIT",
+      "command": "npx vitest run src/host-canonical-hit-admission.test.ts",
+      "paths": [
+        "src/host-canonical-hit-admission.test.ts"
       ]
     },
     {
@@ -3736,7 +3769,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-SUPPORT-RUNTIME",
-          "T-INTERACTION"
+          "T-INTERACTION",
+          "T-CARE-LATCH-E2E"
         ],
         "artifactRefs": []
       }
@@ -4249,7 +4283,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-ORDNANCE-ASSETS",
-          "T-ORDNANCE"
+          "T-ORDNANCE",
+          "T-REMOTE-STICKY-AUTHORITY",
+          "T-HOST-CANONICAL-HIT"
         ],
         "artifactRefs": []
       }
@@ -4271,7 +4307,9 @@
         "coverage": "partial",
         "testRefs": [
           "T-ORDNANCE-ASSETS",
-          "T-ORDNANCE"
+          "T-ORDNANCE",
+          "T-REMOTE-STICKY-AUTHORITY",
+          "T-HOST-CANONICAL-HIT"
         ],
         "artifactRefs": []
       }
@@ -4694,7 +4732,9 @@
         "testRefs": [
           "T-ORDNANCE",
           "T-WEAPON-PRESENTATION",
-          "T-HUD-UNIT"
+          "T-HUD-UNIT",
+          "T-REMOTE-STICKY-AUTHORITY",
+          "T-HOST-CANONICAL-HIT"
         ],
         "artifactRefs": []
       }
@@ -4716,7 +4756,8 @@
         "coverage": "partial",
         "testRefs": [
           "T-FRAME-POLICY",
-          "T-MENU-LIFECYCLE-E2E"
+          "T-MENU-LIFECYCLE-E2E",
+          "T-FOCUS-RECOVERY-E2E"
         ],
         "artifactRefs": []
       }
