@@ -110,12 +110,15 @@ describe('presentation prewarm startup contract', () => {
     expect(arenaDeployment).toContain("await prepareSharedGameplayAssets()");
     expect(matchDeployment).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
     expect(matchDeployment).toContain('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);');
+    expect(matchDeployment).toContain('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);');
     expect(matchDeployment.indexOf('await spawnBots()'))
       .toBeLessThan(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
     expect(matchDeployment).toContain("await settleWebGpuPresentation('Initial match')");
     expect(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match')"))
       .toBeLessThan(matchDeployment.indexOf('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
     expect(matchDeployment.indexOf('await smokeVolumePresentationPool.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'))
+      .toBeLessThan(matchDeployment.indexOf('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);'));
+    expect(matchDeployment.indexOf('await prewarmExplosiveBoltPresentation(-killstreakMatchEpoch);'))
       .toBeLessThan(matchDeployment.indexOf('await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);'));
     expect(matchDeployment).toContain('await waitForStableMatchAdmissionCadence();');
     expect(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'))
