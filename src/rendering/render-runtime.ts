@@ -142,6 +142,7 @@ export function detectLivePresentationStall(input: Readonly<{
   activeMatch: boolean;
   menuHidden: boolean;
   documentVisible: boolean;
+  documentFocused: boolean;
   arenaSelectionReady: boolean;
   debugRenderPaused: boolean;
   renderSubmissionPaused: boolean;
@@ -150,7 +151,7 @@ export function detectLivePresentationStall(input: Readonly<{
   pendingForMs: number;
   stallThresholdMs: number;
 }>): LivePresentationStall | null {
-  if (!input.activeMatch || !input.menuHidden || !input.documentVisible || !input.arenaSelectionReady
+  if (!input.activeMatch || !input.menuHidden || !input.documentVisible || !input.documentFocused || !input.arenaSelectionReady
     || input.debugRenderPaused || input.renderSubmissionPaused) return null;
   if (!Number.isFinite(input.stallThresholdMs) || input.stallThresholdMs < 0) return null;
   if (Number.isFinite(input.pendingForMs) && input.pendingForMs >= input.stallThresholdMs) {
@@ -161,6 +162,19 @@ export function detectLivePresentationStall(input: Readonly<{
     return Object.freeze({ kind: 'missing-submission', elapsedMs: Math.max(0, input.currentSubmissionGapMs) });
   }
   return null;
+}
+
+/**
+ * A long requestAnimationFrame gap is browser/OS scheduling evidence, not proof
+ * that the GPU stopped presenting. Start a fresh foreground observation epoch
+ * before judging queue progress so hidden, unfocused, capture, and breakpoint
+ * time cannot be charged to the live-device fence.
+ */
+export function shouldResetPresentationAfterSchedulerGap(frameGapMs: number, stallThresholdMs: number): boolean {
+  return Number.isFinite(frameGapMs)
+    && Number.isFinite(stallThresholdMs)
+    && stallThresholdMs >= 0
+    && frameGapMs >= stallThresholdMs;
 }
 
 export function shouldBackpressureWebGpuSubmissions(

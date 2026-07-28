@@ -147,7 +147,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('WebGPU queue latency remained ${Math.round(completionLatencyMs)}ms for ${consecutiveMinimumTierSlowSamples} consecutive samples at the minimum quality tier');
     expect(source).toContain('adaptiveQuality.forceDownshift(');
     expect(matchDeployment).toContain("resetWebGpuPresentationEpoch('match admitted', performance.now());");
-    expect(source).toContain("resetWebGpuPresentationEpoch('tab visibility regained', refocusAt);");
+    expect(source).toContain("recoverFromSchedulingInterruption('tab visibility regained');");
+    expect(source).toContain("recoverFromSchedulingInterruption('window focus regained');");
     const presentationEpochReset = source.slice(
       source.indexOf('function resetWebGpuPresentationEpoch('),
       source.indexOf('let lastHudAt'),
@@ -157,6 +158,8 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
+    expect(source).toContain('documentFocused: document.hasFocus()');
+    expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now);");
     expect(source).toContain('currentSubmissionGapMs: presentation.progress.currentSubmissionGapMs');
     expect(source).toContain('backpressureActive: presentation.backpressureActive');
     expect(source).toContain('debugRenderPaused,');

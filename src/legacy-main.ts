@@ -4,7 +4,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, classifyDisplayFrameMs, configuredAdaptiveQualityLevels } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
-import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
+import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
@@ -14734,23 +14734,24 @@ shareGlobalLeaderboardInput.addEventListener('change', () => {
 });
 reducedMotionMedia.addEventListener('change', applyAccessibilitySettings);
 reducedTransparencyMedia.addEventListener('change', applyAccessibilitySettings);
-function recoverFromVisibilityRegain(): void {
-  // Browser rAF throttling while hidden pollutes every frame-time sampler.
-  // Re-anchor pacing and drop adaptive evidence before presentation resumes.
+function recoverFromSchedulingInterruption(reason: string): void {
+  // Browser rAF throttling while hidden or unfocused pollutes every frame-time
+  // sampler. Re-anchor pacing and drop adaptive evidence before presentation
+  // resumes; elapsed scheduler time is not evidence of a GPU/device hang.
   audio.resume();
   const refocusAt = performance.now();
   lastFrame = refocusAt;
   lastPresentedFrameAt = refocusAt;
-  framePacing.reset('tab visibility regained');
-  resetWebGpuPresentationEpoch('tab visibility regained', refocusAt);
-  adaptiveQuality.resetSampling('tab visibility regained');
+  framePacing.reset(reason);
+  resetWebGpuPresentationEpoch(reason, refocusAt);
+  adaptiveQuality.resetSampling(reason);
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     audio.suspend();
     return;
   }
-  recoverFromVisibilityRegain();
+  recoverFromSchedulingInterruption('tab visibility regained');
 });
 window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
@@ -14923,6 +14924,7 @@ window.addEventListener('blur', () => {
   applyMenuLifecycle({ type: 'focus-lost' });
 });
 window.addEventListener('focus', () => {
+  recoverFromSchedulingInterruption('window focus regained');
   applyMenuLifecycle({ type: 'focus-gained' });
 });
 window.addEventListener('mousemove', (event) => {
@@ -15822,6 +15824,7 @@ function monitorSelectedArenaRender(now: number): void {
     activeMatch: gameStarted && matchState.phase === 'active',
     menuHidden: menuLifecycle.surface === 'hidden',
     documentVisible: document.visibilityState === 'visible',
+    documentFocused: document.hasFocus(),
     arenaSelectionReady,
     debugRenderPaused,
     renderSubmissionPaused,
@@ -15839,7 +15842,13 @@ function monitorSelectedArenaRender(now: number): void {
   if (liveStall?.kind === 'missing-submission') {
     throw new Error(`Renderer admitted no foreground WebGPU submission for ${Math.round(liveStall.elapsedMs)}ms`);
   }
-  if (eligible && (presentation.status === 'stalled' || presentation.status === 'device-lost' || presentation.status === 'failed')) {
+  const foregroundPresentationEligible = gameStarted && matchState.phase === 'active'
+    && menuLifecycle.surface === 'hidden' && document.visibilityState === 'visible' && document.hasFocus()
+    && arenaSelectionReady && !debugRenderPaused && !renderSubmissionPaused;
+  if (eligible && (presentation.status === 'device-lost' || presentation.status === 'failed')) {
+    throw new Error(`Renderer presentation ${presentation.status}: ${presentation.lastFailure ?? 'device failure'}`);
+  }
+  if (foregroundPresentationEligible && presentation.status === 'stalled') {
     throw new Error(`Renderer presentation ${presentation.status}: ${presentation.lastFailure ?? `${Math.round(presentation.pendingForMs)} ms pending`}`);
   }
   const watchdog = arenaRenderWatchdog.observe(audit, now);
@@ -15860,6 +15869,13 @@ function frame(now: number, scheduleNext = true): void {
   frameCount += 1;
   try {
     const rawFrameMs = Math.max(0, now - lastFrame);
+    const activeForegroundWebGpuFrame = scheduleNext && renderRuntime.backend === 'webgpu'
+      && gameStarted && matchState.phase === 'active' && menuLifecycle.surface === 'hidden'
+      && document.visibilityState === 'visible' && document.hasFocus();
+    if (activeForegroundWebGpuFrame
+      && shouldResetPresentationAfterSchedulerGap(rawFrameMs, LIVE_WEBGPU_PRESENTATION_STALL_MS)) {
+      resetWebGpuPresentationEpoch('foreground scheduler gap', now);
+    }
     adaptToCompletedWebGpuQueueLatency(now);
     // The HUD must report even pathologically slow software-rendered frames.
     // Adaptive quality still receives the unclamped sample and independently
@@ -17917,7 +17933,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleArenaPerformanceBudget,
   resetPresentationProgressWindow: () => renderRuntime.resetPresentationProgressWindow(performance.now()),
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
-  recoverFromVisibilityRegain,
+  recoverFromVisibilityRegain: () => recoverFromSchedulingInterruption('debug visibility regain'),
   openMenu: () => openActiveMatchPause('debug-pause'),
   fireOnce: () => {
     debugInputUnlocked = true;

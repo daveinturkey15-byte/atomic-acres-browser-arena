@@ -6,6 +6,7 @@ import {
   classifyPresentationFreshness,
   configureSceneLightShadowSchedule,
   detectLivePresentationStall,
+  shouldResetPresentationAfterSchedulerGap,
   formatWebGpuUncapturedError,
   pendingCompletionStartAfterProgress,
   resolveRenderRuntimeRequest,
@@ -90,6 +91,7 @@ describe('Pass 64 render runtime boundary', () => {
       activeMatch: true,
       menuHidden: true,
       documentVisible: true,
+      documentFocused: true,
       arenaSelectionReady: true,
       debugRenderPaused: false,
       renderSubmissionPaused: false,
@@ -103,12 +105,21 @@ describe('Pass 64 render runtime boundary', () => {
     expect(detect({ activeMatch: false })).toBeNull();
     expect(detect({ menuHidden: false })).toBeNull();
     expect(detect({ documentVisible: false })).toBeNull();
+    expect(detect({ documentFocused: false })).toBeNull();
     expect(detect({ arenaSelectionReady: false })).toBeNull();
     expect(detect({ debugRenderPaused: true })).toBeNull();
     expect(detect({ renderSubmissionPaused: true })).toBeNull();
     expect(detect({ backpressureActive: true })).toBeNull();
     expect(detect({ backpressureActive: true, pendingForMs: 1_000 }))
       .toEqual({ kind: 'pending-completion', elapsedMs: 1_000 });
+  });
+
+  it('restarts the foreground presentation epoch after a scheduler-sized frame gap', () => {
+    expect(shouldResetPresentationAfterSchedulerGap(999.9, 1_000)).toBe(false);
+    expect(shouldResetPresentationAfterSchedulerGap(1_000, 1_000)).toBe(true);
+    expect(shouldResetPresentationAfterSchedulerGap(5_000, 1_000)).toBe(true);
+    expect(shouldResetPresentationAfterSchedulerGap(Number.NaN, 1_000)).toBe(false);
+    expect(shouldResetPresentationAfterSchedulerGap(1_000, -1)).toBe(false);
   });
 
   it('uses current-frame WebGPU draw calls instead of cumulative lifetime render calls', () => {
@@ -255,6 +266,7 @@ describe('Pass 64 render runtime boundary', () => {
       activeMatch: true,
       menuHidden: true,
       documentVisible: true,
+      documentFocused: true,
       arenaSelectionReady: true,
       debugRenderPaused: false,
       renderSubmissionPaused: false,
@@ -268,6 +280,7 @@ describe('Pass 64 render runtime boundary', () => {
       activeMatch: true,
       menuHidden: true,
       documentVisible: true,
+      documentFocused: true,
       arenaSelectionReady: true,
       debugRenderPaused: false,
       renderSubmissionPaused: false,
