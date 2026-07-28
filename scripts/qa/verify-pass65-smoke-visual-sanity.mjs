@@ -8,6 +8,7 @@ import { createServer } from 'vite';
 const artifactRoot = 'artifacts/pass65/smoke-visual-sanity';
 const port = Number(process.env.PASS65_SMOKE_VISUAL_PORT ?? '44125');
 const allowDirty = process.env.PASS65_SMOKE_ALLOW_DIRTY === '1';
+const baselineEdgeThreshold = 12;
 const chromeCandidates = [
   process.env.PASS65_CHROME_PATH,
   process.env.PASS64_CHROME_PATH,
@@ -47,6 +48,7 @@ function analyseFrame(frame, cleanFrame = null) {
   const cleanData = cleanFrame?.data ?? null;
   const pixelCount = info.width * info.height;
   const delta = new Float64Array(pixelCount);
+  const cleanLuminance = cleanData ? new Float64Array(pixelCount) : null;
   let luminanceSum = 0;
   let luminanceSquaredSum = 0;
   let highLuminancePixels = 0;
@@ -62,6 +64,7 @@ function analyseFrame(frame, cleanFrame = null) {
     if (value >= 235) veryHighLuminancePixels += 1;
     if (cleanData) {
       const cleanValue = luminance(cleanData, offset);
+      cleanLuminance[index] = cleanValue;
       const difference = value - cleanValue;
       delta[index] = difference;
       meanAbsoluteDeltaSum += Math.abs(difference);
@@ -69,6 +72,8 @@ function analyseFrame(frame, cleanFrame = null) {
     }
   }
   let hardEdgePixels = 0;
+  let baselineExcludedEdges = 0;
+  let evaluatedEdges = 0;
   let gradientSum = 0;
   let maximumVerticalHardEdgeCoverage = 0;
   let maximumHorizontalHardEdgeCoverage = 0;
@@ -79,7 +84,10 @@ function analyseFrame(frame, cleanFrame = null) {
         const index = y * info.width + x;
         const gradient = Math.abs(delta[index] - delta[index - 1]);
         gradientSum += gradient;
-        if (gradient >= 20) {
+        evaluatedEdges += 1;
+        if (Math.abs(cleanLuminance[index] - cleanLuminance[index - 1]) >= baselineEdgeThreshold) {
+          baselineExcludedEdges += 1;
+        } else if (gradient >= 20) {
           hardEdgePixels += 1;
           hardEdgesInColumn += 1;
         }
@@ -92,7 +100,10 @@ function analyseFrame(frame, cleanFrame = null) {
         const index = y * info.width + x;
         const gradient = Math.abs(delta[index] - delta[index - info.width]);
         gradientSum += gradient;
-        if (gradient >= 20) {
+        evaluatedEdges += 1;
+        if (Math.abs(cleanLuminance[index] - cleanLuminance[index - info.width]) >= baselineEdgeThreshold) {
+          baselineExcludedEdges += 1;
+        } else if (gradient >= 20) {
           hardEdgePixels += 1;
           hardEdgesInRow += 1;
         }
@@ -110,15 +121,49 @@ function analyseFrame(frame, cleanFrame = null) {
     rootMeanSquareDelta: Math.sqrt(deltaSquaredSum / pixelCount),
     meanDeltaGradient: gradientSum / Math.max(1, pixelCount * 2),
     hardDeltaEdgeRatio: hardEdgePixels / Math.max(1, pixelCount * 2),
+    baselineExcludedEdgeRatio: baselineExcludedEdges / Math.max(1, evaluatedEdges),
     maximumVerticalHardEdgeCoverage,
     maximumHorizontalHardEdgeCoverage,
   });
 }
 
+function verifyBaselineEdgeIsolation() {
+  const width = 4;
+  const height = 4;
+  const frame = (sample) => {
+    const data = Buffer.alloc(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const value = sample(x, y);
+        const offset = (y * width + x) * 3;
+        data[offset] = value;
+        data[offset + 1] = value;
+        data[offset + 2] = value;
+      }
+    }
+    return { data, info: { width, height, channels: 3 } };
+  };
+  const structuredClean = frame((x) => x < 2 ? 0 : 200);
+  const smokeOverStructure = frame((x) => x < 2 ? 100 : 200);
+  const structuralMetrics = analyseFrame(smokeOverStructure, structuredClean);
+  if (structuralMetrics.maximumVerticalHardEdgeCoverage !== 0) {
+    throw new Error('Smoke visual gate self-test mistook baseline geometry for a smoke-card edge');
+  }
+  const flatClean = frame(() => 0);
+  const actualSmokeEdge = frame((x) => x < 2 ? 100 : 0);
+  const smokeEdgeMetrics = analyseFrame(actualSmokeEdge, flatClean);
+  if (smokeEdgeMetrics.maximumVerticalHardEdgeCoverage < 0.99) {
+    throw new Error('Smoke visual gate self-test failed to detect an actual smoke-card edge');
+  }
+}
+
+verifyBaselineEdgeIsolation();
+
 function assertFrameContracts(single, multi) {
   const violations = [];
   if (single.meanAbsoluteDelta < 10) violations.push('single smoke volume is visually ineffective');
   if (single.highLuminanceRatio > 0.35) violations.push('single smoke volume produces a near-white frame');
+  if (single.baselineExcludedEdgeRatio > 0.35) violations.push('smoke edge scene baseline is too structured for a trustworthy verdict');
   if (single.maximumVerticalHardEdgeCoverage > 0.32) violations.push('single smoke volume exposes a hard vertical card boundary');
   if (single.maximumHorizontalHardEdgeCoverage > 0.36) violations.push('single smoke volume exposes a hard horizontal card boundary');
   if (multi.meanAbsoluteDelta < single.meanAbsoluteDelta * 0.9) violations.push('overlapping smoke does not preserve dense obscuration');
@@ -271,6 +316,8 @@ try {
       multiMinimumLuminanceStandardDeviation: 8,
       multiMaximumVerticalHardEdgeCoverage: 0.4,
       multiMaximumHorizontalHardEdgeCoverage: 0.44,
+      maximumBaselineExcludedEdgeRatio: 0.35,
+      baselineEdgeThreshold,
     },
     captures: ['clean.png', 'single-volume.png', 'multi-volume.png'],
     browserErrors: [...new Set(errors)],
