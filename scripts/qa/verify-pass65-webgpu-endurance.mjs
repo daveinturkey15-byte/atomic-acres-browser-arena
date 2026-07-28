@@ -36,6 +36,7 @@ const canonicalArenaSequence = [
   'rustworks-1v1',
 ];
 const diagnosticStress = process.env.PASS65_DIAGNOSTIC_STRESS?.trim().toLowerCase() ?? '';
+const profileFirstActivation = process.env.PASS65_PROFILE_FIRST_ACTIVATION === '1';
 const diagnosticArena = process.env.PASS65_DIAGNOSTIC_ARENA?.trim() ?? '';
 const diagnosticSequence = (process.env.PASS65_DIAGNOSTIC_SEQUENCE ?? '')
   .split(',')
@@ -242,6 +243,13 @@ try {
         throw new Error(`RustRig detached-door reset did not render safely: ${JSON.stringify(doorResetProbe)}`);
       }
     }
+    let activationProfiler = null;
+    if (profileFirstActivation && visit === 0 && enabledStress.has('killstreak')) {
+      activationProfiler = await page.context().newCDPSession(page);
+      await activationProfiler.send('Profiler.enable');
+      await activationProfiler.send('Profiler.setSamplingInterval', { interval: 100 });
+      await activationProfiler.send('Profiler.start');
+    }
     const killstreakActivationProbe = await page.evaluate(async (enabled) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
       if (!enabled) return {
@@ -251,6 +259,16 @@ try {
       const before = api.snapshot();
       return new Promise((resolve) => {
         const frameGapsMs = [];
+        const frameGapDetails = [];
+        const longTasks = [];
+        const longTaskObserver = typeof PerformanceObserver === 'function'
+          ? new PerformanceObserver((list) => {
+              for (const entry of list.getEntries()) {
+                longTasks.push({ startTime: entry.startTime, duration: entry.duration, name: entry.name });
+              }
+            })
+          : null;
+        longTaskObserver?.observe({ entryTypes: ['longtask'] });
         let previousRafAt = 0;
         let activationStartedAt = 0;
         let activationCallMs = 0;
@@ -261,6 +279,7 @@ try {
           if (settled) return;
           settled = true;
           window.clearTimeout(fallbackTimer);
+          longTaskObserver?.disconnect();
           const after = api.snapshot();
           const elapsedMs = Math.max(1, performance.now() - activationStartedAt);
           resolve({
@@ -271,6 +290,10 @@ try {
             elapsedMs,
             sampledFrames: frameGapsMs.length,
             maxFrameGapMs: frameGapsMs.length > 0 ? Math.max(...frameGapsMs) : null,
+            largestFrameGaps: [...frameGapDetails]
+              .sort((left, right) => right.gapMs - left.gapMs)
+              .slice(0, 8),
+            longTasks,
             frameDelta: after.frameCount - before.frameCount,
             submissionDelta: after.render.runtime.presentation.submissionSequence
               - before.render.runtime.presentation.submissionSequence,
@@ -281,7 +304,9 @@ try {
           });
         };
         const sampleFrame = (now) => {
-          frameGapsMs.push(now - previousRafAt);
+          const gapMs = now - previousRafAt;
+          frameGapsMs.push(gapMs);
+          frameGapDetails.push({ gapMs, atMs: now, offsetMs: now - activationStartedAt });
           previousRafAt = now;
           if (now - activationStartedAt >= 2_000) finish('raf-window');
           else requestAnimationFrame(sampleFrame);
@@ -301,6 +326,11 @@ try {
         fallbackTimer = window.setTimeout(() => finish('timeout'), 3_500);
       });
     }, enabledStress.has('killstreak'));
+    if (activationProfiler) {
+      const { profile } = await activationProfiler.send('Profiler.stop');
+      await activationProfiler.detach();
+      await writeFile(`${artifactRoot}/activation-cpu-profile.json`, `${JSON.stringify(profile)}\n`, 'utf8');
+    }
     const killstreakStress = killstreakActivationProbe.activations;
     if (enabledStress.has('killstreak') && (!killstreakStress.chopper || !killstreakStress.droneSwarm)) {
       throw new Error(`${arenaId} could not stage the chopper plus drone-swarm stress overlap: ${JSON.stringify(killstreakStress)}`);
