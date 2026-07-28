@@ -880,7 +880,7 @@ describe('additional authored maps', () => {
     }
   });
 
-  it('applies the Performance/Quality split to Skyline instead of rendering Quality props on low-spec profiles', () => {
+  it('keeps primary Skyline silhouettes visible while reserving secondary detail for Quality', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
     const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
@@ -901,13 +901,18 @@ describe('additional authored maps', () => {
     applyAdditionalMapPresentationProfile(map.root, 'performance');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(false);
-    expect(qualityNacelles?.visible).toBe(false);
-    expect(qualityShells.every((shell) => shell?.visible === false)).toBe(true);
-    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(true);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
     expect(coreFloor?.visible).not.toBe(false);
     applyAdditionalMapPresentationProfile(map.root, 'blender');
     expect(performanceSign?.visible).toBe(true);
     expect(qualityBoard?.visible).toBe(true);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+    applyAdditionalMapPresentationProfile(map.root, 'compat');
+    expect(qualityBoard?.visible).toBe(false);
     expect(qualityNacelles?.visible).toBe(true);
     expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
     expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);

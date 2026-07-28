@@ -1305,13 +1305,15 @@ export function applyAdditionalMapPresentationProfile(
   });
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh) || node.userData.skylineQualityPlaceholder !== true) return;
-    const replaced = allowQuality;
-    node.castShadow = !replaced;
-    node.receiveShadow = !replaced;
+    // These meshes retain collision/ballistic authority only. Their former
+    // visible-box role made Performance and Compatibility collide with shapes
+    // the player could not see after the higher-fidelity silhouette was hidden.
+    node.castShadow = false;
+    node.receiveShadow = false;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     for (const material of materials) {
-      material.colorWrite = !replaced;
-      material.depthWrite = !replaced;
+      material.colorWrite = false;
+      material.depthWrite = false;
       material.needsUpdate = true;
     }
   });
@@ -2654,7 +2656,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [x, 4.3, 2],
     [0, 0, Math.PI / 2],
   ));
-  for (const shell of fuselageShells) shell.userData.assetOwner = 'skyline-terminal';
+  for (const shell of fuselageShells) {
+    shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.rustworksDetail = 'core';
+  }
   // The exterior half-cylinder is intentionally FrontSide. From the cabin its
   // backfaces disappear, which made the aircraft roof look absent in Quality.
   // A slightly inset, separately split BackSide shell restores the interior
@@ -2672,6 +2677,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   ));
   for (const shell of cabinCeilingShells) {
     shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.rustworksDetail = 'core';
     shell.userData.interiorFaceOrientation = 'back-side';
     shell.userData.boardingAperturePreserved = true;
   }
@@ -2687,6 +2693,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   );
   qualityNose.scale.set(2.45, 2.1, 2.1);
   qualityNose.userData.assetOwner = 'skyline-terminal';
+  qualityNose.userData.rustworksDetail = 'core';
   const tailShape = new THREE.Shape();
   tailShape.moveTo(0, 0);
   tailShape.lineTo(3.1, 0);
@@ -2798,6 +2805,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [0, 2.82, 3.6],
   );
   portWing.userData.assetOwner = 'skyline-terminal';
+  portWing.userData.rustworksDetail = 'core';
   const starboardWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-starboard',
@@ -2806,6 +2814,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     [0, 2.82, 0.4],
   );
   starboardWing.userData.assetOwner = 'skyline-terminal';
+  starboardWing.userData.rustworksDetail = 'core';
   detailBox('aircraft-skin', 'skyline-wingtip-port', [0, 2.99, 18.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wingtip-starboard', [0, 2.99, -14.42], [5.1, 0.08, 0.14], planeStripeMat);
   detailBox('aircraft-skin', 'skyline-wing-navigation-port', [-2.35, 3.06, 18.48], [0.42, 0.16, 0.16], practicalMat);
@@ -2815,7 +2824,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   engineNacelles.castShadow = true;
   engineNacelles.receiveShadow = true;
   engineNacelles.userData.presentationOnly = true;
-  engineNacelles.userData.rustworksDetail = 'quality';
+  engineNacelles.userData.rustworksDetail = 'core';
   engineNacelles.userData.skylineCluster = 'aircraft-skin';
   const nacelleMatrix = new THREE.Matrix4();
   const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
@@ -2854,7 +2863,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   fuelTank.receiveShadow = true;
   fuelTank.userData.presentationOnly = true;
   fuelTank.userData.impactSurface = 'metal';
-  fuelTank.userData.rustworksDetail = 'quality';
+  fuelTank.userData.rustworksDetail = 'core';
   fuelTank.userData.skylineCluster = 'service-equipment';
   fuelTank.userData.assetOwner = 'skyline-terminal';
   fuelTank.raycast = () => undefined;
@@ -2891,6 +2900,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       [x, 0, z - 1.3],
     );
     shell.userData.assetOwner = 'skyline-terminal';
+    shell.userData.rustworksDetail = 'core';
     detailBox('service-equipment', `skyline-uld-rail-${x}-${z}`, [x, 1.42, z + 1.34], [4.15, 0.12, 0.08], hazardMat, 'quality');
   }
 
