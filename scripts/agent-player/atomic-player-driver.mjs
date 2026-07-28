@@ -702,8 +702,10 @@ async function run() {
       await sleep(120);
       pointerLock = await page.evaluate(() => document.pointerLockElement?.id === 'game');
       if (headed && !pointerLock) throw new Error('Trusted canvas click did not acquire pointer lock');
+      const operatorMinimumPixels = integerArg(args['operator-minimum-pixels'], 12, 6, 20);
       const operatorDetectionOptions = args['operator-profile'] === 'g0031-balanced-v1'
         ? {
+            minimumPixels: operatorMinimumPixels,
             minimumWidth: 2, maximumWidth: 50,
             minimumHeight: 3, maximumHeight: 70,
             maximumPixels: 500,
