@@ -249,8 +249,8 @@ describe('killstreak presentation', () => {
         expect(chopperChild.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(false);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
-        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-1')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-12')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-1')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-12')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(false);
         expect(lod0.visible).toBe(true);
@@ -273,8 +273,8 @@ describe('killstreak presentation', () => {
         expect(chopper.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(false);
         expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
-        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-1')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-12')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-1')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-12')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-care-aircraft-1')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(true);
         expect([lod0.visible, lod1.visible].filter(Boolean)).toHaveLength(1);
@@ -410,7 +410,7 @@ describe('killstreak presentation', () => {
     const drone = presentation.root.getObjectByName('pass65-swarm-drone') as THREE.Group;
     const aircraft = presentation.root.getObjectByName('pass65-care-package-aircraft') as THREE.Group;
     expect(drone.visible).toBe(false);
-    expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-1')?.visible).toBe(true);
+    expect(presentation.root.getObjectByName('pass65-swarm-instanced-batch-1')?.visible).toBe(true);
     expect(chopper.rotation.x).toBeCloseTo(0.02);
     expect(chopper.rotation.z).toBeCloseTo(-0.04);
     expect(missingSupportNodes(chopper, SUPPORT_VEHICLE_PRESENTATION_CONTRACT.chopper.requiredNodes)).toEqual([]);

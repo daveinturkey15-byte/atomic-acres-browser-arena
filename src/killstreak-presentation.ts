@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { DroneSensorContact, KillstreakEntitySnapshot, KillstreakImpactEvent, KillstreakPlacementMarkerSnapshot, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_GUN_PROFILE_ID, DRONE_PRESENTATION_FAMILY_ID } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
@@ -535,17 +536,35 @@ type PresentedEntity = Readonly<{
 
 type SwarmInstanceBatch = Readonly<{
   root: THREE.InstancedMesh;
-  sources: readonly THREE.Mesh[];
+  sources: readonly THREE.Object3D[];
   staticLocalMatrices: readonly THREE.Matrix4[] | null;
+  ownsGeometry: boolean;
 }>;
 
 function isAnimatedSwarmSource(source: THREE.Object3D, root: THREE.Object3D): boolean {
   let cursor: THREE.Object3D | null = source;
   while (cursor && cursor !== root) {
-    if (/rotor|propeller/i.test(cursor.name)) return true;
+    if (/rotor|propeller|gun/i.test(cursor.name)) return true;
     cursor = cursor.parent;
   }
   return false;
+}
+
+function swarmStaticMergeKey(mesh: THREE.Mesh): string | null {
+  if (Array.isArray(mesh.material)) return null;
+  const attributes = Object.keys(mesh.geometry.attributes).sort().join(',');
+  const morphAttributes = Object.keys(mesh.geometry.morphAttributes).sort().join(',');
+  return [
+    mesh.material.uuid,
+    mesh.geometry.index === null ? 'non-indexed' : 'indexed',
+    attributes,
+    morphAttributes,
+    String(mesh.geometry.morphTargetsRelative),
+    String(mesh.castShadow),
+    String(mesh.receiveShadow),
+    String(mesh.renderOrder),
+    String(mesh.layers.mask),
+  ].join('|');
 }
 
 type PresentedEntityPoolKey = 'chopper' | 'care-aircraft' | 'carpet-aircraft' | 'care-crate' | 'piloted-drone' | 'swarm-drone';
@@ -1318,11 +1337,16 @@ export class KillstreakPresentation {
     for (const entry of pool) entry.root.updateWorldMatrix(true, true);
 
     const initialMatrix = new THREE.Matrix4();
-    for (let primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex += 1) {
-      const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
-      const representative = sources[0]!;
-      const instanced = new THREE.InstancedMesh(representative.geometry, representative.material, pool.length);
-      instanced.name = `pass65-swarm-instanced-primitive-${primitiveIndex + 1}`;
+    const addBatch = (
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material | THREE.Material[],
+      sources: readonly THREE.Object3D[],
+      staticLocalMatrices: readonly THREE.Matrix4[] | null,
+      ownsGeometry: boolean,
+      representative: THREE.Mesh,
+    ): void => {
+      const instanced = new THREE.InstancedMesh(geometry, material, pool.length);
+      instanced.name = `pass65-swarm-instanced-batch-${this.swarmInstanceBatches.length + 1}`;
       instanced.userData.presentationOnly = true;
       instanced.userData.swarmInstancedPresentation = true;
       instanced.castShadow = representative.castShadow;
@@ -1339,16 +1363,72 @@ export class KillstreakPresentation {
       instanced.count = pool.length;
       instanced.visible = false;
       this.root.add(instanced);
+      this.swarmInstanceBatches.push(Object.freeze({
+        root: instanced,
+        sources: Object.freeze(sources),
+        staticLocalMatrices: staticLocalMatrices ? Object.freeze(staticLocalMatrices) : null,
+        ownsGeometry,
+      }));
+    };
+
+    const staticGroups = new Map<string, number[]>();
+    const individualIndices: number[] = [];
+    for (let primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex += 1) {
+      const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
+      const dynamic = sources.some((source, index) => isAnimatedSwarmSource(source, pool[index]!.root));
+      const key = dynamic ? null : swarmStaticMergeKey(sources[0]!);
+      if (!key) individualIndices.push(primitiveIndex);
+      else {
+        const indices = staticGroups.get(key) ?? [];
+        indices.push(primitiveIndex);
+        staticGroups.set(key, indices);
+      }
+    }
+
+    const firstRootInverse = new THREE.Matrix4().copy(pool[0]!.root.matrixWorld).invert();
+    for (const primitiveIndices of staticGroups.values()) {
+      if (primitiveIndices.length === 1) {
+        individualIndices.push(primitiveIndices[0]!);
+        continue;
+      }
+      const representative = sourceMeshes[0]![primitiveIndices[0]!]!;
+      const transformed = primitiveIndices.map((primitiveIndex) => {
+        const source = sourceMeshes[0]![primitiveIndex]!;
+        const localMatrix = new THREE.Matrix4().multiplyMatrices(firstRootInverse, source.matrixWorld);
+        return source.geometry.clone().applyMatrix4(localMatrix);
+      });
+      const merged = mergeGeometries(transformed, false);
+      for (const geometry of transformed) geometry.dispose();
+      if (!merged) {
+        individualIndices.push(...primitiveIndices);
+        continue;
+      }
+      addBatch(
+        merged,
+        representative.material,
+        pool.map((entry) => entry.root),
+        pool.map(() => new THREE.Matrix4()),
+        true,
+        representative,
+      );
+    }
+
+    for (const primitiveIndex of individualIndices) {
+      const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
+      const representative = sources[0]!;
       const staticLocalMatrices = sources.some((source, index) => isAnimatedSwarmSource(source, pool[index]!.root))
         ? null
         : sources.map((source, index) => (
           new THREE.Matrix4().copy(pool[index]!.root.matrixWorld).invert().multiply(source.matrixWorld)
         ));
-      this.swarmInstanceBatches.push(Object.freeze({
-        root: instanced,
-        sources: Object.freeze(sources),
-        staticLocalMatrices: staticLocalMatrices ? Object.freeze(staticLocalMatrices) : null,
-      }));
+      addBatch(
+        representative.geometry,
+        representative.material,
+        sources,
+        staticLocalMatrices,
+        false,
+        representative,
+      );
     }
     for (const meshes of sourceMeshes) {
       for (const source of meshes) {
@@ -1363,6 +1443,7 @@ export class KillstreakPresentation {
     for (const batch of this.swarmInstanceBatches) {
       batch.root.removeFromParent();
       batch.root.dispose();
+      if (batch.ownsGeometry) batch.root.geometry.dispose();
     }
     this.swarmInstanceBatches.length = 0;
   }
