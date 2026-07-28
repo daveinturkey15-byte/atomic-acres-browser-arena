@@ -11951,7 +11951,12 @@ function updateFullSupportOverlapAdaptiveBudget(): void {
   }
   if (fullSupportOverlapAdaptiveActive) return;
   fullSupportOverlapAdaptiveActive = true;
-  const nextPixelRatio = adaptiveQuality.forceDownshift('full chopper plus 24-drone support overlap');
+  let nextPixelRatio: number | null = null;
+  while (adaptiveQuality.telemetry().pixelRatioCap > 0.75) {
+    const downshifted = adaptiveQuality.forceDownshift('full chopper plus 24-drone support overlap');
+    if (downshifted === null) break;
+    nextPixelRatio = downshifted;
+  }
   if (nextPixelRatio === null) return;
   applyAdaptiveRenderBudget(nextPixelRatio);
   grassSystem?.setAdaptivePixelRatio(nextPixelRatio);
