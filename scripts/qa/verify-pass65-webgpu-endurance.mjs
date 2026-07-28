@@ -235,23 +235,102 @@ try {
         throw new Error(`RustRig detached-door reset did not render safely: ${JSON.stringify(doorResetProbe)}`);
       }
     }
-    const killstreakStress = await page.evaluate((enabled) => {
+    const killstreakActivationProbe = await page.evaluate(async (enabled) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      if (!enabled) return { chopper: null, droneSwarm: null };
-      api.earnSupport(15);
-      return {
-        chopper: api.activateKillstreak('chopper'),
-        droneSwarm: api.activateKillstreak('drone-swarm'),
+      if (!enabled) return {
+        skipped: true,
+        activations: { chopper: null, droneSwarm: null },
       };
+      const before = api.snapshot();
+      return new Promise((resolve) => {
+        const frameGapsMs = [];
+        let previousRafAt = 0;
+        let activationStartedAt = 0;
+        let activationCallMs = 0;
+        let activations = { chopper: null, droneSwarm: null };
+        let settled = false;
+        let fallbackTimer = 0;
+        const finish = (finishReason) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(fallbackTimer);
+          const after = api.snapshot();
+          const elapsedMs = Math.max(1, performance.now() - activationStartedAt);
+          resolve({
+            skipped: false,
+            finishReason,
+            activations,
+            activationCallMs,
+            elapsedMs,
+            sampledFrames: frameGapsMs.length,
+            maxFrameGapMs: frameGapsMs.length > 0 ? Math.max(...frameGapsMs) : null,
+            frameDelta: after.frameCount - before.frameCount,
+            submissionDelta: after.render.runtime.presentation.submissionSequence
+              - before.render.runtime.presentation.submissionSequence,
+            completionDelta: after.render.runtime.presentation.completedSequence
+              - before.render.runtime.presentation.completedSequence,
+            presentation: after.render.runtime.presentation,
+            uncapturedErrors: after.render.runtime.uncapturedErrors,
+          });
+        };
+        const sampleFrame = (now) => {
+          frameGapsMs.push(now - previousRafAt);
+          previousRafAt = now;
+          if (now - activationStartedAt >= 2_000) finish('raf-window');
+          else requestAnimationFrame(sampleFrame);
+        };
+        requestAnimationFrame((now) => {
+          previousRafAt = now;
+          activationStartedAt = performance.now();
+          api.earnSupport(15);
+          const callStartedAt = performance.now();
+          activations = {
+            chopper: api.activateKillstreak('chopper'),
+            droneSwarm: api.activateKillstreak('drone-swarm'),
+          };
+          activationCallMs = performance.now() - callStartedAt;
+          requestAnimationFrame(sampleFrame);
+        });
+        fallbackTimer = window.setTimeout(() => finish('timeout'), 3_500);
+      });
     }, enabledStress.has('killstreak'));
+    const killstreakStress = killstreakActivationProbe.activations;
     if (enabledStress.has('killstreak') && (!killstreakStress.chopper || !killstreakStress.droneSwarm)) {
       throw new Error(`${arenaId} could not stage the chopper plus drone-swarm stress overlap: ${JSON.stringify(killstreakStress)}`);
+    }
+    if (enabledStress.has('killstreak')) {
+      const minimumActivationProgress = Math.max(4, Math.floor(killstreakActivationProbe.elapsedMs / 100));
+      if (killstreakActivationProbe.finishReason !== 'raf-window'
+        || killstreakActivationProbe.sampledFrames < minimumActivationProgress
+        || killstreakActivationProbe.frameDelta < minimumActivationProgress
+        || killstreakActivationProbe.submissionDelta < minimumActivationProgress
+        || killstreakActivationProbe.completionDelta < 1
+        || killstreakActivationProbe.maxFrameGapMs > 250
+        || killstreakActivationProbe.presentation.status !== 'healthy'
+        || killstreakActivationProbe.uncapturedErrors !== 0) {
+        throw new Error(`${arenaId} killstreak first activation stalled presentation: ${JSON.stringify({ minimumActivationProgress, killstreakActivationProbe })}`);
+      }
     }
     if (enabledStress.has('killstreak')) await page.waitForFunction(() => {
       const entities = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.killstreak?.entities ?? [];
       return entities.some((entity) => entity.kind === 'chopper')
         && entities.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm').length >= 5;
     }, undefined, { timeout: 5_000 });
+    const activeStressBudget = enabledStress.has('killstreak')
+      ? await page.evaluate(async () => {
+        const api = window.__ATOMIC_ACRES_DEBUG__;
+        const performanceSample = await api.sampleArenaPerformanceBudget();
+        const state = api.snapshot();
+        return {
+          performanceSample,
+          budgetAudit: state.render.playableScene.budgetAudit,
+          residency: api.sampleRendererResidency(),
+        };
+      })
+      : null;
+    if (activeStressBudget && activeStressBudget.budgetAudit.pass !== true) {
+      throw new Error(`${arenaId} exceeded its live chopper plus drone-swarm budget: ${JSON.stringify(activeStressBudget)}`);
+    }
     const canvasClip = await page.locator('#game').boundingBox();
     if (!canvasClip || canvasClip.width <= 0 || canvasClip.height <= 0) {
       throw new Error(`${arenaId} gameplay canvas has no capture bounds`);
@@ -451,6 +530,8 @@ try {
       requestedDurationMs: durationMs,
       actualDurationMs: samples.at(-1).atMs - samples[0].atMs,
       killstreakStress,
+      killstreakActivationProbe,
+      activeStressBudget,
       doorResetProbe,
       samples: samples.length,
       distinctScreenshots: screenshotHashes.size,
