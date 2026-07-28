@@ -15892,17 +15892,20 @@ function frame(now: number, scheduleNext = true): void {
       resize();
     }
     if (renderRuntime.backend === 'webgpu') applyDeferredAdaptiveWebGpuRenderBudget(now);
-    const pacing = effectiveFramePacing(now);
     if (now - lastFpsHudAt >= 250) {
+      // Sorting three 180-sample pacing windows is HUD work, not frame work.
+      // Keep it on the four-Hz display cadence so uncapped WebGPU does not
+      // manufacture sustained allocation/GC pressure merely to repaint text.
+      const pacing = effectiveFramePacing(now);
       const fps = pacing.sampleCount >= 1 ? Math.max(1, Math.round(pacing.cadenceHz)) : null;
       fpsCounterValue.textContent = fps === null ? '--' : String(fps);
       fpsCounter.dataset.pacing = fps === null ? 'warming' : fps >= 55 ? 'smooth' : fps >= 40 ? 'strained' : 'slow';
+      const refreshWarning = element<HTMLElement>('#refresh-warning');
+      refreshWarning.hidden = !(pacing.displayLimited && now < refreshWarningUntil);
+      if (pacing.displayLimited) {
+        refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
+      }
       lastFpsHudAt = now;
-    }
-    const refreshWarning = element<HTMLElement>('#refresh-warning');
-    refreshWarning.hidden = !(pacing.displayLimited && now < refreshWarningUntil);
-    if (pacing.displayLimited) {
-      refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
     }
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
     lastFrame = now;

@@ -168,6 +168,12 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('deferredWebGpuAdaptivePixelRatio.takeWhenPresentationIdle(');
     expect(source).toContain("if (renderRuntime.backend === 'webgpu') applyDeferredAdaptiveWebGpuRenderBudget(now);");
     expect(source).toContain('cadenceWithNoProgressAge(');
+    const fpsHudCadence = source.slice(
+      source.indexOf('if (now - lastFpsHudAt >= 250) {'),
+      source.indexOf('const frameDt = Math.min(0.05, rawFrameMs / 1000);'),
+    );
+    expect(fpsHudCadence).toContain('const pacing = effectiveFramePacing(now);');
+    expect(fpsHudCadence).toContain("element<HTMLElement>('#refresh-warning')");
     expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
