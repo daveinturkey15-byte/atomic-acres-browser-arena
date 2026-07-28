@@ -533,6 +533,11 @@ type PresentedEntity = Readonly<{
   authored: boolean;
 }>;
 
+type SwarmInstanceBatch = Readonly<{
+  root: THREE.InstancedMesh;
+  sources: readonly THREE.Mesh[];
+}>;
+
 type PresentedEntityPoolKey = 'chopper' | 'care-aircraft' | 'carpet-aircraft' | 'care-crate' | 'piloted-drone' | 'swarm-drone';
 
 function presentedEntityPoolKey(entity: KillstreakEntitySnapshot): PresentedEntityPoolKey {
@@ -621,6 +626,8 @@ export type KillstreakPresentationTelemetry = Readonly<{
   prewarmed: number;
   pooledEntityInstances: number;
   pooledSwarmDrones: number;
+  swarmRenderBatches: number;
+  swarmRenderedInstances: number;
   prewarmedAuthoredSupportFamilies: readonly string[];
   markerDetails: readonly KillstreakPlacementMarkerTelemetry[];
   bounded: boolean;
@@ -1216,6 +1223,7 @@ export class KillstreakPresentation {
   private readonly emberPool = Array.from({ length: MAX_EMBER_PARTICLES }, (_, index) => createPooledEmber(index));
   private readonly prewarmed: PresentedEntity[] = [];
   private readonly entityPools = new Map<PresentedEntityPoolKey, PresentedEntity[]>();
+  private readonly swarmInstanceBatches: SwarmInstanceBatch[] = [];
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -1270,6 +1278,7 @@ export class KillstreakPresentation {
         const entry = buildPresentedEntityForPool(key);
         entry.root.userData.poolActiveName = entry.root.name;
         entry.root.userData.presentationPoolKey = key;
+        entry.root.userData.presentationPoolIndex = index;
         entry.root.userData.presentationPoolInUse = false;
         entry.root.name = `prewarmed-${key}-${index + 1}`;
         entry.root.visible = false;
@@ -1282,6 +1291,83 @@ export class KillstreakPresentation {
     for (const entry of this.prewarmed) {
       entry.root.userData.prewarmed = true;
     }
+    this.installSwarmInstancing();
+  }
+
+  private installSwarmInstancing(): void {
+    const pool = this.entityPools.get('swarm-drone') ?? [];
+    const sourceMeshes = pool.map((entry) => {
+      const meshes: THREE.Mesh[] = [];
+      entry.root.traverse((node) => {
+        if (node instanceof THREE.Mesh && !(node instanceof THREE.InstancedMesh)) meshes.push(node);
+      });
+      return meshes;
+    });
+    const primitiveCount = sourceMeshes[0]?.length ?? 0;
+    if (primitiveCount === 0 || sourceMeshes.some((meshes) => meshes.length !== primitiveCount)) return;
+
+    const initialMatrix = new THREE.Matrix4();
+    for (let primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex += 1) {
+      const sources = sourceMeshes.map((meshes) => meshes[primitiveIndex]!);
+      const representative = sources[0]!;
+      const instanced = new THREE.InstancedMesh(representative.geometry, representative.material, pool.length);
+      instanced.name = `pass65-swarm-instanced-primitive-${primitiveIndex + 1}`;
+      instanced.userData.presentationOnly = true;
+      instanced.userData.swarmInstancedPresentation = true;
+      instanced.castShadow = representative.castShadow;
+      instanced.receiveShadow = representative.receiveShadow;
+      instanced.renderOrder = representative.renderOrder;
+      instanced.frustumCulled = false;
+      instanced.raycast = () => undefined;
+      instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      for (let index = 0; index < pool.length; index += 1) {
+        initialMatrix.makeTranslation((index % 6 - 2.5) * 2.4, Math.floor(index / 6) * 1.8, 0);
+        instanced.setMatrixAt(index, initialMatrix);
+      }
+      instanced.instanceMatrix.needsUpdate = true;
+      instanced.count = pool.length;
+      instanced.visible = false;
+      this.root.add(instanced);
+      this.swarmInstanceBatches.push(Object.freeze({ root: instanced, sources: Object.freeze(sources) }));
+    }
+    for (const meshes of sourceMeshes) {
+      for (const source of meshes) {
+        source.visible = false;
+        source.castShadow = false;
+        source.userData.swarmInstanceSource = true;
+      }
+    }
+  }
+
+  private disposeSwarmInstancing(): void {
+    for (const batch of this.swarmInstanceBatches) {
+      batch.root.removeFromParent();
+      batch.root.dispose();
+    }
+    this.swarmInstanceBatches.length = 0;
+  }
+
+  private syncSwarmInstancing(): void {
+    if (this.swarmInstanceBatches.length === 0) return;
+    const active = [...this.entities.values()].filter((entry) => (
+      entry.root.userData.presentationPoolKey === 'swarm-drone'
+    ));
+    this.root.updateWorldMatrix(true, false);
+    const inverseRoot = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
+    const instanceMatrix = new THREE.Matrix4();
+    for (const entry of active) entry.root.updateWorldMatrix(true, true);
+    for (const batch of this.swarmInstanceBatches) {
+      for (const [instanceIndex, entry] of active.entries()) {
+        const poolIndex = Number(entry.root.userData.presentationPoolIndex);
+        const source = Number.isInteger(poolIndex) ? batch.sources[poolIndex] : undefined;
+        if (!source) continue;
+        instanceMatrix.multiplyMatrices(inverseRoot, source.matrixWorld);
+        batch.root.setMatrixAt(instanceIndex, instanceMatrix);
+      }
+      batch.root.count = active.length;
+      batch.root.visible = active.length > 0;
+      batch.root.instanceMatrix.needsUpdate = true;
+    }
   }
 
   prewarmAuthoredAssets(): void {
@@ -1289,6 +1375,7 @@ export class KillstreakPresentation {
     if (this.gpuPrewarmPromise) throw new Error('Cannot rebuild killstreak presentation assets during GPU prewarm');
     if (this.entities.size > 0) return;
     this.gpuPrewarmGeneration = -1;
+    this.disposeSwarmInstancing();
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;
     this.entityPools.clear();
@@ -1348,7 +1435,12 @@ export class KillstreakPresentation {
     // all 24 swarm drones, before any of them can enter a live frame. Families
     // are split across fenced batches so one hidden warm-up frame cannot become
     // a giant GPU spike of its own.
-    const entityRoots = [...this.entityPools.values()].flatMap((pool) => pool.map((entry) => entry.root));
+    const entityRoots = [
+      ...[...this.entityPools.entries()].flatMap(([key, pool]) => (
+        key === 'swarm-drone' ? [] : pool.map((entry) => entry.root)
+      )),
+      ...this.swarmInstanceBatches.map((batch) => batch.root),
+    ];
     const effectRoots: THREE.Object3D[] = [
       ...this.impactFlashPool.map((entry) => entry.root),
       ...this.bombShellPool.map((entry) => entry.root),
@@ -1361,7 +1453,10 @@ export class KillstreakPresentation {
       ...(this.entityPools.get('chopper') ?? []).slice(0, 1),
       ...(this.entityPools.get('swarm-drone') ?? []),
     ];
-    const liveActivationRoots = liveActivationEntries.map((entry) => entry.root);
+    const liveActivationRoots = [
+      ...liveActivationEntries.filter((entry) => entry.root.userData.presentationPoolKey === 'chopper').map((entry) => entry.root),
+      ...this.swarmInstanceBatches.map((batch) => batch.root),
+    ];
     const objectStates = new Map<THREE.Object3D, Readonly<{
       visible: boolean;
       position: THREE.Vector3;
@@ -1590,6 +1685,7 @@ export class KillstreakPresentation {
       presented.root.userData.phase = entity.phase;
       presented.root.userData.gunController = entity.gunController;
     }
+    this.syncSwarmInstancing();
     this.applyFirstPersonVisibility();
     this.syncSensorContacts(snapshot.sensorContacts);
     this.syncPlacementMarkers(snapshot.placementMarkers, snapshot.revision, nowMs);
@@ -1847,6 +1943,8 @@ export class KillstreakPresentation {
       prewarmed: this.entityPools.size,
       pooledEntityInstances: this.prewarmed.length,
       pooledSwarmDrones: this.entityPools.get('swarm-drone')?.length ?? 0,
+      swarmRenderBatches: this.swarmInstanceBatches.length,
+      swarmRenderedInstances: this.swarmInstanceBatches[0]?.root.count ?? 0,
       prewarmedAuthoredSupportFamilies: Object.freeze([...new Set(this.prewarmed
         .filter((entry) => entry.root.userData.presentationSource === 'project-original-blender-glb')
         .map((entry) => String(entry.root.userData.presentationFamily)))].sort()),
@@ -1864,6 +1962,11 @@ export class KillstreakPresentation {
     this.setFirstPersonEntity(null);
     for (const presented of this.entities.values()) this.releasePresentedEntity(presented);
     this.entities.clear();
+    for (const batch of this.swarmInstanceBatches) {
+      batch.root.count = 0;
+      batch.root.visible = false;
+      batch.root.instanceMatrix.needsUpdate = true;
+    }
     for (const flash of this.impactFlashPool) if (flash.active) this.deactivateImpactFlash(flash);
     for (const shell of this.bombShellPool) if (shell.active) this.deactivateBombShell(shell);
     for (const ember of this.emberPool) if (ember.active) this.deactivateEmber(ember);
@@ -1889,6 +1992,7 @@ export class KillstreakPresentation {
     if (this.disposalFinalized) return;
     this.disposalFinalized = true;
     this.clear();
+    this.disposeSwarmInstancing();
     for (const entry of this.prewarmed) this.retireRoot(entry.root);
     this.prewarmed.length = 0;
     this.retireRoot(this.sensorRoot);

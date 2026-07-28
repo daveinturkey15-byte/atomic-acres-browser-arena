@@ -247,9 +247,10 @@ describe('killstreak presentation', () => {
       if (compilePass === 1) {
         expect(chopper.visible).toBe(true);
         expect(chopperChild.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-2')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(false);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-1')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-12')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('pass65-impact-flash-pool-20')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(false);
         expect(lod0.visible).toBe(true);
@@ -270,8 +271,10 @@ describe('killstreak presentation', () => {
         expect(presentation.root.getObjectByName('prewarmed-support-placement-corridor')?.visible).toBe(true);
       } else if (compilePass === 4) {
         expect(chopper.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(true);
-        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-1')?.visible).toBe(false);
+        expect(presentation.root.getObjectByName('prewarmed-swarm-drone-24')?.visible).toBe(false);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-1')?.visible).toBe(true);
+        expect(presentation.root.getObjectByName('pass65-swarm-instanced-primitive-12')?.visible).toBe(true);
         expect(presentation.root.getObjectByName('prewarmed-care-aircraft-1')?.visible).toBe(false);
         expect(lod.autoUpdate).toBe(true);
         expect([lod0.visible, lod1.visible].filter(Boolean)).toHaveLength(1);
@@ -393,6 +396,8 @@ describe('killstreak presentation', () => {
       prewarmed: 6,
       pooledEntityInstances: 29,
       pooledSwarmDrones: 24,
+      swarmRenderBatches: 12,
+      swarmRenderedInstances: 1,
       prewarmedAuthoredSupportFamilies: [],
       markerDetails: [],
       bounded: true,

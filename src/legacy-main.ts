@@ -8003,7 +8003,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     if (renderRuntime.backend === 'webgpu') {
       // Arena prewarm runs against the menu camera before match-only operators
       // join the scene. Rehearse the exact support overlap once more against
-      // the final match scene/camera/light topology; otherwise Three r185
+      // the match-only scene topology after operators join; otherwise Three r185
       // defers WebGPU render-object and node/bind-group construction for one
       // chopper plus 24 drones into the first live activation frame.
       await killstreakPresentation.prewarm(renderRuntime, camera, -killstreakMatchEpoch);
