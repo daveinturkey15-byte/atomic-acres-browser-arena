@@ -785,6 +785,11 @@ export type KillstreakPresentationTelemetry = Readonly<{
 
 export type KillstreakPresentationRetireRoot = (root: THREE.Object3D) => void;
 
+export type KillstreakPresentationProgress = Readonly<{
+  submissionSequence: number;
+  completedSequence: number;
+}>;
+
 function material(color: number, options: { emissive?: number; transparent?: boolean; opacity?: number } = {}): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color,
@@ -1393,6 +1398,11 @@ export class KillstreakPresentation {
   private gpuPrewarmGeneration = -1;
   private gpuPrewarmPromise: Promise<void> | null = null;
   private gpuPrewarmActive = false;
+  private swarmOverlapAdmission: {
+    key: string;
+    admittedInstances: number;
+    requiredCompletionSequence: number;
+  } | null = null;
   private disposalFinalized = false;
 
   constructor(
@@ -1621,11 +1631,11 @@ export class KillstreakPresentation {
     this.swarmInstanceBatches.length = 0;
   }
 
-  private syncSwarmInstancing(): void {
+  private syncSwarmInstancing(maximumVisibleInstances = Number.POSITIVE_INFINITY): void {
     if (this.swarmInstanceBatches.length === 0) return;
     const active = [...this.entities.values()].filter((entry) => (
       entry.root.userData.presentationPoolKey === 'swarm-drone'
-    ));
+    )).slice(0, maximumVisibleInstances);
     this.root.updateWorldMatrix(true, false);
     const inverseRoot = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
     const instanceMatrix = new THREE.Matrix4();
@@ -1961,7 +1971,11 @@ export class KillstreakPresentation {
     ember.root.scale.setScalar(1);
   }
 
-  sync(snapshot: KillstreakRecipientSnapshot, nowMs: number): void {
+  sync(
+    snapshot: KillstreakRecipientSnapshot,
+    nowMs: number,
+    presentationProgress: KillstreakPresentationProgress | null = null,
+  ): void {
     const admitted = snapshot.entities.slice(0, MAX_PRESENTED_ENTITIES);
     const liveIds = new Set(admitted.map((entity) => entity.id));
     for (const [id, presented] of this.entities) {
@@ -2001,7 +2015,46 @@ export class KillstreakPresentation {
       presented.root.userData.phase = entity.phase;
       presented.root.userData.gunController = entity.gunController;
     }
-    this.syncSwarmInstancing();
+    const liveChoppers = admitted.filter((entity) => entity.kind === 'chopper' && entity.expiresInMs > 0);
+    const liveSwarm = admitted.filter((entity) => entity.kind === 'drone' && entity.mode === 'swarm' && entity.expiresInMs > 0);
+    let maximumVisibleSwarm = liveSwarm.length;
+    const progressIsUsable = presentationProgress !== null
+      && Number.isSafeInteger(presentationProgress.submissionSequence)
+      && Number.isSafeInteger(presentationProgress.completedSequence)
+      && presentationProgress.submissionSequence >= 0
+      && presentationProgress.completedSequence >= 0;
+    if (liveChoppers.length > 0 && liveSwarm.length > 0 && progressIsUsable) {
+      const key = [...liveChoppers, ...liveSwarm]
+        .map((entity) => entity.activationId)
+        .filter((activationId, index, values) => values.indexOf(activationId) === index)
+        .sort()
+        .join('|');
+      if (!this.swarmOverlapAdmission || this.swarmOverlapAdmission.key !== key) {
+        // The exact full chopper+24-drone visibility edge intermittently stalls
+        // Chrome's WebGPU compositor even though each family is smooth alone and
+        // the combined pipeline is prewarmed. Keep authority immediate, but
+        // admit four already-authoritative drone visuals per completed frame.
+        // The complete formation is visible well before its 500ms fire gate.
+        this.swarmOverlapAdmission = {
+          key,
+          admittedInstances: Math.min(4, liveSwarm.length),
+          requiredCompletionSequence: presentationProgress.submissionSequence + 1,
+        };
+      } else if (
+        this.swarmOverlapAdmission.admittedInstances < liveSwarm.length
+        && presentationProgress.completedSequence >= this.swarmOverlapAdmission.requiredCompletionSequence
+      ) {
+        this.swarmOverlapAdmission.admittedInstances = Math.min(
+          liveSwarm.length,
+          this.swarmOverlapAdmission.admittedInstances + 4,
+        );
+        this.swarmOverlapAdmission.requiredCompletionSequence = presentationProgress.submissionSequence + 1;
+      }
+      maximumVisibleSwarm = Math.min(liveSwarm.length, this.swarmOverlapAdmission.admittedInstances);
+    } else {
+      this.swarmOverlapAdmission = null;
+    }
+    this.syncSwarmInstancing(maximumVisibleSwarm);
     this.applyFirstPersonVisibility();
     this.syncSensorContacts(snapshot.sensorContacts);
     this.syncPlacementMarkers(snapshot.placementMarkers, snapshot.revision, nowMs);
@@ -2279,6 +2332,7 @@ export class KillstreakPresentation {
     // flight. Preserve the staged exact-count submission until prewarm settles;
     // no live presentation state exists behind the opaque deployment surface.
     if (this.gpuPrewarmActive) return;
+    this.swarmOverlapAdmission = null;
     this.setFirstPersonEntity(null);
     for (const presented of this.entities.values()) this.releasePresentedEntity(presented);
     this.entities.clear();

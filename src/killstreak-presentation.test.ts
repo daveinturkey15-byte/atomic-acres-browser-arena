@@ -79,6 +79,26 @@ describe('killstreak presentation', () => {
     webGlPresentation.dispose();
   });
 
+  it('admits a legal chopper plus 24-drone overlap only across completed presentation frames', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene(), undefined, true);
+    const overlap = snapshot(27);
+    presentation.sync(overlap, 1_000, { submissionSequence: 10, completedSequence: 10 });
+    expect(presentation.telemetry().swarmRenderedInstances).toBe(4);
+    presentation.sync(overlap, 1_016, { submissionSequence: 10, completedSequence: 10 });
+    expect(presentation.telemetry().swarmRenderedInstances).toBe(4);
+    presentation.sync(overlap, 1_032, { submissionSequence: 11, completedSequence: 11 });
+    expect(presentation.telemetry().swarmRenderedInstances).toBe(8);
+    presentation.sync(overlap, 1_048, { submissionSequence: 12, completedSequence: 12 });
+    expect(presentation.telemetry().swarmRenderedInstances).toBe(12);
+    presentation.sync(overlap, 1_064, { submissionSequence: 13, completedSequence: 13 });
+    presentation.sync(overlap, 1_080, { submissionSequence: 14, completedSequence: 14 });
+    presentation.sync(overlap, 1_096, { submissionSequence: 15, completedSequence: 15 });
+    expect(presentation.telemetry().swarmRenderedInstances).toBe(24);
+    presentation.sync(snapshot(1), 1_112, { submissionSequence: 16, completedSequence: 16 });
+    expect(presentation.telemetry().swarmRenderedInstances).toBe(0);
+    presentation.dispose();
+  });
+
   it('binds the runtime presentation loader to the gated authored Hunter Drone LOD0', () => {
     expect(HUNTER_DRONE_ASSET).toBe('./assets/original/models/support/hunter-drone-lod0.glb');
     expect(hunterDronePresentationTelemetry()).toMatchObject({ state: 'idle', asset: HUNTER_DRONE_ASSET });
