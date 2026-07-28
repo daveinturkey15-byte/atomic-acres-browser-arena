@@ -51,7 +51,10 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain("bootstrapStage = 'prewarming-explosive-bolts'");
     expect(arenaPresentationPrewarm).toContain('await prewarmExplosiveBoltPresentation(sceneGeneration);');
     expect(source).toContain("bootstrapStage = 'prewarming-weapon-catalog'");
-    expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog([');
+    expect(matchDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));');
+    expect(arenaDeployment).toContain('await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id));');
+    expect(arenaDeployment.indexOf('weaponPrewarmCatalogForArena(nextSelection.id)'))
+      .toBeLessThan(arenaDeployment.indexOf('respawn(false);'));
     expect(source).toContain("bootstrapStage = 'prewarming-killstreak-presentations'");
     expect(arenaPresentationPrewarm).toContain('await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);');
     expect(source).toContain("bootstrapStage = 'prewarming-smoke-presentations'");

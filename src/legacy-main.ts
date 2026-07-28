@@ -4482,6 +4482,15 @@ function activeLoadoutSelection(state = loadoutState): CombatLoadoutSelection {
   });
 }
 
+function weaponPrewarmCatalogForArena(arenaId: ArenaId): readonly WeaponId[] {
+  if (arenaId === 'gun-range') {
+    const rangePrimary: PrimaryWeaponId = 'carbine';
+    return [rangePrimary, handicapSidearm(rangePrimary), 'explosive-crossbow', 'm14-ebr'];
+  }
+  const deployment = activeLoadoutSelection();
+  return [deployment.primary, deployment.secondary, 'explosive-crossbow', 'm14-ebr'];
+}
+
 function selectedLoadoutLabel(state = loadoutState): string {
   const selected = state.selected;
   if (selected.kind === 'curated') return fieldKitById(selected.kitId).title;
@@ -7840,12 +7849,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
     }
   }
   bootstrapStage = 'prewarming-weapon-catalog';
-  await weaponView.prewarmBrowserWeaponCatalog([
-    player.primaryWeapon,
-    player.secondaryWeapon,
-    'explosive-crossbow',
-    'm14-ebr',
-  ]);
+  await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
   gamepadSupportSelection = frozenKillstreakLoadout.slots[0];
@@ -14984,6 +14988,8 @@ async function performArenaSelection(id: ArenaId, allowWhilePreparing = false): 
     );
     graphicsRefinement.refine(scene, maximumAnisotropy);
     await waitForPendingArtTextures();
+    bootstrapStage = 'prewarming-weapon-catalog';
+    await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id));
     batchSelectedArenaPresentation();
     setArenaPresentationVisibility();
     matchState = createMatch(performance.now(), selectedArena.matchRules);
