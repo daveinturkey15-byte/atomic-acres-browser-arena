@@ -262,7 +262,21 @@ describe('Pass 65 managed weapon runtime behavior', () => {
     }
     expect(loadSpy).toHaveBeenCalledTimes(loadsAfterDeployment);
     expect(prewarmer).toHaveBeenCalledTimes(catalogIds.length);
-    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(catalogIds.length - 1);
+    presentation.setWeapon('carbine', true);
+    const replacementIds = ['sniper', 'machine-pistol', 'explosive-crossbow', 'm14-ebr'] as const;
+    await presentation.prewarmBrowserWeaponCatalog(replacementIds);
+    presentation.setWeapon('sniper', true);
+    const replacementCatalog = presentation.presentationState().browserWeaponCatalog;
+    expect(new Set(replacementCatalog.retained)).toEqual(new Set(replacementIds));
+    expect(replacementCatalog).toMatchObject({
+      retainedCount: 4,
+      loaded: 4,
+      gpuReady: 4,
+      unpreparedSwitches: 0,
+      lastUnpreparedSwitch: null,
+    });
+    expect(prewarmer).toHaveBeenCalledTimes(6);
+    expect(releasePass65WeaponModelsIn(presentation.root)).toBe(replacementIds.length - 1);
     await expect(presentation.prewarmBrowserWeaponCatalog([
       ...PASS65_AUTHORED_FIREARM_IDS,
       'explosive-crossbow',

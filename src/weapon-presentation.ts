@@ -829,7 +829,17 @@ export class WeaponPresentation {
       throw new Error(`Pass 65 WebGPU weapon prewarm requires 1-${WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS} unique models`);
     }
     if (!ids.includes(this.active)) {
-      throw new Error(`Pass 65 WebGPU weapon prewarm omitted active model: ${this.active}`);
+      // Loadout changes may replace both primary and secondary while the menu
+      // still owns the screen. Move presentation ownership to an already-warm
+      // member of the destination set (the bounded policy pins crossbow/DMR),
+      // then the old model can retire without a fifth live catalog entry or a
+      // cold visibility swap.
+      const bridge = ids.find((id) => {
+        const model = this.models.get(id);
+        return this.browserResidentWeaponIds.has(id) && model !== undefined && this.modelIsGpuReady(model);
+      });
+      if (!bridge) throw new Error(`Pass 65 WebGPU weapon prewarm has no ready bridge from active model: ${this.active}`);
+      this.setWeapon(bridge, true);
     }
     if (this.browserCatalogPrewarmPromise) {
       await this.browserCatalogPrewarmPromise;

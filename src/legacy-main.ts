@@ -7863,6 +7863,7 @@ async function startGame(mode: 'solo' | 'host' | 'client', requestLock = true, a
   }
   bootstrapStage = 'prewarming-weapon-catalog';
   await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(selectedArena.id));
+  weaponView.setWeapon(player.weapon, true);
   killstreakLoadoutController.releaseAfterMatch();
   const frozenKillstreakLoadout = killstreakLoadoutController.freezeAtMatchStart();
   gamepadSupportSelection = frozenKillstreakLoadout.slots[0];
@@ -15214,7 +15215,7 @@ function resetForMode(): void {
   player.selectedGrenade = menuLoadout.grenade;
   player.weapon = selectedArena.id === 'gun-range' ? 'pistol' : player.primaryWeapon;
   player.switchingUntil = 0;
-  weaponView.setWeapon(player.weapon, true);
+  if (renderRuntime.backend !== 'webgpu') weaponView.setWeapon(player.weapon, true);
   renderFieldKitSelection();
   player.ammo = createWeaponCapacityRegistry('mag');
   player.reserve = createWeaponCapacityRegistry('reserve');
