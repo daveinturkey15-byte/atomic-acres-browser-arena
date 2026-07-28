@@ -249,6 +249,7 @@ export class WeaponPresentation {
   private readonly muzzleFlash: THREE.Group;
   private readonly weaponFlashlight: THREE.SpotLight;
   private readonly weaponFlashlightTarget: THREE.Object3D;
+  private flashlightGpuPrewarmCount = 0;
   private readonly casings: ViewCasing[] = [];
   private readonly smokes: ViewSmoke[] = [];
   private readonly smokePositions = new Float32Array(24);
@@ -935,11 +936,20 @@ export class WeaponPresentation {
         this.modelLastUsed.set(id, ++this.modelUseCounter);
         this.root.add(model);
       }
+      const exercisesFlashlightPipeline = WEAPONS[id].flashlight !== null;
+      let flashlightPipelineReady = false;
+      if (exercisesFlashlightPipeline) this.configureWeaponFlashlight(id);
       try {
         await this.prewarmBrowserModel(id, model, this.browserWeaponRequest);
+        flashlightPipelineReady = true;
       } catch (error) {
         this.retireRejectedBrowserModel(id, model);
         throw error;
+      } finally {
+        if (exercisesFlashlightPipeline) {
+          if (flashlightPipelineReady) this.flashlightGpuPrewarmCount += 1;
+          this.configureWeaponFlashlight(this.active);
+        }
       }
       this.browserResidentWeaponIds.add(id);
       onProgress?.(index + 1, ids.length);
@@ -1115,6 +1125,10 @@ export class WeaponPresentation {
       }
       this.ensureBrowserWeapon(id);
     }
+    this.configureWeaponFlashlight(id);
+  }
+
+  private configureWeaponFlashlight(id: WeaponId): void {
     const flashlight = WEAPONS[id].flashlight;
     // Keep one quality spotlight in the renderer topology from bootstrap onward.
     // Toggling the light's visibility when the flashlight pistol was equipped
@@ -1438,6 +1452,7 @@ export class WeaponPresentation {
         unpreparedSwitches: this.unpreparedBrowserSwitches,
         lastUnpreparedSwitch: this.lastUnpreparedBrowserSwitch,
         maximumRetained: WeaponPresentation.MAX_RETAINED_WEBGPU_WEAPONS,
+        flashlightGpuPrewarmCount: this.flashlightGpuPrewarmCount,
       },
       importedModel,
     };

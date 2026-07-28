@@ -86,6 +86,7 @@ function catalogEvidence(state) {
     unpreparedSwitches: catalog.unpreparedSwitches,
     lastUnpreparedSwitch: catalog.lastUnpreparedSwitch,
     maximumRetained: catalog.maximumRetained,
+    flashlightGpuPrewarmCount: catalog.flashlightGpuPrewarmCount,
     renderSubmissionPaused: state.arenaSelection.streaming.transition.renderSubmissionPaused,
     transitionPhase: state.arenaSelection.streaming.transition.phase,
     transitionFailure: state.arenaSelection.streaming.transition.failure,
@@ -125,6 +126,9 @@ function catalogViolations(label, evidence, expectedWeapons, baselineUnpreparedS
   }
   if (evidence.maximumRetained < expectedWeapons.length) {
     violations.push(`${label}: maximum retained ${evidence.maximumRetained} cannot hold the ${expectedWeapons.length}-weapon reachable set`);
+  }
+  if (evidence.flashlightGpuPrewarmCount < 1) {
+    violations.push(`${label}: flashlight lighting/shadow pipeline was not prewarmed`);
   }
   if (evidence.unpreparedSwitches !== baselineUnpreparedSwitches) {
     violations.push(`${label}: unprepared switches changed from ${baselineUnpreparedSwitches} to ${evidence.unpreparedSwitches}`);
@@ -239,7 +243,9 @@ try {
       pauseObservations: [],
       maximumUnpreparedSwitches: 0,
       maximumFrameGapMs: 0,
+      maximumFrameGapWeapon: null,
       lastFrameAt: performance.now(),
+      currentWeapon: null,
     };
     const sample = (source) => {
       const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -253,7 +259,11 @@ try {
       );
     };
     const frame = (now) => {
-      monitor.maximumFrameGapMs = Math.max(monitor.maximumFrameGapMs, now - monitor.lastFrameAt);
+      const gap = now - monitor.lastFrameAt;
+      if (gap > monitor.maximumFrameGapMs) {
+        monitor.maximumFrameGapMs = gap;
+        monitor.maximumFrameGapWeapon = monitor.currentWeapon;
+      }
       monitor.lastFrameAt = now;
       if (!monitor.stopped) monitor.animationFrameId = requestAnimationFrame(frame);
     };
@@ -268,6 +278,7 @@ try {
   for (const weapon of expectedWeapons) {
     const immediate = await page.evaluate((requestedWeapon) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
+      window.__PASS65_WEAPON_SWITCH_MONITOR__.currentWeapon = requestedWeapon;
       const before = api.snapshot();
       const startedAt = performance.now();
       api.equipWeapon(requestedWeapon);
@@ -328,6 +339,7 @@ try {
       pauseObservations: monitor.pauseObservations,
       maximumUnpreparedSwitches: monitor.maximumUnpreparedSwitches,
       maximumFrameGapMs: monitor.maximumFrameGapMs,
+      maximumFrameGapWeapon: monitor.maximumFrameGapWeapon,
     };
   });
   final = catalogEvidence(await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot()));
