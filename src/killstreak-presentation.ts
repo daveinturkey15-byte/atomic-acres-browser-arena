@@ -645,6 +645,7 @@ function batchAuthoredSupportStaticMeshes(
   anchor: THREE.Object3D,
   family: SupportVehicleAssetFamily,
   scope: string,
+  allowAnimatedAnchor = false,
 ): Readonly<{ sourceMeshes: number; batches: number }> {
   anchor.updateWorldMatrix(true, true);
   const anchorInverse = new THREE.Matrix4().copy(anchor.matrixWorld).invert();
@@ -654,6 +655,7 @@ function batchAuthoredSupportStaticMeshes(
     let cursor: THREE.Object3D | null = node;
     while (cursor && cursor !== anchor.parent) {
       if (cursor.userData.supportAnimationTarget === true
+        && !(allowAnimatedAnchor && cursor === anchor)
         || cursor.userData.supportStaticBatchBoundary === true) return;
       cursor = cursor.parent;
     }
@@ -703,10 +705,19 @@ function optimizeAuthoredSupportLevel(
   family: SupportVehicleAssetFamily,
   animations: readonly THREE.AnimationClip[],
 ): void {
+  const animatedTargets: THREE.Object3D[] = [];
   for (const targetName of supportAnimationTargetNames(animations)) {
     const target = level.getObjectByName(targetName);
-    if (target) target.userData.supportAnimationTarget = true;
+    if (!target) continue;
+    target.userData.supportAnimationTarget = true;
+    animatedTargets.push(target);
   }
+  const animatedStats = animatedTargets.map((target, index) => batchAuthoredSupportStaticMeshes(
+    target,
+    family,
+    `animated-${index + 1}`,
+    true,
+  ));
   const cockpit = family === 'chopper' ? level.getObjectByName('chopper-first-person-cockpit') : null;
   const cockpitStats = cockpit
     ? batchAuthoredSupportStaticMeshes(cockpit, family, 'cockpit')
@@ -714,8 +725,11 @@ function optimizeAuthoredSupportLevel(
   if (cockpit) cockpit.userData.supportStaticBatchBoundary = true;
   const exteriorStats = batchAuthoredSupportStaticMeshes(level, family, 'exterior');
   level.userData.supportStaticBatchStats = Object.freeze({
-    sourceMeshes: cockpitStats.sourceMeshes + exteriorStats.sourceMeshes,
-    batches: cockpitStats.batches + exteriorStats.batches,
+    sourceMeshes: cockpitStats.sourceMeshes + exteriorStats.sourceMeshes
+      + animatedStats.reduce((total, stats) => total + stats.sourceMeshes, 0),
+    batches: cockpitStats.batches + exteriorStats.batches
+      + animatedStats.reduce((total, stats) => total + stats.batches, 0),
+    animatedTargets: animatedTargets.length,
   });
 }
 
