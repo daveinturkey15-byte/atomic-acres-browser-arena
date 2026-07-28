@@ -16038,8 +16038,8 @@ type ArenaPerformanceBudgetSample = Readonly<{
   geometryBytesEstimate: number;
   transientBytesEstimate: number;
   gpuTimingMethod: 'minimum-of-presentation-and-queue-upper-bounds';
-  textureEstimateMethod: 'unique-active-plus-detached-cache-textures-rgba8-mip-chain';
-  geometryEstimateMethod: 'unique-active-plus-detached-cache-buffer-arrays';
+  textureEstimateMethod: 'unique-visible-plus-hidden-and-detached-resident-textures-rgba8-mip-chain';
+  geometryEstimateMethod: 'unique-visible-plus-hidden-and-detached-resident-buffer-arrays';
   transientEstimateMethod: 'principal-msaa-hdr-depth-post-upper-bound';
 }>;
 let latestArenaPerformanceBudgetSample: ArenaPerformanceBudgetSample | null = null;
@@ -16141,8 +16141,8 @@ async function sampleArenaPerformanceBudget(): Promise<ArenaPerformanceBudgetSam
     geometryBytesEstimate: residency.totalGeometryBytes,
     transientBytesEstimate: estimateTransientRenderBytes(),
     gpuTimingMethod: 'minimum-of-presentation-and-queue-upper-bounds',
-    textureEstimateMethod: 'unique-active-plus-detached-cache-textures-rgba8-mip-chain',
-    geometryEstimateMethod: 'unique-active-plus-detached-cache-buffer-arrays',
+    textureEstimateMethod: 'unique-visible-plus-hidden-and-detached-resident-textures-rgba8-mip-chain',
+    geometryEstimateMethod: 'unique-visible-plus-hidden-and-detached-resident-buffer-arrays',
     transientEstimateMethod: 'principal-msaa-hdr-depth-post-upper-bound',
   });
   return latestArenaPerformanceBudgetSample;
@@ -16269,6 +16269,10 @@ function arenaVisualBudgetAudit(): Record<string, unknown> {
   if (measured.postTextureSamples > limits.maximumPostTextureSamples) violations.push(`postTextureSamples ${measured.postTextureSamples}/${limits.maximumPostTextureSamples}`);
   if (measured.textureBytes === null) violations.push('textureBytes budget has not been sampled');
   else if (measured.textureBytes > limits.maximumTextureBytes) violations.push(`textureBytes ${measured.textureBytes}/${limits.maximumTextureBytes}`);
+  if (measured.residentTextureBytes === null) violations.push('residentTextureBytes budget has not been sampled');
+  else if (measured.residentTextureBytes > limits.maximumResidentTextureBytes) {
+    violations.push(`residentTextureBytes ${measured.residentTextureBytes}/${limits.maximumResidentTextureBytes}`);
+  }
   if (measured.transientBytes === null) violations.push('transientBytes budget has not been sampled');
   else if (measured.transientBytes > limits.maximumTransientBytes) violations.push(`transientBytes ${measured.transientBytes}/${limits.maximumTransientBytes}`);
   if (measured.cpuFrameP95Ms === null) violations.push('cpuFrameP95Ms budget has not been sampled');

@@ -57,4 +57,28 @@ describe('resident renderer memory estimate', () => {
     expect(estimate.totalGeometryBytes).toBe(sharedPositions.byteLength);
     expect(estimate.cachedGeometries).toBe(1);
   });
+
+  it('classifies hidden attached resources as resident cache instead of active presentation', () => {
+    const visibleTexture = new THREE.DataTexture(new Uint8Array(4 * 4 * 4), 4, 4);
+    visibleTexture.generateMipmaps = false;
+    const hiddenTexture = new THREE.DataTexture(new Uint8Array(8 * 8 * 4), 8, 8);
+    hiddenTexture.generateMipmaps = false;
+    const scene = new THREE.Scene();
+    scene.add(texturedMesh(visibleTexture));
+    const hiddenPrewarmRoot = new THREE.Group();
+    hiddenPrewarmRoot.visible = false;
+    hiddenPrewarmRoot.add(texturedMesh(hiddenTexture));
+    scene.add(hiddenPrewarmRoot);
+
+    const estimate = estimateResidentObjectMemory(scene, []);
+    expect(estimate).toMatchObject({
+      activeTextureBytes: 4 * 4 * 4,
+      cachedTextureBytes: 8 * 8 * 4,
+      totalTextureBytes: 4 * 4 * 4 + 8 * 8 * 4,
+      activeTextures: 1,
+      cachedTextures: 1,
+      activeGeometries: 1,
+      cachedGeometries: 1,
+    });
+  });
 });

@@ -23,6 +23,10 @@ export function budgets(overrides: Partial<ArenaVisualBudgets> = {}): ArenaVisua
     maximumDrawCalls: 520,
     maximumTriangles: 1_400_000,
     maximumTextureBytes: 384 * 1024 * 1024,
+    // Includes invisible GPU-prewarmed viewmodels/support assets as well as
+    // the visible arena. This is deliberately tighter than the legacy 768 MiB
+    // global guard while allowing the hitch-free reachable-weapon catalog.
+    maximumResidentTextureBytes: 512 * 1024 * 1024,
     maximumShadowLights: 3,
     maximumShadowMapPixels: 6 * 2048 * 2048,
     maximumPostTextureSamples: 28,

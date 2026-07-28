@@ -66,6 +66,7 @@ export type ArenaVisualBudgets = Readonly<{
   maximumDrawCalls: number;
   maximumTriangles: number;
   maximumTextureBytes: number;
+  maximumResidentTextureBytes: number;
   maximumShadowLights: number;
   maximumShadowMapPixels: number;
   maximumPostTextureSamples: number;

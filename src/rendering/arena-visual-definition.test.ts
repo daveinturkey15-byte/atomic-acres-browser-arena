@@ -183,7 +183,7 @@ function fakeDefinition(id: ArenaId, requestUrl: string | null = null): ArenaVis
     shadows: { enabled: true, mapSize: 1, maximumDistance: 2, normalBias: 0 },
     atmosphere: { preset: 'test', mist: 0, dust: 0, clouds: false },
     colorPipeline: { id: 'test', workingSpace: 'linear-srgb-hdr', toneMap: 'aces-filmic', exposure: 1, grade: { contrast: 1, saturation: 1, shadowTint: 0, highlightTint: 0xffffff }, grain: { mode: 'ordered-dither', strength: 0, deterministic: true }, output: 'srgb' },
-    budgets: { maximumDrawCalls: 1, maximumTriangles: 1, maximumTextureBytes: 1, maximumShadowLights: 1, maximumShadowMapPixels: 1, maximumPostTextureSamples: 1, maximumTransientBytes: 1, cpuFrameP95Ms: 1, gpuFrameP95Ms: 1 },
+    budgets: { maximumDrawCalls: 1, maximumTriangles: 1, maximumTextureBytes: 1, maximumResidentTextureBytes: 1, maximumShadowLights: 1, maximumShadowMapPixels: 1, maximumPostTextureSamples: 1, maximumTransientBytes: 1, cpuFrameP95Ms: 1, gpuFrameP95Ms: 1 },
     reviewCameras: [
       { id: 'a', position: [0, 0, 0], target: [0, 0, 1], fov: 1, near: 1, far: 2, fixedTimeMs: 1, seed: 1, exposure: 1, hud: 'hidden', purpose: 'overview' },
       { id: 'b', position: [0, 0, 0], target: [0, 0, 1], fov: 1, near: 1, far: 2, fixedTimeMs: 1, seed: 1, exposure: 1, hud: 'hidden', purpose: 'geometry' },

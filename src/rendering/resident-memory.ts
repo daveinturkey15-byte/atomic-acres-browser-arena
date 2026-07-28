@@ -23,12 +23,16 @@ const MATERIAL_TEXTURE_KEYS = Object.freeze([
   'emissiveMap', 'alphaMap', 'lightMap', 'envMap',
 ] as const);
 
-function collectObjectResources(root: THREE.Object3D, destination: ResourceSet): void {
+function collectObjectResources(
+  root: THREE.Object3D,
+  destination: ResourceSet,
+  visibility: 'all' | 'visible',
+): void {
   if (root instanceof THREE.Scene) {
     if (root.background instanceof THREE.Texture) destination.textures.add(root.background);
     if (root.environment instanceof THREE.Texture) destination.textures.add(root.environment);
   }
-  root.traverse((node) => {
+  const collect = (node: THREE.Object3D): void => {
     const mesh = node as THREE.Mesh;
     if (mesh.geometry instanceof THREE.BufferGeometry) destination.geometries.add(mesh.geometry);
     const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
@@ -42,7 +46,9 @@ function collectObjectResources(root: THREE.Object3D, destination: ResourceSet):
       const shadowTexture = node.shadow.map?.texture;
       if (shadowTexture instanceof THREE.Texture) destination.textures.add(shadowTexture);
     }
-  });
+  };
+  if (visibility === 'visible') root.traverseVisible(collect);
+  else root.traverse(collect);
 }
 
 function textureBytes(texture: THREE.Texture): number {
@@ -85,13 +91,17 @@ export function estimateResidentObjectMemory(
   retainedRoots: readonly (THREE.Object3D | null | undefined)[],
 ): ResidentObjectMemoryEstimate {
   const active: ResourceSet = { textures: new Set(), geometries: new Set() };
-  collectObjectResources(activeRoot, active);
+  // Only resources reachable through the visible presentation are active for
+  // the arena budget. Hidden viewmodels and prewarmed support assets remain
+  // resident and are accounted by the separate total below.
+  collectObjectResources(activeRoot, active, 'visible');
   const total: ResourceSet = {
     textures: new Set(active.textures),
     geometries: new Set(active.geometries),
   };
+  collectObjectResources(activeRoot, total, 'all');
   for (const root of retainedRoots) {
-    if (root) collectObjectResources(root, total);
+    if (root) collectObjectResources(root, total, 'all');
   }
   const cachedTextures = new Set([...total.textures].filter((texture) => !active.textures.has(texture)));
   const cachedGeometries = new Set([...total.geometries].filter((geometry) => !active.geometries.has(geometry)));
